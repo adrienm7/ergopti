@@ -82,7 +82,7 @@ helpers.describe("model switcher: suggested profile decision", function()
 	helpers.it("leaves state and runtime untouched when the user refuses", function()
 		local switcher, state, calls = build_fixture("button.cancel")
 
-		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), true)
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model", { force_dialog = true }), true)
 
 		helpers.assert_eq(state.llm_active_profile, "basic")
 		helpers.assert_eq(calls.profiles, {},
@@ -96,7 +96,7 @@ helpers.describe("model switcher: suggested profile decision", function()
 	helpers.it("sets, saves, and renders the accepted profile exactly once", function()
 		local switcher, state, calls = build_fixture("button.confirm")
 
-		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), true)
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model", { force_dialog = true }), true)
 
 		helpers.assert_eq(state.llm_active_profile, "advanced")
 		helpers.assert_eq(calls.profiles, { "advanced" })
@@ -104,10 +104,30 @@ helpers.describe("model switcher: suggested profile decision", function()
 		helpers.assert_eq(calls.updates, 1)
 	end)
 
+	-- A model change follows llm.profiles.auto_profile_for_model, as on Windows
+	-- and Linux: on, the recommended profile is applied without a question; off,
+	-- the chosen profile stays. Only an explicit request still asks.
+	helpers.it("follows the model without a dialog when the automatic profile is on", function()
+		local switcher, state, calls = build_fixture("throw")
+		state.llm_auto_profile_for_model = true
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), true)
+		helpers.assert_eq(state.llm_active_profile, "advanced")
+		helpers.assert_eq(calls.profiles, { "advanced" })
+		helpers.assert_eq(calls.saves, 1)
+	end)
+
+	helpers.it("keeps the chosen profile when the automatic profile is off", function()
+		local switcher, state, calls = build_fixture("throw")
+		state.llm_auto_profile_for_model = false
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), true)
+		helpers.assert_eq(state.llm_active_profile, "basic")
+		helpers.assert_eq({ calls.profiles, calls.saves, calls.updates }, { {}, 0, 0 })
+	end)
+
 	helpers.it("reports a throwing profile dialog as a failed action", function()
 		local switcher, state, calls = build_fixture("throw")
 
-		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), false)
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model", { force_dialog = true }), false)
 		helpers.assert_eq(state.llm_active_profile, "basic")
 		helpers.assert_eq(calls.profiles, {})
 		helpers.assert_eq(calls.saves, 0)

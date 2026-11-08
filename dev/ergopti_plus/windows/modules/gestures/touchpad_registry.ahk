@@ -5,10 +5,10 @@
 ; DESCRIPTION:
 ; The one owner of Ergopti's writes to the Windows Precision Touchpad registry
 ; key. Before the first write it backs up the prior value of every name it is
-; about to write; it applies the generated value table; it gives the first-run
-; wizard's elevated PowerShell script the same table; and the Gestures and
-; global « Tout effacer » restore the backup, or the Windows factory defaults
-; when there is none.
+; about to write; it applies the generated value table, in the resident
+; process for the tray action and the first-run wizard alike; and the Gestures
+; and global « Tout effacer » restore the backup, or the Windows factory
+; defaults when there is none.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One source: _generated/touchpad_registry.ahk, generated from
@@ -131,15 +131,20 @@ _TouchpadRegistryNames(Data) {
 ; @param CreateFn {Func|0} Create-only durable writer (FSWriteCreateDurable).
 ; @param ExistsFn {Func|0} Strict existence probe (FSStrictExists).
 ; @param BackupPath {String} Backup file; empty selects TouchpadRegistryBackupPath().
-; @return {Boolean} True when a backup exists afterwards; false blocks every write.
-TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "") {
+; @param ReadFn {Func|0} Strict file reader, fn(Path) (FSReadStrict).
+; @return {Boolean} True when a restorable backup exists afterwards; false blocks every write.
+TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "", ReadFn := 0) {
 	Tag := TouchpadRegistryLogTag()
 	Path := BackupPath != "" ? BackupPath : TouchpadRegistryBackupPath()
 	Snapshot := HasMethod(SnapshotFn, "Call") ? SnapshotFn : TouchpadRegistrySnapshot
 	Create := HasMethod(CreateFn, "Call") ? CreateFn : FSWriteCreateDurable
 	Exists := HasMethod(ExistsFn, "Call") ? ExistsFn : FSStrictExists
+	Read := HasMethod(ReadFn, "Call") ? ReadFn : FSReadStrict
 	try {
 		if Exists.Call(Path) {
+			; A kept backup is immutable but must be restorable: an unreadable or
+			; malformed one would authorize writes that Restore later refuses to undo.
+			_TouchpadRegistryParseBackup(Read.Call(Path), TouchpadRegistryData())
 			LoggerDebug(Tag, "Keeping the touchpad backup of the values from before Ergopti's first write.")
 			return true
 		}
@@ -149,8 +154,10 @@ TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, Back
 		FSEnsureDirectoryStrict(Directory)
 		if (Create.Call(Path, Text) != 1) {
 			; A concurrent owner may have created it between the probe and the create
-			if Exists.Call(Path)
+			if Exists.Call(Path) {
+				_TouchpadRegistryParseBackup(Read.Call(Path), TouchpadRegistryData())
 				return true
+			}
 			LoggerError(Tag, "The touchpad backup '{1}' could not be created.", Path)
 			return false
 		}
@@ -173,16 +180,17 @@ TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, Back
 ; ==============================
 ; ==============================
 
-; Writes every generated value, after the backup. Used by the tray action and
-; the deferred first-boot configuration; the wizard's elevated script reads
-; the same table through TouchpadRegistryPowerShellValues().
+; Writes every generated value, after the backup. Used by the tray action, the
+; deferred first-boot configuration and the first-run wizard, always in the
+; resident process: an elevated writer would target the HKCU of whichever
+; account answered the UAC prompt, not the signed-in user's (WG-003).
 ; @param WriteFn {Func|0} DWORD writer, fn(Key, Name, Value) (Reg_WriteDword).
 ; @param SnapshotFn, CreateFn, ExistsFn, BackupPath: forwarded to the backup.
 ; @return {Boolean} True only when the backup exists and every value was written.
-TouchpadRegistryApply(WriteFn := 0, SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "") {
+TouchpadRegistryApply(WriteFn := 0, SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "", ReadFn := 0) {
 	Tag := TouchpadRegistryLogTag()
 	LoggerStart(Tag, "Writing the Precision Touchpad gesture values…")
-	if !TouchpadRegistryEnsureBackup(SnapshotFn, CreateFn, ExistsFn, BackupPath) {
+	if !TouchpadRegistryEnsureBackup(SnapshotFn, CreateFn, ExistsFn, BackupPath, ReadFn) {
 		LoggerError(Tag, "No touchpad value was written: the prior values are not backed up.")
 		return false
 	}
@@ -200,23 +208,6 @@ TouchpadRegistryApply(WriteFn := 0, SnapshotFn := 0, CreateFn := 0, ExistsFn := 
 	}
 	LoggerSuccess(Tag, "{1} touchpad value(s) written.", Data["values"].Length)
 	return true
-}
-
-; The registry key in PowerShell drive syntax, for the wizard's elevated script.
-; @return {String}
-TouchpadRegistryPowerShellKey() {
-	return TouchpadRegistryData()["powershell_key"]
-}
-
-; The body of the wizard script's value hashtable: one "  'Name' = value" line
-; per generated value, CRLF-terminated. Value names are plain identifiers
-; (validated by the generator), so no quoting is needed.
-; @return {String}
-TouchpadRegistryPowerShellValues() {
-	Lines := ""
-	for _, Entry in TouchpadRegistryData()["values"]
-		Lines .= "  '" . Entry["name"] . "' = " . Entry["value"] . "`r`n"
-	return Lines
 }
 
 

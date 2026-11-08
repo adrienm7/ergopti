@@ -200,10 +200,11 @@ priority = 41
 		helpers.assert_eq(Metadata.valid("color", "#aabbcc"), true)
 		helpers.assert_eq(Metadata.valid("color", "aabbcc"), true)
 		helpers.assert_eq(Metadata.valid("color", "#xyz123"), false)
-		for _, supported in ipairs({ "#abc", "#abcd", "#abcde", "#abcdef0", "#abcdef01" }) do
-			helpers.assert_eq(Metadata.valid("color", supported), true, "the existing configuration-window palette remains supported")
+		for _, supported in ipairs({ "#abc", "#abcd", "#abcdef01" }) do
+			helpers.assert_eq(Metadata.valid("color", supported), true, "every CSS hexadecimal length remains supported")
 		end
-		for _, bad in ipairs({ "#f", "#ab", "#abcdef012", "#abcg", "#fff\n", "#abcdef01;" }) do
+		-- Five and seven digits are no CSS color: the shared contract leaves them unowned.
+		for _, bad in ipairs({ "#f", "#ab", "#abcde", "#abcdef0", "#abcdef012", "#abcg", "#fff\n", "#abcdef01;" }) do
 			helpers.assert_eq(Metadata.valid("color", bad), false)
 		end
 		for _, bad in ipairs({ -1, 101, 1.5 }) do helpers.assert_eq(Metadata.valid("priority", bad), false) end

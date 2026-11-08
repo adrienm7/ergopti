@@ -99,6 +99,21 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 		helpers.assert_true(initialized == false, "a relative logs folder must fail initialisation")
 	end)
 
+	helpers.it("refuses NUL in either override before publishing paths (config-path-nul)", function()
+		for _, key in ipairs({ "ConfigDirPath", "LogsDirPath" }) do
+			local _, _, initialized = fresh_resolver(key .. ' = "/fixture/\\u0000tail"\n')
+			helpers.assert_eq(initialized, false, "a persisted NUL must refuse initialization")
+		end
+		for _, pair in ipairs({ { "/fixture/\0tail", nil }, { nil, "/fixture/\0tail" } }) do
+			local paths, observations = fresh_resolver(nil)
+			local count = #observations.writes
+			local changed, reason = paths.set_paths(pair[1], pair[2])
+			helpers.assert_eq(changed, false)
+			helpers.assert_true(type(reason) == "string" and reason:find("NUL", 1, true) ~= nil)
+			helpers.assert_eq(#observations.writes, count, "no bootstrap write is authorized")
+		end
+	end)
+
 	helpers.it("stores both folders in one publication and keeps the other key", function()
 		local ConfigPaths, observations = fresh_resolver('ConfigDirPath = "/fixture/cfg/"\n')
 		local changed, err = ConfigPaths.set_paths(nil, "/fixture/Documents")
@@ -117,6 +132,16 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 		local written = observations.writes[#observations.writes]
 		helpers.assert_contains(written, 'LogsDirPath = "/fixture/sync/' .. APP .. '/"')
 		helpers.assert_contains(written, 'ConfigDirPath = "/fixture/cfg2/"')
+	end)
+
+	helpers.it("refuses false instead of clearing the saved configuration path (config-path-false)", function()
+		local paths, observations = fresh_resolver('ConfigDirPath = "/fixture/cfg/"\n')
+		local before = #observations.writes
+		local changed, reason = paths.set_config_dir(false)
+		helpers.assert_eq(changed, false)
+		helpers.assert_true(type(reason) == "string" and reason:find("must be a string", 1, true) ~= nil)
+		helpers.assert_eq(paths.get_config_dir(), "/fixture/cfg/")
+		helpers.assert_eq(#observations.writes, before, "invalid input must not clear the persisted override")
 	end)
 
 	helpers.it("clears an override equal to the default", function()

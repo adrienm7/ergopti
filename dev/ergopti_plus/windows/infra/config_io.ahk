@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include config_write_lease.ahk
+#Include toml/toml_refusals.ahk
 #Include config_unused_keys.ahk
 #Include %A_LineFile%\..\slot_roles.ahk
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
@@ -156,6 +157,30 @@ _ConfigFullSaveCoordinator(Replacement := unset) {
 	return State
 }
 
+; Capture the already admitted boot image, never a fresh physical image as
+; authority for old RAM. Invalidated/replaced boot ownership simply makes the
+; optional canonicalizer dispensable; ordinary required saves keep their scope.
+_ConfigFullSaveCaptureOptionalBootSource(Path) {
+	global _BootConfigSnapshot
+	if !IsSet(_BootConfigSnapshot) || !IsObject(_BootConfigSnapshot)
+		return 0
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ConfigFullSaveCaptureOptionalBootSource(Path)
+		finally Critical(InheritedCritical)
+	}
+	try {
+		Boot := _BootConfigSnapshot
+		Actual := ConfigTomlReadSnapshot(Path)
+		if Actual != Boot || _BootConfigSnapshot != Boot
+			return 0
+		return {source: Actual.Source, present: Actual.Present}
+	} catch {
+		return 0
+	}
+}
+
 _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := unset, RetireIntent := false) {
 	static MandatoryIntents := Map()
 	global ConfigurationFile
@@ -173,6 +198,26 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := 
 			if !MandatoryIntents.Has(InspectState)
 				return false
 			Intent := MandatoryIntents[InspectState]
+			if (RetireIntent is Integer) && (RetireIntent == 3 || RetireIntent == 4) {
+				if !_ConfigFullSaveCoordinatorDataAdmitted(InspectState)
+						|| InspectState != _ConfigFullSaveCoordinator()
+						|| !IsSet(Path) || !(Path is Integer) || Path != Intent.generation
+						|| Path != InspectState.requested_generation
+						|| InspectState.bound_path_key != Intent.path_key
+					return 0
+				if RetireIntent == 3 {
+					Boot := Intent.boot_source
+					return {optional: Intent.required == 0, admitted: Boot is Object,
+						present: Boot is Object ? Boot.present : false,
+						source: Boot is Object ? Boot.source : ""}
+				}
+				; Only this genuine boot-optional intention can be abandoned. A
+				; newer mandatory request changes the private generation/required.
+				if Intent.required != 0 || !_ConfigFullSaveAbandonThrough(Path)
+					return false
+				MandatoryIntents.Delete(InspectState)
+				return true
+			}
 			if (RetireIntent is Integer) && RetireIntent == 2 {
 				return _ConfigFullSaveCoordinatorDataAdmitted(InspectState)
 					&& InspectState.requested_generation == Intent.generation
@@ -201,12 +246,18 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := 
 		try LoggerError("ConfigIO", "Refusing a full-save request without a concrete configuration path.")
 		return 0
 	}
+	BootSource := TerminalRequired ? 0 : _ConfigFullSaveCaptureOptionalBootSource(RequestPath)
 	State := _ConfigFullSaveCoordinator()
 	if !_ConfigFullSaveCoordinatorDataAdmitted(State)
 		return 0
 	PreviousCritical := Critical("On")
 	try {
 		if !_ConfigFullSaveCoordinatorDataAdmitted(State) || State != _ConfigFullSaveCoordinator()
+			return 0
+		; Authenticating the boot reader may pump a relocation. An automatic
+		; request must still belong to the selected lexical path at admission.
+		if !TerminalRequired && (!IsSet(ConfigurationFile) || !(ConfigurationFile is String)
+				|| _ConfigWriteLeaseKey(ConfigurationFile) != RequestKey)
 			return 0
 		if State.reload_required || _ConfigWriteTerminalIsActive()
 			return 0
@@ -223,7 +274,8 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := 
 			State.terminal_required_generation := State.requested_generation
 			Required := State.requested_generation
 		}
-		MandatoryIntents[State] := { generation: State.requested_generation, required: Required, path: RequestPath }
+		MandatoryIntents[State] := { generation: State.requested_generation, required: Required, path: RequestPath,
+			path_key: RequestKey, boot_source: BootSource }
 		return State.requested_generation
 	} finally {
 		Critical(PreviousCritical)
@@ -446,7 +498,7 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
 		FailureDetail := "another configuration transaction is already in progress"
 		StateUnchanged := true
 		_ConfigRunPrecommitCompensation(CompensateFn, &FailureDetail, &StateUnchanged)
-		return ConfigReportPersistenceFailure(Context, NotifyFn,
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn,
 				FailureDetail, StateUnchanged)
 	}
 	return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
@@ -458,22 +510,25 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
 ; Reload publication, so consuming and releasing it inside _ConfigCommitOwned
 ; would reopen the exact interleaving window the barrier exists to close.
 ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
-		WriterFn := 0, NotifyFn := 0) {
+		WriterFn := 0, NotifyFn := 0, DurableOutcome := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates,
-			Context, WriterFn, NotifyFn)
+			Context, WriterFn, NotifyFn, DurableOutcome)
 		finally Critical(InheritedCritical)
 	}
 	if !_ConfigWriteLeaseOwns(OwnerToken, Path)
-		return ConfigReportPersistenceFailure(Context, NotifyFn,
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn,
 			"the borrowed configuration owner is stale or owns another path")
 	FailureDetail := ""
 	if !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-			"the borrowed configuration writer", &FailureDetail)
+			"the borrowed configuration writer", &FailureDetail, 0, 0, DurableOutcome) {
+		StateUnchanged := true
+		_ConfigDescribeSessionPartial(Path, &FailureDetail, &StateUnchanged)
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
-			FailureDetail)
+			FailureDetail, StateUnchanged)
+	}
 	return true
 }
 
@@ -481,7 +536,10 @@ ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
 ; detached transaction plan. This closes the read/clone -> acquire window that
 ; otherwise lets a sibling publish between a stale snapshot and its later write.
 ; BuildFn returns { updates, publish?, finalize?, compensate?, cleanup?,
-; rollback_updates?, retain? }. A rollback batch is written through the same
+; rollback_updates?, retain?, durable_outcome? }. The optional Map records a
+; forward writer/noop acknowledgment before post-commit effects; it is used by
+; picker plans without rollback and does not replace the final Boolean result.
+; A rollback batch is written through the same
 ; writer while this exact lease is still held when primary finalization fails.
 ; ExistingOwner may borrow an exact live lease or terminal bundle. Its caller
 ; retains release responsibility through a subsequent WAL/reload handoff.
@@ -494,11 +552,11 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 	}
 	Borrowed := ExistingOwner is Object
 	if !Borrowed && (!(ExistingOwner is Integer) || ExistingOwner != 0)
-		return ConfigReportPersistenceFailure(Context, NotifyFn, "invalid borrowed configuration owner")
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn, "invalid borrowed configuration owner")
 	OwnerToken := Borrowed ? _ConfigWriteLeaseSelectOwner(ExistingOwner, Path)
 		: _ConfigWriteLeaseTryAcquire(Path, "built")
 	if !(OwnerToken is Object)
-		return ConfigReportPersistenceFailure(Context, NotifyFn,
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn,
 				"another configuration transaction is already in progress")
 	Plan := 0
 	FailureDetail := ""
@@ -509,6 +567,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 	StateUnchanged := true
 	PlanAdmission := 0
 	NoOpSourceAdmission := 0
+	DurableOutcome := 0
 	try {
 		if _ConfigSchemaEntrySelected(Path)
 			NoOpSourceAdmission := ConfigMigrateBoot(Path, "capture_noop")
@@ -525,6 +584,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			CompensateFn := _ConfigPlanGet(Plan, "compensate", 0)
 			RetainFn := _ConfigPlanGet(Plan, "retain", 0)
 			PlanAdmission := _ConfigPlanGet(Plan, "admission", 0)
+			DurableOutcome := _ConfigPlanGet(Plan, "durable_outcome", 0)
 			NoOp := !!_ConfigPlanGet(Plan, "noop", false)
 		}
 		if (FailureDetail == "" && !NoOp) {
@@ -546,7 +606,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			Transferred := true
 			return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
 					NotifyFn, PublishFn, FinalizeFn, CompensateFn,
-					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed, PlanAdmission)
+					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed, PlanAdmission, "commit", DurableOutcome)
 		}
 		NativePlanAdmission := () => _ConfigWriteLeaseOwns(OwnerToken, Path) && _FSNativeAdmissionAccepted(PlanAdmission)
 		if FailureDetail == "" && NoOp {
@@ -573,9 +633,12 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 				_ConfigWriteLeaseRelease(OwnerToken)
 		}
 	}
-	if NoOp
+	if NoOp {
+		if DurableOutcome is Map
+			DurableOutcome["status"] := "committed", DurableOutcome["committed"] := true
 		return true
-	return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail,
+	}
+	return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn, FailureDetail,
 		StateUnchanged)
 }
 
@@ -587,7 +650,7 @@ _ConfigPlanGet(Plan, Key, Default := 0) {
 
 _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		PublishFn, FinalizeFn, CompensateFn, PublishOnFinalizeFailure := false,
-		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true, AdmissionFn := 0, Request := "commit") {
+		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true, AdmissionFn := 0, Request := "commit", DurableOutcome := 0) {
 	static PublicationDebt := Map()
 	; Only these retained genuine producers may prove an already durable full-save
 	; obligation. No supplied collector, writer, snapshot or registration token
@@ -704,7 +767,7 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 				&FailureDetail, &StateUnchanged)
 			Failed := true
 		if !Failed && !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-				"the configuration writer", &FailureDetail, AdmissionFn, OwnerAdmission) {
+				"the configuration writer", &FailureDetail, AdmissionFn, OwnerAdmission, DurableOutcome) {
 			Failed := true
 		}
 		if !Failed {
@@ -820,17 +883,63 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		if ReleaseOwner
 			_ConfigWriteLeaseRelease(OwnerToken)
 	}
-	if Failed
+	if Failed {
+		_ConfigDescribeSessionPartial(Path, &FailureDetail, &StateUnchanged)
 		return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail, StateUnchanged)
+	}
 	return true
 }
 
-_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, AdmissionFn := 0, OwnerAdmission := 0) {
+; A session latch describes a previous uncertain effect, including on retries.
+; It is reporting metadata and cannot admit or acknowledge another writer.
+_ConfigDescribeSessionPartial(Path, &Detail, &StateUnchanged) {
+	if !_TOML_SessionHasPartialPublication(Path)
+		return
+	StateUnchanged := false
+	Detail .= (Detail != "" ? "; " : "")
+		. "a native publication in this session was not fully acknowledged; restart before further writes"
+}
+
+_ConfigReportPathPersistenceFailure(Path, Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+	_ConfigDescribeSessionPartial(Path, &Detail, &StateUnchanged)
+	return ConfigReportPersistenceFailure(Context, NotifyFn, Detail, StateUnchanged)
+}
+
+; Optional result observation never stores source bytes on a long-lived UI
+; receipt. The local snapshot only distinguishes a verified unchanged refusal
+; from an unknown writer outcome; acknowledged durability wins before apply.
+_ConfigDurableWriteStart(Outcome, Path) {
+	if !(Outcome is Map)
+		return 0
+	Outcome["status"] := "unknown"
+	try return FSReadWithStatus(Path)
+	catch
+		return 0
+}
+
+_ConfigDurableWriteEnd(Outcome, Path, Before, Committed) {
+	if !(Outcome is Map)
+		return
+	if Committed {
+		Outcome["status"] := "committed", Outcome["committed"] := true
+		return
+	}
+	Unchanged := false
+	if Before is Map && (Before["status"] == "ok" || Before["status"] == "absent") {
+		try Unchanged := _FSSourceIsUnchanged(Path, Before)
+		catch
+			Unchanged := false
+	}
+	Outcome["status"] := Unchanged ? "refused" : "unknown"
+}
+
+_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, AdmissionFn := 0, OwnerAdmission := 0, DurableOutcome := 0) {
 	global ConfigurationFile
 	if FileReadActivityBusy(Path) {
 		FailureDetail .= (FailureDetail != "" ? "; " : "") . "an exact configuration read is still in progress"
 		return false
 	}
+	BeforeOutcome := 0, WriteEntered := false
 	try {
 		NativeAdmission := () => _FSNativeAdmissionAccepted(OwnerAdmission) && _FSNativeAdmissionAccepted(AdmissionFn)
 		Guarded := !((AdmissionFn is Integer) && AdmissionFn == 0)
@@ -845,6 +954,8 @@ _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, Admiss
 			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
 		if IsConfiguration
 			Updates := _ConfigPrepareTypedUpdates(Updates)
+		BeforeOutcome := _ConfigDurableWriteStart(DurableOutcome, Path)
+		WriteEntered := true
 		if HasMethod(WriterFn, "Call") {
 			if Guarded {
 				if WriterFn != TOML_ConfigBatchWrite && WriterFn != TOML_BatchWrite
@@ -857,15 +968,19 @@ _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, Admiss
 			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)
 				: TOML_BatchWrite(Path, Updates, [], NativeAdmission)
 	} catch as Err {
+		if WriteEntered
+			_ConfigDurableWriteEnd(DurableOutcome, Path, BeforeOutcome, false)
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " failed: " . Err.Message
 		return false
 	}
 	if !((Written is Integer) && Written == 1) {
+		_ConfigDurableWriteEnd(DurableOutcome, Path, BeforeOutcome, false)
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " refused or returned a malformed status"
 		return false
 	}
+	_ConfigDurableWriteEnd(DurableOutcome, Path, BeforeOutcome, true)
 	return true
 }
 
@@ -1539,6 +1654,8 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.WPM_MENUBAR_VISIBLE, Value: WPMTrayReadout.running })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.WPM_MENUBAR_COLORS, Value: WPMTrayReadout.use_colors })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
 		; Features), so the _LLM_Menu_SyncToFeatures gate above does not cover them. The
 		; boot-armed SaveFullConfig timer fires ~0-100 ms after _DriverReady, while
@@ -1548,19 +1665,9 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
-				if !MenuState.Has(ConfigLeaf.ONBOARDING_SEEN)
-						|| !LLM_Option_TryNormalize(ConfigLeaf.ONBOARDING_SEEN,
-							MenuState[ConfigLeaf.ONBOARDING_SEEN], &OnboardingSeen)
-					throw Error("LLM onboarding state could not be serialized into the full-save candidate")
-				Updates.Push({ Section: "llm", Key: ConfigLeaf.ONBOARDING_SEEN, Value: OnboardingSeen })
-				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
-						MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES])
-				if !(_AppOverridesPayload is String)
-						throw Error("Could not serialize LLM app-profile overrides")
-				Updates.Push({ Section: "llm", Key: ConfigLeaf.APP_PROFILE_OVERRIDES, Value: _AppOverridesPayload })
-				if IsSet(_LLM_Menu_AppendPersistedUpdates)
-						&& !_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
-					throw Error("LLM menu persistence fields could not be serialized into the full-save candidate")
+				if !IsSet(_LLM_Menu_AppendOwnedPersistedUpdates)
+						throw Error("The LLM persistence collector is unavailable")
+				_LLM_Menu_AppendOwnedPersistedUpdates(Updates, MenuState)
 		}
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled
@@ -1736,6 +1843,16 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
 				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 		}
+		; A retry that finds another configuration write in flight waits for it.
+		; Its admission would read config.toml while that writer replaces it and
+		; report a refusal for the very request the writer is settling: the boot
+		; arms two tail retries, and the second fired inside the first one's write.
+		if !RegisterRequest && !(ExistingOwner is Object) && !PublicationDebt
+				&& _ConfigWriteLeaseTryAcquire("", "", 0) {
+			PerfCount("config_io.save_retry_deferred_active_write")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
 		if !PublicationDebt && !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
@@ -1830,12 +1947,26 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				try {
 				SourceImage := 0
 				if !HasMethod(WriterFn, "Call") {
+					BootIntent := _ConfigFullSaveRequest(false, TargetGeneration, State, 3)
+					if !(BootIntent is Object)
+						return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+							? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 					; Bind full-snapshot preservation to one admitted generation
 					; before collection can run callbacks or change live state.
 					SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])
 					if !(SourceImage is Map) || SourceImage.Get("status", "") != "ok"
 							|| SourceImage.Get("kind", "") != "rendered"
 						throw Error("The full configuration source could not be admitted.")
+					if BootIntent.optional && (!BootIntent.admitted
+							|| SourceImage["source_present"] != BootIntent.present
+							|| StrCompare(SourceImage["source_content"], BootIntent.source, true) != 0) {
+						; Settled optional work is not committed work. Do not collect
+						; stale RAM or produce a false user-facing "reverted" notice.
+						if _ConfigFullSaveRequest(false, TargetGeneration, State, 4)
+							return CONFIG_SAVE_OK
+						return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+							? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+					}
 					ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])
 				}
 				Phase := "collector"

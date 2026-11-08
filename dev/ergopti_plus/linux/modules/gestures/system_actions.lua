@@ -15,7 +15,9 @@
 ---    so the executor can list what it runs and the suite pins each command.
 --- 2. Backgrounded: every command is handed to the executor's background
 ---    runner. The daemon holds the grabbed keyboard, so a command that waits
----    for a window manager or a dialog must never be waited for here.
+---    for a window manager or a dialog must never be waited for here; the
+---    runner (modules/gestures/background_commands.lua) still logs a command
+---    that fails, with its exit status.
 --- 3. A catalogue action with `confirm = true` gets its question from
 ---    confirmed_command(): Ergopti's own dialog (ui/native_dialog.lua) in the
 ---    same background shell, chained to the command with &&, so Cancel (or a
@@ -92,21 +94,27 @@ local SYSTEM_MOUNTS = "^(/|/boot|/boot/efi|/usr|/var|/home|\\[SWAP\\])$"
 M.EJECT_ALL_DISKS = 'lsblk -nrpo NAME,TYPE,RM,HOTPLUG 2>/dev/null | while read -r dev kind rm hot; do'
 	.. ' [ "$kind" = disk ] || continue;'
 	.. ' [ "$rm" = 1 ] || [ "$hot" = 1 ] || continue;'
-	.. " lsblk -nrpo MOUNTPOINT \"$dev\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
-	.. ' lsblk -nrpo NAME,MOUNTPOINT "$dev" | while read -r part mnt; do'
-	.. ' [ -n "$mnt" ] && udisksctl unmount -b "$part" </dev/null; done;'
-	.. ' udisksctl power-off -b "$dev" </dev/null; done'
+	.. ' mounts=$(lsblk -nrpo MOUNTPOINT "$dev") || continue;'
+	.. " printf '%s\\n' \"$mounts\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
+	.. ' parts=$(lsblk -nrpo NAME,MOUNTPOINT "$dev") || continue;'
+	.. ' printf "%s\\n" "$parts" | while read -r part mnt; do'
+	.. ' [ -n "$mnt" ] || continue; udisksctl unmount -b "$part" </dev/null || exit 1; done'
+	.. ' && udisksctl power-off -b "$dev" </dev/null; done'
+
 
 --- Every action this module runs as one fixed shell command, by action id.
 M.COMMANDS = {
 	-- wmctrl -m reports the EWMH "showing the desktop" mode; -k sets it.
-	show_desktop = "case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac",
+	show_desktop = "desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
+		.. " *'mode: ON'*) wmctrl -k off;; *'mode: OFF'*) wmctrl -k on;; *) false;; esac",
 	-- Releasing the keys that fired it is input that would wake the displays
 	-- straight back up: they are powered off once that release has happened.
 	sleep_displays = "sleep 1 && xset dpms force off",
-	toggle_dark_mode = "case \"$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null)\" in"
-		.. " *prefer-dark*) gsettings set " .. COLOR_SCHEME .. " default;;"
-		.. " *) gsettings set " .. COLOR_SCHEME .. " prefer-dark;; esac",
+	toggle_dark_mode = "scheme=$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null) && case \"$scheme\" in"
+		.. " \"'prefer-dark'\") gsettings set " .. COLOR_SCHEME .. " default;;"
+		.. " \"'default'\"|\"'prefer-light'\") gsettings set " .. COLOR_SCHEME .. " prefer-dark;;"
+		.. " *) false;; esac",
+
 	mic_mute_toggle = "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
 	empty_trash = "gio trash --empty",
 	minimize_all = M.MINIMIZE_ALL,
@@ -122,6 +130,14 @@ M.TARGETS = {
 	quit_frontmost_app = ACTIVE_WINDOW_OWNER,
 	force_quit_frontmost = ACTIVE_WINDOW_OWNER,
 }
+
+--- The actions of COMMANDS that read a state and write the one derived from
+--- it. Each accepted toggle backgrounds its own shell: unserialized, two of
+--- them both read the old state and one toggle is lost. They queue on one
+--- flock in the session lock folder install/launch.sh creates (`flock` is a
+--- launcher dependency), so the second reads what the first wrote.
+M.SERIALIZED = { show_desktop = true, toggle_dark_mode = true }
+local SERIAL_LOCK = '"${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti/system-toggle.lock"'
 
 --- The notification daemons whose client can dismiss every notification.
 --- GNOME Shell and KDE Plasma expose no such command.
@@ -156,6 +172,7 @@ end
 function M.command_for(action_name, action_label, confirm)
 	local command = M.COMMANDS[action_name]
 	if not command then error("system_actions: no command for '" .. tostring(action_name) .. "'", 2) end
+	if M.SERIALIZED[action_name] then command = "flock " .. SERIAL_LOCK .. " sh -c " .. quote(command) end
 	local target = M.TARGETS[action_name]
 	local read_target = target and (target .. " && ") or ""
 	if not confirm then return "{ " .. read_target .. command .. "; }" end
@@ -196,7 +213,7 @@ M.COLOR_PICKERS = {
 	},
 	x11 = {
 		{ binary = "xcolor", command = "xcolor --selection clipboard" },
-		{ binary = "gpick", command = "gpick --single --output --no-newline | xclip -selection clipboard" },
+		{ binary = "gpick", command = '{ colour=$(gpick --single --output --no-newline) && [ -n "$colour" ] && printf "%s" "$colour" | xclip -selection clipboard; }' },
 	},
 }
 
@@ -239,6 +256,19 @@ end
 --- receives { run_background = fn(cmd), clipboard = adapter, emit_combo = fn,
 --- sleep_ms = fn } from the executor.
 M.HANDLERS = {
+	activity_simulation = function()
+		return require("modules.keep_awake").toggle()
+	end,
+	take_note = function(deps)
+		return require("modules.take_note").open(deps.run_background)
+	end,
+	-- X11 pointer moves (modules/gestures/pointer_warp.lua); Wayland refuses.
+	center_mouse = function(deps) require("modules.gestures.pointer_warp").center_mouse(deps) end,
+	teleport_mouse = function(deps)
+		require("modules.gestures.pointer_warp").teleport_mouse({ run_background = deps.run_background, notify = notify })
+	end,
+	-- X11 overlay (modules/gestures/pointer_spotlight.lua); Wayland refuses.
+	spotlight_mouse = function() require("modules.gestures.pointer_spotlight").spotlight_mouse() end,
 	-- Backgrounded, the command's failure is invisible: with none of the
 	-- clients installed nothing could ever be cleared, which is said here.
 	clear_notifications = function(deps)
@@ -282,7 +312,17 @@ M.HANDLERS = {
 		end
 	end,
 	make_executable_selection = function(deps)
-		local ok, uri_list, reason = deps.clipboard.read_selection_uri_list(deps.emit_combo, deps.sleep_ms)
+		local admitted = require("modules.shortcuts.open_selection").capture_file_manager()
+		if not admitted then
+			Logger.warn(LOG, "make_executable_selection: no focused file manager; copy refused.")
+			return
+		end
+		local function guarded_copy(combo)
+			if admitted() ~= true then return false end
+			return deps.emit_combo(combo)
+		end
+		local ok, uri_list, reason = deps.clipboard.read_selection_uri_list(guarded_copy, deps.sleep_ms)
+		if admitted() ~= true then return end
 		if not ok then
 			if reason == "no_file_selection" then
 				Logger.info(LOG, "make_executable_selection: no file is selected.")

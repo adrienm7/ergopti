@@ -35,6 +35,12 @@
 
 local helpers = require("tests.helpers")
 
+helpers.it("linux-reload-entrypoint: the actual daemon compiles with LuaJIT", function()
+	if not jit then return end
+	local chunk, reason = loadfile(helpers.driver_root() .. "/ergopti_hotstrings.lua")
+	helpers.assert_true(type(chunk) == "function", tostring(reason))
+end)
+
 
 --- Returns the TOP-LEVEL item whose title matches.
 ---
@@ -238,6 +244,32 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 			helpers.assert_true(items[#items] == quit, "the existing desktop Quit-last policy is retained")
 			reload.fn(); quit.fn()
 			helpers.assert_eq(table.concat(calls, ","), "reload,quit")
+		end)
+	end)
+
+	helpers.it("(reload-refusal-notice) tells the user when a reload request is refused", function()
+		with_lifecycle_declarations(function(builder)
+			local original, sent = package.loaded["adapters.notifier"], {}
+			package.loaded["adapters.notifier"] = { send = function(text, opts)
+				sent[#sent + 1] = { text = text, title = opts.title, level = opts.level }; return true
+			end }
+			local ok, err = pcall(function()
+				local outcome = "false"
+				local items = builder.build({ config = make_config(), on_reload = function()
+					if outcome == "throw" then error("controlled refusal") end
+					return outcome == "success"
+				end, reload_in_flight = function() return outcome == "pending" end })
+				local reload = lifecycle_declared_row(items, "button.cancel")
+				reload.fn()
+				outcome = "throw"; reload.fn()
+				outcome = "pending"; reload.fn()
+				outcome = "success"; reload.fn()
+				local expected = { text = require("infra.i18n").get("init.reload_refused_body"),
+					title = require("infra.i18n").get("init.reload_refused_title"), level = "error" }
+				helpers.assert_eq(sent, { expected, expected })
+			end)
+			package.loaded["adapters.notifier"] = original
+			if not ok then error(err, 0) end
 		end)
 	end)
 

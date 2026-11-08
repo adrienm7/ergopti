@@ -15,11 +15,19 @@
 ; Runs Body on an isolated engine with the chords given, and a recorder.
 _KCCE_With(Chords, Symmetric, Body) {
 	global KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts
+	global _KeyCombinationChordOwner
 	global _KeyCombinationChordWaiting, _KeyCombinationChordTaken, _KeyCombinationChordQueue, _KeyCombinationChordBusy
+	global _KeyCombinationChordWaitAt, _KeyCombinationChordReplaying
 	global CategoryEnabled, _KeyCombinationScanNames, _KeyCombinationKeysByScanName, _KeyCombinationTaken, _KeyCombinationHandled
 	global _KeyCombinationPressAssignments, KeyCombinationTaps, KeyCombinationHolds, _KeyCombinationFirstKeys, LayerEnabled
+	AssertTrue(_KeyCombinationChordWaiting == "" && _KeyCombinationChordQueue.Length == 0
+		&& _KeyCombinationChordTaken.Count == 0 && !_KeyCombinationChordBusy,
+		"A foreign live chord batch cannot be parked across lifecycle teardown")
+	SavedChord := {Waiting: _KeyCombinationChordWaiting, At: _KeyCombinationChordWaitAt,
+		Taken: _KeyCombinationChordTaken, Queue: _KeyCombinationChordQueue, Busy: _KeyCombinationChordBusy,
+		Replaying: _KeyCombinationChordReplaying}
 	Saved := [KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts,
-		CategoryEnabled, LayerEnabled]
+		CategoryEnabled, LayerEnabled, IsSet(_KeyCombinationChordOwner) ? _KeyCombinationChordOwner : 0]
 	World := { Now: 1000, Held: Map(), Sends: [], Actions: [], Polls: [], Drains: 0, Log: [] }
 	Ports := Map(
 		"tick", () => World.Now,
@@ -34,6 +42,7 @@ _KCCE_With(Chords, Symmetric, Body) {
 	Cache["mod_combos"] := Map("simultaneous_threshold_ms", 100, "symmetric", Symmetric)
 	CategoryEnabled := Map("KeyCombinations", true)
 	LayerEnabled := false
+	_KeyCombinationChordOwner := 0
 	_KeyCombinationChordWaiting := "", _KeyCombinationChordTaken := Map()
 	_KeyCombinationChordQueue := [], _KeyCombinationChordBusy := false
 	Scans := Map(), Keys := Map()
@@ -50,8 +59,10 @@ _KCCE_With(Chords, Symmetric, Body) {
 		KeyCombinationChords := Saved[1], KeyCombinationChordConfig := Saved[2]
 		_KeyCombinationChordPolicy := Saved[3], _KeyCombinationChordFirsts := Saved[4]
 		CategoryEnabled := Saved[5], LayerEnabled := Saved[6]
-		_KeyCombinationChordWaiting := "", _KeyCombinationChordTaken := Map()
-		_KeyCombinationChordQueue := [], _KeyCombinationChordBusy := false
+		_KeyCombinationChordOwner := IsObject(Saved[7]) && !TapHoldOwnerCurrent(Saved[7]) ? 0 : Saved[7]
+		_KeyCombinationChordWaiting := SavedChord.Waiting, _KeyCombinationChordWaitAt := SavedChord.At
+		_KeyCombinationChordTaken := SavedChord.Taken, _KeyCombinationChordQueue := SavedChord.Queue
+		_KeyCombinationChordBusy := SavedChord.Busy, _KeyCombinationChordReplaying := SavedChord.Replaying
 		_KeyCombinationScanNames := SavedScans, _KeyCombinationKeysByScanName := SavedKeys
 	}
 }
@@ -100,6 +111,80 @@ _KCCE_ChordWritersBody(World, Ports) {
 }
 Test("key combination chords: the writers report a refused commit and never reload behind it",
 	_KCCE_ChordWritersFollowTheirCommit)
+
+; The bulk copy, as macOS and Linux plan it: a chord takes its pair's tap, an
+; empty tap empties the chord, a chord already equal is left alone and a tap no
+; chord can run keeps the chord it has.
+_KCCE_CopyRows(Source) {
+	Rows := Map()
+	for Row in KeyCombinationChordCopyRows(ConfigTomlDecodeSnapshot(Source), (*) => true)
+		Rows[Row.Section] := Row
+	return Rows
+}
+_KCCE_ChordCopySource(Symmetric) {
+	return '[shortcuts.key_combination_taps]`ncaps_lock_then_tab = "copy"`ntab_then_caps_lock = "paste"`n'
+		. 'space_then_tab = "one_shot_shift"`n'
+		. '[mod_combos]`nsymmetric = ' . (Symmetric ? "true" : "false") . '`n'
+		. '[mod_combos.config.caps_lock_then_space]`ncombo = "copy"`n'
+		. '[mod_combos.config.space_then_tab]`ncombo = "copy"`n'
+}
+_KCCE_ChordCopyPlansFromTheTaps() {
+	Rows := _KCCE_CopyRows(_KCCE_ChordCopySource(false) . '[mod_combos.config.tab_then_caps_lock]`ncombo = "paste"`n')
+	Row := Rows.Get("mod_combos.config.caps_lock_then_tab", 0)
+	AssertTrue(IsObject(Row) && Row.Key == "combo" && Row.Value == "copy", "the chord takes the pair's tap")
+	AssertFalse(Rows.Has("mod_combos.config.tab_then_caps_lock"), "a chord already equal to its tap is left alone")
+	Row := Rows.Get("mod_combos.config.caps_lock_then_space", 0)
+	AssertTrue(IsObject(Row) && Row.HasOwnProp("Delete") && Row.Delete, "an empty tap empties the chord")
+	AssertFalse(Rows.Has("mod_combos.config.space_then_tab"), "a tap no chord can run keeps the chord it has")
+	AssertEqual(2, Rows.Count, "nothing else moves")
+	AssertEqual(0, _KCCE_CopyRows("").Count, "an empty configuration has nothing to copy")
+}
+Test("key combination chords: the bulk copy plans each chord from its pair's tap (copy-tap-to-combo)",
+	_KCCE_ChordCopyPlansFromTheTaps)
+
+; Under symmetry both orders share the earlier order's chord slot: only that
+; order's tap is copied, and the later order gets no slot of its own.
+_KCCE_ChordCopyFollowsSymmetry() {
+	Owner := _KeyCombinationChordOwnerPairFor("caps_lock_then_tab", true)
+	AssertTrue(Owner == "caps_lock_then_tab" || Owner == "tab_then_caps_lock", "the owner is one of the two orders")
+	Other := Owner == "caps_lock_then_tab" ? "tab_then_caps_lock" : "caps_lock_then_tab"
+	Rows := _KCCE_CopyRows(_KCCE_ChordCopySource(true))
+	Row := Rows.Get("mod_combos.config." . Owner, 0)
+	AssertTrue(IsObject(Row) && Row.Value == (Owner == "caps_lock_then_tab" ? "copy" : "paste"),
+		"the shared slot takes its owner order's tap")
+	AssertFalse(Rows.Has("mod_combos.config." . Other), "the other order gets no slot of its own")
+}
+Test("key combination chords: the bulk copy follows the chord symmetry (copy-tap-to-combo)",
+	_KCCE_ChordCopyFollowsSymmetry)
+
+; The command commits like every chord writer: a held lease reports false with no
+; reload and no write; a free one writes and reloads once; a second copy has
+; nothing left to do and neither writes nor reloads.
+_KCCE_ChordCopyFollowsItsCommit() {
+	Path := A_Temp . "\ergopti_kcce_chord_copy_" . DllCall("GetCurrentProcessId", "UInt") . ".toml"
+	if FileExist(Path)
+		FileDelete(Path)
+	Source := _KCCE_ChordCopySource(false)
+	FileAppend(Source, Path, "UTF-8-RAW")
+	Reloads := 0
+	Reload := () => (Reloads += 1, "reloaded")
+	try {
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "chord-copy-refusal")
+		AssertTrue(Owner is Object, "the test holds the write lease")
+		try AssertEqual(false, KeyCombinationCopyTapsToChords(Path, Reload, (*) => true), "a refused commit reports false")
+		finally _ConfigWriteLeaseRelease(Owner)
+		AssertEqual(0, Reloads, "a refused commit never reloads")
+		AssertEqual(Source, FileRead(Path, "UTF-8"), "a refused commit writes nothing")
+		AssertEqual("reloaded", KeyCombinationCopyTapsToChords(Path, Reload, (*) => true), "a commit answers with its reload")
+		AssertEqual(1, Reloads, "a commit reloads once")
+		Cache := ConfigTomlDecodeSnapshot(FileRead(Path, "UTF-8")).Cache
+		AssertEqual("copy", Cache["mod_combos.config.caps_lock_then_tab"]["combo"], "the copied chord reaches the file")
+		AssertEqual(true, KeyCombinationCopyTapsToChords(Path, Reload, (*) => true), "a second copy has nothing to do")
+		AssertEqual(1, Reloads, "a copy with nothing to change never reloads")
+	} finally FileDelete(Path)
+}
+Test("key combination chords: the bulk copy reports a refused commit and never reloads behind it (copy-tap-to-combo)",
+	_KCCE_ChordCopyFollowsItsCommit)
 
 _KCCE_ChordFiresInsideTheDelay() {
 	_KCCE_With(Map("caps_lock_then_tab", "copy"), false, _KCCE_ChordFiresBody)
@@ -308,3 +393,289 @@ _KCCE_BudgetBody(World, Ports) {
 	Assert(Elapsed < 2000, "100000 criterion reads took " . Elapsed . " ms: the hot path budget is 20 us per key")
 }
 Test("key chord engine: plain typing stays inside the hot path budget (item2-budget)", _KCCE_PlainTypingBudget)
+
+; Deliver the actual poll/drain through native SetTimer after native Suspend.
+; The real engine/policy owns admission and queueing; only keyboard edges are observed.
+_KCCE_NativePauseDelivery(Queued, Pause, RetireBeforeDelivery := false) {
+	_KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_NativePauseBody.Bind(Queued, Pause, RetireBeforeDelivery))
+}
+
+_KCCE_NativePauseBody(Queued, Pause, RetireBeforeDelivery, World, Ports) {
+	global _KeyCombinationChordQueue, _KeyCombinationChordWaiting, _KeyCombinationChordBusy
+	WasSuspended := A_IsSuspended, PreviousCritical := Critical("On")
+	Delivered := 0, Failure := 0, Before := 0, BusyAfterResume := false
+	Deliver() {
+		try {
+			if Queued
+				KeyCombinationChordDrain(Ports)
+			else
+				KeyCombinationChordTick(Ports)
+		} catch as Err {
+			Failure := Err
+		} finally Delivered += 1
+	}
+	OriginalPoll := Ports["arm_poll"]
+	Poll(Armed) {
+		OriginalPoll.Call(Armed)
+		if !Queued
+			SetTimer(Deliver, Armed ? -1 : 0)
+	}
+	Ports["arm_poll"] := Poll
+	if Queued
+		Ports["arm_drain"] := () => SetTimer(Deliver, -1)
+	try {
+		Suspend(false)
+		AssertEqual("wait", _KCCE_Press(World, Ports, "space"), "the real policy must admit the first press")
+		if Queued {
+			KeyCombinationChordInterrupt(0x010, Ports)
+			AssertEqual(1, World.Sends.Length, "the originating Space precedes the queued letter before pause")
+		} else {
+			World.Held.Delete("space")
+			World.Now += 5
+		}
+		Before := World.Sends.Length
+		if RetireBeforeDelivery {
+			Suspend(true)
+			try AssertTrue(TapHoldReleaseSyntheticKeys())
+			finally Suspend(false)
+			BusyAfterResume := TapHoldRollUndecided()
+		} else
+			Suspend(Pause)
+		Critical("Off")
+		Started := A_TickCount
+		while Delivered == 0 && A_TickCount - Started < 3000
+			Sleep(5)
+		AssertEqual(1, Delivered, "one genuine native timer must deliver the production callback")
+		if IsObject(Failure)
+			throw Failure
+		AssertEqual(Before + ((Pause || RetireBeforeDelivery) ? 0 : 1), World.Sends.Length,
+			"a paused poll/drain must never inject; its unpaused control must genuinely replay")
+		if RetireBeforeDelivery
+			AssertFalse(BusyAfterResume, "a retired criterion must not intercept new typing before its old timer delivers")
+		AssertEqual(0, _KeyCombinationChordQueue.Length, "a retired queue must not replay after resume")
+		AssertEqual("", _KeyCombinationChordWaiting)
+		AssertFalse(_KeyCombinationChordBusy)
+		Suspend(false)
+		KeyCombinationChordDrain(Ports)
+		KeyCombinationChordTick(Ports)
+		AssertEqual(Before + ((Pause || RetireBeforeDelivery) ? 0 : 1), World.Sends.Length, "resume cannot revive the retired replay")
+	} finally {
+		SetTimer(Deliver, 0)
+		Suspend(WasSuspended)
+		Critical(PreviousCritical)
+	}
+}
+for _KCCE_QueuedNative in [false, true]
+	for _KCCE_PauseNative in [false, true]
+		Test("key chord lifecycle: native queued=" . _KCCE_QueuedNative . " paused=" . _KCCE_PauseNative . " fences replay (chord-native-pause)",
+			_KCCE_NativePauseDelivery.Bind(_KCCE_QueuedNative, _KCCE_PauseNative))
+
+
+_KCCE_NativeResumeBeforeDelivery(Queued) {
+	_TSUH_Begin(Map(), Map())
+	try _KCCE_NativePauseDelivery(Queued, false, true)
+	finally _TSUH_End()
+}
+for _KCCE_ResumeQueued in [false, true]
+	Test("key chord lifecycle: queued=" . _KCCE_ResumeQueued . " pause and resume before native delivery revoke replay (chord-native-resume)",
+		_KCCE_NativeResumeBeforeDelivery.Bind(_KCCE_ResumeQueued))
+
+; A real lifecycle cleanup retires A, then B enters through the real criterion/handler.
+_KCCE_PublishResumedFirst(World, Ports) {
+	Suspend(true)
+	try AssertTrue(TapHoldReleaseSyntheticKeys())
+	finally Suspend(false)
+	World.Held := Map()
+	return _KCCE_Press(World, Ports, "space")
+}
+
+_KCCE_SuccessorDuringHeldRead() {
+	_TSUH_Begin(Map(), Map())
+	try _KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_SuccessorHeldBody)
+	finally _TSUH_End()
+}
+_KCCE_SuccessorHeldBody(World, Ports) {
+	global _KeyCombinationChordWaiting, _KeyCombinationChordQueue, _KeyCombinationChordBusy
+	WasSuspended := A_IsSuspended, Ready := false, Replaced := false, BResult := ""
+	OriginalHeld := Ports["is_held"]
+	Read(Key) {
+		if Ready && !Replaced && Key == "space" {
+			Replaced := true
+			BResult := _KCCE_PublishResumedFirst(World, Ports)
+		}
+		return OriginalHeld.Call(Key)
+	}
+	Ports["is_held"] := Read
+	try {
+		Suspend(false)
+		AssertEqual("wait", _KCCE_Press(World, Ports, "space"))
+		Ready := true
+		KeyCombinationChordInterrupt(0x010, Ports)
+		AssertTrue(Replaced, "the actual held-state callout must run lifecycle teardown and admit B")
+		AssertEqual(0, World.Sends.Length, "old A must not emit after its held-state callback publishes B")
+		AssertEqual("wait", BResult, "the resumed first key must start its own real wait")
+		AssertEqual("space", _KeyCombinationChordWaiting)
+		AssertEqual(0, _KeyCombinationChordQueue.Length, "old Interrupt must not append its character into B's queue")
+		AssertTrue(_KeyCombinationChordBusy)
+	} finally Suspend(WasSuspended)
+}
+Test("key chord lifecycle: held-state callback preserves a resumed successor (chord-callout-successor)", _KCCE_SuccessorDuringHeldRead)
+
+_KCCE_SuccessorDuringLog() {
+	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_MIN_SEVERITY
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
+	Saved := {Sink: _LOGGER_TEST_SINK, Info: _LOGGER_INFO_ENABLED, Severity: _LOGGER_MIN_SEVERITY,
+		Dedup: _LOGGER_DEDUP_KEY, Level: _LOGGER_DEDUP_LEVEL, Count: _LOGGER_DEDUP_COUNT,
+		Time: _LastErrTime, Repeat: _LOGGER_REPEAT_ENABLED}
+	_TSUH_Begin(Map(), Map())
+	try {
+		_LOGGER_INFO_ENABLED := true, _LOGGER_MIN_SEVERITY := 10
+		_LOGGER_DEDUP_KEY := "", _LOGGER_REPEAT_ENABLED := false
+		_KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_SuccessorLogBody)
+	} finally {
+		_LOGGER_TEST_SINK := Saved.Sink, _LOGGER_INFO_ENABLED := Saved.Info, _LOGGER_MIN_SEVERITY := Saved.Severity
+		_LOGGER_DEDUP_KEY := Saved.Dedup, _LOGGER_DEDUP_LEVEL := Saved.Level, _LOGGER_DEDUP_COUNT := Saved.Count
+		_LastErrTime := Saved.Time, _LOGGER_REPEAT_ENABLED := Saved.Repeat
+		_TSUH_End()
+	}
+}
+_KCCE_SuccessorLogBody(World, Ports) {
+	global _KeyCombinationChordWaiting, _KeyCombinationChordQueue, _KeyCombinationChordBusy
+	WasSuspended := A_IsSuspended, Replaced := false, BResult := ""
+	Observe(Line) {
+		if Replaced || !InStr(Line, "[KeyCombinations] Chord '")
+			return
+		Replaced := true
+		BResult := _KCCE_PublishResumedFirst(World, Ports)
+	}
+	try {
+		Suspend(false)
+		AssertEqual("wait", _KCCE_Press(World, Ports, "space"))
+		LoggerSetTestSink(Observe)
+		World.Now += 10
+		KeyCombinationChordHandle("tab", Ports)
+		AssertTrue(Replaced, "the actual chord log must reach the controlled lifecycle interruption")
+		AssertEqual(0, World.Actions.Length, "old A must not fire its action after logging publishes B")
+		AssertEqual("wait", BResult)
+		AssertEqual("space", _KeyCombinationChordWaiting)
+		AssertEqual(0, _KeyCombinationChordQueue.Length)
+		AssertTrue(_KeyCombinationChordBusy)
+	} finally Suspend(WasSuspended)
+}
+Test("key chord lifecycle: logging cannot fire a retired action or erase its successor (chord-callout-successor)", _KCCE_SuccessorDuringLog)
+
+_KCSBOOT_ReadTypedSettings(Mode, _World, _Ports) {
+	global ConfigurationFile, _ConfigBootReadFailed
+	global KeyCombinationChordConfig, _KeyCombinationChordPolicy
+	SavedPath := ConfigurationFile, SavedReadFailed := _ConfigBootReadFailed
+	Root := A_Temp . "\ergopti_key_chord_boot_types_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "the real source fixture must acquire its root before any write")
+		DelayRaw := "100", SymmetryRaw := "false", ExpectedDelay := 100, ExpectedSymmetry := false, Elapsed := 0
+		switch Mode {
+			case "quoted-symmetry": SymmetryRaw := '"false"'
+			case "number-symmetry": SymmetryRaw := "2"
+			case "quoted-delay": DelayRaw := '"500"', Elapsed := 200
+			case "boolean-delay": DelayRaw := "true", Elapsed := 50
+			case "true-control": SymmetryRaw := "true", ExpectedSymmetry := true
+			case "numeric-delay-control": DelayRaw := "500", ExpectedDelay := 500, Elapsed := 200
+		}
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[mod_combos]`n"
+			. "simultaneous_threshold_ms = " . DelayRaw . "`nsymmetric = " . SymmetryRaw . "`n"
+			. '[mod_combos.config.caps_lock_then_tab]`ncombo = "copy"`n'
+			. '[mod_combos.config.tab_then_caps_lock]`ncombo = "paste"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"], "the source must have a genuine current-schema boot admission")
+		Cache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlBootSnapshot(Cache)
+		AssertTrue(IsObject(Snapshot), "the policy must receive the actual boot cache rather than a detached mock")
+		ConfigTomlBootSnapshotValue(Snapshot, "mod_combos", "symmetric", &CanonicalSymmetry)
+		ConfigTomlBootSnapshotValue(Snapshot, "mod_combos", "simultaneous_threshold_ms", &CanonicalDelay)
+		AssertEqual(ExpectedSymmetry, CanonicalSymmetry, "the canonical boot owner already knows the stored or default symmetry")
+		AssertEqual(ExpectedDelay, CanonicalDelay, "the canonical boot owner already knows the stored or default timing")
+		KeyCombinationChordsReadConfig(Cache)
+		Forward := _KeyCombinationChordPolicy.Choose("caps_lock", "tab", Elapsed)
+		Reverse := _KeyCombinationChordPolicy.Choose("tab", "caps_lock", Elapsed)
+		if Elapsed > ExpectedDelay {
+			AssertFalse(Forward, "an outdated quoted delay cannot lengthen the real policy's chord window")
+			AssertFalse(Reverse)
+		} else {
+			AssertTrue(Forward is Map && Reverse is Map, "valid timing must preserve both authored actions")
+			AssertEqual(ExpectedSymmetry ? "paste" : "copy", Forward["action"], "the actual policy must not route a non-symmetric order to its reverse action")
+			AssertEqual("paste", Reverse["action"])
+		}
+		AssertEqual(ExpectedSymmetry, KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])
+		AssertEqual(ExpectedDelay, KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS])
+		AssertEqual(Source, FSReadUtf8Exact(Path), "loading outdated values must leave the authored source unchanged")
+	} finally {
+		ConfigurationFile := SavedPath, _ConfigBootReadFailed := SavedReadFailed
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+for _KCSBOOT_Mode in ["quoted-symmetry", "number-symmetry", "quoted-delay", "boolean-delay", "false-control", "true-control", "numeric-delay-control"]
+	Test("key chord boot settings: " . _KCSBOOT_Mode,
+		_KCCE_With.Bind(Map(), false, _KCSBOOT_ReadTypedSettings.Bind(_KCSBOOT_Mode)))
+
+; Uses the real-file admission fixture from test_tap_hold_lone_tap.ahk.
+_KCSENABLED_Run(Mode, _World, _Ports) {
+	Raw := Mode == "number-zero" ? "-0" : Mode == "legacy-zero-control" ? "0"
+		: Mode == "legacy-one-control" ? "1 # retained old writer intent" : Mode == "false-control" ? "false" : "true"
+	Source := "[mod_combos]`nenabled = " . Raw . "`n"
+		. '[mod_combos.config.caps_lock_then_tab]`ncombo = "copy"`n'
+	_RBC_WithActualBootCache(Source, _KCSENABLED_Read.Bind(Mode))
+}
+_KCSENABLED_Read(Mode, Cache) {
+	global _KeyCombinationChordPolicy
+	Expected := Mode != "false-control" && Mode != "legacy-zero-control"
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	AssertFalse(ManifestFindEntryByPath("mod_combos.enabled") is Map, "the private enabled switch has no feature-manifest default")
+	Authored := Snapshot.Document["mod_combos"]["enabled"]
+	if Mode == "number-zero"
+		AssertTrue(Authored is Integer && Authored == 0, "signed zero keeps its native integer shape but is not an old writer bare0 spelling")
+	else if InStr(Mode, "legacy-") == 1
+		AssertTrue(Authored is Integer && Authored == Expected, "the exact bare0/1 old writer spellings preserve legacy intent")
+	else
+		AssertTrue(Authored is TOML_Bool, "valid controls retain their actual authored Boolean type")
+	KeyCombinationChordsReadConfig(Cache)
+	AssertEqual(Expected, IsObject(_KeyCombinationChordPolicy), "an outdated numeric zero must not disable the admitted default chord policy")
+	if Expected {
+		Chosen := _KeyCombinationChordPolicy.Choose("caps_lock", "tab", 0)
+		AssertTrue(Chosen is Map)
+		AssertEqual("copy", Chosen["action"])
+	}
+}
+for _KCSENABLED_Mode in ["number-zero", "false-control", "true-control", "legacy-zero-control", "legacy-one-control"]
+	Test("key chord boot enabled admission: " . _KCSENABLED_Mode,
+		_KCCE_With.Bind(Map(), false, _KCSENABLED_Run.Bind(_KCSENABLED_Mode)))
+
+
+_KCCE_ChordDelayCannotWrap() {
+ _KCCE_With(Map(), false, _KCCE_ChordDelayCannotWrapBody)
+}
+_KCCE_ChordDelayCannotWrapBody(World, Ports) {
+ Path := A_Temp . "\ergopti_chord_numeric_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".toml"
+ AssertTrue(FSWriteCreateDurable(Path, "") != 0)
+ Reloads := 0, Reload := () => (Reloads += 1, true)
+ try {
+  Before := FSReadUtf8Exact(Path)
+  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "", "soon"] {
+   AssertFalse(KeyCombinationChordCommitDelay(Raw, Path, Reload), "The complete user magnitude must be refused before any config write")
+   AssertEqual(Before, FSReadUtf8Exact(Path), "A rejected delay cannot change even private source bytes")
+   AssertEqual(0, Reloads, "A rejected delay cannot reload")
+  }
+  AssertTrue(KeyCombinationChordCommitDelay("3", Path, Reload))
+  AssertEqual(1, Reloads)
+  AssertTrue(KeyCombinationChordCommitDelay("3.5", Path, Reload), "The existing positive fractional grammar must stay accepted")
+  AssertEqual(2, Reloads)
+  AssertContains(FSReadUtf8Exact(Path), "simultaneous_threshold_ms = 3.5")
+ } finally FileDelete(Path)
+}
+Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)

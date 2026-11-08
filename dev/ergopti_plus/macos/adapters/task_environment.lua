@@ -11,6 +11,7 @@
 local M = {}
 
 local LauncherEnvironment = require("infra.launcher_environment")
+local ErrorDescription = require("error_description")
 
 
 
@@ -48,7 +49,7 @@ function M.sanitize(task, overrides)
 		return get_environment(task)
 	end, debug.traceback)
 	if not read_ok then
-		return false, "native task environment read raised: " .. tostring(environment_or_err)
+		return false, "native task environment read raised: " .. ErrorDescription.describe(environment_or_err)
 	end
 	local sanitized, sanitize_err = LauncherEnvironment.child_copy(environment_or_err, overrides)
 	if sanitized == nil then return false, sanitize_err end
@@ -57,7 +58,7 @@ function M.sanitize(task, overrides)
 		return set_environment(task, sanitized)
 	end, debug.traceback)
 	if not write_ok then
-		return false, "native task environment write raised: " .. tostring(write_result)
+		return false, "native task environment write raised: " .. ErrorDescription.describe(write_result)
 	end
 	if write_result == false or write_result == nil then
 		return false, "native task environment write was refused"
@@ -67,7 +68,7 @@ function M.sanitize(task, overrides)
 		return get_environment(task)
 	end, debug.traceback)
 	if not verify_ok then
-		return false, "native task environment readback raised: " .. tostring(observed_or_err)
+		return false, "native task environment readback raised: " .. ErrorDescription.describe(observed_or_err)
 	end
 	return LauncherEnvironment.verify_child_copy(sanitized, observed_or_err)
 end

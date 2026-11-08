@@ -29,6 +29,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Agent = require("llm.agent")
+local Utf8 = require("compat.utf8")
 local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "modules.llm.agent_connectors"
@@ -92,7 +93,11 @@ local function private_dir()
 	local base = os.getenv("XDG_RUNTIME_DIR")
 	if not base or base == "" then base = os.getenv("TMPDIR") end
 	if not base or base == "" then base = "/tmp" end
-	return ShellRunner.exec_line("mktemp -d " .. ShellRunner.quote(base .. "/ergopti-agent.XXXXXXXX"))
+	local created, output = ShellRunner.exec_checked(
+		"mktemp -d " .. ShellRunner.quote(base .. "/ergopti-agent.XXXXXXXX"), { output_dir = base })
+	if not created or type(output) ~= "string" then return nil end
+	local path = output:gsub("\n$", "")
+	return path ~= "" and path or nil
 end
 
 --- Random hexadecimal digits from the kernel's generator.
@@ -114,10 +119,15 @@ local function list_executables(dir)
 		return nil, "the tools folder could not be created"
 	end
 	local ok, output, err = ShellRunner.exec_checked("find " .. ShellRunner.quote(dir)
-		.. " -mindepth 1 -maxdepth 1 -type f -perm -u+x -printf '%f\\n' 2>/dev/null")
+		.. " -mindepth 1 -maxdepth 1 -type f -perm -u+x -printf '%f\\0' 2>/dev/null")
 	if not ok then return nil, tostring(err) end
-	local names = {}
-	for line in output:gmatch("[^\n]+") do names[#names + 1] = line end
+	local names, at = {}, 1
+	while at <= #output do
+		local finish = output:find("\0", at, true)
+		if not finish then return nil, "the tools listing is incomplete" end
+		names[#names + 1] = output:sub(at, finish - 1)
+		at = finish + 1
+	end
 	return names, nil
 end
 
@@ -141,12 +151,13 @@ local DEFAULT_DEPS = {
 	has_command = function(name) return ShellRunner.has_command(name) end,
 	private_dir = private_dir,
 	write_file = function(path, content)
-		local fh = io.open(path, "wb")
-		if not fh then return false end
-		-- A buffered write is not a complete calendar until close acknowledges it.
+		local fh, _, _, remove_owned, current_image = require("infra.regular_file_writer").open(path, "wx")
+		if not fh then return false, nil, nil, false end
+		-- Retain the native cleanup receipt even on an incomplete write.
 		local wrote, written = pcall(fh.write, fh, content)
 		local closed, flushed = pcall(fh.close, fh)
-		return wrote and written ~= nil and written ~= false and closed and flushed == true
+		return wrote and written ~= nil and written ~= false and closed and flushed == true,
+			remove_owned, current_image, true
 	end,
 	remove = function(path) return os.remove(path) end,
 	utc_stamp = function() return os.date("!%Y%m%dT%H%M%SZ") end,
@@ -178,7 +189,16 @@ function M.cleanup()
 			kept[#kept + 1] = file
 		else
 			local removed_file = true
-			if file.path then
+			if file.remove_owned then
+				local called, removed = pcall(file.remove_owned)
+				removed_file = called and removed == true
+				if not removed_file then
+					local checked, kind, _, code = pcall(function()
+						return require("infra.native_directory").target_kind(file.path)
+					end)
+					removed_file = checked and kind == nil and code == "ENOENT"
+				end
+			elseif file.path then
 				local removed, _, errno = _deps.remove(file.path)
 				removed_file = removed or errno == 2 -- Already absent after an interrupted write.
 			end
@@ -202,6 +222,12 @@ end
 -- =========================================
 -- =========================================
 
+local function copy_tools(names)
+	local copy = {}
+	for index, name in ipairs(names) do copy[index] = name end
+	return copy
+end
+
 --- The user's tools: the executable files of the tools folder, sorted, at most
 --- config.max_tools. Read again after TOOLS_TTL_SEC or refresh_tools().
 --- @param config table Decoded agent.json.
@@ -210,7 +236,9 @@ function M.tools(config)
 	if _stopping then return {} end
 	local now = _deps.clock()
 	if _stopping then return {} end
-	if _tools_cache and now - _tools_cache.at < TOOLS_TTL_SEC then return _tools_cache.names end
+	if _tools_cache and now >= _tools_cache.at and now - _tools_cache.at < TOOLS_TTL_SEC then
+		return copy_tools(_tools_cache.names)
+	end
 	local directory = _deps.tools_dir()
 	if _stopping then return {} end
 	local names, reason = _deps.list_executables(directory)
@@ -222,15 +250,18 @@ function M.tools(config)
 		Logger.warn(LOG, "The agent's tools could not be listed: %s.", tostring(reason))
 	else
 		table.sort(names)
+		local invalid_utf8 = false
 		for _, name in ipairs(names) do
 			if #kept >= limit then break end
 			if type(name) == "string" and name:match(TOOL_NAME_PATTERN) and name ~= "." and name ~= ".." then
-				kept[#kept + 1] = name
+				if Utf8.len(name) then kept[#kept + 1] = name
+				else invalid_utf8 = true end
 			end
 		end
+		if invalid_utf8 then Logger.warn(LOG, "Agent tools with invalid UTF-8 filenames were ignored.") end
 	end
 	_tools_cache = { at = now, names = kept }
-	return kept
+	return copy_tools(kept)
 end
 
 --- Forgets the tools list: the next tools() reads the folder again.
@@ -302,7 +333,7 @@ local function start_desktop(executable, args, on_done)
 	if _stopping then return false end
 	local job = {}
 	_desktop_jobs[job] = true
-	local called, operation, reason = pcall(_deps.run, executable, args, { timeout_ms = OPEN_TIMEOUT_MS }, function(result)
+	local called, operation, reason, cleanup = pcall(_deps.run, executable, args, { timeout_ms = OPEN_TIMEOUT_MS }, function(result)
 		if not _desktop_jobs[job] then return end
 		_desktop_jobs[job] = nil
 		if _stopping then M.cleanup(); return end
@@ -313,7 +344,14 @@ local function start_desktop(executable, args, on_done)
 	end)
 	if not called then error(operation, 0) end
 	if operation == nil then
-		_desktop_jobs[job] = nil
+		if cleanup then
+			-- A refused output watcher can still leave the launcher alive with
+			-- its calendar input; keep it until the exact child has retired.
+			pcall(cleanup.on_settled, function()
+				_desktop_jobs[job] = nil
+				M.cleanup()
+			end)
+		else _desktop_jobs[job] = nil end
 		if not _stopping then on_done(false, string.format("%s could not start: %s", executable, tostring(reason))) end
 		return false
 	end
@@ -349,9 +387,17 @@ local function open_ics(config, action, on_done, frame)
 	if _stopping then return false end
 	local path = dir .. "/" .. (action.type == "calendar" and "event" or "task") .. ".ics"
 	if _stopping then return false end
-	pending.path = path
-	local written = _deps.write_file(path, content)
+	-- The native writer owns no path until its exclusive-open receipt arrives.
+	-- Test boundaries retain their original path-based cleanup contract.
+	if _deps.write_file ~= DEFAULT_DEPS.write_file then pending.path = path end
+	local written, remove_owned, current_image, owned = _deps.write_file(path, content)
+	if owned == true then pending.path = path elseif owned == false then pending.path = nil end
+	if type(remove_owned) == "function" then pending.remove_owned = remove_owned end
 	if _stopping then return false end
+	if written and type(current_image) == "function" then
+		local checked, current = pcall(current_image, content)
+		written = checked and current == true
+	end
 	if not written then
 		M.cleanup()
 		on_done(false, "the calendar file could not be written")
@@ -370,6 +416,13 @@ local function open_mail(action, on_done)
 	local has_email = _deps.has_command("xdg-email")
 	if _stopping then return false end
 	if has_email then
+		for _, address in ipairs(action.to or {}) do
+			if address:sub(1, 1) == "-" then
+				-- A positional address beginning with '-' is parsed as an option
+				-- by xdg-email. Its documented mailto URI form is unambiguous.
+				return start_desktop("xdg-email", { Agent.mailto(action) }, on_done)
+			end
+		end
 		local args = { "--utf8" }
 		if action.subject then
 			args[#args + 1] = "--subject"
@@ -401,6 +454,16 @@ local function run_tool(config, action, on_done)
 	local known = false
 	for _, candidate in ipairs(M.tools(config)) do
 		if candidate == name then known = true end
+	end
+	if _stopping then return false end
+	if known then
+		-- The offered snapshot can be ten minutes old. Require the name in
+		-- both that snapshot and a fresh list before admitting execution.
+		_tools_cache = nil
+		known = false
+		for _, candidate in ipairs(M.tools(config)) do
+			if candidate == name then known = true end
+		end
 	end
 	if _stopping then return false end
 	if not known then

@@ -50,6 +50,8 @@ require("test.keystats_correction_erased_contract")(helpers, data, function(vec)
 		for _, ev in ipairs(flush) do events[#events + 1] = { ev.char, ev.delay, ev.meta or {} } end
 		agg.walk_typing({ app = data.app, timestamp = data.timestamps[index], events = events })
 	end
-	local ngram = require("modules.keystats.aggregator.state").agg_batch.ngram
-	return ngram
-end, 6)
+	local batch = require("modules.keystats.aggregator.state").agg_batch
+	local context = require("modules.keystats.aggregator.core").get_app_ctx(data.app)
+	local error_row = batch.errors[data.date .. "\1" .. data.app]
+	return batch.ngram, { bs_total = error_row.bs_total, cur_word = context.cur_word, word_err = context.word_err, hs_input_chars = (batch.app_day[data.date .. "\1" .. data.app] or {}).hs_input_chars or 0 }
+end, 11)

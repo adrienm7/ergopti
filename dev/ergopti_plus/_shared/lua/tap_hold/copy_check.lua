@@ -36,6 +36,7 @@ M.RETRY_REFUSED = "retry_refused"
 M.COUNTER_UNREADABLE = "counter_unreadable"
 M.TIMER_REFUSED = "timer_refused"
 M.SUPERSEDED = "superseded"
+M.CONTEXT_CHANGED = "context_changed"
 
 -- The outcomes after which the user is told the copy did not happen.
 local FAILURES = { [M.NOT_COPIED] = true, [M.RETRY_REFUSED] = true }
@@ -76,7 +77,8 @@ end
 --- @param pending table The check that ends.
 --- @param outcome string Outcome name.
 local function finish(self, pending, outcome)
-	if self.pending == pending then self.pending = nil end
+	if self.pending ~= pending then return false end
+	self.pending = nil
 	self.ports.report(outcome, {
 		source = pending.source,
 		attempts = pending.attempts,
@@ -91,8 +93,12 @@ local check
 --- @return boolean armed
 local function arm(self, pending)
 	local generation = pending.generation
-	local handle = self.ports.after(self.verify_ms, function() check(self, generation) end)
-	if handle == nil or handle == false then
+	local called, handle = pcall(self.ports.after, self.verify_ms, function() check(self, generation) end)
+	if self.pending ~= pending or pending.generation ~= generation then
+		if called and handle ~= nil and handle ~= false and self.ports.cancel then pcall(self.ports.cancel, handle) end
+		return false
+	end
+	if not called or handle == nil or handle == false then
 		finish(self, pending, M.TIMER_REFUSED)
 		return false
 	end
@@ -106,8 +112,9 @@ check = function(self, generation)
 	local pending = self.pending
 	if pending == nil or pending.generation ~= generation then return end
 	pending.timer = nil
-	local counter = self.ports.read_counter()
-	if type(counter) ~= "number" then
+	local called, counter = pcall(self.ports.read_counter)
+	if self.pending ~= pending or pending.generation ~= generation then return end
+	if not called or type(counter) ~= "number" then
 		finish(self, pending, M.COUNTER_UNREADABLE)
 		return
 	end
@@ -119,10 +126,29 @@ check = function(self, generation)
 		finish(self, pending, M.NOT_COPIED)
 		return
 	end
+	if pending.retry_guard then
+		local checked, current = pcall(pending.retry_guard)
+		if self.pending ~= pending then return end
+		if not checked or current ~= true then
+			finish(self, pending, M.CONTEXT_CHANGED)
+			return
+		end
+	end
 	pending.attempts = pending.attempts + 1
 	pending.baseline = counter
 	local sent_ok, sent = pcall(self.ports.send_copy)
+	if self.pending ~= pending or pending.generation ~= generation then return end
 	if not sent_ok or sent ~= true then
+		-- A retry its owner refused because the context changed meanwhile is not
+		-- a copy failure: report it as such instead of warning the user.
+		if pending.retry_guard then
+			local checked, current = pcall(pending.retry_guard)
+			if self.pending ~= pending or pending.generation ~= generation then return end
+			if not checked or current ~= true then
+				finish(self, pending, M.CONTEXT_CHANGED)
+				return
+			end
+		end
 		finish(self, pending, M.RETRY_REFUSED)
 		return
 	end
@@ -133,8 +159,11 @@ end
 --- @param baseline number|nil The counter read before the keystroke reached the
 ---   application; nil when it could not be read.
 --- @param source string What sent the copy, for the report.
+--- @param retry_guard function|nil Must prove that retrying is still safe.
 --- @return boolean started False when nothing can be checked.
-function Checker:start(baseline, source)
+function Checker:start(baseline, source, retry_guard)
+	assert(retry_guard == nil or type(retry_guard) == "function", "copy_check.start: invalid retry guard")
+	local generation = self.generation
 	local previous = self.pending
 	if previous ~= nil then
 		self.pending = nil
@@ -145,8 +174,10 @@ function Checker:start(baseline, source)
 			waited_ms = 0,
 		})
 	end
+	if self.generation ~= generation then return false end
 	self.generation = self.generation + 1
-	local pending = { baseline = baseline, attempts = 1, source = tostring(source), generation = self.generation }
+	local pending = { baseline = baseline, attempts = 1, source = tostring(source), generation = self.generation,
+		retry_guard = retry_guard }
 	if type(baseline) ~= "number" then
 		self.ports.report(M.COUNTER_UNREADABLE, { source = pending.source, attempts = 1, waited_ms = 0 })
 		return false
@@ -196,6 +227,8 @@ function M.reporter(log, warn_user)
 			log("warn", "Tap-hold copy from %s reached the clipboard only when sent again (%s ms).", source, waited)
 		elseif outcome == M.SUPERSEDED then
 			log("debug", "Tap-hold copy check from %s superseded by a newer copy.", source)
+		elseif outcome == M.CONTEXT_CHANGED then
+			log("warn", "Tap-hold copy from %s could not be retried because its original context is no longer proven.", source)
 		elseif M.is_failure(outcome) then
 			log("warn", "Tap-hold copy from %s never reached the clipboard (%s after %s ms); the user is warned.",
 				source, outcome, waited)

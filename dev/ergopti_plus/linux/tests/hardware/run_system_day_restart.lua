@@ -40,7 +40,8 @@ local function row(device, day)
 end
 init(database)
 local device = assert(W.query_rows("SELECT device_id FROM devices WHERE os='linux';"))[1]
-assert(device and device:match("^linux%-[a-zA-Z0-9_.%-]+$"))
+-- The collector's own device: the ledger identity, or linux-<host> without one.
+assert(device and device == K.ledger_status().device_id)
 assert(Clock.backend() == "luv.hrtime")
 local observation
 if phase == "first" then
@@ -145,13 +146,16 @@ else
 	check("modeled next-date baseline is isolated without old clock handoff", function()
 		assert(type(W.read_system_day) == "function")
 		local capture = Calendar.capture
-		local clock = capture()
+		-- Where the runtime has the suspend-aware boot clock, the sampler took it
+		-- at its first real sample, so the modeled midnight keeps the boot reading
+		-- of the same instant; elsewhere both readings are the monotonic clock.
+		local clock = capture(true)
 		local midnight = Calendar.next_midnight(clock.wall_ms)
 		local next_date = os.date("%Y-%m-%d", midnight / 1000)
 		assert(W.upsert_system_day(device, { date = next_date, awake_ms = 888 }))
-		Calendar.capture = function()
-			return { mono_ms = clock.mono_ms, wall_ms = midnight, date = next_date,
-				ts = os.date("!%Y-%m-%d %H:%M:%S", midnight / 1000) }
+		Calendar.capture = function(include_boot)
+			return { mono_ms = clock.mono_ms, boot_ms = include_boot and clock.boot_ms or nil, wall_ms = midnight,
+				date = next_date, ts = os.date("!%Y-%m-%d %H:%M:%S", midnight / 1000) }
 		end
 		local ok, next_day = pcall(Metrics.sample)
 		Calendar.capture = capture

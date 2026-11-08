@@ -79,6 +79,8 @@ function M.parse_applescript_paths(text)
 		if at > last then break end
 		if body:sub(at, at) ~= "," then return nil, "missing_separator" end
 		at = at + 1
+		while at <= last and body:sub(at, at):match("%s") do at = at + 1 end
+		if at > last then return nil, "trailing_separator" end
 	end
 	return paths, nil
 end

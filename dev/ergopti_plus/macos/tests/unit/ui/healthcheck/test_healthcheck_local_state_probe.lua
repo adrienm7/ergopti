@@ -29,9 +29,22 @@ local function with_core(body)
 	local saved_usb = hs.usb
 	local ok, err = pcall(helpers.with_stub_scope, {
 		"infra.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"adapters.accessibility_permission", "adapters.screen_capture",
 	}, function()
 		helpers.load_with_stubs("infra.logger")
-		local world = { signal_reads = 0 }
+		local world = { signal_reads = 0, tcc_reads = {} }
+		package.loaded["adapters.accessibility_permission"] = {
+			is_trusted = function()
+				world.tcc_reads[#world.tcc_reads + 1] = "accessibility"
+				return true
+			end,
+		}
+		package.loaded["adapters.screen_capture"] = {
+			permission_state = function()
+				world.tcc_reads[#world.tcc_reads + 1] = "screen_recording"
+				return false
+			end,
+		}
 		package.loaded["adapters.network_info"] = {
 			getSsidHash = function() return nil end,
 			getSignalStrength = function() world.signal_reads = world.signal_reads + 1; return 64 end,
@@ -134,8 +147,9 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			for _, step in ipairs(steps) do step() end
 			helpers.assert_eq(world.signal_reads, 1)
 			helpers.assert_eq(sections.network.wifi_signal, "64%")
-			helpers.assert_true(#sections.developer.modules_ok + #sections.developer.modules_failed == #steps - 4,
-				"one step per adapter, after the versions, input, USB and Wi-Fi ones")
+			helpers.assert_true(#sections.developer.modules_ok + #sections.developer.modules_failed
+				== #steps - 4 - #sections.permissions.items,
+				"one step per adapter, after the versions, input, USB, Wi-Fi and permission ones")
 			helpers.assert_true(#steps > 10, "the adapter specs were enumerated")
 		end)
 	end)
@@ -157,6 +171,38 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			helpers.assert_true(completed.sections.versions.commit ~= nil, "the steps fill the versions")
 			helpers.assert_true(completed.sections.input.shift ~= nil, "the steps fill the keyboard state")
 			helpers.assert_eq(#completed.sections.peripherals.items, 1, "the steps list the USB devices")
+			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
+			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
+		end)
+	end)
+
+	-- Field report 2026-11-06: phase A took 10.2 ms against 5, of which the
+	-- permissions 9.2: the Accessibility and Screen Recording queries are TCC
+	-- calls into another process, not memory reads.
+	helpers.it("phase A queries no TCC permission; the steps read them one per step (healthcheck-tcc-off-phase-a)", function()
+		with_core(function(Core, world)
+			local snapshot = Core.run()
+			helpers.assert_eq(world.tcc_reads, {}, "phase A queried a TCC permission on the run loop")
+			helpers.assert_eq(snapshot.sections.permissions.items, {}, "phase A reported a permission state")
+			for _, collector in ipairs(Core.last_phase_a().collectors) do
+				helpers.assert_true(collector.name ~= "permissions", "phase A still runs the permissions")
+			end
+			local steps = Core.local_state_steps(snapshot)
+			for _, step in ipairs(steps) do
+				local before = #world.tcc_reads
+				step()
+				helpers.assert_true(#world.tcc_reads - before <= 1, "one step queried more than one TCC permission")
+			end
+			helpers.assert_eq(#world.tcc_reads, 2, "the steps read Accessibility and Screen Recording once each")
+			local completed = Core.run({ complete_local = true, configuration = {} })
+			local states = {}
+			for _, item in ipairs(completed.sections.permissions.items) do states[item.id] = item.state end
+			helpers.assert_eq(states, { accessibility = "granted", input_monitoring = "unknown",
+				login_items = "unknown", screen_recording = "missing" }, "the report reads every permission live")
+			local ids = {}
+			for _, item in ipairs(completed.sections.permissions.items) do ids[#ids + 1] = item.id end
+			helpers.assert_eq(ids, { "accessibility", "input_monitoring", "login_items", "screen_recording" },
+				"the schema's order is kept")
 			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
 		end)

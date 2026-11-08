@@ -184,6 +184,37 @@ _HPX_FastSegmentStaysSilent() {
 		"a sub-threshold segment must log nothing at all — the profiler stays on permanently only because normal typing is silent")
 }
 
+; The suite resets the tracker between cases while earlier production segments
+; may still hold open frames. The reset kept the child time billed to those
+; frames, and the next segment opened at the same depth subtracted it from its
+; own time: the nested case above stayed silent on every CI run.
+_HPX_ResetForgetsDiscardedBilling() {
+	_HotPathResetForTest()
+	; Three frames left open, the third slow and billed to the second, as a
+	; segment that raised before its close leaves them.
+	HotPath_Now()
+	HotPath_Now()
+	Abandoned := HotPath_Now()
+	_HPX_BurnTicks(100)
+	HotPath_LogIfSlow("HpxAbandoned", Abandoned, "abandoned")
+	_HotPathResetForTest()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	Outer := HotPath_Now()
+	Inner := HotPath_Now()
+	_HPX_BurnTicks(25)
+	InnerEnd := PerfClockTicks()
+	HotPath_LogIfSlow("HpxInner", Inner, "inner")
+	HotPath_LogIfSlow("HpxOuter", Outer, "outer")
+	LoggerClearTestSink()
+
+	Assert(_HPX_FindLine(Captured, "Slow HpxInner:") != "",
+		"a segment opened after a reset owns all of its time, whatever the discarded frames held"
+		. _HPX_MissingLineEvidence("HpxInner", Inner, InnerEnd, Captured))
+	Assert(_HPX_FindLine(Captured, "Slow HpxAbandoned") == "",
+		"the discarded frames' pending report is forgotten with them")
+}
+
 
 Test("hotpath profiler: a nested segment is not billed to its parent",
 	_HPX_NestedSegmentIsNotBilledToItsParent)
@@ -195,3 +226,5 @@ Test("hotpath profiler: a repeated slow segment is rate limited",
 	_HPX_RepeatedSlowSegmentIsRateLimited)
 Test("hotpath profiler: a fast segment stays silent",
 	_HPX_FastSegmentStaysSilent)
+Test("hotpath profiler: a reset forgets the time billed to the frames it discards",
+	_HPX_ResetForgetsDiscardedBilling)

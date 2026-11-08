@@ -28,8 +28,10 @@ function M.new(ctx)
 	local core_keys = { llm_backend = "backend", llm_model_mlx = "llm_model_mlx",
 		llm_model_ollama = "llm_model_ollama", llm_active_profile = "active_profile_id",
 		llm_user_profiles = ConfigKeys.LEAF.USER_PROFILES }
+	-- The automatic profile lives only in the menu state the model switcher reads;
+	-- no keymap runtime owns it, so a scope reset settles it as a preference.
 	local preference_only = { llm_user_models = true, llm_arrow_nav_enabled = true,
-		llm_enabled = true }
+		llm_enabled = true, llm_auto_profile_for_model = true }
 	for _, row in ipairs(Manifest.scope_operations("llm", "clear")) do
 		local path = row.section .. "." .. row.key
 		local key = assert(Preferences.flat_key_for(path), "LLM preference owner missing: " .. path)

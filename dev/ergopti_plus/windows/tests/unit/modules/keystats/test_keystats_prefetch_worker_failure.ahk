@@ -27,6 +27,49 @@ _KLPFWF_ReportPreservesPrivacy() {
 Test("keystats prefetch worker: caught errors emit safe diagnostics (klpf-worker-failure)",
 	_KLPFWF_ReportPreservesPrivacy)
 
+; A projection that returns false instead of throwing used to report only
+; "(failure)": its closed reason now reaches the parent's transcript.
+_KLPFWF_ClosedReasonIsReported() {
+	Captured := ""
+	_KLPFWF_WriteReason(Line) {
+		Captured := Line
+	}
+	KLPF_WorkerReportFailure("projection", "the metrics database could not be built: purge_schema.sql is unreadable",
+		_KLPFWF_WriteReason)
+	AssertEqual("keystats-prefetch-worker: projection failed (the metrics database could not be built: "
+		. "purge_schema.sql is unreadable).`n", Captured)
+	Captured := ""
+	KLPF_WorkerReportFailure("projection", 0, _KLPFWF_WriteReason)
+	AssertEqual("keystats-prefetch-worker: projection failed (failure).`n", Captured,
+		"no reason stays the generic failure, never an invented one")
+}
+Test("keystats prefetch worker: a refused projection names its closed reason (klpf-worker-refusal-reason)",
+	_KLPFWF_ClosedReasonIsReported)
+
+; The reader names which schema refused, for the worker line above.
+_KLPFWF_SchemaRefusalIsNamed() {
+	global _SharedDir
+	Saved := _SharedDir
+	Root := A_Temp . "\ergopti_schema_refusal_" . A_TickCount . "_" . Random(1000, 999999)
+	Db := 0
+	try {
+		DirCreate(Root . "\data\db")
+		for Name in ["schema.sql", "media_schema.sql"]
+			FileCopy(Saved . "\data\db\" . Name, Root . "\data\db\" . Name)
+		_SharedDir := Root
+		Db := _KLRSQL_OpenMemory()
+		AssertFalse(KLR_LoadSchema(Db), "a store without purge_schema.sql cannot load")
+		AssertEqual("purge_schema.sql is unreadable", KLRCache.schema_refusal)
+	} finally {
+		_SharedDir := Saved
+		if Db
+			SQLite_Close(Db)
+		DirDelete(Root, true)
+	}
+}
+Test("keystats reader: a refused schema names the missing file (klpf-worker-refusal-reason)",
+	_KLPFWF_SchemaRefusalIsNamed)
+
 _KLPFWF_RefusalPreservesPrivacy(Field) {
 	_KLRDC_Reset()
 	Root := _KLRDC_Root()

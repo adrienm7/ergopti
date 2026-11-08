@@ -306,18 +306,16 @@ helpers.describe("independent complete fixed wrap declaration coverage", functio
 						helpers.assert_eq(actual.id, expected.id)
 						helpers.assert_eq(actual.i18n, expected.i18n)
 						helpers.assert_eq(actual.disabled_when, expected.disabled_when)
-						helpers.assert_eq(actual.platforms, wrap_expectations.platforms)
-						helpers.assert_eq(actual.unavailable, "hide")
+						-- Declared for every driver: Linux manages its pairs too.
+						helpers.assert_eq(actual.platforms, nil)
+						helpers.assert_eq(actual.unavailable, nil)
 						if expected.id then commands[expected.id] = function() error("projection must not deliver a native effect", 0) end end
 					end
 					local rows = assert(renderer.template_rows(section.section, commands, { wrap_symbols_ready = function() return true end }))
-					if platform == "linux" then helpers.assert_eq(rows, {})
-					else
-						helpers.assert_eq(#rows, #section.rows)
-						for index, expected in ipairs(section.rows) do
-							if expected.separator then helpers.assert_eq(rows[index], { separator = true })
-							else helpers.assert_eq(rows[index].label, expected.i18n) end
-						end
+					helpers.assert_eq(#rows, #section.rows)
+					for index, expected in ipairs(section.rows) do
+						if expected.separator then helpers.assert_eq(rows[index], { separator = true })
+						else helpers.assert_eq(rows[index].label, expected.i18n) end
 					end
 				end
 			end
@@ -608,6 +606,7 @@ local function with_shortcut_presentation(language, scenario)
 			block_alert = function() return true end,
 		}
 		local menu = require("ui.menu.menu_shortcuts")
+		local active_url = "https://hand.original/"
 		local context = {
 			state = { shortcuts = true, chatgpt_url = "https://hand.original/", wrap_symbol_states = {}, custom_wrap_symbols = {} },
 			shortcuts = {
@@ -615,13 +614,21 @@ local function with_shortcut_presentation(language, scenario)
 				list_shortcuts = function() return {} end,
 				is_enabled = function() return true end,
 				set_wrap_pairs_getter = function() effects.catalogue_wires = effects.catalogue_wires + 1 end,
-				set_chatgpt_url = function(url) effects.urls[#effects.urls + 1] = url end,
+				set_chatgpt_url = function(url) effects.urls[#effects.urls + 1] = url; active_url = url; return true end,
+				get_chatgpt_url = function() return active_url end,
 			},
 			applyTriggerChar = function(value) return value end,
 			save_prefs = function() effects.saves = effects.saves + 1; return true end,
 			updateMenu = function() effects.updates = effects.updates + 1 end,
 			notify_feature = function() end,
 		}
+		local owner = require("ui.menu.chatgpt_url_transaction").new({
+			state = context.state, shortcuts = context.shortcuts,
+			paused = function() return false end,
+			admission = function(_, callback) return callback() end,
+			save_prefs = function() return context.save_prefs() end,
+		})
+		context.commit_chatgpt_url = owner.set
 		local function build()
 			local item = menu.build(context)
 			return item and renderer.render_rows({ item }, "top_level")[1] or nil
@@ -663,6 +670,38 @@ helpers.describe("complete declared Shortcut presentation", function()
 			end)
 		end)
 	end
+
+	helpers.it("edits an empty saved URL whose live value is the default", function()
+		with_shortcut_presentation("en", function(f)
+			f.ctx.state.chatgpt_url = ""
+			local active = "https://chat.openai.com"
+			f.ctx.shortcuts.set_chatgpt_url = function(url) active = url; return true end
+			f.ctx.shortcuts.get_chatgpt_url = function() return active end
+			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
+			local raw = assert(file:read("*a")); assert(file:close())
+			local hand = assert(require("adapters.json_codec").decode(raw)).en
+			local editor = assert(shortcut_nested_row(assert(f.build()).menu, hand.mac_url))
+			editor.fn()
+			helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.changed/")
+			helpers.assert_eq(active, "https://hand.changed/")
+		end)
+	end)
+
+	helpers.it("keeps the live ChatGPT URL when preference admission is refused", function()
+		with_shortcut_presentation("en", function(f)
+			local active = "https://hand.original/"
+			f.ctx.shortcuts.set_chatgpt_url = function(url) active = url; return true end
+			f.ctx.shortcuts.get_chatgpt_url = function() return active end
+			f.ctx.save_prefs = function() return false end
+			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
+			local raw = assert(file:read("*a")); assert(file:close())
+			local hand = assert(require("adapters.json_codec").decode(raw)).en
+			local editor = assert(shortcut_nested_row(assert(f.build()).menu, hand.mac_url))
+			editor.fn()
+			helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.original/")
+			helpers.assert_eq(active, "https://hand.original/")
+		end)
+	end)
 
 	helpers.it("withdraws the true wrap declaration before native child construction and repairs it", function()
 		with_shortcut_presentation("en", function(f)

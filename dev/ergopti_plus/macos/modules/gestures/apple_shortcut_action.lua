@@ -79,21 +79,43 @@ end
 --- @param success boolean|nil True when the shortcut completed.
 --- @param category string|nil The closed terminal category.
 local function release(run, success, category)
+	if run.cancelled then success, category = false, "cancelled" end
+	run.release_pending = { success = success == true, category = category }
+	-- A native allocation or write can reenter PAUSE and still return a newly
+	-- created file afterward. Keep the run published until that call returns so
+	-- its exact temporary paths can be attached and removed before a successor.
+	if (run.acquiring or 0) > 0 or run.releasing then return false end
+	run.releasing = true
+	local settled = true
 	for _, field in ipairs({ "input_path", "output_path" }) do
 		local path = run[field]
-		run[field] = nil
 		if path then
-			local removed, detail = FileSystem.remove_exact(path)
-			if not removed then Logger.error(LOG, "A temporary file of a shortcut run stayed: %s.", tostring(detail)) end
+			local ok, removed, detail = pcall(FileSystem.remove_exact, path)
+			local absent = false
+			if not ok or removed ~= true then
+				local classified, _, status = pcall(FileSystem.classify_no_follow, path)
+				absent = classified and status == "absent"
+			end
+			if (ok and removed == true) or absent then
+				run[field] = nil
+			else
+				settled = false
+				Logger.error(LOG, "A temporary file of a shortcut run stayed: %s.", tostring(ok and detail or removed))
+			end
 		end
 	end
+	run.releasing = false
+	if not settled then return false end
+	local outcome = run.release_pending
+	run.release_pending = nil
 	if _run == run then _run = nil end
 	local observer = run.on_finished
 	run.on_finished = nil
 	if observer then
-		local ok, err = pcall(observer, success == true, category or (success and "completed" or "refused"))
+		local ok, err = pcall(observer, outcome.success, outcome.category or (outcome.success and "completed" or "refused"))
 		if not ok then Logger.error(LOG, "A shortcut run observer raised: %s.", tostring(err)) end
 	end
+	return true
 end
 
 --- Pausing a parent cancels its run: the owner invalidates its choices and
@@ -182,8 +204,13 @@ end
 --- Reads the text a finished run wrote and types or copies it.
 --- @param run table
 local function deliver(run)
+	local function admitted()
+		return _run == run and not run.cancelled and not AuxOwner.is_paused(run.parent)
+	end
+	if not admitted() then return end
 	if run.fields.output == "none" then return end
 	local status, attributes = FileSystem.path_status(run.output_path)
+	if not admitted() then return end
 	if status ~= "present" or type(attributes) ~= "table" then
 		Logger.warn(LOG, "A shortcut run returned no text output.")
 		return
@@ -193,8 +220,18 @@ local function deliver(run)
 		UserActions.notify("user_actions.command_output_too_large", M.MAX_OUTPUT_BYTES)
 		return
 	end
-	UserActions.deliver_output(FileSystem.read(run.output_path) or "", run.fields.output, run.max_typed,
-		"A shortcut run")
+	local output, read_status = FileSystem.read_bounded(run.output_path, M.MAX_OUTPUT_BYTES)
+	if not admitted() then return end
+	if read_status == "too_large" then
+		Logger.error(LOG, "A shortcut run returned more than %d bytes.", M.MAX_OUTPUT_BYTES)
+		UserActions.notify("user_actions.command_output_too_large", M.MAX_OUTPUT_BYTES)
+		return
+	end
+	if type(output) ~= "string" then
+		Logger.error(LOG, "A shortcut run's text output could not be read.")
+		return
+	end
+	UserActions.deliver_output(output, run.fields.output, run.max_typed, "A shortcut run")
 end
 
 --- Invokes the stored shortcut once its input is ready: discovers, refuses a
@@ -210,7 +247,10 @@ local function invoke(run)
 	local function admitted()
 		return _run == run and not run.cancelled and not AuxOwner.is_paused(run.parent)
 	end
+	local discovery_delivered = false
 	local accepted, refused = current.discover(function(result, discover_reason)
+		if discovery_delivered then return end
+		discovery_delivered = true
 		if not admitted() then release(run, false, "admission_refused"); return end
 		if not result then
 			report_refusal(run, discover_reason)
@@ -230,8 +270,11 @@ local function invoke(run)
 			release(run, false, category)
 			return
 		end
+		local invocation_delivered = false
 		local invoked, invoke_reason = current.invoke(result.choices[index].key, M.CONSUMER, admitted,
 			function(success, terminal)
+				if invocation_delivered then return end
+				invocation_delivered = true
 				if success then
 					Logger.success(LOG, "A shortcut run completed.")
 					deliver(run)
@@ -240,12 +283,14 @@ local function invoke(run)
 				end
 				release(run, success, terminal)
 			end)
-		if not invoked then
+		if not invoked and not invocation_delivered then
+			invocation_delivered = true
 			report_refusal(run, invoke_reason)
 			release(run, false, invoke_reason)
 		end
 	end)
-	if not accepted then
+	if not accepted and not discovery_delivered then
+		discovery_delivered = true
 		report_refusal(run, refused)
 		release(run, false, refused)
 	end
@@ -254,18 +299,36 @@ end
 --- Creates a private temporary file for a run, or nil when none could be made.
 --- @param content string|nil Text to write, nil for an empty file.
 --- @return string|nil path
-local function temp_file(content)
+local function temp_file(run, field, content)
 	local path, detail = FileSystem.create_secure_temp_file()
 	if not path then
 		Logger.error(LOG, "No temporary file for a shortcut run: %s.", tostring(detail))
 		return nil
 	end
-	if content ~= nil and FileSystem.write(path, content) ~= true then
-		Logger.error(LOG, "The input of a shortcut run could not be written.")
-		FileSystem.remove_exact(path)
+	run[field] = path
+	if run.cancelled then return nil end
+	if content ~= nil then
+		local written = FileSystem.write(path, content)
+		if run.cancelled then return nil end
+		if written ~= true then
+			Logger.error(LOG, "The input of a shortcut run could not be written.")
+			return nil
+		end
+	end
+	if run.cancelled then return nil end
+	return path
+end
+
+--- Keeps a reentrant cancellation pending until the native acquisition returns.
+local function acquire_temp_file(run, field, content)
+	run.acquiring = run.acquiring + 1
+	local ok, result = xpcall(temp_file, debug.traceback, run, field, content)
+	run.acquiring = run.acquiring - 1
+	if not ok then
+		Logger.error(LOG, "A shortcut temporary file acquisition failed: %s.", tostring(result))
 		return nil
 	end
-	return path
+	return result
 end
 
 --- Runs a decoded run_apple_shortcut parameter.
@@ -276,17 +339,26 @@ end
 ---   (the field run reads it); never called when the run does not start.
 --- @return boolean started
 function M.run(fields, parent, max_typed, on_finished)
+	if _run and _run.release_pending then
+		local pending = _run.release_pending
+		release(_run, pending.success, pending.category)
+	end
 	if _run then
 		Logger.warn(LOG, "A shortcut run is still in flight: this one is refused.")
 		UserActions.notify("user_actions.shortcut_busy")
 		return false
 	end
-	local run = { fields = fields, parent = parent, max_typed = max_typed,
+	local scope_id = type(parent) == "string" and parent ~= "" and parent or "gestures"
+	local run = { fields = fields, parent = scope_id, max_typed = max_typed, acquiring = 0,
 		timeout_sec = M.RUN_TIMEOUT_SEC, max_bytes = M.MAX_OUTPUT_BYTES, on_finished = on_finished }
 	_run = run
 	if fields.output ~= "none" then
-		run.output_path = temp_file(nil)
-		if not run.output_path then
+		local allocated = acquire_temp_file(run, "output_path", nil)
+		if run.cancelled then
+			release(run, false, "cancelled")
+			return false
+		end
+		if not allocated then
 			run.on_finished = nil
 			release(run)
 			UserActions.notify("user_actions.shortcuts_unavailable")
@@ -294,6 +366,7 @@ function M.run(fields, parent, max_typed, on_finished)
 		end
 	end
 	Logger.start(LOG, "Running the shortcut of a run_apple_shortcut binding…")
+	if _run ~= run or run.cancelled then return false end
 	if fields.input ~= "selection" then
 		invoke(run)
 		return true
@@ -301,14 +374,16 @@ function M.run(fields, parent, max_typed, on_finished)
 	local Text = require("modules.shortcuts.actions.text")
 	local started = Text.read_copied_selection(parent, function(selection)
 		if _run ~= run or run.cancelled then return end
-		run.input_path = temp_file(selection)
-		if not run.input_path then
+		local allocated = acquire_temp_file(run, "input_path", selection)
+		if run.cancelled then release(run, false, "cancelled"); return end
+		if not allocated then
 			release(run, false, "input_refused")
 			UserActions.notify("user_actions.shortcuts_unavailable")
 			return
 		end
 		invoke(run)
 	end, function()
+		if _run ~= run or run.cancelled then return end
 		Logger.warn(LOG, "Nothing was selected: the shortcut was not run.")
 		UserActions.notify("user_actions.no_selection")
 		release(run, false, "no_selection")

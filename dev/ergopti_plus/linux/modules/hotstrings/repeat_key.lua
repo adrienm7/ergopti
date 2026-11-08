@@ -42,6 +42,10 @@ local ConfigKeys = require("config_keys")
 
 local LOG = "hotstrings.repeat_key"
 
+-- The hotstring category whose delay is the repeat's activation window: the
+-- magic key's, macOS's STAR_TRIGGER (decision of 2026-11-06).
+M.WINDOW_CATEGORY = "magickey"
+
 local FEATURE_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local _enabled = nil -- populated once; no preference IO on each keystroke
 
@@ -150,7 +154,7 @@ end
 --- Publishes a sparse canonical preference before changing runtime state.
 --- @param enabled boolean Desired state.
 --- @return boolean committed
-function M.set_enabled(enabled)
+local function set_enabled(enabled, on_notice)
 	if type(enabled) ~= "boolean" then return false end
 	-- The hotstrings scope owns this leaf while it holds the preferences.
 	if Preferences.is_acquired() then
@@ -160,7 +164,7 @@ function M.set_enabled(enabled)
 	local called, committed, detail = pcall(function()
 		local _, source = read_setting()
 		return Writer.batch_write(Paths.config("config.toml"),
-			{ Manifest.sparse_operation(FEATURE_PATH, enabled) }, nil, source)
+			{ Manifest.sparse_operation(FEATURE_PATH, enabled) }, nil, source, nil, nil, on_notice)
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "Repeat configuration was not persisted: %s.", tostring(called and detail or committed))
@@ -171,10 +175,26 @@ function M.set_enabled(enabled)
 	return true
 end
 
+--- Sets the repeat preference using its durable owner.
+--- @param enabled boolean Desired state.
+--- @return boolean committed
+function M.set_enabled(enabled)
+	return set_enabled(enabled)
+end
+
 --- Flips it.
 --- @return boolean
 function M.toggle()
 	return M.set_enabled(not M.is_enabled())
+end
+
+--- Toggles with a receipt for an error notice owned by this exact attempt.
+--- @return boolean committed
+--- @return boolean noticed
+function M.toggle_with_notice()
+	local noticed = false
+	local committed = set_enabled(not M.is_enabled(), function() noticed = true end)
+	return committed, noticed
 end
 
 

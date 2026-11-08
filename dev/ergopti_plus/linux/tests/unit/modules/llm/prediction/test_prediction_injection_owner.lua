@@ -8,6 +8,7 @@
 --- belongs to the separate GTK proof; these cases claim no kernel input coverage.
 --- ==============================================================================
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 
 --- Runs a complete offer/accept workflow and restores every imported module.
 --- @param action string Transition to deliver, or stable.
@@ -22,11 +23,12 @@ local function scenario(action, phase, body)
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "adapters.secure_field_detector",
 			"adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end
-		local state = { bus = ":1.23", path = "/field/original", role = 61, now = 1000,
+		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
 			owner_captures = 0, apply_admissions = 0, clipboard_reads = 0 }
 		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
-		logger.set_sink(function() end)
+		logger.set_level("trace")
+		logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function(_, template) state.errors[#state.errors + 1] = template end)
 		package.loaded["logger.shim"] = logger
 		local policy = require("modules.keystats.keystats")
@@ -90,7 +92,8 @@ local function scenario(action, phase, body)
 		local clipboard = "SAVED"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec_checked = function()
+			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 				state.clipboard_reads = state.clipboard_reads + 1
 				transition("read"); return true, clipboard
 			end,
@@ -182,6 +185,16 @@ local function scenario(action, phase, body)
 end
 
 helpers.describe("AI continuation retains its injection authority", function()
+	for _, route in ipairs({ "native", "clipboard" }) do
+		helpers.it("keeps the accepted " .. route .. " prediction out of real trace logs", function()
+			scenario("stable", route, function(accepted, state)
+				helpers.assert_true(accepted and state.completed)
+				local logs = table.concat(state.logs, "\n")
+				helpers.assert_nil(logs:find(state.text, 1, true), "generated prediction text must not enter the log")
+				helpers.assert_true(logs:find("content withheld", 1, true) ~= nil, "the real private injector path is used")
+			end)
+		end)
+	end
 	for _, route in ipairs({ "native", "clipboard" }) do
 		helpers.it("refuses a dry-run " .. route .. " prediction before output", function()
 			scenario("dry-run", route, function(accepted, state)

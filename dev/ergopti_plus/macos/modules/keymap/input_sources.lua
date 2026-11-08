@@ -311,9 +311,8 @@ end
 --- The result is filtered to ``kTISTypeKeyboardLayout`` so non-keyboard
 --- entries that always sit in ``AppleEnabledInputSources`` (PressAndHold,
 --- CharacterPalette, IMEs) are dropped at the source rather than after the
---- fact. Exactly one record carries ``selected = true`` — the layout
---- macOS would route a keystroke to right now — which is what the menu
---- uses to render the checkmark on the active row.
+--- fact. A unique name match carries ``selected = true``; an ambiguous name
+--- cannot identify the active source and therefore selects no row.
 ---
 --- A defensive Lua-side filter also drops ids that look like input methods
 --- or services in case the TIS type predicate is partially honoured by
@@ -353,6 +352,22 @@ local function is_record_selected(kl_name, display, current_name)
 	return display_no_space == current_lower
 end
 
+--- A localized current name can match several distinct source identities.
+--- Refuse to choose when that happens: the name alone cannot prove which is live.
+--- @param records table Input-source records.
+--- @param current_name string|nil Current layout name.
+local function select_unique_record(records, current_name)
+	local match = nil
+	local ambiguous = false
+	for _, record in ipairs(records) do
+		record.selected = false
+		if is_record_selected(record.id or "", record.name or "", current_name) then
+			if match then ambiguous = true else match = record end
+		end
+	end
+	if match and not ambiguous then match.selected = true end
+end
+
 --- Parses the enabled input sources the HIToolbox probe printed into menu
 --- records: every entry whose kind is a keyboard layout (or unset) and that
 --- names its layout. Pure (no I/O), so it is unit-testable and never runs a
@@ -380,8 +395,9 @@ local function parse_active_layouts(raw_out, current_name)
 		-- hs.keycodes.setLayout() and currentLayout() understand.
 		local ergopti_display = format_ergopti_display(kl_name)
 		local display = ergopti_display or kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
-		out[#out + 1] = { id = kl_name, name = display, selected = is_record_selected(kl_name, display, current_name) }
+		out[#out + 1] = { id = kl_name, name = display, selected = false }
 	end
+	select_unique_record(out, current_name)
 	return out
 end
 
@@ -397,9 +413,10 @@ local function compute_active_layouts_fast(current_name)
 		local layouts = hs.keycodes.layouts() or {}
 		for _, name in ipairs(layouts) do
 			local display = format_ergopti_display(name) or name
-			out[#out + 1] = { id = name, name = display, selected = is_record_selected(name, display, current_name) }
+			out[#out + 1] = { id = name, name = display, selected = false }
 		end
 	end
+	select_unique_record(out, current_name)
 	return out
 end
 
@@ -604,9 +621,7 @@ local function list_active_keyboard_layouts()
 	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
 		and hs.keycodes.currentLayout() or nil
 	if _active_layouts_cache then
-		for _, r in ipairs(_active_layouts_cache) do
-			r.selected = is_record_selected(r.id or "", r.name or "", current_name)
-		end
+		select_unique_record(_active_layouts_cache, current_name)
 		maybe_refresh_active_layouts(false)
 		return _active_layouts_cache
 	end
@@ -709,19 +724,23 @@ end
 --- first). Returns nil if no bundle is installed. The bundle itself says what it
 --- installs, so no list of variants is written here.
 --- Example: { ["Ergopti_v2_2_2_plus"] = "com.apple.keyboardlayout.ergopti.plus", ... }
---- @return table|nil
-function build_kl_name_to_tis_id()
-	local sb_sys  = highest_installed(SYSTEM_LAYOUTS_DIR)
-	local sb_user = highest_installed(USER_LAYOUTS_DIR)
+--- @param installed table|nil { system, user } highest_installed() of both scopes, read once
+---        by a caller that needs them several times (the menu build); read here when nil.
+--- @return table|nil map
+--- @return table|nil variants The bundle_variants() list the map was built from.
+function build_kl_name_to_tis_id(installed)
+	local sb_sys  = installed and installed.system or not installed and highest_installed(SYSTEM_LAYOUTS_DIR) or nil
+	local sb_user = installed and installed.user or not installed and highest_installed(USER_LAYOUTS_DIR) or nil
 	local sb      = sb_sys or sb_user
 	local sb_dir  = sb_sys and SYSTEM_LAYOUTS_DIR or (sb_user and USER_LAYOUTS_DIR) or nil
 	if not sb or not sb_dir then return nil end
 	local bundle_path = NativePath.without_trailing_separators(sb_dir) .. "/" .. sb.name
 	local map = {}
-	for _, variant in ipairs(install.bundle_variants(bundle_path)) do
+	local variants = install.bundle_variants(bundle_path)
+	for _, variant in ipairs(variants) do
 		map[variant.name] = variant.tis_id
 	end
-	return map
+	return map, variants
 end
 
 
@@ -1275,11 +1294,29 @@ end
 local function is_legacy_ergopti_id(name)
 	if type(name) ~= "string" then return false end
 	local lower = name:lower()
-	-- Versioned IDs (any namespace)
-	if lower:find("ergopti[._]v%d", 1) ~= nil then return true end
-	-- Short reserved namespace, only for Ergopti
-	if lower:find("^com%.apple%.keylayout%.ergopti", 1) ~= nil then return true end
-	return false
+	local raw_suffixes = { [""] = true, ["_plus"] = true, ["_ansi"] = true,
+		["_plus_ansi"] = true, ["_plus_plus"] = true, ["_plus_plus_ansi"] = true }
+	local id_suffixes = { [""] = true, [".plus"] = true, [".ansi"] = true,
+		[".plus.ansi"] = true, [".plus_plus"] = true, [".plus_plus.ansi"] = true }
+	local raw = lower:match("^ergopti(.*)$")
+	local versioned_id = lower:match("^com%.apple%.keyboardlayout%.ergopti(.*)$")
+	local short_id = lower:match("^com%.apple%.keylayout%.ergopti(.*)$")
+	if short_id ~= nil and id_suffixes[short_id] then return true end
+	local tail, suffixes = raw or versioned_id or short_id, raw and raw_suffixes or id_suffixes
+	if tail == nil then return false end
+	if raw and raw_suffixes[tail] then return true end
+	-- Version numbers consist of digits separated by dots or underscores. Only
+	-- known variant suffixes may follow, so a third-party name cannot claim a
+	-- source merely by beginning with an Ergopti-looking version.
+	local remainder = tail:match("^[._]v%d+(.*)$")
+	if remainder == nil then return false end
+	while true do
+		local after = remainder:match("^[._]%d+(.*)$")
+		if after == nil then break end
+		remainder = after
+	end
+	-- The old prefix-free ID spelling (ergopti.v2_2_0.plus) uses ID suffixes.
+	return suffixes[remainder] == true or (raw and id_suffixes[remainder] == true) or false
 end
 
 --- Maps a legacy Ergopti identifier to its v2.2.2+ stable equivalent.
@@ -1317,6 +1354,10 @@ local function upgrade_active_list_async(legacy_active, on_done)
 	local entry_count = 0
 	for index, old in pairs(legacy_active) do
 		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > requested_upgrades then
+			invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+			return false
+		end
+		if not is_legacy_ergopti_id(old) then
 			invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
 			return false
 		end
@@ -1376,10 +1417,11 @@ end
 
 --- Returns the highest Ergopti version installed across the user and system
 --- keyboard-layout directories, or nil when none is present.
+--- @param installed table|nil { system, user } both scopes already read; read here when nil.
 --- @return table|nil Numeric version components, e.g. {2,2,1}.
-local function resolve_installed_ergopti_version()
-	local user_best   = highest_installed(USER_LAYOUTS_DIR)
-	local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
+local function resolve_installed_ergopti_version(installed)
+	local user_best   = installed and installed.user or not installed and highest_installed(USER_LAYOUTS_DIR) or nil
+	local system_best = installed and installed.system or not installed and highest_installed(SYSTEM_LAYOUTS_DIR) or nil
 	if user_best and system_best then
 		return version_gt(user_best.version, system_best.version)
 			and user_best.version or system_best.version
@@ -1397,8 +1439,9 @@ end
 --- never has to display ``v0.0.0`` for an entry that the user is happily
 --- running.
 --- @param records table List of records from :func:`list_active_keyboard_layouts`.
+--- @param installed table|nil { system, user } both scopes already read; read here when nil.
 --- @return table { present = boolean, name = string|nil, id = string|nil, version = table|nil }
-local function ergopti_in_active_layouts(records)
+local function ergopti_in_active_layouts(records, installed)
 	for _, r in ipairs(records) do
 		local id = (r and r.id) or ""
 		if type(id) == "string" and id:lower():find("ergopti", 1, true) then
@@ -1406,7 +1449,7 @@ local function ergopti_in_active_layouts(records)
 			-- Stable-id entries (no version embedded): substitute the version
 			-- of whatever bundle is installed locally.
 			if v and v[1] == 0 and v[2] == 0 and v[3] == 0 then
-				v = resolve_installed_ergopti_version() or v
+				v = resolve_installed_ergopti_version(installed) or v
 			end
 			return { present = true, name = r.name, id = id, version = v }
 		end

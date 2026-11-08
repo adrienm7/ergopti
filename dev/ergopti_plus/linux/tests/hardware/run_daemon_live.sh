@@ -8,12 +8,17 @@
 # real daemon, a real trigger, a real prediction, and the tray it shows.
 #
 # Needs root (uinput and the grab), Xvfb, dbus-launch, at-spi2-core, openbox,
-# xkbcomp, xclip, python3-gi with Gtk 3. Run from anywhere.
+# xkbcomp, xclip, python3-gi with Gtk 3, lua-lgi. Run from anywhere.
 # Exit 0 = expansion and tray both verified; 1 = a failure; 2 = no environment.
 
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+# lua-lgi installs for the distro's Lua, not for LuaJIT. Without it the daemon
+# has no tooltip renderer, retires every prediction offer it cannot draw, and
+# the AI phase sees its accepting digit typed instead.
+export LUA_PATH="${LUA_PATH};/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
 BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
 	[ -x "${candidate}" ] && BUS_LAUNCHER="${candidate}" && break
@@ -22,6 +27,7 @@ for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp xclip; do
 	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
+luajit -e 'require("lgi")' >/dev/null 2>&1 || { echo "ENVIRONMENT: lgi is unreachable from LuaJIT (lua-lgi)" >&2; exit 2; }
 python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
 # Keep the new race regressions on the native lane, beyond recorder-based units.
 for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py run_secure_focus_watch.py; do

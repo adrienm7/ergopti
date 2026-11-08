@@ -758,4 +758,93 @@ helpers.describe("LLM API persistence transaction", function()
 				"tombstone may clear only after delete and settings readback both commit")
 		end)
 	end)
+
+	--- A committed entry whose Keychain account holds OLD, plus an in-memory
+	--- Keychain that the fixture's write and delete jobs mutate.
+	local function replacement_world(extra)
+		local keychain = { ["entry-a"] = "OLD" }
+		local options = {
+			initial_store = {
+				[API_STATE_KEY] = {
+					version = 1, active_id = "entry-a", pending_keychain_deletes = {},
+					entries = { { id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" } },
+				},
+			},
+			on_encrypt_start = function(job)
+				keychain[job.id] = job.cleartext
+				job.callback(true, "keychain:" .. job.id, nil)
+			end,
+		}
+		for key, value in pairs(extra or {}) do options[key] = value end
+		return keychain, options
+	end
+
+	--- Applies the fixture's recorded delete jobs to the in-memory Keychain.
+	local function apply_deletes(fixture, keychain)
+		for _, job in ipairs(fixture.delete_jobs) do keychain[job.id] = nil end
+	end
+
+	helpers.it("(api-token-replacement-revision) a refused publication keeps the old secret behind the restored reference", function()
+		local keychain, options = replacement_world({ corrupt_on_write = 2 })
+		with_persistence_fixture(options, function(llm, fixture)
+			helpers.assert_eq(llm.load_api_entries(), true)
+			fixture.api_remote.set_entries({ { id = "entry-a", provider = "openai", token = "NEW", model = "gpt" } })
+			fixture.api_remote.set_active_entry_id("entry-a")
+			local result
+			llm.persist_api_entries(function(ok, reason, durable) result = { ok, reason, durable } end)
+			apply_deletes(fixture, keychain)
+			helpers.assert_eq(result[1], false)
+			helpers.assert_eq(result[2], "settings_readback_failed")
+			helpers.assert_eq(fixture.store[API_STATE_KEY].entries[1].token, "keychain:entry-a",
+				"the rolled-back metadata keeps its reference")
+			helpers.assert_eq(#fixture.encrypt_jobs, 1)
+			helpers.assert_true(fixture.encrypt_jobs[1].id ~= "entry-a",
+				"the new secret is never written over the referenced account")
+			helpers.assert_eq(keychain["entry-a"], "OLD", "the restored reference still resolves to the old secret")
+			helpers.assert_nil(keychain[fixture.encrypt_jobs[1].id], "the unpublished revision is cleaned up")
+			for _, job in ipairs(fixture.delete_jobs) do
+				helpers.assert_true(job.id ~= "entry-a", "the referenced account is never deleted")
+			end
+		end)
+	end)
+
+	helpers.it("(api-token-replacement-revision) a committed replacement retires the superseded account", function()
+		local keychain, options = replacement_world()
+		with_persistence_fixture(options, function(llm, fixture)
+			helpers.assert_eq(llm.load_api_entries(), true)
+			fixture.api_remote.set_entries({ { id = "entry-a", provider = "openai", token = "NEW", model = "gpt" } })
+			fixture.api_remote.set_active_entry_id("entry-a")
+			local result
+			llm.persist_api_entries(function(ok, reason, durable) result = { ok, reason, durable } end)
+			apply_deletes(fixture, keychain)
+			helpers.assert_eq(result[1], true, tostring(result[2]))
+			local reference = fixture.store[API_STATE_KEY].entries[1].token
+			helpers.assert_eq(reference, "keychain:entry-a#r1")
+			helpers.assert_eq(keychain["entry-a#r1"], "NEW")
+			helpers.assert_nil(keychain["entry-a"], "the superseded secret is deleted after the commit")
+			helpers.assert_eq(#fixture.store[API_STATE_KEY].pending_keychain_deletes, 0)
+		end)
+		with_persistence_fixture({ initial_store = options.initial_store }, function(llm, fixture)
+			helpers.assert_eq(llm.load_api_entries(), true, "a revision reference reloads")
+			helpers.assert_eq(fixture.get_entries()[1].token, "keychain:entry-a#r1")
+		end)
+	end)
+
+	helpers.it("(api-token-replacement-revision) refuses a revision of another entry or a shared account", function()
+		for _, entries in ipairs({
+			{ { id = "entry-a", provider = "openai", token = "keychain:entry-b#r1", model = "gpt" } },
+			{ { id = "entry-a", provider = "openai", token = "keychain:entry-a#r0", model = "gpt" } },
+			{
+				{ id = "entry-a", provider = "openai", token = "keychain:entry-a#r1", model = "gpt" },
+				{ id = "entry-a#r1", provider = "openai", token = "keychain:entry-a#r1", model = "gpt" },
+			},
+		}) do
+			local store = { [API_STATE_KEY] = {
+				version = 1, active_id = "entry-a", pending_keychain_deletes = {}, entries = entries,
+			} }
+			with_persistence_fixture({ initial_store = store }, function(llm)
+				helpers.assert_eq(llm.load_api_entries(), false)
+			end)
+		end
+	end)
 end)

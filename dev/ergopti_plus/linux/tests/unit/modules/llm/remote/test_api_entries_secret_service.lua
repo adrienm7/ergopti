@@ -209,6 +209,65 @@ helpers.describe("api_token_store: the secret-tool calls", function()
 		return
 	end
 
+	helpers.it("secret-service-revision: restart in the same second cannot overwrite a published key", function()
+		local saved_time, saved_module = os.time, package.loaded["modules.llm.api_token_store"]
+		local records = {}
+		local backend = { unavailable = function() end, store = function(name, token) records[name] = token; return true end }
+		local ok, err = pcall(function()
+			os.time = function() return 123456 end
+			local first = helpers.load_module("modules.llm.api_token_store")
+			first._set_backend_for_test(backend)
+			local old = assert(first.store("provider", "old-key"))
+			local restarted = helpers.load_module("modules.llm.api_token_store")
+			restarted._set_backend_for_test(backend)
+			local new = assert(restarted.store("provider", "new-key"))
+			helpers.assert_true(old ~= new, "a new process must not reuse the published reference")
+			helpers.assert_eq(records[old:sub(#first.REFERENCE_PREFIX + 1)], "old-key")
+		end)
+		os.time, package.loaded["modules.llm.api_token_store"] = saved_time, saved_module
+		assert(ok, err)
+	end)
+
+	helpers.it("secret-service-revision: unavailable randomness refuses before storing", function()
+		local previous_uv, previous_store = package.loaded["luv"], package.loaded["modules.llm.api_token_store"]
+		local writes = 0
+		local ok, err = pcall(function()
+			package.loaded["luv"] = { random = function() return nil, "unavailable" end }
+			local Store = helpers.load_module("modules.llm.api_token_store")
+			Store._set_backend_for_test({ unavailable = function() end, store = function() writes = writes + 1; return true end })
+			local reference, reason = Store.store("provider", "private-key")
+			helpers.assert_nil(reference)
+			helpers.assert_eq(reason, "secure random revision unavailable")
+			helpers.assert_eq(writes, 0)
+		end)
+		package.loaded["luv"], package.loaded["modules.llm.api_token_store"] = previous_uv, previous_store
+		assert(ok, err)
+	end)
+
+	helpers.it("linux-secret-tool-input-limit: an oversized token cannot publish a truncated key", function()
+		local dir = os.tmpname(); os.remove(dir); assert(os.execute("mkdir -p '" .. dir .. "'"))
+		local tool = dir .. "/secret-tool"
+		local script = assert(io.open(tool, "w"))
+		script:write("#!/bin/sh\ndd bs=8192 count=1 of='" .. dir .. "/stored' 2>/dev/null\nexit 0\n")
+		script:close(); os.execute("chmod +x '" .. tool .. "'")
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local ok, err = pcall(function()
+			local reference = Store.store("provider", string.rep("x", 8193))
+			helpers.assert_nil(reference, "secret-tool cannot acknowledge a key longer than its input capacity")
+			helpers.assert_nil(io.open(dir .. "/stored", "rb"), "refusal must happen before the service is changed")
+			assert(Store.store("provider", string.rep("x", 8192)), "the full supported buffer must remain usable")
+			local stored = assert(io.open(dir .. "/stored", "rb"))
+			local bytes = stored:read("*a"); stored:close()
+			helpers.assert_eq(#bytes, 8192)
+		end)
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
+	end)
+
 	--- A stand-in secret-tool: records its arguments and stdin, answers as told.
 	--- @param body string Shell lines run after recording.
 	--- @return string tool, string dir
@@ -233,6 +292,134 @@ helpers.describe("api_token_store: the secret-tool calls", function()
 		fh:close()
 		return text
 	end
+
+	local function substituted_diagnostic(replacement, expected_type)
+		local tool, dir = stand_in('path=$(readlink /proc/self/fd/2)\nrm -- "$path"\n'
+			.. replacement .. '\nprintf "%s" "$path" > "$(dirname "$0")/fifo-path"\nexit 1')
+		local uv = require("luv")
+		local code = string.format([[package.path = %q
+local store = require("modules.llm.api_token_store")
+store._set_tool_for_test(%q)
+local _, reasons = store.lookup_many({ "secret-service:fixture#1" })
+assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics are not proof of absence")
+]], package.path, tool)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		local fifo = recorded(dir, "fifo-path")
+		local info = fifo and uv.fs_lstat(fifo)
+		if fifo then
+			os.remove(fifo)
+			uv.fs_rmdir(require("native_path").dirname(fifo))
+		end
+		os.execute("rm -rf '" .. dir .. "'")
+		helpers.assert_eq(expired, false, "secret-tool diagnostics must not block on a FIFO")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+		helpers.assert_eq(info and info.type, expected_type, "the substituted endpoint is not deleted")
+	end
+
+	helpers.it("refuses a substituted FIFO diagnostic without blocking or reporting absence", function()
+		substituted_diagnostic('mkfifo -- "$path"', "fifo")
+	end)
+
+	helpers.it("refuses a substituted regular diagnostic without deleting it", function()
+		substituted_diagnostic(': > "$path"', "file")
+	end)
+
+	helpers.it("uses a private result directory and retires it after secret-tool finishes", function()
+		local tool, dir = stand_in('path=$(readlink /proc/self/fd/2)\n'
+			.. 'printf "%s" "$path" > "$(dirname "$0")/result-path"\n'
+			.. 'stat -c %a "$(dirname "$path")" > "$(dirname "$0")/result-mode"\nexit 0')
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local reference = Store.store("fixture", "private-token")
+		local result_path, mode = recorded(dir, "result-path"), recorded(dir, "result-mode")
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		local uv = require("luv")
+		local result_dir = result_path and require("native_path").dirname(result_path)
+		local file_left = result_path and uv.fs_lstat(result_path)
+		local dir_left = result_dir and uv.fs_lstat(result_dir)
+		os.execute("rm -rf '" .. dir .. "'")
+		helpers.assert_true(reference ~= nil)
+		helpers.assert_eq(mode, "700\n")
+		helpers.assert_nil(file_left)
+		helpers.assert_nil(dir_left)
+	end)
+
+	helpers.it("retires private result files if secret-tool dispatch raises", function()
+		local tool, dir = stand_in("exit 0")
+		local uv = require("luv")
+		local mkdtemp, popen, result_dir = uv.fs_mkdtemp, io.popen, nil
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		local ok, err = pcall(function()
+			Store._set_backend_for_test(nil)
+			Store._set_tool_for_test(tool)
+			uv.fs_mkdtemp = function(template)
+				result_dir = assert(mkdtemp(template))
+				return result_dir
+			end
+			io.popen = function() error("injected dispatch refusal") end
+			local reference = Store.store("fixture", "private-token")
+			helpers.assert_nil(reference)
+			helpers.assert_true(result_dir ~= nil, "dispatch was attempted after native reservation")
+			helpers.assert_nil(uv.fs_lstat(result_dir), "failed dispatch must retire its exact files and directory")
+		end)
+		uv.fs_mkdtemp, io.popen = mkdtemp, popen
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		if result_dir and uv.fs_lstat(result_dir) then
+			os.remove(result_dir .. "/stderr"); os.remove(result_dir .. "/status"); uv.fs_rmdir(result_dir)
+		end
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-secret-tool-write-refusal: a refused stdin write cannot publish a reference", function()
+		-- LCR-002: secret-tool exits 0 after reading a short stdin, so its exit
+		-- status alone is not proof that the whole key reached the service.
+		local tool, dir = stand_in("exit 0")
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local popen = io.popen
+		local ok, err = pcall(function()
+			io.popen = function(command, mode)
+				local pipe = popen(command, mode)
+				if mode ~= "w" or not pipe then return pipe end
+				return setmetatable({}, { __index = function(_, key)
+					if key == "write" then
+						return function(_, input)
+							pipe:write(input:sub(1, 3))
+							return nil, "controlled short write"
+						end
+					end
+					local value = pipe[key]
+					if type(value) ~= "function" then return value end
+					return function(_, ...) return value(pipe, ...) end
+				end })
+			end
+			local reference = Store.store("provider", "SYNTHETIC-KEY-0123456789abcd")
+			io.popen = popen
+			helpers.assert_eq(recorded(dir, "stdin"), "SYN", "the stand-in received only the short write")
+			helpers.assert_nil(reference, "a refused write must not publish a secret-service reference")
+		end)
+		io.popen = popen
+		Store._set_tool_for_test(nil)
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
+	end)
 
 	helpers.it("hands the key on stdin, byte for byte, never in the arguments (linux-api-key-secret-service)", function()
 		local tool, dir = stand_in("exit 0")

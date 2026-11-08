@@ -68,13 +68,6 @@ local STDERR_TO_STDOUT = "2>&1"
 -- returning no rows.
 local STDERR_DISCARDED = "2>/dev/null"
 
--- Replaces the SQL fragment sqlite3 quotes back at us in an error message.
-local REDACTED_SQL_TOKEN = '"[redacted]"'
-
--- Upper bound on a logged diagnostic. Long enough to identify the failure,
--- short enough that a runaway message cannot flood the log.
-local ERROR_LOG_MAX_CHARS = 200
-
 -- stdout is otherwise empty on the write path. The shell emits this terminal
 -- receipt after sqlite3; LuaJIT's pclose result can conceal a nonzero exit.
 local EXIT_STATUS_PREFIX = "ERGOPTI_SQL_EXIT_STATUS="
@@ -112,7 +105,8 @@ end
 --- Composes the `sqlite3` invocation that reads `sql` from standard input.
 --- @param db_path string Filesystem path to the database file.
 --- @param sql     string Complete SQL script; may contain arbitrary user text.
---- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit? }.
+--- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit?,
+---   busy_timeout_ms = integer? (wait for the writer's lock before refusing) }.
 --- @return string|nil The command, or nil when the arguments are unusable.
 --- @return string|nil The reason, when the command could not be composed.
 function M.build(db_path, sql, opts)
@@ -123,6 +117,15 @@ function M.build(db_path, sql, opts)
 		return nil, "sql must be a non-empty string"
 	end
 	opts = opts or {}
+	if opts.busy_timeout_ms ~= nil then
+		local wait = opts.busy_timeout_ms
+		if type(wait) ~= "number" or wait < 0 or wait % 1 ~= 0 then
+			return nil, "busy_timeout_ms must be a non-negative integer"
+		end
+		-- A dot-command on the script's first line: the CLI has no flag for it, and
+		-- it prints nothing, so JSON output and the exit receipt are unchanged.
+		sql = string.format(".timeout %d\n", opts.busy_timeout_ms) .. sql
+	end
 
 	-- A personal .sqliterc is executable CLI setup: it can replace JSON mode,
 	-- prepend output or run .shell before the owned script/receipt even starts.
@@ -195,17 +198,35 @@ end
 -- ==============================
 -- ==============================
 
+--- The sqlite3 diagnostic categories M.sanitise_error returns, in SQLite's own
+--- wording; a caller that decides on one compares with this table's entry.
+M.ERROR_CATEGORY = {
+	SYNTAX = "syntax error",
+	LOCKED = "database is locked",
+	FULL = "database or disk is full",
+	READONLY_WRITE = "attempt to write a readonly database",
+	CANNOT_OPEN = "unable to open database file",
+	MALFORMED = "database disk image is malformed",
+	IO = "disk i/o error",
+	NO_MEMORY = "out of memory",
+	CONSTRAINT = "constraint failed",
+}
+local ERROR_CATEGORY_ORDER = { "SYNTAX", "LOCKED", "FULL", "READONLY_WRITE", "CANNOT_OPEN", "MALFORMED", "IO",
+	"NO_MEMORY", "CONSTRAINT" }
+
 --- Makes a sqlite3 diagnostic safe to log.
---- sqlite3 reports syntax problems as `near "<token>": syntax error`, and for
---- the keystats that token is a slice of what the user typed. Dropping the
---- quoted span keeps the diagnostic useful while keeping typed text out of the
---- log file.
+--- sqlite3 can echo arbitrary SQL, including unquoted and single-quoted user
+--- data. Return only fixed diagnostic categories, never native output bytes.
 --- @param text string|nil Raw CLI output.
 --- @return string A single-line, bounded, payload-free message.
 function M.sanitise_error(text)
 	if type(text) ~= "string" or text == "" then return "" end
-	local redacted = (text:gsub('"[^"]*"', REDACTED_SQL_TOKEN))
-	return (redacted:gsub("%s+", " "):sub(1, ERROR_LOG_MAX_CHARS))
+	local lower = text:lower()
+	for _, name in ipairs(ERROR_CATEGORY_ORDER) do
+		local category = M.ERROR_CATEGORY[name]
+		if lower:find(category, 1, true) then return category end
+	end
+	return "SQLite command failed"
 end
 
 return M

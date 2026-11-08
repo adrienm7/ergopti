@@ -266,7 +266,7 @@ _KLRManifest_AbandonmentStart(Kind, Duration := unset, Commit := 0) {
 
 _KLRManifest_Abandonment(Scenario, Consumer := "") {
 	HookSaved := Map()
-	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
+	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		HookSaved[Name] := KLHook.%Name%
 	WatchSaved := Map()
 	for Name in ["is_session_active", "session_started_at", "session_generation", "idle_generation", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
@@ -288,6 +288,8 @@ _KLRManifest_Abandonment(Scenario, Consumer := "") {
 		Keystats.buffer_text := ""
 		KLHook.prev_app := ""
 		KLHook.prev_title := ""
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLHook.last_tick := 0
 		KLWatch.is_session_active := false
 		KLWatch.is_idle := false
@@ -430,7 +432,7 @@ for _KLRManifest_AbandonmentConsumer in ["Map", "encoded"] {
 ; Native origins retain their complete elapsed span and abandonment authority.
 _KLRManifest_Native64(Scenario, Consumer := "projection") {
 	HookSaved := Map()
-	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
+	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		HookSaved[Name] := KLHook.%Name%
 	WatchSaved := Map()
 	for Name in ["is_session_active", "session_started_at", "session_generation", "idle_generation", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
@@ -452,6 +454,8 @@ _KLRManifest_Native64(Scenario, Consumer := "projection") {
 		Keystats.buffer_text := ""
 		KLHook.prev_app := ""
 		KLHook.prev_title := ""
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLHook.last_tick := 0
 		KLWatch.is_session_active := false
 		KLWatch.is_idle := false
@@ -936,3 +940,738 @@ _KLRMedia_CheckedCloseRefusesLiveStatement() {
 Test("Semantic media history: checked native close refuses live statement", _KLRMedia_CheckedCloseRefusesLiveStatement)
 
 Test("Semantic media history: upgraded image persists for future worker", _KLRMedia_CompatibleWarmCache.Bind(false))
+
+
+; Resolve the actual declaration once by authored-source identity, not a pinned path.
+_KFCD_ClassOwner(ClassName) {
+	global _DriverDir
+	Owners := []
+	for Path in _DriverProductionSourceCensus(_DriverDir).Paths {
+		Text := FileRead(Path, "UTF-8")
+		Mask := _DriverMaskNonCode(&Text)
+		if RegExMatch(Mask, "m)^\h*class\h+" . ClassName . "\b\s*\{")
+			Owners.Push(Path)
+	}
+	AssertEqual(1, Owners.Length, "The actual native dispatcher constants must have exactly one authored class declaration")
+	return Owners[1]
+}
+
+; Actual public context and stop bodies retain canonical privacy and append.
+_KFCD_ChildSource() {
+	global _DriverDir
+	Source := _KSD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	Common := RTrim(FileRead(_DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk", "UTF-8"), "`r`n")
+	Entry := "_KSD_Main()"
+	AssertEqual(Entry, SubStr(Common, StrLen(Common) - StrLen(Entry) + 1))
+	Source .= SubStr(Common, 1, StrLen(Common) - StrLen(Entry)) . "`n"
+	for Spec in [["KL_CommitPwCache", "KLPasswordCache"], ["", "HookDispatcherConst"]] {
+		Owner := Spec[1] == "" ? _KFCD_ClassOwner(Spec[2]) : _DriverProductionFileForSymbol(Spec[1], _DriverDir)
+		AssertTrue(Owner != "")
+		AssertTrue(RegExMatch(FileRead(Owner, "UTF-8"), "ms)^class " . Spec[2] . " \{.*?^\}", &Definition) > 0)
+		Source .= Definition[0] . "`n"
+	}
+	Source .= 'class HookDispatcher {`nstatic Unregister(*) {`nthrow Error("Unexpected physical hook removal.")`n}`n}`n'
+	for JsonSymbol in ["JsonStringLiteral", "KL_JsonEncode"] {
+		Owner := _DriverProductionFileForSymbol(JsonSymbol, _DriverDir)
+		AssertTrue(Owner != "", "The actual canonical JSON graph requires its genuine owner: " . JsonSymbol)
+		Source .= "#Include " . Owner . "`n"
+	}
+	for Symbol in ["KL_Hook_Stop", "KL_Hook_InvalidateCapture", "KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback"] {
+		Body := _DriverFuncBody(Symbol)
+		AssertTrue(Body != "")
+		Source .= Body . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+}
+
+_KFCD_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_final_context_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KFCD_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# final-context-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS final-context-duration " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KFCD_DurableCase(Mode) {
+	Output := _KFCD_Case(Mode)
+	Rows := []
+	for Line in StrSplit(Output, "`n", "`r")
+		if SubStr(Line, 1, 4) == "ROW "
+			Rows.Push(JsonParse(SubStr(Line, 5)))
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Row in Rows {
+			Statements := KL_BuildInserts(Row)
+			for Sql in Statements
+				AssertTrue(SQLite_Exec(Db, Sql), "Every actual producer row must enter canonical SQLite unchanged")
+		}
+		AssertTrue(KLR_PrepareTypingProjection(Db), "The real rebuild requires its actual typing projection table even for no typing rows")
+		AssertTrue(KLR_RebuildAggregates(Db), "The actual aggregate rebuild must accept the producer rows")
+		Actual := SQLite_Query(Db, "SELECT COALESCE(SUM(app_time_ms),0) AS ms FROM agg_app_day WHERE app='fixture-final-context-a.exe'")[1]["ms"]
+		_TestPrint("# final-context-durable mode=" . Mode . " app_time_ms=" . Actual . " canonical_rows=" . Rows.Length)
+		AssertTrue(Actual >= 40, "A completed foreground interval must survive its public stop and a cold SQL rebuild")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KFCD_Mode in ["switch-control", "terminal"]
+	Test("Keystats final context: " . _KFCD_Mode . " survives cold durable aggregation (final-context-duration-owner)",
+		_KFCD_DurableCase.Bind(_KFCD_Mode))
+
+_KMD_ChildSource() {
+	global _DriverDir
+	Source := _KFCD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	; Remove only the inherited test wrapper whose empty-buffer-only contract
+	; deliberately does not load the full publication graph. SUT bodies are not
+	; rewritten: replace its exact alias by the genuine default public definition.
+	Source := RegExReplace(Source, "ms)^KL_FlushBuffer\(.*?^\}\r?\n", "", &Removed)
+	AssertEqual(1, Removed)
+	Body := _DriverFuncBody("KL_FlushBuffer")
+	Alias := RegExReplace(Body, "^KL_FlushBuffer", "_KSD_NativeFlush")
+	Source := StrReplace(Source, Alias, "", true, &Removed)
+	AssertEqual(1, Removed)
+	Source .= Body . "`n"
+	Source .= "#Include " . _KFCD_ClassOwner("KeystatsConst") . "`n"
+	for Spec in [["KL_Mouse_ParkTick", "KLMouseConst"], ["KL_Mouse_ParkTick", "KLMouse"], ["KL_AppCat_Get", "KLAppCat"]] {
+		Owner := _DriverProductionFileForSymbol(Spec[1], _DriverDir)
+		AssertTrue(Owner != "")
+		AssertTrue(RegExMatch(FileRead(Owner, "UTF-8"), "ms)^class " . Spec[2] . " \{.*?^\}", &Definition) > 0)
+		Source .= Definition[0] . "`n"
+	}
+	for Symbol in ["_KL_PublishBufferSnapshot", "_KL_RestoreBufferSnapshot", "KL_AppCat_Get",
+		"KL_AppCat_RequireInit", "_KL_AppCat_RecordLabel", "KL_Mouse_ParkTick", "_KL_Mouse_ProcessParkSample",
+		"_KL_Mouse_ShouldFilter", "KL_BumpMouseDistance", "KL_BumpMouseClick", "KL_Hook_Tick", "KL_Hook_LivePush"] {
+		Body := _DriverFuncBody(Symbol)
+		AssertTrue(Body != "", "The complete actual public distance-to-flush graph must resolve: " . Symbol)
+		Source .= Body . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\mouse_distance_flush_owner_body.ahk`n"
+}
+
+_KMD_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_mouse_distance_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KMD_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# mouse-distance-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS mouse-distance-flush " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KMD_DurableCase(Mode) {
+	Output := _KMD_Case(Mode)
+	Db := 0, Rows := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if SubStr(Line, 1, 4) != "ROW "
+				continue
+			Entry := JsonParse(SubStr(Line, 5))
+			for Sql in KL_BuildInserts(Entry)
+				AssertTrue(SQLite_Exec(Db, Sql))
+			Rows += 1
+		}
+		Distance := SQLite_Query(Db, "SELECT COALESCE(SUM(mouse_distance_px),0) AS n FROM events_typing WHERE app='fixture-distance-owner.exe'")[1]["n"]
+		_TestPrint("# mouse-distance-durable mode=" . Mode . " rows=" . Rows . " distance_px=" . Distance)
+		AssertEqual(5, Distance, "Accepted pointer movement must reach the canonical SQL distance column even without a key or click")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KMD_Mode in ["with-click-control", "direct-movement-only", "periodic-movement-only"]
+	Test("Keystats pointer distance: " . _KMD_Mode . " survives actual flush to canonical SQL (mouse-distance-flush-owner)",
+		_KMD_DurableCase.Bind(_KMD_Mode))
+
+_KTAC_ChildSource() {
+	global _DriverDir
+	Source := _KFCD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	; Rename only inherited TEST observation wrappers. Native producer bodies,
+	; canonical append, clock samples and their accepted queue stay untouched.
+	for Name in ["KL_LogAppSwitch", "KL_LogWindowSwitch"] {
+		Source := RegExReplace(Source, "m)^" . Name . "\(", "_KTAC_Inherited" . Name . "(", &Changed)
+		AssertEqual(1, Changed)
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_clock_ack_owner_body.ahk`n"
+}
+
+_KTAC_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_context_clock_ack_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KTAC_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# context-clock-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS context-clock-ack " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KTAC_DurableCase(Mode) {
+	Output := _KTAC_Case(Mode)
+	Db := 0, State := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if SubStr(Line, 1, 6) == "STATE " {
+				State := StrSplit(SubStr(Line, 7), "|")
+				continue
+			}
+			if SubStr(Line, 1, 4) != "ROW "
+				continue
+			Entry := JsonParse(SubStr(Line, 5))
+			for Sql in KL_BuildInserts(Entry)
+				AssertTrue(SQLite_Exec(Db, Sql))
+		}
+		AssertTrue(State is Array && State.Length == 6, "The exact native cutpoint must provide its independent clock bound")
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		AppMs := SQLite_Query(Db, "SELECT COALESCE(SUM(app_time_ms),0) AS ms FROM agg_app_day WHERE app IN ('fixture-tail-a.exe','fixture-tail-b.exe')")[1]["ms"]
+		TitleMs := SQLite_Query(Db, "SELECT COALESCE(SUM(ms),0) AS ms FROM agg_app_day_titles WHERE app IN ('fixture-tail-a.exe','fixture-tail-b.exe')")[1]["ms"]
+		Foreign := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_window_switch WHERE app='fixture-tail-b.exe' AND prev_title='Fixture source title A'")[1]["n"]
+		_TestPrint("# context-clock-ack-durable mode=" . Mode . " app_ms=" . AppMs . " title_ms=" . TitleMs
+			. " native_bound=" . State[4] . " foreign_titles=" . Foreign . " stable=" . State[1])
+		AssertTrue(AppMs <= Integer(State[4]), "Accepted app interval plus tail may not count an earlier accepted origin twice")
+		AssertTrue(TitleMs <= Integer(State[4]), "Accepted title interval plus tail may not count an earlier accepted origin twice")
+		AssertEqual(0, Foreign, "An app ACK cannot transfer the still-outgoing title clock to its destination")
+		if Integer(State[6]) {
+			AssertEqual(1, Integer(State[1]), "An interrupted context producer cannot resurrect its app/title/origins after actual Stop")
+			AssertEqual(Integer(State[2]), Integer(State[3]), "An interrupted producer cannot append a new row after actual Stop")
+		}
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KTAC_Mode in ["app-control", "title-control", "app-stop", "title-stop"]
+	Test("Keystats context clock ACK: " . _KTAC_Mode . " respects accepted-row and native-stop ownership (context-clock-ack-owner)",
+		_KTAC_DurableCase.Bind(_KTAC_Mode))
+
+for _KTAC_ThirdMode in ["app-third", "title-third"]
+	Test("Keystats context clock ACK: " . _KTAC_ThirdMode . " preserves third observation receipts (context-clock-ack-third)",
+		_KTAC_Case.Bind(_KTAC_ThirdMode))
+
+_KCTR_ChildSource() {
+	global _DriverDir
+	Source := _KFCD_ChildSource()
+	Source := StrReplace(Source, "`nKL_LogWindowSwitch(Values*) {", "`n_KCTR_ObservedLogWindowSwitch(Values*) {")
+	AssertTrue(InStr(Source, "`n_KCTR_ObservedLogWindowSwitch(Values*) {") > 0,
+		"The observation wrapper alone is renamed; its genuine native logger and central sink remain unchanged")
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	return SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+		. "#Include " . _DriverDir . "\tests\fixtures\context_tail_retry_owner_body.ahk`n"
+}
+_KCTR_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_context_tail_retry_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCTR_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# context-tail-retry-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS context-tail-retry " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KCTR_DurableCase(Mode) {
+	Output := _KCTR_Case(Mode)
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if SubStr(Line, 1, 4) != "ROW "
+				continue
+			for Sql in KL_BuildInserts(JsonParse(SubStr(Line, 5)))
+				AssertTrue(SQLite_Exec(Db, Sql), "Actual acknowledged tail rows must enter canonical SQLite unchanged")
+		}
+		AppRows := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_app_switch WHERE prev_app='fixture-tail-retry-a.exe'")[1]["n"]
+		TitleRows := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_window_switch WHERE app='fixture-tail-retry-a.exe'")[1]["n"]
+		AssertEqual(Mode == "privacy-terminal" ? 0 : 1, AppRows)
+		AssertEqual(Mode == "privacy-terminal" ? 0 : 1, TitleRows)
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		Ms := SQLite_Query(Db, "SELECT COALESCE(SUM(app_time_ms),0) AS ms FROM agg_app_day WHERE app='fixture-tail-retry-a.exe'")[1]["ms"]
+		if Mode == "privacy-terminal"
+			AssertEqual(0, Ms)
+		else
+			AssertTrue(Ms >= 30, "The actual final interval must survive its independently acknowledged retry and cold rebuild")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KCTR_Mode in ["complete-control", "partial-retry", "privacy-terminal", "transition-retry"]
+	Test("Keystats context tail: " . _KCTR_Mode . " consumes only independently acknowledged intervals (context-tail-retry-owner)",
+		_KCTR_DurableCase.Bind(_KCTR_Mode))
+
+
+; Proposed append-only native regression for test_keystats_reader_manifest_contract.ahk.
+; This measures canonical journal reconstruction, not a native InputHook batching race.
+_KTPR_CorpusCase(VectorId) {
+	Corpus := _KlgAggCorpus_LoadCorpus()
+	AssertTrue(Corpus is Map && Corpus.Has("vectors"), "Use the same shared golden input and expected values as the real walker contract")
+	Vector := 0
+	for Candidate in Corpus["vectors"]
+		if Candidate["id"] == VectorId
+			Vector := Candidate
+	AssertTrue(Vector is Map && Vector["events"].Length == 1, "This focused case must select one genuine corpus typing row")
+	Raw := Vector["events"][1]
+	Events := [], Text := ""
+	for Ev in Raw["events"] {
+		Events.Push([Ev["char"], Ev["delay"], Ev["meta"]])
+		Text .= Ev["char"]
+	}
+	Entry := Map("type", "typing", "_event_id", 1, "app", Raw["app"],
+		"timestamp", Raw["timestamp"], "events", Events, "text", Text,
+		"pause_before_ms", Events[1][2])
+	Date := SubStr(Raw["timestamp"], 1, 10)
+	Expected := Vector["expected"]["app_day"][Date . Chr(1) . Raw["app"]]
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Sql in KL_BuildInserts(Entry)
+			AssertTrue(SQLite_Exec(Db, Sql), "The actual canonical typing builder must persist the shared input unchanged")
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		Cell := KLR_ReadManifest(Db, Date, Date)[Date][Raw["app"]]
+		_TestPrint("# think-pause-corpus id=" . VectorId . " chars=" . Cell["chars"]
+			. " pauses=" . Cell["pauses"] . " think_time=" . Cell["think_time"])
+		AssertEqual(Expected["chars"], Cell["chars"])
+		AssertEqual(Expected["pauses"], Cell["pauses"], "SQL-owned pause counts must retain manual pauses at every position in a canonical row")
+		AssertEqual(Expected["think_time_ms"], Cell["think_time"], "The published reconstruction must honor the shared event-level thinking-time contract")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KTPR_Id in ["simple_typing_3_chars", "typing_with_think_pause"]
+	Test("Keystats reader shared think-pause corpus: " . _KTPR_Id . " survives canonical SQL projection (reader-think-pause-corpus)",
+		_KTPR_CorpusCase.Bind(_KTPR_Id))
+
+
+; Numeric migration and threshold semantics use the real reader and canonical schema.
+_KLRTP_NumericMigration(Db) {
+	SavedThink := KLWConst.THINK_PAUSE_MS
+	try {
+		KLWConst.THINK_PAUSE_MS := 100
+		AssertTrue(KLR_LoadSchema(Db))
+		Events := [["a",100,Map()], ["b",101,Map()], ["[BS]",201,Map()],
+			["c",501,Map("s",1,"st","hotstring")], ["d",601,Map("sc","Ctrl+D")], ["e",20,Map()]]
+		AssertTrue(SQLite_Exec(Db,
+			"INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json,pause_before_ms) "
+			. "VALUES('pause-owner',1,'2026-01-01 10:00:00.000','2026-01-01','pause.exe',0,0,0,0,0,'ace',"
+			. SQLite_Q(KL_JsonEncode(Events)) . ",9000);"
+			. "CREATE TABLE klr_reader_typing_counts(device_id TEXT NOT NULL,event_id INTEGER NOT NULL,chars INTEGER NOT NULL,PRIMARY KEY(device_id,event_id)) WITHOUT ROWID;"
+			. "INSERT INTO klr_reader_typing_counts VALUES('pause-owner',1,5);"
+			. "CREATE TRIGGER pause_count_delete_refusal BEFORE DELETE ON klr_reader_typing_counts BEGIN SELECT RAISE(ABORT,'no count deletion');END;"))
+		AssertTrue(KLR_PrepareTypingProjection(Db, 0, false), "The actual old chars-only table must migrate and compute missing event-level numbers")
+		Row := SQLite_Query(Db, "SELECT chars,pauses,think_time_ms,think_pause_ms FROM klr_reader_typing_counts;")[1]
+		AssertEqual(5, Row["chars"], "The pre-existing chars projection policy remains unchanged")
+		AssertEqual(2, Row["pauses"], "Strict threshold excludes equality; manual Backspace counts; synthetic and shortcut entries do not")
+		AssertEqual(302, Row["think_time_ms"])
+		AssertEqual(100, Row["think_pause_ms"])
+		AssertEqual(1, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM sqlite_schema WHERE name='pause_count_delete_refusal';")[1]["n"],
+			"Migration must preserve existing refusal triggers rather than replace the numeric owner")
+		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"], "Counts-only preparation must not retain clear replay payloads")
+		AssertTrue(KLR_RebuildAggregates(Db))
+		Cell := KLR_ReadManifest(Db, "2026-01-01", "2026-01-01")["2026-01-01"]["pause.exe"]
+		AssertEqual(2, Cell["pauses"])
+		AssertEqual(302, Cell["think_time"], "The deliberately unrelated pause_before_ms=9000 is not the event-level source")
+		KLWConst.THINK_PAUSE_MS := 200
+		AssertTrue(KLR_PrepareTypingProjection(Db, ["2026-01-01"], false), "A changed real walker threshold must invalidate the numeric row even with no TEMP payload")
+		Row := SQLite_Query(Db, "SELECT pauses,think_time_ms,think_pause_ms FROM klr_reader_typing_counts;")[1]
+		AssertEqual(1, Row["pauses"])
+		AssertEqual(201, Row["think_time_ms"])
+		AssertEqual(200, Row["think_pause_ms"])
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertEqual(201, KLR_ReadManifest(Db, "2026-01-01", "2026-01-01")["2026-01-01"]["pause.exe"]["think_time"])
+		_SQLRD_AssertNoStatements(Db)
+	} finally KLWConst.THINK_PAUSE_MS := SavedThink
+}
+Test("KLR thinking pauses: legacy numeric rows and changed thresholds preserve actual manual semantics (klr-thinking-pause-numeric)",
+	_SQLRD_WithDatabase.Bind(_KLRTP_NumericMigration))
+
+
+; These are real canonical JSON numbers through SQLite and public projection,
+; not a direct call to the arithmetic helper or invented append verdicts.
+_KLRTP_NumericBoundary(Spec, Db) {
+	SavedThink := KLWConst.THINK_PAUSE_MS
+	try {
+		KLWConst.THINK_PAUSE_MS := 0
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(SQLite_Exec(Db,
+			"INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json,pause_before_ms) "
+			. "VALUES('numeric-pause',1,'2026-01-01 10:00:00.000','2026-01-01','number.exe',0,0,0,0,0,'ab',"
+			. SQLite_Q(Spec[2]) . ",0);"))
+		Result := KLR_PrepareTypingProjection(Db, 0, false)
+		AssertEqual(Spec[3], Result, "Only a representable finite thinking-time sum may prepare its numeric projection: " . Spec[1])
+		if !Spec[3] {
+			AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+				"An invalid row sum must fail before that page publishes even a wrapped numeric count")
+			AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"])
+		} else {
+			Actual := SQLite_Query(Db, "SELECT think_time_ms FROM klr_reader_typing_counts;")[1]["think_time_ms"]
+			AssertTrue(Actual = Spec[4], "Integer exactness and ordinary IEEE Float results must survive the actual SQL literal unchanged")
+			AssertTrue(KLR_RebuildAggregates(Db))
+			Cell := KLR_ReadManifest(Db, "2026-01-01", "2026-01-01")["2026-01-01"]["number.exe"]
+			AssertTrue(Cell["think_time"] = Spec[4], "The actual manifest must expose the same finite native sum")
+			AssertEqual(2, Cell["pauses"])
+		}
+		_SQLRD_AssertNoStatements(Db)
+	} finally KLWConst.THINK_PAUSE_MS := SavedThink
+}
+for _KLRTP_Spec in [
+	["int64-limit", '[["a",9223372036854775806,{}],["b",1,{}]]', true, 0x7FFFFFFFFFFFFFFF],
+	["int64-overflow", '[["a",9223372036854775807,{}],["b",1,{}]]', false, 0],
+	["binary-float", '[["a",1.25,{}],["b",2.5,{}]]', true, 3.75],
+	["ordinary-float", '[["a",0.1,{}],["b",0.2,{}]]', true, 0.1 + 0.2],
+	["float-overflow", '[["a",1e308,{}],["b",1e308,{}]]', false, 0]
+]
+	Test("KLR thinking pauses numeric domain: " . _KLRTP_Spec[1] . " retains finite projection semantics (klr-thinking-pause-numeric-domain)",
+		_SQLRD_WithDatabase.Bind(_KLRTP_NumericBoundary.Bind(_KLRTP_Spec)))
+
+_KLDL_Frontend(Root, Kind) {
+	global _DriverDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved frontend child must retain its exact owned input directory")
+	Repo := FSResolveDirectoryPath(_DriverDir . "\..\..\..")
+	Script := Repo . "\tools\test\support\typing-live-inventory.cjs"
+	AssertTrue(FSStrictExists(Script), "The actual frontend fixture must exist")
+	Directory := A_Temp . "\ergopti_live_inventory_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory), "The frontend inputs require an exclusively acquired directory")
+	State := {Calls: 0, Code: -1, Output: ""}, Handle := 0
+	Complete(Code, Out, Err) {
+		State.Calls += 1, State.Code := Code, State.Output := Out . Err
+	}
+	try {
+		for Name in ["full.json", "live.json", "range.json"]
+			FileCopy(Root . Name, Directory . "\" . Name, false)
+		Handle := ShellRunner_SpawnTreeOwned("node.exe", [Script, Directory, Kind], Complete)
+		AssertTrue(Handle.start(), "The real Node frontend process must start")
+		Started := A_TickCount
+		while State.Calls = 0 && TickElapsed64(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		for Line in StrSplit(StrReplace(State.Output, "`r`n", "`n"), "`n")
+			if Trim(Line) != ""
+				_TestPrint("# live-frontend " . Line)
+		AssertEqual(1, State.Calls, "The exact frontend process must settle")
+		AssertEqual(0, State.Code, "The actual typing frontend must retain and refresh its visible inventory")
+		AssertContains(State.Output, "PASS live-inventory-composed " . Kind)
+	} finally {
+		Retired := !IsObject(Handle) || Handle.terminate()
+		if Retired
+			DirDelete(Directory, true)
+		else
+			RetirementDebt := {Handle: Handle, Directory: Directory}
+		AssertTrue(Retired, "The exact Node process tree must retire before its separate input directory is deleted")
+	}
+}
+_KLDL_Count(Data, Kind, Token) {
+	return Data.Has(Kind) && Data[Kind] is Map && Data[Kind].Has(Token) ? Data[Kind][Token].Get("c", 0) : 0
+}
+_KLDL_Case(Kind) {
+	global _TimingsCache
+	SavedRegistry := _TimingsCache, SavedTimings := KLW_TimingValues()
+	PreviousCritical := Critical("Off")
+	Fields := ["MAX_KEYSTROKE_DELAY_MS", "THINK_PAUSE_MS", "BURST_GAP_MS", "SESSION_GAP_MS", "AUTO_REPEAT_MAX_DELAY_MS", "HOLD_THRESHOLD_MS"]
+	try {
+		TimingsLoadShared()
+		KeystatsWalkerLoadTimings()
+		_KLRDC_EnsureSharedDir()
+		_KLRDC_Reset()
+		Today := FormatTime(A_Now, "yyyy-MM-dd")
+		Characters := ["a", "b", "c", "d", "e", "f", "g"]
+		_KLRDC_WriteLedger(_KLRDC_Header() . _KLRDC_TypingBatch(1,
+			Today . " 10:00:00.000", Today, "fixture.exe", Characters))
+		Db := _KLRDC_BuildAsWorker()
+		Full := KLPF_BuildTyping(Db, "full", true, Today, true)
+		FullToday := JsonParse(Full["__klpf_prefetch_json"])["today"]["fixture.exe"]
+		Seed := KLPF_CaptureHistorySeed(_KLRDC_Root(), Today)
+		_KLRDC_AppendLedger(_KLRDC_TypingBatch(2,
+			Today . " 10:00:01.000", Today, "fixture.exe", Characters))
+		Db := _KLRDC_BuildAsWorker()
+		AssertTrue(KLPF_HistorySeedAllowsDelta(Seed, KLPF_CaptureHistorySeed(_KLRDC_Root(), Today)),
+			"The actual durable same-day append must be admitted to the production live mode")
+		Live := KLPF_BuildTyping(Db, "live", false, Today, true)
+		for Spec in [["pg", "ngram_pentagrams", "abcde"], ["hx", "ngram_hexagrams", "abcdef"], ["hp", "ngram_heptagrams", "abcdefg"]] {
+			Raw := SQLite_Query(Db, "SELECT SUM(c) AS c FROM " . Spec[2]
+				. " WHERE app='fixture.exe' AND token=" . SQLite_Q(Spec[3]) . ";")[1]["c"]
+			_TestPrint("# LIVE_DEPTH kind=" . Spec[1] . " initial_full=" . _KLDL_Count(FullToday, Spec[1], Spec[3])
+				. " rebuilt_raw=" . Raw . " live=" . _KLDL_Count(JsonParse(Live["__klpf_today_json"])["fixture.exe"], Spec[1], Spec[3]))
+			AssertEqual(1, _KLDL_Count(FullToday, Spec[1], Spec[3]))
+			AssertEqual(2, Raw, "The genuine source contains both occurrences before frontend delivery")
+		}
+		Root := _KLRDC_Root()
+		AssertTrue(FSWriteCreateDurable(Root . "full.json", KLPF_SerializeBlob(Full)))
+		AssertTrue(FSWriteCreateDurable(Root . "live.json", KLPF_SerializeBlob(Live)))
+		AssertTrue(FSWriteCreateDurable(Root . "range.json", KLR_BuildRangeSplitTodayJson(Db, Today, Today, ["fixture.exe"], Today)))
+		_KLDL_Frontend(Root, Kind)
+	} finally {
+		try _KLRDC_Cleanup()
+		finally {
+			Critical("On")
+			try {
+				_TimingsCache := SavedRegistry
+				for Index, Field in Fields
+					KLWConst.%Field% := SavedTimings[Index]
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
+for _KLDL_Kind in ["chars", "deep"]
+	Test("Keystats live projection: " . _KLDL_Kind . " retains visible same-day typing inventory through the genuine frontend (klr-live-deep-inventory)",
+		_KLRDC_CheckTeardown.Bind(_KLDL_Case.Bind(_KLDL_Kind)))
+
+_KLRManifest_DetachedForeground(Mode) {
+	Saved := KLRForegroundProjection.worker_snapshot
+	HookBefore := [KLHook.prev_app, KLHook.app_entered_at, KLHook.last_tick, KLWatch.last_authorized_tick]
+	Day := "2026-11-05", App := "owned-detached-editor.exe"
+	Wire := Map("app", App, "origin", 0x100000000 + 50, "now", 0x100000000 + 150,
+		"activity", 0x100000000 + 100, "day", Day, "timeout", 1000)
+	if Mode == "expired"
+		Wire["now"] := Wire["activity"] + Wire["timeout"]
+	Manifest := Map(), Cell := KLR_GetCell(Manifest, Day, App)
+	Cell["app_time_ms"] := 17
+	try {
+		KLRForegroundProjection.worker_snapshot := Wire
+		KLR_AddLiveForegroundTime(Manifest, Mode == "bounds" ? "2026-11-06" : Day, Day)
+		AssertEqual(Mode == "live" ? 117 : 17, Cell["app_time_ms"],
+			"a detached projection must use the captured native64 clock, exact date bounds and captured abandonment authority")
+		AssertEqual(1, Manifest.Count)
+		AssertEqual(1, Manifest[Day].Count)
+		for Index, Actual in [KLHook.prev_app, KLHook.app_entered_at, KLHook.last_tick, KLWatch.last_authorized_tick]
+			AssertEqual(HookBefore[Index], Actual, "projecting transported context cannot fabricate or advance resident hook/session state")
+	} finally KLRForegroundProjection.worker_snapshot := Saved
+}
+for _KLRManifest_DetachedMode in ["live", "expired", "bounds"]
+	Test("Keystats detached foreground: " . _KLRManifest_DetachedMode . " preserves pure projection (klr-detached-foreground)",
+		_KLRManifest_DetachedForeground.Bind(_KLRManifest_DetachedMode))

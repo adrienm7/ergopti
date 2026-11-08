@@ -302,9 +302,11 @@ end
 local Converter = {}
 Converter.__index = Converter
 
-local function new_converter(layout, keycodes, hints, keysyms)
+local function new_converter(layout, keycodes, hints, keysyms, private_states)
 	local self = setmetatable({}, Converter)
 	self.layout = layout
+	-- Dead states whose trigger is borrowed instead of standard, see M.convert.
+	self.private_states = private_states
 	self.keycodes = keycodes
 	self.keysyms = keysyms
 	self.base_level_only = set_of(hints.base_level_only or {})
@@ -396,7 +398,9 @@ end
 --- what it types sends its output. Naming only base_keysym left those untypable and
 --- made a plain action and a dead-key action with the same base keysym collide. The
 --- base keysym stays first when a key sends it; a dead key also using the action adds
---- its trigger; an action no key uses keeps its base keysym. Twin of state_keysyms in
+--- its trigger; an action no key uses keeps its base keysym. A base_level_only key
+--- (Ergopti+'s magic key) also adds the keysym its base level sends: inside a dead
+--- state macOS types the action's output for it. Twin of state_keysyms in
 --- keylayout_to_xkb.py.
 function Converter:state_keysyms(action_id)
 	local typed = self:keysyms_typing_action(action_id)
@@ -411,9 +415,19 @@ function Converter:state_keysyms(action_id)
 	end
 	local result = { base }
 	for _, keysym in ipairs(typed) do
-		if keysym ~= base and self.dead_trigger_values[keysym] then result[#result + 1] = keysym end
+		if keysym ~= base and (self.dead_trigger_values[keysym] or self:is_base_level_only_keysym(keysym)) then
+			result[#result + 1] = keysym
+		end
 	end
 	return result
+end
+
+--- True when `keysym` is what a base_level_only text (the magic key) types.
+function Converter:is_base_level_only_keysym(keysym)
+	for text in pairs(self.base_level_only) do
+		if ulen(text) == 1 and self:text_keysym(text) == keysym then return true end
+	end
+	return false
 end
 
 --- Keysym a dead key entering `state` produces.
@@ -421,7 +435,9 @@ function Converter:dead_trigger(state)
 	if self.dead_triggers[state] ~= nil then return self.dead_triggers[state] end
 	local terminator = self.layout.terminators[state] or ""
 	local keysym = nil
-	if self.borrowed.has(terminator) then
+	if self.private_states[state] then
+		keysym = nil
+	elseif self.borrowed.has(terminator) then
 		keysym = self.borrowed.get(terminator)
 	elseif KNOWN_DEAD_KEYSYMS["dead_" .. state] then
 		keysym = "dead_" .. state
@@ -581,12 +597,18 @@ function Converter:compose()
 		end
 	end
 
+	local explicit = self:explicit_state_keysyms()
+	local chain_heads = {}
+	for _, seqs in pairs(sequences) do
+		for _, seq in ipairs(seqs) do chain_heads[table.concat(seq, " ")] = true end
+	end
 	local first = true
 	local emitted = {}
 	local conflicts = {}
 	for _, state in ipairs(TableUtil.sorted_keys(outputs)) do
 		if sequences[state] ~= nil then
 			sort_pairs(outputs[state])
+			local terminator = self.layout.terminators[state] or ""
 			for _, prefix in ipairs(sequences[state]) do
 				if not first then lines[#lines + 1] = "" end
 				first = false
@@ -607,11 +629,80 @@ function Converter:compose()
 						end
 					end
 				end
+				if is_printable(terminator) then
+					local explicit_here = explicit[state] or {}
+					local prefix_key = table.concat(prefix, " ")
+					for _, pair in ipairs(self:typed_texts()) do
+						local keysym, text = pair[1], pair[2]
+						local sequence = head .. " <" .. keysym .. ">"
+						if emitted[sequence] == nil and not explicit_here[keysym]
+							and not chain_heads[prefix_key .. " " .. keysym] then
+							emitted[sequence] = terminator .. text
+							lines[#lines + 1] = sequence .. "\t: " .. compose_string(terminator .. text)
+						end
+					end
+				end
 			end
 		end
 	end
 	self.conflicts = conflicts
+	self.emitted = emitted
 	return 'include "%L"\n\n' .. table.concat(lines, "\n") .. "\n"
+end
+
+--- Dead states starting a written sequence the locale Compose table extends.
+--- @param extended table Set of space-joined keysym sequences.
+--- @return table states Array of state names, sorted.
+function Converter:shadowed_states(extended)
+	local by_trigger = {}
+	for state, keysym in pairs(self.dead_triggers) do by_trigger[keysym] = state end
+	local found = {}
+	for sequence in pairs(self.emitted) do
+		local keysyms = {}
+		for keysym in sequence:gmatch("<([^>]+)>") do keysyms[#keysyms + 1] = keysym end
+		local state = by_trigger[keysyms[1]]
+		if extended[table.concat(keysyms, " ")] and state ~= nil and not self.private_states[state] then
+			found[#found + 1] = state
+		end
+	end
+	table.sort(found)
+	return found
+end
+
+--- { keysym, text } of every key/level typing text, in keyboard order. Inside a dead
+--- state macOS types the dead key's terminator then what a key with no composition
+--- there types; compose() writes that fallback explicitly, since native Compose would
+--- cancel the sequence instead. Twin of _typed_texts in keylayout_to_xkb.py.
+function Converter:typed_texts()
+	local found, seen = {}, {}
+	for _, key in ipairs(self.keycodes) do
+		for _, cell in ipairs(self.grid[key[1]]) do
+			if cell.kind == "text" then
+				local keysym = self:text_keysym(cell.text)
+				if not seen[keysym] then
+					seen[keysym] = true
+					found[#found + 1] = { keysym, cell.text }
+				end
+			end
+		end
+	end
+	return found
+end
+
+--- State -> set of keysyms whose action the .keylayout defines in that state: an
+--- explicit <when>, even one typing nothing or chaining, never gets the terminator
+--- fallback. Twin of _explicit_state_keysyms in keylayout_to_xkb.py.
+function Converter:explicit_state_keysyms()
+	local explicit = {}
+	for _, action_id in ipairs(self.layout.action_ids) do
+		for _, when in ipairs(self.layout.actions[action_id].list) do
+			if when.state ~= "none" then
+				explicit[when.state] = explicit[when.state] or {}
+				for _, keysym in ipairs(self:state_keysyms(action_id)) do explicit[when.state][keysym] = true end
+			end
+		end
+	end
+	return explicit
 end
 
 --- The policy descriptor of a grid cell, as layout/number_row_policy.lua reads it.
@@ -693,24 +784,12 @@ local function unplaced_codes(canonical, keycodes)
 	return codes
 end
 
---- Converts a canonical keylayout to XKB symbols and XCompose text.
---- @param canonical table The schema-1 form (layouts/keylayout.lua).
---- @param options table {
----   keycodes = array of { xkb_name, mac_code } (M.keycodes),
----   keysyms = table character -> keysym name (key_sym.json "keysyms"),
----   template = string (xkb_symbols.txt),
----   layout_id = string (letters, digits, "_"), display_name = string,
----   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
---- @return table|nil result { symbols_text, compose_text, conflicts, unplaced }
---- @return string|nil err
-function M.convert(canonical, options)
-	if type(canonical) ~= "table" or canonical.schema ~= 1 then return nil, "canonical keylayout must be schema 1" end
-	if not tostring(options.layout_id):match("^[A-Za-z0-9_]+$") then
-		return nil, "layout id '" .. tostring(options.layout_id) .. "' must be letters, digits and _"
-	end
+--- One conversion pass with the given private dead states (see M.convert).
+local function convert_once(canonical, options, private_states)
+	local converter
 	local ok, result = pcall(function()
 		local layout = index_layout(canonical)
-		local converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms)
+		converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms, private_states)
 		local rows_report = options.rows ~= nil and converter:apply_rows(options.rows) or nil
 		-- Dead triggers first, in state order, so borrowed keysyms do not depend on the
 		-- order keys happen to be listed in.
@@ -735,9 +814,105 @@ function M.convert(canonical, options)
 			rows = rows_report,
 		}
 	end)
-	if ok then return result end
+	if ok then return result, nil, converter end
 	if type(result) == "table" and result.keylayout_error then return nil, result.keylayout_error end
 	error(result, 0)
+end
+
+--- Converts a canonical keylayout to XKB symbols and XCompose text.
+--- @param canonical table The schema-1 form (layouts/keylayout.lua).
+--- @param options table {
+---   keycodes = array of { xkb_name, mac_code } (M.keycodes),
+---   keysyms = table character -> keysym name (key_sym.json "keysyms"),
+---   template = string (xkb_symbols.txt),
+---   layout_id = string (letters, digits, "_"), display_name = string,
+---   locale_extended_prefixes = array of space-joined keysym sequences the locale
+---     Compose table extends (key_sym.json "locale_extended_prefixes"),
+---   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
+--- @return table|nil result { symbols_text, compose_text, conflicts, unplaced }
+--- @return string|nil err
+function M.convert(canonical, options)
+	if type(canonical) ~= "table" or canonical.schema ~= 1 then return nil, "canonical keylayout must be schema 1" end
+	if not tostring(options.layout_id):match("^[A-Za-z0-9_]+$") then
+		return nil, "layout id '" .. tostring(options.layout_id) .. "' must be letters, digits and _"
+	end
+	if type(options.locale_extended_prefixes) ~= "table" then
+		return nil, "the locale-extended Compose prefixes (key_sym.json) are required"
+	end
+	local extended = set_of(options.locale_extended_prefixes)
+	-- The table starts with include "%L": a locale sequence longer than one of ours
+	-- makes Compose skip ours (Bépo's monnaie then cedilla waits for the locale's cedi
+	-- sign instead of typing ₢). The dead key starting such a sequence gets a borrowed
+	-- trigger, which the locale does not extend, and the conversion runs again until no
+	-- written sequence is shadowed.
+	local private_states = {}
+	while true do
+		local result, err, converter = convert_once(canonical, options, private_states)
+		if result == nil then return nil, err end
+		local shadowed = converter:shadowed_states(extended)
+		if #shadowed == 0 then return result end
+		for _, state in ipairs(shadowed) do private_states[state] = true end
+	end
+end
+
+--- Reports how the shipped XKB type projects every source modifier combination.
+--- Raw key entries are compared, including action identity, so state-dependent
+--- differences are reported even when the neutral text happens to be equal.
+--- @param canonical table Schema-1 layout.
+--- @param keycodes table Array of { xkb_name, mac_code }.
+--- @param types string Shipped xkb_types.txt, the owner of native level selection.
+--- @return table report { source_levels, modifier_differences }
+function M.projection_report(canonical, keycodes, types)
+	local layout, native = index_layout(canonical), {}
+	local function signature(tokens)
+		table.sort(tokens)
+		return table.concat(tokens, "+")
+	end
+	for keys, level in types:gmatch("map%[([^%]]+)%]%s*=%s*Level(%d+)") do
+		local tokens = {}
+		for token in keys:gmatch("%a[%w_]*") do if token ~= "None" then tokens[#tokens + 1] = token end end
+		level = tonumber(level)
+		assert(XKB_LEVELS[level], "unknown XKB projection level")
+		native[signature(tokens)] = level
+	end
+	assert(native[""] == 1, "XKB type has no base mapping")
+	local modifiers = { { "shift", "Shift" }, { "caps", "Lock" }, { "option", "LevelThree" }, { "control", "Control" }, { "command", "Mod4" } }
+	local differences = {}
+	for mask = 0, 31 do
+		local source, target = {}, {}
+		for bit, pair in ipairs(modifiers) do
+			if math.floor(mask / 2 ^ (bit - 1)) % 2 == 1 then source[#source + 1] = pair[1]; target[#target + 1] = pair[2] end
+		end
+		-- XKB's default level is one for combinations absent from the type map.
+		local level = native[signature(target)] or 1
+		local original = key_map_index(layout, set_of(source))
+		local projected = key_map_index(layout, set_of(XKB_LEVELS[level]))
+		local changed = {}
+		for _, key in ipairs(keycodes) do
+			local before = key_entry(layout, canonical.map_set, original, key[2], 0)
+			local after = key_entry(layout, canonical.map_set, projected, key[2], 0)
+			if (before == nil) ~= (after == nil) or before and after and (before[1] ~= after[1] or before[2] ~= after[2]) then changed[#changed + 1] = key[2] end
+		end
+		if #changed > 0 then differences[#differences + 1] = { modifiers = source, level = level, key_codes = changed } end
+	end
+	local empty, bound = {}, {}
+	for level, modifiers_at_level in ipairs(XKB_LEVELS) do
+		local index = key_map_index(layout, set_of(modifiers_at_level))
+		local codes = {}
+		for _, key in ipairs(keycodes) do
+			local entry = key_entry(layout, canonical.map_set, index, key[2], 0)
+			if entry and entry[1] == "action" then bound[entry[2]] = true end
+			if resolve(layout, index, key[2]).kind == "none" then codes[#codes + 1] = key[2] end
+		end
+		if #codes > 0 then empty[#empty + 1] = { level = level, key_codes = codes } end
+	end
+	local unbound = {}
+	for _, action in ipairs(canonical.actions) do
+		for _, when in ipairs(action.whens) do
+			if when.state ~= "none" and not bound[action.id] then unbound[#unbound + 1] = action.id; break end
+		end
+	end
+	return { source_levels = TableUtil.deep_copy(XKB_LEVELS), modifier_differences = differences, empty_cells = empty, unbound_actions = unbound }
 end
 
 return M

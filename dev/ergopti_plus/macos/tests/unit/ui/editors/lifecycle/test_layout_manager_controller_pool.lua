@@ -36,6 +36,18 @@ helpers.describe("layout manager bounds native controller ownership", function()
 			h.close(); assert(next(h.callback_refs) == nil)
 		end)
 	end)
+	helpers.it("retires pending focus on close and reports presentation refusal", function()
+		Fixture(function(host, h)
+			assert(host.open()); assert(host.open())
+			local current = h.focus_owner
+			assert(current())
+			h.focus_result = false
+			assert(not host.open())
+			h.close(); assert(not current())
+			h.focus_result = nil
+			assert(host.open()); assert(not current())
+		end)
+	end)
 	helpers.it("rejects foreign native identities before reading their bodies", function()
 		Fixture(function(host, h)
 			assert(host.open())

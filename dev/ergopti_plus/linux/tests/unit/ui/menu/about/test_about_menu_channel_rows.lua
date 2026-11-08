@@ -241,6 +241,35 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			"consent must retain the displayed URL so the manager can reject stale offers")
 	end)
 
+	-- A Versions install whose daemon restart was refused had no completing
+	-- action in the tray (MUR-001).
+	helpers.it("a release waiting for its restart turns the check row into its completion (release-restart-pending)", function()
+		local up, calls = fake_updater("dev")
+		local previous = package.loaded["ui.changelog.bridge"]
+		local completions, observer = 0, nil
+		package.loaded["ui.changelog.bridge"] = {
+			pending_install = function() return { tag = "v0.0.0-dev.139" } end,
+			complete_pending_install = function() completions = completions + 1; return true end,
+			set_pending_install_observer = function(fn) observer = fn end,
+		}
+		local changed = { count = 0 }
+		local ok, err = pcall(function()
+			local rows = submenu_of(build(up, changed), "menu.about.title")
+			local row = rows[CHANNEL_AT + 1]
+			local wording = require("infra.i18n").get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
+			helpers.assert_true(row.title:find(wording, 1, true) == 1, row.title)
+			helpers.assert_true(row.title:find("v0.0.0-dev.139", 1, true) ~= nil, row.title)
+			row.fn()
+			helpers.assert_eq(completions, 1, "the click asks for the completing restart")
+			helpers.assert_eq(calls.checks, 0, "no check runs over a waiting release")
+			helpers.assert_eq(type(observer), "function", "the tray redraws when the wait changes")
+			observer()
+			helpers.assert_eq(changed.count, 1)
+		end)
+		package.loaded["ui.changelog.bridge"] = previous
+		if not ok then error(err, 0) end
+	end)
+
 	-- The picker lists the shared presets (defaults.json, never last), and its
 	-- parent row names the preset in force in words. A value outside the presets
 	-- read as raw seconds ("Check frequency: 600") with no ticked row.
@@ -493,7 +522,8 @@ helpers.describe("tray (linux): published About channel choices", function()
 	helpers.it("does not redraw or update Versions after refused preference writes", function()
 		local previous_bridge = package.loaded["ui.changelog.bridge"]
 		local pushed = {}
-		package.loaded["ui.changelog.bridge"] = { push_subscribed_channel = function(id) pushed[#pushed + 1] = id end }
+		package.loaded["ui.changelog.bridge"] = { push_subscribed_channel = function(id) pushed[#pushed + 1] = id end,
+			pending_install = function() return nil end, set_pending_install_observer = function() end }
 		local ok, detail = pcall(function()
 			for _, refusal in ipairs(channel_corpus().refusals) do
 				local up, requests = fake_updater("main")
@@ -837,7 +867,8 @@ helpers.describe("Linux About channel durable receipts", function()
 		helpers.it("publishes menu and Versions effects only after exact native ACK (channel-ack " .. outcome .. ")", function()
 			local previous_bridge = package.loaded["ui.changelog.bridge"]
 			local pushes, calls = 0, 0
-			package.loaded["ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end}
+			package.loaded["ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end,
+				pending_install = function() return nil end, set_pending_install_observer = function() end}
 			local ok, detail = xpcall(function()
 				local up = fake_updater("main")
 				up.set_channel = function()

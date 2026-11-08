@@ -145,6 +145,7 @@ _MI_TopLevelBuilders() {
 		"shortcuts",       _MI_StageShortcuts,
 		ConfigLeaf.TAP_HOLDS,       _MI_StageTapHolds,
 		"gestures",        _MI_StageGestures,
+		"apps",            _MI_StageApps,
 		"configuration",   _MI_StageConfiguration,
 		"language",        _MI_StageLanguage,
 		"about",           _MI_StageAbout,
@@ -208,7 +209,8 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 ; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
 ; The two feature blocks are `list` providers: each names its layout feature
 ; and returns its row, which the renderer materialises.
-; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
+; ``active_layouts`` lists the layouts installed for the user (_LAY_ActiveLayoutRows);
+; ``layout_system_install`` installs the Ergopti system layout (SystemLayout_MenuRows).
 _MI_StageLayout() {
 	Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")
 	if !Receiver
@@ -216,10 +218,13 @@ _MI_StageLayout() {
 	LayoutListProviders := Map(
 		"number_row_policy",      (*) => _LAY_NumberRowRows(),
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
+		"layout_emulation",       (*) => _LAY_EmulationChoiceRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
 		ConfigLeaf.MAGIC_KEY_SOURCE,       (*) => MagicKeySourceMenuRows(),
 		"layout_switching",       (*) => PauseLayoutSwitch_MenuRows(),
+		"active_layouts",         (*) => _LAY_ActiveLayoutRows(),
+		"layout_system_install",  (*) => SystemLayout_MenuRows(),
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).

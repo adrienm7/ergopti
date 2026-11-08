@@ -334,6 +334,7 @@ body {
 
 #install-failure-actions button,
 #btn-install-retry,
+#btn-install-restart,
 #btn-restore {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.55);
@@ -348,10 +349,12 @@ body {
 
 #install-failure-actions button:hover,
 #btn-install-retry:hover,
+#btn-install-restart:hover,
 #btn-restore:hover {
 	background: rgba(10, 132, 255, 0.28);
 }
 
+#btn-install-restart:disabled,
 #btn-restore:disabled {
 	cursor: default;
 	opacity: 0.5;

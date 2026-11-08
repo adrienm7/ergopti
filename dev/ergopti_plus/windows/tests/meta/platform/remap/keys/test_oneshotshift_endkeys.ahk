@@ -13,12 +13,13 @@ _OSEK_OneShotShiftResendsEndKeys() {
     Body := _DriverFuncBody("OneShotShift")
     Assert(Body != "", "OneShotShift() must exist in platform/remap/one_shot_shift.ahk")
 
-    Assert(InStr(Body, 'NamedKeys := "{BackSpace}{Enter}{Delete}"') > 0
-        && InStr(Body, 'KeyOpt(NamedKeys, "E")') > 0,
+    Assert(InStr(Body, 'NamedKeys := "{BackSpace}{Enter}{Delete}{Escape}{Tab}"') > 0
+        && InStr(Body, 'KeyOpt(NamedKeys, "ES")') > 0,
         "the same explicit control list must classify native completion and decoder admission")
     ReadPos := InStr(Body, 'Capture := _SIHO_ReadScalar(ihvText, NamedKeys)')
     GuardPos := InStr(Body, 'if Capture.Kind == "control"')
-    SendPos := InStr(Body, 'SendNewResult("{" . Capture.Name . "}", False, False)')
+    ; A control keeps the modifiers held with it: the prefix rides on the replay.
+    SendPos := InStr(Body, 'SendNewResult(CapturedPrefix . "{" . Capture.Name . "}", False, False)')
     SpecialPos := InStr(Body, 'SpecialCharacter := TapHoldOneShotResult(Scalar, MagicKey)')
     Assert(ReadPos > 0 && GuardPos > ReadPos && SendPos > GuardPos && SpecialPos > SendPos,
         "only named controls may replay as keys, while complete scalar punctuation/magic remains reachable")

@@ -78,6 +78,38 @@ local function tick(deferred)
 end
 
 helpers.describe("api_remote: capability listings skip what a model lacks (thinking-off-capabilities)", function()
+	helpers.it("treats null supported parameters as unknown rather than unsupported", function()
+		local remote, http, deferred = load_remote()
+		local entry = { provider = "openrouter", model = "mistralai/mistral-small-2603", token = "k" }
+		assert(remote.build_request(entry, MESSAGES, {})); tick(deferred)
+		http.gets[1].callback({ ok = true, status = 200,
+			body = '{"data":[{"id":"mistralai/mistral-small-2603","supported_parameters":null}]}' })
+		helpers.assert_eq(type(Json.decode(assert(remote.build_request(entry, MESSAGES, {})).body).reasoning), "table")
+		unload()
+	end)
+	helpers.it("keeps known capabilities when a refresh returns a null model list", function()
+		local remote, http, deferred = load_remote()
+		local entry = { provider = "openrouter", model = "mistralai/mistral-small-2603", token = "k" }
+		assert(remote.build_request(entry, MESSAGES, {})); tick(deferred)
+		http.gets[1].callback({ ok = true, status = 200, body = Json.encode(answers().openrouter) })
+		helpers.assert_nil(Json.decode(assert(remote.build_request(entry, MESSAGES, {})).body).reasoning)
+		remote._capabilities_for_test().openrouter.at = 0
+		assert(remote.build_request(entry, MESSAGES, {})); tick(deferred)
+		http.gets[2].callback({ ok = true, status = 200, body = '{"data":null}' })
+		helpers.assert_nil(Json.decode(assert(remote.build_request(entry, MESSAGES, {})).body).reasoning,
+			"a null list must not replace the last known capabilities")
+		remote._capabilities_for_test().openrouter.at = 0
+		assert(remote.build_request(entry, MESSAGES, {})); tick(deferred)
+		http.gets[3].callback({ ok = true, status = 200, body = '{"data":{}}' })
+		helpers.assert_nil(Json.decode(assert(remote.build_request(entry, MESSAGES, {})).body).reasoning,
+			"an object must not replace the last known capabilities")
+		remote._capabilities_for_test().openrouter.at = 0
+		assert(remote.build_request(entry, MESSAGES, {})); tick(deferred)
+		http.gets[4].callback({ ok = true, status = 200, body = '{"data":[]}' })
+		helpers.assert_eq(type(Json.decode(assert(remote.build_request(entry, MESSAGES, {})).body).reasoning), "table",
+			"an actual empty list replaces the stale capabilities")
+		unload()
+	end)
 
 	helpers.it("a prediction only schedules the fetch; the listing then skips a lacking control", function()
 		local remote, http, deferred = load_remote()

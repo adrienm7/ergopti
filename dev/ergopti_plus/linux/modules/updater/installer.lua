@@ -21,8 +21,13 @@ local Snapshot = require("diagnostics.snapshot")
 local NativePath = require("native_path")
 local NoReplaceMove = require("infra.no_replace_move")
 local Ownership = require("modules.updater.ownership_receipt")
+local ProgramRunner = require("adapters.program_runner")
+local uv_loaded, uv = pcall(require, "luv")
 
 local WORK_PREFIX = ".ergopti-update."
+-- How often the owned smoke child re-admits the install deadline while the
+-- event loop keeps running; a refused admission kills its process group.
+local SMOKE_ADMISSION_POLL_MS = 50
 
 
 
@@ -166,7 +171,9 @@ local function archive_listings_canonical(names, verbose)
 	for _, entry in ipairs(split_lines(names)) do
 		if entry:sub(1, 1) == "/"
 			or entry:find("\\", 1, true)
-			or entry:find("..", 1, true)
+			-- Only a complete parent component escapes a root; names such as
+			-- notes..toml are ordinary files produced by tar as well.
+			or ("/" .. entry .. "/"):find("/../", 1, true)
 			or entry:match("^%./") then
 			return false, "archive contains an unsafe path: " .. entry
 		end
@@ -377,7 +384,9 @@ local function install_transaction(options, owned_current)
 
 	local retained_work = false
 	local function fail(detail)
-		if not retained_work then cleanup_work(work_dir, context.parent, ops) end
+		if not retained_work and not cleanup_work(work_dir, context.parent, ops) then
+			detail = detail .. "; staging cleanup failed at " .. work_dir
+		end
 		return false, detail
 	end
 
@@ -437,11 +446,10 @@ local function install_transaction(options, owned_current)
 
 	if not forward_current() or not ops.move(candidate, context.install_root) then
 		local restored = ops.move(backup, context.install_root)
-		cleanup_work(work_dir, context.parent, ops)
 		if not restored then
-			return false, "candidate activation and rollback both failed; backup remains at " .. backup
+			return fail("candidate activation and rollback both failed; backup remains at " .. backup)
 		end
-		return false, "candidate activation failed; previous installation restored"
+		return fail("candidate activation failed; previous installation restored")
 	end
 
 	local smoke_ok = forward_current() and ops.smoke(context.wrapper) and forward_current()
@@ -466,10 +474,10 @@ local function install_transaction(options, owned_current)
 		end
 		local restored = displaced and ops.move(backup, context.install_root)
 		if restored then
-			cleanup_work(work_dir, context.parent, ops)
-			return false, "updated wrapper smoke failed; previous installation restored"
+			return fail("updated wrapper smoke failed; previous installation restored")
 		end
 		return false, "updated wrapper smoke and rollback failed; backup remains at " .. backup
+			.. "; staging retained at " .. work_dir
 	end
 
 	local work_removed = cleanup_work(work_dir, context.parent, ops)
@@ -543,6 +551,81 @@ local function refuse_owned_admission(finish, reservation, callback)
  return operation
 end
 
+--- Starts the updated wrapper's `--help` smoke as an owned child of the event
+--- loop, for the async installer.
+---
+--- The synchronous smoke ran `os.execute` on the daemon's event loop: a slow
+--- or hung wrapper stalled input and every timer, past the install deadline it
+--- could not observe. Here the child runs in its own process group, a libuv
+--- timer re-admits the install deadline while it runs, and a refused admission
+--- kills the group; the result is delivered only once the group is gone.
+--- @param wrapper string Absolute wrapper path.
+--- @param admitted function The install admission (deadline included).
+--- @param done function Receives { ok = boolean }.
+--- @return table operation is_settled, request_cancel and on_settled.
+local function start_owned_smoke(wrapper, admitted, done)
+ local operation, listeners = {}, {}
+ local settled, outcome, timer = false, nil, nil
+ local function settle(result)
+  if settled then return end
+  settled = true
+  pcall(done, result)
+  local pending = listeners; listeners = {}
+  for _, listener in ipairs(pending) do pcall(listener) end
+ end
+ function operation:is_settled() return settled end
+ function operation:on_settled(listener)
+  if type(listener) ~= "function" then return false end
+  if settled then pcall(listener) else listeners[#listeners + 1] = listener end
+  return true
+ end
+ if not uv_loaded or type(uv.new_timer) ~= "function" or not ProgramRunner.supported() then
+  settle({ ok = false })
+  function operation:request_cancel() return true end
+  return operation
+ end
+ local cancelled = false
+ local child = ProgramRunner.spawn(wrapper, { "--help" }, function(code) outcome = code end, function()
+  return not cancelled and admitted()
+ end)
+ local function retire()
+  if timer then
+   local owned = timer
+   timer = nil
+   pcall(owned.stop, owned)
+   pcall(owned.close, owned)
+  end
+  settle({ ok = outcome == 0 and not cancelled })
+ end
+ local function tick()
+  if child.isSettled() then retire(); return end
+  if cancelled or not admitted() then
+   cancelled = true
+   child.terminate(true)
+   if child.isSettled() then retire() end
+  end
+ end
+ function operation:request_cancel()
+  cancelled = true
+  tick()
+  return true
+ end
+ local made, created = pcall(uv.new_timer)
+ if not made or not created then settle({ ok = false }); return operation end
+ timer = created
+ if not child.start() then
+  -- A refused spawn holds no process; an ambiguous one is still polled.
+  if child.isSettled() then retire(); return operation end
+ end
+ local armed = pcall(timer.start, timer, SMOKE_ADMISSION_POLL_MS, SMOKE_ADMISSION_POLL_MS, tick)
+ if not armed then
+  cancelled = true
+  child.terminate(true)
+  if child.isSettled() then retire() end
+ end
+ return operation
+end
+
 --- Runs the original rollback transaction on one private native reservation.
 --- No displayed archive path is opened. The fixed artifact factory owns every
 --- listing/extract reader and cleanup; returned operation methods export no FD.
@@ -601,6 +684,10 @@ function M.install_owned(options, callback)
  ops.remove_file = function()
   local result = await(function(done) return finish(reservation, false, done) end, true)
   task.artifact_finished = true
+  return type(result) == "table" and result.ok == true
+ end
+ ops.smoke = function(wrapper)
+  local result = await(function(done) return start_owned_smoke(wrapper, owned_current, done) end)
   return type(result) == "table" and result.ok == true
  end
  local captured = { context = rawget(options, "context"), expected_version = rawget(options, "expected_version"),

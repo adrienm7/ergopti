@@ -34,9 +34,12 @@
 #Requires Autohotkey v2.0+
 
 #Include ../number.ahk
+#Include ../source_text_codec.ahk
+#Include ../../adapters/file_system.ahk
 #Include toml_inline_tables.ahk
 #Include toml_document.ahk
 #Include config_snapshot.ahk
+#Include toml_refusals.ahk
 
 
 
@@ -690,8 +693,13 @@ TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
 
 /** Encodes contents for a TOML basic string without surrounding quotes. */
 TOML_EscapeBasicStringContents(s) {
+	; Preserve legacy coercion for non-String callers, while native Strings
+	; must be admitted before any helper can truncate their original units.
+	if !(s is String)
+		s := String(s)
+	SourceTextRequireUnicodeScalars(StrPtr(s), 0, StrLen(s))
 	Result := ""
-	Loop Parse, String(s) {
+	Loop Parse, s {
 		Char := A_LoopField
 		Code := Ord(Char)
 		switch Code {
@@ -798,34 +806,6 @@ TOML_Write(Value, Path, Section, Key) {
 ; ===============================
 ; ===============================
 
-; Paths this session must not write, with the reason. The config migration
-; registers a config.toml it could not version (a newer schema, a failed
-; migration): the batch writer then refuses it in both modes, so neither a
-; targeted save, a full save nor a transactional candidate can replace a file
-; this build does not understand. Deliberately never lifted: a restart
-; re-evaluates the file.
-_TOML_WriteRefusals() {
-	static Refusals := Map()
-	return Refusals
-}
-
-_TOML_WriteRefusalKey(Path) {
-	return StrLower(StrReplace(String(Path), "/", "\"))
-}
-
-TOML_RefuseWrites(Path, Reason) {
-	if !(Path is String) || Path == "" || !(Reason is String) || Reason == ""
-		throw ValueError("TOML_RefuseWrites needs a path and a reason")
-	_TOML_WriteRefusals()[_TOML_WriteRefusalKey(Path)] := Reason
-}
-
-; Why writes to Path are refused this session, or "".
-TOML_WriteRefusal(Path) {
-	Refusals := _TOML_WriteRefusals()
-	Key := _TOML_WriteRefusalKey(Path)
-	return Refusals.Has(Key) ? Refusals[Key] : ""
-}
-
 ; Minimum age of an abandoned atomic-write stage: one minute tells it from a live
 ; writer, and the reapers also check producer ownership. Writers can run before the
 ; timing registry loads, so this copy is pinned to [adapters] stale_temp_age_ms by
@@ -855,15 +835,6 @@ _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 								try FileDelete(A_LoopFileFullPath)
 				}
 		}
-}
-
-; Retire only a stage owned and abandoned by the current save operation.
-; A refusal must remain visible without replacing the primary save failure.
-_TOML_RemoveOwnedStage(Path) {
-	if FSDelete(Path)
-		return true
-	try LoggerError("TomlWrite", "Owned staging file cleanup failed for '{1}'.", Path)
-	return false
 }
 
 ; A successful Write call is not proof that the complete qualified image
@@ -996,7 +967,7 @@ _TOML_AdmitExactPrefixCandidate(Source, Before, After, Candidate, Updates, Prefi
 }
 
 _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
-		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false, AdmissionFn := 0) {
+		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false, AdmissionFn := 0, HeldFlushFn := 0) {
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
@@ -1011,11 +982,32 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if !(ExactSectionPrefixes is Array)
 				throw TypeError("ExactSectionPrefixes must be an Array")
 		for _, Prefix in ExactSectionPrefixes {
+				if Prefix is String
+						SourceTextRequireUnicodeScalars(StrPtr(Prefix), 0, StrLen(Prefix))
 				if !(Prefix is String) or Prefix = ""
 						throw ValueError("ExactSectionPrefixes must contain non-empty strings")
 		}
+		; Native Map keys compare NUL-terminated identities. Validate original
+		; update names before any lookup can alias a distinct shorter setting.
+		for Update in Updates {
+			for Name in [Update.Section, Update.Key] {
+				if Name is String
+					SourceTextRequireUnicodeScalars(StrPtr(Name), 0, StrLen(Name))
+			}
+		}
 		if (!DocumentMode && !BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
 				return FSNativeAcknowledge(AdmissionFn)
+
+		; Keep logical schema/cache/refusal identity unchanged. Native I/O binds
+		; one absolute target before any source read can yield and change cwd.
+		SourcePath := Path
+		if !BuildOnly {
+			try SourcePath := FSResolveAbsolutePath(Path)
+			catch as Err {
+				try LoggerError("TomlWrite", "Cannot capture the native target for '{1}': {2}. No file was changed.", Path, Err.Message)
+				return false
+			}
+		}
 
 		; A config save is a full read-modify-write plus a canonicalisation pass, and
 		; it runs from menu callbacks — so a slow one blocks the tray menu while the
@@ -1026,9 +1018,9 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if IsSet(ProvidedPresence) && (!(ProvidedPresence is Integer)
 				|| (ProvidedPresence != 0 && ProvidedPresence != 1))
 				throw TypeError("Provided source presence must be Integer 0 or 1")
-		SourcePresent := IsSet(ProvidedPresence) ? ProvidedPresence : (FileExist(Path) ? 1 : 0)
+		SourcePresent := IsSet(ProvidedPresence) ? ProvidedPresence : (FileExist(SourcePath) ? 1 : 0)
 		SourceBytes := IsSet(ProvidedContent) ? ProvidedContent
-			: (SourcePresent ? FSReadUtf8Exact(Path) : "")
+			: (SourcePresent ? FSReadUtf8Exact(SourcePath) : "")
 		if !(SourceBytes is String) {
 				global _TomlReadFailures, _TomlUnreadableFiles
 				_TomlReadFailures[Path] := true
@@ -1186,7 +1178,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					return false
 			}
 		}
-		if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+		if !_TOML_WriteSourceMatches(SourcePath, SourcePresent, SourceBytes) {
 				; Detached builds never own the live reader cache. An ordinary
 				; write must retire its now-stale snapshot after actual source drift.
 				if !BuildOnly {
@@ -1237,7 +1229,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 
 		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
-		if FileExist(Path) && FSUtf8ExactMatches(Path, FinalCandidate) {
+		if FileExist(SourcePath) && FSUtf8ExactMatches(SourcePath, FinalCandidate) {
 				if !FSNativeAcknowledge(FinalAdmission) {
 					try LoggerError("TomlWrite", "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
 					return false
@@ -1248,75 +1240,27 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				return true
 		}
 
-		; Per-invocation scratch name. A fixed ``Path . ".tmp"`` made the staging
-		; file a shared resource between every writer of the same target, and the
-		; delete below is unconditional — so a save that interrupted another one
-		; destroyed its live staging file, and whichever writer landed last decided
-		; what the config ended up as. config.toml is written both from menu actions
-		; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
-		; rather than a GetCurrentProcessId DllCall: unique per process all the
-		; same, and it keeps the OS-call purity ratchet at its baseline.
+		; Exclusive creation and retained-handle publication protect this exact
+		; candidate from foreign stage names through readback, rename and cleanup.
 		static WriteSeq := 0
 		WriteSeq += 1
-		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-		_TOML_ReapStaleTemps(Path, StaleTempAgeMs())
-		try FileDelete(tmp)
-		f := 0
-		StageOwned := false
-		StageWritten := false
-		try {
-				f := FileOpen(tmp, "w", HasByteOrderMark ? "UTF-8" : "UTF-8-RAW")
-				if !f {
-						_TOML_InvalidateParseCache(Path)
-						; Logged, not merely returned. This branch fails without throwing, and
-						; every caller that discarded the boolean turned it into a silent
-						; no-op: the menu and the engine went on showing a state that never
-						; reached disk, with nothing in the log to explain the next restart.
-						try LoggerError("TomlWrite", "Cannot open the staging file for '{1}' — nothing was written and the change is NOT persisted.", Path)
-						return false
-				}
-				StageOwned := true
-				f.Write(body)
-				if !FSFlushFileBuffers(f)
-						throw Error("FlushFileBuffers refused the staging handle")
-				f.Close()
-				f := 0
-				StageWritten := true
-		} catch as Err {
-				_TOML_InvalidateParseCache(Path)
-				try LoggerError("TomlWrite", "Writing the staging file for '{1}' failed: {2}. The change is NOT persisted.", Path, Err.Message)
-				return false
-		} finally {
-				if IsObject(f)
-						try f.Close()
-				if StageOwned && !StageWritten
-						_TOML_RemoveOwnedStage(tmp)
+		Suffix := "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
+		_TOML_ReapStaleTemps(SourcePath, StaleTempAgeMs())
+		Stage := {handle: -1}
+		Published := FSWriteReplaceOwned(SourcePath, FinalCandidate, Suffix, &StageDetail,
+			_TOML_CreateHeldStage.Bind(Stage),
+			_TOML_AdmitHeldStage.Bind(Stage, SourcePath, SourcePresent, SourceBytes, FinalCandidate),
+			FinalAdmission, SourcePresent, &Publication, HeldFlushFn)
+		if !((Published is Integer) && Published == 1) {
+			_TOML_InvalidateParseCache(Path)
+			if Publication is Object && Publication.renamed && !Publication.durable {
+				_TOML_RecordPartialPublication(Path, Publication)
+				try LoggerError("TomlWrite", "Native publication of '{1}' occurred but was not fully acknowledged ({2}). This session refuses further writes until restart.", Path, StageDetail)
+			} else {
+				try LoggerError("TomlWrite", "Owned staging/publication of '{1}' refused ({2}). No target was replaced.", Path, StageDetail)
+			}
+			return false
 		}
-		if !_TOML_StageMatches(tmp, body) {
-				_TOML_InvalidateParseCache(Path)
-				try LoggerError("TomlWrite", "The staging file for '{1}' did not match the complete canonical image. The previous contents are intact, so the change is NOT persisted.", Path)
-				_TOML_RemoveOwnedStage(tmp)
-				return false
-		}
-	if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
-		_TOML_InvalidateParseCache(Path)
-		try LoggerError("TomlWrite", "Refusing TOML publication for '{1}': the exact source changed after staging. No file was replaced.", Path)
-		_TOML_RemoveOwnedStage(tmp)
-		return false
-	}
-
-	; Publish only through the same-volume write-through adapter. The WAL may
-	; promote immediately after this return, so a merely visible rename is not a
-	; sufficient durability boundary.
-	Moved := DocumentMode || HasMethod(AdmissionFn, "Call")
-		? FSConfigAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)
-		: FSAtomicMoveReplace(tmp, Path, &MoveError)
-	if !((Moved is Integer) && Moved == 1) {
-		_TOML_InvalidateParseCache(Path)
-		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted (native error {2}).", Path, MoveError)
-		_TOML_RemoveOwnedStage(tmp)
-		return false
-	}
 
 		; Invalidate the parse cache so the next ParseTomlFile call re-reads
 		; the updated file rather than returning a stale snapshot.
@@ -1326,7 +1270,27 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		return true
 }
 
+_TOML_CreateHeldStage(State, Folder, Name, Attributes) {
+	Handle := _FSCreateHeldStage(Folder, Name, Attributes)
+	State.handle := Handle
+	return Handle
+}
+
+_TOML_ReadHeldStage(State, IgnoredPath) {
+	_FSRewind(State.handle)
+	return _FSReadUtf8ExactHandle(State.handle, 0, false)
+}
+
+; Native readback and the original exact-source witness run outside Critical.
+; The final memory-only schema/lease predicate remains at the native rename.
+_TOML_AdmitHeldStage(State, Path, SourcePresent, SourceBytes, Candidate) {
+	return _TOML_StageMatches(Path, Candidate, _TOML_ReadHeldStage.Bind(State))
+		&& _TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes)
+}
+
 TOML_RenderKey(k) {
+		if k is String
+				SourceTextRequireUnicodeScalars(StrPtr(k), 0, StrLen(k))
 		; Bare key: only A-Z / a-z / 0-9 / _ / -. Otherwise quote.
 		if RegExMatch(k, "^[A-Za-z0-9_\-]+$")
 				return k
@@ -1469,19 +1433,19 @@ ReadPathsToml(FilePath) {
 				try DirCreate(SubStr(FilePath, 1, InStr(FilePath, "\", , -1) - 1))
 
 				if !FileExist(FilePath) {
-						try {
-								f := FileOpen(FilePath, "w", "UTF-8")
-								if f {
-										DefaultDir := StrReplace(AppFoldersDefaultConfigDir(), "\", "/")
-										f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
-										f.Write("# Edit this file to point to your personal configuration folder.`r`n")
-										f.Write("# If absent or commented out, files are looked up in: " . DefaultDir . "`r`n")
-										f.Write("`r`n")
-										f.Write('# ConfigDirPath = "' . DefaultDir . '"`r`n')
-										f.Close()
-								}
-						}
-						return Result
+						DefaultDir := StrReplace(AppFoldersDefaultConfigDir(), "\", "/")
+						DefaultText := Chr(0xFEFF) . "# Custom paths — auto-generated by ErgoptiPlus.`r`n"
+								. "# Edit this file to point to your personal configuration folder.`r`n"
+								. "# If absent or commented out, files are looked up in: " . DefaultDir . "`r`n"
+								. "`r`n# ConfigDirPath = " . Chr(34) . DefaultDir . Chr(34) . "`r`n"
+						Created := false
+						try Created := FSWriteCreateDurable(FilePath, DefaultText)
+						if (Created is Integer) && Created == 1
+								return Result
+						; CREATE_NEW cannot adopt a concurrent locator. If another owner
+						; won, consume that exact file through the ordinary reader below.
+						if !FileExist(FilePath)
+								return Result
 				}
 		}
 
@@ -1502,7 +1466,9 @@ ReadPathsToml(FilePath) {
 		; hazard of the kind the config readers have.
 		Content := ""
 		try {
-				Content := FileRead(FilePath, "UTF-8")
+				; Retain one exact source image; lossy decoding can name another profile.
+				Bytes := FileRead(FilePath, "RAW")
+				Content := SourceTextDecodeExact(Bytes)
 		} catch as Err {
 				try LoggerError("TomlPaths", "Cannot read '{1}': {2}. Falling back to the default configuration directory for this session.", FilePath, Err.Message)
 				return Result

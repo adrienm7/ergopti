@@ -18,6 +18,34 @@ local helpers, Engine, DOWN, UP, REPEAT, SHIFT, CTRL, ALT, CAPS, ENTER, BACKSPAC
 
 
 helpers.describe("tap-hold engine: under a modifier and on the layer", function()
+	helpers.it("keeps a physical blocker down until both source keyboards release it", function()
+		local e = engine({ left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } })
+		local a = { source = "a", generation = 1 }
+		local b = { source = "b", generation = 1 }
+		e:process(CAPS, DOWN, 0, a); e:process(CAPS, DOWN, 1, b); e:process(CAPS, UP, 2, a)
+		helpers.assert_eq(trail(e:process(ALT, DOWN, 3, b)), "", "the remaining CapsLock still blocks the one-shot")
+		e:process(ALT, UP, 4, b); e:process(CAPS, UP, 5, b)
+		helpers.assert_eq(trail(e:process(ALT, DOWN, 6, b)), "42↓", "the last release removes the blocker")
+	end)
+	helpers.it("releases held chord keys in reverse press order during retirement", function()
+		for _, order in ipairs({ { SHIFT, CTRL, ALT }, { CTRL, SHIFT, ALT }, { ALT, CTRL, SHIFT },
+			{ SHIFT, ALT, CTRL }, { CTRL, ALT, SHIFT }, { ALT, SHIFT, CTRL } }) do
+			local e = engine({})
+			e:combination_hold({ mods = order })
+			local releases = e:release_all()
+			helpers.assert_eq({ releases[1].code, releases[2].code, releases[3].code }, { order[3], order[2], order[1] })
+		end
+	end)
+
+	helpers.it("retires shared and reacquired holds in their current press order", function()
+		local e = engine({})
+		local _, first = e:combination_hold({ mods = { CTRL, SHIFT } })
+		e:combination_hold({ mods = { CTRL } })
+		helpers.assert_eq(trail(e:combination_release(first)), "42↑")
+		e:combination_hold({ mods = { SHIFT } })
+		helpers.assert_eq(trail(e:release_all()), "42↑ 29↑")
+		helpers.assert_eq(trail(e:release_all()), "")
+	end)
 
 	local TAB = 15
 	local WITH_TAB = {
@@ -191,6 +219,36 @@ helpers.describe("tap-hold engine: tap sentinels and the one-shot Shift", functi
 		helpers.assert_eq(trail(e:process(KEY_A, DOWN, 200)), "42↓ 30↓")
 		helpers.assert_eq(trail(e:process(KEY_A, UP, 250)), "30↑ 42↑")
 		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "only once")
+	end)
+
+	-- Caps Lock plus Shift gives the lowercase: the same-key Shift would type
+	-- "a" for "A" and spend the arm (OSL-001). Locked, the capital is typed with
+	-- the lock released around it, as the injector types text, and put back.
+	helpers.it("types the capital with Caps Lock released when it is locked (OSL-001)", function()
+		local RSHIFT = 54
+		for _, held in ipairs({ false, SHIFT, RSHIFT }) do
+			local e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, lone_tap_max_ms = 0,
+				one_shot_timeout_ms = 2000, key_text = Fixture.us_text, plan_text = Fixture.us_plan,
+				one_shot_result = one_shot_result, caps_locked = function() return true end })
+			e:process(RCTRL, DOWN, 0)
+			e:process(RCTRL, UP, 100)
+			if held then helpers.assert_nil(e:process(held, DOWN, 150), "the hand's Shift passes") end
+			local out, tap = e:process(KEY_A, DOWN, 200)
+			local expected = "58↓ 58↑ 42↓ 30↓ 30↑ 42↑ 58↓ 58↑"
+			if held then expected = string.format("%d↑ %s %d↓", held, expected, held) end
+			helpers.assert_eq(trail(out), expected, "Caps Lock off around Shift+A, then back on")
+			helpers.assert_nil(tap)
+			helpers.assert_eq(trail(e:process(KEY_A, UP, 250) or {}), "", "the typed capital left nothing down")
+			if held then e:process(held, UP, 260) end
+			helpers.assert_nil(e:process(KEY_A, DOWN, 300), "spent once")
+		end
+		-- Unlocked, the same key under Shift stays a real keystroke that repeats.
+		local e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, lone_tap_max_ms = 0,
+			one_shot_timeout_ms = 2000, key_text = Fixture.us_text, plan_text = Fixture.us_plan,
+			one_shot_result = one_shot_result, caps_locked = function() return false end })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 200))), "42↓ 30↓")
 	end)
 
 	helpers.it("expires the one-shot Shift", function()

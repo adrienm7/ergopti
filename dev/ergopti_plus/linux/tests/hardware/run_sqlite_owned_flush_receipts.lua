@@ -29,21 +29,25 @@ if arg[1] == "--no-luv" then
 	require("compat.utf8").install()
 	local K = require("modules.keystats.keystats")
 	local W = require("modules.keystats.sqlite_writer")
-	assert(K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" }) ~= false)
+	local initialized = K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" })
 	if not rawget(_G, "jit") then
 		-- Stock Lua has neither luv nor an FFI descriptor API, so the private
 		-- file admission (run_sqlite_private_no_luv.lua) must refuse plaintext
-		-- storage. The collector still retains RAM and never claims a save.
+		-- storage. A refused store blocks capture (keystats may_record): init
+		-- reports it, and no keystroke is held in RAM that could never be saved.
+		assert(initialized == false, "a refused private store must be reported by init")
 		assert(K.is_enabled() and not W.is_available() and not W.flush_transport_available(),
 			"stock Lua without a descriptor API must not admit the SQLite store")
 		K.on_keydown("a", typed_at(1000), "minimal")
 		assert(K.flush() == false and not K.has_flush_debt())
-		assert(K._pending_buffer_count_for_test() == 1)
-		assert(K.get_range_payload().today.minimal.c.a.c == 1)
-		assert(K.stop() == true and K._pending_buffer_count_for_test() == 1)
-		print("PASS native dependency absent on stock Lua: private storage refused, RAM retained, no saved ACK")
+		assert(K._pending_buffer_count_for_test() == 0, "blocked capture must hold no keystroke")
+		local today = K.get_range_payload().today
+		assert(not (today and today.minimal), "blocked capture must report no keystroke")
+		assert(K.stop() == true and K._pending_buffer_count_for_test() == 0)
+		print("PASS native dependency absent on stock Lua: private storage refused, capture blocked, no saved ACK")
 		os.exit(0)
 	end
+	assert(initialized ~= false, "LuaJIT's descriptor API admits the store without luv")
 	assert(K.is_enabled() and W.is_available() and not W.flush_transport_available())
 	local revision = W.get_revision()
 	K.on_keydown("a", typed_at(1000), "minimal")

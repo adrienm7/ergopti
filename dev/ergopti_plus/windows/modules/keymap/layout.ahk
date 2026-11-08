@@ -67,6 +67,9 @@ DeadKey(Mapping) {
 		try {
 			NamedKeys := "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Insert}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
 			ih := InputHook("L2 E C T2", _SIHO_ScalarEndKeys() . NamedKeys)
+			; Ending controls are replayed below. Suppress these exact keys,
+			; leaving non-ending native controls and modifiers visible.
+			ih.KeyOpt(NamedKeys, "S")
 			OwnerToken := SIHO_StartOwned(ih, "dead-key", true)
 			if !OwnerToken
 				return
@@ -89,11 +92,10 @@ DeadKey(Mapping) {
 			LoggerWarn("DeadKey", "Discarded invalid scalar capture ({1}).", Capture.Reason)
 		if Capture.Kind == "invalid"
 			return
-		if Capture.Kind == "timeout" {
-			if Mapping.Has(" ")
-				SendNewResult(Mapping[" "])
+		; Expiry cancels the pending dead key, like a pause: nothing is typed
+		; and nothing composes later (maintainer decision, dead-key lifecycle).
+		if Capture.Kind == "timeout"
 			return
-		}
 		PressedKey := Capture.Text
 		if Mapping.Has(PressedKey) {
 			SendNewResult(Mapping[PressedKey])
@@ -107,8 +109,16 @@ DeadKey(Mapping) {
 		; Re-send EndKeys (Enter, BackSpace, Delete) consumed by the InputHook.
 		; Without the "V" option the hook swallows them; the user's newline,
 		; delete or erase would disappear silently after a dead-key sequence.
-		if Capture.Kind == "control"
-			Send("{" . Capture.Name . "}")
+		; The modifiers held with it are replayed too (OSW-001): Ctrl+Backspace
+		; must still erase a word, not one character.
+		if Capture.Kind == "control" {
+			CapturedPrefix := ""
+			for Symbol in ["^", "!", "+", "#"] {
+				if InStr(ih.EndMods, Symbol)
+					CapturedPrefix .= Symbol
+			}
+			SendNewResult(CapturedPrefix . "{" . Capture.Name . "}", False, False)
+		}
 	} finally {
 		InDeadKeySequence := false
 	}
@@ -524,7 +534,7 @@ _UIA_SelectionPollTick() {
 		if !Cache.Has(ProcName)
 			continue
 		Entry := Cache[ProcName]
-		if !TickExpired(Entry.Tick, Entry.DurationMs, Now) {
+		if !TickExpired64(Entry.Tick, Entry.DurationMs, Now) {
 			_UIA_SelectionCache := 0
 			return
 		}
@@ -580,7 +590,7 @@ GetUIASelection() {
 		if !IsObject(Snapshot)
 			return ""
 		Elapsed := Snapshot.HasOwnProp("CapturedAt")
-			? TickElapsed(Snapshot.CapturedAt) : UIA_SELECTION_MAX_AGE_MS + 1
+			? TickElapsed64(Snapshot.CapturedAt) : UIA_SELECTION_MAX_AGE_MS + 1
 		Selection := UIASW_ConsumeSelectionSnapshot(Snapshot,
 			WIGetForegroundHwnd(), WIGetFocusedControlToken(),
 			_UIA_CurrentInputEpoch(), Elapsed, UIA_SELECTION_MAX_AGE_MS)
@@ -594,7 +604,52 @@ GetUIASelection() {
 	}
 }
 
+; An epoch mismatch never authorizes the cached text. It may authorize a new
+; selection read when every other part of the old selection capability matches.
+_WrapSelectionNeedsFreshRead(Snapshot, Target) {
+	global UIA_SELECTION_MAX_AGE_MS
+	if !IsObject(Snapshot) || !(Target is Map)
+		return false
+	for Field in ["Text", "Hwnd", "Control", "InputEpoch", "CapturedAt", "Consumed"] {
+		if !Snapshot.HasOwnProp(Field)
+			return false
+	}
+	return Snapshot.Text is String && Snapshot.Text != "" && !Snapshot.Consumed
+		&& Snapshot.Hwnd == Target["hwnd"] && Snapshot.Control == Target["control"]
+		&& TickElapsed64(Snapshot.CapturedAt) <= UIA_SELECTION_MAX_AGE_MS
+		&& Snapshot.InputEpoch != _UIA_CurrentInputEpoch()
+}
+
+; Both the fresh-read continuation and a proven empty timeout own the same
+; command. A newer command, lifecycle teardown or target change revokes output.
+_WrapSelectionReady(Request, Text) {
+	; Empty/non-text copies and failed sends never authorize a bare-key fallback.
+	if Text == "" || !_SendInstantTargetCurrent(Request.Target)
+		return
+	if SendInstant(Request.Left . Text . Request.Right, "", Request.Target)
+		UpdateLastSentCharacter(SubStr(Request.Right, -_TextTailCodeUnits(Request.Right, 1)))
+}
+
+_WrapSelectionEmpty(Request) {
+	PreviousCritical := Critical("On")
+	try {
+		if _SendInstantTargetCurrent(Request.Target)
+			SendNewResult(Request.Symbol)
+	} finally Critical(PreviousCritical)
+}
+
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
+	global _UIA_SelectionCache
+	static CommandId := 0
+	EntryCritical := Critical("On")
+	try {
+		ThisCommand := ++CommandId
+		; Native production owns both ports. A logical fast-path harness may
+		; omit them, but may never start a deferred selection command.
+		HasAdmission := IsSet(TapHoldNewOwner) && IsSet(KS_GetPhysicalInputGeneration)
+		Owner := HasAdmission ? TapHoldNewOwner() : 0
+		InputGeneration := HasAdmission ? KS_GetPhysicalInputGeneration() : 0
+	} finally Critical(EntryCritical)
 	; Two gates must pass before a selection is wrapped:
 	;   1. The master feature flag (Raccourcis > « encadrer la sélection »).
 	;   2. The per-symbol enable/disable state set from the wrap-symbols menu.
@@ -611,6 +666,13 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 		and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
 		and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
+		; A saved custom pair owns its key: the layout descriptor's delimiters are
+		; the built-in ones, and the prefix route already wraps with the custom pair.
+		CustomPair := WrapSymbols_CustomPairFor(Symbol)
+		if (CustomPair is Map) {
+			LeftSymbol := CustomPair["left"]
+			RightSymbol := CustomPair["right"]
+		}
 		; Critical is RELEASED across the selection probe and the clipboard
 		; round-trip, then restored.
 		;
@@ -629,6 +691,8 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 		; DeadKey uses around its InputHook wait.
 		_WrapCrit := Critical("Off")
 		try {
+			Target := _SendInstantCaptureTarget()
+			Snapshot := IsSet(_UIA_SelectionCache) ? _UIA_SelectionCache : 0
 			Selection := GetUIASelection()
 			if (Selection != "") {
 				; Send all the text instantly and without triggering hotstrings while
@@ -642,12 +706,30 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 				; pushed it twice and shifted every GetLastSentCharacterAt(-N)
 				; lookup by one. SendInstant, in contrast, does NOT record — so
 				; the explicit push belongs only to its success branch.
-				if !SendInstant(LeftSymbol Selection RightSymbol)
-					SendNewResult(Symbol)
-				else
+				if !SendInstant(LeftSymbol Selection RightSymbol, "", Target) {
+					; A failed clipboard transport may also have changed the editor.
+					; The bare-key fallback belongs only to the original selection.
+					if _SendInstantTargetCurrent(Target)
+						SendNewResult(Symbol)
+				} else
 					; Wrapping ends at the closing text, which can differ from the
 					; pressed key and can include a no-break prefix or a surrogate pair.
 					UpdateLastSentCharacter(SubStr(RightSymbol, -_TextTailCodeUnits(RightSymbol, 1)))
+				return
+			}
+			if HasAdmission && _WrapSelectionNeedsFreshRead(Snapshot, Target) {
+				; This is a new copy of the current selection, never a promotion of
+				; the old snapshot's epoch or text. Preserve this original target
+				; through capture, clipboard rendering and the final native send.
+				Target["admission"] := () => !A_IsSuspended && CommandId == ThisCommand
+					&& TapHoldOwnerCurrent(Owner) && KS_GetPhysicalInputGeneration() == InputGeneration
+				Request := {Symbol: Symbol, Left: LeftSymbol, Right: RightSymbol, Target: Target}
+				Ready := _WrapSelectionReady.Bind(Request)
+				if !_SendInstantTargetCurrent(Target)
+					return
+				; A false start may already own mutation/restore debt. It never
+				; authorizes a bare key; only the typed timeout continuation does.
+				GetSelectionAsync(Ready, Map("on_empty", _WrapSelectionEmpty.Bind(Request)))
 				return
 			}
 		} finally {

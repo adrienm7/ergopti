@@ -152,7 +152,8 @@ local function pause_handoff_fixture(body)
 	end
 	local function restart(paused, run, cgroup)
 		return Restarter.restart({ wrapper = LAUNCHER, args = { "--tray", "space ' apostrophe" },
-			paused = paused, pid = 123, cgroup = cgroup or SESSION_CGROUP, run = run })
+			paused = paused, pid = 123, start_tick = "12345", boot_id = "01234567-89ab-cdef-0123-456789abcdef",
+			cgroup = cgroup or SESSION_CGROUP, run = run })
 	end
 	local ok, failure = xpcall(function()
 		body({ path = path, read = read, write = write, restart = restart, files = Files })
@@ -315,13 +316,18 @@ helpers.describe("Main early pause restoration", function()
 				local first = assert(source:find("\tlocal script_actions = ScriptActions.new({", 1, true))
 				local last = assert(source:find("\t-- A control can change", first, true))
 				local before_watch = source:sub(first, last - 1)
-				local applications = 0
+				local applications, pause_steps = 0, {}
 				local environment = setmetatable({ ScriptActions = require("modules.shortcuts.script_actions"),
 					Logger = require("logger.shim"), LOG = "Main early pause test", privacy_owners = {},
-					keystats = { cancel_hold_intervals = function() end }, engine = { reset = function() end },
+					keystats = {
+						cancel_hold_intervals = function() end,
+						discard_roi = function() pause_steps[#pause_steps + 1] = "roi" end,
+					}, engine = { reset = function() end },
 					MagicKeySource = { cancel_capture = function() end }, perform_reload = function() end,
 					shutdown = { request = function() end },
 					TapHold = { set_paused = function(paused)
+						helpers.assert_eq(pause_steps, { "roi" }, "pause retires ROI before native remapping")
+						pause_steps[#pause_steps + 1] = "remapper"
 						applications = applications + 1; helpers.assert_true(paused); return acknowledged
 					end } }, { __index = _G })
 				local text = "return function()\n" .. before_watch .. "\nreturn script_actions\nend"
@@ -329,22 +335,26 @@ helpers.describe("Main early pause restoration", function()
 				if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
 				else chunk = assert(load(text, "Main early pause", "t", environment)) end
 				-- The desktop layout switch is initialised by an earlier Main span.
-				local layout_switches = {}
+				local layout_switches, starts = {}, {}
 				local previous_switch = package.loaded["modules.keymap.pause_layout_switch"]
 				package.loaded["modules.keymap.pause_layout_switch"] = { on_pause_change = function(paused)
 					layout_switches[#layout_switches + 1] = paused
-				end }
+				end, start_safely = function(paused) starts[#starts + 1] = paused end }
 				local ran, controller = pcall(chunk())
 				package.loaded["modules.keymap.pause_layout_switch"] = previous_switch
 				if not ran then error(controller, 0) end
 				helpers.assert_eq(applications, 1, "startup must apply the normal remapper transition once")
+				helpers.assert_eq(pause_steps, { "roi", "remapper" }, "both acknowledgement outcomes retire the ROI fragment exactly once")
 				helpers.assert_eq(#layout_switches, 1, "the restored pause switches the desktop layout once")
 				helpers.assert_true(layout_switches[1])
 				if acknowledged then
+					helpers.assert_eq(#starts, 1, "the start switch follows the restored pause once")
+					helpers.assert_true(starts[1], "the start reads the restored pause")
 					helpers.assert_true(controller.is_paused())
 					local _, status = f.read(); helpers.assert_eq(status, "absent")
 				else
 					helpers.assert_nil(controller, "refused pause must return before watch and native capture")
+					helpers.assert_eq(#starts, 0, "a refused start never switches the layout")
 					helpers.assert_eq(f.read(), image, "the next startup must retain the requested pause")
 				end
 			end)

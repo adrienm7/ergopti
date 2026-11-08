@@ -161,9 +161,9 @@ _PrefixLogSafe(Text) {
 	return StrLen(Text)
 }
 
-; The preview boundary set. NOT a cached copy any more: it delegates to the
-; matcher's own derivation so the tooltip and the engine cannot answer the
-; word-boundary question differently. A cache here was tried twice — first a
+; The preview boundary set delegates to the matcher's own derivation, with
+; no separate snapshot that could disagree about the same word boundary.
+; A preview-owned cache was tried twice — first a
 ; compile-time snapshot, then a refreshed copy built from a WIDER expression
 ; than the matcher used — and both drifted, each time producing suggestions the
 ; engine then refused to fire.
@@ -536,6 +536,17 @@ _ResolveFireHType(Spec) {
 	return (Spec.HasOwnProp("Star") and Spec.Star) ? "star" : "endchar"
 }
 
+; The category a fired Spec is logged and WPM-coloured with. A repeat fallback
+; Spec carries the magic-key category of the registry it was built beside, so it
+; is normalised here, once, for the atomic caller and every deferred owner
+; (Notepad, terminal): a doubling is a neutral ``repeat_key`` source, never a
+; coloured magic-key correction.
+_ResolveFireCategory(Spec) {
+	if (Spec.HasOwnProp("IsRepeat") and Spec.IsRepeat)
+		return MenuCommand.REPEAT_KEY
+	return Spec.HasOwnProp("Category") ? Spec.Category : ""
+}
+
 ; Toggle the render/depth guard around an output transaction.  Synthetic
 ; provenance is enforced by the InputHook's I1 input level, so this guard must
 ; never suppress a physical character merely because it arrives near a send.
@@ -577,7 +588,7 @@ _HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section, IsPrivate := f
 	; and must not create deferred work for a paused driver.
 	if A_IsSuspended
 		return false
-	; Dynamic hotstrings (@dt, @date, the phone/SSN/IBAN prefixes…) store a
+	; Dynamic hotstrings (dt, date, the phone/SSN/IBAN prefixes…) store a
 	; CALLABLE in Spec.Replacement and resolve it at fire time. HSE_DispatchMatch
 	; resolves it into a local and never writes it back, so the fire paths read
 	; the raw property and would hand the Func object straight to the drain —
@@ -1312,6 +1323,22 @@ _PrefixShortcutModifierHeld() {
 	return IsDown.Call("LWin") or IsDown.Call("RWin")
 }
 
+; Takes the expansion undo record on the key after an expansion. A modifier
+; pressed alone keeps it, so Shift+Backspace still restores; Ctrl, Alt or Win
+; with Backspace stay the application's, as on macOS and Linux.
+; @param VK {Integer} The key going down.
+; @returns {Boolean} True when HSE_UndoExpansion owns this Backspace.
+_PrefixTakeUndoOnKeyDown(VK) {
+	global HSE_Undoable
+	if !IsObject(HSE_Undoable) || _PrefixIsModifierVK(VK)
+		return false
+	Undo := HSE_Undoable
+	HSE_Undoable := ""
+	if (VK != 0x08 || _PrefixShortcutModifierHeld())
+		return false
+	return HSE_UndoExpansion(Undo)
+}
+
 ; Handle the two genuine Ctrl chords proven to relocate focus without OnChar.
 ; AltGr synthesizes Ctrl on a standard layout, so RAlt/SC138 ownership is
 ; resolved by the caller (_PrefixAltGrMasksCtrl) and excludes that path.
@@ -1589,6 +1616,14 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				_PrefixAppendTypedChar(Char)
 				return
 			}
+			; A registered winner whose time gate has expired is no match: the
+			; magic-key fallbacks below answer instead, as on macOS and Linux
+			; (decision of 2026-11-06). Dispatching it only to be refused on time
+			; masked the repeat behind a hotstring the user was too slow for.
+			if (HSEMatch != "" and HSE_TimeGateExpired(HSEMatch, HSE_Buffer, HSE_LastEndChar, HSE_TypoNbspStripped)) {
+				_PrefixRecordMagicOutcome(Char, "expired_winner")
+				HSEMatch := ""
+			}
 			; When no registered hotstring matched, try the engine-level repeat
 			; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
 			; letter of the current word. This replaces the now-removed [[repeat]]
@@ -1650,11 +1685,9 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				; _MIN_PREFIX_LEN) still carry meaningful metadata.
 				HotstringHType := _ResolveFireHType(HSEMatch)
 				HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-				; IsRepeat matches have no Category property — pass "repeat_key" explicitly
-				; so the WPM widget knows to stay at the default color.
-				HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-					? MenuCommand.REPEAT_KEY
-					: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+				; A repeat is classified "repeat_key" so the WPM widget stays at the
+				; default colour, the same value every deferred owner logs.
+				HotstringCategory := _ResolveFireCategory(HSEMatch)
 				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
 				; Metrics logging is analytics — enqueue it and return; the heavy
 				; KL_LogHotstring work runs off the keystroke path (see
@@ -1756,6 +1789,12 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; private InputHook is fully silent during suspend.
 	if A_IsSuspended
 		return
+	; A key the prediction tooltip does not own is user activity: the pending
+	; prediction stops before this key's typing arms the next pause.
+	if IsSet(LLM_Bridge_OnKeyActivity)
+		try LLM_Bridge_OnKeyActivity(VK)
+		catch as Err
+			LoggerError("PrefixWatcher", "Prediction activity cancel failed for VK {1}: {2}.", VK, Err.Message)
 	; This press belongs to the expansion it completes (HotstringEndKeyClaim).
 	if (VK == _PrefixEndKeyClaim) {
 		_PrefixEndKeyClaim := 0
@@ -1769,6 +1808,11 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
 	try {
+		; The very next key after an expansion decides its undo: a plain or Shift
+		; Backspace restores the trigger and owns its buffer effect; any other key
+		; voids it (HSE_UndoExpansion).
+		if _PrefixTakeUndoOnKeyDown(VK)
+			return
 		; A long enough pause before this key starts a new word, whatever the
 		; key does next (a Backspace or a navigation key then applies on top).
 		_PrefixApplyIdleReset(A_TickCount)
@@ -1797,6 +1841,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; char, leaving the buffer ahead of the screen and later firing an
 				; expansion with backspaces into unrelated text.
 				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, _PrefixWordDeleteChordHeld())
+				; The AI context describes text that is no longer there.
+				if IsSet(LLM_Bridge_OnUnknownEdit)
+					LLM_Bridge_OnUnknownEdit("Modified Backspace")
 				return
 			}
 			; Insert and Delete keep their own reset below, modifiers or not.
@@ -1809,7 +1856,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; then empties the field and the next one deletes nothing.
 				SelectsAll := (VK == 0x41 and _PrefixWordDeleteChordHeld()
 					and !_PrefixTerminalHostFocused())
-				HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut", SelectsAll)
+				if HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut", SelectsAll)
+						and IsSet(LLM_Bridge_OnUnknownEdit)
+					LLM_Bridge_OnUnknownEdit("Shortcut")
 				return
 			}
 		}
@@ -1968,9 +2017,9 @@ _PrefixWordTailFromEngine() {
 	return IsSet(HSE_Buffer) ? _PrefixWordTail(HSE_Buffer) : ""
 }
 
-; The trailing word of an arbitrary buffer, using the shared boundary set. One
-; definition of "the word currently being typed", so every consumer agrees on
-; where it starts.
+; The trailing word of an arbitrary buffer, using the matcher's word-opening
+; predicate. ASCII symbols open a word even when they do not complete a
+; hotstring; consulting the delimiter set alone leaves those symbols in previews.
 _PrefixWordTail(Buf) {
 	global _MAX_BUFFER_LEN
 	if (Buf == "")
@@ -1981,7 +2030,7 @@ _PrefixWordTail(Buf) {
 	while Position > 0 {
 		Start := _TextCodepointStart(Buf, Position)
 		Ch := SubStr(Buf, Start, Position - Start + 1)
-		if _TextCompleteTailScalar(Ch) != "" && InStr(Boundaries, Ch)
+		if _TextCompleteTailScalar(Ch) != "" && _HSE_CharOpensWord(Ch, Boundaries)
 			break
 		Tail := Ch . Tail
 		Position := Start - 1
@@ -2123,7 +2172,7 @@ _PrefixAppendTypedChar(Char) {
 	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
 	; may contain one as a non-final char); the preview only tracks the current
 	; word, so it starts fresh here.
-	if CompletedScalar != "" && InStr(_PrefixWordBoundaries(), CompletedScalar) {
+	if _HSE_CharOpensWord(CompletedScalar, _PrefixWordBoundaries()) {
 		_ResetPrefixBuffer(false)
 		; The boundary itself may be the body of a boundary-leading star trigger
 		; (for example " ★"). HSE_Buffer retains it, so ask the canonical oracle

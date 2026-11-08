@@ -73,7 +73,7 @@ _RoiWord_OverflowDiscardsRun() {
 	Assert(InStr(Body, "word_overflowed") > 0, "KL_Roi_OnChar must track an overflow flag so the over-long run is discarded (roi-current-word-unbounded-growth)")
 	; The boundary path must early-return on overflow before calling ProcessWord.
 	OverflowIdx := InStr(Body, "if (overflowed)")
-	ProcessIdx := InStr(Body, "KL_Roi_ProcessWord(word)")
+	ProcessIdx := InStr(Body, "KL_Roi_ProcessWord(word")
 	Assert(OverflowIdx > 0, "KL_Roi_OnChar must branch on the overflow flag at the boundary (roi-current-word-unbounded-growth)")
 	Assert(ProcessIdx > OverflowIdx, "KL_Roi_OnChar must check overflow and return BEFORE KL_Roi_ProcessWord so an over-long run never becomes a candidate (roi-current-word-unbounded-growth)")
 }

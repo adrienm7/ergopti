@@ -783,6 +783,8 @@ M.eventtap = {
 			scrollWheelEventDeltaAxis2 = 7,
 			scrollWheelEventScrollPhase = 9,
 			scrollWheelEventMomentumPhase = 10,
+			mouseEventDeltaX = 11,
+			mouseEventDeltaY = 12,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
@@ -800,6 +802,8 @@ M.eventtap = {
 			leftMouseDown = 3, rightMouseDown = 4, mouseMoved = 5,
 			middleMouseDown = 6, otherMouseDown = 25, otherMouseUp = 26,
 			scrollWheel = 22,
+			leftMouseDragged = 7, rightMouseDragged = 8, otherMouseDragged = 27,
+			rotate = 18, gesture = 29, magnify = 30, swipe = 31, smartMagnify = 32,
 		},
 		newKeyEvent   = function(mods, key, isDown)
 			local properties = {}
@@ -1043,6 +1047,20 @@ local function make_canvas(initial_frame)
 		return self
 	end
 
+	--- Mirrors hs.canvas: every tracking class starts disabled and native
+	--- delivery requires an explicit opt-in (down, up, enter/exit, move).
+	function canvas:canvasMouseEvents(down, up, enter_exit, move)
+		if down == nil and up == nil and enter_exit == nil and move == nil then
+			local flags = self._mouse_events or {}
+			return flags.down == true, flags.up == true, flags.enter_exit == true, flags.move == true
+		end
+		self._mouse_events = {
+			down = down == true, up = up == true,
+			enter_exit = enter_exit == true, move = move == true,
+		}
+		return self
+	end
+
 	function canvas:show()
 		if self._deleted then return nil end
 		self._showing = true
@@ -1143,6 +1161,8 @@ M.application = {
 	launchOrFocus = function(_) end,
 	open = function(_) end,
 	applicationsForBundleID = function(_) return {} end,
+	-- Hammerspoon returns nil when no bundle metadata can be resolved.
+	infoForBundlePath = function(_) return nil end,
 	applicationForPID = function(pid)
 		APPLICATION_QUERIES[#APPLICATION_QUERIES + 1] = pid
 		local active_watchers = 0
@@ -1272,6 +1292,19 @@ M.axuielement = {
 }
 
 M.window = {
+	__windows = {},
+	allWindows = function()
+		local result = {}
+		for _, win in ipairs(M.window.__windows) do result[#result + 1] = win end
+		return result
+	end,
+	visibleWindows = function()
+		local result = {}
+		for _, win in ipairs(M.window.__windows) do
+			if win:isVisible() == true then result[#result + 1] = win end
+		end
+		return result
+	end,
 	focusedWindow = function() return nil end,
 	frontmostWindow = function() return nil end,
 	-- Like the real call (AXUIElementSetMessagingTimeout on the system-wide
@@ -1322,6 +1355,13 @@ end
 -- table references. Raw strings are immutable, so one table copy suffices.
 -- Explicit test overrides remain responsible for daemon/ownership refusals.
 M.pasteboard = {
+	allContentTypes = function(name)
+		local data = PASTEBOARD_DATA[pasteboard_key(name)]
+		if not data or next(data) == nil then return {} end
+		local types = {}
+		for uti in pairs(data) do types[#types + 1] = uti end
+		return { types }
+	end,
 	changeCount = function(name) return PASTEBOARD_COUNTS[pasteboard_key(name)] or 0 end,
 	getContents = function(name)
 		local data = PASTEBOARD_DATA[pasteboard_key(name)] or {}
@@ -1508,6 +1548,7 @@ M.host = {
 --- Resets all in-memory stub state. Test helpers should call this before each
 --- test to avoid cross-test pollution.
 function M.__reset()
+	M.window.__windows = {}
 	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
 	for name in pairs(PASTEBOARD_DATA) do PASTEBOARD_DATA[name] = nil end

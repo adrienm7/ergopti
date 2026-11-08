@@ -30,8 +30,10 @@ Shell.has_command = function(name, ...)
 	if name == "nmcli" or name == "loginctl" or name == "pactl" then return true end
 	return original_has(name, ...)
 end
+-- The network read is matched by program and fields, not its whole spelling:
+-- the sampler's flags (--colors no) once moved and left every wifi change unseen.
 Shell.exec_line = function(command)
-	if command:find("nmcli -t -f active,ssid", 1, true) then calls.network = calls.network + 1; return "yes:" .. network end
+	if command:find("nmcli", 1, true) and command:find("-f active,ssid", 1, true) then calls.network = calls.network + 1; return "yes:" .. network end
 	if command:find("loginctl show-session", 1, true) then calls.lock = calls.lock + 1; return locked and "yes" or "no" end
 	if command:find("pactl get-sink-mute", 1, true) then calls.mute = calls.mute + 1; return "Mute: no" end
 	return original_line(command)
@@ -66,6 +68,8 @@ local ok, failure = xpcall(function()
 	}) do
 		elapsed, network, locked = 0, "allowed-initial-network", false
 		System._reset()
+		-- The host's /proc would add system_load rows; this fixture admits transitions.
+		System._set_proc_paths("/nonexistent/ergopti-stat", "/nonexistent/ergopti-meminfo")
 		Preferences.with(function()
 			Fixture.with(function(k)
 				local database = own_database(case.name)
@@ -101,7 +105,7 @@ local ok, failure = xpcall(function()
 				if case.allowed_prefix then transition_sample() end
 				k.on_keydown("a", Clock.now_ms(), "privacy-probe")
 				Fixture.flush(k)
-				local rows = assert(writer.query_rows("SELECT action,COALESCE(json_extract(metadata_json,'$.asleep_ms'),'') FROM events_system ORDER BY action;"))
+				local rows = assert(writer.query_rows("SELECT action,COALESCE(json_extract(metadata_json,'$.asleep_ms'),'') FROM events_system WHERE action IN ('lock','unlock','wake','wifi_change') ORDER BY action;"))
 				local text = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id;"))
 				assert(#text == 1 and text[1] == "a", "privacy must reject the forbidden key and preserve permitted input")
 				local metadata = assert(writer.query_rows("SELECT COUNT(*) FROM events_system WHERE json_extract(metadata_json,'$.asleep_ms')=" .. tostring(System._sample_interval_ms() * 4) .. ";"))
@@ -128,6 +132,7 @@ local ok, failure = xpcall(function()
 	-- A stopped collector refuses reinitialization and cannot reauthorize samples.
 	elapsed, network, locked = 0, "failed-open-initial", false
 	System._reset()
+	System._set_proc_paths("/nonexistent/ergopti-stat", "/nonexistent/ergopti-meminfo")
 	Preferences.with(function()
 		Fixture.with(function(k)
 			k.init({ sqlite_path = directory, log_dir = directory .. "/logs" })

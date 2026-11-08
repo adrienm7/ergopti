@@ -14,6 +14,10 @@ local TAGS = {
 		{ key = "left_shift", flag = "shift" } },
 	capsword_deactivated = { { key = "left_control", flag = "ctrl" }, { key = "left_option", flag = "alt" },
 		{ key = "left_command", flag = "cmd" } },
+	-- A tap-hold key's own command is about to be sent: the driver's word reset
+	-- tells it from the keyboard's own chords (hotstrings.tap_hold_resets_word).
+	tap_hold_command = { { key = "left_control", flag = "ctrl" }, { key = "left_option", flag = "alt" },
+		{ key = "left_command", flag = "cmd" }, { key = "left_shift", flag = "shift" } },
 }
 
 --- Returns a fresh Karabiner output-modifier list for one owned signal.

@@ -73,24 +73,13 @@ local function _load_shared_layouts()
 		return nil, "keycodes.evdev module unavailable"
 	end
 
-	-- The Linux daemon uses a vendored pure-Lua JSON decoder.
+	-- Keycode data is JSON, never executable Lua. Refuse a broken install
+	-- before handing an unavailable decoder to the shared loader.
 	local ok_json, json_mod = pcall(require, "json")
-	local decode = (ok_json and json_mod and json_mod.decode) or nil
-	if not decode then
-		-- Fall back to a minimal JSON parser if no json module is available.
-		-- Uses load("return "..raw) which works for our trusted static data
-		-- (keycodes are plain strings/numbers; booleans/null not yet needed).
-		decode = function(raw)
-			local ok, val = pcall(function()
-				local f = assert(load("return " .. raw))
-				return f()
-			end)
-			if ok then return val end
-		end
-	end
-	if not decode then
+	if not ok_json or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil, "no JSON decoder available"
 	end
+	local decode = json_mod.decode
 
 	-- Resolve the _shared/ root through infra.paths, which knows the two layouts
 	-- that ship. Stripping three path components off this file's own location

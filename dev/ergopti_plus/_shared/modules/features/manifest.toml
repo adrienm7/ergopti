@@ -84,7 +84,7 @@
 #       restore_exempt_reason   Optional. Why a row stays out of every
 #                               configuration scope, so that no restore touches
 #                               it; every other row belongs to [scopes.global].
-#       superseded_reason_key   Optional, Windows-only booleans. i18n key of
+#       superseded_reason_key   Optional, layout emulation booleans. i18n key of
 #                               why the feature is off while a registry layout
 #                               is emulated (layout.emulated_layout): the master
 #                               gate turns it off and the menu greys its row.
@@ -191,11 +191,10 @@ platforms = ["ahk", "hs", "linux"]
 description_key = "menu.hotstrings.personal"
 platforms = ["ahk", "hs", "linux"]
 
-# macOS alone persists optional per-category menu orders; this data has no toggle.
+# Per-category menu orders are presentation preferences, with no expansion toggle.
 [sections.hotstrings.order_overrides]
 description_key = "menu.hotstrings"
-platforms = ["hs"]
-reason_key = "platform_reason.hotstring_menu_order_is_macos"
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -305,11 +304,12 @@ reason_key = "platform_reason.personal_shortcut_switches_are_windows"
 description_key = "menu.shortcuts.script_control"
 platforms = ["ahk", "hs", "linux"]
 
-# macOS persists its native wrap choices in this optional canonical namespace.
+# macOS and Linux persist their wrap choices in this optional canonical
+# namespace (_shared/lua/menu/wrap_preferences); Windows keeps wrap_symbols.toml.
 [sections.shortcuts.wrap_symbols]
 description_key = "menu.shortcuts.wrap_symbols"
-platforms = ["hs"]
-reason_key = "platform_reason.wrap_symbols_store_is_macos"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.wrap_symbols_store_is_not_windows"
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
@@ -352,13 +352,13 @@ subsections = ["modes", "sensitivities"]
 
 [sections.gestures.modes]
 description_key = "menu.gestures.modes"
-platforms = ["hs"]
-reason_key = "platform_reason.gesture_modes_and_steps_are_macos"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.gesture_modes_and_steps_need_finger_travel"
 
 [sections.gestures.sensitivities]
 description_key = "menu.gestures.sensitivities"
-platforms = ["hs"]
-reason_key = "platform_reason.gesture_modes_and_steps_are_macos"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.gesture_modes_and_steps_need_finger_travel"
 
 
 
@@ -596,19 +596,18 @@ description_key = "menu.hotstrings.shortcut_resets_word"
 # (copy, paste, a window switch…) and every shortcut struck under its held
 # modifier or layer. A tap that types its key (Space, Enter, Tab, Backspace…)
 # keeps that key's effect, a Shift or AltGr hold is typing, and an arrow from
-# the navigation layer follows arrow_resets_word. Not on macOS: Karabiner-
-# Elements runs the tap-holds there and its output reaches the driver as the
-# keyboard's own keys, so a shortcut it sends follows shortcut_resets_word.
+# the navigation layer follows arrow_resets_word. On macOS Karabiner-Elements
+# runs the tap-holds and marks their output with tagged F20 sentinels
+# (_shared/lua/keymap/control_signals.lua), which the keymap reads.
 [[features.hotstrings]]
 id = "tap_hold_resets_word"
-platforms = ["ahk", "linux"]
-requires = { linux = ["evdev", "uinput"], windows = [] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
 type = "boolean"
 description_key = "menu.hotstrings.tap_hold_resets_word"
-reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 
 # The cascade: how many hotstring expansions (arrows) a chain may hold. The
 # setting counts ARROWS: 1 is a single expansion (`a` -> `b`, the text a
@@ -1678,9 +1677,7 @@ recommended = true
 family = "setting"
 type = "boolean"
 description_key = "menu.llm.profiles.auto_profile_for_model"
-platforms = ["ahk", "linux"]
-requires = { linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
-reason_key = "platform_reason.llm_profile_follows_model_is_not_on_macos"
+requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 
 
 
@@ -1752,6 +1749,9 @@ type = "enum"
 enum_values = ["wait", "both"]
 description_key = "menu.llm.while_hotstring_tooltip"
 
+# A finished prediction is typed into the document instead of offered, after
+# the same checks an accept makes; one variant only, and a rewrite or an
+# erasing correction keeps its offer. It is not token-by-token streaming.
 [[features.llm.trigger]]
 id = "inline_autotype"
 default = false
@@ -1759,9 +1759,8 @@ recommended = false
 family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.inline_autotype"
-platforms = ["ahk"]
-requires = { windows = ["ollama", "webview2"] }
-reason_key = "platform_reason.inline_autotype_is_windows"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 
 [[features.llm.trigger]]
 id = "secure_filter_enabled"
@@ -1922,13 +1921,13 @@ family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_graph"
 
-# The typing-speed readout in the Linux tray and the macOS menu bar. Same
-# shipped answers on both: off, coloured by source once on.
+# The typing-speed readout in the macOS menu bar and the Windows and Linux
+# notification areas. Same shipped answers everywhere: off, coloured by source
+# once on.
 [[features.metrics]]
 id = "wpm_menubar_visible"
-platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev"] }
-reason_key = "platform_reason.wpm_readout_needs_a_menubar"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = false
 recommended = false
 family = "setting"
@@ -1937,9 +1936,8 @@ description_key = "menu.metrics.show_wpm_menubar"
 
 [[features.metrics]]
 id = "wpm_menubar_colors"
-platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev"] }
-reason_key = "platform_reason.wpm_readout_needs_a_menubar"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = true
 recommended = true
 family = "setting"
@@ -2052,9 +2050,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.a_grave"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.a_grave]]
 id = "letter"
@@ -2063,9 +2061,9 @@ recommended = "v"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -2080,9 +2078,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_acute"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.e_acute]]
 id = "letter"
@@ -2091,9 +2089,9 @@ recommended = "c"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_acute.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -2108,9 +2106,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_circ"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.e_circ]]
 id = "letter"
@@ -2119,9 +2117,9 @@ recommended = "x"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_circ.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -2136,9 +2134,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_grave"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.e_grave]]
 id = "letter"
@@ -2147,9 +2145,9 @@ recommended = "z"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_grave.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -3444,8 +3442,8 @@ description_key = "menu.gestures.tap_5"
 # --- 2-finger (all x1) ---
 [[features.gestures.modes]]
 id = "swipe_2_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3455,8 +3453,8 @@ description_key = "menu.gestures.modes.swipe_2_left"
 
 [[features.gestures.modes]]
 id = "swipe_2_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3466,8 +3464,8 @@ description_key = "menu.gestures.modes.swipe_2_right"
 
 [[features.gestures.modes]]
 id = "swipe_2_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3477,8 +3475,8 @@ description_key = "menu.gestures.modes.swipe_2_up"
 
 [[features.gestures.modes]]
 id = "swipe_2_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3488,8 +3486,8 @@ description_key = "menu.gestures.modes.swipe_2_down"
 
 [[features.gestures.modes]]
 id = "swipe_2_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3499,8 +3497,8 @@ description_key = "menu.gestures.modes.swipe_2_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_2_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3510,8 +3508,8 @@ description_key = "menu.gestures.modes.swipe_2_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_2_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3521,8 +3519,8 @@ description_key = "menu.gestures.modes.swipe_2_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_2_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3534,8 +3532,8 @@ description_key = "menu.gestures.modes.swipe_2_right_up"
 # swipe opens or closes one tab, decision of 2026-11-04) ---
 [[features.gestures.modes]]
 id = "swipe_3_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3545,8 +3543,8 @@ description_key = "menu.gestures.modes.swipe_3_left"
 
 [[features.gestures.modes]]
 id = "swipe_3_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3556,8 +3554,8 @@ description_key = "menu.gestures.modes.swipe_3_right"
 
 [[features.gestures.modes]]
 id = "swipe_3_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3567,8 +3565,8 @@ description_key = "menu.gestures.modes.swipe_3_up"
 
 [[features.gestures.modes]]
 id = "swipe_3_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3578,8 +3576,8 @@ description_key = "menu.gestures.modes.swipe_3_down"
 
 [[features.gestures.modes]]
 id = "swipe_3_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3589,8 +3587,8 @@ description_key = "menu.gestures.modes.swipe_3_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_3_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3600,8 +3598,8 @@ description_key = "menu.gestures.modes.swipe_3_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_3_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3611,8 +3609,8 @@ description_key = "menu.gestures.modes.swipe_3_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_3_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3623,8 +3621,8 @@ description_key = "menu.gestures.modes.swipe_3_right_up"
 # --- 4-finger (all x1) ---
 [[features.gestures.modes]]
 id = "swipe_4_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3634,8 +3632,8 @@ description_key = "menu.gestures.modes.swipe_4_left"
 
 [[features.gestures.modes]]
 id = "swipe_4_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3645,8 +3643,8 @@ description_key = "menu.gestures.modes.swipe_4_right"
 
 [[features.gestures.modes]]
 id = "swipe_4_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3656,8 +3654,8 @@ description_key = "menu.gestures.modes.swipe_4_up"
 
 [[features.gestures.modes]]
 id = "swipe_4_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3667,8 +3665,8 @@ description_key = "menu.gestures.modes.swipe_4_down"
 
 [[features.gestures.modes]]
 id = "swipe_4_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3678,8 +3676,8 @@ description_key = "menu.gestures.modes.swipe_4_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_4_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3689,8 +3687,8 @@ description_key = "menu.gestures.modes.swipe_4_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_4_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3700,8 +3698,8 @@ description_key = "menu.gestures.modes.swipe_4_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_4_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3712,8 +3710,8 @@ description_key = "menu.gestures.modes.swipe_4_right_up"
 # --- 5-finger (horiz incremental, vert x1) ---
 [[features.gestures.modes]]
 id = "swipe_5_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3723,8 +3721,8 @@ description_key = "menu.gestures.modes.swipe_5_left"
 
 [[features.gestures.modes]]
 id = "swipe_5_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3734,8 +3732,8 @@ description_key = "menu.gestures.modes.swipe_5_right"
 
 [[features.gestures.modes]]
 id = "swipe_5_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3745,8 +3743,8 @@ description_key = "menu.gestures.modes.swipe_5_up"
 
 [[features.gestures.modes]]
 id = "swipe_5_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3756,8 +3754,8 @@ description_key = "menu.gestures.modes.swipe_5_down"
 
 [[features.gestures.modes]]
 id = "swipe_5_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3767,8 +3765,8 @@ description_key = "menu.gestures.modes.swipe_5_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_5_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3778,8 +3776,8 @@ description_key = "menu.gestures.modes.swipe_5_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_5_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3789,8 +3787,8 @@ description_key = "menu.gestures.modes.swipe_5_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_5_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3804,10 +3802,12 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 # ===== 3.6.2 gestures.sensitivities =====
 # ========================================
 
-# Distance per action of an incremental swipe, in touch-device units (the `sd`
-# the gesture log prints; a deliberate three-finger swipe on the built-in
-# trackpad travels about 15 to 45). The first action fires after
-# Geometry.INCREMENTAL_FIRST_STEP (4) or one step if that is shorter, and each
+# Distance per action of an incremental swipe, in millimetres of travel on the
+# pad (the `sd` the macOS gesture log prints; a deliberate three-finger swipe on
+# the built-in trackpad travels about 15 to 45). Linux converts its evdev units
+# with the resolution the touchpad reports, so one value means the same travel
+# there. The first action fires after the shared FIRST_STEP (4,
+# _shared/lua/gestures/incremental.lua) or one step if that is shorter, and each
 # further action after one more step; an x1 slot ignores it.
 
 # Directions default to 3.5, one action per short stretch (words, spaces),
@@ -3816,8 +3816,8 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 # 25: up to 29 is one tab (a short 4.9 included), 29 to 54 two, 54 and more three.
 [[features.gestures.sensitivities]]
 id = "swipe_2_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3826,8 +3826,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3836,8 +3836,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3846,8 +3846,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3856,8 +3856,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3866,8 +3866,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3876,8 +3876,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3886,8 +3886,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3896,8 +3896,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3906,8 +3906,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3916,8 +3916,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 25
 recommended = 25
 family = "setting"
@@ -3926,8 +3926,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 25
 recommended = 25
 family = "setting"
@@ -3936,8 +3936,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3946,8 +3946,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3956,8 +3956,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3966,8 +3966,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3976,8 +3976,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3986,8 +3986,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3996,8 +3996,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4006,8 +4006,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4016,8 +4016,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4026,8 +4026,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4036,8 +4036,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4046,8 +4046,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4056,8 +4056,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4066,8 +4066,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4076,8 +4076,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4086,8 +4086,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4096,8 +4096,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4106,8 +4106,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4116,8 +4116,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4126,8 +4126,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4147,8 +4147,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 # and the menu greys its row with this reason.
 [[features.gestures.modes]]
 id = "swipe_3_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4158,8 +4158,8 @@ description_key = "menu.gestures.modes"
 
 [[features.gestures.modes]]
 id = "swipe_4_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4169,8 +4169,8 @@ description_key = "menu.gestures.modes"
 
 [[features.gestures.modes]]
 id = "swipe_5_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4180,8 +4180,8 @@ description_key = "menu.gestures.modes"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4190,8 +4190,8 @@ description_key = "menu.gestures.sensitivities"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4200,8 +4200,8 @@ description_key = "menu.gestures.sensitivities"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4210,9 +4210,8 @@ description_key = "menu.gestures.sensitivities"
 
 [[features.layout]]
 id = "ergopti_base"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = false
 recommended = true
 family = "feature"
@@ -4220,8 +4219,10 @@ type = "boolean"
 description_key = "menu.layout.ergopti_base"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
-# Linux and macOS only report the layout's own number row (number_row_policy
-# native_rows); no writer reorders it there, so they cannot recommend digits.
+# Linux and macOS reorder the number row through the layout emulation when it
+# types that row (_shared/lua/layouts/keylayout_emulation.lua), else they rebuild
+# an installed layout of ours; with neither they only report the layout's own
+# row, so they cannot recommend digits.
 [[features.layout]]
 id = "direct_access_digits"
 platforms = ["ahk", "hs", "linux"]
@@ -4261,8 +4262,8 @@ description_key = "menu.layout.virtual_keyboard"
 # ordering moves the ten digit keys only and the edge keys type what the
 # effective layout types there. On: each edge key types its Shift level
 # unshifted and its base level with Shift, read from the effective layout,
-# while an ordering applies and each edge key can be swapped. Like the ordering
-# itself, only Windows applies it; macOS and Linux keep the native row.
+# while an ordering applies and each edge key can be swapped, wherever the
+# ordering itself applies.
 [[features.layout]]
 id = "number_row_reorder_edges"
 platforms = ["ahk", "hs", "linux"]
@@ -4275,9 +4276,8 @@ description_key = "menu.layout.number_row_edges"
 
 [[features.layout]]
 id = "ergopti_alt_gr"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = false
 recommended = true
 family = "feature"
@@ -4287,9 +4287,8 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "ergopti_variant"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "none"
 recommended = "ergopti_plus"
 family = "feature"
@@ -4304,16 +4303,15 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 # and the number-row ordering then reads the OS layout's row. Which keys each
 # row holds is read from the shared physical-key registry by the shared policy
 # (layout_rows_policy.ahk and .lua, tests/corpus/layouts/layout_rows.json).
-# Windows alone emulates a layout: macOS installs it as a system input source
-# and Linux remaps through kanata, so their menus grey these rows with why.
+# The three OS emulate it (Windows in AutoHotkey, macOS and Linux through the
+# shared engine _shared/lua/layouts/keylayout_emulation.lua).
 # The switches only narrow an emulation that an empty configuration leaves off
 # (emulated_layout "", ergopti_variant "none", ergopti_base false): on their
 # own they alter no input, so they are parameters, not activations.
 [[features.layout]]
 id = "emulate_number_row"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
@@ -4322,9 +4320,8 @@ description_key = "menu.layout.emulate_number_row"
 
 [[features.layout]]
 id = "emulate_top_row"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
@@ -4333,9 +4330,8 @@ description_key = "menu.layout.emulate_top_row"
 
 [[features.layout]]
 id = "emulate_home_row"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
@@ -4344,9 +4340,8 @@ description_key = "menu.layout.emulate_home_row"
 
 [[features.layout]]
 id = "emulate_bottom_row"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
@@ -4365,16 +4360,14 @@ type = "boolean"
 description_key = "menu.layout.ctrl_magic_save"
 
 # The registry layout (static/layouts/registry, _shared/modules/layouts) the
-# Windows driver emulates by reading its .keylayout, "" for none. While set it
-# supersedes the Ergopti emulation above. A choice, not a switch: no toggle row
-# lists it. Windows only, like this whole section: macOS installs a registry
-# .keylayout and Linux converts it to XKB, and the system's input sources then
-# select it.
+# three drivers emulate by reading its .keylayout over whatever system layout is
+# installed, "" for none. While set it supersedes the Ergopti emulation above. A
+# choice, not a switch: no toggle row lists it. Installing a layout as a system
+# input source (macOS) or an XKB layout (Linux) is a separate feature.
 [[features.layout]]
 id = "emulated_layout"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = ""
 recommended = ""
 family = "feature"
@@ -4764,6 +4757,10 @@ description_key = "onboarding.page.tap_holds.description"
 master = { ahk = "category_enabled.tap_holds" }
 state = { hs = "tap_holds.enabled", linux = "tap_holds.enabled" }
 checklist = "tap_holds"
+# Karabiner cannot decide from release order: macOS says how its typing keys
+# ([tap_hold.rollover] in _shared/tap_hold/defaults.toml) differ, without
+# promising the Windows/Linux hold semantics.
+hint_key = { hs = "onboarding.page.tap_holds.rollover_note" }
 
 [onboarding.pages.shortcuts]
 title_key = "menu.shortcuts.title"
@@ -4814,28 +4811,26 @@ note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboar
 # base and Shift levels) and the number-row ordering, drawn on the page rather
 # than in its checklist. Each starts at the value in force and changes only
 # when the user changes it, so a new installation emulates no layout and
-# reorders nothing; a change redraws the controls alone. Layout emulation and the ordering are
-# Windows-only today: macOS and Linux draw the controls greyed with why.
+# reorders nothing; a change redraws the controls alone. The three OS
+# emulate the layout (maintainer, 2026-11-06), and the ordering runs on the
+# three OS, live where a layout of ours types.
 [[onboarding.pages.keyboard_layout.controls]]
 id = "emulated_layout"
 label_key = "onboarding.layout.emulated_layout"
-platforms = ["ahk"]
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
 choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_base" = false, "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
 
 [[onboarding.pages.keyboard_layout.controls]]
 id = "alt_gr_emulation"
 label_key = "layout.ergoptialtgr"
 path = "layout.ergopti_alt_gr"
-platforms = ["ahk"]
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
 
 [[onboarding.pages.keyboard_layout.controls]]
 id = "number_row_emulation"
 label_key = "onboarding.layout.number_row_emulation"
 path = "layout.emulate_number_row"
-platforms = ["ahk"]
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+platforms = ["ahk", "hs", "linux"]
 
 [[onboarding.pages.keyboard_layout.controls]]
 id = "number_row_order"
@@ -4843,12 +4838,14 @@ label_key = "menu.layout.number_row"
 path = "layout.direct_access_digits"
 choice_label_prefix = "menu.layout.number_row_"
 # Windows emulates the layout and always applies it. Linux applies it live to the
-# layout of the running X11 session when one of ours is installed; the host says so
-# (capability number_row_live) and gives the reason when it cannot. macOS keeps the system row.
-platforms = ["ahk", "linux"]
-reason_key = "platform_reason.number_row_override_unsupported"
+# layout of the running X11 session when one of ours is installed, and macOS
+# rebuilds the installed .keylayout of ours typing now, as their menu rows do; the
+# host says so (capability number_row_live) and gives the reason when it cannot.
+platforms = ["ahk", "linux", "hs"]
+# Shown when the host does not say why it lacks the capability.
+reason_key = "platform_reason.number_row_live_no_layout"
 capability = "number_row_live"
-capability_platforms = ["linux"]
+capability_platforms = ["linux", "hs"]
 
 [onboarding.pages.hotstrings]
 title_key = "menu.hotstrings.title"

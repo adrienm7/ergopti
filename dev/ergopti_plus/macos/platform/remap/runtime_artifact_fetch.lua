@@ -64,6 +64,7 @@ M.REASON = {
 	MEMBERS = "artifact_members_refused",
 	EXTRACT = "artifact_extract_failed",
 	STORE = "artifact_store_failed",
+	BUSY = "artifact_busy",
 }
 local REASON = M.REASON
 
@@ -77,7 +78,7 @@ local function complete_pin(pin)
 	for _, key in ipairs(PIN_KEYS) do
 		if pin[key] == nil then return false end
 	end
-	return type(pin.version) == "string" and pin.version:match("^[%w%.%-+]+$") ~= nil
+	return require("platform.remap.runtime_manifest").valid_version(pin.version)
 		and type(pin.file_name) == "string" and pin.file_name:match("^[%w][%w%._%-]*$") ~= nil
 		and type(pin.source_url) == "string" and pin.source_url:match("^https://[^%s]+/" .. pin.file_name:gsub("%p", "%%%0") .. "$") ~= nil
 		and type(pin.sha256) == "string" and #pin.sha256 == 64 and pin.sha256:match("^%x+$") ~= nil
@@ -132,11 +133,13 @@ function M.new(ports)
 	end
 	local fetcher = {}
 	local waiters
+	local active_pin
 
 	--- Settles every waiter of the running fetch once.
 	local function settle(ok, value, detail)
 		local pending = waiters
 		waiters = nil
+		active_pin = nil
 		if ok then
 			Logger.success(LOG, "Owned runtime artifact ready at %s.", tostring(value))
 		elseif value == REASON.DOWNLOAD then
@@ -170,8 +173,10 @@ function M.new(ports)
 		-- A first start has no folder yet: reading through a missing parent is an
 		-- ERROR of the file system adapter, while an absent receipt is the normal case.
 		if ports.exists(home .. "/receipt") ~= true then return false end
-		local receipt = ports.read(home .. "/receipt")
-		if type(receipt) ~= "string" or receipt:match("^(%x+)") ~= pin.sha256 then return false end
+		-- The exact bytes the writer below produces, as the launcher's helper source
+		-- requires (OwnedRuntimeDownloadedHelper.swift): a looser match would call
+		-- the artifact ready while every install keeps refusing it.
+		if ports.read(home .. "/receipt") ~= pin.sha256 .. "\n" then return false end
 		for _, product in ipairs(M.PRODUCTS) do
 			if ports.exists(home .. "/payload/" .. product) ~= true then return false end
 		end
@@ -197,9 +202,18 @@ function M.new(ports)
 			return callback(false, REASON.UNPINNED, "the runtime artifact is not pinned in the manifest")
 		end
 		if waiters then
+			for _, key in ipairs(PIN_KEYS) do
+				if pin[key] ~= active_pin[key] then
+					return callback(false, REASON.BUSY, "another runtime artifact pin is being fetched")
+				end
+			end
 			waiters[#waiters + 1] = callback
 			return
 		end
+		local admitted_pin = {}
+		for _, key in ipairs(PIN_KEYS) do admitted_pin[key] = pin[key] end
+		pin = admitted_pin
+		active_pin = pin
 		waiters = { callback }
 		local home = ports.expand(M.home_for(pin.version))
 		if kept(home, pin) then

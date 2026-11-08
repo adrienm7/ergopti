@@ -27,18 +27,28 @@ _KCR_AssertPreservesCallerCritical(FuncName, RequiredFragment) {
 }
 
 _KCR_FlushSnapshotPreservesCritical() {
-	_KCR_AssertPreservesCallerCritical("KL_FlushBuffer", "Keystats.buffer_events    := []")
+	_KCR_AssertPreservesCallerCritical("KL_FlushBuffer", "_KL_DetachBufferSnapshot()")
+	_KCR_AssertPreservesCallerCritical("_KL_DetachBufferSnapshot", "Keystats.buffer_events    := []")
 }
 Test("keystats: flush snapshot restores caller Critical state (keystats-critical-restore)", _KCR_FlushSnapshotPreservesCritical)
 
 
 _KCR_IngestQueueTransactionsPreserveCritical() {
 	_KCR_AssertPreservesCallerCritical("KL_IngestOnce", "Keystats._pending_entries := []")
+	; The failure requeue lives in the journal's restore owner, which every
+	; ingest failure path calls with the detached snapshot.
 	Body := _DriverFuncBody("KL_IngestOnce")
-	Assert(InStr(Body, "Keystats._pending_entries.InsertAt") > 0,
+	Assert(InStr(Body, "_KL_JournalRestoreSnapshot(pending_snapshot)") > 0,
 		"KL_IngestOnce must retain its failure requeue transaction (keystats-critical-restore)")
-	Assert(InStr(Body, "Critical(previous_critical)", false, InStr(Body, "Keystats._pending_entries.InsertAt")) > 0,
-		"KL_IngestOnce requeue transaction must restore caller Critical state (keystats-critical-restore)")
+	Restore := _DriverFuncBody("_KL_JournalRestoreSnapshot")
+	StartIdx := InStr(Restore, 'PreviousCritical := Critical("On")')
+	InsertIdx := InStr(Restore, "Keystats._pending_entries.InsertAt")
+	FinallyIdx := InStr(Restore, "finally", , InsertIdx > 0 ? InsertIdx : 1)
+	RestoreIdx := InStr(Restore, "Critical(PreviousCritical)", , FinallyIdx > 0 ? FinallyIdx : 1)
+	Assert(StartIdx > 0 && InsertIdx > StartIdx && FinallyIdx > InsertIdx && RestoreIdx > FinallyIdx,
+		"the ingest requeue transaction must restore the caller's Critical state in finally (keystats-critical-restore)")
+	Assert(InStr(Restore, 'Critical("Off")') = 0,
+		"the ingest requeue must not clobber a caller Critical state with Critical('Off') (keystats-critical-restore)")
 }
 Test("keystats: ingest queue transactions restore caller Critical state (keystats-critical-restore)", _KCR_IngestQueueTransactionsPreserveCritical)
 

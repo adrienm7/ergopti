@@ -8,6 +8,17 @@ set -euo pipefail
 # The sentences this script prints, in the user's language (install/messages.sh).
 source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON
+case "$DRIVER_ROOT${ERGOPTI_RUNTIME_PREFIX:-}" in
+	*[\;\?]*)
+		export ERGOPTI_LITERAL_DRIVER_ROOT="$DRIVER_ROOT"
+		if [ -f "$DRIVER_ROOT/../_shared/data/locales/en.json" ]; then
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/../_shared/lua"
+		else
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/_shared/lua"
+		fi ;;
+	*) unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_NATIVE_MODULES ;;
+esac
 GROUPS_REFRESHED=false
 if [ "${1:-}" = --groups-refreshed ]; then GROUPS_REFRESHED=true; shift; fi
 SESSION_START=false
@@ -16,7 +27,11 @@ if [ "${1:-}" = --service ]; then SERVICE_MODE=true; shift; fi
 if [ "${1:-}" = --session-start ]; then
 	SESSION_START=true
 	shift
-	set -- --tray "$@"
+	# The native autostart entry already carries --tray. Avoid duplicating it
+	# while keeping every supplied daemon argument in its original order.
+	has_tray=false
+	for value in "$@"; do if [ "$value" = --tray ]; then has_tray=true; fi; done
+	if ! "$has_tray"; then set -- --tray "$@"; fi
 fi
 for arg in "$@"; do if [ "$arg" = --tray ]; then SESSION_START=true; fi; done
 
@@ -27,7 +42,10 @@ for arg in "$@"; do
 	if [ "$arg" = --help ] || [ "$arg" = -h ]; then DAEMON_LAUNCH=false; fi
 done
 
-if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && command -v systemctl >/dev/null 2>&1 \
+# Only the desktop's bare tray request can be represented by the unit. Any
+# additional daemon arguments must reach the daemon itself in their original order.
+if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" \
+	&& [ "$#" -eq 1 ] && [ "$1" = --tray ] && command -v systemctl >/dev/null 2>&1 \
 	&& systemctl --user show-environment >/dev/null 2>&1; then
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
@@ -41,6 +59,11 @@ for arg in "$@"; do
 		uid="$(id -u)"
 		groups=" $(id -nG "$uid") "
 		if [[ "$groups" != *' input '* || "$groups" != *' uinput '* ]]; then
+			if ! command -v pkexec >/dev/null 2>&1; then
+				export ERGOPTI_MISSING_PROGRAM=pkexec
+				printf '%s\n' 'missing-program pkexec' >&2
+				break
+			fi
 			status=0
 			diagnostic="$(pkexec /bin/bash "$DRIVER_ROOT/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
 			if [ -n "$diagnostic" ]; then printf '%s\n' "$diagnostic" >&2; fi
@@ -83,7 +106,19 @@ done
 
 # Every daemon launch, including a terminal launch, takes the instance lock.
 if "$DAEMON_LAUNCH"; then
-	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
+	lock_base="${XDG_RUNTIME_DIR:-}"
+	if [ -z "$lock_base" ]; then
+		if [[ "${HOME:-}" != /* ]]; then
+			ergopti_msg launch.session_lock_invalid >&2
+			exit 78
+		fi
+		lock_base="$HOME/.cache"
+	fi
+	if [[ "$lock_base" != /* ]]; then
+		ergopti_msg launch.session_lock_invalid >&2
+		exit 78
+	fi
+	lock_root="$lock_base/ergopti"
 	install -d -m 700 "$lock_root"
 	# Read/write open never waits for a peer on a foreign FIFO. Inspect the
 	# resulting descriptor, not the path, before accepting flock ownership.

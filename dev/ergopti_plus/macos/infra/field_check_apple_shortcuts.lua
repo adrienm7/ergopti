@@ -33,11 +33,20 @@ M.PARENT = "gestures"
 --- ports.apple_shortcut_action() -> modules/gestures/apple_shortcut_action.
 function M.apple_shortcuts(ports, report, finish)
 	local Action = ports.apple_shortcut_action()
+	local listed = false
+	local finished = false
+	local function finish_once()
+		if finished then return end
+		finished = true
+		finish()
+	end
 	local accepted, refused = Action.list(function(rows, reason)
+		if listed or finished then return end
+		listed = true
 		if not rows then
 			report.step("shortcuts_listed", FAIL, reason or "refused")
 			report.step("field_test_shortcut", SKIP, "no_listing")
-			return finish()
+			return finish_once()
 		end
 		report.step("shortcuts_listed", PASS, #rows)
 		local test
@@ -46,23 +55,28 @@ function M.apple_shortcuts(ports, report, finish)
 		end
 		if not test then
 			report.step("field_test_shortcut", SKIP, "absent")
-			return finish()
+			return finish_once()
 		end
 		report.step("field_test_shortcut", INFO, "present")
+		local run_finished = false
 		local started = Action.run({ id = test.id, name = test.name, input = "none", output = "none" }, M.PARENT, 0,
 			function(success, category)
+				if run_finished or finished then return end
+				run_finished = true
 				report.step("field_test_run", success and PASS or FAIL, category)
-				finish()
+				finish_once()
 			end)
-		if not started then
+		if not started and not run_finished then
+			run_finished = true
 			report.step("field_test_run", FAIL, "not_started")
-			finish()
+			finish_once()
 		end
 	end)
-	if not accepted then
+	if not accepted and not listed then
+		listed = true
 		report.step("shortcuts_listed", FAIL, refused or "refused")
 		report.step("field_test_shortcut", SKIP, "no_listing")
-		finish()
+		finish_once()
 	end
 end
 

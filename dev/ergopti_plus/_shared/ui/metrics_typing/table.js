@@ -430,6 +430,8 @@ function compute_key_km_per_stroke(key, char_km_map, is_kc_tab, is_sc_tab) {
  * represents the full manifest period, not just the current tab's subset.
  */
 function render_current_tab() {
+	if (app_state.today_partial_types?.includes(app_state.current_tab))
+		request_partial_today_refresh();
 	// "mods" draws from sc data and derives modifier patterns; "sc"/"sc_bg"/"w_bg" show as-is
 	// New word-ngram and shortcut-ngram tabs fall back to empty if backend hasn't produced data yet
 	const source_key = app_state.current_tab === 'mods' ? 'sc' : app_state.current_tab;
@@ -1473,7 +1475,14 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		return `rgb(${r},${g},${b})`;
 	};
 
-	const grand_total = Object.values(sfb_by_kc).reduce((s, c) => s + c, 0);
+	// A pair between distinct keys appears once for each key, whereas a
+	// self-pair appears once. Recover the number of distinct pair occurrences.
+	const key_total = Object.values(sfb_by_kc).reduce((s, c) => s + c, 0);
+	const self_total = Object.entries(sfb_pairs_by_kc).reduce(
+		(sum, [kc, pairs]) => sum + pairs.reduce((n, p) => n + (p.partner_kc === kc ? p.count : 0), 0),
+		0
+	);
+	const grand_total = (key_total + self_total) / 2;
 	const uid = 'sfbhm_' + Date.now().toString(36);
 
 	const SHORT_LABELS_MAC = {
@@ -2067,7 +2076,9 @@ function render_media_keys() {
 			!object(apps)
 		)
 			return;
-		Object.entries(apps).forEach(([app_name, app]) => {
+		Object.entries(apps).forEach(([app_key, app]) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name) || !object(app)) return;
 			rows.forEach((row, id) => {
 				if (object(app.media_keys) && Object.hasOwn(app.media_keys, id)) {

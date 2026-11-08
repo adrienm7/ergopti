@@ -64,6 +64,18 @@ helpers.describe("Remap configuration sparse loading", function()
 		helpers.assert_eq(state.mod_combos_config.esc_tab, { tap = "none", hold = "ctrl", combo = "none" })
 	end)
 
+	helpers.it("uses safe defaults for invalid stored timings (remap-timing-load-invalid)", function()
+		require("config_outdated").reset_for_tests()
+		local state, status, _, config = load('[tap_holds]\ntimeout_ms = 0\nsticky_timeout_ms = 0.5\n'
+			.. '[mod_combos]\nsimultaneous_threshold_ms = -2\n')
+		local neutral = config.build_default_state({ { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } })
+		helpers.assert_eq(status, "ok")
+		helpers.assert_eq(state.tap_hold_timeout_ms, neutral.tap_hold_timeout_ms)
+		helpers.assert_eq(state.sticky_timeout_ms, neutral.sticky_timeout_ms)
+		helpers.assert_eq(state.simultaneous_threshold_ms, neutral.simultaneous_threshold_ms)
+		require("config_outdated").reset_for_tests()
+	end)
+
 	helpers.it("still warns about a present value of the wrong type", function()
 		local state, _, warnings = load('[tap_holds]\nconfig = "opaque"\ntimeout_ms = "slow"\n')
 		helpers.assert_eq(#warnings, 2, table.concat(warnings, " | "))
@@ -132,6 +144,9 @@ helpers.describe("Remap obsolete scalar leaves", function()
 		{ section = "tap_holds", key = "sticky_timeout_ms", state = "sticky_timeout_ms", literal = '"later"', raw = "later" },
 		{ section = "mod_combos", key = "simultaneous_threshold_ms", state = "simultaneous_threshold_ms", literal = '"soon"', raw = "soon" },
 		{ section = "mod_combos", key = "enabled", state = "mod_combos_enabled", literal = '"old"', raw = "old" },
+		{ section = "tap_holds", key = "timeout_ms", state = "tap_hold_timeout_ms", literal = "0", raw = 0 },
+		{ section = "tap_holds", key = "sticky_timeout_ms", state = "sticky_timeout_ms", literal = "0.5", raw = 0.5 },
+		{ section = "mod_combos", key = "simultaneous_threshold_ms", state = "simultaneous_threshold_ms", literal = "-2", raw = -2 },
 	}
 	local function source(leaf)
 		return '[' .. leaf.section .. ']\n' .. leaf.key .. ' = ' .. leaf.literal

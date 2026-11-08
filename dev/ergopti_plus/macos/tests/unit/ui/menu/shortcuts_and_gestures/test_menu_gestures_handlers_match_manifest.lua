@@ -146,8 +146,10 @@ local function with_mode_fixture(options, callback)
 		local root = renderer.get_root()
 		root.gesture_slots = { ["2"] = { "swipe_2_left" }, ["3"] = {}, ["4"] = {}, ["5"] = {} }
 		local fixture = { mode = options.mode or "x1", writes = {}, saves = 0, updates = 0,
-			renderer = renderer, root = root, corpus = corpus, strings = strings, locale = locale }
+			renderer = renderer, root = root, corpus = corpus, strings = strings, locale = locale, click_changes = {} }
 		fixture.gestures = {
+			begin_click_binding_change = function(slot) return { slot = slot } end,
+			finish_click_binding_change = function(_, committed) fixture.click_changes[#fixture.click_changes + 1] = committed; return true end,
 			get_action = function() return "none" end,
 			get_action_label = function() return "None" end,
 			get_action_parameter = function() return "" end,
@@ -432,7 +434,12 @@ local function with_gesture_controls(options, callback)
 		f.gestures.get_action_label = function(action) return f.strings["sg_labels." .. action] or action end
 		f.gestures.set_action = function(slot, value)
 			f.control_writes[#f.control_writes + 1] = { slot, value }
+			if options.rollback_no_effect and #f.control_writes == 2 then return false end
 			f.action = value
+			if options.rollback_throw and #f.control_writes == 2 then
+				package.loaded["infra.logger"].error = function() error("logger failure") end
+				error("logger failure after restoration")
+			end
 			if options.setter and #f.control_writes == 1 then return options.setter() end
 			return true
 		end
@@ -610,6 +617,23 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 			helpers.assert_eq(f.queue, {})
 		end)
 	end)
+	helpers.it("closes the restored binding guard before a failing diagnostic", function()
+		with_gesture_controls({ save = function() return false end, rollback_throw = true }, function(f)
+			local slot = assert(f.control_slot())
+			slot.menu[1].fn(); f.action = "paste"
+			pcall(f.drain)
+			helpers.assert_eq(f.action, "paste")
+			helpers.assert_eq(f.click_changes, { false })
+		end)
+	end)
+	helpers.it("retains the binding guard when restoration is not observed", function()
+		with_gesture_controls({ save = function() return false end, rollback_no_effect = true }, function(f)
+			local slot = assert(f.control_slot())
+			slot.menu[1].fn(); f.action = "paste"; f.drain()
+			helpers.assert_eq(f.action, "copy")
+			helpers.assert_eq(f.click_changes, {})
+		end)
+	end)
 	for _, refusal in ipairs({ { "false", function() return false end }, { "nil", function() return nil end },
 		{ "truthy", function() return "accepted" end }, { "throw", function() error("refused") end } }) do
 		for _, edge in ipairs({ "setter", "save" }) do
@@ -628,6 +652,7 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 							helpers.assert_eq(f.action, "paste")
 							helpers.assert_eq(f.control_writes, { { "swipe_2_left", "copy" }, { "swipe_2_left", "paste" } })
 							helpers.assert_eq(f.conflicts, 0)
+							helpers.assert_eq(f.click_changes, { false })
 						end
 						helpers.assert_eq(f.saves, edge == "save" and 1 or 0)
 							helpers.assert_eq(f.updates, 0)

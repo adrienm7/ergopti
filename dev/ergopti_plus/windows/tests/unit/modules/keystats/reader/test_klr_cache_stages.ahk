@@ -18,10 +18,20 @@ _KLRCS_ReapDeadProducer(Mode := "normal") {
 		CachePath := KLR_CachePath(_KLRDC_Root())
 		Script := _KLRDC_Root() . "stage_owner.ahk"
 		Receipt := _KLRDC_Root() . "stage_owner.txt"
+		; A bound native clock-domain observation, not a claim that this runner
+		; has physically remained up for one or several DWORD eras.
+		ClockExpression := Mode == "native64-one" ? "(A_TickCount + 0x100000000)"
+			: Mode == "native64-wide" ? "(A_TickCount + 0x300000000)" : "A_TickCount"
+		NativeSave := _DriverFuncBody("_KLR_CacheSaveGuarded")
+		AssertTrue(RegExMatch(NativeSave, "m)^\h*Staged :=[^\r\n]+", &NameStatement) > 0,
+			"The stage name statement must come from the actual production cache writer")
+		BoundName := StrReplace(Trim(NameStatement[0]), "A_TickCount", "ObservedTick", , &BoundReads)
+		AssertEqual(1, BoundReads, "Only the unique native stage-clock observation is bound")
 		FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n"
-			. 'Stage := A_Args[1] . ".stage." . A_ScriptHwnd . "." . A_TickCount' . "`n"
-			. 'FileCopy(A_Args[1], Stage)' . "`n"
-			. 'FileAppend(Stage, A_Args[2], "UTF-8-RAW")' . "`nExitApp(0)`n", Script, "UTF-8")
+			. "ObservedTick := " . ClockExpression . "`n"
+			. 'Path := A_Args[1]' . "`n" . BoundName . "`n"
+			. 'FileCopy(Path, Staged)' . "`n"
+			. 'FileAppend(Staged, A_Args[2], "UTF-8-RAW")' . "`nExitApp(0)`n", Script, "UTF-8")
 		AssertEqual(0, RunWait('"' . A_AhkPath . '" /ErrorStdOut "' . Script . '" "'
 			. CachePath . '" "' . Receipt . '"', , "Hide"))
 		DeadStage := FileRead(Receipt, "UTF-8")
@@ -46,9 +56,9 @@ _KLRCS_ReapDeadProducer(Mode := "normal") {
 			FileAppend("foreign fixture", DeadStage, "UTF-8-RAW")
 		} else if Mode = "journal" {
 			FileAppend("recovery fixture", DeadStage . "-journal", "UTF-8-RAW")
-		} else if Mode = "legacy" {
+		} else if Mode = "legacy" || Mode = "pre-collision-fix" || Mode = "pre-key-codec" || Mode = "pre-title-count" || Mode = "pre-wifi-kpi" {
 			Legacy := SQLite_Open(DeadStage)
-			try AssertTrue(SQLite_Exec(Legacy, "UPDATE klr_cache_meta SET value='3' WHERE key='format_version';"))
+			try AssertTrue(SQLite_Exec(Legacy, "UPDATE klr_cache_meta SET value=" . SQLite_Q(Mode = "legacy" ? "3" : Mode = "pre-wifi-kpi" ? "19" : Mode = "pre-title-count" ? "18" : Mode = "pre-key-codec" ? "17" : "16") . " WHERE key='format_version';"))
 			finally SQLite_Close(Legacy)
 		} else if Mode = "missing-cache" {
 			KLR_ResetCache()
@@ -94,3 +104,23 @@ Test("KLR cache stages: retire the previous cache format (klr-cache-stage-owners
 	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("legacy")))
 Test("KLR cache stages: clean up before a cold rebuild (klr-cache-stage-ownership)",
 	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("missing-cache")))
+
+
+Test("KLR cache stages: retire pre-collision-fix stages (klr-cache-stage-ownership)",
+	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-collision-fix")))
+
+Test("KLR cache stages: retire pre-key-codec stages (walker-composite-stage)",
+	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-key-codec")))
+
+Test("KLR cache stages: retire obsolete window visit count images (window-title-app-attribution)",
+	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-title-count")))
+
+Test("KLR cache stages: retire missing Wi-Fi mobility images (wifi-dashboard-kpi-owner)",
+	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-wifi-kpi")))
+
+
+; CacheSave names its real preparation files from the full native A_TickCount.
+; The same existing child/SQLite fixture also accepts those legal long-uptime names.
+for _KLRCS_ClockMode in ["native64-one", "native64-wide"]
+	Test("KLR cache stages: " . _KLRCS_ClockMode . " reaps an actual dead producer in the native tick domain (klr-cache-stage-native64)",
+		_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind(_KLRCS_ClockMode)))

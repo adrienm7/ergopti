@@ -57,7 +57,8 @@ local function keystats_uses_fenced_tag_ownership(handle_key)
 	local reject_at = code:find("if provenance then", 1, true)
 	local unreadable_at = code:find(
 		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
-	local aggregate_at = code:find("if not CoreState.is_enabled then return end", 1, true)
+	local aggregate_at, _, disabled_body = code:find("if not CoreState%.is_enabled then%s*(.-)%s*end")
+	if disabled_body ~= "return" and disabled_body ~= "discard_roi_word(); return" then return false end
 	if not (classify_at and reject_at and unreadable_at and aggregate_at) then return false end
 	if not (classify_at < reject_at and reject_at < unreadable_at
 		and unreadable_at < aggregate_at) then
@@ -120,6 +121,64 @@ helpers.describe("keystats: virtual synthetic telemetry for clipboard output", f
 		local aggregation_mutant = "if not CoreState.is_enabled then return end\n" .. handle_key
 		helpers.assert_true(not keystats_uses_fenced_tag_ownership(aggregation_mutant),
 			"the keystats guard must fail if a sibling aggregation route precedes tag rejection")
+	end)
+
+	helpers.it("does not restore an earlier synthetic session after reset", function()
+		local fixture = fixture_module.load_keystats()
+		fixture.state.is_enabled = true
+		fixture.keystats.notify_synthetic("xy", "hotstring", 0, "case", "xy", false)
+		helpers.assert_eq(fixture.keystats.reset_session(), true)
+		fixture.drain()
+		helpers.assert_eq(#fixture.flushes[#fixture.flushes].events, 2, "accepted history must still drain")
+		helpers.assert_eq(fixture.state.session_start_time, 0)
+		helpers.assert_eq(fixture.state.session_last_active, 0)
+		helpers.assert_eq(#fixture.state.recent_typing_eff, 0)
+	end)
+
+	helpers.it("keeps only the new synthetic session after a reset", function()
+		local fixture = fixture_module.load_keystats()
+		fixture.state.is_enabled = true
+		local original_clock = fixture.hs.timer.absoluteTime
+		local now = 1000000000
+		fixture.hs.timer.absoluteTime = function() return now end
+		fixture.keystats.notify_synthetic("old", "hotstring", 0, nil, "old", false)
+		helpers.assert_eq(fixture.keystats.reset_session(), true)
+		now = 2000000000
+		fixture.keystats.notify_synthetic("new", "hotstring", 0, nil, "new", false)
+		fixture.drain()
+		fixture.hs.timer.absoluteTime = original_clock
+		local old, new = fixture.flushes[#fixture.flushes - 1], fixture.flushes[#fixture.flushes]
+		helpers.assert_eq(old.events[1][1], "o")
+		helpers.assert_eq(new.events[1][1], "n")
+		helpers.assert_eq(#old.events, 3)
+		helpers.assert_eq(#new.events, 3)
+		helpers.assert_eq(fixture.state.session_start_time, 2000)
+		helpers.assert_eq(fixture.state.session_last_active, 2000)
+		helpers.assert_eq(fixture.state.recent_typing_eff, { 2000, 2000, 2000 })
+	end)
+
+	helpers.it("does not reopen an idle-expired session when a synthetic builder drains", function()
+		local fixture = fixture_module.load_keystats()
+		fixture.state.is_enabled = true
+		fixture.state.session_start_time = 1000
+		fixture.state.session_last_active = 1000
+		local clock = fixture.hs.timer.absoluteTime
+		local now = 2000000000
+		fixture.hs.timer.absoluteTime = function() return now end
+		fixture.keystats.notify_synthetic("old", "hotstring", 0, nil, "old", false)
+		local log = package.loaded["modules.keystats.log_manager"]
+		log.append_log = function() return true end
+		package.loaded["modules.keystats.watchers"] = nil
+		local watchers = require("modules.keystats.watchers")
+		helpers.assert_true(watchers.init(fixture.state, function() return false end))
+		now = 302000000000
+		watchers.check_idle()
+		helpers.assert_eq(fixture.state.session_start_time, 0)
+		fixture.drain()
+		fixture.hs.timer.absoluteTime = clock
+		helpers.assert_eq(fixture.state.session_start_time, 0)
+		helpers.assert_eq(#fixture.state.recent_typing_eff, 0)
+		helpers.assert_eq(#fixture.flushes[#fixture.flushes].events, 3)
 	end)
 
 	helpers.it("immutable user-data tags own telemetry; PID remains diagnostic", function()

@@ -357,6 +357,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_click_resets_word",           val = state.click_resets_word },
 			{ fn = "set_arrow_resets_word",           val = state.arrow_resets_word },
 			{ fn = "set_shortcut_resets_word",        val = state.shortcut_resets_word },
+			{ fn = "set_tap_hold_resets_word",        val = state.tap_hold_resets_word },
 			{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
 			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
@@ -395,6 +396,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 
+	-- A refused context setting must never be mirrored into the plist until
+	-- the exact runtime value has been read back.
+	local context_storage_safe = true
 	-- Sync keymap AI options
 	if keymap then
 		local llm_enabled_setter = type(apply_llm_enabled) == "function"
@@ -452,6 +456,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_url_bar_filter_enabled",      val = state.llm_url_bar_filter_enabled },
 			{ fn = "set_llm_secure_field_filter_enabled", val = state.llm_secure_field_filter_enabled },
 			{ fn = "set_llm_instant_on_word_end",         val = state.llm_instant_on_word_end },
+			{ fn = "set_llm_inline_autotype",             val = state.llm_inline_autotype },
 			{ fn = "set_llm_agent_system1",               val = state.llm_agent_system1 },
 			{ fn = "set_llm_agent_system2",               val = state.llm_agent_system2 },
 			{ fn = "set_llm_agent_mode",                  val = state.llm_agent_mode },
@@ -459,7 +464,29 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			}
 			for _, item in ipairs(map) do
 				if type(keymap[item.fn]) == "function" then
-					try("ai", "keymap." .. item.fn, keymap[item.fn], item.val)
+					if item.fn == "set_llm_context_length" and item.val ~= nil then
+						if not try_exact("ai", "keymap." .. item.fn, keymap[item.fn], item.val) then
+							context_storage_safe = false
+							local ok, found, actual = pcall(function()
+								return keymap.get_llm_runtime_setting("llm_context_length")
+							end)
+							if ok and found == true and type(actual) == "number"
+								and require("infra.llm_context_limit").valid(actual) then
+								report.demotions[#report.demotions + 1] = {
+									feature = "ai", key = "llm_context_length",
+									persisted = clone_value(state.llm_context_length), demoted = actual,
+								}
+								Logger.error(LOG, "Saved AI context length %s was refused; this session uses %s, while config.toml stays unchanged.",
+									tostring(state.llm_context_length), tostring(actual))
+								state.llm_context_length = actual
+								context_storage_safe = true
+							else
+								unsettled("ai", "keymap.get_llm_runtime_setting llm_context_length", ok and actual or found)
+							end
+						end
+					else
+						try("ai", "keymap." .. item.fn, keymap[item.fn], item.val)
+					end
 				end
 			end
 		end
@@ -471,7 +498,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		"llm_debounce", "llm_max_words", "llm_min_words", "llm_temperature",
 		"llm_context_length", "llm_pred_indent", "llm_nav_modifiers", "llm_val_modifiers",
 	}) do
-		if state[key] ~= nil then try("ai", "Storage.set " .. key, Storage.set, key, state[key]) end
+		if state[key] ~= nil and (key ~= "llm_context_length" or context_storage_safe) then
+			try("ai", "Storage.set " .. key, Storage.set, key, state[key])
+		end
 	end
 
 	-- Sync editor options
@@ -582,7 +611,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 	local cipher_ok, TextCipher = pcall(require, "modules.keystats.text_cipher")
 	if cipher_ok and type(TextCipher) == "table" and type(TextCipher.set_enabled) == "function" then
-		try("metrics", "keystats.text_cipher.set_enabled", TextCipher.set_enabled, state.keystats_encrypt)
+		local called, committed = try("metrics", "keystats.text_cipher.set_enabled", TextCipher.set_enabled,
+			state.keystats_encrypt == true, state.keystats_encrypt ~= false)
+		if not called or committed ~= true then
+			Logger.error(LOG, "Configured encryption remains unpublished while a prior journal write is pending.")
+		end
 	end
 
 	-- Start/stop engines

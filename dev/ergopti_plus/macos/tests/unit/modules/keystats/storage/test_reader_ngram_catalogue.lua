@@ -37,16 +37,77 @@ end
 helpers.describe("macOS n-gram reads: the shared catalogue", function()
 	local Queries = require("keystats.queries")
 
+	helpers.it("reads cross-device days even when the local timezone skipped a calendar date", function()
+		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "infra.logger"}, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local fake = require("tests.support.fake_ngram_sqlite").new({ngram_chars = {
+				{date = "2011-12-29", app = "Code", token = "a", c = 1},
+				{date = "2011-12-30", app = "Code", token = "a", c = 1},
+				{date = "2011-12-31", app = "Code", token = "a", c = 1},
+			}})
+			local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", {sqlite3 = fake})
+			if os.getenv("TZ") == "Pacific/Apia" then
+				helpers.assert_eq(reader.next_day("2011-12-29"), "2011-12-30",
+					"the skipped local day is still a valid cross-device calendar date")
+			end
+			local previous_time = os.time
+			os.time = function() error("date pagination must not depend on local timezone") end
+			local ok, err = xpcall(function()
+				helpers.assert_eq(reader.next_day("2011-12-29"), "2011-12-30")
+				helpers.assert_eq(reader.split_bounds(nil, nil, "2011-12-31").historical_end, "2011-12-30")
+				local out, complete = reader.read_ngrams("/fake/db", "2011-12-29", "2011-12-31", nil,
+					{pause = function() end})
+				helpers.assert_true(complete)
+				helpers.assert_eq(out.c.a.c, 3, "all three calendar days contribute")
+			end, debug.traceback)
+			os.time = previous_time
+			if not ok then error(err) end
+		end)
+	end)
+
+	helpers.it("does not issue per-day projections for an empty bounded range", function()
+		local reader, statements = reader_with({})
+		local out, complete = reader.read_ngrams("/declared/db.sqlite", "2025-01-01", "2025-12-31", nil,
+			{pause = function() end})
+		helpers.assert_eq(complete, true)
+		helpers.assert_eq(out, {c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {},
+			w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {}}, "the returned empty projection is unchanged")
+		local projections = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("GROUP BY", 1, true) then projections = projections + 1 end
+		end
+		helpers.assert_eq(projections, 0, "an empty database needs no daily projection queries")
+	end)
+
+	helpers.it("marks non-finite SQL totals incomplete instead of returning infinite metrics", function()
+		for _, counter in ipairs({math.huge, -math.huge, 0/0}) do
+			local reader = reader_with({{token = "a", c = counter, td = 1, e = 0, esrc_json = "{}"}})
+			local out, complete = reader.read_ngrams("/declared/db.sqlite")
+			helpers.assert_eq(complete, false, "an unusable projection cannot be cached as complete")
+			helpers.assert_true(out.c.a == nil or out.c.a.c == 0, "the non-finite value cannot escape")
+		end
+	end)
+
 	helpers.it("issues the catalogue rendering for every family", function()
 		local reader, statements = reader_with({})
 		reader.read_ngrams("/declared/db.sqlite", "2026-10-01", "2026-10-02", { "Code" })
 		local issued = {}
 		for _, sql in ipairs(statements) do issued[sql] = true end
-		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('Code')"
+		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('Code','Unknown')"
 		for _, family in ipairs({ "ngram_chars", "ngram_bigrams", "ngram_trigrams", "ngram_quadgrams",
 			"ngram_pentagrams", "ngram_hexagrams", "ngram_heptagrams", "ngram_words", "ngram_word_bigrams" }) do
 			local sql = Queries.render("ngram.tokens", "native", { table = family, where = where, conjunction = " AND " })
 			helpers.assert_true(issued[sql] == true, family .. " is read through the catalogue")
+		end
+	end)
+
+	helpers.it("keeps the unselectable Unknown bucket in every selected today query", function()
+		local reader, statements = reader_with({})
+		local _, complete = reader.read_today_split("/declared/db.sqlite", "2026-10-02", "2026-10-02", { "Code" }, nil, "2026-10-02")
+		helpers.assert_true(complete)
+		helpers.assert_true(#statements > 0)
+		for _, sql in ipairs(statements) do
+			helpers.assert_true(sql:find("app IN ('Code','Unknown')", 1, true) ~= nil, "selected today query must keep Unknown")
 		end
 	end)
 

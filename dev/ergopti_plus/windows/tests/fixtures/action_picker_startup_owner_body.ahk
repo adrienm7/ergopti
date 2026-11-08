@@ -27,7 +27,15 @@ LLM_Vision_BackendChoices() => []
 LLM_Translate_ShippedChoices() => []
 GestureClearPickedParameter() => 0
 LoggerSuccess(*) => 0
-LoggerError(*) => 0
+LoggerError(Owner, Template, Args*) {
+	global _APSO
+	if InStr(_APSO.Mode, "subscription-sdk-") != 1
+		return
+	if Owner == "ActionPicker" && InStr(Template, "Browser subscription failed (error_type=") && Args.Length && Args[1] == "Error"
+		_APSO.SdkLogs += 1
+	else
+		_APSO.UnexpectedLogs += 1
+}
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {
@@ -51,11 +59,17 @@ class _APSO_View {
 		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0
 	}
 	WebMessageReceived(Callback) {
+		global _APSO
 		this.Subscriptions += 1
+		if InStr(_APSO.Mode, "subscription-") == 1
+			return _APSO_Subscribe(Callback)
 		return { Callback: Callback }
 	}
 	NavigationCompleted(Callback) {
+		global _APSO
 		this.Subscriptions += 1
+		if InStr(_APSO.Mode, "subscription-") == 1
+			return _APSO_Subscription(Callback)
 		return { Callback: Callback }
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
@@ -70,6 +84,12 @@ class _APSO_Controller {
 		this.CoreWebView2 := _APSO_View(), this.Closed := 0, this.Fills := 0
 	}
 	Close() {
+		global _APSO
+		if InStr(_APSO.Mode, "subscription-") == 1 {
+			_APSO.CloseCalls += 1
+			_APSO.ActiveAtClose := _APSO.ActiveSubscriptions
+			_APSO.AliveAtClose := !!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int")
+		}
 		this.Closed += 1
 	}
 	Fill() {
@@ -86,7 +106,7 @@ _APSO_Create(Hwnd) {
 		"The browser wait begins only after the genuine picker is visible and published.")
 	Controller := _APSO_Controller()
 	_APSO.Controllers.Push(Controller)
-	if _APSO.Controllers.Length > 1 || _APSO.Mode == "current"
+	if _APSO.Controllers.Length > 1 || _APSO.Mode == "current" || InStr(_APSO.Mode, "subscription-") == 1
 		return Controller
 	_APSO.Pending := Promise.withResolvers()
 	; The timer port has an independent settlement consumer so Promise.task does
@@ -181,6 +201,14 @@ _APSO_Check() {
 		throw _APSO.Failure
 	_APSO_Require(_APSO.OldConfirmed == 0 && _APSO.NextConfirmed == 0,
 		"Closing during startup must never invoke either confirmation callback.")
+	if InStr(_APSO.Mode, "subscription-sdk-") == 1 || _APSO.Mode == "subscription-reset-retain" {
+		_APSO_CheckSdkContract()
+		return
+	}
+	if InStr(_APSO.Mode, "subscription-") == 1 {
+		_APSO_CheckSubscription()
+		return
+	}
 	if _APSO.Mode == "current" {
 		_APSO_Require(_APSO.Controllers.Length == 1 && _APSO.Windows.Length == 1,
 			"The current positive must open exactly one web picker without native fallback.")
@@ -225,14 +253,24 @@ _APSO_Main() {
 		ExitApp(2)
 	Persistent(true)
 	global _APSO := { Mode: A_Args[1], Windows: [], Hwnds: [], Controllers: [], Pending: 0,
-		Boundary: 0, Failure: 0, CloseSent: 0, OldEpoch: 0, OldConfirmed: 0, NextConfirmed: 0 }
+		Boundary: 0, Failure: 0, CloseSent: 0, OldEpoch: 0, OldConfirmed: 0, NextConfirmed: 0,
+		SubscriptionCalls: 0, InFlight: false, ActiveSubscriptions: 0, CreatedSubscriptions: 0,
+		ReleasedSubscriptions: 0, ReleasedInFlight: false, CloseObserved: false,
+		AliveAtReturn: false, AliveAtClose: false, ActiveAtClose: -1, CloseCalls: 0,
+		SdkFailure: Error("Controlled action picker SDK add-event refusal"), SdkCaught: 0,
+		SdkLogs: 0, UnexpectedLogs: 0, ResetRetained: false }
 	global _VendorDir := A_Args[2], _SharedDir := A_Args[2], _I18nLocale := "en"
 	global _LLM_Menu := Map("n_predictions", 3)
 	_ActPickWeb_ProgramCapturing := true
 	Primary := 0
 	OnError(_APSO_OnError)
 	try {
-		ShowActionPicker("Private original picker", "none", _APSO_Confirm.Bind("old"))
+		if InStr(_APSO.Mode, "subscription-sdk-") == 1 {
+			try ShowActionPicker("Private original picker", "none", _APSO_Confirm.Bind("old"))
+			catch Any as SdkFailure
+				_APSO.SdkCaught := SdkFailure
+		} else
+			ShowActionPicker("Private original picker", "none", _APSO_Confirm.Bind("old"))
 		_APSO_Observe()
 		_APSO_Check()
 	} catch as Failure {
@@ -265,6 +303,137 @@ _APSO_Main() {
 	}
 	FileAppend("PASS action-picker-startup " . _APSO.Mode . "`n", "*", "UTF-8")
 	ExitApp(0)
+}
+
+
+; The browser port returns a real AHK handle with the same last-reference
+; unsubscribe lifetime as the shipped SDK. Native cancellation is unmodified.
+class _APSO_Subscription {
+	__New(Callback) {
+		global _APSO
+		this.Callback := Callback
+		_APSO.ActiveSubscriptions += 1, _APSO.CreatedSubscriptions += 1
+	}
+	__Delete() {
+		global _APSO
+		_APSO.ReleasedInFlight := _APSO.ReleasedInFlight || _APSO.InFlight
+		_APSO.ActiveSubscriptions -= 1, _APSO.ReleasedSubscriptions += 1
+	}
+}
+
+_APSO_SubscriptionClose() {
+	global _APSO, _ActPickWeb_SessionEpoch, _ActPickWeb_Gui
+	Hwnd := _APSO.Hwnds[1], Epoch := _ActPickWeb_SessionEpoch
+	_APSO_Require(Epoch > 0 && _ActPickWeb_Gui == _APSO.Windows[1]
+		&& WinGetPID("ahk_id " . Hwnd) == ProcessExist()
+		&& DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"),
+		"The add-event actor requires its exact current visible native picker")
+	_APSO.CloseSent += 1
+	_APSO_Require(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int"),
+		"The owned picker must admit the genuine WM_CLOSE")
+	Started := A_TickCount
+	while _ActPickWeb_SessionEpoch == Epoch && A_TickCount - Started < 1000
+		Sleep(10)
+	_APSO.CloseObserved := _ActPickWeb_SessionEpoch > Epoch && !IsObject(_ActPickWeb_Gui)
+	_APSO_Require(_APSO.CloseObserved, "The actual Close must revoke the picker before add-event returns")
+}
+
+_APSO_Subscribe(Callback) {
+	global _APSO, _ActPickWeb_Gui
+	_APSO.SubscriptionCalls += 1
+	_APSO.InFlight := true
+	try {
+		if _APSO.Mode == "subscription-close" || _APSO.Mode == "subscription-sdk-retired"
+			_APSO_SubscriptionClose()
+		if _APSO.Mode == "subscription-reset-retain" {
+			_ActPickWeb_Reset()
+			_APSO.ResetRetained := _ActPickWeb_Gui == _APSO.Windows[1]
+				&& !!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int")
+		}
+		_APSO.AliveAtReturn := !!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int")
+		if InStr(_APSO.Mode, "subscription-sdk-") == 1
+			throw _APSO.SdkFailure
+		return _APSO_Subscription(Callback)
+	} finally _APSO.InFlight := false
+}
+
+_APSO_CheckSubscription() {
+	global _APSO, _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
+	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub
+	Ready := true
+	if _APSO.Mode == "subscription-current" {
+		Ready := _APSO.SubscriptionCalls == 1 && _APSO.ActiveSubscriptions == 2
+			&& _APSO.Controllers.Length == 1 && _APSO.Windows.Length == 1
+			&& _ActPickWeb_Gui == _APSO.Windows[1] && _ActPickWeb_Controller == _APSO.Controllers[1]
+			&& _ActPickWeb_WebView == _APSO.Controllers[1].CoreWebView2
+			&& IsSet(_ActPickWeb_MsgSub) && IsSet(_ActPickWeb_NavSub)
+			&& _APSO.Controllers[1].CoreWebView2.Navigations == 1 && _APSO.Controllers[1].Fills >= 1
+		_APSO_SubscriptionClose()
+	}
+	FileAppend("OBSERVATION action-picker-subscription mode=" . _APSO.Mode
+		. " calls=" . _APSO.SubscriptionCalls . " close_sent=" . _APSO.CloseSent
+		. " close_observed=" . _APSO.CloseObserved . " native_alive_at_return=" . _APSO.AliveAtReturn
+		. " native_alive_at_close=" . _APSO.AliveAtClose . " active_at_close=" . _APSO.ActiveAtClose
+		. " created=" . _APSO.CreatedSubscriptions . " released=" . _APSO.ReleasedSubscriptions
+		. " released_in_flight=" . _APSO.ReleasedInFlight . " controller_closed=" . _APSO.Controllers[1].Closed
+		. " close_calls=" . _APSO.CloseCalls . " ready=" . Ready . "`n", "*", "UTF-8")
+	_APSO_Require(Ready && _APSO.Controllers.Length == 1 && _APSO.Windows.Length == 1
+		&& _APSO.CloseSent == 1 && _APSO.CloseObserved && _APSO.SubscriptionCalls == 1,
+		"One genuine public browser must reach its actual native cancellation")
+	if _APSO.Mode == "subscription-close"
+		_APSO_Require(_APSO.Controllers[1].CoreWebView2.Subscriptions == 1
+			&& _APSO.Controllers[1].CoreWebView2.Navigations == 0 && _APSO.Controllers[1].Fills == 0,
+			"A retired add-event must not subscribe again, navigate or Fill")
+	_APSO_Require(_APSO.AliveAtReturn && _APSO.AliveAtClose && _APSO.ActiveAtClose == 0
+		&& _APSO.ActiveSubscriptions == 0 && _APSO.CreatedSubscriptions == _APSO.ReleasedSubscriptions
+		&& !_APSO.ReleasedInFlight && _APSO.Controllers[1].Closed == 1 && _APSO.CloseCalls == 1,
+		"The HWND must survive add-event return and unsubscribe before its controller closes once")
+	_APSO_Require(!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int") && !IsObject(_ActPickWeb_Gui)
+		&& !IsSet(_ActPickWeb_Controller) && !IsSet(_ActPickWeb_WebView)
+		&& !IsSet(_ActPickWeb_MsgSub) && !IsSet(_ActPickWeb_NavSub),
+		"The exact retired picker must finally release its native and browser resources")
+}
+
+
+_APSO_CheckSdkContract() {
+	global _APSO, _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
+	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_SessionEpoch, _ActPickWeb_ResetDone
+	Retain := _APSO.Mode == "subscription-reset-retain"
+	Live := !!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int")
+	FileAppend("OBSERVATION action-picker-sdk mode=" . _APSO.Mode . " caught_same=" . (_APSO.SdkCaught == _APSO.SdkFailure)
+		. " caught_any=" . IsObject(_APSO.SdkCaught) . " sdk_logs=" . _APSO.SdkLogs . " other_logs=" . _APSO.UnexpectedLogs
+		. " calls=" . _APSO.SubscriptionCalls . " close_sent=" . _APSO.CloseSent . " close_observed=" . _APSO.CloseObserved
+		. " alive_at_return=" . _APSO.AliveAtReturn . " alive_at_close=" . _APSO.AliveAtClose . " alive_after=" . Live
+		. " reset_retained=" . _APSO.ResetRetained . " closed=" . _APSO.Controllers[1].Closed
+		. " created_handles=" . _APSO.CreatedSubscriptions . " retired_handles=" . _APSO.ReleasedSubscriptions . "`n", "*", "UTF-8")
+	_APSO_Require(_APSO.Windows.Length == 1 && _APSO.Controllers.Length == 1 && _APSO.SubscriptionCalls == 1
+		&& _APSO.Controllers[1].Closed == 1 && _APSO.CloseCalls == 1 && _APSO.AliveAtReturn && _APSO.AliveAtClose
+		&& _APSO.ActiveSubscriptions == 0 && _APSO.ActiveAtClose == 0 && !_APSO.ReleasedInFlight
+		&& _APSO.UnexpectedLogs == 0 && _APSO.OldConfirmed == 0 && _APSO.NextConfirmed == 0,
+		"The exact public startup must settle the real handle/controller order without invoking confirmation")
+	if Retain {
+		_APSO_Require(!IsObject(_APSO.SdkCaught) && _APSO.ResetRetained && Live && _ActPickWeb_Gui == _APSO.Windows[1]
+			&& _ActPickWeb_ResetDone && _APSO.CreatedSubscriptions == 1 && _APSO.ReleasedSubscriptions == 1
+			&& _APSO.SdkLogs == 0 && _APSO.CloseSent == 0,
+			"Plumbing-only Reset during add must retain its exact native window after the genuine public return")
+		Epoch := _ActPickWeb_SessionEpoch
+		_APSO_Require(_ActPickWeb_Close(_APSO.Windows[1]), "The retained exact owner must accept its later manual Close")
+		_APSO_Require(_ActPickWeb_SessionEpoch == Epoch && _APSO.Controllers[1].Closed == 1,
+			"Closing the retained native host cannot repeat browser Close or advance the retired session")
+	} else {
+		_APSO_Require(!Live && _APSO.CreatedSubscriptions == 0 && _APSO.ReleasedSubscriptions == 0,
+			"An SDK refusal must retire its native form rather than leave a blank retained window")
+		if _APSO.Mode == "subscription-sdk-current"
+			_APSO_Require(_APSO.SdkCaught == _APSO.SdkFailure && _APSO.SdkLogs == 0 && _APSO.CloseSent == 0,
+				"A current SDK failure reaches the public picker caller as the exact original Error")
+		else
+			_APSO_Require(!IsObject(_APSO.SdkCaught) && _APSO.SdkLogs == 1 && _APSO.CloseSent == 1 && _APSO.CloseObserved,
+				"An SDK failure after real native Close is consumed without reopening the canceled picker")
+	}
+	_APSO_Require(!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int") && !IsObject(_ActPickWeb_Gui)
+		&& !IsSet(_ActPickWeb_Controller) && !IsSet(_ActPickWeb_WebView)
+		&& !IsSet(_ActPickWeb_MsgSub) && !IsSet(_ActPickWeb_NavSub),
+		"Actual close completion must leave no published native/browser owner")
 }
 
 _APSO_Main()

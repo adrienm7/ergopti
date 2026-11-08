@@ -9,7 +9,7 @@
 ; independently from the inner-loop walking code.
 ;
 ; FEATURES & RATIONALE:
-; 1. KLW_SplitKey: helper of KLW_BuildBatchSql. A statement the
+; 1. KLW_BuildBatchSql renders literal row fields. A statement the
 ;    three drivers share is rendered from the catalogue
 ;    (_shared/data/db/queries.sql) by name; the Windows-only tables stay spelled here.
 ; 2. KLW_BuildBatchSql: drains KLW.batch into one SQL string (all tables in one
@@ -50,23 +50,7 @@ _KLW_Zeros(Names) {
 		return Slots
 }
 
-; Split a Chr(1)-delimited composite key into N parts.
-KLW_SplitKey(k, n) {
-		parts := []
-		rest := k
-		Loop n - 1 {
-				pos := InStr(rest, Chr(1))
-				if !pos {
-						parts.Push(rest)
-						rest := ""
-						break
-				}
-				parts.Push(SubStr(rest, 1, pos - 1))
-				rest := SubStr(rest, pos + 1)
-		}
-		parts.Push(rest)
-		return parts
-}
+; Tuple keys are opaque identity only; persisted fields come from row values.
 
 
 
@@ -127,9 +111,8 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 		; n-gram tables.
 		for tbl_name, tbl in KLW.batch["ngram"] {
 				for key, item in tbl {
-						parts := KLW_SplitKey(key, 3)
 						out .= KeystatsQuery("agg.ngram", Map("table", tbl_name, "device_id", Device,
-								"date", parts[1], "app", parts[2], "token", parts[3],
+								"date", item["date"], "app", item["app"], "token", item["token"],
 								"c", item["c"], "td", item["td"], "cd", item["cd"], "e", item["e"],
 								"esrc_json", KL_JsonEncode(item["esrc"]))) . "`n"
 				}
@@ -160,8 +143,8 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 		}
 
 		; agg_app_day_titles — walker owns `ms` (focus time per title); the
-		; occurrence count `c` is owned by KLR_RebuildAggregates (from
-		; events_window_switch), so it is not written here.
+		; manual keystroke count `c` is owned by KLR_RebuildAggregates (from
+		; events_typing manual keystroke projection), so it is not written here.
 		;
 		; Every app-day touched by this batch is collected while inserting so the
 		; per-app-day cap can be enforced once per group afterwards. Any app whose
@@ -178,7 +161,7 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 						Map("c", 0, "title", String(row["title"])))
 				; Private replay ranks complete totals after every batch has landed.
 				if TrimTitles
-						title_app_days[row["date"] . Chr(1) . row["app"]] := row
+						title_app_days[KLW_Key(row["date"], row["app"])] := row
 		}
 		; Ranked by (c + ms) like the macOS twin: a title matters either because it
 		; was seen often or because it held focus for a long time.
@@ -283,14 +266,16 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 ; ======================================
 ; ======================================
 
-; Serialise KLW.ctx into a Map suitable for state.json.
+; Version only derived context keys; journal offsets and event identities stay unchanged.
+; Legacy context maps are discarded because their control-bearing keys were ambiguous.
 KLW_SerializeCtx() {
-		return KLW.ctx
+		return Map("key_format", 1, "contexts", KLW.ctx)
 }
 
 KLW_RestoreCtx(loaded) {
-		if (loaded is Map)
-				KLW.ctx := loaded
+		if (loaded is Map) && (loaded.Get("key_format", 0) is Integer)
+				&& loaded.Get("key_format", 0) = 1 && (loaded.Get("contexts", 0) is Map)
+				KLW.ctx := loaded["contexts"]
 		else
 				KLW.ctx := Map()
 }

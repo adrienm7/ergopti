@@ -326,6 +326,10 @@ TomlConfigForeignOwner(SectionPath, Key) {
 		if Section.Has(Key)
 			return Section[Key]
 	}
+	; Per-category order lists belong to the menu reader, including categories
+	; temporarily absent from the loaded hotstring catalogue.
+	if SectionPath == ConfigKey.HOTSTRINGS_ORDER_OVERRIDES && Key != ""
+		return "HotstringsMenu"
 	if SectionPath == "action_parameters" && TomlConfigActionParameterIsOwned(Key)
 		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
@@ -443,6 +447,15 @@ TomlConfigTableArrayKind(Features, Section, Key) {
 ; what boot warns about is exactly what the cleanup lists. RawValue is the TOML
 ; literal, so legacy spellings are judged exactly as at boot.
 TomlConfigOutdatedReason(Features, Section, Key, Value, RawValue, ForeignOwner := "") {
+	if TomlConfigManifestPath(Section) == ConfigKey.HOTSTRINGS_ORDER_OVERRIDES {
+		if !(Value is Array)
+			return "section order is not a text list"
+		for Entry in Value {
+			if !(Entry is String)
+				return "section order contains a non-text entry"
+		}
+		return ""
+	}
 	if !TomlConfigValueMatchesManifest(Section, Key, Value, &ExpectedType, RawValue)
 		return "its '" . ExpectedType . "' setting no longer accepts this value"
 	; A key another module owns is not assigned into the Features tree.

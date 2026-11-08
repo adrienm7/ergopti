@@ -60,9 +60,10 @@ end
 
 --- Runs one isolated real-module graph over a temporary personal-info file.
 --- @param scenario function Receives the fixture table.
-local function with_fixture(scenario)
+--- @param source string|nil Initial file content; a default phone-only file when nil.
+local function with_fixture(scenario, source)
 	local path = os.tmpname()
-	local initial = table.concat({
+	local initial = source or table.concat({
 		"[info]",
 		'phone_number = "' .. OLD_PHONE .. '"',
 		'phone_number_clean = "06 12 34 56 78"',
@@ -285,6 +286,59 @@ helpers.describe("personal-info save refreshes literal prefix mappings", functio
 			helpers.assert_eq(fixture.PersonalInfo.get_info().phone_number, external_phone)
 			helpers.assert_eq(fixture.read_file(), external)
 		end)
+	end)
+end)
+
+helpers.describe("personal-info aliases and literal prefix output (PIM-001, PIM-002)", function()
+	helpers.it("personal-unicode-alias: preserves quoted cased keys through an unrelated save", function()
+		local source = '[info]\ncity = "Lyon"\n[letters]\n"é" = "city"\n"𐐨" = "city"\n'
+		with_fixture(function(fixture)
+			local resolved = fixture.PersonalInfo._resolve_combo_for_test(
+				fixture.PersonalInfo.get_info(), fixture.PersonalInfo.get_letters(), "É𐐀")
+			helpers.assert_eq(table.concat(resolved, "|"), "Lyon|Lyon")
+			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
+			local decoded = require("toml_codec.codec").decode(fixture.read_file())
+			helpers.assert_eq(decoded.letters["é"], "city")
+			helpers.assert_eq(decoded.letters["𐐨"], "city")
+		end, source)
+	end)
+
+	helpers.it("keeps a user-added lowercase alias through load and an unrelated save (PIM-001)", function()
+		local source = table.concat({
+			"[info]",
+			'phone_number = "' .. OLD_PHONE .. '"',
+			'city = "Lyon"',
+			"",
+			"[letters]",
+			'x = "city"',
+			"",
+		}, "\n")
+		with_fixture(function(fixture)
+			local resolved = fixture.PersonalInfo._resolve_combo_for_test(
+				fixture.PersonalInfo.get_info(), fixture.PersonalInfo.get_letters(), "x")
+			helpers.assert_eq(resolved[1], "Lyon", "the added alias must resolve at load")
+			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
+			helpers.assert_contains(fixture.read_file(), 'x = "city"')
+			helpers.assert_contains(fixture.read_file(), 'p = "first_name"')
+		end, source)
+	end)
+
+	helpers.it("types personal prefix values verbatim, never as key commands (PIM-002)", function()
+		local source = table.concat({
+			"[info]",
+			'phone_number = "0123{Tab}45"',
+			"",
+			"[letters]",
+			'p = "phone_number"',
+			"",
+		}, "\n")
+		with_fixture(function(fixture)
+			local mapping = fixture.mapping_for("0123")
+			helpers.assert_not_nil(mapping, "the phone prefix must be registered")
+			helpers.assert_eq(mapping.repl, "0123{Tab}45")
+			helpers.assert_eq(mapping.plain_repl, mapping.repl,
+				"a personal value is literal text, so no {Tab} token may be sent as a key")
+		end, source)
 	end)
 end)
 

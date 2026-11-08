@@ -123,6 +123,7 @@ func performConfirmedUninstall(
 	validate: () throws -> Void,
 	authorize: () throws -> Bool,
 	waitForCleanExit: () -> Bool,
+	checkLeaseRetirement: () throws -> Void = {},
 	retireOwnedRuntime: () throws -> Void = {},
 	unregister: () throws -> Void,
 	trash: () throws -> Void
@@ -131,6 +132,7 @@ func performConfirmedUninstall(
 	guard try authorize() else { throw UninstallFailure.invalidProtocol }
 	guard waitForCleanExit() else { throw UninstallFailure.parentExit }
 	try validate()
+	try checkLeaseRetirement()
 	try retireOwnedRuntime()
 	try unregister()
 	try validate()
@@ -200,7 +202,19 @@ enum UninstallWorker {
 				guard message == Data("COMMIT\n".utf8) else { return false }
 				try FileHandle.standardOutput.write(contentsOf: Data("ACK\n".utf8))
 				return true
-			}, waitForCleanExit: observation.wait, retireOwnedRuntime: {
+			}, waitForCleanExit: observation.wait, checkLeaseRetirement: {
+				let records = LeaseGuardianPaths().records
+				guard try waitForUninstallLeaseRetirement(isEmpty: {
+					var attributes = stat()
+					if Darwin.lstat(records, &attributes) != 0 {
+						if errno == ENOENT { return true }
+						throw UninstallFailure.activeLease
+					}
+					guard attributes.st_mode & S_IFMT == S_IFDIR,
+						attributes.st_uid == getuid() else { throw UninstallFailure.activeLease }
+					return try FileManager.default.contentsOfDirectory(atPath: records).isEmpty
+				}) else { throw UninstallFailure.activeLease }
+			}, retireOwnedRuntime: {
 				try OwnedRuntimeUninstall.retire(exists: { path in
 					var attributes = stat()
 					return Darwin.lstat(path, &attributes) == 0
@@ -215,17 +229,6 @@ enum UninstallWorker {
 					return process.terminationReason == .exit && process.terminationStatus == 0
 				})
 			}, unregister: {
-				let records = LeaseGuardianPaths().records
-				guard try waitForUninstallLeaseRetirement(isEmpty: {
-					var attributes = stat()
-					if Darwin.lstat(records, &attributes) != 0 {
-						if errno == ENOENT { return true }
-						throw UninstallFailure.activeLease
-					}
-					guard attributes.st_mode & S_IFMT == S_IFDIR,
-						attributes.st_uid == getuid() else { throw UninstallFailure.activeLease }
-					return try FileManager.default.contentsOfDirectory(atPath: records).isEmpty
-				}) else { throw UninstallFailure.activeLease }
 				guard removeLegacyRemapGuardian(executablePath: executable) else {
 					throw UninstallFailure.guardian
 				}

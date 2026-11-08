@@ -18,7 +18,8 @@
 ---    finds the moved file and the new configuration folder.
 --- 2. Shared Rules: what moves and what is refused is _shared/lua/
 ---    legacy_folder_migration.lua; this adapter resolves the folders from
----    app_dirs and owns the native effects (hs.fs and os.rename).
+---    app_dirs and owns the native effects (hs.fs and os.rename), none of
+---    which replaces an existing destination.
 --- 3. What Stays: the owned Karabiner runtime's folders keep their compiled name
 ---    (app_dirs owned_runtime), and the runtime state of the old support folder
 ---    (locks, the lease guardian, the PTY sources) stays for a build that may
@@ -50,15 +51,45 @@ function M.native_ports()
 	local function exists(path) return fs.symlinkAttributes(path, "mode") ~= nil end
 	return {
 		exists = exists,
+		-- fs.dir raises on a folder it cannot open (no permission, gone after the
+		-- stat): the refusal is returned to the core, which reports it, instead
+		-- of escaping the migration and aborting init.lua.
 		list = function(dir)
-			if fs.attributes(dir, "mode") ~= "directory" then return nil end
+			if fs.attributes(dir, "mode") ~= "directory" then return nil, "not a folder" end
 			local names = {}
-			for name in fs.dir(dir) do
-				if name ~= "." and name ~= ".." then names[#names + 1] = name end
-			end
+			local listed, list_error = pcall(function()
+				for name in fs.dir(dir) do
+					if name ~= "." and name ~= ".." then names[#names + 1] = name end
+				end
+			end)
+			if not listed then return nil, tostring(list_error) end
 			return names
 		end,
-		rename = function(from, to) return os.rename(from, to) end,
+		-- os.rename replaces an existing destination file or empty folder, so a
+		-- name published after the core's check would be lost. A folder first
+		-- reserves its destination with mkdir, which fails on any existing name,
+		-- and rename over that empty reservation fails once anything arrives in
+		-- it. Anything else is hard linked, which never replaces, then unlinked.
+		rename = function(from, to)
+			if fs.symlinkAttributes(from, "mode") == "directory" then
+				local reserved, reserve_err = fs.mkdir(to)
+				if not reserved then return nil, tostring(reserve_err or "destination exists") end
+				local moved, move_err = os.rename(from, to)
+				if not moved then
+					fs.rmdir(to)
+					return nil, move_err
+				end
+				return true
+			end
+			local linked, link_err = fs.link(from, to, false)
+			if linked ~= true then return nil, tostring(link_err or "hard link refused") end
+			local removed, remove_err = os.remove(from)
+			if not removed then
+				os.remove(to)
+				return nil, remove_err
+			end
+			return true
+		end,
 		make_dir = function(path)
 			local current = ""
 			for part in path:gmatch("[^/]+") do
@@ -73,6 +104,12 @@ function M.native_ports()
 			return true
 		end,
 		remove_empty_dir = function(path) return fs.rmdir(path) == true end,
+		-- fs.attributes follows links: a legacy folder linked to the new one has
+		-- the new one's device and inode.
+		same_object = function(a, b)
+			local left, right = fs.attributes(a), fs.attributes(b)
+			return type(left) == "table" and type(right) == "table" and left.dev == right.dev and left.ino == right.ino
+		end,
 		read = function(path)
 			local file = io.open(path, "rb")
 			if not file then return nil end
@@ -80,12 +117,16 @@ function M.native_ports()
 			file:close()
 			return text
 		end,
+		-- Only the core's private stage files are written; they reach their
+		-- final name through rename or replace.
 		write = function(path, text)
 			local file = io.open(path, "wb")
 			if not file then return false end
 			local written = file:write(text) ~= nil
 			return file:close() and written
 		end,
+		replace = function(from, to) return os.rename(from, to) == true end,
+		remove = function(path) return os.remove(path) == true end,
 	}
 end
 
@@ -128,13 +169,18 @@ end
 --- @return table rewrites
 function M.rewrites(home)
 	local legacy = AppDirs.migration.macos
+	-- The configuration folder moves in one rename, so a locator that cannot
+	-- follow it gets it back; the logs folder merges entry by entry and only
+	-- follows.
 	return {
 		{ key = AppDirs.config.override_key,
 			old = { home .. "/" .. legacy.legacy_config_relative, "~/" .. legacy.legacy_config_relative },
-			new = home .. "/" .. AppDirs.config.macos_relative },
+			new = home .. "/" .. AppDirs.config.macos_relative,
+			source = home .. "/" .. legacy.legacy_config_relative, restorable = true },
 		{ key = AppDirs.override_key,
 			old = { home .. "/" .. legacy.legacy_logs_relative, "~/" .. legacy.legacy_logs_relative },
-			new = home .. "/" .. AppDirs.macos.relative },
+			new = home .. "/" .. AppDirs.macos.relative,
+			source = home .. "/" .. legacy.legacy_logs_relative },
 	}
 end
 
@@ -150,8 +196,8 @@ function M.run(logger, options)
 	local ports = options.ports or M.native_ports()
 	local plan = M.plan(home)
 	local report = Core.apply(plan, ports)
-	report.paths_file = Core.rewrite_paths_file(home .. "/" .. AppDirs.config.macos_paths_file, M.rewrites(home),
-		AppDirs.migration.backup_suffix, ports)
+	Core.publish_paths_file(home .. "/" .. AppDirs.config.macos_paths_file, M.rewrites(home),
+		AppDirs.migration.backup_suffix, report, ports)
 	Core.log_report(logger, LOG, report)
 	return report
 end

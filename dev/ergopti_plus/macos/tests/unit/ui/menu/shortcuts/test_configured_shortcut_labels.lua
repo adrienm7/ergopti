@@ -165,11 +165,22 @@ helpers.describe("real script-action catalogue projection", function()
 				set_shortcut_action = function(slot, action) published[#published + 1] = { slot, action }; return true end }
 			local state = { shortcuts = true, script_control_enabled = true, script_control_shortcuts = {} }
 			for _, slot in ipairs(control.script_chord_slots()) do state.script_control_shortcuts[slot.id] = "none" end
-			local gesture_exports = { get_action_label = actions.get_label,
+			local gesture_exports = { get_action_label = actions.get_label, get_sg_names = actions.get_sg_names,
 				get_action_parameter = actions.get_action_parameter, get_action_parameter_spec = actions.get_action_parameter_spec }
 			local context = { gestures = gesture_exports, shortcuts = {}, script_control = control, state = state,
 				save_prefs = function() saves = saves + 1; return true end,
 				updateMenu = function() updates = updates + 1 end }
+			context.commit_script_action = function(slot, action)
+				control.set_shortcut_action(slot, action)
+				state.script_control_shortcuts[slot] = action
+				return context.save_prefs()
+			end
+			-- The slot row opens the shared picker, as on Windows: the catalogue
+			-- reaches the picker, not 840 inline rows per slot (menu-script-slots-picker).
+			local opened = {}
+			package.loaded["ui.action_picker"] = {
+				open = function(options, on_pick) opened[#opened + 1] = { options = options, on_pick = on_pick } end,
+			}
 			package.loaded["ui.menu.menu_shortcuts"] = nil
 			local owner = require("ui.menu.menu_shortcuts")
 			for _, paused in ipairs({ false, true }) do
@@ -180,30 +191,45 @@ helpers.describe("real script-action catalogue projection", function()
 				helpers.assert_eq(boundaries, 1, "the genuine declared controls/slots separator survives")
 				helpers.assert_eq(#captured, #control.script_chord_slots())
 				for _, slot in ipairs(captured) do
-					helpers.assert_eq(#slot.items, #expected)
-					for index, row in ipairs(slot.items) do
-						local original = expected[index]
-						helpers.assert_eq(row.label, original[2], "original native projection " .. index)
-						helpers.assert_nil(row.separator, "no genuine action becomes an invented boundary")
-						if original[3] == "heading" then
-							helpers.assert_eq(row.disabled, true); helpers.assert_nil(row.action)
-						else
-							helpers.assert_eq(row.disabled == true, paused)
-							helpers.assert_eq(type(row.action), paused and "nil" or "function")
-							helpers.assert_eq(row.checked == true, original[1] == "none")
+					helpers.assert_nil(slot.items, "a slot row must not inline the action catalogue")
+					helpers.assert_eq(slot.disabled == true, paused)
+					helpers.assert_eq(type(slot.action), paused and "nil" or "function")
+				end
+			end
+			context.paused = false; owner.build(context)
+			local first = control.script_chord_slots()[1].id
+			captured[1].action()
+			helpers.assert_eq(#opened, 1, "the slot row opens exactly one picker")
+			local options = opened[1].options
+			helpers.assert_eq(options.current, "none")
+			helpers.assert_eq(options.title, translator.get("sg_labels.script_ropt_return"))
+			-- Every genuine action and heading of the original projection, in
+			-- catalogue order; the picker draws « none » itself.
+			local index = 0
+			for _, original in ipairs(expected) do
+				if original[1] ~= "none" then
+					index = index + 1
+					local item = options.items[index]
+					helpers.assert_true(item ~= nil, "picker item " .. index .. " for " .. original[1])
+					if original[3] == "heading" then
+						local hashes = original[1]:match("^#+")
+						helpers.assert_eq(item.type, "heading")
+						helpers.assert_eq(item.level, #hashes)
+						helpers.assert_eq(item.text, original[1]:sub(#hashes + 1))
+					else
+						helpers.assert_eq(item.type, "action")
+						helpers.assert_eq(item.id, original[1], "genuine catalogue order " .. index)
+						if actions.get_action_parameter_spec(original[1]) == nil then
+							helpers.assert_eq(item.label, original[2], "original native projection " .. index)
 						end
 					end
 				end
 			end
-			context.paused = false; owner.build(context)
-			for index, row in ipairs(expected) do
-				if row[1] == "save" then
-					captured[1].items[index].action()
-					helpers.assert_eq(saves, 1); helpers.assert_eq(updates, 1)
-					helpers.assert_eq(published[1], { control.script_chord_slots()[1].id, "save" })
-					helpers.assert_eq(state.script_control_shortcuts[control.script_chord_slots()[1].id], "save")
-				end
-			end
+			helpers.assert_eq(#options.items, index, "the picker offers nothing beyond the catalogue")
+			opened[1].on_pick("save")
+			helpers.assert_eq(saves, 1); helpers.assert_eq(updates, 1)
+			helpers.assert_eq(published[1], { first, "save" })
+			helpers.assert_eq(state.script_control_shortcuts[first], "save")
 		end))
 	end
 end)

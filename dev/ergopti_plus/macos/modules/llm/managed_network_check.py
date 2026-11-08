@@ -31,6 +31,7 @@ Range. Only verdicts are printed, never a host or a digest.
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import time
@@ -122,8 +123,8 @@ def digest_step(bootstrap, source):
     bytes the chain delivers are the pinned ones (a company proxy that
     rewrites or truncates a download answers a HEAD normally).
     """
-    with tempfile.TemporaryDirectory(prefix="ergopti-network-check-") as folder:
-        try:
+    try:
+        with tempfile.TemporaryDirectory(prefix="ergopti-network-check-") as folder:
             bootstrap.download(
                 source["url"],
                 Path(folder) / "input",
@@ -132,12 +133,12 @@ def digest_step(bootstrap, source):
                 time.monotonic() + DIGEST_TIMEOUT,
                 IDLE_TIMEOUT,
             )
-        except bootstrap.BootstrapFailure as failure:
-            emit("digest", "fail", "mismatch" if failure.reason == "integrity" else failure.reason)
-            return
-        except Exception as failure:
-            emit("digest", "fail", getattr(failure, "reason", "unavailable"))
-            return
+    except bootstrap.BootstrapFailure as failure:
+        emit("digest", "fail", "mismatch" if failure.reason == "integrity" else failure.reason)
+        return
+    except Exception as failure:
+        emit("digest", "fail", getattr(failure, "reason", "unavailable"))
+        return
     emit("digest", "pass", "sha256")
 
 
@@ -287,7 +288,9 @@ def blob_range_verdict(status, content_range):
     managed daemon skips to each part's offset, at the cost of the skipped bytes.
     """
     if status == 206:
-        served = (content_range or "").startswith("bytes 1-2/")
+        match = re.fullmatch(r"bytes 1-2/(\*|[0-9]+)", content_range or "")
+        total = match.group(1).lstrip("0") if match else ""
+        served = bool(match) and (total == "*" or len(total) > 1 or total >= "3")
         return ("pass", "honoured") if served else ("fail", "wrong_range")
     if status == 200:
         return "info", "ignored"
@@ -367,6 +370,17 @@ def ranged_blob_verdict(bootstrap, url, planned):
             status = response.status
             location = header(response, "location")
             content_range = header(response, "content-range")
+            if status == 206 and blob_range_verdict(status, content_range) == ("pass", "honoured"):
+                received = 0
+                while True:
+                    chunk = response.read(3 - received)
+                    if not chunk:
+                        break
+                    received += len(chunk)
+                    if received > 2:
+                        return "fail", "wrong_length"
+                if received != 2:
+                    return "fail", "wrong_length"
         if status not in REDIRECT_STATUSES:
             return blob_range_verdict(status, content_range)
         target = urllib.parse.urljoin(url, location) if location else None

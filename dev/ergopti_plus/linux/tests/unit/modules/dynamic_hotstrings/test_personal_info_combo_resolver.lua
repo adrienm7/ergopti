@@ -186,12 +186,14 @@ helpers.describe("personal-info @-combo resolver", function()
 		end)
 	end)
 
-	helpers.it("offers nothing the resolver would refuse", function()
+	helpers.it("offers only what the resolver would deliver", function()
 		with_fixture(function()
 			helpers.assert_eq(#dh.preview_candidates("@npz"), 0,
 				"a bubble offering an expansion the magic key will not deliver is worse than no bubble")
-			helpers.assert_eq(#dh.preview_candidates("@n"), 0,
-				"and a single-letter tag is a REGISTERED rule that reaches the bubble by the ordinary path — offering it here too would draw the row twice")
+			local single = dh.preview_candidates("@n")
+			helpers.assert_eq(#single, 1,
+				"a single-letter tag is a REGISTERED rule the static matcher never holds, so this is its only row (single-field-preview)")
+			helpers.assert_eq(single[1].field, "last_name", "and it names the field that masks it")
 			helpers.assert_eq(#dh.preview_candidates("bonjour"), 0,
 				"ordinary typing offers nothing")
 		end)
@@ -327,6 +329,32 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 		helpers.assert_eq(#field_calls, 1, "the multi-field combo reaches its dedicated boundary")
 		helpers.assert_true(field_calls[1].is_private == true,
 			"every multi-field personal combo must be private before injection")
+	end)
+
+	helpers.it("hands the retained text destination to the combo output boundary (PIL-001)", function()
+		local single_publication, combo_publication
+		local observing_injector = {
+			inject = function(_count, _text, _private, _terminator, publication)
+				single_publication = publication
+				return { ok = true }
+			end,
+			inject_fields = function(_count, _values, _private, publication)
+				combo_publication = publication
+				return { ok = true }
+			end,
+		}
+		local refused_without_destination
+		with_fixture(function()
+			local Fixture = require("tests.support.dynamic_hotstrings_fixture")
+			helpers.assert_true(Fixture.trigger(dh, "@p\\", "\\"))
+			helpers.assert_true(Fixture.trigger(dh, "@np\\", "\\"))
+			refused_without_destination = dh.on_trigger("@np\\", "\\", true, nil)
+		end, observing_injector)
+		helpers.assert_not_nil(single_publication, "the single-field output keeps its destination")
+		helpers.assert_not_nil(combo_publication,
+			"the multi-field output must keep the destination captured with the trigger")
+		helpers.assert_eq(refused_without_destination, false,
+			"a combo without a retained destination must not write into whatever is focused")
 	end)
 
 	helpers.it("the daemon forwards the flag it is given", function()

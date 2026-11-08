@@ -99,7 +99,8 @@ M.REQUIREMENT_STATE_FEATURES = {
 	tap_holds_enabled         = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	-- The per-key bindings and the tap timeout belong to the Tap-Holds switch;
 	-- they live in config_karabiner.toml and have no manifest row of their own.
-	tap_hold_config           = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
+	-- A tap's command is led by the word-reset marker (tap_hold_marker).
+	tap_hold_config           = { "tap_holds.enabled", "hotstrings.tap_hold_resets_word" }, -- config-key-literal-ok: a manifest feature selector
 	tap_hold_timeout_ms       = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	lone_modifier_tap_max_ms  = { "tap_holds.lone_modifier_tap_max_ms" }, -- config-key-literal-ok: a manifest feature selector
 	mod_combos_enabled        = { "mod_combos.*" },
@@ -624,7 +625,9 @@ end
 --- Idempotent: re-runs are safe because we skip actions whose first event is
 --- already the F20 sentinel.
 --- @param available_actions table List of action definitions (mutated in place).
-local function prepend_nav_layer_sentinel(available_actions)
+--- @param counts boolean Whether the layer binds a repeat count: entering the
+---   layer then also puts the count back to rest.
+local function prepend_nav_layer_sentinel(available_actions, counts)
 	local patched = 0
 	for _, action in ipairs(available_actions) do
 		local to_events = action.karabiner_to
@@ -638,6 +641,23 @@ local function prepend_nav_layer_sentinel(available_actions)
 				patched = patched + 1
 				Logger.debug(LOG, "Action '%s': prepended F20 sentinel to nav-layer activation.",
 					tostring(action.id))
+			end
+			-- Entering the layer starts the repeat count at rest, as Windows'
+			-- ActivateLayer does; set before layer_active, which stays the last
+			-- event Karabiner holds until the release.
+			local resets = not counts
+			for _, ev in ipairs(to_events) do
+				if type(ev) == "table" and type(ev.set_variable) == "table"
+					and ev.set_variable.name == NavLayer.REPEAT_COUNT_VAR_NAME then resets = true end
+			end
+			if not resets then
+				for index, ev in ipairs(to_events) do
+					if is_layer_activation_event(ev) then
+						table.insert(to_events, index, { set_variable = {
+							name = NavLayer.REPEAT_COUNT_VAR_NAME, value = NavLayer.REPEAT_COUNT_RESET_VALUE } })
+						break
+					end
+				end
 			end
 		end
 	end
@@ -1011,6 +1031,43 @@ local function is_lone_modifier_key(key_def, tap_action, hold_action)
 	return true
 end
 
+--- One tagged F20 telling the driver a tap-hold's own command follows.
+--- Only a command is marked: a tagged event makes the rule claim the hand's
+--- modifiers (exact_modifier_manipulators), which a command, a chord of its
+--- own, does not need, while a marked hold would lose Ctrl held before it.
+--- @return table event Fresh Karabiner event.
+local function tap_hold_marker()
+	return { key_code = LAYER_NAV_SENTINEL_NAME, modifiers = ControlSignals.modifiers_for("tap_hold_command"),
+		["repeat"] = false }
+end
+
+--- Whether a tap's output is a command rather than a typed key: one of its keys
+--- carries Cmd, Ctrl or Option.
+--- @param events table Karabiner to-events.
+--- @return boolean
+local function is_command_output(events)
+	for _, event in ipairs(events or {}) do
+		if type(event) == "table" and type(event.modifiers) == "table" then
+			for _, modifier in ipairs(event.modifiers) do
+				if type(modifier) == "string" and (modifier:find("command", 1, true) or modifier:find("control", 1, true)
+					or modifier:find("option", 1, true)) then return true end
+			end
+		end
+	end
+	return false
+end
+
+--- A copy of a tap's events led by the command marker when it is a command.
+--- @param events table Karabiner to-events.
+--- @param marked boolean Whether markers are emitted at all.
+--- @return table events
+local function marked_tap(events, marked)
+	if not marked or not is_command_output(events) then return events end
+	local copy = { tap_hold_marker() }
+	for _, event in ipairs(events) do copy[#copy + 1] = deep_copy(event) end
+	return copy
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -1075,11 +1132,15 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	-- losing keys in fast typing. It never sends the physical key as well, which
 	-- typed two keys for one tap. A "none" tap under a hold stays the native key,
 	-- typed on release.
+	-- Markers tell the driver this key's output from the keyboard's own keys
+	-- (tap_hold_marker). A historical reconstruction (typing_priority false)
+	-- rebuilds a released graph, which had none.
+	local marked = typing_priority ~= false
 	local key_down_action = hold_action
 	local rollover_hold_var
 	if #hold_to == 0 then
 		key_down_action = tap_action
-		for _, ev in ipairs(tap_to) do to_events[#to_events + 1] = ev end
+		for _, ev in ipairs(marked_tap(tap_to, marked)) do to_events[#to_events + 1] = ev end
 	elseif typing_priority ~= false and Defaults.rollover_keys[key_def.id] and
 		same_output((#tap_to > 0) and tap_to or { { key_code = key_code } }, { { key_code = key_code } })
 		and not same_output(tap_to, hold_to) then
@@ -1099,7 +1160,7 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 		local effective_tap_to = (#tap_to > 0) and tap_to or { { key_code = key_code } }
 		-- to_if_alone only when tap output differs from hold output
 		if not same_output(effective_tap_to, hold_to) then
-			manipulator.to_if_alone = effective_tap_to
+			manipulator.to_if_alone = marked_tap(effective_tap_to, marked)
 		end
 	end
 	manipulator.to = to_events
@@ -1874,7 +1935,8 @@ function M.build_karabiner_json(
 	-- Inject the F20 and F19 sentinels into every action that turns the nav
 	-- layer on or off BEFORE indexing, so all downstream rule builders
 	-- (tap/hold, combo, etc.) inherit them.
-	prepend_nav_layer_sentinel(available_actions)
+	prepend_nav_layer_sentinel(available_actions,
+		state.nav_layer ~= nil and NavLayer.binds_repeat_count(state.nav_layer.bindings))
 	insert_nav_layer_exit_sentinel(available_actions)
 
 	local action_index, prepared_catalogue_err = ActionCatalogue.index_by_id(available_actions)

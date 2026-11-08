@@ -17,8 +17,9 @@
 --- 2. One key: KeyT bound to F3 instead of F2 changes the t manipulators only.
 --- 3. Contracts: every manipulator is gated on layer_active; no binding is no
 ---    rule; `none` swallows the key; a mouse button is a layer key; the wheel
----    and a repeat count have no Karabiner form, the wheel being the strokes
----    Hammerspoon posts (wheel_slots); every macOS call handler the
+---    has no Karabiner form, being the strokes Hammerspoon posts
+---    (wheel_slots); a repeat count is the nav_repeat_count variable, as
+---    Windows' NumberOfRepetitions (layer-repeat-count-macos); every macOS call handler the
 ---    vocabulary declares is implemented; a layers.toml rejected as a whole
 ---    closes its START with an error and no SUCCESS.
 --- 4. The generator deploys state.nav_layer in place of the static file and
@@ -236,14 +237,81 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		helpers.assert_eq(actual.button4, "to=left_arrow[option]")
 	end)
 
-	helpers.it("the wheel and a repeat count have no Karabiner form", function()
+	helpers.it("the wheel has no Karabiner form", function()
 		local wheel_only = bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"WheelUp" = "vol_up"\n')
 		helpers.assert_not_nil(wheel_only.WheelUp, "the loader takes the wheel as a macOS layer key (layer-wheel-slots)")
 		helpers.assert_nil(NavLayer.build_rule(wheel_only, ctx.registry, "ansi"),
 			"the wheel is Hammerspoon's to run: Karabiner gets no manipulator for it")
-		helpers.assert_throws(function()
-			NavLayer.build_rule({ Digit1 = { kind = "repeat_count", count = 1 } }, ctx.registry, "ansi")
-		end, "a repeat count does not exist on macOS")
+	end)
+
+	--- The manipulators firing on one Karabiner key code, in rule order.
+	local function on_key(rule, key_code)
+		local found = {}
+		for _, manipulator in ipairs(rule.manipulators) do
+			if manipulator.from.key_code == key_code then found[#found + 1] = manipulator end
+		end
+		return found
+	end
+
+	--- The value a manipulator's condition on a variable requires, or nil.
+	local function required(manipulator, name)
+		for _, condition in ipairs(manipulator.conditions) do
+			if condition.name == name and condition.type == "variable_if" then return condition.value end
+		end
+		return nil
+	end
+
+	--- The key codes a manipulator sends, and the repeat counts it sets.
+	local function sent(manipulator)
+		local parts = {}
+		for _, event in ipairs(manipulator.to) do
+			if event.key_code then parts[#parts + 1] = event.key_code end
+			if event.set_variable then
+				parts[#parts + 1] = event.set_variable.name .. "=" .. tostring(event.set_variable.value)
+			end
+		end
+		return table.concat(parts, " ")
+	end
+
+	helpers.it("(layer-repeat-count-macos) a repeat_count key sets the count a repeatable action spends", function()
+		local bindings = bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit3" = "repeat_count:3"\n"Digit5" = "repeat_count:5"\n"KeyK" = "arrow_left"\n'
+			.. '"KeyJ" = "keystroke:Home"\n')
+		helpers.assert_eq(bindings.Digit3, { kind = "repeat_count", count = 3 }, "macOS resolves the count now")
+		local rule = NavLayer.build_rule(bindings, ctx.registry, "ansi")
+		local digit = on_key(rule, "3")
+		helpers.assert_eq(#digit, 1)
+		helpers.assert_eq(sent(digit[1]), "nav_repeat_count=3", "the count key only sets the variable")
+		local arrow = on_key(rule, "k")
+		helpers.assert_eq(#arrow, 3, "one variant per count, then the plain send")
+		helpers.assert_eq(required(arrow[1], "nav_repeat_count"), 3)
+		helpers.assert_eq(sent(arrow[1]), "left_arrow left_arrow left_arrow nav_repeat_count=1")
+		helpers.assert_eq(required(arrow[2], "nav_repeat_count"), 5)
+		helpers.assert_eq(sent(arrow[2]), "left_arrow left_arrow left_arrow left_arrow left_arrow nav_repeat_count=1")
+		helpers.assert_nil(required(arrow[3], "nav_repeat_count"), "the plain send matches whatever the count")
+		helpers.assert_eq(sent(arrow[3]), "left_arrow nav_repeat_count=1")
+		local home = on_key(rule, "j")
+		helpers.assert_eq(#home, 1, "a literal keystroke is not repeatable")
+		helpers.assert_eq(sent(home[1]), "home nav_repeat_count=1", "but its send spends the count")
+	end)
+
+	helpers.it("(layer-repeat-count-macos) a layer without a count generates exactly what it did before", function()
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"KeyK" = "arrow_left"\n'), ctx.registry, "ansi")
+		local arrow = on_key(rule, "k")
+		helpers.assert_eq(#arrow, 1)
+		helpers.assert_eq(sent(arrow[1]), "left_arrow")
+	end)
+
+	helpers.it("(layer-repeat-count-macos) a counted function key keeps both top-row variants", function()
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit2" = "repeat_count:2"\n"KeyK" = "keystroke:F2"\n"KeyL" = "vol_up"\n'), ctx.registry, "ansi")
+		helpers.assert_eq(#on_key(rule, "k"), 2, "F2 is not repeatable: one plain send per top-row mode")
+		helpers.assert_eq(sent(on_key(rule, "k")[1]), "f2 nav_repeat_count=1")
+		helpers.assert_true(NavLayer.binds_repeat_count(bindings_of('[_meta]\nschema_version = 1\n\n'
+			.. '[layers.nav.all]\n"Digit2" = "repeat_count:2"\n')))
+		helpers.assert_true(not NavLayer.binds_repeat_count(bindings_of(recommended)),
+			"the recommended macOS layer keeps its F-key number row")
 	end)
 
 	helpers.it("(layer-wheel-slots) the recommended wheel is volume up and down, posted as media keys", function()
@@ -372,6 +440,37 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 		end)
 	end)
 
+	helpers.it("refuses a shipped preset read or close failure and closes the stream", function()
+		with_folder(function(dir)
+			for _, failure in ipairs({ "read_throw", "read_nil", "close_nil" }) do
+				local original_open, closes = io.open, 0
+				io.open = function(path, mode)
+					local file, err = original_open(path, mode)
+					if not file or not path:match("layer_actions%.toml$") then return file, err end
+					return {
+						read = function(_, ...)
+							if failure == "read_throw" then error("read refused") end
+							if failure == "read_nil" then return nil, "read refused" end
+							return file:read(...)
+						end,
+						close = function()
+							closes = closes + 1
+							file:close()
+							if failure == "close_nil" then return nil, "close refused" end
+							return true
+						end,
+					}
+				end
+				local called, imported = pcall(NavLayer.import_recommended, { shared_root = helpers.shared(), config_dir = dir })
+				io.open = original_open
+				helpers.assert_true(called)
+				helpers.assert_nil(imported, failure .. " must prevent publishing the preset")
+				helpers.assert_eq(closes, 1)
+				helpers.assert_nil(content(dir .. "/layers.toml"))
+			end
+		end)
+	end)
+
 	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
 		for label, own in pairs({ edited = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n',
 			empty = "" }) do
@@ -386,6 +485,21 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 				helpers.assert_eq(content(dir .. "/layers.toml"), own, label .. ": an undo never removes a kept file")
 			end)
 		end
+	end)
+
+	helpers.it("refuses an unreadable existing navigation layer", function()
+		with_folder(function(dir)
+			local writes = 0
+			local import, err = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir,
+				file_adapter = {
+					read_with_status = function() return nil, "error", "permission denied" end,
+					write_if_unchanged = function() writes = writes + 1; return true end,
+				},
+			})
+			helpers.assert_nil(import, "an unreadable layer must not be reported as usable")
+			helpers.assert_true(type(err) == "string" and err ~= "")
+			helpers.assert_eq(writes, 0, "the inaccessible file remains untouched")
+		end)
 	end)
 
 	helpers.it("(nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it", function()

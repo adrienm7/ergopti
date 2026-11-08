@@ -25,22 +25,40 @@ end
 
 --- Parse a semver tag into its components.
 --- @param tag string
---- @return table|nil  {major=int, minor=int, patch=int, prerelease=string[]|nil}
+--- @return table|nil  {major=string, minor=string, patch=string, prerelease=string[]|nil}
 local function parse_version(tag)
 	local norm = M.normalize_tag(tag)
-	local maj, min, pat, pre = norm:match("^(%d+)%.(%d+)%.(%d+)%-?(.*)$")
+	local maj, min, pat, suffix = norm:match("^(%d+)%.(%d+)%.(%d+)(.*)$")
 	if not maj then return nil end
-	if pre == "" then pre = nil end
+	local pre = nil
+	if suffix ~= "" then
+		if suffix:sub(1, 1) ~= "-" or #suffix == 1 or suffix:find("[\r\n]")
+			or suffix:find("\226\128\168", 1, true) or suffix:find("\226\128\169", 1, true) then return nil end
+		pre = suffix:sub(2)
+		if pre:sub(1, 1) == "." or pre:sub(-1) == "." or pre:find("..", 1, true) then return nil end
+	end
 	return {
-		major = tonumber(maj),
-		minor = tonumber(min),
-		patch = tonumber(pat),
+		major = maj,
+		minor = min,
+		patch = pat,
 		prerelease = pre and (function()
 			local parts = {}
 			for part in pre:gmatch("[^%.]+") do table.insert(parts, part) end
 			return parts
 		end)() or nil,
 	}
+end
+
+--- Compare arbitrary-length decimal strings without numeric conversion.
+--- @param a string Decimal digits.
+--- @param b string Decimal digits.
+--- @return integer
+local function compare_decimal(a, b)
+	local ai, bi = a:gsub("^0+", ""), b:gsub("^0+", "")
+	if #ai ~= #bi then return #ai > #bi and 1 or -1 end
+	if ai > bi then return 1 end
+	if ai < bi then return -1 end
+	return 0
 end
 
 --- Compare two prerelease identifiers using semver rules.
@@ -50,11 +68,9 @@ end
 local function compare_prerelease_id(a, b)
 	local a_num = a:match("^%d+$") ~= nil
 	local b_num = b:match("^%d+$") ~= nil
+	if a_num ~= b_num then return a_num and -1 or 1 end
 	if a_num and b_num then
-		local ai, bi = tonumber(a), tonumber(b)
-		if ai > bi then return 1 end
-		if ai < bi then return -1 end
-		return 0
+		return compare_decimal(a, b)
 	end
 	if a > b then return 1 end
 	if a < b then return -1 end
@@ -95,9 +111,10 @@ function M.compare_versions(a, b)
 		-- version-compare parity gate (D-1).
 		return 0
 	end
-	if pa.major ~= pb.major then return pa.major > pb.major and 1 or -1 end
-	if pa.minor ~= pb.minor then return pa.minor > pb.minor and 1 or -1 end
-	if pa.patch ~= pb.patch then return pa.patch > pb.patch and 1 or -1 end
+	for _, key in ipairs({ "major", "minor", "patch" }) do
+		local order = compare_decimal(pa[key], pb[key])
+		if order ~= 0 then return order end
+	end
 	return compare_prerelease(pa.prerelease, pb.prerelease)
 end
 

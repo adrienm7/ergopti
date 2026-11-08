@@ -56,16 +56,24 @@ local function with_fixture(collision, body)
 		local controls, observations = {}, { writes = 0, notices = {}, refreshes = 0, starts = 0 }
 		local attributes = {}
 		for index, entry in ipairs(definitions) do attributes[entry.path] = { mode = "file", dev = 1, ino = index } end
+		local backups, backup_prefix = {}, config .. ".section-settings-"
 		local native_files = {
 			path_status = function(path)
 				local value = attributes[path]; return value and "present" or "absent", value
 			end,
 			read_with_status = function(path)
 				if path == config then return disk, "ok" end
+				if backups[path] then return backups[path], "ok" end
 				local file = io.open(path, "r"); if not file then return nil, "absent" end
 				local content = assert(file:read("*a")); assert(file:close()); return content, "ok"
 			end,
 			write_if_unchanged = function(path, content, expected)
+				-- A changed section batch keeps a durable native-cell backup next to
+				-- config.toml; it is not a canonical preference publication.
+				if path:sub(1, #backup_prefix) == backup_prefix then
+					if expected.status ~= "absent" or backups[path] then return false end
+					backups[path] = content; return true
+				end
 				observations.writes = observations.writes + 1
 				observations.expected = expected
 				if controls.writer == "throw" then error("owned writer refusal") end
@@ -78,6 +86,7 @@ local function with_fixture(collision, body)
 		package.loaded["adapters.file_system"] = native_files
 		package.loaded["infra.config_paths"] = { get = function(key)
 			if key == "PersonalHotstringsDir" then return controls.root or root end
+			if key == "ConfigTomlPath" then return config end
 		end }
 		package.loaded["infra.notifications"] = { notify = function(...)
 			observations.notices[#observations.notices + 1] = { ... }

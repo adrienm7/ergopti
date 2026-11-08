@@ -48,6 +48,8 @@ global _PathsEdWeb_NavSub     := unset
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _PathsEdWeb_ResetDone  := false
 global _PathsEdWeb_SessionEpoch := 0
+global _PathsEdWeb_SubscriptionOwner := 0
+global _PathsEdWeb_RetiredHosts := []
 
 ; Virtual host that maps to _SharedDir so the document and its relative assets
 ; resolve over https (file:// is an opaque origin and breaks the JS->AHK channel).
@@ -66,8 +68,12 @@ _PathsEdWeb_Available() {
 _PathsEdWeb_TryOpen() {
 	global _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_WebView
 	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub, _PathsEdWeb_ResetDone, _PathsEdWeb_SessionEpoch
-	global _VendorDir, _SharedDir
+	global _VendorDir, _SharedDir, _PathsEdWeb_SubscriptionOwner
 
+	EntryEpoch := _PathsEdWeb_SessionEpoch
+	_PathsEdWeb_RetryRetiredHosts()
+	if _PathsEdWeb_SessionEpoch != EntryEpoch
+		return true
 	if !_PathsEdWeb_Available()
 		return false
 
@@ -100,7 +106,7 @@ _PathsEdWeb_TryOpen() {
 	}
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	Installed := false
+	Installed := false, Host := 0
 	try {
 		try {
 			; Both the shared environment and controller await can dispatch Close.
@@ -114,20 +120,17 @@ _PathsEdWeb_TryOpen() {
 			try LoggerError("PathsEditor", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
 			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			try g.Destroy()
-			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			; Capture the exact GUI even though no controller was ever created.
+			; The usual retirement queue owns any unacknowledged Destroy.
+			Host := _PathsEdWeb_BeginBareHost(g, SessionEpoch)
+			if !IsObject(Host)
 				return true
-			; This failed opening has published no controller or subscriptions.
-			_PathsEdWeb_Reset()
-			FallbackReady := false
+			ResetReceipt := false
+			_PathsEdWeb_Reset(g, SessionEpoch, &ResetReceipt)
 			PreviousCritical := Critical("On")
-			try {
-				if _PathsEdWeb_Gui == g && _PathsEdWeb_ResetDone
-						&& _PathsEdWeb_SessionEpoch == SessionEpoch + 1 {
-					_PathsEdWeb_Gui := 0
-					FallbackReady := true
-				}
-			} finally Critical(PreviousCritical)
+			try FallbackReady := ResetReceipt && !IsObject(Host.gui) && _PathsEdWeb_Gui == 0 && _PathsEdWeb_ResetDone
+				&& _PathsEdWeb_SessionEpoch == SessionEpoch + 1
+			finally Critical(PreviousCritical)
 			return !FallbackReady
 		}
 		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
@@ -157,25 +160,21 @@ _PathsEdWeb_TryOpen() {
 		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true
 
-		MsgSub := View.WebMessageReceived(_PathsEdWeb_OnWebMessage.Bind(SessionEpoch))
-		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+		Host := _PathsEdWeb_BeginSubscriptions(g, Controller, View, SessionEpoch)
+		if !IsObject(Host)
 			return true
-		NavSub := View.NavigationCompleted(_PathsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
-		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+		if !_PathsEdWeb_Subscribe(Host, "message", _PathsEdWeb_OnWebMessage.Bind(SessionEpoch))
+			return true
+		if !_PathsEdWeb_Subscribe(Host, "navigation", _PathsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
 			return true
 		try View.SetVirtualHostNameToFolderMapping(PATHSED_VHOST, _SharedDir, PATHSED_HOST_ACCESS_ALLOW)
-
-		; The globals retain the subscription handles before local aliases leave
-		; this RAM-only transaction, so Close can release them before the browser.
 		PreviousCritical := Critical("On")
 		try {
-			if _PathsEdWeb_StartupCurrent(SessionEpoch, g) {
+			if _PathsEdWeb_StartupCurrent(SessionEpoch, g) && _PathsEdWeb_SubscriptionOwner == Host && !Host.retired {
 				_PathsEdWeb_Controller := Controller
 				_PathsEdWeb_WebView := View
-				_PathsEdWeb_MsgSub := MsgSub
-				_PathsEdWeb_NavSub := NavSub
-				MsgSub := unset
-				NavSub := unset
+				_PathsEdWeb_MsgSub := Host.message
+				_PathsEdWeb_NavSub := Host.navigation
 				Installed := true
 			}
 		} finally Critical(PreviousCritical)
@@ -193,11 +192,15 @@ _PathsEdWeb_TryOpen() {
 		return true
 	} finally {
 		if !Installed {
-			; A canceled opening is consumed, and retires only its private browser.
-			; It cannot Reset a replacement or ask the public caller for a fallback.
-			MsgSub := unset
-			NavSub := unset
-			if IsSet(Controller) {
+			RetireDestroy := IsObject(Host) && (!Host.retired || Host.destroy)
+			if IsObject(Host) {
+				if _PathsEdWeb_Gui == g
+					_PathsEdWeb_Reset(g, SessionEpoch)
+				; Reset already queued a bare host; leave any failed Destroy debt
+				; for the next public request instead of retrying inside this one.
+				if !Host.HasOwnProp("bare") || !Host.bare || !Host.retired
+					_PathsEdWeb_RetireHost(Host, RetireDestroy, true)
+			} else if IsSet(Controller) {
 				try Controller.Close()
 				catch as Err
 					try LoggerError("PathsEditor", "Retired browser cleanup failed: {1}.", Err.Message)
@@ -572,61 +575,225 @@ _PathsEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.
-_PathsEdWeb_OnClose(*) {
-	_PathsEdWeb_Close()
+_PathsEdWeb_OnClose(GuiObj := unset, *) {
+	_PathsEdWeb_Close(GuiObj?)
 }
 
-_PathsEdWeb_Close() {
+_PathsEdWeb_Close(ExpectedGui := unset) {
 	global _PathsEdWeb_Gui
-	saved := (_PathsEdWeb_Gui != 0) ? _PathsEdWeb_Gui : 0
-	_PathsEdWeb_Reset()
-	; Native destruction can dispatch another public open. Retire only this
-	; captured slot after controller teardown, before that request can reenter.
+	Window := IsSet(ExpectedGui) ? ExpectedGui : _PathsEdWeb_Gui
+	Saved := _PathsEdWeb_Reset(Window)
+	if Saved
+		try Saved.Destroy()
+}
+
+; Reset without an exact window retains the native GUI for a later Close.
+_PathsEdWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset, &ResetReceipt := unset) {
+	global _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_WebView, _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub
+	global _PathsEdWeb_ResetDone, _PathsEdWeb_SessionEpoch
+	global _PathsEdWeb_SubscriptionOwner, _PathsEdWeb_RetiredHosts
+	ResetReceipt := false
+	Host := 0, SavedGui := 0, SavedController := 0, SavedMsg := 0, SavedNav := 0
 	PreviousCritical := Critical("On")
 	try {
-		if _PathsEdWeb_Gui == saved
+		if IsSet(ExpectedGui) && _PathsEdWeb_Gui != ExpectedGui
+			return 0
+		if IsSet(ExpectedEpoch) && !_PathsEdWeb_SessionCurrent(ExpectedEpoch)
+			return 0
+		if _PathsEdWeb_ResetDone {
+			if !IsSet(ExpectedGui)
+				return 0
+			SavedGui := _PathsEdWeb_Gui
 			_PathsEdWeb_Gui := 0
+			for Pending in _PathsEdWeb_RetiredHosts
+				if Pending.gui == SavedGui {
+					Host := Pending, Host.destroy := true
+					break
+				}
+		} else {
+			SavedGui := _PathsEdWeb_Gui
+			Host := _PathsEdWeb_SubscriptionOwner
+			SavedController := IsSet(_PathsEdWeb_Controller) ? _PathsEdWeb_Controller : 0
+			SavedView := IsSet(_PathsEdWeb_WebView) ? _PathsEdWeb_WebView : 0
+			SavedMsg := IsSet(_PathsEdWeb_MsgSub) ? _PathsEdWeb_MsgSub : 0
+			SavedNav := IsSet(_PathsEdWeb_NavSub) ? _PathsEdWeb_NavSub : 0
+			_PathsEdWeb_ResetDone := true
+			_PathsEdWeb_SessionEpoch += 1
+			_PathsEdWeb_MsgSub := unset, _PathsEdWeb_NavSub := unset
+			_PathsEdWeb_Controller := unset, _PathsEdWeb_WebView := unset
+			_PathsEdWeb_SubscriptionOwner := 0
+			ResetReceipt := true
+			if IsSet(ExpectedGui)
+				_PathsEdWeb_Gui := 0
+			if IsObject(Host) {
+				Host.retired := true, Host.destroy := IsSet(ExpectedGui)
+				_PathsEdWeb_RetiredHosts.Push(Host)
+			}
+		}
 	} finally Critical(PreviousCritical)
-	try {
-		if saved
-			saved.Destroy()
+	; Global aliases must be gone before the host releases its own handles.
+	SavedMsg := 0, SavedNav := 0
+	if IsObject(Host) {
+		if Host.destroy
+			try Host.gui.Hide()
+		_PathsEdWeb_RetryRetiredHosts()
+		return 0
 	}
+	if SavedController
+		try SavedController.Close()
+	return SavedGui
 }
 
-; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Idempotent: a second call (e.g. the frontend
-; "cancel" message and the native Gui Close event both firing for the same
-; teardown) is a true no-op instead of touching the globals again.
-_PathsEdWeb_Reset() {
-	global _PathsEdWeb_Controller, _PathsEdWeb_WebView, _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub
-	global _PathsEdWeb_ResetDone, _PathsEdWeb_SessionEpoch
-
-	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
-	; Completed against this controller. Re-running the unset lines below would
-	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
-	; has already torn down (Controller.Close() releases CoreWebView2's underlying
-	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
-	if _PathsEdWeb_ResetDone
-		return
-	_PathsEdWeb_ResetDone := true
-	_PathsEdWeb_SessionEpoch += 1
-
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+; A native close revokes admission immediately but retains the exact host until
+; any add_Event call has returned its handle and that handle is released.
+; A factory failure has no controller, but still owns this native window.
+_PathsEdWeb_BeginBareHost(Window, Epoch) {
+	global _PathsEdWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
 	try {
-		; Release the subscriptions FIRST, while the controller is still alive. Their
-		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-		; Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script.
-		_PathsEdWeb_MsgSub := unset
-		_PathsEdWeb_NavSub := unset
-		if IsSet(_PathsEdWeb_Controller)
-			_PathsEdWeb_Controller.Close()
+		if !_PathsEdWeb_StartupCurrent(Epoch, Window) || IsObject(_PathsEdWeb_SubscriptionOwner)
+			return 0
+		Hwnd := Window.Hwnd
+		Host := {gui: Window, hwnd: Hwnd, bare: true, controller: 0, view: 0, epoch: Epoch,
+			message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: true, destroy: false}
+		_PathsEdWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+; Only a different AHK owner or native absence proves this HWND was retired.
+; An extant HWND without a resolvable AHK owner stays debt rather than being adopted.
+_PathsEdWeb_BareWindowRetired(Host) {
+	if !WMHandleExists(Host.hwnd)
+		return true
+	Other := GuiFromHwnd(Host.hwnd)
+	return IsObject(Other) && Other != Host.gui
+}
+
+_PathsEdWeb_BeginSubscriptions(Window, Controller, View, Epoch) {
+	global _PathsEdWeb_SubscriptionOwner, _PathsEdWeb_Gui
+	Host := {gui: Window, controller: Controller, view: View, epoch: Epoch,
+		message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: false, destroy: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_PathsEdWeb_StartupCurrent(Epoch, Window) || IsObject(_PathsEdWeb_SubscriptionOwner)
+			return 0
+		_PathsEdWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+_PathsEdWeb_Subscribe(Host, Kind, Handler) {
+	global _PathsEdWeb_SubscriptionOwner, _PathsEdWeb_Gui
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _PathsEdWeb_SubscriptionOwner != Host || _PathsEdWeb_Gui != Host.gui
+				|| !_PathsEdWeb_StartupCurrent(Host.epoch, Host.gui)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureValue := 0
+	try {
+		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
+			: Host.view.NavigationCompleted(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureValue := Failure
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.%Kind% := Subscription
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _PathsEdWeb_SubscriptionOwner == Host
+				&& _PathsEdWeb_StartupCurrent(Host.epoch, Host.gui)
+		} finally Critical(PreviousCritical)
 	}
-	_PathsEdWeb_Controller := unset
-	_PathsEdWeb_WebView    := unset
+	if Host.retired
+		_PathsEdWeb_RetryRetiredHosts()
+	if Failed
+		throw FailureValue
+	return Current && !Host.retired
+}
+
+_PathsEdWeb_RetireHost(Host, Destroy, RespectExisting := false) {
+	global _PathsEdWeb_RetiredHosts, _PathsEdWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Host.gui)
+			return
+		; A plumbing Reset can retire the host after the caller's snapshot.
+		Host.destroy := Host.destroy || (Destroy && (!RespectExisting || !Host.retired))
+		Host.retired := true
+		if _PathsEdWeb_SubscriptionOwner == Host
+			_PathsEdWeb_SubscriptionOwner := 0
+		Found := false
+		for Pending in _PathsEdWeb_RetiredHosts
+			if Pending == Host
+				Found := true
+		if !Found
+			_PathsEdWeb_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+	if Host.destroy
+		try Host.gui.Hide()
+	_PathsEdWeb_RetryRetiredHosts()
+}
+
+_PathsEdWeb_RetryRetiredHosts() {
+	global _PathsEdWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _PathsEdWeb_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false, Destroyed := false, Recheck := false
+		try {
+			Host.message := 0, Host.navigation := 0
+			if !Host.closed {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			if Host.destroy {
+				if Host.HasOwnProp("bare") && Host.bare {
+					if !_PathsEdWeb_BareWindowRetired(Host) {
+						if GuiFromHwnd(Host.hwnd) != Host.gui
+							throw Error("The failed Paths editor HWND identity is unresolved.")
+						; Verify the actual outcome even if the call throws after effect.
+						try Host.gui.Destroy()
+					}
+					if !_PathsEdWeb_BareWindowRetired(Host)
+						throw Error("The failed Paths editor native window remains live.")
+				} else
+					Host.gui.Destroy()
+				Destroyed := true
+			}
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("PathsEditor", "Browser retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			; Retain local strong references until after the RAM-only claim.
+			Window := Host.gui, Controller := Host.controller, View := Host.view
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled && Host.destroy && !Destroyed
+					Recheck := true
+				else if Settled {
+					Host.gui := 0, Host.controller := 0, Host.view := 0
+					Count := _PathsEdWeb_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _PathsEdWeb_RetiredHosts[Index] == Host
+							_PathsEdWeb_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+		if Recheck
+			_PathsEdWeb_RetryRetiredHosts()
+	}
 }

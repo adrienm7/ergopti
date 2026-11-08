@@ -153,7 +153,8 @@ for _, spec in ipairs({{'models','lmstudio','openai',''}, {'models','openai_comp
             local log=diagnostics[#diagnostics]
             good = good and #diagnostics==old_logs+1 and log ~= nil
                 and log.owner=='modules.llm.api_remote' and log.message=='Terminal callback raised — %s'
-                and log.detail==(case=='string' and 'owned ordinary wrapper failure' or 'error object (table)')
+                -- A string error may quote provider or user text: the owner withholds it.
+                and log.detail==(case=='string' and 'details withheld' or 'error object (table)')
         end
         local retry_count=0
         local retry=start(owner,provider,format,token,case,'retry',function(a,b,c)

@@ -513,6 +513,25 @@ end)
 
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	helpers.it("linux-http-header-name: keeps all RFC token characters", function()
+		local policy = require("infra.http_header_policy")
+		helpers.assert_eq(policy.validate("!#$%&'*+-.^_`|~AZ09", "value"), true)
+	end)
+	for _, name in ipairs({ "X-Api-Key: synthetic", "X-Api-Key ", "X-Api-Key;", "", "X-Api-Key\t" }) do
+		helpers.it("linux-http-header-name: rejects invalid field name " .. name, function()
+			local client, state = fresh_client()
+			local result, callbacks = nil, 0
+			local started = client.get("https://example.invalid", { [name] = "value" },
+				{ follow_redirects = true }, function(value) result, callbacks = value, callbacks + 1 end)
+			helpers.assert_eq(started, false)
+			helpers.assert_true(result and result.ok == false and type(result.error) == "string")
+			helpers.assert_eq(callbacks, 1)
+			helpers.assert_eq(#state.handles, 0)
+		end)
+	end
+end)
+
+helpers.describe("http_client: asynchronous curl ownership", function()
 	for _, name in ipairs(sensitive_headers) do
 		for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 			helpers.it("linux-http-redirect-credentials: " .. method .. " retains " .. name .. " only at its original hop", function()

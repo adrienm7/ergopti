@@ -3,7 +3,8 @@
 ; ==============================================================================
 ; MODULE: Pause Switch Policy
 ; DESCRIPTION:
-; Decides which keyboard layout a pause, a resume or a quit switches to, from
+; Decides which keyboard layout a pause, a resume, a quit or a start switches
+; to, from
 ; the three [layout] settings declared in the features manifest. Twin of
 ; _shared/lua/layout/pause_switch_policy.lua; both replay
 ; tests/corpus/layouts/pause_switch_vectors.json. The driver keeps the native
@@ -52,6 +53,19 @@ PauseSwitchPolicyValidTarget(Value) {
  */
 PauseSwitchPolicyTargetId(Value) {
 	return (Value is String) ? Value : ""
+}
+
+/**
+ * The event a driver start applies: a start running selects the resume layout
+ * and a start paused the pause one.
+ * @param {Integer} Paused 1 or 0 (true or false) once the start settled.
+ * @returns {String} "pause" or "resume".
+ * @throws {TypeError} For any other value.
+ */
+PauseSwitchPolicyStartupEvent(Paused) {
+	if !(Paused is Integer) || (Paused != 0 && Paused != 1)
+		throw TypeError("the startup pause state must be a boolean")
+	return Paused ? "pause" : "resume"
 }
 
 /**

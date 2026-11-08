@@ -28,6 +28,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 local WebviewResult = require("adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
 local OwnWindow = require("adapters.own_window")
@@ -222,6 +223,26 @@ local function reset_caches(generation, webview)
 		Logger.error(LOG, "Typing metrics cache reset failed (disk deletion; content withheld; repeats suppressed).")
 	end
 	return false
+end
+
+--- The dashboard's Export and Purge: log_manager, the single writer, owns
+--- both, and the page learns the outcome through complete_metrics_maintenance.
+local MAINTENANCE = { metrics_export = "export", metrics_purge = "purge" }
+
+local function request_maintenance(generation, webview, action, maintenance_id)
+	if type(maintenance_id) ~= "number" or maintenance_id <= 0 or maintenance_id % 1 ~= 0
+		or maintenance_id > JS_MAX_SAFE_INTEGER then
+		delivery_failure(generation, webview, "metrics maintenance", "invalid owner")
+		return
+	end
+	local function answer(success, path)
+		local encoded_path = type(path) == "string" and encode_delivery(generation, webview, "metrics maintenance", path)
+		submit_javascript(generation, webview, "metrics maintenance completion", string.format(
+			"window.complete_metrics_maintenance&&window.complete_metrics_maintenance(%d,%s,%s);",
+			maintenance_id, tostring(success == true), encoded_path or "null"))
+	end
+	local accepted = _get_log_manager().request_metrics_maintenance(MAINTENANCE[action], answer)
+	if accepted ~= true then answer(false) end
 end
 
 local function clear_cache(generation, webview, reset_id)
@@ -483,12 +504,13 @@ local function compute_full(pacer)
 	local all_apps_list  = {}
 	for date_str, day_data in pairs(manifest) do
 		if first_date == nil or date_str < first_date then first_date = date_str end
-		for app_name, _ in pairs(day_data) do
-			if not EXCLUDED_APPS[app_name] and not all_apps_set[app_name] then
+		for app_key, _ in pairs(day_data) do
+			local app_name = ManifestKeys.decode(app_key)
+			if not EXCLUDED_APPS[app_key] and app_name ~= "Unknown" and not all_apps_set[app_name] then
 				all_apps_set[app_name] = true
 				table.insert(all_apps_list, app_name)
 			end
-			if app_name ~= "Unknown" and app_icons[app_name] == nil then
+			if not EXCLUDED_APPS[app_key] and app_name ~= "Unknown" and app_icons[app_name] == nil then
 				local cached = M._app_icon_cache[app_name]
 				if cached ~= nil then
 					if cached then app_icons[app_name] = cached end
@@ -957,6 +979,8 @@ function M.show()
 						if ok and query then
 							if query.action == "clear_cache" then
 								clear_cache(generation, webview, query.reset_id)
+							elseif MAINTENANCE[query.action] then
+								request_maintenance(generation, webview, query.action, query.maintenance_id)
 							else
 								local request_id = tonumber(query.request_id)
 								if not (request_id and request_id > 0 and request_id % 1 == 0) then

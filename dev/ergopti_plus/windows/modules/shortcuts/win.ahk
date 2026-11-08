@@ -49,7 +49,8 @@ StartActivitySimulation(*) {
 		}
 		ActivitySimulation := True
 		; Capture the current cursor position as the jitter origin
-		MouseGetPos(&AwakeOriginX, &AwakeOriginY)
+		Position := MCGetPos()
+		AwakeOriginX := Position["x"], AwakeOriginY := Position["y"]
 		; Reset the user-move baseline so the first tick never self-cancels
 		SimulateActivity(True)
 		SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
@@ -162,7 +163,8 @@ AwakeCheckMouseMoved() {
 		global ActivitySimulation, AwakeOriginX, AwakeOriginY
 		if not ActivitySimulation
 				return
-		MouseGetPos(&CurX, &CurY)
+		Position := MCGetPos()
+		CurX := Position["x"], CurY := Position["y"]
 		if (Abs(CurX - AwakeOriginX) > AWAKE_JITTER_PX or Abs(CurY - AwakeOriginY) > AWAKE_JITTER_PX) {
 				SetTimer(StopActivitySimulation, -1)
 		}
@@ -178,6 +180,9 @@ AwakeCancelOnMouse(*) {
 }
 
 AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
+		global ActivitySimulation, AwakeInputHook
+		if !IsObject(ih) || ih != AwakeInputHook
+				return
 		if A_IsSuspended
 				return
 		; Ignore key presses with modifiers to prevent the trigger hotkey
@@ -190,8 +195,7 @@ AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
 						or GetKeyState(KS_AltGrKeyName())
 						return
 		}
-		global ActivitySimulation
-		if ActivitySimulation {
+		if ih == AwakeInputHook && ActivitySimulation {
 				StopActivitySimulation()
 		}
 }
@@ -236,7 +240,8 @@ SimulateActivity(ResetOnly := False) {
 
 		; If the cursor moved more than AWAKE_JITTER_PX from where we left it,
 		; the user touched the mouse or touchpad -- stop without moving again.
-		MouseGetPos(&CurX, &CurY)
+		Position := MCGetPos()
+		CurX := Position["x"], CurY := Position["y"]
 		if (LastX != -1 and (Abs(CurX - LastX) > AWAKE_JITTER_PX or Abs(CurY - LastY) > AWAKE_JITTER_PX)) {
 				StopActivitySimulation()
 				return
@@ -289,7 +294,20 @@ _SearchSelectionReady(Text, SearchInExplorer) {
 ; searched. A target that is recognised but cannot be opened (a path that
 ; does not exist, a bare file name) is reported, never searched instead:
 ; the user asked to open that thing.
-SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
+; Only the native absence receipts allow trying a punctuation-stripped path.
+_SearchPathStatus(Path) {
+		try {
+				Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Path, "UInt")
+				if (Attributes != 0xFFFFFFFF)
+						return "present"
+				NativeError := A_LastError
+				return (NativeError == 2 || NativeError == 3) ? "absent" : "error"
+		} catch {
+				return "error"
+		}
+}
+
+SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, PathStatusFn := _SearchPathStatus) {
 		Target := OpenTarget_Classify(SelectedText)
 		Kind := Target["kind"]
 		Value := Target["target"]
@@ -311,6 +329,17 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
 		}
 		LoggerStart("Search", "Opening the selected {1} '{2}'…", Kind, Value)
 		if (Kind == "path") {
+				if Target.Has("exact_path") {
+						try Status := PathStatusFn.Call(Target["exact_path"])
+						catch
+								Status := "error"
+						if (Status != "present" && Status != "absent") {
+								ReportFn.Call("open_target.open_failed", Target["exact_path"], "exact selected path could not be inspected")
+								return false
+						}
+						if (Status == "present")
+								Value := Target["exact_path"]
+				}
 				if !FileExist(Value) {
 						ReportFn.Call("open_target.missing_path", Value, "no file or folder exists at that path")
 						return false

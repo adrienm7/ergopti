@@ -248,6 +248,9 @@ _KL_Mouse_MeasureGesture(Gesture, X, Y, NowTick?) {
 }
 
 KL_Mouse_OnLDown(*) {
+		; Any pointer selection can move the caret, even in the same control.
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_InvalidatePasswordFocus()
 		KLMouse.lbtn_held := false
 		KLMouse.lbtn_authorized := false
@@ -312,6 +315,9 @@ KL_Mouse_OnLUp(*) {
 }
 
 KL_Mouse_OnRDown(*) {
+		; Any pointer selection can move the caret, even in the same control.
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_InvalidatePasswordFocus()
 		KLMouse.rbtn_held := false
 		KLMouse.rbtn_authorized := false
@@ -376,6 +382,9 @@ KL_Mouse_OnRUp(*) {
 }
 
 KL_Mouse_OnMDown(*) {
+		; Any pointer selection can move the caret, even in the same control.
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_InvalidatePasswordFocus()
 		KLMouse.mbtn_held := false
 		KLMouse.mbtn_authorized := false
@@ -530,9 +539,6 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 				KLMouse.scroll_last := 0
 				return
 		}
-		if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
-				return
-
 		; Claim before a yielding privacy query so subsequent input retains its
 		; own burst. Restore the caller's Critical state before any port call.
 		previous_critical := Critical("On")
@@ -547,6 +553,10 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 		} finally {
 				Critical(previous_critical)
 		}
+
+		; A zero-net burst still owns timestamps that must be retired.
+		if (ticks == 0 and h_ticks == 0)
+				return
 
 		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 		if filtered

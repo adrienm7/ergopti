@@ -30,6 +30,8 @@ param(
 	[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$ProxyRelayHandshakeMs,
 	[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$ProxyRelayIdleMs,
 	[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$ProxyRelayProbeMs,
+	# The TCP connect deadline of each PAC list relay that has a successor entry.
+	[Parameter(Mandatory = $true)][ValidateRange(1, 600000)][int]$ProxyListProbeMs,
 	# Absent while the relay is not installed (docs/design/proxy-auth-relay.md).
 	[string]$ProxyRelayPath = '',
 	[string]$ProxyRelaySha256 = ''
@@ -166,7 +168,12 @@ function Get-OllamaRuntimeProxy($Vendor, $Request) {
 		return Resolve-ErgoptiNativeNetworkRoutes $Origin ([int]$remaining) $null $null $Request.policy $Request.defaults
 	}
 	$read = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }
-	$proxy = Get-ErgoptiOwnedProxyEnvironment -Origins @($origins.clients.ollama) -Resolve $resolve -ReadEnvironment $read
+	$probe = {
+		param($Relay)
+		$remaining = [Math]::Min($Request.list_probe_ms, (Get-OllamaRuntimeRemaining $Request))
+		return Test-ErgoptiRelayReachable -Relay $Relay -TimeoutMs ([Math]::Max(1, [int]$remaining))
+	}
+	$proxy = Get-ErgoptiOwnedProxyEnvironment -Origins @($origins.clients.ollama) -Resolve $resolve -ReadEnvironment $read -Probe $probe
 	if (-not $proxy.Ok) { throw ('The owned runtime proxy was refused: ' + $proxy.Reason) }
 	$tunnel = 'none'; $relay = 'not_applicable'; $relayRun = ''
 	if ($proxy.Mode -ceq 'relay') {
@@ -396,7 +403,7 @@ function Invoke-OllamaRuntimeEntry {
 		identity = $StageIdentity; ticket = $TicketId; manifest = $ManifestSha256;
 		runtime_ticket = $RuntimeTicket; port = $Port; started_tick = $StartedTick; deadline_ms = $DeadlineMs;
 		policy = $ProxyPolicyPath; defaults = $UpdaterDefaultsPath;
-		route_origins = $RouteOriginsPath; route_origins_sha256 = $RouteOriginsSha256;
+		route_origins = $RouteOriginsPath; route_origins_sha256 = $RouteOriginsSha256; list_probe_ms = $ProxyListProbeMs;
 		relay = @{ path = $ProxyRelayPath; contract = $ProxyRelayContractPath; contract_sha256 = $ProxyRelayContractSha256;
 			dial_ms = $ProxyRelayDialMs; handshake_ms = $ProxyRelayHandshakeMs; idle_ms = $ProxyRelayIdleMs; probe_ms = $ProxyRelayProbeMs } }
 	$serveEnvironment = Read-OllamaServeEnvironment $ServeEnvironmentPath $ServeEnvironmentSha256

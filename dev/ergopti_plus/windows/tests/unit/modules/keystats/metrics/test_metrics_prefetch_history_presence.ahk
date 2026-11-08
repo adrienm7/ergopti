@@ -91,7 +91,7 @@ _MPHP_DeliverDelta(Root, Mode) {
 		KLWV.windows["typing"]["history_seed"] := KLPF_ReadHistorySeed(Path)
 		Before := FileRead(Path, "UTF-8")
 		AssertTrue(KLPF_RequestBuild("typing", Root, Mode, 71,
-			KLWV_OnBuildTerminal.Bind("typing", 71)))
+			KLWV_OnBuildTerminal.Bind("typing", 71)), "the reopened build must start: " . KLPF_LastBuildRefusal())
 		Job := KLPFWorker.jobs["typing"]
 		Stage := Job["stage"]
 		AssertTrue(KLPF_BuildAndWriteToPath("typing", Root, Stage, Root . "probe.log", Mode))

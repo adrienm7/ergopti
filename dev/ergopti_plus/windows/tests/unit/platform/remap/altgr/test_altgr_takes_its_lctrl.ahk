@@ -118,3 +118,93 @@ _ATIL_TheWiringIsInPlace() {
 }
 Test("altgr lctrl: the SC01D prefixes pass through and both detectors are wired (lctrl-hold-deferred-2026-09-26)",
 	_ATIL_TheWiringIsInPlace)
+
+_ATIL_RetiredCompanionPreservesSuccessor() {
+	global _TH_SyntheticHeldKeys
+	Family := _TestSetAltGrFamily(false, true)
+	_TSUH_Begin(Map(), Map("SC01D", true))
+	Paused := A_IsSuspended, Clock := 900, B := 0
+	Wait(*) {
+		AssertTrue(TapHoldAltGrTakesItsLCtrl(true))
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"], "The actual AltGr path must first own its genuine companion")
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		B := TapHoldNewOwner()
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl", B))
+		return true
+	}
+	try {
+		Suspend(false)
+		Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D", "LShift", 0.2,
+			Wait, (*) => false, (*) => (Clock += 100), 0, 0, (*) => "")
+		AssertFalse(Result["tap"])
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"], "A retired parent must not release B through its old companion")
+		AssertEqual(1, _TSUH_Count("{LCtrl Up}"), "Only the actual companion teardown may precede B's release")
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", B))
+		AssertEqual(2, _TSUH_Count("{LCtrl Up}"))
+	} finally {
+		Suspend(Paused)
+		_TSUH_End()
+		_TestRestoreAltGrFamily(Family)
+	}
+}
+Test("altgr lctrl: a revoked companion cannot consume a resumed owner (synthetic-owner-altgr)", _ATIL_RetiredCompanionPreservesSuccessor)
+
+_ATIL_ExpiredReadCannotMarkSuccessor() {
+	global _TapHoldKeyIsDown, _TH_AltGrPresses, _TH_ModifierOwners, _TH_SyntheticHeldKeys
+	Family := _TestSetAltGrFamily(false, true)
+	_TSUH_Begin(Map(), Map())
+	Paused := A_IsSuspended, B := 0
+	Read(Name, Mode) {
+		if Name != "SC01D" || Mode != "P"
+			return false
+		_TapHoldKeyIsDown := _TSUH_KeyIsDown
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		B := TapHoldNewOwner(), B.KeyId := "left_ctrl"
+		AssertTrue(TapHoldSyntheticKeyDown("LShift", B))
+		return true
+	}
+	try {
+		Suspend(false)
+		_TapHoldKeyIsDown := Read
+		TapHoldAltGrTakesItsLCtrl(true)
+		AssertFalse(_TH_AltGrPresses.Has("left_ctrl"), "An old key-state callout must not mark the new parent as a fake Ctrl press")
+		AssertTrue(_TH_ModifierOwners["left_ctrl"] == B)
+		AssertEqual(1, _TH_SyntheticHeldKeys["LShift"])
+		AssertFalse(B.Retracted)
+		AssertTrue(TapHoldSyntheticKeyUp("LShift", B))
+	} finally {
+		Suspend(Paused)
+		_TSUH_End()
+		_TestRestoreAltGrFamily(Family)
+	}
+}
+Test("altgr lctrl: a revoked physical-state read cannot mark a successor (synthetic-owner-altgr)", _ATIL_ExpiredReadCannotMarkSuccessor)
+
+_ATIL_HandbackRequiresExpectedParent() {
+	global _TH_ModifierOwners, _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	Paused := A_IsSuspended
+	try {
+		Suspend(false)
+		A := TapHoldNewOwner(), A.KeyId := "left_ctrl"
+		AssertTrue(TapHoldSyntheticKeyDown("LShift", A))
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		B := TapHoldNewOwner(), B.KeyId := "left_ctrl"
+		AssertTrue(TapHoldSyntheticKeyDown("LShift", B))
+		AssertFalse(TapHoldRetractOwnedModifier("left_ctrl", A), "A handback must not recapture a different parent after yielding")
+		AssertTrue(_TH_ModifierOwners["left_ctrl"] == B && !B.Retracted)
+		AssertEqual(1, _TH_SyntheticHeldKeys["LShift"])
+		AssertEqual(1, _TSUH_Count("{LShift Up}"), "Only the acknowledged teardown may have released A")
+		AssertTrue(TapHoldSyntheticKeyUp("LShift", B))
+	} finally {
+		Suspend(Paused)
+		_TSUH_End()
+	}
+}
+Test("altgr lctrl: delayed handback requires the exact captured parent (synthetic-owner-altgr)", _ATIL_HandbackRequiresExpectedParent)

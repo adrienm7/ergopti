@@ -64,11 +64,11 @@ OnExit(_HCfgTestCleanup)
 
 _HCfgTestReset() {
     global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
-    _HotstringsOverrides := Map()
 	; Mutators publish memory only after a successful write, so unit tests use a
 	; private writable target instead of treating "no path" as a fake success.
 	_HotstringsOverridesPath := _HCfgTestOverridePath()
 	try FileDelete(_HotstringsOverridesPath)
+	_HotstringsOverrides := _ParseOverrides(_HotstringsOverridesPath)
     HotstringGroupConfig := Map()
     ; Build a fresh empty config per category so mutations in one test do not
     ; leak into the next (each Sections map must be a distinct instance).
@@ -621,8 +621,9 @@ Test("HotstringsConfig: set/clear rollback when publication fails (hotstrings-ov
 TestHotstringsConfig_SaveOverridesPublishesAtomically() {
 	Body := _DriverFuncBody("_SaveOverrides")
 	Assert(Body != "", "_SaveOverrides must exist for the atomic-publication guard")
-	Assert(InStr(Body, "FSAtomicMoveReplace(") > 0,
-		"_SaveOverrides must publish a same-directory stage through the atomic filesystem adapter")
+	Assert(InStr(Body, "FSConfigAtomicMoveCreate(StagePath, Path, FinalAdmission)") > 0
+		&& InStr(Body, "FSConfigAtomicMoveReplace(StagePath, Path, &MoveError, FinalAdmission)") > 0,
+		"both absent and existing sources must publish through their atomic filesystem adapter with final source admission")
 	Assert(InStr(Body, 'FileOpen(_HotstringsOverridesPath, "w"') == 0,
 		"_SaveOverrides must never truncate the live override file before publication succeeds")
 }
@@ -634,13 +635,19 @@ TestHotstringsConfig_SaveOverridesRequiresDurableExactStage() {
 	Body := _DriverFuncBody("_SaveOverrides")
 	DurablePos := InStr(Body, "FSWriteDurable(StagePath, Out)")
 	ExactPos := InStr(Body, "FSUtf8ExactMatches(StagePath, Out)")
-	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, Path)")
+	CreatePos := InStr(Body, "FSConfigAtomicMoveCreate(StagePath, Path, FinalAdmission)")
+	ReplacePos := InStr(Body, "FSConfigAtomicMoveReplace(StagePath, Path, &MoveError, FinalAdmission)")
+	PublishedReadbackPos := InStr(Body, "FSUtf8ExactMatches(NativeAdapters ? PhysicalPath : Path, Out)")
+	LivePos := InStr(Body, "LivePublished := MemoryAdmission.Call() ? PublishFn.Call() : false")
 	Assert(DurablePos > 0,
 		"the default override writer must count bytes and flush its stage to stable storage")
 	Assert(ExactPos > DurablePos,
 		"the durable stage must be read back byte-exactly before publication")
-	Assert(ReplacePos > ExactPos,
-		"atomic replacement and live publication must remain downstream of exact stage validation")
+	Assert(CreatePos > ExactPos && ReplacePos > ExactPos,
+		"both atomic publication modes must remain downstream of durable exact stage validation")
+	Assert(PublishedReadbackPos > CreatePos && PublishedReadbackPos > ReplacePos
+		&& LivePos > PublishedReadbackPos,
+		"RAM publication must remain downstream of byte-exact native target readback")
 }
 Test("HotstringsConfig: durable exact stage validation gates override publish (AHK-078)",
 	TestHotstringsConfig_SaveOverridesRequiresDurableExactStage)
@@ -913,7 +920,7 @@ TestHotstringsConfig_PrioritySetClearRoundTrip() {
 	SavedOv   := _HotstringsOverrides
 	Path := A_Temp . "\hotstrings_config_prio_rt.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides     := Map()
+	_HotstringsOverrides     := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path   ; enable persistence so the save path is exercised
 
 	AssertTrue(HotstringsSetOverride("rolls", "", "priority", 25) != false,
@@ -947,7 +954,7 @@ TestHotstringsConfig_ClearAllFieldsClearsPriority() {
 	SavedPath := _HotstringsOverridesPath
 	Path := A_Temp . "\hotstrings_config_clear_all_priority.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides     := Map()
+	_HotstringsOverrides     := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	try {
 		HotstringsSetOverride("rolls", "ct", "delay", 0.2)
@@ -977,7 +984,7 @@ TestHotstringsConfig_ResolveExtPriority() {
 	ExtPath := A_Temp . "\hotstrings_ext_prio.toml"
 	try FileDelete(Path)
 	try FileDelete(ExtPath)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
 	try {
@@ -1002,3 +1009,1015 @@ TestHotstringsConfig_ResolveExtPriority() {
 }
 Test("HotstringsResolveExt: exposes priority with the package source default + override",
 	TestHotstringsConfig_ResolveExtPriority)
+
+; Real offset source, production projection/rebase and actual public colour/delay
+; writes. Expectations compare an independent semantic source decode or a fresh
+; production reload, never the proposed StoredOffset implementation property.
+_HCO_OffsetRetainsIntent(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {features: Features, overrides: _HotstringsOverrides,
+		path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_offset_intent_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Features := Features.Clone()
+		Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		_HotstringsOverridesPath := Path
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		Offset := (Mode == "unclipped-control" || Mode == "base-roundtrip") ? -0.25 : -1.0
+		Leaf := Mode == "unlimited-control" ? "delay_unlimited = true" : "delay_offset = " . Offset
+		Source := '[magickey]`n' . Leaf . '`ncolor = "#123456"`n'
+			. '[magickey.text_expansion_symbols]`n' . Leaf . '`ncolor = "#234567"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		SourceModel := TOML_ParseDocument(FSReadStrict(Path))
+		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase()
+		HotstringsResolveBumpGen()
+		Initial := HotstringsResolve("magickey", "").Delay
+		if Mode == "unlimited-control"
+			AssertEqual(0, Initial)
+		else if Mode == "unclipped-control" || Mode == "base-roundtrip"
+			AssertEqual(0.5, Initial)
+		else
+			AssertEqual(0.001, Initial, "a finite cancelling offset clamps; it must not become unlimited")
+
+		if Mode == "replace-clipped-delay" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "delay", 0.5))
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", 0.5))
+			AssertEqual(0.5, HotstringsResolve("magickey", "").Delay)
+			AssertEqual(0.5, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+		}
+		if Mode == "base-roundtrip" {
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.1
+			HotstringsOverridesRebase(0.75, 0.1)
+			AssertEqual(0.001, HotstringsResolve("magickey", "").Delay)
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+			HotstringsOverridesRebase(0.1, 0.75)
+		} else if Mode != "colour" {
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 2.0
+			HotstringsOverridesRebase(0.75, 2.0)
+		}
+
+		if Mode == "colour" || Mode == "unclipped-control" || Mode == "unlimited-control" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "color", "#abcdef"),
+				"the actual public writer must acknowledge the unrelated colour change")
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "color", "#fedcba"))
+			Disk := TOML_ParseDocument(FSReadStrict(Path))
+			AssertEqual("#abcdef", Disk["magickey"]["color"])
+			AssertEqual("#fedcba", Disk["magickey"]["text_expansion_symbols"]["color"])
+			if Mode != "unlimited-control" {
+				AssertEqual(SourceModel["magickey"]["delay_offset"], Disk["magickey"]["delay_offset"],
+					"a colour write cannot replace the finite relative intention with its clipped projection")
+				AssertEqual(SourceModel["magickey"]["text_expansion_symbols"]["delay_offset"],
+					Disk["magickey"]["text_expansion_symbols"]["delay_offset"])
+			} else {
+				AssertTrue(Disk["magickey"]["delay_unlimited"] is TOML_Bool)
+				AssertTrue(Disk["magickey"]["delay_unlimited"].Value)
+				AssertFalse(Disk["magickey"].Has("delay_offset"))
+			}
+		}
+
+		Fresh := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase(Fresh)
+		FileLive := HotstringsResolve("magickey", "").Delay
+		SectionLive := HotstringsResolve("magickey", "text_expansion_symbols").Delay
+		AssertEqual(Fresh["magickey"].Delay, FileLive,
+			"live rebasing must equal a genuine reload of the same persistent offset at the same base")
+		AssertEqual(Fresh["magickey"].Sections["text_expansion_symbols"].Delay, SectionLive)
+		if Mode == "rebase"
+			AssertEqual(1.0, FileLive, "source -1.000 plus base 2.000 is finite one second")
+		else if Mode == "base-roundtrip"
+			AssertEqual(0.5, FileLive, "returning the base must restore the pre-clamp finite delay")
+		else if Mode == "replace-clipped-delay" || Mode == "unclipped-control"
+			AssertEqual(1.75, FileLive)
+		else if Mode == "unlimited-control"
+			AssertEqual(0, FileLive)
+		if Mode == "rebase" || Mode == "base-roundtrip"
+			AssertEqual(Source, FSReadStrict(Path), "memory-only rebase must not rewrite the original offset")
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+		Probe := _ConfigWriteLeaseTryAcquire(Path, "offset-fixture-terminal-probe")
+		AssertTrue(Probe is Object)
+		try AssertTrue(_ConfigWriteLeaseOwns(Probe, Path))
+		finally _ConfigWriteLeaseRelease(Probe)
+	} finally {
+		Features := Saved.features
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HCO_Mode in ["rebase", "colour", "base-roundtrip", "unclipped-control", "unlimited-control", "replace-clipped-delay"]
+	Test("HotstringsConfig persistent offset: " . _HCO_Mode, _HCO_OffsetRetainsIntent.Bind(_HCO_Mode))
+
+; A valid source may carry both recognised delay leaves. The shared resolver
+; explicitly gives true unlimited priority over an offset, independently of
+; source line order. The offset here stays above the clamp: this is not the
+; separate clipped-offset information-loss regression.
+_HCU_UnlimitedPrecedence(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {features: Features, overrides: _HotstringsOverrides,
+		path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_unlimited_precedence_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		Features := Features.Clone()
+		Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		_HotstringsOverridesPath := Path
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		switch Mode {
+			case "unlimited-only": Leaves := "delay_unlimited = true`n"
+			case "offset-only": Leaves := "delay_offset = -0.25`n"
+			case "unlimited-first": Leaves := "delay_unlimited = true`ndelay_offset = -0.25`n"
+			case "offset-first": Leaves := "delay_offset = -0.25`ndelay_unlimited = true`n"
+			default: throw ValueError("unknown unlimited precedence control")
+		}
+		Source := "[magickey]`n" . Leaves . "[magickey.text_expansion_symbols]`n" . Leaves
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Document := TOML_ParseDocument(FSReadStrict(Path))
+		if Mode != "offset-only" {
+			AssertTrue(Document["magickey"]["delay_unlimited"] is TOML_Bool)
+			AssertTrue(Document["magickey"]["delay_unlimited"].Value)
+		}
+		if Mode != "unlimited-only"
+			AssertEqual(-0.25, Document["magickey"]["delay_offset"])
+		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase()
+		HotstringsResolveBumpGen()
+		Expected := Mode == "offset-only" ? 0.5 : 0
+		AssertEqual(Expected, HotstringsResolve("magickey", "").Delay,
+			"the actual category resolver must give true unlimited precedence over a finite source offset")
+		AssertEqual(Expected, HotstringsResolve("magickey", "text_expansion_symbols").Delay,
+			"the actual section resolver must use the same unlimited precedence")
+		AssertEqual(Source, FSReadStrict(Path), "reading/applying overrides must not normalize or rewrite source bytes")
+	} finally {
+		Features := Saved.features
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HCU_Mode in ["unlimited-only", "offset-only", "unlimited-first", "offset-first"]
+	Test("HotstringsConfig unlimited precedence: " . _HCU_Mode, _HCU_UnlimitedPrecedence.Bind(_HCU_Mode))
+
+; Canonical TOML spellings must survive an unrelated public setting change.
+_HOS_ValidSyntaxRoundTrip(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {features: Features, overrides: _HotstringsOverrides,
+		path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_syntax_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Features := Features.Clone()
+		Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		Field := InStr(Mode, "color") ? "color" : InStr(Mode, "priority") ? "priority" : "delay_offset"
+		if Mode == "literal-color"
+			Leaf := "color = '#123456'"
+		else if Mode == "quoted-key-color"
+			Leaf := '"color" = "#123456"'
+		else if Mode == "color-control"
+			Leaf := 'color = "#123456"'
+		else if Mode == "signed-offset"
+			Leaf := "delay_offset = +0.250"
+		else if Mode == "exponent-offset"
+			Leaf := "delay_offset = 2.5e-1"
+		else if Mode == "offset-control"
+			Leaf := "delay_offset = 0.250"
+		else if Mode == "separated-priority"
+			Leaf := "priority = 2_5"
+		else
+			Leaf := "priority = 25"
+		Source := "[magickey]`n" . Leaf . "`n[magickey.text_expansion_symbols]`n" . Leaf . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Before := TOML_ParseDocument(FSReadStrict(Path))
+		AssertTrue(Before["magickey"].Has(Field), "the canonical source decoder must recognize the real owned leaf")
+		AssertTrue(HotstringsConfigReload(), "the real loader must admit the source before the public edit")
+		AssertTrue(HotstringsSetOverride("magickey", "", "show_tooltip", false))
+		AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "show_tooltip", false))
+		After := TOML_ParseDocument(FSReadStrict(Path))
+		AssertTrue(After["magickey"].Has(Field), "an unrelated acknowledged save must preserve the category's existing valid leaf")
+		AssertTrue(After["magickey"]["text_expansion_symbols"].Has(Field), "an unrelated acknowledged save must preserve the section's existing valid leaf")
+		AssertEqual(Before["magickey"][Field], After["magickey"][Field])
+		AssertEqual(Before["magickey"]["text_expansion_symbols"][Field], After["magickey"]["text_expansion_symbols"][Field])
+		AssertTrue(After["magickey"]["show_tooltip"] is TOML_Bool)
+		AssertFalse(After["magickey"]["show_tooltip"].Value)
+		AssertTrue(HotstringsConfigReload(), "the written file must remain reloadable by the production owner")
+		Expected := Before["magickey"][Field]
+		Live := HotstringsResolve("magickey", "")
+		AssertEqual(Field == "color" ? Expected : Field == "priority" ? Expected : 0.75 + Expected,
+			Field == "color" ? Live.Color : Field == "priority" ? Live.Priority : Live.Delay)
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		Features := Saved.features
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOS_Mode in ["literal-color", "quoted-key-color", "signed-offset", "exponent-offset", "separated-priority", "color-control", "offset-control", "priority-control"]
+	Test("HotstringsConfig valid syntax persistence: " . _HOS_Mode, _HOS_ValidSyntaxRoundTrip.Bind(_HOS_Mode))
+
+; A projection can ignore future data for reading, but may not erase it on save.
+_HOSP_RefusesUnrepresentableSource(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_preservation_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Source := '[magickey]`ncolor = "#123456"`n'
+		switch Mode {
+			case "unknown-leaf": Source .= 'future_enabled = true`n'
+			case "nested-section": Source .= '[magickey.text_expansion_symbols.future]`nflag = true`n'
+			case "array-category": Source .= '[[future_records]]`nvalue = "keep"`n'
+			case "invalid-owned-type": Source .= 'delay_offset = "future-mode"`n'
+			case "extension-control": Source .= '[ext.demo.main]`npriority = 25`n'
+		}
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		TOML_ParseDocument(FSReadStrict(Path))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		AssertTrue(HotstringsConfigReload(), "the shared read projection may ignore foreign data")
+		Owner := _HotstringsOverrides
+		if Mode == "extension-control" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "show_tooltip", false))
+			Disk := TOML_ParseDocument(FSReadStrict(Path))
+			AssertEqual(25, Disk["ext"]["demo"]["main"]["priority"], "the supported extension route stays writable")
+		} else {
+			AssertFalse(HotstringsSetOverride("magickey", "", "show_tooltip", false),
+				"a serializer cannot acknowledge an edit that loses unrepresented source data")
+			AssertEqual(Source, FSReadStrict(Path), "refusal must preserve the exact foreign source bytes")
+			AssertTrue(_HotstringsOverrides == Owner, "refusal cannot publish a detached candidate")
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSP_Mode in ["unknown-leaf", "nested-section", "array-category", "invalid-owned-type", "extension-control"]
+	Test("HotstringsConfig source preservation: " . _HOSP_Mode, _HOSP_RefusesUnrepresentableSource.Bind(_HOSP_Mode))
+
+_HOL_LegacyDelayRoundTrip(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	global _HotstringsLegacyDelimiters, _HotstringsCommonOverrideAdmitted
+	Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		groups: HotstringGroupConfig, legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted()}
+	Root := A_Temp . "\ergopti_legacy_reload_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+		Leaf := Mode == "offset-control" ? "delay_offset = -0.250" : "delay = 0.500"
+		Source := "[magickey]`n" . Leaf . "`n[magickey.text_expansion_symbols]`n" . Leaf . "`n"
+		if Mode == "global-default-refused" || Mode == "init-global-save"
+			Source := "[_global]`ndelay = 1.500`n" . Source
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		if Mode == "global-default-refused" {
+			Owner := _HotstringsOverrides
+			AssertFalse(HotstringsConfigReload(), "a runtime read cannot acknowledge the cross-file default migration")
+			AssertTrue(_HotstringsOverrides == Owner)
+			AssertEqual(0.75, HotstringsBaseDelay())
+			AssertEqual(Source, FSReadStrict(Path))
+			return
+		}
+		if InStr(Mode, "init-") == 1
+			HotstringsConfigInit(Path)
+		else
+			AssertTrue(HotstringsConfigReload())
+		if Mode == "reload-effective" || Mode == "offset-control" {
+			AssertEqual(0.5, HotstringsResolve("magickey", "").Delay, "runtime reload must apply a recognized absolute delay")
+			AssertEqual(0.5, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+			AssertEqual(Source, FSReadStrict(Path), "the memory-only reload may not rewrite the source")
+		}
+		if Mode == "init-clear" {
+			AssertTrue(HotstringsClearOverride("magickey", "", "delay"))
+			AssertTrue(HotstringsClearOverride("magickey", "text_expansion_symbols", "delay"))
+		} else if Mode == "init-replace" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "delay", 0.25))
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", 0.25))
+		} else {
+			AssertTrue(HotstringsSetOverride("magickey", "", "color", "#123456"))
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "color", "#234567"))
+		}
+		Disk := TOML_ParseDocument(FSReadStrict(Path))
+		for Values in [Disk.Get("magickey", Map()), Disk.Has("magickey") ? Disk["magickey"].Get("text_expansion_symbols", Map()) : Map()] {
+			if Mode == "init-clear" {
+				AssertFalse(Values.Has("delay"), "explicit clear retires legacy intention too")
+				AssertFalse(Values.Has("delay_offset"))
+			} else {
+				AssertTrue(Values.Has("delay") || Values.Has("delay_offset"), "an unrelated acknowledged save cannot lose the existing absolute delay")
+				Effective := Values.Has("delay") ? Values["delay"] : 0.75 + Values["delay_offset"]
+				AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, Effective)
+			}
+		}
+		if Mode == "init-global-save" {
+			AssertEqual(1.5, Disk["_global"]["delay"], "a pre-boot unrelated write must preserve the absolute default intent")
+			AssertFalse(Disk["_global"].Has("delay_offset"), "the legacy default is not an ordinary category offset")
+			AfterSave := FSReadStrict(Path), Owner := _HotstringsOverrides
+			AssertFalse(HotstringsConfigReload(), "the preserved pending default still requires the startup migration")
+			AssertTrue(_HotstringsOverrides == Owner)
+			AssertEqual(AfterSave, FSReadStrict(Path))
+			AssertEqual(0.75, HotstringsBaseDelay())
+			return
+		}
+		AssertTrue(HotstringsConfigReload())
+		if Mode != "init-clear" {
+			AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, HotstringsResolve("magickey", "").Delay)
+			AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+		}
+	} finally {
+		Features := Saved.features, _HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path, HotstringGroupConfig := Saved.groups
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOL_Mode in ["reload-effective", "reload-save", "init-save", "init-clear", "init-replace", "offset-control", "global-default-refused", "init-global-save"]
+	Test("HotstringsConfig legacy runtime delay: " . _HOL_Mode, _HOL_LegacyDelayRoundTrip.Bind(_HOL_Mode))
+
+_HOUTF8_ExactSource(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_utf8_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	EmptyOwner := _ParseOverrides(Path)
+	try {
+		AssertFalse(A_IsSuspended)
+		Invalid := Mode == "invalid-byte" || Mode == "invalid-save"
+		Value := Invalid ? "X" : "é" . Chr(0x1F600)
+		Source := Mode == "empty-control" ? "" : "[magickey]`ncolor = " . TOML_RenderString(Value) . "`n"
+		if Mode == "bom-unicode"
+			Source := Chr(0xFEFF) . Source
+		Bytes := FSUtf8Bytes(Source)
+		if Invalid {
+			Offset := InStr(Source, "X", true) - 1
+			AssertTrue(Offset >= 0)
+			NumPut("UChar", 0xFF, Bytes, Offset)
+		}
+		Stream := FileOpen(Path, "w", "UTF-8-RAW")
+		AssertTrue(IsObject(Stream))
+		try {
+			if Bytes.Size
+				AssertEqual(Bytes.Size, Stream.RawWrite(Bytes, Bytes.Size))
+			else
+				AssertEqual(0, Stream.Length, "opening an empty owned fixture must create a genuinely zero-byte file")
+		} finally Stream.Close()
+		Initial := FSReadBytesStrict(Path)
+		AssertEqual(Bytes.Size, Initial.Size)
+		if Bytes.Size
+			AssertEqual(Bytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Bytes, "Ptr", Initial, "UPtr", Bytes.Size, "UPtr"))
+		if Mode == "bom-unicode"
+			AssertEqual(0xEF, NumGet(Initial, 0, "UChar"), "the fixture physically contains its input UTF-8 BOM")
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := EmptyOwner
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		Owner := _HotstringsOverrides
+		if Invalid {
+			AssertFalse(FSReadUtf8Exact(Path) is String, "the native exact reader must observe malformed UTF-8")
+			Status := FSReadWithStatus(Path)
+			AssertEqual(FS_STATUS_ERROR, Status["status"], "the actual existing source must classify as an encoding/read error, never absence")
+			AssertEqual("", Status["content"])
+			if Mode == "invalid-save"
+				AssertFalse(HotstringsSetOverride("magickey", "", "show_tooltip", false), "a genuine native save must refuse before normalizing malformed source bytes")
+			AssertFalse(HotstringsConfigReload(), "invalid source bytes cannot publish normalized replacement data")
+			AssertTrue(_HotstringsOverrides == Owner)
+			RefusedGlobal := false
+			try _ParseGlobalKey(Path, "word_delimiters")
+			catch ValueError
+				RefusedGlobal := true
+			AssertTrue(RefusedGlobal, "the sibling legacy reader must refuse the same malformed bytes")
+			AssertFalse(HotstringsSetOverride("magickey", "", "show_tooltip", false), "even a valid unrelated edit cannot overwrite undecodable source data")
+			AssertTrue(_HotstringsOverrides == Owner)
+			After := FSReadBytesStrict(Path)
+			AssertEqual(Initial.Size, After.Size)
+			AssertEqual(Initial.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Initial, "Ptr", After, "UPtr", Initial.Size, "UPtr"))
+		} else {
+			AssertTrue(FSReadUtf8Exact(Path) is String, "an empty or BOM-bearing valid UTF-8 source remains readable")
+			AssertTrue(HotstringsConfigReload())
+			AssertEqual("", _ParseGlobalKey(Path, "word_delimiters"))
+			if Mode != "empty-control"
+				AssertEqual(Value, _HotstringsOverrides["magickey"].Color)
+			else
+				AssertEqual(0, _HotstringsOverrides.Count)
+			AssertTrue(HotstringsSetOverride("magickey", "", "show_tooltip", false))
+			Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			if Mode != "empty-control"
+				AssertEqual(Value, Disk["magickey"]["color"], "valid Unicode must survive a genuine unrelated native save")
+			AssertTrue(HotstringsConfigReload())
+			if Mode != "empty-control"
+				AssertEqual(Value, _HotstringsOverrides["magickey"].Color)
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOUTF8_Mode in ["invalid-byte", "invalid-save", "unicode-control", "bom-unicode", "empty-control"]
+	Test("HotstringsConfig exact source UTF-8: " . _HOUTF8_Mode, _HOUTF8_ExactSource.Bind(_HOUTF8_Mode))
+
+; Shape validation of today's file cannot grant yesterday's Map write authority.
+_HOSS_ExternalSourceSurvivesSave(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_external_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		A := '[magickey]`ncolor = "#111111"`npriority = 10`nshow_tooltip = true`n'
+			. '[magickey.text_expansion_symbols]`ncolor = "#111111"`npriority = 10`nshow_tooltip = true`n'
+		B := StrReplace(StrReplace(A, "#111111", "#222222", true), "priority = 10", "priority = 25", true)
+		if Mode == "external-new-category"
+			B := A . '[rolls]`npriority = 77`ncolor = "#777777"`n'
+		if Mode == "unchanged-control"
+			B := A
+		AssertTrue(FSWriteCreateDurable(Path, A))
+		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		AssertTrue(HotstringsConfigReload(), "the real loader first admits source A")
+		AssertEqual(10, _HotstringsOverrides["magickey"].Priority)
+		AssertEqual("#111111", _HotstringsOverrides["magickey"].Color)
+		AssertTrue(FSWriteDurable(Path, B), "an external editor finishes writing valid source B before the user's next click")
+		External := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		if Mode == "reloaded-control"
+			AssertTrue(HotstringsConfigReload(), "an explicit genuine reload admits source B")
+		Owner := _HotstringsOverrides
+		Section := Mode == "external-section-set" ? "text_expansion_symbols" : ""
+		Result := Mode == "external-clear"
+			? HotstringsClearOverride("magickey", "", "show_tooltip")
+			: HotstringsSetOverride("magickey", Section, "show_tooltip", false)
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		if Mode == "external-new-category" {
+			AssertTrue(Disk.Has("rolls"), "a full-state edit cannot delete a category the external editor already committed")
+			AssertEqual(77, Disk["rolls"]["priority"])
+			AssertEqual("#777777", Disk["rolls"]["color"])
+		}
+		for Key in ["color", "priority"] {
+			AssertEqual(External["magickey"][Key], Disk["magickey"][Key], "the real native save must preserve the newer external category " . Key)
+			AssertEqual(External["magickey"]["text_expansion_symbols"][Key], Disk["magickey"]["text_expansion_symbols"][Key], "the real native save must preserve the newer external section " . Key)
+		}
+		if Mode == "unchanged-control" || Mode == "reloaded-control"
+			AssertTrue(Result, "an unchanged or explicitly reloaded source stays writable")
+		if Result {
+			Target := Section == "" ? Disk["magickey"] : Disk["magickey"][Section]
+			if Mode == "external-clear"
+				AssertFalse(Target.Has("show_tooltip"))
+			else {
+				AssertTrue(Target["show_tooltip"] is TOML_Bool)
+				AssertFalse(Target["show_tooltip"].Value)
+			}
+			AssertEqual(External["magickey"]["color"], HotstringsResolve("magickey", "").Color)
+		} else {
+			AssertEqual(B, FSReadUtf8Exact(Path), "source-conflict refusal must retain every exact byte from the external editor")
+			AssertTrue(_HotstringsOverrides == Owner, "refusal must preserve the old live owner until an explicit reload")
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+		Probe := _ConfigWriteLeaseTryAcquire(Path, "external-source-fixture-terminal-probe")
+		AssertTrue(Probe is Object)
+		try AssertTrue(_ConfigWriteLeaseOwns(Probe, Path))
+		finally _ConfigWriteLeaseRelease(Probe)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSS_Mode in ["external-category-set", "external-section-set", "external-clear", "external-new-category", "unchanged-control", "reloaded-control"]
+	Test("HotstringsConfig external source ownership: " . _HOSS_Mode, _HOSS_ExternalSourceSurvivesSave.Bind(_HOSS_Mode))
+
+_HOSST_ExternalSourceChangesWhileStaging(ChangeSource) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_stage_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		A := '[magickey]`ncolor = "#111111"`npriority = 10`n'
+		C := ChangeSource ? '[magickey]`ncolor = "#333333"`npriority = 35`n' : A
+		AssertTrue(FSWriteCreateDurable(Path, A))
+		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		AssertTrue(HotstringsConfigReload())
+		Owner := _HotstringsOverrides, State := {Calls: 0}
+		WriteStage(StagePath, Content) {
+			State.Calls += 1
+			; The seam observes the existing cutpoint but delegates staging to
+			; the genuine durable writer; no fake result or filesystem is used.
+			AssertTrue(FSWriteDurable(StagePath, Content))
+			AssertTrue(FSWriteDurable(Path, C), "the external source changes only after the real candidate is staged")
+			return 1
+		}
+		Result := HotstringsSetOverride("magickey", "", "show_tooltip", false, WriteStage)
+		AssertEqual(1, State.Calls)
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(ChangeSource ? 35 : 10, Disk["magickey"]["priority"], "the final native commit cannot bless newly read C for a candidate constructed from A")
+		AssertEqual(ChangeSource ? "#333333" : "#111111", Disk["magickey"]["color"])
+		if ChangeSource {
+			AssertFalse(Result, "the stale staged candidate has no authority over source C")
+			AssertEqual(C, FSReadUtf8Exact(Path))
+			AssertTrue(_HotstringsOverrides == Owner)
+		} else {
+			AssertTrue(Result, "the genuine stage writer remains supported when source is unchanged")
+			AssertFalse(Disk["magickey"]["show_tooltip"].Value)
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+Test("HotstringsConfig staged source ownership: external change survives the final native commit", _HOSST_ExternalSourceChangesWhileStaging.Bind(true))
+Test("HotstringsConfig staged source ownership: unchanged real stage remains writable", _HOSST_ExternalSourceChangesWhileStaging.Bind(false))
+
+_HOSGATE_FinalSourceAdmission(ChangeSource) {
+	Root := A_Temp . "\ergopti_override_gate_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		A := '[magickey]`ncolor = "#111111"`npriority = 10`n'
+		C := ChangeSource ? '[magickey]`ncolor = "#444444"`npriority = 45`n' : A
+		AssertTrue(FSWriteCreateDurable(Path, A))
+		Candidate := _ParseOverrides(Path)
+		Candidate["magickey"].ShowTooltip := false
+		State := {Staged: false, Admissions: 0, Edits: 0}
+		WriteStage(StagePath, Content) {
+			Written := FSWriteDurable(StagePath, Content)
+			State.Staged := Written == 1
+			return Written
+		}
+		Admit() {
+			State.Admissions += 1
+			if State.Staged {
+				AssertTrue(FSWriteDurable(Path, C), "a reentrant admission finishes writing C before native replacement")
+				State.Edits += 1
+			}
+			return 1
+		}
+		Result := _SaveOverrides(Candidate, WriteStage, 0, Path, Admit)
+		AssertTrue(State.Staged && State.Edits > 0, "the genuine candidate stage and final logical admission must both be reached")
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(ChangeSource ? 45 : 10, Disk["magickey"]["priority"], "the final source comparison must follow reentrant logical admission")
+		AssertEqual(ChangeSource ? "#444444" : "#111111", Disk["magickey"]["color"])
+		if ChangeSource {
+			AssertFalse(Result)
+			AssertEqual(C, FSReadUtf8Exact(Path))
+		} else {
+			AssertTrue(Result)
+			AssertFalse(Disk["magickey"]["show_tooltip"].Value)
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally DirDelete(Root, true)
+}
+Test("HotstringsConfig native source gate: admission source edit survives the true native boundary", _HOSGATE_FinalSourceAdmission.Bind(true))
+Test("HotstringsConfig native source gate: unchanged admission still commits", _HOSGATE_FinalSourceAdmission.Bind(false))
+
+
+_HOSDIRECT_ReadReceiptIsNotBorrowed(CloneOwner) {
+	Root := A_Temp . "\ergopti_override_direct_origin_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		A := '[magickey]`ncolor = "#111111"`npriority = 10`n'
+		AssertTrue(FSWriteCreateDurable(Path, A))
+		Read := _ParseOverrides(Path)
+		if CloneOwner {
+			Candidate := Read.Clone()
+			Candidate["magickey"] := _HotstringsCloneOverrideCategory(Read["magickey"])
+		} else
+			Candidate := Read
+		Candidate["magickey"].Color := "#222222"
+		Result := _SaveOverrides(Candidate, 0, 0, Path)
+		if CloneOwner {
+			AssertEqual(A, FSReadUtf8Exact(Path), "a copied Map cannot borrow the original Map's read authority")
+			AssertFalse(Result, "an explicit clone needs its separately captured origin")
+			AssertEqual("#111111", Read["magickey"].Color, "the detached clone cannot mutate the actual read owner")
+		} else {
+			AssertTrue(Result, "the actual read Map retains its direct atomic write-only contract")
+			Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual("#222222", Disk["magickey"]["color"])
+			AssertEqual(10, Disk["magickey"]["priority"])
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally DirDelete(Root, true)
+}
+Test("HotstringsConfig direct source authority: a cloned Map cannot borrow read ownership", _HOSDIRECT_ReadReceiptIsNotBorrowed.Bind(true))
+Test("HotstringsConfig direct source authority: the actual read Map remains writable", _HOSDIRECT_ReadReceiptIsNotBorrowed.Bind(false))
+
+
+_HOLACK_DefaultNeedsDurableAck(Mode) {
+	global Features, ConfigurationFile, _HotstringsOverrides, _HotstringsOverridesPath
+	global _HotstringsLegacyDelimiters, _HotstringsCommonOverrideAdmitted, HotstringGroupConfig
+	Gates := MasterGateState()
+	Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted(),
+		groups: HotstringGroupConfig, initialized: Gates["initialized"]}
+	Root := A_Temp . "\ergopti_legacy_default_ack_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	Blocker := 0
+	try {
+		Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		Gates["initialized"] := false
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		HasDefault := Mode != "no-default-lease-control"
+		Source := (HasDefault ? "[_global]`ndelay = 1.500`n" : "")
+			. '[magickey]`ndelay = 2.000`ncolor = "#123456"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		HotstringsConfigInit(Path)
+		ConfigBefore := FSReadUtf8Exact(ConfigurationFile)
+		AssertEqual(0.75, TOML_ParseDocument(ConfigBefore)["hotstrings"]["expansion_delay"])
+		Held := Mode == "base-lease-refusal" || Mode == "base-refusal-color" || Mode == "no-default-lease-control" || Mode == "explicit-after-base-refusal"
+		if Held {
+			Blocker := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "independent-config-owner-during-legacy-default")
+			AssertTrue(Blocker is Object, "a real separate config writer must own the exact destination")
+		} else if Mode == "explicit-after-override-refusal" {
+			Blocker := _ConfigWriteLeaseTryAcquire(Path, "independent-override-owner-after-base-ack")
+			AssertTrue(Blocker is Object)
+		}
+		State := {Calls: 0}
+		RefuseBase(Seconds) {
+			State.Calls += 1
+			AssertEqual(1.5, Seconds)
+			if Mode == "sibling-base-commit"
+				AssertTrue(WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, 2.25), "the sibling really commits a different base through the native writer")
+			return false
+		}
+		Result := Mode == "seam-base-refusal" || Mode == "sibling-base-commit" ? HotstringsOverridesBoot(RefuseBase) : HotstringsOverridesBoot()
+		if Mode == "explicit-after-base-refusal" || Mode == "explicit-after-override-refusal" {
+			AssertFalse(Result, "the first migration must observe the genuine held destination")
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+			if Mode == "explicit-after-override-refusal"
+				AssertEqual(1.5, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"], "the base really acknowledged before override retirement was refused")
+			else
+				AssertEqual(ConfigBefore, FSReadUtf8Exact(ConfigurationFile))
+			AssertTrue(_ConfigWriteLeaseRelease(Blocker))
+			Blocker := 0
+			AssertTrue(HotstringsSetBaseDelay(2.25), "an explicit newer choice must finish pending legacy work before committing")
+			AssertEqual(2.25, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"])
+			; Reconstruct the effective base from its actual durable image and run
+			; the real startup readers again, rather than trusting the RAM mirror.
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"]
+			HotstringsConfigInit(Path)
+			AssertTrue(HotstringsOverridesBoot())
+			AssertEqual(2.25, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"], "fresh boot cannot resurrect the older default after the explicit choice acknowledged")
+			AssertEqual(2.25, HotstringsBaseDelay())
+			AssertFalse(TOML_ParseDocument(FSReadUtf8Exact(Path)).Has("_global"))
+			AssertEqual(2.75, HotstringsResolve("magickey", "").Delay, "the category retains its relative distance through pending work and the later base change")
+		} else if Mode == "sibling-base-commit" {
+			AssertFalse(Result)
+			AssertEqual(1, State.Calls)
+			AssertEqual(2.25, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"])
+			AssertEqual(2.25, HotstringsBaseDelay(), "the failed old migration cannot overwrite the sibling's freshly committed base in the same Feature node")
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+		} else if Mode == "base-success-control" {
+			AssertTrue(Result, "the genuine unblocked cross-file migration must complete")
+			AssertEqual(1.5, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"])
+			AssertEqual(1.5, HotstringsBaseDelay())
+			Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertFalse(Disk.Has("_global"))
+			AssertEqual(0.5, Disk["magickey"]["delay_offset"])
+		} else if Mode == "no-default-lease-control" {
+			AssertTrue(Result, "a category-only migration requires no config.toml write")
+			AssertEqual(ConfigBefore, FSReadUtf8Exact(ConfigurationFile))
+			Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertFalse(Disk.Has("_global"))
+			AssertEqual(1.25, Disk["magickey"]["delay_offset"])
+		} else {
+			AssertEqual(ConfigBefore, FSReadUtf8Exact(ConfigurationFile), "the real refused destination write cannot have committed a new base")
+			if Held
+				AssertTrue(_ConfigWriteLeaseOwns(Blocker, ConfigurationFile), "the genuine competing config owner stays held")
+			if Mode == "base-refusal-color" {
+				SavedColor := HotstringsSetOverride("magickey", "", "color", "#abcdef")
+				Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+				AssertTrue(Disk.Has("_global"), "a later unrelated save cannot erase a default whose destination never acknowledged it")
+				AssertEqual(1.5, Disk["_global"]["delay"])
+				if SavedColor
+					AssertEqual("#abcdef", Disk["magickey"]["color"])
+				else
+					AssertEqual(Source, FSReadUtf8Exact(Path))
+			} else
+				AssertEqual(Source, FSReadUtf8Exact(Path), "failed cross-file default migration must retain its exact legacy source for next boot")
+			AssertFalse(Result, "the migration cannot acknowledge retirement after its default destination refused")
+			if Mode == "seam-base-refusal"
+				AssertEqual(1, State.Calls)
+		}
+		if Mode == "base-success-control" || Mode == "no-default-lease-control" {
+			Fresh := _ParseOverrides(Path)
+			HotstringsOverridesApplyBase(Fresh)
+			AssertEqual(2.0, Fresh["magickey"].Delay, "the category intent survives a genuine next load against the persisted base")
+		}
+	} finally {
+		if Blocker is Object
+			_ConfigWriteLeaseRelease(Blocker)
+		Features := Saved.features, _HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringGroupConfig := Saved.groups, Gates["initialized"] := Saved.initialized
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOLACK_Mode in ["base-lease-refusal", "base-refusal-color", "seam-base-refusal", "base-success-control", "no-default-lease-control"]
+	Test("HotstringsConfig legacy default durable ACK: " . _HOLACK_Mode,
+		_HTBS_Run.Bind("legacy-default-ack-" . _HOLACK_Mode,
+			"[hotstrings]`nexpansion_delay = 0.750`n", _HOLACK_DefaultNeedsDurableAck.Bind(_HOLACK_Mode)))
+
+_HOUP_PublicBaseKeepsEffectiveDuration(Mode) {
+	global Features, ConfigurationFile, TICK_MAX_DURATION_MS, LastSentCharacterKeyTime
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HotstringsLegacyDelimiters
+	global _HotstringsCommonOverrideAdmitted, HotstringGroupConfig
+	Gates := MasterGateState()
+	Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted(),
+		groups: HotstringGroupConfig, initialized: Gates["initialized"], times: LastSentCharacterKeyTime}
+	Root := A_Temp . "\ergopti_delay_upper_domain_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml"
+	Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "the fixture must affirmatively acquire its exclusive root before any write")
+		Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		Gates["initialized"] := false
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		LastSentCharacterKeyTime := LastSentCharacterKeyTime.Clone()
+		HotstringsConfigInit(Path)
+		AssertTrue(HotstringsOverridesBoot())
+		InitialDelay := Mode == "unlimited-control" ? 0 : Mode == "zero-offset-control" ? 0.75 : 1.0
+		AssertTrue(HotstringsSetOverride("magickey", "", "delay", InitialDelay), "the real public category writer must produce the initial offset")
+		AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", InitialDelay), "the real public section writer must produce the initial offset")
+		Source := FSReadUtf8Exact(Path)
+		Before := FSReadUtf8Exact(ConfigurationFile)
+		Maximum := TICK_MAX_DURATION_MS / 1000
+		Base := Mode == "below-cap-control" ? Maximum - 1.0 : Maximum
+		AssertTrue(TickTryDurationMsFromSeconds(Base, &BaseMs), "the exact UI-bound public setter input must be valid")
+		Committed := HotstringsSetBaseDelay(Base)
+		if !Committed {
+			AssertEqual("overflow", Mode, "valid controls must not be rejected conservatively")
+			AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "a safe refusal cannot persist only the invalid base transition")
+			AssertEqual(0.75, HotstringsBaseDelay())
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+			return
+		}
+		AssertEqual(Base, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"], "the real config writer acknowledged the base")
+		for Section in ["", "text_expansion_symbols"] {
+			Resolved := HotstringsResolve("magickey", Section)
+			AssertTrue(TickTryDurationMsFromSeconds(Resolved.Delay, &EffectiveMs), "an acknowledged valid base cannot make an existing override permanently expire outside the engine duration domain")
+			Now := A_TickCount
+			LastSentCharacterKeyTime["x"] := Now
+			AssertFalse(IsTimeActivationExpired("x", Resolved.Delay, Now), "the actual engine time gate must accept a previous scalar sent now")
+		}
+		AssertEqual(Source, FSReadUtf8Exact(Path), "a base rebase must not destroy the stored relative intention")
+		AssertTrue(HotstringsSetBaseDelay(0.75))
+		Expected := Mode == "unlimited-control" ? 0 : Mode == "zero-offset-control" ? 0.75 : 1.0
+		AssertEqual(Expected, HotstringsResolve("magickey", "").Delay, "returning the base restores the original offset rather than persisting an upper clamp")
+		AssertEqual(Expected, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+	} finally {
+		Features := Saved.features, _HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringGroupConfig := Saved.groups, Gates["initialized"] := Saved.initialized
+		LastSentCharacterKeyTime := Saved.times
+		HotstringsResolveBumpGen()
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _HOUP_Mode in ["overflow", "below-cap-control", "zero-offset-control", "unlimited-control"]
+	Test("HotstringsConfig public base upper duration: " . _HOUP_Mode,
+		_HTBS_Run.Bind("upper-duration-" . _HOUP_Mode, "[hotstrings]`nexpansion_delay = 0.750`n",
+			_HOUP_PublicBaseKeepsEffectiveDuration.Bind(_HOUP_Mode)))
+
+Test("HotstringsConfig legacy default durable ACK: sibling-base-commit",
+	_HTBS_Run.Bind("legacy-default-ack-sibling-base-commit", "[hotstrings]`nexpansion_delay = 0.750`n",
+		_HOLACK_DefaultNeedsDurableAck.Bind("sibling-base-commit")))
+
+for _HOLACK_PendingMode in ["explicit-after-base-refusal", "explicit-after-override-refusal"]
+	Test("HotstringsConfig legacy default durable ACK: " . _HOLACK_PendingMode,
+		_HTBS_Run.Bind("legacy-default-ack-" . _HOLACK_PendingMode, "[hotstrings]`nexpansion_delay = 0.750`n",
+			_HOLACK_DefaultNeedsDurableAck.Bind(_HOLACK_PendingMode)))
+
+_HSAC_LastAuthorizer(ChangeSource) {
+	Root := A_Temp . "\ergopti_override_authorizer_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	A := '[magickey]`ncolor = "#111111"`npriority = 10`n'
+	B := ChangeSource ? '[magickey]`ncolor = "#444444"`npriority = 45`n' : A
+	State := {calls: 0, criticalEdits: 0, observedStage: 0, nativeWriteAck: 0}
+	Admit() {
+		State.calls += 1
+		if A_IsCritical {
+			Count := 0
+			loop files Path . "." . A_ScriptHwnd . "-*.tmp", "F"
+				Count += 1
+			if Count {
+				State.observedStage += Count
+				State.nativeWriteAck := FSWriteDurable(Path, B)
+				if State.nativeWriteAck == 1
+					State.criticalEdits += 1
+			}
+		}
+		return 1
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, A))
+		Candidate := _ParseOverrides(Path)
+		Candidate["magickey"].ShowTooltip := false
+		Result := _SaveOverrides(Candidate, 0, 0, Path, Admit)
+		Actual := FSReadUtf8Exact(Path), Disk := TOML_ParseDocument(Actual)
+		_TestPrint("# override-last-authorizer change_source=" . ChangeSource . " result=" . Result
+			. " calls=" . State.calls . " critical_edits=" . State.criticalEdits
+			. " observed_stage=" . State.observedStage . " native_write_ack=" . State.nativeWriteAck
+			. " disk_color=" . Disk["magickey"]["color"] . " disk_priority=" . Disk["magickey"]["priority"])
+		AssertTrue(State.observedStage > 0, "the real default writer must already own its native candidate stage")
+		AssertTrue(State.criticalEdits > 0, "the arbitrary authorizer must reach its actual final Critical callback")
+		AssertEqual(1, State.nativeWriteAck, "the competing source image must actually be durably written")
+		AssertEqual(ChangeSource ? 45 : 10, Disk["magickey"]["priority"])
+		AssertEqual(ChangeSource ? "#444444" : "#111111", Disk["magickey"]["color"])
+		if ChangeSource {
+			AssertFalse(Result, "an arbitrary final authorizer cannot lend its ACK to an older source image")
+			AssertEqual(B, Actual, "the complete image written by the real callback remains authoritative")
+		} else {
+			AssertTrue(Result, "legacy custom authorization still permits unchanged-source default publication")
+			AssertFalse(Disk["magickey"]["show_tooltip"].Value)
+		}
+	} finally {
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSAC_Change in [true, false]
+	Test("hotstring override authorization: last arbitrary callback source edit=" . _HSAC_Change
+		. " (override-last-authorizer-source)", _HSAC_LastAuthorizer.Bind(_HSAC_Change))
+
+_HSBR_PublicNamespace(ExtensionControl) {
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Root := A_Temp . "\ergopti_override_namespace_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	Category := ExtensionControl ? "ext.demo" : "ext"
+	try {
+		AssertFalse(_ConfigFullSaveHasPending())
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, '[rolls]`ncolor = "#111111"`n'))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		Before := FSReadBytesStrict(Path)
+		Result := HotstringsSetOverride(Category, "", "color", "#222222")
+		AfterSetter := FSReadBytesStrict(Path)
+		Reloaded := HotstringsConfigReload()
+		Retained := _HotstringsOverrides.Has(Category)
+		ReloadedColor := Retained ? _HotstringsOverrides[Category].Color : "<absent>"
+		NextWrite := HotstringsSetOverride("rolls", "", "priority", 23)
+		_TestPrint("# override-reserved-root category=" . Category . " result=" . Result
+			. " reload=" . Reloaded . " retained=" . Retained . " reloaded_color=" . ReloadedColor
+			. " next_write=" . NextWrite . " before_bytes=" . Before.Size . " setter_bytes=" . AfterSetter.Size)
+		AssertTrue(Reloaded, "the actual reload must complete before a persistence roundtrip verdict")
+		if Result {
+			AssertTrue(Retained, "a durable setter ACK must survive the actual override loader")
+			AssertEqual("#222222", ReloadedColor)
+		} else {
+			AssertFalse(ExtensionControl, "a real extension category remains a supported positive control")
+			AssertEqual(Before.Size, AfterSetter.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", AfterSetter, "UPtr", Before.Size, "UPtr"), "a reserved unsupported category must refuse before replacing the original source")
+		}
+		AssertTrue(NextWrite, "a category setter cannot turn its source into an unrepresentable document that blocks unrelated valid changes")
+		AssertEqual(23, TOML_ParseDocument(FSReadUtf8Exact(Path))["rolls"]["priority"])
+	} finally {
+		_HotstringsOverridesPath := SavedPath, _HotstringsOverrides := SavedMap, _HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSBR_Control in [false, true]
+	Test("hotstring override reserved namespace: extension_control=" . _HSBR_Control
+		. " (override-reserved-root-roundtrip)", _HSBR_PublicNamespace.Bind(_HSBR_Control))
+
+
+_HSQS_LegacyFiniteIntention(Kind) {
+ global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+ global _HotstringsLegacyDelimiters, _HotstringsCommonOverrideAdmitted, LastSentCharacterKeyTime
+ Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+  groups: HotstringGroupConfig, legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted(),
+  times: LastSentCharacterKeyTime}
+ Root := A_Temp . "\ergopti_delay_zero_sentinel_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+ Created := FSCreateDirectoryExclusiveStrict(Root)
+ AssertEqual(1, Created)
+ Path := Root . "\overrides.toml"
+ Raw := Kind == "positive-sub-ms" ? "0.0004" : (Kind == "one-ms" ? "0.001" : "0")
+ Original := Kind == "positive-sub-ms" ? 0.0004 : (Kind == "one-ms" ? 0.001 : 0)
+ try {
+  AssertFalse(A_IsSuspended)
+  Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+  Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+  HotstringGroupConfig := HotstringGroupConfig.Clone()
+  _HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+  Source := "[magickey]`ndelay = " . Raw . "`n[magickey.text_expansion_symbols]`ndelay = " . Raw . "`n"
+  AssertEqual(1, FSWriteCreateDurable(Path, Source))
+  HotstringsConfigInit(Path)
+  AssertEqual(Original, _HotstringsOverrides["magickey"].LegacyDelay, "The actual typed TOML reader must admit the complete original finite intention")
+  AssertEqual(Original, _HotstringsOverrides["magickey"].Sections["text_expansion_symbols"].LegacyDelay)
+  AssertTrue(TickTryDurationMsFromSeconds(Original, &QuantizedMs), "The existing native duration policy admits this source")
+  LastSentCharacterKeyTime := Map("a", 1000)
+  ExpectedExpired := IsTimeActivationExpired("a", Original, 1002)
+  AssertEqual(Original > 0, ExpectedExpired, "The original positive delay is a finite same-tick gate; explicit zero is unlimited")
+  AssertTrue(HotstringsSetOverride("magickey", "", "color", "#123456"), "An unrelated real public metadata save must be acknowledged")
+  Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+  AssertEqual("#123456", Disk["magickey"]["color"])
+  AssertTrue(HotstringsConfigReload(), "The actual acknowledged image must reload through the genuine override owner")
+  for Section in ["", "text_expansion_symbols"] {
+   Resolved := HotstringsResolve("magickey", Section)
+   ActualExpired := IsTimeActivationExpired("a", Resolved.Delay, 1002)
+   _TestPrint("# delay-zero-sentinel kind=" . Kind . " original=" . Raw . " quantized_ms=" . QuantizedMs
+    . " section=" . Section . " resolved=" . Resolved.Delay . " expected_expired=" . ExpectedExpired . " actual_expired=" . ActualExpired)
+   AssertEqual(Original == 0, Resolved.Delay == 0, "Millisecond quantization cannot turn an acknowledged finite source into the unlimited sentinel")
+   AssertEqual(ExpectedExpired, ActualExpired, "An unrelated save cannot remove the original finite activation gate")
+  }
+ } finally {
+  Features := Saved.features, _HotstringsOverrides := Saved.overrides
+  _HotstringsOverridesPath := Saved.path, HotstringGroupConfig := Saved.groups
+  _HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+  LastSentCharacterKeyTime := Saved.times
+  HotstringsResolveBumpGen()
+  _TOML_InvalidateParseCache(Path)
+  if Created
+   DirDelete(Root, true)
+ }
+}
+for _HSQS_Kind in ["positive-sub-ms", "one-ms", "explicit-zero"]
+ Test("Hotstring delay quantization preserves its zero sentinel: " . _HSQS_Kind . " (hotstring-delay-zero-sentinel-domain)", _HSQS_LegacyFiniteIntention.Bind(_HSQS_Kind))

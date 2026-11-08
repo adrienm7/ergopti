@@ -41,6 +41,7 @@ local function run(scenario)
 				function operation:is_settled() return self.closed end
 				function operation:cancel() self.cancelled = true; self.closed = self.closed or not world.hold_cancel; return self.closed end
 				world.requests[#world.requests + 1] = { target = target, on_done = on_done, operation = operation }
+				if world.during_request then world.during_request() end
 				if world.refuse_synchronously or world.refuse_without_callback then
 					operation.started, operation.closed = false, true
 					if world.refuse_synchronously then on_done(false, "HTTP preflight refused") end
@@ -67,6 +68,23 @@ local function answer(world, loaded, failure)
 end
 
 helpers.describe("Ollama model warmup chain", function()
+	helpers.it("linux-warmup-acquisition: reentrant stop retains and cancels the returned transport", function()
+		run(function(Warmup, world)
+			world.hold_cancel = true
+			world.during_request = function()
+				helpers.assert_eq(Warmup.stop(), false, "construction has not returned its transport")
+				helpers.assert_true(Warmup.pending())
+			end
+			helpers.assert_true(Warmup.schedule("enable"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			local operation = world.requests[1].operation
+			helpers.assert_true(operation.cancelled)
+			helpers.assert_true(Warmup.pending())
+			operation.closed = true
+			helpers.assert_true(Warmup.stop())
+			helpers.assert_eq(Warmup.pending(), false)
+		end)
+	end)
 	helpers.it("linux-warmup-refusal-debt: retains a real rejected native deadline until its close callback", function()
 		local native = require("luv")
 		local Deadline = require("infra.managed_http_deadline")

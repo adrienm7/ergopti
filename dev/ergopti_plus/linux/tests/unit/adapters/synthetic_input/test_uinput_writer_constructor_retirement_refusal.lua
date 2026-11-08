@@ -89,6 +89,43 @@ helpers.describe("uinput_writer: constructor and retirement refusal boundaries",
 		helpers.assert_eq(recorded.closed, 1)
 	end)
 
+	helpers.it("acknowledges unowned uinput retirement only after both native receipts", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_true(writer.open())
+		helpers.assert_true(writer.close())
+		helpers.assert_eq(recorded.closed, 1)
+		helpers.assert_eq(writer.has_output_debt(), false)
+		helpers.assert_eq(writer.is_open(), false)
+		helpers.assert_true(writer.close(), "closing an already retired channel is idempotent")
+	end)
+
+	for _, failure in ipairs({ "destroy", "close", "close_throw" }) do
+		helpers.it("retains unowned uinput retirement debt after " .. failure, function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			local ioctl = recorded.backend.ioctl
+			recorded.backend.ioctl = function(fd, request, arg)
+				if failure == "destroy" and request == writer.UI_DEV_DESTROY then return false end
+				return ioctl(fd, request, arg)
+			end
+			recorded.backend.close = function()
+				recorded.closed = recorded.closed + 1
+				if failure == "close_throw" then error("controlled close refusal") end
+				return failure ~= "close"
+			end
+			writer._set_backend(recorded.backend)
+			helpers.assert_true(writer.open())
+			helpers.assert_eq(writer.close(), false)
+			helpers.assert_true(writer.has_output_debt())
+			helpers.assert_eq(writer.open(), false, "uncertain retirement cannot admit another device")
+			helpers.assert_eq(writer.close(), false)
+			helpers.assert_eq(recorded.closed, 1, "a possibly recycled descriptor must never be closed twice")
+		end)
+	end
+
 	helpers.it("retains a throwing write while retiring its exact known open channel", function()
 		local writer = helpers.load_module("adapters.uinput_writer")
 		local recorded = recorder()

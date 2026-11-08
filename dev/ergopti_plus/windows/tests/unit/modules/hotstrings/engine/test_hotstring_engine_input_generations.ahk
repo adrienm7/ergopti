@@ -584,3 +584,59 @@ _HUE_Schedule(State, Callback) {
 }
 
 #Include test_hotstring_scalar_framing.ahk
+
+
+/** Count actual catalogue copies while retaining the production mutation methods. */
+class _HSE_BoundaryCountingTerminators extends Terminators {
+	CatalogueReads := 0
+	all() {
+		this.CatalogueReads += 1
+		return super.all()
+	}
+}
+
+/** Repeated reads share one derivation, but every exact input remains observable. */
+TestHSE_WordBoundaryCacheTracksInputs() {
+	global HSE_Terminators, HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+	Saved := { Catalogue: HSE_Terminators, Words: HSE_WORD_TERMINATORS,
+		Quotes: HOTSTRINGS_QUOTE_WORD_BOUNDARIES }
+	try {
+		HSE_Terminators := _HSE_BoundaryCountingTerminators()
+		HSE_WORD_TERMINATORS := " ★§-Q"
+		First := _HSE_WordBoundarySet()
+		AssertEqual(0, InStr(First, "★", true), "the magic selector never opens a word")
+		AssertTrue(InStr(First, "§", true) > 0, "another configured Unicode delimiter does")
+		Loop 20
+			AssertEqual(First, _PrefixWordBoundaries(), "preview and matcher read one exact image")
+		AssertEqual(1, HSE_Terminators.CatalogueReads,
+			"boundary-cache: repeated reads never copy the catalogue again")
+
+		HSE_WORD_TERMINATORS := " ★§-q"
+		Changed := _HSE_WordBoundarySet()
+		AssertEqual(0, InStr(Changed, "Q", true), "a case-only edit retires the old delimiter")
+		AssertTrue(InStr(Changed, "q", true) > 0, "the new exact delimiter is visible immediately")
+		HSE_WORD_TERMINATORS := " ★§-Q"
+		AssertEqual(First, _HSE_WordBoundarySet(), "restoring delimiters restores the original image")
+
+		HSE_Terminators.updateMagicKey("§")
+		Renamed := _HSE_WordBoundarySet()
+		AssertEqual(0, InStr(Renamed, "§", true), "a renamed magic slot invalidates with unchanged delimiters")
+		AssertTrue(InStr(Renamed, "★", true) > 0, "the former magic character is a configured boundary again")
+		AssertEqual(1, HSE_Terminators.CatalogueReads, "a live slot change needs no catalogue copy")
+		HSE_Terminators.updateMagicKey("-")
+		AssertTrue(InStr(_HSE_WordBoundarySet(), "-", true) > 0, "an ASCII magic slot keeps its punctuation role")
+
+		HSE_Terminators := _HSE_BoundaryCountingTerminators()
+		AssertEqual(First, _HSE_WordBoundarySet(), "replacing the catalogue discovers its own magic slot")
+		AssertEqual(1, HSE_Terminators.CatalogueReads, "a new catalogue is discovered exactly once")
+		HOTSTRINGS_QUOTE_WORD_BOUNDARIES := "!"
+		AssertEqual(" §-Q!", _HSE_WordBoundarySet(), "the quote source is part of the exact cache input")
+	} finally {
+		HSE_Terminators := Saved.Catalogue
+		HSE_WORD_TERMINATORS := Saved.Words
+		HOTSTRINGS_QUOTE_WORD_BOUNDARIES := Saved.Quotes
+		_HSE_WordBoundarySet()
+	}
+}
+Test("HSE boundary-cache: exact delimiter, quote and magic inputs invalidate together",
+	TestHSE_WordBoundaryCacheTracksInputs)

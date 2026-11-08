@@ -36,10 +36,18 @@ local LOG = "adapters.mouse_control"
 --- @param y number Vertical coordinate in pixels.
 --- @return boolean True when Hammerspoon accepted the position.
 function M.setPos(x, y)
-	local ok = pcall(function()
-		hs.mouse.absolutePosition({ x = tonumber(x) or 0, y = tonumber(y) or 0 })
-	end)
-	return ok
+	x, y = tonumber(x), tonumber(y)
+	if not x or not y or x ~= x or y ~= y
+		or x == math.huge or x == -math.huge or y == math.huge or y == -math.huge then
+		return false
+	end
+	-- Hammerspoon ignores CGWarpMouseCursorPosition's status, but its setter
+	-- returns the position read back from Quartz. Allow sub-point rounding.
+	local ok, position = pcall(hs.mouse.absolutePosition, { x = x, y = y })
+	if not ok or type(position) ~= "table" then return false end
+	local actual_x, actual_y = tonumber(position.x), tonumber(position.y)
+	return actual_x ~= nil and actual_y ~= nil and actual_x == actual_x and actual_y == actual_y
+		and math.abs(actual_x - x) < 1 and math.abs(actual_y - y) < 1
 end
 
 --- Returns the current absolute cursor position.
@@ -78,10 +86,12 @@ end
 --- @return table { left: number, top: number, right: number, bottom: number }
 function M.getMonitorBounds(n)
 	local empty = { left = 0, top = 0, right = 0, bottom = 0 }
+	local index = tonumber(n)
+	if not index or index ~= index or index < 1 or index >= math.huge or index % 1 ~= 0 then return empty end
 	local ok, result = pcall(function()
 		local screens = hs.screen.allScreens()
 		if type(screens) ~= "table" then return empty end
-		local screen = screens[tonumber(n) or 1]
+		local screen = screens[index]
 		if not screen then return empty end
 		local frame = screen:fullFrame()
 		if type(frame) ~= "table" then return empty end
@@ -183,10 +193,12 @@ local _button_read_failure_logged = false
 --- Tells whether any mouse button is physically held at this instant. Not part
 --- of the MouseControl port: the gesture engine reads it on every trackpad
 --- frame, because the contacts of a click-drag are never a gesture.
---- @return boolean down True while at least one button is held.
+--- @return boolean down True while at least one button is held or the read fails.
 function M.any_button_down()
 	local ok, result = pcall(function()
-		for _, pressed in pairs(hs.eventtap.checkMouseButtons() or {}) do
+		local buttons = hs.eventtap.checkMouseButtons()
+		if type(buttons) ~= "table" then error("mouse button state unavailable") end
+		for _, pressed in pairs(buttons) do
 			if pressed == true then return true end
 		end
 		return false
@@ -196,8 +208,9 @@ function M.any_button_down()
 			_button_read_failure_logged = true
 			Logger.error(LOG, "any_button_down(): the mouse buttons cannot be read — %s", tostring(result))
 		end
-		return false
+		return true
 	end
+	_button_read_failure_logged = false
 	return result
 end
 

@@ -13,11 +13,12 @@ helpers.describe("llm-scope-contract", function()
 			helpers.assert_not_nil(Preferences.flat_key_for(path), path)
 			found[path] = true
 		end
-		for _, path in ipairs({ "llm.trigger.disabled_apps", "llm.navigation.nav_modifiers", "llm.models.user_models", "llm.user_profiles" }) do
+		-- macOS stores the automatic profile since 4c0197d2, so the scope now clears it.
+		for _, path in ipairs({ "llm.trigger.disabled_apps", "llm.navigation.nav_modifiers", "llm.models.user_models",
+			"llm.user_profiles", "llm.profiles.auto_profile_for_model" }) do
 			helpers.assert_true(found[path], path)
 		end
 		helpers.assert_nil(found["llm.profiles.user_profiles"])
-		helpers.assert_nil(found["llm.profiles.auto_profile_for_model"])
 	end)
 
 	helpers.it("plans only supplied shortcut leaves and keeps restoration consent excluded", function()

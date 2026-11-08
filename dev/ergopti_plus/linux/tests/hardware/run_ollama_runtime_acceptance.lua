@@ -263,15 +263,15 @@ local ok, diagnostic = xpcall(function()
 		"actual existing writer acknowledges engine enable")
 	assert(scripted_choices == 1 and archive_dispatches == 1 and changed == 1,
 		"one explicit binary-only choice, one actual HTTPS archive and one writer refresh")
-	assert(archive_options.url == "https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-linux-amd64.tar.zst"
-		and archive_options.https_only == true and archive_options.bytes == 1436408810,
+	assert(archive_options.url == "https://github.com/ollama/ollama/releases/download/v0.40.6/ollama-linux-amd64.tar.zst"
+		and archive_options.https_only == true and archive_options.bytes == 1438364593,
 		"exact independently frozen official HTTPS archive admission")
-	assert(checksum_receipt and checksum_receipt.accepted == true and checksum_receipt.bytes == 1436408810
-		and checksum_receipt.digest == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a",
+	assert(checksum_receipt and checksum_receipt.accepted == true and checksum_receipt.bytes == 1438364593
+		and checksum_receipt.digest == "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0",
 		"full actual archive digest matches independent official receipt before extraction")
 	assert(archive_operation and archive_operation:is_settled() == true, "exact archive HTTP physically settled")
 	assert(#chronological >= 2 and chronological[1].kind == "typed_version"
-		and chronological[1].version == "0.40.4" and chronological[1].engine == false
+		and chronological[1].version == "0.40.6" and chronological[1].engine == false
 		and chronological[1].profile == false and chronological[2].kind == "profile_write",
 		"actual typed readiness before enable publication")
 	assert(#native_services == 1 and native_services[1].timeout == nil

@@ -335,6 +335,25 @@ _GSS_OpenOnlyForTheGesturesMenuInner(State) {
 }
 Test("Gestures availability: the open-time check ignores every other menu", _GSS_OpenOnlyForTheGesturesMenu)
 
+_GSS_RefusedPopupAndRecovery() {
+	_GSS_WithState(_GSS_RefusedPopupAndRecoveryInner)
+}
+_GSS_RefusedPopupAndRecoveryInner(State) {
+	State["menu"] := 777
+	AssertTrue(GestureSystemRefresh(_GSS_FullReader()))
+	Calls := Map("cancel", 0, "schedule", 0, "rebuild", 0)
+	_GestureSystemCheckPopup(777, TestGestures_RefuseSystemRead,
+		() => Calls["cancel"] += 1, () => Calls["schedule"] += 1)
+	AssertFalse(GestureSystemSlotAvailable("tap_3"), "a refused popup read invalidates the old snapshot")
+	AssertEqual(1, Calls["cancel"], "the stale menu closes")
+	AssertEqual(1, Calls["schedule"], "the unverified menu is scheduled")
+	_GestureSystemRefreshAndRebuild(_GSS_FullReader(), () => Calls["rebuild"] += 1)
+	AssertTrue(GestureSystemSlotAvailable("tap_3"), "a later successful read restores availability")
+	AssertEqual(1, Calls["rebuild"], "recovery rebuilds the published unverified menu")
+}
+Test("Gestures availability: refused popup and recovery (gesture-popup-read-failure)", _GSS_RefusedPopupAndRecovery)
+
+
 
 
 

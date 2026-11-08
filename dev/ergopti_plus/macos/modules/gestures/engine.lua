@@ -153,6 +153,10 @@ local function stopScrollBlock()
 end
 
 -- All directional slot suffixes a finger count can resolve to.
+-- The horizontal axis slot of each finger count that offers one: the binding of
+-- both horizontal directions. Two fingers have none (a two-finger left swipe
+-- belongs to macOS).
+local AXIS_SLOT_HORIZ = { [3] = "swipe_3_horiz", [4] = "swipe_4_horiz", [5] = "swipe_5_horiz" }
 local SLOT_DIRS_ALL   = { "left", "right", "up", "down", "left_up", "right_up", "left_down", "right_down" }
 local SLOT_DIRS_HORIZ = { "left", "right" }
 local SLOT_DIRS_VERT  = { "up", "down" }
@@ -188,6 +192,13 @@ local function finger_count_is_inert(mf, axis)
 	for _, dir in ipairs(dirs) do
 		local action = _state.ga["swipe_" .. fc .. "_" .. dir]
 		if action and action ~= "none" then return false end
+	end
+	-- An axis slot binds both horizontal directions, so it makes a horizontal
+	-- (or unknown-axis) gesture of its finger count live.
+	local axis_slot = AXIS_SLOT_HORIZ[math.min(mf, 5)]
+	if axis_slot and (axis == nil or axis == "horiz") then
+		local axis_action = _state.ga[axis_slot]
+		if axis_action and axis_action ~= "none" then return false end
 	end
 	-- Tap only matters when direction is not yet known — a moving gesture
 	-- past lockedDir cannot become a tap.
@@ -418,6 +429,30 @@ local function signedDistAxis(pos, axis)
 	end
 end
 
+--- Resolves the slot a classified swipe runs. The explicit direction slot wins;
+--- a straight left or right swipe whose own slot is unbound runs the horizontal
+--- axis slot of its finger count, so one gesture never runs two actions. This is
+--- the rule Linux applies (maintainer decision of 2026-11-06). Diagonals and
+--- vertical swipes have no axis slot.
+--- @param mf number Finger count.
+--- @param dir string Axis the swipe travelled on: "horiz", "vert" or "diag".
+--- @param dx number Horizontal displacement.
+--- @param dy number Vertical displacement.
+--- @return string|nil slot The slot to fire, or the unbound direction slot.
+local function resolveSwipeSlot(mf, dir, dx, dy)
+	local slot = Geometry.slotForDir(mf, dir, dx, dy)
+	local action = slot and _state.ga[slot]
+	if action and action ~= "none" then return slot end
+	if dir ~= "horiz" then return slot end
+	local axis_slot = AXIS_SLOT_HORIZ[math.min(mf, 5)]
+	local axis_action = axis_slot and _state.ga[axis_slot]
+	if axis_action and axis_action ~= "none" then
+		Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", tostring(slot), axis_slot)
+		return axis_slot
+	end
+	return slot
+end
+
 --- Calls one action dispatcher and preserves its exact boolean contract.
 --- @param method_name string Dispatcher field on the actions module.
 --- @param action string Action identifier.
@@ -443,6 +478,18 @@ local function dispatchAction(method_name, action, ...)
 	return "invalid", tostring(verdict)
 end
 
+--- Whether macOS runs its own gesture on this slot while it is on in the
+--- Trackpad settings: firing Ergopti's too would be a double action. Swipes and
+--- taps both ask it before any dispatch.
+--- @param slot string|nil Gesture slot provenance.
+--- @param action string Action that would fire.
+--- @return boolean held
+local function system_holds(slot, action)
+	if not slot or type(_state.system_held) ~= "function" or not _state.system_held(slot) then return false end
+	Logger.debug(LOG, "Gesture %s -> %s held back: macOS uses this gesture.", tostring(slot), tostring(action))
+	return true
+end
+
 --- Executes an action by trying the single registry before the axis fallback.
 --- @param action string The action ID.
 --- @param sign number The direction sign (1 for next, -1 for prev).
@@ -450,12 +497,7 @@ end
 --- @return boolean dispatched True only when one exact dispatcher accepted.
 local function triggerAction(action, sign, slot)
 	if not action or action == "none" then return false end
-	-- macOS runs its own gesture on this slot while it is on in the Trackpad
-	-- settings: firing Ergopti's too would be a double action.
-	if slot and type(_state.system_held) == "function" and _state.system_held(slot) then
-		Logger.debug(LOG, "Gesture %s -> %s held back: macOS uses this gesture.", tostring(slot), action)
-		return false
-	end
+	if system_holds(slot, action) then return false end
 	-- An AI action is unarmed while the AI is off, as for the keys.
 	if require("modules.shortcuts.ai_actions").blocked(action) then
 		Logger.debug(LOG, "Gesture %s -> %s held back: the AI is off.", tostring(slot), action)
@@ -492,6 +534,16 @@ local function triggerIncrementalActions(action, sign, slot, count)
 		fired = fired + 1
 	end
 	return fired
+end
+
+--- Rejects an implausible frame before its requested actions can block the tap.
+local function incrementalCountAdmitted(count, slot)
+	if count <= Geometry.MAX_INCREMENTAL_ACTIONS_PER_FRAME then return true end
+	Logger.error(LOG, "Gesture '%s' requested %s incremental actions in one frame; gesture aborted.",
+		tostring(slot), tostring(count))
+	gs.aborted = true
+	if not gs.hadLiveFire then stopScrollBlock() end
+	return false
 end
 
 --- Triggers non-scalable horizontal actions during the gesture to reduce latency.
@@ -577,6 +629,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
+			if not incrementalCountAdmitted(diff, slot) then return end
 			local prior_steps = gs.stepsCommitted
 			local fired = triggerIncrementalActions(action, sd, slot, diff)
 			if fired > 0 then
@@ -702,7 +755,9 @@ local function commitGesture(now)
 			elseif mf >= 5 then slot = "tap_5" end
 
 			local tap_action = slot and _state.ga[slot] or nil
-			if tap_action and tap_action ~= "none" and require("modules.shortcuts.ai_actions").blocked(tap_action) then
+			if tap_action and tap_action ~= "none" and system_holds(slot, tap_action) then
+				Logger.debug(LOG, "commitGesture: tap %s not fired, macOS owns it.", tostring(slot))
+			elseif tap_action and tap_action ~= "none" and require("modules.shortcuts.ai_actions").blocked(tap_action) then
 				Logger.debug(LOG, "commitGesture: tap %s -> %s held back: the AI is off.", tostring(slot), tap_action)
 			elseif tap_action and tap_action ~= "none" then
 				local status, detail = dispatchAction("execute_single", tap_action, slot)
@@ -746,7 +801,7 @@ local function commitGesture(now)
 		return
 	end
 
-	local slot = Geometry.slotForDir(mf, dir, dx, dy)
+	local slot = resolveSwipeSlot(mf, dir, dx, dy)
 	Logger.debug(LOG, "commitGesture: slotForDir(%d, %s, %.2f, %.2f) → %s", mf, dir, dx, dy, tostring(slot))
 	if not slot or _state.ga[slot] == "none" then
 		Logger.debug(LOG, "commitGesture: slot=%s action=%s — skip",
@@ -769,6 +824,7 @@ local function commitGesture(now)
 		local sd = signedDistAxis(gs.endPos, dir)
 		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
+		if diff > 0 and not incrementalCountAdmitted(diff, slot) then return end
 		Logger.info(LOG, "commitGesture INCREMENTAL: sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
 			sd, targetSteps, gs.stepsCommitted, diff)
 
@@ -913,6 +969,12 @@ function M.process_frame(touches, frame_stamp)
 	if n == 0 and gs.pointerDrag then
 		resetGS()
 		return
+	end
+	if n >= 2 and not Geometry.validPositions(touches) then
+		-- A substituted zero would move the centroid and may fire an action.
+		-- Quarantine the sequence until it drops below the ownership floor.
+		gs.aborted = true
+		stopScrollBlock()
 	end
 
 	-- A gesture of three or more fingers that dropped to two for good is a
@@ -1191,8 +1253,11 @@ function M.process_frame(touches, frame_stamp)
 					and (n <= gs.maxFingers + 1 or inert)
 					and not new_count_active_on_locked_axis
 				if use_fast_path then
-					Logger.info(LOG, string.format("Finger join (fast-path): %d → %d (inert_at_%d_on_%s=%s)",
-						gs.maxFingers, n, gs.maxFingers, tostring(gs.lockedDir), tostring(inert)))
+					-- Each contact's position and size calibrate the far or
+					-- oversized contact a resting thumb adds (field report 2026-11-05).
+					Logger.info(LOG, string.format("Finger join (fast-path): %d → %d (inert_at_%d_on_%s=%s), contacts %s",
+						gs.maxFingers, n, gs.maxFingers, tostring(gs.lockedDir), tostring(inert),
+						Geometry.describeContacts(touches)))
 					gs.maxFingers = n
 					gs.lifting    = false
 					gs.fingerCountChangedAt = now
@@ -1214,7 +1279,8 @@ function M.process_frame(touches, frame_stamp)
 							confirmed = gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_SEC
 						end
 						if confirmed then
-							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
+							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs), contacts %s.",
+								gs.maxFingers, n, gs.candidateFrames, elapsed, Geometry.describeContacts(touches)))
 							gs.maxFingers = n
 							gs.lifting    = false
 							-- The candidate-confirmation period already enforced stability:
@@ -1276,7 +1342,7 @@ function M.process_frame(touches, frame_stamp)
 					local axis = gs.lockedDir
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local slot = Geometry.slotForDir(gs.maxFingers, axis, dx, dy)
+					local slot = resolveSwipeSlot(gs.maxFingers, axis, dx, dy)
 
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
 						triggerLiveAxisIfNeeded(slot, pos, now, axis)

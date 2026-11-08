@@ -183,10 +183,11 @@ helpers.describe("linux daemon: output is the logical commit boundary", function
 
 	helpers.it("publishes metrics, undo and engine state only after delivery.ok", function()
 		local daemon = daemon_source()
-		local boundary_at = daemon:find("local expansion_committed = opts.dry_run", 1, true)
+		local boundary_at = daemon:find("local queued_input, expansion_committed = nil, false", 1, true)
 		helpers.assert_not_nil(boundary_at,
-			"the daemon must name the output commit boundary explicitly")
+			"the output commit starts false before the expansion path")
 		local match_path = daemon:sub(boundary_at)
+		local dry_run_at = match_path:find("expansion_committed = opts.dry_run", 1, true)
 		local delivery_at = match_path:find("delivery.ok == true", 1, true)
 		local commit_guard_at = match_path:find("if expansion_committed then", 1, true)
 		local metrics_at = match_path:find("keystats.record_hotstring(", 1, true)
@@ -200,12 +201,12 @@ helpers.describe("linux daemon: output is the logical commit boundary", function
 		-- Walked by name: a nil value drops its key from a table, so pairs() over
 		-- the positions never visited a lost locator and the order checks below
 		-- failed on a nil comparison instead of naming it.
-		local positions = { delivery = delivery_at, commit_guard = commit_guard_at, metrics = metrics_at,
+		local positions = { dry_run = dry_run_at, delivery = delivery_at, commit_guard = commit_guard_at, metrics = metrics_at,
 			undo = undo_at, apply_guard = apply_guard_at, apply = apply_at }
-		for _, label in ipairs({ "delivery", "commit_guard", "metrics", "undo", "apply_guard", "apply" }) do
+		for _, label in ipairs({ "dry_run", "delivery", "commit_guard", "metrics", "undo", "apply_guard", "apply" }) do
 			helpers.assert_not_nil(positions[label], label .. " must exist in the static expansion path")
 		end
-		helpers.assert_true(delivery_at < commit_guard_at and commit_guard_at < metrics_at,
+		helpers.assert_true(dry_run_at < delivery_at and delivery_at < commit_guard_at and commit_guard_at < metrics_at,
 			"metrics must be inside the success branch after delivery.ok")
 		helpers.assert_true(commit_guard_at < undo_at,
 			"undo must be armed only for output that committed")

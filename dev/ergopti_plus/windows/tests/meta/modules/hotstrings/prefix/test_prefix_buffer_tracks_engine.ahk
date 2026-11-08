@@ -352,8 +352,8 @@ _A0720HS_PrefixBoundariesAreDerived() {
 	; recompute a cached preview global after every write to HSE_WORD_TERMINATORS.
 	; That contract depended on every writer remembering to call it, and a second
 	; divergence shipped anyway because the refresh derived from a WIDER expression
-	; than the matcher gated on. There is now no cache to refresh: the preview and
-	; the matcher both call _HSE_WordBoundarySet() on every read, which makes the
+	; than the matcher gated on. No writer-managed refresh remains: the preview and
+	; the matcher both call _HSE_WordBoundarySet() with live inputs, which makes the
 	; original bug unrepresentable rather than merely guarded.
 	Assert(_DriverFuncBody("_HSE_WordBoundarySet") != "",
 		"_HSE_WordBoundarySet() must exist as the single word-boundary derivation")

@@ -55,13 +55,9 @@ local TapKeys = ShortcutCatalogue.new_tap_keys({
 	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
 	resolve_path = function(rel) return Paths.shared(rel) end,
 	read = function(path)
-		local handle = path and io.open(path, "r")
-		if not handle then error("tap_keys: cannot read " .. tostring(path)) end
-		local read_ok, body = pcall(handle.read, handle, "*a")
-		local close_ok, closed = pcall(handle.close, handle)
-		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-			error("tap_keys: cannot complete read of " .. tostring(path))
-		end
+		local body, status
+		if path then body, status = require("toml_codec.writer").read_classified(path) end
+		if status ~= "ok" then error("tap_keys: cannot read " .. tostring(path)) end
 		return body
 	end,
 	decode = function(body)
@@ -82,6 +78,7 @@ local _is_active = NEVER_ACTIVE
 
 -- Injected by init(): queues a function for the next loop tick.
 local _defer = nil
+local _pause_epoch = nil
 local _configuration_owner = nil
 local _dispatch_generation = 0
 
@@ -236,9 +233,24 @@ function M.set_action(id, action_id)
 		return false
 	end
 	local path = require("infra.config_paths").config("config.toml")
+	local assignments, generation = _assignments, _dispatch_generation
+	local bytes, status = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function()
+		return M.configuration_candidate(TomlCodec.decode(bytes or "")).assignments
+	end)
+	if not ok or type(expected) ~= "table" or _assignments ~= assignments
+		or _dispatch_generation ~= generation or _configuration_owner ~= nil then return false end
+	for key, value in pairs(assignments) do
+		if expected[key] ~= value then
+			Logger.warn(LOG, "Tap key configuration changed externally; reload shortcuts before editing.")
+			return false
+		end
+	end
+	for key, value in pairs(expected) do if assignments[key] ~= value then return false end end
 	local committed, detail = TomlWriter.batch_write(path, {
 		{ section = ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, key = id, value = action_id },
-	})
+	}, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist tap key '%s': %s.", id, tostring(detail))
 		return false
@@ -261,13 +273,18 @@ end
 
 --- Wires the daemon's state in.
 --- @param opts table { is_active = fn(action|nil) -> boolean, defer = fn(fn) -> boolean }
+---   Optional pause_epoch = fn() -> number identifies the active pause lifetime.
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_active) ~= "function" or type(opts.defer) ~= "function" then
 		error("tap_keys.init() needs is_active and defer functions")
 	end
+	if opts.pause_epoch ~= nil and type(opts.pause_epoch) ~= "function" then
+		error("tap_keys.init() pause_epoch must be a function")
+	end
 	_is_active = opts.is_active
 	_defer = opts.defer
+	_pause_epoch = opts.pause_epoch
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
@@ -287,14 +304,28 @@ function M.on_key(detail)
 		if mods[name] then return false end
 	end
 	-- Initial admission is itself a foreign callback and can revoke this source.
-	local generation, active = _dispatch_generation, _is_active
+	local generation, active, epoch_reader = _dispatch_generation, _is_active, _pause_epoch
+	local epoch
+	if epoch_reader then
+		local called, value = pcall(epoch_reader)
+		if not called or type(value) ~= "number" then return false end
+		epoch = value
+	end
+	local function epoch_current()
+		if _pause_epoch ~= epoch_reader then return false end
+		if not epoch_reader then return true end
+		local called, value = pcall(epoch_reader)
+		return called and value == epoch and _pause_epoch == epoch_reader
+	end
 	local action = M.get_action(id)
 	local function current()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active then return false end
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active
+			or not epoch_current() then return false end
 		-- Re-read at delivery: the AI may be switched off between press and run.
 		if AiActions.blocked(action) then return false end
 		local admitted = active(action)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation and _is_active == active
+			and epoch_current()
 	end
 	if action == "none" or not current() then return false end
 	if not _defer then
@@ -359,6 +390,7 @@ function M._reset()
 	_assignments = nil
 	_is_active = NEVER_ACTIVE
 	_defer = nil
+	_pause_epoch = nil
 end
 
 

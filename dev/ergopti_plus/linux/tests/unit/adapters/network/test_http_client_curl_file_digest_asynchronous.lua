@@ -144,6 +144,49 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 		helpers.assert_eq(state.kills[1].pid, -4321)
 		helpers.assert_true(not digest.isActive())
 	end)
+
+	helpers.it("linux-digest-timeout: signal refusal retains the running child", function()
+		local digest, state = fresh_digest({ kill_failure = true })
+		local callbacks = 0
+		helpers.assert_true(digest.sha256("/tmp/release.part", { owner = "failed-signal" }, function() callbacks = callbacks + 1 end))
+		state.timer.callback()
+		helpers.assert_true(digest.isActive("failed-signal"), "a failed signal must not discard the live process owner")
+		helpers.assert_eq(callbacks, 0, "a replacement must not be admitted before the failed termination is resolved")
+		helpers.assert_eq(digest.sha256("/tmp/next.part", { owner = "failed-signal" }, function() end), false)
+		helpers.assert_eq(#state.requests, 1, "a refused cancellation cannot spawn a successor")
+		state.allow_kills = true
+		helpers.assert_true(digest.cancel("failed-signal"))
+		helpers.assert_true(not digest.isActive("failed-signal"))
+		helpers.assert_eq(callbacks, 0)
+	end)
+
+	helpers.it("linux-digest-timeout: a refused termination reports timeout only after child exit", function()
+		local digest, state = fresh_digest({ kill_failure = true })
+		local error_message, callbacks
+		callbacks = 0
+		helpers.assert_true(digest.sha256("/tmp/release.part", {}, function(_, err) error_message, callbacks = err, callbacks + 1 end))
+		state.timer.callback()
+		state.complete_request(1, string.rep("a", 64) .. " */tmp/release.part\0", 0)
+		helpers.assert_eq(error_message, "timeout")
+		helpers.assert_eq(callbacks, 1)
+		helpers.assert_true(not digest.isActive())
+	end)
+
+	for _, cause in ipairs({ "read", "oversize" }) do
+		helpers.it("linux-digest-signal-refusal: retains failed " .. cause .. " until exit", function()
+			local digest, state = fresh_digest({ kill_failure = true })
+			local failure, calls = nil, 0
+			helpers.assert_true(digest.sha256("/tmp/release.part", {}, function(_, err) failure, calls = err, calls + 1 end))
+			if cause == "read" then state.options.stdio[2].read_callback("EIO", nil)
+			else state.stdout(string.rep("x", 2048)) end
+			helpers.assert_true(digest.isActive())
+			helpers.assert_eq(calls, 0)
+			state.complete_request(1, nil, 0)
+			helpers.assert_eq(failure, cause == "read" and "EIO" or "sha256sum output exceeds limit")
+			helpers.assert_eq(calls, 1)
+			helpers.assert_true(not digest.isActive())
+		end)
+	end
 end)
 
 

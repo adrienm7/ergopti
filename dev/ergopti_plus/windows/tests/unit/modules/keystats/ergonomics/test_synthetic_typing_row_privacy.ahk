@@ -95,6 +95,9 @@ _STRP_WithCleanBuffer(Body) {
 	PrevInit    := Keystats.initialized
 	PrevEvents  := Keystats.buffer_events
 	PrevText    := Keystats.buffer_text
+	PrevScalarFragment := Keystats.scalar_fragment
+	PrevScalarHistory := Keystats.scalar_history
+	PrevScalarEpoch := Keystats.scalar_epoch
 	PrevDepth   := Keystats.synth_active
 	PrevType    := Keystats.synth_type
 	PrevOwners  := Keystats.synth_owners
@@ -112,6 +115,9 @@ _STRP_WithCleanBuffer(Body) {
 	Keystats.initialized   := true
 	Keystats.buffer_events := []
 	Keystats.buffer_text   := ""
+	Keystats.scalar_fragment := false
+	Keystats.scalar_history := false
+	Keystats.scalar_epoch += 1
 	Keystats.synth_active  := 0
 	Keystats.synth_type    := "none"
 	Keystats.synth_owners  := []
@@ -142,6 +148,9 @@ _STRP_WithCleanBuffer(Body) {
 		Keystats.initialized   := PrevInit
 		Keystats.buffer_events := PrevEvents
 		Keystats.buffer_text   := PrevText
+		Keystats.scalar_fragment := PrevScalarFragment
+		Keystats.scalar_history := PrevScalarHistory
+		Keystats.scalar_epoch := PrevScalarEpoch
 		Keystats.synth_active  := PrevDepth
 		Keystats.synth_type    := PrevType
 		Keystats.synth_owners  := PrevOwners
@@ -431,7 +440,7 @@ Test("meta hotstrings: a private fire raises the buffer-residue latch (personal-
 ; the real source, rather than assumed. If this test fails, section 1 has
 ; stopped testing the persisted row and must be re-pointed, never relaxed.
 _STRP_FlushPersistsTheBufferVerbatim() {
-	Body := _DriverFuncBody("KL_FlushBuffer")
+	Body := _DriverFuncBody("_KL_DetachBufferSnapshot")
 	Assert(RegExMatch(Body, "snap_text[ \t]*:=[ \t]*Keystats\.buffer_text"),
 		"KL_FlushBuffer must snapshot Keystats.buffer_text — the field this file asserts on")
 	Assert(RegExMatch(Body, "snap_events[ \t]*:=[ \t]*Keystats\.buffer_events"),
@@ -603,7 +612,8 @@ _STRP_PrivateFireIsNotKeyedInTheHalflifeMap() {
 		"and it is TOLD that the trigger it received is a redaction, so it can skip the half-life map instead of merging every private mapping of the same length onto one entry")
 
 	Body := _DriverFuncBody("KL_Roi_OnHotstring")
-	Assert(RegExMatch(Body, "if !is_private[\r\n\t ]+KLRoi\.trigger_last_use"),
+	AssertTrue(Body != "", "The real ROI hotstring owner must resolve before checking privacy.")
+	Assert(RegExMatch(Body, "if !is_private && TextAllowed[\r\n\t ]+KLRoi\.trigger_last_use"),
 		"KL_Roi_OnHotstring must skip trigger_last_use for a private mapping: its keys are triggers, a redaction is not a trigger, and KL_Roi_HalflifeTick writes those keys straight back out into a persisted row")
 	Assert(RegExMatch(Body, "session_saved_chars[ \t]*\+="),
 		"while still accumulating the savings — dropping the metric would be the wrong fix here for exactly the reason it would be at the sink")

@@ -74,7 +74,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				capture = {
 					is_ready = function() return true end, reset_state = function() caps_locked = false; return true end,
 					modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
-					caps_locked = function() return caps_locked end, cancel_compose = function() return true end,
+					caps_locked = function() return caps_locked end, restore_compose = function() return true end,
 					peek_text = function() return nil end,
 					process = function(code, value) if code == 58 and value == 1 then caps_locked = not caps_locked end end,
 				}
@@ -114,7 +114,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				environment.action_catalogue = environment.gestures
 				environment.WordReset = require("modules.hotstrings.word_reset")
 				environment.engine = { reset = function() world.resets = world.resets + 1 end }
-				evaluate(assert(source:match("\n\t(TapHold%.init%b())")), environment)
+				evaluate(assert(source:match("return (TapHold%.init%b())")), environment)
 
 				session.rows = {}
 				if route ~= "single" then session.edge("a", 58, 1, 1000) end
@@ -155,6 +155,25 @@ local function with_remap(route, dry, action, hold, body, revoke)
 end
 
 helpers.describe("dry-run physical remaps", function()
+	for _, fault in ipairs({ "refusal", "exception" }) do
+	helpers.it("refuses daemon startup after tap-hold " .. fault .. " and retires owners (tap-hold-startup-refusal)", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		local init = assert(source:match("\n\t(privacy_owners%.tap_hold_called, privacy_owners%.tap_hold_initialized = pcall%(.-\n\tend%))"))
+		local guard = assert(source:match("\n\t(if not privacy_owners%.tap_hold_called or privacy_owners%.tap_hold_initialized ~= true then.-\n\tend)"))
+		local trace, pending = {}, false
+		local env = setmetatable({ privacy_owners = {}, Logger = helpers.make_logger_stub(), TapHold = { init = function() trace[#trace + 1] = "init"; if fault == "exception" then error("controlled init failure") end; return false end },
+			opts = {}, gestures = {}, keyboard_hook = {}, engine = {}, WordReset = {},
+			shutdown = { request = function() trace[#trace + 1] = "shutdown"; pending = true end,
+				is_pending = function() return pending end, poll = function() pending = false end },
+			event_loop = { run = function(options) trace[#trace + 1] = "wait"; options.onIdle() end },
+		}, { __index = _G })
+		local ok, err = pcall(evaluate, init .. "\n" .. guard .. "\nreturn 'captured'", env)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(tostring(err), "refusing input capture")
+		helpers.assert_eq(trace, { "init", "shutdown", "wait" })
+	end)
+	end
 	for _, route in ipairs({ "single", "ordered", "buffered" }) do
 		for _, action in ipairs({ "send_text", "paste_plain" }) do
 			for _, dry in ipairs({ false, true }) do

@@ -105,20 +105,23 @@ function M.new(deps)
 	--- Reads the resume point for a direction.
 	local function read_cursor(for_mode)
 		local stored = backend.get_cursor()
-		if type(stored) ~= "string" then return 0 end
+		if stored == nil then return 0 end
+		if type(stored) ~= "string" then return nil end
 		local stored_mode, stored_cursor = stored:match("^([^" .. CURSOR_SEPARATOR .. "]+)"
 			.. CURSOR_SEPARATOR .. "(%d+)$")
-		-- A cursor from the OTHER direction says nothing about this one: those
-		-- rows are converted, just not the way this pass wants them.
+		if stored_mode ~= Plan.MODE_ENCRYPT and stored_mode ~= Plan.MODE_DECRYPT then return nil end
+		local exact = Plan.exact_id(stored_cursor)
+		if exact == nil then return nil end
+		-- A cursor from the other direction says nothing about this pass.
 		if stored_mode ~= for_mode then return 0 end
-		return tonumber(stored_cursor) or 0
+		return exact
 	end
 
 	--- Persists the resume point. Advances cover only committed rows; the initial
 	--- publication also owns a pass stopped before its first periodic slice.
 	--- @return boolean acknowledged Only an explicit committed receipt succeeds.
 	local function write_cursor()
-		return backend.set_cursor(mode .. CURSOR_SEPARATOR .. tostring(math.floor(cursor))) == true
+		return backend.set_cursor(mode .. CURSOR_SEPARATOR .. string.format("%.0f", cursor)) == true
 	end
 
 	--- Stops the pass, leaving every already-converted row converted.
@@ -193,10 +196,11 @@ function M.new(deps)
 
 		mode        = wanted_mode
 		device_id   = owner
-		cursor      = read_cursor(wanted_mode)
 		scanned     = 0
 		converted   = 0
 		last_logged = 0
+		cursor      = read_cursor(wanted_mode)
+		if cursor == nil then return abort("the stored resume point is not an exact supported integer") end
 		total       = backend.count(owner)
 
 		-- Boot resumes only durable intent. The daemon may stop before its first
@@ -214,8 +218,11 @@ function M.new(deps)
 	function runner.resume(wanted_mode, owner)
 		if not backend.available() then return false end
 		local stored = backend.get_cursor()
-		if type(stored) ~= "string"
-			or not stored:match("^" .. wanted_mode .. CURSOR_SEPARATOR .. "%d+$") then
+		if type(stored) ~= "string" or type(wanted_mode) ~= "string" then return false end
+		local prefix = wanted_mode .. CURSOR_SEPARATOR
+		if stored:sub(1, #prefix) ~= prefix then return false end
+		if Plan.exact_id(stored:sub(#prefix + 1)) == nil then
+			Logger.error(LOG, "At-rest migration could not resume: the stored resume point is not an exact supported integer.")
 			return false
 		end
 		return runner.start(wanted_mode, owner)
@@ -233,14 +240,18 @@ function M.new(deps)
 		local updates = {}
 		local batch_cursor = cursor
 		for _, row in ipairs(rows) do
+			local id = type(row) == "table" and Plan.exact_id(row.id) or nil
+			if id == nil or id <= batch_cursor then
+				return abort("the batch contains an unsupported or unordered row id")
+			end
+			batch_cursor = id
 			scanned = scanned + 1
-			if row.id > batch_cursor then batch_cursor = row.id end
-			local assignments, failed = plan_row(row.id, row.values)
+			local assignments, failed = plan_row(id, row.values)
 			if failed then
-				return abort(string.format("row %d could not be converted", row.id))
+				return abort(string.format("row %d could not be converted", id))
 			end
 			if #assignments > 0 then
-				updates[#updates + 1] = { id = row.id, assignments = assignments }
+				updates[#updates + 1] = { id = id, assignments = assignments }
 			end
 		end
 

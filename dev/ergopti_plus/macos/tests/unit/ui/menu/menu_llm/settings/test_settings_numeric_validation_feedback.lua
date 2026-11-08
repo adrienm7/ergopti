@@ -115,6 +115,27 @@ end
 
 local INVALID_ROUTES = {
 	{
+		name = "context above retention limit",
+		raw = "4001",
+		title = "menu.settings.context_length_title",
+		body = "numeric_prompt.out_of_range",
+		invoke = function(manager) return manager.set_context_length() end,
+	},
+	{
+		name = "temperature above the maximum",
+		raw = "2",
+		title = "menu.settings.temperature_title",
+		body = "numeric_prompt.out_of_range",
+		invoke = function(manager) return manager.set_temperature() end,
+	},
+	{
+		name = "temperature below the minimum",
+		raw = "-0.1",
+		title = "menu.settings.temperature_title",
+		body = "numeric_prompt.out_of_range",
+		invoke = function(manager) return manager.set_temperature() end,
+	},
+	{
 		name = "temperature decimal comma",
 		raw = "0,8",
 		title = "menu.settings.temperature_title",
@@ -216,6 +237,14 @@ helpers.describe("settings_manager numeric validation feedback", function()
 		end)
 	end
 
+	helpers.it("accepts the maximum context length without clamping", function()
+		with_fixture("4000", function(manager, observations)
+			helpers.assert_eq(manager.set_context_length(), true)
+			helpers.assert_eq(observations.applications[1].value, 4000)
+			helpers.assert_eq(#observations.notifications, 0)
+		end)
+	end)
+
 	helpers.it("keeps valid temperature input on the mutation path without a warning", function()
 		with_fixture("0.75", function(manager, observations)
 			helpers.assert_eq(manager.set_temperature(), true)
@@ -225,6 +254,16 @@ helpers.describe("settings_manager numeric validation feedback", function()
 			helpers.assert_eq(#observations.notifications, 0)
 		end)
 	end)
+
+	for _, raw in ipairs({ "0", "1" }) do
+		helpers.it("accepts the temperature boundary " .. raw, function()
+			with_fixture(raw, function(manager, observations)
+				helpers.assert_eq(manager.set_temperature(), true)
+				helpers.assert_eq(observations.applications[1].value, tonumber(raw))
+				helpers.assert_eq(#observations.notifications, 0)
+			end)
+		end)
+	end
 
 	helpers.it("sends a valid request interval in seconds to the engine setter and the config (request-floor-setting)", function()
 		with_fixture("750", function(manager, observations)

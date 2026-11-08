@@ -674,9 +674,9 @@ _LLM_Menu_TryNormalizeIntegerPrompt(Result, Raw, Key, &Normalized,
 	Normalized := false
 	if Result != "OK"
 		return false
-	if Raw == "" || !IsInteger(Raw)
+	if !NumberTryParseInputInteger(Raw, &Parsed)
 		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
-	if !LLM_Option_TryNormalize(Key, Integer(Raw), &Normalized)
+	if !LLM_Option_TryNormalize(Key, Parsed, &Normalized)
 		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
 	return true
 }

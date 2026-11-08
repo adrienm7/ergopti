@@ -20,6 +20,8 @@
 #    the same vectors (_shared/tests/corpus/network/route_plan_vectors.json),
 #    replayed here by tools/test/test-windows-route-plan.cjs.
 # 5. Windows PowerShell 5.1 syntax only: the driver runs on the stock host.
+# 6. The owned daemon's PAC list is walked like a browser, as on Linux: a relay
+#    followed by another entry is kept only when the caller's probe reaches it.
 # ==============================================================================
 
 Set-StrictMode -Version 2.0
@@ -205,7 +207,8 @@ $script:ErgoptiOwnedInheritedSources = @('environment', 'environment_bypass')
 function Get-ErgoptiOwnedProxyEnvironment {
 	param([Parameter(Mandatory = $true)][string[]]$Origins,
 		[Parameter(Mandatory = $true)][scriptblock]$Resolve,
-		[Parameter(Mandatory = $true)][scriptblock]$ReadEnvironment)
+		[Parameter(Mandatory = $true)][scriptblock]$ReadEnvironment,
+		[Parameter(Mandatory = $true)][scriptblock]$Probe)
 	if ($Origins.Count -eq 0) { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanEmpty } }
 	$Entries = New-Object System.Collections.ArrayList
 	$OverrideDirect = $false
@@ -214,8 +217,25 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		if ($null -eq $Answer -or $Answer.Ok -ne $true -or @($Answer.Routes).Count -eq 0) {
 			return @{ Ok = $false; Reason = 'route-lookup-refused' }
 		}
-		# The daemon has no failover: only the first selection is used
-		$First = @($Answer.Routes)[0]
+		# The daemon has no failover, so the PAC list is walked here as Linux does:
+		# a relay followed by another entry is kept only when $Probe reaches it
+		# (a TCP connect within the shared probe deadline); otherwise the next
+		# entry is tried. The last entry is kept unprobed, nothing follows it.
+		$Routes = @($Answer.Routes)
+		$First = $Routes[$Routes.Count - 1]
+		for ($At = 0; $At -lt $Routes.Count - 1; $At++) {
+			$Candidate = $Routes[$At]
+			# DIRECT, an override and a relay the user exported are kept as named.
+			if ($Candidate.Kind -cne 'proxy' -or $Candidate.Endpoint -isnot [string] -or $Candidate.Source -ceq 'override' -or
+					$script:ErgoptiOwnedInheritedSources -ccontains $Candidate.Source) {
+				$First = $Candidate
+				break
+			}
+			if ((& $Probe $Candidate.Endpoint) -eq $true) {
+				$First = $Candidate
+				break
+			}
+		}
 		if ($script:ErgoptiOwnedInheritedSources -ccontains $First.Source) {
 			return @{ Ok = $true; Mode = 'inherit'; Proxy = ''; Environment = [ordered]@{} }
 		}
@@ -245,6 +265,23 @@ function Get-ErgoptiOwnedProxyEnvironment {
 			$Plan.NoProxy } else { $Current + ',' + $Plan.NoProxy })
 	}
 	return @{ Ok = $true; Mode = 'relay'; Proxy = $Plan.Proxy; Environment = $Environment }
+}
+
+# Whether a relay of a PAC list ("http://host:port/") accepts a TCP connection
+# within TimeoutMs: the browser-like walk keeps a relay only when it answers.
+# Any refusal, timeout or malformed address is $false.
+function Test-ErgoptiRelayReachable {
+	param([Parameter(Mandatory = $true)][string]$Relay,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 600000)][int]$TimeoutMs)
+	$Uri = $null
+	if (-not [Uri]::TryCreate($Relay, [UriKind]::Absolute, [ref]$Uri) -or $Uri.Port -le 0) { return $false }
+	$Client = New-Object System.Net.Sockets.TcpClient
+	try {
+		$Pending = $Client.ConnectAsync($Uri.DnsSafeHost, $Uri.Port)
+		if (-not $Pending.Wait($TimeoutMs)) { return $false }
+		return $Client.Connected
+	} catch { return $false }
+	finally { $Client.Dispose() }
 }
 
 # Asks a plain http relay for a tunnel to Target ("host:443") without any

@@ -37,7 +37,7 @@ local function metadata(path, follow)
 end
 local function sqlite_open(path)
 	local identity = request({ op = "open", path = path })
-	local db = { last_error = "", opened = true }
+	local db = { last_error = "", opened = true, _bridge_id = identity }
 	function db:exec(sql)
 		local response = rpc({ op = "exec", connection = identity, sql = sql })
 		self.last_error = response.error or ""
@@ -84,6 +84,8 @@ hs.fs.rmdir = os.remove
 local physical_fs = hs.fs
 local sqlite_port, json_port = hs.sqlite3, hs.json
 sqlite_port.open = sqlite_open
+-- The aggregate rebuild publishes through a private backup snapshot.
+sqlite_port.backup_init = require("tests.support.keystats.rebuild_sqlite_bridge").backup_init(rpc)
 for _, name in ipairs({ "fs", "json", "sqlite3" }) do package.loaded["hs." .. name] = hs[name] end
 package.loaded["hs.timer"] = loop.api
 hs.timer = loop.api

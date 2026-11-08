@@ -55,7 +55,7 @@ _MRR_Notify(Fixture, Message, Options) {
 }
 
 /** Isolates every owner the hand-off touches and restores it afterwards. */
-_MRR_Run(Body) {
+_MRR_Run(Body, FlatCleanup := false) {
 	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
 	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
 	global _ReloadTerminalHandoff, _MenuStartupCommands, _TrayStartupCommands, _SuspendPending
@@ -75,7 +75,7 @@ _MRR_Run(Body) {
 		Tray: IsSet(_TrayStartupCommands) ? _TrayStartupCommands : false,
 		Pause: IsSet(_SuspendPending) ? _SuspendPending : false}
 	Dir := A_Temp . "\ergopti_mrr_" . A_ScriptHwnd . "_" . A_TickCount
-	DirCreate(Dir)
+	FSCreateDirectoryExclusiveStrict(Dir)
 	Fixture := {Runs: [], Menus: [], Armed: [], Notices: [], Dir: Dir,
 		File: Dir . "\menu_reload_replay.json", Populations: []}
 	try {
@@ -118,7 +118,13 @@ _MRR_Run(Body) {
 		_MenuReloadReplayConsumed := Saved.Consumed
 		_TrayStartupCommands := Saved.Tray
 		_SuspendPending := Saved.Pause
-		DirDelete(Dir, true)
+		if FlatCleanup {
+			for Path in [Fixture.File, Fixture.File . ".stage"]
+				if !FSDelete(Path)
+					throw Error("The private menu hand-off fixture could not retire an owned leaf.")
+			DirDelete(Dir, false)
+		} else
+			DirDelete(Dir, true)
 	}
 }
 
@@ -650,3 +656,73 @@ Test("menu reload replay: a startup Reload intent joins the reload in flight too
 #Include test_menu_reload_replay_identity.ahk
 
 #Include test_menu_reload_replay_hold_owner.ahk
+
+
+; Both the exiting producer and the successor must preserve a foreign stage.
+_MRR_StageSnapshot(Path) {
+	File := FileOpen(Path, "r", "UTF-8-RAW")
+	if !IsObject(File)
+		throw Error("The menu hand-off fixture could not read its native identity.")
+	try return FSHandleSnapshot(File.Handle)
+	finally File.Close()
+}
+
+_MRR_StageCustodyBody(Step, Collision, Fixture) {
+	global _MenuReloadReplayRoot
+	Old := _MRR_BuildTray(Fixture, "predecessor")
+	_MenuReloadReplayRoot := Old.Root
+	_MRR_ReloadPending()
+	AssertEqual("", MenuCommandRun(Old.Command, ["Toggle", 2, Old.Sub], 0, () => false,
+		_MRR_Arm.Bind(Fixture), Old.Identity), "the real native row must wait for the accepted reload")
+	AssertEqual(1, MenuReloadReplay_HeldCount(), "the production holder must retain exactly one real command")
+	AssertEqual(0, Fixture.Runs.Length, "the retained native row must not have executed yet")
+	Stage := Fixture.File . ".stage"
+	Foreign := "foreign independent menu stage: é😀`n"
+	Prior := "previous independent published receipt`n"
+	if Step == "consume"
+		AssertTrue(MenuReloadReplay_Publish(Fixture.File), "the actual producer must first create a genuine complete hand-off")
+	else
+		AssertTrue(FSWriteCreateDurable(Fixture.File, Prior), "the previous target must be exclusively created")
+	if Collision {
+		AssertTrue(FSWriteCreateDurable(Stage, Foreign), "CREATE_NEW must acquire the exact foreign stage independently")
+		Before := _MRR_StageSnapshot(Stage)
+		AssertTrue(Before["ok"], "the foreign stage must have a real native identity before the public operation")
+	}
+	if Step == "publish" {
+		Published := MenuReloadReplay_Publish(Fixture.File)
+		FileAppend("# menu-stage step=publish collision=" . Collision . " published=" . Published
+			. " stage_present=" . !!FileExist(Stage) . " prior_target=" . (FSReadUtf8Exact(Fixture.File) == Prior) . "`n", "*")
+		AssertEqual(!Collision, Published, "only a genuinely acquired default stage may publish")
+	}
+	if Step == "consume" || !Collision {
+		_MRR_ReloadEnded()
+		New := _MRR_BuildTray(Fixture, "successor")
+		_MenuReloadReplayRoot := New.Root
+		Paths := MenuReloadReplay_Consume(Fixture.File, _MRR_Notify.Bind(Fixture))
+		AssertEqual(1, Paths.Length, "the genuine published command must reach the successor")
+		_MRR_SuccessorDrains(Fixture, Paths)
+		AssertEqual(1, Fixture.Runs.Length, "the successor must really replay the native command exactly once")
+		AssertEqual("successor", Fixture.Runs[1].Who)
+		AssertEqual(0, Fixture.Notices.Length, "a foreign stage cannot invalidate a complete published hand-off")
+		AssertFalse(FileExist(Fixture.File), "the genuinely published receipt must be consumed once")
+		FileAppend("# menu-stage step=consume collision=" . Collision . " runs=" . Fixture.Runs.Length
+			. " stage_present=" . !!FileExist(Stage) . "`n", "*")
+	}
+	if Collision {
+		AssertTrue(FileExist(Stage) != "", "neither public owner may consume a foreign stage")
+		AssertEqual(Foreign, FSReadUtf8Exact(Stage), "the foreign stage's exact native bytes must survive")
+		After := _MRR_StageSnapshot(Stage)
+		AssertTrue(After["ok"], "the original foreign stage must still be readable by native identity")
+		for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+			AssertEqual(Before[Key], After[Key], "the foreign stage keeps its native " . Key)
+		if Step == "publish"
+			AssertEqual(Prior, FSReadUtf8Exact(Fixture.File), "refusing a foreign stage preserves the previous target")
+	} else
+		AssertFalse(FileExist(Stage), "a healthy owned publication and consumption leave no sibling stage")
+}
+
+for _MRR_StageStep in ["publish", "consume"] {
+	for _MRR_StageCollision in [false, true]
+		Test("menu reload replay: " . _MRR_StageStep . " collision=" . _MRR_StageCollision . " (menu-reload-stage-custody)",
+			_MRR_Run.Bind(_MRR_StageCustodyBody.Bind(_MRR_StageStep, _MRR_StageCollision), true))
+}

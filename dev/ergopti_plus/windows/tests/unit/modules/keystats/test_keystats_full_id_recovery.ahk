@@ -425,3 +425,105 @@ for _KFIR_RecoveryCase in [
 ]
 	Test("keystats: startup journal identity " . _KFIR_RecoveryCase[1] . " preserves recovery admission (journal-identity-recovery-provenance)",
 		_KFIR_JournalIdentityRecovery.Bind(_KFIR_RecoveryCase*))
+
+
+; Public state/recovery/SQL producers at the finite identity boundary. Only
+; three persisted rows are needed; no claim of naturally reaching MAX uptime.
+_KFID_Row(Id, Text) {
+	return Map("type", "mouse_click", "_event_id", Id, "timestamp", "2026-01-01 10:00:00.000",
+		"app", Text, "button", "left", "x", 0, "y", 0)
+}
+
+_KFID_DomainCase(Mode) {
+	Names := ["state_json_path", "next_event_id", "device_id", "_device_id_lit", "data_sql_receipt", "rollover_pending", "today_log_date", "today_log_offset"]
+	Saved := Map()
+	for Name in Names
+		if Keystats.HasOwnProp(Name)
+			Saved[Name] := Keystats.%Name%
+	Directory := _FSWL_Path() . "-event-id-domain"
+	Created := false, Db := 0
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Directory)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The recovery ledger must belong to an exclusively created private namespace")
+		Keystats.device_id := "identity-domain-fixture"
+		Keystats._device_id_lit := KL_SqlStr(Keystats.device_id)
+		Keystats.state_json_path := Directory . "\state.json"
+		PersistedNext := Mode == "allocation-exhausted" ? 0x7FFFFFFFFFFFFFFF : (Mode == "ordinary" ? 41 : 1)
+		High := Mode == "recovery-exhausted" ? 0x7FFFFFFFFFFFFFFF : (Mode == "ordinary" ? 40 : 0x7FFFFFFFFFFFFFFE)
+		Sql := ""
+		for Row in [_KFID_Row(1, "existing-low.exe"), _KFID_Row(High, "existing-high.exe")]
+			for Statement in KL_BuildInserts(Row)
+				Sql .= Statement
+		Path := Directory . "\data.sql"
+		AssertTrue(FSWriteCreateDurable(Path, Sql) != 0, "The source ledger must contain genuine canonical SQL for both existing identities")
+		AssertTrue(FSWriteCreateDurable(Keystats.state_json_path, '{"next_event_id":' . PersistedNext . '}') != 0)
+		BeforeLedger := FileRead(Path, "UTF-8"), BeforeState := FileRead(Keystats.state_json_path, "UTF-8")
+		AssertTrue(KL_LoadState(), "The admitted boundary is a real signed64 JSON number, not an overflowing lexeme or fake RAM seed")
+		MaxId := KL_RecoverSqlEventId(Path, Keystats._device_id_lit, 31)
+		AssertEqual(High, MaxId)
+		Resolved := 0, Refused := false, Accepted := false, Inserted := 0, NewId := 0
+		try {
+			; This is the exact install performed by KL_Init after its genuine
+			; state/ledger recovery. No returned identity is fabricated here.
+			Resolved := KL_ResolveStartId(Keystats.next_event_id, MaxId)
+			Keystats.next_event_id := Resolved
+		} catch Error {
+			Refused := true
+		}
+		Db := _WJFM_OpenMemory()
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(SQLite_Exec(Db, BeforeLedger))
+		if !Refused {
+			Entry := Map("type", "mouse_click", "timestamp", "2026-01-01 10:00:01.000",
+				"app", "new-entry.exe", "button", "left", "x", 1, "y", 1)
+			try {
+				; The actual public SQL producer calls the actual stable-id owner
+				; and allocator. It is not the master test stub of KL_AppendLog.
+				Statements := KL_BuildInserts(Entry)
+				Accepted := Statements is Array && Statements.Length > 0
+				NewId := Entry.Get("_event_id", 0)
+			} catch Error {
+				Refused := true
+			}
+			if Accepted {
+				for Statement in Statements {
+					AssertTrue(SQLite_Exec(Db, Statement))
+					Inserted += SQLite_Query(Db, "SELECT changes() AS n;")[1]["n"]
+				}
+			}
+		}
+		_TestPrint("# event-id-domain mode=" . Mode . " source_max=" . MaxId . " resolved=" . Resolved
+			. " accepted=" . Accepted . " refused=" . Refused . " new_id=" . NewId
+			. " counter_after=" . Keystats.next_event_id . " inserted=" . Inserted)
+		AssertEqual(BeforeLedger, FileRead(Path, "UTF-8"), "Recovery cannot rewrite the authoritative source")
+		AssertEqual(BeforeState, FileRead(Keystats.state_json_path, "UTF-8"))
+		if Refused
+			AssertEqual(PersistedNext, Keystats.next_event_id, "a capacity refusal cannot publish a rewound or wrapped counter")
+		AssertEqual(2 + Inserted, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_mouse;")[1]["n"])
+		if Mode == "ordinary" {
+			AssertTrue(Accepted && !Refused)
+			AssertEqual(41, NewId)
+			AssertEqual(1, Inserted)
+		} else if Mode == "recovery-exhausted" {
+			AssertTrue(Refused && !Accepted,
+				"A source already containing MAXINT has no higher signed identity: refuse instead of rewinding and acknowledging INSERT OR IGNORE data loss")
+		} else {
+			AssertTrue(Refused || (Accepted && Inserted == 1 && Keystats.next_event_id > 0),
+				"The allocator may refuse capacity or allocate safely, but cannot publish a negative next identity after accepting MAXINT")
+		}
+	} finally {
+		SQLite_Close(Db)
+		for Name in Names {
+			if Saved.Has(Name)
+				Keystats.%Name% := Saved[Name]
+			else if Keystats.HasOwnProp(Name)
+				Keystats.DeleteProp(Name)
+		}
+		if Created
+			DirDelete(Directory, true)
+	}
+}
+for _KFID_Mode in ["ordinary", "recovery-exhausted", "allocation-exhausted"]
+	Test("Keystats identity domain: " . _KFID_Mode . " preserves source and canonical append ownership (event-id-domain-owner)",
+		_KFID_DomainCase.Bind(_KFID_Mode))

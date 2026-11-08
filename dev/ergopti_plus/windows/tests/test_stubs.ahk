@@ -937,6 +937,9 @@ class Keystats {
     ; "text" and "events" — KL_FlushBuffer snapshots them into the entry without
     ; transforming either — so a test that drives the real KL_Hook_OnChar can
     ; read back exactly what would reach today.log.
+	static scalar_fragment := false
+	static scalar_history := false
+	static scalar_epoch := 1
     static buffer_events  := []
     static buffer_text    := ""
     static rich_chunks    := []
@@ -968,9 +971,17 @@ class Keystats {
     ; Mirrors the production terminal lease read by KL_LogHotstring. Tests leave
     ; it false unless they explicitly exercise shutdown-owned publication.
     static _shutting_down := false
+    ; Production declares the resident store too (KL_ResolvePaths writes it);
+    ; KLPF_CaptureForegroundProjection reads it. A test that sets it and then
+    ; deletes the property it believes it created must leave the declared
+    ; field, not a class without one, for every later build.
+    static metrics_dir    := ""
     static by_device_dir  := ""
     static data_sql_path  := ""
 	static today_log_path   := ""
+    ; Production's journal bookmark: KLPF_CaptureForegroundProjection and
+    ; KLPF_ForegroundProjectionCurrent read it once the resident store matches.
+    static today_log_offset := 0
     ; Read by KL_LogHotstring (modules/keystats/keystats_hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"
@@ -982,6 +993,8 @@ class Keystats {
 ; can verify the refcounting behaviour.
 KL_MarkSynthetic(source, is_private := false) {
     Owner := Map("source", source, "private", is_private ? true : false)
+    Keystats.scalar_fragment := false
+    Keystats.scalar_epoch += 1
     Keystats.synth_owners.Push(Owner)
     Keystats.synth_active := Keystats.synth_owners.Length
     Keystats.synth_type := source
@@ -1005,6 +1018,8 @@ KL_ClearSynthetic(Owner, *) {
     }
     if !OwnerIndex
         return false
+    Keystats.scalar_fragment := false
+    Keystats.scalar_epoch += 1
     Keystats.synth_owners.RemoveAt(OwnerIndex)
     Keystats.synth_active := Keystats.synth_owners.Length
     if Keystats.synth_active {
@@ -1030,4 +1045,46 @@ _Stub_CurlResolveProxyDirect(State, Url, Callback) {
 	State["proxy_resolutions"] := State.Get("proxy_resolutions", 0) + 1
 	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
 	return true
+}
+
+
+; Private RAM verdict for pure bridge fixtures. No focus hook or native probe is installed.
+_LLM_TestPrivacyEnter(Focus) {
+ global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS, _LLM_Bridge_ReadLiveFocus
+ global _LLM_Bridge_BufferSource, _LLM_Bridge_AgentBufferSource, _LLM_Bridge_BufferAgentSafe
+ global _LLM_Bridge_AgentContentGeneration, _LLM_Bridge_PrivacyAppCache
+ global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+ AssertEqual(0, SFD_FIELD_CACHE["focus_hook"], "A pure privacy fixture cannot borrow a native WinEvent hook")
+ AssertEqual(0, SFD_FIELD_CACHE["focus_callback"], "A pure privacy fixture cannot borrow a native callback")
+ AssertEqual(0, SFD_FIELD_CACHE["pending_hwnd"], "A pure privacy fixture cannot borrow a pending UIA owner")
+ Saved := {Buffer: _LLM_Bridge_Buffer, Content: _LLM_Bridge_ContentGeneration,
+  AgentBuffer: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding, Cache: SFD_FIELD_CACHE, Ttl: SFD_FIELD_CACHE_TTL_MS, Focus: _LLM_Bridge_ReadLiveFocus,
+  BufferSource: _LLM_Bridge_BufferSource, AgentSource: _LLM_Bridge_AgentBufferSource,
+  AgentSafe: _LLM_Bridge_BufferAgentSafe, AgentGeneration: _LLM_Bridge_AgentContentGeneration,
+  AppCache: _LLM_Bridge_PrivacyAppCache}
+ SFD_FIELD_CACHE := SFD_FIELD_CACHE.Clone()
+ SFD_FIELD_CACHE["hwnd"] := Focus["control"], SFD_FIELD_CACHE["secure"] := false
+ SFD_FIELD_CACHE["focus_generation"] := 47, SFD_FIELD_CACHE["verdict_generation"] := 47
+ SFD_FIELD_CACHE["current_element_id"] := "fixture:bridge-field", SFD_FIELD_CACHE["element_id"] := "fixture:bridge-field"
+ SFD_FIELD_CACHE["focus_tracking_active"] := true, SFD_FIELD_CACHE["at"] := A_TickCount
+ SFD_FIELD_CACHE["focus_hook"] := 0, SFD_FIELD_CACHE["focus_callback"] := 0
+ SFD_FIELD_CACHE_TTL_MS := 600000
+ _LLM_Bridge_ReadLiveFocus := () => Focus.Clone()
+ _LLM_Bridge_BufferSource := 0, _LLM_Bridge_AgentBufferSource := 0
+ _LLM_Bridge_BufferAgentSafe := true
+ _LLM_Bridge_PrivacyAppCache := Map("hwnd", Focus["hwnd"], "control", Focus["control"],
+  "focus_generation", 47, "at", A_TickCount, "app", "fixture-typing.exe")
+ return Saved
+}
+_LLM_TestPrivacyExit(Saved) {
+ global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS, _LLM_Bridge_ReadLiveFocus
+ global _LLM_Bridge_BufferSource, _LLM_Bridge_AgentBufferSource, _LLM_Bridge_BufferAgentSafe
+ global _LLM_Bridge_AgentContentGeneration, _LLM_Bridge_PrivacyAppCache
+ global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+ SFD_FIELD_CACHE := Saved.Cache, SFD_FIELD_CACHE_TTL_MS := Saved.Ttl, _LLM_Bridge_ReadLiveFocus := Saved.Focus
+ _LLM_Bridge_BufferSource := Saved.BufferSource, _LLM_Bridge_AgentBufferSource := Saved.AgentSource
+ _LLM_Bridge_BufferAgentSafe := Saved.AgentSafe, _LLM_Bridge_AgentContentGeneration := Saved.AgentGeneration
+ _LLM_Bridge_PrivacyAppCache := Saved.AppCache
+ _LLM_Bridge_Buffer := Saved.Buffer, _LLM_Bridge_ContentGeneration := Saved.Content
+ _LLM_Bridge_AgentBuffer := Saved.AgentBuffer, _LLM_Bridge_AgentFeeding := Saved.Feeding
 }

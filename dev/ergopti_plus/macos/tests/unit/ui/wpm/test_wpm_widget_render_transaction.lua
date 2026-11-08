@@ -10,103 +10,39 @@
 local helpers = require("tests.helpers")
 local with_menubar = require("tests.support.wpm_menubar_fixture")
 
---- Exercises a fresh widget with independently observable native capabilities.
---- @param callback function Receives the widget and its native state.
---- @param position table|nil Persisted coordinates keyed by storage setting.
-local function with_widget(callback, position)
-	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "ui.tooltip",
-		"modules.keystats", "infra.logger", "infra.paths", "infra.timings", "adapters.timer_scheduler",
-		"adapters.graphics_renderer", "adapters.storage" }, function()
-		local state = { timers = {}, taps = {}, canvases = {}, logs = {} }
-		local function phase(name)
-			if state.on_phase then state.on_phase(name) end
-		end
-		local logger = helpers.make_logger_stub()
-		for _, level in ipairs({ "debug", "info", "error" }) do
-			logger[level] = function(_, message)
-				state.logs[#state.logs + 1] = { level = level, message = message }
-				phase(message)
-			end
-		end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = helpers.shared }
-		package.loaded["adapters.storage"] = { get = function(key) return position and position[key] end,
-			set = function() end, delete = function() end }
-		package.loaded["modules.keystats"] = { get_live_stats = function()
-			phase("stats")
-			if state.stats_failure then error("PRIVATE_DETAIL") end
-			return { wpm = 42 }
-		end }
-		package.loaded["ui.wpm.shared"] = { get_active_source = function() return "manual" end,
-			resolve_group_hex = function() return nil end, unit_label = function() return "WPM" end }
-		package.loaded["ui.tooltip"] = { is_visible = function() phase("tooltip"); return false end }
-		package.loaded["adapters.timer_scheduler"] = {
-			every = function(_, run)
-				local handle = { run = run, active = true }
-				state.timers[#state.timers + 1] = handle
-				return handle, true
-			end,
-			cancel = function(handle)
-				if state.refuse_timer_once then state.refuse_timer_once = false; return false end
-				handle.active = false
-				return true
-			end,
-		}
-		package.loaded["adapters.graphics_renderer"] = { createWindow = function(frame)
-			if state.canvas_failure == "zero" then return 0 end
-			if state.canvas_failure == "throw" then error("PRIVATE_DETAIL") end
-			local canvas = { current_frame = frame, deleted = false, shows = 0 }
-			for _, name in ipairs({ "level", "behavior", "replaceElements", "hide" }) do
-				canvas[name] = function(self)
-					helpers.assert_eq(self.deleted, false, "retired canvas cannot receive " .. name)
-					phase(name)
-					return self
-				end
-			end
-			function canvas:show()
-				helpers.assert_eq(self.deleted, false, "retired canvas cannot be shown")
-				self.shows = self.shows + 1
-				phase("show")
-				return self
-			end
-			function canvas:delete() self.deleted = true; return self end
-			function canvas:frame(next_frame)
-				helpers.assert_eq(self.deleted, false, "retired canvas cannot be repositioned")
-				if next_frame then self.current_frame = next_frame end
-				return self.current_frame
-			end
-			function canvas:mouseCallback(fn) self.mouse_callback = fn; return self end
-			state.canvases[#state.canvases + 1] = canvas
-			phase("create")
-			return canvas
-		end }
-		local widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
-			timer = { absoluteTime = function() return 1000000000 end },
-			screen = { mainScreen = function()
-				phase("screen")
-				return { fullFrame = function() return { x = 0, y = 0, w = 1600, h = 1000 } end }
-			end },
-			eventtap = {
-				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
-				new = function(_, run)
-					local tap = { run = run, enabled = false }
-					function tap:start() self.enabled = true; return self end
-					function tap:stop()
-						if state.refuse_tap_once then state.refuse_tap_once = false; return self end
-						self.enabled = false
-						return self
-					end
-					function tap:isEnabled() return self.enabled end
-					state.taps[#state.taps + 1] = tap
-					return tap
-				end,
-			},
-		})
-		callback(widget, state)
-	end)
-end
+local with_widget = require("tests.support.wpm_widget_fixture")
 
 helpers.describe("WPM widget render lifecycle", function()
+	helpers.it("retains a canvas after deletion failure and retries on stop", function()
+		with_widget(function(widget, state)
+			helpers.assert_true(widget.start(false))
+			state.refuse_canvas_delete = true
+			helpers.assert_eq(widget.stop(), false)
+			helpers.assert_eq(state.canvases[1].deleted, false)
+			helpers.assert_eq(widget.start(false), false, "unsettled canvas blocks restart")
+			helpers.assert_eq(#state.canvases, 1)
+			state.refuse_canvas_delete = false
+			helpers.assert_true(widget.stop())
+			helpers.assert_true(state.canvases[1].deleted)
+		end)
+	end)
+	helpers.it("refuses a reentrant start while the previous canvas is being deleted", function()
+		with_widget(function(widget, state)
+			helpers.assert_true(widget.start(false))
+			local attempted = false
+			state.on_phase = function(name)
+				if name ~= "delete" then return end
+				state.on_phase = nil
+				attempted = true
+				helpers.assert_eq(widget.start(false), false)
+			end
+			helpers.assert_true(widget.stop())
+			helpers.assert_true(attempted)
+			helpers.assert_true(widget.start(false))
+			helpers.assert_eq(#state.canvases, 2)
+			helpers.assert_true(widget.stop())
+		end)
+	end)
 	helpers.it("(wpm-menubar-stop-owner) timer failure logging preserves a restarted native item", function()
 		with_menubar(function(menubar, state)
 			helpers.assert_eq(menubar.start(), true)

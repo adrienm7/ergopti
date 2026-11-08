@@ -87,6 +87,8 @@ local function with_fixture(spec, body)
 			llm_backend = "ollama",
 			llm_enabled = spec.enabled ~= false,
 			llm_active_profile = "basic",
+			-- The automatic profile is on by default (llm.profiles.auto_profile_for_model).
+			llm_auto_profile_for_model = true,
 			llm_model = "A",
 			llm_model_power = 1,
 			llm_model_mlx = "mlx-A",

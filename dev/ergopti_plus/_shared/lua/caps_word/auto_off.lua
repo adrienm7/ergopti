@@ -49,6 +49,23 @@ end
 -- ======================================
 -- ======================================
 
+-- The editing and navigation keys that always end CapsWord, whatever the
+-- delimiter settings: macOS's fixed Karabiner exits (capsword.json), which
+-- Windows and Linux follow (decision of 2026-11-06). Backspace keeps CapsWord.
+M.FIXED_EXIT_KEYS = {
+	"escape", "delete", "up", "down", "left", "right", "home", "end", "page_up", "page_down",
+	"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+}
+local FIXED_EXIT_SET = {}
+for _, key in ipairs(M.FIXED_EXIT_KEYS) do FIXED_EXIT_SET[key] = true end
+
+--- Whether `key` is one of the editing or navigation keys that always end CapsWord.
+--- @param key any Neutral key name (FIXED_EXIT_KEYS spelling).
+--- @return boolean
+function M.is_fixed_exit_key(key)
+	return type(key) == "string" and FIXED_EXIT_SET[key] == true
+end
+
 --- Whether `key` names a built-in delimiter of the hotstring catalogue.
 --- @param key any Candidate delimiter key.
 --- @return boolean
@@ -57,6 +74,8 @@ function M.is_terminator_key(key)
 end
 
 --- Validates the stored inactivity delay.
+--- A positive delay that rounds to 0 ms would expire at once here and mean
+--- "never" on the AHK port, so it is refused instead of quantized.
 --- @param value any Candidate number of seconds (0 = never).
 --- @return boolean valid
 --- @return string|nil reason Stable refusal reason.
@@ -64,6 +83,7 @@ function M.validate_idle_timeout(value)
 	if type(value) ~= "number" or value ~= value or value == math.huge or value < 0 then
 		return false, "invalid_idle_timeout"
 	end
+	if value > 0 and value * MS_PER_SECOND < 0.5 then return false, "invalid_idle_timeout" end
 	return true
 end
 

@@ -143,6 +143,11 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "value", "s"],
 			["literal", ")`;"]
 		],
+		"export.vacuum_into", [
+			["literal", "VACUUM INTO "],
+			["slot", "path", "s"],
+			["literal", "`;"]
+		],
 		"meta.rev_bump", [
 			["literal", "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev'`;"]
 		],
@@ -162,6 +167,17 @@ KeystatsQuery(Name, Params := Map()) {
 			["literal", ", "],
 			["slot", "updated_at", "s"],
 			["literal", ") ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at`;"]
+		],
+		"devices.import_watermark", [
+			["literal", "UPDATE devices SET imported_data_sql_size="],
+			["slot", "size", "i"],
+			["literal", ", imported_data_sql_sha256="],
+			["slot", "digest", "s"],
+			["literal", ", updated_at="],
+			["slot", "updated_at", "s"],
+			["literal", " WHERE device_id="],
+			["slot", "device_id", "s"],
+			["literal", "`;"]
 		],
 		"agg.app_day", [
 			["literal", "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, app_time_ms, category) VALUES ("],
@@ -598,6 +614,40 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "action", "s"],
 			["literal", ", "],
 			["slot", "metadata_json", "s?"],
+			["literal", ")`;"]
+		],
+		"events.network", [
+			["literal", "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["slot", "device_id", "s"],
+			["literal", ", "],
+			["slot", "id", "i"],
+			["literal", ", "],
+			["slot", "ts", "s"],
+			["literal", ", "],
+			["slot", "date", "s"],
+			["literal", ", "],
+			["slot", "kind", "s"],
+			["literal", ", "],
+			["slot", "app", "s"],
+			["literal", ", "],
+			["slot", "meta_json", "s?"],
+			["literal", ")`;"]
+		],
+		"events.roi", [
+			["literal", "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["slot", "device_id", "s"],
+			["literal", ", "],
+			["slot", "id", "i"],
+			["literal", ", "],
+			["slot", "ts", "s"],
+			["literal", ", "],
+			["slot", "date", "s"],
+			["literal", ", "],
+			["slot", "kind", "s"],
+			["literal", ", "],
+			["slot", "app", "s"],
+			["literal", ", "],
+			["slot", "meta_json", "s?"],
 			["literal", ")`;"]
 		],
 		"events.hotstring", [

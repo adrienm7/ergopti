@@ -1404,6 +1404,8 @@ do
 		boot_note("config.toml is absent at %s: opening the first-run wizard; the full boot follows it.",
 			tostring(cfg_path))
 		onboarding_mod.run(cfg_path)
+		-- The boot now waits for the user: a release swap keeps this build.
+		require("infra.updater_boot_ready").report("onboarding")
 		Boot.mark("First-launch guard (onboarding check)")
 		return
 	end
@@ -1477,8 +1479,10 @@ Boot.stage_once("Accessibility permission")
 -- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
 -- Each ad hoc signed build also invalidates the previous grant while System
 -- Settings still shows it checked, so exiting with instructions left users
--- stuck. The wait clears that stale entry once per install, shows macOS's own
--- prompt, opens the pane, and runs this boot again once macOS trusts the process.
+-- stuck. The wait clears that stale entry once per install, unless another copy
+-- signed differently can hold the switch (it then names that copy), shows
+-- macOS's own prompt, opens the pane, and runs this boot again once macOS
+-- trusts the process.
 local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
 if accessibility_trusted == nil then
 	emergency_exit_after_runtime_failure("accessibility",
@@ -1499,6 +1503,10 @@ if accessibility_trusted ~= true then
 		every = TimerScheduler.every,
 		cancel = TimerScheduler.cancel,
 		watch_reopen = watch_launcher_reopen,
+		-- Another copy signed differently can hold the one switch: its paths are named.
+		name_other_copies = function(paths)
+			return require("ui.permission_dialog").name_other_copies(AccessibilityPermission, paths)
+		end,
 		install_identity = install_identity,
 		reset_memory = {
 			get = function() return Storage.get(ACCESSIBILITY_RESET_STORAGE_KEY) end,
@@ -1521,7 +1529,10 @@ if accessibility_trusted ~= true then
 		emergency_exit_after_runtime_failure("accessibility",
 			"Accessibility wait could not start: " .. tostring(wait_err),
 			"startup.accessibility_required")
+		return
 	end
+	-- A new signature waits for the user's grant: a release swap keeps this build.
+	require("infra.updater_boot_ready").report("waiting for Accessibility")
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
@@ -2194,6 +2205,11 @@ do
 end
 Boot.sub("choice catalogue and cache stats")
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
+-- Read each category's TOML metadata on run-loop turns from now on, so the
+-- first preview of a category reads memory instead of its file on the keystroke
+if require("modules.hotstrings.hotstrings_config").prewarm_meta(keymap.list_toml_groups()) ~= true then
+	Logger.error(LOG, "The hotstring category metadata is read on each category's first preview this session.")
+end
 Boot.stage("Final mapping sort + tail-index rebuild")
 
 -- Single final sort covering personal + dynamic + common TOML groups.
@@ -2207,9 +2223,16 @@ Boot.stage("Keymap engine started")
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
 -- This call was previously auto-invoked at the end of modules/keymap/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
+if keymap.migrate_legacy_section_settings() ~= true then
+	error("legacy hotstring section settings could not be migrated before eventtap startup")
+end
 if keymap.apply_hotstring_preferences(boot_saved_prefs) ~= true then
 	error("canonical hotstring preferences did not commit before eventtap startup")
 end
+-- The layout emulation the keymap tap types through. A layout it cannot read
+-- is an ERROR of its owner and the system layout keeps typing; only a broken
+-- owner (a raise) stops the boot.
+keymap.start_layout_emulation()
 local keymap_started = keymap.start()
 if keymap_started ~= true then
 	error("keymap.start did not commit")
@@ -2426,6 +2449,8 @@ end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- A release swap that opened this build keeps it only once it reports ready.
+require("infra.updater_boot_ready").report("boot complete")
 -- The reload this boot follows, from its reload call to this boot's end.
 if _reload_started_epoch_ms then
 	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms

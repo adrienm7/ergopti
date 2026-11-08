@@ -24,6 +24,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local km_utils = require("modules.keymap.utils")
+local TextUtils = require("text_utils")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 
 local LOG = "llm.app_filter"
@@ -83,8 +84,9 @@ end
 --- @return any error_detail Native focus-read refusal or Lua exception, if any.
 local function get_focused_element(front)
 	if not front then return nil end
-	local ok_ax, ax = pcall(hs.axuielement.applicationElementForPID, front:pid())
-	if not ok_ax or not ax then return nil end
+	local ok_ax, ax = pcall(function() return hs.axuielement.applicationElementForPID(front:pid()) end)
+	if not ok_ax then return nil, true, ax end
+	if not ax then return nil, true, "Accessibility application element is unavailable" end
 	local ok_fe, focused, focus_error = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
 	if not ok_fe then return nil, true, focused end
 	return focused, focused == nil and focus_error ~= nil, focus_error
@@ -101,6 +103,17 @@ local function is_secure_field_focused(front, resolve_focused)
 	return SecureFieldDetector.isElementSecure(focused)
 end
 
+--- Reads one optional AX attribute without mistaking a transport refusal for absence.
+--- Hammerspoon returns nil plus this exact error for an unsupported attribute.
+local function read_optional_attribute(element, attribute)
+	local ok, value, detail = pcall(function() return element:attributeValue(attribute) end)
+	if not ok then return nil, false end
+	if value == nil and detail ~= nil and detail ~= "Attribute is not supported by target" then
+		return nil, false
+	end
+	return value, true
+end
+
 --- Returns true when the currently focused element is a browser URL bar.
 ---
 --- Detection strategy (three layers, each more expensive than the last):
@@ -113,22 +126,27 @@ end
 --- @return boolean True if a URL-bar-type element has input focus.
 local function is_url_bar_focused(front, resolve_focused)
 	if not front then return false end
-	local bid = front:bundleID() or ""
-	if not BROWSER_BUNDLE_IDS[bid] then return false end
+	local ok_bid, bid = pcall(function() return front:bundleID() end)
+	if not ok_bid or (bid ~= nil and type(bid) ~= "string") then return true end
+	if not BROWSER_BUNDLE_IDS[bid or ""] then return false end
 
 	local focused = resolve_focused()
 	if not focused then return false end
 
 	local ok_role, role = pcall(function() return focused:attributeValue("AXRole") end)
-	if not ok_role or role ~= "AXTextField" then return false end
+	-- A missing or malformed role cannot prove that this is not a URL field.
+	if not ok_role or type(role) ~= "string" or role == "" then return true end
+	if role ~= "AXTextField" then return false end
 
 	-- Layer 1 — Safari / WebKit: AXSubrole is explicitly "AXURLField"
-	local ok_sub, subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
-	if ok_sub and subrole == AX_URL_SUBROLE then return true end
+	local subrole, ok_sub = read_optional_attribute(focused, "AXSubrole")
+	if not ok_sub then return true end
+	if subrole == AX_URL_SUBROLE then return true end
 
 	-- Layer 2 — Chrome / Brave / Opera: AXIdentifier contains a recognisable pattern
-	local ok_id, identifier = pcall(function() return focused:attributeValue("AXIdentifier") end)
-	if ok_id and type(identifier) == "string" and identifier ~= "" then
+	local identifier, ok_id = read_optional_attribute(focused, "AXIdentifier")
+	if not ok_id then return true end
+	if type(identifier) == "string" and identifier ~= "" then
 		local id_lower = identifier:lower()
 		for _, pattern in ipairs(URL_BAR_ID_PATTERNS) do
 			if id_lower:find(pattern, 1, true) then return true end
@@ -138,14 +156,18 @@ local function is_url_bar_focused(front, resolve_focused)
 	-- Layer 3 — Edge / Firefox / Arc: no usable identifier; check the parent hierarchy.
 	-- Walk up two levels: input may be directly in the toolbar (Firefox) or wrapped in
 	-- an AXGroup inside the toolbar (Chromium / Edge omnibox structure).
-	local ok_p, parent = pcall(function() return focused:attributeValue("AXParent") end)
-	if ok_p and parent then
-		local ok_pr, parent_role = pcall(function() return parent:attributeValue("AXRole") end)
-		if ok_pr and parent_role == "AXToolbar" then return true end
-		local ok_gp, grandparent = pcall(function() return parent:attributeValue("AXParent") end)
-		if ok_gp and grandparent then
-			local ok_gr, gp_role = pcall(function() return grandparent:attributeValue("AXRole") end)
-			if ok_gr and gp_role == "AXToolbar" then return true end
+	local parent, ok_p = read_optional_attribute(focused, "AXParent")
+	if not ok_p then return true end
+	if parent then
+		local parent_role, ok_pr = read_optional_attribute(parent, "AXRole")
+		if not ok_pr or type(parent_role) ~= "string" or parent_role == "" then return true end
+		if parent_role == "AXToolbar" then return true end
+		local grandparent, ok_gp = read_optional_attribute(parent, "AXParent")
+		if not ok_gp then return true end
+		if grandparent then
+			local gp_role, ok_gr = read_optional_attribute(grandparent, "AXRole")
+			if not ok_gr or type(gp_role) ~= "string" or gp_role == "" then return true end
+			if gp_role == "AXToolbar" then return true end
 		end
 	end
 
@@ -160,11 +182,15 @@ end
 --- @return userdata|nil hs.application object, or nil on failure.
 local function get_focused_app()
 	local ok_fw, fw = pcall(hs.window.focusedWindow)
-	if ok_fw and fw then
+	if not ok_fw then return nil, true end
+	if fw then
 		local ok_app, app = pcall(function() return fw:application() end)
-		if ok_app and app then return app end
+		if not ok_app or not app then return nil, true end
+		return app, false
 	end
-	return hs.application.frontmostApplication()
+	local ok_front, front = pcall(hs.application.frontmostApplication)
+	if not ok_front then return nil, true end
+	return front, false
 end
 
 
@@ -206,7 +232,11 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 		return true
 	end
 
-	local front = get_focused_app()
+	local front, focus_failed = get_focused_app()
+	if focus_failed then
+		Logger.debug(LOG, "Focused application could not be established — LLM request skipped.")
+		return true
+	end
 
 	-- Both filters used to resolve the focused AX element independently, so a
 	-- browser with both enabled paid the cross-process round-trip TWICE per
@@ -238,24 +268,47 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 	end
 	if not front then return false end
 
-	local bid  = front:bundleID() or ""
-	local path = front:path() or ""
-	local name = (front:name() or ""):lower()
+	local metadata_ok, bid, path, name = pcall(function()
+		return front:bundleID(), front:path(), front:name()
+	end)
+	if not metadata_ok or (bid ~= nil and type(bid) ~= "string")
+		or (path ~= nil and type(path) ~= "string") or (name ~= nil and type(name) ~= "string") then
+		Logger.debug(LOG, "Focused application metadata is unreadable — LLM request skipped.")
+		return true
+	end
+	local path_known = type(path) == "string" and path ~= ""
+	bid, path, name = bid or "", path or "", TextUtils.trig_fold(name or "")
 
 	for _, app in ipairs(excluded_apps) do
-		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
-		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
-		local configured_name = type(app.name) == "string" and app.name:lower() or ""
+		if type(app) ~= "string" and type(app) ~= "table" then
+			Logger.warn(LOG, "Invalid application exclusion — LLM request skipped.")
+			return true
+		end
+		-- Shared configuration also admits a plain application identifier.
+		-- Keep structured entries' path / bundle priority unchanged.
+		local item = type(app) == "table" and app or {}
+		local plain = type(app) == "string" and app or ""
+		local plain_path = plain ~= "" and plain:sub(1, 1) == "/"
+		local has_path = type(item.appPath) == "string" and item.appPath ~= ""
+		local has_bid  = type(item.bundleID) == "string" and item.bundleID ~= ""
+		local configured_name = TextUtils.trig_fold(type(item.name) == "string" and item.name or plain)
+		if (has_path or plain_path) and not path_known then
+			Logger.debug(LOG, "Focused application path is unavailable — LLM request skipped.")
+			return true
+		end
 		-- Guard: name must also be non-empty. Without this, an empty name (app
 		-- whose hs:name() returns nil) causes ("slack"):find("", 1, true) = 1,
 		-- so every name-only exclusion entry would match any nameless app.
-		local same_name = (not has_path and not has_bid
+		local same_name = (not has_path and not has_bid and not plain_path
 			and configured_name ~= "" and name ~= ""
-			and (configured_name == name
-			or name:find(configured_name, 1, true)
-			or configured_name:find(name, 1, true)))
-		local path_match = has_path and (app.appPath == path)
-		local bid_match  = (not has_path and has_bid and app.bundleID == bid)
+			and (configured_name == name or (plain == "" and
+				(name:find(configured_name, 1, true)
+				or configured_name:find(name, 1, true)))))
+		local path_match = (has_path and item.appPath == path)
+			or (plain_path and plain == path)
+		local bid_match  = (not has_path and has_bid and item.bundleID == bid)
+			or (plain ~= "" and not plain_path and bid ~= ""
+				and TextUtils.trig_fold(plain) == TextUtils.trig_fold(bid))
 
 		if path_match or bid_match or same_name then
 			Logger.debug(LOG, "App excluded: '%s' — LLM request skipped.", front:name() or bid)

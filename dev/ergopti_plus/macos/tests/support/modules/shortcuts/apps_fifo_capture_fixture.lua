@@ -6,7 +6,7 @@ require("infra.logger")
 local M = {}
 local OWNED = {
 	"modules.shortcuts.actions.apps", "adapters.synthetic_input", "adapters.event_provenance",
-	"adapters.timer_scheduler", "adapters.storage", "infra.logger", "logger.shim", "tests.stubs.hs", "hs",
+	"adapters.timer_scheduler", "adapters.storage", "adapters.clipboard", "infra.logger", "logger.shim", "tests.stubs.hs", "hs",
 	"adapters.window_info", "adapters.window_manager", "adapters.app_launcher", "adapters.shell_runner",
 	"infra.notifications", "infra.i18n", "infra.text_utils",
 	"text_utils", "compat.utf8",
@@ -17,7 +17,7 @@ function M.with_world(options, callback)
 		local syn = f.load()
 		local backlog = options.backlog == true
 		local original = { ['public.utf8-plain-text'] = 'ORIGINAL', ['public.html'] = '<b>ORIGINAL</b>' }
-		local board = original
+		local board, generation, count_reads = original, 0, 0
 		local events, reads = {}, 0
 		local copies, restores, urls = 0, 0, {}
 		local refusal_count = options.restore_refusals or 0
@@ -28,19 +28,45 @@ function M.with_world(options, callback)
 				copies = copies + 1
 				if mods == 'cmd' or not options.no_finder_path then
 					board = { ['public.utf8-plain-text'] = mods == 'cmd' and 'SELECTED WORDS' or '/Users/user/Documents/report.txt' }
+					generation = generation + 1
 				end
 				events[#events+1] = {kind='copy', at=now}
 			end
 		end
 		f.key_observer = observe
 		hs.pasteboard = {
-			readAllData = function() return board end,
-			clearContents = function() board = {} end,
-			getContents = function() reads = reads + 1; return board['public.utf8-plain-text'] end,
+			changeCount = function()
+				count_reads = count_reads + 1
+				if options.change_before_clear and count_reads == 3 then
+					board = { ['public.utf8-plain-text'] = 'LATER USER COPY' }
+					generation = generation + 1
+				end
+				return generation
+			end,
+			allContentTypes = function() if options.multi_item then return { { "public.utf8-plain-text" }, { "public.file-url" } } end; return { {} } end,
+			readAllData = function()
+				if options.change_during_snapshot then
+					options.change_during_snapshot = false
+					board = { ['public.utf8-plain-text'] = 'NEW USER COPY' }
+					generation = generation + 1
+				end
+				return board
+			end,
+			clearContents = function() board = {}; generation = generation + 1 end,
+			getContents = function()
+				reads = reads + 1
+				local text = board['public.utf8-plain-text']
+				if options.copy_during_read then
+					-- Another application copies while the selection is being read
+					board = { ['public.utf8-plain-text'] = 'COPY DURING READ' }
+					generation = generation + 1
+				end
+				return text
+			end,
 			writeAllData = function(saved)
 				restores = restores + 1
 				if restores <= refusal_count then return false end
-				board = saved; events[#events+1] = {kind='restore', at=now}; return true
+				board = saved; generation = generation + 1; events[#events+1] = {kind='restore', at=now}; return true
 			end,
 		}
 		hs.urlevent = { openURL = function(value) urls[#urls+1]=value; return true end }
@@ -51,6 +77,7 @@ function M.with_world(options, callback)
 		package.loaded['adapters.shell_runner'] = {}
 		package.loaded['infra.notifications'] = { notify=function() end }
 		package.loaded['infra.i18n'] = {get=function(key) return key end}
+		package.loaded['adapters.clipboard'] = nil
 		local apps = require('modules.shortcuts.actions.apps')
 		local head_completed = not backlog
 		if backlog then
@@ -93,6 +120,8 @@ function M.with_world(options, callback)
 		end
 		local world = { apps=apps, synthetic=syn, original=original, events=events, fixture=f,
 			advance=advance, clipboard=function() return board end,
+			-- An independent user or application copy, outside the Apps owner
+			user_copy=function(data) board = data; generation = generation + 1 end,
 			counts=function() return copies, restores, #urls, reads end }
 		local outcome=table.pack(xpcall(function() return callback(world) end, debug.traceback))
 		apps.stop_apps_actions()

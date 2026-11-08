@@ -20,6 +20,7 @@ local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
+local ContextLimit = require("infra.llm_context_limit")
 
 local LOG = "menu_llm.settings"
 
@@ -236,8 +237,9 @@ local function generic_numeric_prompt(
 			-- fraction made it extract an empty context.
 			return reject_numeric_input(title)
 		elseif new_val and is_finite_number(new_val) then
-			if min_val and new_val < min_val then new_val = min_val end
-			if max_val and new_val > max_val then new_val = max_val end
+			if (min_val and new_val < min_val) or (max_val and new_val > max_val) then
+				return reject_numeric_input(title, "numeric_prompt.out_of_range")
+			end
 
 			-- Reverse the factor if applied
 			local final_val = factor and (new_val / factor) or new_val
@@ -314,6 +316,11 @@ function M.new(deps)
 		deps.state[snapshot.key] = clone_value(snapshot.state_value)
 
 		local failures = {}
+		if debt.released_demotions then
+			local called, restored = pcall(deps.demotions.readopt, debt.released_demotions)
+			if called and restored == true then debt.released_demotions = nil
+			else failures[#failures + 1] = "session preference restoration" end
+		end
 		if debt.menu then
 			if refresh_menu(deps, "LLM setting menu rollback") then
 				debt.menu = false
@@ -321,7 +328,7 @@ function M.new(deps)
 				failures[#failures + 1] = "menu rollback"
 			end
 		end
-		if debt.persist then
+		if debt.persist and debt.released_demotions == nil then
 			local persisted = publish_setting(debt, "LLM setting preference rollback")
 			-- The outer preference owner may restore its last committed candidate
 			-- when this compensating write refuses, so reclaim this key immediately
@@ -394,6 +401,11 @@ function M.new(deps)
 			return false
 		end
 		if options.publication_guard ~= nil and type(options.publication_guard) ~= "function" then return false end
+		if options.key == "llm_context_length" and (type(options.value) ~= "number"
+			or not ContextLimit.valid(options.value) or options.value % 1 ~= 0) then
+			Logger.error(LOG, "LLM context length refused outside the supported integer range.")
+			return false
+		end
 		if not is_finite_number(options.value) then
 			Logger.error(LOG, "LLM setting '%s' refused a non-finite numeric value.",
 				tostring(options.key))
@@ -469,6 +481,20 @@ function M.new(deps)
 		end
 
 		deps.state[options.key] = clone_value(candidate)
+		-- A user can explicitly confirm the currently displayed fallback. Detach
+		-- only this key's boot demotion during publication, and reclaim it before
+		-- any compensating save if a later boundary refuses.
+		if options.key == "llm_context_length" and deps.demotions ~= nil then
+			if type(deps.demotions) ~= "table" or type(deps.demotions.release_feature) ~= "function"
+				or type(deps.demotions.readopt) ~= "function" then
+				return reject_transition("session preference ownership")
+			end
+			local called, released = pcall(deps.demotions.release_feature, "ai", { [options.key] = true })
+			if not called or type(released) ~= "table" then
+				return reject_transition("session preference release")
+			end
+			debt.released_demotions = released
+		end
 		debt.persist = true
 		if not publish_setting(debt, "LLM setting preference save") then
 			return reject_transition("preference save")
@@ -655,7 +681,13 @@ function M.new(deps)
 
 	--- Sets the size of the text buffer sent as context to the AI.
 	function obj.set_context_length()
-		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
+		local function apply_context(options)
+			if not ContextLimit.valid(options.value) then
+				return reject_numeric_input(i18n.get("menu.settings.context_length_title"), "numeric_prompt.out_of_range")
+			end
+			return obj.apply_setting_transaction(options)
+		end
+		return generic_numeric_prompt(deps, apply_context,
 			i18n.get("menu.settings.context_length_title"),
 			i18n.get("menu.llm.context_length_prompt"),
 			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length,
@@ -753,7 +785,20 @@ function M.new(deps)
 		local current_mods = Storage.get(key)
 		-- Fail closed on a non-table (corrupt/AHK-migrated plist): table.concat on a
 		-- string would raise and blank the submenu (same class as format_shortcut_title).
-		if type(current_mods) ~= "table" then current_mods = default_mods end
+		local valid = type(current_mods) == "table"
+		if valid then
+			local count, length = 0, #current_mods
+			for index, value in pairs(current_mods) do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
+					or type(value) ~= "string" then valid = false; break end
+				count = count + 1
+			end
+			valid = valid and count == length
+		end
+		if not valid then
+			if current_mods ~= nil then Logger.warn(LOG, "Invalid modifier array for '%s'; using the menu default.", key) end
+			current_mods = default_mods
+		end
 		local current_str = table.concat(current_mods, "+")
 		local paused = is_paused(deps, "Modifier menu pause-state read")
 

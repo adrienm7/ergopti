@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 -- Preserve the process-wide logger identity while scoping its shared adapter.
 require("logger")
 
-local function with_destination(callback)
+local function with_destination(callback, real_detector)
 	helpers.with_stub_scope({
 		"modules.keymap.utils", "keymap.utils", "infra.text_utils", "text_utils", "compat.utf8",
 		"infra.logger", "logger.shim", "infra.timings", "adapters.timer_scheduler",
@@ -56,7 +56,11 @@ local function with_destination(callback)
 			window = { focusedWindow = function() f.calls.ax = f.calls.ax + 1; return window end },
 			axuielement = { applicationElementForPID = function()
 				f.calls.ax = f.calls.ax + 1
-				return { attributeValue = function() f.calls.ax = f.calls.ax + 1; return f.element end }
+				return { attributeValue = function()
+					f.calls.ax = f.calls.ax + 1
+					if f.first_element then local first = f.first_element; f.first_element = nil; return first end
+					return f.element
+				end }
 			end },
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -65,8 +69,15 @@ local function with_destination(callback)
 		package.loaded["adapters.secure_field_detector"] = {
 			isSecureApp = function() return false end,
 			inspectFocusedElement = function() f.calls.ax = f.calls.ax + 1; return f.secure end,
+			inspectFocusedElementWithReceipt = function() f.calls.ax = f.calls.ax + 1; return f.secure, nil, f.element end,
+			isElementSecure = function(element) return element.secure == true end,
 			watchFocusedElementChanges = function(_, receive) return watcher("secure", receive), nil, true end,
 		}
+		if real_detector then
+			package.loaded["adapters.secure_field_detector"] = nil
+			local detector = require("adapters.secure_field_detector")
+			detector.watchFocusedElementChanges = function(_, receive) return watcher("secure", receive), nil, true end
+		end
 		f.Utils = require("modules.keymap.utils")
 		function f.prime()
 			f.Utils.start_ignored_win_tracking({ Secret = true }, {})
@@ -135,6 +146,26 @@ helpers.describe("text destination RAM snapshot", function()
 				helpers.assert_nil(f.Utils.capture_text_destination())
 				helpers.assert_eq(f.calls, before)
 			end)
+		end)
+	end
+
+	for _, role in ipairs({ "AXSecureTextField", "unreadable" }) do
+		helpers.it("refuses a " .. role .. " element reached after initial classification", function()
+			with_destination(function(f)
+				f.first_element = { attributeValue = function(_, attr) return attr == "AXRole" and "AXTextField" or nil end }
+				f.initial_safe = f.first_element
+				f.element = { attributeValue = function(_, attr)
+					if role == "unreadable" then return nil, "AX failure" end
+					return attr == "AXRole" and role or nil
+				end }
+				helpers.assert_true(f.prime())
+				local receipt = f.Utils.capture_text_destination()
+				helpers.assert_not_nil(receipt)
+				helpers.assert_true(rawequal(receipt.element, f.initial_safe), "the receipt must name the classified element")
+				helpers.assert_eq(f.Utils.owns_text_destination(receipt), false, "a changed field must refuse deferred output")
+				helpers.assert_nil(f.Utils.capture_text_destination())
+				helpers.assert_eq(f.Utils.is_secure_field(f.now), true, "the typing guard must close as well")
+			end, true)
 		end)
 	end
 

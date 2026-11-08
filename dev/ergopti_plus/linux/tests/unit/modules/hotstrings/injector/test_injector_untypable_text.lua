@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local original_layout = package.loaded["adapters.keyboard_layout"]
 
 
 -- A layout with no Spanish letters: exactly what a French or US keymap gives a
@@ -98,6 +99,74 @@ local function load_injector(channel, prepare_layout)
 	injector._set_nanosleep_for_test(function() end)
 	return injector
 end
+
+helpers.describe("private injection failure receipts", function()
+	helpers.it("(private-injection-errors) never exposes payloads from a failing layout planner", function()
+		local clip, restore = stub_clipboard(false)
+		local layout_before = package.loaded["adapters.keyboard_layout"]
+		local logger, lines = require("logger.shim"), {}
+		local original = logger.error
+		logger.error = function(_, format, ...) lines[#lines + 1] = string.format(format, ...) end
+		local ok, err = pcall(function()
+			local injector = load_injector(fake_channel(true), function(layout)
+				layout.plan = function(text) error("planner rejected " .. text) end
+			end)
+			local secret = "secret-canary"
+			local results = {
+				injector.inject(0, secret, true),
+				injector.inject_fields(0, { secret, "other" }, true),
+				injector.inject_tokens(0, { { kind = "text", value = secret } }, true),
+			}
+			for _, result in ipairs(results) do
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_true(not tostring(result.error):find(secret, 1, true), "receipt must withhold payload")
+			end
+			helpers.assert_true(not table.concat(lines, "\n"):find(secret, 1, true), "logs must withhold payload")
+		end)
+		logger.error = original
+		package.loaded["adapters.keyboard_layout"] = layout_before
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(private-injection-errors) withholds native and observer exception details", function()
+		local clip, restore = stub_clipboard(false)
+		local logger, lines = require("logger.shim"), {}
+		local original = logger.error
+		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function(reason) lines[#lines + 1] = reason end }
+		logger.error = function(_, format, ...) lines[#lines + 1] = string.format(format, ...) end
+		local ok, err = pcall(function()
+			local channel = fake_channel(true)
+			channel.emit = function() error("native exception secret-canary") end
+			local injector = load_injector(channel)
+			local result = injector.inject(0, "seor", true)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_true(not tostring(result.error):find("secret-canary", 1, true))
+			injector = load_injector(fake_channel(true))
+			injector.set_output_observer(function(text) error("observer exception secret-canary " .. text) end)
+			helpers.assert_true(injector.inject(0, "seor", true).ok)
+			helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+		end)
+		logger.error = original
+		package.loaded["adapters.keyboard_hook"] = previous_hook
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(private-injection-errors) withholds clipboard preparation exceptions", function()
+		local clip, restore = stub_clipboard(true)
+		clip.new_paste_stage = function(text) error("clipboard refused " .. text) end
+		local ok, err = pcall(function()
+			local injector = load_injector(fake_channel(true))
+			local result = injector.inject(0, "secret-canary ñ", true)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_true(not tostring(result.error):find("secret-canary", 1, true))
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)
 
 
 
@@ -175,10 +244,10 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 	for _, invalid in ipairs({ "second-type", "hole", "metatable" }) do
 		helpers.it("(injection-fields-preflight) refuses " .. invalid .. " before any planning callback", function()
 			local clip, restore = stub_clipboard(false)
-			local ch, plans = fake_channel(true), 0
+			local ch, plans, layout_owner, original_plan = fake_channel(true), 0, nil, nil
 			local injector = load_injector(ch, function(layout)
-				local plan = layout.plan
-				layout.plan = function(text) plans = plans + 1; return plan(text) end
+				layout_owner, original_plan = layout, layout.plan
+				layout.plan = function(text) plans = plans + 1; return original_plan(text) end
 			end)
 			local values = invalid == "second-type" and { "seor", 17 } or invalid == "hole" and { [1] = "seor", [3] = "or" }
 				or setmetatable({ "seor", "or" }, { __len = function() error("caller length metamethod must not run") end })
@@ -190,6 +259,7 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 				helpers.assert_eq(#ch.emitted, 0)
 				helpers.assert_eq(#clip.calls, 0)
 			end)
+			layout_owner.plan = original_plan
 			restore()
 			if not ok then error(why, 0) end
 		end)
@@ -603,3 +673,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 	end)
 
 end)
+
+-- Several cases replace the layout planner; never leave their test function in
+-- the module cache for a later suite to observe.
+package.loaded["adapters.keyboard_layout"] = original_layout

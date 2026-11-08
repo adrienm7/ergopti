@@ -16,9 +16,10 @@ HotIf(Args*) {
 }
 Hotkey(Name, Callback, Options) {
 	global _LRPCM_Current, _LRPCM_Entries
-	if !_LRPCM_Entries.Has(Name)
-		_LRPCM_Entries[Name] := []
-	_LRPCM_Entries[Name].Push(Map("name", Name, "callback", Callback, "criterion", _LRPCM_Current, "options", Options))
+	Identity := StrReplace(Name, "~")
+	if !_LRPCM_Entries.Has(Identity)
+		_LRPCM_Entries[Identity] := []
+	_LRPCM_Entries[Identity].Push(Map("name", Name, "callback", Callback, "criterion", _LRPCM_Current, "options", Options))
 }
 IsCategoryGated(*) => true
 SIHO_HasActive() => false
@@ -59,8 +60,8 @@ _LRPCM_Run() {
 		if Prefix != "" {
 			_LRPCM_Emits := []
 			Entry["callback"].Call(Entry["name"])
-			_LRPCM_Require(_LRPCM_Emits.Length == 1 && _LRPCM_Emits[1]["kind"] == "physical"
-				&& _LRPCM_Emits[1]["keys"] == "{Blind}{" . Scan . "}", "modified variants must retain the physical key")
+			_LRPCM_Require(SubStr(Entry["name"], 1, 1) == "~" && _LRPCM_Emits.Length == 0,
+				"modified variants must admit the original physical key without synthetic duplication")
 		}
 	}
 	_LRPCM_Emits := []

@@ -120,6 +120,8 @@ class KLHook {
 		static capture_owner := false
 		static capture_generation := 1
 		static capture_stopping := false
+		; A one-use named-key receipt, never an inference from last_vk hints.
+		static control_char_echo := false
 		static ih := unset           ; the live InputHook object
 		static flush_timer := unset  ; bound function reference for SetTimer
 		static context_timer := unset  ; bound ref for the memory-only context projection
@@ -136,6 +138,10 @@ class KLHook {
 		; Active-window context cache. Avoids hammering Win32 on every
 		; keystroke; refreshed at most every CONTEXT_TTL_MS.
 		static context_at := 0
+		static context_transition := false
+		static context_observations := []
+		static context_observation_head := 1
+		static context_stop := false
 
 		; Previous (app, title) values + their entry tick — used to emit
 		; ``app_switch`` / ``window_switch`` events when the focused app or
@@ -178,42 +184,137 @@ class KLHook {
 ;
 ; Clamping here rather than at the consumer keeps the watermark itself honest:
 ; it can never claim the app was entered in the future.
-KL_Hook_AdvanceContextWatermarks(Elapsed) {
-		Now := A_TickCount
-		KLHook.app_entered_at   := Min(KLHook.app_entered_at + Elapsed, Now)
-		KLHook.title_entered_at := Min(KLHook.title_entered_at + Elapsed, Now)
+KL_Hook_AdvanceContextWatermarks(Elapsed, NowTick := unset) {
+		; Gap compensation and both exact clock receipts share one RAM claim.
+		PreviousCritical := Critical("On")
+		try {
+			Now := IsSet(NowTick) ? NowTick : A_TickCount
+			Pending := KLHook.context_transition
+			if IsObject(KLHook.context_stop)
+				return ; the first stop endpoint also freezes an unfinished normal transition
+			if KLHook.context_observation_head <= KLHook.context_observations.Length {
+				; A pause after C was observed belongs to C, not to the still-pending B.
+				Last := KLHook.context_observations[-1]
+				Last.Shift := Min(Last.Shift + Elapsed, TickElapsed64(Last.EndTick, Now))
+				return
+			}
+			if IsObject(Pending) && Pending.App.Required && !Pending.App.Done
+					&& KLHook.app_entered_at = Pending.App.Origin
+				Pending.App.Shift := Min(Pending.App.Shift + Elapsed, TickElapsed64(Pending.EndTick, Now))
+			else
+				KLHook.app_entered_at := Min(KLHook.app_entered_at + Elapsed, Now)
+			if IsObject(Pending) && Pending.Title.Required && !Pending.Title.Done
+					&& KLHook.title_entered_at = Pending.Title.Origin
+				Pending.Title.Shift := Min(Pending.Title.Shift + Elapsed, TickElapsed64(Pending.EndTick, Now))
+			else
+				KLHook.title_entered_at := Min(KLHook.title_entered_at + Elapsed, Now)
+		} finally Critical(PreviousCritical)
+}
+
+; Split the open foreground app and title intervals at local midnight, as the
+; macOS (split_active_app_at_midnight) and Linux producers do. Switch rows are
+; bucketed by their timestamp date, so an interval carried across midnight
+; would otherwise credit the whole closed day to the following one. The closed
+; share is a destination-less closure (not a switch) stamped on PreviousDate.
+; Retrying after a refused rollover is a no-op: the watermarks already sit at
+; the boundary, so no second closed-day share remains.
+; @param PreviousDate {String} The closed "YYYY-MM-DD" journal day.
+; @returns {Boolean} Whether the open intervals now start at the boundary.
+KL_Hook_SplitContextAtMidnight(PreviousDate) {
+		Stamp := KL_NowTimestamp()
+		if !RegExMatch(Stamp, "^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2}):(\d{2})\.(\d{3})$", &Wall) || Wall[1] = PreviousDate {
+			try LoggerError("Keystats", "Midnight context split refused: the wall clock {1} is not past {2}.", Stamp, PreviousDate)
+			return false
+		}
+		TodayMs := ((Wall[2] * 60 + Wall[3]) * 60 + Wall[4]) * 1000 + Wall[5]
+		PreviousCritical := Critical("On")
+		try {
+			if !Keystats.initialized || KLHook.capture_stopping || KL_CaptureHeld()
+				return false ; stop closes the tail itself; resume reseeds a paused interval
+			if KLHook.prev_app == "" || KLHook.app_entered_at == 0
+				return true
+			; A pending transition or stop froze the current origins in its receipts;
+			; moving them here would orphan that frame's exact acknowledgement.
+			if IsObject(KLHook.context_transition) || IsObject(KLHook.context_stop) {
+				try LoggerWarn("Keystats", "Midnight context split deferred to the pending context transition.")
+				return false
+			}
+			Now := A_TickCount
+			Boundary := Now - TodayMs
+			App := KLHook.prev_app, Title := KLHook.prev_title
+			AppMs := Max(0, TickElapsed64(KLHook.app_entered_at, Now) - TodayMs)
+			TitleMs := Title != "" && KLHook.title_entered_at != 0
+				? Max(0, TickElapsed64(KLHook.title_entered_at, Now) - TodayMs) : 0
+			; Advance both watermarks in this claim, before the writers yield, so any
+			; later frame freezes the post-boundary origin and never the closed day.
+			KLHook.app_entered_at := Max(KLHook.app_entered_at, Boundary)
+			if KLHook.title_entered_at != 0
+				KLHook.title_entered_at := Max(KLHook.title_entered_at, Boundary)
+		} finally Critical(PreviousCritical)
+		ClosedStamp := PreviousDate . " 23:59:59.999"
+		Written := true
+		if AppMs > 0
+			Written := KL_LogAppSwitch(App, "", AppMs, Title, , , , , , ClosedStamp) && Written
+		if TitleMs > 0
+			Written := KL_LogWindowSwitch(App, Title, "", TitleMs, , , , , , ClosedStamp) && Written
+		if !Written
+			try LoggerWarn("Keystats", "Midnight context split share for {1} was not recorded (privacy or pause refusal).", PreviousDate)
+		return true
 }
 
 KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
-		; Driven by SetTimer, which bypasses native Suspend — stay silent while
-		; the driver is paused so no app/title switch is observed or flushed.
-		;
-		; A bare return is not enough: the watermarks would freeze while wall-clock
-		; keeps running, so the first refresh after resume emits an app_switch whose
-		; duration spans the whole pause. KLW_WalkAppSwitch adds that value verbatim
-		; to app_time with no upper clamp, so an overnight pause credited hours of
-		; screen time to whichever app happened to be focused — landing on the RESUME
-		; day. The gap compensation in KL_Watchers_OnKeystroke cannot help: it is
-		; driven by the first post-resume KEYSTROKE, and this 250 ms timer always
-		; fires first whenever the focused app changed during the pause.
-		if KL_CaptureHeld() {
-				PausedNow := A_TickCount
-				if (KLHook.suspend_tick != 0) {
-						Elapsed := (PausedNow - KLHook.suspend_tick) & 0xFFFFFFFF
-						KL_Hook_AdvanceContextWatermarks(Elapsed)
-				}
-				KLHook.suspend_tick := PausedNow
-				return
+		EntryCritical := Critical("On")
+		try {
+			if KLHook.capture_stopping
+				return false
+			Generation := KLHook.capture_generation
+			; Driven by SetTimer, which bypasses native Suspend — stay silent while
+			; the driver is paused so no app/title switch is observed or flushed.
+			;
+			; A bare return is not enough: the watermarks would freeze while wall-clock
+			; keeps running, so the first refresh after resume emits an app_switch whose
+			; duration spans the whole pause. KLW_WalkAppSwitch adds that value verbatim
+			; to app_time with no upper clamp, so an overnight pause credited hours of
+			; screen time to whichever app happened to be focused — landing on the RESUME
+			; day. The gap compensation in KL_Watchers_OnKeystroke cannot help: it is
+			; driven by the first post-resume KEYSTROKE, and this 250 ms timer always
+			; fires first whenever the focused app changed during the pause.
+			if KL_CaptureHeld() {
+					PausedNow := A_TickCount
+					if (KLHook.suspend_tick != 0) {
+							Elapsed := TickElapsed64(KLHook.suspend_tick, PausedNow)
+							KL_Hook_AdvanceContextWatermarks(Elapsed)
+					}
+					KLHook.suspend_tick := PausedNow
+					return
+			}
+			KLHook.suspend_tick := 0
+			; Guard against the timer firing before KL_Init() has completed — the
+			; KL_LogAppSwitch / KL_LogWindowSwitch calls below require an initialized
+			; keystats instance; without this guard a fast startup race could crash
+			; or write a corrupted switch event (H-16 fix).
+			if !Keystats.initialized
+					return
+			Pending := KLHook.context_transition
+		} finally Critical(EntryCritical)
+		while IsObject(Pending) {
+			if !_KL_ContextDrain(Pending, Generation) {
+				; Keep accepting actual later observations even when publication of the
+				; previous interval is deferred. The canonical cache remains the owner.
+				try Later := HasMethod(SnapshotFn, "Call") ? SnapshotFn.Call() : MF_GetFocusSnapshot()
+				catch
+					return false
+				_KL_ContextStageObserved(Pending, Later, A_TickCount, Generation)
+				return false
+			}
+			PreviousCritical := Critical("On")
+			try Pending := KLHook.context_transition
+			finally Critical(PreviousCritical)
 		}
-		KLHook.suspend_tick := 0
-		; Guard against the timer firing before KL_Init() has completed — the
-		; KL_LogAppSwitch / KL_LogWindowSwitch calls below require an initialized
-		; keystats instance; without this guard a fast startup race could crash
-		; or write a corrupted switch event (H-16 fix).
-		if !Keystats.initialized
-				return
-		if !force and (A_TickCount - (KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS
-				return
+		if !_KL_ContextEpochCurrent(Generation)
+			return false
+		if !force && TickElapsed64(KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
+			return false
 		; The 50 ms metrics poll is the sole OS acquisition owner. This resident
 		; timer reads that already-published object and refuses an invalid snapshot;
 		; MF_ShouldFilter independently sees the same invalid marker and drops every
@@ -225,71 +326,23 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 						"Canonical focus snapshot read failed: {1}.", Err.Message)
 				return false
 		}
-		if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid
+		ProjectionCritical := Critical("On")
+		try {
+			if !_KL_ContextEpochCurrent(Generation)
 				return false
-		NewTitle := Snapshot.title
-		NewApp := Snapshot.process_name
-		Now := A_TickCount
-
-		; Snapshot the outgoing app BEFORE any mutation below. The app-switch
-		; block updates KLHook.prev_app in place the instant the app itself
-		; changes, so by the time the title-change block runs (same refresh
-		; tick, e.g. Alt-Tab to a different app with a different title)
-		; KLHook.prev_app would already read the NEW app. KL_LogWindowSwitch
-		; must be attributed to the app that actually owned prev_title, not
-		; the one the user switched into (F9 fix).
-		outgoing_app := KLHook.prev_app
-
-		; Emit app_switch / window_switch the first time we observe a change.
-		; HS tracks app and title separately because a window-title-only change
-		; (e.g. switching tabs in a browser) is interesting on its own — it
-		; surfaces in the metrics dashboard as a per-app context shift without
-		; double-counting as an app switch.
-		if (NewApp != "" and NewApp != KLHook.prev_app) {
-				if (KLHook.prev_app != "") {
-		duration := TickElapsed(KLHook.app_entered_at, Now)
-						; Flush before logging so the typing buffer is attributed to the
-						; previous app, not the new one. Mirrors HS log_manager flush_buffer
-						; calls on app_switch.
-						try KL_FlushBuffer()
-						; The retained destination may differ from the later live focus.
-						; Refuse only its row; context projection must still advance.
-						DestinationFiltered := true
-						try DestinationFiltered := MF_ShouldFilterFor(NewApp, NewTitle)
-						catch {
-								try LoggerWarn("keystats_hook", "Captured app-switch destination could not be classified; its row was refused.")
-						}
-						if !DestinationFiltered
-								try KL_LogAppSwitch(KLHook.prev_app, NewApp, duration)
-				}
-				KLHook.prev_app := NewApp
-				KLHook.app_entered_at := Now
-		}
-		if (NewTitle != KLHook.prev_title) {
-				if (KLHook.prev_title != "" and outgoing_app != "") {
-		duration := TickElapsed(KLHook.title_entered_at, Now)
-						; Flush before logging so the typing buffer is attributed to
-						; the previous window context, not the new one. Mirrors the
-						; flush that already precedes KL_LogAppSwitch above (M-01 fix).
-						try KL_FlushBuffer()
-						; The retained destination may differ from the later live focus.
-						; Refuse only its row; context projection must still advance.
-						DestinationFiltered := true
-						try DestinationFiltered := MF_ShouldFilterFor(NewApp, NewTitle)
-						catch {
-								try LoggerWarn("keystats_hook", "Captured window-switch destination could not be classified; its row was refused.")
-						}
-						if !DestinationFiltered
-								try KL_LogWindowSwitch(outgoing_app, KLHook.prev_title, NewTitle, duration)
-				}
-				KLHook.prev_title := NewTitle
-				KLHook.title_entered_at := Now
-		}
-
-		Keystats.session_title := NewTitle
-		Keystats.session_app := NewApp
-		KLHook.context_at := Now
-		return true
+			; A getter can return after a newer focus and word were admitted. ROI
+			; may mutate only for the object still owned by the canonical cache;
+			; the retained snapshot keeps its existing projection contract below.
+			SnapshotCurrent := IsObject(Snapshot) && Snapshot == MetricsFocusCache.state
+			if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
+				if SnapshotCurrent && IsSet(KL_Roi_DiscardWord)
+					KL_Roi_DiscardWord()
+				return false
+			}
+			if SnapshotCurrent && IsSet(KL_Roi_AdmitWordContext)
+				KL_Roi_AdmitWordContext(Snapshot)
+		} finally Critical(ProjectionCritical)
+		return _KL_ContextProject(Snapshot, A_TickCount, Generation)
 }
 
 
@@ -370,17 +423,23 @@ KL_Hook_HasPendingInput() {
 KL_Hook_InvalidateCapture(Stopping := false) {
 	PreviousCritical := Critical("On")
 	try {
+		Keystats.scalar_fragment := false
+		Keystats.scalar_history := false
+		Keystats.scalar_epoch += 1
 		KLHook.capture_generation += 1
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KLHook.last_vk := 0
 		KLHook.last_sc := 0
 		KLHook.last_hint_lifecycle := 0
+		KLHook.control_char_echo := false
 		if Stopping
 			KLHook.capture_stopping := true
 	}
 	finally Critical(PreviousCritical)
 }
 
-_KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
+_KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := unset, ErgoFn := unset, SourceHook := 0) {
 	PreviousCritical := Critical("On")
 	try {
 		if KL_CaptureHeld()
@@ -407,13 +466,27 @@ _KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := uns
 			synth_active: Keystats.synth_active, synth_type: Keystats.synth_type,
 			synth_private: Keystats.synth_private,
 			lifecycle: Keystats.lifecycle_generation,
-			generation: KLHook.capture_generation,
+			generation: KLHook.capture_generation, scalar_epoch: Keystats.scalar_epoch,
+			scalar_backspace: false,
 			entry_privacy: _KL_CaptureLlmJournalPrivacy(),
 			entry_focus: KLPasswordCache.focus_generation,
 			privacy: false, ready: false, cancelled: true, filtered: true,
 			shortcut: "", activity: Kind = "char",
 			filter_fn: IsSet(FilterFn) ? FilterFn : 0,
-			ergo_fn: IsSet(ErgoFn) ? ErgoFn : 0
+			ergo_fn: IsSet(ErgoFn) ? ErgoFn : 0,
+			source_hook: SourceHook, echo_of: false, recorded: false
+		}
+		if Kind = "key" {
+			; Every other native keydown revokes an unconsumed named-key echo.
+			KLHook.control_char_echo := IsObject(SourceHook) && (vk = 0x0D || vk = 0x09) ? Intent : false
+		} else {
+			Echo := KLHook.control_char_echo
+			KLHook.control_char_echo := false
+			if IsObject(Echo) && IsObject(SourceHook) && Echo.source_hook == SourceHook
+					&& Echo.lifecycle = Intent.lifecycle && Echo.generation = Intent.generation
+					&& ((Echo.vk = 0x0D && (Character = "`n" || Character = "`r"))
+						|| (Echo.vk = 0x09 && Character = "`t"))
+				Intent.echo_of := Echo
 		}
 		KLHook.capture_queue.Push(Intent)
 		return Intent
@@ -531,9 +604,170 @@ _KL_Hook_DrainInput() {
 	}
 }
 
-_KL_Hook_CommitInput(Intent) {
-	if Intent.cancelled || !_KL_Hook_InputLifecycleCurrent(Intent) || !Intent.activity
+; The pending unit never authorizes another target, source hook or epoch.
+_KL_Hook_ScalarOwnerCurrent(Pending, Intent) {
+	return IsObject(Pending) && _KL_Hook_InputCurrent(Pending)
+		&& Pending.scalar_epoch = Intent.scalar_epoch && Intent.scalar_epoch = Keystats.scalar_epoch
+		&& Pending.source_hook == Intent.source_hook && Pending.entry_focus = Intent.entry_focus
+		&& Pending.synth_active = Intent.synth_active && Pending.synth_private = Intent.synth_private
+		&& Pending.synth_type == Intent.synth_type
+		&& Pending.app == Keystats.session_app && Pending.title == Keystats.session_title
+}
+
+; This is the observed chronological stream, not a model of unobserved caret
+; or document changes. Cache/synthetic invalidation revokes assembly only. A
+; real hook/context/lifecycle change or an attested different field retires the
+; numeric omissions as well. No omitted text is retained in this history.
+_KL_Hook_ScalarHistory(Intent) {
+	History := Keystats.scalar_history
+	Field := KLPasswordCache.current_element_id
+	if !IsObject(History) || History.lifecycle != Intent.lifecycle
+		|| History.generation != Intent.generation || History.hook != Intent.source_hook
+		|| !(History.app == Keystats.session_app) || !(History.title == Keystats.session_title)
+		|| (History.field != "" && Field != "" && !(History.field == Field)) {
+		History := {position: 0, gaps: [], carry_delay: 0, lifecycle: Intent.lifecycle,
+			generation: Intent.generation, hook: Intent.source_hook,
+			app: Keystats.session_app, title: Keystats.session_title, field: Field}
+		Keystats.scalar_history := History
+	} else if Field != ""
+		History.field := Field
+	return History
+}
+
+; Adjacent omitted units occupy one run. Publications change one absolute
+; position, not every retained gap; storage grows only with interleaved output.
+_KL_Hook_ScalarOmit(History) {
+	if History.gaps.Length && History.gaps[-1].position = History.position {
+		Gap := History.gaps[-1]
+		if Gap.units = 0x7FFFFFFFFFFFFFFF
+			throw Error("Keystats omitted-unit count exhausted the native integer range.")
+		Gap.units += 1
+	} else {
+		Gap := {position: History.position, units: 1}
+		History.gaps.Push(Gap)
+	}
+	return Gap
+}
+
+_KL_Hook_ScalarPublished(History) {
+	if !History.gaps.Length {
+		History.position := 0
+		return
+	}
+	if History.position = 0x7FFFFFFFFFFFFFFF
+		throw Error("Keystats omitted-unit position exhausted the native integer range.")
+	History.position += 1
+}
+
+_KL_Hook_ScalarConsume(History) {
+	Gap := History.gaps[-1]
+	if Gap.position != History.position || Gap.units <= 0
+		throw Error("Keystats omitted-unit history is out of order.")
+	Gap.units -= 1
+	if !Gap.units
+		History.gaps.Pop()
+	if !History.gaps.Length
+		History.position := 0
+}
+
+; Keep the original [BS] and counters, but never attribute deletion of a
+; published scalar to a Backspace which consumed one omitted UTF-16 unit.
+_KL_Hook_ScalarBackspace(History) {
+	if !History.gaps.Length
 		return false
+	if History.gaps[-1].position = History.position {
+		_KL_Hook_ScalarConsume(History)
+		return true
+	}
+	if History.position < History.gaps[-1].position
+		throw Error("Keystats omitted-unit position moved before its newest gap.")
+	History.position -= 1
+	return false
+}
+
+_KL_Hook_ScalarDelay(History, Delay) {
+	if Delay > 0x7FFFFFFFFFFFFFFF - History.carry_delay
+		throw Error("Keystats omitted-unit delay exhausted the native integer range.")
+	return Delay + History.carry_delay
+}
+
+; Hold a trailing high outside serializable state under its original receipt.
+; Its numeric omission survives loss of assembly permission, until observed
+; editing consumes it or a real context/privacy/capture boundary retires it.
+_KL_Hook_FrameCharacters(Intent, Token, &Delay) {
+	History := _KL_Hook_ScalarHistory(Intent)
+	Pending := Keystats.scalar_fragment
+	Keystats.scalar_fragment := false
+	Paired := false
+	if Token != "" && _KL_Hook_ScalarOwnerCurrent(Pending, Intent)
+		&& History.gaps.Length && History.gaps[-1] == Pending.gap
+		&& Pending.gap.position = History.position {
+		First := NumGet(StrPtr(Token), 0, "UShort")
+		if First >= 0xDC00 && First <= 0xDFFF {
+			_KL_Hook_ScalarConsume(History)
+			Token := Pending.text . Token
+			; The carry includes the original high delay and earlier omitted
+			; arrivals. Low's transport endpoint never adds another key delay.
+			Delay := History.carry_delay
+			Paired := true
+		}
+	}
+	Complete := ""
+	Characters := _TextCodepoints(Token)
+	for Index, Character in Characters {
+		if _TextCompleteTailScalar(Character) != "" {
+			Complete .= Character
+			_KL_Hook_ScalarPublished(History)
+			continue
+		}
+		Gap := _KL_Hook_ScalarOmit(History)
+		Unit := NumGet(StrPtr(Character), 0, "UShort")
+		if Index = Characters.Length && Unit >= 0xD800 && Unit <= 0xDBFF
+			&& Intent.scalar_epoch = Keystats.scalar_epoch {
+			Keystats.scalar_fragment := {
+				text: Character, gap: Gap,
+				lifecycle: Intent.lifecycle, generation: Intent.generation,
+				cancelled: false, filtered: false, privacy: Intent.privacy,
+				source_hook: Intent.source_hook, entry_focus: Intent.entry_focus,
+				scalar_epoch: Intent.scalar_epoch, synth_active: Intent.synth_active,
+				synth_private: Intent.synth_private, synth_type: Intent.synth_type,
+				app: Keystats.session_app, title: Keystats.session_title
+			}
+		}
+	}
+	if Complete != "" {
+		if !Paired
+			Delay := _KL_Hook_ScalarDelay(History, Delay)
+		History.carry_delay := 0
+	} else
+		History.carry_delay := _KL_Hook_ScalarDelay(History, Delay)
+	return Complete
+}
+
+_KL_Hook_CommitInput(Intent) {
+	EntryCritical := Critical("On")
+	try {
+		if !_KL_Hook_InputLifecycleCurrent(Intent)
+			return false
+		; VK_PACKET and its Up are transport edges between two UTF-16 units.
+		; Every other keydown breaks the pending scalar, even without a token.
+		BoundaryCurrent := Intent.scalar_epoch = Keystats.scalar_epoch
+			&& Intent.entry_focus = KLPasswordCache.focus_generation
+			&& _KL_LlmJournalPrivacyStillCurrent(Intent.entry_privacy)
+		if Intent.kind = "key" && Intent.vk != 0xE7 && BoundaryCurrent {
+			Keystats.scalar_fragment := false
+		}
+		if Intent.cancelled || !Intent.activity {
+			if Intent.kind = "char" && BoundaryCurrent
+				Keystats.scalar_fragment := false
+			return false
+		}
+	} finally Critical(EntryCritical)
+	; FIFO commits the named predecessor first. Only its actual canonical
+	; publication can consume the matching native control-character echo.
+	if Intent.kind = "char" && IsObject(Intent.echo_of) && Intent.echo_of.recorded
+			&& _KL_Hook_InputLifecycleCurrent(Intent.echo_of)
+		return true
 	if !Intent.filtered && !_KL_LlmJournalPrivacyStillCurrent(Intent.privacy)
 		Intent.filtered := true
 	GuardFn := _KL_Hook_InputCurrent.Bind(Intent)
@@ -549,6 +783,19 @@ _KL_Hook_CommitInput(Intent) {
 			return false
 	}
 	if Intent.filtered {
+		PrivacyCritical := Critical("On")
+		try {
+			PendingScalar := Keystats.scalar_fragment
+			if Intent.scalar_epoch = Keystats.scalar_epoch
+				&& Intent.entry_focus = KLPasswordCache.focus_generation
+				&& _KL_LlmJournalPrivacyStillCurrent(Intent.entry_privacy) {
+				Keystats.scalar_fragment := false
+				Keystats.scalar_history := false
+			} else if IsObject(PendingScalar) && !_KL_Hook_InputCurrent(PendingScalar)
+				Keystats.scalar_fragment := false
+		} finally Critical(PrivacyCritical)
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_RecordPrivacyHit()
 		return true
 	}
@@ -573,16 +820,39 @@ _KL_Hook_CommitInput(Intent) {
 				meta["sk"] := Intent.arrival_sc
 		}
 		if Intent.synth_active {
+			if IsSet(KL_Roi_DiscardWord)
+				KL_Roi_DiscardWord()
 			meta["s"] := 1
 			meta["st"] := Intent.synth_type
 		}
+		if Intent.kind = "char" {
+			Recorded := _KL_Hook_FrameCharacters(Intent, Recorded, &delay)
+			if Recorded == ""
+				return true
+		}
+		if Intent.kind = "key" {
+			History := _KL_Hook_ScalarHistory(Intent)
+			if Intent.vk = 0x08
+				Intent.scalar_backspace := _KL_Hook_ScalarBackspace(History)
+			else if Intent.vk = 0x0D || Intent.vk = 0x09
+				_KL_Hook_ScalarPublished(History)
+			; Transfer omitted callback time once, independently of which gap
+			; a later correction consumes. Cache/synthetic revocation cannot
+			; lose this numeric receipt or charge it to multiple publications.
+			delay := _KL_Hook_ScalarDelay(History, delay)
+			History.carry_delay := 0
+		}
+		if Intent.scalar_backspace
+			meta["erase"] := 0
 		Keystats.buffer_events.Push([Recorded, delay, meta])
+		Intent.recorded := true
 		if Intent.kind = "char"
 			Keystats.buffer_text .= Recorded
 		else {
 			switch Intent.vk {
 				case 0x08:
-					Keystats.buffer_text := KLW_PopLast(Keystats.buffer_text)
+					if !Intent.scalar_backspace
+						Keystats.buffer_text := KLW_PopLast(Keystats.buffer_text)
 				case 0x0D: Keystats.buffer_text .= Chr(10)
 				case 0x09: Keystats.buffer_text .= Chr(9)
 			}
@@ -591,6 +861,8 @@ _KL_Hook_CommitInput(Intent) {
 			KLHook.last_tick := 0
 	} finally Critical(PreviousCritical)
 	if !Intent.synth_active {
+		if !GuardFn.Call()
+			return false
 		try {
 			ErgoFn := HasMethod(Intent.ergo_fn, "Call") ? Intent.ergo_fn : KL_Ergo_OnKeystroke
 			if Intent.kind = "char"
@@ -598,10 +870,19 @@ _KL_Hook_CommitInput(Intent) {
 			else
 				ErgoFn.Call(delay, Intent.vk, Intent.sc, Intent.vk = 0x08)
 		}
-		if Intent.kind = "char" {
-			try KL_Roi_OnChar(Intent.character)
-			try WPMWidget_Push(false, false)
+		; Ergonomic publication can yield and revoke this arrival.
+		if !GuardFn.Call() {
+			if IsSet(KL_Roi_DiscardWord)
+				KL_Roi_DiscardWord()
+			return false
 		}
+		if Intent.kind = "char" {
+			try KL_Roi_OnChar(Recorded)
+			if !GuardFn.Call()
+				return false
+			try WPMWidget_Push(false, false)
+		} else if !Intent.scalar_backspace
+			try KL_Roi_OnKey(Intent.vk)
 	}
 	return true
 }
@@ -612,7 +893,7 @@ KL_Hook_OnChar(ih, c, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
 	Intent := false
 	_hpKlIngest := HotPath_Now()
 	try {
-		Intent := _KL_Hook_CaptureInput("char", c, 0, 0, FilterFn?, NowTick?, ErgoFn?)
+		Intent := _KL_Hook_CaptureInput("char", c, 0, 0, FilterFn?, NowTick?, ErgoFn?, ih)
 		if !IsObject(Intent)
 			return
 		try Intent.filtered := HasMethod(Intent.filter_fn, "Call")
@@ -635,7 +916,7 @@ KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn :=
 	Intent := false
 	PotentialFocusMove := vk = 0x09
 	try {
-		Intent := _KL_Hook_CaptureInput("key", "", vk, sc, FilterFn?, NowTick?, ErgoFn?)
+		Intent := _KL_Hook_CaptureInput("key", "", vk, sc, FilterFn?, NowTick?, ErgoFn?, ih)
 		if !IsObject(Intent)
 			return
 		try Intent.shortcut := IsSet(ShortcutFn)
@@ -659,6 +940,17 @@ KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn :=
 		if IsObject(Intent)
 			_KL_Hook_CompleteInput(Intent)
 	}
+}
+
+
+; A released key cannot authorize dropping a later standalone LF/Tab payload.
+KL_Hook_OnKeyUp(ih, vk, sc) {
+	PreviousCritical := Critical("On")
+	try {
+		Echo := KLHook.control_char_echo
+		if IsObject(Echo) && IsObject(ih) && Echo.source_hook == ih && Echo.vk = vk && Echo.sc = sc
+			KLHook.control_char_echo := false
+	} finally Critical(PreviousCritical)
 }
 
 
@@ -716,7 +1008,7 @@ KL_Hook_Tick() {
 		; timer in keystats.ahk handles persistence asynchronously.
 		if (Keystats.buffer_events.Length = 0
 				&& Keystats.session_clicks = 0
-				&& Keystats.session_scrolls = 0)
+				&& Keystats.session_scrolls = 0 && Keystats.mouse_distance = 0)
 				return
 		try KL_FlushBuffer()
 		; Re-arm the debounce timer so the dashboard sees the flush within
@@ -749,6 +1041,8 @@ KL_Hook_LivePush() {
 ; ============================
 
 KL_Hook_Start() {
+		if IsObject(KLHook.context_stop)
+			return false
 		; Idempotent — multiple Start calls are no-ops once subscribed.
 		if KLHook.HasOwnProp("registered") && KLHook.registered
 				return
@@ -764,17 +1058,23 @@ KL_Hook_Start() {
 		; Seed before subscription: an admitted callback must not be overwritten by Start.
 		PreviousCritical := Critical("On")
 		try {
+			Keystats.scalar_fragment := false
+			Keystats.scalar_history := false
+			Keystats.scalar_epoch += 1
 			KLHook.capture_generation += 1
 			KLHook.capture_stopping := false
 			KLHook.last_vk := 0
 			KLHook.last_sc := 0
 			KLHook.last_hint_lifecycle := Keystats.lifecycle_generation
+			KLHook.control_char_echo := false
 			KLHook.last_tick := A_TickCount
 		} finally Critical(PreviousCritical)
 		KLHook.cb_char := KL_Hook_OnChar.Bind()
 		KLHook.cb_down := KL_Hook_OnKeyDown.Bind()
+		KLHook.cb_up := KL_Hook_OnKeyUp.Bind()
 		HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
 		HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
+		HookDispatcher.Register(HookDispatcherConst.EVT_KB_UP, KLHook.cb_up)
 		KLHook.registered := true
 
 		; Bind the flush callback once and keep the reference around so
@@ -785,28 +1085,75 @@ KL_Hook_Start() {
 		; Project the canonical focus snapshot from memory on a resident timer. The
 		; metrics owner seeds its bounded snapshot before KL_Hook_Start, so the first
 		; keystroke has context without any target-window call on this path.
-		KL_Hook_RefreshContext()
+		KL_Hook_RefreshContext(true)
 		KLHook.context_timer := KL_Hook_RefreshContext.Bind()
 		SetTimer(KLHook.context_timer, KLHookConst.CONTEXT_REFRESH_MS)
 }
 
-KL_Hook_Stop() {
+KL_Hook_Stop(AppendFn := unset) {
 		KL_Hook_InvalidateCapture(true)
-		KL_PasswordFocusTrackingStop()
-		if KLHook.HasOwnProp("flush_timer") && IsObject(KLHook.flush_timer) {
-				try SetTimer(KLHook.flush_timer, 0)
+		Generation := KLHook.capture_generation
+		Closed := false
+		try Closed := _KL_ContextCloseTail(AppendFn?)
+		catch as Failure
+			try LoggerError("Keystats", "Context tail close remains pending: {1}.", Failure.Message)
+		PreviousCritical := Critical("On")
+		try {
+			Stop := KLHook.context_stop
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			Resources := {}
+			for Field in ["flush_timer", "context_timer", "live_push_timer", "cb_char", "cb_down", "cb_up"]
+				Resources.%Field% := KLHook.HasOwnProp(Field) ? KLHook.%Field% : false
+		} finally Critical(PreviousCritical)
+		; Only cancel the exact resources captured by this stop attempt. A nested
+		; stop may finish and a successor may start while native teardown returns.
+		ResourcesStopped := true
+		for Field in ["flush_timer", "context_timer", "live_push_timer"] {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if IsObject(Resources.%Field%) {
+				try SetTimer(Resources.%Field%, 0)
+				catch
+					ResourcesStopped := false
+			}
 		}
-		if KLHook.HasOwnProp("context_timer") && IsObject(KLHook.context_timer) {
-				try SetTimer(KLHook.context_timer, 0)
+		for Binding in [["cb_char", HookDispatcherConst.EVT_KB_CHAR], ["cb_down", HookDispatcherConst.EVT_KB_DOWN],
+			["cb_up", HookDispatcherConst.EVT_KB_UP]] {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if IsObject(Resources.%Binding[1]%) {
+				try HookDispatcher.Unregister(Binding[2], Resources.%Binding[1]%)
+				catch
+					ResourcesStopped := false
+			}
 		}
-		if KLHook.HasOwnProp("live_push_timer") && IsObject(KLHook.live_push_timer) {
-				try SetTimer(KLHook.live_push_timer, 0)
-		}
-		if KLHook.HasOwnProp("cb_char") {
-				try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
-				try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
-		}
-		KLHook.registered := false
-		; Final flush so the in-RAM buffer hits today.log before we leave.
-		try KL_FlushBuffer()
+		PreviousCritical := Critical("On")
+		try {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if ResourcesStopped
+				KLHook.registered := false
+		} finally Critical(PreviousCritical)
+		; Preserve both the close receipt and its classifier through final flush.
+		; The gate also protects a detached typing snapshot against a nested stop.
+		Flushed := false, PasswordStopped := false
+		try Flushed := !Keystats.initialized || KL_FlushBuffer(_KL_ContextStopCurrent.Bind(Stop, Generation))
+		if !_KL_ContextStopCurrent(Stop, Generation)
+			return false
+		if Closed && Flushed && ResourcesStopped
+			try PasswordStopped := KL_PasswordFocusTrackingStop()
+		PreviousCritical := Critical("On")
+		try {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if Closed && Flushed && ResourcesStopped && PasswordStopped {
+				KLHook.context_stop := false
+				return true
+			}
+			return false
+		} finally Critical(PreviousCritical)
 }
+
+
+#Include keystats_context_owner.ahk

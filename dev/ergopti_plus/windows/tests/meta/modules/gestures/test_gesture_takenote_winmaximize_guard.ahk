@@ -12,7 +12,7 @@
 
 _GTNWMG_CheckWinMaximizeGuard() {
 	Body := _DriverFuncBody("_TakeNotePoll")
-	FindPos := InStr(Body, 'WindowHwnd := Ops.FindWindow(Job["file_name"])')
+	FindPos := InStr(Body, 'WindowHwnd := Ops.FindWindow(Job["file_name"], Admits)')
 	ActivatePos := InStr(Body, "Ops.Activate(WindowHwnd)", , FindPos)
 	ActivePos := InStr(Body, "Ops.IsActive(WindowHwnd)", , ActivatePos)
 	ExactPos := InStr(Body, "Ops.IsExactWindow(WindowHwnd", , ActivePos)

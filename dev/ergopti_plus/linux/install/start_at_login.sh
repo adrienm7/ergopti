@@ -17,27 +17,71 @@ case "$ACTION" in status|enable|disable) ;; *) exit 64 ;; esac
 if [ "$DRIVER_ROOT" = /usr/lib/ergopti ]; then
 	DESKTOP_NAME=ergopti.desktop
 	LAUNCHER=/usr/bin/ergopti
+	receipt_allowed=false
 elif [[ "$DRIVER_ROOT" = */lib/ergopti/linux ]]; then
 	DESKTOP_NAME=ergopti-hotstrings.desktop
 	LAUNCHER="${DRIVER_ROOT%/lib/ergopti/linux}/bin/ergopti-hotstrings"
+	receipt_allowed=true
 else
 	ergopti_msg startup.requires_installed >&2
 	exit 78
 fi
 DESKTOP_FILE="$CONFIG_ROOT/autostart/$DESKTOP_NAME"
+USER_UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
+
+# systemd expands %h from the account database, not from an arbitrary HOME in
+# this process. Admit the documented manual unit only when that physical prefix
+# is the one this installation actually owns.
+startup_manual_unit_matches() {
+	"$receipt_allowed" || return 1
+	local uid entry name password account_uid group_id comment account_home shell prefix
+	uid="$(id -u)" || return 1
+	command -v getent >/dev/null 2>&1 || return 1
+	entry="$(getent passwd "$uid")" || return 1
+	case "$entry" in *$'\n'*) return 1 ;; esac
+	IFS=: read -r name password account_uid group_id comment account_home shell <<< "$entry"
+	[ -n "$name" ] && [ "$account_uid" = "$uid" ] || return 1
+	case "$account_home" in /*) ;; *) return 1 ;; esac
+	IFS= read -r -d '' prefix < <(CDPATH= cd -Pe -- "$account_home/.local" && printf '%s\0' "$PWD") || return 1
+	[ "$prefix/bin/ergopti-hotstrings" = "$LAUNCHER" ]
+}
+
+# A same-named user unit can belong to a second installation. Never disable it
+# merely because systemd lists the name; only admit an unambiguous launcher.
+startup_unit_compatible() {
+	local unit_path="$1" expected line count=0
+	[ -f "$unit_path" ] && [ ! -L "$unit_path" ] || return 1
+	expected="$(ergopti_systemd_exec "$LAUNCHER")" || return 1
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in
+			ExecStart=*)
+				count=$((count + 1))
+				case "$line" in
+					"$expected"|"ExecStart=$LAUNCHER --tray"|"ExecStart=$LAUNCHER --service --tray") ;;
+					'ExecStart=%h/.local/bin/ergopti-hotstrings --tray') startup_manual_unit_matches || return 1 ;;
+					*) return 1 ;;
+				esac ;;
+		esac
+	done < "$unit_path"
+	[ "$count" -eq 1 ]
+}
+if { [ -e "$USER_UNIT" ] || [ -L "$USER_UNIT" ]; } && ! startup_unit_compatible "$USER_UNIT"; then
+	if [ "$ACTION" = status ]; then printf 'other\n'; exit 0; fi
+	printf '[startup] code=foreign-unit path=%q\n' "$USER_UNIT" >&2
+	exit 78
+fi
 
 if [ "$ACTION" = status ]; then
 	# Report a real conflicting command without acquiring it for replacement.
-	if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
-		&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
-		&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
+	if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER"; then
 		printf 'other\n'
 		exit 0
 	fi
-	if [ -f "$DESKTOP_FILE" ] && grep -Eq '^(Hidden=true|X-GNOME-Autostart-enabled=false)$' "$DESKTOP_FILE"; then
-		printf 'disabled\n'
-	elif systemctl --user is-enabled --quiet ergopti-hotstrings.service 2>/dev/null; then
+	# A separately enabled unit starts even if the XDG entry is hidden.
+	if systemctl --user is-enabled --quiet ergopti-hotstrings.service 2>/dev/null; then
 		printf 'enabled\n'
+	elif [ -f "$DESKTOP_FILE" ] && ergopti_desktop_entry_disabled "$DESKTOP_FILE"; then
+		printf 'disabled\n'
 	elif [ -f "$DESKTOP_FILE" ] || [ -f "/etc/xdg/autostart/$DESKTOP_NAME" ]; then
 		printf 'enabled\n'
 	else
@@ -54,15 +98,16 @@ startup_record() {
 	printf '%s path=%q\n' "$record" "$3" >&2
 }
 
+# Validate the eventual Exec before allocating or publishing any setting.
+desktop_exec="$(ergopti_desktop_exec "$LAUNCHER")" || exit 78
+
 if { [ -e "$DESKTOP_FILE" ] || [ -L "$DESKTOP_FILE" ]; } \
 	&& { [ -L "$DESKTOP_FILE" ] || [ ! -f "$DESKTOP_FILE" ]; }; then
 	if [ -L "$DESKTOP_FILE" ]; then ergopti_msg startup.linked_setting >&2; fi
 	startup_record invalid-source desktop "$DESKTOP_FILE"
 	exit 78
 fi
-if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
-	&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
-	&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
+if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER"; then
 	ergopti_msg startup.foreign_entry >&2
 	exit 78
 fi
@@ -71,7 +116,7 @@ fi
 # source cannot authorize publishing a preference that removal cannot own.
 manifest="$DRIVER_ROOT/../.ergopti-owned-files"
 receipt_present=false
-if [ -e "$manifest" ] || [ -L "$manifest" ]; then
+if "$receipt_allowed" && { [ -e "$manifest" ] || [ -L "$manifest" ]; }; then
 	[ ! -L "$manifest" ] && [ -f "$manifest" ] \
 		|| {
 			if [ -L "$manifest" ]; then ergopti_msg startup.linked_receipt >&2; fi
@@ -124,22 +169,69 @@ finish_startup() {
 trap finish_startup EXIT
 
 desktop_tmp="$(mktemp "$DESKTOP_FILE.XXXXXX")"
+previous_desktop_digest=
 if [ -f "$DESKTOP_FILE" ]; then
 	desktop_previous="$(mktemp "$DESKTOP_FILE.previous.XXXXXX")"
 	cp -p -- "$DESKTOP_FILE" "$desktop_previous"
+	# Recheck the snapshot that will actually be rewritten.
+	ergopti_desktop_entry_textual "$desktop_previous" || {
+		startup_record invalid-source desktop "$DESKTOP_FILE"; exit 78;
+	}
+	previous_desktop_digest="$(sha256sum < "$desktop_previous")"
+	previous_desktop_digest="${previous_desktop_digest%% *}"
 	cp -p -- "$desktop_previous" "$desktop_tmp"
 fi
 hidden=false
 if [ "$ACTION" = disable ]; then hidden=true; fi
-cat > "$desktop_tmp" <<EOF
+write_desktop_choice() {
+	local line normalized carriage group= inserted=false newline= last_newline=true
+	while :; do
+		line= newline=
+		if IFS= read -r line; then newline=$'\n'; else [ -n "$line" ] || break; fi
+		normalized="$line"
+		[ -z "$newline" ] || normalized="${normalized%$'\r'}"
+		normalized="${normalized#"${normalized%%[![:space:]]*}"}"
+		case "$normalized" in
+			\[*\]*)
+				if [ "$group" = main ] && ! "$inserted"; then
+					printf 'Hidden=%s\nX-Ergopti-Startup=true\n' "$hidden" || return 1
+					inserted=true
+				fi
+				normalized="${normalized%"${normalized##*[![:space:]]}"}"
+				if [ "$normalized" = '[Desktop Entry]' ]; then group=main; else group=other; fi ;;
+			*)
+				if [ "$group" = main ] && [[ "$normalized" =~ ^Exec[[:space:]]*= ]]; then
+					carriage=
+					if [ -n "$newline" ] && [[ "$line" = *$'\r' ]]; then carriage=$'\r'; fi
+					printf '%s%s%s' "$desktop_exec" "$carriage" "$newline" || return 1
+					if [ -n "$newline" ]; then last_newline=true; else last_newline=false; fi
+					continue
+				fi
+				if [ "$group" = main ] && [[ "$normalized" =~ ^(Hidden|X-GNOME-Autostart-enabled|X-Ergopti-Startup)[[:space:]]*= ]]; then
+					continue
+				fi ;;
+		esac
+		printf '%s%s' "$line" "$newline" || return 1
+		if [ -n "$newline" ]; then last_newline=true; else last_newline=false; fi
+	done < "$desktop_previous" || return 1
+	if [ "$group" = main ] && ! "$inserted"; then
+		if ! "$last_newline"; then printf '\n' || return 1; fi
+		printf 'Hidden=%s\nX-Ergopti-Startup=true\n' "$hidden" || return 1
+	fi
+}
+if [ -n "$desktop_previous" ]; then
+	write_desktop_choice > "$desktop_tmp"
+else
+	cat > "$desktop_tmp" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Ergopti
-$(ergopti_desktop_exec "$LAUNCHER")
+$desktop_exec
 Terminal=false
 Hidden=$hidden
 X-Ergopti-Startup=true
 EOF
+fi
 # Standalone removal follows content receipts, including startup changes made
 # by this menu. Stage its exact new digest before either file is published.
 if "$receipt_present"; then
@@ -147,11 +239,37 @@ if "$receipt_present"; then
 	cp -p -- "$manifest" "$receipt_previous"
 	receipt_tmp="$(mktemp "$manifest.XXXXXX")"
 	cp -p -- "$receipt_previous" "$receipt_tmp"
-	while IFS=$'\t' read -r digest relative; do
-		if [ "$relative" != @autostart ]; then printf '%s\t%s\n' "$digest" "$relative"; fi
+	declare -A receipt_seen=()
+	receipt_count=0
+	update_desktop_receipt=false
+	if [ -z "$desktop_previous" ]; then update_desktop_receipt=true; fi
+	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
+		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
+		case "$relative" in
+			linux/*|_shared/*|bin/ergopti-hotstrings|@wrapper|@unit|@autostart) ;;
+			*) startup_record invalid-receipt receipt "$manifest"; exit 78 ;;
+		esac
+		case "/$relative/" in
+			*/../*|*/./*|*//*|*\\*|*$'\r'*|*$'\t'*) startup_record invalid-receipt receipt "$manifest"; exit 78 ;;
+		esac
+		[ -z "${receipt_seen[$relative]:-}" ] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
+		receipt_seen["$relative"]=1
+		((receipt_count += 1))
+		if [ "$relative" = @autostart ]; then
+			if [ -z "$desktop_previous" ] || [ "$digest" = "$previous_desktop_digest" ]; then
+				update_desktop_receipt=true
+			else
+				printf '%s\t%s\n' "$digest" "$relative"
+			fi
+		else
+			printf '%s\t%s\n' "$digest" "$relative"
+		fi
 	done < "$receipt_previous" > "$receipt_tmp"
-	digest="$(sha256sum < "$desktop_tmp")"
-	printf '%s\t@autostart\n' "${digest%% *}" >> "$receipt_tmp"
+	[ "$receipt_count" -gt 0 ] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
+	if "$update_desktop_receipt"; then
+		digest="$(sha256sum < "$desktop_tmp")"
+		printf '%s\t@autostart\n' "${digest%% *}" >> "$receipt_tmp"
+	fi
 	mv -f -- "$receipt_tmp" "$manifest"
 	receipt_published=true
 fi
@@ -164,11 +282,30 @@ if command -v systemctl >/dev/null 2>&1; then
 	# list-unit-files works without a user bus; a failed query remains an error.
 	# A filtered query exits 1 for a missing unit on systemd 257, so select from
 	# the complete successful inventory instead of filtering the native query.
-	unit_files="$(systemctl --user --no-pager --no-legend list-unit-files)"
+	unit_files="$(SYSTEMD_COLORS=0 systemctl --user --no-pager --no-legend list-unit-files)"
 	unit_present=false
-	while read -r unit_name unit_metadata; do
+	while read -r unit_name unit_state unit_metadata; do
 		if [ "$unit_name" = ergopti-hotstrings.service ]; then unit_present=true; break; fi
 	done <<< "$unit_files"
-	if "$unit_present"; then systemctl --user --no-reload disable ergopti-hotstrings.service; fi
+	if "$unit_present"; then
+		if unit_properties="$(SYSTEMD_COLORS=0 systemctl --user show ergopti-hotstrings.service --all -p FragmentPath -p DropInPaths 2>/dev/null)"; then
+			fragment= dropins= fragment_count=0 dropin_count=0
+			while IFS='=' read -r property value; do
+				case "$property" in
+					FragmentPath) fragment="$value"; fragment_count=$((fragment_count + 1)) ;;
+					DropInPaths) dropins="$value"; dropin_count=$((dropin_count + 1)) ;;
+				esac
+			done <<< "$unit_properties"
+			if [ "$fragment_count" -ne 1 ] || [ "$dropin_count" -ne 1 ] || [ -n "$dropins" ] \
+				|| [[ "$fragment" != /* ]] || ! startup_unit_compatible "$fragment"; then
+				startup_record foreign-unit unit "$fragment"
+				exit 78
+			fi
+			systemctl --user --no-reload disable ergopti-hotstrings.service
+		elif [ "$unit_state" != disabled ] || { ! "$receipt_allowed" && [ "$ACTION" = enable ]; }; then
+			startup_record unit-unverified unit ergopti-hotstrings.service
+			exit 78
+		fi
+	fi
 fi
 committed=true

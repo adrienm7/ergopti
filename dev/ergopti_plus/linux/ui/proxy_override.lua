@@ -28,9 +28,14 @@ function M.run()
 		Logger.error(LOG, "The proxy override row cannot open: %s.", tostring(err))
 		return false
 	end
+	local receipt
 	return Override.edit(setting, {
-		get = function(key) return Storage.get(key, nil) end,
-		set = Storage.set,
+		get = function(key)
+			local value
+			value, receipt = Storage.capture_string_edit(key)
+			return value, receipt ~= nil
+		end,
+		set = function(_, value) return Storage.commit_string_edit(receipt, value) end,
 		prompt = function(title, text, initial) return Dialogs.prompt_text(title, text, initial) end,
 		error = function(title, text) Dialogs.show_error(text, title) end,
 		info = function(title, text) Dialogs.show_info(title, text) end,

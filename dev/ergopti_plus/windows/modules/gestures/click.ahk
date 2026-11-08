@@ -26,6 +26,8 @@
 global GestureLeftClickHeld  := False
 global GestureRightClickHeld := False
 global GestureKeyboardHook   := 0
+global GestureLeftClickOwner := 0
+global GestureRightClickOwner := 0
 
 
 
@@ -38,8 +40,8 @@ global GestureKeyboardHook   := 0
 ; (browser gestures, 3D viewport rotation, …) and whatever else left-
 ; click means in the focused app, hence the broader naming over the
 ; previous "selection" wording.
-GestureToggleLeftClick() {
-	global GestureLeftClickHeld, GestureRightClickHeld
+GestureToggleLeftClick(BindingId := "") {
+	global GestureLeftClickHeld, GestureRightClickHeld, GestureLeftClickOwner, GestureBindingWriteOwners
 
 	if (GestureLeftClickHeld) {
 		return GestureReleaseLeftClick()
@@ -53,6 +55,8 @@ GestureToggleLeftClick() {
 		; Existing holds still take the release branch above while suspended.
 		if A_IsSuspended
 			return false
+		if BindingId != "" && IsSet(GestureBindingWriteOwners) && GestureBindingWriteOwners.Has(BindingId)
+			return false
 		; Prepare all fallible cleanup resources before the OS button is acquired
 		GestureStartKeyboardWatcher()
 		HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
@@ -60,6 +64,7 @@ GestureToggleLeftClick() {
 		DownAttempted := true
 		Click("Left", "Down")
 		GestureLeftClickHeld := True
+		GestureLeftClickOwner := { BindingId: BindingId }
 	} catch as e {
 		; Click can fail after Windows accepted the synthetic Down. Keep every
 		; recovery subscriber live until the compensating Up is known to have
@@ -69,6 +74,7 @@ GestureToggleLeftClick() {
 			try Click("Left", "Up")
 			catch as cleanupError {
 				GestureLeftClickHeld := True
+				GestureLeftClickOwner := { BindingId: BindingId }
 				LoggerError("gestures", "Could not release left-click hold after setup failure; recovery ownership was retained: {1}.", cleanupError.Message)
 				LoggerError("gestures", "Could not enable left-click hold mode: {1}.", e.Message)
 				return false
@@ -98,7 +104,7 @@ GestureToggleLeftClick() {
 
 ; Releases the left mouse button if it is currently held by the toggle.
 GestureReleaseLeftClick(*) {
-	global GestureLeftClickHeld, GestureRightClickHeld
+	global GestureLeftClickHeld, GestureRightClickHeld, GestureLeftClickOwner
 
     if (!GestureLeftClickHeld) {
 		return GestureRightClickHeld ? true : GestureStopKeyboardWatcher()
@@ -115,6 +121,7 @@ GestureReleaseLeftClick(*) {
 			return false
 		}
 		GestureLeftClickHeld := False
+		GestureLeftClickOwner := 0
 		; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
 		; ~LButton/~RButton handlers that the dispatcher registered.
 		try {
@@ -141,19 +148,54 @@ GestureReleaseLeftClick(*) {
 	return true
 }
 
+; Captures the exact hold created by a binding before an assignment write.
+GestureCaptureBindingHold(BindingId, ActionName) {
+	global GestureLeftClickHeld, GestureRightClickHeld, GestureLeftClickOwner, GestureRightClickOwner
+	if !(BindingId is String) || BindingId == ""
+		return 0
+	if ActionName == "left_click_toggle" && GestureLeftClickHeld && IsObject(GestureLeftClickOwner)
+		return GestureLeftClickOwner.BindingId == BindingId ? GestureLeftClickOwner : 0
+	if ActionName == "right_click_toggle" && GestureRightClickHeld && IsObject(GestureRightClickOwner)
+		return GestureRightClickOwner.BindingId == BindingId ? GestureRightClickOwner : 0
+	return 0
+}
+
+; Retires only the same hold after its assignment is durable.
+GestureReleaseCapturedBindingHold(ActionName, Owner) {
+	global GestureLeftClickHeld, GestureRightClickHeld, GestureLeftClickOwner, GestureRightClickOwner
+	if !IsObject(Owner)
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		if ActionName == "left_click_toggle" && GestureLeftClickHeld && IsObject(GestureLeftClickOwner)
+			&& ObjPtr(GestureLeftClickOwner) == ObjPtr(Owner)
+			return GestureReleaseLeftClick()
+		if ActionName == "right_click_toggle" && GestureRightClickHeld && IsObject(GestureRightClickOwner)
+			&& ObjPtr(GestureRightClickOwner) == ObjPtr(Owner)
+			return GestureReleaseRightClick()
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ; Installs a low-level keyboard hook to detect any key press.
-; Uses no flags so both physical and synthetic keys cancel selection
+; Keeps MinSendLevel zero so both physical and synthetic keys cancel selection
 ; (e.g. a tap-hold that fires Ctrl+C should also stop the drag).
 GestureStartKeyboardWatcher() {
 	global GestureKeyboardHook
 	PreviousCritical := Critical("On")
 	try {
+		; Both click holds share one observer. Replacing a live observer creates
+		; a failure window in which the earlier held button has no release path.
+		if IsObject(GestureKeyboardHook) && GestureKeyboardHook.InProgress
+			return true
 		if !GestureStopKeyboardWatcher()
 			throw Error("the previous keyboard watcher still owns its native hook")
-		; L3: Level 3 (higher than Ergopti's Level 2 hotkeys).
-		; V keeps the observer non-consuming so keys pass through normally.
-		Hook := InputHook("V L3")
-		Hook.KeyOpt("{All}", "N")
+		; Observe without a text limit or text retention while a Button Up is owed.
+		; L is a length limit, not an input level. KeyOpt I ignores text while N
+		; retains notifications; constructor MinSendLevel stays zero, and V lets
+		; both physical and synthetic keys pass through normally.
+		Hook := InputHook("V L0")
+		Hook.KeyOpt("{All}", "NI")
 		Hook.OnKeyDown := GestureOnKeyDown
 		; Publish before Start so even a partial native admission keeps an exact
 		; cleanup owner. The surrounding Critical prevents its callback from
@@ -226,8 +268,8 @@ GestureOnKeyDown(ih, vk, sc) {
 ; that has no physical mouse hardware attached.
 
 ; Activates or deactivates a right-button-held mode. Mirrors GestureToggleLeftClick.
-GestureToggleRightClick() {
-	global GestureRightClickHeld, GestureLeftClickHeld
+GestureToggleRightClick(BindingId := "") {
+	global GestureRightClickHeld, GestureLeftClickHeld, GestureRightClickOwner, GestureBindingWriteOwners
 
     if (GestureRightClickHeld) {
 		return GestureReleaseRightClick()
@@ -241,6 +283,8 @@ GestureToggleRightClick() {
 		; Existing holds still take the release branch above while suspended.
 		if A_IsSuspended
 			return false
+		if BindingId != "" && IsSet(GestureBindingWriteOwners) && GestureBindingWriteOwners.Has(BindingId)
+			return false
 		; Prepare all fallible cleanup resources before the OS button is acquired
 		GestureStartKeyboardWatcher()
 		HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)
@@ -248,6 +292,7 @@ GestureToggleRightClick() {
 		DownAttempted := true
 		Click("Right", "Down")
 		GestureRightClickHeld := True
+		GestureRightClickOwner := { BindingId: BindingId }
 	} catch as e {
 		; Mirror the left-button transaction: a failed compensating Up retains the
 		; exact logical hold and its recovery callbacks for a later retry.
@@ -255,6 +300,7 @@ GestureToggleRightClick() {
 			try Click("Right", "Up")
 			catch as cleanupError {
 				GestureRightClickHeld := True
+				GestureRightClickOwner := { BindingId: BindingId }
 				LoggerError("gestures", "Could not release right-click hold after setup failure; recovery ownership was retained: {1}.", cleanupError.Message)
 				LoggerError("gestures", "Could not enable right-click hold mode: {1}.", e.Message)
 				return false
@@ -284,7 +330,7 @@ GestureToggleRightClick() {
 
 ; Releases the right mouse button if it is currently held by the toggle.
 GestureReleaseRightClick(*) {
-	global GestureRightClickHeld, GestureLeftClickHeld
+	global GestureRightClickHeld, GestureLeftClickHeld, GestureRightClickOwner
 
     if (!GestureRightClickHeld) {
 		return GestureLeftClickHeld ? true : GestureStopKeyboardWatcher()
@@ -301,6 +347,7 @@ GestureReleaseRightClick(*) {
 			return false
 		}
 		GestureRightClickHeld := False
+		GestureRightClickOwner := 0
 		; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
 		; ~LButton/~RButton handlers that the dispatcher registered.
 		try {

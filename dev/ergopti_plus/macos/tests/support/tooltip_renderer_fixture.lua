@@ -31,6 +31,10 @@ local OWNERS = {
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
 	"keycodes.key_names", "keycodes.key_names_data", "table_util",
+	-- The configuration resolves tint colors through the shared CSS hex parser.
+	"color.hex",
+	-- text_utils builds its case tables from this generated data at require time.
+	"unicode_case.data",
 }
 
 --- Loads a fresh production renderer with an observable file-logger surface.

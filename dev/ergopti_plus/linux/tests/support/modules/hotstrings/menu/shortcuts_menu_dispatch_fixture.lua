@@ -28,6 +28,9 @@ local function fake_shortcuts(log)
 		select_line         = function() log.line = true end,
 		paste_plain         = function() log.paste = true end,
 		wrap_selection      = function(l, r) log.wrapped = l .. r end,
+		get_wrap_pair_list  = function()
+			return { { left = "(", right = ")" }, { left = "«", right = "»" } }
+		end,
 		get_wrap_pairs      = function()
 			return {
 				["("] = { left = "(", right = ")" },
@@ -35,6 +38,21 @@ local function fake_shortcuts(log)
 				["«"] = { left = "«", right = "»" },
 				["»"] = { left = "«", right = "»" },
 			}
+		end,
+		get_wrap_groups     = function()
+			return { { i18n = "menu.shortcuts.wrap_symbols_title",
+				pairs = { { left = "(", right = ")" }, { left = "«", right = "»" } } } }
+		end,
+		-- The stored wrap choices, changed only through commit_wrap_choices.
+		get_wrap_choices    = function() return { states = log.wrap_states or {}, custom = log.wrap_custom or {} } end,
+		commit_wrap_choices = function(mutate)
+			local candidate = { wrap_symbol_states = {}, custom_wrap_symbols = {} }
+			for key, value in pairs(log.wrap_states or {}) do candidate.wrap_symbol_states[key] = value end
+			for index, pair in ipairs(log.wrap_custom or {}) do candidate.custom_wrap_symbols[index] = pair end
+			if mutate(candidate) ~= true then return false end
+			log.wrap_states, log.wrap_custom = candidate.wrap_symbol_states, candidate.custom_wrap_symbols
+			log.wrap_commits = (log.wrap_commits or 0) + 1
+			return true
 		end,
 	}
 end

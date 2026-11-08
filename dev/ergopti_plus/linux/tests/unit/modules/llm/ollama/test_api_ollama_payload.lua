@@ -23,6 +23,36 @@
 
 local helpers = require("tests.helpers")
 
+for _, name in ipairs({ "defaults.json", "inference.json" }) do
+	helpers.it("Ollama payload refuses FIFO for " .. name, function()
+		local uv, Paths = require("luv"), require("infra.paths")
+		require("modules.llm.prediction_engine") -- Load unrelated owners before redirecting this source root.
+		local root, previous_root, previous_api = assert(Paths.shared_root()), Paths.shared_root, package.loaded["modules.llm.api_ollama"]
+		local base = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-ollama-policy-XXXXXX"))
+		assert(uv.fs_mkdir(base .. "/modules", 448)); assert(uv.fs_mkdir(base .. "/modules/llm", 448))
+		for _, file in ipairs({ "defaults.json", "inference.json" }) do
+			local path = base .. "/modules/llm/" .. file
+			if file == name then
+				local made = os.execute("mkfifo '" .. path .. "'")
+				assert(made == true or made == 0)
+			else assert(uv.fs_symlink(root .. "/modules/llm/" .. file, path)) end
+		end
+		local path = base .. "/modules/llm/" .. name
+		local exited, code, process = false, nil, nil
+		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path,
+			root .. "/modules/llm/" .. name } }, function(result) code, exited = result, true; process:close() end))
+		Paths.shared_root = function() return base end
+		package.loaded["modules.llm.api_ollama"] = nil
+		local ok, owner = pcall(require, "modules.llm.api_ollama")
+		Paths.shared_root, package.loaded["modules.llm.api_ollama"] = previous_root, previous_api
+		os.remove(base .. "/modules/llm/defaults.json"); os.remove(base .. "/modules/llm/inference.json")
+		os.remove(base .. "/modules/llm"); os.remove(base .. "/modules"); os.remove(base)
+		while not exited do uv.run("once") end
+		assert(ok, owner)
+		helpers.assert_true(code ~= 0, "the configuration reader opened the FIFO")
+	end)
+end
+
 --- Captures the asynchronous request chat() dispatches, without running it.
 --- @param opts table Request options.
 --- @return table The composed transport request.

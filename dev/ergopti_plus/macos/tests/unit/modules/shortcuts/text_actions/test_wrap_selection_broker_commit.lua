@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 local Fixture = require("tests.support.synthetic_input_fixture")
 
 
@@ -16,7 +17,8 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 --- @param callback function Scenario body.
 local function with_broker(callback)
 	helpers.with_stub_scope({
-		"modules.shortcuts.actions.text", "adapters.synthetic_input",
+		"modules.keymap.utils",
+		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
 		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
 	}, function()
@@ -29,6 +31,7 @@ local function with_broker(callback)
 		local change_count = 0
 		f.hs_overrides.pasteboard = {
 			changeCount = function() return change_count end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function() return clipboard end,
 			setContents = function(value)
 				change_count = change_count + 1
@@ -49,6 +52,7 @@ local function with_broker(callback)
 		end
 		local synthetic = f.load()
 		package.loaded["modules.shortcuts.actions.text"] = nil
+		Destination.install()
 		local text = require("modules.shortcuts.actions.text")
 		f.text = text
 		f.synthetic = synthetic

@@ -752,7 +752,11 @@ helpers.describe("linux-open-session-crash-recovery", function()
 		package.loaded[writer_name], package.loaded[keystats_name] = writer, nil
 		local ok, err = xpcall(function()
 			local collector = require(keystats_name)
-			collector.init({ sqlite_path = "/tmp/open-walk-logical.sqlite" })
+			-- A store of its own metrics folder: an identity another test minted
+			-- under the shared test HOME must not rename this device.
+			local uv = require("luv")
+			collector.init({ sqlite_path = "/tmp/open-walk-logical.sqlite",
+				metrics_dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-open-walk-XXXXXX")) .. "/metrics" })
 			require("tests.support.metrics_consent_fixture").enable(collector)
 			body(collector)
 		end, debug.traceback)
@@ -1417,5 +1421,171 @@ helpers.describe("native sampled reset acknowledgement", function()
 		local status = os.execute("env -u LUA_PATH -u LUA_CPATH" .. provider .. " " .. quote(runtime) .. " "
 			.. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "actual sampled reset must finish once after COMMIT and cleanup")
+	end)
+end)
+
+helpers.describe("dashboard export and purge through the owning writer", function()
+	local function tombstones(op)
+		local found = {}
+		for _, event in ipairs(op.payload.raw.system or {}) do
+			if event.action == "metrics_purge" then found[#found + 1] = event end
+		end
+		return found
+	end
+
+	it("metrics-purge-after-settle: the tombstone waits for the pending flush and completes after its own COMMIT", function()
+		with_collector(function(k, operations)
+			k.on_keydown("a", 1000, "owned")
+			k.flush()
+			helpers.assert_eq(#operations, 1)
+			local replies = {}
+			helpers.assert_true(k.request_metrics_maintenance("purge", function(success, path)
+				replies[#replies + 1] = { success, path }
+			end))
+			assert_false(k.request_metrics_maintenance("export", function() error("duplicate owner") end))
+			helpers.assert_eq(#tombstones(operations[1]), 0, "the tombstone must not ride the unsettled flush")
+			operations[1].outcome, operations[1].physical = "commit", true
+			k.pump_flush()
+			helpers.assert_eq(#operations, 2, "the settled flush hands over to the tombstone's flush")
+			local tombstone = tombstones(operations[2])
+			helpers.assert_eq(#tombstone, 1)
+			helpers.assert_true(tombstone[1].ts:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$") ~= nil)
+			helpers.assert_true(tombstone[1].metadata.utc:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d$") ~= nil)
+			helpers.assert_eq(#replies, 0, "no answer before the tombstone commits")
+			operations[2].outcome, operations[2].physical = "commit", true
+			k.pump_flush()
+			helpers.assert_eq(replies, { { true, nil } })
+		end)
+	end)
+
+	it("metrics-purge-refused: a stopping writer answers false once", function()
+		with_collector(function(k, operations)
+			k.on_keydown("a", 1000, "owned")
+			k.flush()
+			local replies = {}
+			helpers.assert_true(k.request_metrics_maintenance("purge", function(success) replies[#replies + 1] = success end))
+			operations[1].outcome, operations[1].physical = "abort", true
+			k.stop()
+			helpers.assert_eq(replies, { false })
+		end)
+	end)
+
+	it("metrics-export-after-settle: the copy is taken by VACUUM INTO once the flush settles", function()
+		with_collector(function(k, operations, writer)
+			local home = os.tmpname()
+			os.remove(home)
+			assert(os.execute("mkdir -p '" .. home .. "/Downloads'"))
+			local getenv = os.getenv
+			os.getenv = function(name)
+				if name == "HOME" then return home end
+				if name == "XDG_DOWNLOAD_DIR" then return nil end
+				return getenv(name)
+			end
+			local ok, err = pcall(function()
+				k.on_keydown("a", 1000, "owned")
+				k.flush()
+				writer.executed = {}
+				local replies = {}
+				helpers.assert_true(k.request_metrics_maintenance("export", function(success, path)
+					replies[#replies + 1] = { success, path }
+				end))
+				helpers.assert_eq(#writer.executed, 0, "no copy of an unsettled store")
+				operations[1].outcome, operations[1].physical = "commit", true
+				k.pump_flush()
+				helpers.assert_eq(#replies, 1)
+				helpers.assert_eq(replies[1][1], true)
+				helpers.assert_true(replies[1][2]:match("^" .. home:gsub("%p", "%%%0")
+					.. "/Downloads/ergopti%-metrics%-%d%d%d%d%-%d%d%-%d%d_%d%d%-%d%d%-%d%d%.sqlite$") ~= nil)
+				helpers.assert_eq(writer.executed[#writer.executed], "VACUUM INTO '" .. replies[1][2] .. "';")
+			end)
+			os.getenv = getenv
+			os.execute("rm -rf '" .. home .. "'")
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	it("metrics-maintenance-vectors: the shared helper renders the shared tombstone and export name", function()
+		local Maintenance = require("keystats.metrics_maintenance")
+		local handle = assert(io.open(require("infra.paths").shared(
+			"tests/corpus/keystats/metrics_maintenance_vectors.json"), "rb"))
+		local vectors = require("json").decode(handle:read("*a"))
+		handle:close()
+		local tombstone = Maintenance.tombstone(vectors.tombstone.epoch)
+		helpers.assert_eq(tombstone.action, vectors.tombstone.action)
+		helpers.assert_eq(tombstone.metadata.utc, vectors.tombstone.utc)
+		helpers.assert_eq(tombstone.ts:sub(-4), vectors.tombstone.millis)
+		helpers.assert_eq(tombstone.ts:sub(1, 10), tombstone.date)
+		local name = Maintenance.export_file_name(vectors.tombstone.epoch)
+		helpers.assert_eq(name:sub(1, #vectors.export.prefix), vectors.export.prefix)
+		helpers.assert_eq(name:sub(-#vectors.export.extension), vectors.export.extension)
+		helpers.assert_true(name:match("^ergopti%-metrics%-%d%d%d%d%-%d%d%-%d%d_%d%d%-%d%d%-%d%d%.sqlite$") ~= nil)
+		helpers.assert_eq(Maintenance.downloads_dir(function(key) return ({ HOME = "/h" })[key] end), "/h/Downloads")
+		helpers.assert_eq(Maintenance.downloads_dir(function(key)
+			return ({ HOME = "/h", XDG_DOWNLOAD_DIR = "/d" })[key]
+		end), "/d")
+		helpers.assert_nil(Maintenance.downloads_dir(function() return nil end))
+	end)
+
+	it("metrics-maintenance-kind: an unknown kind or a missing callback is refused", function()
+		with_collector(function(k)
+			assert_false(k.request_metrics_maintenance("drop", function() end))
+			assert_false(k.request_metrics_maintenance("purge"))
+		end)
+	end)
+end)
+
+require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: native stop commits admitted zero-count groups", function()
+	local Home = require("tests.support.keystats_home_fixture")
+	local Native = require("tests.support.keystats_native_fixture")
+	Native.with(function(collector)
+		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
+		require("tests.support.metrics_consent_fixture").enable(collector)
+		local now = require("infra.monotonic").now_ms()
+		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
+		Native.flush(collector)
+		Native.flush(collector)
+		local until_ms = now + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		while not collector.stop() and require("infra.monotonic").now_ms() < until_ms do
+			require("luv").run("nowait")
+			require("luv").sleep(1)
+		end
+		helpers.assert_true(collector.stop(), "the native stop must retire")
+		helpers.assert_true(collector.get_flush_status().committed, "an empty n-gram group must not refuse the closing transaction")
+		local writer = require("modules.keystats.sqlite_writer")
+		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", {}, "ngram_chars"), "the public empty insertion remains a no-op")
+		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", nil, "ngram_chars"), "malformed input remains refused")
+		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", { word = 1 }, "not_a_table"), "an unknown table remains refused")
+	end)
+end)
+
+require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: native transactions refuse malformed no-op groups", function()
+	local Home = require("tests.support.keystats_home_fixture")
+	require("tests.support.keystats_native_fixture").with(function(collector)
+		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
+		local writer = require("modules.keystats.sqlite_writer")
+		local now = require("infra.monotonic").now_ms
+		local uv = require("luv")
+		local groups = { { word = "bad" }, { word = -1 }, { word = 0 / 0 }, { word = {} },
+			{ word = { c = 0, sources = "bad" } }, { word = { c = 0, td = "bad" } },
+			{ word = { c = 0, sources = { manual = -1 } } },
+			{}, { word = 0 }, { word = { c = 0, td = 0, cd = 0, e = 1, sources = { hotstring = 0 } } },
+			{ word = "bad", valid = { c = 1, sources = { manual = 2, negative = -1, invalid = "bad" } } } }
+		for index, group in ipairs(groups) do
+			local expected = index > 7
+			local operation = assert(writer.start_flush("fixture", {
+				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} },
+				upserts = { { kind = "ngrams", args = { "2026-11-07", "Editor", group, "ngram_chars" } } },
+			}))
+			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+			while not operation:is_settled() and now() < until_ms do
+				operation:pump()
+				if operation:is_retryable() then operation:cancel() end
+				uv.run("nowait"); uv.sleep(1)
+			end
+			helpers.assert_true(operation:is_settled(), "the native transaction must retire")
+			helpers.assert_eq(operation.result.committed, expected, "only structurally valid zero-count groups may commit: " .. index)
+		end
+		helpers.assert_eq(writer.query_rows("SELECT count(*) FROM ngram_chars;"), { "1" }, "only the historical positive path writes a row")
+		helpers.assert_eq(writer.query_rows("SELECT token,c,esrc_json FROM ngram_chars;"), { 'valid|1|{"manual":2}' }, "mixed groups keep the original positive-row and source filters")
 	end)
 end)

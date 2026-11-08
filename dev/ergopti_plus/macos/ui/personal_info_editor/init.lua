@@ -157,13 +157,16 @@ local function inject_init_data(owner)
 	local view = _webview
 	owner.javascript_failures = owner.javascript_failures or {}
 	local function report(category)
+		if not owner_is_current(owner) or _revision ~= revision or _webview ~= view then return end
 		if owner.javascript_failures[category] then return end
 		owner.javascript_failures[category] = true
 		-- Native errors may echo personal field values, so report only fixed metadata
 		Logger.error(LOG, "Personal editor JavaScript %s (session=%d); repeats suppressed.", category, owner.serial)
 	end
+	-- Both readiness and navigation can inject into the same page. Keep the
+	-- guard in that page so a later injection cannot erase an edited draft.
 	local submitted, result = pcall(function()
-		return view:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")", function(_, script_error)
+		return view:evaluateJavaScript("if(window.initData && !window.__personalInfoInitialized){window.initData(" .. json .. ");window.__personalInfoInitialized=true;}", function(_, script_error)
 			if WebviewResult.is_error(script_error) then report("execution failed") end
 		end)
 	end)
@@ -219,16 +222,15 @@ function M.close()
 end
 
 --- Opens the editor as a standalone WKWebView window.
---- @param current_info table Current data used to populate form fields.
+--- @param current_info table Current data used to populate a newly opened form.
 --- @param save_callback function Returns true after committing the edited {key=value} map.
+---   A currently open form keeps its original callback and unsaved edits.
 function M.open(current_info, save_callback)
 	if _owner and (_owner.constructing or _owner.closing) then return false end
 	if _owner and _owner.retired then
 		if not close_webview() then return false end
 	end
 	_revision = _revision + 1
-	_current = type(current_info) == "table" and current_info or {}
-	_save_cb = save_callback
 	-- Singleton — focus the existing window instead of opening a second one.
 	if _webview then
 		local owner, view = _owner, _webview
@@ -239,6 +241,8 @@ function M.open(current_info, save_callback)
 		})
 		return owner_is_current(owner)
 	end
+	_current = type(current_info) == "table" and current_info or {}
+	_save_cb = save_callback
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPersonalInfo")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")

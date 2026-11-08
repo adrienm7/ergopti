@@ -25,7 +25,7 @@ _KLSCR_RetryPartialClose(Mode) {
 			Saved[Name] := KLWatch.%Name%
 	}
 	SavedHookState := Map()
-	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+	for Name in ["last_tick", "app_entered_at", "title_entered_at", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		SavedHookState[Name] := KLHook.%Name%
 	SavedInitialized := Keystats.initialized
 	SavedRows := _Stub_AppendLogRows
@@ -36,6 +36,8 @@ _KLSCR_RetryPartialClose(Mode) {
 		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture must not stop a live timer")
 		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture must not detach live callbacks")
 		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture must not detach live callbacks")
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLWatch.system_events := false
 		KLWatch.wts_registered := false
 		KLWatch.wts_retry_timer := false
@@ -153,7 +155,7 @@ _KLSCR_ShortIdleRetry(Mode) {
 			Saved[Name] := KLWatch.%Name%
 	}
 	SavedHookState := Map()
-	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+	for Name in ["last_tick", "app_entered_at", "title_entered_at", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		SavedHookState[Name] := KLHook.%Name%
 	SavedInitialized := Keystats.initialized
 	SavedRows := _Stub_AppendLogRows
@@ -164,6 +166,8 @@ _KLSCR_ShortIdleRetry(Mode) {
 		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture must not stop a live timer")
 		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture must not detach live callbacks")
 		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture must not detach live callbacks")
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLWatch.system_events := false
 		KLWatch.wts_registered := false
 		KLWatch.wts_retry_timer := false
@@ -241,6 +245,7 @@ for Mode in ["key", "timer", "stop", "timeout", "private", "native32-boundary"]
 ; the actual production append and teardown bodies, preserving their include
 ; isolation while exercising the privacy refusal that the recording stub hides.
 _KLSCR_ShutdownCloseNativeChain() {
+	global _DriverDir
 	_KLRDC_Reset()
 	Script := _KLRDC_Root() . "shutdown_close_chain.ahk"
 	Handle := 0
@@ -257,7 +262,8 @@ _KLSCR_ShutdownCloseNativeChain() {
 				"each native-chain class must come from actual production source")
 			Source .= NativeClass[0] . "`n"
 		}
-		for Name in ["KL_AppendLog", "KL_CaptureHeld", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
+		for Name in ["KL_AppendLog", "KL_LogAppSwitch", "KL_LogWindowSwitch",
+			"KL_CaptureHeld", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
 			"KL_CommitPwCache", "KL_TryGetPwCachedVerdict", "KL_PasswordFocusSnapshot",
 			"KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback", "KL_IsFocusedFieldPassword",
 			"MF_ShouldFilter", "MF_ShouldFilterFor", "KL_AssignStableEventId", "KL_AllocEventId",
@@ -270,6 +276,16 @@ _KLSCR_ShutdownCloseNativeChain() {
 			AssertTrue(Body != "", "each actual native-chain function must be present")
 			Source .= Body . "`n"
 		}
+		; KL_AppendLog admits trigger-ROI text through its privacy owner. The close
+		; chain carries no ROI row, so reaching that owner here is a failure.
+		Source .= 'KL_Roi_AdmitTextEntry(Entry) {`n`tthrow Error("A trigger-ROI row reached the session close chain.")`n}`n'
+		ContextOwner := _DriverProductionFileForSymbol("_KL_ContextProject", _DriverDir)
+		AssertTrue(ContextOwner != "", "The actual inactive context close still needs its genuine owner")
+		Source .= "#Include " . ContextOwner . "`n"
+		FocusOwner := _DriverProductionFileForSymbol("MF_GetFocusSnapshot", _DriverDir)
+		AssertTrue(FocusOwner != "", "The genuine context privacy owner requires the real focus-cache state class")
+		AssertTrue(RegExMatch(FileRead(FocusOwner, "UTF-8"), "ms)^class MetricsFocusCache \{.*?^\}", &FocusClass) > 0)
+		Source .= FocusClass[0] . "`n"
 		Source .= '#Include ' . A_ScriptDir . '\..\modules\keystats\keystats_session_events.ahk' . "`n"
 		Source .= '#Include ' . A_ScriptDir . '\fixtures\keystats_shutdown_close_fixture.ahk' . "`n"
 		AssertTrue(FSWriteCreateDurable(Script, Source) != 0)

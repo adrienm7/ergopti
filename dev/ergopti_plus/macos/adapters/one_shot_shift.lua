@@ -14,6 +14,7 @@ local Keycodes = require("keycodes")
 local Timer = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local CapsWordOutput = require("infra.capsword_output")
 local CONTROL = {
 	[Keycodes.BACKSPACE] = "backspace", [Keycodes.FORWARD_DELETE] = "delete",
 	[Keycodes.RETURN] = "enter", [Keycodes.ENTER] = "enter",
@@ -109,11 +110,11 @@ function M.new(deps)
 		local raw_flags = event:rawFlags()
 		local kind, result = owner:take(code, control, text, now(), deps.magic(), function(title)
 			return translated(code, raw_flags) == text
-				and translated(code, event_api.rawFlagMasks.shift) == title
+				and translated(code, raw_flags | event_api.rawFlagMasks.shift) == title
 		end)
 		if kind == "text" then
 			assert(emit(result), "one-shot Shift text emission was refused")
-			pending = { key = code, kind = kind }
+			pending = { key = code, kind = kind, emitted = result }
 			return true
 		elseif kind == "shift" or kind == "shift-held" then
 			pending = { key = code, kind = kind, event = event, raw = raw_flags, text = event:getCharacters(false) }
@@ -130,6 +131,11 @@ function M.new(deps)
 		if not current then return end
 		if accepted then
 			if current.kind ~= "shift-held" then owner:commit(current.key, current.kind) end
+			-- The serialized result goes out as returned events the CapsWord
+			-- watcher's tap never sees: its delimiters end CapsWord as typed
+			-- output, as the text sender reports its own (" :" ends a space-only
+			-- CapsWord although the physical "." does not).
+			if current.kind == "text" then CapsWordOutput.report(current.emitted) end
 		elseif current.event then
 			current.event:rawFlags(current.raw)
 			current.event:setUnicodeString(current.text)

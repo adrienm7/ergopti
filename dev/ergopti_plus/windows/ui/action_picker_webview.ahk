@@ -53,6 +53,8 @@ global _ActPickWeb_NavSub     := unset
 ; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _ActPickWeb_ResetDone  := false
+global _ActPickWeb_SubscriptionOwner := 0
+global _ActPickWeb_RetiredHosts := []
 global _ActPickWeb_SessionEpoch := 0
 global _ActPickWeb_ProgramOwner := 0
 global _ActPickWeb_ProgramPacket := Map("unavailable", true)
@@ -97,6 +99,10 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	global _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch, _ActPickWeb_AfterClose
 	global _VendorDir, _SharedDir
 
+	EntryEpoch := _ActPickWeb_SessionEpoch
+	_ActPickWeb_RetryRetiredHosts()
+	if _ActPickWeb_SessionEpoch != EntryEpoch
+		return true
 	if !_ActPickWeb_Available()
 		return false
 
@@ -156,7 +162,7 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	}
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	Installed := false
+	Installed := false, Host := 0
 	try {
 		try {
 			; Environment boot and controller creation both pump native Close.
@@ -168,15 +174,20 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 			try LoggerError("ActionPicker", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
 			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			try g.Destroy()
-			_ActPickWeb_Reset()
-			_ActPickWeb_Gui := 0
-			return false
+			ClosedForFallback := _ActPickWeb_Close(g, SessionEpoch)
+			; Cleanup may admit a successor; only this exact failed opening
+			; may request the native fallback.
+			return !((ClosedForFallback is Integer) && ClosedForFallback == 1
+				&& _ActPickWeb_SessionEpoch == SessionEpoch + 1
+				&& _ActPickWeb_ResetDone && _ActPickWeb_Gui == 0)
 		}
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
 		View := Controller.CoreWebView2
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		Host := _ActPickWeb_BeginSubscriptions(SessionEpoch, g, Controller, View)
+		if !IsObject(Host)
 			return true
 
 		try {
@@ -200,10 +211,12 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
 
-		MsgSub := View.WebMessageReceived(_ActPickWeb_OnWebMessage.Bind(SessionEpoch))
+		if !_ActPickWeb_Subscribe(Host, "message", _ActPickWeb_OnWebMessage.Bind(SessionEpoch))
+			return true
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
-		NavSub := View.NavigationCompleted(_ActPickWeb_OnNavigationCompleted.Bind(SessionEpoch))
+		if !_ActPickWeb_Subscribe(Host, "navigation", _ActPickWeb_OnNavigationCompleted.Bind(SessionEpoch))
+			return true
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
 		try View.SetVirtualHostNameToFolderMapping(ACTPICK_VHOST, _SharedDir, ACTPICK_HOST_ACCESS_ALLOW)
@@ -218,10 +231,8 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 			if _ActPickWeb_StartupCurrent(SessionEpoch, g) {
 				_ActPickWeb_Controller := Controller
 				_ActPickWeb_WebView := View
-				_ActPickWeb_MsgSub := MsgSub
-				_ActPickWeb_NavSub := NavSub
-				MsgSub := unset
-				NavSub := unset
+				_ActPickWeb_MsgSub := Host.message
+				_ActPickWeb_NavSub := Host.navigation
 				Installed := true
 			}
 		} finally Critical(PreviousCritical)
@@ -241,9 +252,13 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 		if !Installed {
 			; A revoked open is consumed: never Reset a replacement or ask the
 			; public caller to reopen its native fallback after the user canceled.
-			MsgSub := unset
-			NavSub := unset
-			if IsSet(Controller) {
+			if IsObject(Host) {
+				DestroyFailedHost := _ActPickWeb_StartupCurrent(SessionEpoch, g)
+				try _ActPickWeb_Reset(DestroyFailedHost, g, , SessionEpoch)
+				catch Any as CleanupFailure
+					try LoggerWarn("ActionPicker", "Failed browser cleanup remains pending (error_type={1}).", Type(CleanupFailure))
+				_ActPickWeb_RetireSubscriptionHost(Host)
+			} else if IsSet(Controller) {
 				try Controller.Close()
 				catch as Err
 					try LoggerError("ActionPicker", "Retired browser cleanup failed: {1}.", Err.Message)
@@ -261,6 +276,127 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
 ; ====================================
+
+; A subscription is returned after add_Event has pumped native messages. The
+; exact host retains its HWND/controller until that returned handle is released.
+_ActPickWeb_BeginSubscriptions(Epoch, Window, Controller, View) {
+	global _ActPickWeb_SubscriptionOwner
+	Host := {epoch: Epoch, gui: Window, controller: Controller, view: View, message: 0,
+		navigation: 0, in_flight: false, retired: false, closing: false, closed: false, destroy: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_ActPickWeb_StartupCurrent(Epoch, Window) || IsObject(_ActPickWeb_SubscriptionOwner)
+			return 0
+		_ActPickWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+_ActPickWeb_Subscribe(Host, Kind, Handler) {
+	global _ActPickWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _ActPickWeb_SubscriptionOwner != Host
+				|| !_ActPickWeb_StartupCurrent(Host.epoch, Host.gui)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureType := "", FailureValue := 0
+	try {
+		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
+			: Host.view.NavigationCompleted(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureType := Type(Failure), FailureValue := Failure
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.%Kind% := Subscription
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _ActPickWeb_SubscriptionOwner == Host
+				&& _ActPickWeb_StartupCurrent(Host.epoch, Host.gui)
+		} finally Critical(PreviousCritical)
+	}
+	; Preserve the original SDK error at the public picker's caller. A retired
+	; constructor consumes its late failure without reviving a canceled session.
+	if Failed && Current && !Host.retired
+		throw FailureValue
+	if Host.retired
+		_ActPickWeb_RetryRetiredHosts()
+	if Failed
+		try LoggerError("ActionPicker", "Browser subscription failed (error_type={1}).", FailureType)
+	return !Failed && Current && !Host.retired
+}
+
+_ActPickWeb_RetireSubscriptionHost(Host) {
+	global _ActPickWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Host.gui)
+			return
+		Host.retired := true
+		Found := false
+		for Pending in _ActPickWeb_RetiredHosts
+			if Pending == Host
+				Found := true
+		if !Found
+			_ActPickWeb_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+	; Hide can pump a replacement; all subsequent operations use this old record.
+	if Host.destroy
+		try Host.gui.Hide()
+	_ActPickWeb_RetryRetiredHosts()
+}
+
+_ActPickWeb_RetryRetiredHosts() {
+	global _ActPickWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _ActPickWeb_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false, Destroyed := false, Recheck := false
+		try {
+			Host.message := 0
+			Host.navigation := 0
+			if !Host.closed {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			if Host.destroy {
+				Host.gui.Destroy()
+				Destroyed := true
+			}
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("ActionPicker", "Browser retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			Window := Host.gui, Controller := Host.controller, View := Host.view
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled && Host.destroy && !Destroyed
+					Recheck := true
+				else if Settled {
+					Host.gui := 0, Host.controller := 0, Host.view := 0
+					Count := _ActPickWeb_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _ActPickWeb_RetiredHosts[Index] == Host
+							_ActPickWeb_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+		if Recheck
+			_ActPickWeb_RetryRetiredHosts()
+	}
+}
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, …}. Work is
@@ -624,65 +760,95 @@ _ActPickWeb_OnClose(*) {
 	_ActPickWeb_Close()
 }
 
-_ActPickWeb_Close() {
+_ActPickWeb_Close(ExpectedWindow := unset, ExpectedEpoch := unset) {
 	global _ActPickWeb_Gui
-	saved := (_ActPickWeb_Gui != 0) ? _ActPickWeb_Gui : 0
-	_ActPickWeb_Reset()
-	; Native Destroy can dispatch a successor. Detach only this retained window
-	; before that callout, and never clear a replacement published during Reset.
-	PreviousCritical := Critical("On")
-	try {
-		if _ActPickWeb_Gui == saved
-			_ActPickWeb_Gui := 0
-	} finally Critical(PreviousCritical)
-	try {
-		if saved
-			saved.Destroy()
-	}
+	Window := IsSet(ExpectedWindow) ? ExpectedWindow : _ActPickWeb_Gui
+	; A caller naming its window closes only that window. Closing the current
+	; session still retires its callbacks when it never got a native window.
+	if !IsObject(Window) && IsSet(ExpectedWindow)
+		return false
+	Host := 0
+	Accepted := IsSet(ExpectedEpoch) ? _ActPickWeb_Reset(true, Window, &Host, ExpectedEpoch)
+		: _ActPickWeb_Reset(true, Window, &Host)
+	if !Accepted
+		return false
+	if IsObject(Window) && !IsObject(Host)
+		try Window.Destroy()
+	return true
 }
 
-; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Idempotent: a second call (e.g. the native
-; Close event firing after the frontend's "cancel"/"confirm" message already
-; tore the same window down) is a true no-op instead of touching the globals
-; again.
-_ActPickWeb_Reset() {
+; A plumbing-only Reset retains its native GUI, including a pending add_Event.
+; Actual Close marks that same record for destruction only after Close ACK.
+_ActPickWeb_Reset(DestroyWindow := false, ExpectedWindow := unset, &ManagedHost := unset, ExpectedEpoch := unset) {
+	global _ActPickWeb_Gui, _ActPickWeb_SubscriptionOwner, _ActPickWeb_RetiredHosts
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
 	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch, _ActPickWeb_AfterClose
-
-	; Detach the exact retired session before native teardown can pump a public
-	; replacement. Local aliases keep every potentially final reference alive
-	; until the RAM-only transaction has released Critical.
 	Controller := unset, View := unset, MessageSubscription := unset, NavigationSubscription := unset
+	ManagedHost := 0
 	PreviousCritical := Critical("On")
 	try {
-		if _ActPickWeb_ResetDone
-			return
-		_ActPickWeb_ResetDone := true
-		_ActPickWeb_SessionEpoch += 1
-		if IsSet(_ActPickWeb_Controller)
-			Controller := _ActPickWeb_Controller
-		if IsSet(_ActPickWeb_WebView)
-			View := _ActPickWeb_WebView
-		if IsSet(_ActPickWeb_MsgSub)
-			MessageSubscription := _ActPickWeb_MsgSub
-		if IsSet(_ActPickWeb_NavSub)
-			NavigationSubscription := _ActPickWeb_NavSub
-		Confirm := _ActPickWeb_OnConfirm, AfterClose := _ActPickWeb_AfterClose
-		_ActPickWeb_Controller := unset, _ActPickWeb_WebView := unset
-		_ActPickWeb_MsgSub := unset, _ActPickWeb_NavSub := unset
-		_ActPickWeb_OnConfirm := 0, _ActPickWeb_AfterClose := 0
+		if IsSet(ExpectedWindow) && _ActPickWeb_Gui != ExpectedWindow
+			return false
+		if IsSet(ExpectedEpoch) && _ActPickWeb_SessionEpoch != ExpectedEpoch
+			return false
+		if _ActPickWeb_ResetDone && !DestroyWindow
+			return true
+		Window := _ActPickWeb_Gui
+		Host := _ActPickWeb_SubscriptionOwner
+		if !IsObject(Host) {
+			for Pending in _ActPickWeb_RetiredHosts
+				if Pending.gui == Window {
+					Host := Pending
+					break
+				}
+		}
+		ManagedHost := Host
+		if IsObject(Host) {
+			; Program-provider retirement can yield or throw. Cleanup custody
+			; must already be retained before that independent callout.
+			Found := false
+			for Pending in _ActPickWeb_RetiredHosts
+				if Pending == Host
+					Found := true
+			if !Found
+				_ActPickWeb_RetiredHosts.Push(Host)
+		}
+		if DestroyWindow {
+			if IsObject(Host)
+				Host.destroy := true
+			_ActPickWeb_Gui := 0
+		}
+		AlreadyReset := _ActPickWeb_ResetDone
+		if !AlreadyReset {
+			_ActPickWeb_ResetDone := true
+			_ActPickWeb_SessionEpoch += 1
+			if IsSet(_ActPickWeb_Controller)
+				Controller := _ActPickWeb_Controller
+			if IsSet(_ActPickWeb_WebView)
+				View := _ActPickWeb_WebView
+			if IsSet(_ActPickWeb_MsgSub)
+				MessageSubscription := _ActPickWeb_MsgSub
+			if IsSet(_ActPickWeb_NavSub)
+				NavigationSubscription := _ActPickWeb_NavSub
+			Confirm := _ActPickWeb_OnConfirm, AfterClose := _ActPickWeb_AfterClose
+			_ActPickWeb_Controller := unset, _ActPickWeb_WebView := unset
+			_ActPickWeb_MsgSub := unset, _ActPickWeb_NavSub := unset
+			_ActPickWeb_OnConfirm := 0, _ActPickWeb_AfterClose := 0
+			_ActPickWeb_SubscriptionOwner := 0
+			if IsObject(Host)
+				Host.retired := true
+		}
 	} finally Critical(PreviousCritical)
-	_ActPickWeb_ProgramRetire()
-
-	; Subscription destructors use their still-live controller. Teardown owns
-	; only these local aliases, so a successor's entire published state survives.
-	try {
+	if !AlreadyReset {
+		_ActPickWeb_ProgramRetire()
 		MessageSubscription := unset
 		NavigationSubscription := unset
-		if IsSet(Controller)
-			Controller.Close()
+		if !IsObject(Host) && IsSet(Controller)
+			try Controller.Close()
 	}
+	if IsObject(Host)
+		_ActPickWeb_RetireSubscriptionHost(Host)
+	return true
 }
 
 ; Discovery closes its resources independently from WebView COM teardown. An

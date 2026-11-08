@@ -86,6 +86,44 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 		return false
 	end
 
+	helpers.it("shows and removes a stored string exclusion without removing other entries", function()
+		local picker = load_picker_with_front_app("Current")
+		local other = { name = "Other", appPath = "/Applications/Other.app", bundleID = "com.example.other" }
+		local changed
+		local menu = picker.build_menu({ "private-app", other }, function(value) changed = value end, "search")
+		local string_row
+		for _, row in ipairs(menu) do
+			if tostring(row.label):find("private-app", 1, true) then string_row = row end
+		end
+		helpers.assert_true(string_row ~= nil, "the stored exclusion must be visible and removable")
+		string_row.action()
+		helpers.assert_eq(changed, { other })
+	end)
+
+	helpers.it("removes a name-only legacy entry by its exact identity", function()
+		local picker = load_picker_with_front_app("Current")
+		local first, second = { name = "Same" }, { name = "Same" }
+		local changed
+		local menu = picker.build_menu({ first, second }, function(value) changed = value end, "search")
+		menu[1].action()
+		helpers.assert_eq(#changed, 1)
+		helpers.assert_true(rawequal(changed[1], first) or rawequal(changed[1], second))
+	end)
+
+	helpers.it("removes only the selected installation when bundle IDs coincide", function()
+		local AppPicker = load_picker_with_front_app("Current")
+		local first = { name = "App A", appPath = "/Applications/A.app", bundleID = "org.example.app" }
+		local second = { name = "App B", appPath = "/Applications/B.app", bundleID = "org.example.app" }
+		local changed
+		local menu = AppPicker.build_menu({ first, second }, function(value) changed = value end, "search")
+		menu[1].action()
+		helpers.assert_eq(changed, { second }, "removing one path must retain the other installation")
+		local legacy = { name = "Legacy", bundleID = "org.example.legacy" }
+		menu = AppPicker.build_menu({ legacy, second }, function(value) changed = value end, "search")
+		menu[2].action()
+		helpers.assert_eq(changed, { second }, "a pathless legacy entry remains removable by bundle ID")
+	end)
+
 	helpers.it("build_menu does not throw when the frontmost app name contains '%'", function()
 		local AppPicker = load_picker_with_front_app("100% Orange Juice")
 

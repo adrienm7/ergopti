@@ -103,19 +103,22 @@ function M.parse(code, stdout)
 	if line == "OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled" then return false, REASON.CANCELLED, nil end
 	local refused = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|refused|([%w_%-]+)$")
 	if refused then return false, REASON.REFUSED, refused end
-	local status = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|failed|(%-?[%w]+)$")
+	local status, step = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|failed|(%-?[%w]+)|([%l_]+)$")
+	if not status then status = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|failed|(%-?[%w]+)$") end
 	if status then
 		local number = math.tointeger(tonumber(status))
 		if number == HELPER_REFUSED then
 			return false, REASON.REFUSED,
 				"the staged helper failed its checks or refused the install (an earlier install is still on this Mac)"
+					.. (step and (" at step " .. step) or "")
 		end
 		if number == HELPER_CLEANUP then return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" end
 		if number == Update.EXIT_DIGEST or number == Update.EXIT_SIGNATURE then
 			return false, REASON.DRIVER, "the kept VirtualHIDDevice package failed its "
 				.. (number == Update.EXIT_DIGEST and "digest" or "signature") .. " check as root"
 		end
-		return false, REASON.FAILED, "administrator shell status " .. status
+		-- The staged program names the step that failed (field reports 2026-11-05 and 2026-11-06 had only "1").
+		return false, REASON.FAILED, "administrator shell status " .. status .. (step and (" at step " .. step) or "")
 	end
 	return false, REASON.UNANSWERED, "unexpected answer: " .. line
 end

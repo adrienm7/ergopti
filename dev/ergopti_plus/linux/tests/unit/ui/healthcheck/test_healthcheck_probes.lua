@@ -32,21 +32,6 @@ local PROC_AFTER = {
 	["/proc/self/stat"] = "4242 (lua (ergopti) d) S 1 4242 4242 0 -1 4194304 1000 0 0 0 150 75 0 0 20 0 3 0 12345\n",
 }
 
---- An io.open answering the /proc paths of world.proc from memory.
---- @param world table
---- @param real function The real io.open.
---- @return function
-local function proc_open(world, real)
-	return function(path, mode)
-		local content = world.proc and world.proc[path]
-		if content == nil then return real(path, mode) end
-		return {
-			read = function() return content end,
-			close = function() return true end,
-		}
-	end
-end
-
 --- Runs body with the real probes over recorded adapters.
 --- @param async boolean Whether libuv is available.
 --- @param body function(Probes, world)
@@ -61,7 +46,7 @@ local function with_probes(async, body, absent)
 	package.loaded["adapters.timer_scheduler"] = {
 		HAS_ASYNC = async,
 		after = function(delay, fn)
-			local handle = { delay = delay, fn = fn }
+			local handle = { delay = delay, fn = fn, armed = true }
 			world.timers[#world.timers + 1] = handle
 			return handle
 		end,
@@ -70,8 +55,13 @@ local function with_probes(async, body, absent)
 			world.cancelled_timers = world.cancelled_timers + 1
 		end,
 	}
-	local real_open = io.open
-	io.open = proc_open(world, real_open)
+	local reader = require("infra.regular_file_reader")
+	local real_read = reader.read_source
+	reader.read_source = function(path)
+		local content = world.proc and world.proc[path]
+		if content ~= nil then return content end
+		return real_read(path)
+	end
 	package.loaded["adapters.http_client"] = {
 		HAS_ASYNC = async,
 		get = function(url, headers, options, callback)
@@ -88,6 +78,11 @@ local function with_probes(async, body, absent)
 			return not (absent or {})[binary]
 		end,
 		run_async = function(executable, args, options, callback)
+			if world.refuse and world.refuse[executable] then
+				local debt = { cancel = function() world.cancelled_children = world.cancelled_children + 1 end,
+					on_settled = function(listener) world.refuse[executable] = listener; return true end }
+				return nil, "pipe activation failed", debt
+			end
 			world.children[#world.children + 1] = { executable = executable, args = args, options = options,
 				callback = callback }
 			return { cancel = function() world.cancelled_children = world.cancelled_children + 1 end }
@@ -95,7 +90,7 @@ local function with_probes(async, body, absent)
 	}
 	package.loaded["ui.healthcheck.probes"] = nil
 	local ok, err = pcall(body, require("ui.healthcheck.probes"), world)
-	io.open = real_open
+	reader.read_source = real_read
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end
@@ -139,6 +134,66 @@ local function gsettings_children(world)
 end
 
 helpers.describe("diagnostics probes (linux)", function()
+	helpers.it("(healthcheck-timer-refusal) reports failed starts and retains cancellation owners", function()
+		with_probes(true, function(Probes, world)
+			package.loaded["adapters.timer_scheduler"].after = function()
+				local handle = { armed = false, fired = true, timer = {} }
+				world.timers[#world.timers + 1] = handle
+				return handle
+			end
+			local run, answers = start(Probes)
+			helpers.assert_eq(answers.configuration.result.state, "error")
+			helpers.assert_eq(answers.cpu_load.result.state, "error")
+			run.cancel()
+			helpers.assert_eq(world.cancelled_timers, 2)
+		end)
+	end)
+
+	helpers.it("(healthcheck-http-refusal) preserves an inline completion despite a false dispatch receipt", function()
+		with_probes(true, function(Probes)
+			package.loaded["adapters.http_client"].get = function(_, _, _, done)
+				done({ status = 200, body = "{}" }); return false
+			end
+			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
+				get_base_url = function() return "http://127.0.0.1:11434" end } })
+			helpers.assert_eq(answers.github_api.result.state, "ok")
+			helpers.assert_eq(answers.ai_health.result.state, "ok")
+			run.cancel()
+		end)
+	end)
+
+	helpers.it("(healthcheck-http-refusal) completes probes when HTTP admission refuses without callback", function()
+		with_probes(true, function(Probes, world)
+			package.loaded["adapters.http_client"].get = function() return false end
+			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
+				get_base_url = function() return "http://127.0.0.1:11434" end } })
+			helpers.assert_eq(answers.github_api.result.state, "error")
+			helpers.assert_eq(answers.ai_health.result.state, "error")
+			gsettings_children(world).callback({ ok = true, stdout = "'auto'" })
+			select(2, gsettings_children(world)).callback({ ok = true, stdout = "'http://pac.example.invalid/a.pac'" })
+			helpers.assert_eq(answers.proxy_pac.result.state, "error")
+			run.cancel()
+			helpers.assert_eq(world.cancelled_owners, { "diagnostics.pac", "diagnostics.ai", "diagnostics.github" },
+				"the display result must not discard the native cancellation owners")
+		end)
+	end)
+
+	helpers.it("(healthcheck-probe-admission) stops launching after an inline answer revokes its page", function()
+		with_probes(true, function(Probes, world)
+			local schema = helpers.load_module("ui.healthcheck.bridge").config().schema
+			local current = true
+			local run = Probes.start(schema, { logs_dir = "/tmp" }, {}, function(id)
+				if id == "ai_health" then current = false end
+			end, { current = function() return current end })
+			helpers.assert_eq(#world.requests, 1, "only the earlier GitHub probe was launched")
+			helpers.assert_eq(#world.children, 0, "later system probes must not start")
+			helpers.assert_eq(world.cancelled_owners, { "diagnostics.github" })
+			helpers.assert_true(run.cancelled)
+		end)
+	end)
+
 	helpers.it("reads GitHub's rate limit under the probe's own owner", function()
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
@@ -149,6 +204,31 @@ helpers.describe("diagnostics probes (linux)", function()
 			request.callback({ status = 200, body = '{"resources":{"core":{"limit":60,"remaining":12}}}' })
 			helpers.assert_eq(answers.github_api.result.state, "ok")
 			helpers.assert_eq(answers.github_api.sections.network.github_api, "HTTP 200, 12/60")
+		end)
+	end)
+
+	helpers.it("retains refused native probe cleanup before reporting failure (healthcheck-probe-debt)", function()
+		with_probes(true, function(Probes, world)
+			world.refuse = { df = true, gsettings = true }
+			local _, answers = start(Probes)
+			helpers.assert_nil(answers.system_details)
+			helpers.assert_nil(answers.proxy_pac)
+			world.refuse.df()
+			helpers.assert_eq(answers.system_details.result.state, "error")
+			world.refuse.gsettings()
+			helpers.assert_eq(answers.proxy_pac.result.state, "ok")
+		end)
+	end)
+
+	helpers.it("cancels refused native probe debt without a late answer (healthcheck-probe-debt)", function()
+		with_probes(true, function(Probes, world)
+			world.refuse = { df = true, gsettings = true }
+			local run, answers = start(Probes)
+			run.cancel()
+			helpers.assert_eq(world.cancelled_children, 2)
+			world.refuse.df(); world.refuse.gsettings()
+			helpers.assert_nil(answers.system_details)
+			helpers.assert_nil(answers.proxy_pac)
 		end)
 	end)
 
@@ -167,9 +247,39 @@ helpers.describe("diagnostics probes (linux)", function()
 		end)
 	end)
 
+	helpers.it("never probes the local Ollama for a selected API backend (ldg-001)", function()
+		with_probes(true, function(Probes, world)
+			local _, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "api" end,
+				get_base_url = function() return "http://127.0.0.1:11435" end } })
+			helpers.assert_eq(answers.ai_health.result.state, "unsupported")
+			for _, request in ipairs(world.requests) do
+				helpers.assert_true(not request.url:find("11435", 1, true), "no request reaches the local Ollama")
+			end
+		end)
+	end)
+
+	helpers.it("probes the selected local Ollama and names it (ldg-001)", function()
+		with_probes(true, function(Probes, world)
+			local _, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
+				get_base_url = function() return "http://127.0.0.1:11435" end } })
+			local request
+			for _, candidate in ipairs(world.requests) do
+				if candidate.url:find("11435", 1, true) then request = candidate end
+			end
+			helpers.assert_not_nil(request, "the selected Ollama is probed")
+			helpers.assert_eq(request.url, "http://127.0.0.1:11435/api/version")
+			request.callback({ status = 200, body = '{"version":"0.9.1"}' })
+			helpers.assert_eq(answers.ai_health.result.state, "ok")
+			helpers.assert_eq(answers.ai_health.sections.ai.ai_health, "ollama 0.9.1")
+		end)
+	end)
+
 	helpers.it("answers unsupported without libuv rather than blocking the loop", function()
 		with_probes(false, function(Probes, world)
 			local _, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
 				get_base_url = function() return "http://localhost:11434" end } })
 			helpers.assert_eq(answers.github_api.result.state, "unsupported")
 			helpers.assert_eq(answers.ai_health.result.state, "unsupported")
@@ -290,5 +400,42 @@ helpers.describe("diagnostics probes (linux)", function()
 			helpers.assert_eq(answers.proxy_pac.result.state, "ok")
 			helpers.assert_eq(answers.proxy_pac.sections.network.proxy_pac, "No PAC configured")
 		end)
+	end)
+end)
+
+helpers.describe("healthcheck native source admission", function()
+	for _, mode in ipairs({ "stat_refused", "stat_throw", "access_nil", "access_throw" }) do
+		helpers.it("(healthcheck-device-owner) refuses " .. mode .. " without opening a descriptor", function()
+			local previous, accesses = package.loaded["luv"], 0
+			package.loaded["luv"] = {
+				fs_open = function() error("a diagnostic must not open the device") end,
+				fs_stat = function()
+					if mode == "stat_throw" then error("stat failed") end
+					if mode == "stat_refused" then return nil end
+					return { type = "char" }
+				end,
+				fs_access = function()
+					accesses = accesses + 1
+					if mode == "access_throw" then error("access failed") end
+					return nil
+				end,
+			}
+			local called, result = pcall(require("ui.healthcheck.bridge")._device_access_for_test, "/synthetic")
+			package.loaded["luv"] = previous
+			helpers.assert_true(called)
+			helpers.assert_eq(result, "unknown")
+			helpers.assert_eq(accesses, (mode == "stat_refused" or mode == "stat_throw") and 0 or 1)
+		end)
+	end
+
+	helpers.it("(healthcheck-source-fifo) reads regular sources and rejects special files without blocking", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
+		local quote = require("text_utils").shell_quote
+		local runtime = assert(shell.exec_line("command -v luajit"))
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_healthcheck_sources.py"
+		local result = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime) .. " --driver " .. quote(root))
+		helpers.assert_true(result == true or result == 0, "native healthcheck reads must not wait on special files")
 	end)
 end)

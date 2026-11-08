@@ -42,7 +42,7 @@ local function with_windows(scenario)
 			end },
 		})
 		function h.show(kind, on_closed)
-			return h.dialog.show({ kind = kind or "accessibility", bundle_path = "/Applications/Hammerspoon.app",
+			return h.dialog.show({ kind = kind or "accessibility_copies", copies = { "/Applications/Other.app" }, bundle_path = "/Applications/Hammerspoon.app",
 				open_settings = function() return true end, on_closed = on_closed or function() h.closed = h.closed + 1 end })
 		end
 		function h.drain()
@@ -53,7 +53,7 @@ local function with_windows(scenario)
 end
 
 helpers.describe("permission native window reference lifetime", function()
-	for _, kind in ipairs({ "accessibility", "login_items" }) do
+	for _, kind in ipairs({ "accessibility_copies", "login_items" }) do
 		helpers.it("releases the native window after the user closes " .. kind, function()
 			with_windows(function(h)
 				helpers.assert_true(h.show(kind))

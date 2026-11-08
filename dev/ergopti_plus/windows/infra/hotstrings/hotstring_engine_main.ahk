@@ -141,6 +141,11 @@ _HSE_SourcePriority(CategoryName) {
 ; HSE_FeedBackspace (chop one char), HSE_FeedReset (clear), and
 ; HSE_ApplyExpansion (replace trigger suffix by replacement).
 global HSE_Buffer := ""
+; The buffer text as of the last nonfinal PRIVATE expansion the matcher kept
+; (a programmable user-code output is one). A later repeat that derives its
+; scalar from a prefix of it inherits the private classification; every buffer
+; reset drops it. Never logged, never persisted.
+global HSE_PrivateAncestry := ""
 global HSE_FinalNoOpPending := false
 global HSE_FinalNoOpFound := false
 
@@ -847,7 +852,7 @@ _HSE_TrimBufferToCapacity() {
 		; Completion framing is not trigger text. Retain an in-progress nbsp too,
 		; because its punctuation arrives in a separate character notification.
 		LastChar := _TextCompleteTailScalar(HSE_Buffer)
-		FramingLength := (LastChar != "" && (InStr(HSE_WORD_TERMINATORS, LastChar)
+		FramingLength := (LastChar != "" && (InStr(HSE_WORD_TERMINATORS, LastChar, true)
 				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F))) ? StrLen(LastChar) : 0
 		LastUnit := NumGet(StrPtr(HSE_Buffer), (BufferLength - 1) * 2, "UShort")
 		; Keep the possible completion's high unit outside trigger capacity until
@@ -968,12 +973,13 @@ HSE_FeedBackspace(IsPhysical := false, ErasesTypedText := false) {
 ; input line (HSE_StartIsLineStart); it holds only with a known boundary.
 HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false, AtLineStart := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_Suppressed
-		global HSE_FinalNoOpPending
+		global HSE_FinalNoOpPending, HSE_PrivateAncestry
 		if HSE_Suppressed and !IsPhysical {
 				return
 		}
 		HSE_FinalNoOpPending := false
 		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
 		HSE_StartIsWordBoundary := !!KnownTerminatorBefore
 		HSE_StartIsLineStart := HSE_StartIsWordBoundary and !!AtLineStart
 }
@@ -1003,7 +1009,9 @@ HSE_Suppress(YesNo) {
 ; word terminator has been observed.
 HSE_HardReset() {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		global HSE_PrivateAncestry
 		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
 		HSE_StartIsWordBoundary := false
 		HSE_StartIsLineStart := false
 		HSE_FinalNoOpPending := false
@@ -1016,7 +1024,9 @@ HSE_HardReset() {
 ; @param Effect {Object} The committed effect, for KnownBoundaryAfter.
 _HSE_ForgetFinalOutput(Effect) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		global HSE_PrivateAncestry
 		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
 		HSE_StartIsWordBoundary := Effect.KnownBoundaryAfter
 		HSE_StartIsLineStart := false
 		HSE_FinalNoOpPending := false
@@ -1050,7 +1060,11 @@ HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds) {
 				throw ValueError("HSE_IdleResetsWord: the idle delay must be a non-negative number of seconds.")
 		if (IdleSeconds == 0 or LastTick == "")
 				return false
-		return NowTick - LastTick >= IdleSeconds * 1000
+		; Keep exact reachable integer deadlines; only wider seconds need a
+		; floating product so native multiplication cannot wrap into immediate reset.
+		Milliseconds := (IdleSeconds is Integer) && IdleSeconds <= (0x7FFFFFFFFFFFFFFF // 1000)
+				? IdleSeconds * 1000 : IdleSeconds * 1000.0
+		return NowTick - LastTick >= Milliseconds
 }
 
 ; The idle delay in force: the published value, or the manifest default before
@@ -1105,6 +1119,7 @@ HSE_WordResetFlagCurrent(Key) {
 ; is the end of it: its output leaves the matcher (_HSE_ForgetFinalOutput).
 HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0, ChainIsFinal := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
+		global HSE_PrivateAncestry
 
 		StripLen := _HSE_ExpansionStripUnits(Spec.Length + ExtraStrip, EndChar, HSE_TypoNbspStripped)
 		EmittedEndChar := HSE_PlanTail(_HSE_ExpansionPath(EndChar),
@@ -1130,6 +1145,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		; parser. Clear the model rather than publishing a confidently false buffer.
 		if Effect.ClearAll {
 				HSE_Buffer := ""
+				HSE_PrivateAncestry := ""
 				HSE_StartIsWordBoundary := false
 				return Effect
 		}
@@ -1152,6 +1168,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		HSE_Buffer .= Effect.InsertedText
 
 		_HSE_TrimBufferToCapacity()
+		HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 		if (ChainIsFinal or (Spec.HasOwnProp("FinalResult") and Spec.FinalResult))
 				_HSE_ForgetFinalOutput(Effect)
 		return Effect
@@ -1190,9 +1207,22 @@ _HSE_RepeatWordChar(Ch) {
 ;
 ; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
 ; trigger, no end char) or "" when the repeat condition is not met.
+; The repeat's activation window in seconds: the delay the override cascade
+; resolves for the magic key category, the window macOS applies (STAR_TRIGGER).
+; @returns {Number|String} Seconds (0 = always), or "" when it cannot be resolved.
+HSE_RepeatWindowSeconds() {
+		try Resolved := HotstringsResolve("magickey", "repeat_corrections")
+		catch as Err {
+				LoggerError("HSE", "The repeat window could not be resolved ({1}): the repeat is refused.", Err.Message)
+				return ""
+		}
+		Delay := Resolved.HasOwnProp("Delay") ? Resolved.Delay : ""
+		return Delay == "" ? 0 : Delay
+}
+
 HSE_TryRepeatKey(MagicKey) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
-		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
+		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth, HSE_PrivateAncestry
 		; The live-rebuild fence belongs here as much as in HSE_FindMatchAtEnd. While
 		; the registry is being rewritten the matcher answers "" for EVERY sequence —
 		; that means "the registry cannot answer right now", not "no trigger claims
@@ -1249,7 +1279,22 @@ HSE_TryRepeatKey(MagicKey) {
 		}
 		; All checks passed — build a transient Spec and fire.
 		TriggerStr := RepeatChar . MagicKey
+		; The scalar is derived from a secret while the text before the magic key is
+		; still a prefix of the private expansion the matcher kept: the repeat keeps
+		; the classification (metrics, AI context, queued events), and its own
+		; application re-marks the ancestry so a further repeat stays private.
+		Before := SubStr(HSE_Buffer, 1, BufLen - MkLen)
+		DerivedPrivate := HSE_PrivateAncestry != ""
+				and SubStr(HSE_PrivateAncestry, 1, StrLen(Before)) == Before
+		; The repeat answers the magic key within its category's window, as on
+		; macOS (decision of 2026-11-06): the dispatcher's time gate measures it
+		; from the repeated letter, complex-key widening included; 0 is always.
+		WindowSeconds := HSE_RepeatWindowSeconds()
+		if (WindowSeconds == "")
+				return ""
 		return {
+				TimeActivationSeconds: WindowSeconds,
+				PrevCharKey: HSE_TimeGateReferenceChar(TriggerStr, true),
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),
 				Star:        true,
@@ -1259,6 +1304,7 @@ HSE_TryRepeatKey(MagicKey) {
 				Replacement: RepeatChar . RepeatChar,
 				OnlyText:    true,
 				FinalResult: false,
+				IsPrivate:   DerivedPrivate,
 				Category:    "magickey",
 				Section:     "repeat_corrections"
 		}
@@ -1283,9 +1329,9 @@ HSE_TryRepeatKey(MagicKey) {
 ; letters in different sequence and concatenate their fields in that sequence.
 ;
 ; PRIORITY: this is a fallback, reached only when no registered trigger claimed
-; the sequence, so the literal tags (@iban★, @tel★) and the dates (@dt★) still
-; win — @dt spells two valid alias letters AND is the short-date trigger, and the
-; registration is what decides. It runs BEFORE HSE_TryRepeatKey because it is the
+; the sequence, so the literal tags (@iban★, @tel★) and the dates (dt★) still
+; win — dt is the short-date trigger while "d" and "t" are also alias letters, and
+; the registration is what decides. It runs BEFORE HSE_TryRepeatKey because it is the
 ; more specific of the two: @nn★ must expand two fields, not double an "n".
 ;
 ; SINGLE SOURCE: the engine owns the tag walk and letters-to-fields resolution;

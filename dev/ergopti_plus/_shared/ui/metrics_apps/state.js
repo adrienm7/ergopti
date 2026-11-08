@@ -176,7 +176,8 @@ function buildAggregatedData() {
 				total_active_ms: 0,
 				longest_ms: 0,
 				longest_chars: 0,
-				longest_app: null
+				longest_app: null,
+				rows: []
 			},
 			bursts: {
 				count: 0,
@@ -206,6 +207,7 @@ function buildAggregatedData() {
 			hour_weekday: {},
 			// Per-day rollup: date_str → { time_ms, active_ms, chars, switches, sessions }
 			by_date: {},
+			timeline_day: { date: null, rows: [] },
 			// Per-category rollup: cat → { time_ms, chars, active_ms }
 			by_category: Object.create(null),
 			// Sessions count signal: how many app/day rows whose longest_ms is
@@ -248,6 +250,11 @@ function buildAggregatedData() {
 		}
 		return true;
 	});
+
+	// Timeline holds only the selected admitted day, not every hourly history.
+	result.rich.timeline_day.date = validDates.some((d) => d.key === currentSelectedDate)
+		? currentSelectedDate
+		: (validDates[0] && validDates[0].key) || null;
 
 	// Date range bookkeeping for the rich rollup
 	if (validDates.length > 0) {
@@ -326,8 +333,9 @@ function buildAggregatedData() {
 		const byWk =
 			result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
 
-		for (const [appName, appData] of Object.entries(dayData)) {
-			if (appName === '_sys' || appName === '_system') continue;
+		for (const [appKey, appData] of Object.entries(dayData)) {
+			if (appKey === '_sys' || appKey === '_system') continue;
+			const appName = metricsManifestLabel(appKey);
 
 			// #53 category filter — skip apps not in the allowed set
 			if (currentCategoryFilter) {
@@ -337,6 +345,29 @@ function buildAggregatedData() {
 
 			if (!result.apps[appName]) {
 				result.apps[appName] = { time_ms: 0, typing_time: 0, switches: Object.create(null) };
+			}
+
+			// Project each admitted app/day once for the modal and the selected
+			// day's timeline. Never reread rejected days from the source manifest.
+			if (appData.hourly) {
+				const hourEntries = Object.entries(appData.hourly);
+				const totalChars = hourEntries.reduce((n, [, h]) => n + (Number(h.c) || 0), 0);
+				const appHours =
+					result.apps[appName].modal_hourly ||
+					(result.apps[appName].modal_hourly = Object.create(null));
+				for (const [hour, data] of hourEntries) {
+					let ms = Number(data.time_ms) || 0;
+					const chars = Number(data.c) || 0;
+					if (ms === 0 && totalChars > 0 && chars > 0) {
+						ms = (chars / totalChars) * (Number(appData.app_time_ms) || 0);
+					}
+					const slot = appHours[hour] || (appHours[hour] = { time_ms: 0, chars: 0 });
+					slot.time_ms += ms;
+					slot.chars += chars;
+					if (ms > 0 && d.key === result.rich.timeline_day.date) {
+						result.rich.timeline_day.rows.push({ app: appName, hour, ms });
+					}
+				}
 			}
 
 			// Per-app keep-awake correction: when the toggle is OFF (default),
@@ -371,8 +402,11 @@ function buildAggregatedData() {
 				(appOut.session_total_active_ms || 0) + (Number(appData.session_total_active_ms) || 0);
 			if ((Number(appData.session_longest_ms) || 0) > (appOut.session_longest_ms || 0)) {
 				appOut.session_longest_ms = Number(appData.session_longest_ms) || 0;
-				appOut.session_longest_chars = Number(appData.session_longest_chars) || 0;
 			}
+			appOut.session_longest_chars = Math.max(
+				appOut.session_longest_chars || 0,
+				Number(appData.session_longest_chars) || 0
+			);
 			if ((Number(appData.burst_max_cpm) || 0) > (appOut.burst_max_cpm || 0)) {
 				appOut.burst_max_cpm = Number(appData.burst_max_cpm) || 0;
 			}
@@ -440,13 +474,27 @@ function buildAggregatedData() {
 			if ((Number(appData.cascade_max_len) || 0) > r.typing.cascade_max_len) {
 				r.typing.cascade_max_len = Number(appData.cascade_max_len);
 			}
+			// Capture rows only after the date and category admission above. The
+			// table must use this same projection, including per-day categories.
+			const sessionDuration = Number(appData.session_longest_ms) || 0;
+			if (sessionDuration > 0) {
+				r.sessions.rows.push({
+					date: d.key,
+					app: appName,
+					ms: sessionDuration,
+					chars: Number(appData.session_longest_chars) || 0
+				});
+			}
 			r.sessions.count += Number(appData.session_count_total) || 0;
 			r.sessions.total_active_ms += Number(appData.session_total_active_ms) || 0;
 			if ((Number(appData.session_longest_ms) || 0) > r.sessions.longest_ms) {
 				r.sessions.longest_ms = Number(appData.session_longest_ms);
-				r.sessions.longest_chars = Number(appData.session_longest_chars) || 0;
 				r.sessions.longest_app = appName;
 			}
+			r.sessions.longest_chars = Math.max(
+				r.sessions.longest_chars,
+				Number(appData.session_longest_chars) || 0
+			);
 			if ((Number(appData.session_longest_ms) || 0) >= LONG_SESSION_THRESHOLD_MS) {
 				r.long_sessions += 1;
 			}
@@ -510,8 +558,10 @@ function buildAggregatedData() {
 			}
 			// Layouts seen roll-up
 			if (appData.layouts_seen) {
+				const appLayouts = appOut.modal_layouts || (appOut.modal_layouts = Object.create(null));
 				Object.entries(appData.layouts_seen).forEach(([id, n]) => {
 					r.layouts[id] = (r.layouts[id] || 0) + (n || 0);
+					appLayouts[id] = (appLayouts[id] || 0) + (n || 0);
 				});
 			}
 

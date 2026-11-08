@@ -36,6 +36,23 @@ local function read(path)
 	return content
 end
 
+--- A private scratch folder for the native-port cases, removed by `drop`.
+--- @return string dir
+local function scratch()
+	local dir = os.tmpname()
+	os.remove(dir)
+	assert(os.execute("mkdir -p -- '" .. dir .. "'"))
+	return dir
+end
+
+local function drop(dir) os.execute("rm -rf -- '" .. dir .. "'") end
+
+local function write(path, text)
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(text))
+	assert(file:close())
+end
+
 helpers.describe("Linux legacy folder migration", function()
 	helpers.it("merges each XDG base's old folder into its ergopti folder (legacy-folder-migration-linux)", function()
 		local ports, snapshot = Contract.memory_ports({
@@ -49,7 +66,8 @@ helpers.describe("Linux legacy folder migration", function()
 			"/home/u/.local/state/" .. LEGACY .. "/logs/a.log",
 			"/home/u/.local/share/" .. LEGACY .. "/runtimes/ollama/x",
 		})
-		local report = Migration.run({ config_paths = fake_paths, ports = ports })
+		local report = Migration.run({ config_paths = fake_paths, ports = ports,
+			storage = { get = function(_, default) return default end, set = function() return true end } })
 		local after = table.concat(snapshot(), " ")
 		helpers.assert_true(after:find("/home/u/.config/" .. NAME .. "/storage.json", 1, true) ~= nil,
 			"the bootstrap storage moved beside the configuration")
@@ -70,6 +88,137 @@ helpers.describe("Linux legacy folder migration", function()
 		helpers.assert_true(report.cache_ready, "cache folder reported ready")
 	end)
 
+	helpers.it("keeps a file published after the check, on real folders (legacy-folder-migration-linux-race)", function()
+		local dir = scratch()
+		local ok, err = pcall(function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
+			write(dir .. "/old/storage.json", "LEGACY")
+			local ports = Migration.native_ports()
+			local rename = ports.rename
+			ports.rename = function(from, to)
+				-- Another writer publishes the destination between the check and the rename.
+				if to == dir .. "/new/storage.json" then write(to, "CONCURRENT-NEW") end
+				return rename(from, to)
+			end
+			local report = require("legacy_folder_migration").apply({
+				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" } }, ports)
+			helpers.assert_eq(read(dir .. "/new/storage.json"), "CONCURRENT-NEW", "the newer file survives")
+			helpers.assert_eq(read(dir .. "/new/bak/old/storage.json"), "LEGACY", "the old file went to the backup")
+			helpers.assert_eq(#report.moved, 0, "no move reported over the newer file")
+			helpers.assert_eq(#report.backed_up, 1, "the backup is reported")
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("lists exact names and reports an unlistable folder, on real folders (legacy-folder-migration-linux-list)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
+			-- A newline is a legal filename byte: line-split listing invented two names.
+			write(dir .. "/old/line\nbreak", "NL")
+			write(dir .. "/notdir", "FILE")
+			local Core = require("legacy_folder_migration")
+			local ports = Migration.native_ports()
+			local report = Core.apply({
+				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" },
+				{ from_dir = dir .. "/notdir", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/notdir" },
+			}, ports)
+			helpers.assert_eq(read(dir .. "/new/line\nbreak"), "NL", "the newline-named entry moved")
+			helpers.assert_eq(#report.moved, 1, "one move")
+			helpers.assert_eq(#report.removed, 1, "the emptied old folder is removed")
+			helpers.assert_eq(#report.kept, 1, "the unlistable source is reported")
+			helpers.assert_eq(report.kept[1].reason, "list_failed", "not read as an empty folder")
+			helpers.assert_eq(read(dir .. "/notdir"), "FILE", "and left untouched")
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("reports a folder the user cannot read (legacy-folder-migration-linux-permission)", function()
+		local id = io.popen("id -u")
+		local uid = id and id:read("*l")
+		if id then id:close() end
+		-- root reads any folder, so the refusal exists only for an ordinary user.
+		if uid == "0" then return end
+		local dir = scratch()
+		local ok, err = pcall(function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
+			write(dir .. "/old/storage.json", "LEGACY")
+			assert(os.execute("chmod 000 -- '" .. dir .. "/old'"))
+			local report = require("legacy_folder_migration").apply({
+				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" } },
+				Migration.native_ports())
+			assert(os.execute("chmod 700 -- '" .. dir .. "/old'"))
+			helpers.assert_eq(#report.kept, 1, "the refusal is reported")
+			helpers.assert_eq(report.kept[1].reason, "list_failed", "not read as an empty folder")
+			helpers.assert_eq(read(dir .. "/old/storage.json"), "LEGACY", "the old entry stays")
+		end)
+		os.execute("chmod 700 -- '" .. dir .. "/old' 2>/dev/null")
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("leaves a legacy folder linked to the current one, on real folders (legacy-folder-migration-linux-alias)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(function()
+			local base = dir .. "/config"
+			assert(os.execute("mkdir -p -- '" .. base .. "/" .. NAME .. "'"))
+			write(base .. "/" .. NAME .. "/config.toml", "ACTIVE")
+			assert(os.execute("ln -s -- '" .. base .. "/" .. NAME .. "' '" .. base .. "/" .. LEGACY .. "'"))
+			local paths = {
+				config_home = function() return base end,
+				state_home = function() return dir .. "/state" end,
+				data_home = function() return dir .. "/data" end,
+				cache = function() return dir .. "/cache/" .. NAME end,
+			}
+			for _ = 1, 2 do
+				local report = Migration.run({ config_paths = paths })
+				helpers.assert_eq(read(base .. "/" .. NAME .. "/config.toml"), "ACTIVE", "the live file stays")
+				helpers.assert_eq(#report.aliased, 1, "the link is recognised as the current folder")
+				helpers.assert_eq(#report.backed_up + #report.kept + #report.moved, 0, "nothing is archived")
+			end
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("follows a configuration folder chosen inside the old folder (legacy-folder-migration-linux-locator)",
+		function()
+		local old_custom = "/home/u/.config/" .. LEGACY .. "/custom"
+		local new_custom = "/home/u/.config/" .. NAME .. "/custom"
+		local function storage(values, accepts)
+			return {
+				get = function(key, default) local value = values[key]; if value == nil then return default end; return value end,
+				set = function(key, value) if not accepts then return false end; values[key] = value; return true end,
+			}
+		end
+		local values = { ["paths.config_dir"] = old_custom, [AppDirs.linux_storage_key] = "/home/u/Documents/logs" }
+		local ports, snapshot = Contract.memory_ports({ old_custom .. "/config.toml", "/home/u/.config/" .. LEGACY .. "/storage.json" })
+		local report = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage(values, true) })
+		helpers.assert_true(table.concat(snapshot(), " "):find(new_custom .. "/config.toml", 1, true) ~= nil,
+			"the chosen folder moved")
+		helpers.assert_eq(values["paths.config_dir"], new_custom, "the bootstrap setting names it where it went")
+		helpers.assert_eq(values[AppDirs.linux_storage_key], "/home/u/Documents/logs", "an outside folder is untouched")
+		helpers.assert_eq(#report.relocated, 1, "the relocation is reported")
+
+		values = { ["paths.config_dir"] = old_custom }
+		ports, snapshot = Contract.memory_ports({ old_custom .. "/config.toml" })
+		report = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage(values, false) })
+		helpers.assert_eq(values["paths.config_dir"], old_custom, "a refused setting keeps its value")
+		helpers.assert_true(table.concat(snapshot(), " "):find(old_custom .. "/config.toml", 1, true) ~= nil,
+			"and the folder moves back to the path it names")
+		helpers.assert_eq(#report.restored, 1, "the move back is reported")
+		local lines = {}
+		Migration.log({ info = function() end, warn = function(_, fmt, ...) lines[#lines + 1] = fmt:format(...) end },
+			report)
+		local logged = table.concat(lines, "\n")
+		helpers.assert_true(logged:find("back to " .. old_custom, 1, true) ~= nil, "the move back is warned")
+		helpers.assert_true(logged:find("paths.toml", 1, true) == nil, "naming the Linux locator, not paths.toml")
+	end)
+
 	helpers.it("logs every move, backup and kept entry", function()
 		local lines = {}
 		local logger = {
@@ -81,6 +230,7 @@ helpers.describe("Linux legacy folder migration", function()
 			backed_up = { { from = "/e", to = "/bak/e", taken = "/f" } },
 			kept = { { from = "/c", to = "/d", reason = "backup_exists" } },
 			removed = {},
+			aliased = {},
 			cache_ready = true,
 		})
 		helpers.assert_eq(#lines, 3)

@@ -64,21 +64,21 @@ _TNS_StoredAnchor(Stored, Key, Value) {
 ; configuration producer carries them.
 _TNS_WidgetProducers(Mode) {
 	global _LLM_Menu
+	OldAuthority := _WPMWidget_PositionAuthority()
 	OldX := WPMWidget.pos_x
 	OldY := WPMWidget.pos_y
-	OldStoreX := WPMWidgetConst.STORE_X
-	OldStoreY := WPMWidgetConst.STORE_Y
+	OldStore := WPMWidgetConst.STORE_PAIR
 	try {
-		WPMWidgetConst.STORE_X := "test.pos_x"
-		WPMWidgetConst.STORE_Y := "test.pos_y"
+		_WPMWidget_PositionAuthority({active: 0, published: 0})
+		WPMWidgetConst.STORE_PAIR := "test.pos"
 		WPMWidget.pos_x := -125
 		WPMWidget.pos_y := 0
 		switch Mode {
 			case "position":
 				Stored := Map()
 				AssertTrue(WPMWidget_SavePosition(-125, 7, _TNS_StoredAnchor.Bind(Stored)))
-				AssertEqual(2, Stored.Count)
-				for Key, Value in Stored
+				AssertEqual(1, Stored.Count, "the anchor is one stored [x, y] value")
+				for Value in Stored[WPMWidgetConst.STORE_PAIR]
 					AssertTrue(Value is Integer,
 						"the stored coordinate must keep its numeric intent")
 				return
@@ -95,10 +95,10 @@ _TNS_WidgetProducers(Mode) {
 			AssertFalse(Update.Section == "metrics" && (Update.Key == "wpm_widget_x" || Update.Key == "wpm_widget_y"),
 				"no configuration producer may carry the widget anchor")
 	} finally {
+		_WPMWidget_PositionAuthority(OldAuthority)
 		WPMWidget.pos_x := OldX
 		WPMWidget.pos_y := OldY
-		WPMWidgetConst.STORE_X := OldStoreX
-		WPMWidgetConst.STORE_Y := OldStoreY
+		WPMWidgetConst.STORE_PAIR := OldStore
 	}
 }
 for Mode in ["position", "display", "full"]

@@ -171,9 +171,9 @@ function M.get_native_app_category(app_name)
 		local app_path = app:path()
 		if type(app_path) == "string" then
 			local info = hs.application.infoForBundlePath(app_path)
-			if info then
+			if type(info) == "table" then
 				bundle_was_readable = true
-				if info.LSApplicationCategoryType then
+				if type(info.LSApplicationCategoryType) == "string" and info.LSApplicationCategoryType ~= "" then
 					local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
 					raw = raw:gsub("%-", " ")
 					local cap = raw:sub(1, 1):upper() .. raw:sub(2)
@@ -566,16 +566,21 @@ function M.sync_foreign_data_sql(on_applied)
 	end
 	local synced_devices = {}
 	local eligible = {}
+	local function unavailable_directory(path)
+		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+		if type(path) ~= "string" or path == "" then return nil, "foreign metrics directory is unavailable" end
+		local called, _, status = pcall(require("adapters.file_system").classify_no_follow, path)
+		if called and status == "absent" then return synced_devices end
+		return nil, "foreign metrics directory cannot be inspected"
+	end
 
 	local md = _paths.metrics_dir
 	if not md or not fs.attributes(md) then
-		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
-		return synced_devices
+		return unavailable_directory(md)
 	end
 	local by_root = md .. "by_device/"
 	if not fs.attributes(by_root) then
-		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
-		return synced_devices
+		return unavailable_directory(by_root)
 	end
 	local entries, listed, list_err = FsDir.try_entries(by_root)
 	if listed ~= true then
@@ -591,7 +596,9 @@ function M.sync_foreign_data_sql(on_applied)
 			local djattrs   = fs.attributes(djpath)
 			local sql_attrs = fs.attributes(data_sql)
 			if djattrs and sql_attrs then
-				-- Ensure a devices row exists so imported_data_sql_size has a home
+				-- A stored watermark belongs to a previously identified source; it
+				-- cannot authenticate the directory's current device.json.
+				local identified = false
 				local fh = io.open(djpath, "r")
 				if fh then
 					local raw = fh:read("*a"); fh:close()
@@ -599,6 +606,7 @@ function M.sync_foreign_data_sql(on_applied)
 					if ok and type(obj) == "table"
 						and type(obj.device_id) == "string"
 						and obj.device_id == entry then
+						identified = true
 						local stmt = db:prepare(
 							"INSERT OR IGNORE INTO devices "
 							.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
@@ -613,16 +621,16 @@ function M.sync_foreign_data_sql(on_applied)
 					end
 				end
 
-				-- Look up the watermark for this device.  A malformed/missing
-				-- device.json leaves no devices row; applying its ledger anyway would
-				-- rebuild it every tick because the watermark UPDATE affects zero rows.
+				-- Only the currently identified source may use an existing row.
 				local watermark, digest, has_device_row = 0, nil, false
-				for r in db:nrows(string.format(
-					"SELECT imported_data_sql_size, imported_data_sql_sha256 FROM devices WHERE device_id='%s'",
-					Literal.escape(entry))) do
-					has_device_row = true
-					watermark = tonumber(r.imported_data_sql_size)
-					digest = r.imported_data_sql_sha256
+				if identified then
+					for r in db:nrows(string.format(
+						"SELECT imported_data_sql_size, imported_data_sql_sha256 FROM devices WHERE device_id='%s'",
+						Literal.escape(entry))) do
+						has_device_row = true
+						watermark = tonumber(r.imported_data_sql_size)
+						digest = r.imported_data_sql_sha256
+					end
 				end
 
 				local sz = sql_attrs.size or 0
@@ -667,15 +675,21 @@ function M.sync_foreign_data_sql(on_applied)
 							local derived_ok = true
 							if type(on_applied) == "function" then
 								local callback_ok, callback_result = pcall(on_applied, entry)
+								-- The callback can quarantine and retire this exact connection.
+								-- Do not advance a watermark or inspect another device on it.
+								local owner_ok, owner = pcall(_get_db)
+								if not owner_ok or owner ~= db then
+									if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+									return nil, "foreign sync database ownership changed"
+								end
 								derived_ok = callback_ok and callback_result ~= false
 								if not derived_ok then
 									Logger.warn(LOG, "Foreign sync: derived rebuild failed; watermark deferred.")
 								end
 							end
 							if derived_ok then
-								local watermark_rc = db:exec(string.format(
-									"UPDATE devices SET imported_data_sql_size=%d, imported_data_sql_sha256='%s', updated_at='%s' WHERE device_id='%s'",
-									applied_to, Literal.escape(receipt.digest), Literal.escape(_now_ts()), Literal.escape(entry)))
+								local watermark_rc = db:exec(Queries.render("devices.import_watermark", "native", {
+									size = applied_to, digest = receipt.digest, updated_at = _now_ts(), device_id = entry }))
 								if watermark_rc == sqlite3.OK then
 									table.insert(synced_devices, entry)
 									Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)

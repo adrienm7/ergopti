@@ -91,6 +91,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		package.loaded["modules.gestures.touchpad_finder"] = {
+			read_resolution = function() return nil end,
 			find = function() return nil, "no device reports multitouch slots" end,
 		}
 		package.loaded["modules.gestures.manager"] = nil

@@ -440,7 +440,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "bare Tab must explicitly invalidate the accessible-control verdict")
       helpers.assert_true(invalidate_pos < metric_pos and invalidate_pos < llm_pos,
         "focus invalidation must happen before metrics or LLM can consume text")
-      helpers.assert_true(src:find("secure_focus_guard.refresh(false)", 1, true) ~= nil,
+      helpers.assert_true(src:find("refresh_admitted_focus(false)", 1, true) ~= nil
+        and src:find("secure_focus_guard.refresh(immediate)", 1, true) ~= nil,
         "the periodic path must publish the settled fresh verdict")
     end)
 
@@ -580,8 +581,14 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(start_pos ~= nil, "daemon must start lifecycle polling")
       helpers.assert_true(prime_pos and start_pos and prime_pos < start_pos,
         "initial foreground app must be attributed before lifecycle polling starts")
-      helpers.assert_true(src:find("keystats.on_app_focus(_cached_app_id", prime_pos, true) ~= nil,
-        "initial foreground app must be forwarded to the keystats")
+      local helper_start = assert(src:find("local function publish_admitted_focus()", 1, true))
+      local helper_end = assert(src:find("local function refresh_admitted_focus", helper_start, true))
+      local helper = src:sub(helper_start, helper_end - 1)
+      helpers.assert_true(helper:find("keystats.on_app_focus(context.app_id", 1, true) ~= nil,
+        "the admitted app must be forwarded to the keystats")
+      local boot = src:sub(prime_pos, start_pos)
+      helpers.assert_true(boot:find("if secure_focus_guard.prime() then publish_admitted_focus() end", 1, true) ~= nil,
+        "startup must publish only after focus admission")
     end)
   end)
 
@@ -892,4 +899,36 @@ helpers.describe("daemon managed reacquisition publisher", function()
 			end
 		end)
 	end
+end)
+
+for _, result in ipairs({ true, false }) do
+  helpers.it("metrics startup notifies only when initialization refuses " .. tostring(result), function()
+    local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+    local source = assert(file:read("*a")); assert(file:close())
+    local body = assert(source:match('(BootProfiler%.stage%(%"keystats%"%).-BootProfiler%.stage_done%(%"keystats%"%))'))
+    local notices = {}
+    local env = setmetatable({
+      BootProfiler = { stage = function() end, stage_done = function() end },
+      keystats = { init = function() return result end },
+      RuntimeGuard = { optional_require = function() return { get = function(key) return key end } end },
+      notifier = { send = function(message, opts) notices[#notices + 1] = { message, opts.level }; return true end },
+    }, { __index = _G })
+    local fn
+    if setfenv then fn = assert(loadstring(body)); setfenv(fn, env)
+    else fn = assert(load(body, "metrics-startup", "t", env)) end
+    fn()
+    if result then helpers.assert_eq(notices, {})
+    else helpers.assert_eq(notices, { { "dialog.metrics.storage_unavailable", "warning" } }) end
+  end)
+end
+
+helpers.it("metrics storage warning explains blocked collection in every locale", function()
+  local json = require("json")
+  for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+    local path = assert(require("infra.paths").shared("data/locales/" .. lang .. ".json"))
+    local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
+    local message = assert(json.decode(text))["dialog.metrics.storage_unavailable"]
+    helpers.assert_true(type(message) == "string" and message:find("SQLite", 1, true) ~= nil)
+    helpers.assert_true(#message > 40, "warning must explain the unavailable storage")
+  end
 end)

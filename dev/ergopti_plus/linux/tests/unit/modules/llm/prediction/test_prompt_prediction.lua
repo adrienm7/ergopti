@@ -149,6 +149,15 @@ local function scenario(opts, body)
 			world.wait_for(expected + 1)
 		end
 
+		--- Answers request `index` with `texts[index]`, letting the pacing timer send the next.
+		function world.answer_each(texts)
+			for index, text in ipairs(texts) do
+				world.wait_for(index)
+				world.respond(index, text)
+			end
+			world.wait_for(#texts + 1)
+		end
+
 		--- Presses the validation chord of suggestion `index`.
 		function world.press(index)
 			local mods = {}
@@ -226,8 +235,9 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 				"the tail is the current sentence, not the last words")
 			helpers.assert_eq(post.body.max_tokens, Rewrite.max_tokens("ok pr jd 14h"), "the rewrite budget")
 
-			world.answer_all("REWRITE: Ok pour jeudi 14 h.", 3)
-			helpers.assert_eq(#world.posts, 3, "the menu's three predictions")
+			world.answer_all("REWRITE: Ok pour jeudi 14 h.", 6)
+			helpers.assert_eq(#world.posts, 6,
+				"identical rewrites refill the menu's three up to the shared retry budget (3 x 2)")
 			local suggestions = world.engine.get_suggestions()
 			helpers.assert_eq(#suggestions, 1, "identical rewrites are offered once")
 			helpers.assert_eq(suggestions[1].to_type, "Ok pour jeudi 14 h.")
@@ -263,6 +273,13 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 		end)
 	end)
 
+	helpers.it("preserves explicit manual generation when trigger exclusions are invalid", function()
+		scenario({ buffer = "Bonjour", stored = { ["llm.trigger.disabled_apps"] = { "firefox", "Firefox" } } }, function(world)
+			helpers.assert_true(world.handlers.llm_generate_prediction("keyboard__meta_space", nil))
+			helpers.assert_eq(#world.posts, 1, "an invalid automatic-only list does not change manual policy")
+		end)
+	end)
+
 	helpers.it("a normal prediction is unchanged: the menu's prompt, count, tail and budget", function()
 		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
 			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
@@ -273,7 +290,7 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 			local expected = PromptBuilder.build_params("Bonjour Marc, je voulais te dire",
 				{ max_words = Settings.get("max_words") }).max_tokens
 			helpers.assert_eq(post.body.max_tokens, expected, "the continuation budget")
-			world.answer_all("que tout est prêt.", 3)
+			world.answer_each({ "que tout est prêt.", "que tout est prêt demain.", "que tout est enfin prêt." })
 			helpers.assert_eq(#world.posts, 3, "the menu's three predictions")
 			local suggestions = world.engine.get_suggestions()
 			helpers.assert_true(#suggestions >= 1, "a continuation is offered")
@@ -354,9 +371,10 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 		} }, function(world)
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("tap_3", "user_formal"), true)
 			helpers.assert_eq(system_turn(world.posts[1]), "Continue formally.")
-			world.answer_all(" et toute l'équipe.", 3)
+			world.answer_each({ " et toute l'équipe.", " et toute la famille.", " et tous les collègues." })
 			helpers.assert_eq(#world.posts, 3, "no count of its own: the menu's")
 			helpers.assert_eq(world.shown[#world.shown].profile, "Formal", "the tooltip shows its label")
+			assert_menu_untouched(world)
 		end)
 	end)
 
@@ -375,6 +393,19 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			helpers.assert_eq(world.handlers.llm_predict_rewrite("tap_3", nil), false)
 			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
 			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+
+	helpers.it("custom-profile-shortcut: a configured custom prompt is inert while the AI is off", function()
+		scenario({ buffer = "Bonjour Marc", disabled = true, stored = {
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
+			}),
+		} }, function(world)
+			helpers.assert_eq(world.handlers.llm_prompt_prediction("keyboard__primary_p", "user_formal|2"), false)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			assert_menu_untouched(world)
 		end)
 	end)
 
@@ -488,5 +519,86 @@ helpers.it("runs a free-language contextual rewrite without changing the menu pr
 		helpers.assert_true(system_turn(world.posts[1]):find("REWRITE:", 1, true) ~= nil)
 		helpers.assert_eq(user_turn(world.posts[1]), 'PREFIX: "Bonjour Marc. On se voit demain ?"\nTAIL: "On se voit demain ?"')
 		assert_menu_untouched(world)
+	end)
+end)
+
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 4/ Shared sequential retries =======
+-- ============================================
+-- ============================================
+
+-- The retry policy of _shared/modules/llm/inference.json, which macOS and
+-- Windows already apply: max_multiplier attempts per requested prediction,
+-- and a failed or empty attempt followed by one with more room and warmth.
+local INFERENCE = helpers.driver_root() .. "/../_shared/modules/llm/inference.json"
+
+--- The shared retry policy, read from its single source.
+--- @return table
+local function retry_policy()
+	local fh = assert(io.open(INFERENCE, "r"), "cannot open " .. INFERENCE)
+	local root = Json.decode(fh:read("*a"))
+	fh:close()
+	return root.retry
+end
+
+helpers.describe("prompt prediction: sequential variants follow the shared retry policy", function()
+	helpers.it("refills the requested count after duplicate answers", function()
+		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
+			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
+			world.answer_each({ "que tout est prêt.", "que tout est prêt.",
+				"que tout est prêt demain.", "que tout est enfin prêt." })
+			helpers.assert_eq(#world.posts, 4, "one more attempt replaces the duplicate")
+			helpers.assert_eq(#world.engine.get_suggestions(), 3, "the three requested predictions")
+		end)
+	end)
+
+	helpers.it("retries a failed request with the policy's extra tokens and temperature", function()
+		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
+			local policy = retry_policy()
+			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
+			local first = world.posts[1].body
+			world.posts[1].callback({ ok = false, status = 500, body = "{}" })
+			world.wait_for(2)
+			local retried = assert(world.posts[2], "the failed variant is retried").body
+			helpers.assert_eq(retried.max_tokens, first.max_tokens + policy.retry_extra_tokens)
+			helpers.assert_true(math.abs(retried.temperature - (first.temperature + policy.retry_temperature_step)) < 1e-9,
+				"the retry is warmer by the policy's step")
+			for index, text in ipairs({ "que tout est prêt.", "que tout est prêt demain.", "que tout est enfin prêt." }) do
+				world.wait_for(index + 1)
+				world.respond(index + 1, text)
+			end
+			helpers.assert_eq(#world.engine.get_suggestions(), 3, "the failure did not end the request")
+		end)
+	end)
+
+	helpers.it("never retries a refused credential (HTTP 401 or 403)", function()
+		for _, status in ipairs({ 401, 403 }) do
+			scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
+				helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
+				world.posts[1].callback({ ok = false, status = status, body = "{}" })
+				world.wait_for(2)
+				helpers.assert_eq(#world.posts, 1, "HTTP " .. status .. " sends no second attempt")
+				helpers.assert_eq(#world.engine.get_suggestions(), 0)
+			end)
+		end
+	end)
+
+	helpers.it("stops at max_multiplier attempts per requested prediction", function()
+		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
+			local budget = 3 * retry_policy().max_multiplier
+			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
+			for index = 1, budget + 1 do
+				world.wait_for(index)
+				if world.posts[index] then world.posts[index].callback({ ok = false, status = 500, body = "{}" }) end
+			end
+			world.wait_for(budget + 1)
+			helpers.assert_eq(#world.posts, budget, "no attempt beyond the shared budget")
+			helpers.assert_eq(#world.engine.get_suggestions(), 0)
+		end)
 	end)
 end)

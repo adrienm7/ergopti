@@ -56,8 +56,10 @@ local function recording(outcome)
 			if outcome.installed == false then return false, outcome.install_reason, "refused" end
 			return true
 		end,
-		restart = function()
+		restart = function(release)
 			call("restart")
+			seen.restarted_release = release
+			if type(outcome.restarted) == "table" then return table.remove(outcome.restarted, 1) end
 			return outcome.restarted ~= false
 		end,
 		report = function(message) seen.reports[#seen.reports + 1] = message end,
@@ -97,6 +99,33 @@ function M.register(helpers)
 			helpers.assert_eq(last(seen).backup_path, "/cfg/backups/pre-install-x-v0.0.0-dev.139")
 		end)
 
+		helpers.it("does not install an inline completion when download admission fails", function()
+			for _, mode in ipairs({ "refuse", "throw" }) do
+				local ports, seen = recording()
+				ports.download = function(_, _, done)
+					done("/tmp/verified")
+					if mode == "throw" then error("dispatch failed") end
+					return false
+				end
+				local session = Install.new(ports)
+				helpers.assert_eq(session.install("v1", "main"), false)
+				helpers.assert_nil(seen.installed_path, "no installation before admission")
+				helpers.assert_eq(last(seen).phase, "failed")
+				helpers.assert_eq(last(seen).reason_key, Install.REASON.download)
+			end
+		end)
+
+		helpers.it("ignores a late completion after refused download admission", function()
+			local ports, seen = recording()
+			local late
+			ports.download = function(_, _, done) late = done; return false end
+			local session = Install.new(ports)
+			helpers.assert_eq(session.install("v1", "main"), false)
+			late("/tmp/verified")
+			helpers.assert_nil(seen.installed_path)
+			helpers.assert_eq(last(seen).reason_key, Install.REASON.download)
+		end)
+
 		helpers.it("refuses a release without this system's asset and keeps the backup", function()
 			local ports, seen = recording({ asset = false })
 			local session = Install.new(ports)
@@ -106,6 +135,42 @@ function M.register(helpers)
 			helpers.assert_eq(last(seen).reason_key, Install.REASON.no_asset)
 			helpers.assert_eq(last(seen).backup_path, "/cfg/backups/pre-install-x-v0.0.0-dev.139")
 			helpers.assert_eq(session.busy(), false)
+		end)
+
+		helpers.it("releases installation ownership when asset resolution raises", function()
+			for _, failure in ipairs({ "asset resolver unavailable", setmetatable({}, {
+				__tostring = function() error("cannot format") end,
+			}) }) do
+				local ports, seen = recording()
+				ports.resolve_asset = function() error(failure) end
+				local session = Install.new(ports)
+				local ok, started = pcall(session.install, "v1", "main")
+				helpers.assert_true(ok, "the failure must reach the progress owner")
+				helpers.assert_eq(started, false)
+				helpers.assert_eq(session.busy(), false)
+				helpers.assert_eq(last(seen).phase, "failed")
+				helpers.assert_eq(last(seen).reason_key, Install.REASON.unexpected)
+			end
+		end)
+
+		helpers.it("reports opaque callback errors without stranding installation", function()
+			for _, port in ipairs({ "backup", "download", "install", "restart", "report" }) do
+				local ports, seen = recording()
+				local failure = setmetatable({}, { __tostring = function() error("cannot format") end })
+				ports[port] = function() error(failure) end
+				local session = Install.new(ports)
+				local ok = pcall(session.install, "v1", "main")
+				helpers.assert_true(ok, port .. " error must not escape during diagnostics")
+				if port == "restart" then
+					-- The release is installed: a throwing restart holds it for another
+					-- restart, never reports it failed and idle (MUR-001).
+					helpers.assert_eq(last(seen).phase, "restart_pending", "restart must hold the installed release")
+					helpers.assert_eq(session.pending().tag, "v1", "restart must keep its completion action")
+				elseif port ~= "report" then
+					helpers.assert_eq(last(seen).phase, "failed", port .. " must report its failure")
+					helpers.assert_eq(session.busy(), false, port .. " must release ownership")
+				end
+			end
 		end)
 
 		helpers.it("never installs a download that failed its verification", function()
@@ -179,6 +244,121 @@ function M.register(helpers)
 			helpers.assert_eq(installs, 0, "a second completion of a settled download installs nothing")
 		end)
 	end)
+
+	-- A refused restart after an installed (or armed) release reported it failed
+	-- and idle while the install stayed pending (MUR-001).
+	helpers.describe("shared release install waiting for its restart (release-install-restart-pending)", function()
+		local function count(seen, name)
+			local total = 0
+			for _, call in ipairs(seen.calls) do if call == name then total = total + 1 end end
+			return total
+		end
+
+		helpers.it("holds an installed release whose restart is refused instead of failing it", function()
+			local ports, seen = recording({ restarted = false })
+			local session = Install.new(ports)
+			helpers.assert_eq(session.install("v1", "main"), true)
+			helpers.assert_eq(phases(seen), "backing_up,downloading,installing,restarting,restart_pending")
+			helpers.assert_eq(last(seen).tag, "v1")
+			helpers.assert_eq(last(seen).backup_path, "/cfg/backups/pre-install-x-v1")
+			helpers.assert_eq(last(seen).reason_key, nil)
+			helpers.assert_eq(session.busy(), true, "a held install is not idle")
+			helpers.assert_eq(session.pending(), { tag = "v1", backup_path = "/cfg/backups/pre-install-x-v1" })
+		end)
+
+		helpers.it("refuses a second install while one waits for its restart, without a backup", function()
+			local ports, seen = recording({ restarted = false })
+			local session = Install.new(ports)
+			session.install("v1", "main")
+			local calls = #seen.calls
+			helpers.assert_eq(session.install("v2", "main"), false)
+			helpers.assert_eq(#seen.calls, calls, "nothing runs for a refused second install")
+			helpers.assert_eq(last(seen).phase, "restart_pending")
+			helpers.assert_eq(last(seen).tag, "v1")
+		end)
+
+		helpers.it("completes the held install when the restart is asked again", function()
+			local ports, seen = recording({ restarted = { false, false, true } })
+			local session = Install.new(ports)
+			session.install("v1", "main")
+			helpers.assert_eq(session.complete_restart(), false, "a second refusal keeps the release waiting")
+			helpers.assert_eq(last(seen).phase, "restart_pending")
+			helpers.assert_eq(session.pending().tag, "v1")
+			helpers.assert_eq(session.complete_restart(), true)
+			helpers.assert_eq(count(seen, "restart"), 3)
+			helpers.assert_eq(seen.restarted_release.tag, "v1", "the restart names the held release")
+			helpers.assert_eq(last(seen).phase, "restarting")
+			helpers.assert_eq(session.pending(), nil)
+			helpers.assert_eq(session.busy(), true, "an accepted restart stays busy until the exit")
+			helpers.assert_eq(session.complete_restart(), false, "nothing waits any more")
+			helpers.assert_eq(count(seen, "restart"), 3)
+		end)
+
+		helpers.it("reports a held install whose bounded wait lapsed as not installed", function()
+			local ports, seen = recording({ restarted = false })
+			local expire, bounded
+			ports.restart_pending_expiry = function(release, _, fire)
+				bounded, expire = release, fire
+				return true
+			end
+			local session = Install.new(ports)
+			session.install("v1", "main")
+			helpers.assert_eq(bounded.tag, "v1")
+			helpers.assert_eq(session.busy(), true)
+			expire()
+			helpers.assert_eq(last(seen).phase, "failed")
+			helpers.assert_eq(last(seen).reason_key, Install.REASON.restart_expired)
+			helpers.assert_eq(last(seen).backup_path, "/cfg/backups/pre-install-x-v1")
+			helpers.assert_eq(session.busy(), false, "a lapsed install frees the session")
+			helpers.assert_eq(session.complete_restart(), false)
+			local reports = #seen.reports
+			expire()
+			helpers.assert_eq(#seen.reports, reports, "a late second lapse reports nothing")
+		end)
+
+		helpers.it("keeps the release waiting when its wait cannot be bounded", function()
+			local ports, seen = recording({ restarted = false })
+			ports.restart_pending_expiry = function() return false end
+			local session = Install.new(ports)
+			session.install("v1", "main")
+			helpers.assert_eq(last(seen).phase, "restart_pending")
+			helpers.assert_eq(session.busy(), true)
+			local errors = 0
+			for _, level in ipairs(seen.levels) do if level == "error" then errors = errors + 1 end end
+			helpers.assert_eq(errors, 1, "the unbounded wait is reported once")
+		end)
+
+		helpers.it("tells the host each time a release starts or stops waiting", function()
+			local ports = recording({ restarted = { false, true } })
+			local changes, expire = {}, nil
+			ports.pending_changed = function() changes[#changes + 1] = "changed" end
+			ports.restart_pending_expiry = function(_, _, fire) expire = fire; return true end
+			local session = Install.new(ports)
+			session.install("v1", "main")
+			helpers.assert_eq(#changes, 1, "holding announces the waiting release")
+			helpers.assert_eq(session.complete_restart(), true)
+			helpers.assert_eq(#changes, 2, "the accepted restart announces the end of the wait")
+			local lapsing = recording({ restarted = false })
+			lapsing.pending_changed = function() changes[#changes + 1] = "lapsed" end
+			lapsing.restart_pending_expiry = function(_, _, fire) expire = fire; return true end
+			Install.new(lapsing).install("v2", "main")
+			expire()
+			helpers.assert_eq(changes[#changes], "lapsed")
+			helpers.assert_eq(#changes, 4, "the lapse announces the end of the wait")
+		end)
+
+		helpers.it("ignores an expiry after the restart was accepted", function()
+			local ports, seen = recording({ restarted = { false, true } })
+			local expire
+			ports.restart_pending_expiry = function(_, _, fire) expire = fire; return true end
+			local session = Install.new(ports)
+			session.install("v1", "main")
+			helpers.assert_eq(session.complete_restart(), true)
+			expire()
+			helpers.assert_eq(last(seen).phase, "restarting")
+		end)
+	end)
+
 	helpers.describe("shared release install capabilities (release-install-capabilities)", function()
 		local function names_refusal(reason, messages)
 			if type(reason) ~= "string" then return false end

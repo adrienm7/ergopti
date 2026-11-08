@@ -307,6 +307,43 @@ _KLMig_DecryptsBackToTheOriginal() {
 
 Test("KL_Mig: disabling decrypts the stored rows in place", _KLMig_DecryptsBackToTheOriginal)
 
+; Typed text that merely looks like an envelope is sealed at ingress, so the
+; reverse pass completes and restores it literally instead of refusing a row
+; it cannot decrypt (WCR-001).
+_KLMig_DecryptsMarkerPrefixedTypedText() {
+    global _KLMigSuccesses
+    oldSuccess := KLMigration.success_fn
+    _KLMig_Reset()
+    canary := "SENTINEL-PRIVATE-CONTENT"
+    texts := [KL_ENC_MARKER . KL_ENC_SEPARATOR . canary,
+        KL_ENC_MARKER . KL_ENC_SEPARATOR . "00000000000000000000000000000000" . KL_ENC_SEPARATOR . canary]
+    KLMigration.success_fn := _KLMig_RecordSuccess
+    _KLMigSuccesses := []
+    try {
+        KL_Enc_SetEnabled(true)
+        _KLMig_WriteLedger(texts)
+        AssertTrue(!InStr(FileRead(Keystats.data_sql_path, "UTF-8"), canary),
+            "encrypted ingress must not write the marker-prefixed literal in clear")
+
+        KL_Enc_SetEnabled(false)
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_DECRYPT, false), "the reverse pass must start")
+        _KLMig_Drain()
+        AssertEqual(1, _KLMigSuccesses.Length, "the reverse pass must complete")
+        after := FileRead(Keystats.data_sql_path, "UTF-8")
+        loop texts.Length {
+            AssertTrue(texts[A_Index] == _KLMig_FieldOf(after, A_Index, "text"),
+                "row " . A_Index . " must come back as the literal typed text")
+        }
+    } finally {
+        KL_Mig_Cancel()
+        KLMigration.success_fn := oldSuccess
+        KL_Enc_SetEnabled(false)
+    }
+}
+
+Test("KL_Mig: disabling restores marker-prefixed typed text literally (WCR-001)",
+    _KLMig_DecryptsMarkerPrefixedTypedText)
+
 
 
 

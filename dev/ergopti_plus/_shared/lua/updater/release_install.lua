@@ -21,8 +21,16 @@
 ---    the next step never runs. There is no fallback source or unverified path.
 --- 4. One install at a time: a second request while one runs is refused as busy.
 --- 5. Pure Lua: every effect is a port.
+--- 6. Installed is not failed: when the release is installed (or armed to
+---    replace the app on quit) but the restart is refused, the session holds
+---    it as restart_pending instead of reporting a failure. The page and the
+---    menu offer to restart again (complete_restart); a new install is refused
+---    meanwhile. A host whose armed install lapses after a bounded wait (the
+---    macOS swap worker) declares restart_pending_expiry, and the lapse is
+---    reported as restart_expired: only then is nothing installed.
 --- ==============================================================================
 
+local ErrorDescription = require("error_description")
 local M = {}
 
 -- Remains monotonic when a native window creates a new install session.
@@ -37,7 +45,10 @@ M.REASON = {
 	download = "changelog_window.install_error_download",
 	verify = "changelog_window.install_error_verify",
 	install = "changelog_window.install_error_install",
+	previous_backup = "changelog_window.install_error_previous_backup",
 	unknown_release = "changelog_window.install_error_unknown_release",
+	-- The armed replacement waited for a quit that never came, so nothing was replaced.
+	restart_expired = "changelog_window.install_error_restart_expired",
 	-- A feed-only list: no driver verifies a download without the API's digest
 	-- or checksum asset. The macOS window hands the channel's newest release to
 	-- Sparkle instead (ui/changelog/init.lua); Windows and Linux have no updater
@@ -68,8 +79,11 @@ for _, key in pairs(M.REASON) do KNOWN_REASON[key] = true end
 ---   failure_current?(owner) -> true only for that exact live native owner,
 ---   failure_capabilities?(owner) -> actual available native actions,
 ---   failure_action?(id, owner) -> true only after real native dispatch,
+---   restart_pending_expiry?(release, native_owner, expire()) -> true when the
+---     host bounded how long its installed release waits for the restart,
+---   pending_changed?() -- a release started or stopped waiting (menus redraw),
 ---   logger, log }
---- @return table session { install(tag, channel), busy() }
+--- @return table session { install(tag, channel), busy(), pending(), complete_restart() }
 function M.new(ports)
 	assert(type(ports) == "table", "release_install needs its ports")
 	for _, name in ipairs({ "blocked", "find_release", "backup", "resolve_asset", "download",
@@ -87,6 +101,8 @@ function M.new(ports)
 	assert(type(Logger) == "table", "release_install needs a logger")
 
 	local running, terminal, last_operation = nil, nil, nil
+	-- An installed release whose restart was refused: { operation, tag, release, backup_path, native_owner }.
+	local pending = nil
 	local retired, retirement_revision = false, 0
 	local session = {}
 
@@ -118,7 +134,7 @@ function M.new(ports)
 		local retained = operation or running or terminal
 		local native_owner = retained and retained.native_owner or nil
 		local ok, err = pcall(ports.report, message, native_owner)
-		if not ok then Logger.error(LOG, "The Versions page could not be told the install phase: %s.", tostring(err)) end
+		if not ok then Logger.error(LOG, "The Versions page could not be told the install phase: %s.", ErrorDescription.describe(err)) end
 	end
 
 	--- Ends the running install with a failure the page shows.
@@ -166,9 +182,93 @@ function M.new(ports)
 		report(message, operation)
 	end
 
-	--- Whether an install is running.
+	--- Sends a phase to whichever page is open now: a held install outlives the
+	--- page that started it, so its later phases never use that page's owner.
+	--- @param message table
+	local function report_open_page(message)
+		local ok, err = pcall(ports.report, message, nil)
+		if not ok then Logger.error(LOG, "The Versions page could not be told the install phase: %s.", ErrorDescription.describe(err)) end
+	end
+
+	--- Tells the host that the held release changed, so its menu redraws.
+	local function pending_changed()
+		if type(ports.pending_changed) ~= "function" then return end
+		local ok, err = pcall(ports.pending_changed)
+		if not ok then Logger.error(LOG, "The held install could not be announced: %s.", ErrorDescription.describe(err)) end
+	end
+
+	--- The page message of the held install.
+	--- @param held table
+	--- @return table
+	local function pending_message(held)
+		return { tag = held.tag, phase = "restart_pending", backup_path = held.backup_path }
+	end
+
+	--- Ends a held install whose host-declared wait lapsed: nothing was replaced.
+	--- @param held table
+	local function expire(held)
+		if pending ~= held then return end
+		pending = nil
+		pending_changed()
+		Logger.warn(LOG, "Release %s was not installed: Ergopti did not restart before the installer stopped waiting.", held.tag)
+		report_open_page({ tag = held.tag, phase = "failed", reason_key = M.REASON.restart_expired,
+			backup_path = held.backup_path })
+	end
+
+	--- Holds an installed release whose restart was refused.
+	--- @param current table The operation.
+	--- @param release table
+	--- @param backup table
+	local function hold(current, release, backup)
+		running = nil
+		local held = { operation = current, tag = current.tag, release = release,
+			backup_path = backup and backup.path or nil, native_owner = current.native_owner }
+		pending = held
+		pending_changed()
+		if pending ~= held then return end
+		report(pending_message(held), current)
+		if pending ~= held or type(ports.restart_pending_expiry) ~= "function" then return end
+		local ok, armed = pcall(ports.restart_pending_expiry, release, current.native_owner, function() expire(held) end)
+		if not ok or armed ~= true then
+			-- The release still waits; only its lapse can no longer be announced.
+			Logger.error(LOG, "The wait of installed release %s could not be bounded (%s).", held.tag,
+				ErrorDescription.describe(ok and "refused" or armed))
+		end
+	end
+
+	--- Whether an install is running or an installed release waits for its restart.
 	--- @return boolean
-	function session.busy() return running ~= nil end
+	function session.busy() return running ~= nil or pending ~= nil end
+
+	--- The installed release that waits for its restart, or nil.
+	--- @return table|nil { tag, backup_path }
+	function session.pending()
+		if not pending then return nil end
+		return { tag = pending.tag, backup_path = pending.backup_path }
+	end
+
+	--- Asks again for the restart that completes the held install.
+	--- @return boolean accepted True when the host took the restart over.
+	function session.complete_restart()
+		local held = pending
+		if not held then
+			Logger.warn(LOG, "Refused a restart request: no installed release waits for one.")
+			return false
+		end
+		local ok, restarted = pcall(ports.restart, held.release, held.native_owner)
+		if pending ~= held then return false end
+		if ok and restarted == true then
+			pending, running = nil, held.operation
+			pending_changed()
+			Logger.info(LOG, "Restarting on installed release %s.", held.tag)
+			report_open_page({ tag = held.tag, phase = "restarting", backup_path = held.backup_path })
+			return true
+		end
+		Logger.warn(LOG, "The restart that completes release %s was refused again (%s); it still waits.", held.tag,
+			ErrorDescription.describe(ok and "refused" or restarted))
+		report_open_page(pending_message(held))
+		return false
+	end
 
 	--- Installs one release the user clicked.
 	--- @param tag any Release tag posted by the page.
@@ -177,6 +277,12 @@ function M.new(ports)
 	function session.install(tag, channel)
 		if type(tag) ~= "string" or tag == "" then
 			Logger.error(LOG, "Refused an install request without a release tag.")
+			return false
+		end
+		if pending then
+			-- The held release is installed: the user restarts before anything else.
+			Logger.warn(LOG, "Refused to install %s: release %s is installed and waits for a restart.", tag, pending.tag)
+			report_open_page(pending_message(pending))
 			return false
 		end
 		if running then
@@ -276,12 +382,17 @@ function M.new(ports)
 		if not execution_current() then return false end
 		if not ok_backup or not backup then
 			Logger.error(LOG, "Install of %s refused: the configuration backup failed (%s).", tag,
-				tostring(ok_backup and backup_err or backup))
+				ErrorDescription.describe(ok_backup and backup_err or backup))
 			fail(tag, M.REASON.backup, nil, nil, current)
 			return false
 		end
-		local asset = ports.resolve_asset(release, current.native_owner)
+		local asset_ok, asset = pcall(ports.resolve_asset, release, current.native_owner)
 		if not execution_current() then return false end
+		if not asset_ok then
+			Logger.error(LOG, "Install of %s refused: the release asset resolver failed.", tag)
+			fail(tag, M.REASON.unexpected, backup, nil, current)
+			return false
+		end
 		if not asset then
 			Logger.error(LOG, "Install of %s refused: the release has no asset for this system.", tag)
 			fail(tag, M.REASON.no_asset, backup, nil, current)
@@ -291,11 +402,11 @@ function M.new(ports)
 		report({ tag = tag, phase = "downloading", backup_path = backup.path }, current)
 		if not execution_current() then return false end
 		local settled = false
-		local function done(path, reason, detail, failure_receipt)
+		local function finish_download(path, reason, detail, failure_receipt)
 			if settled or not execution_current() then return end
 			settled = true
 			if not path then
-				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, tostring(detail or reason))
+				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, ErrorDescription.describe(detail or reason))
 				fail(tag, reason == M.REASON.verify and M.REASON.verify or M.REASON.download, backup, failure_receipt, current)
 				return
 			end
@@ -308,7 +419,7 @@ function M.new(ports)
 				if not execution_current() then return end
 				if not ok_install or installed ~= true then
 					Logger.error(LOG, "Install of %s failed: %s.", tag,
-						tostring(ok_install and (install_detail or install_reason) or installed))
+						ErrorDescription.describe(ok_install and (install_detail or install_reason) or installed))
 					fail(tag, ok_install and install_reason or M.REASON.install, backup, failure_receipt, current)
 					return
 				end
@@ -319,9 +430,11 @@ function M.new(ports)
 				local ok_restart, restarted = pcall(ports.restart, release, current.native_owner)
 				if not execution_current() then return end
 				if not ok_restart or restarted ~= true then
-					Logger.error(LOG, "Release %s is installed but the restart failed: %s.", tag,
-						tostring(ok_restart and "refused" or restarted))
-					fail(tag, M.REASON.install, backup, nil, current)
+					-- Installed (or armed for the quit) is not failed: a refused restart
+					-- leaves the release waiting, never a retry over a held install.
+					Logger.warn(LOG, "Release %s is installed and waits for a restart: the restart was refused (%s).", tag,
+						ErrorDescription.describe(ok_restart and "refused" or restarted))
+					hold(current, release, backup)
 				end
 			end
 			if install_async then
@@ -351,16 +464,26 @@ function M.new(ports)
 				installed_done(ok_install, installed, install_reason, install_detail)
 			end
 		end
+		local constructing, admitted, seen, early = true, false, false, nil
+		local function done(path, reason, detail, failure_receipt)
+			if seen then return end
+			seen = true
+			if constructing then early = { path = path, reason = reason, detail = detail, receipt = failure_receipt }
+			elseif admitted then finish_download(path, reason, detail, failure_receipt) end
+		end
 		local ok_dispatch, dispatched = pcall(ports.download, asset, release, done, current.native_owner)
-		if not ok_dispatch or dispatched ~= true then
+		admitted = ok_dispatch and dispatched == true
+		constructing = false
+		if not admitted then
 			if not settled then
 				Logger.error(LOG, "Install of %s stopped: the download could not start (%s).", tag,
-					tostring(ok_dispatch and "refused" or dispatched))
+					ErrorDescription.describe(ok_dispatch and "refused" or dispatched))
 				settled = true
 				fail(tag, M.REASON.download, backup, nil, current)
 			end
 			return false
 		end
+		if early then finish_download(early.path, early.reason, early.detail, early.receipt) end
 		return true
 	end
 

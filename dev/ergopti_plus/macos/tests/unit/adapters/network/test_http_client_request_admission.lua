@@ -24,12 +24,13 @@ local helpers = require("tests.helpers")
 --- @param redirects table Map of URL to Location for 302 responses.
 --- @return table http, table state
 local function native_http(redirects)
-	local state = { fetched = {}, pending = {} }
-	local function fetch(url, enable_redirect, callback, hold)
+	local state = { fetched = {}, pending = {}, header_records = {} }
+	local function fetch(url, enable_redirect, callback, hold, headers)
 		state.fetched[#state.fetched + 1] = url
+		state.header_records[#state.header_records + 1] = headers
 		local location = redirects[url]
 		if location and enable_redirect then
-			return fetch(location, enable_redirect, callback, hold)
+			return fetch(location, enable_redirect, callback, hold, headers)
 		end
 		local status, headers = 200, {}
 		if location then status, headers = 302, { Location = location } end
@@ -40,12 +41,12 @@ local function native_http(redirects)
 		end
 	end
 	local http = {}
-	function http.doAsyncRequest(url, _method, _body, _headers, callback, cache_or_redirect, explicit)
+	function http.doAsyncRequest(url, _method, _body, headers, callback, cache_or_redirect, explicit)
 		if type(url) ~= "string" then error("bad argument #1 to 'doAsyncRequest' (string expected)") end
 		local enable = true
 		if type(cache_or_redirect) == "boolean" then enable = cache_or_redirect end
 		if type(explicit) == "boolean" then enable = explicit end
-		fetch(url, enable, callback, state.hold)
+		fetch(url, enable, callback, state.hold, headers)
 	end
 	function http.asyncGet(url, headers, callback)
 		return http.doAsyncRequest(url, "GET", nil, headers, callback)
@@ -118,7 +119,9 @@ end)
 
 
 helpers.describe("HttpClient: an invalid replacement keeps the request in flight (http-validate-before-cancel-2026-10-21)", function()
-	for _, invalid in ipairs({ { "nil URL", nil }, { "NUL URL", "http://h/\0" }, { "file URL", "file:///tmp/x" } }) do
+ for _, invalid in ipairs({ { "nil URL", nil }, { "NUL URL", "http://h/\0" }, { "file URL", "file:///tmp/x" },
+		{ "missing authority", "http:///path" }, { "invalid port", "http://h:65536/" },
+		{ "space in URL", "http://example.test/a b" } }) do
 		helpers.it("delivers the first response after a refused " .. invalid[1], function()
 			local client, state = load_client()
 			state.hold = true
@@ -134,7 +137,62 @@ helpers.describe("HttpClient: an invalid replacement keeps the request in flight
 end)
 
 
+helpers.describe("HttpClient: native header encoding admission", function()
+	helpers.it("keeps admitted credentials stable across an asynchronous redirect", function()
+		local source, target = "https://example.test/start", "https://example.test/next"
+		local client, state = load_client({ [source] = target })
+		state.hold = true
+		local headers, result = { Authorization = "Bearer original" }, nil
+		helpers.assert_eq(client.get(source, headers, function(value) result = value end), true)
+		headers.Authorization = "Bearer modified\0suffix"
+		state.pending[1]()
+		helpers.assert_eq(#state.fetched, 2)
+		helpers.assert_eq(state.header_records[2].Authorization, "Bearer original")
+		state.pending[2]()
+		helpers.assert_true(result and result.ok)
+	end)
+
+	helpers.it("admits legal ASCII and horizontal tabs", function()
+		local client, state = load_client()
+		local result
+		helpers.assert_eq(client.get("https://example.test/", { ["X-Value"] = "a\tb" }, function(value) result = value end), true)
+		helpers.assert_eq(#state.fetched, 1)
+		helpers.assert_true(result and result.ok)
+	end)
+	for _, candidate in ipairs({
+		{ label = "NUL value", headers = { Authorization = "Bearer one\0two" } },
+		{ label = "non-ASCII value", headers = { ["x-api-key"] = "clé" } },
+		{ label = "NUL name", headers = { ["X-Good\0Bad"] = "value" } },
+		{ label = "non-ASCII name", headers = { ["X-Clé"] = "value" } },
+	}) do
+		helpers.it("preserves an active request when refusing " .. candidate.label, function()
+			local client, state = load_client()
+			state.hold = true
+			local first, rejected
+			helpers.assert_eq(client.get("http://127.0.0.1/first", {}, function(value) first = value end), true)
+			helpers.assert_eq(client.get("http://127.0.0.1/second", candidate.headers,
+				function(value) rejected = value end), false)
+			helpers.assert_eq(#state.fetched, 1)
+			helpers.assert_eq(rejected and rejected.error_kind, "invalid_request")
+			helpers.assert_true(client.isActive())
+			state.pending[1]()
+			helpers.assert_true(first and first.ok)
+		end)
+	end
+end)
+
+
 helpers.describe("HttpClient: public HTTPS never follows a downgrade (https-public-downgrade-2026-10-21)", function()
+	helpers.it("does not reinterpret a non-HTTP redirect scheme as a relative path", function()
+		for _, location in ipairs({ "mailto:user@example.test", "file:/private/document" }) do
+			local source = "https://releases.example.test/current"
+			local client, state = load_client({ [source] = location })
+			local terminal
+			client.get(source, {}, function(result) terminal = result end)
+			helpers.assert_eq(state.fetched, { source })
+			helpers.assert_eq(terminal and terminal.ok, false)
+		end
+	end)
 	helpers.it("refuses an HTTPS-to-HTTP redirect without fetching the HTTP hop", function()
 		local client, state = load_client({ ["https://releases.example.test/latest"] = "http://releases.example.test/latest" })
 		local terminal

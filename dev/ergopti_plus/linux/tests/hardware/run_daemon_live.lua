@@ -488,13 +488,21 @@ local function api_requests()
 	return requests
 end
 
+-- Failures of the AI checks, which print the daemon's withheld-input counts.
+local ai_failures_from = nil
+
 if LLM_PORT then
+	-- An inactivity prediction from the scenarios above may already have asked
+	-- the API: only a request made after "//" proves the trigger.
+	ai_failures_from = #failures + 1
+	local before_trigger = #api_requests()
 	type_text("bonjour //")
-	local asked = await(function() return #api_requests() > 0 or nil end, 6)
+	local asked = await(function() return #api_requests() > before_trigger or nil end, 6)
 	if not asked then
-		failures[#failures + 1] = "\"//\" sent no request to the API"
+		failures[#failures + 1] = string.format("\"//\" sent no request to the API (%d request(s) before it, %d after)",
+			before_trigger, #api_requests())
 	else
-		local request = api_requests()[1]
+		local request = api_requests()[before_trigger + 1]
 		print("  the API received: " .. request:sub(1, 300))
 		if not request:find('"authorization": "Bearer ' .. LLM_KEY .. '"', 1, true) then
 			failures[#failures + 1] = "the request did not carry the entry's key"
@@ -592,6 +600,19 @@ Keyboard.close()
 if #failures == 0 then
 	print("  ok   the prediction was requested with the entry's key and typed on a bare 1")
 	os.exit(0)
+end
+-- A failed "//" or rewrite check names where the typed text went: the daemon
+-- logs its withheld-input counts as it exits (infra/typed_input_withheld.lua).
+if ai_failures_from and #failures >= ai_failures_from then
+	local function withheld_summary()
+		local fh = io.open(log, "r")
+		if not fh then return nil end
+		local text = fh:read("*a")
+		fh:close()
+		return text:match("[^\n]*Typed input withheld from the engines:[^\n]*")
+	end
+	local summary = await(withheld_summary, 10)
+	print("  daemon withheld-input counts: " .. tostring(summary or "not logged before the daemon exited"))
 end
 dump_log()
 for _, failure in ipairs(failures) do print("  FAIL " .. failure) end

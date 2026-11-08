@@ -91,10 +91,11 @@ local function native()
 		feed_url = function()
 			local Paths = require("infra.paths")
 			local Json = require("json")
-			local handle = io.open(Paths.shared("modules/updater/defaults.json"), "rb")
+			local handle = require("infra.regular_file_reader").open_source(Paths.shared("modules/updater/defaults.json"))
 			if not handle then return nil end
 			local raw = handle:read("*a")
-			handle:close()
+			local closed = handle:close()
+			if type(raw) ~= "string" or not closed then return nil end
 			local ok, defaults = pcall(Json.decode, raw)
 			if not ok then return nil end
 			local sources = require("updater.release_sources").resolve(defaults)
@@ -158,12 +159,14 @@ function M.failure_token(result)
 		if receipt.stage == "proxy_resolve" then return "proxy_resolve" end
 		if receipt.stage == "proxy_connect" then return "proxy_connect" end
 		if receipt.stage == "connect" then return "connect" end
-		if receipt.stage == "http" and tonumber(receipt.http_status) and receipt.http_status > 0 then
-			return "http_" .. tostring(math.floor(receipt.http_status))
+		local status = tonumber(receipt.http_status)
+		if receipt.stage == "http" and status and status > 0 then
+			return "http_" .. tostring(math.floor(status))
 		end
 	end
-	if type(result) == "table" and tonumber(result.status) and result.status > 0 then
-		return "http_" .. tostring(math.floor(result.status))
+	local status = type(result) == "table" and tonumber(result.status) or nil
+	if status and status > 0 then
+		return "http_" .. tostring(math.floor(status))
 	end
 	if type(result) == "table" and result.error == "timeout" then return "timeout" end
 	return "failed"

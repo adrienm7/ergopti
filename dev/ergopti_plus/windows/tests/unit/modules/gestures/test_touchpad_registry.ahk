@@ -121,7 +121,7 @@ _TPR_RestoreSeams() {
 }
 
 _TPR_Apply() {
-	return TouchpadRegistryApply(_TPR_Write, _TPR_Snapshot, _TPR_Create, _TPR_Exists, _TPR_Path())
+	return TouchpadRegistryApply(_TPR_Write, _TPR_Snapshot, _TPR_Create, _TPR_Exists, _TPR_Path(), _TPR_Read)
 }
 
 _TPR_Count(Prefix) {
@@ -337,6 +337,40 @@ _TPR_UnprovableBackupIsRefused() {
 Test("touchpad registry: an unprovable or failed restore keeps the backup (touchpad-restore-refusal)",
 	_TPR_UnprovableBackupIsRefused)
 
+; Regression (AHK-008 / WG-002): an existing backup that Restore would refuse
+; must not authorize the destructive apply.
+_TPR_UnrestorableExistingBackupBlocksApply() {
+	global _TPR_Files
+	Header := TouchpadRegistryBackupHeader() . "`nkey " . TouchpadRegistryData()["key"] . "`n"
+	for _, Text in ["garbage", Header, Header . "UnknownValue dword 1`n"] {
+		_TPR_Reset(Map("kept", 1))
+		_TPR_Files[_TPR_Path()] := Text
+		AssertFalse(_TPR_Apply(), "an unrestorable existing backup refuses the apply")
+		AssertEqual(0, _TPR_Count("write "), "no value is written over unrecoverable originals")
+		AssertEqual(Text, _TPR_Files[_TPR_Path()], "the existing backup is never replaced")
+	}
+}
+Test("touchpad registry: an existing unrestorable backup blocks every write (WG-002)",
+	_TPR_UnrestorableExistingBackupBlocksApply)
+
+; Regression (AHK-007 / WG-001): the onboarding worker must not report success
+; when the device restart is absent or refused, like the tray restart worker.
+_TPR_OnboardingWorkerFailsWithoutRestart() {
+	Script := _GestureRestartBuildPsScript(A_Temp . "\ergopti_tpr.result")
+	AssertContains(Script, "$devs.Count -eq 0", "no matching device is a failure")
+	AssertFalse(InStr(Script, "PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue"),
+		"PnP operations must not swallow their failures")
+	AssertContains(Script, "Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop")
+	AssertContains(Script, "Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop")
+	AssertContains(Script, "finally {", "a disabled device is re-enabled when a later step fails")
+	Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
+	Assert(Start != "", "the wizard launcher must exist")
+	AssertTrue(InStr(Start, "_GestureRestartBuildPsScript(") > 0,
+		"the wizard launches the tray's restart worker, with its outcome contract")
+}
+Test("touchpad registry: onboarding worker fails when the device restart is absent or refused (WG-001)",
+	_TPR_OnboardingWorkerFailsWithoutRestart)
+
 
 
 
@@ -347,23 +381,24 @@ Test("touchpad registry: an unprovable or failed restore keeps the backup (touch
 ; =============================
 ; =============================
 
-_TPR_WizardScriptWritesTheGeneratedTable() {
-	Data := TouchpadRegistryData()
-	Script := _Onboarding_BuildGesturePsScript(A_Temp . "\ergopti_tpr.result")
-	AssertContains(Script, "$Reg = '" . Data["powershell_key"] . "'", "the script targets the generated key")
-	Lines := 0
-	Pos := 1
-	while (Pos := InStr(Script, "' = ", , Pos)) {
-		Lines += 1
-		Pos += 4
-	}
-	AssertEqual(Data["values"].Length, Lines, "the script writes exactly the generated values")
-	for _, Entry in Data["values"]
-		AssertContains(Script, "  '" . Entry["name"] . "' = " . Entry["value"] . "`r`n",
-			"the script writes " . Entry["name"])
+; Regression (AHK-009 / WG-003): HKCU in an elevated worker is the hive of the
+; account that answered UAC. A standard user typing an administrator's
+; credentials had that administrator's touchpad configured while the backup held
+; their own. The wizard must write in process and elevate only the restart.
+_TPR_WizardElevatesOnlyTheRestart() {
+	Script := _GestureRestartBuildPsScript(A_Temp . "\ergopti_tpr.result")
+	for Needle in ["HKCU", "HKEY_", "PrecisionTouchPad", "ItemProperty", "Registry::"]
+		AssertEqual(0, InStr(Script, Needle), "the elevated worker touches no per-user registry: " . Needle)
+	Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
+	Assert(Start != "", "the wizard launcher must exist")
+	ApplyAt := InStr(Start, "TouchpadRegistryApply(")
+	RunAt := InStr(Start, "Run(")
+	AssertTrue(ApplyAt > 0 && RunAt > ApplyAt,
+		"the wizard writes the values in the resident process before elevating the restart")
+	AssertEqual(0, InStr(Start, "_Onboarding_BuildGesturePsScript"), "no elevated registry writer remains")
 }
-Test("touchpad registry: the wizard script writes the generated table (touchpad-one-source)",
-	_TPR_WizardScriptWritesTheGeneratedTable)
+Test("touchpad registry: the wizard writes as the signed-in user, elevates only the restart (WG-003)",
+	_TPR_WizardElevatesOnlyTheRestart)
 
 _TPR_BothWritersGoThroughTheOwner() {
 	Configure := _DriverFuncBody("GestureAutoConfigureRegistry")
@@ -373,10 +408,9 @@ _TPR_BothWritersGoThroughTheOwner() {
 	AssertEqual(0, InStr(Configure, "Reg_WriteDword"), "and never write a value of its own")
 	Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
 	Assert(Start != "", "the wizard launcher must exist")
-	BackupAt := InStr(Start, "TouchpadRegistryEnsureBackup(")
-	RunAt := InStr(Start, "Run(")
-	AssertTrue(BackupAt > 0 && RunAt > BackupAt,
-		"the wizard must back up the values before its elevated script can overwrite them")
+	AssertTrue(InStr(Start, "TouchpadRegistryApply(") > 0,
+		"the wizard writes through the backing-up owner")
+	AssertEqual(0, InStr(Start, "Reg_WriteDword"), "and never writes a value of its own")
 }
 Test("touchpad registry: both writers go through the one owner (touchpad-one-owner)",
 	_TPR_BothWritersGoThroughTheOwner)

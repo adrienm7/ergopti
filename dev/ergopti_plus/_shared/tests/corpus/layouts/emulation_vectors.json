@@ -1,0 +1,161 @@
+{
+	"description": "What the layout emulation decides for each physical press under the [layout] options, read from the layouts' .keylayout (static/layouts/registry). Complements keylayout_vectors.json, which pins what every level types: these vectors pin the options around it, as the Windows emulation applies them (windows/modules/keymap/keylayout/keylayout_emulation.ahk: _KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, KeylayoutEmulation_PressNative). Keys are named by AutoHotkey scan code and resolved through the physical-key registry. Each press is a space-separated list of modifiers (shift, caps, altgr, ctrl, alt, win) ending with the scan code, optionally followed by native= and the text the OS layout types for that press. 'decides' is pass (the OS types the key), type (consumed, 'text' typed, '' for a pending dead key), type_pass (text typed, then the key reaches the OS) or shortcut (the chord sends 'text'). 'settings' overrides the defaults: base and alt_gr on, every row emulated, number_row native, edges off, no magic key. Replayed by the macOS and Linux emulation (_shared/lua/test/keylayout_emulation_contract.lua).",
+	"vectors": [
+		{
+			"id": "digits_first_swaps_bepo_digit_row",
+			"layout": "bepo",
+			"settings": { "number_row": "digits" },
+			"steps": [
+				{ "press": "SC002", "decides": "type", "text": "1" },
+				{ "press": "shift SC002", "decides": "type", "text": "\"" },
+				{ "press": "SC00B", "decides": "type", "text": "0" },
+				{ "press": "SC029", "decides": "type", "text": "$" }
+			]
+		},
+		{
+			"id": "digits_first_with_edges_swaps_bepo_edge_keys",
+			"layout": "bepo",
+			"settings": { "number_row": "digits", "edges": true },
+			"steps": [
+				{ "press": "SC029", "decides": "type", "text": "#" },
+				{ "press": "shift SC029", "decides": "type", "text": "$" },
+				{ "press": "SC00C", "decides": "type", "text": "°" },
+				{ "press": "SC00D", "decides": "type", "text": "`" }
+			]
+		},
+		{
+			"id": "symbols_first_swaps_ergol_digit_row",
+			"layout": "ergol",
+			"settings": { "number_row": "symbols" },
+			"steps": [
+				{ "press": "SC002", "decides": "type", "text": "€" },
+				{ "press": "shift SC002", "decides": "type", "text": "1" },
+				{ "press": "altgr SC002", "decides": "type", "text": "₁" }
+			]
+		},
+		{
+			"id": "refused_ordering_stays_inert",
+			"layout": "ergopti",
+			"settings": { "number_row": "digits", "edges": true },
+			"steps": [
+				{ "press": "SC002", "decides": "type", "text": "1" },
+				{ "press": "SC029", "decides": "type", "text": "$" }
+			]
+		},
+		{
+			"id": "ordering_already_in_effect_changes_nothing",
+			"layout": "ergol",
+			"settings": { "number_row": "digits" },
+			"steps": [
+				{ "press": "SC002", "decides": "type", "text": "1" },
+				{ "press": "shift SC002", "decides": "type", "text": "€" }
+			]
+		},
+		{
+			"id": "number_row_switched_off_is_the_os_layout",
+			"layout": "bepo",
+			"settings": { "number_row": "digits", "emulate_number_row": false },
+			"steps": [
+				{ "press": "SC002", "decides": "pass" },
+				{ "press": "shift SC002", "decides": "pass" },
+				{ "press": "SC010", "decides": "type", "text": "b" }
+			]
+		},
+		{
+			"id": "top_row_switched_off_on_every_level",
+			"layout": "ergol",
+			"settings": { "emulate_top_row": false },
+			"steps": [
+				{ "press": "SC010", "decides": "pass" },
+				{ "press": "shift SC010", "decides": "pass" },
+				{ "press": "altgr SC010", "decides": "pass" },
+				{ "press": "ctrl SC010", "decides": "pass" },
+				{ "press": "SC020", "decides": "type", "text": "e" }
+			]
+		},
+		{
+			"id": "base_layer_off_keeps_altgr",
+			"layout": "ergol",
+			"settings": { "base": false },
+			"steps": [
+				{ "press": "SC010", "decides": "pass" },
+				{ "press": "shift SC010", "decides": "pass" },
+				{ "press": "ctrl SC010", "decides": "pass" },
+				{ "press": "altgr SC010", "decides": "type", "text": "^" }
+			]
+		},
+		{
+			"id": "altgr_layer_off_keeps_base",
+			"layout": "ergol",
+			"settings": { "alt_gr": false },
+			"steps": [
+				{ "press": "altgr SC010", "decides": "pass" },
+				{ "press": "SC010", "decides": "type", "text": "q" }
+			]
+		},
+		{
+			"id": "dead_key_completed_by_an_os_layout_key",
+			"layout": "ergol",
+			"settings": { "emulate_home_row": false },
+			"steps": [
+				{ "press": "SC018", "decides": "type", "text": "" },
+				{ "press": "SC020 native=e", "decides": "type", "text": "è" },
+				{ "press": "SC018", "decides": "type", "text": "" },
+				{ "press": "SC020 native=ß", "decides": "type", "text": "’ß" },
+				{ "press": "SC018", "decides": "type", "text": "" },
+				{ "press": "SC020", "decides": "type_pass", "text": "’" },
+				{ "press": "SC020 native=e", "decides": "pass" }
+			]
+		},
+		{
+			"id": "reset_keys_drop_a_pending_dead_key",
+			"layout": "ergol",
+			"steps": [
+				{ "press": "SC018", "decides": "type", "text": "" },
+				{ "press": "SC00E", "decides": "pass" },
+				{ "press": "SC020", "decides": "type", "text": "e" },
+				{ "press": "SC018", "decides": "type", "text": "" },
+				{ "press": "SC14B", "decides": "pass" },
+				{ "press": "SC020", "decides": "type", "text": "e" }
+			]
+		},
+		{
+			"id": "keys_outside_the_layout_pass",
+			"layout": "ergol",
+			"steps": [
+				{ "press": "SC03B", "decides": "pass" },
+				{ "press": "ctrl SC03B", "decides": "pass" }
+			]
+		},
+		{
+			"id": "shortcut_chords_send_the_command_level",
+			"layout": "ergopti",
+			"steps": [
+				{ "press": "ctrl SC010", "decides": "shortcut", "text": "z" },
+				{ "press": "win SC010", "decides": "shortcut", "text": "z" },
+				{ "press": "alt shift SC018", "decides": "shortcut", "text": "c" },
+				{ "press": "ctrl SC039", "decides": "pass" }
+			]
+		},
+		{
+			"id": "shortcut_on_a_dead_key_stays_on_the_physical_key",
+			"layout": "ergol",
+			"steps": [
+				{ "press": "ctrl SC018", "decides": "pass" },
+				{ "press": "SC018", "decides": "type", "text": "" },
+				{ "press": "ctrl SC010", "decides": "shortcut", "text": "q" },
+				{ "press": "SC020", "decides": "type", "text": "e" }
+			]
+		},
+		{
+			"id": "magic_key_keeps_its_unshifted_press",
+			"layout": "ergopti_plus",
+			"settings": { "magic_key": "SC02E" },
+			"steps": [
+				{ "press": "SC02E", "decides": "pass" },
+				{ "press": "SC02B", "decides": "type", "text": "" },
+				{ "press": "SC02E", "decides": "type", "text": "j" }
+			]
+		}
+	]
+}

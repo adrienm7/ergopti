@@ -109,8 +109,10 @@ def prefix_input(payload: Path, prefix: Path) -> Path:
     # Project ONLY the genuine installer's launcher template path substitution.
     # Actual updater replacement/smoke remains the original DEFAULT_OPS.
     source = ordinary(payload / "install.sh").decode()
-    start = 'cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER\n'
-    if source.count(start) != 1:
+    # The installer prints the launcher from write_public_launcher, then moves
+    # the printed bytes over "${BIN_DIR}/ergopti-hotstrings".
+    start = "write_public_launcher() {\n\tcat << WRAPPER\n"
+    if source.count(start) != 1 or source.count("write_public_launcher > ") != 1:
         raise RuntimeError("Canonical standalone wrapper constructor unavailable")
     template = source.split(start, 1)[1].split("\nWRAPPER\n", 1)[0] + "\n"
     substitution = "$(printf '%q' \"${LIB_DIR}\")"

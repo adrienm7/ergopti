@@ -28,6 +28,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
 				"modules.keymap.layout_install",
+				"infra.fs_dir",
 				"modules.keymap.input_sources",
 				"ui.menu.menu_keyboard_layout",
 				"infra.logger",
@@ -71,6 +72,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				local system_dir = "/Library/Keyboard Layouts/"
 				local available = { "Ergopti_v2.2.2.bundle" }
 				local installed_user = { "Ergopti_v2.2.1.bundle" }
+				local plist_present = true
 				local revisions = { bundles = 1, user = 1, system = 1 }
 				local scans = { bundles = 0, user = 0, system = 0 }
 
@@ -96,10 +98,20 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					end
 					for _, name in ipairs(installed_user) do
 						if path == user_dir .. name .. "/Contents/Info.plist" then
-							return { mode = "file" }
+							return plist_present and { mode = "file" } or nil
 						end
 					end
 					return nil
+				end
+
+				hs_stub.fs.dir = function(path)
+					local rows
+					if path == bundles_dir then rows = available
+					elseif path == user_dir then rows = installed_user
+					elseif path == system_dir then rows = {}
+					else error("unexpected directory") end
+					local index = 0
+					return function() index = index + 1; return rows[index] end
 				end
 
 				local function pipe_for(rows)
@@ -135,13 +147,21 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				end
 
 				local install = require("modules.keymap.layout_install")
+				-- Each reader of the installed bundles gets the build's one snapshot.
+				local snapshots = {}
 				package.loaded["modules.keymap.input_sources"] = {
 					list_active_keyboard_layouts = function() return {} end,
-					build_kl_name_to_tis_id = function() return {} end,
-					resolve_installed_ergopti_version = function() return nil end,
-					ergopti_in_active_layouts = function() return false end,
+					build_kl_name_to_tis_id = function(installed) snapshots.map = installed; return {} end,
+					resolve_installed_ergopti_version = function(installed) snapshots.version = installed; return nil end,
+					ergopti_in_active_layouts = function(_, installed) snapshots.active = installed; return false end,
 					set_active_layouts_cache = function() end,
 				}
+				local user_listings = 0
+				local list_directory = hs_stub.fs.dir
+				hs_stub.fs.dir = function(path)
+					if path == user_dir then user_listings = user_listings + 1 end
+					return list_directory(path)
+				end
 				package.loaded["adapters.storage"] = {
 					get = function() return nil end,
 					set = function() return true end,
@@ -180,6 +200,12 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				local row = user_row()
 				helpers.assert_eq(row.label, "user update v2.2.1 to v2.2.2")
 				helpers.assert_true(row.disabled ~= true)
+				helpers.assert_true(type(snapshots.map) == "table" and snapshots.map.user ~= nil,
+					"the input-source map reads the build's snapshot")
+				helpers.assert_true(snapshots.version == snapshots.map and snapshots.active == snapshots.map,
+					"every reader shares one snapshot instead of listing both scopes again")
+				helpers.assert_eq(snapshots.map.user.name, "Ergopti_v2.2.1.bundle")
+				helpers.assert_eq(user_listings, 1, "one listing of the user scope per build")
 
 				installed_user = { "Ergopti_v2.2.2.bundle" }
 				revisions.user = revisions.user + 1
@@ -201,8 +227,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				helpers.assert_eq(row.label, "user update v2.2.2 to v2.2.3")
 				helpers.assert_true(row.disabled ~= true)
 
-				-- Positive cache control: unchanged directories keep the same discoveries
-				-- without paying for another directory listing.
+				-- Repeated native listings do not spawn directory-listing processes.
 				local scans_before = {
 					bundles = scans.bundles,
 					user = scans.user,
@@ -212,6 +237,24 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				helpers.assert_eq(row.label, "user update v2.2.2 to v2.2.3")
 				helpers.assert_eq(scans, scans_before)
 				helpers.assert_eq(install.pick_latest_bundle(bundles_dir), "Ergopti_v2.2.3.bundle")
+
+				-- A same-length replacement in the same second keeps the same root
+				-- metadata, but the next native listing must see the new name.
+				installed_user = { "Ergopti_v2.2.3.bundle" }
+				helpers.assert_eq(install.highest_installed(user_dir).name, "Ergopti_v2.2.3.bundle")
+				installed_user = { "Ergopti_v2.2.2.bundle" }
+				available = { "Ergopti_v2.2.4.bundle" }
+				helpers.assert_eq(install.pick_latest_bundle(bundles_dir), "Ergopti_v2.2.4.bundle")
+
+				-- Mutating a bundle's contents does not change its parent's revision.
+				-- The cached names must still be checked against the current plist.
+				plist_present = false
+				hs_stub.execute = function() return "", false end
+				helpers.assert_eq(install.highest_installed(user_dir), nil)
+				plist_present = true
+				helpers.assert_eq(install.highest_installed(user_dir).name, "Ergopti_v2.2.2.bundle")
+				helpers.assert_eq(scans.user, scans_before.user,
+					"nested plist changes must not require another parent listing")
 			end)
 		end, debug.traceback)
 		_G.hs = saved_hs

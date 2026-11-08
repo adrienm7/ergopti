@@ -33,7 +33,8 @@ end
 --- Live stats as the keystats reports them.
 local function stats(wpm, source, variant, at_s)
 	return { wpm = wpm, source = source or "none", source_variant = variant or source or "none",
-		source_time = at_s or 0 }
+		source_time = at_s or 0, last_input_time = at_s,
+		source_holds = source and { { source = source, variant = variant or source, time = at_s or 0 } } or {} }
 end
 
 local function opts(now_s, use_colors, resolve)
@@ -74,7 +75,8 @@ helpers.describe("wpm readouts: the shared canon", function()
 		local loaded = canon()
 		helpers.assert_eq(loaded.position.storage_x, "wpm_widget.pos_x")
 		helpers.assert_eq(loaded.position.storage_y, "wpm_widget.pos_y")
-		for _, key in ipairs({ "storage_x", "storage_y" }) do
+		helpers.assert_eq(loaded.position.storage_pair, "wpm_widget.pos")
+		for _, key in ipairs({ "storage_x", "storage_y", "storage_pair" }) do
 			local broken = canon()
 			broken.position[key] = nil
 			local refused, err = Model.validate(broken)
@@ -216,23 +218,35 @@ end)
 
 helpers.describe("wpm readouts: when they show", function()
 
+	helpers.it("(wpm-pointer-wiring) timestamps the native pointer callback before any event return", function()
+		local code = assert(helpers.read_driver_unit("local function on_pointer_event(kind_of_event"))
+		local first = assert(code:find("local function on_pointer_event(kind_of_event", 1, true))
+		local final = assert(code:find("\n\tend", first, true))
+		local callback = code:sub(first, final)
+		local stamp = assert(callback:find("wpm_widget.observe_pointer(kind_of_event, value, Monotonic.now_ms() / 1000)", 1, true))
+		local early_return = assert(callback:find("then return end", 1, true))
+		helpers.assert_true(stamp < early_return, "native activity must precede frame filtering")
+		helpers.assert_true(code:find("onPointerEvent = on_pointer_event", 1, true) ~= nil,
+			"the clock owner must receive the real hook callback")
+	end)
+
 	local function visible(fields)
-		local ctx = { wpm = 0, source = "none", now_s = 100, last_active_s = 0, last_mouse_s = 0, idle_hide_s = 3 }
+		local ctx = { wpm = 0, source = "none", now_s = 100, last_input_s = 0, last_mouse_s = 0, idle_hide_s = 3 }
 		for key, value in pairs(fields) do ctx[key] = value end
 		return (Model.widget_visible(ctx))
 	end
 
 	helpers.it("shows while text is appearing", function()
-		helpers.assert_true(visible({ wpm = 40 }))
+		helpers.assert_true(visible({ wpm = 40, last_input_s = 100 }))
 	end)
 
 	helpers.it("stays up briefly after typing stops, then hides", function()
-		helpers.assert_true(visible({ last_active_s = 98 }))
-		helpers.assert_true(not visible({ last_active_s = 96 }))
+		helpers.assert_true(visible({ last_input_s = 98 }))
+		helpers.assert_true(not visible({ last_input_s = 96 }))
 	end)
 
 	helpers.it("hides as soon as the mouse moves after the last keystroke", function()
-		helpers.assert_true(not visible({ last_active_s = 99, last_mouse_s = 99.5 }))
+		helpers.assert_true(not visible({ last_input_s = 99, last_mouse_s = 99.5 }))
 	end)
 
 	helpers.it("stays up while a preview is on screen", function()
@@ -267,7 +281,7 @@ end)
 helpers.describe("wpm readouts: the live speed", function()
 
 	local function tracker()
-		return LiveWpm.new({ window_ms = 15000, min_duration_ms = 2000, idle_reset_ms = 5000 })
+		return LiveWpm.new({ window_ms = 15000, min_duration_ms = 2000, idle_reset_ms = 5000, source_hold_ms = 1000 })
 	end
 
 	helpers.it("counts typed characters as words per minute", function()
@@ -306,6 +320,63 @@ helpers.describe("wpm readouts: the live speed", function()
 		keystats.record_synthetic_output("app", "suite", "llm", 5800, 0, 0)
 		helpers.assert_eq(keystats.get_live_stats(5900).source, "llm")
 		keystats.reset_session()
+	end)
+
+	helpers.it("(wpm-pointer-parity) orders a raw key and mouse inside the same millisecond", function()
+		require("tests.support.keystats_native_fixture").with(function(keystats)
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			local clock = require("infra.monotonic")
+			local previous = clock.now_ms
+			clock.now_ms = function() return 10000.9 end
+			local ok, err = pcall(function()
+				keystats.record_physical_key("app", 30, 10000)
+				keystats.on_keydown("a", 10000, "app", 30)
+				local live = keystats.get_live_stats(10001)
+				helpers.assert_eq(live.last_input_time, 10000.9 / 1000,
+					"rounded character telemetry cannot rewind the raw physical input")
+				helpers.assert_true(Model.widget_visible({ last_input_s = live.last_input_time,
+					last_mouse_s = 10000.1 / 1000, now_s = 10.001, idle_hide_s = 3 }))
+				helpers.assert_true(not Model.widget_visible({ last_input_s = live.last_input_time,
+					last_mouse_s = 10000.95 / 1000, now_s = 10.001, idle_hide_s = 3 }))
+			end)
+			clock.now_ms = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("(wpm-source-parity) real keystats preserves independent holds and the physical clock", function()
+		require("tests.support.keystats_native_fixture").with(function(keystats)
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			local hold = require("infra.timings").ms("ui", "wpm_color_hold_ms")
+			local start = 10000
+			keystats.on_keydown("a", start, "app", 30)
+			keystats.record_synthetic_output("app", "AI", "llm", start, 0, 0)
+			keystats.record_hotstring("app", "a", "expand", start + hold / 4, "magickey", 1, false)
+			keystats.record_hotstring("app", "b", "correct", start + hold / 2, "autocorrection", 1, false)
+			keystats.record_hotstring("app", "c", "repeat", start + hold * 3 / 4, "repeat_key", 1, false)
+			local function source(at)
+				local live = keystats.get_live_stats(at)
+				helpers.assert_eq(live.last_input_time, start / 1000, "synthetic text cannot become real input")
+				return Model.active_source(live, hold / 1000, at / 1000, canon())
+			end
+			helpers.assert_eq(source(start + hold * 3 / 4), "llm")
+			helpers.assert_eq(source(start + hold), "magickey", "AI expires at its own deadline")
+			helpers.assert_eq(source(start + hold * 5 / 4), "autocorrection")
+			helpers.assert_eq(source(start + hold * 3 / 2), "none")
+			keystats.record_correction("app", start + hold * 2)
+			helpers.assert_eq(keystats.get_live_stats(start + hold * 2).last_input_time, (start + hold * 2) / 1000)
+			keystats.suspend_collection()
+			keystats.resume_collection()
+			helpers.assert_eq(keystats.get_live_stats(start + hold * 2).last_input_time, nil)
+			helpers.assert_eq(#keystats.get_live_stats(start + hold * 2).source_holds, 0)
+			keystats.record_synthetic_output("app", "AI", "llm", start + hold * 3, 0, 0)
+			require("tests.support.metrics_preferences_fixture").with(function()
+				helpers.assert_true(keystats.set_enabled(false))
+			end)
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			helpers.assert_eq(#keystats.get_live_stats(start + hold * 3).source_holds, 0,
+				"turning collection back on cannot revive old colour")
+		end)
 	end)
 
 end)
@@ -386,7 +457,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			local surface = fake_surface()
 			Widget._set_surface(surface)
 			helpers.assert_true(Widget.start())
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			surface.hide = function() surface.visible = false; return false end
 			helpers.assert_eq(Widget.stop(), false)
 			helpers.assert_eq(preferences.get("metrics.wpm_widget_visible"), true)
@@ -402,7 +473,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Widget._set_surface(surface)
 			Widget.restore()
 			helpers.assert_true(Widget.start())
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			local before = Widget.configuration_snapshot()
 			local changed = Widget.configuration_snapshot()
 			changed.running, changed.shown, changed.graph = false, false, true
@@ -424,7 +495,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Widget._set_surface(surface)
 			Widget.restore()
 			helpers.assert_true(Widget.start())
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			helpers.assert_eq(#surface.draws, 1, "the widget really asks for a drawing")
 			local drawn = surface.draws[1]
 			helpers.assert_eq(drawn.frame.mode, "compact")
@@ -440,23 +511,122 @@ helpers.describe("wpm readouts: the floating widget", function()
 			local surface = fake_surface()
 			Widget._set_surface(surface)
 			Widget.start()
-			Widget.tick(stats(42), 10)
-			Widget.tick(stats(43), 10.05)
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			Widget.tick(stats(43, nil, nil, 10.05), 10.05)
 			helpers.assert_eq(#surface.draws, 1)
-			Widget.tick(stats(44), 10.3)
+			Widget.tick(stats(44, nil, nil, 10.3), 10.3)
 			helpers.assert_eq(#surface.draws, 2)
 		end)
 	end)
 
-	helpers.it("hides once the user stops typing and goes back to the mouse", function()
+	helpers.it("(wpm-pointer-parity) hides on pointer movement despite nonzero WPM and a held source", function()
 		with_storage({}, function()
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
 			Widget.start()
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			surface.pointer = { 300, 400 }
-			Widget.tick(stats(0), 10.5)
+			Widget.observe_pointer("motion", 1, 10.5)
+			Widget.tick(stats(42, "llm", "llm", 10), 10.5)
+			helpers.assert_true(not surface.visible)
+			package.loaded["ui.tooltip.preview"].is_visible = function() return true end
+			Widget.tick(stats(42, "llm", "llm", 10), 10.8)
+			helpers.assert_true(surface.visible)
+			package.loaded["ui.tooltip.preview"].is_visible = function() return false end
+			Widget.tick(stats(42, "llm", "llm", 10), 11.1)
+			helpers.assert_true(not surface.visible)
+			Widget.observe_pointer("motion", 1, 11.3)
+			Widget.tick(stats(42, nil, nil, 11.4), 11.4)
+			helpers.assert_true(surface.visible)
+			Widget.tick(stats(42, nil, nil, 11.4), 100)
+			helpers.assert_true(not surface.visible, "refresh cannot extend real input")
+		end)
+	end)
+
+	helpers.it("(wpm-position-nonfinite) ignores a nonfinite stored coordinate", function()
+		local initial = compact()
+		initial["metrics.wpm_widget_visible"] = true
+		initial["wpm_widget.pos_x"], initial["wpm_widget.pos_y"] = "1e999", 30
+		with_storage(initial, function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.restore())
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			local x, y = Model.default_anchor(canon(), surface.screen_frame())
+			helpers.assert_eq({ surface.draws[1].x, surface.draws[1].y }, { x, y })
+		end)
+	end)
+
+	helpers.it("(wpm-position-nonfinite) refuses malformed native drag coordinates", function()
+		with_storage(compact(), function(store)
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			surface.moved(math.huge, 30)
+			surface.moved({}, 30)
+			helpers.assert_nil(store.values["wpm_widget.pos_x"])
+			helpers.assert_nil(store.values["wpm_widget.pos_y"])
+		end)
+	end)
+
+	helpers.it("(wpm-widget-hide-refusal) retains an ambiguous hide until native acknowledgment", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			local original = surface.hide
+			surface.hide = function() surface.visible = false; return false end
+			surface.pointer = { 300, 400 }
+			Widget.observe_pointer("motion", 1, 10.5)
+			Widget.tick(stats(0, nil, nil, 10), 10.5)
+			helpers.assert_eq(surface.visible, false)
+			helpers.assert_nil(Widget.configuration_snapshot(), "partially hidden surface is not a stable snapshot")
+			local draws = #surface.draws
+			Widget.tick(stats(42, nil, nil, 11), 11)
+			helpers.assert_eq(#surface.draws, draws, "a refused hide must settle before a new frame")
+			surface.hide = original
+			Widget.tick(stats(42, nil, nil, 12), 12)
+			helpers.assert_true(surface.visible, "after the hide ACK the visible frame is drawn again")
+			helpers.assert_type(Widget.configuration_snapshot(), "table")
+		end)
+	end)
+
+	helpers.it("(wpm-draw-partial) hides a surface when drawing partially fails", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			surface.draw = function() surface.visible = true; return false end
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			helpers.assert_eq(surface.hidden, 1, "a failed draw may already have shown the window")
+			helpers.assert_true(not surface.visible)
+		end)
+	end)
+
+	helpers.it("(wpm-draw-partial) retries a refused hide after a failed draw", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			surface.draw = function() surface.visible = true; error("draw failed after show") end
+			local attempts = 0
+			surface.hide = function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				surface.visible = false
+				return true
+			end
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			Widget.tick(stats(0, nil, nil, 10), 100)
+			helpers.assert_eq(attempts, 2)
 			helpers.assert_true(not surface.visible)
 		end)
 	end)
@@ -468,7 +638,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Widget._set_surface(surface)
 			Widget.restore()
 			Widget.start()
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			surface.moved(640, 360)
 			helpers.assert_eq(store.values["wpm_widget.pos_x"], 640)
 			helpers.assert_eq(store.values["wpm_widget.pos_y"], 360)
@@ -477,7 +647,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			local again = fake_surface()
 			Restarted._set_surface(again)
 			Restarted.restore()
-			Restarted.tick(stats(42), 20)
+			Restarted.tick(stats(42, nil, nil, 20), 20)
 			helpers.assert_eq(again.draws[1].x, 640)
 			helpers.assert_eq(again.draws[1].y, 360)
 			helpers.assert_true(Restarted.reset_position())
@@ -493,7 +663,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 				Widget._set_surface(surface)
 				helpers.assert_true(Widget.start())
 				helpers.assert_true(Widget.restore())
-				Widget.tick(stats(42), 10)
+				Widget.tick(stats(42, nil, nil, 10), 10)
 				local scalar, batch = 0, 0
 				local original = store.set_many
 				local function refuse_second(key, value)
@@ -516,7 +686,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 				local again = fake_surface()
 				Restarted._set_surface(again)
 				helpers.assert_true(Restarted.restore())
-				Restarted.tick(stats(42), 20)
+				Restarted.tick(stats(42, nil, nil, 20), 20)
 				if operation == "drag" then
 					helpers.assert_eq(again.draws[1].x, 640)
 					helpers.assert_eq(again.draws[1].y, 360)
@@ -537,7 +707,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 				Widget._set_surface(surface)
 				helpers.assert_true(Widget.start())
 				helpers.assert_true(Widget.restore())
-				Widget.tick(stats(42), 10)
+				Widget.tick(stats(42, nil, nil, 10), 10)
 				helpers.assert_eq(surface.draws[1].x, 120, "persisted numeric strings remain supported")
 				helpers.assert_eq(surface.draws[1].y, 180)
 				if refusal == "missing" then store.set_many = nil
@@ -549,7 +719,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 				local again = fake_surface()
 				Restarted._set_surface(again)
 				helpers.assert_true(Restarted.restore())
-				Restarted.tick(stats(42), 20)
+				Restarted.tick(stats(42, nil, nil, 20), 20)
 				helpers.assert_eq(again.draws[1].x, 120)
 				helpers.assert_eq(again.draws[1].y, 180)
 				helpers.assert_eq(store.get("wpm_widget.pos_x"), "120")
@@ -566,7 +736,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Widget.restore()
 			Widget.start()
 			helpers.assert_true(Widget.set_graph(true))
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			helpers.assert_eq(surface.draws[1].frame.mode, "graph")
 			-- The choice survives a restart, whether stored or now the default.
 			package.loaded["ui.wpm.widget"] = nil
@@ -575,7 +745,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Restarted._set_surface(again)
 			Restarted.restore()
 			Restarted.start()
-			Restarted.tick(stats(42), 20)
+			Restarted.tick(stats(42, nil, nil, 20), 20)
 			helpers.assert_eq(again.draws[1].frame.mode, "graph")
 		end)
 	end)
@@ -590,7 +760,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			local surface = fake_surface()
 			Widget._set_surface(surface)
 			Widget.start()
-			Widget.tick(stats(42), 10)
+			Widget.tick(stats(42, nil, nil, 10), 10)
 			Widget.stop()
 			Renderer.hide = real_hide
 			helpers.assert_eq(surface.hidden, 1)
@@ -626,6 +796,80 @@ helpers.describe("wpm readouts: the tray readout", function()
 		Readout._set_painter(function(frame, path) painted[#painted + 1] = { frame = frame, path = path }; return true end)
 		return Readout, tray, painted
 	end
+
+	helpers.it("(wpm-tray-hide-refusal) restores a visible frame after a partially refused hide", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original = tray.update_item
+			tray.update_item = function(handle, options)
+				if options.active == false then handle.active = false; tray.update_item = original; return false end
+				return original(handle, options)
+			end
+			Readout.tick(stats(0), 20)
+			helpers.assert_nil(Readout.configuration_snapshot(), "an ambiguous hide must not become a stable snapshot")
+			helpers.assert_eq(tray.items[1].active, false, "the refused native update may have hidden it")
+			Readout.tick(stats(10), 30)
+			helpers.assert_eq(tray.items[1].active, true, "the visible frame must be republished")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) never repaints the icon still displayed", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			local paths, calls = {}, 0
+			Readout._set_painter(function(_, path)
+				calls = calls + 1
+				paths[calls] = path
+				return calls ~= 2
+			end)
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local displayed = tray.items[1].icon
+			Readout.tick(stats(20), 20)
+			Readout.tick(stats(30), 30)
+			helpers.assert_true(paths[2] ~= displayed)
+			helpers.assert_true(paths[3] ~= displayed, "a refused paint must keep the current icon immutable")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) retries an ambiguous tray update before repainting", function()
+		with_storage({}, function()
+			local Readout, tray, paths = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original_update = tray.update_item
+			local calls = 0
+			tray.update_item = function(handle, options)
+				calls = calls + 1
+				if calls == 1 then handle.icon = options.icon; return false end
+				return original_update(handle, options)
+			end
+			Readout.tick(stats(20), 20)
+			local possibly_displayed = tray.items[1].icon
+			Readout.tick(stats(30), 30)
+			helpers.assert_eq(calls, 3, "the ambiguous icon is acknowledged before the next frame")
+			helpers.assert_true(paths[3].path ~= possibly_displayed, "the potentially displayed file stays intact")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) keeps an unresolved update through stop refusal", function()
+		with_storage({}, function(_, preferences)
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original = tray.update_item
+			tray.update_item = function() return false end
+			Readout.tick(stats(20), 20)
+			helpers.assert_nil(Readout.configuration_snapshot(), "an ambiguous icon is not a stable snapshot")
+			helpers.assert_eq(Readout.stop(), false)
+			helpers.assert_true(Readout.is_running())
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
+			tray.update_item = original
+			helpers.assert_true(Readout.stop())
+		end)
+	end)
 
 	helpers.it("refuses native retirement without losing the live item or preference", function()
 		with_storage({}, function(_, preferences)

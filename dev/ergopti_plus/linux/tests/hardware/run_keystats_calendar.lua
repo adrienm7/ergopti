@@ -33,15 +33,15 @@ end
 local function scenario(day, body)
 	local base = assert(original_time({ year = 2026, month = day.month, day = day.day, hour = day.hour or 23,
 		min = day.min or 59, sec = day.sec or 59 }))
-	local elapsed, path = 0, os.tmpname()
+	local elapsed, wall_shift, path = 0, 0, os.tmpname()
 	Monotonic.now_ms = function() return 1000 + elapsed end
 	Calendar.capture = function()
-		local wall = base + elapsed / 1000
+		local wall = base + elapsed / 1000 + wall_shift
 		return { wall_ms = wall * 1000, mono_ms = Monotonic.now_ms(),
 			date = original_date("%Y-%m-%d", math.floor(wall)), ts = original_date("!%Y-%m-%d %H:%M:%S", math.floor(wall)) }
 	end
-	os.time = function(value) if value then return original_time(value) end; return math.floor(base + elapsed / 1000) end
-	os.date = function(format, value) return original_date(format, value or math.floor(base + elapsed / 1000)) end
+	os.time = function(value) if value then return original_time(value) end; return math.floor(base + elapsed / 1000 + wall_shift) end
+	os.date = function(format, value) return original_date(format, value or math.floor(base + elapsed / 1000 + wall_shift)) end
 	local ok, failure = xpcall(function()
 		Preferences.with(function()
 			Fixture.with(function(k)
@@ -50,7 +50,7 @@ local function scenario(day, body)
 				local writer = require("modules.keystats.sqlite_writer")
 				local function advance(ms) elapsed = elapsed + ms end
 				local function rows(sql) return assert(writer.query_rows(sql)) end
-				body(k, writer, advance, rows)
+				body(k, writer, advance, rows, function(seconds) wall_shift = wall_shift + seconds end)
 			end)
 		end)
 	end, debug.traceback)
@@ -60,6 +60,62 @@ local function scenario(day, body)
 	os.execute("rm -rf -- " .. require("text_utils").shell_quote(path .. ".logs"))
 	assert(ok, failure)
 end
+
+scenario({ month = 10, day = 25 }, function(k, _, advance)
+	k.on_app_focus("cross-midnight-trigger", Monotonic.now_ms())
+	for _, character in ipairs({ "a", "b", "c", "d" }) do
+		k.on_keydown(character, Monotonic.now_ms(), "cross-midnight-trigger")
+	end
+	advance(2000)
+	k.on_keydown("e", Monotonic.now_ms(), "cross-midnight-trigger")
+	k.record_hotstring("cross-midnight-trigger", "abcde", "x", Monotonic.now_ms(), "static", 5, false)
+	local payload = assert(k.get_dashboard_payload({ include_prefetch = false }))
+	local app = assert(payload.metrics_manifest["2026-10-26"]["cross-midnight-trigger"])
+	-- The trigger's earlier characters are on the preceding day. Its net
+	-- contribution to this day's output may therefore legitimately be negative.
+	equal({ app.chars, app.hs_chars, app.hs_input_chars }, { 1, 1, 5 })
+end)
+
+scenario({ month = 10, day = 26, hour = 0, min = 0, sec = 20 }, function(k, _, advance, _, shift)
+	k.on_app_focus("rollback-app", Monotonic.now_ms())
+	k.on_keydown("a", Monotonic.now_ms(), "rollback-app")
+	advance(1000); shift(-3600)
+	k.on_keydown("b", Monotonic.now_ms(), "rollback-app")
+	local function check_range()
+		local range = assert(k.get_range_payload("2026-10-25", "2026-10-26", { "rollback-app" }))
+		equal(range.historical.c.a and range.historical.c.a.c, 1)
+		equal(range.today["rollback-app"].c.b.c, 1)
+		local future = assert(k.get_range_payload("2026-10-26", "2026-10-26", { "rollback-app" }))
+		equal(future.historical.c.a and future.historical.c.a.c, 1)
+		equal(next(future.today), nil)
+		local current = assert(k.get_range_payload("2026-10-25", "2026-10-25", { "rollback-app" }))
+		equal(current.historical.c.a, nil)
+		equal(current.today["rollback-app"].c.b.c, 1)
+	end
+	check_range()
+	Fixture.flush(k)
+	check_range()
+end)
+
+scenario({ month = 10, day = 25 }, function(k, _, advance)
+	k.on_keydown("x", Monotonic.now_ms(), nil)
+	k.on_keydown("y", Monotonic.now_ms(), "editor")
+	k.on_keydown("z", Monotonic.now_ms(), "browser")
+	local function check_today()
+		local range = assert(k.get_range_payload("2026-10-25", "2026-10-25", { "editor" }))
+		equal(range.today.editor.c.y.c, 1)
+		equal(range.today.Unknown and range.today.Unknown.c.x and range.today.Unknown.c.x.c, 1)
+		equal(range.today.browser, nil)
+	end
+	check_today()
+	Fixture.flush(k)
+	check_today()
+	advance(2000)
+	local old = assert(k.get_range_payload("2026-10-25", "2026-10-25", { "editor" }))
+	equal(old.historical.c.x and old.historical.c.x.c, 1)
+	equal(old.historical.c.y.c, 1)
+	equal(old.historical.c.z, nil)
+end)
 
 scenario({ month = 10, day = 25 }, function(k, _, advance, rows)
 	k.on_app_focus("calendar-app", Monotonic.now_ms())
@@ -196,7 +252,8 @@ scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 		Fixture.flush(k)
 		equal(rows("SELECT date,awake_ms,battery_count,wifi_changes FROM agg_system_day ORDER BY date;"),
 			{ "2026-10-25|60000|2|1", "2026-10-26|30000|2|1" })
-		equal(rows("SELECT date,action FROM events_system ORDER BY id;"),
+		-- system_load samples the host's /proc: the calendar contract is about transitions.
+		equal(rows("SELECT date,action FROM events_system WHERE action<>'system_load' ORDER BY id;"),
 			{ "2026-10-25|wifi_change", "2026-10-26|wifi_change" })
 		equal(system.snapshot().values["2026-10-25"], nil)
 	end, debug.traceback)
@@ -242,21 +299,24 @@ end)
 scenario({ month = 10, day = 25 }, function(k, writer, advance, rows)
 	local path = writer.get_db_path()
 	assert(uv.fs_mkdir(path .. ".logs", 448))
+	-- Capture while the original store is admitted, then simulate its loss.
+	k.on_keydown("a", Monotonic.now_ms(), "recovery-app")
+	local retained = k._pending_buffer_count_for_test()
+	equal(retained > 0, true)
 	writer.close_db()
 	assert(not writer.is_available())
-	-- A real directory is refused by native admission, rather than a stubbed
-	-- available flag. The same collector continues accepting permitted input.
-	k.init({ sqlite_path = path .. ".logs", log_dir = path .. ".logs" })
+	-- A real directory is refused by native admission. Earlier events remain
+	-- pending, while new input is not captured without a durable store.
+	equal(k.init({ sqlite_path = path .. ".logs", log_dir = path .. ".logs" }), false)
 	equal(writer.is_available(), false)
 	assert(k.set_enabled(true))
-	k.on_keydown("a", Monotonic.now_ms(), "recovery-app")
+	k.on_keydown("ignored", Monotonic.now_ms(), "recovery-app")
 	equal(k.flush(), false)
-	equal(k._pending_buffer_count_for_test() > 0, true)
+	equal(k._pending_buffer_count_for_test(), retained)
 	advance(2000)
-	k.on_keydown("b", Monotonic.now_ms(), "recovery-app")
-	equal(k.flush(), false)
-	k.init({ sqlite_path = path, log_dir = path .. ".logs" })
+	equal(k.init({ sqlite_path = path, log_dir = path .. ".logs" }), true)
 	equal(writer.is_available(), true)
+	k.on_keydown("b", Monotonic.now_ms(), "recovery-app")
 	Fixture.flush(k)
 	equal(rows("SELECT date,text FROM events_typing ORDER BY date;"), { "2026-10-25|a", "2026-10-26|b" })
 	equal(rows("SELECT date,chars FROM agg_app_day ORDER BY date;"), { "2026-10-25|1", "2026-10-26|1" })
@@ -286,6 +346,29 @@ scenario({ month = 10, day = 25 }, function(k, writer)
 	assert(ok, failure)
 end)
 
+scenario({ month = 10, day = 25, hour = 12, min = 0, sec = 0 }, function(k, writer)
+	local log_dir = writer.get_db_path() .. ".logs"
+	assert(uv.fs_mkdir(log_dir, 448))
+	local path = log_dir .. "/keystrokes_2026-10-25.json"
+	local prior = assert(io.open(path, "wb")); prior:write("prior summary\n"); prior:close()
+	k.on_app_focus("éditeur", Monotonic.now_ms())
+	k.on_keydown("a", Monotonic.now_ms(), "éditeur")
+	local good = assert(require("json").decode(assert(k.export_json())))
+	equal(good.apps["éditeur"].keystrokes, 1)
+	k.on_app_focus("bad" .. string.char(255), Monotonic.now_ms())
+	k.on_keydown("a", Monotonic.now_ms(), "bad" .. string.char(255))
+	local json, reason = k.export_json()
+	equal(json, nil)
+	equal(type(reason), "string")
+	local debt = k._pending_buffer_count_for_test()
+	equal(debt > 0, true)
+	writer.close_db()
+	equal(k.flush(), false)
+	local file = assert(io.open(path, "rb")); local content = file:read("*a"); file:close()
+	equal(content, "prior summary\n")
+	equal(k._pending_buffer_count_for_test(), debt)
+end)
+
 for _, day in ipairs({ { month = 3, day = 29, hours = 23 }, { month = 10, day = 25, hours = 25 } }) do
 	scenario({ month = day.month, day = day.day, hour = 0, min = 0, sec = 0 }, function(k, _, advance, rows)
 		local clock = Calendar.capture()
@@ -302,4 +385,4 @@ for _, day in ipairs({ { month = 3, day = 29, hours = 23 }, { month = 10, day = 
 		equal(rows("SELECT ms FROM agg_app_day_titles WHERE title='dst' ORDER BY date;"), { string.format("%.0f", length), "1000" })
 	end)
 end
-print("native capture calendar: scenarios=10 checks=" .. checks)
+print("native capture calendar: scenarios=13 checks=" .. checks)

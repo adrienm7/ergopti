@@ -140,6 +140,20 @@ local function with_sources(scenario)
 end
 
 helpers.describe("enabled-list edits retire older read authority", function()
+	helpers.it("does not claim an ambiguous cached input-source selection (input-source-cache-ambiguity)", function()
+		with_sources(function(sources, w)
+			w.current = "German"
+			local read = w.read()
+			read:complete(0, native_output({ "French", "French_v1", "German" }))
+			local records = sources.list_active_keyboard_layouts()
+			helpers.assert_true(records[3].selected, "unique current layout is selected")
+			w.current = "French"
+			records = sources.list_active_keyboard_layouts()
+			for _, record in ipairs(records) do
+				helpers.assert_eq(record.selected, false, "ambiguous identity cannot select " .. record.id)
+			end
+		end)
+	end)
 	helpers.it("publishes an ordinary native read while its enabled-list generation is current", function()
 		with_sources(function(_, w)
 			local read, _, done = w.read()

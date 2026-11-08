@@ -35,6 +35,7 @@ local Logger        = require("infra.logger")
 local ParentSource = require("menu.frames.parent_source")
 
 local LOG = "menu_metrics"
+local exclusion_transactions = setmetatable({}, { __mode = "k" })
 
 
 
@@ -124,16 +125,26 @@ function M.build(ctx)
 	-- menubar's 0.5 s timer while « tout est éteint », and restarts them on resume.
 	-- Without it the WPM timers kept polling get_live_stats() and re-rendering the
 	-- canvas under pause.
-	local paused = script_control and type(script_control.is_paused) == "function"
-		and script_control.is_paused() or false
 	-- Live pause state for the interactive toggle handlers below. They run at CLICK
 	-- time (later than this build), so re-derive pause then — toggling a WPM feature
 	-- ON while paused must record the preference but NOT arm the 0.2s render timer +
 	-- global mouse eventtap until resume (« pause = tout éteint », F-L10).
+	local pause_warning_logged = false
 	local function paused_now()
-		return script_control and type(script_control.is_paused) == "function"
-			and script_control.is_paused() or false
+		local ok, value = false, nil
+		if type(script_control) == "table" and type(script_control.is_paused) == "function" then
+			ok, value = pcall(script_control.is_paused)
+		end
+		if not ok or type(value) ~= "boolean" then
+			if not pause_warning_logged then
+				pause_warning_logged = true
+				Logger.warn(LOG, "Pause state is unavailable; WPM surfaces remain stopped.")
+			end
+			return true
+		end
+		return value
 	end
+	local paused = paused_now()
 
 	--- Persists one WPM state transition without letting a menu callback throw.
 	--- @param label string Diagnostic operation label.
@@ -316,7 +327,7 @@ function M.build(ctx)
 		-- the tick through these instead of the handler setting it.
 		metrics_menubar_wpm    = function() return state.keystats_menubar_wpm end,
 		metrics_menubar_colors = function() return state.keystats_menubar_colors end,
-		metrics_encrypt_enabled = function() return state.keystats_encrypt end,
+		metrics_encrypt_enabled = function() return require("modules.keystats.text_cipher").is_enabled() == true end,
 		-- The user's pause is a runtime state of the keystats module, never a stored
 		-- preference: the tick reads the module itself.
 		metrics_suspended = function() return kl_mod.is_collection_suspended() end,
@@ -371,6 +382,7 @@ function M.build(ctx)
 	end
 
 	local function rows_exclude_apps(_ctx)
+		local captured_apps = state.keystats_disabled_apps
 		local disabled_count = #(type(state.keystats_disabled_apps) == "table" and state.keystats_disabled_apps or {})
 		local label = disabled_count > 0
 			and string.format(i18n.get("menu.metrics.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
@@ -378,13 +390,39 @@ function M.build(ctx)
 		local exclusion_menu = AppPickerLib.build_menu(
 			state.keystats_disabled_apps,
 			function(new_list)
-				state.keystats_disabled_apps = new_list
-				local Keystats = require("modules.keystats")
-				if type(Keystats.set_disabled_apps) == "function" then
-					pcall(Keystats.set_disabled_apps, new_list)
+				if exclusion_transactions[state] then return false end
+				exclusion_transactions[state] = true
+				local completed, committed = xpcall(function()
+					if state.keystats_disabled_apps ~= captured_apps then return false end
+					local Keystats = require("modules.keystats")
+					local setter = Keystats.set_disabled_apps
+					if type(setter) ~= "function" then
+						Logger.error(LOG, "Excluded-app runtime setter is unavailable.")
+						return false
+					end
+					local applied, result = pcall(setter, new_list)
+					if not applied or result == false then
+						local restored = pcall(setter, captured_apps or {})
+						Logger.error(LOG, "Excluded-app runtime update failed; rollback called=%s.", tostring(restored))
+						return false
+					end
+					state.keystats_disabled_apps = new_list
+					local saved, receipt = pcall(save_prefs)
+					if not saved or receipt ~= true then
+						state.keystats_disabled_apps = captured_apps
+						local restored = pcall(setter, captured_apps or {})
+						Logger.error(LOG, "Excluded-app preferences were refused; runtime rollback called=%s.", tostring(restored))
+						return false
+					end
+					pcall(updateMenu)
+					return true
+				end, debug.traceback)
+				exclusion_transactions[state] = nil
+				if not completed then
+					Logger.error(LOG, "Excluded-app update raised; changes were not acknowledged.")
+					return false
 				end
-				if save_prefs() ~= true then return false end
-				pcall(updateMenu)
+				return committed == true
 			end,
 			i18n.get("menu.metrics.exclude_apps")
 		)
@@ -474,22 +512,29 @@ function M.build(ctx)
 		-- real backend, and it refuses to tick when no key can be derived.
 		local TextCipher = require("modules.keystats.text_cipher")
 		local want = not state.keystats_encrypt
+		if want and TextCipher.prepare_roi_encryption() ~= true then
+			dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
+				i18n.get("dialog.metrics.encryption_pending_write"), i18n.get("button.ok"))
+			return false
+		end
 		if want and not TextCipher.is_available() then
-			-- Existing keys, already translated in all 21 locales: the only
-			-- way the key derivation fails on a Mac is a missing openssl,
-			-- which is exactly what this message says.
+			TextCipher.abandon_roi_encryption(state.keystats_encrypt)
 			dialog.block_alert(
 				i18n.get("dialog.metrics.encryptor_error_title"),
-				i18n.get("apps.encryptor.err_openssl_missing"),
+				i18n.get("dialog.metrics.encryption_unavailable"),
 				i18n.get("button.ok"))
-			return
+			return false
 		end
-		TextCipher.set_enabled(want)
+		if TextCipher.set_enabled(want) ~= true then
+			dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
+				i18n.get("dialog.metrics.encryption_pending_write"), i18n.get("button.ok"))
+			return false
+		end
 		state.keystats_encrypt = want
 		if save_prefs() ~= true then return false end
 		local Keystats = require("modules.keystats")
 		if type(Keystats.set_options) == "function" then
-			Keystats.set_options({ encrypt = want })
+			if Keystats.set_options({ encrypt = want }) ~= true then return false end
 		end
 		-- The rows already stored predate this click, and the setting is
 		-- worthless to a user with a year of logs unless they are converted
@@ -498,6 +543,7 @@ function M.build(ctx)
 		-- would convert nothing and report success.
 		require("modules.keystats.text_migration").start_for_posture(want)
 		updateMenu()
+		return true
 	end
 
 

@@ -126,6 +126,8 @@ local state_reason, state_explanation
 local run
 local capture_started, capture_settled = false, true
 local stop_observer
+local close_inflight
+local finish_stop
 local ready_waiters = {}
 local ready_poll
 local ready_polls = 0
@@ -214,7 +216,7 @@ end
 function M.release()
 	if not ports then return true end
 	local retained = state == STATE.STARTING or state == STATE.ADMITTED or state == STATE.PEERS_STARTING
-		or state == STATE.READY or state == STATE.STOPPING or not capture_settled
+		or state == STATE.READY or state == STATE.STOPPING or not capture_settled or close_inflight ~= nil
 	if retained then
 		Logger.warn(LOG, "Owned runtime owner release refused while state is %s.", state)
 		return false
@@ -304,7 +306,12 @@ local function check_coexistence(attempt)
 				"Another Karabiner is running and this build cannot close it.")
 		end
 		Logger.info(LOG, "Closing %d other Karabiner process(es) as the option asks.", count)
+		local close_owner = {}
+		close_inflight = close_owner
 		ports.coexistence.close(function(closed)
+			if close_inflight ~= close_owner then return end
+			close_inflight = nil
+			if state == STATE.STOPPING then finish_stop(); return end
 			if run ~= attempt then return end
 			if closed ~= true then
 				return settle_start(attempt, STATE.FAILED, REASON.CLOSE_FAILED,
@@ -472,7 +479,6 @@ function M._capture_lost(why)
 	lose(REASON.CAPTURE_LOST, "The physical capture was lost: " .. tostring(why) .. ".")
 end
 
-local finish_stop
 local schedule_ready_poll
 
 --- Looks at the capture once while the runtime starts.
@@ -569,6 +575,7 @@ finish_stop = function()
 	-- A synchronous settlement report may already have completed this very stop.
 	if state == STATE.STOPPED then return true end
 	if state ~= STATE.STOPPING then return false, "not_stopping" end
+	if close_inflight ~= nil then return false, "coexistence_close_pending" end
 	if capture_started and not capture_settled then return false, "capture_pending" end
 	capture_started, capture_settled = false, true
 	set_state(STATE.STOPPED)

@@ -78,6 +78,26 @@ end
 -- =================================================================
 
 helpers.describe("prefix expansions: what is built", function()
+	helpers.it("counts formatted phone characters rather than UTF-8 bytes", function()
+		local phone = "06 12 34 56 78"
+		local found = {}
+		for _, mapping in ipairs(for_section("phoneprefixes", { phone_number_clean = phone })) do
+			found[mapping.trigger] = mapping.replacement
+		end
+		helpers.assert_nil(found["06 "])
+		helpers.assert_eq(found["06 12"], phone)
+		helpers.assert_eq(#for_section("phoneprefixes", { phone_number_clean = "06 " }), 0)
+	end)
+
+	helpers.it("retains compact and spaced IBAN expansions for nonbreaking spaces", function()
+		local iban = "FR76 12 3456"
+		local mappings = for_section("ibanprefixes", { iban = iban })
+		local found = {}
+		for _, mapping in ipairs(mappings) do found[mapping.trigger] = mapping.replacement end
+		helpers.assert_eq(found["FR7612"], "FR76123456")
+		helpers.assert_eq(found["FR76 12"], iban)
+	end)
+
 
 	helpers.it("completes a phone number from its first four digits", function()
 		local mapping = by_trigger("0750")
@@ -88,10 +108,36 @@ helpers.describe("prefix expansions: what is built", function()
 			"there is no terminator to wait for — the prefix IS the trigger")
 	end)
 
+	helpers.it("requires the configured magic key for the two-digit phone prefix", function()
+		local engine = require("hotstring_engine").new()
+		engine:load_mappings(Prefix.build(INFO, nil, "\\"))
+		helpers.assert_nil(engine:on_char("0"))
+		helpers.assert_nil(engine:on_char("7"), "ordinary two-digit typing must not insert a phone number")
+		local result = engine:on_char("\\")
+		helpers.assert_not_nil(result)
+		helpers.assert_eq(result.replacement, INFO.phone_number)
+	end)
+
 	helpers.it("offers the international form too", function()
 		helpers.assert_not_nil(by_trigger("+3307"),
 			"a number stored as 07… is also wanted as +3375…, which is the form "
 				.. "every non-French form expects")
+	end)
+
+	helpers.it("international phone prefixes remove the national trunk zero", function()
+		for _, trigger in ipairs({ "+3307", "+33750" }) do
+			local mapping = by_trigger(trigger)
+			helpers.assert_not_nil(mapping)
+			helpers.assert_eq(mapping.replacement, "+33750399576")
+		end
+	end)
+
+	helpers.it("keeps the first digit of an international phone without a trunk zero", function()
+		local mappings = Prefix.build({ phone_number = "750399576" }, nil, "*")
+		local triggers = {}
+		for _, mapping in ipairs(mappings) do triggers[mapping.trigger] = mapping.replacement end
+		helpers.assert_eq(triggers["+337503"], "+33750399576")
+		helpers.assert_nil(triggers["+33503"], "an unrelated international number must not expand")
 	end)
 
 	helpers.it("gives back the form the user started typing", function()
@@ -127,6 +173,25 @@ helpers.describe("prefix expansions: what is built", function()
 			helpers.assert_true(built > 0,
 				section .. ": a family the count says is non-empty must have mappings")
 		end
+	end)
+
+	helpers.it("counts one trigger per family for values stored without spaces (PIS-001)", function()
+		local compact = {
+			phone_number           = "0750399576",
+			phone_number_clean     = "07 50 39 95 76",
+			social_security_number = "199999999999999",
+			iban                   = "FR0000000000000000000000000",
+		}
+		local counts = Prefix.counts(compact)
+		for _, section in ipairs({ "ssnprefixes", "ibanprefixes" }) do
+			helpers.assert_eq(#for_section(section, compact), 1,
+				section .. ": an unspaced value registers a single trigger")
+			helpers.assert_eq(counts[section], 1,
+				section .. ": the menu must announce exactly the triggers that exist")
+		end
+		local spaced = Prefix.counts(INFO)
+		helpers.assert_eq(spaced.ssnprefixes, 2)
+		helpers.assert_eq(spaced.ibanprefixes, 2)
 	end)
 
 	helpers.it("builds nothing at all from an empty personal_info", function()
@@ -221,6 +286,31 @@ helpers.describe("prefix expansions: the switches", function()
 				.. "is switched off says the switch did nothing")
 		helpers.assert_eq(before - after, Prefix.counts(INFO).phoneprefixes,
 			"and it moves by exactly that family's size, not by one")
+	end)
+
+	helpers.it("passes the configured magic key through the real prefix provider", function()
+		local previous_storage = package.loaded["adapters.storage"]
+		package.loaded["adapters.storage"] = helpers.load_module("tests.fakes").storage({})
+		local path = os.tmpname()
+		local file = assert(io.open(path, "w"))
+		file:write('[info]\nphone_number = "0750399576"\n')
+		file:close()
+		local ok, err = pcall(function()
+			local manager = helpers.load_module("modules.dynamic_hotstrings.manager")
+			manager.init({ trigger_char = "\\", personal_info_path = path })
+			manager.set_enabled(true)
+			require("tests.support.dynamic_hotstrings_fixture").prefer_families(manager)
+			local engine = require("hotstring_engine").new()
+			engine:load_mappings(manager.prefix_mappings())
+			helpers.assert_nil(engine:on_char("0"))
+			helpers.assert_nil(engine:on_char("7"))
+			local result = engine:on_char("\\")
+			helpers.assert_not_nil(result)
+			helpers.assert_eq(result.replacement, INFO.phone_number)
+		end)
+		package.loaded["adapters.storage"] = previous_storage
+		os.remove(path)
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("is pure, so the rebuild is the only moving part", function()

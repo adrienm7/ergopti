@@ -29,8 +29,11 @@ _GPCOT_ChildSource() {
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= "global _SendHook := 0`nglobal SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[4])`n"
 	Code .= "global _PPCO_UsesNativeMutation := " . (NativePublisher ? "true" : "false") . "`n"
+	; Native focus is outside this clipboard-custody child: its private Edit
+	; stays the target, so the target observers are passive and always current.
+	Code .= "_SendInstantCaptureAdmittedTarget() => Map()`n_SendInstantTargetCurrent(Target) => Target is Map`n"
 	for Name in ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "_SendVerdictSucceeded",
-			"SendFinalResult", "_GesturePastePlainRestore", "GesturePastePlain"] {
+			"SendFinalResult", "_GesturePastePlainRestore", "_GesturePastePlainSend", "GesturePastePlain"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "Every genuine plain-paste dependency must have a real body: " . Name)
 		Code .= Body . "`n"

@@ -115,6 +115,84 @@ _ToggleWpmWidgetColors(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return _MET_RebuildWidgetMenu(RebuildFn)
 }
 
+; The notification-area readout rows: persist, apply, then repaint the ticks.
+_ToggleWpmTrayReadout(ToggleFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmTrayReadout(ToggleFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMTrayReadout_Toggle()
+	if !(Toggled is Integer) || Toggled != 1
+		return false
+	return _MET_RebuildWidgetMenu(RebuildFn)
+}
+
+_ToggleWpmTrayReadoutColors(ToggleFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmTrayReadoutColors(ToggleFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMTrayReadout_ToggleColors()
+	if !(Toggled is Integer) || Toggled != 1
+		return false
+	return _MET_RebuildWidgetMenu(RebuildFn)
+}
+
+; Detached native surfaces remain owned until actual destruction is observed.
+class _METWpmRetiredSurfaces {
+	static pending := []
+}
+
+_MET_WpmRetirePending() {
+	PreviousCritical := Critical("On")
+	try Pending := _METWpmRetiredSurfaces.pending.Clone()
+	finally Critical(PreviousCritical)
+	for Record in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Record.closing
+				continue
+			Record.closing := true
+		} finally Critical(PreviousCritical)
+		Done := false
+		try {
+			Window := Record.window, Hwnd := Record.hwnd
+			if Hwnd && !WMHandleExists(Hwnd)
+				Done := true
+			else if Hwnd && (Other := GuiFromHwnd(Hwnd)) is Gui && Other != Window
+				Done := true
+			else {
+				Destroyed := false
+				try {
+					Window.Destroy()
+					Destroyed := true
+				}
+				if (!Hwnd && Destroyed) || (Hwnd && !WMHandleExists(Hwnd))
+					Done := true
+				else if Hwnd && (Other := GuiFromHwnd(Hwnd)) is Gui && Other != Window
+					Done := true
+			}
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Record.closing := false
+				if Done {
+					Count := _METWpmRetiredSurfaces.pending.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _METWpmRetiredSurfaces.pending[Index] == Record
+							_METWpmRetiredSurfaces.pending.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
+
 _ToggleWpmWidgetGraph(WriterFn := 0, NotifyFn := 0, HideFn := 0,
 		ShowFn := 0, RebuildFn := 0, StoreFn := 0) {
 	InheritedCritical := A_IsCritical
@@ -127,28 +205,47 @@ _ToggleWpmWidgetGraph(WriterFn := 0, NotifyFn := 0, HideFn := 0,
 	; Commit graph and anchor together before destroying the live surface.
 	if !WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn, StoreFn)
 		return false
-	WasVisible := WPMWidget.visible
+	PreviousCritical := Critical("On")
+	try {
+		WasVisible := WPMWidget.visible
+		ExpectedRevision := WPMWidget._visibility_revision
+		OldCompact := WPMWidget._gui, OldGraph := WPMWidget._graph_gui
+	} finally Critical(PreviousCritical)
 	if WasVisible {
 		if HasMethod(HideFn, "Call")
 			HideFn.Call()
 		else
-			WPMWidget_Hide()
+			ExpectedRevision := WPMWidget_Hide()
 	}
-	if WPMWidget._gui {
-		try WPMWidget._gui.Destroy()
-		WPMWidget._gui      := false
-		WPMWidget._lbl_wpm  := false
-		WPMWidget._lbl_unit := false
-	}
-	if WPMWidget._graph_gui {
-		try WPMWidget._graph_gui.Destroy()
-		WPMWidget._graph_gui := false
-	}
-	if WasVisible {
+	PreviousCritical := Critical("On")
+	try {
+		; A public Show already superseded this old action during Hide.
+		Superseded := !HasMethod(HideFn, "Call") && WPMWidget._visibility_revision != ExpectedRevision
+		if !Superseded {
+			for Window in [OldCompact, OldGraph] {
+				if !IsObject(Window)
+					continue
+				Hwnd := 0
+				if Window is Gui
+					try Hwnd := Window.Hwnd
+				_METWpmRetiredSurfaces.pending.Push({window: Window, hwnd: Hwnd, closing: false})
+			}
+			if WPMWidget._gui == OldCompact {
+				WPMWidget._gui := false
+				WPMWidget._lbl_wpm := false, WPMWidget._lbl_unit := false
+				WPMWidget._lbl_strip := false
+			}
+			if WPMWidget._graph_gui == OldGraph
+				WPMWidget._graph_gui := false
+		}
+	} finally Critical(PreviousCritical)
+	if !Superseded
+		_MET_WpmRetirePending()
+	if WasVisible && (HasMethod(HideFn, "Call") || WPMWidget._visibility_revision == ExpectedRevision) {
 		if HasMethod(ShowFn, "Call")
 			ShowFn.Call()
 		else
-			WPMWidget_Show()
+			WPMWidget_Show(ExpectedRevision)
 	}
 	return _MET_RebuildWidgetMenu(RebuildFn)
 }
@@ -156,6 +253,7 @@ _ToggleWpmWidgetGraph(WriterFn := 0, NotifyFn := 0, HideFn := 0,
 OpenMetricsAppPicker(*) {
 	AppPicker_Show(Map(
 		"owner",    "metrics:disabled_apps",
+		"durable",  true,
 		"title",    t("dialog.metrics.exclude_title"),
 		"prompt",   t("dialog.metrics.exclude_prompt"),
 		"ok_label", t("dialog.metrics.exclude_ok"),
@@ -173,7 +271,11 @@ _MetricsSaveAppPickerAndReload(Selected, WriterFn := 0, NotifyFn := 0,
 	; The picker result is normalized into a detached Map by the owned builder;
 	; the live exclusion lookup remains unchanged while config.toml is written.
 	Committed := MF_CommitDisabledApps(Selected, WriterFn, NotifyFn, Receipt)
-	return _MetricsReloadAfterCommit(Committed, ReloadFn)
+	Applied := _MetricsReloadAfterCommit(Committed, ReloadFn)
+	Outcome := Receipt is Map && Receipt.Get("durable_mode", false) ? AppPicker_DurableResult(Receipt) : 0
+	if Outcome is Map
+		Outcome["applied"] := Applied
+	return Applied
 }
 
 _MetricsSetPreferenceAndReload(Prop, Target, WriterFn := 0, NotifyFn := 0,

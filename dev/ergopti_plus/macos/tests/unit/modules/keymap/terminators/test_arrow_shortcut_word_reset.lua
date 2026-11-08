@@ -64,6 +64,7 @@ local function install_collaborators(effects)
 		get_llm_enabled = function() return false end,
 		reset = function() effects.prediction_resets = effects.prediction_resets + 1; return true end,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		is_visible = function() return false end,
 	}, { __index = function() return function() end end })
 	package.loaded["modules.keystats"] = {
@@ -394,8 +395,10 @@ end)
 
 local KEYCODE_HOME = 115
 local KEYCODE_RETURN = 36
+local KEYCODE_KEYPAD_ENTER = 76
 local OPTION = { cmd = false, ctrl = false, alt = true, shift = false }
 local CMD = { cmd = true, ctrl = false, alt = false, shift = false }
+local SHIFT = { cmd = false, ctrl = false, alt = false, shift = true }
 
 --- Makes the focused application the one named.
 --- @param bundle string Bundle identifier.
@@ -501,6 +504,29 @@ helpers.describe("erasing what was typed (bs-word-start)", function()
 		end)
 	end)
 
+	helpers.it("bs-word-start: a terminal prompt after keypad Enter keeps its word start (WRM-002)", function()
+		for _, payload in ipairs({ "\r", "\3" }) do
+			with_keymap(function(f)
+				focus_app("com.apple.Terminal", "Terminal")
+				f.press("a")
+				f.press(payload, nil, KEYCODE_KEYPAD_ENTER)
+				f.pause(10)
+				f.press("a")
+				backspaces(f, 2)
+				helpers.assert_eq(then_r(f), "R",
+					"keypad Enter submits like Return: the extra Backspace hit the empty prompt")
+			end)
+		end
+		with_keymap(function(f)
+			focus_app("com.apple.Terminal", "Terminal")
+			f.press("a")
+			f.press("\r", SHIFT, KEYCODE_KEYPAD_ENTER)
+			f.press("a")
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "", "Shift+keypad Enter keeps no empty-prompt promise (multiline)")
+		end)
+	end)
+
 	helpers.it("bs-word-start: Cmd+A and a browser's Cmd+L leave an empty field", function()
 		with_keymap(function(f)
 			focus_app("com.apple.TextEdit", "TextEdit")
@@ -527,6 +553,111 @@ helpers.describe("erasing what was typed (bs-word-start)", function()
 			f.press("l", CMD, KEYCODE_LETTER)
 			backspaces(f, 1)
 			helpers.assert_eq(then_r(f), "", "Cmd+L outside a browser promises no empty field")
+		end)
+	end)
+end)
+
+-- A Backspace pressed right after an expansion brings the trigger back, as on
+-- Linux (bs-undo): the Backspace is consumed, the replacement erased and the
+-- trigger typed again. Anything typed in between voids it.
+helpers.describe("immediate Backspace restores the trigger (bs-undo)", function()
+	helpers.it("restores z after z gave Z (bs-undo)", function()
+		with_keymap(function(f)
+			f.press("z", nil, KEYCODE_Z)
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "Z", "control: the expansion fires")
+			f.effects.emitted = {}
+			helpers.assert_true(f.press("", NO_FLAGS, KEYCODE_BACKSPACE) == true, "the Backspace is consumed")
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "z", "the trigger is typed back")
+			helpers.assert_eq(f.state.buffer, "", "the restored trigger is out of the buffer")
+		end)
+	end)
+
+	helpers.it("does nothing once another key was typed (bs-undo)", function()
+		with_keymap(function(f)
+			f.press("z", nil, KEYCODE_Z)
+			f.settle()
+			f.press("a")
+			f.effects.emitted = {}
+			helpers.assert_true(f.press("", NO_FLAGS, KEYCODE_BACKSPACE) ~= true, "an ordinary Backspace passes")
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "", "nothing is typed back")
+		end)
+	end)
+
+	helpers.it("leaves Option+Backspace to the application (bs-undo)", function()
+		with_keymap(function(f)
+			f.press("z", nil, KEYCODE_Z)
+			f.settle()
+			f.effects.emitted = {}
+			helpers.assert_true(f.press("", { cmd = false, ctrl = false, alt = true, shift = false }, KEYCODE_BACKSPACE) ~= true,
+				"Option+Backspace deletes a word, not the expansion")
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "")
+		end)
+	end)
+end)
+
+-- The tagged F20 Karabiner sends before a tap-hold's own command, and the
+-- untagged F20/F19 it sends when the navigation layer turns on and off
+-- (_shared/lua/keymap/control_signals.lua, modules/keymap/control_sentinels.lua).
+local KEYCODE_F20 = 90
+local KEYCODE_F19 = 80
+local TAP_HOLD_TAG = { cmd = true, ctrl = true, alt = true, shift = true }
+local CMD_V = { cmd = true, ctrl = false, alt = false, shift = false }
+
+local TAP_HOLD_EVENTS = {
+	{ name = "a tap-hold's own Cmd+V", fn = function(f)
+		f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID)
+		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+	end },
+	{ name = "Cmd+V under the navigation layer", fn = function(f)
+		f.press("", NO_FLAGS, KEYCODE_F20, KARABINER_PID)
+		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+		f.press("", NO_FLAGS, KEYCODE_F19, KARABINER_PID)
+	end },
+}
+
+helpers.describe("hotstrings.tap_hold_resets_word (macos-tap-hold-word-reset)", function()
+	helpers.it("ships the option on, from the manifest", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.is_tap_hold_resets_word_enabled(), true)
+			helpers.assert_eq(f.keymap.set_tap_hold_resets_word("yes"), false)
+		end)
+	end)
+
+	for _, event in ipairs(TAP_HOLD_EVENTS) do
+		helpers.it(event.name .. " starts a new word when on, with shortcuts off: aR", function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+				helpers.assert_eq(a_event_then(f, event.fn), "R")
+			end)
+		end)
+
+		helpers.it(event.name .. " continues the word when off, with shortcuts on: ar", function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_tap_hold_resets_word(false), true)
+				helpers.assert_eq(a_event_then(f, event.fn), "")
+			end)
+		end)
+	end
+
+	helpers.it("the user's own Cmd+V after a tap-hold command follows the shortcut option", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+			helpers.assert_eq(a_event_then(f, function()
+				f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID)
+				f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+				f.press("b")
+				f.press("v", CMD_V, KEYCODE_V)
+			end), "", "the marker lends its option to one chord only")
+		end)
+	end)
+
+	helpers.it("the marker never reaches the application", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID), true)
 		end)
 	end)
 end)

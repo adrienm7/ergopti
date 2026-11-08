@@ -36,27 +36,9 @@ _HCA_ReadSource(FileName) {
 }
 
 _HCA_UsesAtomicWrite() {
-	Src := _HCA_ReadSource("hotstrings_cache.ahk")
-	Body := _DriverFuncBody("_HotstringsCacheWriteTsv")
-
-	Assert(Body != "", "_HotstringsCacheWriteTsv must exist in hotstrings_cache.ahk")
-
-	; The fix writes to a .tmp file first
-	Assert(InStr(Body, ".tmp") > 0,
-		"_HotstringsCacheWriteTsv must write to a .tmp intermediary (hotstrings-cache-non-atomic-write)")
-
-	WritePos := InStr(Body, "FSWriteDurable(TmpPath, Content)")
-	Assert(WritePos > 0,
-		"_HotstringsCacheWriteTsv must use the complete durable stage writer (AHK-167)")
-	if WritePos <= 0
-		return
-	VerifyPos := InStr(Body, "FSUtf8ExactMatches(TmpPath, Content)", true, WritePos)
-	ReplacePos := InStr(Body, "FSAtomicMoveReplace(TmpPath, TsvPath)", true, VerifyPos)
-	Assert(WritePos > 0 && VerifyPos > WritePos && ReplacePos > VerifyPos,
-		"_HotstringsCacheWriteTsv must finish and verify its stage before atomic publication (AHK-167)")
-
-	; The old two-step (FileDelete then FileAppend to the live path) must be gone
-	Assert(!RegExMatch(Body, "FileDelete\(TsvPath\)\s*\r?\n\s*FileAppend"),
-		"_HotstringsCacheWriteTsv must NOT use FileDelete(TsvPath)+FileAppend — use atomic FileMove (hotstrings-cache-non-atomic-write)")
+	; Real public cold Ensure, original stage factory, native prefix write and
+	; SetEndOfFile(1), then the actual held-stage verifier and rename owner.
+	; Valid TOML must still load while that corrupt cache publication refuses.
+	_HCOW_PublicEnsure(false, true)
 }
 Test("hotstrings_cache: a truncated stage cannot become a fresh cache (AHK-167)", _HCA_UsesAtomicWrite)

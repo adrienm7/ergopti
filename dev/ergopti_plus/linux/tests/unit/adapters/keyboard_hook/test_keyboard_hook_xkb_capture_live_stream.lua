@@ -430,6 +430,191 @@ end)
 
 
 
+-- DKL-001: consuming a later key must not forget a dead key the application
+-- did receive. The application's Compose still holds that accent, so the next
+-- forwarded E composes there; the semantic capture must read it the same way.
+helpers.describe("keyboard_hook: a consumed continuation keeps the received Compose prefix", function()
+	local XKB = 8
+	local KEY_DEAD, KEY_TAP, KEY_E, KEY_SHIFT = 26, 12, 18, 42
+
+	--- A keymap double: KEY_DEAD is dead_circumflex, E composes ê with it, any
+	--- other keysym cancels, and Shift is a modifier Compose ignores.
+	local function backend()
+		return {
+			create = function() return { held = {}, compose = "nothing" } end,
+			destroy = function() end,
+			key_sym = function(_, keycode)
+				local code = keycode - XKB
+				if code == KEY_DEAD then return "dead_circumflex" end
+				if code == KEY_E then return "e" end
+				if code == KEY_TAP then return "minus" end
+				if code == KEY_SHIFT then return "Shift_L" end
+				return nil
+			end,
+			key_utf8 = function(_, keycode)
+				local code = keycode - XKB
+				return (code == KEY_E and "e") or (code == KEY_TAP and "-") or nil
+			end,
+			sym_utf8 = function(_, sym) return (sym == "e" and "e") or (sym == "minus" and "-") or nil end,
+			update_key = function(session, keycode, direction) session.held[keycode] = direction == 1 or nil end,
+			modifier_role = function(_, keycode) return keycode - XKB == KEY_SHIFT and "shift" or nil end,
+			compose_feed = function(session, sym)
+				if sym == "Shift_L" then return false end
+				if sym == "dead_circumflex" then
+					session.compose = "composing"
+				elseif session.compose == "composing" then
+					session.compose = sym == "e" and "composed" or "cancelled"
+				else
+					session.compose = "nothing"
+				end
+				return true
+			end,
+			compose_status = function(session) return session.compose end,
+			compose_utf8 = function(session) return session.compose == "composed" and "ê" or nil end,
+			compose_reset = function(session) session.compose = "nothing" end,
+		}
+	end
+
+	--- Drives the original Hook over a live capture of the double.
+	--- @param events table Key rows { code, value }.
+	--- @param consumed table Key code -> how many of its presses a consumer keeps
+	---   (true: all), auto-repeats included through the repeat callback.
+	--- @return table chars, table forwarded
+	local function drive(events, consumed)
+		local left = {}
+		for code, count in pairs(consumed) do left[code] = count end
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		Capture._set_backend(backend())
+		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		local chars, forwarded, rows = {}, {}, {}
+		for _, row in ipairs(events) do rows[#rows + 1] = key(row[1], row[2]) end
+		local ok, err = pcall(hook._test_drive, rows, {
+			liveXkb = true,
+			onConsume = function(detail)
+				local count = left[detail.code]
+				if not count or count == 0 then return false end
+				if count ~= true then left[detail.code] = count - 1 end
+				return { consume = true, repeat_callback = function() return true end }
+			end,
+			onChar = function(char) chars[#chars + 1] = char end,
+			onEmitRaw = function(code, value) forwarded[#forwarded + 1] = code .. ":" .. value; return true end,
+		}, true)
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+		return chars, forwarded
+	end
+
+	local function tap(code, rows)
+		rows[#rows + 1] = { code, 1 }
+		rows[#rows + 1] = { code, 0 }
+		return rows
+	end
+
+	helpers.it("(dead-key-compose) composes the forwarded accent after a consumed tap", function()
+		local chars, forwarded = drive(tap(KEY_E, tap(KEY_TAP, tap(KEY_DEAD, {}))), { [KEY_TAP] = true })
+		helpers.assert_eq(forwarded, { "26:1", "26:0", "18:1", "18:0" }, "the tap never reached the application")
+		helpers.assert_eq(chars, { "ê" }, "the application composes ê, and so does the capture")
+	end)
+
+	helpers.it("(dead-key-compose) a forwarded tap still cancels the accent", function()
+		local chars = drive(tap(KEY_E, tap(KEY_TAP, tap(KEY_DEAD, {}))), {})
+		helpers.assert_eq(chars, { "-", "e" }, "the cancelled sequence keeps the ordinary keys")
+	end)
+
+	helpers.it("(dead-key-compose) a consumed completing key returns the pending accent", function()
+		local chars, forwarded = drive(tap(KEY_E, tap(KEY_E, tap(KEY_DEAD, {}))), { [KEY_E] = 1 })
+		helpers.assert_eq(forwarded, { "26:1", "26:0", "18:1", "18:0" }, "only the second E reached the application")
+		helpers.assert_eq(chars, { "ê" }, "the consumed E completed nothing the application saw")
+		local rows = tap(KEY_DEAD, {})
+		rows[#rows + 1] = { KEY_TAP, 1 }
+		rows[#rows + 1] = { KEY_TAP, 2 }
+		rows[#rows + 1] = { KEY_TAP, 2 }
+		rows[#rows + 1] = { KEY_TAP, 0 }
+		local repeated = drive(tap(KEY_E, rows), { [KEY_TAP] = true })
+		helpers.assert_eq(repeated, { "ê" }, "consumed auto-repeats withdraw only themselves")
+	end)
+
+	helpers.it("(dead-key-compose) a consumed first dead key still composes nothing", function()
+		helpers.assert_eq(drive(tap(KEY_E, tap(KEY_DEAD, {})), { [KEY_DEAD] = true }), { "e" })
+		helpers.assert_eq(drive(tap(KEY_E, tap(KEY_TAP, {})), { [KEY_TAP] = true }), { "e" },
+			"without a prefix there is nothing to restore")
+	end)
+end)
+
+
+
+
+helpers.describe("xkb_capture: Compose marks restore the sequence before a press", function()
+	local XKB = 8
+	local KEY_DEAD, KEY_SHIFT, KEY_E = 26, 42, 18
+
+	local function capture()
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		local fed = {}
+		Capture._set_backend({
+			create = function() return { compose = "nothing" } end,
+			destroy = function() end,
+			key_sym = function(_, keycode)
+				local code = keycode - XKB
+				return (code == KEY_DEAD and "dead_circumflex") or (code == KEY_SHIFT and "Shift_L")
+					or (code == KEY_E and "e") or nil
+			end,
+			key_utf8 = function(_, keycode) return keycode - XKB == KEY_E and "e" or nil end,
+			sym_utf8 = function() return nil end,
+			update_key = function() end,
+			compose_feed = function(session, sym)
+				fed[#fed + 1] = sym
+				if sym == "Shift_L" then return false end
+				if sym == "dead_circumflex" then session.compose = "composing"
+				elseif session.compose == "composing" then session.compose = sym == "e" and "composed" or "cancelled"
+				else session.compose = "nothing" end
+				return true
+			end,
+			compose_status = function(session) return session.compose end,
+			compose_utf8 = function(session) return session.compose == "composed" and "ê" or nil end,
+			compose_reset = function(session) session.compose = "nothing" end,
+		})
+		helpers.assert_true(Capture.load("keymap", "C"))
+		return Capture, fed
+	end
+
+	helpers.it("(dead-key-compose) an ignored modifier keeps the accent in the mark", function()
+		local Capture = capture()
+		local ok, err = pcall(function()
+			Capture.process(KEY_DEAD, 1)
+			Capture.process(KEY_DEAD, 0)
+			local _, _, shift_err, _, mark = Capture.process(KEY_SHIFT, 1)
+			helpers.assert_nil(shift_err)
+			Capture.process(KEY_E, 1)
+			helpers.assert_true(Capture.restore_compose(mark), "the mark taken before E restores")
+			helpers.assert_eq(Capture.process(KEY_E, 1), "ê", "the accent survived the ignored Shift and the withdrawn E")
+		end)
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(dead-key-compose) a mark of a replaced state restores nothing and refuses junk", function()
+		local Capture = capture()
+		local ok, err = pcall(function()
+			Capture.process(KEY_DEAD, 1)
+			local _, _, _, _, mark = Capture.process(KEY_E, 1)
+			helpers.assert_true(Capture.reset_state(), "a fresh state replaces the session")
+			Capture.process(KEY_DEAD, 1)
+			helpers.assert_true(Capture.restore_compose(mark), "a stale mark is accepted")
+			helpers.assert_eq(Capture.process(KEY_E, 1), "e", "and leaves the new state with no sequence")
+			local refused, reason = Capture.restore_compose({})
+			helpers.assert_eq(refused, false, "a table that is no mark is refused")
+			helpers.assert_true(type(reason) == "string" and reason ~= "")
+		end)
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+
+
 helpers.describe("Original Hook physical editor position observation", function()
 	helpers.it("captures detached original positions/modifiers without changing key forwarding", function()
 		with_position_capture(nil, function(s)

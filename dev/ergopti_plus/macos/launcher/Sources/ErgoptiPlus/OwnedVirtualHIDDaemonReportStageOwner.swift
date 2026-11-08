@@ -54,7 +54,7 @@ final class OwnedVirtualHIDDaemonReportStageOwner {
 	private func admitImage() -> Bool {
 		guard let sourceCode, publisher?.current() == true, imageWitness?.current() == true else { return false }; var code: SecStaticCode?
 		guard SecCodeCopyStaticCode(sourceCode, [], &code) == errSecSuccess, let code,
-			let info = OwnedRuntimePublisherSignature.information(code, role: .installer), let hashes = info[kSecCodeInfoCdHashes as String] as? [Data], hashes.count == 2,
+			let info = OwnedRuntimePublisherSignature.information(code, role: .installer), let hashes = OwnedRuntimeInstallMainOperation.codeDirectoryHashes(info),
 			ergopti_vhd_report_self_image_capture(&image) == 0 else { return false }
 		let actual = withUnsafeBytes(of: &image.cdhash) { Data($0) }
 		guard hashes.contains(where: { Data($0.prefix(20)) == actual }), image.pid == creator, image.seconds == birth.start_seconds, image.microseconds == birth.start_microseconds else { return false }

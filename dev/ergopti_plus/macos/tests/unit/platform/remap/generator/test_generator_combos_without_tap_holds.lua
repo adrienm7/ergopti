@@ -52,7 +52,11 @@ local TAP_HOLDS_ON_PINS = {
 	-- the hold labels named from the key name table, which the rule descriptions
 	-- carry (« ⇧ Maj »). Then for the navigation-layer hold named as the hold
 	-- picker names the layer, which the left Command rule's description carries.
-	recommended = { rules = 27, digest = "2aeebd435b52486e" },
+	-- Then for the AltGr hold named from the key name table (it read « ⌥ AltGr
+	-- (option droite — interne) »), which the right Command rule's description carries.
+	-- Then for the tap-hold command marker: a tap sending a Cmd, Ctrl or Option
+	-- chord is led by the tagged F20 the word reset reads (tap_hold_resets_word).
+	recommended = { rules = 27, digest = "507b9bef2c0f18be" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the
@@ -394,6 +398,46 @@ helpers.with_fresh_modules({
 			end
 			helpers.assert_true(mutated, "the recommended preset has a var-based combination to mutate")
 			helpers.assert_true(digest(rules) ~= before, "a changed manipulator changes the digest")
+		end)
+
+		-- The word reset tells a tap-hold's own command from the keyboard's
+		-- chords by the tagged F20 that leads it (macos-tap-hold-word-reset).
+		helpers.it("a tap sending a Cmd, Ctrl or Option chord is led by the command marker (macos-tap-hold-word-reset)", function()
+			local state = Config.build_recommended_state(keys, combos)
+			state.tap_holds_enabled = true
+			local sentinel = package.loaded["infra.keycodes"].to_name(90)
+			local tag = require("keymap.control_signals").modifiers_for("tap_hold_command")
+			local function is_command(event)
+				for _, modifier in ipairs(type(event) == "table" and event.modifiers or {}) do
+					if modifier:find("command", 1, true) or modifier:find("control", 1, true)
+						or modifier:find("option", 1, true) then return true end
+				end
+				return false
+			end
+			local marked, plain = 0, 0
+			for _, rule in ipairs(rules_of(state)) do
+				for _, manipulator in ipairs(rule.manipulators or {}) do
+					local tap = manipulator.to_if_alone
+					if type(tap) == "table" and #tap > 0 then
+						local first = tap[1]
+						local is_marker = first.key_code == sentinel
+							and table.concat(first.modifiers or {}, "+") == table.concat(tag, "+")
+						if is_marker then
+							helpers.assert_true(#tap > 1 and is_command(tap[2]), "a marker leads a command: " .. tostring(rule.description))
+							marked = marked + 1
+						else
+							-- Another control sentinel (one-shot Shift, CapsWord) is no command.
+							for _, event in ipairs(tap) do
+								helpers.assert_true(event.key_code == sentinel or not is_command(event),
+									"an unmarked command tap: " .. tostring(rule.description))
+							end
+							plain = plain + 1
+						end
+					end
+				end
+			end
+			helpers.assert_true(marked > 0, "the recommended preset has command taps")
+			helpers.assert_true(plain > 0, "and taps that type their key")
 		end)
 
 		helpers.it("the combinations switched off generate no combination rule (combos-without-tap-holds)",

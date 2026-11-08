@@ -1037,8 +1037,8 @@ function _render_activity_calendar() {
 		return `rgb(${r}, ${g}, ${b})`;
 	};
 
-	const fr_date = (d) =>
-		d.toLocaleDateString('fr-FR', {
+	const localized_date = (d) =>
+		d.toLocaleDateString(window._i18n_locale || 'fr', {
 			weekday: 'long',
 			day: 'numeric',
 			month: 'long',
@@ -1059,7 +1059,7 @@ function _render_activity_calendar() {
 		const date_str = formatMetricsDateKey(cursor.getTime());
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
-		const tip = `${fr_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
+		const tip = `${localized_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month
@@ -1149,10 +1149,12 @@ function _render_hour_weekday_heatmap() {
 	const matrix = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
 	let max_cell = 0;
 
-	const accumulate_day = (date_str, app_data_map) => {
+	const accumulate_day = (date_str, app_data_map, encodedKeys = false) => {
 		const d = new Date(parseDateKey(date_str));
 		const dow = (d.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
-		Object.entries(app_data_map || {}).forEach(([app_name, app]) => {
+		Object.entries(app_data_map || {}).forEach(([app_key, app]) => {
+			if (encodedKeys && (app_key === '_sys' || app_key === '_system')) return;
+			const app_name = encodedKeys ? metricsManifestLabel(app_key) : app_key;
 			if (!matches_typing_app_selection(app_name) || !app || !app.hourly) return;
 			Object.entries(app.hourly).forEach(([h_str, hd]) => {
 				const h = parseInt(h_str, 10);
@@ -1168,7 +1170,7 @@ function _render_hour_weekday_heatmap() {
 		Object.keys(window.metrics_manifest).forEach((date_str) => {
 			if (start_val && date_str < start_val) return;
 			if (end_val && date_str > end_val) return;
-			accumulate_day(date_str, window.metrics_manifest[date_str]);
+			accumulate_day(date_str, window.metrics_manifest[date_str], true);
 		});
 	}
 	if (app_state.today_live_data) {

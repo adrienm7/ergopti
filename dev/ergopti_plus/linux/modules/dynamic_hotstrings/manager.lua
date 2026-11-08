@@ -22,6 +22,7 @@
 
 local M = {}
 local TableUtil = require("table_util")
+local UnicodeCase = require("unicode_case")
 
 local Logger = require("logger.shim")
 local ManifestReader = require("infra.manifest_reader")
@@ -119,16 +120,68 @@ end
 -- =========================================
 -- =========================================
 
+--- Serialises the shared first-boot placeholders as a personal_info.toml source.
+--- @return string content
+local function _first_boot_source()
+	local Defaults = require("personal_info.defaults")
+	local function quoted(value) return '"' .. value:gsub('[\\"]', "\\%0") .. '"' end
+	local function section(name, values)
+		local keys = TableUtil.sorted_keys(values)
+		local lines = { "[" .. name .. "]" }
+		for _, key in ipairs(keys) do lines[#lines + 1] = key .. " = " .. quoted(values[key]) end
+		return table.concat(lines, "\n")
+	end
+	return table.concat({
+		"# personal_info.toml — Personal information",
+		"# Auto-managed by the personal information editor.",
+		"# Do not edit manually unless you know what you are doing.",
+		"",
+		section("info", Defaults.info),
+		"",
+		section("letters", Defaults.letters),
+		"",
+	}, "\n")
+end
+
+--- Materialises a missing personal_info.toml with the shared placeholders, as
+--- macOS does at start, so the editor has a source to open and save into. An
+--- existing file (including one a concurrent writer just created) is never
+--- touched.
+--- @param path string Absolute path to personal_info.toml.
+--- @return boolean ok False when the file is absent and could not be created.
+local function _seed_missing_source(path)
+	local _, status = TomlWriter.read_classified(path)
+	if status ~= "absent" then return true end
+	Logger.info(LOG, "Writing default personal_info.toml at '%s'…", path)
+	-- A fresh install starts before anything created the configuration folder:
+	-- the exclusive create then failed with ENOENT, and the editor had no source.
+	local Shell = require("adapters.shell_runner")
+	local directory = require("native_path").dirname(path)
+	if not directory or not Shell.run("mkdir -p -- " .. Shell.quote(directory) .. " 2>/dev/null") then
+		Logger.error(LOG, "Could not create the configuration folder for personal_info.toml — the editor has no source.")
+		return false
+	end
+	local written, errno = require("adapters.file_system").write_new(path, _first_boot_source())
+	if written or errno == "EEXIST" or errno == 17 then return true end
+	Logger.error(LOG, "Could not create the default personal_info.toml (%s) — the editor has no source.",
+		tostring(errno))
+	return false
+end
+
 --- Decodes personal_info.toml via the shared toml_codec and returns the [info]
 --- and [letters] tables. All TOML parsing is delegated to the shared codec —
 --- this module owns no bespoke parser.
 --- @param path string Absolute path to personal_info.toml.
 --- @return table info, table letters
 local function _parse_personal_info_toml(path)
-	local fh = io.open(path, "r")
-	if not fh then return {}, {} end
-	local content = fh:read("*a")
-	fh:close()
+	local content, status, detail = TomlWriter.read_classified(path)
+	if status ~= "ok" then
+		if status ~= "absent" then
+			Logger.error(LOG, "personal_info.toml at '%s' is unreadable (%s) — @-tag shortcuts disabled.",
+				path, tostring(detail or status))
+		end
+		return {}, {}
+	end
 
 	-- Delegate all TOML parsing to the shared codec; decode returns nil on a
 	-- spec violation.
@@ -158,7 +211,10 @@ end
 --- @param opts table|nil { trigger_char?, personal_info_path? }
 function M.init(opts)
 	_info_generation = _info_generation + 1
-	UserCode.invalidate("dynamic initialization")
+	if UserCode.invalidate("dynamic initialization") ~= true then
+		Logger.error(LOG, "Dynamic initialization refused while programmable cancellation remains pending.")
+		return false
+	end
 	local options = type(opts) == "table" and opts or {}
 
 	-- Resolve trigger character (default "★").
@@ -177,8 +233,9 @@ function M.init(opts)
 	end
 
 	-- Resolve personal_info.toml path.
-	local default_path = require("infra.config_paths").default_config_dir() .. "/personal_info.toml"
-	local info_path = options.personal_info_path or default_path
+	-- The EFFECTIVE configuration directory (the user's override included), the
+	-- same file the open-personal-information action and the editor point at.
+	local info_path = options.personal_info_path or require("infra.config_paths").config("personal_info.toml")
 
 	-- Load shared engine.
 	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
@@ -194,6 +251,7 @@ function M.init(opts)
 	-- Stage parsed state and the count locally. Re-initialisation is synchronous,
 	-- but readers must never observe a cumulative count left over from the
 	-- previous rule set while the engine itself has already been reset.
+	_seed_missing_source(info_path)
 	local staged_info, staged_letters = _parse_personal_info_toml(info_path)
 
 	-- Register @-tag letter shortcuts (e.g. "@p" → first_name).
@@ -277,8 +335,24 @@ function M.resolve_combo(tag)
 	-- Lower-cased because the single-letter rules are registered lower-cased and
 	-- typing "@NP" must mean what "@np" means.
 	for _, raw_letter in ipairs(letters) do
-		local letter = raw_letter:lower()
-		local field = _letters[letter]
+		local letter = UnicodeCase.lower(raw_letter)
+		-- Combos are case-insensitive; single-field registered rules remain
+		-- exact. If equivalent aliases name different fields, refusing the
+		-- entire combo avoids silently putting a different value in a form.
+		-- Case conversion can expand one codepoint (e.g. İ): do not normalize
+		-- the user's keys or admit the resulting multi-codepoint spelling.
+		local single_lower = strict_codepoint_length(letter) == 1
+		local upper = single_lower and UnicodeCase.upper(letter) or nil
+		local single_upper = upper and strict_codepoint_length(upper) == 1
+		local field
+		for alias, candidate in pairs(_letters) do
+			if strict_codepoint_length(alias) == 1 and (alias == raw_letter
+				or single_lower and UnicodeCase.lower(alias) == letter
+				or single_upper and UnicodeCase.upper(alias) == upper) then
+				if field and field ~= candidate then return {} end
+				field = candidate
+			end
+		end
 		if not field then return {} end
 		local value = _info[field]
 		if type(value) ~= "string" or value == "" then return {} end
@@ -393,13 +467,21 @@ end
 --- remove when it flips.
 --- @param prefix string The buffer without the trigger character.
 --- @param trigger string The trigger character that fired.
+--- @param publication table|nil Retained text destination captured with the trigger.
+--- @param within_delay function (group, section, count) -> boolean expansion-delay admission.
 --- @return boolean fired
 --- @return table|nil event Canonical event details when it fired.
-local function _fire_combo(prefix, trigger)
+--- @return boolean|nil claimed True when the combo resolved but its delay expired.
+local function _fire_combo(prefix, trigger, publication, within_delay)
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return false end
 
 	local tag = M.trailing_tag(prefix)
 	if tag == "" then return false end
+	if type(publication) ~= "table" or getmetatable(publication) ~= nil
+		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
+		Logger.warn(LOG, "Dynamic @-combo expansion refused: no retained text destination (content withheld).")
+		return false
+	end
 
 	local values = M.resolve_combo_values(tag)
 	-- A single-letter tag that resolves here is one the registered rule already
@@ -416,6 +498,14 @@ local function _fire_combo(prefix, trigger)
 	local total = 0
 	for _, value in ipairs(values) do total = total + #value end
 
+	-- "@" + the letters + the trigger: everything the user typed for this.
+	local backspace_count = tag_length + 2
+	if not within_delay(DYNAMIC_GROUP, PERSONAL_SECTION, backspace_count) then
+		Logger.debug(LOG, "@-combo '@%s' expired before the magic key (%d field(s), content withheld).",
+			tag, #values)
+		return false, nil, true
+	end
+
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
 		Logger.warn(LOG,
@@ -424,11 +514,9 @@ local function _fire_combo(prefix, trigger)
 		return false
 	end
 
-	-- "@" + the letters + the trigger: everything the user typed for this.
-	local backspace_count = tag_length + 2
 	-- is_private is not optional: every value here comes out of personal_info.toml,
 	-- so the payload is the user's own data by construction.
-	local delivery = injector.inject_fields(backspace_count, values, true)
+	local delivery = injector.inject_fields(backspace_count, values, true, publication)
 	if type(delivery) ~= "table" or delivery.ok ~= true then
 		Logger.error(LOG,
 			"@-combo output did not commit for '@%s' (%d field(s), %d-byte content withheld).",
@@ -459,9 +547,16 @@ end
 ---   magic key, typically "★" or "\\").
 --- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
 --- @param publication table|nil Original single-field text destination.
+--- @param within_delay function (group, section, count) -> boolean: whether the
+---   last `count` codepoints of the input owner (the trigger included) were typed
+---   within that category's expansion delay. The daemon owns the timing.
 --- @return boolean True if a dynamic expansion was performed.
 --- @return table|nil Canonical event details for a successful expansion.
-function M.on_trigger(buffer, trigger, start_is_boundary, publication)
+function M.on_trigger(buffer, trigger, start_is_boundary, publication, within_delay)
+	if type(within_delay) ~= "function" then
+		Logger.error(LOG, "Dynamic expansion refused: no expansion-delay admission (content withheld).")
+		return false
+	end
 	if not M.is_enabled() then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
@@ -484,10 +579,11 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication)
 	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary)
 	if not match then
 		-- Nothing registered claimed the sequence. Only now try the multi-letter
-		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
-		-- letters AND is the short-date rule, and the registration is what decides.
-		local expanded, event = _fire_combo(prefix, t)
-		if expanded then return expanded, event end
+		-- @-combo, so a registered tag always wins over the combo of aliases.
+		-- A resolved combo whose delay expired still owns the sequence: the
+		-- programmable source is not a fallback for a late magic key.
+		local expanded, event, claimed = _fire_combo(prefix, t, publication, within_delay)
+		if expanded or claimed then return expanded, event end
 		if UserCode.request(prefix) then return true, { pending_user = true } end
 		return false
 	end
@@ -502,6 +598,13 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication)
 		return false
 	end
 	local backspace_count = suffix_length + 1  -- suffix + trigger
+	-- The same last-letter-to-expander gate as the static matcher and the
+	-- programmable source, under the family's own category and section.
+	if not within_delay(DYNAMIC_GROUP, match.rule.section, backspace_count) then
+		Logger.debug(LOG, "Dynamic rule '%s' expired before the magic key (family=%s, content withheld).",
+			match.rule.suffix, tostring(match.rule.section))
+		return false
+	end
 	if type(publication) ~= "table" or getmetatable(publication) ~= nil
 		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
 		Logger.warn(LOG, "Dynamic single-field expansion refused: no retained text destination.")
@@ -573,12 +676,35 @@ end
 function M.preview_candidates(buffer, start_is_boundary)
 	local rows = {}
 	if not M.is_enabled() then return rows end
-	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary) then
-		local user = UserCode.preview(buffer)
-		if user then
-			rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
-				group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
+	-- A registered rule (a single-letter @-tag or a date) wins at fire time over
+	-- the combo and the programmable source, so it is the one row offered. The
+	-- static matcher never holds these rules: without this row "@p" and "td"
+	-- expanded on the magic key with no bubble at all.
+	local match = require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled,
+		start_is_boundary)
+	if match then
+		local suffix = match.rule.suffix
+		if match.rule.section == PERSONAL_SECTION then
+			-- `field` is what the preview masks the value against; the alias letter
+			-- follows the "@" of the registered suffix. A row without it would be
+			-- shown unmasked, so none is offered.
+			local field = _letters[suffix:sub(2)]
+			if type(field) ~= "string" then
+				Logger.error(LOG, "Personal preview withheld: a registered @-tag names no field.")
+				return rows
+			end
+			rows[1] = { trigger = suffix .. _trigger_char, replacement = match.result,
+				field = field, group = PERSONAL_PREVIEW_GROUP, section = PERSONAL_SECTION, fires = true }
+		else
+			rows[1] = { trigger = suffix .. _trigger_char, replacement = match.result,
+				group = DYNAMIC_GROUP, section = match.rule.section, fires = true }
 		end
+		return rows
+	end
+	local user = UserCode.preview(buffer)
+	if user then
+		rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
+			group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
 	end
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end
 
@@ -588,8 +714,8 @@ function M.preview_candidates(buffer, start_is_boundary)
 	local fields = M.resolve_combo(tag)
 	if #fields == 0 then return rows end
 
-	-- A single-letter tag is a registered rule and reaches the bubble through the
-	-- ordinary path; offering it here too would draw the same row twice.
+	-- A single-letter tag that resolves here is one no registered rule offered
+	-- above (its rule is absent or declined), and the fire path refuses it too.
 	if #fields < 2 then return rows end
 	-- Builtin personal combinations have the same precedence at preview and fire.
 	rows = {}
@@ -939,7 +1065,7 @@ function M.prefix_mappings()
 		Logger.error(LOG, "prefix_rules module unavailable — no prefix expansion is registered.")
 		return {}
 	end
-	return Prefix.build(_info, M.is_rule_enabled)
+	return Prefix.build(_info, M.is_rule_enabled, _trigger_char)
 end
 
 --- Whether one engine section may fire.

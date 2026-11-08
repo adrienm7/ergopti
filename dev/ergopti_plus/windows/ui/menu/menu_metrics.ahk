@@ -23,6 +23,11 @@
 ; instead of being re-derived per handler.
 global _MET_STATE_GETTERS := Map(
 	"keystats_enabled",       () => MetricsShortcuts.enabled,
+	; The notification-area readout (wpm_tray_readout.ahk), the macOS menu bar
+	; and Linux tray readout's counterpart.
+	"metrics_menubar_wpm",     () => WPMTrayReadout.running,
+	"metrics_menubar_colors",  () => WPMTrayReadout.use_colors,
+	ConfigLeaf.WPM_MENUBAR_VISIBLE,     () => WPMTrayReadout.running,
 	ConfigLeaf.WPM_WIDGET_VISIBLE,      () => WPMWidget.visible,
 	"metrics_widget_colors",   () => WPMWidget.use_colors,
 	"metrics_widget_graph",    () => WPMWidget.show_graph,
@@ -58,6 +63,8 @@ BuildMetricsMenu() {
 	Commands := _MET_ScopeCommands()
 	for Id, Handler in Map(
 		MenuCommand.METRICS_TOGGLE,  (*) => ToggleMetricsEnabled(),
+		MenuCommand.WPM_MENUBAR,     (*) => _ToggleWpmTrayReadout(),
+		MenuCommand.MENUBAR_COLORS,  (*) => _ToggleWpmTrayReadoutColors(),
 		MenuCommand.WPM_WIDGET,      (*) => _ToggleWpmWidget(),
 		MenuCommand.WIDGET_COLORS,   (*) => _ToggleWpmWidgetColors(),
 		MenuCommand.INCLUDE_REALTIME, (*) => _ToggleWpmWidgetGraph(),

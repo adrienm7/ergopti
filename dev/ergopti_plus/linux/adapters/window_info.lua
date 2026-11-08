@@ -14,8 +14,15 @@
 ---   - sway and other wlroots compositors answer `swaymsg -t get_tree`.
 ---   - Hyprland answers `hyprctl activewindow -j`.
 ---   - niri answers `niri msg --json focused-window`.
----   - GNOME removed Shell.Eval in 41, so there is no unprivileged way to ask.
----   - KDE, COSMIC and Weston expose nothing equivalent.
+---   - every compositor with wlr-foreign-toplevel-management (labwc, Wayfire,
+---     river and the other wlroots ones) answers through `lswt -j`, whose
+---     listing marks the activated toplevel.
+---   - GNOME removed Shell.Eval in 41 and admits its Introspect interface to
+---     allow-listed senders only, so only a Shell extension could ask.
+---   - KDE answers only a KWin script, which must call back a D-Bus name the
+---     daemon would own; COSMIC's own toplevel protocol needs a native Wayland
+---     client, and ext-foreign-toplevel-list carries no activation state;
+---     Weston exposes nothing. Those stay unknown.
 --- That is a deliberate security posture, not an oversight to work around, and
 --- it is why per-application rules cannot be promised under Wayland. The failure
 --- is honest: an empty appId, logged once, rather than a wrong one.
@@ -51,7 +58,7 @@ local LOG = "adapters.window_info"
 -- Compositors that answer a focused-window query, and how to ask. Order is
 -- deliberate: the probe tries each in turn, so a session running more than one
 -- IPC socket resolves the same way every time rather than by chance.
-local WAYLAND_BACKENDS = { "sway", "hyprland", "niri" }
+local WAYLAND_BACKENDS = { "sway", "hyprland", "niri", "wlr_toplevel" }
 
 -- Set once when no query interface exists, so the log states the limitation
 -- rather than repeating it on every keystroke's context refresh.
@@ -76,6 +83,12 @@ local _read_proc_comm = nil
 --- @return table
 local function empty_info()
 	return { appId = "", windowTitle = "", bundleId = "", executablePath = "" }
+end
+
+--- Compositor text fields may be JSON null; never turn its sentinel into an
+--- application identity or window title.
+local function text_field(value)
+	return type(value) == "string" and value or ""
 end
 
 --- Decodes JSON, returning nil rather than raising on anything unexpected.
@@ -104,8 +117,11 @@ end
 --- @param pid string|number|nil
 --- @return string
 local function comm_of(pid)
-	if not pid then return "" end
-	local comm = Shell.exec("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
+	if type(pid) ~= "string" and type(pid) ~= "number" then return "" end
+	local literal = tostring(pid)
+	local number = tonumber(literal)
+	if not literal:match("^%d+$") or not number or number <= 0 or number > 2147483647 then return "" end
+	local comm = Shell.exec("cat " .. Shell.quote("/proc/" .. literal .. "/comm"))
 	return process_name_record(comm)
 end
 
@@ -116,8 +132,9 @@ end
 local function read_proc_comm(pid)
 	local handle = io.open("/proc/" .. tostring(pid) .. "/comm", "rb")
 	if not handle then return "" end
-	local comm = handle:read("*a") or ""
-	handle:close()
+	local read_ok, comm = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(comm) ~= "string" or not close_ok or closed ~= true then return "" end
 	return process_name_record(comm)
 end
 _read_proc_comm = read_proc_comm
@@ -172,13 +189,17 @@ local function focused_x11()
 		if not win_id then return nil end
 		title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
 		if not title then return nil end
-		native_pid = nil
+		native_pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
 	end
 
 	local info = empty_info()
 	info.windowTitle = title
 
-	if win_id == _x11_cache.id and title == _x11_cache.title and _x11_cache.appId ~= "" then
+	-- The X server can reuse a window ID and title for a different process.
+	-- A native query already carries its PID, so it must still match the owner
+	-- behind the cached attribution (including when the property disappears).
+	local same_native_owner = tonumber(native_pid) == _x11_cache.pid
+	if win_id == _x11_cache.id and title == _x11_cache.title and same_native_owner and _x11_cache.appId ~= "" then
 		info.appId = _x11_cache.appId
 		return info, _x11_cache.identity, _x11_cache.pid
 	end
@@ -188,9 +209,6 @@ local function focused_x11()
 	-- already attributed to, and what the other two drivers report; WM_CLASS
 	-- would be a nicer identity and a silent break of every stored attribution.
 	local pid = native_pid
-	if pid == nil and (native_reason ~= nil or not X11Focus.has_transport()) then
-		pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
-	end
 	info.appId = comm_of(pid)
 
 	_x11_cache.id = win_id
@@ -305,13 +323,14 @@ local function focused_sway()
 	if not node then return nil end
 
 	local info = empty_info()
-	info.windowTitle = tostring(node.name or "")
+	info.windowTitle = text_field(node.name)
 	-- app_id is the Wayland-native identity; window_properties.class is what an
 	-- XWayland client reports instead, and mixing them up means every X11
 	-- application under sway resolves to nothing.
-	info.appId = tostring(node.app_id
-		or (type(node.window_properties) == "table" and node.window_properties.class)
-		or "")
+	info.appId = text_field(node.app_id)
+	if info.appId == "" and type(node.window_properties) == "table" then
+		info.appId = text_field(node.window_properties.class)
+	end
 	if info.appId == "" then info.appId = comm_of(node.pid) end
 	return info, native_identity("sway", node.id, node.pid), tonumber(node.pid)
 end
@@ -323,8 +342,8 @@ local function focused_hyprland()
 	local win = checked_json("hyprctl activewindow -j 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
-	info.windowTitle = tostring(win.title or "")
-	info.appId = tostring(win.class or "")
+	info.windowTitle = text_field(win.title)
+	info.appId = text_field(win.class)
 	if info.appId == "" then info.appId = comm_of(win.pid) end
 	return info, native_identity("hyprland", win.address, win.pid), tonumber(win.pid)
 end
@@ -336,17 +355,43 @@ local function focused_niri()
 	local win = checked_json("niri msg --json focused-window 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
-	info.windowTitle = tostring(win.title or "")
-	info.appId = tostring(win.app_id or "")
+	info.windowTitle = text_field(win.title)
+	info.appId = text_field(win.app_id)
 	if info.appId == "" then info.appId = comm_of(win.pid) end
 	return info, native_identity("niri", win.id, win.pid), tonumber(win.pid)
 end
 
+--- Queries a wlr-foreign-toplevel compositor through lswt (2.0 or later).
+--- The protocol names no process, so the identity carries none. A listing
+--- that cannot report activation (ext-foreign-toplevel-list alone), with no
+--- or with two activated toplevels, names no focus: unknown, not a guess.
+--- @return table|nil
+local function focused_wlr_toplevel()
+	if not Shell.has_command("lswt") then return nil end
+	local listing = checked_json("lswt -j 2>/dev/null")
+	if not listing or type(listing.toplevels) ~= "table" then return nil end
+	local supported = type(listing["supported-data"]) == "table" and listing["supported-data"] or {}
+	if supported.activated ~= true then return nil end
+	local focused = nil
+	for _, toplevel in ipairs(listing.toplevels) do
+		if type(toplevel) == "table" and toplevel.activated == true then
+			if focused then return nil end
+			focused = toplevel
+		end
+	end
+	if not focused then return nil end
+	local info = empty_info()
+	info.windowTitle = text_field(focused.title)
+	info.appId = text_field(focused["app-id"])
+	return info, native_identity("wlr-toplevel", focused.identifier, nil), nil
+end
+
 -- Each query probes its own client binary first and answers nil without it.
 local WAYLAND_QUERIES = {
-	sway     = focused_sway,
-	hyprland = focused_hyprland,
-	niri     = focused_niri,
+	sway         = focused_sway,
+	hyprland     = focused_hyprland,
+	niri         = focused_niri,
+	wlr_toplevel = focused_wlr_toplevel,
 }
 
 --- Tries every Wayland backend this session might speak.
@@ -407,6 +452,15 @@ function M.use_native_x11()
 		Logger.warn(LOG, "libxcb focus queries unavailable (%s) — X11 focus keeps using xdotool.", tostring(reason))
 	end
 	return bound
+end
+
+--- The X server readings the metrics take beside the focus: the cursor
+--- position (pointer distance in screen pixels) and the EWMH current desktop.
+--- Only a native X11 session answers them; under Wayland a client reads neither.
+--- @return table sources { pointer = function|nil, desktop = function|nil }
+function M.metrics_sources()
+	if not DisplayServer.is_x11() or not X11Focus.has_transport() then return {} end
+	return { pointer = X11Focus.pointer_position, desktop = X11Focus.current_desktop }
 end
 
 --- Returns the identity of the currently focused window.

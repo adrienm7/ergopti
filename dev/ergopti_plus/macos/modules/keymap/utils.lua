@@ -25,6 +25,8 @@ local text_utils  = require("infra.text_utils")
 local shared_utils = require("keymap.utils")
 local Logger      = require("infra.logger")
 local Timings     = require("infra.timings")
+local Clipboard = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local SecureFieldDetector = require("adapters.secure_field_detector")
@@ -142,6 +144,7 @@ local _paste_saved_original = nil
 local _paste_pending_timer = nil
 local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
+ClipboardBorrowers.register("keymap_output", function() return _paste_owns_clipboard == true end)
 local _paste_builtin_count = nil
 local _publication_clipboards = setmetatable({}, { __mode = "k" })
 local _paste_publication_lease = nil
@@ -426,6 +429,18 @@ queue_paste_restore_retry = function(reason)
 	return false
 end
 
+--- Whether another family borrows the clipboard right now. Its temporary payload
+--- is not the user's clipboard, so output is typed instead of snapshotting it, as
+--- Windows' SendInstant does when the shared clipboard owner is busy (MCP-002).
+--- @return boolean
+local function clipboard_borrowed_elsewhere()
+	if _paste_owns_clipboard then return false end
+	local holder = ClipboardBorrowers.foreign_holder("keymap_output")
+	if holder == nil then return false end
+	Logger.debug(LOG, "%s borrows the clipboard — typing the output instead of pasting it.", holder)
+	return true
+end
+
 --- Returns true when the text is long enough or unicode-heavy enough that
 --- clipboard-paste should be preferred over simulated keystrokes.
 --- @param text string The text to evaluate.
@@ -509,13 +524,13 @@ local function perform_paste(value, handoff)
 			end
 		end
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
-		local ok_snapshot, snapshot_or_error = pcall(function()
-			return hs.pasteboard.readAllData()
-		end)
-		if not ok_snapshot or (snapshot_or_error ~= nil and type(snapshot_or_error) ~= "table") then
+		local ok_snapshot, snapshot_or_error, captured, snapshot_count = pcall(Clipboard.save, true)
+		if not ok_snapshot or captured ~= true then
 			Logger.error(LOG, "Clipboard paste snapshot failed: %s.", tostring(snapshot_or_error))
 			return false
 		end
+		if guarded_count ~= nil and snapshot_count ~= guarded_count then return false end
+		if builtin_snapshot_count ~= nil and snapshot_count ~= builtin_snapshot_count then return false end
 		if guarded_count ~= nil and clipboard_change_count() ~= guarded_count then return false end
 		if builtin_snapshot_count ~= nil and clipboard_change_count() ~= builtin_snapshot_count then
 			Logger.error(LOG, "Clipboard paste snapshot ownership changed during acquisition.")
@@ -804,7 +819,7 @@ function M.emit_tokens(tokens)
 			-- Clipboard text has no per-character OS echo but is still part of
 			-- the logical replacement consumed by synthetic telemetry.
 			logical_text = logical_text .. tok.value
-			if M.should_paste(tok.value) then
+			if M.should_paste(tok.value) and not clipboard_borrowed_elsewhere() then
 				local ok_l, tok_len = pcall(text_utils.utf8_len, tok.value)
 				count              = count + (ok_l and tok_len or 1)
 
@@ -815,6 +830,13 @@ function M.emit_tokens(tokens)
 						ok_l and tok_len or 1, paste_at)
 				end
 				emit_in_order(paste_at, function()
+					-- A family that borrowed the clipboard after this plan still
+					-- owns it when the deferred paste comes due: type the text.
+					if clipboard_borrowed_elsewhere() then
+						assert(SyntheticInput.emit_key_strokes(paste_value),
+							"synthetic token text could not be dispatched")
+						return
+					end
 					local handoff = {}
 					assert(perform_paste(paste_value, handoff) == true,
 						paste_at > 0 and "deferred clipboard token paste could not be dispatched"
@@ -1062,7 +1084,7 @@ function M.emit_text(text)
 	-- (free); a codepoint count would cost a utf8 scan on the hot path
 	Logger.trace(LOG, "Emitting text (%d byte(s))…", #text)
 
-	if M.should_paste(text) then
+	if M.should_paste(text) and not clipboard_borrowed_elsewhere() then
 		assert(perform_paste(text) == true,
 			"clipboard text paste could not be dispatched")
 		Logger.done(LOG, "Text pasted via clipboard.")
@@ -1156,6 +1178,29 @@ local function stop_application_watcher(label)
 	return true
 end
 
+-- Told when the frontmost application or its focused window changes, so a
+-- pending prediction stops with the context it was asked for. Title and
+-- focused-field edges are left out: an editor retitles its window while the
+-- user types.
+local _context_change_listener = nil
+
+--- Registers the single listener of application and window switches.
+--- @param fn function|nil Zero-argument callback; nil unregisters it.
+function M.set_context_change_listener(fn)
+	if fn ~= nil and type(fn) ~= "function" then
+		error("context change listener must be a function or nil", 2)
+	end
+	_context_change_listener = fn
+end
+
+--- Tells the registered listener that the user switched application or window.
+local function notify_context_change()
+	local listener = _context_change_listener
+	if listener == nil then return end
+	local ok, err = xpcall(listener, debug.traceback)
+	if not ok then Logger.error(LOG, "Context change listener raised: %s.", tostring(err)) end
+end
+
 --- Invalidates the ignored-window cache. Called from focus-change watchers;
 --- also safe to call from anywhere else (tests, manual overrides).
 local function invalidate_ignored_win_cache()
@@ -1193,6 +1238,7 @@ local function ensure_ignored_win_watchers()
 				if event == hs.application.watcher.activated
 					or event == hs.application.watcher.deactivated then
 					invalidate_ignored_win_cache()
+					notify_context_change()
 				end
 			end)
 			if not candidate then error("application watcher construction returned nil", 0) end
@@ -1296,6 +1342,7 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 				if _ignored_win_focus_watcher ~= candidate
 					or _ignored_win_focus_watcher_committed ~= true then return end
 				invalidate_ignored_win_cache()
+				notify_context_change()
 			end)
 			if not candidate then error("focused-window watcher construction returned nil", 0) end
 			_ignored_win_focus_watcher = candidate
@@ -1510,22 +1557,24 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	end
 	stage("context_watchers")
 	observe_ignored_win_identity(win, app_name, title)
-	local secure = SecureFieldDetector.isSecureApp(app_name) == true and true
-		or SecureFieldDetector.inspectFocusedElement(app)
+	local secure, detail, element
+	if SecureFieldDetector.isSecureApp(app_name) == true then
+		secure = true
+	else
+		secure, detail, element = SecureFieldDetector.inspectFocusedElementWithReceipt(app)
+	end
 	if type(secure) ~= "boolean" then return stage("secure_field", true) end
 	stage("secure_field")
 	_secure_field_cache_value = secure
-	-- Retain an exact native destination off the HID path. Application names and
-	-- titles alone cannot distinguish two editor controls or a reused window.
-	local captured, destination = pcall(function()
-		local pid = app:pid()
-		local application_element = hs.axuielement.applicationElementForPID(pid)
-		local element = application_element:attributeValue("AXFocusedUIElement")
-		if not element then return nil end
-		return { pid = pid, app = app, window_id = win:id(), element = element,
-			generation = _ignored_win_context_generation }
-	end)
-	if captured then _text_destination = destination end
+	-- Bind the receipt to the exact AX element whose privacy was classified.
+	-- A second focused-element read could select another field between calls.
+	if not secure and element then
+		local captured, destination = pcall(function()
+			return { pid = app:pid(), app = app, window_id = win:id(), element = element,
+				generation = _ignored_win_context_generation }
+		end)
+		if captured then _text_destination = destination end
+	end
 	stage("destination")
 	report_slow_probe(probe_started, stage_ms)
 
@@ -1663,7 +1712,7 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 		return nil, _ignored_win_context_generation
 	end
 
-	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		-- The periodic timer should normally have refreshed first. If the main
 		-- runloop delayed it, never authorize the previous window's answer.
 		invalidate_ignored_win_cache()
@@ -1707,7 +1756,7 @@ function M.is_secure_field(now)
 		schedule_ignored_win_refresh()
 		return nil, _ignored_win_context_generation
 	end
-	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		invalidate_ignored_win_cache()
 		return nil, _ignored_win_context_generation
 	end

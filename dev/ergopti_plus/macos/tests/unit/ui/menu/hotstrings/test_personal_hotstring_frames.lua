@@ -10,6 +10,7 @@
 
 local helpers = require("tests.helpers")
 local PersonalTranslator = require("infra.i18n")
+local SectionBackups = require("tests.support.section_settings_backups")
 
 --- Owns one genuine renderer and the native context supplied by the tray.
 --- @param body function Receives the private frame and source observations.
@@ -94,6 +95,7 @@ local function with_personal_frame(body, options)
 		end
 		if scratch then
 			os.remove(scratch .. "/metrics/karabiner_kc.log"); os.remove(scratch .. "/paths.toml")
+			SectionBackups.remove_beside(scratch .. "/hammerspoon/config.toml")
 			if hs.fs.attributes(scratch .. "/hammerspoon") then assert(hs.fs.rmdir(scratch .. "/hammerspoon")) end
 			if hs.fs.attributes(scratch .. "/metrics") then assert(hs.fs.rmdir(scratch .. "/metrics")) end
 			assert(hs.fs.rmdir(scratch))

@@ -45,9 +45,18 @@ local function load_bridge(answer)
 	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
 	package.loaded["ui.webview_manager"] = {
-		show = function(app) context.shown[#context.shown + 1] = app; return true end,
-		hide = function() context.hidden = context.hidden + 1; return true end,
+		show = function(app)
+			context.shown[#context.shown + 1] = app
+			if context.on_show then return context.on_show(app) end
+			return true
+		end,
+		hide = function()
+			context.hidden = context.hidden + 1
+			if context.on_hide then return context.on_hide() end
+			return true
+		end,
 		eval_js = function(app, js)
+			if context.on_push then context.on_push() end
 			local payload = js:match("receiveUpdateCheck%((.*)%)$")
 			context.pushed[#context.pushed + 1] = { app = app, message = payload and Json.decode(payload) }
 			return true
@@ -58,7 +67,11 @@ local function load_bridge(answer)
 		complete = function(id, ok, message) context.completed[#context.completed + 1] = { id, ok, message } end,
 	}
 	package.loaded["ui.error_dialog.bridge"] = {
-		report = function(record, complete) context.reports[#context.reports + 1] = record; complete(true) end,
+		report = function(record, complete)
+			context.reports[#context.reports + 1] = record
+			if context.on_report then return context.on_report() end
+			complete(true)
+		end,
 	}
 	package.loaded["ui.changelog.bridge"] = {
 		push_subscribed_channel = function(id) context.channel_pushes[#context.channel_pushes + 1] = id end,
@@ -127,6 +140,121 @@ end
 local function last(context) return context.pushed[#context.pushed].message end
 
 helpers.describe("update-check window bridge (Linux)", function()
+	for _, old_result in ipairs({ false, true }) do
+		helpers.it("(update-check-open-owner) old opening preserves replacement when result is " .. tostring(old_result), function()
+		scenario(available, function(bridge, context)
+			context.on_show = function()
+				context.on_show = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+				return old_result
+			end
+			helpers.assert_eq(bridge.open(context.ctx), false)
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the replacement still answers")
+		end)
+		end)
+	end
+
+	for _, operation in ipairs({ "close", "replace", "page-close" }) do
+		helpers.it("(update-check-retire-owner) preserves replacement during " .. operation, function()
+			scenario(function(channel) return { state = "error", channel = channel, current = "0.0.0-dev.144", others = {} } end,
+				function(bridge, context)
+					bridge.open(context.ctx)
+					context.on_report = function()
+						return { cancel = function()
+							context.on_report = nil
+							helpers.assert_true(bridge.open(context.ctx))
+						end }
+					end
+					bridge.on_message({ action = "report" })
+					if operation == "close" then bridge.on_window_closed()
+					elseif operation == "page-close" then bridge.on_message({ action = "close" })
+					else bridge.open(context.ctx) end
+					local before = #context.pushed
+					bridge.on_message("ready")
+					helpers.assert_true(#context.pushed > before, "replacement remains active")
+					helpers.assert_eq(#context.checks, 2, "old operation must not start another check")
+					helpers.assert_eq(context.hidden, 0, "old operation must not hide the replacement")
+				end)
+		end)
+	end
+
+	helpers.it("(update-check-close-owner) keeps the session when native close is refused", function()
+		scenario(available, function(bridge, context)
+			bridge.open(context.ctx)
+			context.on_hide = function() return false end
+			bridge.on_message({ action = "close" })
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "a refused close retains the session")
+			context.on_hide = nil
+			bridge.on_message({ action = "close" })
+			before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_eq(#context.pushed, before, "an accepted close retires the session")
+		end)
+	end)
+
+	helpers.it("(update-check-close-owner) preserves a successor opened during close", function()
+		scenario(available, function(bridge, context)
+			bridge.open(context.ctx)
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+				return true
+			end
+			bridge.on_message({ action = "close" })
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the successor remains active")
+		end)
+	end)
+
+	helpers.it("(update-check-start-owner) retired session cannot start a check after reentrant publication", function()
+		scenario(available, function(bridge, context)
+			context.on_push = function()
+				context.on_push = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+			end
+			helpers.assert_eq(bridge.open(context.ctx), false)
+			helpers.assert_eq(#context.checks, 1, "only the replacement may start its check")
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the replacement session remains active")
+		end)
+	end)
+
+	for _, kind in ipairs({ "fifo", "regular" }) do
+		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()
+			if package.config:sub(1, 1) == "\\" then return end
+			local path = os.tmpname(); os.remove(path)
+			local quote, root = require("text_utils").shell_quote, helpers.driver_root()
+			if kind == "fifo" then
+				local made = os.execute("mkfifo " .. quote(path))
+				assert(made == true or made == 0)
+			else
+				local file = assert(io.open(path, "w")); assert(file:write("log")); assert(file:close())
+			end
+			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
+				.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;") .. "..package.path;"
+				.. "package.loaded['infra.installation']={is_source_run=function()return false end};"
+				.. "package.loaded['infra.logger_sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
+				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"
+				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"
+				.. "local release={tag='v1',download_url='https://example.invalid/a'}; local u={"
+				.. "get_cached_release=function()return release end,get_state=function()return 'idle' end,"
+				.. "get_channel=function()return 'dev' end,download_update=function()return true end};"
+				.. "assert(require('ui.update_check.bridge').download_offered(u,release,{on_open_today_log=function()end}));"
+				.. "assert(window.can_open_diagnostics()==" .. tostring(kind == "regular") .. ")"
+			local status = os.execute("timeout 3 " .. quote(assert(require("luv").exepath())) .. " -e " .. quote(source))
+			assert(os.remove(path))
+			helpers.assert_true(status == true or status == 0, "special logs must be refused without waiting")
+		end)
+	end
 	helpers.it("opens the window, shows checking, then the updater's answer", function()
 		scenario(available, function(bridge, context)
 			helpers.assert_true(bridge.open(context.ctx))

@@ -199,7 +199,7 @@ end)
 --- @return table db Recording SQLite port with numeric native OK acknowledgements.
 local function recording_reset_db(observed)
 	local meta = { today_log_offset = "0", today_log_date = "2099-06-30",
-		ngram_ctx_json = '{"Editor":{"cur_word":"x"}}', local_data_sql_outbox = "" }
+		ngram_ctx_json = '{"Editor":{"cur_word":"x","typing_date":"2099-06-30"}}', local_data_sql_outbox = "", aggregate_cache_revision = "6" }
 	local pending, step = nil, 0
 	local updates = {
 		{ "UPDATE meta SET value='0' WHERE key='today_log_offset';", "today_log_offset", "0" },
@@ -210,14 +210,15 @@ local function recording_reset_db(observed)
 	return {
 		errmsg = function() return "fixture reset statement refused" end,
 		nrows = function(_self, sql)
-			helpers.assert_eq(sql, "SELECT value FROM meta WHERE key='local_data_sql_outbox'",
-				"the reset fixture admits only the explicit local-outbox read")
-			table.insert(observed.timeline, "outbox")
+			local key = sql:match("SELECT value FROM meta WHERE key='([^']+)'")
+			helpers.assert_true(key == "local_data_sql_outbox" or key == "today_log_date" or key == "ngram_ctx_json" or key == "aggregate_cache_revision" or key == "rollover_settlement_receipt")
+			table.insert(observed.timeline, key == "local_data_sql_outbox" and "outbox" or key .. ":read")
 			local yielded = false
 			return function()
 				if yielded then return nil end
 				yielded = true
-				return { value = meta.local_data_sql_outbox }
+				if meta[key] == nil then return nil end
+				return { value = meta[key] }
 			end
 		end,
 		exec = function(_self, sql)
@@ -226,6 +227,11 @@ local function recording_reset_db(observed)
 				helpers.assert_eq(pending, nil, "reset must begin one fresh transaction")
 				pending, step = {}, 0
 				table.insert(observed.timeline, "BEGIN")
+			elseif sql:find("rollover_settlement_receipt", 1, true) then
+				helpers.assert_true(pending ~= nil)
+				table.insert(observed.timeline, "receipt")
+			elseif sql:find("WHERE key='rev'", 1, true) then
+				table.insert(observed.timeline, "rev")
 			elseif sql == "COMMIT;" then
 				helpers.assert_eq(step, 3, "all three exact reset rows must precede COMMIT")
 				helpers.assert_true(pending ~= nil, "reset COMMIT requires an active transaction")
@@ -294,7 +300,7 @@ local function load_real_day_rollover(stall, ingest_error)
 				"committed EOF and settled empty outbox must precede Rotation ownership")
 			observed.rollover_called = true
 			table.insert(observed.timeline, "rotation")
-			helpers.assert_eq(reset("2099-07-01"), true, "Rotation requires literal true from the checked reset")
+			helpers.assert_eq(reset("2099-07-01", {path="/ledger", resolved="/ledger", dev=1, ino=2, offset=3, batch="marker"}), true, "Rotation requires literal true from the checked reset")
 			helpers.assert_eq(observed.commits, 1, "cache COMMIT must finish before reset acknowledgement")
 			helpers.assert_eq(observed.meta.today_log_offset, "0")
 			helpers.assert_eq(observed.meta.today_log_date, "2099-07-01")
@@ -324,14 +330,17 @@ local function load_real_day_rollover(stall, ingest_error)
 		walk_app_switch    = function() end,
 		walk_window_switch = function() end,
 		walk_system_event  = function() end,
-		flush              = function() end,
+		flush              = function() return true end,
+		settle_contexts    = function() table.insert(observed.timeline, "settle"); return true end,
+		has_pending_batch  = function() return false end,
+		reset_batch        = function() end,
 		get_ngram_ctx      = function() return {} end,
 		set_ngram_ctx      = function() end,
 		reset_ngram_ctx = function()
 			observed.reset_ngram_ctx_calls = observed.reset_ngram_ctx_calls + 1
 			table.insert(observed.timeline, "context")
 			helpers.assert_eq(table.concat(observed.timeline, "|"),
-				"eof|outbox|flush|rotation|BEGIN|outbox|today_log_offset|today_log_date|ngram_ctx_json|COMMIT|reset:true|rotation:true|context",
+				"eof|outbox|flush|rotation|BEGIN|outbox|rollover_settlement_receipt:read|aggregate_cache_revision:read|ngram_ctx_json:read|settle|rev|receipt|today_log_offset|today_log_date|ngram_ctx_json|COMMIT|reset:true|rotation:true|context",
 				"in-memory context resets only after the exact reset transaction and Rotation acknowledgement")
 		end,
 	}

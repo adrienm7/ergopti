@@ -16,7 +16,7 @@ _TTNWMG_CheckWinMaximizeGuard() {
 		"TakeNote must queue the shared transaction")
 	Assert(InStr(Body, "WinWait") = 0 and InStr(Body, "WinMaximize") = 0,
 		"TakeNote must not wait or maximise on the hotkey thread")
-	Assert(InStr(PollBody, 'Ops.FindWindow(Job["file_name"])') > 0,
+	Assert(InStr(PollBody, 'Ops.FindWindow(Job["file_name"], Admits)') > 0,
 		"the poll must resolve the exact Notepad document before finalization")
 	Assert(InStr(PollBody, "Ops.Maximize(WindowHwnd)") > 0,
 		"the poll must maximise the enumerated HWND, never AHK's last-found window")

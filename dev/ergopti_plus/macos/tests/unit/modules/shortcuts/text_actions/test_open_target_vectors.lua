@@ -56,6 +56,7 @@ local function with_apps(existing, body)
 			notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		}
 		package.loaded["adapters.file_system"] = {
+			path_status = function(path) return (existing or {})[path] and "present" or "absent" end,
 			exists = function(path) return (existing or {})[path] == true end,
 		}
 		package.loaded["adapters.shell_runner"] = {
@@ -103,6 +104,10 @@ helpers.describe("copy_or_open_path opens the selection (open-target-ip-address)
 		{ "10.0.0.1:8080/admin", "http://10.0.0.1:8080/admin" },
 		{ "localhost:3000", "http://localhost:3000" },
 		{ "[::1]:8080", "http://[::1]:8080" },
+		{ "::ffff:192.0.2.1", "http://[::ffff:192.0.2.1]" },
+		{ "[::ffff:192.0.2.1]:8080/status", "http://[::ffff:192.0.2.1]:8080/status" },
+		{ "1:2:3:4:5:6:7::", "http://[1:2:3:4:5:6:7::]" },
+		{ "[::1:2:3:4:5:6:7]:8080", "http://[::1:2:3:4:5:6:7]:8080" },
 		{ "ada@example.com", "mailto:ada@example.com" },
 	}) do
 		helpers.it("open-target: opens '" .. case[1] .. "' as " .. case[2] .. ", not a web search", function()
@@ -148,4 +153,26 @@ helpers.describe("copy_or_open_path opens the selection (open-target-ip-address)
 			helpers.assert_eq(world.urls, { OpenTarget.DEFAULT_SEARCH_URL .. "bonjour+le+monde" })
 		end)
 	end)
+end)
+
+helpers.describe('selected existing path with punctuation', function()
+  helpers.it('prefers the exact path over the distinct cleaned path', function()
+    with_apps({ ['/tmp/report']=true, ['/tmp/report.']=true }, function(world)
+      helpers.assert_eq(world.apps._open_or_search('"/tmp/report."'), true)
+      helpers.assert_eq(world.opened, { '/tmp/report.' })
+    end)
+  end)
+  helpers.it('keeps prose punctuation fallback when the exact path is absent', function()
+    with_apps({ ['/tmp/report']=true }, function(world)
+      helpers.assert_eq(world.apps._open_or_search('/tmp/report.'), true)
+      helpers.assert_eq(world.opened, { '/tmp/report' })
+    end)
+  end)
+  helpers.it('refuses the cleaned path when exact metadata cannot be read', function()
+    with_apps({ ['/tmp/report']=true }, function(world)
+      package.loaded['adapters.file_system'].path_status = function() return 'error' end
+      helpers.assert_eq(world.apps._open_or_search('/tmp/report.'), false)
+      helpers.assert_eq(world.opened, {})
+    end)
+  end)
 end)

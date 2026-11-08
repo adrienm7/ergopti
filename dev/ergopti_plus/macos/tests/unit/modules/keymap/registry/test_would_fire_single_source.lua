@@ -122,6 +122,7 @@ helpers.describe("would_fire: the predicate matches what fires", function()
 		return {
 			trigger       = trigger,
 			trigger_bytes = #trigger,
+			tlen          = utf8.len(trigger),
 			plain_repl    = replacement,
 			replacement   = replacement,
 			match_mode    = "exact",

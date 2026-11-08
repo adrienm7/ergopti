@@ -46,8 +46,11 @@ end
 --- @param next_step function Continuation.
 local function report_failure(reason, next_step)
 	local committed = require("infra.deferred_work").after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get("apps.cloner.python_offer.title"),
-			i18n.format("apps.cloner.python_offer.failed", tostring(reason)), i18n.get("common.ok"))
+		local shown, err = pcall(function()
+			require("infra.dialog_util").block_alert(i18n.get("apps.cloner.python_offer.title"),
+				i18n.format("apps.cloner.python_offer.failed", tostring(reason)), i18n.get("common.ok"))
+		end)
+		if not shown then Logger.error(LOG, "The App Cloner Python failure dialog failed: %s.", tostring(err)) end
 		next_step()
 	end, "app_cloner_python_offer.failure")
 	if committed ~= true then
@@ -72,7 +75,10 @@ function M.open(owner, launch)
 		return launch({})
 	end
 	Logger.info(LOG, "Managed PyObjC install accepted for App Cloner.")
-	require("infra.notifications").notify(i18n.get("apps.cloner.python_offer.installing"), nil, "info")
+	local notified = pcall(function()
+		return require("infra.notifications").notify(i18n.get("apps.cloner.python_offer.installing"), nil, "info")
+	end)
+	if not notified then Logger.error(LOG, "The App Cloner Python install notice failed.") end
 	owner.install(function(ok, value)
 		if ok then return launch(M.environment(value)) end
 		report_failure(value, function() launch({}) end)

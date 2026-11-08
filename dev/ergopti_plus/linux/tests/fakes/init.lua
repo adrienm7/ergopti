@@ -466,6 +466,26 @@ function M.storage(opts)
 		generations[key] = (generations[key] or 0) + 1
 		return true
 	end
+	-- A modal string edit: a one-shot receipt that commits only while the
+	-- captured cell and its generation are unchanged, as the real adapter does.
+	local string_edits = setmetatable({}, { __mode = "k" })
+	function fake.capture_string_edit(key)
+		if type(key) ~= "string" or key == "" or aliases[key] ~= nil then return nil end
+		local receipt = {}
+		string_edits[receipt] = { key = key, cell = cell(key), generation = generations[key] or 0 }
+		return copy(fake.values[key]), receipt
+	end
+	function fake.commit_string_edit(receipt, value)
+		if type(receipt) ~= "table" then return false end
+		local expected = string_edits[receipt]
+		string_edits[receipt] = nil
+		if not expected or type(value) ~= "string" or opts.writes_fail or aliases[expected.key] ~= nil
+			or not cells_equal(cell(expected.key), expected.cell)
+			or (generations[expected.key] or 0) ~= expected.generation then return false end
+		fake.values[expected.key] = value
+		generations[expected.key] = expected.generation + 1
+		return true
+	end
 	function fake.set_many(values)
 		if opts.writes_fail or type(values) ~= "table" then return false end
 		for key in pairs(values) do if aliases[key] ~= nil then return false end end
@@ -481,6 +501,7 @@ function M.storage(opts)
 		if stored == nil then return default_value end
 		return stored
 	end
+	function fake.read_exact(key) return true, fake.values[key] end
 	function fake.delete(key)
 		if opts.writes_fail or aliases[key] ~= nil then return false end
 		fake.values[key] = nil
@@ -695,7 +716,7 @@ function M.sqlite_writer(opts)
 	local system_day_paths = {}
 	local fake = {
 		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {}, window_switches = {},
-		session_events = {}, system_events = {},
+		session_events = {}, system_events = {}, network_events = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
@@ -707,7 +728,7 @@ function M.sqlite_writer(opts)
 	function fake.is_available() return available end
 	function fake.flush_transport_available() return available end
 	function fake.has_private_file_debt() return false end
-	function fake.open_db(path) fake.path = path ; return available end
+	function fake.open_db(path) fake.path = path ; if not available then return false, "sqlite_unavailable" end; return true end
 	function fake.ensure_token_encoding() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
@@ -753,6 +774,7 @@ function M.sqlite_writer(opts)
 	fake.insert_window_switch_events = collect(fake.window_switches)
 	fake.insert_session_events = collect(fake.session_events)
 	fake.insert_system_events = collect(fake.system_events)
+	fake.insert_network_events = collect(fake.network_events)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)
@@ -906,7 +928,17 @@ function M.sqlite_writer(opts)
 	end
 
 	function fake.exec_sql(sql) fake.executed[#fake.executed + 1] = sql ; return true end
-	function fake.query_rows() return {} end
+	-- Renders nothing: the fake keeps no derived formatter of its own.
+	function fake.derived_statement() return nil end
+	-- The ledger identity asks whether the store already knows its pre-ledger
+	-- "linux-<hostname>" id. A fake store is an existing one unless the test
+	-- says it is new (opts.fresh_store), so the historical id stays in force.
+	function fake.query_rows(sql)
+		if type(sql) == "string" and sql:match("^SELECT count%(%*%) FROM devices WHERE device_id=") then
+			return { opts.fresh_store and "0" or "1" }
+		end
+		return {}
+	end
 	function fake.get_meta(key) return fake.meta[key] end
 	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
 	function fake.upsert_open_walk(device_id, encoded)

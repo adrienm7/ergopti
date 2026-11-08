@@ -155,7 +155,7 @@ local _input_source_watcher_gen = 0
 local _capsword_last_check_ns = 0
 
 -- Set while an accepted CapsWord clear settles, so pointer events queue no duplicate.
-local _capsword_check_pending = false
+local _capsword_check_pending = nil
 
 -- Delayed CapsLock LED correction and the optional gestures-engine hook are
 -- lease-owned too; both must be cancellable when Ergopti remapping goes inert.
@@ -245,9 +245,9 @@ end
 --- @param reason string Settlement reason.
 --- @param revision number Logical CapsWord revision settled by the writer.
 --- @param cause string What ended CapsWord, for the log.
-local function complete_capsword_clear(watcher_gen, ok, reason, revision, cause)
+local function complete_capsword_clear(watcher_gen, pending, ok, reason, revision, cause)
 	if watcher_gen ~= _capsword_watcher_gen then return end
-	_capsword_check_pending = false
+	if _capsword_check_pending == pending then _capsword_check_pending = nil end
 	if ok ~= true then
 		Logger.warn(LOG, "CapsWord clear did not settle successfully: %s.", tostring(reason))
 		return
@@ -378,8 +378,9 @@ end
 --- the asynchronous clear would capitalise the next letters.
 --- @param watcher_gen number Watcher lifecycle generation.
 --- @param cause string What ends CapsWord, for the log.
+--- @param unthrottled boolean|nil A discrete click must not be lost to motion throttling.
 --- @param immediate boolean|nil True for a keystroke cause.
-local function deactivate_capsword(watcher_gen, cause, immediate)
+local function deactivate_capsword(watcher_gen, cause, immediate, unthrottled)
 	if watcher_gen ~= _capsword_watcher_gen then return end
 	if not drain_scheduled_backlog(_capsword_timer_cleanup_backlog,
 		"CapsWord timer backlog") then
@@ -388,22 +389,24 @@ local function deactivate_capsword(watcher_gen, cause, immediate)
 	end
 	-- Throttle: mouseMoved fires at display refresh rate.
 	local now_ns = TimerScheduler.now_ns()
-	if not immediate and now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
+	if not immediate and not unthrottled
+		and now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
 	-- Skip while an accepted clear is still settling.
 	if _capsword_check_pending then return end
 	_capsword_last_check_ns   = now_ns
-	_capsword_check_pending   = true
+	local pending = {}
+	_capsword_check_pending = pending
 	local supersede_callback_fired = false
 	local function finish_superseded_activation(ok, reason, revision)
 		supersede_callback_fired = true
-		complete_capsword_clear(watcher_gen, ok, reason, revision, cause)
+		complete_capsword_clear(watcher_gen, pending, ok, reason, revision, cause)
 	end
-	local supersede_ok, superseded_or_err = pcall(
+	local supersede_ok, superseded_or_err, accepted_revision = pcall(
 		KeVariables.supersede_capsword_activation,
 		finish_superseded_activation
 	)
 	if not supersede_ok then
-		_capsword_check_pending = false
+		if _capsword_check_pending == pending then _capsword_check_pending = nil end
 		Logger.error(LOG, "CapsWord activation supersession raised: %s",
 			tostring(superseded_or_err))
 		return
@@ -411,13 +414,16 @@ local function deactivate_capsword(watcher_gen, cause, immediate)
 	-- An accepted clear, or one that already settled, owns the pending flag.
 	if superseded_or_err == true or supersede_callback_fired then
 		if superseded_or_err == true then
+			local revision_ok, current_revision = pcall(KeVariables.capsword_revision)
+			if watcher_gen ~= _capsword_watcher_gen or not revision_ok
+				or current_revision ~= accepted_revision then return end
 			Logger.info(LOG, "CapsWord deactivated: %s.", tostring(cause))
 			cancel_capsword_idle_timer()
 			if immediate then Logger.pcall(LOG, KeyState.set_capslock, false) end
 		end
 		return
 	end
-	_capsword_check_pending = false
+	if _capsword_check_pending == pending then _capsword_check_pending = nil end
 	if superseded_or_err ~= false then
 		Logger.error(LOG, "CapsWord activation supersession returned an invalid result: %s.",
 			tostring(superseded_or_err))
@@ -477,11 +483,35 @@ end
 --- Starts measuring inactivity from now, when a delay is configured.
 --- @param watcher_gen number Watcher lifecycle generation.
 local function start_capsword_idle_clock(watcher_gen)
+	-- A fresh activation supersedes any older clear's pending capability. Its
+	-- callback may still arrive, but must not clear a newer request's ownership.
+	_capsword_check_pending = nil
+	-- An earlier pointer event belongs to the previous inactive/active period.
+	-- It must not throttle the first click of this new activation.
+	_capsword_last_check_ns = -math.huge
 	cancel_capsword_idle_timer()
+	-- Stamped even without a delay: a later 0 -> positive change measures from
+	-- this activation, not from a previous session's last keystroke.
+	_capsword_last_activity_ns = TimerScheduler.now_ns()
 	local delay_ms = AutoOffPolicy.idle_delay_ms(CapsWordAutoOff.policy())
 	if not delay_ms then return end
-	_capsword_last_activity_ns = TimerScheduler.now_ns()
 	schedule_capsword_idle_check(watcher_gen, delay_ms / MILLISECONDS_PER_SECOND)
+end
+
+--- Re-times the running session after an accepted live delay change: the
+--- deadline is the new delay counted from the last activity, an expired one
+--- ends CapsWord now, and a delay of 0 retires the pending check.
+--- @param watcher_gen number Watcher lifecycle generation.
+local function rearm_capsword_idle_clock(watcher_gen)
+	if watcher_gen ~= _capsword_watcher_gen or not KeVariables.capsword_known_active() then return end
+	local delay_ms = AutoOffPolicy.idle_delay_ms(CapsWordAutoOff.policy())
+	if not delay_ms then
+		cancel_capsword_idle_timer()
+		return
+	end
+	local elapsed_ms = (TimerScheduler.now_ns() - _capsword_last_activity_ns) / NANOSECONDS_PER_MILLISECOND
+	local remaining_ms = math.max(0, delay_ms - elapsed_ms)
+	schedule_capsword_idle_check(watcher_gen, remaining_ms / MILLISECONDS_PER_SECOND)
 end
 
 --- Names the declared pointer kind of one pointer event.
@@ -522,7 +552,9 @@ local function handle_capsword_event(watcher_gen, event, types)
 	end
 	local kind = capsword_pointer_kind(event, types)
 	if AutoOffPolicy.ends_on_pointer(CapsWordAutoOff.policy(), kind) then
-		deactivate_capsword(watcher_gen, "pointer " .. kind)
+		local click = kind == "left_click" or kind == "right_click"
+			or kind == "middle_click" or kind == "other_buttons"
+		deactivate_capsword(watcher_gen, "pointer " .. kind, false, click)
 	end
 end
 
@@ -679,6 +711,9 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 	CapsWordOutput.set_observer(function(text)
 		return handle_capsword_output(watcher_gen, text)
 	end)
+	CapsWordAutoOff.set_observer(function()
+		rearm_capsword_idle_clock(watcher_gen)
+	end)
 	return watcher
 end
 
@@ -692,13 +727,23 @@ function M.note_capsword_activated()
 	return true
 end
 
+--- Ends the running CapsWord when its catalogue action is invoked again, the
+--- action toggling as on Windows and Linux. A no-op without a running watcher.
+--- @return boolean accepted True when a running watcher took the clear.
+function M.deactivate_capsword_by_action()
+	if not _capsword_listener_owned then return false end
+	deactivate_capsword(_capsword_watcher_gen, "switched off by its action", true)
+	return true
+end
+
 --- Stops every CapsWord pointer resource owned by this remap generation.
 --- @param watcher table|nil Eventtap returned by start_gesture_watcher().
 function M.stop_gesture_watcher(watcher)
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
-	_capsword_check_pending = false
+	_capsword_check_pending = nil
 	_capsword_last_check_ns = 0
 	CapsWordOutput.set_observer(nil)
+	CapsWordAutoOff.set_observer(nil)
 	local all_stopped = true
 	if _capsword_listener_owned then
 		local removed, remove_err = pcall(ControlSentinels.set_listener, "karabiner.capsword", nil)

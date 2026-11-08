@@ -141,6 +141,7 @@ local function with_profiles_fixture(options, body)
 			llm_backend = "ollama",
 			llm_enabled = true,
 			llm_active_profile = options.active_profile or "basic",
+			llm_auto_profile_for_model = options.auto_profile ~= false,
 			llm_model = options.model ~= nil and options.model or "A",
 			llm_model_power = 1,
 			llm_model_ollama = options.model ~= nil and options.model or "A",

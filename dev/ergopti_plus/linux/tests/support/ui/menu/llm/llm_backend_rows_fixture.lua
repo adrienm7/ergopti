@@ -23,6 +23,7 @@ local function add_admission_port(llm, state)
 		local receipt = {}
 		receipts[receipt] = { generation = generation }
 		active = receipt
+		if type(state.on_begin) == "function" then state.on_begin() end
 		return receipt
 	end
 	llm.api_selection_is_current = function(receipt, source_current)
@@ -32,6 +33,8 @@ local function add_admission_port(llm, state)
 			and (active == receipt or held.published == true)
 	end
 	llm.finish_api_selection = function(receipt, committed, settled)
+		state.finished = (state.finished or 0) + 1
+		if state.refuse_finish then return false end
 		local held = receipts[receipt]
 		if not held or active ~= receipt or settled ~= true then return false end
 		active = nil
@@ -111,6 +114,7 @@ local function setup(backend)
 	local dialogs = {
 		prompt = function(title, text, initial, hidden)
 			state.prompts[#state.prompts + 1] = { title = title, text = text, initial = initial, hidden = hidden }
+			if type(state.on_prompt) == "function" then state.on_prompt() end
 			return table.remove(state.answers, 1)
 		end,
 		error = function(text, title)
@@ -127,7 +131,10 @@ local function setup(backend)
 	local Rows = helpers.load_module("ui.menu.llm_backend_rows")
 	local function build()
 		return require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs,
-			function() state.changed = (state.changed or 0) + 1 end)
+			function()
+				state.changed = (state.changed or 0) + 1
+				if type(state.on_changed) == "function" then state.on_changed() end
+			end, nil, state.page_current)
 	end
 	return build, state, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end

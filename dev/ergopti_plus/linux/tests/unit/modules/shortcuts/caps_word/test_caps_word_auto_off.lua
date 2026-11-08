@@ -135,6 +135,54 @@ helpers.describe("caps word auto-off: the settings", function()
 		end)
 	end)
 
+	helpers.it("preserves other live file settings when changing a delimiter", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 5\nterminators = ["space"]\n', function(c)
+			helpers.assert_eq(c.AutoOff.settings().idle_timeout_seconds, 5)
+			local file = assert(io.open(c.path, "wb"))
+			file:write('[shortcuts.caps_word]\nidle_timeout_seconds = 7\nterminators = ["space", "comma"]\n')
+			file:close()
+			helpers.assert_true(c.AutoOff.set_terminator("period", true))
+			local settings = c.AutoOff.settings()
+			helpers.assert_eq(settings.idle_timeout_seconds, 7)
+			helpers.assert_eq(table.concat(settings.terminators, ","), "space,comma,period")
+			c.AutoOff.reset_for_tests()
+			local reread = c.AutoOff.settings()
+			helpers.assert_eq(reread.idle_timeout_seconds, 7)
+			helpers.assert_eq(table.concat(reread.terminators, ","), "space,comma,period")
+		end)
+	end)
+
+	helpers.it("caps word auto-off, keeps an unknown delimiter when editing a known one", function()
+		with_caps_word('[shortcuts.caps_word]\nterminators = ["space", "future_key"]\n', function(c)
+			helpers.assert_true(c.AutoOff.set_terminator("comma", true))
+			local f = assert(io.open(c.path, "rb"))
+			local text = assert(f:read("*a")); assert(f:close())
+			local document = require("toml_codec").decode(text)
+			helpers.assert_eq(table.concat(document.shortcuts.caps_word.terminators, ","), "space,comma,future_key")
+			helpers.assert_eq(table.concat(c.AutoOff.settings().terminators, ","), "space,comma")
+			helpers.assert_true(c.AutoOff.set_terminator("space", false))
+			local second = assert(io.open(c.path, "rb"))
+			local updated = assert(second:read("*a")); assert(second:close())
+			local again = require("toml_codec").decode(updated)
+			helpers.assert_eq(table.concat(again.shortcuts.caps_word.terminators, ","), "comma,future_key")
+		end)
+	end)
+
+	helpers.it("caps word auto-off, refuses to replace an unreadable delimiter list", function()
+		for _, source in ipairs({
+			'[shortcuts.caps_word]\nterminators = "space"\n',
+			'[shortcuts.caps_word]\nterminators = {}\n',
+			'[shortcuts.caps_word]\nterminators = ["space", 42]\n',
+		}) do
+			with_caps_word(source, function(c)
+				helpers.assert_eq(c.AutoOff.set_terminator("comma", true), false)
+				local f = assert(io.open(c.path, "rb"))
+				local text = assert(f:read("*a")); assert(f:close())
+				helpers.assert_eq(text, source)
+			end)
+		end
+	end)
+
 	helpers.it("caps word auto-off, persists a change sparsely and in catalogue order", function()
 		with_caps_word(nil, function(c)
 			helpers.assert_true(c.AutoOff.set_terminator("minus", true))
@@ -240,6 +288,28 @@ helpers.describe("caps word auto-off: the manager session", function()
 			c.now = 6500
 			c.run_due()
 			helpers.assert_eq(c.manager.is_caps_word_active(), false, "3 s after the last key, the timer ends it")
+		end)
+	end)
+
+	helpers.it("caps word auto-off, a timer from a lost source cannot end the next session", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 3\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			local old_loss = c.hook.on_lost
+			c.now = 2000
+			c.hook.lose("keyboard source retired")
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			old_loss("stale source notification")
+			helpers.assert_true(c.manager.is_caps_word_active(), "the old source callback must not retire the new hold")
+			c.now = 4000
+			c.run_due()
+			helpers.assert_true(c.manager.is_caps_word_active(), "the old source timer must not unlock the new session")
+			helpers.assert_true(c.hook.held)
+			helpers.assert_eq(c.hook.releases, 0)
+			c.now = 5000
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_eq(c.hook.releases, 1)
 		end)
 	end)
 
@@ -444,6 +514,108 @@ helpers.describe("caps word auto-off: the manager session", function()
 			helpers.assert_eq(c.hook.releases, 1)
 		end)
 	end)
+
+	-- CWL-002: the menu promises a change applies to the running CapsWord from its
+	-- next event, as on macOS; the session used to keep the policy of its start.
+	helpers.it("(cwl-002) unchecking Space mid-session keeps CapsWord on at the next space", function()
+		with_caps_word(nil, function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_terminator("space", false))
+			helpers.assert_eq(c.manager.caps_word_observe_text(" "), false, "the acknowledged change applies now")
+			helpers.assert_true(c.manager.is_caps_word_active())
+			helpers.assert_true(c.AutoOff.set_terminator("space", true))
+			helpers.assert_eq(c.manager.caps_word_observe_text(" "), true, "checking it again ends at the next space")
+		end)
+	end)
+
+	helpers.it("(cwl-002) enabling left click mid-session ends CapsWord at the next click", function()
+		with_caps_word('[shortcuts.caps_word.pointer]\nleft_click = false\n', function(c)
+			local Codes = require("infra.evdev_codes")
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_LEFT)), false,
+				"control: unchecked, a click keeps it")
+			helpers.assert_true(c.AutoOff.set_pointer("left_click", true))
+			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_LEFT)), true)
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+		end)
+	end)
+
+	helpers.it("(cwl-002) a delay set from 0 mid-session ends a silent CapsWord", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 0\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			c.now = 1500
+			c.manager.caps_word_observe_text("a")
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(1))
+			c.now = 2400
+			c.run_due()
+			helpers.assert_true(c.manager.is_caps_word_active(), "0.9 s after the last key")
+			c.now = 2500
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "1 s after the last key, the new delay ends it")
+		end)
+	end)
+
+	helpers.it("(cwl-002) a shorter delay mid-session replaces the old idle check", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 10\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(1))
+			c.now = 2000
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "ends 1 s after activation, not 10 s")
+		end)
+	end)
+
+	helpers.it("(cwl-002) a longer delay or 0 mid-session never lets the old check end it early", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 1\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(5))
+			c.now = 2000
+			c.run_due()
+			helpers.assert_true(c.manager.is_caps_word_active(), "the 1 s check of the old delay is retired")
+			c.now = 6000
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "the 5 s delay ends it")
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(0))
+			c.now = 60000
+			c.run_due()
+			helpers.assert_eq(c.manager.caps_word_observe_text("a"), false, "0: never times out")
+			helpers.assert_true(c.manager.is_caps_word_active())
+		end)
+	end)
+
+	-- The editing and navigation keys end CapsWord whatever the delimiters, as
+	-- macOS's fixed Karabiner exits do (decision of 2026-11-06).
+	helpers.it("(capsword-fixed-exits) Escape, the arrows, Page Up and F5 end CapsWord with no delimiter checked", function()
+		for _, key_name in ipairs({ "escape", "left", "up", "delete", "home", "end", "pageup", "pagedown", "f5", "f12" }) do
+			with_caps_word('[shortcuts.caps_word]\nterminators = []\nidle_timeout_seconds = 0\n', function(c)
+				helpers.assert_true(c.manager.toggle_caps_word())
+				helpers.assert_eq(c.manager.caps_word_observe_control(key_name), true, key_name .. " ends CapsWord")
+				helpers.assert_eq(c.manager.is_caps_word_active(), false, key_name)
+				helpers.assert_eq(c.hook.releases, 1, key_name .. " unlocks CapsLock")
+			end)
+		end
+	end)
+
+	helpers.it("(capsword-fixed-exits) Backspace and Insert keep CapsWord on", function()
+		with_caps_word('[shortcuts.caps_word]\nterminators = []\nidle_timeout_seconds = 0\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_control("backspace"), false)
+			helpers.assert_eq(c.manager.caps_word_observe_control("insert"), false)
+			helpers.assert_true(c.manager.is_caps_word_active())
+		end)
+	end)
+
+	helpers.it("(cwl-002) a hand edit still waits for the next activation", function()
+		with_caps_word(nil, function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			local file = assert(io.open(c.path, "wb"))
+			file:write('[shortcuts.caps_word]\nterminators = ["comma"]\n')
+			file:close()
+			c.AutoOff.refresh()
+			helpers.assert_eq(c.manager.caps_word_observe_text(" "), true, "the running session keeps its settings")
+		end)
+	end)
 end)
 
 
@@ -579,19 +751,23 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		helpers.assert_contains(hook, "\t\t\t\t_dispatch_event(emitted_event, emitted_source)\n")
 		local daemon = source("ergopti_hotstrings.lua")
 		helpers.assert_contains(daemon, "onChar  = on_char,")
-		helpers.assert_contains(daemon, "injector.set_output_observer(function(text)")
+		helpers.assert_contains(daemon, "injector.set_output_observer(function(text, physical_input)")
 	end)
 
 	helpers.it("caps word auto-off, a delimiter in the daemon's own output ends CapsWord", function()
 		with_caps_word(nil, function(c)
 			local observed = assert(source("ergopti_hotstrings.lua"):match(
-				"injector%.set_output_observer%(function%(text%)(.-)\n\tend%) then"), "the daemon's output observer is missing")
+				"injector%.set_output_observer%(function%(text, physical_input%)(.-)\n\tend, keystats%.discard_roi%) then"), "the daemon's output observer is missing")
+			local discarded = 0
 			local observer = assert((loadstring or load)(
-				"return function(shortcuts) return function(text) " .. observed .. " end end"))()(c.manager)
+				"return function(shortcuts, keystats) return function(text, physical_input) " .. observed .. " end end"))()(c.manager,
+				{ discard_roi = function() discarded = discarded + 1 end })
 			helpers.assert_true(c.manager.toggle_caps_word())
-			observer("BONJOUR")
+			observer("BONJOUR", true)
+			helpers.assert_eq(discarded, 0, "physical remapping preserves the ROI fragment")
 			helpers.assert_true(c.manager.is_caps_word_active(), "letters keep CapsWord")
 			observer("c'est-à-dire,")
+			helpers.assert_eq(discarded, 1, "synthetic output retires the ROI fragment")
 			helpers.assert_eq(c.manager.is_caps_word_active(), false, "an expansion ending in a comma ends CapsWord")
 		end)
 	end)
@@ -599,12 +775,12 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 	helpers.it("caps word auto-off, the hook hands every pointer press and EV_REL report to the callback", function()
 		-- adapters/keyboard_hook, selected by a declaration unique to it.
 		local hook = assert(helpers.read_driver_unit("local function hold_owner("))
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value)')
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value)')
-		helpers.assert_contains(hook, "_on_pointer_event = options.onPointerEvent")
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)')
+		helpers.assert_contains(hook, '_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil')
 		-- The frame a report closes is for the metrics; it is neither a press nor a motion.
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value)')
-		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" then return end')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)')
+		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end')
 	end)
 
 	helpers.it("caps word auto-off, the manager maps a native press and motion to their declared kinds", function()
@@ -619,6 +795,21 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("motion", 0x00), true)
 			helpers.assert_eq(c.manager.is_caps_word_active(), false)
 		end)
+	end)
+
+	helpers.it("caps word auto-off, a changed absolute coordinate is a motion; the metrics ignore it (CWL-001)", function()
+		with_caps_word('[shortcuts.caps_word.pointer]\npointer_motion = false\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("absolute_motion", 0x00), false,
+				"an unchecked motion keeps CapsWord on")
+			helpers.assert_true(c.manager.is_caps_word_active())
+		end)
+		with_caps_word('[shortcuts.caps_word.pointer]\npointer_motion = true\ngesture = false\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("absolute_motion", 0x00), true)
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+		end)
+		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event ~= "absolute_motion" then keystats.record_pointer')
 	end)
 
 	helpers.it("caps word auto-off, the daemon's main() stays within LuaJIT's 60 upvalues", function()

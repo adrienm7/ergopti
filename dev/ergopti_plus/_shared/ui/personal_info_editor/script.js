@@ -17,6 +17,8 @@
 // =================================
 
 let _strings = {};
+let _initialValues = new WeakMap();
+let _initialized = false;
 
 /**
  * Returns the translated string for key, or the key itself as a fallback.
@@ -66,8 +68,10 @@ window.initData = function (data) {
 		applyDomStrings();
 	}
 
+	if (_initialized || !Array.isArray(data.fields)) return;
 	const rows = document.getElementById('rows');
 	rows.innerHTML = '';
+	_initialValues = new WeakMap();
 	(data.fields || []).forEach(function (f) {
 		const row = document.createElement('div');
 		row.className = 'row';
@@ -75,17 +79,24 @@ window.initData = function (data) {
 		const label = document.createElement('label');
 		label.textContent = f.hint ? f.label + ' ' + f.hint : f.label;
 
-		const input = document.createElement('input');
+		const original = typeof f.value === 'string' ? f.value : '';
+		// Every field is a textarea so a single-line value can still become
+		// multiline; an input would silently drop the typed line breaks.
+		const input = document.createElement('textarea');
+		input.setAttribute('rows', /[\r\n]/.test(original) ? '3' : '1');
 		input.setAttribute('name', f.key);
 		input.setAttribute('autocomplete', 'off');
-		input.value = f.value || '';
+		input.value = original;
+		// A textarea normalizes CR/CRLF; retain untouched source bytes on save.
+		_initialValues.set(input, { original, displayed: input.value });
 
 		row.appendChild(label);
 		row.appendChild(input);
 		rows.appendChild(row);
 	});
 
-	const first = document.querySelector('#rows input');
+	_initialized = true;
+	const first = document.querySelector('#rows input, #rows textarea');
 	if (first) first.focus();
 };
 
@@ -94,9 +105,11 @@ window.initData = function (data) {
  * @returns {Object} A map of {key: value}.
  */
 function collectValues() {
-	const values = {};
-	document.querySelectorAll('#rows input').forEach(function (input) {
-		values[input.getAttribute('name')] = input.value;
+	const values = Object.create(null);
+	document.querySelectorAll('#rows input, #rows textarea').forEach(function (input) {
+		const initial = _initialValues.get(input);
+		values[input.getAttribute('name')] =
+			initial && input.value === initial.displayed ? initial.original : input.value;
 	});
 	return values;
 }

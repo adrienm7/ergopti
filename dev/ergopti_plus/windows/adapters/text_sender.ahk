@@ -965,7 +965,10 @@ TextSendMenuMask() {
 ;                   Array transaction. SentKeys records proven Downs,
 ;                   FailedKey identifies the rejected transition, and
 ;                   RollbackFailedKeys retains every earlier Down whose
-;                   compensating Up was not proven. The tap-hold owner uses
+;                   compensating Up was not proven. AttemptedKey retains a
+;                   rejected Down that may already have reached the OS. A
+;                   DeferRollback owner settles those edges through its ledger.
+;                   The tap-hold owner uses
 ;                   that last field to keep release ownership after failure.
 TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 	; "Down" / "Up" — sustained press or release for hold-modifier patterns.
@@ -985,6 +988,11 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 		if (IsObject(Key) and Type(Key) == "Array") {
 			SentKeys := []
 			RollbackFailedKeys := []
+			; A synthetic owner can defer compensation until it checks user and
+			; sibling custody. Direct adapter callers keep the original rollback.
+			DeferRollback := IsSet(Transaction) && IsObject(Transaction)
+				&& Transaction.HasOwnProp("DeferRollback") && (Transaction.DeferRollback is Integer)
+				&& Transaction.DeferRollback == 1
 			for _, ModKey in Key {
 				if (ModKey == "")
 					continue
@@ -996,7 +1004,7 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 					; logically held by the driver.  Release them in reverse order;
 					; each release is guarded/logged independently because the
 					; original injection provider may be transiently unavailable.
-					if (Modifiers == "Down") {
+					if (Modifiers == "Down" && !DeferRollback) {
 						loop SentKeys.Length {
 							SentKey := SentKeys[SentKeys.Length - A_Index + 1]
 							Rollback := _TextSenderSustainedKey(SentKey, "Up")
@@ -1007,6 +1015,9 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 					if IsSet(Transaction) {
 						Transaction.SentKeys := SentKeys.Clone()
 						Transaction.FailedKey := ModKey
+						; A valid payload entered the lower sender. Its false return
+						; does not prove that a port emitted no native Down.
+						Transaction.AttemptedKey := Modifiers == "Down" && Payload != "" ? ModKey : ""
 						Transaction.RollbackFailedKeys := RollbackFailedKeys
 					}
 					return false
@@ -1016,6 +1027,7 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 			if IsSet(Transaction) {
 				Transaction.SentKeys := SentKeys.Clone()
 				Transaction.FailedKey := ""
+				Transaction.AttemptedKey := ""
 				Transaction.RollbackFailedKeys := RollbackFailedKeys
 			}
 			return true

@@ -471,6 +471,9 @@ _MR_ApplyCategoryOff(Result, OffRule) {
 ; cannot bound a filesystem. This driver's own scan stops at _HS_SCAN_MAX_DEPTH
 ; (16) for the same tree
 global MR_MAX_LIST_DEPTH := 8
+; How many native menus _MR_DeclaredTwinLabel remembers before it forgets the
+; destroyed ones; a tray rebuild creates a few dozen.
+global MR_NATIVE_NAME_PRUNE_AT := 256
 
 ; Report a row written in the OTHER drivers' dialect, field by field.
 ;
@@ -524,6 +527,10 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 		try LoggerWarn("MenuRenderer", "List '{1}' produced no row array — skipped.", ListId)
 		return 0
 	}
+	; A tracked call renders a batch of a leaf whose complete list
+	; MenuPopulation.Fill already made distinct; the batch alone cannot see it.
+	if !RequireTracking
+		Rows := _MR_NativeDistinctRows(Rows)
 
 	Added := 0
 	for Row in Rows {
@@ -693,6 +700,111 @@ _MR_ReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {
 	return Key
 }
 
+; AHK names a menu item by its caption: Menu.Add with a caption the menu already
+; holds updates that item instead of adding one, and Check or Disable reach the
+; first match. Two declared rows drawn into one menu may share a caption (the
+; notification area and widget « colour by source » checks), so the later one
+; gets a zero-width space per twin already drawn there: it reads the same and is
+; its own native item. Only a DIFFERENT declared row earns it: drawing the same
+; row again, and every provider or template append, keeps Menu.Add's in-place
+; update, which the reload replay and template repairs rely on. Row data keeps
+; the declared caption; only the native name differs.
+; @param TargetMenu {Menu} The menu the row is drawn into.
+; @param RowKey {String} The declaration and id of the row.
+; @param Label {String} The caption the row would be added under.
+; @returns {String} The caption to add the row under.
+_MR_DeclaredTwinLabel(TargetMenu, RowKey, Label) {
+	global MR_NATIVE_NAME_PRUNE_AT
+	static ZeroWidthSpace := Chr(0x200B), Drawn := Map()
+	; The captions declared rows drew, per native menu, keep the common case free
+	; of native reads; a remembered caption is confirmed natively, so a menu that
+	; was emptied or a recycled handle never earns a suffix it does not need.
+	Handle := TargetMenu.Handle
+	if !Drawn.Has(Handle) {
+		if Drawn.Count >= MR_NATIVE_NAME_PRUNE_AT {
+			Gone := []
+			for Known in Drawn
+				if TrayMenuHandleItemCount(Known) < 0
+					Gone.Push(Known)
+			for Known in Gone
+				Drawn.Delete(Known)
+		}
+		Names := Map()
+		Names.CaseSense := "Off"
+		Drawn[Handle] := Names
+	}
+	Names := Drawn[Handle]
+	while Names.Has(Label) && Names[Label] != RowKey
+			&& _MR_MenuHoldsCaption(TargetMenu, StrReplace(Label, "&", "&&"))
+		Label .= ZeroWidthSpace
+	Names[Label] := RowKey
+	return Label
+}
+
+; Keep every row of one list its own native item.
+;
+; AHK names menu items with the user locale's comparison, which gives some
+; symbols no weight: « Ergopti » and « Ergopti➕ » (U+2795) name ONE item, so the
+; later Menu.Add updates the earlier row in place and its command is never
+; registered. A later row whose different caption the native match merges with an
+; earlier one gets a zero-width space per collision, as declared twins do. The
+; same caption drawn again keeps Menu.Add's in-place update. Only the native name
+; differs: the provider's row Maps are left untouched.
+; @param Rows {Array} The complete row list of one native menu.
+; @returns {Array} Rows, with a relabelled copy in place of each colliding row.
+_MR_NativeDistinctRows(Rows) {
+	static ZeroWidthSpace := Chr(0x200B), MaxSuffixes := 8
+	if !(Rows is Array)
+		return Rows
+	; Locale-equal captions share their letters and digits, so only captions with
+	; the same skeleton need the comparison.
+	Buckets := Map()
+	Distinct := []
+	for Row in Rows {
+		if !(Row is Map) || !Row.Has("label") || !(Row["label"] is String) || Row["label"] == "" {
+			Distinct.Push(Row)
+			continue
+		}
+		Label := Row["label"]
+		Skeleton := StrLower(RegExReplace(Label, "[^\p{L}\p{N}]"))
+		if !Buckets.Has(Skeleton)
+			Buckets[Skeleton] := []
+		Bucket := Buckets[Skeleton]
+		Suffixes := 0
+		loop {
+			Merged := false
+			for Earlier in Bucket {
+				if StrCompare(Earlier, Label, "Locale") == 0 && StrCompare(Earlier, Label) != 0 {
+					Merged := true
+					break
+				}
+			}
+			if !Merged
+				break
+			if ++Suffixes > MaxSuffixes
+				throw Error("Menu caption '" . Row["label"] . "' cannot be made a distinct native item")
+			Label .= ZeroWidthSpace
+		}
+		if Label !== Row["label"] {
+			Row := Row.Clone()
+			Row["label"] := Label
+		}
+		Bucket.Push(Label)
+		Distinct.Push(Row)
+	}
+	return Distinct
+}
+
+; Whether a native row of TargetMenu already carries Caption, compared as AHK
+; compares item names (case-insensitively).
+_MR_MenuHoldsCaption(TargetMenu, Caption) {
+	Loop TrayMenuItemCount(TargetMenu) {
+		if TrayMenuItemCaption(TargetMenu, A_Index - 1) = Caption
+			return true
+	}
+	return false
+}
+
 ; Renders the same declared command/check in full and native-built menus.
 _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	if !_MR_CommandLiteralPrefix(Item, &Prefix) {
@@ -777,6 +889,7 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 		return _MR_RenderGreyedStandIn(ResultMenu,
 			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
 				"reason_key", Row["disabled_reason_key"]), ManifestKey)
+	Row["label"] := _MR_DeclaredTwinLabel(ResultMenu, ManifestKey . "`n" . _MR_Get(Item, "id"), Row["label"])
 	return _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1)
 }
 

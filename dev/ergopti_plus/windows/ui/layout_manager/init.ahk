@@ -41,6 +41,11 @@ global _LayMgrWeb_NavSub     := unset
 global _LayMgrWeb_ResetDone  := false
 global _LayMgrWeb_SessionEpoch := 0
 global _LayMgrWeb_ReadyEpoch := 0
+; An in-flight subscription must return before its controller and HWND retire.
+global _LayMgrWeb_SubscriptionOwner := 0
+global _LayMgrWeb_RetiredHosts := []
+; The current presentation owns its own paths and push port.
+global _LayMgrWeb_PresentationDeps := 0
 ; Result of the last operation, shown by the page (0 when none).
 global _LayMgrWeb_Result := 0
 ; A durable catalogue operation still waits for its terminal runtime refresh.
@@ -199,6 +204,7 @@ _LayMgrWeb_Strings() {
  */
 LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_PresentationDeps
 	if !IsSet(SessionEpoch)
 		SessionEpoch := _LayMgrWeb_SessionEpoch
 	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
@@ -213,6 +219,10 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps := _LayMgrWeb_DefaultDeps()
 	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 		return false
+	; Each retained callback owns the admitting page, even when Deps is reused.
+	Deps := Deps.Clone()
+	Deps["session_epoch"] := SessionEpoch
+	_LayMgrWeb_PresentationDeps := Deps
 	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
 			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
 			|| Action == "composer_remove") {
@@ -224,7 +234,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]))
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
-		Deps["push"].Call("initData", Initial)
+		_LayMgrWeb_PushPayload(Deps, "initData", Initial)
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
@@ -258,8 +268,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		}
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
-		Deps["open_url"].Call(Homepage)
-		return true
+		return Deps["open_url"].Call(Homepage)
 	}
 	if (Action == "install" || Action == "update") {
 		if !(Entry is Map) {
@@ -302,33 +311,61 @@ _LayMgrWeb_CommandCurrent(SessionEpoch, Action) {
 	return SessionEpoch == _LayMgrWeb_SessionEpoch && (Action == "ready" || !A_IsSuspended)
 }
 
+_LayMgrWeb_PresentationCurrent(Deps) {
+	global _LayMgrWeb_SessionEpoch
+	return Deps.Get("session_epoch", _LayMgrWeb_SessionEpoch) == _LayMgrWeb_SessionEpoch
+}
+
+; A result belongs to one page; committing an install remains independent of it.
+_LayMgrWeb_PublishResult(Deps, Result) {
+	global _LayMgrWeb_Result
+	PreviousCritical := Critical("On")
+	try {
+		if !_LayMgrWeb_PresentationCurrent(Deps)
+			return false
+		_LayMgrWeb_Result := Result
+	} finally Critical(PreviousCritical)
+	return true
+}
+
 _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
-	global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+	global _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	; Direct internal callers acquire the same owner as message callbacks.
+	if !Deps.Has("session_epoch") {
+		Deps := Deps.Clone()
+		Deps["session_epoch"] := _LayMgrWeb_SessionEpoch
+	}
 	if !Ok {
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", false, "code", String(CodeOrDetail),
-			"detail", String(Detail))
+		_LayMgrWeb_PublishResult(Deps, Map("id", Id, "action", Action, "ok", false,
+			"code", String(CodeOrDetail), "detail", String(Detail)))
 		_LayMgrWeb_PushState(Deps)
 		return false
 	}
 	if !Deps.Has("after") {
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", true)
+		_LayMgrWeb_PublishResult(Deps, Map("id", Id, "action", Action, "ok", true))
 		_LayMgrWeb_PushState(Deps)
 		return true
 	}
 	Pending := Map("id", Id, "action", Action)
 	_LayMgrWeb_RuntimeRefresh := Pending
-	_LayMgrWeb_Result := 0
+	_LayMgrWeb_PublishResult(Deps, 0)
 	_LayMgrWeb_PushState(Deps)
 	Finish(Ready) {
-		global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+		global _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_PresentationDeps
 		if _LayMgrWeb_RuntimeRefresh != Pending
 			return false
 		_LayMgrWeb_RuntimeRefresh := 0
 		Accepted := (Ready is Integer) && Ready == 1
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", Accepted)
+		Result := Map("id", Id, "action", Action, "ok", Accepted)
 		if !Accepted
-			_LayMgrWeb_Result["code"] := "other"
-		_LayMgrWeb_PushState(Deps)
+			Result["code"] := "other"
+		_LayMgrWeb_PublishResult(Deps, Result)
+		; A replacement page may have observed the operation as busy. Retire
+		; that projection with fresh state while preserving its own result.
+		if _LayMgrWeb_PresentationCurrent(Deps)
+			_LayMgrWeb_PushState(Deps)
+		else if _LayMgrWeb_PresentationDeps is Map
+			_LayMgrWeb_PushState(_LayMgrWeb_PresentationDeps)
 		return true
 	}
 	try Started := Deps["after"].Call(Id, Action, Finish)
@@ -344,7 +381,22 @@ _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
 }
 
 _LayMgrWeb_PushState(Deps, *) {
-	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"]))
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	State := LayoutManager_PageState(Deps["local_dir"])
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	return _LayMgrWeb_PushPayload(Deps, "updateState", State)
+}
+
+_LayMgrWeb_PushPayload(Deps, Name, Payload) {
+	global _LayMgrWeb_SessionEpoch
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	if Deps["push"] == _LayMgrWeb_Push
+		return _LayMgrWeb_Push(Name, Payload, Deps.Get("session_epoch", _LayMgrWeb_SessionEpoch))
+	Deps["push"].Call(Name, Payload)
+	return true
 }
 
 /**
@@ -359,6 +411,40 @@ LayoutManager_Select(Id, Options := unset) {
 }
 
 /**
+ * Selects a layout and reports its terminal outcome. Launch acceptance only
+ * means the successor started: the configuration is rolled back if it later
+ * refuses the handoff, so success is reported when the reload commits.
+ * @param {String} Id Registry layout identifier.
+ * @param {Func} OnDone Called once with (Ok, Detail) at the terminal outcome.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
+ */
+LayoutManager_SelectSettled(Id, OnDone, Options := unset) {
+	Settled := false
+	Settle(Ok, Detail := "") {
+		if Settled
+			return
+		Settled := true
+		OnDone.Call(Ok, Detail)
+	}
+	Lifecycle := IsSet(Options) ? Options.Clone() : Map()
+	ReloadFn := Lifecycle.Get("reload", ReloadPreservingSuspend)
+	Lifecycle["reload"] := (OnCommitted, Bundle, Refused) => ReloadFn.Call(
+		(*) => (OnCommitted.Call(), Settle(true)),
+		Bundle,
+		(Reason := "") => (Refused.Call(Reason), Settle(false, "the driver refused the layout handoff")))
+	Receipt := LayoutManager_SelectTransition(Id, Lifecycle)
+	if Receipt["status"] == "committed" {
+		Settle(true)
+		return true
+	}
+	if Receipt["status"] == "pending"
+		return true
+	Settle(false, "the layout could not be selected")
+	return false
+}
+
+/**
  * Retains the selected configuration until successor completion or rollback.
  * The resident input owner keeps its admitted layout while the reload is pending.
  * @param {String} Id Registry layout identifier.
@@ -366,7 +452,8 @@ LayoutManager_Select(Id, Options := unset) {
  * @returns {Map} Pending or terminal configuration receipt.
  */
 LayoutManager_SelectTransition(Id, Options := unset) {
-	if !LayoutRegistry_IsValidId(Id)
+	; "" is the menu's « none »: the system layout types.
+	if Id != "" && !LayoutRegistry_IsValidId(Id)
 		throw ValueError("The layout selection requires a valid registry identifier.")
 	if !IsSet(Options)
 		Options := Map()
@@ -395,6 +482,12 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 			|| StrCompare(Expected["content"], Current["content"], true) != 0
 			|| !ManifestValuesEqual(Expected["values"], Current["values"])
 		throw Error("The selected helper source intent changed or could not be admitted.")
+	if Id == ""
+		return [
+			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, false),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, "none"),
+		]
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
@@ -490,6 +583,7 @@ LayoutManager_Open(*) {
 	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
 	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _VendorDir, _SharedDir, LAYMGR_VHOST
 	global LAYMGR_HOST_ACCESS_ALLOW
+	_LayMgrWeb_RetryRetiredHosts()
 	if !_LayMgrWeb_Available() {
 		LoggerError("LayoutManager", "The layout manager needs the WebView2 runtime, which is unavailable.")
 		Ui_MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
@@ -528,32 +622,198 @@ LayoutManager_Open(*) {
 			_LayMgrWeb_Close()
 		return false
 	}
-	; SDK creation pumps messages while awaiting COM. The exact opening window
-	; may have closed or been replaced before the controller becomes available.
-	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+	; SDK creation pumps messages while awaiting COM. Claim only the exact GUI
+	; before giving its native Close callback custody of this controller.
+	PreviousCritical := Critical("On")
+	try {
+		Admitted := _LayMgrWeb_StartupCurrent(SessionEpoch, g)
+		if Admitted
+			_LayMgrWeb_Controller := CreatedController
+	} finally Critical(PreviousCritical)
+	if !Admitted {
 		CreatedController.Close()
 		LoggerInfo("LayoutManager", "Layout manager opening cancelled after its window was closed or replaced.")
 		return false
 	}
-	_LayMgrWeb_Controller := CreatedController
-	_LayMgrWeb_WebView := CreatedController.CoreWebView2
+	Controller := CreatedController
+	View := Controller.CoreWebView2
+	; A Close during the property getter already retired the published controller.
+	; The abandoned frame must neither close it twice nor publish over a successor.
+	PreviousCritical := Critical("On")
 	try {
-		s := _LayMgrWeb_WebView.Settings
+		Admitted := _LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller)
+		if Admitted
+			_LayMgrWeb_WebView := View
+	} finally Critical(PreviousCritical)
+	if !Admitted
+		return false
+	try {
+		s := View.Settings
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreDevToolsEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreDefaultContextMenusEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.IsStatusBarEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreBrowserAcceleratorKeysEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.IsSwipeNavigationEnabled := false
 	}
-	; Subscription handles live in globals so they are not collected, which
-	; would silently drop the JS->AHK channel.
-	_LayMgrWeb_MsgSub := _LayMgrWeb_WebView.WebMessageReceived(_LayMgrWeb_OnWebMessage.Bind(SessionEpoch))
-	_LayMgrWeb_NavSub := _LayMgrWeb_WebView.NavigationCompleted(_LayMgrWeb_OnNavigationCompleted.Bind(SessionEpoch))
-	_LayMgrWeb_WebView.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
-	_LayMgrWeb_WebView.Navigate("https://" . LAYMGR_VHOST . "/ui/layout_manager/index.html?cb=" . A_TickCount)
-	_LayMgrWeb_Controller.Fill()
+	; Optional settings may throw as before; cancellation is still terminal.
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	Host := _LayMgrWeb_BeginSubscriptions(SessionEpoch, g, Controller, View)
+	if !IsObject(Host)
+		return false
+	if !_LayMgrWeb_Subscribe(Host, "message", _LayMgrWeb_OnWebMessage.Bind(SessionEpoch))
+		return false
+	if !_LayMgrWeb_Subscribe(Host, "navigation", _LayMgrWeb_OnNavigationCompleted.Bind(SessionEpoch))
+		return false
+	View.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	View.Navigate("https://" . LAYMGR_VHOST . "/ui/layout_manager/index.html?cb=" . A_TickCount)
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	Controller.Fill()
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
 	LoggerSuccess("LayoutManager", "Layout manager opened.")
-	return true
+	return _LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+}
+
+
+; RAM-only admission for a partially configured native host. Browser calls stay
+; outside Critical, and a returned old frame never adopts current globals.
+_LayMgrWeb_StartupCurrent(SessionEpoch, Window, Controller := 0, View := 0) {
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_Gui, _LayMgrWeb_ResetDone
+	global _LayMgrWeb_Controller, _LayMgrWeb_WebView
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != Window || _LayMgrWeb_ResetDone
+		return false
+	if IsObject(Controller) && (!IsSet(_LayMgrWeb_Controller) || _LayMgrWeb_Controller != Controller)
+		return false
+	return !IsObject(View) || (IsSet(_LayMgrWeb_WebView) && _LayMgrWeb_WebView == View)
+}
+
+
+_LayMgrWeb_BeginSubscriptions(Epoch, Window, Controller, View) {
+	global _LayMgrWeb_SubscriptionOwner
+	Host := {epoch: Epoch, gui: Window, controller: Controller, view: View,
+		message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_LayMgrWeb_StartupCurrent(Epoch, Window, Controller, View) || IsObject(_LayMgrWeb_SubscriptionOwner)
+			return 0
+		_LayMgrWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+; The SDK creates its unsubscribe handle after add_Event returns. Native Close
+; can retire the GUI while that call pumps, but cannot close its controller yet.
+_LayMgrWeb_Subscribe(Host, Kind, Handler) {
+	global _LayMgrWeb_SubscriptionOwner, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _LayMgrWeb_SubscriptionOwner != Host
+				|| !_LayMgrWeb_StartupCurrent(Host.epoch, Host.gui, Host.controller, Host.view)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureType := ""
+	try {
+		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
+			: Host.view.NavigationCompleted(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureType := Type(Failure)
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.%Kind% := Subscription
+			; Host retains the handle before this alias disappears; clearing the
+			; alias cannot invoke its destructor inside the short RAM claim.
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _LayMgrWeb_SubscriptionOwner == Host
+				&& _LayMgrWeb_StartupCurrent(Host.epoch, Host.gui, Host.controller, Host.view)
+			if Current && !Failed {
+				if Kind == "message"
+					_LayMgrWeb_MsgSub := Host.message
+				else
+					_LayMgrWeb_NavSub := Host.navigation
+			}
+		} finally Critical(PreviousCritical)
+	}
+	if Failed && Current
+		_LayMgrWeb_Reset(Host)
+	if Host.retired
+		_LayMgrWeb_RetryRetiredHosts()
+	if Failed
+		try LoggerError("LayoutManager", "Browser subscription failed (error_type={1}).", FailureType)
+	return !Failed && Current && !Host.retired
+}
+
+_LayMgrWeb_QueueRetiredHost(Host) {
+	global _LayMgrWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try {
+		for Pending in _LayMgrWeb_RetiredHosts
+			if Pending == Host
+				return
+		_LayMgrWeb_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+}
+
+; Close refusals retain the exact controller and HWND, never a pathname-like
+; lookup of the current singleton. A successor can be opened independently.
+_LayMgrWeb_RetryRetiredHosts() {
+	global _LayMgrWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _LayMgrWeb_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false
+		try {
+			; No local alias may keep either SDK handle beyond controller Close.
+			Host.message := 0
+			Host.navigation := 0
+			if !Host.closed && IsObject(Host.controller) {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			if IsObject(Host.gui)
+				Host.gui.Destroy()
+			Host.gui := 0, Host.controller := 0, Host.view := 0
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("LayoutManager", "Native layout host retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled {
+					Count := _LayMgrWeb_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _LayMgrWeb_RetiredHosts[Index] == Host
+							_LayMgrWeb_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
 }
 
 _LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
@@ -609,12 +869,17 @@ _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
 }
 
 ; Fire-and-forget push to the page; the window may already be gone.
-_LayMgrWeb_Push(FunctionName, Payload) {
-	global _LayMgrWeb_WebView
-	if !IsSet(_LayMgrWeb_WebView)
+_LayMgrWeb_Push(FunctionName, Payload, ExpectedEpoch := unset) {
+	global _LayMgrWeb_WebView, _LayMgrWeb_SessionEpoch
+	if !IsSet(ExpectedEpoch)
+		ExpectedEpoch := _LayMgrWeb_SessionEpoch
+	if ExpectedEpoch != _LayMgrWeb_SessionEpoch || !IsSet(_LayMgrWeb_WebView)
 		return false
-	WebView_RunScriptAsync(_LayMgrWeb_WebView,
-		"if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")", "LayoutManager")
+	View := _LayMgrWeb_WebView, Epoch := ExpectedEpoch
+	Script := "if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")"
+	if Epoch != _LayMgrWeb_SessionEpoch || !IsSet(_LayMgrWeb_WebView) || View != _LayMgrWeb_WebView
+		return false
+	WebView_RunScriptAsync(View, Script, "LayoutManager")
 	return true
 }
 
@@ -626,32 +891,48 @@ _LayMgrWeb_OnResize(GuiObj, MinMax, Width, Height) {
 		try WebView_FitToWindow(_LayMgrWeb_Controller)
 }
 
-_LayMgrWeb_Close(*) {
-	global _LayMgrWeb_Gui
-	Owned := _LayMgrWeb_Gui
-	_LayMgrWeb_Reset()
-	_LayMgrWeb_Gui := 0
-	if Owned
-		try Owned.Destroy()
+_LayMgrWeb_Close(Params*) {
+	Window := Params.Length && Params[1] is Gui ? Params[1] : 0
+	_LayMgrWeb_Reset(0, Window)
 }
 
-; Releases the subscriptions while the controller is alive, then closes it;
-; idempotent, because the page's close and the window's Close event both come here.
-_LayMgrWeb_Reset() {
-	global _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
-	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch
-	if _LayMgrWeb_ResetDone
-		return
-	_LayMgrWeb_ResetDone := true
-	_LayMgrWeb_SessionEpoch += 1
+; Retire the exact logical host before unsubscribe, Close, Hide or Destroy can
+; deliver another public opening. A pending add_Event keeps its HWND alive.
+_LayMgrWeb_Reset(ExpectedHost := 0, ExpectedWindow := 0) {
+	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
+	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _LayMgrWeb_PresentationDeps, _LayMgrWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
 	try {
-		_LayMgrWeb_MsgSub := unset
-		_LayMgrWeb_NavSub := unset
+		if _LayMgrWeb_ResetDone
+			return
+		if IsObject(ExpectedWindow) && _LayMgrWeb_Gui != ExpectedWindow
+			return
+		if IsObject(ExpectedHost) && (_LayMgrWeb_SubscriptionOwner != ExpectedHost
+				|| !_LayMgrWeb_StartupCurrent(ExpectedHost.epoch, ExpectedHost.gui, ExpectedHost.controller, ExpectedHost.view))
+			return
+		Host := IsObject(_LayMgrWeb_SubscriptionOwner) ? _LayMgrWeb_SubscriptionOwner
+			: {epoch: _LayMgrWeb_SessionEpoch, gui: _LayMgrWeb_Gui, controller: 0, view: 0,
+				message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: false}
 		if IsSet(_LayMgrWeb_Controller)
-			_LayMgrWeb_Controller.Close()
-	}
-	_LayMgrWeb_Controller := unset
-	_LayMgrWeb_WebView := unset
+			Host.controller := _LayMgrWeb_Controller
+		if IsSet(_LayMgrWeb_WebView)
+			Host.view := _LayMgrWeb_WebView
+		if IsSet(_LayMgrWeb_MsgSub)
+			Host.message := _LayMgrWeb_MsgSub
+		if IsSet(_LayMgrWeb_NavSub)
+			Host.navigation := _LayMgrWeb_NavSub
+		Presentation := _LayMgrWeb_PresentationDeps
+		Host.retired := true
+		_LayMgrWeb_ResetDone := true
+		_LayMgrWeb_SessionEpoch += 1
+		_LayMgrWeb_Gui := 0, _LayMgrWeb_SubscriptionOwner := 0, _LayMgrWeb_PresentationDeps := 0
+		_LayMgrWeb_Controller := unset, _LayMgrWeb_WebView := unset
+		_LayMgrWeb_MsgSub := unset, _LayMgrWeb_NavSub := unset
+	} finally Critical(PreviousCritical)
+	_LayMgrWeb_QueueRetiredHost(Host)
+	if IsObject(Host.gui)
+		try Host.gui.Hide()
+	_LayMgrWeb_RetryRetiredHosts()
 }
 
 ; Snapshot both typed variant and independent source/layer intent without mutating them.

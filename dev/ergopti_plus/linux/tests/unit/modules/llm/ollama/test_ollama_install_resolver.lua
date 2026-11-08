@@ -43,16 +43,41 @@ local function fixture()
 	return f
 end
 
+test("Ollama release catalogue refuses a FIFO without blocking", function()
+	local uv, Paths = require("luv"), require("infra.paths")
+	local original_shared = Paths.shared
+	local source_path = assert(original_shared("modules/llm/ollama_release.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-release-XXXXXX"))
+	local path = dir .. "/release.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == true or made == 0)
+	Paths.shared = function(relative)
+		if relative == "modules/llm/ollama_release.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source_path } }, function()
+		exited = true; process:close()
+	end))
+	local f = fixture(); f.options.catalogue = nil
+	local called, resolver, reason = pcall(f.new)
+	Paths.shared = original_shared
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(called, resolver)
+	expect(resolver == nil and reason == "ollama_release_unreadable", "special release files must be refused")
+end)
+
 test("canonical Linux asset comes from packaged catalogue", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
-	expect(asset.version == "0.40.4" and asset.key == "linux-amd64", "frozen authoritative version and architecture")
-	expect(asset.bytes == 1436408810 and asset.sha256 == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a", "independent pinned byte/hash receipts")
+	expect(asset.version == "0.40.6" and asset.key == "linux-amd64", "frozen authoritative version and architecture")
+	expect(asset.bytes == 1438364593 and asset.sha256 == "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0", "independent pinned byte/hash receipts")
 end)
 
 test("version asset and complete digest form immutable directory name", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
 	local plan = assert(Policy.posix_plan({ HOME = "/home/test" }, AppDirs, asset))
-	expect(plan.directory == "/home/test/.local/share/" .. AppDirs.linux.folder_name .. "/runtimes/ollama/0.40.4-linux-amd64-15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a/ollama", "independent complete immutable name")
+	expect(plan.directory == "/home/test/.local/share/" .. AppDirs.linux.folder_name .. "/runtimes/ollama/0.40.6-linux-amd64-c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0/ollama", "independent complete immutable name")
 	expect(plan.executable == plan.directory .. "/bin/ollama" and plan.libraries == plan.directory .. "/lib/ollama", "whole archive layout")
 end)
 
@@ -82,7 +107,7 @@ test("release snapshot does not follow original catalogue mutation", function()
 	local catalogue = release()
 	local asset = assert(Policy.asset(catalogue, "linux", "x86_64"))
 	catalogue.version = "99.0.0" catalogue.assets["linux-amd64"].sha256 = string.rep("b", 64)
-	expect(asset.version == "0.40.4" and asset.sha256 == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a", "admitted canonical scalars frozen")
+	expect(asset.version == "0.40.6" and asset.sha256 == "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0", "admitted canonical scalars frozen")
 end)
 
 test("construction is read-only and plan getters cannot rewrite owner", function()

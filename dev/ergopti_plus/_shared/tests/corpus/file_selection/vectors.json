@@ -34,6 +34,8 @@
 		{ "id": "relative_path", "text": "{\"tmp/a\"}", "refused": true },
 		{ "id": "unterminated_string", "text": "{\"/tmp/a}", "refused": true },
 		{ "id": "missing_separator", "text": "{\"/tmp/a\" \"/tmp/b\"}", "refused": true },
+		{ "id": "trailing_separator", "text": "{\"/tmp/a\",}", "refused": true },
+		{ "id": "trailing_separator_with_spaces", "text": "{\"/tmp/a\",   }", "refused": true },
 		{ "id": "unknown_escape", "text": "{\"/tmp/\\q\"}", "refused": true },
 		{ "id": "alias_record_is_refused", "text": "{alias \"Macintosh HD:tmp:a\"}", "refused": true }
 	],

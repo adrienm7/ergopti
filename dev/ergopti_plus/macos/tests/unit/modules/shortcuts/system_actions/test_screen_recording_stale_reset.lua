@@ -118,6 +118,21 @@ helpers.describe("Screen Recording gate: stale entry reset (screen-recording-sta
 		end)
 	end)
 
+	helpers.it("does not admit a transient grant during reset (screen-recording-reset-race)", function()
+		local options = { granted = false }
+		with_gate(options, function(flow, f)
+			helpers.assert_eq(flow.ensure_permission("first capture"), false)
+			options.granted = true
+			helpers.assert_eq(flow.ensure_permission("racing capture"), false,
+				"the pending reset can still revoke the observed grant")
+			f.resets[1](true)
+			options.granted = false
+			helpers.assert_eq(flow.ensure_permission("revoked capture"), false)
+			options.granted = true
+			helpers.assert_eq(flow.ensure_permission("granted capture"), true)
+		end)
+	end)
+
 	helpers.it("still prompts, without claiming a reset, when tccutil fails", function()
 		with_gate({ granted = false }, function(flow, f)
 			flow.ensure_permission("Interactive screenshot")

@@ -120,6 +120,12 @@ local function finish(request, digest, err, suppress_callback)
 	end
 end
 
+--- A refused signal leaves the child owned until exit or a successful retry.
+local function abort(request, err)
+	request.abort_error = err
+	if terminate_group(request) then finish(request, nil, err) end
+end
+
 
 -- =========================================
 -- =========================================
@@ -217,8 +223,7 @@ function M.sha256(path, options, callback)
 	end
 	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
 		if request.terminal then return end
-		terminate_group(request)
-		finish(request, nil, "timeout")
+		abort(request, "timeout")
 	end)
 	if not timer_ok or timer_result == false or timer_result == nil then
 		finish(request, nil, "timeout activation failed")
@@ -232,7 +237,7 @@ function M.sha256(path, options, callback)
 	}, function(code, signal)
 		request.exited = true
 		request.exit_code = LibuvExit.status(code, signal)
-		maybe_complete(request)
+		if request.abort_error then finish(request, nil, request.abort_error) else maybe_complete(request) end
 		close_process(request)
 	end)
 	if not spawn_ok or not process or not pid then
@@ -241,19 +246,18 @@ function M.sha256(path, options, callback)
 	end
 	request.process = process
 	request.pid = pid
+	_active[owner] = request
 
 	local function consume(field, eof_field, err, chunk)
-		if request.terminal then return end
+		if request.terminal or request.abort_error then return end
 		if err then
-			terminate_group(request)
-			finish(request, nil, tostring(err))
+			abort(request, tostring(err))
 		elseif chunk == nil then
 			request[eof_field] = true
 			maybe_complete(request)
 		elseif #request[field] + #chunk > (field == "stdout_text"
 			and request.stdout_limit or MAX_OUTPUT_BYTES) then
-			terminate_group(request)
-			finish(request, nil, "sha256sum output exceeds limit")
+			abort(request, "sha256sum output exceeds limit")
 		else
 			request[field] = request[field] .. chunk
 		end
@@ -266,12 +270,10 @@ function M.sha256(path, options, callback)
 	end)
 	if not stdout_ok or stdout_result == false or stdout_result == nil
 		or not stderr_ok or stderr_result == false or stderr_result == nil then
-		terminate_group(request)
-		finish(request, nil, "pipe activation failed")
+		abort(request, "pipe activation failed")
 		return false
 	end
 
-	_active[owner] = request
 	Logger.debug(LOG, "SHA-256 file digest dispatched asynchronously (pid=%d).", pid)
 	return true
 end

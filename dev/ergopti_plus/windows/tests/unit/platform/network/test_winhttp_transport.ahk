@@ -69,3 +69,39 @@ _WinHttpTransport_Controls() {
 	}
 }
 Test("winhttp transport: real WinHTTP honours the managed request contract against owned loopback services", _WinHttpTransport_Controls)
+
+
+_WinHttpManagedRedirect_Controls() {
+	global _DriverDir, _VendorDir, _SharedDir
+	Observed := [], Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				_DriverDir . "\tests\fixtures\managed_redirect_controls.ps1",
+				"-WorkerPath", _VendorDir . "\ergopti_managed_http_worker.ps1", "-SharedPath", _SharedDir],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 16384)
+		AssertTrue(Handle.start(), "The genuine managed redirect fixture must start")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 180000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length, "The exact native fixture must settle once within its bound")
+		if Observed.Length != 1
+			return
+		AssertEqual(0, Observed[1]["exit"], Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
+		AssertEqual("", Observed[1]["stderr"])
+		Expected := ["get_body_cross_origin_301", "get_body_cross_origin_302", "get_body_cross_origin_307", "get_body_cross_origin_308",
+			"empty_get_cross_origin_307", "empty_get_cross_origin_308", "get_body_cross_origin_303", "post_body_cross_origin_303",
+			"get_body_same_origin_307", "post_body_cross_origin_307", "get_body_same_origin_308", "post_body_cross_origin_308"]
+		Lines := StrSplit(StrReplace(Observed[1]["stdout"], "`r`n", "`n"), "`n")
+		for Index, Name in Expected
+			AssertEqual("CONTROL " . Name, Lines.Has(Index) ? Lines[Index] : "", "Every native redirect control must hold in order")
+		AssertEqual("MANAGED_REDIRECT_CONTROLS:" . Expected.Length,
+			Lines.Has(Expected.Length + 1) ? Lines[Expected.Length + 1] : "", "Every declared native redirect case must run")
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate(), "The request-owned fixture process tree must physically retire")
+	}
+}
+Test("managed HTTP: redirected GET bodies cannot cross origins (managed-redirect-body-owner)", _WinHttpManagedRedirect_Controls)

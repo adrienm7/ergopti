@@ -16,6 +16,7 @@
 local helpers = require("tests.helpers")
 local Contract = require("test.legacy_folder_migration_contract")
 local Migration = require("adapters.legacy_folder_migration")
+local Core = require("legacy_folder_migration")
 local AppDirs = require("app_dirs")
 
 Contract.run(helpers, helpers.shared(""))
@@ -48,7 +49,54 @@ local function ports_with_files(tree, files)
 	end
 	local exists = ports.exists
 	ports.exists = function(path) return files[path] ~= nil or exists(path) end
+	ports.replace = function(from, to)
+		if files[from] == nil then return false end
+		files[to], files[from] = files[from], nil
+		return true
+	end
+	ports.remove = function(path) local had = files[path] ~= nil; files[path] = nil; return had end
 	return ports, snapshot
+end
+
+--- A private scratch folder for the native-port cases, removed by `drop`.
+--- @return string dir
+local function scratch()
+	local dir = os.tmpname()
+	os.remove(dir)
+	assert(os.execute("mkdir -p -- '" .. dir .. "'"))
+	return dir
+end
+
+local function drop(dir) os.execute("rm -rf -- '" .. dir .. "'") end
+
+--- Runs `body` with hs.fs bound to the real LuaFileSystem, as Hammerspoon's
+--- own hs.fs is, so the native ports act on the scratch folder.
+--- @param body function
+local function with_real_fs(body)
+	local lfs = require("lfs")
+	local saved = {}
+	local real = {
+		attributes = lfs.attributes, symlinkAttributes = lfs.symlinkattributes, mkdir = lfs.mkdir,
+		rmdir = lfs.rmdir, link = lfs.link, dir = lfs.dir,
+	}
+	for name, fn in pairs(real) do saved[name] = hs.fs[name]; hs.fs[name] = fn end
+	local ok, err = pcall(body)
+	for name, fn in pairs(saved) do hs.fs[name] = fn end
+	assert(ok, err)
+end
+
+local function write(path, text)
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(text))
+	assert(file:close())
+end
+
+local function read(path)
+	local file = io.open(path, "rb")
+	if not file then return nil end
+	local text = file:read("a")
+	file:close()
+	return text
 end
 
 helpers.describe("macOS legacy folder migration", function()
@@ -86,6 +134,61 @@ helpers.describe("macOS legacy folder migration", function()
 		helpers.assert_eq(files[NEW .. "/paths.toml" .. AppDirs.migration.backup_suffix],
 			'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n', "the previous text is kept")
 		helpers.assert_true(#logged >= 4, "every move and the rewrite are logged")
+	end)
+
+	helpers.it("keeps paths.toml naming a configuration folder whose move was refused (legacy-folder-migration-macos-refused)",
+		function()
+		local text = 'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n'
+		local files = { [OLD .. "/paths.toml"] = text }
+		local ports = ports_with_files({ OLD .. "/paths.toml", OLD_CONFIG .. "/hammerspoon/config.toml" }, files)
+		local rename = ports.rename
+		ports.rename = function(from, to)
+			if from == OLD_CONFIG then return nil, "Operation not permitted" end
+			return rename(from, to)
+		end
+		local logger = { info = function() end, warn = function() end }
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		helpers.assert_eq(files[NEW .. "/paths.toml"], text, "paths.toml still names the folder that holds the data")
+		helpers.assert_eq(report.paths_file, "unchanged", "and is not reported as rewritten")
+	end)
+
+	helpers.it("moves the configuration back when paths.toml cannot follow it (legacy-folder-migration-macos-unpublished)",
+		function()
+		local text = 'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n'
+		local files = { [OLD .. "/paths.toml"] = text }
+		local ports, snapshot = ports_with_files({ OLD .. "/paths.toml", OLD_CONFIG .. "/hammerspoon/config.toml" }, files)
+		local write = ports.write
+		local refused = true
+		ports.write = function(path, content)
+			if refused and path == NEW .. "/paths.toml.migration-stage" then return false end
+			return write(path, content)
+		end
+		local logger = { info = function() end, warn = function() end }
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		helpers.assert_eq(files[NEW .. "/paths.toml"], text, "a refused write leaves paths.toml as it was")
+		helpers.assert_true(table.concat(snapshot(), " "):find(OLD_CONFIG .. "/hammerspoon/config.toml", 1, true) ~= nil,
+			"the configuration is back in the folder paths.toml names")
+		helpers.assert_eq(report.paths_file, "write_refused")
+		helpers.assert_eq(#report.restored, 1, "the move back is reported")
+		refused = false
+		local again = Migration.run(logger, { home = HOME, ports = ports })
+		helpers.assert_eq(again.paths_file, "rewritten", "the next boot completes, reusing the same backup")
+		helpers.assert_true(table.concat(snapshot(), " "):find(HOME .. "/" .. AppDirs.config.macos_relative
+			.. "/hammerspoon/config.toml", 1, true) ~= nil, "and the configuration follows")
+	end)
+
+	helpers.it("follows a configuration folder chosen below the old default one (legacy-folder-migration-macos-descendant)",
+		function()
+		local files = { [OLD .. "/paths.toml"] = 'ConfigDirPath = "' .. OLD_CONFIG .. '/custom/"\n' }
+		local ports, snapshot = ports_with_files({ OLD .. "/paths.toml", OLD_CONFIG .. "/custom/config.toml" }, files)
+		local logger = { info = function() end, warn = function() end }
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		local new_custom = HOME .. "/" .. AppDirs.config.macos_relative .. "/custom"
+		helpers.assert_true(table.concat(snapshot(), " "):find(new_custom .. "/config.toml", 1, true) ~= nil,
+			"the chosen folder moved with its ancestor")
+		helpers.assert_eq(files[NEW .. "/paths.toml"], 'ConfigDirPath = "' .. new_custom .. '/"\n',
+			"paths.toml names it where it went")
+		helpers.assert_eq(report.paths_file, "rewritten")
 	end)
 
 	helpers.it("merges the old logs, cache and control folders, backing up what clashes (legacy-folder-migration-macos-merge)",
@@ -128,6 +231,92 @@ helpers.describe("macOS legacy folder migration", function()
 			if line:find("WARN", 1, true) == 1 and line:find(BACKUP, 1, true) then warned = true end
 		end
 		helpers.assert_true(warned, "the backup is logged as a warning")
+	end)
+
+	helpers.it("keeps a file or folder published after the check, on real folders (legacy-folder-migration-macos-race)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(with_real_fs, function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old/sub' '" .. dir .. "/new'"))
+			write(dir .. "/old/paths.toml", "LEGACY")
+			write(dir .. "/old/sub/a", "OLD-A")
+			local ports = Migration.native_ports()
+			local rename = ports.rename
+			ports.rename = function(from, to)
+				-- Another writer publishes each destination between the check and the rename.
+				if to == dir .. "/new/paths.toml" then write(to, "CONCURRENT-NEW") end
+				if to == dir .. "/new/sub" then
+					assert(os.execute("mkdir -p -- '" .. to .. "'"))
+					write(to .. "/b", "NEW-B")
+				end
+				return rename(from, to)
+			end
+			local report = Core.apply({
+				{ from = dir .. "/old/paths.toml", to = dir .. "/new/paths.toml", backup = dir .. "/bak/paths.toml" },
+				{ from = dir .. "/old/sub", to = dir .. "/new/sub", backup = dir .. "/bak/sub" },
+			}, ports)
+			helpers.assert_eq(read(dir .. "/new/paths.toml"), "CONCURRENT-NEW", "the newer file survives")
+			helpers.assert_eq(read(dir .. "/bak/paths.toml"), "LEGACY", "the old file went to the backup")
+			helpers.assert_eq(read(dir .. "/new/sub/b"), "NEW-B", "the newer folder survives")
+			helpers.assert_eq(read(dir .. "/new/sub/a"), nil, "the old folder did not replace it")
+			helpers.assert_eq(read(dir .. "/bak/sub/a"), "OLD-A", "the old folder went to the backup")
+			helpers.assert_eq(#report.moved, 0, "no move reported over a newer entry")
+			helpers.assert_eq(#report.backed_up, 2, "both backups are reported")
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("reports a folder whose listing raises instead of aborting the boot (legacy-folder-migration-macos-list)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(with_real_fs, function()
+			local home = dir .. "/home"
+			local old_logs = home .. "/" .. AppDirs.migration.macos.legacy_logs_relative
+			assert(os.execute("mkdir -p -- '" .. old_logs .. "'"))
+			write(old_logs .. "/a.log", "OLD")
+			local real_dir = hs.fs.dir
+			-- hs.fs.dir raises on a folder it cannot open (permission, gone after the stat).
+			hs.fs.dir = function(path)
+				if path == old_logs then error(path .. ": Permission denied") end
+				return real_dir(path)
+			end
+			local warned = {}
+			local logger = { info = function() end,
+				warn = function(_, fmt, ...) warned[#warned + 1] = fmt:format(...) end }
+			local run_ok, report = pcall(Migration.run, logger, { home = home })
+			helpers.assert_true(run_ok, "the refusal does not escape the migration: " .. tostring(report))
+			local reasons = {}
+			for _, kept in ipairs(report.kept) do reasons[#reasons + 1] = kept.from .. "=" .. kept.reason end
+			helpers.assert_true(table.concat(reasons, " "):find(old_logs .. "=list_failed", 1, true) ~= nil,
+				"the unlistable folder is reported: " .. table.concat(reasons, " "))
+			helpers.assert_eq(read(old_logs .. "/a.log"), "OLD", "its entry stays")
+			helpers.assert_true(#warned >= 1, "and warned")
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("leaves a legacy logs folder linked to the current one, on real folders (legacy-folder-migration-macos-alias)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(with_real_fs, function()
+			local home = dir .. "/home"
+			local logs = home .. "/" .. AppDirs.macos.relative
+			local old_logs = home .. "/" .. AppDirs.migration.macos.legacy_logs_relative
+			assert(os.execute("mkdir -p -- '" .. logs .. "'"))
+			write(logs .. "/active.log", "CURRENT")
+			assert(os.execute("ln -s -- '" .. logs .. "' '" .. old_logs .. "'"))
+			local logger = { info = function() end, warn = function() end }
+			for _ = 1, 2 do
+				local report = Migration.run(logger, { home = home })
+				helpers.assert_eq(read(logs .. "/active.log"), "CURRENT", "the live log stays")
+				helpers.assert_eq(#report.aliased, 1, "the link is recognised as the current folder")
+				helpers.assert_eq(#report.backed_up + #report.kept, 0, "nothing is archived")
+			end
+		end)
+		drop(dir)
+		assert(ok, err)
 	end)
 
 	helpers.it("names the owned runtime folder apart from the Ergopti root", function()

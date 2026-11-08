@@ -392,7 +392,7 @@ class PersonalFileAdoptedOwner {
 			return HotstringsTryPriority(Value, &Priority)
 		if Field == "show_tooltip"
 			return Value is TOML_Bool
-		return Field == "color" && Value is String && RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")
+		return Field == "color" && HotstringsIsHexColor(Value)
 	}
 
 	/** Compare semantic segments without granting a case-folded writer authority. */
@@ -464,8 +464,8 @@ class PersonalFileAdoptedOwner {
 			throw ValueError("Invalid personal-file priority.")
 		else if Field == "show_tooltip" && !HotstringsTryBooleanOverride(Value, &ShowTooltip)
 			throw ValueError("Invalid personal-file tooltip preference.")
-		else if Field == "color" && (!(Value is String) || !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$"))
-			throw ValueError("Invalid personal-file color.")
+		else if Field == "color" && !HotstringsIsHexColor(Value)
+			throw ValueError("Personal-file color must have 3, 4, 6 or 8 hexadecimal digits.")
 		Operations() {
 			this.Recheck()
 			if Field != "enabled"

@@ -9,6 +9,7 @@
 --- ============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 
 local function with_clipboard(read_ok, read_value, body)
 	local names = {
@@ -23,7 +24,8 @@ local function with_clipboard(read_ok, read_value, body)
 	local shell = { writes = {}, value = read_value }
 	function shell.has_command() return true end
 	function shell.exec() return read_ok and shell.value or "" end
-	function shell.exec_checked()
+	function shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY, nil end
 		return read_ok, read_ok and shell.value or "", read_ok and nil or "clipboard read failed"
 	end
 	function shell.with_exact_stdin(command, text)
@@ -62,6 +64,18 @@ local function channel()
 end
 
 helpers.describe("clipboard paste snapshot", function()
+	helpers.it("refuses a foreign copy made before Ctrl+V (clipboard-payload-replaced)", function()
+		with_clipboard(true, "saved", function(clipboard, shell)
+			local uinput = channel()
+			local result = clipboard.paste_text("replacement", uinput, function(ms)
+				if ms == 30 then shell.value = "external copy" end
+			end)
+			helpers.assert_eq(result, false, "the current clipboard no longer contains the requested output")
+			helpers.assert_eq(#uinput.emitted, 0, "never paste the other application's bytes")
+			helpers.assert_eq(shell.value, "external copy")
+			helpers.assert_eq(#shell.writes, 1, "keep the new copy instead of restoring over it")
+		end)
+	end)
 	helpers.it("aborts before mutation when snapshot read fails (lnx-062)", function()
 		with_clipboard(false, nil, function(clipboard, shell)
 			local uinput = channel()
@@ -87,10 +101,31 @@ helpers.describe("clipboard paste snapshot", function()
 		end)
 	end)
 
+	helpers.it("does not overwrite a copy when the ownership read fails", function()
+		with_clipboard(true, "saved", function(clipboard, shell)
+			local original, reads = shell.exec_checked, 0
+			shell.exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return original(command) end
+				reads = reads + 1
+				if reads == 3 then return false, "", "unreadable" end
+				return original(command)
+			end
+			local result, why = clipboard.paste_text("replacement", channel(), function(ms)
+				if ms == 120 then shell.value = "external copy" end
+			end)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(why, "clipboard restoration failed")
+			helpers.assert_eq(shell.value, "external copy")
+			helpers.assert_eq(#shell.writes, 1)
+		end)
+	end)
+
 	helpers.it("keeps a copy another application made during the paste", function()
 		with_clipboard(true, "saved", function(clipboard, shell)
 			local uinput = channel()
-			local result = clipboard.paste_text("replacement", uinput, function() shell.value = "copied elsewhere" end)
+			local result = clipboard.paste_text("replacement", uinput, function(ms)
+				if ms == 120 then shell.value = "copied elsewhere" end
+			end)
 
 			helpers.assert_eq(result, true, "the paste itself succeeded")
 			helpers.assert_eq(#shell.writes, 1, "nothing is restored over the other application's copy")

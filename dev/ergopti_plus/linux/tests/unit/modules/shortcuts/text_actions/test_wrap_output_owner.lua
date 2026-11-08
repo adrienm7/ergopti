@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local Fixture = require("tests.support.text_owner_fixture")
 
 --- Loads Main's actual wrap callback and its publication wiring.
@@ -37,13 +38,14 @@ local function with_wrap(options, body)
 	require("config_file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
 		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type", "logger.shim" }
+			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
+			"modules.gestures.user_actions", "logger.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { primary = "baseline", clipboard = "SAVED", wire = {}, writes = {}, stops = 0, resets = 0,
-			reads = 0, errors = 0, documents = { ["/field/original"] = "selected", ["/field/successor"] = "SAFE" } }
+			reads = 0, errors = 0, logs = {}, documents = { ["/field/original"] = "selected", ["/field/successor"] = "SAFE" } }
 		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
-		logger.set_level("trace"); logger.set_sink(function() end)
+		logger.set_level("trace"); logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function() state.errors = state.errors + 1 end)
 		package.loaded["logger.shim"] = logger
 		local injector, controller, shortcuts
@@ -52,7 +54,7 @@ local function with_wrap(options, body)
 			state.moved = true
 			if options.change == "focus" then
 				focus.path = "/field/successor"
-				if point == "ctrl-down" then guard.invalidate() end
+				if point == "ctrl-down" or point == "paste-down" then guard.invalidate() end
 			elseif options.change == "password" then
 				focus.role = 40; guard.invalidate()
 			elseif options.change == "pause" then
@@ -69,6 +71,7 @@ local function with_wrap(options, body)
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 				if command:find("primary", 1, true) then state.reads = state.reads + 1; return true, state.primary end
 				transition("clipboard-read"); return true, state.clipboard
 			end,
@@ -111,7 +114,10 @@ local function with_wrap(options, body)
 				if code == 29 and value == 1 then transition("ctrl-down") end
 				if (options.native_failure == true and code == 47 and value == 1)
 					or (options.native_failure == "ctrl-down" and code == 29 and value == 1) then return false end
-				if code == 47 and value == 1 then state.documents[focus.path] = state.clipboard end
+				if code == 47 and value == 1 then
+					state.documents[focus.path] = state.clipboard
+					transition("paste-down")
+				end
 				return true
 			end })
 			injector._set_nanosleep_for_test(function(seconds)
@@ -131,7 +137,9 @@ local function with_wrap(options, body)
 						return accepted
 					end
 				end
-				state.result = injector.inject(...); return state.result
+				state.result = injector.inject(...)
+				if options.throw_after_inject then error("controlled exception after output") end
+				return state.result
 			end }, { __index = injector })
 			local environment = setmetatable({ opts = { dry_run = false }, shortcuts = shortcuts,
 				script_actions = { is_paused = function() return state.paused == true end },
@@ -153,6 +161,24 @@ local function with_wrap(options, body)
 end
 
 helpers.describe("wrap output publication ownership", function()
+	helpers.it("does not log text inserted from a command result (wrap-output-owner)", function()
+		with_wrap({}, function(state)
+			package.loaded["modules.gestures.user_actions"] = nil
+			require("modules.gestures.user_actions").deliver_output("privatecommandoutput", "type", 100,
+				assert(state.guard.capture_text_owner()))
+			helpers.assert_true(not table.concat(state.logs, "\n"):find("privatecommandoutput", 1, true),
+				"command output must not enter trace logs")
+		end)
+	end)
+
+	helpers.it("does not log selected text while wrapping (wrap-output-owner)", function()
+		with_wrap({}, function(state)
+			helpers.assert_true(state.consumed)
+			local logs = table.concat(state.logs, "\n")
+			helpers.assert_true(not logs:find("selected", 1, true), "selection contents must not enter trace logs")
+		end)
+	end)
+
 	helpers.it("commits a stable Unicode wrap through the actual Main and clipboard", function()
 		with_wrap({}, function(state)
 			helpers.assert_eq(state.consumed, true)
@@ -197,6 +223,20 @@ helpers.describe("wrap output publication ownership", function()
 		end
 	end
 
+	helpers.it("consumes the symbol when focus retires immediately after the paste DOWN (wrap-output-owner)", function()
+		with_wrap({ change = "focus", boundary = "paste-down" }, function(state)
+			helpers.assert_true(state.moved)
+			helpers.assert_eq(state.documents["/field/original"], "‘selected’")
+			helpers.assert_eq(state.documents["/field/successor"], "SAFE")
+			helpers.assert_eq(state.consumed, true)
+			helpers.assert_eq(state.result.ok, false)
+			helpers.assert_eq(state.result.cleanup_ok, true)
+			helpers.assert_true(state.result.payload_attempted)
+			helpers.assert_eq(state.resets, 0, "a retired field cannot reset a successor buffer")
+			helpers.assert_eq(state.stops, 0)
+		end)
+	end)
+
 	helpers.it("preserves a successor selection opened during clipboard I/O", function()
 		with_wrap({ change = "successor", boundary = "clipboard-read" }, function(state)
 			helpers.assert_eq(state.moved, true)
@@ -211,14 +251,28 @@ helpers.describe("wrap output publication ownership", function()
 	for _, failure in ipairs({ "false", "throw" }) do
 		helpers.it("keeps clipboard restoration " .. failure .. " observable and fatal", function()
 			with_wrap({ restore_failure = failure }, function(state)
-				helpers.assert_eq(state.consumed, false)
+				helpers.assert_eq(state.consumed, true, "the paste was already attempted")
+				helpers.assert_true(state.result.payload_attempted)
+				helpers.assert_eq(state.resets, 1, "attempted output invalidates the buffered caret")
 				helpers.assert_eq(state.result.ok, false)
 				helpers.assert_eq(state.stops, 1)
 				helpers.assert_true(state.errors > 0, "restoration failures must retain the real error observer")
+				helpers.assert_true(not table.concat(state.logs, "\n"):find("selected", 1, true),
+					"the error path must not log the selection")
 				helpers.assert_eq(state.clipboard, "‘selected’", "a refused restoration cannot be reported as complete")
 			end)
 		end)
 	end
+
+	helpers.it("consumes the symbol if the injector raises after emitting the replacement (wrap-output-owner)", function()
+		with_wrap({ throw_after_inject = true }, function(state)
+			helpers.assert_eq(state.consumed, true)
+			helpers.assert_true(state.result.payload_attempted)
+			helpers.assert_eq(state.documents["/field/original"], "‘selected’")
+			helpers.assert_eq(state.resets, 1)
+			helpers.assert_true(state.errors > 0)
+		end)
+	end)
 
 	helpers.it("keeps an exception from Main type_text observable as an error", function()
 		with_wrap({ throw_inject = true }, function(state)
@@ -244,7 +298,8 @@ helpers.describe("wrap output publication ownership", function()
 
 	helpers.it("keeps a real native paste failure fatal and restores the clipboard", function()
 		with_wrap({ native_failure = true }, function(state)
-			helpers.assert_eq(state.consumed, false)
+			helpers.assert_eq(state.consumed, true, "a failed DOWN acknowledgement may still have changed text")
+			helpers.assert_true(state.result.payload_attempted)
 			helpers.assert_eq(state.result.ok, false)
 			helpers.assert_eq(state.result.cleanup_ok, true)
 			helpers.assert_eq(state.stops, 1)
@@ -269,7 +324,7 @@ if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 					.. "assert(package.loaded['adapters.storage'] == nil, 'the child store must start cold')\n"
 					.. "require('tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner')\n"
 					.. "local results = require('tests.helpers').get_results()\n"
-					.. "assert(results.passed == 33 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
+					.. "assert(results.passed == 37 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
 					.. "local storage = require('adapters.storage')\n"
 					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/' .. require('app_dirs').linux.folder_name .. '/storage.json', 'the store must remain private')\n"
 					.. "assert(storage.set('wrap_fixture_sentinel', 'kept') == true, 'the real store must acknowledge publication')\n"

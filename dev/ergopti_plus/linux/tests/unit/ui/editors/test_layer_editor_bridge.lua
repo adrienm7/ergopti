@@ -31,7 +31,6 @@ local helpers     = require("tests.helpers")
 local Json        = require("json")
 local TomlCodec   = require("toml_codec")
 local Layers      = require("keymap.layers")
-local Manager = require("platform.remap.tap_hold_manager")
 
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 local FIXTURE = SHARED_ROOT .. "/tests/corpus/layer_editor/edited_layers.toml"
@@ -152,7 +151,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	helpers.it("sends the user's file and every OS's problems on ready", function()
 		local dir = make_config_dir()
 		local fh = assert(io.open(dir .. "/layers.toml", "wb"))
-		fh:write('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"MouseMiddle" = "escape"\n')
+		fh:write('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"Space" = "spotlight"\n')
 		fh:close()
 		local world = make_state(dir)
 		local outcome = Bridge.on_message("ready", world.state)
@@ -160,8 +159,8 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_eq(outcome.pushed, true)
 		local init = last_call(world, "init")
 		helpers.assert_eq(init.os, "linux")
-		helpers.assert_true(init.text:match('"MouseMiddle" = "escape"') ~= nil, "init() carries the file's text")
-		-- A mouse button is no layer key on Linux: that loader refuses the entry.
+		helpers.assert_true(init.text:match('"Space" = "spotlight"') ~= nil, "init() carries the file's text")
+		-- Spotlight is a macOS-only action: the Linux loader refuses the entry.
 		helpers.assert_eq(codes(init), "unavailable_on_os")
 		helpers.assert_eq(world.titles[1], "layer_editor=layer_editor.window_title")
 	end)
@@ -195,6 +194,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("sends the loaded keymap's legends and the layer key (layer-editor-current-layout-legends)", function()
+		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local corpus = Json.decode(read_file(LEGENDS))
 		local Layout = helpers.load_module("adapters.keyboard_layout")
 		local LayerEditor = require("keymap.layer_editor")
@@ -267,6 +267,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("saves the page's session and the live daemon applies every keyboard edit (e2e)", function()
+		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local dir = make_config_dir()
 		local config = assert(io.open(dir .. "/tap_hold.toml", "wb"))
 		config:write('[tap_hold]\nenabled = true\ninherit_defaults = false\n'
@@ -314,6 +315,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("saving layer mappings never enables an unconfigured tap-hold owner", function()
+		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local dir = make_config_dir()
 		local world = make_state(dir)
 		local hook = { key_text = function() return nil end,

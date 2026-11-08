@@ -144,15 +144,16 @@ _CPC_ProfileSourceWriterContract(Body) {
 	Body := _DriverMaskBlockComments(&Body)
 	Body := _StripFullLineComments(Body)
 	Guard := RegExMatch(Body,
-		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
+		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!_LLM_Menu_ProfileSourceProjectionMatches\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
 	Publish := RegExMatch(Body,
-		'return\s+TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
+		'Committed\s*:=\s*TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
 		. '_LLM_Menu_ProfileSourceBound\.Bind\(Source\),\s*Source\["content"\],\s*Source\["present"\]\)')
 	Code := _DriverMaskNonCode(&Body)
 	CodeGuard := RegExMatch(Code, 'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)')
-	CodePublish := RegExMatch(Code, 'return\s+TOML_ConfigBatchWrite\(')
+	CodePublish := RegExMatch(Code, 'Committed\s*:=\s*TOML_ConfigBatchWrite\(')
 	return Guard > 0 && Publish > Guard && CodeGuard == Guard && CodePublish == Publish
 		&& _CPC_CountOccurrences(Body, "TOML_ConfigBatchWrite(") == 1
+		&& RegExMatch(Body, 'if\s+Committed\s+is\s+Integer\s*&&\s*Committed\s*==\s*1\s+Source\["native_ack"\]\s*:=\s*1\s+return\s+Committed') > Publish
 }
 
 _CPC_ProfilePublisherRetainsOpeningImage() {
@@ -163,9 +164,11 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 	Quoted := 'Evidence := ' . Chr(34) . StrReplace(Body, Chr(34), Chr(96) . Chr(34)) . Chr(34)
 	AssertFalse(_CPC_ProfileSourceWriterContract(Quoted), "quoted documentation cannot stand in for an executable writer")
 	for Mutant in [StrReplace(Body, 'Source["content"]', '""'),
+		StrReplace(Body, "return Committed", "return true"),
 		StrReplace(Body, 'Source["present"]', "1"),
 		StrReplace(Body, "_LLM_Menu_ProfileSourceBound.Bind(Source)", "0"),
-		StrReplace(Body, 'if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])', "if false")] {
+		StrReplace(Body, "_LLM_Menu_ProfileSourceProjectionMatches(Source)", "true"),
+		StrReplace(Body, "!_LLM_Menu_ProfileSourceBound(Source)", "false")] {
 		Assert(StrCompare(Body, Mutant, true) != 0, "each custody mutant must change the real writer")
 		AssertFalse(_CPC_ProfileSourceWriterContract(Mutant), "a lost retained image or owner fence cannot join the census")
 	}
@@ -178,16 +181,49 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 		Assert(_CPC_LineConsumesResult(Lines, Index), "the actual native receipt must be consumed")
 		for Replacement in ["", "Ignored := "] {
 			Mutant := Lines.Clone()
-			Mutant[Index] := StrReplace(Line, "return ", Replacement)
-			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual return")
+			Mutant[Index] := StrReplace(Line, "Committed := ", Replacement)
+			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual native assignment")
 			AssertFalse(_CPC_LineConsumesResult(Mutant, Index), "discarding or ignoring the actual ACK must fail")
 		}
 	}
 	AssertEqual(1, Calls, "exactly one independently audited opening-image publisher joins the inventory")
 }
 
+; The order menu adds one transaction and one retained-source native publisher.
+; Admit their executable result boundaries before changing either census.
+_CPC_SectionOrderWriterContract(Body) {
+	Body := _StripFullLineComments(_DriverMaskBlockComments(&Body))
+	Publish := RegExMatch(Body,
+		'(?m)^\s*return\s+TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*0,\s*Snapshot\["content"\],\s*Snapshot\["presence"\]\)\s*$')
+	Code := _DriverMaskNonCode(&Body)
+	return Publish > 0 && RegExMatch(Code, '(?m)^\s*return\s+TOML_ConfigBatchWrite\(') == Publish
+}
+
+_CPC_SectionOrderPublishersRetainTheirOwner() {
+	Writer := _DriverFuncBody("_HS_OrderWrite")
+	Action := _StripFullLineComments(_DriverFuncBody("_HS_OrderCommit"))
+	Ack := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
+	Assert(Writer != "" && Action != "" && Ack != "", "the order publisher, transaction and native receipt owners must exist")
+	Assert(_CPC_SectionOrderWriterContract(Writer), "order publication returns the retained source and presence writer's native receipt")
+	for Mutant in [StrReplace(Writer, "return TOML", "Ignored := TOML"),
+		StrReplace(Writer, "TOML_ConfigBatchWrite", "_TOML_BatchWriteImpl"),
+		StrReplace(Writer, 'Snapshot["content"]', '""'), StrReplace(Writer, 'Snapshot["presence"]', "1")] {
+		Assert(StrCompare(Writer, Mutant, true) != 0, "each order publisher mutant must change executable source")
+		AssertFalse(_CPC_SectionOrderWriterContract(Mutant), "losing the native result or opening image must fail admission")
+	}
+	Code := _DriverMaskNonCode(&Action)
+	Commit := RegExMatch(Code, 'if\s+!ConfigCommitUpdates\([^\r\n]+\)\s+return\s+false')
+	Assert(Commit > 0 && InStr(Code, "RebuildFn.Call()") > Commit && InStr(Code, "RebuildTrayMenu()") > Commit,
+		"a refused order transaction returns before either repaint route")
+	Assert(InStr(Action, "WriterFn := _HS_OrderWrite.Bind(Snapshot)") > 0,
+		"the default transaction writer retains the menu's original snapshot")
+	Assert(InStr(Ack, "if !((Written is Integer) && Written == 1)") > 0,
+		"the canonical transaction accepts only the native Integer-1 receipt")
+}
+
 _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	_CPC_ProfilePublisherRetainsOpeningImage()
+	_CPC_SectionOrderPublishersRetainTheirOwner()
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
 	Calls := 0
@@ -226,7 +262,23 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; 48: _ProxyOverride_Store returns the commit's answer to the menu row, which says so.
 	; 49: the lone tap window writer (_TH_CommitLoneTapMaxMs) returns false and
 	; skips its reload on a refusal, driven for real by test_tap_hold_lone_tap.ahk.
-	AssertEqual(49, Calls,
+	; 50: the chord bulk copy (KeyCombinationCopyTapsToChords) returns false and
+	; skips its reload on a refusal, driven for real by
+	; test_key_combination_chord_engine.ahk.
+	; 51: the one-shot Shift timeout writer (_TH_CommitOneShotTimeoutMs) returns
+	; false and skips its reload on a refusal, driven for real by
+	; test_tap_hold_one_shot_timeout.ahk.
+	; 52-53: the proxy override's boot-source seal (_ProxyOverride_Store with a
+	; boot source) returns ConfigCommitBuilt's answer, and its native writer
+	; (_ProxyOverride_WriteBootSource) returns TOML_ConfigBatchWrite's receipt
+	; behind the same lease and source-ownership predicate.
+	; 54: the model browser's backend writer (_LLM_ModelBrowser_BackendWriter)
+	; returns TOML_ConfigBatchWrite's receipt behind its owned lease.
+	; 55-56: the section-order transaction (_HS_OrderCommit) refuses before
+	; repainting, and its publisher (_HS_OrderWrite) returns the exact-source
+	; native receipt. Both are independently admitted above and exercised by
+	; the real configuration owner in test_hotstring_dynamic_menu_scope.ahk.
+	AssertEqual(56, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -273,6 +325,7 @@ Test("AHK-15-persistence: privacy publication retains its source and rejects dis
 	_CPC_PrivacyPublisherRetainsSourceAndStrictResult)
 
 _CPC_InternalTomlPublishersConsumeResult() {
+	_CPC_SectionOrderPublishersRetainTheirOwner()
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "internal publisher inventory requires actual readable production source")
 	Lines := StrSplit(Src, "`n", "`r")
@@ -294,6 +347,9 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; against its captured source, finalizer and status-before-target chain.
 	; Info Bar and privacy now delegate their retained source to the public
 	; semantic gateway; their two former private calls are audited above/below.
+	; Section order now also delegates to TOML_ConfigBatchWrite, removing its
+	; former private call. Its exact source, presence, native receipt and refusal
+	; before repaint remain independently audited above, including mutations.
 	AssertEqual(8, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
@@ -446,25 +502,38 @@ Test("AHK-15-persistence: bulk mutations publish candidates only after commit",
 	_CPC_BulkMutationsStageBeforePublishing)
 
 _CPC_GestureAssignmentIsOneRelatedFieldBatch() {
-	Body := _StripFullLineComments(_DriverFuncBody("_GestureCommitAssignment"))
-	Assert(Body != "", "_GestureCommitAssignment must exist")
-	PersistPos := InStr(Body, "ConfigCommitUpdates(")
-	AssignmentPublish := InStr(Body, "AssignmentsTarget := CandidateAssignments")
-	ParameterPublish := InStr(Body, "ParametersTarget := CandidateParameters")
-	Assert(InStr(Body, "Section: AssignmentSection") > 0,
-		"the assignment update must be in the shared batch")
-	Assert(InStr(Body, 'Section: "action_parameters"') > 0,
-		"the related parameter update must be in the same shared batch")
-	AssertEqual(1, _CPC_CountOccurrences(Body, "ConfigCommitUpdates("),
-		"one logical assignment must perform one TOML batch")
-	Assert(PersistPos > 0 and PersistPos < AssignmentPublish and PersistPos < ParameterPublish,
-		"both detached Maps must be published only after the shared batch succeeds")
-	CriticalPos := InStr(Body, 'Critical("On")')
-	ReleasePos := InStr(Body, "Critical(PreviousCritical)")
-	Assert(CriticalPos > PersistPos and CriticalPos < AssignmentPublish
-		and ParameterPublish < ReleasePos,
-		"the two related Maps must be published in one short non-yielding window")
+	Parts := Map()
+	for Name in ["GestureSetActionParameter", "_GestureBuildActionParameterPlan", "_GesturePublishActionParameters",
+			"_GestureCommitAssignment", "_GestureBuildAssignmentPlan", "_GesturePublishAssignment"] {
+		Parts[Name] := _StripFullLineComments(_DriverFuncBody(Name))
+		Assert(Parts[Name] != "", Name . " must remain source-visible")
+	}
+	Entry := Parts["_GestureCommitAssignment"]
+	Builder := Parts["_GestureBuildAssignmentPlan"]
+	Publish := Parts["_GesturePublishAssignment"]
+	AssertEqual(1, _CPC_CountOccurrences(Entry, "ConfigCommitBuilt("),
+		"one related assignment must enter one path-owned builder")
+	Assert(InStr(Entry, "_GestureBuildAssignmentPlan.Bind(&AssignmentsTarget, &ParametersTarget,") > 0,
+		"the builder must keep both actual caller VarRefs")
+	Assert(InStr(Entry, "CandidateAssignments :=") == 0 && InStr(Entry, "CandidateParameters :=") == 0,
+		"candidate snapshots must not escape before builder admission")
+	Assert(InStr(Builder, "Section: AssignmentSection") > 0
+			&& InStr(Builder, 'Section: "action_parameters"') > 0,
+		"assignment and related parameter belong to the same durable update batch")
+	Assert(InStr(Builder, "_GesturePublishAssignment.Bind(&AssignmentsTarget, &ParametersTarget,") > 0,
+		"publication must retain the same two caller targets through the native gateway")
+	Assert(InStr(Publish, "AssignmentsTarget := CandidateAssignments") > 0
+			&& InStr(Publish, "ParametersTarget := CandidateParameters") > 0,
+		"the gateway publisher swaps both detached Maps in its existing atomic memory span")
+	AssertEqual(1, _CPC_CountOccurrences(Parts["GestureSetActionParameter"], "ConfigCommitBuilt("),
+		"the standalone parameter producer must use the same builder ownership")
+	Assert(InStr(Parts["GestureSetActionParameter"], "CandidateParameters :=") == 0,
+		"the standalone parameter candidate must also be cloned after admission")
+	Assert(InStr(Parts["_GestureBuildActionParameterPlan"], "_GestureCloneActionParameters(GestureActionParameters)") > 0
+			&& InStr(Parts["_GestureBuildActionParameterPlan"], "_GesturePublishActionParameters.Bind(CandidateParameters)") > 0,
+		"the standalone builder must bind its real snapshot into gateway publication")
 }
+
 Test("AHK-15-persistence: parameter and assignment share one commit",
 	_CPC_GestureAssignmentIsOneRelatedFieldBatch)
 

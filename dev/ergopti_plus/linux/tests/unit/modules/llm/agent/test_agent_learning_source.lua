@@ -45,7 +45,48 @@ local PREFIX = '{"version":1,"apps":{"Mail":{"used":'
 local SUFFIX = ',"thresholds":{"calendar":0.2}}}}'
 
 helpers.describe("agent learning source admission", function()
+	helpers.it("linux-agent-learning-timer: retains a timer when cancellation is refused", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			local timers, allow = {}, false
+			Learning._reset_for_test({ path = path, scheduler = {
+				after = function(_, callback)
+					local timer = { armed = true, callback = callback }; timers[#timers + 1] = timer; return timer
+				end,
+				cancel = function() return allow end,
+			} })
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_true(Learning.flush(), "an immediate save may proceed while the timer remains owned")
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_eq(#timers, 1, "a refused cancellation cannot be replaced")
+			timers[1].callback()
+			local saved = assert(Json.decode_lossless(assert(read(path))))
+			helpers.assert_not_nil(saved.apps.Mine, "the retained timer must save the latest map")
+			allow = true
+		end)
+	end)
+	helpers.it("linux-agent-learning-timer: stale callbacks cannot retire their successor", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			local timers = {}
+			Learning._reset_for_test({ path = path, scheduler = {
+				after = function(_, callback)
+					local timer = { armed = true, callback = callback }; timers[#timers + 1] = timer; return timer
+				end,
+				cancel = function() return true end,
+			} })
+			Learning.record(config, "Mine", "calendar", true)
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_eq(#timers, 2)
+			timers[1].callback()
+			helpers.assert_nil(Json.decode_lossless(assert(read(path))).apps.Mine, "a stale callback cannot publish")
+			timers[2].callback()
+			helpers.assert_not_nil(Json.decode_lossless(assert(read(path))).apps.Mine)
+		end)
+	end)
 	for _, candidate in ipairs({
+		{ name = "null application map", source = '{"version":1,"apps":null}' },
+		{ name = "null threshold map", source = PREFIX .. '7,"thresholds":null}}}' },
+		{ name = "invalid saved recency", source = PREFIX .. '"bad"' .. SUFFIX },
+		{ name = "invalid saved threshold", source = PREFIX .. '7,"thresholds":{"calendar":"bad"}}}}' },
 		{ name = "overflow number", source = PREFIX .. "1e999" .. SUFFIX },
 		{ name = "leading-zero number", source = PREFIX .. "01" .. SUFFIX },
 		{ name = "trailing bytes", source = PREFIX .. "1" .. SUFFIX .. " trailing" },
@@ -59,6 +100,74 @@ helpers.describe("agent learning source admission", function()
 			end)
 		end)
 	end
+
+	helpers.it("preserves every original byte before replacing a partially invalid learning map", function()
+		local source = '{"version":1,"apps":{"Mail":{"used":7,"thresholds":{"calendar":0.2}},'
+			.. '"Other":{"used":8,"thresholds":{"calendar":"bad"}}}}'
+		with_source(source, function(Learning, path, config)
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			helpers.assert_eq(read(path .. ".corrupt"), source, "valid and invalid entries remain recoverable")
+			helpers.assert_not_nil(Json.decode_lossless(assert(read(path))).apps.Mine)
+		end)
+	end)
+
+	for _, initial in ipairs({ "present", "absent" }) do
+		helpers.it("preserves another learning update after loading an " .. initial .. " source", function()
+			with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+				if initial == "absent" then assert(os.remove(path)) end
+				Learning.record(config, "Mine", "calendar", true)
+				local successor = '{"version":1,"apps":{"Other":{"used":8,"thresholds":{"calendar":0.4}}}}'
+				local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+				helpers.assert_eq(Learning.flush(), false)
+				helpers.assert_eq(read(path), successor)
+			end)
+		end)
+	end
+
+	helpers.it("preserves a newer learning file published during staging", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			Learning.record(config, "Mine", "calendar", true)
+			local writer, original = require("infra.regular_file_writer"), nil
+			original = writer.open
+			local successor = '{"version":1,"apps":{"Other":{"used":8,"thresholds":{"calendar":0.4}}}}'
+			writer.open = function(...)
+				local stream, detail, errno, cleanup, current = original(...)
+				if not stream then return stream, detail, errno, cleanup, current end
+				return stream, detail, errno, cleanup, function(text)
+					local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+					return current(text)
+				end
+			end
+			local ok, result = pcall(Learning.flush)
+			writer.open = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(read(path), successor)
+			helpers.assert_nil(read(path .. ".tmp"))
+		end)
+	end)
+
+	helpers.it("updates the source receipt after a successful learning save", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			Learning.record(config, "Mail", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			Learning.record(config, "Mail", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			helpers.assert_eq(assert(Json.decode_lossless(read(path))).apps.Mail.used, 9)
+		end)
+	end)
+
+	helpers.it("keeps recency ordered after a large finite persisted counter", function()
+		local source = '{"version":1,"apps":{"A":{"used":9007199254740992,"thresholds":{}},"B":{"used":9007199254740992,"thresholds":{}}}}'
+		with_source(source, function(Learning, path, config)
+			Learning.record(config, "B", "calendar", true)
+			Learning.record(config, "A", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			local apps = assert(Json.decode_lossless(read(path))).apps
+			helpers.assert_true(apps.A.used > apps.B.used, "the most recent app must remain newer")
+		end)
+	end)
 
 	helpers.it("(agent-learning-source) overflow LRU clocks cannot crash a later record", function()
 		local apps = {}

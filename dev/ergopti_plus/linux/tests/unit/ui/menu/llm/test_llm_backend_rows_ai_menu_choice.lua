@@ -49,7 +49,241 @@ end)
 
 
 
+helpers.describe("model selector test ownership", function()
+	helpers.it("reports a refused System 1 entry removal", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
+		state.entries, state.confirm, state.refuse_removal = { entry }, true, true
+		local result = find(build(), "🗑️").action()
+		local kept, errors = state.entries[1], #state.errors
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(kept, entry)
+		helpers.assert_eq(errors, 1)
+	end)
+
+	for _, fault in ipairs({ "backend", "storage" }) do
+		helpers.it("reports a refused API entry removal: " .. fault, function()
+			local build, state, restore = setup("api")
+			local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test", base_url = "" }
+			state.entries, state.active, state.confirm = { entry }, entry, true
+			state.refuse_backend, state.refuse_removal = fault == "backend", fault == "storage"
+			local result = find(build(), "🗑️").action()
+			local kept, errors = state.entries[1], #state.errors
+			restore()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(kept, entry)
+			helpers.assert_eq(errors, 1)
+		end)
+	end
+
+	helpers.it("retains a refused selection retirement after its page closes", function()
+		local build, state, restore = setup("api")
+		local live = true
+		state.page_current = function() return live end
+		state.on_begin = function() live = false end
+		state.refuse_finish = true
+		state.answers = { "test-key", "qwen" }
+		find(build(), "➕ Cerebras").action()
+		live, state.on_begin = true, nil
+		state.answers = { "next-key", "qwen" }
+		local again = find(build(), "➕ Cerebras").action()
+		local admissions, entries = state.admissions, #state.entries
+		restore()
+		helpers.assert_eq(again, false)
+		helpers.assert_eq(admissions, 1)
+		helpers.assert_eq(entries, 0)
+	end)
+
+	helpers.it("retires the selection receipt if its page closes during acquisition", function()
+		local build, state, restore = setup("api")
+		local live = true
+		state.page_current = function() return live end
+		state.on_begin = function() live = false end
+		state.answers = { "test-key", "qwen" }
+		local result = find(build(), "➕ Cerebras").action()
+		local admissions, finished, entries = state.admissions, state.finished, #state.entries
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(admissions, 1)
+		helpers.assert_eq(finished, 1)
+		helpers.assert_eq(entries, 0)
+	end)
+
+	for _, kind in ipairs({ "chat", "system" }) do
+		helpers.it("does not save a " .. kind .. " API entry after its page closes during input", function()
+			local build, state, restore = setup("api")
+			local live = true
+			state.page_current = function() return live end
+			state.on_prompt = function() live = false end
+			state.answers = { "test-key", kind == "chat" and "qwen" or "jev-latest" }
+			find(build(), kind == "chat" and "➕ Cerebras" or "➕ TypeSafe").action()
+			local count, tests = #state.entries, #state.tests
+			restore()
+			helpers.assert_eq(count, 0)
+			helpers.assert_eq(tests, 0)
+		end)
+	end
+
+	for _, kind in ipairs({ "chat", "system" }) do
+		helpers.it("does not remove " .. kind .. " after the owning page closes during confirmation", function()
+			local build, state, restore = setup("api")
+			local entry = { id = "chosen", provider = kind == "chat" and "cerebras" or "typesafe",
+				model = "qwen", token = "test", base_url = "" }
+			state.entries, state.active = { entry }, kind == "chat" and entry or nil
+			local live = true
+			state.page_current = function() return live end
+			local remove = find(build(), "🗑️").action
+			state.confirm = function() live = false; return true end
+			local result = remove()
+			local kept, count = state.entries[1], state.removal_sets or 0
+			restore()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(kept, entry)
+			helpers.assert_eq(count, 0)
+		end)
+	end
+
+	helpers.it("does not remove an active API entry replaced during confirmation", function()
+		local build, state, restore = setup("api")
+		local old = { id = "chosen", provider = "cerebras", model = "qwen", token = "old", base_url = "" }
+		local replacement = { id = "chosen", provider = "cerebras", model = "new", token = "new", base_url = "" }
+		state.entries, state.active = { old }, old
+		local remove = find(build(), "🗑️").action
+		state.confirm = function() state.entries, state.active = { replacement }, replacement; return true end
+		local result = remove()
+		local kept, count = state.entries[1], state.removal_sets or 0
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(kept, replacement)
+		helpers.assert_eq(count, 0)
+	end)
+
+	helpers.it("does not remove a System 1 entry replaced during confirmation", function()
+		local build, state, restore = setup("api")
+		local old = { id = "system", provider = "typesafe", model = "jev-latest", token = "old", base_url = "" }
+		local replacement = { id = "system", provider = "typesafe", model = "new", token = "new", base_url = "" }
+		state.entries = { old }
+		local remove = find(build(), "🗑️").action
+		state.confirm = function() state.entries = { replacement }; return true end
+		local result = remove()
+		local kept, count = state.entries[1], state.removal_sets or 0
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(kept, replacement)
+		helpers.assert_eq(count, 0)
+	end)
+
+	helpers.it("suppresses a System 1 test when its entry is removed", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
+		state.entries = { entry }
+		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		helpers.assert_eq(#state.tests, 1)
+		state.entries = {}
+		state.finish_test(true, "OK", 10)
+		local notices = #state.infos + #state.errors
+		restore()
+		helpers.assert_eq(notices, 0)
+	end)
+
+	helpers.it("suppresses a manual test when the active entry is replaced", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
+		state.entries, state.active = { entry }, entry
+		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		helpers.assert_eq(#state.tests, 1)
+		state.active = { id = "chosen", provider = "cerebras", model = "other", token = "test" }
+		state.finish_test(true, "OK", 10)
+		local notices = #state.infos + #state.errors
+		restore()
+		helpers.assert_eq(notices, 0)
+	end)
+
+	for _, kind in ipairs({ "new chat", "new system", "manual" }) do
+		helpers.it("suppresses " .. kind .. " test results after page closure", function()
+			local build, state, restore = setup("api")
+			local live = true
+			state.page_current = function() return live end
+			if kind == "manual" then
+				local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
+				state.entries, state.active = { entry }, entry
+				find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+			else
+				state.answers = { "test-key", kind == "new chat" and "qwen" or "jev-latest" }
+				find(build(), kind == "new chat" and "➕ Cerebras" or "➕ TypeSafe").action()
+			end
+			helpers.assert_eq(#state.tests, 1)
+			live = false
+			state.finish_test(true, "OK", 10)
+			local notices = #state.infos + #state.errors
+			restore()
+			helpers.assert_eq(notices, 0)
+		end)
+	end
+end)
+
 helpers.describe("AI menu: adding and testing a Cerebras key", function()
+	helpers.it("acknowledges a saved entry if the menu refresh raises", function()
+		local build, state, restore = setup("api")
+		state.answers = { "test-key", "qwen" }
+		state.on_changed = function() error("synthetic refresh failure") end
+		local ok, result = pcall(find(build(), "➕ Cerebras").action)
+		local count = #state.entries
+		restore()
+		helpers.assert_eq(count, 1)
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(result, true)
+	end)
+
+	helpers.it("acknowledges a saved entry if its optional test raises", function()
+		local build, state, restore = setup("api")
+		state.answers = { "test-key", "qwen" }
+		package.loaded["modules.llm.api_remote"].test = function() error("synthetic test failure") end
+		local ok, result = pcall(find(build(), "➕ Cerebras").action)
+		local count = #state.entries
+		restore()
+		helpers.assert_eq(count, 1)
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(result, true)
+	end)
+
+	for _, kind in ipairs({ "chat", "system" }) do
+		helpers.it("acknowledges a saved " .. kind .. " entry when its test request is refused", function()
+			local build, state, restore = setup("api")
+			state.answers = { "test-key", kind == "chat" and "qwen" or "jev-latest" }
+			package.loaded["modules.llm.api_remote"].test = function() return false end
+			local result = find(build(), kind == "chat" and "➕ Cerebras" or "➕ TypeSafe").action()
+			local count, changed = #state.entries, state.changed
+			restore()
+			helpers.assert_eq(count, 1)
+			helpers.assert_eq(changed, 1)
+			helpers.assert_eq(result, true)
+		end)
+	end
+
+	helpers.it("does not overwrite a backend changed while entering an API key", function()
+		local build, state, restore = setup("ollama")
+		state.answers = { "key", "qwen" }
+		state.on_prompt = function() state.backend = "other" end
+		find(build(), "➕ Cerebras").action()
+		local backend, switches, count = state.backend, state.backend_sets or 0, #state.entries
+		restore()
+		helpers.assert_eq(backend, "other")
+		helpers.assert_eq(switches, 0)
+		helpers.assert_eq(count, 0)
+	end)
+
+	helpers.it("does not change the backend when the API key form is cancelled", function()
+		local build, state, restore = setup("ollama")
+		state.answers = {}
+		find(build(), "➕ Cerebras").action()
+		local backend, switches = state.backend, state.backend_sets or 0
+		restore()
+		helpers.assert_eq(backend, "ollama")
+		helpers.assert_eq(switches, 0)
+	end)
+
 
 	helpers.it("asks for a hidden key and the model, stores, selects and tests the entry", function()
 		local build, state, restore = setup("api")
@@ -278,7 +512,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			local rename = os.rename
 			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":""}],"active_id":"chosen","future":{"kept":true}}]]
 			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
-			local changed, result, after, count, active, foreign, stage_calls, backend_calls = 0, nil, nil, nil, nil, nil, 0, 0
+			local changed, result, after, count, active, foreign, stage_calls, backend_calls, errors = 0, nil, nil, nil, nil, nil, 0, 0, 0
 			local ok, failure = pcall(function()
 				local owner = helpers.load_module("modules.llm.api_entries")
 				owner._set_path_for_test(path)
@@ -302,7 +536,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 						backend_calls = backend_calls + 1
 						return kind == "api"
 					end },
-					{ confirm = function() return true end },
+					{ confirm = function() return true end, error = function() errors = errors + 1 end },
 					function() changed = changed + 1 end)
 				result = find(rows, "🗑️").action()
 				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
@@ -318,6 +552,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			helpers.assert_eq(stage_calls, 1, "use the actual private stage and native publication owner")
 			helpers.assert_eq(changed, refused and 0 or 1, "writer refusal must not refresh as a committed mutation")
 			helpers.assert_eq(result, not refused, "the menu returns only a durable ACK")
+			helpers.assert_eq(errors, refused and 1 or 0, "a refused deletion reaches the user")
 			helpers.assert_eq(count, refused and 1 or 0, "the real store rolls back RAM when publication refuses")
 			helpers.assert_eq(active ~= nil, refused)
 			helpers.assert_eq(foreign, true, "unknown root data survives successful removal")

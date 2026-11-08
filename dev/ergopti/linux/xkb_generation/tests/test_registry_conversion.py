@@ -147,9 +147,8 @@ class RegistryConversionTests(unittest.TestCase):
         Read from the written symbols (key_symbols), not from the converter's
         choice of sequence keysym, so naming the character an action is called
         after instead of what its key sends (the old chained-dead-key bug) fails.
-        A ``base_level_only`` output (Ergopti+'s magic key) is left out: inside a
-        dead state it still names its action's letter, a separate known limit
-        the shipped Ergopti files keep.
+        A ``base_level_only`` key (Ergopti+'s magic key) is included: inside a
+        dead state it types its action's output, as macOS does.
         """
         entries = registry_entries()
         self.assertGreaterEqual(len(entries), 5)
@@ -161,16 +160,12 @@ class RegistryConversionTests(unittest.TestCase):
             compose = parse_compose(result.compose_text)
             level_indices = [layout.key_map_index(mods) for mods in keylayout_to_xkb.XKB_LEVELS]
             keycodes = keylayout_to_xkb.load_keycodes(KEYCODES_PATH, entry["keycode_convention"])
-            magic = {
-                result.borrowed.get(text) or keylayout_to_xkb.unicode_keysym(text)
-                for text in entry.get("xkb", {}).get("base_level_only", [])
-            }
             missing = []
             for xkb, code in keycodes:
                 for level, index in enumerate(level_indices):
                     key = layout.key_entry(index, code)
                     keysym = result.key_symbols[xkb][level]
-                    if key is None or key[0] != "action" or keysym in magic:
+                    if key is None or key[0] != "action":
                         continue
                     if keysym == keylayout_to_xkb.NO_SYMBOL:
                         continue

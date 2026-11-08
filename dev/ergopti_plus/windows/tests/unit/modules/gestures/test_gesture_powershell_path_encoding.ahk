@@ -10,31 +10,6 @@
 
 #Requires AutoHotkey v2.0
 
-; Generated data is resolved from the real runner's includes, outside the
-; authored-code census, with the canonical lexical/definition helpers.
-_GPSE_DataOwner(Name) {
-	global _DriverDir
-	Runner := FSReadStrict(A_ScriptFullPath)
-	Code := _DriverMaskNonCode(&Runner)
-	Owners := Map()
-	Owners.CaseSense := "Off"
-	for Line in StrSplit(Code, "`n", "`r") {
-		if !RegExMatch(Line, "i)^\s*#Include\s+(\.\.[\\/]_generated[\\/][A-Za-z0-9_.-]+\.ahk)\s*$", &Include)
-			continue
-		Owner := _DriverDir . "\" . SubStr(StrReplace(Include[1], "/", "\"), 4)
-		Text := FSReadStrict(Owner)
-		Masked := _DriverMaskNonCode(&Text)
-		Count := _DriverTopLevelDefinitionCount(&Masked, Name)
-		if Count {
-			AssertEqual(1, Count)
-			Owners[Owner] := true
-		}
-	}
-	AssertEqual(1, Owners.Count, "one actual included data owner is required")
-	for Owner in Owners
-		return Owner
-}
-
 ; Rewrite only one external boundary identifier in code, never strings or the
 ; writer/builder. Future changes on either real caller or builder remain tested.
 _GPSE_Port(Body, Name, Port) {
@@ -50,12 +25,11 @@ _GPSE_Source() {
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Owner := _DriverProductionFileForSymbol("FSWrite", _DriverDir)
 	AssertTrue(Owner != "")
-	Source .= "#Include " . Owner . "`n#Include " . _GPSE_DataOwner("TouchpadRegistryData") . "`n"
+	Source .= "#Include " . Owner . "`n"
 	for Name in ["_Onboarding_StartGestureAuto", "_Onboarding_ReserveGestureAuto", "_Onboarding_AbortGestureAutoReservation",
-		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult", "_Onboarding_BuildGesturePsScript",
+		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult",
 		"GestureRestartTouchpadDevice", "_GestureRestartReserve", "_GestureRestartAbortReservation",
-		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript",
-		"TouchpadRegistryPowerShellKey", "TouchpadRegistryPowerShellValues"] {
+		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "the child needs the entire actual function: " . Name)
 		if Name == "_Onboarding_StartGestureAuto" || Name == "GestureRestartTouchpadDevice"
@@ -96,14 +70,19 @@ _GPSE_Complete(State, Code, Output, ErrorText) {
 	State.Calls += 1
 }
 
-_GPSE_Wait(Task, State) {
+; The completion callback is the settle event; the deadline only bounds it. A
+; stalled task names its stage and whether its process still runs, so a slow
+; cold start reads differently from a callback that was never delivered.
+_GPSE_Wait(Task, State, Stage) {
 	AssertTrue(Task.start(), "the exact private native task must start")
+	Pid := Task.processId()
 	Started := A_TickCount
 	while State.Calls == 0 && TickElapsed(Started) < 15000 {
 		_SR_TreePoll()
 		Sleep(10)
 	}
-	AssertEqual(1, State.Calls, "the private native task must settle once")
+	AssertEqual(1, State.Calls, "the private native task must settle once: stage=" . Stage
+		. " pid=" . Pid . " alive=" . (ProcessExist(Pid) ? 1 : 0) . " elapsed_ms=" . TickElapsed(Started))
 	AssertEqual("", State.ErrorText, State.Output)
 	AssertEqual(0, State.Code, State.Output)
 }
@@ -140,7 +119,7 @@ _GPSE_Parse(Tasks, PowerShell, Probe, Artifact, Output) {
 		["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Probe, Artifact, Output],
 		_GPSE_Complete.Bind(State))
 	Tasks.Push(Task)
-	_GPSE_Wait(Task, State)
+	_GPSE_Wait(Task, State, "parser")
 	Retirement := Task.terminate()
 	AssertTrue(Retirement is Integer && Retirement == 1, "the exact parser process tree must retire")
 	Result := JsonParse(FSReadStrict(Output))
@@ -169,7 +148,7 @@ _GPSE_Case(Caller, Unicode) {
 		Task := ShellRunner_SpawnTreeOwnedCommand(A_AhkPath, Command, _GPSE_Environment(Directory), Root,
 			_GPSE_Complete.Bind(State))
 		Tasks.Push(Task)
-		_GPSE_Wait(Task, State)
+		_GPSE_Wait(Task, State, "producer")
 		Retirement := Task.terminate()
 		AssertTrue(Retirement is Integer && Retirement == 1, "the artifact producer must physically retire")
 		AssertContains(State.Output, "PASS gesture-powershell-producer " . Caller)

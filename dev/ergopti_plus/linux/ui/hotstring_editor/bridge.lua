@@ -89,6 +89,11 @@ local _pending_mode = "menu"
 local _writer, _reader = nil, nil
 local _opening = nil
 
+-- Whether the last save of the current page was refused. The page's shortcut
+-- auto-close sends `close` right after `save` without reading its answer, so
+-- closing then would destroy the only copy of the draft.
+local _save_refused = false
+
 --- @return table|nil
 local function get_writer()
 	if _writer then return _writer end
@@ -144,7 +149,7 @@ end
 --- @return boolean|string
 local function pref(key)
 	local stored = Storage.get(PREF_PREFIX .. key, nil)
-	if stored == nil then return PREF_DEFAULTS[key] end
+	if type(stored) ~= type(PREF_DEFAULTS[key]) then return PREF_DEFAULTS[key] end
 	return stored
 end
 
@@ -257,7 +262,9 @@ end
 --- @param open_mode string|nil "menu" or "shortcut".
 --- @param parsed table Projection of the exact displayed source.
 --- @return table
-local function build_payload(state, open_mode, parsed)
+local function build_payload(state, open_mode, parsed, opening)
+	opening.row_origins = {}
+	local row_number = 0
 	local sections = {}
 
 	if type(parsed) == "table" and type(parsed.sections_order) == "table" then
@@ -269,7 +276,11 @@ local function build_payload(state, open_mode, parsed)
 			if type(sec) == "table" then
 				local entries = {}
 				for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
+					row_number = row_number + 1
+					local id = "row:" .. row_number
+					opening.row_origins[id] = { section = name, trigger = e.trigger }
 					entries[#entries + 1] = {
+						origin_id         = id,
 						trigger           = type(e.trigger) == "string" and e.trigger or "",
 						output            = type(e.output) == "string" and e.output or "",
 						is_word           = e.is_word == true,
@@ -306,6 +317,7 @@ local function build_payload(state, open_mode, parsed)
 	local star = MagicKey.default()
 	return {
 		sections         = sections,
+		row_identity     = true,
 		-- The key in effect, which is the user's if they chose one. `star` stays
 		-- the shipped character: the UI uses it for the literal it inserts from its
 		-- symbol palette, and that must not drift when someone rebinds the trigger.
@@ -344,12 +356,36 @@ local function save_all(state, data, context)
 	local path = personal_path(state)
 	local writer = get_writer()
 	if not path or not writer or not (_opening == opening and opening_current(opening, state, context)) then return false end
-	if type(data) ~= "table" or type(data.sections) ~= "table" then
-		Logger.error(LOG, "Save rejected: the payload carries no sections.")
+	if type(data) ~= "table" or type(data.sections) ~= "table" or type(data.sections_order) ~= "table" then
+		Logger.error(LOG, "Save rejected: the section model is incomplete.")
 		return false
 	end
 
-	local order = type(data.sections_order) == "table" and data.sections_order or {}
+	local order, listed = data.sections_order, {}
+	for index in pairs(order) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #order then return false end
+	end
+	for index = 1, #order do
+		local name = order[index]
+		if type(name) ~= "string" or name == "" or listed[name] or type(data.sections[name]) ~= "table" then return false end
+		if type(data.sections[name].description) ~= "string" then return false end
+		local entries = data.sections[name].entries
+		if type(entries) ~= "table" then return false end
+		for entry_index in pairs(entries) do
+			if type(entry_index) ~= "number" or entry_index % 1 ~= 0 or entry_index < 1 or entry_index > #entries then return false end
+		end
+		for entry_index = 1, #entries do
+			local entry = entries[entry_index]
+			if type(entry) ~= "table" then return false end
+			if type(entry.trigger) ~= "string" or entry.trigger == "" or type(entry.output) ~= "string" then return false end
+			for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict" }) do
+				if type(entry[flag]) ~= "boolean" then return false end
+			end
+			if entry.priority ~= nil and not require("hotstrings.personal_metadata").valid("priority", entry.priority) then return false end
+		end
+		listed[name] = true
+	end
+	for name in pairs(data.sections) do if not listed[name] then return false end end
 	local toml = {
 		meta           = { description = "Personal" },
 		sections_order = {},
@@ -416,13 +452,20 @@ local function save_all(state, data, context)
 		end
 	end
 
+	local next_origins, seen_ids = {}, {}
 	for _, name in ipairs(order) do
 		local sec = data.sections[name]
 		if type(sec) == "table" then
 			local entries = {}
 			for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
 				if type(e.trigger) == "string" and e.trigger ~= "" then
+					local id = e.origin_id
+					if id ~= nil and (type(id) ~= "string" or seen_ids[id]
+						or (not opening.row_origins[id] and not id:match("^new:%d+$"))) then return false end
+					if id then seen_ids[id] = true; next_origins[id] = { section = name, trigger = e.trigger } end
 					entries[#entries + 1] = {
+						_origin = id and opening.row_origins[id] or nil,
+						_identity_new = id ~= nil and opening.row_origins[id] == nil,
 						trigger           = e.trigger,
 						output            = type(e.output) == "string" and e.output or "",
 						is_word           = e.is_word == true,
@@ -457,6 +500,7 @@ local function save_all(state, data, context)
 		return false
 	end
 	opening.source = { status = "ok", content = committed }
+	opening.row_origins = next_origins
 
 	local count = 0
 	for _, sec in pairs(toml.sections) do count = count + #sec.entries end
@@ -535,18 +579,38 @@ end
 --- that reaches only the log is a failure the user never learns about.
 --- @param message string Already translated.
 --- @return boolean
-function M.show_alert(message)
+function M.show_alert(message, context)
 	local ok_json, json_mod = pcall(require, "json")
 	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
 	if not ok_json or not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "%s", tostring(message))
 		return false
 	end
+	local epoch = type(context) == "table" and context.epoch or nil
+	local current_epoch = Manager.current_epoch
+	local page_current = Manager.page_current
+	local function current()
+		if epoch == nil then return true end
+		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
+			or type(page_current) ~= "function" or Manager.current_epoch ~= current_epoch
+			or Manager.page_current ~= page_current or package.loaded["ui.webview_manager"] ~= Manager then return false end
+		local ok, observed = pcall(current_epoch, APP_NAME)
+		if not ok or observed ~= epoch then return false end
+		local checked, live = pcall(page_current, APP_NAME, epoch)
+		if not checked or live ~= true or Manager.page_current ~= page_current
+			or Manager.current_epoch ~= current_epoch then return false end
+		local reread, final = pcall(current_epoch, APP_NAME)
+		return reread and final == epoch and package.loaded["ui.webview_manager"] == Manager
+			and Manager.current_epoch == current_epoch
+			and Manager.page_current == page_current
+	end
+	if not current() then return false end
 	local ok_enc, encoded = pcall(json_mod.encode, tostring(message))
 	if not ok_enc then
 		Logger.error(LOG, "%s", tostring(message))
 		return false
 	end
+	if not current() then return false end
 	return Manager.eval_js(APP_NAME, "if(window.showAlert)showAlert(" .. encoded .. ")")
 end
 
@@ -559,6 +623,7 @@ end
 --- @return boolean True when the push reached a live webview.
 function M.push_init(state, context)
 	_opening = nil
+	_save_refused = false
 	local opening = capture_opening(state, context)
 	if not opening then return false end
 	local ok_json, json_mod = pcall(require, "json")
@@ -568,7 +633,7 @@ function M.push_init(state, context)
 	end
 
 	local ok_payload, encoded = pcall(function()
-		return json_mod.encode(build_payload(state, _pending_mode, opening.parsed))
+		return json_mod.encode(build_payload(state, _pending_mode, opening.parsed, opening))
 	end)
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push initData(): payload encoding failed (%s).", tostring(encoded))
@@ -642,7 +707,15 @@ function M.on_message(payload, state, context)
 	end
 
 	if action == "save" then
-		local saved = save_all(state, data, context)
+		local opening = _opening
+		if opening and opening.saving then
+			return { saved = false, busy = true }
+		end
+		if opening then opening.saving = true end
+		local ok, saved = pcall(save_all, state, data, context)
+		if opening then opening.saving = false end
+		if not ok then error(saved, 0) end
+		_save_refused = saved ~= true
 		if not saved then
 			-- The page flashes its "saved" toast whatever this returns — it does not
 			-- read bridge responses — so a failed write was visible only as a log
@@ -650,7 +723,7 @@ function M.on_message(payload, state, context)
 			-- with a confirmation on screen saying otherwise. macOS raises a native
 			-- notification here; this driver's channel into the page is the alert
 			-- the shared script already defines.
-			M.show_alert(i18n_label("editor.hotstrings.save_error"))
+			M.show_alert(i18n_label("editor.hotstrings.save_error"), context)
 		end
 		return { saved = saved }
 	end
@@ -692,8 +765,25 @@ function M.on_message(payload, state, context)
 	end
 
 	if action == "close" then
+		-- Sent only by the shortcut auto-close. It must retire the exact window
+		-- through the manager's epoch-bound capability (audit LVB-001), and never
+		-- after a refused save, which would lose the draft (audit MVB-002).
+		if _save_refused then
+			Logger.warn(LOG, "Hotstring editor kept open: its last save was refused, the draft would be lost.")
+			return { closed = false }
+		end
+		local close = type(context) == "table" and context.close_owned_window or nil
+		if type(close) ~= "function" then
+			Logger.error(LOG, "Hotstring editor close refused — no owned window capability.")
+			return { closed = false }
+		end
+		local ok, closed = pcall(close)
+		if not ok or closed ~= true then
+			Logger.error(LOG, "Hotstring editor window did not close: %s.", tostring(closed))
+			return { closed = false }
+		end
 		Logger.info(LOG, "Hotstring editor closed.")
-		return nil
+		return { closed = true }
 	end
 
 	Logger.debug(LOG, "Unhandled editor action: %s.", tostring(action))

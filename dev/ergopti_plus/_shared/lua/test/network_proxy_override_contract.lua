@@ -62,6 +62,28 @@ function M.register(read, helpers)
 	end)
 
 	helpers.describe("shared proxy override: menu row", function()
+		helpers.it("does not promise unchanged settings when saving is unconfirmed", function()
+			local retired_promises = {
+				ar = "لم يتغير شيء", cs = "Nic se nezměnilo", da = "Intet er ændret",
+				de = "Nichts wurde geändert", en = "Nothing has changed", es = "No ha cambiado nada",
+				fr = "Rien n'a changé", he = "דבר לא השתנה", hi = "कुछ नहीं बदला",
+				it = "Non è cambiato nulla", ja = "何も変更されていません", ko = "아무것도 바뀌지 않았습니다",
+				nl = "Er is niets veranderd", no = "Ingenting er endret", pl = "Nic się nie zmieniło",
+				pt = "Nada mudou", ru = "Ничего не изменилось", sv = "Inget har ändrats",
+				tr = "Hiçbir şey değişmedi", uk = "Нічого не змінилося", zh = "未做任何更改",
+			}
+			for locale, promise in pairs(retired_promises) do
+				local messages = Json.decode(assert(read("data/locales/" .. locale .. ".json")))
+				local message = messages[Override.KEYS.not_saved]
+				helpers.assert_true(type(message) == "string" and message ~= "", locale .. " must describe the unconfirmed save")
+				helpers.assert_nil(message:find(promise, 1, true), locale .. " must not promise that nothing changed")
+			end
+			local english = Json.decode(assert(read("data/locales/en.json")))[Override.KEYS.not_saved]
+			local french = Json.decode(assert(read("data/locales/fr.json")))[Override.KEYS.not_saved]
+			helpers.assert_true(english:find("confirmed", 1, true) ~= nil)
+			helpers.assert_true(french:find("confirmé", 1, true) ~= nil)
+		end)
+
 		local function ports(stored, typed, set_result)
 			local p = { store = { ["network.proxy_override"] = stored }, shown = {}, logs = {}, writes = 0 }
 			p.get = function(key) return p.store[key] end

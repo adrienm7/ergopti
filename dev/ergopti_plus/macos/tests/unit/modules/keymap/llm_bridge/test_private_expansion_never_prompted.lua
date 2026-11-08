@@ -6,7 +6,7 @@
 --- (private-ai-context) rules_engine registers the personal-information
 --- expansions (phone, SSN, IBAN) as ordinary mappings flagged is_private. They
 --- are not final results, so their replacement stays in the hotstring buffer,
---- and the bridge mirrors that buffer into the AI context (`llm_buffer`) at each
+--- and the bridge once mirrored that buffer into the AI context at each
 --- preview: the next prediction request, local (Ollama, MLX) or remote, then
 --- carried the secret in its prompt. Linux does not (its AI context object
 --- clears on a private replacement); macOS now withholds everything up to the
@@ -146,6 +146,7 @@ local function build_world()
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
 	state.DELAYS = { llm_prediction = 1 }
 	assert(Registry.init(state) == true)
+	require("modules.keymap.llm_context").reset(state)
 	assert(bridge.init(state, {}) == true)
 	assert(Expander.init(state, Registry, bridge) == true)
 	engine.set_llm_enabled(true)
@@ -181,6 +182,7 @@ end
 --- @param text string
 local function type_text(world, text)
 	world.state.buffer = world.state.buffer .. text
+	require("modules.keymap.llm_context").append(world.state, text)
 	world.bridge.update_preview(world.state.buffer)
 end
 
@@ -238,6 +240,7 @@ helpers.describe("a private expansion never reaches an AI prompt (private-ai-con
 		expand_private(world)
 		for _ = 1, 3 do
 			world.state.buffer = world.state.buffer:sub(1, -2)
+			require("modules.keymap.llm_context").backspace(world.state)
 			world.bridge.update_preview(world.state.buffer)
 		end
 		helpers.assert_true(world.state.buffer:find(SECRET:sub(1, 8), 1, true) ~= nil,
@@ -302,19 +305,19 @@ helpers.describe("the other doors of the AI context stay shut too (private-ai-co
 			"the context is what follows the secret, the accepted words included")
 	end)
 
-	it("a head cut of the hotstring buffer keeps describing it", function()
+	it("trimming the hotstring buffer preserves the independent private boundary", function()
 		local world = build_world()
 		local bridge, state = world.bridge, world.state
-		local before = "xxSECRET tail"
-		bridge.mark_private_context("xxSECRET")
-		bridge.private_context_trimmed(before, 2)
-		helpers.assert_eq(state.llm_private_mark, "SECRET")
-		local after = before:sub(3)
-		bridge.update_preview(after)
-		helpers.assert_eq(state.llm_buffer, " tail", "the cut buffer still hides the secret")
-		bridge.private_context_trimmed(after, 6)
-		helpers.assert_eq(state.llm_private_mark, "", "a secret cut away entirely leaves nothing to hide")
-		bridge.update_preview(" tail more")
+		type_text(world, "xxSECRET")
+		bridge.mark_private_context(state.buffer)
+		type_text(world, " tail")
+		state.buffer = state.buffer:sub(3)
+		bridge.update_preview(state.buffer)
+		helpers.assert_eq(state.llm_buffer, " tail", "the private prefix remains withheld")
+		state.buffer = state.buffer:sub(7)
+		bridge.update_preview(state.buffer)
+		helpers.assert_eq(state.llm_buffer, " tail", "hotstring trimming must not remove the AI privacy boundary")
+		type_text(world, " more")
 		helpers.assert_eq(state.llm_buffer, " tail more")
 	end)
 end)

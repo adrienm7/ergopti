@@ -225,6 +225,30 @@ helpers.describe("AT-SPI focus query", function()
 		end)
 	end
 
+	helpers.it("native focus context closes process stream after read exception", function()
+		local field = { id = "field", focused = true, role = 61, bus = ":1.20", path = "/owned/field" }
+		local frame = { id = "frame", active = true, name = "Owned frame", bus = ":1.10", path = "/owned/frame", children = { field } }
+		local fake = backend({ id = "desktop", children = { { id = "app", children = { frame } } } })
+		fake.active = function(node) return node.active == true end
+		fake.retain = function(node) return node end
+		fake.process_id = function() return 123456 end
+		fake.identity = function(node)
+			return { name = node.name or "", attributes = {}, native_bus_name = node.bus, native_object_path = node.path }
+		end
+		AtspiFocus._set_backend_for_test(fake)
+		local original, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/123456/comm" then return original(path, mode) end
+			return { read = function() error("injected read error") end, close = function() closes = closes + 1; return true end }
+		end
+		local called, snapshot, conclusive = pcall(AtspiFocus._get_native_context_snapshot)
+		io.open = original
+		AtspiFocus._set_backend_for_test(nil)
+		helpers.assert_true(called)
+		helpers.assert_nil(snapshot); helpers.assert_eq(conclusive, false)
+		helpers.assert_eq(closes, 1, "native process stream must always close")
+	end)
+
 	helpers.it("(focus-context-join) embedded cross-process fields retain their actual active frame ancestor", function()
 		local tree = { id = "desktop", children = { { id = "app", children = {
 			{ id = "frame", active = true, name = "Owned native frame", bus = ":1.10", path = "/owned/frame",

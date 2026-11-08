@@ -54,6 +54,45 @@ local function harness(request_exit, schedule_result, timer_stop_result)
 end
 
 helpers.describe("bounded emergency exit", function()
+	helpers.it("refuses nonfinite or oversized deadlines before starting work (emergency-deadline-range)", function()
+		for _, value in ipairs({ 0 / 0, math.huge, math.maxinteger }) do
+			local emergency = load_emergency()
+			local requests = 0
+			local options, calls = harness(function() requests = requests + 1; return true end)
+			options.deadline_seconds = value
+			helpers.assert_eq(emergency.request(options), false)
+			helpers.assert_eq(requests, 0)
+			helpers.assert_eq(calls.delay, nil)
+		end
+	end)
+
+	helpers.it("forces exit even when deadline diagnostics contain opaque errors (emergency-opaque-error)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		for _, scenario in ipairs({
+			{ stop_raises = true, describe_raises = false },
+			{ stop_raises = false, describe_raises = false },
+			{ stop_raises = false, describe_raises = true },
+		}) do
+			local emergency = load_emergency()
+			local options, calls = harness(function() return true end)
+			local deadline
+			options.schedule = function(_, callback)
+				deadline = callback
+				return { stop = function()
+					if scenario.stop_raises then error(hostile) end
+					return true
+				end }
+			end
+			options.describe = function()
+				if scenario.describe_raises then error(hostile) end
+				return hostile
+			end
+			helpers.assert_true(emergency.request(options))
+			helpers.assert_true(pcall(deadline), "a diagnostic error must not escape the watchdog")
+			helpers.assert_eq(calls.exits, 1, "EOF must still revoke the exact lease")
+		end
+	end)
+
 	helpers.it("forces EOF when an accepted exact fence never settles", function()
 		local emergency = load_emergency()
 		local options, calls, deadline = harness(function() return true end)
@@ -102,6 +141,18 @@ helpers.describe("bounded emergency exit", function()
 		helpers.assert_eq(calls.exits, 1)
 		helpers.assert_eq(request_calls, 0,
 			"a failed deadline must exit before starting an unbounded async request")
+	end)
+
+	helpers.it("rejects a malformed deadline handle before starting the fence (emergency-deadline-handle)", function()
+		for _, malformed in ipairs({ true, {} }) do
+			local emergency = load_emergency()
+			local request_calls = 0
+			local options, calls = harness(function() request_calls = request_calls + 1; return true end)
+			options.schedule = function() return malformed end
+			helpers.assert_eq(emergency.request(options), false)
+			helpers.assert_eq(calls.exits, 1, "an unproven deadline requires the EOF backstop")
+			helpers.assert_eq(request_calls, 0)
+		end
 	end)
 
 	helpers.it("does not retain or start work after an inline deadline fires", function()

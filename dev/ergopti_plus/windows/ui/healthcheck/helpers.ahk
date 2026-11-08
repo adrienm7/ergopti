@@ -189,7 +189,7 @@ _HealthCheck_Hardware() {
 	Cores := EnvGet("NUMBER_OF_PROCESSORS")
 	if IsInteger(Cores)
 		Hardware["cpu_cores"] := Integer(Cores)
-	Hardware["arch"] := A_Is64bitOS ? "x64" : "x86"
+	_HealthCheck_Put(Hardware, "arch", _HealthCheck_Read("the native architecture", DiagSnapshot_NativeArchitecture))
 	Memory := _HealthCheck_Read("the memory", _HealthCheck_Memory)
 	if (Memory is Map)
 		Hardware["ram_total"] := Memory["total"]
@@ -333,6 +333,39 @@ _HealthCheck_Features(LlmSnapshotFn := 0, KeystatsSnapshotFn := 0) {
 		Owner := KeystatsSnapshotFn.Call()
 		if (Owner is Map && Owner.Has("enabled"))
 			Items.Push(Map("id", "metrics", "enabled", Owner["enabled"] ? true : false))
+	}
+	return Map("items", Items)
+}
+
+; The features this platform lacks, from the generated manifest: the only
+; place a user can ask why a menu row they read about is not in their menu.
+; Every absence is listed, explained or not, as the Lua drivers'
+; _shared/lua/healthcheck/unavailable.lua does: a list of only the explained
+; ones would look complete while hiding the ones that matter most.
+; @param Unavailable {Array|Integer} Manifest absences (tests replace them).
+; @returns {Map} { items: Array of { feature, platforms, reason } }
+_HealthCheck_Unavailable(Unavailable := 0) {
+	global FEATURES_MANIFEST
+	if !(Unavailable is Array)
+		Unavailable := FEATURES_MANIFEST["unavailable"]
+	PlatformNames := Map("ahk", "Windows", "hs", "macOS", "linux", "Linux")
+	Items := []
+	for Gap in Unavailable {
+		Names := ""
+		for Code in Gap["platforms"] {
+			if !PlatformNames.Has(Code)
+				throw ValueError("The manifest names an unknown platform: " . Code)
+			Names .= (Names == "" ? "" : ", ") . PlatformNames[Code]
+		}
+		Item := Map("feature", Gap["path"], "platforms", Names)
+		Reason := Gap.Get("reason_key", "")
+		if (Reason is String && Reason != "")
+			Item["reason"] := Reason
+		; Insertion keeps the items ordered by feature path, as the Lua collector sorts them
+		Index := Items.Length + 1
+		while (Index > 1 && StrCompare(Items[Index - 1]["feature"], Item["feature"], true) > 0)
+			Index -= 1
+		Items.InsertAt(Index, Item)
 	}
 	return Map("items", Items)
 }

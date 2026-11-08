@@ -25,6 +25,7 @@ local hs       = hs
 local utf8     = utf8
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
+local WPMActivity = require("keystats.wpm_activity")
 local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("config_keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
@@ -44,6 +45,7 @@ local PrivacyContext = require("modules.keystats.privacy_context")
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
 -- docstring says macOS uses — the shared copy existed only to be shadowed.
 local Metrics        = require("keystats.metrics")
+local TriggerRoi     = require("keystats.trigger_roi")
 local Watchers       = require("modules.keystats.watchers")
 local ProcessLifecycle = require("adapters.process_lifecycle")
 local KeyboardHook   = require("adapters.keyboard_hook")
@@ -206,6 +208,7 @@ local CoreState = {
 	last_flush_time       = hs.timer.absoluteTime() / 1000000,
 	current_session_pause = 0,
 	session_start_time    = 0,
+	session_generation    = 0,
 	session_last_active   = 0,
 	is_micro_idle         = false,
 
@@ -241,6 +244,7 @@ local CoreState = {
 	passive_kind          = nil,
 
 	-- Last autocomplete source (for the WPM overlay)
+	wpm_activity          = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms")),
 	last_source_type      = "none",
 	last_source_variant   = "none",
 	last_source_time      = 0,
@@ -323,6 +327,8 @@ local _system_auth_modifier_settlement_pending = false
 --- survives successive source transitions until that exact physical key releases.
 --- @return boolean settled
 local function settle_physical_modifiers()
+	-- The same admission boundary retires a candidate even if no excluded key arrives.
+	if CoreState.trigger_roi then TriggerRoi.discard(CoreState.trigger_roi) end
 	local held, suppressed = CoreState.modifier_down_at, CoreState.modifier_suppressed_releases
 	if type(held) ~= "table" or type(suppressed) ~= "table"
 		or getmetatable(held) ~= nil or getmetatable(suppressed) ~= nil then return false end
@@ -510,6 +516,70 @@ local _layout_listener      = nil
 -- Cached module references to avoid pcall(require, ...) on every keystroke
 local _keymap_mod = nil
 
+--- Retires a physical fragment on any admission or synthetic-output boundary.
+local function discard_roi_word()
+	if CoreState.trigger_roi then TriggerRoi.discard(CoreState.trigger_roi) end
+end
+
+--- Retires every unpersisted ROI word before an encryption policy transition.
+function M.revoke_roi_text()
+	if CoreState.trigger_roi then TriggerRoi.set_text_enabled(CoreState.trigger_roi, false) end
+end
+
+--- Requires both the requested configuration and cipher owner to explicitly admit text.
+local function roi_text_enabled()
+	if not CoreState.options or CoreState.options.encrypt ~= false then return false end
+	local cipher = require("modules.keystats.text_cipher")
+	if type(cipher.roi_text_enabled) ~= "function" then return false end
+	local called, allowed = pcall(cipher.roi_text_enabled)
+	return called and allowed == true
+end
+
+--- Refreshes the process owner without reviving previously retired text.
+local function sync_roi_text()
+	if CoreState.trigger_roi then TriggerRoi.set_text_enabled(CoreState.trigger_roi, roi_text_enabled()) end
+end
+
+--- Transfers ROI events to the existing outbox without formatting time in the event tap.
+local function drain_roi()
+	if not CoreState.trigger_roi then return true end
+	sync_roi_text()
+	return TriggerRoi.drain(CoreState.trigger_roi, function(event)
+		return LogManager.defer_entry_builder(function()
+			local entry = TableUtil.shallow_copy(event)
+			if type(entry.timestamp) == "number" then entry.timestamp = Timestamp.format_epoch(entry.timestamp) end
+			return entry
+		end, TriggerRoi.is_text_event(event)) == true
+	end)
+end
+
+--- Counts only admitted physical text under the context already published by native observers.
+local function record_roi_key(chars, keycode)
+	if not CoreState.trigger_roi then return end
+	sync_roi_text()
+	local context = { app = CoreState.active_app_name, window = CoreState.roi_window_id,
+		title = CoreState.active_win_title, timestamp = Timestamp.now_epoch() }
+	local function known(word)
+		if not _keymap_mod or type(_keymap_mod.is_known_trigger) ~= "function" then return nil end
+		return _keymap_mod.is_known_trigger(word)
+	end
+	local key = SPECIAL_KEY_LABELS[keycode]
+	if key and key ~= "Space" then
+		TriggerRoi.key(CoreState.trigger_roi, key, context, known)
+	else TriggerRoi.text(CoreState.trigger_roi, chars, context, known) end
+	drain_roi()
+end
+
+--- Samples software-only half-life on the already owned maintenance timer.
+local function tick_roi()
+	if not CoreState.trigger_roi then return end
+	sync_roi_text()
+	if not M.may_persist() then discard_roi_word(); return end
+	TriggerRoi.tick(CoreState.trigger_roi, hs.timer.absoluteTime() / 1000000,
+		CoreState.active_app_name or "Unknown", Timestamp.now_epoch())
+	drain_roi()
+end
+
 local ACTION_EPOCH_LISTENER_ID = "modules.keystats.action_epoch"
 local _action_listener_registered = false
 local _last_action_epoch = SyntheticInput.current_action_epoch()
@@ -530,6 +600,7 @@ local _kc_bridge_shutdown_complete = false
 --- @param handoff_time_ms number|nil Monotonic action handoff timestamp.
 local function reconcile_action_epoch(epoch, handoff_time_ms)
 	if epoch == _last_action_epoch then return end
+	discard_roi_word()
 	if CoreState.is_enabled then
 		local previous_time_ms = CoreState.last_time
 		if not LogManager.defer_flush_buffer() then
@@ -727,7 +798,7 @@ local function handle_key(event_obj)
 			returned_events = fence.events
 			consume_original = fence.consume_original == true
 		end
-		if consume_original then return end
+		if consume_original then discard_roi_word(); return end
 		-- This tap may be upstream or downstream of keymap. Whichever non-owned
 		-- consumer runs first claims every older deferred action in
 		-- classify_with_fence(), making the returned payload order independent of
@@ -741,6 +812,7 @@ local function handle_key(event_obj)
 		end
 
 		if provenance then
+			discard_roi_word()
 			-- Logical action boundaries are process-wide epochs, never whichever
 			-- consumer happens to see a transaction's first tagged event. Replacement
 			-- text was already recorded logically by notify_synthetic().
@@ -748,6 +820,7 @@ local function handle_key(event_obj)
 		end
 
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
+			discard_roi_word()
 			-- Preserve the already-observed run through the deferred O(1) outbox, but
 			-- do not let an event whose tag could not be read enter human telemetry.
 			LogManager.defer_flush_buffer()
@@ -757,7 +830,7 @@ local function handle_key(event_obj)
 		end
 
 		-- Refused settlement retains malformed debt until its actual owner retries.
-		if _modifier_context_pending then return end
+		if _modifier_context_pending then discard_roi_word(); return end
 
 		-- A known physical crossing release must retire its marker even while
 		-- pause/privacy excludes telemetry. It emits no press or hold and cannot
@@ -771,7 +844,7 @@ local function handle_key(event_obj)
 			end
 		end
 
-		if not CoreState.is_enabled then return end
+		if not CoreState.is_enabled then discard_roi_word(); return end
 
 		-- If the script control module signals a pause (e.g. during hotstring expansion),
 		-- flush and skip — we do not want to interleave expansion events with real typing
@@ -779,6 +852,7 @@ local function handle_key(event_obj)
 		and type(_script_control.is_paused) == "function"
 		and _script_control.is_paused()
 		then
+			discard_roi_word()
 			-- Observed physical releases retire their old hold even while telemetry
 			-- is paused. A new paused press has no usable timestamp: retain only
 			-- its crossing-release marker until that exact key releases.
@@ -803,6 +877,7 @@ local function handle_key(event_obj)
 		-- question differently — they used to, and notify_synthetic persisted
 		-- expansions this branch would have refused.
 		if not M.context_allows_logging() then
+			discard_roi_word()
 			-- Retain observed per-key release state, never an excluded duration.
 			if evt_type == hs.eventtap.event.types.flagsChanged then
 				local keycode = event_obj:getKeyCode()
@@ -829,10 +904,17 @@ local function handle_key(event_obj)
 			})
 		end
 
+		-- A middle/auxiliary click can move the insertion point without a key.
+		if evt_type == hs.eventtap.event.types.otherMouseDown then
+			discard_roi_word()
+			return
+		end
+
 		-- Mouse events: flush any pending typing context then propagate
 		if evt_type == hs.eventtap.event.types.leftMouseDown
 		or evt_type == hs.eventtap.event.types.rightMouseDown
 		then
+			discard_roi_word()
 			CoreState.session_mouse_clicks = CoreState.session_mouse_clicks + 1
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
 			-- Re-seed the delay baseline. flush_buffer() zeroes CoreState.last_time,
@@ -843,6 +925,7 @@ local function handle_key(event_obj)
 			return
 		end
 		if evt_type == hs.eventtap.event.types.scrollWheel then
+			discard_roi_word()
 			CoreState.session_mouse_scrolls = CoreState.session_mouse_scrolls + 1
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
 			-- Re-seed the delay baseline. flush_buffer() zeroes CoreState.last_time,
@@ -872,6 +955,7 @@ local function handle_key(event_obj)
 				if not down_at then
 					-- Press — record timestamp and credit the kc dict
 					CoreState.modifier_down_at[keycode] = now
+					WPMActivity.record_input(CoreState.wpm_activity, now)
 					if credits then
 						LogManager.log_modifier_press(keycode, current_cached_app_name())
 					end
@@ -893,11 +977,13 @@ local function handle_key(event_obj)
 
 		local flags   = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
+		if not SILENT_KEYCODES[keycode] then WPMActivity.record_input(CoreState.wpm_activity, now) end
 
 		-- Shortcuts: flush then log immediately without entering the typing pipeline.
 		-- Current-process shortcuts (including paste-backed replacements) already
 		-- returned through the provenance guard above, independent of eventtap order.
 		if is_shortcut_candidate(flags, keycode) then
+			discard_roi_word()
 			LogManager.flush_buffer()
 			-- Same re-seed as the mouse branches: this one returns below without
 			-- ever reaching the keystroke path's assignment.
@@ -910,7 +996,7 @@ local function handle_key(event_obj)
 		end
 
 		-- Drop synthetic OS-signal keys before any logging or metric update
-		if SILENT_KEYCODES[keycode] then return end
+		if SILENT_KEYCODES[keycode] then discard_roi_word(); return end
 
 		-- getCharacters(false) returns the actual composed character for the current
 		-- keyboard layout; nil/empty means a dead-key that needs another stroke to resolve.
@@ -921,6 +1007,7 @@ local function handle_key(event_obj)
 		   and not F_KEY_CODES[keycode] and not NAV_KEY_CODES[keycode]
 		then return end
 		chars = chars or ""
+		record_roi_key(chars, keycode)
 
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
@@ -989,7 +1076,7 @@ local function handle_key(event_obj)
 		table.sort(active_mods)
 
 		local shift_side = flags.capslock and "capslock"
-			or (_keymap_mod and type(_keymap_mod.get_shift_side) == "function"
+			or (flags.shift and _keymap_mod and type(_keymap_mod.get_shift_side) == "function"
 				and _keymap_mod.get_shift_side()
 				or "none")
 
@@ -1170,11 +1257,13 @@ function M.set_options(opts)
 
 	local TextCipher = require("modules.keystats.text_cipher")
 	local want = CoreState.options.encrypt == true
+	if CoreState.options.encrypt ~= false and TextCipher.prepare_roi_encryption() ~= true then return false end
 	if want and not TextCipher.is_available() then
 		Logger.error(LOG, "At-rest encryption is configured on but no key can be derived — staying off.")
 		want = false
 	end
-	TextCipher.set_enabled(want)
+	if TextCipher.set_enabled(want, CoreState.options.encrypt ~= false) ~= true then return false end
+	sync_roi_text()
 
 	-- Pick up a conversion a previous session left unfinished. A RESUME only:
 	-- starting one unconditionally would re-read every stored row at every boot,
@@ -1182,6 +1271,7 @@ function M.set_options(opts)
 	require("modules.keystats.text_migration").resume_for_posture(want)
 
 	Logger.debug(LOG, "Options updated (at-rest encryption: %s).", tostring(want))
+	return true
 end
 
 --- Copies only plain configuration data, never native handles or metrics records.
@@ -1301,15 +1391,23 @@ function M.apply_configuration(config)
 		assert(type(config[key]) == "boolean", "invalid metrics filter: " .. key)
 	end
 	assert(type(config.options.encrypt) == "boolean", "invalid metrics encryption preference")
-	if require("modules.keystats.text_migration").is_running() then return false end
 	local cipher = require("modules.keystats.text_cipher")
 	local enabled = config.cipher_enabled
 	if enabled == nil then enabled = config.options.encrypt end
 	assert(type(enabled) == "boolean", "invalid native encryption posture")
-	if enabled and cipher.is_available() ~= true then return false end
-	cipher.set_enabled(enabled)
+	if (enabled or config.options.encrypt) and cipher.prepare_roi_encryption() ~= true then return false end
+	if require("modules.keystats.text_migration").is_running() then
+		cipher.abandon_roi_encryption(CoreState.options.encrypt)
+		return false
+	end
+	if enabled and cipher.is_available() ~= true then
+		cipher.abandon_roi_encryption(CoreState.options.encrypt)
+		return false
+	end
+	if cipher.set_enabled(enabled, config.options.encrypt) ~= true then return false end
 	if cipher.is_enabled() ~= enabled then return false end
 	CoreState.options = copy_configuration(config.options)
+	sync_roi_text()
 	CoreState.disabled_apps = _physical_configuration_binding
 		and require("keystats.physical_configuration_observation").own_apps(config.disabled_apps)
 		or copy_configuration(config.disabled_apps)
@@ -1380,9 +1478,16 @@ end
 --- typed is stored first, so the pause boundary never splits or discards it, and
 --- any modifier hold in progress is retired like any other exclusion.
 function M.suspend_collection()
+	discard_roi_word()
 	if CoreState.collection_suspended then return end
-	if CoreState.is_enabled then LogManager.flush_buffer() end
+	if CoreState.is_enabled then
+		LogManager.flush_buffer()
+		-- Window and app activity are collection too: close the foreground
+		-- interval owned before the pause so no paused time is credited to it.
+		ContextTracker.suspend_collection_context()
+	end
 	CoreState.collection_suspended = true
+	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	assert(settle_context_modifiers(), "Metrics pause modifier settlement remains pending")
 	Logger.info(LOG, "Metrics collection suspended by the user.")
 end
@@ -1391,6 +1496,7 @@ end
 function M.resume_collection()
 	if not CoreState.collection_suspended then return end
 	CoreState.collection_suspended = false
+	if CoreState.is_enabled then ContextTracker.resume_collection_context() end
 	assert(settle_context_modifiers(), "Metrics resume modifier settlement remains pending")
 	Logger.info(LOG, "Metrics collection resumed by the user.")
 end
@@ -1407,6 +1513,7 @@ end
 --- is cleared. Works while paused or disabled; it changes neither.
 --- @return boolean reset False when no session machinery is running to end it.
 function M.reset_session()
+	discard_roi_word()
 	if not CoreState.is_enabled then
 		Logger.warn(LOG, "Session reset ignored: metrics are not running.")
 		return false
@@ -1418,11 +1525,13 @@ function M.reset_session()
 			duration_ms = math.max(0, CoreState.session_last_active - CoreState.session_start_time),
 		})
 	end
+	CoreState.session_generation = CoreState.session_generation + 1
 	CoreState.session_start_time  = 0
 	CoreState.session_last_active = 0
 	CoreState.is_micro_idle       = false
 	CoreState.recent_typing_eff   = {}
 	CoreState.recent_typing_phys  = {}
+	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	CoreState.last_source_type    = "none"
 	CoreState.last_source_variant = "none"
 	CoreState.last_source_time    = 0
@@ -1538,16 +1647,19 @@ local function build_deferred_synthetic_snapshot(operation)
 		end
 	end
 
-	for _ = 1, operation.deletes do
-		remove_effective_timestamp_at_or_before(operation.timestamp_ms)
-	end
-	insert_effective_timestamps(operation.timestamp_ms, char_count)
-	if char_count > 0 then
-		CoreState.session_last_active = math.max(
-			CoreState.session_last_active or 0, operation.timestamp_ms)
-		if CoreState.session_start_time == 0
-			or CoreState.session_start_time > operation.timestamp_ms then
-			CoreState.session_start_time = operation.timestamp_ms
+	-- A queued historical snapshot must not reopen a session reset meanwhile.
+	if operation.session_generation == CoreState.session_generation then
+		for _ = 1, operation.deletes do
+			remove_effective_timestamp_at_or_before(operation.timestamp_ms)
+		end
+		insert_effective_timestamps(operation.timestamp_ms, char_count)
+		if char_count > 0 then
+			CoreState.session_last_active = math.max(
+				CoreState.session_last_active or 0, operation.timestamp_ms)
+			if CoreState.session_start_time == 0
+				or CoreState.session_start_time > operation.timestamp_ms then
+				CoreState.session_start_time = operation.timestamp_ms
+			end
 		end
 	end
 
@@ -1563,6 +1675,7 @@ end
 ---        excluded independently by immutable event provenance; this function
 ---        records only the logical replacement.
 function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo, is_private)
+	discard_roi_word()
 	-- Expander notifies unconditionally, but an opt-in keystats that is currently
 	-- disabled or paused must not accumulate logical events or WPM samples for later.
 	if not M.may_persist() then return end
@@ -1582,6 +1695,7 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 		deletes = deletes and math.max(0, math.floor(deletes)) or 0,
 		is_private = is_private == true,
 		timestamp_ms = timestamp_ms,
+		session_generation = CoreState.session_generation,
 	}
 
 	-- `physical_echo` remains in the public signature for compatibility; immutable
@@ -1603,6 +1717,9 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	CoreState.last_source_type    = source_type
 	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
 	CoreState.last_source_time    = timestamp_ms / 1000
+	if operation.text ~= "" then
+		WPMActivity.mark_source(CoreState.wpm_activity, source_type, source_variant, timestamp_ms)
+	end
 	return true
 end
 
@@ -1636,13 +1753,13 @@ function M.get_live_stats()
 		end
 	end
 
-	return {
+	return WPMActivity.snapshot(CoreState.wpm_activity, {
 		wpm            = wpm_eff,
 		wpm_physical   = wpm_phys,
 		source         = CoreState.last_source_type,
 		source_variant = CoreState.last_source_variant,
 		source_time    = CoreState.last_source_time,
-	}
+	}, now)
 end
 
 --- Exposes the in-memory today N-gram index for read-only access.
@@ -1659,6 +1776,7 @@ end
 --- @param replacement string The expanded replacement text.
 --- @param h_type string Hotstring category ("star", "autocorrect", "personal", …).
 function M.log_hotstring(trigger, replacement, h_type)
+	discard_roi_word()
 	if not M.may_persist() then return end
 	if not LogManager.defer_flush_buffer() then
 		Logger.error(LOG, "log_hotstring(): prior typing was not accepted by the outbox.")
@@ -1682,7 +1800,27 @@ function M.log_hotstring(trigger, replacement, h_type)
 		return false
 	end
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+	if CoreState.trigger_roi then
+		sync_roi_text()
+		TriggerRoi.hotstring(CoreState.trigger_roi, trigger, replacement, false,
+			CoreState.last_flush_time, app_name, Timestamp.now_epoch())
+		drain_roi()
+	end
 	return true
+end
+
+--- Counts an accepted private expansion without retaining either string in any event.
+--- @param trigger string Private input, used only to compute its UTF-16 length.
+--- @param replacement string Private output, used only to compute its UTF-16 length.
+--- @return boolean
+function M.log_private_hotstring(trigger, replacement)
+	discard_roi_word()
+	if not M.may_persist() or not CoreState.trigger_roi then return false end
+	sync_roi_text()
+	local accepted = TriggerRoi.hotstring(CoreState.trigger_roi, trigger, replacement, true,
+		hs.timer.absoluteTime() / 1000000, CoreState.active_app_name or "Unknown", Timestamp.now_epoch())
+	if accepted then drain_roi() end
+	return accepted
 end
 
 --- Logs an LLM prediction generation event with optional provenance metadata.
@@ -1967,8 +2105,18 @@ end
 --- @param opts table|nil Forwarded to LogManager.stop (`process_exit`).
 --- @return boolean complete True only when every runtime owner is released.
 local function teardown_runtime(opts)
+	-- Queue the final snapshot before teardown revokes persistence. A refused
+	-- transfer remains owned for a later retry, without creating another final row.
+	if CoreState.trigger_roi then
+		if M.may_persist() and not CoreState.roi_final_pending then
+			TriggerRoi.finish(CoreState.trigger_roi, CoreState.active_app_name or "Unknown", Timestamp.now_epoch())
+			CoreState.roi_final_pending = true
+		end
+		discard_roi_word()
+	end
 	_runtime_generation = _runtime_generation + 1
 	CoreState.is_enabled = false
+	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	CoreState.is_secure_field = true
 	local steps = {
 		{
@@ -1998,6 +2146,14 @@ local function teardown_runtime(opts)
 			run = function()
 				if not _state or type(ContextTracker.close_active_app) ~= "function" then return true end
 				return ContextTracker.close_active_app() ~= false
+			end,
+		},
+		{
+			name = "trigger-roi-outbox",
+			run = function()
+				if not drain_roi() then return false end
+				CoreState.roi_final_pending = nil
+				return true
 			end,
 		},
 		{
@@ -2149,6 +2305,10 @@ function M.start(script_control)
 		_teardown_state = TeardownTransaction.new_state()
 		Logger.start(LOG, "Starting keystats engine…")
 		CoreState.collection_suspended = false
+		if not CoreState.trigger_roi then
+			CoreState.trigger_roi = TriggerRoi.new(hs.timer.absoluteTime() / 1000000, roi_text_enabled())
+		end
+		CoreState.roi_window_id = nil
 		_script_control = script_control
 	
 		-- Seed the layout cache and keep it current from the OS notification. The
@@ -2269,6 +2429,7 @@ function M.start(script_control)
 			CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 			CoreState.recent_typing_eff = {}
 			CoreState.recent_typing_phys = {}
+			CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	
 			local caffeinate_created, caffeinate_candidate = xpcall(function()
 				return hs.caffeinate.watcher.new(function(...)
@@ -2306,6 +2467,7 @@ function M.start(script_control)
 					hs.eventtap.event.types.flagsChanged,
 					hs.eventtap.event.types.leftMouseDown,
 					hs.eventtap.event.types.rightMouseDown,
+					hs.eventtap.event.types.otherMouseDown,
 					hs.eventtap.event.types.scrollWheel,
 				},
 				onEvent = handle_key,
@@ -2353,8 +2515,10 @@ function M.start(script_control)
 			end
 			local maintenance_committed = acquire_recurring_timer(MAINTENANCE_INTERVAL_SEC,
 				function()
-					invoke_runtime_callback(runtime_generation, "Maintenance timer",
-						Watchers.perform_maintenance)
+					invoke_runtime_callback(runtime_generation, "Maintenance timer", function()
+						Watchers.perform_maintenance()
+						tick_roi()
+					end)
 				end, function(candidate) _maintenance_timer = candidate end)
 			if not maintenance_committed then
 				error("maintenance timer refused startup")

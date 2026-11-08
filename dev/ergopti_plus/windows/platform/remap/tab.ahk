@@ -85,35 +85,43 @@ _TabHoldModKey() {
 SC00F::LAlt
 SC00F::
 {
+	; A visible prediction takes the press before any tap-hold owner exists.
 	if _TabAcceptVisiblePrediction()
 		return
-	if !TapHoldSyntheticKeyDown("LAlt")
-		return
-	tap := KS_WaitReleased("SC00F", TapHoldDuration(TapHold, "tab"))
-	if tap {
-		if TapHoldTapAction(TapHold, "left_alt") == "tab" and KS_IsDown("SC038") { ; LAlt physically held
-			TapHoldDispatchTap("tab", TextPressKey.Bind("Tab", "Alt"))
+	global _TH_TabAltOwner
+	Owner := TapHoldNewOwner()
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return
+		_TH_TabAltOwner := Owner
+	} finally Critical(PreviousCritical)
+	try {
+		if !TapHoldSyntheticKeyDown("LAlt", Owner)
+			return
+		tap := KS_WaitReleased("SC00F", TapHoldDuration(TapHold, "tab"))
+		if tap {
+			if TapHoldTapAction(TapHold, "left_alt") == "tab" and KS_IsDown("SC038") {
+				TapHoldDispatchTap("tab", () => (TapHoldOwnerCurrent(Owner) ? TextPressKey("Tab", "Alt") : false))
+			} else if _TapHoldReleaseOwnedModifier("LAlt", Owner) {
+				TapHoldDispatchTap("tab", () => (TapHoldOwnerCurrent(Owner) ? AltTabMonitor() : false))
+			}
 		} else {
-			; The synthetic LAlt Down armed above must always be released
-			; regardless of Suspend state; only AltTabMonitor()'s side effect
-			; is guarded.
-			if !TapHoldSyntheticKeyUp("LAlt")
-				return
-			TapHoldDispatchTap("tab", AltTabMonitor)
-		}
-	} else {
-		; Held past the tap window: the native Alt+Tab switcher stays up via the
-		; synthetic LAlt Down. Bound the wait and release in a finally so a lost
-		; SC00F key-up (Suspend toggled mid-hold disarms the SC00F Up:: fallback)
-		; can never latch Alt Down system-wide (hold-modifier-unbounded-keywait)
-		try {
 			KS_WaitReleased("SC00F", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-		} finally {
-			TapHoldSyntheticKeyUp("LAlt")
+		}
+	} finally {
+		try _TapHoldReleaseOwnedModifier("LAlt", Owner)
+		finally {
+			PreviousCritical := Critical("On")
+			try {
+				if _TH_TabAltOwner == Owner
+					_TH_TabAltOwner := 0
+			} finally Critical(PreviousCritical)
 		}
 	}
 }
-SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
+; Keep this explicit override: the generated remap Up is not this gesture's owner.
+SC00F Up:: _TapHoldReleaseTabAltOwner()
 
 ^SC00F::  TextPressKey("Tab", "Ctrl")
 ^+SC00F:: TextPressKey("Tab", "Ctrl Shift")

@@ -19,6 +19,7 @@ helpers.provide_timings()
 require("toml_codec.source_memo")
 require("file_system.ports") -- the file-system owner checks itself against it when it loads
 require("adapters.write_lock_path") -- the file-system owner names its cooperative locks with it
+require("lfs") -- a native library: a scenario that loads it first cannot unload it again
 
 --- Collects actual scoped callbacks without publishing replacement registrations.
 --- @return table scenarios Registered names and callbacks.

@@ -103,6 +103,8 @@ local _run_active = false   -- Retained until run() retires its owned handles.
 local _stop_generation = 0  -- Revokes detached callback batches at stop().
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
+local _close_acks = {}      -- Owned handles retained until libuv calls their close callbacks.
+local _external_closes = {} -- A handle invalidated during startup has another close owner.
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
 local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
 local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield_idle().
@@ -208,16 +210,45 @@ end
 
 --- Retires only the handles owned by this loop, including partial startup.
 local function _cleanup_luv()
-	if _idle_handle then
-		pcall(luv.idle_stop, _idle_handle)
-		pcall(luv.close, _idle_handle)
-		_idle_handle = nil
+	local function retire(handle, stop)
+		if not handle then return true end
+		if _close_acks[handle] ~= nil then return _close_acks[handle] end
+		if type(luv.is_closing) == "function" then
+			local inspected, closing = pcall(luv.is_closing, handle)
+			if not inspected then return false end
+			if closing then
+				if type(luv.walk) ~= "function" then return false end
+				_close_acks[handle], _external_closes[handle] = false, true
+				return false
+			end
+		end
+		local called, ack, detail = pcall(stop, handle)
+		if not called or ack == nil or ack == false or detail ~= nil then return false end
+		_close_acks[handle] = false
+		called, ack, detail = pcall(luv.close, handle, function() _close_acks[handle] = true end)
+		if not called or ack == false or detail ~= nil then _close_acks[handle] = nil; return false end
+		return _close_acks[handle]
 	end
-	if _timer_handle then
-		pcall(luv.timer_stop, _timer_handle)
-		pcall(luv.close, _timer_handle)
-		_timer_handle = nil
+	retire(_idle_handle, luv.idle_stop)
+	retire(_timer_handle, luv.timer_stop)
+	-- A close is asynchronous. Pump one nonblocking turn so libuv delivers the
+	-- close callbacks before the last references can be collected at exit.
+	if (_idle_handle and _close_acks[_idle_handle] == false)
+		or (_timer_handle and _close_acks[_timer_handle] == false) then
+		pcall(luv.run, "nowait")
 	end
+	if next(_external_closes) then
+		local seen = {}
+		local walked = pcall(luv.walk, function(handle) seen[handle] = true end)
+		if walked then
+			for handle in pairs(_external_closes) do
+				if not seen[handle] then _external_closes[handle], _close_acks[handle] = nil, true end
+			end
+		end
+	end
+	if _idle_handle and _close_acks[_idle_handle] then _close_acks[_idle_handle] = nil; _idle_handle = nil end
+	if _timer_handle and _close_acks[_timer_handle] then _close_acks[_timer_handle] = nil; _timer_handle = nil end
+	return _idle_handle == nil and _timer_handle == nil
 end
 
 --- Admits a periodic duration in both units before either loop allocates.
@@ -247,14 +278,7 @@ local function _run_luv(opts)
 	_idle_handle = luv.new_idle()
 	if not _idle_handle then error("Unable to allocate event loop idle handle", 0) end
 	local idle_started, idle_error = luv.idle_start(_idle_handle, function()
-		if not _running then
-			if _idle_handle then
-				luv.idle_stop(_idle_handle)
-				luv.close(_idle_handle)
-				_idle_handle = nil
-			end
-			return
-		end
+		if not _running then return end
 		local started = Perf.clock()
 		Perf.count("loop.idle_ticks")
 		_safe_idle(onIdle)
@@ -271,14 +295,7 @@ local function _run_luv(opts)
 		_timer_handle = luv.new_timer()
 		if not _timer_handle then error("Unable to allocate event loop timer handle", 0) end
 		local timer_started, timer_error = NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
-			if not _running then
-				if _timer_handle then
-					luv.timer_stop(_timer_handle)
-					luv.close(_timer_handle)
-					_timer_handle = nil
-				end
-				return
-			end
+			if not _running then return end
 			_safe_periodic(onPeriodic)
 		end)
 		if timer_started == nil or timer_started == false then
@@ -396,7 +413,13 @@ function M.run(opts)
 		return
 	end
 
+	-- A prior failed native cleanup still owns these exact handles. Retry it
+	-- before a new run can replace their references.
 	_run_active = true
+	if luv and (_idle_handle or _timer_handle) and not _cleanup_luv() then
+		_run_active = false
+		error("Event loop native cleanup remains pending", 0)
+	end
 	_running = true
 	_idle_wait = options.idleWait
 	local ran, run_error
@@ -405,7 +428,9 @@ function M.run(opts)
 		Logger.debug(LOG, "Starting luv native event loop (idle + periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
 		ran, run_error = pcall(_run_luv, options)
-		_cleanup_luv()
+		if not _cleanup_luv() then
+			ran, run_error = false, "Event loop native cleanup remains pending"
+		end
 	else
 		Logger.debug(LOG, "Starting pump fallback loop (1 ms sleep, periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)

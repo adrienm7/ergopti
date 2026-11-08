@@ -206,6 +206,16 @@ end
 -- ==============================================
 
 helpers.describe("llm_translate_selection: the selection translated and offered", function()
+	helpers.it("preserves Markdown and code in the accepted translation", function()
+		scenario({ selection = "**Hello** `x**2`", locale = "fr" }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "ui"))
+			world.wait_for(1)
+			world.respond(1, "**TRANSLATION:** **Bonjour** `x**2`")
+			helpers.assert_eq(table.concat(offered(world), "|"), "**Bonjour** `x**2`")
+			helpers.assert_true(world.engine.handle_shortcut({ key = "1", mods = {} }))
+			helpers.assert_eq(table.concat(world.replaced, "|"), "**Bonjour** `x**2`")
+		end)
+	end)
 
 	helpers.it("registers the action", function()
 		scenario({}, function(world)
@@ -403,6 +413,26 @@ helpers.describe("selected translations require a known stable native focus", fu
 			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
 			helpers.assert_eq(table.concat(world.wire, ","), "post,cancel,post",
 				"the first request is cancelled, then the second leaves at once")
+		end)
+	end)
+
+	helpers.it("a translation whose dispatch is refused retires its own loading offer (ll-002)", function()
+		scenario({ selection = SELECTION }, function(world)
+			local transport = package.loaded["adapters.http_client"]
+			local cancel = transport.cancel
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			transport.cancel = function() return false end
+			local ok, err = pcall(function()
+				world.handlers.llm_translate_selection("tap_3", "en")
+				helpers.assert_eq(#world.posts, 1, "the refused cancellation admits no second request")
+				helpers.assert_eq(world.engine.is_predicting(), false, "no dispatched request owns the loading state")
+				helpers.assert_true(world.shown == nil or world.shown.meta.loading ~= true)
+				world.respond(1, "TRANSLATION: original reply")
+				helpers.assert_eq(world.engine.is_predicting(), false)
+				helpers.assert_eq(#world.engine.get_suggestions(), 0, "the superseded answer publishes nothing")
+			end)
+			transport.cancel = cancel
+			if not ok then error(err, 0) end
 		end)
 	end)
 

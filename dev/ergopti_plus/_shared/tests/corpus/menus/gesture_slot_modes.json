@@ -1,5 +1,5 @@
 {
-	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Windows/Linux have no per-slot macOS mode capability. Native callbacks remain their existing owner.",
+	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Linux follows the fingers too (modules/gestures/incremental_tracker.lua) and renders the same rows; Windows has no per-slot mode capability. Native callbacks remain their existing owner.",
 	"section": "gesture_slot_mode_commands",
 	"rows": [
 		{
@@ -7,7 +7,7 @@
 			"type": "check",
 			"i18n": "menu.gestures.mode_single",
 			"checked_when": ["gesture_mode_is_single"],
-			"platforms": ["hs"],
+			"platforms": ["hs", "linux"],
 			"unavailable": "hide",
 			"value": "x1"
 		},
@@ -16,7 +16,7 @@
 			"type": "check",
 			"i18n": "menu.gestures.mode_incremental",
 			"checked_when": ["gesture_mode_is_incremental"],
-			"platforms": ["hs"],
+			"platforms": ["hs", "linux"],
 			"unavailable": "hide",
 			"value": "incremental"
 		}
@@ -29,7 +29,7 @@
 	"platform_rows": {
 		"ahk": [],
 		"hs": ["gesture_mode_single", "gesture_mode_incremental"],
-		"linux": []
+		"linux": ["gesture_mode_single", "gesture_mode_incremental"]
 	},
 	"captions": {
 		"ar": ["إجراء واحد (x1)", "إرسال تدريجي (مسافة)"],

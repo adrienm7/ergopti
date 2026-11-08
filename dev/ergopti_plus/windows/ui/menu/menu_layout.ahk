@@ -47,6 +47,145 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
 	return [Map("label", Label, "disabled", true)]
 }
 
+/**
+ * Layout > « Disposition à émuler »: the same choices as macOS and Linux
+ * (_shared/lua/layouts/emulation_menu.lua): none, the built-in Ergopti
+ * variants, then the registry layouts the app lists or the layout manager
+ * installed. A choice goes through the layout manager's acknowledged handoff,
+ * which restarts the driver on the new selection.
+ * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
+ * @param {Func} SelectFn Port with LayoutManager_Select's contract.
+ * @param {Map} Index Registry metadata; the current catalogue when omitted.
+ * @param {Map} Installed Installed-layout record; read from disk when omitted.
+ * @param {Func} ErrorFn Port: ErrorFn(Message) tells a refused selection.
+ * @returns {Array} One submenu row holding the choices.
+ */
+_LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset, Installed := unset, ErrorFn := 0) {
+	global Features, _ConfigDir, ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
+	if !IsSet(FeaturesSource)
+		FeaturesSource := Features
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := LayoutManager_Select
+	if !HasMethod(ErrorFn, "Call")
+		ErrorFn := (Message) => Ui_MsgBox(Message, t("common.error_title"), "Icon!")
+	if !IsSet(Index) {
+		Index := LayoutCatalogue_Last()["index"]
+		if !(Index is Map)
+			Index := LayoutCatalogue_BundledIndex()
+	}
+	if !IsSet(Installed)
+		Installed := LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))
+	Current := LayoutManager_ActiveId(FeaturesSource)
+	Registry := Map()
+	for Entry in Index["layouts"]
+		Registry[Entry["id"]] := Entry.Get("name", Entry["id"])
+	for Id, Entry in Installed
+		if !Registry.Has(Id)
+			Registry[Id] := Entry.Get("name", Id)
+	Choices := [["", t("onboarding.layout.emulated_none")],
+		[ERGOPTI_LAYOUT_ID, t("onboarding.layout.emulated_ergopti")],
+		[ERGOPTI_PLUS_LAYOUT_ID, t("onboarding.layout.emulated_ergopti_plus")]]
+	Named := []
+	for Id, Name in Registry
+		if Id != ERGOPTI_LAYOUT_ID && Id != ERGOPTI_PLUS_LAYOUT_ID
+			Named.Push([Id, Name])
+	Named := _LAY_SortByName(Named)
+	for Pair in Named
+		Choices.Push(Pair)
+	; A stored layout absent from the catalogue stays named, never « none ».
+	Shown := ""
+	Found := false
+	for Pair in Choices
+		Found := Found || Pair[1] == Current
+	if !Found
+		Choices.Push([Current, Current])
+	; One call per choice owns its id: a closure over the loop variable would
+	; see its last value.
+	ChooseAction(Id) {
+		return (*) => _LAY_ChooseEmulation(Id, SelectFn, ErrorFn)
+	}
+	Items := []
+	for Pair in Choices {
+		Checked := Pair[1] == Current
+		if Checked
+			Shown := Pair[2]
+		Items.Push(Map("label", Pair[2], "checked", Checked, "action", ChooseAction(Pair[1])))
+	}
+	return [Map("label", LabelValue(t("menu.layout.emulated_layout"), Shown), "items", Items)]
+}
+
+; Registry choices by display name, so the list reads alphabetically.
+_LAY_SortByName(Pairs) {
+	Sorted := []
+	for Pair in Pairs {
+		Position := Sorted.Length + 1
+		while Position > 1 && StrCompare(Pair[2], Sorted[Position - 1][2], "Locale") < 0
+			Position -= 1
+		Sorted.InsertAt(Position, Pair)
+	}
+	return Sorted
+}
+
+; Selects one emulation choice from the menu and tells a refusal.
+_LAY_ChooseEmulation(Id, SelectFn, ErrorFn) {
+	try LoggerInfo("Layout", "Choosing the layout to emulate '{1}' from the menu.", Id == "" ? "none" : Id)
+	if SelectFn.Call(Id)
+		return true
+	ErrorFn.Call(t("menu.layout.emulation_not_saved"))
+	return false
+}
+
+/**
+ * Layout > « Input sources »: the layouts installed for the user, the active
+ * one ticked, choosing another switching the foreground window to it, as macOS
+ * lists and selects its input sources.
+ * @param {Func} ChoicesFn Optional port with KLS_Choices' contract.
+ * @param {Func} ActiveFn Optional port with KLS_ActiveId's contract.
+ * @param {Func} SelectFn Optional port with KLS_Select's contract.
+ * @param {Func} ErrorFn Optional port: ErrorFn(Message) tells a refused switch.
+ * @param {Func} OpenFn Optional port with KLS_OpenSettings' contract.
+ * @returns {Array} Provider rows.
+ */
+_LAY_ActiveLayoutRows(ChoicesFn := 0, ActiveFn := 0, SelectFn := 0, ErrorFn := 0, OpenFn := 0) {
+	if !HasMethod(ChoicesFn, "Call")
+		ChoicesFn := KLS_Choices
+	if !HasMethod(ActiveFn, "Call")
+		ActiveFn := KLS_ActiveId
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := KLS_Select
+	if !HasMethod(ErrorFn, "Call")
+		ErrorFn := (Message) => Ui_MsgBox(Message, t("common.error_title"), "Icon!")
+	if !HasMethod(OpenFn, "Call")
+		OpenFn := KLS_OpenSettings
+	Choices := ChoicesFn.Call()
+	if (Choices.Length == 0) {
+		Rows := MenuRenderer_TemplateRows("layout_active_source_empty_commands",
+			Map(MenuCommand.LAYOUT_OPEN_PREFERENCES, (*) => OpenFn.Call()), Map(), Map())
+		return Rows is Array ? Rows : []
+	}
+	Active := ActiveFn.Call()
+	; One call per choice owns its id: a closure over the loop variable would
+	; see its last value.
+	SelectAction(Klid) {
+		return (*) => _LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn)
+	}
+	Rows := []
+	for Choice in Choices
+		Rows.Push(Map("label", Choice["label"], "checked", Choice["id"] == Active,
+			"disabled", Choice["id"] == Active, "action", SelectAction(Choice["id"])))
+	return Rows
+}
+
+; Switches to one installed layout from the menu and tells a refusal.
+_LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn) {
+	try LoggerInfo("Layout", "Switching the keyboard layout to {1} from the menu.", Klid)
+	Result := SelectFn.Call(Klid)
+	if (Result is Integer) && Result == 1
+		return 1
+	ErrorFn.Call(t("menu.layout.select_failed"))
+	return false
+}
+
 ; List provider: Ergopti base-layer feature only (ergopti_base).
 ;
 ; A `list` since 2026-08-07, where both blocks were `dynamic` handlers handed the

@@ -154,6 +154,12 @@ local _live = nil
 -- True while predictions are on screen and waiting for user interaction
 local predictions_visible = false
 
+-- True from the moment a typing pause arms the debounce, a prediction request
+-- leaves or a chain is pending, until a reset or a user-activity revocation.
+-- The pointer path reads it on every mouse event, so it stays a plain upvalue;
+-- a stale true costs one extra revocation, never a missed one.
+local _work_pending = false
+
 -- Incremented each time a new LLM request is triggered; stale async callbacks
 -- capture this value at request time and discard themselves when it changes
 local llm_request_counter = 0
@@ -268,6 +274,7 @@ local llm_display_name        = core_llm.get_current_model()  -- Human-readable 
 local llm_backend_label       = nil                           -- "Ollama 🦙", "MLX 🚀", or a custom label
 local _model_transition_generation = 0
 local temperature             = LLM_DEFAULTS.llm_temperature
+local LlmContextLimit = require("infra.llm_context_limit")
 local context_window_chars    = LLM_DEFAULTS.llm_context_length
 local min_words               = tonumber(Storage.get("llm_min_words")) or LLM_DEFAULTS.llm_min_words
 local max_words               = tonumber(Storage.get("llm_max_words")) or LLM_DEFAULTS.llm_max_words
@@ -296,6 +303,9 @@ local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
 local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
+-- Inline mode (llm.trigger.inline_autotype): a finished prediction is typed
+-- through the acceptance path instead of offered, as on Windows.
+local inline_autotype            = LLM_DEFAULTS.llm_inline_autotype
 -- What an automatic prediction does while a hotstring tooltip shows
 -- (llm.trigger.while_hotstring_tooltip); nil reads the manifest default.
 local while_hotstring_tooltip    = nil
@@ -853,12 +863,14 @@ function M.set_llm_backend_name(label)
 end
 
 function M.set_llm_context_length(l)
-	-- Same coercion contract as set_llm_min_words below: this value reaches
-	-- `context_window_chars > 0` in the shared prompt_builder, which throws on a
-	-- string. config.toml / a half-written plist can deliver one, and neither
-	-- preferences.lua nor menu_state.lua coerces on the way in.
-	context_window_chars = tonumber(l) or LLM_DEFAULTS.llm_context_length
+	if not LlmContextLimit.valid(l) then
+		Logger.error(LOG, "LLM context length refused: expected a finite value no greater than %d.",
+			LlmContextLimit.MAX_CHARS)
+		return false
+	end
+	context_window_chars = tonumber(l)
 	Logger.debug(LOG, "Context window: %s chars.", tostring(context_window_chars))
+	return true
 end
 
 function M.set_llm_temperature(t)
@@ -907,6 +919,11 @@ end
 function M.set_llm_streaming_multi(v)
 	is_streaming_multi_enabled = (v == true)
 	Logger.debug(LOG, "Streaming multi: %s.", is_streaming_multi_enabled and "on" or "off")
+end
+
+function M.set_llm_inline_autotype(v)
+	inline_autotype = (v == true)
+	Logger.debug(LOG, "Inline auto-type: %s.", inline_autotype and "on" or "off")
 end
 
 function M.set_llm_instant_on_word_end(v)
@@ -1037,6 +1054,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_nav_modifiers" then return true, navigation_mods end
 	if key == "llm_val_modifiers" then return true, validation_mods end
 	if key == ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END then return true, instant_on_word_end end
+	if key == ConfigKeys.COMMAND.LLM_INLINE_AUTOTYPE then return true, inline_autotype end
 	if key == ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP then return true, current_while_hotstring_tooltip() end
 	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
 	if key == "llm_secure_field_filter_enabled" then
@@ -1238,6 +1256,7 @@ local function start_inactivity_timer(delay_override, ends_word)
 		token = arm.token,
 	}
 	_inactivity_timer = descriptor
+	_work_pending = true
 
 	--- Releases this descriptor only after both native and business settlement.
 	--- @return boolean released True when this exact owner left the live slot.
@@ -1670,6 +1689,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- Live mode redirects the automatic typing trigger only: a forced request is
 	-- an explicit action (or the chain it owns) and keeps its own profile
 	local live = (request == nil and force_trigger ~= true) and _live or nil
+	-- Inline mode asks for one variant: typing several would be chaos. Live
+	-- mode keeps its offer (it rewrites what is typed).
+	local inline = inline_autotype == true and live == nil
+	if inline then request_count = 1 end
 	local entry_request_counter = llm_request_counter
 	local entry_fetch_counter = fetch_request_counter
 
@@ -1907,6 +1930,9 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	end
 	if not predispatch_is_current() then return end
 	if Rewrite.is_rewrite_profile(request_profile_now) then
+		-- A rewrite erases what the user typed: it is never applied without the
+		-- user's own accept, whatever inline mode says.
+		inline = false
 		local rewrite_ok, rewrite_skip = pcall(M._apply_rewrite_params, params, buffer)
 		if not rewrite_ok then
 			Logger.error(LOG, "Rewrite request parameters raised — request aborted: %s", tostring(rewrite_skip))
@@ -1949,6 +1975,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
 	_activity = { kind = (force_trigger or live) and "explicit" or "automatic", fetch = my_fetch_id }
+	_work_pending = true
 	local superseded_log_id = retire_request_log(_request_log_id)
 	-- A mashed hotkey: the previous press's request is cancelled, not left running.
 	if force_trigger then explicit_supersedes("Prediction", superseded_log_id ~= nil) end
@@ -2106,6 +2133,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			runtime_available       = runtime_available,
 			on_ui_unavailable       = close_current_request,
 			on_request_terminal     = function() retire_request_log(my_fetch_id) end,
+			on_final_predictions    = inline and function(preds) M._inline_accept(preds, my_fetch_id) end or nil,
 		})
 	end, debug.traceback)
 	if not callbacks_ok or type(on_success_cb) ~= "function" or type(on_fail_cb) ~= "function" then
@@ -2148,8 +2176,8 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local function on_fail()
 		run_async_callback("failure callback", on_fail_cb)
 	end
-	local on_partial = on_partial_cb and function(partial_raw)
-		run_async_callback("partial callback", on_partial_cb, partial_raw)
+	local on_partial = on_partial_cb and function(partial_raw, stream_identity)
+		run_async_callback("partial callback", on_partial_cb, partial_raw, stream_identity)
 	end or nil
 
 	-- A request without a live watchdog can strand the loading surface forever.
@@ -2778,6 +2806,7 @@ function M.reset(options)
 	-- Every later cleanup step belongs to this exact generation, not its successor
 	pending_predictions = {}
 	predictions_visible = false
+	_work_pending = false
 	last_buffer_signature = nil
 	llm_request_counter = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
@@ -2903,6 +2932,48 @@ function M.reset(options)
 	return cleanup_committed
 end
 
+--- Inline mode: types the first finished prediction through the bridge's
+--- acceptance, once the callback that painted it has returned (its state sync
+--- would otherwise restore the consumed pool). A prediction that erases typed
+--- text (a correction) keeps its offer, and a request superseded meanwhile
+--- types nothing.
+--- @param preds table The final predictions, as painted.
+--- @param fetch_id number The request they answer.
+--- @param deps table|nil Test seam: { after, bridge, is_current }.
+--- @return boolean scheduled
+function M._inline_accept(preds, fetch_id, deps)
+	deps = deps or {}
+	local first = type(preds) == "table" and preds[1] or nil
+	if type(first) ~= "table" or type(first.to_type) ~= "string" then return false end
+	if (tonumber(first.deletes) or 0) > 0 then
+		Logger.info(LOG, "Inline mode leaves an erasing prediction to the tooltip.")
+		return false
+	end
+	local is_current = deps.is_current or function()
+		return runtime_available() and fetch_request_counter == fetch_id and predictions_visible
+			and pending_predictions[1] == first
+	end
+	local after = deps.after or require("infra.deferred_work").after
+	local scheduled = after(0, function()
+		if not is_current() then
+			Logger.debug(LOG, "Inline prediction #%s superseded before typing.", tostring(fetch_id))
+			return
+		end
+		local bridge = deps.bridge or package.loaded["modules.keymap.llm_bridge"]
+		if type(bridge) ~= "table" or type(bridge.apply_prediction) ~= "function" then
+			Logger.error(LOG, "Inline mode cannot type: the keymap bridge is not loaded.")
+			return
+		end
+		Logger.info(LOG, "Inline mode: typing the finished prediction (%d byte(s)).", #first.to_type)
+		local ok, applied = xpcall(bridge.apply_prediction, debug.traceback, 1)
+		if not ok or applied ~= true then
+			Logger.warn(LOG, "Inline prediction was not typed: %s.", tostring(applied))
+		end
+	end, "llm.inline_autotype")
+	if scheduled ~= true then Logger.error(LOG, "Inline prediction typing could not be scheduled.") end
+	return scheduled == true
+end
+
 --- Captures the prediction at the given index for an apply operation and
 --- atomically fences every older async callback before external cleanup begins.
 --- The bridge logs acceptance, so the following reset must not emit dismissal.
@@ -2980,6 +3051,7 @@ function M.arm_chain()
 	-- unpublished intent and leave chain_pending=true without a fallback.
 	descriptor.authorized = false
 	chain_pending = true
+	_work_pending = true
 
 	--- Rolls back only this arm attempt; a re-entrant successor owns the globals.
 	--- @param label string Cleanup label.
@@ -3190,6 +3262,52 @@ function M.handle_chain_signal(keyCode)
 		end
 	end
 	Logger.debug(LOG, "F16 received — chained LLM dispatch committed.")
+	return true
+end
+
+--- Reports whether a prediction is pending: debounce armed, request in
+--- flight, chain pending or predictions shown. O(1), eventtap-safe.
+--- @return boolean pending True while user activity must cancel prediction work.
+function M.has_pending_work() return _work_pending end
+
+--- Revokes every pending prediction on user activity, in O(1) and without any
+--- native call, so it runs inside the eventtap that saw the activity. Late
+--- answers fail the request-counter check from now on; the debounce callback
+--- loses its authority. The native cleanup (timer, curl, canvas) belongs to
+--- settle_activity_cancel(), called once the eventtap has returned.
+--- @return number|nil token Debounce generation seen, nil when nothing was pending.
+function M.revoke_for_activity()
+	if not _work_pending then return nil end
+	_work_pending = false
+	llm_request_counter = llm_request_counter + 1
+	fetch_request_counter = fetch_request_counter + 1
+	chain_pending = false
+	_chain_generation = _chain_generation + 1
+	if _inactivity_timer then _inactivity_timer.authorized = false end
+	return _inactivity_generation
+end
+
+--- Finishes a revocation off the eventtap: cancels the streams, hides the
+--- surface and stops the debounce. When the typing path already stopped or
+--- re-armed the debounce, it owns the surface (a hotstring preview may be on
+--- screen) and the next pause: only the revoked request's streams remain.
+--- @param token number Debounce generation returned by revoke_for_activity().
+--- @return boolean committed True when the cleanup committed.
+function M.settle_activity_cancel(token)
+	if type(token) ~= "number" then error("activity cancel token must be a number", 2) end
+	if token ~= _inactivity_generation then return M.stop_streams_for_activity() end
+	return M.reset() == true
+end
+
+--- Stops the backend streams of a revoked request without touching a debounce
+--- armed after it.
+--- @return boolean committed True when the backend cancellation committed.
+function M.stop_streams_for_activity()
+	local ok, result = xpcall(core_llm.cancel_streaming, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Activity stream cancellation did not commit (result: %s).", tostring(result))
+		return false
+	end
 	return true
 end
 

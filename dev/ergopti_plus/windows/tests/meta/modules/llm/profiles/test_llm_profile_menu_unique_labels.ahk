@@ -288,3 +288,77 @@ _LPUL_NativeProfileHotkeyLimit() {
 	AssertEqual(9, Value, "the actual native number-row protocol still owns nine hints")
 	return Value
 }
+
+
+_LPUL_ActualFrameSuffixCollision(Order) {
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	global LLM_TONE_LADDER, LLM_PROFILE_LIVE_TRANSLATIONS
+	Previous := _LLM_Menu
+	SavedContext := Map("had_order", IsSet(LLM_PROFILE_BUILTIN_ORDER),
+		"had_limit", IsSet(LLM_PROFILE_HOTKEY_LIMIT),
+		"had_tone", IsSet(LLM_TONE_LADDER),
+		"had_live", IsSet(LLM_PROFILE_LIVE_TRANSLATIONS))
+	if IsSet(LLM_PROFILE_BUILTIN_ORDER)
+		SavedContext["order"] := LLM_PROFILE_BUILTIN_ORDER
+	if IsSet(LLM_PROFILE_HOTKEY_LIMIT)
+		SavedContext["limit"] := LLM_PROFILE_HOTKEY_LIMIT
+	if IsSet(LLM_TONE_LADDER)
+		SavedContext["tone"] := LLM_TONE_LADDER
+	if IsSet(LLM_PROFILE_LIVE_TRANSLATIONS)
+		SavedContext["live"] := LLM_PROFILE_LIVE_TRANSLATIONS
+	Built := false
+	try {
+		; The direct native fixture may start without its number-row context.
+		; Use the actual declarations, then restore exact absent/value identities.
+		LLM_PROFILE_BUILTIN_ORDER := _LPUL_NativeProfileArray("LLM_PROFILE_BUILTIN_ORDER")
+		LLM_TONE_LADDER := _LPUL_NativeProfileArray("LLM_TONE_LADDER")
+		LLM_PROFILE_LIVE_TRANSLATIONS := _LPUL_NativeProfileArray("LLM_PROFILE_LIVE_TRANSLATIONS")
+		LLM_PROFILE_HOTKEY_LIMIT := _LPUL_NativeProfileHotkeyLimit()
+		_LLM_Menu := _HSDeepCloneMap(Previous)
+		_LLM_Menu["user_profiles"] := []
+		; The complete native frame reaches the genuine empty per-app owner too.
+		_LLM_Menu["app_profile_overrides"] := Map()
+		loop LLM_PROFILE_HOTKEY_LIMIT
+			_LLM_Menu["user_profiles"].Push(Map("id", "lpul_suffix_filler_" . A_Index, "label", "LPUL suffix filler " . A_Index))
+		Labels := Order == "generated-first" ? ["LPUL collision", "LPUL collision", "LPUL collision #2"]
+			: Order == "literal-first" ? ["LPUL collision #2", "LPUL collision", "LPUL collision"]
+			: Order == "case-generated-first" ? ["LPUL collision", "lpul collision", "LPUL COLLISION #2"]
+			: ["LPUL COLLISION #2", "LPUL collision", "lpul collision"]
+		for Index, Label in Labels {
+			Id := "lpul_suffix_case_" . Index
+			_LLM_Menu["user_profiles"].Push(Map("id", Id, "label", Label))
+			AssertEqual("", LLM_Menu_GetProfileHotkeyHint(Id), "Each real custom profile must be beyond the hotkey range")
+		}
+		_LLM_Menu["profile_id"] := "lpul_suffix_case_2"
+		Rows := _LLM_Menu_ProfileRows()
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		Built := LLM_Menu_BuildProfileMenu()
+		NativeCount := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
+		Collisions := 0, Seen := Map()
+		Seen.CaseSense := false
+		for Row in Rows {
+			if !Row.Has("label") || Row["label"] == ""
+				continue
+			if Seen.Has(Row["label"])
+				Collisions += 1
+			Seen[Row["label"]] := true
+		}
+		_TestPrint("# profile-suffix order=" . Order . " rows=" . Rows.Length . " native=" . NativeCount . " collisions=" . Collisions)
+		AssertEqual(0, Collisions, "A generated suffix cannot collide with an admitted literal profile label")
+		AssertEqual(Rows.Length, NativeCount, "Every genuine frame row must survive actual Win32 Menu.Add")
+	} finally {
+		try {
+			if Built is Menu
+				_CTC_ReleaseMenu(Built)
+		} finally {
+			_LLM_Menu := Previous
+			LLM_PROFILE_BUILTIN_ORDER := SavedContext["had_order"] ? SavedContext["order"] : unset
+			LLM_PROFILE_HOTKEY_LIMIT := SavedContext["had_limit"] ? SavedContext["limit"] : unset
+			LLM_TONE_LADDER := SavedContext["had_tone"] ? SavedContext["tone"] : unset
+			LLM_PROFILE_LIVE_TRANSLATIONS := SavedContext["had_live"] ? SavedContext["live"] : unset
+		}
+	}
+}
+for _LPUL_Order in ["generated-first", "literal-first", "case-generated-first", "case-literal-first"]
+	Test("menu_profiles: " . _LPUL_Order . " preserves literal suffix labels (profile-suffix-menu-owner)",
+		_LPUL_ActualFrameSuffixCollision.Bind(_LPUL_Order))

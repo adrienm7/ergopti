@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source of truth for bundle discovery: the highest version found in
----    the bundles directory wins, memoised while its directory revision is stable.
+---    the bundles directory wins, read through native directory enumeration.
 --- 2. Idempotent install detection: highest_installed() reports the live on-disk
 ---    version so the menu can disable already-installed entries.
 --- 3. Resilient, SIP-aware filesystem probes: shells out to /bin/test and osascript
@@ -19,10 +19,8 @@
 ---    Info.plist (bundle_variants), and the keyboard names every installed bundle
 ---    provides (bundle_keylayout_names), so no driver table repeats them.
 ---
---- Owns the bundle-discovery memo (_installed_cache / _latest_bundle_cache /
---- _keylayout_index_cache); the
---- input-source layer (input_sources.lua) and the menu builder consume this
---- module's public functions, never its private caches.
+--- The input-source layer (input_sources.lua) and the menu builder consume this
+--- module's public functions.
 --- ==============================================================================
 
 local hs            = hs
@@ -32,77 +30,17 @@ local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
 local FileSystem    = require("adapters.file_system")
+local FsDir         = require("infra.fs_dir")
 local LOG           = "menu.keyboard_layout"
 
 -- Target install paths on macOS
 local USER_LAYOUTS_DIR   = os.getenv("HOME") and (os.getenv("HOME") .. "/Library/Keyboard Layouts/") or "~/Library/Keyboard Layouts/"
 local SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/"
 
--- highest_installed(dir) result and directory revision, keyed by directory.
-local _installed_cache = {}
--- pick_latest_bundle(dir) result and directory revision, keyed by directory.
-local _latest_bundle_cache = {}
--- keylayout_index(dir) result and directory revision, keyed by directory.
-local _keylayout_index_cache = {}
 -- User and system installs rewrite both layout directories. One module-owned
 -- admission bit keeps a reentrant menu callback from interleaving those writes.
 local _install_in_flight = false
 
---- Returns a cheap identity for one directory listing. Directory entry changes
---- update its size or timestamps on macOS, so external installs and removals can
---- invalidate memoised discovery without repeating the full scan on every read.
---- A platform that cannot expose mutable directory attributes bypasses the memo.
---- @param dir string Directory path.
---- @return string|nil revision Stable revision, or nil when it cannot be proved.
-local function directory_revision(dir)
-	if not (hs and hs.fs and type(hs.fs.attributes) == "function") then return nil end
-	local ok, attrs = pcall(hs.fs.attributes, dir)
-	if not ok or type(attrs) ~= "table" then return nil end
-	if attrs.size == nil and attrs.modification == nil and attrs.change == nil then return nil end
-	return table.concat({
-		tostring(attrs.device),
-		tostring(attrs.inode),
-		tostring(attrs.size),
-		tostring(attrs.modification),
-		tostring(attrs.change),
-	}, "\31")
-end
-
---- Reads a memo only when it belongs to the currently observed directory.
---- @param cache table Cache table.
---- @param dir string Directory path.
---- @param revision string|nil Current directory revision.
---- @return boolean hit Whether the memo is authoritative.
---- @return any value Memoised value; false represents a scanned empty directory.
-local function read_revision_cache(cache, dir, revision)
-	local record = cache[dir]
-	if revision == nil or type(record) ~= "table" or record.revision ~= revision then
-		return false, nil
-	end
-	return true, record.value
-end
-
---- Publishes a scan only if the directory stayed stable throughout it.
---- @param cache table Cache table.
---- @param dir string Directory path.
---- @param before string|nil Revision captured before the scan.
---- @param value any Scanned value; nil is stored as false.
-local function publish_revision_cache(cache, dir, before, value)
-	local after = directory_revision(dir)
-	if before ~= nil and after == before then
-		cache[dir] = { revision = before, value = value or false }
-	else
-		cache[dir] = nil
-	end
-end
-
---- Clears the bundle-discovery memo. Called after an install / upgrade changes
---- the on-disk layout set. Exposed for unit tests.
-local function invalidate_bundle_caches()
-	_installed_cache       = {}
-	_latest_bundle_cache   = {}
-	_keylayout_index_cache = {}
-end
 
 
 
@@ -139,47 +77,62 @@ local function version_gt(a, b)
 end
 
 --- Lists every "Ergopti_v*.bundle" inside the given directory.
---- Pure-Lua via lfs-less directory scan using io.popen (cross-platform-ish).
+--- Native directory listing with a checked shell fallback.
 --- @param dir string Absolute path of the bundles directory.
 --- @return table List of basenames (no trailing slash).
+--- @return boolean listed Whether the listing completed successfully.
 local function list_bundles(dir)
 	local out = {}
+	if type(FileSystem.classify_no_follow) == "function" then
+		local _, status = FileSystem.classify_no_follow(NativePath.without_trailing_separators(dir))
+		if status == "absent" then return out, true end
+	end
+	local names, listed = FsDir.try_entries(dir)
+	if listed then
+		for _, name in ipairs(names) do
+			if name:match("^Ergopti_v[%d%.]+%.bundle$") then out[#out + 1] = name end
+		end
+		return out, true
+	end
+	-- A missing scope is a proven empty listing. Other native failures are not:
+	-- retry through ls and admit output only after a successful exit.
+	if type(FileSystem.classify_no_follow) == "function" then
+		local _, status = FileSystem.classify_no_follow(NativePath.without_trailing_separators(dir))
+		if status == "absent" then return out, true end
+	end
 	local cmd
 	if package.config:sub(1, 1) == "\\" then
-		-- Windows (used during Lua test runs)
 		cmd = string.format('cmd /c dir /b /a:d "%s"', dir:gsub("/", "\\"))
 	else
-		cmd = string.format("ls -1 %s", text_utils.shell_quote(dir))
+		cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
 	end
 	local p = io.popen(cmd)
-	if not p then return out end
+	if not p then return out, false end
 	for raw_line in p:lines() do
 		local line = raw_line:gsub("[\r\n]+$", "")
-		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
-			out[#out + 1] = line
-		end
+		if line:match("^Ergopti_v[%d%.]+%.bundle$") then out[#out + 1] = line end
 	end
-	p:close()
-	return out
+	local completed = p:close()
+	if completed ~= true then return {}, false end
+	return out, true
 end
 
 --- Picks the highest-version bundle inside dir.
 --- @param dir string Absolute path of the bundles directory.
 --- @return string|nil Basename of the latest bundle, or nil if none found.
+--- @return boolean listed Whether discovery completed or the directory is absent.
 local function pick_latest_bundle(dir)
-	if type(dir) ~= "string" or dir == "" then return nil end
-	local revision = directory_revision(dir)
-	local hit, cached = read_revision_cache(_latest_bundle_cache, dir, revision)
-	if hit then return cached or nil end
+	if type(dir) ~= "string" or dir == "" then return nil, false end
+	local names, listed = list_bundles(dir)
+	if not listed then return nil, false end
 	local best, best_ver = nil, nil
-	for _, name in ipairs(list_bundles(dir)) do
+	for _, name in ipairs(names) do
 		local ver = parse_version(name)
 		if ver and (not best_ver or version_gt(ver, best_ver)) then
 			best, best_ver = name, ver
 		end
 	end
-	publish_revision_cache(_latest_bundle_cache, dir, revision, best)
-	return best
+	return best, true
 end
 
 
@@ -235,48 +188,40 @@ end
 --- treat as a real keyboard layout.
 --- @param dir string Absolute path of the Keyboard Layouts directory.
 --- @return table Array of { name = string, version = table } entries.
+--- @return boolean listed Whether discovery completed or the directory is absent.
 local function find_installed_bundles(dir)
 	local out = {}
-	if type(dir) ~= "string" or dir == "" then return out end
-	-- shell_quote, not %q: the sibling function 60 lines down already documents
-	-- why (%q escapes for a Lua literal and leaves $, backticks and ! live for
-	-- /bin/sh), and every path reaching here is user-configurable.
-	local cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
-	local p = io.popen(cmd)
-	if not p then return out end
+	if type(dir) ~= "string" or dir == "" then return out, false end
+	local names, listed = list_bundles(dir)
+	if not listed then return out, false end
 	local dir_with_slash = NativePath.with_trailing_separator(dir)
-	for raw_line in p:lines() do
-		local line = raw_line:gsub("[\r\n]+$", "")
-		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
-			local v = parse_version(line)
-			local info_plist = dir_with_slash .. line .. "/Contents/Info.plist"
-			local plist_ok = v and path_exists(info_plist)
-			Logger.debug(LOG, "Bundle probe — dir=%s name=%s plist_exists=%s.", dir, line, tostring(plist_ok))
-			if plist_ok then
-				out[#out + 1] = { name = line, version = v }
-			end
-		end
+	for _, name in ipairs(names) do
+		local v = parse_version(name)
+		local info_plist = dir_with_slash .. name .. "/Contents/Info.plist"
+		local plist_ok = v and path_exists(info_plist)
+		Logger.debug(LOG, "Bundle probe — dir=%s name=%s plist_exists=%s.", dir, name, tostring(plist_ok))
+		if plist_ok then out[#out + 1] = { name = name, version = v } end
 	end
-	p:close()
-	return out
+	return out, true
 end
 
 --- Returns the highest installed Ergopti version in the given directory.
 --- @param dir string Absolute path of the Keyboard Layouts directory.
 --- @return table|nil { name = string, version = table } or nil if none.
+--- @return boolean listed Whether discovery completed or the directory is absent.
 local function highest_installed(dir)
-	if type(dir) ~= "string" or dir == "" then return nil end
-	local revision = directory_revision(dir)
-	local hit, cached = read_revision_cache(_installed_cache, dir, revision)
-	if hit then return cached or nil end
+	if type(dir) ~= "string" or dir == "" then return nil, false end
+	-- Recheck both names and plists: directory timestamps can stay unchanged
+	-- across a same-second replacement, and plist changes are nested.
+	local entries, listed = find_installed_bundles(dir)
+	if not listed then return nil, false end
 	local best
-	for _, entry in ipairs(find_installed_bundles(dir)) do
+	for _, entry in ipairs(entries) do
 		if not best or version_gt(entry.version, best.version) then
 			best = entry
 		end
 	end
-	publish_revision_cache(_installed_cache, dir, revision, best)
-	return best
+	return best, true
 end
 
 --- Renders a version components table back to a human-readable string.
@@ -316,32 +261,65 @@ local function read_bundle_version(bundle_path)
 end
 
 --- Maps every keylayout installed in `dir` to the bundle that ships it, so an
---- active input source can be traced back to its bundle whatever the bundle's
---- folder name. One `find` per directory revision, memoised like the other
---- discovery scans.
+--- active input source can be traced back to its bundle whatever its folder name.
+--- A parent directory revision cannot describe files inside Resources. Enumerate
+--- those directories with native calls each time, avoiding a shell subprocess on
+--- the normal Hammerspoon path and observing even same-second changes.
 --- @param dir string Keyboard Layouts directory.
---- @return table Map { [keylayout basename without extension] = bundle basename }.
+--- @return table|nil Map { [keylayout basename without extension] = bundle basename }, or nil on failure.
 local function keylayout_index(dir)
-	if type(dir) ~= "string" or dir == "" then return {} end
-	local revision = directory_revision(dir)
-	local hit, cached = read_revision_cache(_keylayout_index_cache, dir, revision)
-	if hit then return cached or {} end
+	if type(dir) ~= "string" or dir == "" then return nil end
 	local index = {}
+	if type(FileSystem.classify_no_follow) == "function" then
+		local _, status = FileSystem.classify_no_follow(NativePath.without_trailing_separators(dir))
+		if status == "absent" then return index end
+	end
+	if hs and hs.fs and type(hs.fs.symlinkAttributes) == "function" then
+		local function physical_directory(path)
+			local attrs, status = FileSystem.classify_no_follow(path)
+			if status == "error" then error("directory classification refused") end
+			return status == "ok" and attrs.mode == "directory"
+		end
+		local function entries(path, visit)
+			local names, listed = FsDir.try_entries(path)
+			if not listed then return false end
+			for _, name in ipairs(names) do visit(name) end
+			return true
+		end
+		local root = NativePath.without_trailing_separators(dir)
+		local read_ok, ok = pcall(entries, root, function(bundle)
+			if not bundle:match("%.bundle$") then return end
+			local bundle_path = root .. "/" .. bundle
+			local contents = bundle_path .. "/Contents"
+			local resources = contents .. "/Resources"
+			-- find does not follow directory symlinks: retain that boundary.
+			if not physical_directory(bundle_path) or not physical_directory(contents)
+				or not physical_directory(resources) then return end
+			local resources_listed = entries(resources, function(filename)
+				local layout = filename:match("^(.*)%.keylayout$")
+				if layout and index[layout] == nil then index[layout] = bundle end
+			end)
+			if not resources_listed then error("resource enumeration refused") end
+		end)
+		if read_ok and ok then return index end
+		index = {}
+	end
+	-- Narrow test doubles and hosts without native enumeration still get fresh
+	-- results, never a memo keyed only to the outer directory.
 	local cmd = string.format(
 		"find %s -maxdepth 4 -path '*.bundle/Contents/Resources/*.keylayout' 2>/dev/null",
 		text_utils.shell_quote(dir))
 	local p = io.popen(cmd)
 	if not p then
 		Logger.warn(LOG, "Keylayout scan could not start in %s.", dir)
-		return index
+		return nil
 	end
 	for raw_line in p:lines() do
 		local line = raw_line:gsub("[\r\n]+$", "")
 		local bundle, layout = line:match("([^/]+%.bundle)/Contents/Resources/([^/]+)%.keylayout$")
 		if bundle and index[layout] == nil then index[layout] = bundle end
 	end
-	p:close()
-	publish_revision_cache(_keylayout_index_cache, dir, revision, index)
+	if p:close() ~= true then return nil end
 	return index
 end
 
@@ -364,8 +342,11 @@ local function bundle_variants(bundle_path)
 		local tis_id = body:match("<key>%s*TISInputSourceID%s*</key>%s*<string>%s*([^<]-)%s*</string>")
 		local keylayout = root .. "/Contents/Resources/" .. name .. ".keylayout"
 		-- A name is a file basename here; anything else would read outside the bundle.
-		if tis_id and name:match("^[%w_.%-]+$") and path_exists(keylayout) then
-			variants[#variants + 1] = { name = name, tis_id = tis_id, keylayout = keylayout }
+		if tis_id and name:match("^[%w_.%-]+$") then
+			local file_status, mode = FileSystem.followed_mode(keylayout)
+			if file_status == "present" and mode == "file" then
+				variants[#variants + 1] = { name = name, tis_id = tis_id, keylayout = keylayout }
+			end
 		end
 	end
 	if #variants == 0 then
@@ -376,11 +357,13 @@ end
 
 --- Keyboard-layout names the installed bundles provide, in both scopes, so the
 --- layout manager never installs a second input source under one of them.
---- @return table Set { [name] = true }.
+--- @return table|nil Set { [name] = true }, or nil when a scope cannot be listed.
 local function bundle_keylayout_names()
 	local names = {}
 	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
-		for name in pairs(keylayout_index(dir)) do names[name] = true end
+		local index = keylayout_index(dir)
+		if not index then return nil end
+		for name in pairs(index) do names[name] = true end
 	end
 	return names
 end
@@ -397,7 +380,8 @@ local function layout_version(kl_name)
 	-- A name is matched against file basenames only; a separator could never match.
 	if NativePath.has_separator(kl_name) then return nil end
 	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
-		local bundle = keylayout_index(dir)[kl_name]
+		local index = keylayout_index(dir)
+		local bundle = index and index[kl_name]
 		if bundle then
 			local layouts_dir = NativePath.without_trailing_separators(dir)
 			return read_bundle_version(layouts_dir .. "/" .. bundle)
@@ -426,6 +410,14 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		or not bundle_name:match("^Ergopti_v[%d%.]+%.bundle$") then
 		return nil, "bundle name is invalid"
 	end
+	-- The path will also run under administrator privileges for a system
+	-- install. Admit only the executable bound to this running app and its
+	-- exported device/inode, not an arbitrary environment-supplied program.
+	local resolver = require("platform.remap.lease_helper")
+	local resolved, launcher = pcall(resolver.resolve)
+	if not resolved or type(launcher) ~= "string" or launcher:sub(1, 1) ~= "/" then
+		return nil, "native exclusive rename unavailable; launch ErgoptiPlus to install keyboard layouts", "launcher_unavailable"
+	end
 
 	local target = target_dir:gsub("/+$", "")
 	local source_dir = bundles_dir:match("/$") and bundles_dir or (bundles_dir .. "/")
@@ -434,6 +426,10 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		"target=" .. sq(target) .. ";",
 		"source=" .. sq(source_dir .. bundle_name) .. ";",
 		"name=" .. sq(bundle_name) .. ";",
+		"launcher=" .. sq(launcher) .. ";",
+		'case "$launcher" in /*) ;; *) echo "Native rename role unavailable."; exit 1 ;; esac;',
+		'receipt=$("$launcher" --release-rename probe && printf .) || exit 1;',
+		'[ "$receipt" = "$(printf \'%s\\n.\' --release-rename)" ] || exit 1;',
 		'mkdir -p "$target" || exit 1;',
 		'work="$(mktemp -d "$target/.ergopti-install.XXXXXX")" || exit 1;',
 		'stage="$work/$name";',
@@ -441,16 +437,24 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		'mkdir "$backup" || { rm -rf "$work"; exit 1; };',
 		'cp -R "$source" "$stage" || { rm -rf "$work"; exit 1; };',
 		'test -f "$stage/Contents/Info.plist" || { rm -rf "$work"; exit 1; };',
+		'has_layout=0;',
+		'for layout in "$stage"/Contents/Resources/*.keylayout; do',
+			'if [ -f "$layout" ]; then has_layout=1; break; fi;',
+		'done;',
+		'[ "$has_layout" -eq 1 ] || { echo "Staged bundle contains no regular keyboard layout."; rm -rf "$work"; exit 1; };',
 		'committed=0;',
 		'restore_install() {',
 			'if [ "$committed" -eq 0 ]; then',
 				'restore_ok=1;',
 				'for prior in "$backup"/Ergopti_v*.bundle; do',
-					'[ -e "$prior" ] || continue;',
-					'mv "$prior" "$target/" || restore_ok=0;',
+					'[ -e "$prior" ] || [ -L "$prior" ] || continue;',
+					'"$launcher" --release-rename move "$prior" "$target/${prior##*/}" || restore_ok=0;',
 				'done;',
 				'if [ "$restore_ok" -eq 1 ]; then',
 					'rm -rf "$work";',
+				'else',
+					'echo "Keyboard layout backups retained at $backup.";',
+					'echo "Keyboard layout backups retained at $backup." >&2;',
 				'fi;',
 				'return;',
 			'fi;',
@@ -459,51 +463,59 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		'trap restore_install 0;',
 		"trap 'exit 1' 1 2 15;",
 		'for prior in "$target"/Ergopti_v*.bundle; do',
-			'[ -e "$prior" ] || continue;',
-			'mv "$prior" "$backup/" || exit 1;',
+			'[ -e "$prior" ] || [ -L "$prior" ] || continue;',
+			'prior_name=${prior##*/}; prior_version=${prior_name#Ergopti_v}; prior_version=${prior_version%.bundle};',
+			'case "$prior_version" in ""|*[!0-9.]*) continue ;; esac;',
+			'"$launcher" --release-rename move "$prior" "$backup/${prior##*/}" || exit 1;',
 		'done;',
-		'[ ! -e "$target/$name" ] || exit 1;',
-		'mv "$stage" "$target/$name" || exit 1;',
+		'"$launcher" --release-rename move "$stage" "$target/$name" || exit 1;',
 		'committed=1;',
-		'rm -rf "$backup" || true;',
 		'trap - 0 1 2 15;',
-		'rm -rf "$work" || true;',
+		'if ! rm -rf "$work"; then',
+			'echo "Keyboard layout installation cleanup failed; retained at $work.";',
+			'echo "Keyboard layout installation cleanup failed; retained at $work." >&2;',
+		'fi;',
 		'exit 0;',
 	}, " ")
 end
 
---- Executes one user-owned shell replacement and invalidates discovery state.
+--- Executes one user-owned shell replacement.
 --- @param target_dir string Keyboard Layouts directory receiving the bundle.
 --- @param bundles_dir string Directory containing the source bundle.
 --- @param bundle_name string Basename of the source bundle.
 --- @return boolean committed Whether the replacement committed.
 --- @return any detail Native output or validation/exception detail.
 local function execute_install_transaction(target_dir, bundles_dir, bundle_name)
-	local command, detail = build_install_transaction(target_dir, bundles_dir, bundle_name)
-	if not command then return false, detail end
+	local command, detail, reason = build_install_transaction(target_dir, bundles_dir, bundle_name)
+	if not command then return false, detail, reason end
 	local call_ok, output, native_ok = pcall(hs.execute, command)
-	invalidate_bundle_caches()
 	if not call_ok then return false, output end
 	if native_ok ~= true then return false, output end
 	return true, output
 end
 
---- Removes obsolete bundles from the scope that did not receive the new copy.
---- This is deliberately post-commit: refusal can leave two valid copies, never
---- zero valid copies.
---- @param dir string Keyboard Layouts directory to clean.
---- @param scope_label string Developer-facing scope name for diagnostics.
---- @return boolean
-local function cleanup_other_scope(dir, scope_label)
-	local target = dir:gsub("/+$", "")
-	local command = "rm -rf " .. text_utils.shell_quote(target) .. "/Ergopti_v*.bundle"
-	local call_ok, output, native_ok = pcall(hs.execute, command)
-	invalidate_bundle_caches()
-	if not call_ok or native_ok ~= true then
-		Logger.warn(LOG, "Post-install %s cleanup failed: %s.", scope_label, tostring(output))
-		return false
+--- Reports other-scope entries without deleting a concurrently created bundle.
+--- @param dir string Other Keyboard Layouts directory.
+--- @return boolean|nil occupied Nil when neither enumeration nor absence is proved.
+local function other_scope_occupied(dir)
+	local names, listed = list_bundles(dir)
+	if not listed then return nil end
+	return #names > 0
+end
+
+--- Checks the other scope after publication before allowing input-source changes.
+--- @param dir string Other Keyboard Layouts directory.
+--- @return boolean clear Whether the other scope is known empty.
+--- @return string|nil reason Closed failure reason for the menu.
+local function warn_other_scope(dir)
+	local occupied = other_scope_occupied(dir)
+	if occupied == false then return true end
+	if occupied == nil then
+		Logger.warn(LOG, "The other keyboard layout scope could not be checked: %s.", dir)
+		return false, "other_scope_unverified"
 	end
-	return true
+	Logger.warn(LOG, "Another keyboard layout bundle remains in %s; it was not removed.", dir)
+	return false, "other_scope_occupied"
 end
 
 --- The Ergopti bundles installed in both the user and the system folders.
@@ -536,7 +548,7 @@ local function report_duplicate_bundles()
 end
 
 --- Copies the latest bundle to the user's Keyboard Layouts directory.
---- The user replacement commits before obsolete system copies are removed.
+--- A bundle in the system scope must be removed manually before replacement.
 --- The same bundle already in the system folder is not copied a second time.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
@@ -547,60 +559,55 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 		if entry.name == bundle_name then in_system = true end
 	end
 	if in_system then
+		local user_occupied = other_scope_occupied(USER_LAYOUTS_DIR)
+		if user_occupied == nil then
+			Logger.error(LOG, "User install refused: the user layout directory could not be checked.")
+			return false, "other_scope_unverified"
+		end
+		if user_occupied then
+			Logger.warn(LOG, "User install refused: a keyboard bundle remains in the user scope.")
+			return false, "other_scope_occupied"
+		end
 		Logger.info(LOG, "%s is already installed in %s: no second copy is written to the user folder.",
 			bundle_name, SYSTEM_LAYOUTS_DIR)
 		return true
 	end
+	local occupied = other_scope_occupied(SYSTEM_LAYOUTS_DIR)
+	if occupied == nil then
+		Logger.error(LOG, "User install refused: the system layout directory could not be checked.")
+		return false, "other_scope_unverified"
+	end
+	if occupied then
+		Logger.warn(LOG, "User install refused: another keyboard bundle remains in the system scope.")
+		return false, "other_scope_occupied"
+	end
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
-	local committed, detail = execute_install_transaction(
+	local committed, detail, reason = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
 	if committed then
-		cleanup_other_scope(SYSTEM_LAYOUTS_DIR, "system scope")
+		if type(detail) == "string" and detail:find("Keyboard layout installation cleanup failed; retained at ", 1, true) then
+			Logger.warn(LOG, "%s", (detail:gsub("%s+$", "")))
+		end
+		local clear, check_reason = warn_other_scope(SYSTEM_LAYOUTS_DIR)
+		if not clear then
+			Logger.warn(LOG, "User bundle was installed, but input-source changes are deferred.")
+			return false, check_reason
+		end
 		Logger.success(LOG, "User install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_user"), nil, "success")
 		return true
 	end
 	Logger.error(LOG, "User install failed: %s.", tostring(detail))
-	return false
+	return false, reason
 end
 
---- Copies the latest bundle to /Library/Keyboard Layouts/ via osascript with
---- administrator privileges. Triggers a macOS password prompt. The system
---- replacement commits before obsolete user copies are removed.
---- @param bundles_dir string Absolute path of the source bundles directory.
---- @param bundle_name string Basename of the bundle to install.
---- @return boolean true on success.
-local function install_system_unlocked(bundles_dir, bundle_name)
-	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
-	local shell_cmd, command_detail = build_install_transaction(
-		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name)
-	if not shell_cmd then
-		Logger.error(LOG, "System install failed: %s.", tostring(command_detail))
-		return false
-	end
-	-- TWO layers, and only the inner one was handled. shell_cmd above is correctly
-	-- quoted for /bin/sh, but shell_quote wraps in SINGLE quotes and escapes only
-	-- the single quote — so a `\` or a `"` anywhere in bundles_dir, bundle_name or
-	-- SYSTEM_LAYOUTS_DIR passed through untouched into this AppleScript literal.
-	-- The backslash was then eaten (the privileged cp -R targeting a different
-	-- path) or the quote terminated the literal outright.
-	local script = text_utils.applescript_format(
-		"do shell script \"%s\" with administrator privileges",
-		shell_cmd
-	)
-	local call_ok, native_ok = false, false
-	if hs.osascript and type(hs.osascript.applescript) == "function" then
-		call_ok, native_ok = pcall(hs.osascript.applescript, script)
-	end
-	invalidate_bundle_caches()
-	if call_ok and native_ok == true then
-		cleanup_other_scope(USER_LAYOUTS_DIR, "user scope")
-		Logger.success(LOG, "System install done — %s.", bundle_name)
-		pcall(notifications.notify, i18n.get("menu.layout.installed_system"), nil, "success")
-		return true
-	end
-	Logger.error(LOG, "System install failed (sudo cancelled or copy error).")
-	return false
+--- Refuses privileged installation until a native owner can bind execution to
+--- the already verified launcher across the authorization boundary.
+--- @return boolean committed Always false while this operation is unavailable.
+--- @return string reason Closed reason shown by the menu.
+local function install_system_unlocked()
+	Logger.warn(LOG, "System keyboard layout installation is unavailable; use the user scope.")
+	return false, "system_install_unavailable"
 end
 
 --- Runs one bundle install while owning both destination scopes exclusively.
@@ -618,7 +625,7 @@ local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundl
 		return false
 	end
 	_install_in_flight = true
-	local call_ok, committed_or_err = xpcall(function()
+	local call_ok, committed_or_err, reason = xpcall(function()
 		return install_fn(bundles_dir, bundle_name)
 	end, debug.traceback)
 	_install_in_flight = false
@@ -627,7 +634,7 @@ local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundl
 			scope_label, tostring(committed_or_err))
 		return false
 	end
-	return committed_or_err == true
+	return committed_or_err == true, reason
 end
 
 local function install_user(bundles_dir, bundle_name)
@@ -659,5 +666,4 @@ return {
 	duplicate_bundles     = duplicate_bundles,
 	report_duplicate_bundles = report_duplicate_bundles,
 	install_system         = install_system,
-	invalidate_bundle_caches = invalidate_bundle_caches,
 }

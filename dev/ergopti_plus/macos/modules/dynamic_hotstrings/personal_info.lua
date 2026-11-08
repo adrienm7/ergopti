@@ -28,6 +28,7 @@ if not ok_kl then keystats = nil end
 local FileSystem = require("adapters.file_system")
 local BasicString = require("toml_codec.basic_string")
 local TomlCodec = require("toml_codec.codec")
+local UnicodeCase = require("unicode_case")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -53,6 +54,7 @@ local _enabled   = false
 local _replacing = false
 local _state     = STATE_IDLE
 local _combo     = ""
+local _action_revision = {}
 
 local _trigger         = "★"
 local _info            = {}
@@ -117,42 +119,14 @@ local function rollback_start(token, reason)
 	return false
 end
 
+local SharedDefaults = require("personal_info.defaults")
+
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
 	-- magic key is a second thing to change when the user picks another one.
 	trigger_char = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
-	info = {
-		first_name            = "Prénom",
-		last_name             = "Nom",
-		date_of_birth         = "01/01/1990",
-		email_address         = "prenom.nom@exemple.fr",
-		work_email_address    = "prenom.nom@entreprise.fr",
-		phone_number          = "0600000000",
-		phone_number_clean    = "06 00 00 00 00",
-		street_address        = "1 Rue de la Paix",
-		city                  = "Paris",
-		country               = "France",
-		postal_code           = "75001",
-		iban                  = "FR00 0000 0000 0000 0000 0000 000",
-		bic                   = "ABCDFRPP",
-		credit_card           = "0000 0000 0000 0000",
-		social_security_number = "0 00 00 00 000 000 00",
-	},
-	letters = {
-		a = "street_address",
-		b = "bic",
-		c = "credit_card",
-		d = "date_of_birth",
-		e = "email_address",
-		f = "phone_number_clean",
-		i = "iban",
-		m = "email_address",
-		n = "last_name",
-		p = "first_name",
-		s = "social_security_number",
-		t = "phone_number",
-		w = "work_email_address",
-	},
+	info = SharedDefaults.info,
+	letters = SharedDefaults.letters,
 }
 
 --- Returns the deterministic key order for one immutable schema map.
@@ -213,7 +187,17 @@ end
 -- ===========================================
 -- ===========================================
 
+--- Accepts one cased Unicode scalar, without normalizing the user's alias.
+--- @param value any Candidate alias.
+--- @return boolean accepted
+local function is_alias(value)
+	if type(value) ~= "string" then return false end
+	local okay, length = pcall(utf8.len, value)
+	return okay and length == 1 and UnicodeCase.upper(value) ~= UnicodeCase.lower(value)
+end
+
 --- Validates a decoded section before filling genuinely absent schema fields.
+--- The `info` section is closed; `letters` is an open map of cased scalar aliases.
 --- @param document table Decoded TOML document.
 --- @param section string Section name (without brackets).
 --- @return table|nil values Validated values, or nil for invalid declared data.
@@ -223,12 +207,21 @@ local function parse_toml_section(document, section)
 	if type(declared) ~= "table" then return nil end
 	for key in pairs(declared) do
 		if type(key) ~= "string" then return nil end
+		-- An alias outside the collector alphabet could never be typed; refuse it
+		-- explicitly rather than dropping it and erasing it on the next save.
+		if section == "letters" and not is_alias(key) then return nil end
 	end
 	local result = {}
 	for key, default in pairs(DEFAULT_CONFIG[section]) do
 		local value = declared[key]
 		if value ~= nil and type(value) ~= "string" then return nil end
 		result[key] = value == nil and default or value
+	end
+	if section == "letters" then
+		for key, value in pairs(declared) do
+			if type(value) ~= "string" then return nil end
+			result[key] = value
+		end
 	end
 	return result
 end
@@ -275,13 +268,21 @@ local function serialize_config(candidate)
 	end
 	lines[#lines + 1] = ""
 	lines[#lines + 1] = "[letters]"
+	-- Every alias, user-added ones included, not just the shipped defaults.
+	local alias_keys = {}
+	for key in pairs(_letters) do alias_keys[#alias_keys + 1] = key end
 	for _, key in ipairs(LETTER_KEYS) do
+		if _letters[key] == nil then alias_keys[#alias_keys + 1] = key end
+	end
+	table.sort(alias_keys)
+	for _, key in ipairs(alias_keys) do
 		local value = _letters[key]
-		if type(value) ~= "string" then
+		if not is_alias(key) or type(value) ~= "string" then
 			Logger.error(LOG, "Personal-info serializer rejected a non-string letter mapping.")
 			return nil
 		end
-		lines[#lines + 1] = key .. " = \"" .. escape_toml(value) .. "\""
+		local encoded_key = key:match("^[A-Za-z]$") and key or '"' .. escape_toml(key) .. '"'
+		lines[#lines + 1] = encoded_key .. " = \"" .. escape_toml(value) .. "\""
 	end
 	lines[#lines + 1] = ""
 	return table.concat(lines, "\n")
@@ -426,6 +427,7 @@ end
 --- @param new_info table The updated fields to save.
 --- @return boolean committed True only after disk and live memory commit.
 function M.save_info(new_info)
+	_action_revision = {}
 	if type(new_info) ~= "table" then
 		Logger.error(LOG, "save_info(): expected a table, got %s — save refused.", type(new_info))
 		return false
@@ -510,9 +512,22 @@ local function resolve_combo(combo)
 	local fields = {}
 	if type(combo) ~= "string" then return parts, fields end
 
-	for i = 1, #combo do
-		local letter = combo:sub(i, i)
-		local key    = _letters[letter]
+	local okay, length = pcall(utf8.len, combo)
+	if not okay or not length then return parts, fields end
+	for _, codepoint in utf8.codes(combo) do
+		local letter = utf8.char(codepoint)
+		if not is_alias(letter) then return {}, {} end
+		local lower = UnicodeCase.lower(letter)
+		local upper = UnicodeCase.upper(letter)
+		local key
+		for alias, field in pairs(_letters) do
+			-- Never merge conflicting case twins or multi-scalar case expansions.
+			if alias == letter or (is_alias(lower) and UnicodeCase.lower(alias) == lower)
+				or (is_alias(upper) and UnicodeCase.upper(alias) == upper) then
+				if key and key ~= field then return {}, {} end
+				key = field
+			end
+		end
 		local value  = key and _info[key] or nil
 		if type(value) ~= "string" or value == "" then return {}, {} end
 		table.insert(parts, value)
@@ -546,7 +561,7 @@ end
 --- @return boolean injected True only when the keymap accepted the transaction.
 local function do_expand(combo)
 	Logger.debug(LOG, "Injecting personal data…")
-	local n_back = 1 + #combo
+	local n_back = 1 + utf8.len(combo)
 	local parts  = resolve_combo(combo)
 	_replacing = true
 	-- Two strings serve the historical emitter return contract; neither identifies
@@ -645,7 +660,12 @@ local function do_expand(combo)
 	-- Tagged synthetic events are filtered before interceptors, so ownership can
 	-- end with the transaction. A delay here would only hide real physical input.
 	_replacing = false
-	if ok then Logger.info(LOG, "Personal data injection completed.") end
+	if ok then
+		if keystats and type(keystats.log_private_hotstring) == "function" then
+			pcall(keystats.log_private_hotstring, "@" .. combo .. _trigger, echoed)
+		end
+		Logger.info(LOG, "Personal data injection completed.")
+	end
 	return ok
 end
 
@@ -711,7 +731,7 @@ local function interceptor(event, _km_buffer, ctx)
 				_state = STATE_IDLE
 				_combo = ""
 			elseif #_combo > 0 then
-				_combo = _combo:sub(1, -2)
+				_combo = _combo:sub(1, utf8.offset(_combo, -1) - 1)
 			else
 				_state = STATE_IDLE
 			end
@@ -724,6 +744,7 @@ local function interceptor(event, _km_buffer, ctx)
 
 	if _state == STATE_IDLE then
 		if char == "@" then
+			local revision, token, owner = _action_revision, _active_start_token, _keymap
 			local full_trigger = (_km_buffer or "") .. "@"
 			if _keymap then
 				-- Single-pass and memoised: classify_trigger returns all three flags
@@ -753,6 +774,9 @@ local function interceptor(event, _km_buffer, ctx)
 				if exact or pref or suff then
 					return nil
 				end
+			end
+			if not _enabled or revision ~= _action_revision or token ~= _active_start_token or owner ~= _keymap then
+				return nil
 			end
 
 			_state = STATE_COLLECTING
@@ -786,6 +810,7 @@ local function interceptor(event, _km_buffer, ctx)
 				local combo = _combo
 				
 				local full_trigger = "@" .. combo .. _trigger
+				local revision, token, owner = _action_revision, _active_start_token, _keymap
 				-- Through the memoised classifier, like the @-entry check above.
 				-- has_exact_trigger walks the whole mapping corpus and caches nothing,
 				-- and this runs on the keystroke that completes a combo - so the same
@@ -793,6 +818,9 @@ local function interceptor(event, _km_buffer, ctx)
 				-- classify_trigger returns all three flags; only `exact` matters at this
 				-- point, because a prefix or suffix match does not claim the trigger.
 				local claimed = static_claims_full_trigger(full_trigger)
+				if not _enabled or revision ~= _action_revision or token ~= _active_start_token or owner ~= _keymap then
+					return nil
+				end
 				if claimed and full_trigger:sub(1, 1) == "@" then
 					_state = STATE_IDLE
 					_combo = ""
@@ -811,8 +839,8 @@ local function interceptor(event, _km_buffer, ctx)
 			return nil
 		end
 
-		-- Collect lowercase letters for the combo
-		if char:match("^[a-z]$") then
+		-- Preserve the typed scalar; resolution checks exact and case-equivalent aliases.
+		if is_alias(char) then
 			_combo = _combo .. char
 			return nil
 		end
@@ -838,6 +866,9 @@ end
 --- Retrieves the current personal info table.
 --- @return table The info table.
 function M.get_info()         return _info    end
+--- The live [letters] alias map (shortcut letter -> info field name).
+--- @return table
+function M.get_letters()      return _letters end
 
 --- Seeds the two lookup tables and resolves a combo. TESTS ONLY.
 ---
@@ -875,6 +906,7 @@ function M.set_trigger_char(char)
 		Logger.error(LOG, "set_trigger_char(): expected a non-empty string, got %s — trigger unchanged.", type(char))
 		return false
 	end
+	_action_revision = {}
 	_trigger = char
 	-- A pending combo was accumulated against the OLD trigger; keeping it would
 	-- let the next keystroke fire a combo the user started under different rules.
@@ -1004,7 +1036,7 @@ function M.start(base_dir, keymap_module, info_toml_path, refresh_personal_data)
 			if _active_start_token ~= token or _keymap ~= callback_keymap then return nil end
 			if not _enabled or type(buf) ~= "string" then return nil end
 			
-			local match = buf:match("@([a-z]+)$")
+			local match = buf:match("@([^@]+)$")
 			if match then
 				-- The interceptor owns collection entry. It may deliberately remain
 				-- IDLE because a static mapping already claims this `@` sequence.
@@ -1037,6 +1069,7 @@ end
 --- Enables the engine tracking.
 function M.enable()
 	Logger.debug(LOG, "Enabling personal info tracking…")
+	_action_revision = {}
 	_enabled = true; _state = STATE_IDLE; _combo = ""
 	Logger.info(LOG, "Personal info tracking enabled.")
 	return true
@@ -1045,6 +1078,7 @@ end
 --- Disables the engine tracking.
 function M.disable()
 	Logger.debug(LOG, "Disabling personal info tracking…")
+	_action_revision = {}
 	_enabled = false; _state = STATE_IDLE; _combo = ""
 	Logger.info(LOG, "Personal info tracking disabled.")
 	return true

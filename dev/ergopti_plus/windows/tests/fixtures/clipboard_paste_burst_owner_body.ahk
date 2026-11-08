@@ -128,6 +128,56 @@ _KCPB_Observe(Phase) {
 		. KL_JsonEncode(Keystats._pending_entries) . "`n", "*", "UTF-8-RAW")
 }
 
+; The copy timestamp comes from the genuine accepted copy handler. Only the
+; paste producer's current clock is controlled, preserving its full native domain.
+_KCPB_PasteNow() {
+	global _KCPB
+	return _KCPB.Now
+}
+
+_KCPB_Native64() {
+	global _KCPB
+	_KCPB_Focus(_KCPB.PublicC)
+	KL_Clip_OnChange(2) ; Non-text classification never reads or mutates OS clipboard.
+	_KCPB_CheckErrors()
+	Origin := KLClip.last_copy_tick
+	_KCPB_Require(Origin > 0 && KLClip.last_copy_app == _KCPB.PublicC.App,
+		"The actual accepted copy owns its native timestamp and public provenance.")
+	loop 4 {
+		_KCPB.Now := Origin + A_Index * 100
+		KL_Clip_OnPaste()
+		_KCPB_CheckErrors()
+	}
+	_KCPB_Require(KLClip.paste_ticks.Length == 4 && _KCPB_Rows("paste_burst").Length == 0,
+		"Four genuine accepted pastes must own the initial accumulator.")
+	Era := _KCPB.Mode == "clock-one-era" ? 0x100000000
+		: _KCPB.Mode == "clock-two-era" ? 0x200000000 : 0
+	_KCPB.Now := Origin + Era + 500
+	KL_Clip_OnPaste()
+	_KCPB_CheckErrors()
+	Pastes := _KCPB_Rows("clipboard_paste"), Bursts := _KCPB_Rows("paste_burst")
+	_KCPB_Require(Pastes.Length == 5, "All five genuine producers must publish their canonical paste rows.")
+	_KCPB_Require(Pastes[5]["copy_lag_ms"] == Era + 500,
+		"A native64 copy age cannot be reduced modulo a DWORD.")
+	_KCPB_Require(Bursts.Length == (Era == 0 ? 1 : 0)
+		&& KLClip.paste_ticks.Length == (Era == 0 ? 0 : 1),
+		"Old pastes cannot re-enter a ten-second burst after one or two DWORD eras.")
+	for Row in Pastes
+		_KCPB_Require(Row["source_app"] == _KCPB.PublicC.App && Row["char_count"] == 0,
+			"Clock handling must retain the genuinely accepted public copy metadata.")
+	if Era {
+		loop 4 {
+			_KCPB.Now += 100
+			KL_Clip_OnPaste()
+			_KCPB_CheckErrors()
+		}
+		_KCPB_Require(_KCPB_Rows("paste_burst").Length == 1 && KLClip.paste_ticks.Length == 0,
+			"A fresh same-era burst still fires normally after expired activity was retired.")
+	}
+	FileAppend("RECEIPT clipboard-native64 mode=" . _KCPB.Mode . " origin=" . Origin
+		. " elapsed=" . Era + 500 . " paste_rows=" . _KCPB_Rows("clipboard_paste").Length . "`n", "*", "UTF-8-RAW")
+}
+
 _KCPB_Exercise() {
 	global _KCPB, _KL_CLIP_FILTER_PROBE
 	_KCPB_Require(_KL_CLIP_FILTER_PROBE == 0 && !KLPasswordCache.focus_tracking_active,
@@ -138,6 +188,8 @@ _KCPB_Exercise() {
 	_KCPB_Require(KLClip.paste_ticks.Length == 0 && _KCPB_Rows("clipboard_paste").Length == 0,
 		"The isolated child must start with no paste activity.")
 	_KCPB.WindowStarted := A_TickCount
+	if InStr(_KCPB.Mode, "clock-") == 1
+		return _KCPB_Native64()
 	if _KCPB.Mode != "current" {
 		if _KCPB.Mode == "private-lag" {
 			_KCPB_MFFocus(_KCPB.PublicC)
@@ -219,7 +271,7 @@ _KCPB_Main() {
 		PublicC: {Hwnd: 803, App: "burst-public-c.exe", Title: "Burst Public C"},
 		NativeFrame: 0, Failure: 0, Diagnostics: 0, Acquisitions: 0, FocusReads: 0,
 		Armed: false, TimerCalls: 0, PauseObserved: false, PauseDone: false, Resumed: false,
-		WindowStarted: 0, TicksAtRefusal: -1, PastesAtRefusal: -1, PrivacyDelta: -1,
+		Now: 0, WindowStarted: 0, TicksAtRefusal: -1, PastesAtRefusal: -1, PrivacyDelta: -1,
 		PauseTimer: _KCPB_Pause}
 	Primary := 0, PreviousSuspend := A_IsSuspended, PreviousCritical := Critical("Off")
 	Suspend(false)

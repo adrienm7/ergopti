@@ -263,6 +263,9 @@ _FeatureStateBootRunCaptured(Fixture) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
+		loop parse, Receipt.Output . Receipt.Errors, "`n", "`r"
+			if A_LoopField != ""
+				_TestPrint("# feature-state child " . Fixture . ": " . A_LoopField)
 		AssertEqual(1, Receipt.Calls, "the actual native script chord child must settle once within its bounded wait")
 		AssertEqual(0, Receipt.Code, "the real script chord reader must accept " . Fixture . ": " . Receipt.Output . Receipt.Errors)
 		AssertEqual("", Receipt.Errors, "native script chord startup must not hide an error on stderr")
@@ -282,3 +285,7 @@ for Fixture in [
 ]
 	Test("script chord detached admission: " . Fixture . " (script-chords-config-admission)",
 		_FeatureStateBootRunCaptured.Bind(Fixture))
+
+for _FSBOOT_AdmissionCase in ["raw_boot_category_signed_one", "raw_boot_category_true", "raw_boot_category_false",
+		"raw_boot_idle_boolean", "raw_boot_idle_zero", "raw_boot_idle_number"]
+	Test("Feature-state real boot source admission: " . _FSBOOT_AdmissionCase, _FeatureStateBootRunCaptured.Bind(_FSBOOT_AdmissionCase))

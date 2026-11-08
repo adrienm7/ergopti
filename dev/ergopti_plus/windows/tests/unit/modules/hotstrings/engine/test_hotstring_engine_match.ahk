@@ -370,7 +370,7 @@ TestHSE_NoExplicitPriorityResolvesOverrideCascade() {
 	SavedPath := _HotstringsOverridesPath
 	Path := A_Temp . "\hotstrings_engine_priority_overrides.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
 	try {

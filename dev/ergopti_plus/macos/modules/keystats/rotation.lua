@@ -26,6 +26,10 @@ local M = {}
 
 local json = require("hs.json")
 local LedgerAppend = require("adapters.ledger_append")
+local JournalSeal = require("keystats.journal_seal")
+local TextCrypto = require("keystats.text_crypto")
+local TextCipher = require("modules.keystats.text_cipher")
+local TriggerRoi = require("keystats.trigger_roi")
 
 local Logger = require("infra.logger")
 local LOG    = "keystats.rotation"
@@ -50,8 +54,8 @@ M.READ_STATUS_BATCH  = "batch"
 M.READ_STATUS_EOF    = "eof"
 M.READ_STATUS_FAILED = "failed"
 
---- POSIX errno returned by io.open() when today.log does not exist. In the
---- single-threaded Hammerspoon callback this is a committed empty-journal state.
+--- POSIX errno returned by io.open() when today.log does not exist. It is an
+--- empty-journal state only when no writer or committed watermark contradicts it.
 local ENOENT_ERROR_CODE = 2
 
 --- Shared state injected by M.init().
@@ -87,6 +91,7 @@ local _pending_append = nil
 
 --- Diagnostic callbacks cannot reenter and settle one append twice.
 local _append_active = false
+local _missing_path = false
 
 --- Fences the exact old stream until durable rollover and native cleanup settle.
 local _pending_rollover = nil
@@ -292,12 +297,40 @@ local function _resume_append()
 	return true
 end
 
+--- Distinguishes the IV input of every sealed field. Journal rows carry no
+--- event id yet (ids are allocated at SQL time), so the timestamp, the
+--- monotonic clock and a process counter make each one unique instead.
+local _seal_sequence = 0
+local function _seal_ports(entry)
+	_seal_sequence = _seal_sequence + 1
+	local token = string.format("journal:%s:%.0f:%d", tostring(entry.timestamp),
+		hs.timer.absoluteTime(), _seal_sequence)
+	return {
+		cipher = TextCipher,
+		encode = json.encode,
+		iv_id = function(field) return token .. ":" .. field end,
+	}
+end
+
+local _UNSEAL_PORTS = {
+	cipher = TextCipher,
+	decode = json.decode,
+	is_envelope = function(value) return TextCrypto.unwrap(value) ~= nil end,
+}
+
+--- Reports whether this exact entry owns a previously started append receipt.
+--- @param entry table|nil
+--- @return boolean
+function M.has_pending_entry(entry)
+	return entry ~= nil and _pending_append ~= nil and _pending_append.entry == entry
+end
+
 --- Append one event, retaining its exact serialized receipt after any refusal.
 --- Hot-path success performs one write and no position query or body read.
 --- @param entry table The exact event retained by the deferred FIFO operation.
 --- @return boolean True only after the complete row is acknowledged.
 function M.append_log(entry)
-	if not _require_init("append_log") or _pending_rollover or _append_active then return false end
+	if not _require_init("append_log") or _pending_rollover or _append_active or _missing_path then return false end
 	if type(entry) ~= "table" or type(entry.type) ~= "string" then
 		Logger.warn(LOG, "append_log: invalid entry — skipping")
 		return false
@@ -306,11 +339,27 @@ function M.append_log(entry)
 		Logger.error(LOG, "Cannot append another entry while the original journal append remains pending.")
 		return false
 	end
+	-- A receipt started before an encryption request must settle exactly while
+	-- the cipher is still off; a new textual row has no such authority.
+	if TriggerRoi.is_text_event(entry) then
+		local allowed = type(TextCipher.roi_text_enabled) == "function" and TextCipher.roi_text_enabled() == true
+		if not allowed and (not M.has_pending_entry(entry) or TextCipher.is_enabled() ~= false) then
+			return false
+		end
+	end
 	_append_active = true
 	local attempted, accepted = pcall(function()
 		if not _pending_append then
 			entry.timestamp = entry.timestamp or _now_ts()
-			local encoded, str = pcall(json.encode, entry)
+			-- Under at-rest encryption the journal must not keep the readable
+			-- copy of what the SQL columns seal; a failed seal writes nothing.
+			local journal_entry, unsealed_field = JournalSeal.seal(entry, _seal_ports(entry))
+			if journal_entry == nil then
+				Logger.error(LOG, "At-rest encryption could not seal journal field '%s'; entry kept for retry.",
+					tostring(unsealed_field))
+				return false
+			end
+			local encoded, str = pcall(json.encode, journal_entry)
 			if not encoded or type(str) ~= "string" then
 				Logger.error(LOG, "JSON encode failed for journal entry type '%s'.", tostring(entry.type))
 				return false
@@ -348,7 +397,7 @@ end
 --- @return integer offset New byte offset, or the previous committed offset on failure.
 --- @return string status One of READ_STATUS_BATCH, READ_STATUS_EOF, READ_STATUS_FAILED.
 function M.read_new_entries()
-	if not _require_init("read_new_entries") or _pending_rollover or _pending_append or _append_active then
+	if not _require_init("read_new_entries") or _pending_rollover or _pending_append or _append_active or _missing_path then
 		return {}, _today_log_offset, M.READ_STATUS_FAILED
 	end
 
@@ -360,9 +409,10 @@ function M.read_new_entries()
 
 	local open_ok, fh, open_detail, open_code = pcall(io.open, _paths.today_log_path, "r")
 	if not open_ok or not fh then
-		if open_ok and open_code == ENOENT_ERROR_CODE then
+		if open_ok and open_code == ENOENT_ERROR_CODE and _today_log_offset == 0 and not _log_handle then
 			return {}, _today_log_offset, M.READ_STATUS_EOF
 		end
+		if open_ok and open_code == ENOENT_ERROR_CODE then _missing_path = true end
 		Logger.warn(LOG, "Cannot open today.log; committed offset %d preserved "
 			.. "(failure content withheld; terminal type: %s).",
 			_today_log_offset, type(open_detail))
@@ -404,6 +454,12 @@ function M.read_new_entries()
 		end
 		if type(line) ~= "string" then return fail_read("line type validation") end
 		local ok, entry = pcall(json.decode, line)
+		if ok and type(entry) == "table" then
+			-- An unopenable sealed row is complete but unreadable: skipping it as
+			-- malformed would acknowledge typed text that never reached SQLite.
+			local opened, sealed_field = JournalSeal.unseal(entry, _UNSEAL_PORTS)
+			if opened == nil then return fail_read("sealed field " .. tostring(sealed_field)) end
+		end
 		if ok and type(entry) == "table" and type(entry.type) == "string"
 		   and type(entry.timestamp) == "string" then
 			table.insert(out, { entry = entry, raw = line })
@@ -470,7 +526,7 @@ function M.rollover(data_sql_path, read_status, reset, origin)
 	if not _close_rollover_stream() then return false end
 	local pending = _pending_rollover
 	local function checked_reset(next_date, completion)
-		if next_date ~= pending.date or reset(next_date) ~= true then return false end
+		if next_date ~= pending.date or reset(next_date, completion) ~= true then return false end
 		pending.reset_committed, pending.completion = true, completion
 		return true
 	end
@@ -486,6 +542,7 @@ function M.rollover(data_sql_path, read_status, reset, origin)
 	if committed ~= true then return false end
 	_today_log_offset, _today_log_date = 0, pending.date
 	_append_boundary_required = false
+	_missing_path = false
 	_pending_rollover = nil
 	return true
 end

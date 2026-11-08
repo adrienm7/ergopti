@@ -119,6 +119,47 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 			helpers.assert_eq(state.saves, { { keys = { "tab" }, path = Fixture.KARABINER_CONFIG_PATH } })
 		end)
 	end)
+
+	helpers.it("does not write to the old folder when resolving the selected folder fails", function()
+		local persisted = {}
+		local menu_paths = {
+			persist_config_dir_for_wizard = function(dir) persisted[#persisted + 1] = dir; return true end,
+			get = function() error("path unavailable") end,
+		}
+		with_finish({ answers = answers({ tab = true }, "/virtual/moved"), menu_paths = menu_paths }, function(state)
+			helpers.assert_eq(table.concat(persisted, ","), "/virtual/moved," .. Fixture.CONFIG_DIR,
+				"the refused Finish puts the previous folder back")
+			helpers.assert_eq(#state.writes, 0, "an unknown destination cannot reuse the old config path")
+			helpers.assert_eq(#state.saves, 0)
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0)
+		end)
+	end)
+
+	helpers.it("refuses an empty-folder retry until the destination is selected again", function()
+		local calls = 0
+		local persists = 0
+		local menu_paths = {
+			-- The previous folder cannot be put back: the selection stays unresolved.
+			persist_config_dir_for_wizard = function()
+				persists = persists + 1
+				return persists ~= 2
+			end,
+			get = function()
+				calls = calls + 1
+				if calls == 1 then error("temporarily unavailable") end
+				return "/virtual/moved/hammerspoon/config.toml"
+			end,
+		}
+		with_finish({ answers = answers({}, "/virtual/moved"), menu_paths = menu_paths }, function(state)
+			helpers.assert_eq(#state.writes, 0)
+			state.finish(answers({}, ""))
+			helpers.assert_eq(#state.writes, 0, "the empty field still names the captured old folder")
+			helpers.assert_eq(calls, 1, "empty input must not silently change its promised destination")
+			state.finish(answers({}, "/virtual/moved"))
+			helpers.assert_eq(#state.writes, 1)
+			helpers.assert_eq(state.writes[1].path, "/virtual/moved/hammerspoon/config.toml")
+		end)
+	end)
 end)
 
 
@@ -209,6 +250,12 @@ end)
 -- now brings Ergopti's recommended layer into the configuration folder (the
 -- owner never replaces a layers.toml the user has).
 helpers.describe("the key holding the navigation layer brings the recommended layer", function()
+	helpers.it("retains cleanup when a navigation layer import fails", function()
+		with_finish({ answers = answers({ left_command = true }), layer = "cleanup" }, function(state)
+			helpers.assert_eq(#state.layer_undos, 1, "the failed import's cleanup record must reach its owner")
+			helpers.assert_eq(state.layer_undos[1].path, "failed")
+		end)
+	end)
 	helpers.it("(nav-layer-fresh-install-default) imports the layer into the configuration folder", function()
 		for _, remap in ipairs({ { running = false }, { running = true } }) do
 			with_finish({ answers = answers({ caps_lock = true, left_command = true }), remap = remap }, function(state)

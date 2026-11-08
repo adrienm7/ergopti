@@ -45,6 +45,7 @@ local function install_collaborators(effects)
 			return tooltip and tooltip.hide_forced_silent()
 		end,
 		handle_chain_signal = function() effects.llm_calls = effects.llm_calls + 1; return false end,
+		has_pending_work    = function() return false end,
 		is_visible = function() return false end,
 	}
 	package.loaded["modules.keystats"] = {

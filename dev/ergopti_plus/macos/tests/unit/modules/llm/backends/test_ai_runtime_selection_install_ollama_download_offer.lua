@@ -84,7 +84,7 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 				source_kind = source_kind, target = target, store = store, done = done }
 			return true
 		end
-		require("modules.llm.ollama_binary").pinned_version = function() return "0.40.4" end
+		require("modules.llm.ollama_binary").pinned_version = function() return "0.40.6" end
 	end
 
 	-- Ergopti always installs and uses its own pinned Ollama (maintainer
@@ -100,7 +100,7 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		helpers.assert_eq(record.dialogs, 1)
 		local i18n = require("infra.i18n")
 		helpers.assert_eq(record.dialog_history[1][1], i18n.get("ollama.native_offer_title"))
-		helpers.assert_eq(record.dialog_history[1][2], string.format(i18n.get("ollama.native_offer_body"), "0.40.4"),
+		helpers.assert_eq(record.dialog_history[1][2], string.format(i18n.get("ollama.native_offer_body"), "0.40.6"),
 			"the offer names the version Ergopti pins")
 		helpers.assert_eq(#record.native, 1)
 		helpers.assert_eq(record.native[1].source_path, "", "no user Ollama is ever the source")

@@ -299,6 +299,7 @@ local _channel         = nil       -- registry channel id; resolved at the end o
 local _config_path     = nil       -- config.toml holding [updater] channel; set by init()
 local _channel_persisted = false   -- whether config.toml names the channel (else it is the default)
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
+local _installed_root = nil      -- root of that installation, whose .old the restart watcher restores
 local _download_part   = nil
 local _download_dest   = nil
 local native_transfer, native_verified, native_install, native_channel_intent
@@ -392,7 +393,7 @@ local function _read_persisted_interval(path)
 	local section = config[CONFIG_SECTION]
 	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
 	if raw == nil then return DEFAULT_INTERVAL_SEC end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
 		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
 			tostring(raw), DEFAULT_INTERVAL_SEC)
 		return DEFAULT_INTERVAL_SEC
@@ -421,7 +422,16 @@ end
 --- @return table state
 local function _load_check_state()
 	if _check_state then return _check_state end
-	local state, dropped = Schedule.sanitize_state(_storage_get(CHECK_STATE_KEY, nil))
+	if not Storage or type(Storage.read_exact) ~= "function" then
+		Logger.error(LOG, "The update-check storage cannot perform an exact read.")
+		return nil
+	end
+	local called, read_ok, stored = pcall(Storage.read_exact, CHECK_STATE_KEY)
+	if not called or read_ok ~= true then
+		Logger.error(LOG, "The update-check record could not be read; retrying without overwriting it.")
+		return nil
+	end
+	local state, dropped = Schedule.sanitize_state(stored)
 	for _, field in ipairs(dropped) do
 		Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
 	end
@@ -470,6 +480,13 @@ local function _load_list_cache()
 	end
 	for key, raw in pairs(stored) do
 		local copy, reason = ListCache.validate(raw)
+		if copy then
+			local valid, decoded = pcall(Json.decode_lossless, copy.body)
+			local entries = valid and type(decoded) == "table" and Parser.split_releases_array(copy.body) or nil
+			if not entries or #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
+				copy, reason = nil, "invalid release page JSON"
+			end
+		end
 		if copy and type(key) == "string" and _list_cache[key] == nil then
 			_list_cache[key] = { body = copy.body, validator = copy.etag, effective_url = copy.url, restored = true }
 		else
@@ -1030,27 +1047,11 @@ local function _process_release_response(body, channel, check_only)
 
 	local signature_url = _select_signature_asset(body)
 
-	if current == "local" then
-		-- Running from source — always show the latest as available for dev.
-		Logger.info(LOG, "Local source — latest release: %s.", latest_tag)
-		_cached_release = {
-			tag          = latest_tag,
-			notes        = Parser.parse_notes(body),
-			download_url = _select_update_asset(body),
-			checksum_url = _select_checksum_asset(body),
-			signature_url = signature_url ~= "" and signature_url or nil,
-			published_at = Parser.parse_published_at(body),
-			prerelease   = Parser.parse_prerelease_flag(body),
-			check_only   = check_only == true or nil,
-		}
-		_state = "available"
-		return true
-	end
-
 	-- A deliberate switch to another channel offers that channel's latest release
 	-- even when semver orders it below the installed build (the same rule as the
-	-- other drivers, pinned by channel_vectors.json).
-	if not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
+	-- other drivers, pinned by channel_vectors.json). A source checkout offers the
+	-- latest too, but still needs the same installable asset admission below.
+	if current ~= "local" and not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
 		-- Info, not debug: "the check ran and found nothing" is the answer a user
 		-- asking "why did it not update" needs, and it happens a few times a day.
 		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)
@@ -1244,7 +1245,9 @@ end
 --- @param generation number Captured logical schedule owner.
 local function _complete_background_check(ok, available, release, generation)
 	if not _schedule_current(generation) then return end
-	local state = Schedule.record_check(_load_check_state(), M._now(), ok)
+	local previous = _load_check_state()
+	if not previous then return end
+	local state = Schedule.record_check(previous, M._now(), ok)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 		ok and "success" or "failure", state.failures)
@@ -1283,6 +1286,10 @@ local function _evaluate_schedule()
 	if _schedule_active ~= true then return end
 	_bg_timer_handle = nil
 	local now = M._now()
+	if _started_at and now < _started_at then
+		Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+		_started_at = now
+	end
 	-- A luv timer does not advance during a suspend: a wall-clock gap longer
 	-- than the delay it was armed for is a wake, after which the network needs
 	-- the boot delay before a catch-up check.
@@ -1291,9 +1298,11 @@ local function _evaluate_schedule()
 			now - _armed_at, _armed_for)
 		_started_at = now
 	end
+	local state = _load_check_state()
+	if not state then _arm_schedule(TIMING.reevaluate_sec); return end
 	local due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at or now, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
+		state = state, timing = TIMING,
 	})
 	if due_at == nil then
 		Logger.debug(LOG, "Automatic update checks are off (%s).", reason)
@@ -1392,10 +1401,13 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	_schedule_active = true
 	_started_at = _started_at or M._now()
 	local now = M._now()
-	local due_at, reason = Schedule.next_due({
+	if now < _started_at then _started_at = now end
+	local state = _load_check_state()
+	local due_at, reason
+	if state then due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
-	})
+		state = state, timing = TIMING,
+	}) else reason = "record_unavailable" end
 	local first_delay = due_at and Schedule.delay_until(due_at, now, TIMING) or TIMING.reevaluate_sec
 	Logger.start(LOG, "Background checks every %ds on channel '%s' (next evaluation in %ds, %s).",
 		_check_interval, _channel, first_delay, reason)
@@ -1819,6 +1831,7 @@ local function install_archive(archive_path, expected_version)
 	_verified_archive = nil
 	_verified_release = nil
 	_installed_launcher = context.wrapper
+	_installed_root = context.install_root
 	_state = "idle"
 	return true
 end
@@ -1886,7 +1899,7 @@ local function install_native_archive(path, tag, callback, admission)
   local completed = work.result.installed == true
   if completed then
    native_verified, _verified_archive, _verified_release = nil, nil, nil
-   _installed_launcher, _state = captured_context.wrapper, "idle"
+   _installed_launcher, _installed_root, _state = captured_context.wrapper, captured_context.install_root, "idle"
   else _state = "available" end
   pcall(callback, completed, work.result.detail, work.result.receipt)
  end
@@ -1930,6 +1943,13 @@ end
 --- @return string|nil
 function M.installed_launcher()
 	return _installed_launcher
+end
+
+--- The root of the installation the last update replaced; its `.old` sibling
+--- holds the previous installation the restart watcher puts back.
+--- @return string|nil
+function M.installed_root()
+	return _installed_root
 end
 
 -- =========================================

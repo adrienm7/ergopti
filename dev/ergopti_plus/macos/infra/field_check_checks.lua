@@ -118,6 +118,9 @@ function M.parse_version(output)
 	return tostring(output or ""):match("(%d+%.%d+[%.%d]*)")
 end
 
+-- The skip reason of the lease steps that need an admitted owned runtime
+local NOT_ADMITTED = "owned_runtime_not_admitted"
+
 --- Phases in which the lease is not usable.
 local BAD_PHASES = { failed = true, fencing = true, recovering = true, uninitialized = true }
 
@@ -141,7 +144,10 @@ local function settled_remap_facts(ports, callback)
 	local waited = 0
 	local function poll()
 		local remap = ports.remap_facts()
-		if remap.enabled ~= true or remap.guardian ~= "unknown" or waited >= M.GUARDIAN_SETTLE_SECONDS then
+		-- An owned runtime its owner has not admitted registers no guardian:
+		-- waiting for one only spent the whole bound (field report 2026-11-05)
+		if remap.enabled ~= true or remap.owned_admitted == false or remap.guardian ~= "unknown"
+			or waited >= M.GUARDIAN_SETTLE_SECONDS then
 			return callback(remap, waited)
 		end
 		if type(ports.after) ~= "function" then
@@ -164,26 +170,43 @@ end
 --- @param ports table Check ports.
 --- @param report table Step reporter.
 --- @param finish function Settles the check.
---- @param remap table Remap facts { enabled, phase, guardian }.
+--- @param remap table Remap facts { enabled, phase, guardian, owned_admitted }, owned_admitted
+--- nil for the shared runtime.
 --- @param waited number Seconds spent waiting for the guardian answer.
 function M.lease_with_facts(ports, report, finish, remap, waited)
 	local enabled = remap.enabled == true
+	-- The selected owned runtime before its owner admitted it: its tool, its
+	-- guardian and its version do not exist yet, and the owned_* steps report
+	-- why. Failing them repeated that cause three times (field report 2026-11-05).
+	local not_admitted = remap.owned_admitted == false
 	local cli = ports.path_exists(KePaths.CLI)
-	report.step("cli_present", (cli or not enabled) and STATE.pass or STATE.fail, yes_no(cli))
+	if not_admitted then
+		report.step("cli_present", STATE.skip, NOT_ADMITTED)
+	else
+		report.step("cli_present", (cli or not enabled) and STATE.pass or STATE.fail, yes_no(cli))
+	end
 	report.step("integration_enabled", STATE.info, yes_no(enabled))
 	if enabled then
 		report.step("lease_phase", BAD_PHASES[remap.phase] and STATE.fail or STATE.pass, remap.phase)
-		report.step("guardian_state", remap.guardian == "ready" and STATE.pass or STATE.fail, remap.guardian)
+		if not_admitted then
+			report.step("guardian_state", STATE.skip, NOT_ADMITTED)
+		else
+			report.step("guardian_state", remap.guardian == "ready" and STATE.pass or STATE.fail, remap.guardian)
+		end
 		if waited > 0 then report.step("guardian_wait", STATE.info, string.format("%.1fs", waited)) end
 	else
 		report.step("lease_phase", STATE.skip, remap.phase)
 		report.step("guardian_state", STATE.skip, remap.guardian)
 	end
+	-- The selected runtime's own configuration: the owned runtime never reads
+	-- the user's ~/.config/karabiner/karabiner.json
+	local config = KePaths.config_file_for(KePaths.selected_runtime())
 	local home = ports.home()
-	if home then
-		report.step("config_present", STATE.info, yes_no(ports.path_exists(home .. "/.config/karabiner/karabiner.json")))
-	else
+	if config:sub(1, 2) == "~/" and not home then
 		report.step("config_present", STATE.skip, "no_home")
+	else
+		if config:sub(1, 2) == "~/" then config = home .. config:sub(2) end
+		report.step("config_present", STATE.info, yes_no(ports.path_exists(config)))
 	end
 	local counts = ports.health_counts()
 	local lease_total = 0
@@ -223,6 +246,11 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 			finish()
 		end)
 	end
+	if not_admitted then
+		report.step("cli_version", STATE.skip, NOT_ADMITTED)
+		memory_then_finish()
+		return
+	end
 	if not cli then
 		report.step("cli_version", STATE.skip, "no_cli")
 		memory_then_finish()
@@ -239,7 +267,10 @@ end
 function M.owned_runtime(ports, report, finish)
 	local facts = ports.keystats_facts()
 	report.step("dormant_source", facts.credit_source == "legacy" and STATE.pass or STATE.fail, facts.credit_source)
-	report.step("capture_unloaded", facts.capture_loaded and STATE.fail or STATE.pass, yes_no(not facts.capture_loaded))
+	-- Information only: the owned runtime is the default and its owner builds
+	-- the capture port, which loads the raw stream owner, on every owned boot
+	-- (field report 2026-11-05: this step failed every such run).
+	report.step("capture_unloaded", STATE.info, yes_no(not facts.capture_loaded))
 	report.step("runtime_installed", STATE.info, yes_no(ports.path_exists(OWNED_RUNTIME_DIR)))
 	report.step("job_file", STATE.info, yes_no(ports.path_exists(OWNED_JOB_FILE)))
 	report.step("stock_app", STATE.info, yes_no(ports.path_exists(STOCK_APP)))

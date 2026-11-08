@@ -240,7 +240,8 @@ window.publishTypingMetricsData = function (payload, metadata) {
 		metadata.assets_revision > appliedTypingAssetsRevision
 	) {
 		window.app_icons = payload.app_icons;
-		window.keycode_layout = payload.kc_layout;
+		window.keycode_layout_source = payload.kc_layout;
+		window.keycode_layout = name_keycode_layout(payload.kc_layout, window.driver_meta);
 		appliedTypingAssetsRevision = metadata.assets_revision;
 		assetsChanged = true;
 	}
@@ -268,8 +269,10 @@ function update_manifest_scope() {
 	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
 	const app_set = new Set();
 	app_state.manifest_dates_sorted.forEach((date) => {
-		Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-			if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+		Object.keys(window.metrics_manifest[date]).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
+			if (app_name !== 'Unknown') {
 				app_set.add(app_name);
 			}
 		});
@@ -394,10 +397,12 @@ function compute_manifest_metrics() {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
 
-		Object.keys(window.metrics_manifest[date_str]).forEach((app_name) => {
+		Object.keys(window.metrics_manifest[date_str]).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
 
-			const app = window.metrics_manifest[date_str][app_name];
+			const app = window.metrics_manifest[date_str][app_key];
 
 			if (!app_state.time_series[date_str]) {
 				app_state.time_series[date_str] = {
@@ -726,9 +731,11 @@ function recompute_speed_kpi() {
 	manifest_dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
-		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_name) => {
+		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
-			accumulate(window.metrics_manifest[date_str][app_name]);
+			accumulate(window.metrics_manifest[date_str][app_key]);
 		});
 	});
 	const today_str = get_local_date_string();
@@ -904,7 +911,6 @@ function apply_local_filters() {
 	// the first projection would be stored under its pre-discovery selection.
 	if (include_today && app_state.today_live_data) {
 		Object.keys(app_state.today_live_data).forEach((app_name) => {
-			if (app_name === '_sys' || app_name === '_system') return;
 			// Register newly seen apps from live data
 			if (app_name !== 'Unknown' && !app_state.available_apps.includes(app_name)) {
 				app_state.available_apps.push(app_name);
@@ -980,8 +986,6 @@ function apply_local_filters() {
 
 		if (include_today && app_state.today_live_data) {
 			Object.keys(app_state.today_live_data).forEach((app_name) => {
-				if (app_name === '_sys' || app_name === '_system') return;
-
 				if (!matches_typing_app_selection(app_name)) return;
 
 				const app_data = app_state.today_live_data[app_name];
@@ -1294,11 +1298,11 @@ function render_sfb_kpi() {
 		// build BOTH the full map and the same-key-only delta so the
 		// heatmap-only toggle can switch view without re-running this loop.
 		sfb_by_kc[kc_a] = (sfb_by_kc[kc_a] || 0) + count;
-		sfb_by_kc[kc_b] = (sfb_by_kc[kc_b] || 0) + count;
+		if (!is_same_key) sfb_by_kc[kc_b] = (sfb_by_kc[kc_b] || 0) + count;
 		if (!sfb_pairs_by_kc[kc_a]) sfb_pairs_by_kc[kc_a] = [];
 		if (!sfb_pairs_by_kc[kc_b]) sfb_pairs_by_kc[kc_b] = [];
 		sfb_pairs_by_kc[kc_a].push({ partner_kc: kc_b, pair_label: k, count });
-		sfb_pairs_by_kc[kc_b].push({ partner_kc: kc_a, pair_label: k, count });
+		if (!is_same_key) sfb_pairs_by_kc[kc_b].push({ partner_kc: kc_a, pair_label: k, count });
 		if (is_same_key) {
 			// Heatmap delta — subtracted at render time when the heatmap
 			// toggle is "doublons exclus".
@@ -1310,10 +1314,39 @@ function render_sfb_kpi() {
 		if (!_sfb_include_same_key && is_same_key) return;
 
 		sfb_total += count;
-		const finger_fr = FINGER_LABELS_FR[col_a] || col_a;
-		const fp = finger_fr.split(' ');
-		const hand = fp[fp.length - 1];
-		const finger = fp.slice(0, -1).join(' ');
+		// Some languages join finger and hand without a space. Only expose a
+		// side when both translations prove the same finger stem with opposite,
+		// unambiguous hand suffixes; otherwise retain the full name and no side.
+		const finger = FINGER_LABELS_FR[col_a] || col_a;
+		const strings = window._i18n_strings || {};
+		const left = strings['ui_typing.finger.hand_l'];
+		const right = strings['ui_typing.finger.hand_r'];
+		const otherKey = col_a.startsWith('l_')
+			? `r_${col_a.slice(2)}`
+			: col_a.startsWith('r_')
+				? `l_${col_a.slice(2)}`
+				: null;
+		const other = otherKey && FINGER_LABELS_FR[otherKey];
+		let hand = '—';
+		if (
+			typeof left === 'string' &&
+			left &&
+			typeof right === 'string' &&
+			right &&
+			typeof other === 'string'
+		) {
+			const lm = finger.endsWith(left),
+				rm = finger.endsWith(right);
+			const olm = other.endsWith(left),
+				orm = other.endsWith(right);
+			if (lm !== rm && olm !== orm && lm !== olm) {
+				const suffix = lm ? left : right,
+					otherSuffix = olm ? left : right;
+				const stem = finger.slice(0, -suffix.length).trim();
+				const otherStem = other.slice(0, -otherSuffix.length).trim();
+				if (stem && stem === otherStem) hand = suffix;
+			}
+		}
 		sfb_list.push({ pair: k, count, kc_a, kc_b, finger, hand });
 	});
 
@@ -1415,13 +1448,12 @@ function _render_sfb_heatmap_with_toggle() {
 		render_sfb_heatmap(full.sfb_by_kc, full.sfb_pairs_by_kc, app_state.data.kc || {});
 		return;
 	}
-	// Subtract same-key deltas from the full map (each side of the pair was
-	// the same key so we credit twice — count is doubled in sfb_by_kc).
+	// Subtract each same-key pair once from the full per-key totals.
 	const adjusted = {};
 	const same = (_sfb_heatmap_same_only && _sfb_heatmap_same_only.sfb_by_kc) || {};
 	Object.entries(full.sfb_by_kc).forEach(([kc_str, n]) => {
 		const dup = same[kc_str] || 0;
-		const v = n - dup * 2;
+		const v = n - dup;
 		if (v > 0) adjusted[kc_str] = v;
 	});
 	// Filter pair lists too — drop any entry where partner_kc === kc itself
@@ -1480,11 +1512,8 @@ function render_sfb_table() {
 		rows_html = sorted
 			.slice(0, 200)
 			.map((d) => {
-				// finger and hand are pre-computed in render_sfb_kpi() for sortability
-				// "doigt" / "main" share the same FINGER_LABELS_FR convention as the
-				// distance card; strip the trailing G/D from the finger label since the
-				// hand is already shown in its own column.
-				const doigt_str = (d.finger || '').replace(/\s+[GD]$/, '');
+				// The finger label is intentionally kept whole in every language.
+				const doigt_str = d.finger || '';
 				const main_str = d.hand || '';
 				const pair_html = `<span class="seq-chips">${format_seq_chips(d.pair)}</span>`;
 				return `<tr>
@@ -2474,9 +2503,11 @@ function render_roi_kpi() {
 	manifest_dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
-		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_name) => {
+		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_key) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
-			accumulate(window.metrics_manifest[date_str][app_name]);
+			accumulate(window.metrics_manifest[date_str][app_key]);
 		});
 	});
 	const today_str = get_local_date_string();
@@ -2593,10 +2624,13 @@ function render_lexical_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('lexical_val', `${richness.toFixed(1)}<span class="stat-unit">% richesse</span>`);
+	set(
+		'lexical_val',
+		`${richness.toFixed(1)}<span class="stat-unit">${escape_html(_t('ui_typing.unit_richness'))}</span>`
+	);
 	set('lexical_unique', format_number(unique_words));
 	set('lexical_total', format_number(total_words));
-	set('lexical_avg_len', `${avg_len.toFixed(2)} car.`);
+	set('lexical_avg_len', `${avg_len.toFixed(2)} ${escape_html(_t('ui_typing.col_chars'))}`);
 	set('lexical_top', top_word ? `${escape_html(top_word)} (${format_number(top_count)})` : '—');
 
 	const loading = document.getElementById('lexical_loading');
@@ -2624,7 +2658,7 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} car.</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
@@ -2660,7 +2694,9 @@ function _foreach_filtered_app(fn) {
 	dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
-		Object.entries(window.metrics_manifest[date_str] || {}).forEach(([app_name, app]) => {
+		Object.entries(window.metrics_manifest[date_str] || {}).forEach(([app_key, app]) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name)) return;
 			fn(app, date_str, app_name);
 		});
@@ -2726,9 +2762,12 @@ function render_rhythm_kpi() {
 		'rhythm_val',
 		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">${_t('ui_typing.unit_cpm_burst')}</span>`
 	);
-	set('rhythm_max_chars', max_chars > 0 ? `${format_number(max_chars)} car.` : '—');
+	set(
+		'rhythm_max_chars',
+		max_chars > 0 ? `${format_number(max_chars)} ${escape_html(_t('ui_typing.col_chars'))}` : '—'
+	);
 	set('rhythm_count', format_number(total_bursts));
-	set('rhythm_mean_delay', mean_delay > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
+	set('rhythm_mean_delay', inter_count > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
 	set('rhythm_cv', inter_count > 0 ? cv.toFixed(2) : '—');
 
 	const loading = document.getElementById('rhythm_loading');
@@ -2754,7 +2793,7 @@ function render_rhythm_kpi() {
 		.map((k) => {
 			const n = length_buckets[k] || 0;
 			const pct = max_bucket > 0 ? (n / max_bucket) * 100 : 0;
-			const label = k === '500+' ? '500+ car.' : `≤ ${k} car.`;
+			const label = `${k === '500+' ? '> 500' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
 			return (
 				`<tr>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
@@ -2818,7 +2857,12 @@ function render_sessions_kpi() {
 	);
 	set('sessions_total_time', count > 0 ? _fmt_duration_ms(total_active_ms) : '—');
 	set('sessions_longest_time', longest_ms > 0 ? _fmt_duration_ms(longest_ms) : '—');
-	set('sessions_longest_chars', longest_chars > 0 ? `${format_number(longest_chars)} car.` : '—');
+	set(
+		'sessions_longest_chars',
+		longest_chars > 0
+			? `${format_number(longest_chars)} ${escape_html(_t('ui_typing.col_chars'))}`
+			: '—'
+	);
 	set('sessions_avg_time', avg_ms > 0 ? _fmt_duration_ms(avg_ms) : '—');
 
 	const loading = document.getElementById('sessions_loading');
@@ -2875,7 +2919,10 @@ function render_records_kpi() {
 
 	if (window.metrics_manifest) {
 		Object.entries(window.metrics_manifest).forEach(([date_str, apps]) => {
-			Object.entries(apps || {}).forEach(([app_name, app]) => visit(app, date_str, app_name));
+			Object.entries(apps || {}).forEach(([app_key, app]) => {
+				if (app_key === '_sys' || app_key === '_system') return;
+				visit(app, date_str, metricsManifestLabel(app_key));
+			});
 		});
 	}
 	if (app_state.today_live_data) {
@@ -2907,10 +2954,10 @@ function render_records_kpi() {
 		prev = ordinal;
 	});
 
-	const fr_short = (date_str) => {
+	const localized_short_date = (date_str) => {
 		if (!date_str) return '—';
 		const d = new Date(parseDateKey(date_str));
-		return d.toLocaleDateString('fr-FR', {
+		return d.toLocaleDateString(window._i18n_locale || 'fr', {
 			day: 'numeric',
 			month: 'short',
 			year: '2-digit',
@@ -2928,17 +2975,26 @@ function render_records_kpi() {
 	);
 	set(
 		'records_burst_chars',
-		max_burst > 0 ? `${format_number(max_burst)} car. (${escape_html(max_burst_app)})` : '—'
+		max_burst > 0
+			? `${format_number(max_burst)} ${escape_html(_t('ui_typing.col_chars'))} (${escape_html(max_burst_app)})`
+			: '—'
 	);
 	set(
 		'records_session',
-		max_session_ms > 0 ? `${_fmt_duration_ms(max_session_ms)} (${fr_short(max_session_date)})` : '—'
+		max_session_ms > 0
+			? `${_fmt_duration_ms(max_session_ms)} (${localized_short_date(max_session_date)})`
+			: '—'
 	);
 	set(
 		'records_best_day',
-		best_day_chars > 0 ? `${format_number(best_day_chars)} car. (${fr_short(best_day)})` : '—'
+		best_day_chars > 0
+			? `${format_number(best_day_chars)} ${escape_html(_t('ui_typing.col_chars'))} (${localized_short_date(best_day)})`
+			: '—'
 	);
-	set('records_streak', streak_max > 0 ? `${streak_max} jour${streak_max > 1 ? 's' : ''}` : '—');
+	set(
+		'records_streak',
+		streak_max > 0 ? `${escape_html(_t('ui_apps.label_days'))} ${streak_max}` : '—'
+	);
 
 	const has_data = max_burst > 0 || max_session_ms > 0 || best_day_chars > 0;
 	const loading = document.getElementById('records_loading');
@@ -3024,7 +3080,7 @@ function render_charmix_kpi() {
 	set(
 		'charmix_val',
 		dominant && grand > 0
-			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${_t(dominant.labelKey).toLowerCase()}</span>`
+			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${escape_html(_t(dominant.labelKey).toLowerCase())}</span>`
 			: `—`
 	);
 
@@ -3049,13 +3105,15 @@ function render_charmix_kpi() {
 	const segments = CHARMIX_CATEGORIES.map((c) => {
 		const n = totals[c.key] || 0;
 		const pct = (n / grand) * 100;
-		const label = pct >= 6 ? `${_t(c.labelKey)} ${pct.toFixed(0)}%` : '';
-		return { ...c, n, pct, label };
+		const category = escape_html(_t(c.labelKey));
+		const label = pct >= 6 ? `${category} ${pct.toFixed(0)}%` : '';
+		const tooltip = `${category} ${pct.toFixed(2)}%`;
+		return { ...c, n, pct, label, tooltip };
 	}).filter((s) => s.pct > 0);
 	const bar_html = segments
 		.map(
 			(s) =>
-				`<div title="${s.label || (s.label || '') + ' ' + s.pct.toFixed(2) + '%'}" ` +
+				`<div title="${s.tooltip}" ` +
 				`style="flex-basis:${s.pct}%;background:${s.color};display:flex;align-items:center;justify-content:center;` +
 				`color:${ThemeTokens.color('hue-0f172a')};font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
 		)
@@ -3157,7 +3215,9 @@ function render_apps_kpi() {
 	const top_vol = _apps_data.slice().sort((a, b) => b.chars - a.chars)[0];
 	set(
 		'apps_top_volume',
-		top_vol ? `${escape_html(top_vol.name)} (${format_number(top_vol.chars)} car.)` : '—'
+		top_vol
+			? `${escape_html(top_vol.name)} (${format_number(top_vol.chars)} ${escape_html(_t('ui_typing.col_chars'))})`
+			: '—'
 	);
 
 	// Build symmetric app-pair affinity: both directions of switching count.
@@ -3714,11 +3774,44 @@ function mark_incomplete_read(part, incomplete) {
 	if (window.metrics_freshness) window.metrics_freshness.mark_incomplete(part, incomplete);
 }
 
+/** Preserve only explicitly omitted slots; every other slot is a complete replacement. */
+function merge_partial_today_data(previous, incoming, partial_types) {
+	if (!partial_types.length) return incoming;
+	const merged = Object.create(null);
+	for (const [app, bucket] of Object.entries(incoming || {})) {
+		merged[app] = Object.assign(Object.create(null), bucket);
+	}
+	for (const [app, bucket] of Object.entries(previous || {})) {
+		for (const kind of partial_types) {
+			if (!Object.hasOwn(bucket, kind)) continue;
+			if (!Object.hasOwn(merged, app)) merged[app] = Object.create(null);
+			merged[app][kind] = bucket[kind];
+		}
+	}
+	return merged;
+}
+
+/** Fetch omitted tables only for a visible tab whose selection includes today. */
+function request_partial_today_refresh() {
+	if (!app_state.today_partial_types.includes(app_state.current_tab) || !has_typing_app_selection())
+		return false;
+	const today = get_local_date_string();
+	const start = document.getElementById('date_start')?.value || '';
+	const end = document.getElementById('date_end')?.value || '';
+	if ((start && today < start) || (end && today > end)) return false;
+	// The existing request owner coalesces this selection while it is in flight.
+	// Keep rendered rows rather than showing a spinner for this live refresh.
+	request_range_data(false);
+	return true;
+}
+
 /**
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries,
  *     plus `incomplete: true` when the host read missed rows. A host may name
+ *     `today_partial_types` lists omitted table slots, anchored by `today_date`;
+ *     an absent list means a complete replacement. A host may also name
  *     its history with `historical_serial`, and then replace `historical` with
  *     `historical_reused: true` when the request named that same serial.
  * @param {number|null} [request_id=null] - Native request ownership token.
@@ -3726,6 +3819,21 @@ function mark_incomplete_read(part, incomplete) {
  */
 function receive_range_data(payload, request_id = null) {
 	if (!can_receive_range_data(request_id)) return false;
+	const has_day = Boolean(payload) && Object.hasOwn(payload, 'today_date');
+	// Legacy complete payloads have no captured day; never reuse their slots.
+	const day = has_day ? payload.today_date : '';
+	const kinds =
+		payload && Object.hasOwn(payload, 'today_partial_types') ? payload.today_partial_types : [];
+	if (
+		!Array.isArray(kinds) ||
+		kinds.some((kind) => typeof kind !== 'string' || !Object.hasOwn(app_state.data, kind))
+	)
+		throw new TypeError('Invalid partial today table metadata.');
+	if ((has_day || kinds.length) && (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)))
+		throw new TypeError('Invalid today snapshot date.');
+	if (kinds.length && !has_day)
+		throw new TypeError('Partial today data requires its captured date.');
+	const partial_types = [...new Set(kinds)];
 	const serial = Number.isSafeInteger(payload?.historical_serial)
 		? payload.historical_serial
 		: null;
@@ -3747,8 +3855,12 @@ function receive_range_data(payload, request_id = null) {
 	if (payload.historical_reused !== true) {
 		app_state.historical_cache = payload.historical;
 		app_state.historical_serial = serial;
+		app_state.historical_cache_incomplete = payload.incomplete === true;
 	}
-	app_state.today_live_data = payload.today;
+	const prior_today = day === app_state.today_live_date ? app_state.today_live_data : null;
+	app_state.today_live_data = merge_partial_today_data(prior_today, payload.today, partial_types);
+	app_state.today_partial_types = partial_types;
+	app_state.today_live_date = day;
 	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();
 	return true;
@@ -3762,6 +3874,8 @@ function receive_range_data(payload, request_id = null) {
 window.receive_live_update = function (today_idx) {
 	invalidate_typing_projection_cache();
 	app_state.today_live_data = today_idx;
+	app_state.today_partial_types = [];
+	app_state.today_live_date = get_local_date_string();
 	if (app_state.live_update_timer) clearTimeout(app_state.live_update_timer);
 	app_state.live_update_timer = setTimeout(() => {
 		apply_local_filters();

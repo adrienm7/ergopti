@@ -98,12 +98,12 @@ class NativeHTTPError(Exception):
 
 
 def _positive_timeout(value):
-    return (
-        not isinstance(value, bool)
-        and isinstance(value, (int, float))
-        and math.isfinite(value)
-        and value > 0
-    )
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _dev_source_names(root):
@@ -181,12 +181,19 @@ class NativeHTTPResponse:
     """
 
     def __init__(self, url, headers, method="GET", timeout=None, idle_timeout=None, direct=False):
-        if timeout is not None and not _positive_timeout(timeout):
+        if timeout is not None and (
+            not _positive_timeout(timeout) or timeout > ((1 << 31) - 1) / 1000
+        ):
             raise NativeHTTPError("protocol")
-        if not _positive_timeout(idle_timeout) or type(direct) is not bool:
+        if (
+            not _positive_timeout(idle_timeout)
+            or idle_timeout > ((1 << 31) - 1) / 1000
+            or type(direct) is not bool
+        ):
             raise NativeHTTPError("protocol")
         if method not in ("GET", "HEAD") or not isinstance(url, str):
             raise NativeHTTPError("protocol")
+        self._method = method
         if not isinstance(headers, (list, tuple)) or any(
             not isinstance(pair, (list, tuple))
             or len(pair) != 2
@@ -461,13 +468,41 @@ class NativeHTTPResponse:
             for pair in metadata["headers"]
         ):
             raise NativeHTTPError("protocol")
+        content_length = None
+        for name, value in metadata["headers"]:
+            if not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name) or any(
+                char in value for char in "\r\n\x00"
+            ):
+                raise NativeHTTPError("protocol")
+            if name.lower() == "content-encoding" and value.lower() != "identity":
+                raise NativeHTTPError("content_encoding")
+            if name.lower() == "content-length":
+                if content_length is not None or re.fullmatch(r"\+?[0-9]+", value) is None:
+                    raise NativeHTTPError("protocol")
+                digits = value.lstrip("+").lstrip("0") or "0"
+                if len(digits) > 19:
+                    raise NativeHTTPError("protocol")
+                content_length = int(digits)
+                if content_length > (1 << 63) - 1:
+                    raise NativeHTTPError("protocol")
         self.status = metadata["status"]
         self.headers = metadata["headers"]
+        # A 304 may advertise the size of the selected representation while its
+        # own response body is empty, just like a HEAD response.
+        self._body_expected = 0 if self._method == "HEAD" or self.status == 304 else content_length
+        self._body_received = 0
+        if self._body_expected == 0:
+            tag, payload = self._frame()
+            if tag != b"C":
+                raise NativeHTTPError("protocol")
+            self._terminal(payload)
 
     def _remaining(self):
         progress = getattr(self, "_role_progress", None)
         if progress is not None:
             progress()
+            if self._closed:
+                raise NativeHTTPError("protocol")
         now = time.monotonic()
         deadline = self._idle_deadline
         if self._absolute is not None:
@@ -589,8 +624,22 @@ class NativeHTTPResponse:
             if not self._pending and not self._complete:
                 tag, payload = self._frame()
                 if tag == b"C":
+                    if (
+                        self._body_expected is not None
+                        and self._body_received != self._body_expected
+                    ):
+                        raise NativeHTTPError("protocol")
                     self._terminal(payload)
                 elif tag == b"D" and payload:
+                    self._body_received += len(payload)
+                    if self._body_expected is not None:
+                        if self._body_received > self._body_expected:
+                            raise NativeHTTPError("protocol")
+                        if self._body_received == self._body_expected:
+                            tag, terminal = self._frame()
+                            if tag != b"C":
+                                raise NativeHTTPError("protocol")
+                            self._terminal(terminal)
                     self._pending = payload
                 else:
                     raise NativeHTTPError("protocol")
@@ -603,6 +652,11 @@ class NativeHTTPResponse:
             failure = NativeHTTPError("protocol")
             self._close_for_failure(failure, source)
             raise failure from None
+        except BaseException as failure:
+            # Progress cancellation and other caller exceptions still own the
+            # native child until its pipes are closed and the process is reaped.
+            self._close_for_failure(failure)
+            raise
 
     def _close_for_failure(self, failure, source=None):
         """Retire through the original owner before projecting fixed observations."""

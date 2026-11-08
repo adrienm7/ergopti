@@ -81,32 +81,32 @@ end
 --- @param events table
 --- @return table fired The actions that ran, as {slot, action}.
 local function pump_gesture(slot, events)
-	local reader = Fakes.evdev_reader({ events = events })
-	package.loaded["adapters.evdev_reader"] = reader
+	local previous_reader, previous_manager = package.loaded["adapters.evdev_reader"], package.loaded["modules.gestures.manager"]
+	local ok, result = xpcall(function()
+		local reader = Fakes.evdev_reader({ events = events })
+		package.loaded["adapters.evdev_reader"] = reader
+		local M = helpers.load_module("modules.gestures.manager")
+		M.init({ enabled = false, persist = false })
+		M.set_action(slot, "enter")
 
-	local M = helpers.load_module("modules.gestures.manager")
-	M.init({ enabled = false, persist = false })
-	M.set_action(slot, "enter")
+		local fired = {}
+		local real_dispatch = M.dispatch_gesture
+		M.dispatch_gesture = function(gesture)
+			fired[#fired + 1] = gesture
+			return real_dispatch(gesture)
+		end
 
-	local fired = {}
-	local real_dispatch = M.dispatch_gesture
-	M.dispatch_gesture = function(gesture)
-		fired[#fired + 1] = gesture
-		return real_dispatch(gesture)
-	end
-
-	-- The manager only pumps once start_reading() has opened a device. The finder
-	-- needs a real /proc entry, so the reading state is set through the same
-	-- public path a caller uses and the fake reader stands in for the device.
-	reader.open("/dev/input/event-fake", reader.TOUCHPAD)
-	M._test_begin_reading(Decoder.new())
-	helpers.assert_true(M.enable(), "a live reader must enable dispatch before the pump runs")
-	M.pump()
-
-	package.loaded["adapters.evdev_reader"] = nil
-	return fired
+		-- The manager pumps only after a device is open; the fake is the device.
+		reader.open("/dev/input/event-fake", reader.TOUCHPAD)
+		M._test_begin_reading(Decoder.new())
+		helpers.assert_true(M.enable(), "a live reader must enable dispatch before the pump runs")
+		M.pump()
+		return fired
+	end, debug.traceback)
+	package.loaded["adapters.evdev_reader"], package.loaded["modules.gestures.manager"] = previous_reader, previous_manager
+	if not ok then error(result, 0) end
+	return result
 end
-
 
 
 

@@ -47,6 +47,7 @@ local function in_session(session, body)
 		for needle, answer in pairs(session.answers or {}) do
 			if cmd:find(needle, 1, true) then return answer end
 		end
+		if session.on_switch then session.on_switch(cmd) end
 		return session.refuse_switch ~= true
 	end)
 	package.loaded[SWITCHER] = nil
@@ -119,25 +120,37 @@ helpers.describe("workspace switcher: X11 through wmctrl", function()
 		end)
 	end)
 
-	helpers.it("presses the desktop's shortcut when wmctrl cannot list or switch", function()
+	helpers.it("presses the desktop shortcut when wmctrl cannot list, but not after an unconfirmed switch", function()
 		in_session(x11(false), function(Switcher, _, pressed, press)
 			helpers.assert_eq(Switcher.switch("next", false, press), "pressed")
 			helpers.assert_eq(pressed, { "ctrl+alt+Right" })
 		end)
 		in_session(x11(WMCTRL_THREE, { refuse_switch = true }), function(Switcher, _, pressed, press)
-			helpers.assert_eq(Switcher.switch("prev", false, press), "pressed")
-			helpers.assert_eq(pressed, { "ctrl+alt+Left" })
+			helpers.assert_eq(Switcher.switch("prev", false, press), "unconfirmed")
+			helpers.assert_eq(pressed, {})
 		end)
 	end)
 
-	helpers.it("walks to the wrap target with the shortcut when wmctrl refuses the switch", function()
-		-- The listing placed the edge; only the switch failed. One press in the
-		-- requested direction would run into that edge and stay there.
+	helpers.it("does not walk after an unconfirmed wrap command", function()
 		local FOUR = WMCTRL_THREE:gsub("2  %*", "2  -") .. "3  * DG: 1920x1080  Four\n"
 		in_session(x11(FOUR, { refuse_switch = true }), function(Switcher, _, pressed, press)
-			helpers.assert_eq(Switcher.switch("next", true, press), "pressed")
-			helpers.assert_eq(pressed, { "ctrl+alt+Left", "ctrl+alt+Left", "ctrl+alt+Left" },
-				"from the fourth workspace back to the first is three steps left")
+			helpers.assert_eq(Switcher.switch("next", true, press), "unconfirmed")
+			helpers.assert_eq(pressed, {})
+		end)
+	end)
+
+	helpers.it("does not emit a second switch when native execution moved before failing", function()
+		local active = 2
+		in_session(x11(WMCTRL_THREE, { refuse_switch = true, on_switch = function(cmd)
+			if cmd:find("wmctrl -s", 1, true) then active = 1 end
+		end }), function(Switcher, _, pressed, press)
+			local result = Switcher.switch("prev", false, function(combo)
+				press(combo)
+				active = active - 1
+			end)
+			helpers.assert_eq(result, "unconfirmed")
+			helpers.assert_eq(pressed, {})
+			helpers.assert_eq(active, 1, "one requested step must not become two")
 		end)
 	end)
 
@@ -193,6 +206,23 @@ helpers.describe("workspace switcher: Wayland compositors", function()
 			helpers.assert_eq(switches(commands, "setCurrentDesktop"),
 				{ "timeout 1 qdbus6 org.kde.KWin /KWin org.kde.KWin.setCurrentDesktop '1' >/dev/null 2>&1" })
 			helpers.assert_eq(pressed, {})
+		end)
+	end)
+
+	helpers.it("rejects an excessive KWin workspace count before allocating it", function()
+		in_session({ kind = "wayland", desktop = "kde", tools = { ["qdbus6"] = true } }, function(Switcher)
+			local ok = pcall(Switcher.parse_kwin, "1", "1000000")
+			helpers.assert_eq(ok, false, "an implausible count must not allocate one million entries")
+		end)
+	end)
+
+	helpers.it("falls back once when KWin's workspace count is excessive", function()
+		in_session({ kind = "wayland", desktop = "kde", tools = { ["qdbus6"] = true }, answers = {
+			["org.kde.KWin.currentDesktop"] = "1", ["VirtualDesktopManager.count"] = "1000000",
+		} }, function(Switcher, commands, pressed, press)
+			helpers.assert_eq(Switcher.switch("next", false, press), "pressed")
+			helpers.assert_eq(pressed, { "ctrl+alt+Right" })
+			helpers.assert_eq(switches(commands, "setCurrentDesktop"), {})
 		end)
 	end)
 

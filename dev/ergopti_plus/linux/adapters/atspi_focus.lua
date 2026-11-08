@@ -379,9 +379,9 @@ function M._get_native_context_snapshot()
 		if not frame or type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0 then return nil end
 		local file = io.open("/proc/" .. string.format("%d", pid) .. "/comm", "r")
 		if not file then return nil end
-		local app = file:read("*a")
-		local closed = file:close()
-		if closed ~= true or type(app) ~= "string" then return nil end
+		local read_ok, app = pcall(file.read, file, "*a")
+		local close_ok, closed = pcall(file.close, file)
+		if not read_ok or not close_ok or closed ~= true or type(app) ~= "string" then return nil end
 		-- procfs appends one LF; any earlier LF belongs to the kernel task name.
 		app = app:gsub("\n$", "")
 		if app == "" then return nil end
@@ -507,7 +507,9 @@ local function read_snapshot(include_context)
 	local timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local timeout_seconds = math.max(1, math.ceil(timeout_ms / 1000))
 	local query = include_context and "_get_native_context_snapshot" or "_get_native_snapshot"
-	local child_code = "local m=require('adapters.atspi_focus'); local j=require('json'); "
+	local child_code = "local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); "
+		.. "if d and d~='' then assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX'),os.getenv('ERGOPTI_LITERAL_DIRECT')=='1' and 'child-direct' or (os.getenv('ERGOPTI_LITERAL_DAEMON')=='1' and 'daemon' or nil)) end; "
+		.. "local m=require('adapters.atspi_focus'); local j=require('json'); "
 		.. "local s,ok=m." .. query .. "(); if ok then io.write('FOCUS:'..j.encode(s)) else os.exit(2) end"
 	local command = string.format("env LUA_PATH=%s timeout -s KILL %ds %s -e %s 2>/dev/null",
 		ShellRunner.quote(package.path), timeout_seconds,

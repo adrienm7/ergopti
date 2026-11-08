@@ -74,6 +74,16 @@ function M.resolve(overrides, app, default_id)
 	local key = M.normalize_app(app)
 	local mapped = key and overrides[key] or nil
 	if type(mapped) == "string" and mapped ~= "" then return mapped end
+	local comparison = key and AppIdentity.comparison_key(key)
+	if not comparison then return default_id end
+	local found
+	for stored, profile in pairs(overrides) do
+		if type(profile) == "string" and profile ~= "" and AppIdentity.comparison_key(stored) == comparison then
+			if found and found ~= profile then return default_id end
+			found = profile
+		end
+	end
+	if found then return found end
 	return default_id
 end
 

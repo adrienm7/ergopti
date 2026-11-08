@@ -125,12 +125,15 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 				subject.refresh()
 				for _, task in ipairs(pending) do task.done(0, output, "") end
 				helpers.assert_type(subject.on_action_changed("swipe_3_left", "word_prev"), "table")
+				helpers.assert_eq(subject.slot_system_state("swipe_3_left"), "unverified")
+				helpers.assert_eq(subject.slot_held_by_system("swipe_3_left"), true)
 			end)
 		end
 		fixture(function(subject, pending)
 			subject.refresh()
 			for _, task in ipairs(pending) do task.done(0, "TrackpadThreeFingerDrag = 0; TrackpadThreeFingerHorizSwipeGesture = 0;", "") end
 			helpers.assert_nil(subject.on_action_changed("swipe_3_left", "word_prev"))
+			helpers.assert_eq(subject.slot_system_state("swipe_3_left"), "free")
 		end)
 	end)
 	helpers.it("keeps failed probes unknown rather than calling them disabled", function()
@@ -158,6 +161,28 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 			for _, task in ipairs(pending) do task.done(0, "TrackpadRightClick = 0;", ""); task.done(1, "", "") end
 			helpers.assert_eq(count, 2)
 			helpers.assert_nil(subject.on_action_changed("tap_2", "lookup"))
+		end)
+	end)
+
+	helpers.it("coalesces repeated rechecks into one state change notification", function()
+		fixture(function(subject, pending)
+			subject.refresh()
+			for index = 1, 4 do pending[index].done(0, "TrackpadThreeFingerTapGesture = 0;", "") end
+			local changes = 0
+			subject.set_state_listener(function() changes = changes + 1 end)
+			for _ = 1, 20 do helpers.assert_eq(subject.recheck(), true) end
+			helpers.assert_eq(#pending, 8, "one probe serves every overlapping recheck")
+			for index = 5, 8 do pending[index].done(0, "TrackpadThreeFingerTapGesture = 1;", "") end
+			helpers.assert_eq(changes, 1, "one changed snapshot triggers one menu rebuild")
+		end)
+	end)
+
+	helpers.it("accepts a fresh recheck after shutdown cancels an earlier one", function()
+		fixture(function(subject, pending)
+			helpers.assert_eq(subject.recheck(), true)
+			helpers.assert_eq(subject.restore_all_overrides(), true)
+			helpers.assert_eq(subject.recheck(), true)
+			helpers.assert_eq(#pending, 8)
 		end)
 	end)
 end)

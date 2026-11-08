@@ -440,6 +440,20 @@ helpers.describe("word reset events: erasing what was typed (bs-word-start)", fu
 		helpers.assert_eq(editor:sub(-1), "r", "in an editor the extra Backspace joined the lines")
 	end)
 
+	helpers.it("recognizes the procfs-truncated GNOME Terminal process at a prompt (gnome-terminal-comm)", function()
+		local events = seq(tap(K.a), tap(K.enter), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(events, on, nil, "gnome-terminal-"),
+			type_through_hook(events, on, nil, "gnome-terminal-server"),
+			"the 15-byte /proc comm name must preserve terminal prompt handling")
+	end)
+
+	helpers.it("recognizes the procfs-truncated Chromium browser at its address bar (chromium-comm)", function()
+		local events = seq(chord({ K.lctrl }, K.l), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(events, on, nil, "chromium-browse"),
+			type_through_hook(events, on, nil, "chromium-browser"),
+			"the 15-byte /proc comm name must preserve browser address-bar handling")
+	end)
+
 	helpers.it("bs-word-start: Ctrl+A and a browser's Ctrl+L leave an empty field", function()
 		local select_all = seq(tap(K.a), chord({ K.lctrl }, K.a), tap(K.backspace), tap(K.backspace), tap(K.r))
 		helpers.assert_eq(type_through_hook(select_all, on, nil, "org.gnome.TextEditor"), "R",
@@ -450,6 +464,15 @@ helpers.describe("word reset events: erasing what was typed (bs-word-start)", fu
 		helpers.assert_eq(type_through_hook(address, on, nil, "firefox"), "R", "Ctrl+L selects the whole address")
 		helpers.assert_eq(type_through_hook(address, on, nil, "org.gnome.TextEditor"), "r",
 			"Ctrl+L outside a browser promises no empty field")
+	end)
+
+	helpers.it("does not treat shifted shortcuts as select-all at a field boundary (shifted-select-shortcut)", function()
+		local events = seq(chord({ K.lctrl, K.lshift }, K.a), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(events, on, nil, "org.gnome.TextEditor"), "r",
+			"Ctrl+Shift+A does not prove the field is selected or empty")
+		local browser = seq(chord({ K.lctrl, K.lshift }, K.l), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(browser, on, nil, "firefox"), "r",
+			"Ctrl+Shift+L does not prove the address bar is selected")
 	end)
 
 	helpers.it("bs-word-start: names terminals and the delete-word chord", function()

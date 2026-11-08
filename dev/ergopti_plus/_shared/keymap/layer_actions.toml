@@ -85,15 +85,11 @@ reason_key = "platform_reason.layer_fn_modifier_is_macos"
 # as a layer key. The wheel is no longer one: Karabiner-Elements, which carries
 # the rest of the macOS layer, takes no wheel input, so Hammerspoon runs the
 # macOS wheel bindings, consuming a turn only while the layer is held
-# (macos/modules/shortcuts/actions/system.lua, bind_layer_wheel); the Linux hook
-# takes the mouse for the hold and forwards everything but a bound notch
-# (linux/adapters/keyboard_hook.lua, _sync_layer_pointer).
-
-# The native Linux hook observes pointer activity without grabbing the pointer,
-# so it cannot suppress a button's original event when a layer remaps it.
-[source_kinds.mouse_button]
-platforms = ["windows", "macos"]
-reason_key = "platform_reason.layer_pointer_source_is_not_linux"
+# (macos/modules/shortcuts/actions/system.lua, bind_layer_wheel). Nor is the
+# mouse button: the Linux hook takes the mouse for the hold and forwards
+# everything but a bound notch or button (linux/adapters/keyboard_hook.lua,
+# LayerPointer.sync). No source kind is OS-specific today; a [source_kinds.<kind>]
+# table with `platforms` and `reason_key` would declare one.
 
 # Driver-native handlers a `call:` resolution may name, per OS.
 [call_handlers]
@@ -117,9 +113,12 @@ groups = ["key", "cursor", "selection", "editing", "window", "media", "system"]
 # =============================
 # =============================
 
+# Windows counts with NumberOfRepetitions, macOS with the Karabiner variable
+# nav_repeat_count (macos/platform/remap/nav_layer.lua), Linux in its tap-hold
+# engine (repeat_count): each resets the count at the next send and when the
+# layer is entered again.
 [parameters.repeat_count]
-platforms = ["windows"]
-reason_key = "platform_reason.layer_repeat_count_is_windows_only"
+platforms = ["windows", "macos", "linux"]
 min = 1
 max = 99
 

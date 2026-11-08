@@ -37,6 +37,7 @@ local Priority = require("hotstring_priority")
 local Extensions = require("hotstrings.extensions")
 local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
+local RegularFile = require("infra.regular_file_reader")
 local TomlReader = require("infra.toml.reader")
 local TomlCodec = require("toml_codec")
 local Overrides = require("hotstrings.overrides")
@@ -107,6 +108,7 @@ local _choices = nil
 --- setters are refused until it releases, so they cannot interleave its inverse.
 local _scope_owner = nil
 local _scope_owner_epoch = 0
+local _scope_inverse_sources = nil
 local _personal_transaction_owner, _prepared_personal_sources, _personal_debt
 local _personal_gate_debt
 local restore_personal_runtime
@@ -854,6 +856,10 @@ function M.set_override(category, section, field, value)
 		Logger.error(LOG, "set_override(): '%s' is not an overridable field.", tostring(field))
 		return false
 	end
+	if field == "color" and value ~= nil and require("color.hex").parse(value) == nil then
+		Logger.error(LOG, "set_override(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
+		return false
+	end
 
 	local candidate = copy_overrides(_overrides)
 	local entry = candidate[category] or { sections = {} }
@@ -1054,14 +1060,19 @@ function M.init(engine, config_dir, on_change)
 	_on_change = type(on_change) == "function" and on_change or nil
 	_magic_key = nil
 	_canonical_magic_key = nil
+	_config_dir = nil
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
 		local xdg = require("infra.config_paths").default_config_dir() .. "/hotstrings"
-		local fh = io.open(xdg, "r")
-		if fh then fh:close(); _config_dir = xdg end
+		local kind, detail, code = require("infra.native_directory").target_kind(xdg)
+		if kind == "directory" then _config_dir = xdg
+		elseif kind ~= nil or code ~= "ENOENT" then
+			Logger.error(LOG, "Hotstring directory is unavailable: %s.", tostring(detail or kind))
+			return false
+		end
 	end
-	_scope_owner = nil
+	_scope_owner, _scope_inverse_sources = nil, nil
 	_personal_transaction_owner, _prepared_personal_sources, _personal_debt = nil, nil, nil
 	_personal_gate_debt = nil
 	_live_mappings = {}
@@ -1311,10 +1322,13 @@ local _language_packs = nil
 function M.language_packs()
 	if _language_packs then return _language_packs end
 	local path = Paths.shared("modules/hotstrings/_index.toml")
-	local fh = io.open(path, "r")
+	local fh = RegularFile.open_source(path)
 	if not fh then error("[hotstrings_config] hotstring index is unreadable: " .. tostring(path)) end
 	local raw = fh:read("*a")
-	fh:close()
+	local closed = fh:close()
+	if type(raw) ~= "string" or not closed then
+		error("[hotstrings_config] hotstring index could not be read: " .. tostring(path))
+	end
 	_language_packs = Languages.packs(TomlCodec.decode(raw))
 	return _language_packs
 end
@@ -1344,8 +1358,9 @@ end
 --- handed to route_bound_sources by path. Independently owned additional files
 --- use exact descriptor identities instead of overlaying another personal stem.
 --- @return table Array of absolute paths.
-local function resolve_paths()
+local function resolve_paths(cold_boot)
 	local by_stem, order, user_paths = {}, {}, {}
+	local incomplete_personal = false
 	local shipped_stems, additional = {}, {}
 	local personal_sources, descriptors_by_path = {}, {}
 	local function discover_personal(path, root)
@@ -1384,10 +1399,12 @@ local function resolve_paths()
 
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local bundled = ok_paths and Paths.shared("modules/hotstrings") or nil
+	assert(bundled, "bundled hotstring root is unavailable")
 	-- Language folders are not overlaid by stem: french/autocorrection.toml is
 	-- its own group, not a second copy of the neutral autocorrection.toml.
 	if bundled then
-		for _, path in ipairs(Loader.find_toml_files(bundled)) do
+		-- The bundled tree is part of the installation, not an optional user folder.
+		for _, path in ipairs(Loader.find_toml_files(bundled, nil, true, false)) do
 			if not in_language_folder(path, bundled) then
 				add(path)
 				local stem = path:match("([^/]+)%.toml$")
@@ -1408,7 +1425,9 @@ local function resolve_paths()
 
 	-- Second, so the user's copy of a category replaces the bundled one.
 	if _config_dir then
-		for _, path in ipairs(Loader.find_toml_files(_config_dir, PersonalFiles.additional_scan_max_depth)) do
+		local found, complete = Loader.find_toml_files(_config_dir, PersonalFiles.additional_scan_max_depth, not cold_boot)
+		if complete == false then incomplete_personal = true end
+		for _, path in ipairs(found) do
 			if not in_language_folder(path, _config_dir) then
 				discover_personal(path, _config_dir:gsub("/+$", ""))
 				local stem = path:match("([^/]+)%.toml$")
@@ -1434,11 +1453,15 @@ local function resolve_paths()
 				local rel = "/" .. pack.id .. "/" .. stem .. ".toml"
 				local path = bundled .. rel
 				if _config_dir then
-					local fh = io.open(_config_dir .. rel, "r")
+					local candidate = _config_dir .. rel
+					local fh, detail, code = RegularFile.open_source(candidate)
 					if fh then
-						fh:close()
-						path = _config_dir .. rel
+						if not fh:close() then error("[hotstrings_config] language override close failed: " .. candidate) end
+						path = candidate
 						user_paths[path] = true
+					elseif code ~= RegularFile.ENOENT then
+						if not cold_boot then error("[hotstrings_config] language override unreadable: " .. candidate .. ": " .. tostring(detail)) end
+						incomplete_personal = true
 					end
 				end
 				paths[#paths + 1] = { path = path, category = Languages.group_id(pack.id, stem) }
@@ -1481,7 +1504,7 @@ local function resolve_paths()
 		records[#records + 1] = { source = source.descriptor, path = source.path,
 			legacy_name = legacy, legacy_stored = _overrides[legacy] ~= nil }
 	end
-	if #records == 0 then return paths, personal_sources, {} end
+	if #records == 0 then return paths, personal_sources, {}, incomplete_personal end
 	local inventory, refusal = PersonalAdoption.stage(records, _choices,
 		_config_dir:gsub("/+$", "") .. "/personal_hotstrings.toml")
 	assert(inventory, "personal source adoption refused: " .. tostring(refusal))
@@ -1490,7 +1513,7 @@ local function resolve_paths()
 			record.admitted, record.exclusive, record.reason = false, false, "unavailable-owner"
 		end
 	end
-	return paths, personal_sources, inventory
+	return paths, personal_sources, inventory, incomplete_personal
 end
 
 --- Loads one complete catalogue and reports whether runtime publication succeeded.
@@ -1500,7 +1523,7 @@ end
 --- @param cold_boot boolean|nil Explicit partial registration mode for the sole startup caller.
 --- @return string|nil Refusal reason.
 --- @return table|nil Classified receipt only after native publication.
-function M.load_all(personal_owner, cold_boot)
+local function load_all_internal(personal_owner, cold_boot, inverse_sources)
 	if _personal_transaction_owner and personal_owner ~= _personal_transaction_owner then
 		return #_mappings, false, "personal-source-pending"
 	end
@@ -1523,7 +1546,11 @@ function M.load_all(personal_owner, cold_boot)
 		return #_mappings, false, "common-autocorrection-overrides-unadmitted"
 	end
 
-	local staged_paths, staged_personal_sources, staged_personal_adoptions = resolve_paths()
+	local resolved, staged_paths, staged_personal_sources, staged_personal_adoptions, incomplete_personal = pcall(resolve_paths, cold_boot == true)
+	if not resolved then
+		Logger.error(LOG, "Hotstring source discovery failed; keeping the active catalogue: %s.", tostring(staged_paths))
+		return #_mappings, false, "source-unavailable"
+	end
 	if common_unavailable then
 		local admitted_paths = {}
 		for _, source in ipairs(staged_paths) do
@@ -1546,7 +1573,8 @@ function M.load_all(personal_owner, cold_boot)
 	local catalogue = Loader.load_catalogue(staged_paths, {
 		magic_key = _magic_key,
 		canonical_magic_key = _canonical_magic_key,
-	}, _prepared_personal_sources)
+		defer_source_snapshots = true,
+	}, _prepared_personal_sources, inverse_sources)
 	_parse_errors = tonumber(catalogue.errors) or 0
 	if catalogue.committed ~= true then
 		Logger.error(LOG,
@@ -1624,6 +1652,10 @@ function M.load_all(personal_owner, cold_boot)
 		Logger.error(LOG, "Catalogue publication refused: %s.", reason)
 		return #_mappings, false, reason
 	end
+	-- Only this accepted image may become the active fallback source set.
+	if catalogue.source_receipt and type(Loader.commit_source_snapshots) == "function" then
+		assert(Loader.commit_source_snapshots(catalogue.source_receipt), "source publication receipt refused")
+	end
 	_toml_paths = staged_paths
 	_personal_sources = staged_personal_sources
 	_personal_adoptions = staged_personal_adoptions or {}
@@ -1635,14 +1667,21 @@ function M.load_all(personal_owner, cold_boot)
 	report_retired_choices(choices)
 	report_retired_overrides()
 
-	if common_unavailable then
-		Logger.warn(LOG, "Common autocorrection is unavailable; loaded %d unrelated mapping(s).", #filtered)
+	if common_unavailable or incomplete_personal then
+		Logger.warn(LOG, "Some hotstring sources are unavailable; loaded %d available mapping(s).", #filtered)
 	else
 		Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 			#filtered, _count_groups(filtered), _parse_errors)
 	end
-	return #filtered, true, nil, { committed = true, complete = not common_unavailable,
-		unavailable = common_unavailable and { "autocorrection" } or {} }
+	local unavailable = {}
+	if common_unavailable then unavailable[#unavailable + 1] = "autocorrection" end
+	if incomplete_personal then unavailable[#unavailable + 1] = "personal-sources" end
+	return #filtered, true, nil, { committed = true, complete = #unavailable == 0, unavailable = unavailable }
+end
+
+--- Loads a catalogue without borrowing a transaction's inverse source receipt.
+function M.load_all(personal_owner, cold_boot)
+	return load_all_internal(personal_owner, cold_boot, nil)
 end
 
 --- Re-reads every hotstring source, then asks for a menu rebuild.
@@ -2000,8 +2039,8 @@ function M.personal_file_scope_binding(id)
 			if _personal_debt or _personal_gate_debt or _personal_adoptions ~= inventory or _categories[id] ~= category or _config_dir ~= root
 				or _engine ~= engine or engine_generation(engine) ~= generation
 				or PersonalAdoption.current(inventory, record) ~= true then return false end
-			local _, _, fresh = resolve_paths()
-			if not fresh or #fresh ~= #inventory then return false end
+			local resolved, _, _, fresh = pcall(resolve_paths)
+			if not resolved or not fresh or #fresh ~= #inventory then return false end
 			local expected = {}
 			for _, source in ipairs(inventory) do expected[source.owner] = source end
 			for _, source in ipairs(fresh) do
@@ -2039,6 +2078,9 @@ restore_personal_runtime = function(snapshot)
 	_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
 	_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, snapshot.resolve_cache or {}
 	_parse_errors, _published = snapshot.errors, snapshot.published
+	if _scope_inverse_sources and type(Loader.commit_source_snapshots) == "function" then
+		assert(Loader.commit_source_snapshots(_scope_inverse_sources), "inverse source receipt refused")
+	end
 	return true
 end
 
@@ -2087,6 +2129,10 @@ end
 --- Source metadata reaches the real engine before conditional source replacement.
 --- A recognized legacy override may be removed only within this held cohort.
 function M.set_personal_metadata(id, section, field, value)
+	if field == "color" and value ~= nil and require("color.hex").parse(value) == nil then
+		Logger.error(LOG, "set_personal_metadata(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
+		return false
+	end
 	if M.retry_personal_cleanup() ~= true then return false end
 	local binding, record = M.personal_file_scope_binding(id), personal_adoption(id)
 	if not binding or binding.current() ~= true or _override_source.status == "error" then return false end
@@ -2477,6 +2523,8 @@ end
 --- @return boolean acquired
 function M.acquire(owner)
 	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
+	_scope_inverse_sources = type(Loader.capture_source_snapshots) == "function"
+		and Loader.capture_source_snapshots() or nil
 	_scope_owner = owner
 	_scope_owner_epoch = _scope_owner_epoch + 1
 	return true
@@ -2489,6 +2537,7 @@ function M.release(owner)
 	if _scope_owner ~= owner then return false end
 	_scope_owner = nil
 	_scope_owner_epoch = _scope_owner_epoch + 1
+	_scope_inverse_sources = nil
 	return true
 end
 
@@ -2545,7 +2594,7 @@ function M.restore_configuration(owner, snapshot)
 	_choices, _overrides, _resolve_cache = copy_choices(snapshot.choices), copy_overrides(snapshot.overrides), {}
 	_override_source = { status = snapshot.override_source.status, content = snapshot.override_source.content }
 	_magic_key, _canonical_magic_key = snapshot.magic_key, snapshot.canonical_magic_key
-	local _, committed = M.load_all()
+	local _, committed = load_all_internal(nil, nil, _scope_inverse_sources)
 	return committed == true
 end
 

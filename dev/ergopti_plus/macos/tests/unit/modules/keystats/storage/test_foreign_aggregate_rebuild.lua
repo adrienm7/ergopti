@@ -33,11 +33,22 @@ local function read_source(selector)
 	return source
 end
 
+local function upvalue(fn, wanted, replacement)
+	for index = 1, math.huge do
+		local name, current = debug.getupvalue(fn, index)
+		assert(name, "missing production ownership: " .. wanted)
+		if name == wanted then
+			if replacement then debug.setupvalue(fn, index, replacement) end
+			return current
+		end
+	end
+end
+
 helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", function()
 	helpers.it("defers the foreign watermark until the derived callback succeeds", function()
 		local source = read_source("function M._last_complete_batch_offset") -- modules/keystats/export.lua
 		local callback_pos = assert(source:find("pcall(on_applied, entry)", 1, true))
-		local watermark_pos = assert(source:find("UPDATE devices SET imported_data_sql_size", callback_pos, true))
+		local watermark_pos = assert(source:find("Queries.render(\"devices.import_watermark\"", callback_pos, true))
 		helpers.assert_true(callback_pos < watermark_pos,
 			"a failed aggregate rebuild must leave the raw import retryable")
 		helpers.assert_true(source:find("return synced_devices", 1, true) ~= nil,
@@ -84,12 +95,65 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 		end)
 	end)
 
+	helpers.it("requires current matching metadata even when a device row already exists", function()
+		helpers.with_stub_scope({ "infra.fs_dir", "modules.keystats.export" }, function()
+			package.loaded["infra.fs_dir"] = { try_entries = function() return { "foreign" }, true end }
+			local export = helpers.load_with_stubs("modules.keystats.export", {
+				fs = { attributes = function() return { size = 100 } end },
+			})
+			local chunk = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
+			local opens, writes, callbacks = 0, 0, 0
+			local snapshot = {
+				open = function() opens = opens + 1; return {} end,
+				start = function() return true end,
+				poll = function() return "done", { chunk = chunk, offset = 0, applied_to = #chunk, digest = "hash" } end,
+				close = function() return true end,
+			}
+			local read_tail = upvalue(export.sync_foreign_data_sql, "_read_foreign_sql_tail")
+			upvalue(read_tail, "ForeignLedgerSnapshot", snapshot)
+			local db = {}
+			function db:prepare() return { bind_values = function() end, step = function() end, finalize = function() end } end
+			function db:nrows() local done = false; return function()
+				if not done then done = true; return { imported_data_sql_size = 0 } end
+			end end
+			function db:exec() writes = writes + 1; return 0 end
+			export.init({ paths = { metrics_dir = "/owned/" }, device_id = "local", get_db = function() return db end })
+			local metadata = '{"device_id":"different"}'
+			local original_open = io.open
+			io.open = function(path)
+				if path:match("device%.json$") then
+					return metadata and { read = function() return metadata end, close = function() end } or nil
+				end
+				return original_open(path)
+			end
+			local ok, err = xpcall(function()
+				local function sync() return export.sync_foreign_data_sql(function() callbacks = callbacks + 1; return true end) end
+				for _, invalid in ipairs({ '{"device_id":"different"}', 'invalid-json', false }) do
+					metadata = invalid
+					helpers.assert_eq(sync(), {})
+					helpers.assert_eq(opens, 0, "a stale row cannot authorize a foreign reader")
+					helpers.assert_eq(writes, 0, "unidentified data must never reach SQLite")
+				end
+				metadata = '{"device_id":"foreign"}'
+				helpers.assert_eq(sync(), { "foreign" })
+				helpers.assert_eq(opens, 1)
+				helpers.assert_eq(writes, 2, "verified ledger and watermark both commit")
+				helpers.assert_eq(callbacks, 1)
+			end, debug.traceback)
+			io.open = original_open
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("rebuilds only the imported device before invalidating UI snapshots", function()
 		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keystats/log_manager.lua
 		local callback_pos = assert(source:find("_sync_foreign_data_sql(function(device_id)", 1, true))
-		local rebuild_pos = assert(source:find("_rebuild_aggregates_from_raw(db, { device_id })", callback_pos, true))
-		local mark_pos = assert(source:find("_mark_aggregate_cache_rebuilt(db, true)", rebuild_pos, true))
-		helpers.assert_true(callback_pos < rebuild_pos and rebuild_pos < mark_pos,
+		local rebuild_pos = assert(source:find("_publish_rebuilt_partitions(db, { device_id })", callback_pos, true))
+		local owner_pos = assert(source:find("local function _publish_rebuilt_partitions", 1, true))
+		local revision_pos = assert(source:find('Queries.render("meta.rev_bump", "native")', owner_pos, true))
+		local publish_pos = assert(source:find("RebuildSnapshot.publish(snapshot, _sq(device), finish_sql)", revision_pos, true))
+		helpers.assert_true(owner_pos < revision_pos and revision_pos < publish_pos
+			and publish_pos < callback_pos and callback_pos < rebuild_pos,
 			"foreign rows must be rebuilt and invalidate the DB revision before their watermark advances")
 		helpers.assert_true(source:find("DERIVED_DEVICE_TABLES", 1, true) ~= nil,
 			"rebuild must clear the old additive aggregate partition before replaying raw rows")
@@ -152,6 +216,15 @@ helpers.describe("keystats-device-log-privacy", function()
 					end,
 				}
 				local manager = EmptyLedger.load()
+				local publish = upvalue(manager.ingest_once, "_publish_rebuilt_partitions")
+				upvalue(publish, "_typing_replay_cutoffs", function() return {} end)
+				upvalue(publish, "RebuildSnapshot", {
+					witness = function() return {} end,
+					same = function() return true end,
+					open = function() return { db = db, captured = {} } end,
+					publish = function() error("failed replay must not publish") end,
+					close = function() return true end,
+				})
 				manager.ingest_once()
 				helpers.assert_eq(calls, 1)
 				helpers.assert_eq(applied, false)

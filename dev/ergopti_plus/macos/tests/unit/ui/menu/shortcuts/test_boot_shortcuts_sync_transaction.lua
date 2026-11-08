@@ -20,6 +20,8 @@ local function load_fixture(opts)
 	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
 	hs_stub.__reset()
 	local runtime = { bindings = true, keyboard = true }
+	local script_actions = { return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit" }
+	local menu_context
 	local sync_states = {}
 	local snapshotted_shortcuts = nil
 	local destroyed = 0
@@ -54,7 +56,7 @@ local function load_fixture(opts)
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["infra.preferences"] = {
 		build_initial_state = function() return state end,
-		load = function() return { shortcuts = false }, "present" end,
+		load = function() return { shortcuts = opts.script_rollback == true }, "present" end,
 		merge_saved_data = function(live, saved)
 			live.shortcuts = saved.shortcuts
 		end,
@@ -62,11 +64,15 @@ local function load_fixture(opts)
 			snapshotted_shortcuts = live.shortcuts
 			return { shortcuts = live.shortcuts }
 		end,
-		save = function() return true end,
+		save = function()
+			if opts.script_rollback then script_actions.return_key = "foreign"; return false end
+			return true
+		end,
 		get_group_name = function() return "common" end,
 	}
 	package.loaded["ui.menu.builder"] = {
-		generate = function() return {} end,
+		generate = function(ctx) menu_context = ctx; return {} end,
+		get_last_item_timings = function() return {} end,
 		invalidate_cache = noop,
 	}
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
@@ -132,7 +138,8 @@ local function load_fixture(opts)
 	local shortcuts = {
 		is_paused = function() return false end,
 		set_on_pause_change = noop,
-		set_shortcut_action = noop,
+		get_shortcut_actions = function() return script_actions end,
+		set_shortcut_action = function(slot, value) script_actions[slot] = value; return true end,
 		set_extras = noop,
 		list_shortcuts = function() return {} end,
 		pause_bindings = function()
@@ -153,11 +160,23 @@ local function load_fixture(opts)
 	package.loaded["ui.menu.menu_state"] = {
 		sync_state_to_modules = function(live, _saved, _absent, deps)
 			sync_states[#sync_states + 1] = live.shortcuts
-			if live.shortcuts then return deps.core_mods.shortcuts_mod.resume_bindings() end
+			if live.shortcuts then
+				if opts.script_rollback and deps.restoring then
+					deps.core_mods.shortcuts_mod.set_shortcut_action("return_key", live.script_control_shortcuts.return_key)
+				end
+				return deps.core_mods.shortcuts_mod.resume_bindings()
+			end
 			return deps.core_mods.shortcuts_mod.pause_bindings()
 		end,
 	}
 
+	if opts.script_rollback then
+		package.loaded["ui.menu.global_actions_transaction"] = { create = function() return {
+			run_exclusive = function(_, callback) return callback() end,
+			is_pending = function() return false end,
+			is_exclusive_blocked = function() return false end,
+		} end }
+	end
 	package.loaded["ui.menu.init"] = nil
 	local Menu = require("ui.menu.init")
 	local program_admission
@@ -170,6 +189,9 @@ local function load_fixture(opts)
 	helpers.assert_type(program_admission, "function", "startup registers its required program admission owner")
 	return {
 		menu = menu,
+		controller = Menu,
+		menu_context = function() return menu_context end,
+		script_actions = script_actions,
 		state = state,
 		runtime = runtime,
 		sync_states = sync_states,
@@ -189,6 +211,15 @@ end
 -- =============================================
 
 helpers.describe("menu boot preference synchronization is transactional", function()
+	helpers.it("preserves a foreign script action when a menu save is refused", function()
+		helpers.with_stub_scope({ "ui.menu.global_actions_transaction", "ui.menu.init" }, function()
+			local fixture = load_fixture({ script_rollback = true })
+			pcall(fixture.controller.timed_rebuild)
+			local ctx = assert(fixture.menu_context(), "menu builder must receive its real context")
+			helpers.assert_eq(ctx.commit_script_action("return_key", "script_reload"), false)
+			helpers.assert_eq(fixture.script_actions.return_key, "foreign")
+		end)
+	end)
 	helpers.it("restores runtime and menu state when persisted Shortcuts OFF is refused", function()
 		local fixture = load_fixture()
 		helpers.assert_not_nil(fixture.menu,

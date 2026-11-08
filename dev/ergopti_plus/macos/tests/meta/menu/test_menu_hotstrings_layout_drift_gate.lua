@@ -141,6 +141,14 @@ local CANONICAL_LAYOUT_MENU = {
 	-- keyboard layout through the OS's input-source mechanism and draws a
 	-- menubar icon; neither concept exists on the other two drivers.
 	"list:layout_bundle",
+	-- UPDATED 2026-11-06: the layout emulation runs on the three drivers, so its
+	-- layers header, the layout picker, the two layer switches and the rows
+	-- submenu are drawn here too (layouts/emulation_menu.lua).
+	"section_header:menu.layout.header_layers",
+	"list:layout_emulation",
+	"list:layout_features_base",
+	"list:layout_features_altgr",
+	"group:layout_emulated_rows",
 	-- UPDATED 2026-10-23: the Karabiner virtual keyboard type (Automatic, ISO,
 	-- ANSI) that menu_keyboard_layout.lua registers as a choice command.
 	"choice:virtual_keyboard",

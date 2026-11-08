@@ -40,6 +40,32 @@ local function scratch_bundle(files)
 end
 
 helpers.describe("layout install: the layouts an installed bundle declares", function()
+	helpers.it("accepts links to files but not directory or dangling links (layout-variant-symlinks)", function()
+		local install = helpers.load_with_stubs("modules.keymap.layout_install")
+		local plist = "<plist><dict>"
+		for _, name in ipairs({ "Regular", "Linked", "Directory", "Dangling" }) do
+			plist = plist .. "<key>KLInfo_" .. name .. "</key><dict><key>TISInputSourceID</key><string>org.example."
+				.. name .. "</string></dict>"
+		end
+		local bundle = scratch_bundle({ ["Contents/Info.plist"] = plist .. "</dict></plist>",
+			["Contents/Resources/Regular.keylayout"] = "layout" })
+		local resources = bundle .. "/Contents/Resources/"
+		assert(os.execute("ln -s Regular.keylayout '" .. resources .. "Linked.keylayout'"))
+		assert(os.execute("ln -s . '" .. resources .. "Directory.keylayout'"))
+		assert(os.execute("ln -s missing '" .. resources .. "Dangling.keylayout'"))
+		local names = {}
+		for _, variant in ipairs(install.bundle_variants(bundle)) do names[variant.name] = true end
+		helpers.assert_eq(names, { Regular = true, Linked = true })
+	end)
+	helpers.it("does not expose a directory as a keylayout file (layout-variant-regular-file)", function()
+		local install = helpers.load_with_stubs("modules.keymap.layout_install")
+		local bundle = scratch_bundle({ ["Contents/Info.plist"] =
+			"<plist><dict><key>KLInfo_Fake</key><dict><key>TISInputSourceID</key>"
+			.. "<string>org.example.fake</string></dict></dict></plist>" })
+		local directory = bundle .. "/Contents/Resources/Fake.keylayout"
+		assert(os.execute("mkdir '" .. directory .. "'"))
+		helpers.assert_eq(#install.bundle_variants(bundle), 0, "a directory cannot be loaded as a layout")
+	end)
 	helpers.it("reads each layout and its input-source id from the Info.plist (layout-bundle-variants)", function()
 		local install = helpers.load_with_stubs("modules.keymap.layout_install")
 		local variants = install.bundle_variants(BUNDLE)

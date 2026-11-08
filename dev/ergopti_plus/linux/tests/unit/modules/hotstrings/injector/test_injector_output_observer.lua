@@ -37,6 +37,51 @@ local function with_injector(body)
 end
 
 helpers.describe("injector: output observer", function()
+	helpers.it("injector output, physical remapping is distinct from expansions and private output", function()
+		with_injector(function(injector)
+			local origins = {}
+			assert(injector.set_output_observer(function(_, physical) origins[#origins + 1] = physical end))
+			helpers.assert_true(injector.type_directly("a").ok)
+			helpers.assert_true(injector.inject(0, "x", false, nil, nil, nil, true).ok)
+			helpers.assert_true(injector.inject(0, "x", false).ok)
+			helpers.assert_true(injector.inject(1, "x", false, nil, nil, nil, true).ok)
+			helpers.assert_true(injector.inject(0, "x", true, nil, nil, nil, true).ok)
+			helpers.assert_true(injector.inject(0, "x", false, ".", nil, nil, true).ok)
+			helpers.assert_eq(origins, { true, true, false, false, false, false })
+		end)
+	end)
+
+	helpers.it("injector output, mutation barriers retire empty and partial synthetic edits without inventing typed text", function()
+		for _, scenario in ipairs({ "empty", "partial", "preflight" }) do
+			with_injector(function(injector, channel)
+				local Roi = require("keystats.trigger_roi")
+				local state = Roi.new(0, true)
+				local context = { app = "Editor", window = 1, title = "Document", timestamp = "stamp" }
+				local barriers, outputs = 0, 0
+				assert(injector.set_output_observer(function() outputs = outputs + 1 end, function()
+					barriers = barriers + 1
+					Roi.discard(state)
+				end))
+				for _ = 1, 5 do
+					assert(Roi.text(state, "secr", context, function() return false end))
+					local current = scenario ~= "preflight"
+					channel.emit = function(code, value)
+						if scenario == "partial" and code == 14 and value == 0 then current = false end
+						return true
+					end
+					local publication = { current = function() return current end, cached = function() return current end }
+					local result = injector.inject(1, scenario == "empty" and "" or "a", false, nil, publication)
+					helpers.assert_eq(result.ok, scenario == "empty")
+					assert(Roi.text(state, "et ", context, function() return false end))
+				end
+				helpers.assert_eq(outputs, 0, "empty or refused output cannot claim successful typed text")
+				helpers.assert_eq(barriers, scenario == "preflight" and 0 or 5)
+				helpers.assert_eq(state.words.secret, scenario == "preflight" and 5 or nil,
+					"only preflight refusal before any edit preserves the physical fragment")
+			end)
+		end
+	end)
+
 	helpers.it("injector output, reports the replacement and its replayed terminator", function()
 		with_injector(function(injector)
 			local seen = {}
@@ -71,9 +116,9 @@ helpers.describe("injector: output observer", function()
 		local f = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local source = f:read("*a")
 		f:close()
-		local start = assert(source:find("injector.set_output_observer(function(text)", 1, true),
+		local start = assert(source:find("injector.set_output_observer(function(text, physical_input)", 1, true),
 			"the daemon installs the output observer")
-		local body = source:sub(start, (source:find("\tend) then", start, true)))
+		local body = source:sub(start, (source:find("\tend, keystats.discard_roi) then", start, true)))
 		helpers.assert_contains(body, "shortcuts.caps_word_observe_text(text)")
 		helpers.assert_contains(body, "shortcuts.is_caps_word_active()")
 	end)

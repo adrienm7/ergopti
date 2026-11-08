@@ -20,6 +20,46 @@ local function fail_scan(state, mode)
 end
 
 helpers.describe("app_picker: discovery receipts", function()
+	helpers.it("rescans after the wall clock moves behind its cached result", function()
+		with_picker(function(picker, state)
+			local received = {}
+			picker.discover_apps(function(rows, ok) received[#received + 1] = { rows, ok } end)
+			state.pending[1].callback(0, "/Applications/Old.app\0")
+			state.now = state.now - 120
+			picker.discover_apps(function(rows, ok) received[#received + 1] = { rows, ok } end)
+			helpers.assert_eq(#state.pending, 2, "clock rollback must invalidate the cached application list")
+			state.pending[2].callback(0, "/Applications/New.app\0")
+			helpers.assert_eq(received[2][1][1].text, "New")
+		end)
+	end)
+	for _, accepted in ipairs({ false, true }) do
+		helpers.it("settles an inline completion only after the start receipt=" .. tostring(accepted), function()
+			with_picker(function(picker, state)
+				local receipts = {}
+				state.started = accepted
+				state.on_start = function(callback) callback(0, "") end
+				picker.discover_apps(function(_, success) receipts[#receipts + 1] = success end)
+				helpers.assert_eq(receipts, { accepted })
+				state.pending[1].callback(0, "")
+				helpers.assert_eq(receipts, { accepted }, "one discovery has one completion")
+			end)
+		end)
+	end
+	helpers.it("ignores a late completion after a refused scan start", function()
+		with_picker(function(picker, state)
+			local receipts = {}
+			state.started = false
+			picker.discover_apps(function(_, success) receipts[#receipts + 1] = success end)
+			helpers.assert_eq(receipts, { false })
+			state.pending[1].callback(0, "/Applications/Stale.app\0")
+			helpers.assert_eq(receipts, { false }, "a refused scan must not publish a second receipt")
+			state.started = true
+			picker.discover_apps(function(_, success) receipts[#receipts + 1] = success end)
+			helpers.assert_eq(#state.pending, 2, "late data from a refused scan must not enter the cache")
+			state.pending[2].callback(0, "")
+			helpers.assert_eq(receipts, { false, true })
+		end)
+	end)
 	for _, fail in ipairs({ false, true }) do
 		helpers.it("restores fixture globals after callback failure=" .. tostring(fail), function()
 			local original_hs, original_time, original_getenv = hs, os.time, os.getenv

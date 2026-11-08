@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\menu_hotstring_order.ahk
 
 
 

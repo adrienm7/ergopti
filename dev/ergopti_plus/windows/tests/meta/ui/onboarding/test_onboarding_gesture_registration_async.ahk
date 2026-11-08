@@ -4,7 +4,7 @@
 _OGRA_NativeRegistrationIsAsync() {
     Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
     Poll := _DriverFuncBody("_Onboarding_PollGestureAuto")
-    Builder := _DriverFuncBody("_Onboarding_BuildGesturePsScript")
+    Builder := _DriverFuncBody("_GestureRestartBuildPsScript")
     Web := _DriverFuncBody("_OnbWeb_RegisterGesturesAuto")
     Assert(Start != "" && Poll != "" && Builder != "" && Web != "", "onboarding async registration helpers must exist")
     Assert(InStr(Start, "RunWait") = 0,

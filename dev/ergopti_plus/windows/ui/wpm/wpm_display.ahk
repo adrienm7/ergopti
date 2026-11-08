@@ -71,10 +71,16 @@ class WPMWidgetConst {
     ; [transparency]
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
+    ; [menubar] — the notification-area readout (wpm_tray_readout.ahk); hex
+    ; strings without the leading '#'.
+    static MENUBAR_ALPHA      := 0.0
+    static MENUBAR_TEXT       := ""
+    static MENUBAR_NEUTRAL_BG := ""
     ; Timings: [ui] and [keystats].
     static IDLE_HIDE_MS       := 0
     static COLOR_HOLD_MS      := 0
     static TICK_MS            := 0
+    static MENUBAR_TICK_MS    := 0
     static WINDOW_MS          := 0
     static WPM_MIN_DURATION_MS := 0
 
@@ -92,10 +98,10 @@ class WPMWidgetConst {
     ; window-allocation cost is not absorbed by a tooltip render when the widget
     ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
     static PREWARM_DELAY_MS := 900
-    ; Storage keys of the saved position, from the shared canon ([position]
-    ; storage_x / storage_y): the same two keys the other drivers use.
-    static STORE_X            := ""
-    static STORE_Y            := ""
+    ; Storage key of the saved position, from the shared canon ([position]
+    ; storage_pair): one [x, y] value, so the registry publishes the pair in a
+    ; single atomic write (WCF-001).
+    static STORE_PAIR         := ""
     ; Config key names written to config.toml under [metrics].
     static CFG_VISIBLE        := ConfigLeaf.WPM_WIDGET_VISIBLE
     static CFG_COLORS         := ConfigLeaf.WPM_WIDGET_COLORS
@@ -144,10 +150,14 @@ class WPMWidget {
     static _gdip_font        := 0
     static _gdip_fmt         := 0
     static _gdip_frame_rendering := false
+    ; True while the last graph frame upload was refused by the native bitmap owner,
+    ; so a persistent refusal is logged once instead of on every 200 ms tick.
+    static _graph_upload_refused := false
     static _gdip_frame_cleanup_debt := 0
 
     ; Visibility + position.
     static visible        := false
+    static _visibility_revision := 0
     static pos_x          := -1         ; -1 = auto-position on first show
     static pos_y          := -1
 
@@ -213,6 +223,36 @@ _WPMWidget_NeutralCategory(category) {
     return WPMWidgetConst.NEUTRAL.Has(category)
 }
 
+; Whether a readout needs the ring: the floating widget or the notification-area
+; readout, which draw from the same keystrokes. Neither costs anything when off.
+_WPMWidget_Collecting() {
+	return WPMWidget.visible || (IsSet(WPMTrayReadout) && WPMTrayReadout.running)
+}
+
+; Which sources still colour the readouts: each held for COLOR_HOLD_MS after
+; its last keystroke, as Model.active_source holds the last one on macOS and
+; Linux. The watermarks are sampled together under Critical, RAM-only.
+; @returns {Map} has_hs, has_ai, has_ac (Booleans).
+WPMWidget_ActiveSources() {
+	StampCritical := Critical("On")
+	try {
+		now := A_TickCount
+		last_hs := WPMWidget._last_hs_tick
+		last_ai := WPMWidget._last_ai_tick
+		last_ac := WPMWidget._last_ac_tick
+	} finally {
+		Critical(StampCritical)
+	}
+	return Map("has_hs", _WPMWidget_SourceHeld(now, last_hs), "has_ai", _WPMWidget_SourceHeld(now, last_ai),
+		"has_ac", _WPMWidget_SourceHeld(now, last_ac))
+}
+
+; Zero means no source event, not an event in a later UInt32 era.
+_WPMWidget_SourceHeld(Now, Last) {
+	return Last is Integer && Last > 0 && Last <= Now
+		&& _WPMWidget_TickDelta(Now, Last) < WPMWidgetConst.COLOR_HOLD_MS
+}
+
 ; Called by the keystats hook after each accepted keystroke.
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
@@ -223,7 +263,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	; stale callback cannot repaint pre-pause activity after resume.
 	if A_IsSuspended
 		return
-	if !WPMWidget.visible
+	if !_WPMWidget_Collecting()
 		return
 	; Neutral categories count as keystrokes but must not trigger HS color.
 	if (is_hs and _WPMWidget_NeutralCategory(category))
@@ -236,7 +276,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	; bounded regardless of replacement length.
 	RingCritical := Critical("On")
 	try {
-		if A_IsSuspended or !WPMWidget.visible
+		if A_IsSuspended or !_WPMWidget_Collecting()
 			return
 		head := WPMWidget._ring_head
 		if (WPMWidget._ring.Length < cap)
@@ -455,7 +495,7 @@ WPMWidget_ShowPos(&out_x, &out_y) {
 _WPMWidget_ApplySurfaceGeometry(gui_ref) {
     if !gui_ref
         return
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+    if _WPMWidget_IsAutoPosition(WPMWidget.pos_x, WPMWidget.pos_y) {
         WPMWidget_DefaultPos(&def_x, &def_y)
         WPMWidget.pos_x := def_x
         WPMWidget.pos_y := def_y
@@ -500,8 +540,10 @@ WPMWidget_PrewarmGraph() {
         ; content. GR_Hide leaves it in the clean SW_HIDE resting state.
         _WPMWidget_ApplySurfaceGeometry(g)
         WPMWidget_EnsureGdip()
-        GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
+        Uploaded := GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
         GR_Hide(g.Hwnd)
+        if Uploaded != true
+            throw Error("the native bitmap upload was refused")
         LoggerDone("WPMWidget", "Graph window pre-warmed (transparent surface), off the typing path.")
     } catch as e {
         LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
@@ -530,7 +572,13 @@ _WPMWidget_ResetRolling() {
 }
 
 
-WPMWidget_Show() {
+WPMWidget_Show(ExpectedRevision := unset) {
+    PreviousCritical := Critical("On")
+    try {
+        if IsSet(ExpectedRevision) && WPMWidget._visibility_revision != ExpectedRevision
+            return false
+        Revision := ++WPMWidget._visibility_revision
+    } finally Critical(PreviousCritical)
     LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
         WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
     if WPMWidget.show_graph {
@@ -541,7 +589,12 @@ WPMWidget_Show() {
             WPMWidget_BuildCompact()
     }
 
-    WPMWidget.visible := true
+    PreviousCritical := Critical("On")
+    try {
+        if WPMWidget._visibility_revision != Revision
+            return false
+        WPMWidget.visible := true
+    } finally Critical(PreviousCritical)
 
     ; Start from a clean slate -- discard any keystrokes counted during boot or
     ; reload so the surface stays hidden until the user types AFTER it is shown.
@@ -556,28 +609,50 @@ WPMWidget_Show() {
     ; Compact mode uses the same "Hide" approach — no flash on startup.
     _WPMWidget_ApplySurfaceGeometry(gui_ref)
 
-    SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
-
-    ; Seed the cursor position and arm the fast mouse-watch so the widget hides the
-    ; instant the cursor moves — it must never cover text the user wants to read.
+    ; Seed outside the RAM claim; an intervening Hide revokes both timer arms.
     MouseGetPos(&_seed_mx, &_seed_my)
-    WPMWidget._last_mouse_x := _seed_mx
-    WPMWidget._last_mouse_y := _seed_my
-    SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+    PreviousCritical := Critical("On")
+    try {
+        if WPMWidget._visibility_revision != Revision || !WPMWidget.visible
+            return false
+        WPMWidget._last_mouse_x := _seed_mx
+        WPMWidget._last_mouse_y := _seed_my
+        SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
+        SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+    } finally Critical(PreviousCritical)
 
     LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
 }
 
+; Deferred boot Show, armed once the tray is ready. WPMWidget_Show forces
+; WPMWidget.visible := true, which is right for a user activation but wrong for
+; this timer: the user can disable the widget during the post-ready delay, and a
+; stale Show would then restore it and re-arm both display timers against the
+; committed preference. The preference is read when the timer fires.
+WPMWidget_BootShow() {
+    if !WPMWidget.visible {
+        LoggerDebug("WPMWidget", "Boot Show skipped: the widget was disabled before it ran.")
+        return
+    }
+    WPMWidget_Show()
+}
+
 WPMWidget_Hide() {
-    WPMWidget.visible := false
-    SetTimer(WPMWidget_Tick, 0)
-    SetTimer(WPMWidget_MouseWatch, 0)
-    if WPMWidget._gui
-        try WPMWidget._gui.Hide()
-    if WPMWidget._graph_gui
-        try WPMWidget._graph_gui.Hide()
+    PreviousCritical := Critical("On")
+    try {
+        Revision := ++WPMWidget._visibility_revision
+        WPMWidget.visible := false
+        Compact := WPMWidget._gui, Graph := WPMWidget._graph_gui
+        SetTimer(WPMWidget_Tick, 0)
+        SetTimer(WPMWidget_MouseWatch, 0)
+    } finally Critical(PreviousCritical)
+    if Compact && WPMWidget._visibility_revision == Revision
+        try Compact.Hide()
+    if Graph && WPMWidget._visibility_revision == Revision
+        try Graph.Hide()
     try LoggerDone("WPMWidget", "Widget hidden.")
+    return Revision
 }
 
 
@@ -589,6 +664,58 @@ WPMWidget_Hide() {
 ; ======= 7/ Tick — refresh display =======
 ; =========================================
 ; =========================================
+
+; Retire only the exact failed surface; a replacement owns its own references.
+_WPMWidget_DiscardSurface(Candidate, Graph) {
+    PreviousCritical := Critical("On")
+    try {
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if Current == Candidate {
+            if Graph
+                WPMWidget._graph_gui := false
+            else {
+                WPMWidget._gui := false
+                WPMWidget._lbl_wpm := false
+                WPMWidget._lbl_unit := false
+                WPMWidget._lbl_strip := false
+            }
+        }
+    } finally Critical(PreviousCritical)
+    if Candidate
+        try Candidate.Destroy()
+}
+
+; A missing surface remains retryable until both construction and geometry succeed.
+; This does not reset the admitted rolling samples or start another display timer.
+_WPMWidget_RebuildSurface() {
+    if !WPMWidget.visible || A_IsSuspended
+        return false
+    Graph := WPMWidget.show_graph
+    Existing := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if Existing
+        return true
+    Candidate := 0
+    try {
+        Candidate := Graph ? WPMWidget_BuildGraph() : WPMWidget_BuildCompact()
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if !Candidate || Current != Candidate || Graph != WPMWidget.show_graph
+                || !WPMWidget.visible || A_IsSuspended {
+            _WPMWidget_DiscardSurface(Candidate, Graph)
+            return false
+        }
+        _WPMWidget_ApplySurfaceGeometry(Candidate)
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if Current != Candidate || Graph != WPMWidget.show_graph || !WPMWidget.visible || A_IsSuspended {
+            _WPMWidget_DiscardSurface(Candidate, Graph)
+            return false
+        }
+        return true
+    } catch as Err {
+        _WPMWidget_DiscardSurface(Candidate, Graph)
+        try LoggerError("WPMWidget", "Surface reconstruction failed; a later display tick will retry: {1}.", Err.Message)
+        return false
+    }
+}
 
 WPMWidget_Tick() {
     if !WPMWidget.visible
@@ -640,12 +767,15 @@ WPMWidget_Tick() {
     should_show   := _WPMWidget_TooltipUp()
         || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-    if !gui_ref
-        return
-
     if !should_show {
-        try _WPMWidget_HideSurface(gui_ref)
+        if gui_ref
+            try _WPMWidget_HideSurface(gui_ref)
         return
+    }
+    if !gui_ref {
+        if !_WPMWidget_RebuildSurface()
+            return
+        gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     }
 
     is_idle := false
@@ -669,13 +799,8 @@ WPMWidget_Tick() {
             ; to say a render had thrown — the two branches of the same tick
             ; behaved differently for no reason anyone chose.
             try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
-            WPMWidget._graph_gui := false
-            try WPMWidget_BuildGraph()
-            ; The builder only constructs. Without the geometry the rebuilt Gui
-            ; keeps a 0x0 client rect, GR_DrawBitmap early-returns on every later
-            ; tick and the "recovery" leaves the widget exactly as dead as the bare
-            ; catch it replaced — just with one ERROR line to show for it.
-            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._graph_gui)
+            _WPMWidget_DiscardSurface(gui_ref, true)
+            _WPMWidget_RebuildSurface()
         }
     } else {
         bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
@@ -696,15 +821,8 @@ WPMWidget_Tick() {
                 WPMWidget._lbl_unit.SetFont("c" . txt_col)
         } catch as _e {
             try LoggerError("WPMWidget", "Compact mode tick threw — rebuilding widget: {1}.", _e.Message)
-            WPMWidget._gui       := false
-            WPMWidget._lbl_wpm   := false
-            WPMWidget._lbl_unit  := false
-            WPMWidget._lbl_strip := false
-            try WPMWidget_BuildCompact()
-            ; Same reason as the graph sibling above: the next tick reveals this
-            ; window with a bare Show("NoActivate"), which would put the rebuilt
-            ; widget at the OS default position instead of the user's corner.
-            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._gui)
+            _WPMWidget_DiscardSurface(gui_ref, false)
+            _WPMWidget_RebuildSurface()
         }
     }
     WPMWidget._last_wpm := wpm

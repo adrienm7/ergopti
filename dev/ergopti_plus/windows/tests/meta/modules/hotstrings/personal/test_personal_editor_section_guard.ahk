@@ -65,8 +65,10 @@ _PESG_EveryConsumerIsGuarded() {
 			Pos += StrLen(Needle)
 		}
 	}
-	Assert(Checked >= 8,
-		"expected five global reads, the presence-guarded list helper and two session-bound local reads; every pointer consumer remains policed")
+	; Entry and section writes now edit a detached Candidate clone, so only the
+	; reads remain: two global, the list helper and four session-bound locals.
+	Assert(Checked >= 7,
+		"expected two global reads, the presence-guarded list helper and four session-bound local reads; every pointer consumer remains policed")
 }
 
 ; The shared helper must test BOTH halves of "selected". A helper that only

@@ -1,84 +1,112 @@
 {
 	"schema_version": 1,
-	"audited_sha": "c3f261cdaa8fbc3f3c880f87e335aa5db5aed62d",
-	"reviewed_at": "2026-11-05",
+	"audited_sha": "830b0a0ac9b81c7fcbf6418b07a0ed2a381e7203",
+	"reviewed_at": "2026-11-07",
 	"owners": [
 		{
 			"id": "windows-repeat",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 			"symbol": "HSE_TryRepeatKey(MagicKey)",
-			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+			"sha256": "b395f84d6020140500a59c1e8a92e8469f87b591547c50df744ba9a101b6c579"
 		},
 		{
 			"id": "windows-control",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 			"symbol": "_OnPrefixKeyDown",
-			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503"
+			"sha256": "00ec602245ada57862e5468dd180108f0181b076a1ab8834cc49eb87258a05b2"
+		},
+		{
+			"id": "windows-undo",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"symbol": "HSE_UndoExpansion(Undo",
+			"sha256": "247ab39752f6c1aa72058ea4736a31e3fc71d0d7e1351b3c363477abe50bca96"
 		},
 		{
 			"id": "macos-repeat",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+			"sha256": "9e65c105587d836960da6534021d6e6a88f7e6acb9fa06bd29ab343738902afe"
 		},
 		{
 			"id": "macos-control",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+			"sha256": "3fce2ecca18f928b8c46f7282f68a0ab205cd957e767a0953686a81f98e9d1d8"
 		},
 		{
 			"id": "linux-repeat",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
 			"symbol": "function M.resolve",
-			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13"
+			"sha256": "e632fd03d128ac367693f2737d86a5a6eed5a812a69a4569f4c546171f9765ec"
 		},
 		{
 			"id": "linux-control",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+			"sha256": "82f8b222baa8ac81dadf3436216b37fb9c9c7bec6332934236ce2f9b3bab6aaa"
 		},
 		{
 			"id": "windows-dead-legacy",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 			"symbol": "DeadKey(Mapping)",
-			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+			"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
 		},
 		{
 			"id": "windows-dead-registry",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_PressNative",
-			"sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df"
+			"sha256": "85db8f22445f4c6cc0b98534eb2ebd700cd518993b593fc851095d51ea918590"
 		},
 		{
 			"id": "macos-dead-native",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+			"sha256": "3fce2ecca18f928b8c46f7282f68a0ab205cd957e767a0953686a81f98e9d1d8"
 		},
 		{
 			"id": "linux-dead-capture",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
 			"symbol": "local function resolve_press(keycode)",
-			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+			"sha256": "5ed9e04682f32a7c5bb810b8f45171609e0b0dcd7dfbb5374319ad02f9d1bcfa"
 		},
 		{
 			"id": "linux-dead-consume",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
-			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+			"sha256": "8fb9dd342370909fea6c3ed7832295b52ce86c38d171f5dbc22e61b4e6a071bd"
+		},
+		{
+			"id": "windows-layout-emulation",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+			"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
+			"sha256": "85db8f22445f4c6cc0b98534eb2ebd700cd518993b593fc851095d51ea918590"
+		},
+		{
+			"id": "macos-layout-emulation",
+			"platform": "macos",
+			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
+			"symbol": "function M.key_down(e, key_code)",
+			"sha256": "787fce71958f6929dc9370de59baa59eb91ef18b715b975d394aa30cca85d40e"
+		},
+		{
+			"id": "linux-layout-emulation",
+			"platform": "linux",
+			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
+			"symbol": "function M.on_key(detail)",
+			"sha256": "3b48263035543d67b7c5e5e96e9ded1d5e86aaae8ec81d736dd634fc5ea061f7"
 		}
 	],
 	"behaviors": [
@@ -108,9 +136,9 @@
 			"label_key": "inventory.behavior.backspace_restore",
 			"platforms": {
 				"windows": {
-					"declared": false,
-					"note_key": "inventory.behavior.backspace_other",
-					"owners": ["windows-control"]
+					"declared": true,
+					"note_key": "inventory.behavior.backspace_linux",
+					"owners": ["windows-control", "windows-undo"]
 				},
 				"macos": {
 					"declared": false,
@@ -205,6 +233,27 @@
 					"declared": true,
 					"note_key": "inventory.behavior.dead_native_lifetime",
 					"owners": ["linux-dead-capture", "linux-dead-consume"]
+				}
+			}
+		},
+		{
+			"id": "layout.emulation",
+			"label_key": "menu.layout.emulated_layout",
+			"platforms": {
+				"windows": {
+					"declared": true,
+					"note_key": "inventory.behavior.layout_emulation",
+					"owners": ["windows-layout-emulation"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.layout_emulation",
+					"owners": ["macos-layout-emulation", "macos-dead-native"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.layout_emulation",
+					"owners": ["linux-layout-emulation", "linux-control"]
 				}
 			}
 		}

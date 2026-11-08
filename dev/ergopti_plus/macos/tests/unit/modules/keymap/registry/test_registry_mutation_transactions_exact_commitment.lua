@@ -275,7 +275,7 @@ helpers.describe("hotstring category scope: runtime and persistence acknowledgem
 				add_group_mapping(registry, "spare", "untouched")
 				local spare_mapping = state.mappings[1]
 				for _, name in ipairs({ "hc", "sx" }) do
-					hs.settings.set("ergopti.hotstrings_section_rolls_" .. name, before)
+					hs.settings.set("ergopti." .. registry.section_setting_key("rolls", name), before)
 				end
 				registry.set_post_load_hook("rolls", function()
 					for _, name in ipairs({ "hc", "sx" }) do
@@ -310,7 +310,7 @@ helpers.describe("hotstring category scope: runtime and persistence acknowledgem
 				for _, name in ipairs({ "hc", "sx" }) do helpers.assert_eq(candidate[name], enabled) end
 				helpers.assert_eq(registry.is_group_enabled("rolls"), wanted)
 				for _, name in ipairs({ "hc", "sx" }) do
-					helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_" .. name), wanted)
+					helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key("rolls", name)), wanted)
 				end
 				helpers.assert_eq(registry.is_group_enabled("spare"), true)
 				helpers.assert_eq(state.mappings[1], spare_mapping, "another group's exact mapping survives")
@@ -331,12 +331,12 @@ helpers.describe("hotstring category scope: runtime and persistence acknowledgem
 		local _, registry = fresh_registry()
 		registry.register_lua_group("magickey", "Magic key", { { name = "own" }, { name = "replace" } })
 		for _, name in ipairs({ "own", "replace" }) do
-			hs.settings.set("ergopti.hotstrings_section_magickey_" .. name, false)
+			hs.settings.set("ergopti." .. registry.section_setting_key("magickey", name), false)
 		end
 		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, function() return true end,
 			{ magickey = { replace = true } }), true)
-		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_magickey_own"), true)
-		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_magickey_replace"), false,
+		helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key("magickey", "own")), true)
+		helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key("magickey", "replace")), false,
 			"the extension's bound section is not this submenu's")
 		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, nil, "replace"), false,
 			"a malformed exclusion refuses before any write")
@@ -402,6 +402,82 @@ helpers.describe("canonical hotstring cache projection", function()
 		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_ext:demo:test_info"))
 	end)
 
+	helpers.it("projects distinct canonical choices over one ambiguous legacy key (section-cache-identity)", function()
+		local _, registry = fixture(nil)
+		registry.register_lua_group("a_b", "One", { { name = "c" } })
+		registry.register_lua_group("a", "Two", { { name = "b_c" } })
+		hs.settings.set("ergopti.hotstrings_section_a_b_c", true)
+		local saved = { hotstrings = { rolls = false, ["ext:demo:test"] = false, a_b = false, a = false },
+			section_states = { a_b = { c = false }, a = { b_c = true } } }
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(registry.is_section_enabled("a_b", "c"), false)
+		helpers.assert_eq(registry.is_section_enabled("a", "b_c"), true)
+	end)
+
+	helpers.it("migrates only unique historical identities from the complete inventory (section-cache-identity)", function()
+		local _, registry = fixture(nil)
+		registry.register_lua_group("a_b", "One", { { name = "c" }, { name = "unique_name" } })
+		registry.register_lua_group("a", "Two", { { name = "b_c" } })
+		hs.settings.set("ergopti.hotstrings_section_a_b_c", false)
+		hs.settings.set("ergopti.hotstrings_section_a_b_unique_name", false)
+		helpers.assert_true(registry.migrate_legacy_section_settings())
+		helpers.assert_nil(hs.settings.get("ergopti." .. registry.section_setting_key("a_b", "c")))
+		helpers.assert_nil(hs.settings.get("ergopti." .. registry.section_setting_key("a", "b_c")))
+		helpers.assert_eq(registry.is_section_enabled("a_b", "unique_name"), false)
+	end)
+
+	helpers.it("leaves legacy entries available after a refused migration write (section-cache-identity)", function()
+		local _, registry = fixture(nil)
+		registry.register_lua_group("legacy_pack", "Legacy", { { name = "one" }, { name = "two" } })
+		hs.settings.set("ergopti.hotstrings_section_legacy_pack_one", true)
+		hs.settings.set("ergopti.hotstrings_section_legacy_pack_two", false)
+		local set = hs.settings.set
+		hs.settings.set = function(key, value)
+			set(key, value)
+			if key == "ergopti." .. registry.section_setting_key("legacy_pack", "two") then return false end
+			return true
+		end
+		local migrated = registry.migrate_legacy_section_settings()
+		hs.settings.set = set
+		helpers.assert_eq(migrated, false)
+		helpers.assert_nil(hs.settings.get("ergopti." .. registry.section_setting_key("legacy_pack", "one")))
+		helpers.assert_nil(hs.settings.get("ergopti." .. registry.section_setting_key("legacy_pack", "two")))
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_legacy_pack_one"), true)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_legacy_pack_two"), false)
+	end)
+
+	helpers.it("keeps absent TOML at shipped defaults after legacy migration (section-cache-identity)", function()
+		local _, registry, preferences = fixture(nil)
+		registry.register_lua_group("autocorrection", "Autocorrection", { { name = "technical_terms" } })
+		hs.settings.set("ergopti.hotstrings_section_autocorrection_technical_terms", true)
+		helpers.assert_true(registry.migrate_legacy_section_settings())
+		helpers.assert_eq(registry.is_section_enabled("autocorrection", "technical_terms"), true)
+		local saved, status = preferences.load("config")
+		helpers.assert_eq(status, "absent")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(registry.is_section_enabled("autocorrection", "technical_terms"), false)
+	end)
+
+	helpers.it("retains migrated data if canonical projection is refused (section-cache-identity)", function()
+		local _, registry, preferences = fixture(nil)
+		registry.register_lua_group("autocorrection", "Autocorrection", { { name = "technical_terms" } })
+		hs.settings.set("ergopti.hotstrings_section_autocorrection_technical_terms", true)
+		helpers.assert_true(registry.migrate_legacy_section_settings())
+		local key = "ergopti." .. registry.section_setting_key("autocorrection", "technical_terms")
+		local set = hs.settings.set
+		hs.settings.set = function(k, value)
+			if k == key and value == false then return false end
+			return set(k, value)
+		end
+		local committed = registry.apply_hotstring_preferences(preferences.load("config"))
+		hs.settings.set = set
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(hs.settings.get(key), true)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_autocorrection_technical_terms"), true)
+		helpers.assert_true(registry.apply_hotstring_preferences(preferences.load("config")))
+		helpers.assert_eq(registry.is_section_enabled("autocorrection", "technical_terms"), false)
+	end)
+
 	helpers.it("reads an old-shape owned value as neutral absence, never a refused projection (config-outdated-hotstrings)", function()
 		-- An outdated choice is never an ERROR or a failed boot sync, and never
 		-- guessed on: "yes" is not a switch, so the section keeps its neutral value.
@@ -416,14 +492,14 @@ helpers.describe("canonical hotstring cache projection", function()
 		local _, registry, preferences = fixture(nil)
 		local set = hs.settings.set
 		hs.settings.set = function(key, value)
-			if key == "ergopti.hotstrings_section_rolls_hc" and value == false then return nil end
+			if key == "ergopti." .. registry.section_setting_key("rolls", "hc") and value == false then return nil end
 			return set(key, value)
 		end
 		local ok, result = pcall(registry.apply_hotstring_preferences, preferences.load("config"))
 		hs.settings.set = set
 		helpers.assert_true(ok)
 		helpers.assert_eq(result, false)
-		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_hc"))
+		helpers.assert_nil(hs.settings.get("ergopti." .. registry.section_setting_key("rolls", "hc")))
 		helpers.assert_true(registry.is_group_enabled("rolls"))
 	end)
 
@@ -475,6 +551,7 @@ helpers.describe("canonical hotstring cache projection", function()
 			boot_saved_prefs = require("infra.preferences").load("config"),
 			keymap = {
 				apply_hotstring_preferences = registry.apply_hotstring_preferences,
+				start_layout_emulation = function() end,
 				start = function()
 					helpers.assert_eq(registry.is_group_enabled("rolls"), false)
 					helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
@@ -513,7 +590,7 @@ helpers.describe("personal menu: the real category persistence owner", function(
 					for _, group in ipairs(names) do
 						registry.register_lua_group(group, group, { { name = "one" }, { name = "two" } })
 						for _, section in ipairs({ "one", "two" }) do
-							hs.settings.set("ergopti.hotstrings_section_" .. group .. "_" .. section, not enabled)
+							hs.settings.set("ergopti." .. registry.section_setting_key(group, section), not enabled)
 						end
 						registry.set_post_load_hook(group, function()
 							for _, section in ipairs({ "one", "two" }) do
@@ -555,7 +632,7 @@ helpers.describe("personal menu: the real category persistence owner", function(
 						helpers.assert_eq(registry.is_group_enabled(group), wanted)
 						helpers.assert_eq(menu_state.hotstrings[group], wanted)
 						for _, section in ipairs({ "one", "two" }) do
-							helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_" .. group .. "_" .. section), wanted)
+							helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key(group, section)), wanted)
 						end
 					end
 					helpers.assert_eq(registry.is_group_enabled("spare"), true)

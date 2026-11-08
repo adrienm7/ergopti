@@ -109,7 +109,6 @@ local highest_installed    = install.highest_installed
 local install_user         = install.install_user
 local install_system       = install.install_system
 local pick_latest_bundle   = install.pick_latest_bundle
-local invalidate_bundle_caches = install.invalidate_bundle_caches
 local USER_LAYOUTS_DIR     = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR   = install.SYSTEM_LAYOUTS_DIR
 
@@ -181,9 +180,15 @@ end
 --- @param legacy_active table Legacy entries in the active input-source list.
 --- @param update_menu function|nil Menu rebuild callback.
 local function run_install_and_chain(install_fn, legacy_active, update_menu)
-	local ok = false
-	pcall(function() ok = install_fn() end)
-	if ok and type(legacy_active) == "table" and #legacy_active > 0 then
+	local called, ok, reason = pcall(install_fn)
+	if not called or ok ~= true then
+		local key = reason == "launcher_unavailable" and "menu.layout.install_launcher_required"
+			or reason == "system_install_unavailable" and "menu.layout.install_system_unavailable"
+			or reason == "other_scope_occupied" and "menu.layout.install_other_scope"
+			or reason == "other_scope_unverified" and "menu.layout.install_other_scope_unverified" or "menu.layout.install_failed"
+		pcall(notifications.notify, i18n.get(key), nil, "error")
+	end
+	if called and ok == true and type(legacy_active) == "table" and #legacy_active > 0 then
 		Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
 		upgrade_active_list_async(legacy_active, function()
 			schedule_menu_refresh(update_menu)
@@ -310,6 +315,9 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 	local started = PhaseStats.now()
 	local available, reason = Live.available()
 	PhaseStats.stop("menu_keyboard_layout.number_row", started)
+	-- An emulation typing the number row applies the ordering itself.
+	local emulating = require("modules.keymap.layout_emulation").status().active == true
+	available = available or emulating
 	local function stored()
 		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
 	end
@@ -321,6 +329,7 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 			return false
 		end
 		Logger.info(LOG, "Number-row option %s set to %s.", key, tostring(value))
+		if emulating then require("modules.keymap.layout_emulation").reload_if_started() end
 		Live.apply(stored(), function(applied, code)
 			if not applied and code ~= Live.REASON_NO_SOURCE then
 				pcall(notifications.notify, i18n.get("layouts.rows_not_applied"), nil, "error")
@@ -365,6 +374,10 @@ function M.build(ctx)
 	-- phase list can say which stage the slow ones spend it in.
 	local stage_started = PhaseStats.now()
 	local records    = list_active_keyboard_layouts()
+	-- Both Keyboard Layouts scopes, listed once for the whole build: four
+	-- readers below each listed both again (eight directory scans and their
+	-- plist probes per rebuild), all with the same answer.
+	local installed  = { system = highest_installed(SYSTEM_LAYOUTS_DIR), user = highest_installed(USER_LAYOUTS_DIR) }
 	-- Build the active-Ergopti set directly from records — the same source used
 	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
 	-- it is truly active; no need to read HIToolbox separately.
@@ -373,13 +386,14 @@ function M.build(ctx)
 	-- NOT a TIS ID. We map it to a stable TIS ID via the installed bundle's keylayout files.
 	-- Records whose KeyboardLayout Name doesn't match any installed variant are orphan entries
 	-- (old bundle, different version) — we flag them so the menu can offer an upgrade.
-	local kl_name_to_tis = build_kl_name_to_tis_id() or {}
+	local kl_name_to_tis, installed_variants = build_kl_name_to_tis_id(installed)
+	kl_name_to_tis = kl_name_to_tis or {}
 	local active_id_set_pre = {}
 	local legacy_active     = {}
 	for _, r in ipairs(records) do
 		local kl_name = r.id or ""
-		if kl_name:lower():find("ergopti", 1, true) then
-			local stable_id = kl_name_to_tis[kl_name]
+		local stable_id = kl_name_to_tis[kl_name]
+		if stable_id or is_legacy_ergopti_id(kl_name) then
 			if stable_id then
 				-- Matches an installed variant → genuinely active
 				active_id_set_pre[stable_id] = true
@@ -389,7 +403,7 @@ function M.build(ctx)
 			end
 		end
 	end
-	local list_state = ergopti_in_active_layouts(records)
+	local list_state = ergopti_in_active_layouts(records, installed)
 	PhaseStats.stop("menu_keyboard_layout.sources", stage_started)
 
 	stage_started = PhaseStats.now()
@@ -398,8 +412,8 @@ function M.build(ctx)
 	-- TIS can't enable an input source whose .bundle isn't installed.
 	-- user_best and system_best are declared here so they remain in scope for the
 	-- "Ajouter" submenu closures below (which live outside the `if latest then` block).
-	local user_best   = highest_installed(USER_LAYOUTS_DIR)
-	local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
+	local user_best   = installed.user
+	local system_best = installed.system
 	local latest_installed_anywhere = false
 	if latest then
 		local latest_ver  = parse_version(latest)
@@ -412,12 +426,14 @@ function M.build(ctx)
 			system_best and system_best.name or "none",
 			tostring(latest_installed_anywhere))
 
-		-- System scope is listed first: it is the preferred install target
-		-- because it makes the layout available for all users and avoids
-		-- duplication between ~/Library and /Library. A system install also
-		-- removes the user copy automatically, keeping a single canonical bundle.
+		-- Keep an existing system copy visible. Installation and updates in that
+		-- scope are unavailable until privileged launcher identity can be bound.
+		local system_scope_label = i18n.get("menu.layout.scope_system")
+		if not system_best or version_gt(latest_ver, system_best.version) then
+			system_scope_label = system_scope_label .. " — " .. i18n.get("menu.layout.install_system_reason")
+		end
 		bundle_rows[#bundle_rows + 1] = build_install_item(
-			i18n.get("menu.layout.scope_system"), "🔐", system_best, latest, latest_ver,
+			system_scope_label, "🔐", system_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
 					function() return install_system(bundles_dir, latest) end,
@@ -462,7 +478,9 @@ function M.build(ctx)
 	stage_started = PhaseStats.now()
 	local bundle_full_path = (installed_dir and installed_name) and
 		(NativePath.without_trailing_separators(installed_dir) .. "/" .. installed_name) or ""
-	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
+	-- The same bundle (system scope first) the input-source map read above.
+	local variants = installed_variants
+		or (bundle_full_path ~= "" and install.bundle_variants(bundle_full_path)) or {}
 	local all_variants_active = #variants > 0
 	local active_variant_count = 0
 	for _, var in ipairs(variants) do
@@ -583,7 +601,7 @@ function M.build(ctx)
 	-- names, which can collide across languages). Ergopti entries get the
 	-- bundle's actual installed version appended to their localised name
 	-- so a stable-id row no longer shows up as a bare "Ergopti+".
-	local resolved_ergopti_v = resolve_installed_ergopti_version()
+	local resolved_ergopti_v = resolve_installed_ergopti_version(installed)
 	local function display_for_record(r)
 		local id = r.id or ""
 		if id:lower():find("ergopti", 1, true) then
@@ -614,7 +632,16 @@ function M.build(ctx)
 	if #records == 0 then
 		local ManifestMenu = require("infra.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
-			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
+				local ok, started = pcall(function()
+					return require("adapters.shell_runner").open(KEYBOARD_PREFS_URL)
+				end)
+				if not ok or started ~= true then
+					Logger.error(LOG, "Keyboard settings could not be opened.")
+					return false
+				end
+				return true
+			end,
 		}, {}, {}) or {}
 	else
 		for _, r in ipairs(records) do
@@ -806,7 +833,10 @@ function M.build(ctx)
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
-			return ctx.apply_preference_scope("keyboard_layout", mode)
+			local applied = ctx.apply_preference_scope("keyboard_layout", mode)
+			-- The scope holds the emulation's rows too: it types what was restored.
+			require("modules.keymap.layout_emulation").reload_if_started()
+			return applied
 		end
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
@@ -837,7 +867,66 @@ function M.build(ctx)
 	if custom_rows == nil then return nil end
 	local active_rows = active_layout_rows()
 	if active_rows == nil then return nil end
-	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- types over the selected input source, its two layers and its four rows. A
+	-- change is stored, then the emulation reloads it at once.
+	local EmulationRows = require("layouts.emulation_menu")
+	local function emulation_changed(committed)
+		if not committed then pcall(notifications.notify, i18n.get("menu.layout.emulation_not_saved"), nil, "error") end
+		local reloaded = require("modules.keymap.layout_emulation").reload_if_started()
+		if committed and reloaded == false then
+			pcall(notifications.notify, i18n.get("menu.layout.emulation_failed"), nil, "error")
+		end
+		schedule_menu_refresh(update_menu)
+	end
+	local function emulation_switch(path, label_key)
+		local Preferences = require("infra.layout_emulation_preferences")
+		return EmulationRows.switch_row({
+			t = i18n.get, label_key = label_key, checked = Preferences.switch(state, path),
+			toggle = function(value) emulation_changed(Preferences.set_switch(state, save_prefs, path, value)) end,
+		})
+	end
+	render_ctx.feature_rows = {}
+	for path, row in pairs(type(ctx) == "table" and type(ctx.feature_rows) == "table" and ctx.feature_rows or {}) do
+		render_ctx.feature_rows[path] = row
+	end
+	for _, row in ipairs({ "number_row", "top_row", "home_row", "bottom_row" }) do
+		local path = "layout.emulate_" .. row
+		render_ctx.feature_rows[path] = function() return emulation_switch(path, "menu.layout.emulate_" .. row) end
+	end
+	-- « Rangées émulées »: the four layout.emulate_<row> switches of the
+	-- manifest's layout_emulated_rows_group, as Windows builds them. The
+	-- renderer hands back finished menu rows while `items` takes row data, so
+	-- they convert back first: passed as is, every row lacked a label and the
+	-- submenu opened onto nothing.
+	local group_builders = {
+		layout_emulated_rows = function()
+			local rendered = ManifestMenu.build("layout_emulated_rows_group", "Layout", nil, nil, render_ctx, {})
+			local child_rows = ManifestMenu.native_child_rows(rendered)
+			if child_rows == nil then
+				Logger.error(LOG, "The emulated rows could not be converted — their submenu is left out.")
+				return nil
+			end
+			return { items = child_rows }
+		end,
+	}
+	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, {
+		["layout_emulation"] = function()
+			local Preferences = require("infra.layout_emulation_preferences")
+			return EmulationRows.choice_rows({
+				t = i18n.get,
+				settings = Preferences.settings(state),
+				status = require("modules.keymap.layout_emulation").status(),
+				snapshot = require("modules.keymap.layout_registry").snapshot(),
+				choose = function(choice) emulation_changed(Preferences.choose(state, save_prefs, choice)) end,
+			})
+		end,
+		["layout_features_base"] = function()
+			return { emulation_switch(require("config_keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
+		end,
+		["layout_features_altgr"] = function()
+			return { emulation_switch(require("config_keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
+		end,
 		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = function() return active_rows end,
@@ -875,18 +964,10 @@ M._parse_active_layouts         = parse_active_layouts
 M._compute_active_layouts_fast  = compute_active_layouts_fast
 M._list_active_keyboard_layouts = list_active_keyboard_layouts
 M._refresh_active_layouts_async = refresh_active_layouts_async
-M._invalidate_bundle_caches     = invalidate_bundle_caches
 M._set_active_layouts_cache     = input_sources.set_active_layouts_cache
 
---- Warms the discovery caches off the menu-open path so the first user click
---- renders instantly. Safe to call repeatedly. Invoked from ui.menu.init once
---- boot settles. See the discovery-cache notes near the top of this module.
---- @param ctx table|nil Menu context; ctx.base_dir locates the bundles directory.
-function M.prime(ctx)
-	local base_dir = (type(ctx) == "table" and type(ctx.base_dir) == "string") and ctx.base_dir or ""
-	pcall(function() M.pick_latest_bundle(base_dir .. BUNDLES_RELDIR) end)
-	pcall(highest_installed, USER_LAYOUTS_DIR)
-	pcall(highest_installed, SYSTEM_LAYOUTS_DIR)
+--- Starts the asynchronous active-layout refresh after boot settles.
+function M.prime()
 	refresh_active_layouts_async(nil)
 end
 

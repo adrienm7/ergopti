@@ -146,10 +146,92 @@ _KSD_Observe(Stage) {
 	return [PrivateApps, PrivateTitles]
 }
 
+
+; Equal caption text is not equal window ownership when the application changes.
+; Only native focus acquisition is a port; refresh, flush, append and clocks stay real.
+_KSD_SameCaptionAppOwner(SameCaption) {
+	global _KSD
+	A := {App: "fixture-caption-a.exe", Title: "Fixture shared caption", Hwnd: 201}
+	B := {App: "fixture-caption-b.exe", Title: SameCaption ? A.Title : "Fixture distinct caption", Hwnd: 202}
+	C := {App: B.App, Title: "Fixture later caption", Hwnd: 203}
+	_KSD_Acquire(A)
+	_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == 0,
+		"The genuine initial focus must establish its own app and title clocks.")
+	FirstOrigin := KLHook.title_entered_at
+	Sleep(40)
+	_KSD_Acquire(B)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The second app must be genuinely published.")
+	SecondOrigin := KLHook.title_entered_at
+	RowsAfterApp := Keystats._pending_entries.Length
+	Sleep(40)
+	_KSD_Acquire(C)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The second app's later title change must publish normally.")
+	if IsObject(_KSD.Failure)
+		throw _KSD.Failure
+	Windows := []
+	for Row in Keystats._pending_entries
+		if Row["type"] == "window_switch"
+			Windows.Push(Row)
+	FileAppend("RECEIPT caption-app-owner same_caption=" . SameCaption . " rows_after_app=" . RowsAfterApp
+		. " window_rows=" . Windows.Length . " title_origin_advanced=" . (SecondOrigin > FirstOrigin)
+		. " errors=" . _KSD.Errors . "`n", "*", "UTF-8")
+	_KSD_Require(_KSD.Errors == 0, "A swallowed producer exception cannot explain a missing interval.")
+	_KSD_Require(Windows.Length == 2, "Every outgoing app/title interval needs its own canonical row, even when the caption is unchanged.")
+	_KSD_Require(Windows[1]["app"] == A.App && Windows[1]["prev_title"] == A.Title
+		&& Windows[1]["duration_ms"] > 0, "App A must retain its own observed caption duration.")
+	_KSD_Require(Windows[2]["app"] == B.App && Windows[2]["prev_title"] == B.Title
+		&& Windows[2]["duration_ms"] > 0, "App B must retain its separate observed caption duration.")
+	_KSD_Require(SecondOrigin > FirstOrigin, "The actual second app acquisition must restart title ownership rather than adopt A's origin.")
+}
+
+
+_KSD_CaseOnlyTitleOwner() {
+	global _KSD
+	A := {App: "fixture-caption-case.exe", Title: "Fixture CASE caption", Hwnd: 211}
+	B := {App: A.App, Title: "Fixture case caption", Hwnd: A.Hwnd}
+	C := {App: A.App, Title: "Fixture later caption", Hwnd: A.Hwnd}
+	_KSD_Require(!(A.Title == B.Title) && StrLower(A.Title) == StrLower(B.Title),
+		"The actual title inputs differ only by case, under the same application and window.")
+	_KSD_Acquire(A)
+	_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == 0,
+		"The genuine initial focus must establish its own title origin.")
+	FirstOrigin := KLHook.title_entered_at
+	Sleep(40)
+	_KSD_Acquire(B)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The actual new case-sensitive caption must be observed.")
+	SecondOrigin := KLHook.title_entered_at
+	RowsAfterCase := Keystats._pending_entries.Length
+	Sleep(40)
+	_KSD_Acquire(C)
+	_KSD_Require(KL_Hook_RefreshContext(true), "A later ordinary caption must still publish normally.")
+	if IsObject(_KSD.Failure)
+		throw _KSD.Failure
+	Windows := []
+	for Row in Keystats._pending_entries
+		if Row["type"] == "window_switch"
+			Windows.Push(Row)
+	FileAppend("RECEIPT caption-case-owner rows_after_case=" . RowsAfterCase
+		. " window_rows=" . Windows.Length . " title_origin_advanced=" . (SecondOrigin > FirstOrigin)
+		. " errors=" . _KSD.Errors . "`n", "*", "UTF-8")
+	_KSD_Require(_KSD.Errors == 0, "A hidden producer exception cannot explain a missing caption interval.")
+	_KSD_Require(Windows.Length == 2 && RowsAfterCase == 1,
+		"A case-only title change owns a separate canonical window interval.")
+	_KSD_Require(Windows[1]["app"] == A.App && Windows[1]["prev_title"] == A.Title
+		&& Windows[1]["next_title"] == B.Title && Windows[1]["duration_ms"] > 0,
+		"The first exact caption must retain its own observed positive duration.")
+	_KSD_Require(Windows[2]["app"] == A.App && Windows[2]["prev_title"] == B.Title
+		&& Windows[2]["duration_ms"] > 0 && SecondOrigin > FirstOrigin,
+		"The second exact caption cannot adopt the first caption's origin.")
+}
+
 _KSD_Exercise() {
 	global _KSD
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
+	if _KSD.Mode == "caption-case-only"
+		return _KSD_CaseOnlyTitleOwner()
+	if InStr(_KSD.Mode, "caption-app-") == 1
+		return _KSD_SameCaptionAppOwner(_KSD.Mode == "caption-app-same")
 	_KSD.A := {App: "fixture-public-a.exe", Title: "Fixture public A", Hwnd: 102}
 	_KSD.B := {App: _KSD.AppPrivate ? "fixture-excluded-b.exe"
 		: _KSD.TitlePrivate ? _KSD.A.App : "fixture-public-b.exe",
@@ -171,11 +253,22 @@ _KSD_Exercise() {
 		MetricsFilters.disabled_apps[_KSD.B.App] := true
 	if _KSD.Mode == "outgoing-private"
 		MetricsFilters.disabled_apps[_KSD.A.App] := true
+	if _KSD.Mode == "outgoing-title-private" {
+		_KSD.A.Title := "Fixture A (Private Browsing)"
+		_KSD_Acquire(_KSD.A)
+		_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == _KSD.HistoryRows,
+			"Entering a private title must update context without adding a private transition.")
+	}
 	_KSD.Destination := _KSD_Acquire(_KSD.B)
+	if _KSD.Mode == "outgoing-title-private" {
+		_KSD_NativeLogAppSwitch(_KSD.A.App, _KSD.B.App, 1000, _KSD.A.Title)
+		_KSD_Require(Keystats._pending_entries.Length == _KSD.HistoryRows,
+			"The actual app-switch sink must independently refuse the private retained source title.")
+	}
 	PrivateDestination := MF_ShouldFilterFor(_KSD.B.App, _KSD.B.Title)
 	_KSD_Require(PrivateDestination == (_KSD.AppPrivate || _KSD.TitlePrivate),
 		"The genuine explicit predicate must authenticate the configured destination privacy.")
-	_KSD_Require(MF_ShouldFilterFor(_KSD.A.App, _KSD.A.Title) == (_KSD.Mode == "outgoing-private"),
+	_KSD_Require(MF_ShouldFilterFor(_KSD.A.App, _KSD.A.Title) == (_KSD.Mode == "outgoing-private" || _KSD.Mode == "outgoing-title-private"),
 		"The independent outgoing predicate must authenticate the chosen public or excluded A.")
 	_KSD_Require(Keystats.buffer_events.Length == 0 && Keystats._retry_snapshots.Length == 0
 		&& !Keystats._flush_in_progress && Keystats.session_clicks == 0 && Keystats.session_scrolls == 0,
@@ -191,7 +284,7 @@ _KSD_Exercise() {
 	Observed := _KSD_Observe("old-return")
 	_KSD_Require(Observed[1] == 0, "A captured excluded next_app must never enter the canonical switch queue.")
 	_KSD_Require(Observed[2] == 0, "A captured private next_title must never enter the canonical switch queue.")
-	if _KSD.Mode == "outgoing-private" {
+	if _KSD.Mode == "outgoing-private" || _KSD.Mode == "outgoing-title-private" {
 		for Index, Row in Keystats._pending_entries {
 			if Index > _KSD.HistoryRows
 				_KSD_Require(Row["type"] != "app_switch" && Row["type"] != "window_switch",
@@ -241,7 +334,13 @@ _KSD_Main() {
 		Probes: 0, LogCalls: 0, Errors: 0, TimerCalls: 0, BeforeTimer: false, Done: false,
 		CapturedGeneration: -1, Failure: 0}
 	Primary := 0
-	try _KSD_Exercise()
+	global _KSD_ExtraExercise
+	try {
+		if IsObject(_KSD_ExtraExercise)
+			_KSD_ExtraExercise.Call()
+		else
+			_KSD_Exercise()
+	}
 	catch Any as Failure
 		Primary := Failure
 	finally {

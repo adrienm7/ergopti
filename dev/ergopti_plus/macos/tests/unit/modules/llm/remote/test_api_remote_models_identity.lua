@@ -98,6 +98,20 @@ end
 
 
 helpers.describe("HS-097 remote models endpoint identity", function()
+	for _, case in ipairs({
+		{ format = "openai", body = [[{"data":{}}]] },
+		{ format = "anthropic", body = [[{"data":{}}]] },
+		{ format = "gemini", body = [[{"models":{}}]] },
+	}) do
+		helpers.it("rejects an object in the " .. case.format .. " models array", function()
+			package.loaded["modules.llm.api_remote"] = nil
+			local api = helpers.load_with_stubs("modules.llm.api_remote")
+			local result = exercise(api, case.format, { ok = true, status = 200, body = case.body })
+			helpers.assert_eq(result.ready, false)
+			helpers.assert_eq(result.available, 0)
+			helpers.assert_eq(result.missing, 1)
+		end)
+	end
 	helpers.it("rejects captive HTML and unshaped JSON on both health paths", function()
 		package.loaded["modules.llm.api_remote"] = nil
 		local api = helpers.load_with_stubs("modules.llm.api_remote")

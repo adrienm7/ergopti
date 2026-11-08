@@ -21,8 +21,11 @@
 ---    already defines its list keeps it, and the legacy custom states with it.
 --- 3. One conditional write, then cleanup. Every leaf is published in one batch
 ---    against the exact bytes read; the legacy keys are removed only after that
----    write commits, so a refused import is retried at the next start and a
----    committed one never resurrects a later neutral choice.
+---    write commits, so a refused import is retried at the next start.
+--- 4. A committed import is marked in the same batch. A neutral choice is stored
+---    as absence, so legacy keys left behind by a failed removal would read as
+---    unclaimed and overwrite a choice made after the import. The mark makes a
+---    later start only retry the removal, never the import.
 --- ==============================================================================
 
 local M = {}
@@ -50,6 +53,9 @@ local LEGACY_REPEAT_DEFAULT = true
 
 -- Legacy dynamic family switches were keyed by engine section.
 local LEGACY_FAMILY_PREFIX = "hotstrings.dynamic."
+
+-- Written with the imported leaves; its presence retires the legacy keys.
+local IMPORTED_MARK_PATH = ConfigKeys.KEY._META_LINUX_LEGACY_STORAGE_IMPORTED
 
 -- The legacy word-delimiter lists: every delimiter's state, and the user's own
 -- delimiters, as records of fields joined by these two control characters.
@@ -257,7 +263,13 @@ function M.import(options)
 		assert(status == "ok" or status == "absent", "configuration is unreadable: " .. tostring(why))
 		local document = Codec.decode(content or "")
 		assert(type(document) == "table", "configuration is malformed")
-		local operations = {}
+		local mark = lookup(document, segments(IMPORTED_MARK_PATH))
+		if mark == true then
+			Logger.info(LOG, "The legacy hotstring settings were already imported; only their removal is retried.")
+			return true, 0
+		end
+		-- The mark goes first so it commits in the same write as the leaves.
+		local operations = { { path = segments(IMPORTED_MARK_PATH), value = true } }
 		-- Only a usable list is config.toml's own; one of another shape is
 		-- outdated, so the legacy delimiters replace it rather than being
 		-- skipped, then removed from storage without ever being imported.
@@ -275,7 +287,6 @@ function M.import(options)
 				end
 			end
 		end
-		if #operations == 0 then return true, 0 end
 		local rows = LeafRows.prepare(content or "", operations)
 		local directory = NativePath.dirname(options.path)
 		if status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
@@ -283,7 +294,7 @@ function M.import(options)
 		end
 		local written, reason = Writer.batch_write(options.path, rows, nil, { status = status, content = content })
 		if written ~= true then return false, tostring(reason) end
-		return true, #operations
+		return true, #operations - 1
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "Legacy hotstring settings were not imported; they stay in storage: %s.",

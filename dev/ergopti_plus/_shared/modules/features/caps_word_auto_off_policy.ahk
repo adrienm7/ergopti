@@ -87,6 +87,12 @@ CapsWordAutoOffValidateIdleTimeout(Value, &Reason := "") {
 		Reason := "invalid_idle_timeout"
 		return false
 	}
+	; A positive delay rounding to 0 ms would mean "never" here and expire at
+	; once on the Lua drivers: refuse it rather than quantize it.
+	if Value > 0 && Value * 1000 < 0.5 {
+		Reason := "invalid_idle_timeout"
+		return false
+	}
 	return true
 }
 

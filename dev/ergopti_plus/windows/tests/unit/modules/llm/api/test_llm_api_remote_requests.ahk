@@ -441,3 +441,550 @@ for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
 #Include %A_LineFile%/../test_llm_api_remote_abort_retirement.ahk
 
 #Include %A_LineFile%/../test_llm_api_remote_completion_reads.ahk
+
+_RemoteBuildContext_RawProfile() {
+	profile := Map("id", "raw", "system_single", "{context}", "batch", false)
+	system := LLM_ResolveSystemPrompt(profile, 1, 1, 15)
+	req := _LLMRemote_BuildRequestContext(system, "typed context", "context")
+	AssertEqual("", req["system"], "the raw profile has no system instruction")
+	AssertEqual("typed context", req["user"], "the typed context is the user message")
+}
+Test("raw profile puts the context in the user message", _RemoteBuildContext_RawProfile)
+
+; Uses the existing RawPost transport port and actual managed facade/registry.
+_NUI_Body(Mode) {
+    Prefix := '{"choices":[{"message":{"content":"owned-usage-ok"}}],"usage":'
+    if Mode == "normal"
+        return Prefix . '{"prompt_tokens":2,"completion_tokens":3}}'
+    if Mode == "float_outside_int64"
+        return Prefix . '{"prompt_tokens":1e30,"completion_tokens":1}}'
+    ; Each input is accepted by the strict signed integer JSON domain. Their
+    ; inferred total cannot be represented in that domain without validation.
+    return Prefix . '{"prompt_tokens":9223372036854775807,"completion_tokens":1}}'
+}
+
+_NUI_UsageValid(Usage) {
+    if !(Usage is Map)
+        return false
+    for Name in ["prompt_tokens", "completion_tokens", "total_tokens"] {
+        if !Usage.Has(Name) || !(Usage[Name] is Integer) || Usage[Name] < 0
+            return false
+    }
+    return Usage.Has("est_cost_usd") && Usage["est_cost_usd"] is Number && Usage["est_cost_usd"] >= 0
+}
+
+_NUI_Check(Mode, ViaPoll) {
+    global _LLM_Remote_Async
+    Body := _NUI_Body(Mode)
+    ; Actual parser must first accept the exact synthetic finite JSON source.
+    Root := JsonParse(Body)
+    AssertTrue(Root is Map)
+    if Mode == "float_outside_int64"
+        AssertTrue(Root["usage"]["prompt_tokens"] is Float && Root["usage"]["prompt_tokens"] > 9223372036854775807)
+    if !ViaPoll {
+        Result := 0, Failure := 0
+        try Result := _LLMRemoteClassifyResponse("openai", Body, "gpt-4.1")
+        catch Any as ErrorObject
+            Failure := ErrorObject
+        _TestPrint("# USAGE_INTEGER_CLASSIFIER " . KL_JsonEncode(Map("case", Mode,
+            "threw", IsObject(Failure), "error", IsObject(Failure) ? Type(Failure) : "",
+            "usage", Result is Map ? Result["usage"] : 0)))
+        AssertFalse(IsObject(Failure), "finite JSON usage must not tear down completion classification")
+        AssertTrue(Result["ok"] && Result["text"] == "owned-usage-ok")
+        AssertTrue(_NUI_UsageValid(Result["usage"]), "usage counters and estimated cost must remain nonnegative in the consumer integer domain")
+        if Mode == "normal"
+            AssertEqual(5, Result["usage"]["total_tokens"])
+        return
+    }
+    AssertEqual(0, _LLM_Remote_Async.Count, "do not borrow foreign live requests")
+    Control := _ManagedCurlControlState()
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _NUI_Create.Bind(Control))
+    Heard := [], Id := 0, Entry := 0, Failure := 0, Primary := 0
+    try {
+        Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "BaseUrl", "https://usage-fixture.invalid/v1",
+            "Token", "owned-fixture-secret", "Model", "gpt-4.1"))
+        Id := LLM_RemotePostBody_Async(Resolved, "https://usage-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text, "usage", Usage)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)), 20000, "usage_integer_control", 0, 0, Port)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Entry := _LLM_Remote_Async[Id]
+        Http := Control["request"]
+        AssertTrue(Entry["http"] == Http)
+        AssertEqual(1, Control["spawns"])
+        _ManagedCurlControlAck(Control)
+        Http._PollManagedAdmission()
+        AssertTrue(Http.ManagedPayloadPublished)
+        AssertTrue(FSWrite(Http.BodyPath, Body))
+        AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        ; Hold only the controlled terminal -> consumer handoff so the existing
+        ; background poll timer cannot consume this same terminal first.
+        TerminalCritical := Critical("On")
+        try {
+            Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            AssertTrue(Http.Completed && Http.ResponseEncodingValid)
+            AssertEqual(200, Http.Status)
+            AssertFalse(IsObject(Http.Handle), "the genuine facade must retain no controlled Job after terminal acknowledgement")
+            try _LLMRemote_PollRequest(Id)
+            catch Any as ErrorObject
+                Failure := ErrorObject
+        } finally Critical(TerminalCritical)
+        Observed := Heard.Length ? Heard[1] : 0
+        _TestPrint("# USAGE_INTEGER_POLL " . KL_JsonEncode(Map("case", Mode, "threw", IsObject(Failure),
+            "error", IsObject(Failure) ? Type(Failure) : "", "callbacks", Heard.Length,
+            "reservation_present", _LLM_Remote_Async.Has(Id), "http_completed", Http.Completed,
+            "http_handle_retired", !IsObject(Http.Handle), "status", Http.Status,
+            "usage", Observed is Map && Observed.Get("ok", false) ? Observed["usage"] : 0)))
+        AssertFalse(IsObject(Failure), "actual polling must not throw before retiring its reservation")
+        AssertFalse(_LLM_Remote_Async.Has(Id), "a terminal response must retire the exact reservation")
+        AssertEqual(1, Heard.Length, "the real terminal must publish exactly one callback")
+        AssertTrue(Heard[1]["ok"] && Heard[1]["text"] == "owned-usage-ok")
+        AssertTrue(_NUI_UsageValid(Heard[1]["usage"]), "actual completion callback must carry valid integer-domain usage")
+    } catch Any as ErrorObject {
+        Primary := ErrorObject
+    } finally {
+        if Entry is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entry {
+            LLM_RemoteCancelAsync(Id)
+            _LLMRemote_PollRequest(Id)
+        }
+        if Control.Has("request") {
+            Http := Control["request"]
+            try {
+                AssertTrue(Http.Abort())
+                AssertFalse(IsObject(Http.Handle))
+                AssertFalse(_LLM_Remote_Async.Has(Id))
+                _ManagedCurlControlRelease(Control)
+            } catch Any as CleanupFailure {
+                _TestPrint("# USAGE_INTEGER_CLEANUP " . KL_JsonEncode(Map("case", Mode,
+                    "error", Type(CleanupFailure), "message", SubStr(CleanupFailure.Message, 1, 300))))
+                if !IsObject(Primary)
+                    Primary := CleanupFailure
+            }
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+
+_NUI_Create(Control) {
+    Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Control)))
+    Control["request"] := Request
+    return Request
+}
+_NUI_Run(Mode, ViaPoll) {
+    _ManagedRemoteFixtureWithLlmTimings(_NUI_Check.Bind(Mode, ViaPoll))
+}
+for _NUI_Mode in ["normal", "float_outside_int64", "sum_outside_int64"] {
+    Test("Remote usage integer domain: classifier " . _NUI_Mode . " (usage-integer-domain)", _NUI_Run.Bind(_NUI_Mode, false))
+    Test("Remote usage integer domain: managed poll " . _NUI_Mode . " (usage-integer-domain)", _NUI_Run.Bind(_NUI_Mode, true))
+}
+
+; Append to test_llm_api_remote_requests.ahk after existing _NUI_* probes.
+; Machine integer representation boundaries only, no product token-count limit.
+_NUI_NativeBoundaries() {
+    Rows := [
+        {Id: "ordinary exponential", Usage: '{"prompt_tokens":1e3,"completion_tokens":2}', Prompt: 1000, Completion: 2, Total: 1002},
+        {Id: "ordinary fractional truncation retained", Usage: '{"prompt_tokens":3.5,"completion_tokens":2}', Prompt: 3, Completion: 2, Total: 5},
+        {Id: "signed maximum exact integer", Usage: '{"prompt_tokens":9223372036854775807}', Prompt: 9223372036854775807, Completion: 0, Total: 9223372036854775807},
+        {Id: "largest safe float below signed bound", Usage: '{"prompt_tokens":9223372036854774784.0}', Prompt: 9223372036854774784, Completion: 0, Total: 9223372036854774784},
+        {Id: "float at excluded signed bound", Usage: '{"prompt_tokens":9223372036854775808.0,"completion_tokens":2}', Prompt: 0, Completion: 2, Total: 2},
+        {Id: "invalid explicit total falls back safely", Usage: '{"prompt_tokens":2,"completion_tokens":3,"total_tokens":1e30}', Prompt: 2, Completion: 3, Total: 5},
+        {Id: "unrepresentable inferred total stays unknown", Usage: '{"prompt_tokens":9223372036854775807,"completion_tokens":1}', Prompt: 9223372036854775807, Completion: 1, Total: 0},
+        {Id: "reported valid total is retained", Usage: '{"prompt_tokens":9223372036854775807,"completion_tokens":1,"total_tokens":5}', Prompt: 9223372036854775807, Completion: 1, Total: 5}
+    ]
+    for Row in Rows {
+        Body := '{"choices":[{"message":{"content":"owned-boundary-ok"}}],"usage":' . Row.Usage . '}'
+        Result := _LLMRemoteClassifyResponse("openai", Body, "gpt-4.1")
+        Usage := Result["usage"]
+        AssertTrue(Result["ok"] && Result["text"] == "owned-boundary-ok", Row.Id)
+        AssertTrue(_NUI_UsageValid(Usage), Row.Id)
+        AssertEqual(Row.Prompt, Usage["prompt_tokens"], Row.Id)
+        AssertEqual(Row.Completion, Usage["completion_tokens"], Row.Id)
+        AssertEqual(Row.Total, Usage["total_tokens"], Row.Id)
+    }
+}
+Test("Remote usage integer domain: native representable boundary controls (usage-integer-domain)", _NUI_NativeBoundaries)
+
+; Probe only. Append to test_llm_api_remote_requests.ahk. Native AHK UNRUN.
+; Actual catalogue price admission and EstimateCost; no decoder/subject replaced.
+_NUIC_IntegerPrices() {
+    global LLM_REMOTE_MODEL_PRICES
+    Saved := LLM_REMOTE_MODEL_PRICES
+    Observed := []
+    Rows := [
+        {Id: "large integer price", InPrice: 3, OutPrice: 0, Prompt: 4000000000000000000, Completion: 0, Expected: 12000000000000.0},
+        {Id: "large float price control", InPrice: 3.0, OutPrice: 0.0, Prompt: 4000000000000000000, Completion: 0, Expected: 12000000000000.0},
+        {Id: "large integer completion price", InPrice: 0, OutPrice: 3, Prompt: 0, Completion: 4000000000000000000, Expected: 12000000000000.0},
+        {Id: "ordinary integer prices", InPrice: 3, OutPrice: 2, Prompt: 500, Completion: 10, Expected: 0.00152}
+    ]
+    try {
+        for Row in Rows {
+            Model := "owned-integer-price"
+            LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map(Model, Map("in", Row.InPrice, "out", Row.OutPrice)))
+            AssertTrue(LLM_REMOTE_MODEL_PRICES.Has(Model), "these finite nonnegative Integer/Float prices are actually admitted")
+            Actual := _LLMRemoteEstimateCost(Model, Row.Prompt, Row.Completion)
+            Observed.Push(Map("case", Row.Id, "input_price_type", Type(Row.InPrice),
+                "output_price_type", Type(Row.OutPrice), "prompt_tokens", Row.Prompt,
+                "completion_tokens", Row.Completion, "actual", Actual, "expected", Row.Expected))
+        }
+    } finally LLM_REMOTE_MODEL_PRICES := Saved
+    _TestPrint("# USAGE_INTEGER_PRICE " . KL_JsonEncode(Observed))
+    ; Record every control before asserting; integer-price failure must not hide
+    ; the equivalent floating-price or normal-sized positive control.
+    for Row in Observed {
+        AssertTrue(Row["actual"] >= 0, "admitted price/count multiplication cannot wrap into negative USD: " . Row["case"])
+        AssertEqual(Row["expected"], Row["actual"], Row["case"])
+    }
+}
+Test("Remote usage cost: admitted integer prices preserve numeric domain (usage-integer-price)", _NUIC_IntegerPrices)
+
+
+_NUF_Poll(Resolved, Body) {
+    global _LLM_Remote_Async
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Control := _ManagedCurlControlState(), Heard := [], Id := 0, Entry := 0, Primary := 0, Result := 0
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _NUI_Create.Bind(Control))
+    try {
+        Id := LLM_RemotePostBody_Async(Resolved, "https://finite-cost-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text, "usage", Usage)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)), 20000, "finite_cost_control", 0, 0, Port)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Entry := _LLM_Remote_Async[Id], Http := Control["request"]
+        AssertTrue(Entry["http"] == Http)
+        _ManagedCurlControlAck(Control)
+        Http._PollManagedAdmission()
+        AssertTrue(Http.ManagedPayloadPublished)
+        AssertTrue(FSWrite(Http.BodyPath, Body))
+        AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        HandoffCritical := Critical("On")
+        try {
+            Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            _LLMRemote_PollRequest(Id)
+        } finally Critical(HandoffCritical)
+        AssertTrue(Http.Completed && Http.ResponseEncodingValid)
+        AssertEqual(200, Http.Status)
+        AssertFalse(_LLM_Remote_Async.Has(Id))
+        AssertFalse(IsObject(Http.Handle))
+        AssertEqual(1, Heard.Length)
+        AssertTrue(Heard[1]["ok"] && Heard[1]["text"] == "owned-finite-cost-ok")
+        Result := Map("usage", Heard[1]["usage"], "callbacks", Heard.Length,
+            "reservation_present", _LLM_Remote_Async.Has(Id), "http_handle_retired", !IsObject(Http.Handle))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            if Entry is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entry {
+                LLM_RemoteCancelAsync(Id)
+                _LLMRemote_PollRequest(Id)
+            }
+            if Control.Has("request") {
+                AssertTrue(Control["request"].Abort())
+                AssertFalse(IsObject(Control["request"].Handle))
+                _ManagedCurlControlRelease(Control)
+            }
+        } catch Any as Failure {
+            _TestPrint("# FINITE_COST_CLEANUP " . KL_JsonEncode(Map("error", Type(Failure), "message", SubStr(Failure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+    return Result
+}
+
+_NUF_Run(ViaPoll) {
+    global LLM_REMOTE_MODEL_PRICES
+    SavedPrices := LLM_REMOTE_MODEL_PRICES, Observed := []
+    Rows := [
+        {Id: "ordinary finite", PriceIn: 2.0, PriceOut: 0.0, Prompt: 2, Completion: 0, Expected: 0.000004},
+        {Id: "finite prompt cost despite intermediate overflow", PriceIn: 1e308, PriceOut: 0.0, Prompt: 2, Completion: 0, Expected: 2e302},
+        {Id: "finite output cost despite intermediate overflow", PriceIn: 0.0, PriceOut: 1e308, Prompt: 0, Completion: 2, Expected: 2e302},
+        {Id: "unrepresentable final sum stays unknown", PriceIn: 1e308, PriceOut: 1e308, Prompt: 1000000, Completion: 1000000, Expected: 0.0}
+    ]
+    try {
+        for Row in Rows {
+            Model := "owned-finite-cost"
+            LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map(Model, Map("in", Row.PriceIn, "out", Row.PriceOut)))
+            AssertTrue(LLM_REMOTE_MODEL_PRICES.Has(Model), "finite nonnegative prices are admitted by the genuine domain")
+            Body := '{"choices":[{"message":{"content":"owned-finite-cost-ok"}}],"usage":{"prompt_tokens":'
+                . Row.Prompt . ',"completion_tokens":' . Row.Completion . '}}'
+            if ViaPoll {
+                Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "Model", Model,
+                    "Token", "owned-fixture-secret", "BaseUrl", "https://finite-cost-fixture.invalid/v1"))
+                Result := _NUF_Poll(Resolved, Body)
+                Usage := Result["usage"]
+            } else {
+                Result := _LLMRemoteClassifyResponse("openai", Body, Model)
+                AssertTrue(Result["ok"] && Result["text"] == "owned-finite-cost-ok")
+                Usage := Result["usage"]
+            }
+            Cost := Usage["est_cost_usd"]
+            ; Never serialize raw infinity into JSON evidence. The same finite
+            ; Number predicate already governs catalogue admission; no new cap.
+            Finite := _LLMRemote_CatalogPriceIsValid(Cost)
+            Seen := Map("case", Row.Id, "via_poll", ViaPoll, "cost_text", String(Cost),
+                "cost_type", Type(Cost), "finite_nonnegative", Finite, "expected", Row.Expected,
+                "prompt_tokens", Usage["prompt_tokens"], "completion_tokens", Usage["completion_tokens"])
+            Seen["matches_expected"] := Finite && (Row.Expected == 0.0 ? Cost == 0.0 : Abs(Cost / Row.Expected - 1.0) < 0.000000001)
+            if ViaPoll {
+                Seen["callbacks"] := Result["callbacks"]
+                Seen["reservation_present"] := Result["reservation_present"]
+                Seen["http_handle_retired"] := Result["http_handle_retired"]
+            }
+            Observed.Push(Seen)
+        }
+    } finally LLM_REMOTE_MODEL_PRICES := SavedPrices
+    _TestPrint("# FINITE_COST_DOMAIN " . KL_JsonEncode(Observed))
+    for Row in Observed {
+        AssertTrue(Row["finite_nonnegative"], "estimated cost must fit the already-admitted native finite Number domain: " . Row["case"])
+        AssertTrue(Row["matches_expected"], "representable cost must survive intermediate arithmetic; an unrepresentable final estimate remains unknown: " . Row["case"])
+    }
+}
+_NUF_Timings(ViaPoll) {
+    _ManagedRemoteFixtureWithLlmTimings(_NUF_Run.Bind(ViaPoll))
+}
+Test("Remote usage cost: finite domain through actual classifier (usage-finite-cost)", _NUF_Timings.Bind(false))
+Test("Remote usage cost: finite domain through actual managed Poll (usage-finite-cost)", _NUF_Timings.Bind(true))
+
+; Add after _NUF_* finite-cost probes. Native AHK UNRUN.
+; Protect tiny admitted prices against price/1e6 underflow in a numeric fix.
+_NUFT_PriceScale() {
+    global LLM_REMOTE_MODEL_PRICES
+    Saved := LLM_REMOTE_MODEL_PRICES, Observed := []
+    Tiny := JsonParse("1e-320")
+    if Tiny == 0.0 {
+        _TestPrint("# FINITE_COST_TINY " . KL_JsonEncode(Map("supported", false,
+            "reason", "this runtime does not represent the finite subnormal fixture")))
+        return
+    }
+    Count := 4000000000000000000
+    Reference := (Float(Count) * Tiny) / 1000000.0
+    AssertTrue(Reference > 0.0 && _LLMRemote_CatalogPriceIsValid(Reference),
+        "the represented tiny price and integer count have a positive finite reference USD result")
+    try {
+        Model := "owned-tiny-price"
+        LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map(Model, Map("in", Tiny, "out", 0.0)))
+        AssertTrue(LLM_REMOTE_MODEL_PRICES.Has(Model))
+        Body := '{"choices":[{"message":{"content":"owned-finite-cost-ok"}}],"usage":{"prompt_tokens":'
+            . Count . ',"completion_tokens":0}}'
+        for ViaPoll in [false, true] {
+            if ViaPoll {
+                Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "Model", Model,
+                    "Token", "owned-fixture-secret", "BaseUrl", "https://finite-cost-fixture.invalid/v1"))
+                Result := _NUF_Poll(Resolved, Body)
+            } else {
+                Result := _LLMRemoteClassifyResponse("openai", Body, Model)
+                AssertTrue(Result["ok"] && Result["text"] == "owned-finite-cost-ok")
+            }
+            Cost := Result["usage"]["est_cost_usd"]
+            Finite := _LLMRemote_CatalogPriceIsValid(Cost)
+            Seen := Map("via_poll", ViaPoll, "supported", true, "price_text", String(Tiny),
+                "reference_text", String(Reference), "cost_text", String(Cost), "finite", Finite,
+                "positive", Finite && Cost > 0.0,
+                "matches_reference", Finite && Cost > 0.0 && Abs(Cost / Reference - 1.0) < 0.000000001)
+            if ViaPoll {
+                Seen["callbacks"] := Result["callbacks"]
+                Seen["reservation_present"] := Result["reservation_present"]
+                Seen["http_handle_retired"] := Result["http_handle_retired"]
+            }
+            Observed.Push(Seen)
+        }
+    } finally LLM_REMOTE_MODEL_PRICES := Saved
+    _TestPrint("# FINITE_COST_TINY " . KL_JsonEncode(Observed))
+    for Seen in Observed {
+        AssertTrue(Seen["finite"] && Seen["positive"], "scaling an admitted positive tiny price must not erase its representable estimated cost")
+        AssertTrue(Seen["matches_reference"], "cost remains consistent with the nonoverflowing original operation order")
+    }
+}
+_NUFT_Run() {
+    _ManagedRemoteFixtureWithLlmTimings(_NUFT_PriceScale)
+}
+Test("Remote usage cost: tiny finite price keeps positive USD across scaling (usage-finite-cost)", _NUFT_Run)
+
+_MCC_Poll(Resolved, Body) {
+    global _LLM_Remote_Async
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Control := _ManagedCurlControlState(), Heard := [], Id := 0, Entry := 0, Primary := 0, Result := 0
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _NUI_Create.Bind(Control))
+    try {
+        Id := LLM_RemotePostBody_Async(Resolved, "https://mistral-content-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text, "usage", Usage)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)), 20000, "mistral_content_control", 0, 0, Port)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Entry := _LLM_Remote_Async[Id], Http := Control["request"]
+        AssertTrue(Entry["http"] == Http)
+        _ManagedCurlControlAck(Control)
+        Http._PollManagedAdmission()
+        AssertTrue(Http.ManagedPayloadPublished)
+        AssertTrue(FSWrite(Http.BodyPath, Body))
+        AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        HandoffCritical := Critical("On")
+        try {
+            Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            _LLMRemote_PollRequest(Id)
+        } finally Critical(HandoffCritical)
+        AssertTrue(Http.Completed && Http.ResponseEncodingValid)
+        AssertEqual(200, Http.Status)
+        AssertFalse(_LLM_Remote_Async.Has(Id))
+        AssertFalse(IsObject(Http.Handle))
+        AssertEqual(1, Heard.Length)
+        Result := Map("verdict", Heard[1], "callbacks", Heard.Length,
+            "reservation_present", _LLM_Remote_Async.Has(Id), "http_handle_retired", !IsObject(Http.Handle))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            if Entry is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entry {
+                LLM_RemoteCancelAsync(Id)
+                _LLMRemote_PollRequest(Id)
+            }
+            if Control.Has("request") {
+                AssertTrue(Control["request"].Abort())
+                AssertFalse(IsObject(Control["request"].Handle))
+                _ManagedCurlControlRelease(Control)
+            }
+        } catch Any as Failure {
+            _TestPrint("# MISTRAL_CONTENT_CLEANUP " . KL_JsonEncode(Map("error", Type(Failure), "message", SubStr(Failure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+    return Result
+}
+
+_MCC_Row(Mode) {
+    switch Mode {
+        case "string": Content := '"owned-mistral-answer"', Expected := "owned-mistral-answer"
+        case "text-chunk": Content := '[{"type":"text","text":"owned-mistral-answer"}]', Expected := "owned-mistral-answer"
+        case "thinking-plus-text":
+            Content := '[{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]},{"type":"text","text":"owned-mistral-answer"}]'
+            Expected := "owned-mistral-answer"
+        case "thinking-only":
+            Content := '[{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]}]'
+            Expected := ""
+        case "multi-text":
+            Content := '[{"type":"text","text":"first "},{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]},{"type":"text","text":"second"},{"type":"text","text":"!"}]'
+            Expected := "first second!"
+        case "empty-text-before-answer":
+            Content := '[{"type":"text","text":""},{"type":"text","text":"owned-mistral-answer"}]'
+            Expected := "owned-mistral-answer"
+        case "empty-array": Content := '[]', Expected := ""
+        case "untyped-decoy": Content := '[{"text":"untyped-decoy"}]', Expected := ""
+        case "malformed-text-after-answer":
+            Content := '[{"type":"text","text":"partial-answer-must-not-escape"},{"type":"text","text":42}]'
+            Expected := ""
+        case "malformed-entry-after-answer":
+            Content := '[{"type":"text","text":"partial-answer-must-not-escape"},42]'
+            Expected := ""
+        case "nontext-decoy-before-answer":
+            Content := '[{"type":"image_url","text":"nontext-decoy"},{"type":"TEXT","text":"wrong-case-decoy"},{"type":"text","text":"owned-mistral-answer"}]'
+            Expected := "owned-mistral-answer"
+        default: throw ValueError("Unknown Mistral content case.")
+    }
+    Body := '{"id":"fixture-mistral","object":"chat.completion","created":1,"model":"mistral-small-latest",'
+        . '"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":' . Content . '}}],'
+        . '"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}'
+    Resolved := _LLMRemoteResolveEntry(Map("Provider", "mistral", "Model", "mistral-small-latest",
+        "Token", "owned-fixture-secret", "BaseUrl", "https://mistral-content-fixture.invalid/v1"))
+    AssertTrue(Resolved is Map && Resolved["Format"] == "openai", "the shipped Mistral producer uses the genuine OpenAI-format consumer")
+    Classified := _LLMRemoteClassifyResponse(Resolved["Format"], Body, Resolved["Model"])
+    Poll := _MCC_Poll(Resolved, Body)
+    Verdict := Poll["verdict"]
+    _TestPrint("# MISTRAL_CONTENT_CHUNKS " . KL_JsonEncode(Map("mode", Mode, "format", Resolved["Format"],
+        "classifier_ok", Classified["ok"], "classifier_text", Classified["text"], "classifier_reason", Classified["reason"],
+        "poll_ok", Verdict["ok"], "poll_text", Verdict.Get("text", ""), "poll_reason", Verdict.Get("info", Map()).Get("reason", ""),
+        "callbacks", Poll["callbacks"], "reservation_present", Poll["reservation_present"], "http_handle_retired", Poll["http_handle_retired"])))
+    AssertEqual(Expected != "", Classified["ok"], "the official Mistral assistant-content union must retain ordinary text and exclude reasoning")
+    AssertEqual(Expected, Classified["text"])
+    AssertEqual(Expected != "", Verdict["ok"], "the actual public RawPost/Poll consumer must deliver the declared response union")
+    if Expected != ""
+        AssertEqual(Expected, Verdict["text"], "structured thinking never replaces the text answer")
+    else
+        AssertEqual("canonical_empty", Verdict["info"]["reason"], "reasoning-only content is terminally empty")
+    AssertEqual(1, Poll["callbacks"])
+    AssertFalse(Poll["reservation_present"])
+    AssertTrue(Poll["http_handle_retired"])
+}
+_MCC_Run(Mode) {
+    _ManagedRemoteFixtureWithLlmTimings(_MCC_Row.Bind(Mode))
+}
+for _MCC_Mode in ["string", "text-chunk", "thinking-plus-text", "thinking-only", "multi-text", "empty-text-before-answer",
+    "empty-array", "untyped-decoy", "malformed-text-after-answer", "malformed-entry-after-answer", "nontext-decoy-before-answer"]
+    Test("Mistral response: " . _MCC_Mode . " reaches the actual response consumer (mistral-content-chunks)", _MCC_Run.Bind(_MCC_Mode))
+
+; The official SDK text projections concatenate ordinary blocks/parts in order.
+; The existing exact managed transport fixture publishes actual response bytes;
+; no network, fake classifier, fake RawPost or replacement parser is used.
+_PMP091_Row(Provider, Mode) {
+    if Provider == "anthropic" {
+        switch Mode {
+            case "ordinary":
+                Content := '[{"type":"text","text":"owned-answer"}]', Expected := "owned-answer"
+            case "multipart":
+                Content := '[{"type":"text","text":"first "},{"type":"tool_use","id":"toolu_fixture","name":"fixture","input":{}},{"type":"thinking","thinking":"reasoning-decoy","signature":"fixture"},{"type":"text","text":"second"},{"type":"text","text":"!"}]'
+                Expected := "first second!"
+            case "empty-before-answer":
+                Content := '[{"type":"text","text":""},{"type":"text","text":"owned-answer"}]', Expected := "owned-answer"
+            case "reasoning-only":
+                Content := '[{"type":"thinking","thinking":"reasoning-decoy","signature":"fixture"}]', Expected := ""
+            case "malformed-after-answer":
+                Content := '[{"type":"text","text":"partial-must-not-escape"},{"type":"text","text":42}]', Expected := ""
+            default: throw ValueError("Unknown provider multipart fixture mode.")
+        }
+        Body := '{"id":"msg_fixture","type":"message","role":"assistant","model":"claude-haiku-4-5",'
+            . '"content":' . Content . ',"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":2,"output_tokens":3}}'
+        Model := "claude-haiku-4-5", BaseUrl := "https://api.anthropic.com/v1"
+    } else {
+        AssertEqual("gemini", Provider)
+        switch Mode {
+            case "ordinary":
+                Content := '[{"text":"owned-answer"}]', Expected := "owned-answer"
+            case "multipart":
+                Content := '[{"text":"first "},{"functionCall":{"name":"fixture","args":{}}},{"thought":true,"text":"reasoning-decoy"},{"text":"second"},{"text":"!"}]'
+                Expected := "first second!"
+            case "empty-before-answer":
+                Content := '[{"text":""},{"text":"owned-answer"}]', Expected := "owned-answer"
+            case "reasoning-only":
+                Content := '[{"thought":true,"text":"reasoning-decoy"}]', Expected := ""
+            case "malformed-after-answer":
+                Content := '[{"text":"partial-must-not-escape"},{"text":42}]', Expected := ""
+            default: throw ValueError("Unknown provider multipart fixture mode.")
+        }
+        Body := '{"candidates":[{"content":{"role":"model","parts":' . Content
+            . '},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3,"totalTokenCount":5}}'
+        Model := "gemini-2.0-flash", BaseUrl := "https://generativelanguage.googleapis.com/v1beta"
+    }
+    Resolved := _LLMRemoteResolveEntry(Map("Provider", Provider, "Model", Model,
+        "Token", "owned-fixture-secret", "BaseUrl", BaseUrl))
+    AssertTrue(Resolved is Map)
+    AssertEqual(Provider, Resolved["Format"], "the genuine shipped provider selects its canonical dialect")
+    Classified := _LLMRemoteClassifyResponse(Resolved["Format"], Body, Resolved["Model"])
+    Poll := _MCC_Poll(Resolved, Body), Verdict := Poll["verdict"]
+    _TestPrint("# PROVIDER_MULTIPART_091 " . KL_JsonEncode(Map("provider", Provider, "mode", Mode,
+        "classifier_ok", Classified["ok"], "classifier_text", Classified["text"], "classifier_reason", Classified["reason"],
+        "poll_ok", Verdict["ok"], "poll_text", Verdict.Get("text", ""), "poll_reason", Verdict.Get("info", Map()).Get("reason", ""),
+        "callbacks", Poll["callbacks"], "reservation_present", Poll["reservation_present"], "http_handle_retired", Poll["http_handle_retired"])))
+    AssertEqual(Expected != "", Classified["ok"])
+    AssertEqual(Expected, Classified["text"], "all ordinary text chunks must concatenate verbatim without reasoning or tool data")
+    AssertEqual(Expected != "", Verdict["ok"], "the real RawPost/Poll route must preserve the canonical complete text projection")
+    if Expected != ""
+        AssertEqual(Expected, Verdict["text"])
+    else
+        AssertEqual("canonical_empty", Verdict["info"]["reason"])
+    AssertEqual(1, Poll["callbacks"])
+    AssertFalse(Poll["reservation_present"])
+    AssertTrue(Poll["http_handle_retired"])
+}
+_PMP091_Run(Provider, Mode) {
+    _ManagedRemoteFixtureWithLlmTimings(_PMP091_Row.Bind(Provider, Mode))
+}
+for _PMP091_Provider in ["anthropic", "gemini"] {
+    for _PMP091_Mode in ["ordinary", "multipart", "empty-before-answer", "reasoning-only", "malformed-after-answer"]
+        Test("Provider complete text: " . _PMP091_Provider . "/" . _PMP091_Mode . " (provider-multipart-091)",
+            _PMP091_Run.Bind(_PMP091_Provider, _PMP091_Mode))
+}

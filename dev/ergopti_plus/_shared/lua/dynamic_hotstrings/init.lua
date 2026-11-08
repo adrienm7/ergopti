@@ -58,26 +58,43 @@ local _resolver_error_reporter = nil
 -- ===============================================
 -- ===============================================
 
---- Returns the shortest prefix of a spaced string containing exactly raw_count
---- non-space characters.
---- Used to build the "with spaces" trigger that expands to the formatted value.
---- Mirrors the identical helper in AHK hotstrings.ahk section 5.2.
---- @param spaced string The full string containing decorative spaces.
---- @param raw_count number The number of non-space characters to collect.
---- @return string The prefix ending after the raw_count-th non-space character.
+--- Removes the spacing commonly found in pasted personal identifiers.
+--- @param value string
+--- @return string
+function M.strip_prefix_spacing(value)
+	return (value:gsub("%s+", ""):gsub("\194\160", ""):gsub("\226\128\175", ""))
+end
+
+--- Returns the shortest prefix containing raw_count non-space characters.
+--- Mirrors the helper in the Windows dynamic hotstrings driver.
+--- @param spaced string
+--- @param raw_count number
+--- @return string
 function M.spaced_prefix(spaced, raw_count)
 	local seen = 0
-	for i = 1, #spaced do
-		if spaced:sub(i, i) ~= " " then
-			seen = seen + 1
-		end
-		if seen >= raw_count then
-			return spaced:sub(1, i)
-		end
+	local i = 1
+	while i <= #spaced do
+		local char = spaced:match("^[%z\1-\127\194-\244][\128-\191]*", i) or spaced:sub(i, i)
+		if M.strip_prefix_spacing(char) ~= "" then seen = seen + 1 end
+		i = i + #char
+		if seen >= raw_count then return spaced:sub(1, i - 1) end
 	end
 	return spaced
 end
 
+
+--- How many distinct triggers a stored value registers for a prefix length: none
+--- below the threshold, one for the unspaced prefix, two when the spaced prefix
+--- differs from it.
+--- @param stored string The value as stored, spacing included.
+--- @param raw_count integer Raw (non-space) characters in the trigger.
+--- @return integer count 0, 1 or 2.
+function M.distinct_trigger_count(stored, raw_count)
+	local raw = M.strip_prefix_spacing(stored)
+	if TextUtils.utf8_len(raw) < raw_count then return 0 end
+	local raw_prefix = TextUtils.utf8_sub(raw, 1, raw_count)
+	return M.spaced_prefix(stored, raw_count) ~= raw_prefix and 2 or 1
+end
 
 --- Computes the real hotstring count for each prefix section given personal data.
 --- Returns a table keyed by section name with integer counts.
@@ -85,21 +102,23 @@ end
 --- so both drivers expose the same section counts in their respective UIs.
 --- @param phone string Raw phone number string (digits only, no spaces).
 --- @param fphone string Formatted phone number (may contain spaces).
---- @param ssn_raw string SSN with spaces stripped.
---- @param iban_raw string IBAN with spaces stripped.
+--- @param ssn string SSN as stored, spacing included: the spaced trigger only exists
+---   when it differs from the raw one, so a value without spaces has one trigger.
+--- @param iban string IBAN as stored, spacing included (same rule).
 --- @return table Counts per section: {phoneprefixes, ssnprefixes, ibanprefixes}.
-function M.compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
+function M.compute_prefix_counts(phone, fphone, ssn, iban)
 	local phone_n = 0
-	if #phone >= 2 then phone_n = phone_n + 2 end  -- phone[1:2]+★ and +33+phone[1:2]
-	if #phone >= 4 then phone_n = phone_n + 2 end  -- phone[1:4] and +33+phone[2:4]
-	if #phone >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
-	if #fphone >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
+	if TextUtils.utf8_len(phone) >= 2 then phone_n = phone_n + 2 end  -- phone[1:2]+★ and +33+phone[1:2]
+	if TextUtils.utf8_len(phone) >= 4 then phone_n = phone_n + 2 end  -- phone[1:4] and +33+phone[2:4]
+	if TextUtils.utf8_len(phone) >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
+	if TextUtils.utf8_len(fphone) >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
 
-	-- No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
-	local ssn_n = (#ssn_raw >= 5) and 2 or 0
+	-- The no-space trigger fires from 5 raw digits; the spaced one is registered
+	-- only when its prefix differs, exactly as the producers on every driver do.
+	local ssn_n = M.distinct_trigger_count(ssn, 5)
 
-	-- 6 raw chars (no-space, case-insensitive) and 7-char spaced trigger
-	local iban_n = (#iban_raw >= 6) and 2 or 0
+	-- 6 raw chars (no-space, case-insensitive) and the 7-char spaced trigger.
+	local iban_n = M.distinct_trigger_count(iban, 6)
 
 	return { phoneprefixes = phone_n, ssnprefixes = ssn_n, ibanprefixes = iban_n }
 end
@@ -293,46 +312,34 @@ end
 -- ==========================================
 -- ==========================================
 
+-- Capture one local-calendar snapshot for all components. Separate os.date
+-- calls can cross midnight and combine a weekday with another calendar day.
+local function date_strings()
+	local day = os.date("*t")
+	local days = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
+	local months = { "janvier", "février", "mars", "avril", "mai", "juin",
+		"juillet", "août", "septembre", "octobre", "novembre", "décembre" }
+	return {
+		iso = string.format("%04d_%02d_%02d", day.year, day.month, day.day),
+		fr = string.format("%02d/%02d/%04d", day.day, day.month, day.year),
+		long_fr = days[day.wday] .. " " .. day.day .. " " .. months[day.month] .. " " .. day.year,
+	}
+end
+
 --- Registers the three standard date rules (ISO, French short, French long).
---- Called by each driver's start() function after the engine is initialized.
---- @param trigger string The trigger character (e.g. "★") — used only for logging.
+--- @param trigger string The trigger character, used only for logging.
 function M.register_date_rules(trigger)
 	local t = trigger or "★"
-
 	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end, true)
 	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end, true)
-	M.add_rule("date", "datelongfr", function()
-		local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
-		local months = { "janvier", "février", "mars", "avril", "mai", "juin",
-		                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
-		local wday = tonumber(os.date("%w")) + 1  -- os.date %w: 0 = Sunday
-		local mday = tonumber(os.date("%d"))
-		local mon  = tonumber(os.date("%m"))
-		local year = os.date("%Y")
-		return days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year
-	end, true)
-
+	M.add_rule("date", "datelongfr", function() return date_strings().long_fr end, true)
 	Logger.info(LOG, "Date rules registered (trigger='%s').", t)
 end
 
-
---- Resolves today's date strings for section descriptions.
---- Returns a table with iso, fr, and long_fr fields so callers can embed
---- live date previews in UI section labels without reimplementing os.date logic.
+--- Resolves all section date previews from one local-calendar snapshot.
 --- @return table {iso, fr, long_fr}
 function M.today_date_strings()
-	local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
-	local months = { "janvier", "février", "mars", "avril", "mai", "juin",
-	                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
-	local wday   = tonumber(os.date("%w")) + 1
-	local mday   = tonumber(os.date("%d"))
-	local mon    = tonumber(os.date("%m"))
-	local year   = os.date("%Y")
-	return {
-		iso     = os.date("%Y_%m_%d"),
-		fr      = os.date("%d/%m/%Y"),
-		long_fr = days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year,
-	}
+	return date_strings()
 end
 
 return M

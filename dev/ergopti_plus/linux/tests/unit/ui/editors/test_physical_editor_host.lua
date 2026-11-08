@@ -395,3 +395,40 @@ helpers.describe("Physical editor returned Window retirement acknowledgement", f
 		if not checked then error(failure, 0) end
 	end)
 end)
+
+helpers.it("physical editor refuses a FIFO key registry without blocking", function()
+	local uv, Paths = require("luv"), require("infra.paths")
+	local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager", "adapters.keyboard_hook" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
+	local original_shared = Paths.shared
+	local source = assert(original_shared("data/keycodes/physical_keys.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-editor-fifo-XXXXXX"))
+	local path = dir .. "/keys.json"
+	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
+	local shows = 0
+	package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+		show = function() shows = shows + 1; return false end }
+	package.loaded["modules.gestures.manager"] = {}
+	package.loaded["adapters.keyboard_hook"] = {}
+	package.loaded["ui.physical_shortcuts.bridge"] = nil
+	local host = require("ui.physical_shortcuts.bridge")
+	Paths.shared = function(relative)
+		if relative == "data/keycodes/physical_keys.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, exit_code, process = false, nil, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function(code)
+		exit_code, exited = code, true; process:close()
+	end))
+	local scope = { physical_delivery_available = function() return true end,
+		capture_editor_inventory = function() end, editor_source_current = function() end, edit = function() end }
+	local called, opened = pcall(host.open, { scope = scope, is_paused = function() return false end })
+	Paths.shared = original_shared
+	for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(called, opened)
+	helpers.assert_true(exit_code ~= 0, "the editor opened the FIFO")
+	helpers.assert_eq(opened, false)
+	helpers.assert_eq(shows, 0, "a special registry cannot start the editor")
+end)

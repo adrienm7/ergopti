@@ -84,7 +84,7 @@ function format_number_plain(num) {
 		);
 	}
 
-	const str = parsed.toString();
+	const str = abs_val.toString();
 	const parts = str.split('.');
 	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
 	return prefix + parts.join(',');
@@ -98,7 +98,7 @@ function format_number_plain(num) {
  */
 function wrap_exact_tooltip(display, exact) {
 	// Use toLocaleString with 'fr-FR' for native French number formatting in the tooltip
-	const exact_str = Number(Math.round(exact)).toLocaleString('fr-FR');
+	const exact_str = Number(exact).toLocaleString('fr-FR', { maximumFractionDigits: 20 });
 	return `<span class="num-tooltip" title="${exact_str}">${display}</span>`;
 }
 
@@ -126,7 +126,7 @@ function format_number(num) {
 	}
 
 	// Apply space as thousands separator
-	const str = parsed.toString();
+	const str = abs_val.toString();
 	const parts = str.split('.');
 	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
 	const formatted = parts.join(',');

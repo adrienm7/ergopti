@@ -20,6 +20,21 @@ local with_fixture = Fixture.with_fixture
 
 
 helpers.describe("Complete LLM fixed controls: real transaction owners", function()
+	helpers.it("renders modifier pickers with malformed persisted arrays (llm-modifier-array-invalid)", function()
+		for _, value in ipairs({ { true }, { {} }, { [1] = "alt", [3] = "shift" }, { extra = "alt" } }) do
+			with_fixture({}, function(f)
+				f.settings_store.llm_nav_modifiers = value
+				f.settings_store.llm_val_modifiers = value
+				local nav, val = f.manager.build_nav_modifier_menu(), f.manager.build_val_modifier_menu()
+				helpers.assert_true(#nav > 0 and #val > 0, "both menus remain available")
+				for _, menu in ipairs({ nav, val }) do
+					local checked = 0
+					for _, row in ipairs(menu) do if row.checked then checked = checked + 1 end end
+					helpers.assert_eq(checked, 1, "the default selection must be restored")
+				end
+			end)
+		end
+	end)
 	helpers.it("the modifier frame owns translated choices and retains every physical-key callback", function()
 		-- The choices name their modifiers from the shared key name table in the
 		-- user's language: French reads « Maj », never the English « Shift ».

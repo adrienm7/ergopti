@@ -310,8 +310,16 @@ local function harness(opts)
 		end,
 	}
 	ctx.state = {
-		restart_after_update = function() event("restart"); return true end,
-		restart = function(reason) event("restart:" .. reason); return true end,
+		restart_after_update = function()
+			event("restart")
+			if opts.update_restarts then return table.remove(opts.update_restarts, 1) end
+			return true
+		end,
+		restart = function(reason)
+			event("restart:" .. reason)
+			if opts.restart == "throw" then error("restart raised") end
+			return opts.restart ~= false
+		end,
 	}
 	ctx.bridge = bridge
 	function ctx.restore_modules()
@@ -364,6 +372,16 @@ local function index_of(list, prefix)
 end
 
 helpers.describe("changelog_bridge: one-click release install", function()
+	helpers.it("does not install the previous list during a release refresh", function()
+		local ctx = harness()
+		ctx.bridge._http_get = function() return true end
+		ctx.bridge.on_message({ action = "fetch", channel = "dev" }, ctx.state)
+		local answer = ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
+		local events = #ctx.events
+		ctx.restore_modules()
+		helpers.assert_eq(events, 0, "a pending fetch must not authorize the old release")
+		helpers.assert_eq(answer.reason_key, "changelog_window.install_error_unknown_release")
+	end)
 	helpers.it("announces the installed build and the restorable backup when the page is ready", function()
 		local ctx = harness({ latest = { id = "pre-install-b", created_at = "2026-09-30T10:00:00Z", tag = "v1" } })
 		ctx.restore_modules()
@@ -391,6 +409,35 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		helpers.assert_eq(ctx.backup_meta.tag, "v0.0.0-dev.139")
 		helpers.assert_eq(ctx.backup_meta.from_version, "0.0.0-dev.140")
 		helpers.assert_eq(progress(ctx)[4].backup_path, "/cfg/backups/pre-install-x")
+	end)
+
+	-- The release was installed but a refused daemon restart reported it failed,
+	-- with a retry over the installed files and no way to restart on it (MUR-001).
+	helpers.it("holds an installed release whose daemon restart is refused (release-restart-pending)", function()
+		local ctx = harness({ update_restarts = { false, false, true } })
+		local redraws = 0
+		ctx.bridge.set_pending_install_observer(function() redraws = redraws + 1 end)
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
+		local held_phases = phases(ctx)
+		local held = ctx.bridge.pending_install()
+		local reopened = ctx.bridge.on_message({ action = "fetch", channel = "dev" }, ctx.state)
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.141", channel = "dev" }, ctx.state)
+		local refused_phases, installs = phases(ctx), #ctx.installs
+		ctx.bridge.on_message({ action = "complete_install_restart" }, ctx.state)
+		local still = ctx.bridge.pending_install()
+		local completed = ctx.bridge.complete_pending_install()
+		local after = ctx.bridge.pending_install()
+		ctx.restore_modules()
+		helpers.assert_eq(held_phases, "backing_up,downloading,installing,restarting,restart_pending")
+		helpers.assert_eq(held, { tag = "v0.0.0-dev.139", backup_path = "/cfg/backups/pre-install-x" })
+		helpers.assert_eq(reopened.install.pending, held, "a window opened later shows the waiting release")
+		helpers.assert_eq(refused_phases, held_phases .. ",restart_pending", "a second install is refused meanwhile")
+		helpers.assert_eq(installs, 1, "the refused second install installs nothing")
+		helpers.assert_eq(still.tag, "v0.0.0-dev.139", "a second refused restart keeps it waiting")
+		helpers.assert_eq(completed, true, "the tray row completes it")
+		helpers.assert_eq(after, nil)
+		helpers.assert_eq(phases(ctx), refused_phases .. ",restart_pending,restarting")
+		helpers.assert_eq(redraws, 2, "the tray redraws when the wait starts and when it ends")
 	end)
 
 	helpers.it("refuses a release without the Linux bundle, keeping the backup", function()
@@ -464,6 +511,19 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		helpers.assert_eq(answer.backup_path, "/cfg/backups/pre-restore-y")
 		helpers.assert_nil(index_of(ctx.events, "restart"), "a failed restore restarts nothing")
 	end)
+
+	-- (restore-restart-refused) The disk is restored but the daemon did not take
+	-- the restart: the page must not promise one (Linux LC-001).
+	for _, mode in ipairs({ false, "throw" }) do
+		helpers.it("reports a refused restore restart as failed (" .. tostring(mode) .. ")", function()
+			local ctx = harness({ restart = mode })
+			local answer = ctx.bridge.on_message({ action = "restore_backup", id = "pre-install-x" }, ctx.state)
+			ctx.restore_modules()
+			helpers.assert_eq(answer.phase, "failed")
+			helpers.assert_eq(answer.reason_key, "changelog_window.restore_error_unexpected")
+			helpers.assert_eq(answer.backup_path, "/cfg/backups/pre-restore-y")
+		end)
+	end
 end)
 
 helpers.describe("updater: nothing installs without a click (Linux)", function()

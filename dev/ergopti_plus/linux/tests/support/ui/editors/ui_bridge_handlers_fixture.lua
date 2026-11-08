@@ -17,7 +17,9 @@ local OPENING_FOREIGN = OPENING_SOURCE .. '[outside]\n"future" = { output = "ind
 
 local function opening_model(output)
 	return { sections_order = { "english" }, sections = {
-		english = { description = "English", entries = { { trigger = "old", output = output } } },
+		english = { description = "English", entries = { { trigger = "old", output = output,
+			is_word = true, auto_expand = false, is_case_sensitive = false,
+			final_result = false, is_case_sensitive_strict = false } } },
 	} }
 end
 
@@ -45,6 +47,7 @@ local function with_opening_file(callback)
 	package.loaded["toml_codec.writer"] = publisher
 	package.loaded["ui.webview_manager"] = {
 		current_epoch = function() return seen.epoch end,
+		page_current = function(app, epoch) return app == "hotstring_editor" and epoch == seen.epoch end,
 		eval_js = function(_, js)
 			if js:find("window.initData(", 1, true) then
 				seen.deliveries[#seen.deliveries + 1] = js
@@ -73,6 +76,7 @@ local function with_opening_file(callback)
 end
 
 local function build_mock_state()
+  local metrics_suspended = false
   return {
     engine    = { loaded = true },
     keystats = require("tests.fakes.metrics_keystats").synchronous({
@@ -100,6 +104,9 @@ local function build_mock_state()
       is_suppressed     = function() return false end,
       suppress          = function() end,
       unsuppress        = function() end,
+      suspend_collection = function() metrics_suspended = true end,
+      resume_collection = function() metrics_suspended = false end,
+      is_collection_suspended = function() return metrics_suspended end,
       reset_session     = function() return true end,
       export_json       = function() return '{"keystrokes":42}' end,
     }),

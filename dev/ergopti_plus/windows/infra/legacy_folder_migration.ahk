@@ -9,7 +9,9 @@
 ; LocalAppData folder (logs, cache, control, updater, diagnostics) and the old
 ; managed Ollama folders (the first build's, then the protected sibling), each
 ; into %LOCALAPPDATA%\Ergopti\ollama. A paths.toml that named an old default folder is
-; rewritten to the new one, after a backup of its previous text.
+; rewritten to the new one, after a backup of its previous text, only when
+; that folder actually moved; when the file cannot follow, the configuration
+; folder moves back.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Same Rules as Lua: a move is a rename that never overwrites. An empty
@@ -21,7 +23,8 @@
 ;    _shared/lua/legacy_folder_migration.lua is the Lua twin.
 ; 2. Before paths.toml: infra/boot.ahk runs it before the configuration
 ;    transition recovery reads paths.toml, and before the logger opens its
-;    folder; its lines are queued until LoggerInit.
+;    folder; its lines are queued until LoggerInit. A transition journal the
+;    old build left beside its own paths.toml is recovered there first.
 ; 3. Never in Tests: the startup smoke and the unit harness never call it, so
 ;    no test moves a real user folder.
 ; 4. Maintainer Machines Only: no build was published with the old folders
@@ -29,6 +32,16 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+; The suffix of the private stage files the paths.toml publication renames.
+global LEGACY_FOLDER_STAGE_SUFFIX := ".migration-stage"
+; Why paths.toml still names an old folder, for its warning (PATHS_FILE_REFUSALS
+; of _shared/lua/legacy_folder_migration.lua).
+global LEGACY_FOLDER_PATHS_REFUSALS := Map(
+		"read_failed", "it could not be read",
+		"backup_taken", "its backup name already holds other text",
+		"backup_refused", "its backup could not be written",
+		"write_refused", "its new text could not be written (the backup beside it holds the previous text)")
 
 
 
@@ -70,9 +83,33 @@ LegacyFolderIsEmptyDir(Dir) {
 		return true
 }
 
+; Moves one old entry into its backup slot, its destination being taken.
+; Mirrors back_up_entry of _shared/lua/legacy_folder_migration.lua.
+; @param From {String} Old path.
+; @param To {String} The taken destination.
+; @param Backup {String} Path the old entry takes.
+; @param Report {Map} Receives a "backed_up" or a "kept" row.
+LegacyFolderBackUpEntry(From, To, Backup, Report) {
+		if (FileExist(Backup) != "") {
+				Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
+				return
+		}
+		Failure := LegacyFolderRenameInto(From, Backup)
+		if (Failure == "")
+				Report["backed_up"].Push(Map("from", From, "to", Backup, "taken", To))
+		else if (FileExist(Backup) != "")
+				; The slot was taken between the check and the move, which never
+				; replaces: what arrived there stays.
+				Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
+		else
+				Report["kept"].Push(Map("from", From, "to", Backup, "reason", "rename_failed", "detail", Failure))
+}
+
 ; Moves one file or folder to its destination; when the destination holds
 ; something, moves it into the backup slot instead. Mirrors move_entry of
-; _shared/lua/legacy_folder_migration.lua.
+; _shared/lua/legacy_folder_migration.lua. DirMove and FSMove never replace an
+; existing destination, so one that appears after the check fails the move and
+; the old entry goes to its backup like any taken name.
 ; @param From {String} Old path.
 ; @param To {String} New path.
 ; @param Backup {String} Path the old entry takes when To is taken.
@@ -90,21 +127,15 @@ LegacyFolderMoveEntry(From, To, Backup, Report) {
 						}
 				}
 				if !Freed {
-						if (FileExist(Backup) != "") {
-								Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
-								return
-						}
-						Failure := LegacyFolderRenameInto(From, Backup)
-						if (Failure == "")
-								Report["backed_up"].Push(Map("from", From, "to", Backup, "taken", To))
-						else
-								Report["kept"].Push(Map("from", From, "to", Backup, "reason", "rename_failed", "detail", Failure))
+						LegacyFolderBackUpEntry(From, To, Backup, Report)
 						return
 				}
 		}
 		Failure := LegacyFolderRenameInto(From, To)
 		if (Failure == "")
 				Report["moved"].Push(Map("from", From, "to", To))
+		else if (FileExist(To) != "")
+				LegacyFolderBackUpEntry(From, To, Backup, Report)
 		else
 				Report["kept"].Push(Map("from", From, "to", To, "reason", "rename_failed", "detail", Failure))
 }
@@ -118,9 +149,20 @@ LegacyFolderMoveEntry(From, To, Backup, Report) {
 LegacyFolderMergeEntries(FromDir, ToDir, BackupDir, Report) {
 		if !DirExist(FromDir)
 				return
+		; A loop files over a folder it cannot open yields nothing, as if the
+		; folder were empty; the strict listing throws, and the refusal is kept.
 		Names := []
-		loop files, FromDir . "\*", "FD"
-				Names.Push(A_LoopFileName)
+		try {
+				for Directories in [false, true] {
+						for Path in FSListDirectoryStrict(FromDir, Directories) {
+								SplitPath(Path, &Name)
+								Names.Push(Name)
+						}
+				}
+		} catch as ListError {
+				Report["kept"].Push(Map("from", FromDir, "to", ToDir, "reason", "list_failed", "detail", ListError.Message))
+				return
+		}
 		for Name in Names
 				LegacyFolderMoveEntry(FromDir . "\" . Name, ToDir . "\" . Name, BackupDir . "\" . Name, Report)
 		LegacyFolderRemoveIfEmpty(FromDir, Report)
@@ -160,11 +202,157 @@ LegacyFolderNormalize(Value) {
 		return RTrim(Value, "\")
 }
 
-; Rewrites the paths.toml lines whose value is an old default folder.
-; Mirrors rewrite_paths_text of _shared/lua/legacy_folder_migration.lua; the
-; comparison ignores case, as Windows paths do.
+; Reads one single-line TOML string at Pos of Line, as the boot TOML reader
+; does: a literal string as written, a basic string with its escapes decoded.
+; Mirrors read_string of _shared/lua/legacy_folder_migration.lua.
+; @param Line {String}
+; @param Pos {Integer} Position of the opening quote.
+; @param Value {VarRef} Receives the decoded value.
+; @param After {VarRef} Receives the position after the closing quote.
+; @param Kind {VarRef} Receives "basic" or "literal".
+; @returns {Boolean} False when no valid string starts there.
+LegacyFolderReadTomlString(Line, Pos, &Value, &After, &Kind) {
+		static Escapes := Map("b", "`b", "t", "`t", "n", "`n", "f", "`f", "r", "`r", '"', '"', "\", "\")
+		Quote := SubStr(Line, Pos, 1)
+		if (Quote == "'") {
+				Close := InStr(Line, "'", true, Pos + 1)
+				if !Close
+						return false
+				Value := SubStr(Line, Pos + 1, Close - Pos - 1), After := Close + 1, Kind := "literal"
+				return true
+		}
+		if (Quote != '"')
+				return false
+		Value := "", Index := Pos + 1
+		while (Index <= StrLen(Line)) {
+				Char := SubStr(Line, Index, 1)
+				if (Char == '"') {
+						After := Index + 1, Kind := "basic"
+						return true
+				}
+				if (Char != "\") {
+						Value .= Char, Index += 1
+						continue
+				}
+				Letter := SubStr(Line, Index + 1, 1)
+				if Escapes.Has(Letter) {
+						Value .= Escapes[Letter], Index += 2
+						continue
+				}
+				if (Letter !== "u" && Letter !== "U")
+						return false
+				Width := (Letter == "u") ? 4 : 8
+				Hex := SubStr(Line, Index + 2, Width)
+				if !RegExMatch(Hex, "^[0-9A-Fa-f]{" . Width . "}$")
+						return false
+				Code := Integer("0x" . Hex)
+				if (Code > 0x10FFFF || (Code >= 0xD800 && Code <= 0xDFFF))
+						return false
+				Value .= Chr(Code), Index += 2 + Width
+		}
+		return false
+}
+
+; Spells a value as a TOML string of the kind it replaces; a literal string
+; cannot hold a quote or a control character, so such a value becomes basic.
+; Mirrors spell_string of _shared/lua/legacy_folder_migration.lua.
+; @param Value {String}
+; @param Kind {String} "basic" or "literal".
+; @returns {String}
+LegacyFolderSpellTomlString(Value, Kind) {
+		if (Kind == "literal" && !RegExMatch(Value, "['\x00-\x1F\x7F]"))
+				return "'" . Value . "'"
+		Out := ""
+		loop parse Value {
+				Code := Ord(A_LoopField)
+				if (A_LoopField == "\" || A_LoopField == '"')
+						Out .= "\" . A_LoopField
+				else if (Code == 8)
+						Out .= "\b"
+				else if (Code == 9)
+						Out .= "\t"
+				else if (Code == 10)
+						Out .= "\n"
+				else if (Code == 12)
+						Out .= "\f"
+				else if (Code == 13)
+						Out .= "\r"
+				else if (Code < 0x20 || Code == 0x7F)
+						Out .= Format("\u{:04X}", Code)
+				else
+						Out .= A_LoopField
+		}
+		return '"' . Out . '"'
+}
+
+; Splits one `key = "value"` line of paths.toml as the boot TOML reader reads
+; it: a bare or quoted key, and a basic or literal single-line string.
+; Mirrors parse_assignment of _shared/lua/legacy_folder_migration.lua.
+; @param Line {String}
+; @returns {Map|String} "indent", "key", "key_text", "spacing", "value", "kind"
+;   and "rest", or "" when the line is not such an assignment.
+LegacyFolderParseAssignment(Line) {
+		RegExMatch(Line, "^\s*", &Indent)
+		Pos := Indent.Len + 1
+		if RegExMatch(Line, "\G[A-Za-z0-9_-]+", &Bare, Pos) {
+				Key := Bare[0], KeyText := Bare[0], After := Pos + Bare.Len
+		} else {
+				if !LegacyFolderReadTomlString(Line, Pos, &Key, &After, &KeyKind)
+						return ""
+				KeyText := SubStr(Line, Pos, After - Pos)
+		}
+		if !RegExMatch(Line, "\G\s*=\s*", &Spacing, After)
+				return ""
+		if !LegacyFolderReadTomlString(Line, After + Spacing.Len, &Value, &ValueAfter, &Kind)
+				return ""
+		return Map("indent", Indent[0], "key", Key, "key_text", KeyText, "spacing", Spacing[0], "value", Value,
+				"kind", Kind, "rest", SubStr(Line, ValueAfter))
+}
+
+; The new value of one locator, or "" when the rule does not name it. Mirrors
+; rebased of _shared/lua/legacy_folder_migration.lua: the old folder itself
+; becomes "new", a folder below it the same folder below "under" (where the old
+; folder went; "new" by default). The comparison ignores case, as Windows paths
+; do, and the result keeps the separator style of the value.
+; @param Value {String} Current value, decoded.
+; @param Rule {Map} "old" (Array), "new" and an optional "under".
+; @returns {String}
+LegacyFolderRebased(Value, Rule) {
+		if (Value == "")
+				return ""
+		Current := LegacyFolderNormalize(Value)
+		; The trailing separators, spelled like the rest before the style below.
+		RegExMatch(Value, "[\\/]+$", &Tail)
+		Trailing := IsObject(Tail) ? StrReplace(StrReplace(Tail[0], "\\", "\"), "/", "\") : ""
+		New := ""
+		for Old in Rule["old"] {
+				OldFolder := LegacyFolderNormalize(Old)
+				if (Current = OldFolder) {
+						New := LegacyFolderNormalize(Rule["new"]) . Trailing
+						break
+				}
+				Prefix := OldFolder . "\"
+				if (OldFolder != "" && StrLen(Current) > StrLen(Prefix) && SubStr(Current, 1, StrLen(Prefix)) = Prefix) {
+						Base := Rule.Has("under") ? Rule["under"] : Rule["new"]
+						New := LegacyFolderNormalize(Base) . SubStr(Current, StrLen(OldFolder) + 1) . Trailing
+						break
+				}
+		}
+		if (New == "")
+				return ""
+		; Keep the separator style of the value; the string spelling doubles a
+		; backslash of a basic string.
+		if InStr(Value, "/")
+				New := StrReplace(New, "\", "/")
+		return New
+}
+
+; Rewrites the paths.toml lines whose value is an old default folder or a
+; folder below one, reading quoted keys, literal strings and escapes as the
+; boot TOML reader does. Mirrors rewrite_paths_text of
+; _shared/lua/legacy_folder_migration.lua.
 ; @param Text {String} paths.toml content.
-; @param Rewrites {Array} Maps with "key", "old" (Array) and "new".
+; @param Rewrites {Array} Maps with "key", "old" (Array), "new" and an optional "under".
 ; @returns {String} The new text, or "" when nothing changed.
 LegacyFolderRewritePathsText(Text, Rewrites) {
 		Changed := false
@@ -173,59 +361,141 @@ LegacyFolderRewritePathsText(Text, Rewrites) {
 		for Index, Line in Lines {
 				if (Index > 1)
 						Out .= "`n"
-				if !RegExMatch(Line, '^(\s*)(\w+)(\s*=\s*)"([^"]*)"(.*)$', &Match) {
+				Parts := LegacyFolderParseAssignment(Line)
+				if !(Parts is Map) {
 						Out .= Line
 						continue
 				}
 				Replacement := Line
 				for Rule in Rewrites {
-						if (Rule["key"] != Match[2] || Match[4] == "")
+						if (Rule["key"] !== Parts["key"])
 								continue
-						for Old in Rule["old"] {
-								if (LegacyFolderNormalize(Match[4]) != LegacyFolderNormalize(Old))
-										continue
-								RegExMatch(Match[4], "[\\/]+$", &Tail)
-								Trailing := IsObject(Tail) ? Tail[0] : ""
-								New := RTrim(Rule["new"], "\/") . Trailing
-								; Keep the separator style of the line: forward slashes, or the
-								; doubled backslashes of a TOML basic string.
-								if InStr(Match[4], "/")
-										New := StrReplace(New, "\", "/")
-								else if InStr(Match[4], "\\")
-										New := StrReplace(StrReplace(New, "\\", "\"), "\", "\\")
-								if (New != Match[4]) {
-										Replacement := Match[1] . Match[2] . Match[3] . '"' . New . '"' . Match[5]
-										Changed := true
-								}
-								break
+						New := LegacyFolderRebased(Parts["value"], Rule)
+						if (New == "")
+								continue
+						if (New !== Parts["value"]) {
+								Replacement := Parts["indent"] . Parts["key_text"] . Parts["spacing"]
+										. LegacyFolderSpellTomlString(New, Parts["kind"]) . Parts["rest"]
+								Changed := true
 						}
+						break
 				}
 				Out .= Replacement
 		}
 		return Changed ? Out : ""
 }
 
-; Rewrites one paths.toml after keeping its previous text beside it.
+; Rewrites one paths.toml after keeping its previous text beside it. Mirrors
+; rewrite_paths_file of _shared/lua/legacy_folder_migration.lua: both files are
+; written to a private stage and renamed into place (the backup with a
+; no-replace move, paths.toml with an atomic replace), so a refused or partial
+; write leaves paths.toml exactly as it was. A backup holding the current text,
+; left by an interrupted boot, is reused; one holding other text is kept.
 ; @param Path {String} paths.toml.
 ; @param Rewrites {Array} See LegacyFolderRewritePathsText.
-; @returns {String} "absent", "unchanged", "rewritten" or "backup_refused".
+; @returns {String} "absent", "unchanged", "rewritten", or the refusal
+;   "read_failed", "backup_taken", "backup_refused" or "write_refused".
 LegacyFolderRewritePathsFile(Path, Rewrites) {
 		if !FileExist(Path)
 				return "absent"
 		try Text := FSReadStrict(Path)
 		catch
-				return "backup_refused"
+				return "read_failed"
 		Rewritten := LegacyFolderRewritePathsText(Text, Rewrites)
 		if (Rewritten == "")
 				return "unchanged"
 		Backup := Path . AppDirsMigrationBackupSuffix()
-		if FileExist(Backup)
-				return "backup_refused"
-		; The adapter writes UTF-8 without a BOM and removes a partial file; the
-		; verified backup beside it still holds the previous text.
-		if !FSCopyCreateVerified(Path, Backup) || !FSWrite(Path, Rewritten)
-				return "backup_refused"
+		if FileExist(Backup) {
+				try BackupText := FSReadStrict(Backup)
+				catch
+						return "backup_taken"
+				if (BackupText !== Text)
+						return "backup_taken"
+		} else {
+				; The stage names are written by this migration alone.
+				Stage := Backup . LEGACY_FOLDER_STAGE_SUFFIX
+				if FileExist(Stage)
+						FSDelete(Stage)
+				if !FSCopyCreateVerified(Path, Stage) || !FSAtomicMoveCreate(Stage, Backup) {
+						FSDelete(Stage)
+						return "backup_refused"
+				}
+		}
+		Stage := Path . LEGACY_FOLDER_STAGE_SUFFIX
+		if FileExist(Stage)
+				FSDelete(Stage)
+		if !FSWriteCreateDurable(Stage, Rewritten) || !FSAtomicMoveReplace(Stage, Path) {
+				FSDelete(Stage)
+				return "write_refused"
+		}
 		return "rewritten"
+}
+
+; The report row of one old folder, as LegacyFolderOutcomeKind names it.
+; @param Report {Map} Report of the moves.
+; @param Source {String} Absolute old folder.
+; @param Kind {VarRef} Receives "moved", "backed_up", "kept" or "".
+; @returns {Map|String} The row, or "" when the folder has none.
+LegacyFolderOutcomeOf(Report, Source, &Kind) {
+		for Name in ["moved", "backed_up", "kept"] {
+				for Row in Report[Name] {
+						; Windows paths ignore case: = rather than ==.
+						if (LegacyFolderNormalize(Row["from"]) = LegacyFolderNormalize(Source)) {
+								Kind := Name
+								return Row
+						}
+				}
+		}
+		Kind := ""
+		return ""
+}
+
+; Keeps the rewrites whose old folder did not stay where it was. Mirrors
+; settle_rewrites: a refused move keeps the data in the folder paths.toml names.
+; @param Rules {Array} Maps with "key", "old", "new" and an optional "source".
+; @param Report {Map} Report of the moves.
+; @returns {Array} The rewrites for LegacyFolderRewritePathsText.
+LegacyFolderSettleRewrites(Rules, Report) {
+		Settled := []
+		for Rule in Rules {
+				if Rule.Has("source") {
+						Row := LegacyFolderOutcomeOf(Report, Rule["source"], &Kind)
+						if (Kind == "kept")
+								continue
+						if (Kind == "moved" || Kind == "backed_up") {
+								; A folder chosen below the old one is where its ancestor went.
+								Settled.Push(Map("key", Rule["key"], "old", Rule["old"], "new", Rule["new"], "under", Row["to"]))
+								continue
+						}
+				}
+				Settled.Push(Rule)
+		}
+		return Settled
+}
+
+; Rewrites paths.toml from what moved; when it cannot, moves each "restorable"
+; folder back to the old path the file still names, so boot never selects an
+; empty folder while the user's one sits elsewhere. Mirrors publish_paths_file.
+; @param PathsFile {String} paths.toml.
+; @param Rules {Array} Maps with "key", "old", "new", "source", "restorable".
+; @param Report {Map} Receives "paths_file" and the "restored" rows.
+LegacyFolderPublishPathsFile(PathsFile, Rules, Report) {
+		Report["paths_file"] := LegacyFolderRewritePathsFile(PathsFile, LegacyFolderSettleRewrites(Rules, Report))
+		if !LEGACY_FOLDER_PATHS_REFUSALS.Has(Report["paths_file"])
+				return
+		for Rule in Rules {
+				if !(Rule.Has("restorable") && Rule["restorable"])
+						continue
+				Row := LegacyFolderOutcomeOf(Report, Rule["source"], &Kind)
+				if (Kind != "moved" && Kind != "backed_up")
+						continue
+				Failure := LegacyFolderRenameInto(Row["to"], Row["from"])
+				if (Failure == "")
+						Report["restored"].Push(Map("from", Row["to"], "to", Row["from"]))
+				else
+						Report["kept"].Push(Map("from", Row["to"], "to", Row["from"], "reason", "restore_failed",
+								"detail", Failure))
+		}
 }
 
 
@@ -242,7 +512,7 @@ LegacyFolderRewritePathsFile(Path, Rewrites) {
 ; @param PathsFile {String} The paths.toml boot is about to read.
 ; @returns {Map} Report with "moved", "kept", "removed" and "paths_file".
 LegacyFolderMigrationRun(PathsFile) {
-		Report := Map("moved", [], "backed_up", [], "kept", [], "removed", [], "paths_file", "absent")
+		Report := Map("moved", [], "backed_up", [], "kept", [], "removed", [], "restored", [], "paths_file", "absent")
 		Root := RTrim(AppFoldersRoot(), "\")
 		; An old entry whose destination is taken goes to
 		; <root>\<backup folder>\<its path below its environment folder>.
@@ -254,6 +524,12 @@ LegacyFolderMigrationRun(PathsFile) {
 				. AppDirsMigrationWindowsLegacyConfigRelative()
 		LegacyLocal := LocalAppData . "\" . AppDirsMigrationWindowsLegacyLocalFolder()
 		NewConfig := RTrim(AppFoldersDefaultConfigDir(), "\")
+		; A transition the old build left beside its paths.toml is settled in
+		; place before anything moves: its journal names the old locator and
+		; folders, and once paths.toml left, boot recovery would only look beside
+		; the new one. Quarantine throws, as it does at boot.
+		if (FileExist(LegacyPaths) != "")
+				ConfigTransitionRecoverAtBootOrThrow(LegacyPaths)
 		LegacyFolderMoveEntry(LegacyPaths, AppFoldersPathsFile(),
 				Backup . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative(), Report)
 		SplitPath(LegacyPaths, , &LegacyPathsDir)
@@ -266,11 +542,15 @@ LegacyFolderMigrationRun(PathsFile) {
 		for LegacyOllama in AppDirsMigrationWindowsLegacyOllamaFolders()
 				LegacyFolderMoveEntry(LocalAppData . "\" . LegacyOllama, AppFoldersManagedOllamaRoot(),
 						Backup . "\" . LegacyOllama, Report)
-		Rewrites := [
-				Map("key", "ConfigDirPath", "old", [LegacyConfig], "new", NewConfig),
-				Map("key", AppDirsLogsOverrideKey(), "old", [LegacyLocal . "\logs"], "new", RTrim(LoggerDefaultLogsDir(), "\"))
+		; The configuration folder moves in one rename, so a locator that cannot
+		; follow it gets it back; the logs folder only follows.
+		Rules := [
+				Map("key", "ConfigDirPath", "old", [LegacyConfig], "new", NewConfig, "source", LegacyConfig,
+						"restorable", true),
+				Map("key", AppDirsLogsOverrideKey(), "old", [LegacyLocal . "\logs"], "new", RTrim(LoggerDefaultLogsDir(), "\"),
+						"source", LegacyLocal . "\logs")
 		]
-		Report["paths_file"] := LegacyFolderRewritePathsFile(PathsFile, Rewrites)
+		LegacyFolderPublishPathsFile(PathsFile, Rules, Report)
 		LegacyFolderLogReport(Report)
 		return Report
 }
@@ -283,14 +563,21 @@ LegacyFolderLogReport(Report) {
 		for Row in Report["backed_up"]
 				LoggerWarn("Boot", "Moved legacy folder entry '{1}' to the backup '{2}': '{3}' is already taken.",
 						Row["from"], Row["to"], Row["taken"])
+		; The reason phrases of KEPT_REASONS in _shared/lua/legacy_folder_migration.lua.
+		Reasons := Map("backup_exists", "a backup already exists", "list_failed", "its folder could not be listed",
+				"remove_failed", "its emptied folder could not be removed",
+				"restore_failed", "it could not be moved back to the folder paths.toml names")
 		for Row in Report["kept"]
 				LoggerWarn("Boot", "Kept legacy folder entry '{1}': {2} at '{3}' ({4}).", Row["from"],
-						Row["reason"] == "backup_exists" ? "a backup already exists" : "it could not be moved",
+						Reasons.Has(Row["reason"]) ? Reasons[Row["reason"]] : "it could not be moved",
 						Row["to"], Row.Has("detail") ? Row["detail"] : Row["reason"])
 		for Dir in Report["removed"]
 				LoggerInfo("Boot", "Removed the emptied legacy folder '{1}'.", Dir)
 		if (Report["paths_file"] == "rewritten")
 				LoggerInfo("Boot", "paths.toml now names the new default folders; its previous text is kept beside it.")
-		else if (Report["paths_file"] == "backup_refused")
-				LoggerWarn("Boot", "paths.toml still names an old default folder: its backup could not be written.")
+		else if LEGACY_FOLDER_PATHS_REFUSALS.Has(Report["paths_file"])
+				LoggerWarn("Boot", "paths.toml still names an old default folder: {1}.",
+						LEGACY_FOLDER_PATHS_REFUSALS[Report["paths_file"]])
+		for Row in Report["restored"]
+				LoggerWarn("Boot", "Moved '{1}' back to '{2}', the folder paths.toml still names.", Row["from"], Row["to"])
 }

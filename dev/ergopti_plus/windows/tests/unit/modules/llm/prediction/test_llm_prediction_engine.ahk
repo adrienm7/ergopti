@@ -512,6 +512,46 @@ _EngineFinalize_ReadyFlagBelongsToOllama() {
 Test("LLM finalizer: Ollama readiness remains backend-owned (ahk2-13-backend-readiness-owner)",
 	_EngineFinalize_ReadyFlagBelongsToOllama)
 
+; A refused credential is not retried and spends no further variant; any other
+; failure keeps the shared retry policy (a next variant is dispatched).
+_EngineVariantFail_RefusedKeyIsNeverRetried() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedCalls := _Stub_LlmTooltipCalls
+	try {
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Engine["request_id"] := 7331
+		_LLM_Engine["active_request_signature"] := "auth-no-retry"
+		_LLM_Engine["inline_autotype"] := false
+		_Stub_LlmTooltipCalls := []
+		for Vector in [
+			Map("failure", Map("reason", "http_401", "status", 401, "message", ""), "dispatches", 0),
+			Map("failure", Map("reason", "http_403", "status", 403, "message", ""), "dispatches", 0),
+			Map("failure", Map("reason", "http_400", "status", 400, "message", "API key not valid."), "dispatches", 0),
+			Map("failure", Map("reason", "http_500", "status", 500, "message", ""), "dispatches", 1)
+		] {
+			Dispatches := 0
+			State := _EngineFinalize_ReadinessState("api", 7331, "auth-no-retry")
+			State["requested"] := 3
+			State["attempt_index"] := 2
+			State["max_attempts"] := 6
+			State["base_temp"] := 0.4
+			State["streaming"] := false
+			State["show_all_at_once"] := true
+			State["dispatch_stream_fn"] := ""
+			State["dispatch_fn"] := (Temp, OnSuccess, OnFail, Tokens := 0) => Dispatches += 1
+			_LLM_Engine_OnVariantFail(State, Vector["failure"])
+			AssertEqual(Vector["dispatches"], Dispatches,
+				"authentication failures send no retry, other failures keep the retry policy: " . Vector["failure"]["reason"])
+		}
+	} finally {
+		_LLM_Engine := SavedEngine
+		_Stub_LlmTooltipCalls := SavedCalls
+	}
+}
+Test("LLM engine: a refused credential is never retried, other failures are",
+	_EngineVariantFail_RefusedKeyIsNeverRetried)
+
 _EngineTypedRestoreFeedsValidatedAppFilter() {
 	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Engine
 	SavedMenu := _LLM_Menu
@@ -615,3 +655,35 @@ _AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus() {
 
 Test("LLM privacy: disabled-app policy rejects uncertain focus (audit-ahk-006)",
 	_AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus)
+
+
+_EngineCapturedSourceAppPrivacy() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+	try {
+		_LLM_Engine := Map("disabled_apps", ["Notepad.EXE"])
+		Calls := 0
+		AllowedFocus := (*) => (Calls += 1, Map("appId", "allowed.exe"))
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, "notepad.exe"), "an allowed destination cannot authorize an excluded source")
+		AssertEqual(0, Calls, "excluded source refuses before the native destination lookup")
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, ""), "unknown source fails closed under an exclusion policy")
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, "allowed.exe"), "allowed source and allowed destination remain eligible")
+		AssertEqual(1, Calls)
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(() => Map("appId", "notepad.exe"), "allowed.exe"), "current native app exclusions remain enforced")
+		_LLM_Engine["disabled_apps"] := []
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, ""), "empty policy retains the legacy no-probe path")
+		AssertEqual(1, Calls)
+		_LLM_Engine := Map("enabled", true, "request_id", 71, "active_request_signature", "source-policy", "disabled_apps", [])
+		AssertTrue(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"))
+		_LLM_Engine["disabled_apps"] := ["SOURCE"]
+		AssertTrue(_LLM_Engine_RenderIdentityIsCurrent(71, "source-policy"), "the request identity alone remains current")
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"), "transport/retry admission rechecks the original source against current policy")
+		_LLM_Engine["disabled_apps"] := [""]
+		AssertFalse(_LLM_Engine_SourceAppAllowed("source.exe"), "corrupt blank policy entries cannot grant transport admission")
+		_LLM_Engine["disabled_apps"] := []
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(70, "source-policy", "source.exe"), "source policy cannot replace exact request ownership")
+		_LLM_Engine := 0
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"), "withdrawn engine state cannot grant or throw during transport admission")
+	} finally _LLM_Engine := Saved
+}
+Test("LLM privacy: captured source app and transport policy are both enforced (llm-captured-source-app-privacy)", _EngineCapturedSourceAppPrivacy)

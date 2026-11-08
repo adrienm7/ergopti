@@ -113,23 +113,37 @@ local function report_test(dialogs, name, ok, detail, elapsed_ms)
 	dialogs.error(body .. "\n" .. text, tr("menu.llm." .. kind .. "title"))
 end
 
+--- Whether the exact entry that started a test is still present.
+local function entry_retained(entries, entry)
+	for _, current in ipairs(entries.list()) do
+		if current == entry then return true end
+	end
+	return false
+end
+
 --- Tests one entry and reports the verdict when the answer arrives.
 --- @param remote table api_remote
 --- @param dialogs table
 --- @param entry table
 --- @param name string The entry's automatic name.
 --- @param admit function|nil Exact source-bound runtime admission.
-local function run_test(remote, dialogs, entry, name, admit)
+--- @param page_current function|nil Whether this page may still display a result.
+local function run_test(remote, dialogs, entry, name, admit, page_current)
 	local function allowed()
 		if admit == nil then return true end
 		local ok, value = pcall(admit)
 		return ok and value == true
 	end
-	if not allowed() then return false end
+	local function visible()
+		if page_current == nil then return true end
+		local ok, value = pcall(page_current)
+		return ok and value == true
+	end
+	if not allowed() or not visible() then return false end
 	local dispatched = remote.test(entry, function(ok, detail, elapsed_ms)
-		if not allowed() then return end
+		if not allowed() or not visible() then return end
 		Logger.info(LOG, "API test of '%s': %s.", name, ok and "answered" or "failed")
-		if not allowed() then return end
+		if not allowed() or not visible() then return end
 		report_test(dialogs, name, ok, detail, elapsed_ms)
 	end, admit)
 	if not dispatched then Logger.warn(LOG, "API test of '%s' could not be sent.", name) end
@@ -144,7 +158,14 @@ end
 --- @param dialogs table { prompt, error, info }
 --- @param provider table
 --- @param on_changed function|nil
-local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
+local function add_entry(llm, remote, entries, dialogs, provider, on_changed, page_current)
+	local function page_owned()
+		if page_current == nil then return true end
+		local ok, current = pcall(page_current)
+		return ok and current == true
+	end
+	if not page_owned() then return false end
+	local starting_backend = llm.get_backend()
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
 	local fields = UrlTemplate.fields(provider.base_url)
@@ -154,7 +175,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		for _, name in ipairs(fields) do
 			local label = tr("menu.llm.api_prompt_field." .. name)
 			local value = dialogs.prompt(heading, label, "")
-			if not value then return end
+			if not value or not page_owned() then return false end
 			values[name] = TextUtils.trim(value)
 			if not UrlTemplate.valid_value(values[name]) then
 				dialogs.error(label .. " " .. tr("menu.llm.api_prompt_field_invalid"), heading)
@@ -167,7 +188,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		-- The catalogue's address works; one optional value replaces it
 		local optional = provider.optional_address
 		local value = dialogs.prompt(heading, tr("menu.llm.api_prompt_field." .. optional.field), "")
-		if not value then return end
+		if not value or not page_owned() then return false end
 		local filled = UrlTemplate.optional_url(optional, TextUtils.trim(value))
 		if not filled then
 			Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
@@ -179,7 +200,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	-- default visible while allowing the same custom endpoint as the generic form.
 	elseif provider.base_url == "" or provider.id == "openai" then
 		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), provider.base_url)
-		if not base_url or base_url == "" then return end
+		if not base_url or base_url == "" or not page_owned() then return false end
 		if not remote.normalize_base_url(base_url) then
 			dialogs.error(tr("menu.llm.api_prompt_url") .. " " .. base_url, heading)
 			return
@@ -188,17 +209,29 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "", base_url) == true
 		and fill(tr("dialog.local_servers.key_prompt"), { provider.label }) or tr("menu.llm.api_prompt_token")
 	local token = dialogs.prompt(heading, prompt, "", true)
-	if not token then return end
+	if not token or not page_owned() then return false end
 	-- The actual provider owns optional authentication; never trim secret bytes.
 	if token == "" and (type(remote.token_allowed) ~= "function"
 		or remote.token_allowed(provider.id, token, base_url) ~= true) then return end
 	local model = dialogs.prompt(heading, tr("menu.llm.api_prompt_model"), provider.default_model)
-	if not model then return end
+	if not model or not page_owned() then return false end
 	model = TextUtils.trim(model)
 	if model == "" then model = provider.default_model end
 	if model == "" then return end
 
 	local chat = remote.serves(provider.id, "chat")
+	if not page_owned() then return false end
+	if chat then
+		if llm.get_backend() ~= starting_backend then
+			if page_owned() then SaveFailure.present(tr, function(message) dialogs.error(message, heading) end) end
+			return false
+		end
+		if starting_backend ~= "api" and llm.set_backend("api", page_owned) ~= true then
+			if page_owned() then SaveFailure.present(tr, function(message) dialogs.error(message, heading) end) end
+			return false
+		end
+		if not page_owned() then return false end
+	end
 	local ticket, current, finish
 	if chat then
 		local begin = llm.begin_api_selection
@@ -213,6 +246,13 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 			return false
 		end
 		ticket = receipt
+	end
+	if not page_owned() then
+		if chat then
+			local retired, ack = pcall(finish, ticket, false, true)
+			if not retired or ack ~= true then Logger.error(LOG, "The API selection owner could not retire after the page closed.") end
+		end
+		return false
 	end
 	local function admitted()
 		local ok, value = pcall(current, ticket)
@@ -251,9 +291,24 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
 			entry.id)
 	end
-	if type(on_changed) == "function" then on_changed() end
+	if type(on_changed) == "function" then
+		local notified = pcall(on_changed)
+		if not notified then Logger.warn(LOG, "The API entry was saved but its menu could not refresh.") end
+	end
 	if chat and not published_current() then return false end
-	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id], chat and published_current or nil)
+	-- The entry has already been published. A refused optional connection test
+	-- must not report that durable addition as a failed operation.
+	local tested = pcall(function()
+		return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id],
+			chat and published_current or function() return entry_retained(entries, entry) end, page_current)
+	end)
+	if not tested then Logger.warn(LOG, "The optional API entry test raised after the entry was saved.") end
+	if chat then
+		if not published_current() then return false end
+	elseif not entry_retained(entries, entry) then
+		return false
+	end
+	return true
 end
 
 --- The name of the model that answers predictions: the active API entry's
@@ -352,20 +407,27 @@ end
 --- @param on_changed function|nil Called after a change (menu and page refresh).
 --- @param context table|nil { paused, is_paused } for the local servers.
 --- @param listings table|nil Provider listing state by entry id (llm.api_model_listing); nil when never asked.
+--- @param page_current function|nil Exact page projection owner.
 --- @return table api { rows, providers, tools }
-function M.api_page(llm, dialogs, on_changed, context, listings)
+function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
+	local function page_owned()
+		if page_current == nil then return true end
+		local ok, current = pcall(page_current)
+		return ok and current == true
+	end
 	local function changed() if type(on_changed) == "function" then on_changed() end end
+	local function report_save_failure()
+		if page_owned() then
+			SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
+		end
+		return false
+	end
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
 	local api = { rows = {}, providers = {}, tools = {} }
 	if not ok_remote or not ok_entries then
 		Logger.error(LOG, "Remote API modules unavailable — the page lists no API entry.")
 		return api
-	end
-	--- Runs one API transaction under the API backend, selecting it first.
-	local function under_api(fn)
-		if llm.get_backend() ~= "api" and llm.set_backend("api") ~= true then return false end
-		return fn()
 	end
 	local active = entries.active()
 	local list = entries.list()
@@ -374,7 +436,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 	--- The entry the page was drawn with is still the active one.
 	local function active_commands_ready()
 		local current = entries.active()
-		return active ~= nil and current ~= nil and current.id == active.id
+		return active ~= nil and current == active
 	end
 	-- Two entries of one provider and host can share a model name: each
 	-- entry's own model wins, then the first entry keeps a shared known model
@@ -399,25 +461,29 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 			-- retires the running request (set_backend) before deleting it.
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"), run = function()
 				if not active_commands_ready() then return false end
-				return run_test(remote, dialogs, active, active_name)
+				return run_test(remote, dialogs, active, active_name, function() return entries.active() == active end, page_current)
 			end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+				if not page_owned() then return false end
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
-				if not active_commands_ready() then return false end
-				if llm.set_backend("api") ~= true or not active_commands_ready() then return false end
-				if entries.remove(active.id) ~= true then return false end
+				if not page_owned() or not active_commands_ready() then return false end
+				if llm.set_backend("api") ~= true then return report_save_failure() end
+				if not page_owned() or not active_commands_ready() then return false end
+				if entries.remove(active.id) ~= true then return report_save_failure() end
 				changed()
 				return true
 			end }
 		elseif not chat then
 			-- Never the predictions' entry: its own test and removal instead.
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"),
-				run = function() return run_test(remote, dialogs, entry, label) end }
+				run = function() return run_test(remote, dialogs, entry, label, function() return entry_retained(entries, entry) end, page_current) end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+				if not page_owned() or not entry_retained(entries, entry) then return false end
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
-				if entries.remove(entry.id) ~= true then return false end
+				if not page_owned() or not entry_retained(entries, entry) then return false end
+				if entries.remove(entry.id) ~= true then return report_save_failure() end
 				changed()
 				return true
 			end }
@@ -442,7 +508,9 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 				-- Selecting goes through set_backend("api") even under the API
 				-- backend: it retires the running request of the previous entry.
 				run = chat and function()
-					if llm.set_backend("api") ~= true then return false end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					if llm.set_backend("api") ~= true then return report_save_failure() end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					local saved
 					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
 					if saved ~= true then
@@ -461,13 +529,12 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 				name = base .. suffix, runtime_name = configured, provider = entry.provider, installed = true,
 				available = false, typed = true, hint_key = plan.typed.hint_key,
 				actions = { { id = "other_model", text = tr("model_browser.api_other_model"), run = function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
-					if typed == "" then return false end
-					if llm.set_backend("api") ~= true then
-						SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
-						return false
-					end
+					if typed == "" or not page_owned() or not entry_retained(entries, entry) then return false end
+					if llm.set_backend("api") ~= true then return report_save_failure() end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					if entries.set_model(entry.id, typed) ~= true then
 						save_failed(dialogs, entries, tr("common.error_title"))
 						return false
@@ -480,17 +547,13 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 	end
 	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do
-		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed) end
-		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = function()
-			-- A chat key becomes the predictions' entry, under the API backend;
-			-- a System 1 key leaves the backend as it is.
-			if remote.serves(provider.id, "chat") then return under_api(add) end
-			return add()
-		end }
+		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed, page_current) end
+		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = add }
 	end
 	if type(context) == "table" and type(context.is_paused) == "function"
 		and type(llm.can_configure_local_servers) == "function" then
-		local rows, tools = require("ui.menu.local_server_rows").page_rows(llm, dialogs, changed, context)
+		local local_context = setmetatable({ page_current = page_current }, { __index = context })
+		local rows, tools = require("ui.menu.local_server_rows").page_rows(llm, dialogs, changed, local_context)
 		for _, row in ipairs(rows) do api.rows[#api.rows + 1] = row end
 		for _, tool in ipairs(tools) do api.tools[#api.tools + 1] = tool end
 	end

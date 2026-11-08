@@ -107,6 +107,8 @@ local function scenario(options, body)
 			is_wayland = function() return false end, kind = function() return "x11" end }
 		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
+			-- The fixture's evdev A=30 and space=57 belong to this physical provider.
+			get_layout = function() return "qwerty" end,
 			emergency_stop = function() state.stopped = true end }
 		local layout = require("adapters.keyboard_layout")
 		layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
@@ -143,6 +145,7 @@ local function scenario(options, body)
 		local gate = require("infra.input_capture_gate").new()
 		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
 		local environment = setmetatable({ engine = matcher, engine_mod = require("modules.hotstrings.engine"),
+			TapHold = { observe_copy_activity = function() end },
 			prediction_engine = prediction, injector = injector, secure_focus_guard = guard,
 			shortcuts = options.restart_prediction and { is_enabled = function() return true end,
 				is_caps_word_active = function() return false end } or nil,
@@ -353,13 +356,26 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 		end)
 	end)
 
+	-- Predictions run only while the user does nothing (2026-11-06): a key the
+	-- tooltip does not own is activity even when the document is unchanged.
 	for _, control in ipairs({ { "f1", 59 }, { "f12", 88 }, { "shortcut", 31, { ctrl = true } } }) do
-		helpers.it("preserves an unchanged document's offer through " .. control[1], function()
+		helpers.it("cancels the request in flight and its late offer through " .. control[1], function()
 			scenario({}, function(s)
 				s.type("hello"); s.scheduler.test.advance(.5); s.control(control[1], control[2], control[3])
 				s.respond(1, RESPONSE)
-				helpers.assert_true(s.prediction.has_suggestions())
-				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "hello")
+			end)
+		end)
+
+		helpers.it("hides a shown offer through " .. control[1], function()
+			scenario({}, function(s)
+				s.type("hello"); s.scheduler.test.advance(.5); s.respond(1, RESPONSE)
+				helpers.assert_true(s.prediction.has_suggestions() and s.overlay_showing)
+				s.control(control[1], control[2], control[3])
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
 			end)
 		end)
 	end
@@ -404,6 +420,81 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 			s.respond(1, RESPONSE)
 			helpers.assert_eq(s.prediction.has_suggestions(), false)
 			helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "ab")
+		end)
+	end)
+end)
+
+--- Compiles Main's real pointer callback against the scenario's engine.
+--- @param prediction table The real prediction engine.
+--- @return function on_pointer_event
+local function main_pointer_callback(prediction)
+	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+	local source = assert(file:read("*a")); assert(file:close())
+	local first = assert(source:find("\tlocal function on_pointer_event(", 1, true))
+	local last = assert(source:find("\n\tend\n", first, true))
+	local body = source:sub(first, last + #"\n\tend") .. "\nreturn on_pointer_event"
+	local environment = setmetatable({
+		keystats = { record_pointer = function() end },
+		shortcuts = nil,
+		prediction_engine = prediction,
+	}, { __index = _G })
+	local chunk
+	if loadstring then chunk = assert(loadstring(body)); setfenv(chunk, environment)
+	else chunk = assert(load(body, "actual Main pointer callback", "t", environment)) end
+	return chunk()
+end
+
+helpers.describe("Main cancels AI on pointer activity (predictions run only while idle)", function()
+	local REL_X, REL_WHEEL = 0, 8
+	for _, vector in ipairs({
+		{ label = "a pointer move", kind = "motion", code = REL_X, value = 3 },
+		{ label = "a wheel turn", kind = "motion", code = REL_WHEEL, value = -1 },
+		{ label = "a touchpad coordinate", kind = "absolute_motion", code = 0, value = 512 },
+	}) do
+		helpers.it("cancels the request in flight and drops its late answer on " .. vector.label, function()
+			scenario({}, function(s)
+				local on_pointer_event = main_pointer_callback(s.prediction)
+				s.type("hello"); s.scheduler.test.advance(.5)
+				helpers.assert_eq(#s.requests, 1)
+				on_pointer_event(vector.kind, vector.code, vector.value, "mouse")
+				s.respond(1, RESPONSE)
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "hello")
+			end)
+		end)
+
+		helpers.it("hides a shown prediction on " .. vector.label, function()
+			scenario({}, function(s)
+				local on_pointer_event = main_pointer_callback(s.prediction)
+				s.type("hello"); s.scheduler.test.advance(.5); s.respond(1, RESPONSE)
+				helpers.assert_true(s.prediction.has_suggestions() and s.overlay_showing)
+				on_pointer_event(vector.kind, vector.code, vector.value, "mouse")
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
+			end)
+		end)
+	end
+
+	helpers.it("cancels a debounce still waiting, so no request leaves", function()
+		scenario({}, function(s)
+			local on_pointer_event = main_pointer_callback(s.prediction)
+			s.type("hello")
+			on_pointer_event("motion", REL_X, 1, "mouse")
+			s.scheduler.test.advance(.5)
+			helpers.assert_eq(#s.requests, 0, "the pause was interrupted by the pointer")
+		end)
+	end)
+
+	helpers.it("ignores a zero-distance report and frames", function()
+		scenario({}, function(s)
+			local on_pointer_event = main_pointer_callback(s.prediction)
+			s.type("hello"); s.scheduler.test.advance(.5)
+			on_pointer_event("motion", REL_X, 0, "mouse")
+			on_pointer_event("frame", 0, 0, "mouse")
+			s.respond(1, RESPONSE)
+			helpers.assert_true(s.prediction.has_suggestions(), "an idle user sees the answer")
+			helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
 		end)
 	end)
 end)
@@ -481,12 +572,15 @@ helpers.describe("Main retires AI at forwarded standard editing chords", functio
 		{ label = "Ctrl+Meta+V", key = "v", code = 47, mods = { ctrl = true, meta = true } },
 		{ label = "Ctrl+AltGr+V", key = "v", code = 47, mods = { ctrl = true, altgr = true } },
 	}) do
-		helpers.it("editing-chord-owner preserves unclassified " .. vector.label, function()
+		-- An unclassified chord leaves the document alone, but it is still a key
+		-- the tooltip does not own: predictions run only while the user does
+		-- nothing (2026-11-06), so the request in flight and its answer go.
+		helpers.it("editing-chord-owner keeps the document but cancels the offer through unclassified " .. vector.label, function()
 			scenario({}, function(s)
 				s.type("hello"); s.scheduler.test.advance(.5)
 				s.shortcut(vector); s.respond(1, RESPONSE)
-				helpers.assert_true(s.prediction.has_suggestions())
-				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "hello")
 			end)
 		end)
 	end
@@ -527,8 +621,8 @@ do
 				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "adapters.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
 				"infra.config_paths", "config_migrate", "toml_codec.writer",
-				-- Main initialises this owner once; an earlier suite may have loaded it.
-				"modules.keymap.pause_layout_switch" }) do package.loaded[name] = nil end
+				-- Main initialises these owners once; an earlier suite may have loaded them.
+				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
 			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
 			local app = options.app or "gnome-terminal"
 			local action_mode = options.mode or "none"
@@ -569,7 +663,7 @@ do
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
 			put("modules.hotstrings.hotstrings_config", config)
-			put("platform.remap.tap_hold_manager", { init = noop, user_path = function() return marker .. ".tap_hold.toml" end,
+			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end,
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
 			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
 			-- Gesture/action sources have no configured bindings in this scope.
@@ -600,7 +694,8 @@ do
 			} })
 			put("infra.llm_preferences", preferences)
 			put("modules.llm.profiles", { init = yes, is_enabled = yes })
-			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end })
+			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end,
+			  migrate_plaintext = yes })
 			put("modules.llm.api_remote", { serves = yes, provider = function() return { default_model = "fixture-model" } end,
 			  chat = function(_, _, messages, _, stream, done) state.requests[#state.requests + 1] = { messages = messages, stream = stream, done = done }; return true end,
 			  cancel = function() state.cancellations = state.cancellations + 1; return true end })
@@ -615,7 +710,9 @@ do
 			watch.barrier = function() local receipt = original_barrier(); receipt.role = role; return receipt end
 			watch.snapshot = function() local receipt = original_snapshot(); receipt.role = role; return receipt end
 			put("adapters.atspi_focus_watch", { new = function() return watch end })
+			-- Main binds the metrics sources at boot; none is granted, as on Wayland.
 			local window = { getFocused = function() return { appId = app, windowTitle = "owned ordinary field" } end,
+			  metrics_sources = function() return {} end,
 			  start_privacy_context = function(field, opts, callback)
 			    assert(field.role == role and opts.authorized())
 			    callback({ app_id = app, title = "owned ordinary field", native_identity = "owned-audit-frame" })
@@ -901,14 +998,17 @@ do
 		for _, specimen in ipairs({ { "c", "ctrl", "owned-gui-editor" }, { "s", "ctrl", "owned-gui-editor" },
 			{ "u", "ctrl", "owned-gui-editor" }, { "u", "ctrl-alt", "gnome-terminal" },
 			{ "u", "ctrl-meta", "gnome-terminal" }, { "u", "ctrl-altgr", "gnome-terminal" }, { "u", "ctrl-shift", "gnome-terminal" } }) do
+			-- Out of Readline scope the chord leaves the field unchanged, yet it is
+			-- a key the tooltip does not own: the offer goes (2026-11-06).
 			helpers.it("readline-control-scope " .. table.concat(specimen, " "), function()
 				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
 					s.prepare(); s.control(); finish_old(s, "late")
 					helpers.assert_eq(s.after_control, s.before_control)
 					if specimen[1] == "c" then helpers.assert_true(s.copy_observed) end
 					if specimen[1] == "s" then helpers.assert_eq(s.saved_text, s.before_control.text) end
-					helpers.assert_true(s.prediction.has_suggestions())
-					helpers.assert_true(s.prediction.accept(1))
+					helpers.assert_eq(s.prediction.has_suggestions(), false)
+					helpers.assert_eq(s.prediction.accept(1), false)
+					helpers.assert_eq({ text = s.text, caret = s.caret }, s.before_control)
 				end)
 			end)
 		end
@@ -982,8 +1082,10 @@ do
 					s.prepare(); s.control(); finish_old(s, "late")
 					helpers.assert_eq(s.after_control, s.before_control)
 					helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
-					helpers.assert_true(s.prediction.has_suggestions())
-					helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+					-- Unchanged field, yet a key the tooltip does not own: the
+					-- offer goes, as no prediction outlives user activity (2026-11-06).
+					helpers.assert_eq(s.prediction.has_suggestions(), false)
+					helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 				end)
 			end)
 		end
@@ -1040,8 +1142,10 @@ do
 				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
 					s.prepare(); s.control(); finish_old(s, "late")
 					helpers.assert_eq(s.after_control, s.before_control)
-					helpers.assert_true(s.prediction.has_suggestions())
-					helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+					-- Unchanged field, yet a key the tooltip does not own: the
+					-- offer goes, as no prediction outlives user activity (2026-11-06).
+					helpers.assert_eq(s.prediction.has_suggestions(), false)
+					helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 				end)
 			end)
 		end
@@ -1118,8 +1222,10 @@ do
 					else
 						helpers.assert_eq(s.chars, 0); helpers.assert_eq(s.controls, 1)
 						helpers.assert_eq(s.after_control, s.before_control)
-						helpers.assert_true(s.prediction.has_suggestions()); helpers.assert_true(s.visible)
-						helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+						-- Unchanged field, yet a key the tooltip does not own: the
+						-- offer goes, as no prediction outlives user activity (2026-11-06).
+						helpers.assert_eq(s.prediction.has_suggestions(), false); helpers.assert_eq(s.visible, false)
+						helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 					end
 					helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback)
 				end)
@@ -1191,13 +1297,16 @@ do
 			end)
 		end)
 
-		helpers.it("an unclassified nil-text input leaves the unchanged Main field and offer alone", function()
+		-- The key is still a press the tooltip does not own: predictions run
+		-- only while the user does nothing (2026-11-06), so the offer goes while
+		-- the field and the hotstring buffer stay untouched.
+		helpers.it("an unclassified nil-text input leaves the unchanged Main field alone and hides the offer", function()
 			whole_main({ semantic_input = {}, phase = "visible" }, function(s)
 				s.prepare(); local buffer, resets = s.matcher:current_buffer(), #s.resets
 				s.control(); helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.chars, 0)
 				helpers.assert_eq(s.after_control, s.before_control); helpers.assert_eq(s.matcher:current_buffer(), buffer)
-				helpers.assert_eq(#s.resets, resets); helpers.assert_true(s.prediction.has_suggestions())
-				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+				helpers.assert_eq(#s.resets, resets); helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 			end)
 		end)
 	end)

@@ -113,6 +113,7 @@ local KEY_MAP = {
 	click_resets_word                    = { sec = "hotstrings"                                        },
 	arrow_resets_word                    = { sec = "hotstrings"                                        },
 	shortcut_resets_word                 = { sec = "hotstrings"                                        },
+	tap_hold_resets_word                 = { sec = "hotstrings"                                        },
 	personal_info                       = { sec = "hotstrings", path = "modules", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
 	preview_autocorrect_enabled          = { sec = "hotstrings"                                        },
@@ -158,9 +159,11 @@ local KEY_MAP = {
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = ConfigKeys.LEAF.NUM_PREDICTIONS },
+	llm_auto_profile_for_model           = { sec = "llm", path = "profiles", key = ConfigKeys.LEAF.AUTO_PROFILE_FOR_MODEL },
 	llm_debounce                         = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.DEBOUNCE_MS, units_per_state = 1000, never = true },
 	llm_min_request_interval             = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },
+	llm_inline_autotype                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INLINE_AUTOTYPE },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.AFTER_HOTSTRING },
 	llm_while_hotstring_tooltip          = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.WHILE_HOTSTRING_TOOLTIP },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.URL_BAR_FILTER_ENABLED },
@@ -192,6 +195,16 @@ local KEY_MAP = {
 	layout_number_row_mode               = { sec = "layout", key = ConfigKeys.LEAF.DIRECT_ACCESS_DIGITS, enum = true },
 	-- Declared for macOS like the ordering it extends: kept, never applied here.
 	layout_number_row_reorder_edges      = { sec = "layout", key = ConfigKeys.LEAF.NUMBER_ROW_REORDER_EDGES },
+	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- types, its two layers and its four rows, as on Windows and Linux.
+	layout_emulated_layout               = { sec = "layout", key = LEAF.EMULATED_LAYOUT          },
+	layout_ergopti_variant               = { sec = "layout", key = LEAF.ERGOPTI_VARIANT, enum = true },
+	layout_ergopti_base                  = { sec = "layout", key = LEAF.ERGOPTI_BASE             },
+	layout_ergopti_alt_gr                = { sec = "layout", key = LEAF.ERGOPTI_ALT_GR           },
+	layout_emulate_number_row            = { sec = "layout", key = LEAF.EMULATE_NUMBER_ROW       },
+	layout_emulate_top_row               = { sec = "layout", key = LEAF.EMULATE_TOP_ROW          },
+	layout_emulate_home_row              = { sec = "layout", key = LEAF.EMULATE_HOME_ROW         },
+	layout_emulate_bottom_row            = { sec = "layout", key = LEAF.EMULATE_BOTTOM_ROW       },
 	layout_pause_switch_enabled          = { sec = "layout", key = ConfigKeys.LEAF.PAUSE_SWITCH_ENABLED    },
 	layout_on_pause                      = { sec = "layout", key = ConfigKeys.LEAF.ON_PAUSE                },
 	layout_on_resume                     = { sec = "layout", key = ConfigKeys.LEAF.ON_RESUME               },
@@ -362,13 +375,12 @@ end
 --- Value rules of owners that accept more than the manifest's Lua type. The
 --- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
 --- edit or an AHK migration can persist "4.5"), so a numeric string is a value
---- it applies, not an outdated one. A script-control slot takes an action id
+--- it applies within the supported range, not an outdated one. A script-control slot takes an action id
 --- the catalogue still offers.
 local OWNER_VALUE_RULES = {
 	gesture_sensitivities = function(value)
-		local number = tonumber(value)
-		if type(number) == "number" and number > 0 then return true end
-		return false, "the value is not a positive number"
+		if require("gestures.sensitivity").coerce(value) ~= nil then return true end
+		return false, "the value is outside the supported sensitivity range"
 	end,
 	script_control_shortcuts = function(value)
 		local retired, detail = M.action_is_retired(value)
@@ -637,6 +649,10 @@ local SCALAR_VALUE_RULES = {
 	shortcut_resets_word = function(value)
 		if type(value) == "boolean" then return true end
 		return false, "the shortcut reset is not a boolean"
+	end,
+	tap_hold_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the tap-hold reset is not a boolean"
 	end,
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end
@@ -1180,6 +1196,54 @@ end
 -- full-document model long after boot. A last-moment check inside the adapter
 -- cannot detect an external edit that landed before save() was called.
 local _source_snapshots = {}
+local _roi_encryption_requests = {}
+local _active_source_path = nil
+
+--- Qualifies only encryption's canonical scalar, without changing ordinary defaults.
+--- Unknown parents, arrays and non-booleans must never become a plaintext grant.
+local function roi_encryption_request(source)
+	if type(source) ~= "table" then return nil end
+	if source.status == "absent" then return false end
+	if source.status ~= "ok" or type(source.content) ~= "string" then return nil end
+	local called, document, shapes = pcall(require("toml_codec.leaf_rows").decode_source, source.content)
+	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return nil end
+	local metrics = rawget(document, "metrics")
+	if metrics == nil then return false end
+	if type(metrics) ~= "table" or shapes.arrays[metrics] then return nil end
+	local requested = rawget(metrics, "encrypt")
+	if requested == nil then return false end
+	if type(requested) == "boolean" then return requested end
+	return nil
+end
+
+--- Publishes the ROI verdict without granting any preference overwrite authority.
+local function set_roi_encryption_request(path, requested)
+	_roi_encryption_requests[path] = requested
+	if path == _active_source_path and requested ~= false then
+		local cipher = package.loaded["modules.keystats.text_cipher"]
+		if type(cipher) == "table" and type(cipher.prepare_roi_encryption) == "function" then
+			local called, settled = pcall(cipher.prepare_roi_encryption)
+			if not called or settled ~= true then
+				Logger.error(LOG, "Canonical encryption policy closed textual ROI while prior journal work remains pending.")
+			end
+		end
+	end
+end
+
+--- Publishes source and its ROI admission together, outside input callbacks.
+--- Existing source adoption, publication and rollback keep their own authority.
+local function set_source_snapshot(path, source)
+	_source_snapshots[path] = source
+	set_roi_encryption_request(path, roi_encryption_request(source))
+end
+
+--- Returns the adopted source's cached scalar; this getter performs no I/O or parsing.
+--- A failed reload revokes the earlier source before native reads can reenter.
+--- @return boolean|nil requested Nil means no known canonical policy.
+function M.roi_encryption_requested()
+	if _active_source_path == nil then return nil end
+	return _roi_encryption_requests[_active_source_path]
+end
 local _save_receipts = {}
 local _owned_publications = {}
 -- Paths load() judged outdated, per destination: never read into the state,
@@ -1265,7 +1329,7 @@ local function adopt_changed_source(prefs_file, expected_source, on_error)
 		local decode_ok, decoded = pcall(TomlCodec.decode, current_source.content)
 		if not decode_ok or type(decoded) ~= "table" then return false end
 	end
-	_source_snapshots[prefs_file] = current_source
+	set_source_snapshot(prefs_file, current_source)
 	return true
 end
 
@@ -1291,25 +1355,27 @@ end
 --- @return table The decoded preferences (empty when the file is absent or invalid).
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
+	_active_source_path = prefs_file
+	set_roi_encryption_request(prefs_file, nil)
 	assert(not _owned_publications[prefs_file], "preference publication is still active")
 	local schema_check = capture_schema_read(prefs_file, FileSystem)
 	if schema_check == false then
-		_source_snapshots[prefs_file] = nil
+		set_source_snapshot(prefs_file, nil)
 		Logger.error(LOG, "config.toml schema reader owner is unavailable; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	local content, read_status = FileSystem.read_with_status(prefs_file)
 	if not schema_read_admitted(schema_check, content, read_status) then
-		_source_snapshots[prefs_file] = nil
+		set_source_snapshot(prefs_file, nil)
 		Logger.error(LOG, "config.toml has unsupported schema metadata; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	if read_status ~= "ok" then
 		if read_status == "absent" then
-			_source_snapshots[prefs_file] = { status = "absent" }
+			set_source_snapshot(prefs_file, { status = "absent" })
 			return {}, "absent"
 		end
-		_source_snapshots[prefs_file] = nil
+		set_source_snapshot(prefs_file, nil)
 		Logger.error(LOG, "config.toml could not be read; treating it as corrupt "
 			.. "(failure content withheld).")
 		return {}, "corrupt"
@@ -1317,7 +1383,7 @@ function M.load(prefs_file)
 
 	local dec_ok, tbl, shapes = pcall(require("toml_codec.leaf_rows").decode_source, content)
 	if not dec_ok or type(tbl) ~= "table" then
-		_source_snapshots[prefs_file] = nil
+		set_source_snapshot(prefs_file, nil)
 		-- Loud, and never silently overwritten. The user's settings are still on
 		-- disk and are recoverable by hand; treating this as "fresh install" is
 		-- what destroys them.
@@ -1333,16 +1399,16 @@ function M.load(prefs_file)
 		values = flatten_from_disk(tbl, nil, shapes)
 	end)
 	if not flattened then
-		_source_snapshots[prefs_file] = nil
+		set_source_snapshot(prefs_file, nil)
 		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	if not schema_read_admitted(schema_check, content, read_status) then
-		_source_snapshots[prefs_file] = nil
+		set_source_snapshot(prefs_file, nil)
 		Logger.error(LOG, "config.toml reader admission changed during hydration; keeping its source untouched.")
 		return {}, "corrupt"
 	end
-	_source_snapshots[prefs_file] = { status = "ok", content = content }
+	set_source_snapshot(prefs_file, { status = "ok", content = content })
 	_load_outdated[prefs_file] = outdated
 	return values, "ok"
 end
@@ -1364,7 +1430,10 @@ end
 ---   every regeneration and nothing said which key held it. Never the value itself.
 function M.current_view(prefs_file, tolerate_outdated)
 	if type(prefs_file) ~= "string" or prefs_file == "" then return nil, nil, "invalid_path" end
-	if _owned_publications[prefs_file] then return nil, nil, "publication_in_flight" end
+	if _owned_publications[prefs_file] then
+		if prefs_file == _active_source_path then set_roi_encryption_request(prefs_file, nil) end
+		return nil, nil, "publication_in_flight"
+	end
 	local called, values, source, reason, key_path = pcall(function()
 		local current, refusal = classify_source(prefs_file)
 		if not current then return nil, nil, refusal end
@@ -1380,6 +1449,13 @@ function M.current_view(prefs_file, tolerate_outdated)
 		end
 		return flat, current
 	end)
+	if prefs_file == _active_source_path then
+		local requested
+		if called and values ~= nil then requested = roi_encryption_request(source) end
+		-- A read-only observation may revoke text but cannot adopt a source or
+		-- reopen capture. OFF needs the existing load/publication acknowledgement.
+		if requested ~= false then set_roi_encryption_request(prefs_file, requested) end
+	end
 	if not called then return nil, nil, "raised" end
 	if values == nil then return nil, nil, reason, key_path end
 	return values, source
@@ -1442,7 +1518,7 @@ function M.adopt_cleanup(prefs_file, previous, content)
 		or type(content) ~= "string" then
 		return false
 	end
-	_source_snapshots[prefs_file] = { status = "ok", content = content }
+	set_source_snapshot(prefs_file, { status = "ok", content = content })
 	return true
 end
 
@@ -1479,7 +1555,7 @@ function M.replace_source(path, expected, replacement)
 	end
 	if not valid(expected) or not valid(replacement) or not valid(current)
 		or current.status ~= expected.status or current.content ~= expected.content then return false end
-	_source_snapshots[path] = { status = replacement.status, content = replacement.content }
+	set_source_snapshot(path, { status = replacement.status, content = replacement.content })
 	return true
 end
 
@@ -1805,7 +1881,7 @@ local function handoff_native_publication(path, expected, candidate, native, on_
 			or native.matches_source() ~= true then return false end
 		local baseline = _source_snapshots[path]
 		if baseline and not same_source(baseline, expected) and not same_source(baseline, source) then return false end
-		_source_snapshots[path] = { status = source.status, content = source.content }
+		set_source_snapshot(path, { status = source.status, content = source.content })
 		return true
 	end
 	-- Deliver the capability even when a foreign source currently prevents its
@@ -1865,7 +1941,7 @@ function M.publish_owned(path, updates, source, on_error, publication_observer)
 		report("publication", "error", "Owned preferences were not published: %s.", tostring(called and detail or committed))
 		return false
 	end
-	_source_snapshots[path] = { status = "ok", content = encoded }
+	set_source_snapshot(path, { status = "ok", content = encoded })
 	return true
 end
 
@@ -2132,7 +2208,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				tostring(prefs_file))
 			return false
 		end
-		_source_snapshots[prefs_file] = expected_source
+		set_source_snapshot(prefs_file, expected_source)
 	end
 
 	-- A value load() judged outdated is left for the cleanup: the state holds
@@ -2266,7 +2342,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		end
 	end
 	if model_operation then RecordList.acknowledge(model_operation, encoded) end
-	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
+	set_source_snapshot(prefs_file, { status = "ok", content = encoded })
 	if type(encoded) == "string" then
 		local prior = _save_receipts[prefs_file]
 		_save_receipts[prefs_file] = { id = (prior and prior.id or 0) + 1, source = { status = "ok", content = encoded } }

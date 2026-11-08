@@ -933,6 +933,14 @@ local function admit_metadata(url, headers, body, options)
 		-- until the adapter owns and filters every redirect hop explicitly.
 		follow_redirects = allowed
 	end
+	local body_limit = rawget(options, "max_body_bytes")
+	if body_limit ~= nil then
+		body_limit = tonumber(body_limit)
+		if not body_limit or body_limit ~= body_limit or body_limit < 0
+			or body_limit > MAX_SAFE_INTEGER or body_limit % 1 ~= 0 then
+			return nil, "native HTTP response body limit is invalid"
+		end
+	end
 	local output_target = rawget(options, "output_target")
 	if output_target ~= nil then
 		local limit = rawget(options, "max_download_bytes")
@@ -977,6 +985,7 @@ local function admit_metadata(url, headers, body, options)
 		prepared_headers = options.prepared_headers,
 		protocols = protocols,
 		buffered = options.buffered == true,
+		max_body_bytes = body_limit,
 		method = options.method or "POST",
 		failure_log_level = failure_log_level,
 		timeout_ms = timeout_ms,
@@ -1130,7 +1139,6 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			handles = {},
 			spawned = false,
 			buffered = options.buffered == true,
-			max_body_bytes = tonumber(options.max_body_bytes),
 			on_chunk = on_chunk,
 			on_done = on_done,
 			stdout_text = "",
@@ -1202,6 +1210,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	end
 
 	request = request or new_request(owner)
+	request.max_body_bytes = request_options.max_body_bytes
 	request.failure_log_level = request_options.failure_log_level
 	request.proxy_selection = request_options.proxy_selection
 	request.proxy_metrics_available = request_options.proxy_metrics_available

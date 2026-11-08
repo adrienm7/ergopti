@@ -39,7 +39,7 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 	_LPP_Run(IsSet(Menu) ? Menu : _LPP_Menu(), Buffer, _Inner, true)
 	_Inner(Calls, Lines) {
 		global _LLM_Live, _LLM_Bridge_Active, _LLM_MenuBuildCoordinator, _LLM_Engine
-		global _LLM_Bridge_ReadLiveFocus
+		global _LLM_Bridge_ReadLiveFocus, _LLM_Bridge_Buffer
 		global _TooltipActiveSurface, _LLM_AcceptInProgress
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
 		global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
@@ -53,12 +53,15 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			Tasks: _SR_ActiveTasks.Count
 		}
 		Builds := []
+		Privacy := _LLM_TestPrivacyEnter(Map("hwnd", 101, "control", 102))
 		try {
 			LLM_Engine_CancelTimer()
 			_LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
 			_LLM_Bridge_Active := true
 			; This scenario owns its typing target; the hosted desktop need not have focus.
 			_LLM_Bridge_ReadLiveFocus := () => Map("hwnd", 101, "control", 102)
+			AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(_LLM_Bridge_ReadLiveFocus.Call(), true)))
+			_LLM_Bridge_Buffer := Buffer
 			_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(
 				(*) => (Builds.Push(1), 1), (*) => false)
 			_TooltipActiveSurface := 0
@@ -85,6 +88,7 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			_LLM_Bridge_ReadLiveFocus := Saved.Focus
 			_LLM_Bridge_Active := Saved.Active
 			_LLM_Live := Saved.Live
+			_LLM_TestPrivacyExit(Privacy)
 		}
 		AssertEqual(ObjPtr(Saved.Focus), ObjPtr(_LLM_Bridge_ReadLiveFocus),
 			"the live-mode fixture restores the exact foreground probe identity")
@@ -711,6 +715,11 @@ _LLV_ExpansionObserverRequiresCurrentFocus() {
 		Changed := _LLV_CaptureRealTimer(ChangeTarget)
 		AssertFalse(Changed.Active, "a focused-control change retires the exact deferred owner")
 		AssertEqual(0, Calls.Length, "a stale typing target starts no transport")
+		OtherTarget := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
+			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
+		AssertFalse(OtherTarget.Active, "a stable new target cannot relabel the context captured in control 102")
+		AssertEqual(0, Calls.Length, "control 103 receives no old-target transport without new admitted typing")
+		Focus["control"] := 102
 		Stable := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
 			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
 		AssertTrue(Stable.Active, "a verified unchanged typing target re-arms the live request")

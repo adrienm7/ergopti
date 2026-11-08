@@ -46,6 +46,7 @@ local LOG = "adapters.field_check_ports"
 --- @param environment table|nil Explicit child environment (the launcher's identity).
 local function exec(executable, args, timeout_s, callback, environment)
 	local settled, timer, handle = false, nil, nil
+	local retiring = false
 	local function settle(code, stdout, stderr)
 		if settled then return end
 		settled = true
@@ -53,18 +54,44 @@ local function exec(executable, args, timeout_s, callback, environment)
 		callback(code, stdout, stderr or "")
 	end
 	handle = ShellRunner.spawn(executable, args, function(code, stdout, stderr)
-		settle(code, stdout, stderr)
+		if not retiring then settle(code, stdout, stderr) end
 	end, nil, environment)
-	if handle.isSettled() or not handle.start() then
+	local function retire(reason)
+		if retiring or settled then return end
+		retiring = true
+		local observer_ok, observed = pcall(handle.onSettled, function() settle(nil, "", reason) end)
+		if not observer_ok or observed ~= true then
+			Logger.error(LOG, "Could not observe the child after %s.", reason)
+		end
+		if settled then return end
+		local terminated, accepted = pcall(handle.terminate)
+		if not terminated or accepted ~= true then Logger.error(LOG, "Could not terminate the child after %s.", reason) end
+	end
+	if handle.isSettled() then
 		Logger.warn(LOG, "Could not start %s.", NativePath.basename(executable) or "a command")
 		settle(nil, "")
 		return
 	end
-	timer = Timer.after(timeout_s, function()
+	if not handle.start() then
+		Logger.warn(LOG, "Could not start %s.", NativePath.basename(executable) or "a command")
+		if handle.isSettled() then settle(nil, "") else retire("start refused") end
+		return
+	end
+	if settled then return end
+	local timer_committed
+	timer, timer_committed = Timer.after(timeout_s, function()
 		timer = nil
-		pcall(handle.terminate)
-		settle(nil, "")
+		retire("deadline expired")
 	end)
+	if settled then
+		if timer then Timer.cancel(timer); timer = nil end
+		return
+	end
+	if timer_committed ~= true then
+		-- The task was already started. A refused deadline is not permission to
+		-- abandon it or report completion before the exact process is retired.
+		retire("deadline unavailable")
+	end
 end
 
 
@@ -112,7 +139,15 @@ local function remap_facts()
 	local phase = "unknown"
 	local ok, current = pcall(function() return (require("platform.remap.lease_controller").status()) end)
 	if ok and type(current) == "string" then phase = current end
-	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state() }
+	local KePaths = require("platform.remap.ke_paths")
+	-- Nil for the shared runtime; for the owned one, whether its owner admitted it
+	local owned_admitted = nil
+	if KePaths.selected_runtime() == KePaths.RUNTIME_OWNED then
+		local status = type(Remap.owned_runtime_status) == "function" and Remap.owned_runtime_status() or nil
+		owned_admitted = type(status) == "table" and status.state == "ready"
+	end
+	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state(),
+		owned_admitted = owned_admitted }
 end
 
 --- The deployed Karabiner configuration and the tap-hold delays the shared
@@ -134,7 +169,23 @@ local function tap_hold_threshold_facts()
 			facts.expected[key_code] = { id = key.id, ms = deployed[key.id] or ((own and own > 0) and own or global) }
 		end
 	end
-	local text = FileSystem.read(FileSystem.expand_path(KePaths.config_file_for(KePaths.selected_runtime())))
+	local runtime = KePaths.selected_runtime()
+	-- The owned runtime deploys nothing before its owner admits it: its folder
+	-- does not exist yet, and reading through it logged an error and failed the
+	-- thresholds for a runtime the owned_* steps already report (field report 2026-11-06).
+	if runtime == KePaths.RUNTIME_OWNED then
+		local status = type(Remap.owned_runtime_status) == "function" and Remap.owned_runtime_status() or nil
+		if type(status) ~= "table" or status.state ~= "ready" then
+			facts.reason = "owned_runtime_not_ready"
+			return facts
+		end
+	end
+	local path = FileSystem.expand_path(KePaths.config_file_for(runtime))
+	if FileSystem.exists(path) ~= true then
+		facts.reason = "not_deployed"
+		return facts
+	end
+	local text = FileSystem.read(path)
 	if type(text) ~= "string" then
 		facts.reason = "unreadable"
 		return facts
@@ -156,7 +207,7 @@ local function tap_copy_facts()
 	local Remap = require("platform.remap")
 	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
 	local rollover = require("platform.remap.defaults").rollover_keys
-	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {},
+	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {}, deployed = next(deployed) ~= nil,
 		change_count = (require("adapters.clipboard")._change_count()),
 		stats = require("modules.keymap").tap_copy_statistics() }
 	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
@@ -352,7 +403,7 @@ local function owned_readiness(callback)
 		local OwnerPorts = require("adapters.runtime_owner_ports")
 		local readiness = {
 			unpinned = OwnerPorts.unpinned_count(),
-			virtual_hid_version = OwnerPorts.virtual_hid_version(),
+			virtual_hid_version = OwnerPorts.virtual_hid_extension_version(),
 			artifact = OwnerPorts.artifact_receipt_state(),
 			source = source_available == true,
 			helper_present = facts.helper_present,
@@ -408,7 +459,7 @@ local function owned_activation()
 		end,
 		driver_active = function(callback)
 			exec("/usr/bin/systemextensionsctl", { "list" }, 5, function(code, output)
-				local version = require("adapters.runtime_owner_ports").virtual_hid_version()
+				local version = require("adapters.runtime_owner_ports").virtual_hid_extension_version()
 				if code ~= 0 or type(version) ~= "string" then return callback(nil) end
 				local Vhid = require("platform.remap.runtime_vhid")
 				callback(Vhid.assess(Vhid.parse(output), version).ok == true)

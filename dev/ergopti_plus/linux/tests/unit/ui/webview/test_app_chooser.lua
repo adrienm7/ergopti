@@ -35,12 +35,52 @@ helpers.describe("open_app application chooser (Linux)", function()
 
 	helpers.it("the owned dialog lists the desktop entries and the choice becomes its desktop id", function()
 		local shell, commands = fake_shell("/usr/share/applications/org.gnome.Nautilus.desktop")
-		local id, err = Chooser.pick(shell, "Open an application")
+		local id, err = Chooser.pick(shell, "Open an application", { resolve = function()
+			return "/usr/share/applications/org.gnome.Nautilus.desktop", "found"
+		end })
 		helpers.assert_eq(err, nil)
 		helpers.assert_eq(id, "org.gnome.Nautilus")
 		helpers.assert_eq(commands[1], require("ui.native_dialog").command()
 			.. " --file-selection --title='ErgoptiPlus — Open an application'"
 			.. " --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null")
+	end)
+
+	helpers.it("refuses a selected desktop entry shadowed by the native XDG owner", function()
+		local shell = fake_shell("/usr/share/applications/example.desktop")
+		local notices = 0
+		local selected = Chooser.pick(shell, "Applications", {
+			resolve = function(id)
+				helpers.assert_eq(id, "example")
+				return "/home/example/.local/share/applications/example.desktop", "found"
+			end,
+			notify = function() notices = notices + 1; return true end,
+		})
+		helpers.assert_nil(selected)
+		helpers.assert_eq(notices, 1)
+	end)
+
+	helpers.it("refuses unverifiable native desktop resolution and reports it", function()
+		for _, resolver in ipairs({ function() return nil, "unavailable" end, function() return nil, "not_found" end,
+			function() error("native resolver failed") end }) do
+			local shell, notices = fake_shell("/usr/share/applications/example.desktop"), 0
+			local selected = Chooser.pick(shell, "Applications", {
+				resolve = resolver, notify = function() notices = notices + 1; return true end,
+			})
+			helpers.assert_nil(selected)
+			helpers.assert_eq(notices, 1)
+		end
+	end)
+
+	helpers.it("a shadowed choice shows the translated native error", function()
+		local shell, commands = fake_shell("/usr/share/applications/example.desktop")
+		local selected = Chooser.pick(shell, "Applications", {
+			resolve = function() return "/other/example.desktop", "found" end,
+		})
+		helpers.assert_nil(selected)
+		helpers.assert_eq(#commands, 2)
+		helpers.assert_true(commands[2]:find(" --error --no-markup ", 1, true) ~= nil)
+		helpers.assert_true(commands[2]:find(" --title='ErgoptiPlus — Applications'", 1, true) ~= nil)
+		helpers.assert_true(commands[2]:find(require("infra.i18n").get("dialog.app_picker.selection_unverified"), 1, true) ~= nil)
 	end)
 
 	helpers.it("a cancelled dialog or another file chooses nothing", function()
@@ -102,7 +142,7 @@ helpers.describe("application chooser preserves installed desktop ids", function
 				local Chooser = require("ui.app_chooser")
 				helpers.assert_eq(Chooser.desktop_id(row[4]), expected)
 				local shell = fake_shell(row[4] .. "\n")
-				local selected, reason = Chooser.pick(shell, "Applications")
+				local selected, reason = Chooser.pick(shell, "Applications", { resolve = function() return row[4], "found" end })
 				helpers.assert_eq(selected, expected)
 				if expected == nil then helpers.assert_true(type(reason) == "string" and reason ~= "") end
 			end)
@@ -135,7 +175,8 @@ local function native_dialog_receipt(status, output)
 			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked}\n"
 			-- The private executable stands in for the owned dialog host.
 			.. "package.loaded['ui.native_dialog']={command=function()return S.quote(" .. string.format("%q", executable) .. ")end}\n"
-			.. "local id=require('ui.app_chooser').pick(shell,'Applications')\n"
+			.. "local id=require('ui.app_chooser').pick(shell,'Applications',{resolve=function() return "
+			.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
 			.. "io.write(id==nil and 'refused' or 'accepted|'..id);io.write('|modal:'..calls)\n")
 		local executed, result, reason = Shell.exec_checked("env PATH="
 			.. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
@@ -149,6 +190,191 @@ local function native_dialog_receipt(status, output)
 	assert(ok, receipt)
 	return receipt
 end
+
+helpers.describe("application chooser follows the actual XDG resolution owner", function()
+	helpers.it("keeps the higher-priority file and refuses the shadowed selection", function()
+		if not rawget(_G, "jit") then print("SKIP: native Gio worker requires LuaJIT FFI"); return end
+		local Shell = require("adapters.shell_runner")
+		local ok, root = Shell.exec_checked("mktemp -d")
+		assert(ok); root = root:gsub("[\r\n]+$", "")
+		local user, system, worker = root .. "/user", root .. "/system", root .. "/worker.lua"
+		assert(Shell.run("mkdir -p " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(system .. "/applications")))
+		local function write(path, text)
+			local f = assert(io.open(path, "wb")); assert(f:write(text)); assert(f:close())
+		end
+		local name = "ergopti-choice-witness.desktop"
+		write(system .. "/applications/" .. name, "[Desktop Entry]\nType=Application\nName=Witness\nExec=/bin/true\n")
+		write(worker, "package.path=" .. string.format("%q", package.path) .. "\n"
+			.. "package.loaded['ui.modal']={run=function(fn)return fn()end}\n"
+			.. "package.loaded['ui.native_dialog']={command=function()return 'dialog' end}\n"
+			.. "local chooser=require('ui.app_chooser'); local resolver=require('ui.desktop_application_resolution'); local notices=0\n"
+			.. "local function pick(path) local shell={quote=function(s)return s end,exec_checked=function()return true,path..'\\n' end}; "
+			.. "return chooser.pick(shell,'T',{notify=function()notices=notices+1;return true end}) end\n"
+			.. "local before=resolver.resolve('ergopti-choice-witness')\n"
+			.. "local f=assert(io.open(" .. string.format("%q", user .. "/applications/" .. name) .. ", 'wb')); "
+			.. "assert(f:write('[Desktop Entry]\\nType=Application\\nName=Override\\nExec=/bin/true\\n')); assert(f:close())\n"
+			.. "local after=resolver.resolve('ergopti-choice-witness')\n"
+			.. "io.write(tostring(before==" .. string.format("%q", system .. "/applications/" .. name) .. "), '|', "
+			.. "tostring(after==" .. string.format("%q", user .. "/applications/" .. name) .. "), '|', "
+			.. "tostring(pick(" .. string.format("%q", system .. "/applications/" .. name) .. ")), '|', "
+			.. "tostring(pick(" .. string.format("%q", user .. "/applications/" .. name) .. ")), '|')\n"
+			-- A LuaJIT built with LUA52COMPAT (Fedora, Alpine) answers true, not 0.
+			.. "local made=os.execute(" .. string.format("%q", "mkdir -p " .. Shell.quote(user .. "/applications/vendor")) .. "); assert(made==true or made==0)\n"
+			.. "local f=assert(io.open(" .. string.format("%q", user .. "/applications/vendor/editor.desktop") .. ", 'wb')); "
+			.. "assert(f:write('[Desktop Entry]\\nType=Application\\nName=Nested\\nExec=/bin/true\\n')); assert(f:close())\n"
+			.. "local f=assert(io.open(" .. string.format("%q", user .. "/applications/" .. name .. ".desktop") .. ", 'wb')); "
+			.. "assert(f:write('[Desktop Entry]\\nType=Application\\nName=Double\\nExec=/bin/true\\n')); assert(f:close())\n"
+			.. "io.write(tostring(pick(" .. string.format("%q", user .. "/applications/" .. name .. ".desktop") .. ")), '|', "
+			.. "tostring(pick(" .. string.format("%q", user .. "/applications/vendor/editor.desktop") .. ")), '|', notices)\n")
+		local command = "env XDG_DATA_HOME=" .. Shell.quote(user) .. " XDG_DATA_DIRS=" .. Shell.quote(system)
+			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
+		local ran, output = Shell.exec_checked(command)
+		os.remove(worker); os.remove(user .. "/applications/vendor/editor.desktop")
+		Shell.run("rmdir " .. Shell.quote(user .. "/applications/vendor"))
+		os.remove(user .. "/applications/" .. name .. ".desktop")
+		os.remove(user .. "/applications/" .. name); os.remove(system .. "/applications/" .. name)
+		Shell.run("rmdir " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(system .. "/applications")
+			.. " " .. Shell.quote(user) .. " " .. Shell.quote(system) .. " " .. Shell.quote(root))
+		helpers.assert_true(ran)
+		helpers.assert_eq(output, "true|true|nil|ergopti-choice-witness|nil|vendor-editor|2")
+	end)
+end)
+
+helpers.describe("application lookup owns its bounded native worker", function()
+	helpers.it("refuses failed or malformed bounded lookup receipts", function()
+		local names = { "ui.desktop_application_resolution", "adapters.shell_runner", "ui.modal" }
+		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local command, modal_calls, answer, output = nil, 0, false, ""
+		local real_shell = require("adapters.shell_runner")
+		package.loaded["adapters.shell_runner"] = { quote = real_shell.quote, exec_checked = function(value)
+			command = value
+			return answer, output
+		end }
+		package.loaded["ui.modal"] = { run = function(fn) modal_calls = modal_calls + 1; return fn() end }
+		package.loaded["ui.desktop_application_resolution"] = nil
+		local ok, detail = pcall(function()
+			local resolver = require("ui.desktop_application_resolution")
+			local path, status = resolver.resolve("example")
+			helpers.assert_nil(path); helpers.assert_eq(status, "unavailable")
+			helpers.assert_true(command:find("timeout --foreground --kill-after=1s 2s ", 1, true) == 1)
+			answer, output = true, "/first\n/forged\n"
+			path, status = resolver.resolve("example")
+			helpers.assert_nil(path); helpers.assert_eq(status, "unavailable")
+			answer, output = true, "/valid/example.desktop\n"
+			path, status = resolver.resolve("example")
+			helpers.assert_eq(path, "/valid/example.desktop"); helpers.assert_eq(status, "found")
+			helpers.assert_eq(modal_calls, 3)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("resolves through a literal driver root containing semicolon and question mark", function()
+		if not rawget(_G, "jit") then print("SKIP: native Gio worker requires LuaJIT FFI"); return end
+		local Shell = require("adapters.shell_runner")
+		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
+		local driver, user = root .. "/driver;?literal", root .. "/user"
+		assert(Shell.run("mkdir -p " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
+			.. " " .. Shell.quote(user .. "/applications")))
+		-- The sources are resolved by module name, never by a path pinned to the tree.
+		local modules = { "ui.desktop_application_resolution", "ui.desktop_application_resolution_worker",
+			"_generated.native_runtime" }
+		local function relative(module_name) return (module_name:gsub("%.", "/")) .. ".lua" end
+		for _, module_name in ipairs(modules) do
+			local bytes = assert(helpers.read_module_source(module_name))
+			local output = assert(io.open(driver .. "/" .. relative(module_name), "wb"))
+			assert(output:write(bytes)); assert(output:close())
+		end
+		local desktop = user .. "/applications/ergopti-literal-choice.desktop"
+		local entry = assert(io.open(desktop, "wb")); assert(entry:write("[Desktop Entry]\nType=Application\nName=Literal\nExec=/bin/true\n")); assert(entry:close())
+		local parent = root .. "/parent.lua"
+		local file = assert(io.open(parent, "wb"))
+		assert(file:write("package.path=" .. string.format("%q", package.path) .. "\n"
+			.. "package.loaded['ui.modal']={run=function(fn)return fn()end}\n"
+			.. "local resolver=assert(loadfile(" .. string.format("%q", driver .. "/" .. relative(modules[1])) .. "))()\n"
+			.. "local path,status=resolver.resolve('ergopti-literal-choice'); io.write(tostring(path),'|',status)\n")); assert(file:close())
+		local command = "env XDG_DATA_HOME=" .. Shell.quote(user) .. " XDG_DATA_DIRS=" .. Shell.quote(root .. "/empty")
+			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(parent)
+		local ran, output = Shell.exec_checked(command)
+		for _, module_name in ipairs(modules) do os.remove(driver .. "/" .. relative(module_name)) end
+		os.remove(parent); os.remove(desktop)
+		Shell.run("rmdir " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
+			.. " " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(driver) .. " " .. Shell.quote(user) .. " " .. Shell.quote(root))
+		helpers.assert_true(ran)
+		helpers.assert_eq(output, desktop .. "|found")
+	end)
+
+	helpers.it("waits for a worker that ignores TERM and needs KILL", function()
+		local Shell, uv = require("adapters.shell_runner"), require("luv")
+		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
+		local interpreter, marker, parent = root .. "/interpreter", root .. "/pid", root .. "/parent.lua"
+		local function write(path, text)
+			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
+		end
+		-- No child commands: this interpreter remains the exact timeout child.
+		write(interpreter, "#!/bin/sh\ntrap '' TERM\nprintf '%s' \"$$\" > " .. Shell.quote(marker)
+			.. "\nwhile :; do :; done\n")
+		assert(Shell.run("chmod u+x " .. Shell.quote(interpreter)))
+		write(parent, "package.path=" .. string.format("%q", package.path) .. "\n"
+			.. "require('adapters.shell_runner')\n"
+			.. "package.loaded['ui.modal']={run=function(fn)return fn()end}\n"
+			.. "package.loaded.luv={exepath=function()return " .. string.format("%q", interpreter) .. " end}\n"
+			.. "local path,status=require('ui.desktop_application_resolution').resolve('witness'); io.write(tostring(path),'|',status)\n")
+		local start = uv.hrtime()
+		local ran, output = Shell.exec_checked("timeout --foreground --kill-after=1s 8s "
+			.. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(parent))
+		local elapsed = (uv.hrtime() - start) / 1e9
+		local f = io.open(marker, "rb"); local pid = f and f:read("*a") or nil; if f then f:close() end
+		local alive = type(pid) == "string" and pid:match("^%d+$") and Shell.run("kill -0 " .. pid .. " 2>/dev/null")
+		os.remove(interpreter); os.remove(marker); os.remove(parent); Shell.run("rmdir " .. Shell.quote(root))
+		helpers.assert_true(ran)
+		helpers.assert_eq(output, "nil|unavailable")
+		helpers.assert_true(type(pid) == "string" and pid:match("^%d+$") ~= nil, "the exact worker started")
+		helpers.assert_true(elapsed >= 2.8 and elapsed < 10, "the kill grace elapsed and the worker retired")
+		helpers.assert_eq(alive, false, "the exact worker no longer exists after timeout returns")
+	end)
+
+	helpers.it("retires a Gio worker blocked on a higher-priority FIFO", function()
+		if not rawget(_G, "jit") then print("SKIP: native Gio worker requires LuaJIT FFI"); return end
+		local Shell, uv = require("adapters.shell_runner"), require("luv")
+		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
+		local user, system = root .. "/user", root .. "/system"
+		assert(Shell.run("mkdir -p " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(system .. "/applications")))
+		local id = "ergopti-fifo-witness-" .. tostring(uv.os_getpid())
+		local fifo, worker = user .. "/applications/" .. id .. ".desktop", root .. "/worker.lua"
+		assert(Shell.run("mkfifo " .. Shell.quote(fifo)))
+		local f = assert(io.open(worker, "wb"))
+		assert(f:write("package.path=" .. string.format("%q", package.path) .. "\n"
+			.. "package.loaded['ui.modal']={run=function(fn)return fn()end}\n"
+			.. "local path,status=require('ui.desktop_application_resolution').resolve(" .. string.format("%q", id) .. ")\n"
+			.. "io.write(tostring(path),'|',status)\n")); assert(f:close())
+		local command = "timeout --foreground --kill-after=1s 8s env XDG_DATA_HOME=" .. Shell.quote(user) .. " XDG_DATA_DIRS=" .. Shell.quote(system)
+			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
+		local start = uv.hrtime()
+		local ran, output = Shell.exec_checked(command)
+		local elapsed = (uv.hrtime() - start) / 1e9
+		-- The child has no descendants; timeout waits for its native exit before
+		-- exec_checked returns. Check no matching worker survives the reply.
+		-- Read /proc, as the driver does: ps is not in every minimal image.
+		local listed, entries = Shell.exec_checked("ls /proc")
+		local survivor = false
+		for pid in (entries or ""):gmatch("%d+") do
+			local cmdline = io.open("/proc/" .. pid .. "/cmdline", "rb")
+			local args = cmdline and cmdline:read("*a") or ""
+			if cmdline then cmdline:close() end
+			if args:find("desktop_application_resolution_worker.lua", 1, true)
+				and args:find(id, 1, true) then survivor = true end
+		end
+		os.remove(worker); os.remove(fifo)
+		Shell.run("rmdir " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(system .. "/applications")
+			.. " " .. Shell.quote(user) .. " " .. Shell.quote(system) .. " " .. Shell.quote(root))
+		helpers.assert_true(ran)
+		helpers.assert_eq(output, "nil|unavailable")
+		helpers.assert_true(elapsed < 10, "a FIFO lookup must be bounded")
+		helpers.assert_true(listed)
+		helpers.assert_eq(survivor, false, "the lookup worker must have exited before the reply")
+	end)
+end)
 
 helpers.describe("application chooser requires native confirmation", function()
 	do local tool = "owned dialog"

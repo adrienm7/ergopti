@@ -213,7 +213,94 @@
 				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gestures_manager_config.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_dispatch.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gesture_enable_transaction.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_pump_chain.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_pump_chain.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_axis_slots.lua"
+			]
+		},
+		"gesture_modes": {
+			"members": [
+				"gestures.modes.swipe_2_left",
+				"gestures.modes.swipe_2_right",
+				"gestures.modes.swipe_2_up",
+				"gestures.modes.swipe_2_down",
+				"gestures.modes.swipe_2_left_down",
+				"gestures.modes.swipe_2_left_up",
+				"gestures.modes.swipe_2_right_down",
+				"gestures.modes.swipe_2_right_up",
+				"gestures.modes.swipe_3_left",
+				"gestures.modes.swipe_3_right",
+				"gestures.modes.swipe_3_up",
+				"gestures.modes.swipe_3_down",
+				"gestures.modes.swipe_3_left_down",
+				"gestures.modes.swipe_3_left_up",
+				"gestures.modes.swipe_3_right_down",
+				"gestures.modes.swipe_3_right_up",
+				"gestures.modes.swipe_4_left",
+				"gestures.modes.swipe_4_right",
+				"gestures.modes.swipe_4_up",
+				"gestures.modes.swipe_4_down",
+				"gestures.modes.swipe_4_left_down",
+				"gestures.modes.swipe_4_left_up",
+				"gestures.modes.swipe_4_right_down",
+				"gestures.modes.swipe_4_right_up",
+				"gestures.modes.swipe_5_left",
+				"gestures.modes.swipe_5_right",
+				"gestures.modes.swipe_5_up",
+				"gestures.modes.swipe_5_down",
+				"gestures.modes.swipe_5_left_down",
+				"gestures.modes.swipe_5_left_up",
+				"gestures.modes.swipe_5_right_down",
+				"gestures.modes.swipe_5_right_up",
+				"gestures.sensitivities.swipe_2_left",
+				"gestures.sensitivities.swipe_2_right",
+				"gestures.sensitivities.swipe_2_up",
+				"gestures.sensitivities.swipe_2_down",
+				"gestures.sensitivities.swipe_2_left_down",
+				"gestures.sensitivities.swipe_2_left_up",
+				"gestures.sensitivities.swipe_2_right_down",
+				"gestures.sensitivities.swipe_2_right_up",
+				"gestures.sensitivities.swipe_3_left",
+				"gestures.sensitivities.swipe_3_right",
+				"gestures.sensitivities.swipe_3_up",
+				"gestures.sensitivities.swipe_3_down",
+				"gestures.sensitivities.swipe_3_left_down",
+				"gestures.sensitivities.swipe_3_left_up",
+				"gestures.sensitivities.swipe_3_right_down",
+				"gestures.sensitivities.swipe_3_right_up",
+				"gestures.sensitivities.swipe_4_left",
+				"gestures.sensitivities.swipe_4_right",
+				"gestures.sensitivities.swipe_4_up",
+				"gestures.sensitivities.swipe_4_down",
+				"gestures.sensitivities.swipe_4_left_down",
+				"gestures.sensitivities.swipe_4_left_up",
+				"gestures.sensitivities.swipe_4_right_down",
+				"gestures.sensitivities.swipe_4_right_up",
+				"gestures.sensitivities.swipe_5_left",
+				"gestures.sensitivities.swipe_5_right",
+				"gestures.sensitivities.swipe_5_up",
+				"gestures.sensitivities.swipe_5_down",
+				"gestures.sensitivities.swipe_5_left_down",
+				"gestures.sensitivities.swipe_5_left_up",
+				"gestures.sensitivities.swipe_5_right_down",
+				"gestures.sensitivities.swipe_5_right_up",
+				"gestures.modes.swipe_3_horiz",
+				"gestures.modes.swipe_4_horiz",
+				"gestures.modes.swipe_5_horiz",
+				"gestures.sensitivities.swipe_3_horiz",
+				"gestures.sensitivities.swipe_4_horiz",
+				"gestures.sensitivities.swipe_5_horiz"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/gestures/manager.lua",
+				"static/ergopti_plus/linux/modules/gestures/incremental_tracker.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_incremental.lua"
 			]
 		},
 		"hotstrings": {
@@ -414,6 +501,60 @@
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
+			]
+		},
+		"layout_emulation": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
+				"static/ergopti_plus/linux/infra/layout_emulation_preferences.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
+				"static/ergopti_plus/_shared/lua/layouts/keylayout_emulation.lua",
+				"static/ergopti_plus/_shared/lua/layouts/emulation_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_emulation.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_keylayout_emulation.lua"
+			],
+			"members": [
+				"layout.emulated_layout",
+				"layout.ergopti_variant",
+				"layout.ergopti_base",
+				"layout.ergopti_alt_gr",
+				"layout.emulate_number_row",
+				"layout.emulate_top_row",
+				"layout.emulate_home_row",
+				"layout.emulate_bottom_row"
+			]
+		},
+		"accented_shortcuts": {
+			"members": [
+				"shortcuts.e_grave.enabled",
+				"shortcuts.e_grave.letter",
+				"shortcuts.e_circ.enabled",
+				"shortcuts.e_circ.letter",
+				"shortcuts.e_acute.enabled",
+				"shortcuts.e_acute.letter",
+				"shortcuts.a_grave.enabled",
+				"shortcuts.a_grave.letter"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/shortcuts/accented_shortcuts.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_accented_shortcuts.lua"
 			]
 		}
 	},
@@ -642,6 +783,21 @@
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/ui/tooltip/preview.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_triggers.lua"
+			]
+		},
+		"llm.trigger.inline_autotype": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_llm.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_inline_autotype.lua"
 			]
 		},
 		"llm.trigger.while_hotstring_tooltip": {

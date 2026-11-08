@@ -29,6 +29,7 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local CapsWordOutput = require("infra.capsword_output")
@@ -93,6 +94,7 @@ local _paste_saved_original = nil
 local _paste_pending_timer = nil
 local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
+ClipboardBorrowers.register("text_sender", function() return _paste_owns_clipboard == true end)
 local _paste_recovery_only = false
 local _paste_generation = 0
 local _paste_transaction = nil
@@ -347,6 +349,16 @@ function M.send(text, opts, callback)
 	-- Resolve "auto" to a concrete strategy based on payload length.
 	if mode == "auto" then
 		mode = #text > CLIPBOARD_THRESHOLD and "clipboard" or "direct"
+	end
+	-- Another family's temporary payload is not the user's clipboard: snapshotting
+	-- it would lose the original. Type the text instead, as Windows' SendInstant
+	-- does when the shared clipboard owner is busy (MCP-002).
+	if mode == "clipboard" and not _paste_owns_clipboard then
+		local holder = ClipboardBorrowers.foreign_holder("text_sender")
+		if holder then
+			Logger.debug(LOG, "send(): %s borrows the clipboard — typing the text instead.", holder)
+			mode = "direct"
+		end
 	end
 
 	local ok, err

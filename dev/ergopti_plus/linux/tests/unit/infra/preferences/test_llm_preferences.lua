@@ -32,6 +32,27 @@ local function with_config(source, body)
 	end)
 end
 
+helpers.describe("AI preference classification", function()
+	for _, vector in ipairs({
+		{ name = "absent", content = "[llm.trigger]\n", status = "absent" },
+		{ name = "valid array", content = '[llm.trigger]\ndisabled_apps = ["firefox"]\n', status = "ok", value = { "firefox" } },
+		{ name = "wrong leaf", content = '[llm.trigger]\ndisabled_apps = "firefox"\n', status = "invalid" },
+		{ name = "wrong parent", content = '[llm]\ntrigger = "firefox"\n', status = "invalid" },
+	}) do
+		helpers.it("classifies " .. vector.name .. " without changing source bytes", function()
+			with_config(vector.content, function(path)
+				local preferences = require("infra.llm_preferences")
+				local before = Sandbox.read_bytes(path)
+				local value, status = preferences.get_with_status("llm.trigger.disabled_apps")
+				helpers.assert_eq(status, vector.status)
+				helpers.assert_eq(value, vector.value)
+				helpers.assert_eq(Sandbox.read_bytes(path), before)
+				if value then value[1] = "mutated"; helpers.assert_eq(preferences.get("llm.trigger.disabled_apps"), vector.value) end
+			end)
+		end)
+	end
+end)
+
 helpers.describe("canonical Linux AI settings", function()
 	helpers.it("round-trips the agent-mode enum through the real durable owner without changing neighbors", function()
 		with_config('[llm]\nagent_mode = "auto"\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
@@ -76,6 +97,108 @@ helpers.describe("canonical Linux AI settings", function()
 		with_config('[llm.generation]\ntemperature = 0.9\n[llm.trigger]\ndebounce_ms = 750\n', function()
 			helpers.assert_eq(require("modules.llm.settings").get("temperature"), 0.9)
 			helpers.assert_eq(require("modules.llm.trigger_settings").get("debounce_ms"), 750)
+		end)
+	end)
+
+	helpers.it("refuses a minimum that exceeds the current saved maximum", function()
+		with_config('[llm.generation]\nmin_words = 1\nmax_words = 10\n', function(path)
+			local settings = require("modules.llm.settings")
+			helpers.assert_eq(settings.get("max_words"), 10)
+			local successor = '[llm.generation]\nmin_words = 1\nmax_words = 3\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+			helpers.assert_eq(settings.set("min_words", 5), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+		end)
+	end)
+
+	helpers.it("refuses a bound read from a different image than the retained source", function()
+		local first = '[llm.generation]\nmax_words = 3\n'
+		local interim = '[llm.generation]\nmax_words = 10\n'
+		with_config(first, function(path)
+			local preferences = require("infra.llm_preferences")
+			local _, expected = preferences.get_many({ "llm.generation.max_words" })
+			local file = assert(io.open(path, "wb")); assert(file:write(interim)); assert(file:close())
+			local original = preferences.get_many
+			preferences.get_many = function(...)
+				local values, source, revision = original(...)
+				local restore = assert(io.open(path, "wb")); assert(restore:write(first)); assert(restore:close())
+				return values, source, revision
+			end
+			local settings = require("modules.llm.settings")
+			local ok, accepted = pcall(settings.set, "min_words", 5, expected, function() return true end)
+			preferences.get_many = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), first)
+		end)
+	end)
+
+	helpers.it("accepts generation bounds against the retained matching image", function()
+		with_config('[llm.generation]\nmax_words = 3\n', function(path)
+			local preferences = require("infra.llm_preferences")
+			local _, expected = preferences.get_many({ "llm.generation.max_words" })
+			local settings = require("modules.llm.settings")
+			helpers.assert_true(settings.set("min_words", 2, expected, function() return true end))
+			local document = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(document.llm.generation.max_words, 3)
+			helpers.assert_eq(document.llm.generation.min_words, 2)
+		end)
+	end)
+
+	helpers.it("refuses generation bounds when the source changes before publication", function()
+		with_config('[llm.generation]\nmax_words = 10\n', function(path)
+			local settings = require("modules.llm.settings")
+			local writer = require("toml_codec.writer")
+			local original = writer.batch_write
+			local successor = '[llm.generation]\nmax_words = 3\n'
+			writer.batch_write = function(...)
+				local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+				return original(...)
+			end
+			local ok, result = pcall(settings.set, "min_words", 5)
+			writer.batch_write = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+		end)
+	end)
+
+	helpers.it("reclassifies malformed automatic exclusions after another trigger edit", function()
+		with_config('[llm.trigger]\ndisabled_apps = []\n', function(path)
+			local settings = require("modules.llm.trigger_settings")
+			helpers.assert_eq(settings.is_app_disabled("editor", true), false)
+			local file = assert(io.open(path, "wb"))
+			assert(file:write('[llm.trigger]\ndisabled_apps = ["firefox", "Firefox"]\n')); assert(file:close())
+			helpers.assert_true(settings.set("debounce_ms", 600))
+			helpers.assert_eq(settings.is_app_disabled("editor", true), true)
+			helpers.assert_eq(settings.is_app_disabled("editor"), false, "manual policy is unchanged")
+			local snapshot = settings.configuration_snapshot()
+			settings._reset()
+			helpers.assert_true(settings.restore_configuration(snapshot))
+			helpers.assert_eq(settings.is_app_disabled("editor", true), true)
+		end)
+	end)
+
+	helpers.it("refreshes automatic app exclusions after editing another trigger setting", function()
+		with_config('[llm.trigger]\ndisabled_apps = []\n', function(path)
+			local settings = require("modules.llm.trigger_settings")
+			helpers.assert_eq(settings.is_app_disabled("firefox", true), false)
+			local file = assert(io.open(path, "wb"))
+			assert(file:write('[llm.trigger]\ndisabled_apps = ["firefox"]\n')); assert(file:close())
+			helpers.assert_true(settings.set("debounce_ms", 600))
+			helpers.assert_eq(settings.is_app_disabled("firefox", true), true)
+		end)
+	end)
+
+	helpers.it("refreshes neighboring generation settings after an external edit", function()
+		with_config('[llm.generation]\ntemperature = 0.2\n', function(path)
+			local settings = require("modules.llm.settings")
+			helpers.assert_eq(settings.get("temperature"), 0.2)
+			local file = assert(io.open(path, "wb"))
+			assert(file:write('[llm.generation]\ntemperature = 0.9\n')); assert(file:close())
+			helpers.assert_true(settings.set("context_length", 600))
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.generation.temperature, 0.9)
+			helpers.assert_eq(settings.get("temperature"), 0.9)
 		end)
 	end)
 

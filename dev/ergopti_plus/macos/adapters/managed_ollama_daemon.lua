@@ -104,7 +104,12 @@ function M.prepare(command, nonce, callbacks)
 		observe = function(original, callback)
 			if rawequal(original, task) then return observe(callback) end
 		end,
-	}, callbacks)
+	}, setmetatable({
+		on_released = function(_, reason)
+			Logger.warn(LOG, "Owned Ollama daemon exited without publishing its port (%s); "
+				.. "released from the pause without a retirement receipt.", tostring(reason))
+		end,
+	}, { __index = callbacks }))
 	acquiring = false
 	if not handle then return nil, "preparation", task end
 	return handle, nil, nil

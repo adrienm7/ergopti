@@ -129,6 +129,12 @@ end
 local INSTALLED = { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } }
 
 helpers.describe("menu_keyboard_layout: active-list upgrade label versions", function()
+	helpers.it("does not offer migration for a third-party source containing Ergopti (layout-legacy-ownership)", function()
+		local labels = bundle_labels({ legacy = "OtherErgopti_v2_2_0", latest = "Ergopti_v2.2.2.bundle", installed = INSTALLED })
+		for _, label in ipairs(labels) do
+			helpers.assert_true(not label:find("list ->", 1, true), "a foreign source must not offer an upgrade")
+		end
+	end)
 	helpers.it("drops an unknown legacy version instead of printing v?", function()
 		local labels = bundle_labels({
 			legacy = "Ergopti_plus", legacy_version = nil,
@@ -191,7 +197,9 @@ local function with_layout_fixture(listing, plists, callback)
 		helpers.with_fresh_modules({
 			"modules.keymap.layout_install",
 			"adapters.file_system",
+			"infra.fs_dir",
 		}, function()
+			package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
 			local reads = {}
 			package.loaded["adapters.file_system"] = {
 				read_with_status = function(path)
@@ -321,7 +329,8 @@ helpers.describe("canonical no-bundle status reaches the actual native layout me
 		with_no_bundle_status(function(session)
 			helpers.assert_eq(session.owner.status_rows.no_bundle, {{type = "label", i18n = "menu.layout.no_bundle"}})
 			helpers.assert_eq(session.owner.platforms, {"hs"})
-			helpers.assert_eq(session.owner.reason_key, "platform_reason.layout_bundle_and_menubar_are_macos")
+			-- The install rows name where Windows and Linux install instead (db0cb571).
+			helpers.assert_eq(session.owner.reason_key, "platform_reason.layout_install_is_the_macos_bundle")
 			local rows = session.build()
 			local status, position = find_bundle_status(rows, "menu.layout.no_bundle")
 			local unchanged, neighbor = find_bundle_status(rows, "menu.layout.install_first")

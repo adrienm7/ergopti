@@ -174,14 +174,25 @@ local DEFAULT_EFFECTS = {
 	copy = function(text) return require("adapters.clipboard").write(text) == true end,
 	save = function(dir, name, text)
 		if not make_dir(dir) then return nil, "cannot create " .. dir end
-		local path = dir .. "/" .. name
-		local fh, err = io.open(path, "wb")
-		if not fh then return nil, tostring(err) end
-		local ok, write_err = fh:write(text)
-		local closed, close_err = fh:close()
-		if not ok then return nil, tostring(write_err) end
-		if not closed then return nil, tostring(close_err) end
-		return path
+		local stem, extension = name:match("^(.*)(%.[^.]+)$")
+		stem, extension = stem or name, extension or ""
+		local files = require("adapters.file_system")
+		for index = 0, 999 do
+			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
+			-- This probe only skips a visibly occupied name; creation still belongs
+			-- to the exclusive owner, which revalidates every native path.
+			local occupied = false
+			if hs.fs and type(hs.fs.symlinkAttributes) == "function" then
+				local checked, attributes = pcall(hs.fs.symlinkAttributes, path)
+				occupied = checked and type(attributes) == "table"
+			end
+			if not occupied then
+				local created, status, detail = files.create_if_absent(path, text)
+				if created == true then return path end
+				if status ~= "exists" then return nil, tostring(detail or status) end
+			end
+		end
+		return nil, "no unused diagnostic report name"
 	end,
 	make_dir = make_dir,
 	exists = function(path) return hs.fs.attributes(path, "mode") ~= nil end,

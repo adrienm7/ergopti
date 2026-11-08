@@ -223,16 +223,15 @@
 		},
 		{
 			"id": "resolves_every_binding_form_on_macos",
-			"description": "The same file on macOS: Command is the primary modifier, word and line moves use macOS chords, and a repeat count does not exist there.",
+			"description": "The same file on macOS: Command is the primary modifier, word and line moves use macOS chords, and the repeat count resolves as on Windows.",
 			"os": "macos",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
 			"expected": {
-				"errors": [
-					"unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"
-				],
+				"errors": [],
 				"layers": {
 					"nav": {
 						"CapsLock": "keystroke:Backspace@repeat",
+						"Digit3": "repeat_count:3",
 						"KeyB": "keystroke:shift+meta+KeyS",
 						"KeyJ": "keystroke:alt+ArrowLeft@repeat",
 						"KeyK": "keystroke:ArrowLeft@repeat",
@@ -247,16 +246,15 @@
 		},
 		{
 			"id": "resolves_every_binding_form_on_linux",
-			"description": "The same file on Linux: Ctrl is the primary modifier, the window actions go through the Super key, and a repeat count does not exist there.",
+			"description": "The same file on Linux: Ctrl is the primary modifier, the window actions go through the Super key, and the repeat count resolves as on Windows.",
 			"os": "linux",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
 			"expected": {
-				"errors": [
-					"unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"
-				],
+				"errors": [],
 				"layers": {
 					"nav": {
 						"CapsLock": "keystroke:Backspace@repeat",
+						"Digit3": "repeat_count:3",
 						"KeyB": "keystroke:ctrl+shift+KeyS",
 						"KeyJ": "keystroke:ctrl+ArrowLeft@repeat",
 						"KeyK": "keystroke:ArrowLeft@repeat",
@@ -427,16 +425,15 @@
 			}
 		},
 		{
-			"id": "pointer_buttons_are_not_a_linux_source",
-			"description": "The native daemon takes the mouse only while the layer binds its wheel, so a wheel direction binds on Linux and a button stays refused with its localized reason.",
+			"id": "pointer_buttons_are_a_linux_source",
+			"description": "The native daemon takes the mouse while the layer binds its wheel or a button, so both a wheel direction and a mouse button bind on Linux.",
 			"os": "linux",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
 			"expected": {
-				"errors": [
-					"unavailable_on_os|nav|all|MouseMiddle|platform_reason.layer_pointer_source_is_not_linux"
-				],
+				"errors": [],
 				"layers": {
 					"nav": {
+						"MouseMiddle": "keystroke:Escape@repeat",
 						"WheelDown": "keystroke:AudioVolumeDown@repeat",
 						"WheelUp": "keystroke:AudioVolumeUp@repeat"
 					}
@@ -620,7 +617,7 @@
 		},
 		{
 			"id": "recommended_layer_on_linux",
-			"description": "The same preset on Linux: the Windows chords, the Super key for window placement, the wheel as volume, and no number-row entry.",
+			"description": "The same preset on Linux: the Windows chords, the Super key for window placement, the wheel as volume, and the number row as repeat counts.",
 			"os": "linux",
 			"file": "layers.recommended.toml",
 			"expected": {
@@ -631,6 +628,16 @@
 						"BracketLeft": "keystroke:shift+End",
 						"CapsLock": "keystroke:Backspace@repeat",
 						"Comma": "keystroke:meta+ArrowLeft",
+						"Digit0": "repeat_count:10",
+						"Digit1": "repeat_count:1",
+						"Digit2": "repeat_count:2",
+						"Digit3": "repeat_count:3",
+						"Digit4": "repeat_count:4",
+						"Digit5": "repeat_count:5",
+						"Digit6": "repeat_count:6",
+						"Digit7": "repeat_count:7",
+						"Digit8": "repeat_count:8",
+						"Digit9": "repeat_count:9",
 						"IntlBackslash": "keystroke:alt+shift+ArrowUp@repeat",
 						"KeyA": "keystroke:ctrl+shift+ArrowUp@repeat",
 						"KeyC": "keystroke:alt+shift+ArrowDown@repeat",

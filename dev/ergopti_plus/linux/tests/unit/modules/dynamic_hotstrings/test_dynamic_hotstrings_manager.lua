@@ -35,6 +35,54 @@ helpers.describe("dynamic hotstrings manager", function()
 
   helpers.describe("init and rule registration", function()
 
+    helpers.it("linux-dynamic-init-cancel: refuses reinitialization when programmable cancellation fails", function()
+      local UserCode = require("modules.dynamic_hotstrings.user_code")
+      local Engine = require("dynamic_hotstrings")
+      local old_invalidate, old_reset = UserCode.invalidate, Engine.reset_rules
+      local old_manager = package.loaded["modules.dynamic_hotstrings.manager"]
+      local manager = helpers.load_module("modules.dynamic_hotstrings.manager")
+      local previous_trigger = manager.get_trigger_char()
+      local resets = 0
+      UserCode.invalidate = function() return false end
+      Engine.reset_rules = function(...) resets = resets + 1; return old_reset(...) end
+      local ok, result = pcall(manager.init, { trigger_char = "§" })
+      UserCode.invalidate, Engine.reset_rules = old_invalidate, old_reset
+      package.loaded["modules.dynamic_hotstrings.manager"] = old_manager
+      helpers.assert_true(ok)
+      helpers.assert_eq(result, false)
+      helpers.assert_eq(manager.get_trigger_char(), previous_trigger)
+      helpers.assert_eq(resets, 0, "a refused programmable cancellation must preserve the active rules")
+    end)
+
+    helpers.it("personal info FIFO is refused without blocking dynamic initialization", function()
+      local uv = require("luv")
+      local shell = require("adapters.shell_runner")
+      local path = os.tmpname()
+      os.remove(path)
+      assert(shell.run("mkfifo -- " .. shell.quote(path)))
+      local code = string.format([[package.path = %q
+local manager = require("modules.dynamic_hotstrings.manager")
+assert(manager.init({ personal_info_path = %q }))
+assert(next(manager.get_info()) == nil)
+]], package.path, path)
+      local exited, expired, status, signal = false, false, nil, nil
+      local timer = assert(uv.new_timer())
+      local child
+      child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+        exited, status, signal = true, code, sig
+        uv.timer_stop(timer); uv.close(timer); uv.close(child)
+      end))
+      assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+        expired = true; child:kill("sigkill")
+      end))
+      while not exited do uv.run("once") end
+      uv.run("nowait")
+      os.remove(path)
+      helpers.assert_eq(expired, false, "initialization must never wait for a FIFO writer")
+      helpers.assert_eq(status, 0)
+      helpers.assert_eq(signal, 0)
+    end)
+
     helpers.it("init without personal_info.toml registers at least date rules", function()
       dh.init({ trigger_char = "\\" })
       local count = dh.get_rules_count()
@@ -42,6 +90,23 @@ helpers.describe("dynamic hotstrings manager", function()
       -- when personal_info.toml is absent (only letters would be missing).
       helpers.assert_true(count >= 3,
         string.format("at least 3 rules registered (got %d)", count))
+    end)
+
+    helpers.it("seeds personal_info.toml in a configuration folder a fresh install has not created", function()
+      -- A fresh install starts before anything made the folder; the exclusive
+      -- create alone failed with ENOENT and the editor had no source.
+      local root = os.tmpname(); os.remove(root)
+      local path = root .. "/ergopti/personal_info.toml"
+      local ok, err = pcall(function()
+        dh.init({ trigger_char = "\\", personal_info_path = path })
+        local seeded = io.open(path, "rb")
+        helpers.assert_true(seeded ~= nil, "the default personal_info.toml must be written")
+        local text = seeded:read("*a"); seeded:close()
+        helpers.assert_true(text:find("[info]", 1, true) ~= nil, "the seed holds the shared placeholders")
+      end)
+      os.remove(path); os.remove(root .. "/ergopti"); os.remove(root)
+      dh.init({ trigger_char = "\\", personal_info_path = "/definitely/missing/personal_info.toml" })
+      if not ok then error(err, 0) end
     end)
 
     helpers.it("is_enabled remains false until explicit activation", function()
@@ -62,6 +127,71 @@ helpers.describe("dynamic hotstrings manager", function()
     helpers.it("get_info returns a table (empty if no toml)", function()
       local info = dh.get_info()
       helpers.assert_true(type(info) == "table", "get_info returns a table")
+    end)
+
+    helpers.it("preserves multiline personal info when another field is saved", function()
+      local path = os.tmpname()
+      local fh = assert(io.open(path, "wb"))
+      fh:write('[info]\nstreet_address = "first\\r\\nsecond\\rthird\\nfourth"\ncity = "Puteaux"\n\n[letters]\na = "street_address"\n')
+      fh:close()
+      local ok, err = pcall(function()
+        helpers.assert_true(dh.init({ trigger_char = "★", personal_info_path = path }))
+        local original = "first\r\nsecond\rthird\nfourth"
+        helpers.assert_eq(dh.get_info().street_address, original)
+        helpers.assert_true(dh.save_info({ street_address = original, city = "Paris" }))
+        local saved = assert(io.open(path, "rb"))
+        local decoded = require("toml_codec").decode(saved:read("*a")); saved:close()
+        helpers.assert_eq(decoded.info.street_address, original)
+        helpers.assert_eq(decoded.info.city, "Paris")
+      end)
+      os.remove(path); os.remove(path .. ".tmp")
+      dh.init({ trigger_char = "\\", personal_info_path = "/definitely/missing/personal_info.toml" })
+      if not ok then error(err, 0) end
+    end)
+
+    helpers.it("persists a custom personal-info key named __proto__", function()
+      local path = os.tmpname()
+      local fh = assert(io.open(path, "wb"))
+      fh:write('[info]\n__proto__ = "before"\n\n[letters]\na = "__proto__"\n'); fh:close()
+      local ok, err = pcall(function()
+        helpers.assert_true(dh.init({ trigger_char = "★", personal_info_path = path }))
+        local values = assert(require("json").decode('{"__proto__":"after"}'))
+        helpers.assert_true(dh.save_info(values))
+        local saved = assert(io.open(path, "rb"))
+        local decoded = require("toml_codec").decode(saved:read("*a")); saved:close()
+        helpers.assert_eq(decoded.info["__proto__"], "after")
+      end)
+      os.remove(path); os.remove(path .. ".tmp")
+      dh.init({ trigger_char = "\\", personal_info_path = "/definitely/missing/personal_info.toml" })
+      if not ok then error(err, 0) end
+    end)
+
+    helpers.it("reads and saves the personal file in the effective configuration directory (PIL-002)", function()
+      local directory = os.tmpname()
+      os.remove(directory)
+      assert(os.execute("mkdir -p '" .. directory .. "'"))
+      local path = directory .. "/personal_info.toml"
+      local fh = assert(io.open(path, "w"))
+      fh:write('[info]\nfirst_name = "Effective"\n\n[letters]\np = "first_name"\n')
+      fh:close()
+      local previous = package.loaded["adapters.storage"]
+      package.loaded["adapters.storage"] = { get = function() return directory end }
+      local ok, err = pcall(function()
+        helpers.assert_true(dh.init({ trigger_char = "★" }))
+        helpers.assert_eq(dh.get_info().first_name, "Effective",
+          "init without an explicit path must follow the configuration-directory override")
+        helpers.assert_true(dh.save_info({ first_name = "Saved" }))
+        local saved = assert(io.open(path, "r"))
+        local decoded = require("toml_codec").decode(saved:read("*a"))
+        saved:close()
+        helpers.assert_eq(decoded.info.first_name, "Saved")
+      end)
+      package.loaded["adapters.storage"] = previous
+      os.remove(path)
+      os.remove(path .. ".tmp")
+      os.execute("rmdir '" .. directory .. "'")
+      dh.init({ trigger_char = "\\", personal_info_path = "/definitely/missing/personal_info.toml" })
+      if not ok then error(err, 0) end
     end)
 
     helpers.it("atomically persists editor values and refreshes live aliases", function()
@@ -117,6 +247,36 @@ helpers.describe("dynamic hotstrings manager", function()
       -- This will try to inject via ydotool, which fails on test machines.
       -- We only verify it doesn't crash.
       helpers.assert_true(type(ok) == "boolean", "on_trigger returns boolean")
+    end)
+
+    helpers.it("uses one calendar instant across a date expansion at midnight", function()
+      local info_path = os.tmpname(); os.remove(info_path)
+      dh.init({ trigger_char = "\\", personal_info_path = info_path })
+      local old_date, old_time = os.date, os.time
+      local boundary = old_time({ year = 2024, month = 12, day = 31, hour = 23, min = 59, sec = 59 })
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected
+      package.loaded["modules.hotstrings.injector"] = { inject = function(_, text) injected = text; return { ok = true } end }
+      local calls = 0
+      os.time = function() return boundary end
+      os.date = function(format, instant)
+        if instant == nil then calls = calls + 1; instant = boundary + (calls > 1 and 1 or 0) end
+        return old_date(format, instant)
+      end
+      local ok, err = pcall(function()
+        dh.set_enabled(true)
+        local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "date\\", "\\", true)
+        helpers.assert_true(fired)
+        helpers.assert_eq(injected, "mardi 31 décembre 2024", "a single expansion cannot mix calendar dates")
+        calls = 0
+        local dates = require("dynamic_hotstrings").today_date_strings()
+        helpers.assert_eq(dates.iso, "2024_12_31")
+        helpers.assert_eq(dates.fr, "31/12/2024")
+        helpers.assert_eq(dates.long_fr, "mardi 31 décembre 2024")
+      end)
+      os.date, os.time = old_date, old_time
+      package.loaded["modules.hotstrings.injector"] = previous
+      if not ok then error(err, 0) end
     end)
 
     helpers.it("on_trigger when disabled returns false", function()
@@ -340,8 +500,11 @@ helpers.describe("dynamic hotstrings manager", function()
       local single_preview = dh.preview("@é\\", true)
       local single_fired, single_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@é\\", "\\")
       local fields = dh.resolve_combo("né")
+      local uppercase_fields = dh.resolve_combo("NÉ")
+      local uppercase_rows = dh.preview_candidates("@NÉ")
       local rows = dh.preview_candidates("@né")
       local combo_fired, combo_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@né\\", "\\")
+      local uppercase_fired, uppercase_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
 
       package.loaded["modules.hotstrings.injector"] = previous_injector
       os.remove(path)
@@ -354,6 +517,10 @@ helpers.describe("dynamic hotstrings manager", function()
         "single NFC alias erases @ + one codepoint + trigger")
       helpers.assert_eq(single_event.backspace_count, 3, "the single event publishes codepoint backspaces")
 
+      helpers.assert_eq(#uppercase_fields, 2, "uppercase accented aliases resolve like lowercase aliases")
+      helpers.assert_eq(#uppercase_rows, 1, "uppercase accented combo is offered before typing the trigger")
+      helpers.assert_true(uppercase_fired == true, "uppercase accented combo fires")
+      helpers.assert_eq(uppercase_event.backspace_count, 4)
       helpers.assert_eq(#fields, 2, "the mixed ASCII/NFC combo resolves both aliases")
       helpers.assert_eq(fields[1], "last_name", "the mixed combo preserves its first field")
       helpers.assert_eq(fields[2], "first_name", "the mixed combo preserves its NFC field")
@@ -370,6 +537,137 @@ helpers.describe("dynamic hotstrings manager", function()
         "mixed combo erases @ + two codepoints + trigger, not UTF-8 bytes")
       helpers.assert_eq(combo_event.backspace_count, 4, "the combo event publishes codepoint backspaces")
       helpers.assert_eq(combo_event.trigger, "@né\\", "the combo event preserves the exact NFC trigger")
+    end)
+
+    helpers.it("resolves configured uppercase accented aliases in combinations", function()
+      local path = os.tmpname()
+      local fh = assert(io.open(path, "w"))
+      fh:write('[info]\nfirst_name = "Élodie"\nlast_name = "Durand"\n[letters]\nn = "last_name"\n"É" = "first_name"\n')
+      fh:close()
+      dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      local previous = package.loaded["modules.hotstrings.injector"]
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function() return { ok = true } end }
+      local values = dh.resolve_combo_values("né")
+      local rows = dh.preview_candidates("@NÉ")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous
+      os.remove(path)
+      helpers.assert_eq(values, { "Durand", "Élodie" })
+      helpers.assert_eq(#rows, 1)
+      helpers.assert_true(fired)
+    end)
+
+    helpers.it("refuses conflicting aliases and multi-codepoint case expansions", function()
+      local path = os.tmpname()
+      local text = '[info]\nfirst_name = "Élodie"\nlast_name = "Durand"\n'
+        .. '[letters]\nn = "last_name"\n"é" = "first_name"\n"É" = "last_name"\n'
+        .. 'i = "last_name"\n"i̇" = "first_name"\n'
+      local function write(value)
+        local file = assert(io.open(path, "w")); file:write(value); file:close()
+        dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      end
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected, single = {}, nil
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function(_, values)
+        injected[#injected + 1] = values; return { ok = true }
+      end, inject = function(_, value) single = value; return { ok = true } end }
+      write(text)
+      local single_preview = dh.preview("@É\\", true)
+      local single_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@É\\", "\\")
+      local rejected_rows = dh.preview_candidates("@nİ")
+      local rejected = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nİ\\", "\\")
+      write(text .. '"İ" = "first_name"\n')
+      local collision_rows = dh.preview_candidates("@NÉ")
+      local collision_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
+      local exact_rows = dh.preview_candidates("@nİ")
+      local exact_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nİ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_eq(single_preview, "Durand"); helpers.assert_true(single_fired); helpers.assert_eq(single, "Durand")
+      helpers.assert_eq(#rejected_rows, 0); helpers.assert_eq(rejected, false)
+      helpers.assert_eq(#collision_rows, 0); helpers.assert_eq(collision_fired, false)
+      helpers.assert_eq(#exact_rows, 1); helpers.assert_true(exact_fired)
+      helpers.assert_eq(injected[1], { "Durand", "Élodie" }, "exact İ remains distinct from the invalid decomposed key")
+    end)
+
+    helpers.it("independent: final sigma simple stays exact while a combo resolves uppercase", function()
+      local path = os.tmpname()
+      local file = assert(io.open(path, "w"))
+      file:write('[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n[letters]\nn = "last_name"\n"ς" = "first_name"\n'); file:close()
+      dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local single, values
+      package.loaded["modules.hotstrings.injector"] = {
+        inject = function(_, value) single = value; return { ok = true } end,
+        inject_fields = function(_, result) values = result; return { ok = true } end,
+      }
+      local missing = dh.preview("@Σ\\", true)
+      local missing_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@Σ\\", "\\")
+      local exact = dh.preview("@ς\\", true)
+      local exact_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@ς\\", "\\")
+      local rows = dh.preview_candidates("@nΣ")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_nil(missing); helpers.assert_eq(missing_fired, false)
+      helpers.assert_eq(exact, "Anna"); helpers.assert_true(exact_fired); helpers.assert_eq(single, "Anna")
+      helpers.assert_eq(rows[1].parts, { "Demos", "Anna" }); helpers.assert_true(fired)
+      helpers.assert_eq(values, { "Demos", "Anna" })
+    end)
+
+    helpers.it("resolves uppercase Greek final-sigma aliases and refuses conflicts", function()
+      local path = os.tmpname()
+      local text = '[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n'
+        .. '[letters]\nn = "last_name"\n"ς" = "first_name"\n'
+      local function write(value)
+        local file = assert(io.open(path, "w")); file:write(value); file:close()
+        dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      end
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected = {}
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function(_, values)
+        injected[#injected + 1] = values; return { ok = true }
+      end }
+      write(text)
+      local rows = dh.preview_candidates("@nΣ")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
+      write(text .. '"σ" = "last_name"\n')
+      local preferred = dh.preview_candidates("@nΣ")
+      local preferred_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
+      write('[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n[letters]\nn = "last_name"\n'
+        .. '"ᲄ" = "first_name"\n"ᲅ" = "last_name"\n')
+      local ambiguous = dh.preview_candidates("@nТ")
+      local ambiguous_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nТ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_eq(#rows, 1); helpers.assert_true(fired); helpers.assert_eq(injected[1], { "Demos", "Anna" })
+      helpers.assert_eq(#preferred, 0); helpers.assert_eq(preferred_fired, false)
+      helpers.assert_eq(#ambiguous, 0); helpers.assert_eq(ambiguous_fired, false)
+      helpers.assert_eq(#injected, 1, "ambiguous aliases cannot shift fields")
+    end)
+
+    helpers.it("resolves Kelvin and Angstrom aliases without normalizing their configuration", function()
+      local path = os.tmpname()
+      local file = assert(io.open(path, "w"))
+      file:write('[info]\nfirst_name = "Kelvin"\nlast_name = "Durand"\n[letters]\nn = "last_name"\n"K" = "first_name"\n"Å" = "first_name"\n'); file:close()
+      dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected = {}
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function(_, values)
+        injected[#injected + 1] = values; return { ok = true }
+      end }
+      local rows = dh.preview_candidates("@nk")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nk\\", "\\")
+      local upper_rows = dh.preview_candidates("@nK")
+      local upper_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nK\\", "\\")
+      local angstrom_rows = dh.preview_candidates("@nå")
+      local angstrom_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nå\\", "\\")
+      local angstrom_upper = dh.preview_candidates("@nÅ")
+      local angstrom_upper_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nÅ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_eq(#rows, 1); helpers.assert_true(fired)
+      helpers.assert_eq(#upper_rows, 1); helpers.assert_true(upper_fired)
+      helpers.assert_eq(#angstrom_rows, 1); helpers.assert_true(angstrom_fired)
+      helpers.assert_eq(#angstrom_upper, 1); helpers.assert_true(angstrom_upper_fired)
+      helpers.assert_eq(injected[1], { "Durand", "Kelvin" }); helpers.assert_eq(injected[2], injected[1])
+      helpers.assert_eq(injected[3], injected[1]); helpers.assert_eq(injected[4], injected[1])
     end)
 
   end)

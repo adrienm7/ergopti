@@ -25,10 +25,10 @@ global GESTURE_ACTIONS := Map(
 		},
 		; --- Mouse ---
 		"left_click_toggle", {
-				Fn: (*) => GestureToggleLeftClick(),
+				Fn: (BindingId := "") => GestureToggleLeftClick(BindingId),
 		},
 		"right_click_toggle", {
-				Fn: (*) => GestureToggleRightClick(),
+				Fn: (BindingId := "") => GestureToggleRightClick(BindingId),
 		},
 		; --- Editing ---
 		; --- Keys ---
@@ -692,13 +692,23 @@ global _GestureMirrorPriorTopology := 0
 GestureDisplayMirrorToggle(Sys := 0) {
 		global _GestureMirrorPriorTopology, GESTURE_DISPLAY_TOPOLOGY_INTERNAL, GESTURE_DISPLAY_TOPOLOGY_CLONE
 		global GESTURE_DISPLAY_TOPOLOGY_EXTEND, GESTURE_DISPLAY_TOPOLOGY_EXTERNAL
+		global _LifecycleLatestTransition
+		Transition := _LifecycleLatestTransition
+		if A_IsSuspended
+				return false
 		Sys := _GestureSys(Sys)
-		if (Sys.ConnectedDisplayCount() < 2) {
+		Count := Sys.ConnectedDisplayCount()
+		if A_IsSuspended || Transition != _LifecycleLatestTransition
+				return false
+		if (Count < 2) {
 				LoggerInfo("gestures", "display_mirror_toggle: one display is connected, nothing to mirror.")
 				Sys.Notify(t("shortcuts.no_other_monitor"))
 				return false
 		}
 		Current := Sys.DisplayTopology()
+		; Both native reads can yield to a complete suspend/resume transition.
+		if A_IsSuspended || Transition != _LifecycleLatestTransition
+				return false
 		if (Current = GESTURE_DISPLAY_TOPOLOGY_CLONE)
 				Target := _GestureMirrorPriorTopology ? _GestureMirrorPriorTopology : GESTURE_DISPLAY_TOPOLOGY_EXTEND
 		else if (Current = GESTURE_DISPLAY_TOPOLOGY_INTERNAL || Current = GESTURE_DISPLAY_TOPOLOGY_EXTEND
@@ -734,18 +744,34 @@ GestureCaseTransforms() {
 ; Win+U / Win+W shortcuts go through here too.
 ; @param {Func} Transform String -> String.
 GestureTransformSelection(Transform) {
-		GetSelectionAsync((Text) => _GestureSendTransformedSelection(Text, Transform))
+		EntryCritical := Critical("On")
+		try {
+				Owner := TapHoldNewOwner()
+				InputGeneration := KS_GetPhysicalInputGeneration()
+				ExpectedTarget := _SendInstantCaptureTarget()
+		} finally Critical(EntryCritical)
+		if !(ExpectedTarget is Map)
+				return false
+		ExpectedTarget["admission"] := () => !A_IsSuspended && TapHoldOwnerCurrent(Owner)
+				&& KS_GetPhysicalInputGeneration() == InputGeneration
+		if !_SendInstantTargetCurrent(ExpectedTarget)
+				return false
+		return GetSelectionAsync((Text) => _GestureSendTransformedSelection(Text, Transform, ExpectedTarget))
 }
 
-_GestureSendTransformedSelection(Text, Transform) {
+_GestureSendTransformedSelection(Text, Transform, ExpectedTarget := unset) {
 		; No-op on an empty/failed capture: async cancellation must never turn into
 		; a stale SendInstant paste.
 		if (Text = "")
 				return
+		if !IsSet(ExpectedTarget)
+				ExpectedTarget := _SendInstantCaptureTarget()
+		if !_SendInstantTargetCurrent(ExpectedTarget)
+				return
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
-				SendInstant(Transform.Call(Text))
+				SendInstant(Transform.Call(Text), "", ExpectedTarget)
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("gestures", "synthetic_clear_ms"))
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
@@ -822,6 +848,19 @@ GestureSendInput(ActionName, BindingId := "") {
 		return true
 }
 
+; The paste chord of GesturePastePlain, sent only while its target is current.
+; Critical keeps the check and the injection one step.
+_GesturePastePlainSend(Target, Keys) {
+		PreviousCritical := Critical("On")
+		try {
+				if !_SendInstantTargetCurrent(Target) {
+						try LoggerInfo("gestures", "Plain paste refused: the target or the input changed before the paste.")
+						return false
+				}
+				return SendFinalResult(Keys)
+		} finally Critical(PreviousCritical)
+}
+
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
@@ -831,6 +870,13 @@ _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
 }
 
 GesturePastePlain() {
+		; Every read, snapshot and write below can yield. The paste belongs only to
+		; the window, control and physical action that asked for it (WCP-002).
+		Target := _SendInstantCaptureAdmittedTarget()
+		if !(Target is Map) {
+				try LoggerInfo("gestures", "Plain paste refused: no input target or the driver is paused.")
+				return
+		}
 		OwnerToken := CB_TryBeginPasteTransaction("gesture_paste_plain")
 		if !OwnerToken {
 				try LoggerWarn("gestures", "Plain paste refused while another clipboard transaction is active.")
@@ -839,12 +885,12 @@ GesturePastePlain() {
 		RestoreTimerArmed := false
 		try {
 				if WinActive("ahk_exe EXCEL.EXE") {
-						SendFinalResult("^+v")
+						_GesturePastePlainSend(Target, "^+v")
 						return
 				}
 				; Keep non-text formats intact and use the application's native paste.
 				if CB_Read() == "" {
-						SendFinalResult("^v")
+						_GesturePastePlainSend(Target, "^v")
 						return
 				}
 				; Admission precedes every read, including an empty temporary clear owned
@@ -852,14 +898,19 @@ GesturePastePlain() {
 				Captured := 0
 				if !CB_SavePlainSnapshot(OwnerToken, &Captured) {
 						try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot is unavailable or changed; using native paste.")
-						SendFinalResult("^v")
+						_GesturePastePlainSend(Target, "^v")
 						return
 				}
 				OldClip := Captured["saved"]
 				PlainText := CB_Read()
 				; Saving all formats can yield to a new non-text copy. Paste it intact.
 				if PlainText == "" {
-						SendFinalResult("^v")
+						_GesturePastePlainSend(Target, "^v")
+						return
+				}
+				; Never replace the clipboard for a paste that can no longer happen.
+				if !_SendInstantTargetCurrent(Target) {
+						try LoggerInfo("gestures", "Plain paste refused: the target or the input changed during clipboard preparation.")
 						return
 				}
 				OwnedSequence := 0
@@ -868,7 +919,12 @@ GesturePastePlain() {
 								throw Error("clipboard write failed")
 						if !OwnedSequence
 								throw Error("clipboard sequence unavailable")
-						SendFinalResult("^v")
+						; A refused or failed paste puts the user's clipboard back at once.
+						if !_GesturePastePlainSend(Target, "^v") {
+								CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence, OwnerToken,
+										"gesture_paste_plain_refused")
+								return
+						}
 						SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						RestoreTimerArmed := true
 				} catch as Err {

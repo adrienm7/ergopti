@@ -18,7 +18,7 @@ _LRDT_Quote(Text) {
 	return Chr(34) . StrReplace(StrReplace(Text, Chr(96), Chr(96) . Chr(96)), Chr(34), Chr(96) . Chr(34)) . Chr(34)
 }
 
-_LRDT_ChildSource() {
+_LRDT_ChildSource(ObserveLayerResult := false) {
 	global _DriverDir, _SharedDir
 	Support := _DriverDir . "\tests\support\feature_state_boot_smoke.ahk"
 	Source := FSReadStrict(Support)
@@ -50,7 +50,21 @@ _LRDT_ChildSource() {
 		AssertTrue(Owner != "", "The readiness child requires its genuine whole owner: " . Symbol)
 		if !Seen.Has(Owner) {
 			Seen[Owner] := true
-			Code .= "#Include " . Owner . "`n"
+			if ObserveLayerResult && Symbol == "LayerEditor_Open" {
+				LayerCode := FSReadStrict(Owner)
+				; Observe the real owner's terminal Map; no return status,
+				; admission, dispatch or durable operation is replaced.
+				Needle := "`treturn Result`n}"
+				LayerCode := StrReplace(LayerCode, Needle,
+					"`t_LRDS_ObserveLayerResult(Result)`n" . Needle, , &Replaced)
+				AssertEqual(1, Replaced, "Only the complete save-and-apply owner's final return is observed")
+				LayerCode := StrReplace(LayerCode,
+					"#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk",
+					"#Include " . _DriverDir . "\_generated\config_keys.ahk", , &Replaced)
+				AssertEqual(1, Replaced, "Only the copied complete owner's relative include must resolve from its original driver")
+				Code .= LayerCode . "`n"
+			} else
+				Code .= "#Include " . Owner . "`n"
 		}
 	}
 	AssertEqual(19, Seen.Count, "The whole host, resume/menu and real data-policy owners must be nonempty and distinct")
@@ -75,7 +89,7 @@ _LRDT_Case(Mode) {
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _LRDT_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _LRDT_ChildSource(Mode == "source-close-after-save")) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory, _SharedDir], _LRDT_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine public layer editor child must start")
@@ -141,6 +155,6 @@ _LRDT_Case(Mode) {
 		throw ExportFailure
 }
 
-for _LRDT_Mode in ["current", "paused-dispatch", "retired-epoch"]
+for _LRDT_Mode in ["current", "paused-dispatch", "retired-epoch", "source-stale", "source-close-after-save"]
 	Test("Layer editor readiness: " . _LRDT_Mode . " retains only its admitted initialization (layer-editor-ready-delivery-owner)",
 		_LRDT_Case.Bind(_LRDT_Mode))

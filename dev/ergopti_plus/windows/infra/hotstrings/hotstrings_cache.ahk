@@ -14,8 +14,8 @@
 ; 2. Faster time-to-icon: AHK no longer parses ~1 MB of generated source during
 ;    the load phase that precedes tray-icon creation. The cache is DATA read at
 ;    registration time (after the icon), not code parsed before it.
-; 3. Self-healing: on boot the ``.tsv`` is used when it exists AND is at least as
-;    new as every bundled TOML; otherwise it is rebuilt from the TOML (the slow
+; 3. Self-healing: on boot the ``.tsv`` is used only when its captured source
+;    inventory still matches native reads; otherwise it is rebuilt (the slow
 ;    path runs once, on first launch or after a TOML edit) and rewritten so the
 ;    NEXT boot is fast — exactly mirroring _I18nLoadLocaleMap.
 ; 4. Behaviour-preserving: rows carry the identical fields the old generated
@@ -111,26 +111,43 @@ _HotstringsCacheTsvPath() {
 
 ; Absolute path to one bundled category's source TOML.
 _HotstringsCacheTomlPath(Category) {
-	return HotstringsBundledTomlPath(Category)
+	return _HotstringsPhysicalBundledTomlPath(Category)
 }
 
 ; Language packs declared by _shared/modules/hotstrings/_index.toml [languages],
 ; in declared order. Each item is Map("id", folder, "locale", locale code,
 ; "categories", Array of file stems). The index is the only place a language is
 ; declared, so adding one is data: its folder, its [languages.<id>] table and its
-; manifest rows. Parsed once per process; an index that declares a language
+; manifest rows. Parsed once per canonical index image; an index that declares a language
 ; without a locale or categories is a broken install and throws.
-HotstringsLanguagePacks() {
+; Preserve the exact canonical memo image actually consumed by both scanners.
+; A later physical read may verify this receipt, but cannot replace its content.
+_HotstringsIndexSource() {
 	global _SharedDir
-	static Packs := ""
-	if (Packs is Array)
-		return Packs
-	IndexPath := _SharedDir . "\modules\hotstrings\_index.toml"
-	; Through the shared TOML file reader, which owns the read; an empty answer
-	; is an unreadable index, and loading on without it would drop every language.
-	Content := ReadTomlFile(IndexPath)
-	if (Content == "")
-		throw Error("Hotstring index is unreadable: " . IndexPath)
+	Path := _SharedDir . "\modules\hotstrings\_index.toml"
+	Content := ReadTomlFile(Path)
+	if Content == ""
+		throw Error("Hotstring index is unreadable: " . Path)
+	return {path: Path, content: Content}
+}
+
+HotstringsLanguagePacks() {
+	return _HotstringsLanguagePacksFrom(_HotstringsIndexSource())
+}
+
+_HotstringsCloneLanguagePacks(Packs) {
+	Result := []
+	for Pack in Packs
+		Result.Push(Map("id", Pack["id"], "locale", Pack["locale"], "categories", Pack["categories"].Clone()))
+	return Result
+}
+
+_HotstringsLanguagePacksFrom(Source) {
+	static MemoPath := "", MemoContent := "", Packs := ""
+	IndexPath := Source.path, Content := Source.content
+	if Packs is Array && StrCompare(MemoPath, IndexPath, true) == 0
+		&& StrCompare(MemoContent, Content, true) == 0
+		return _HotstringsCloneLanguagePacks(Packs)
 	Order := []
 	ById := Map()
 	Table := ""
@@ -162,8 +179,8 @@ HotstringsLanguagePacks() {
 			throw Error("Hotstring index declares language '" . Id . "' without a locale or categories: " . IndexPath)
 		Result.Push(ById[Id])
 	}
-	Packs := Result
-	return Packs
+	Packs := Result, MemoPath := IndexPath, MemoContent := Content
+	return _HotstringsCloneLanguagePacks(Packs)
 }
 
 ; Split the inside of a one-line TOML string array ("a", "b") into an Array.
@@ -197,9 +214,12 @@ HotstringsIsLanguageGroup(Group) {
 ; Every bundled category a cache or catalogue must cover: the neutral root files
 ; followed by each language pack's categories, as group ids.
 HotstringsCommonCategories() {
-	global _SharedDir, HS_BUNDLED_CATEGORIES
-	IndexPath := _SharedDir . "\modules\hotstrings\_index.toml"
-	Content := ReadTomlFile(IndexPath)
+	return _HotstringsCommonCategoriesFrom(_HotstringsIndexSource())
+}
+
+_HotstringsCommonCategoriesFrom(Source) {
+	global HS_BUNDLED_CATEGORIES
+	IndexPath := Source.path, Content := Source.content
 	Table := ""
 	loop parse, Content, "`n", "`r" {
 		Line := Trim(TOML_StripInlineComment(Trim(A_LoopField, " `t")), " `t")
@@ -215,8 +235,9 @@ HotstringsCommonCategories() {
 }
 
 HotstringsBundledCategories() {
-	All := HotstringsCommonCategories()
-	for _, Pack in HotstringsLanguagePacks() {
+	Source := _HotstringsIndexSource()
+	All := _HotstringsCommonCategoriesFrom(Source)
+	for _, Pack in _HotstringsLanguagePacksFrom(Source) {
 		for _, Stem in Pack["categories"]
 			All.Push(HotstringsLanguageGroupId(Pack["id"], Stem))
 	}
@@ -302,8 +323,15 @@ HotstringsBundledTomlPath(Category) {
 	Bound := HotstringsBoundTomlPath(Category)
 	if (Bound != "")
 		return Bound
+	return _HotstringsPhysicalBundledTomlPath(Category)
+}
+
+; Physical bundled sources are independent of current extension/adopted routes.
+_HotstringsPhysicalBundledTomlPath(Category, IndexSource := 0) {
+	global _SharedDir
+	Source := IndexSource is Object ? IndexSource : _HotstringsIndexSource()
 	Wanted := StrLower(StrReplace(Category, "_"))
-	for _, Pack in HotstringsLanguagePacks() {
+	for _, Pack in _HotstringsLanguagePacksFrom(Source) {
 		for _, Stem in Pack["categories"] {
 			if (Wanted == StrLower(Pack["id"] . StrReplace(Stem, "_")))
 				return _SharedDir . "\modules\hotstrings\" . Pack["id"] . "\" . Stem . ".toml"
@@ -312,30 +340,72 @@ HotstringsBundledTomlPath(Category) {
 	return _SharedDir . "\modules\hotstrings\" . StrLower(Category) . ".toml"
 }
 
-; True when the .tsv is STRICTLY newer than EVERY bundled TOML — i.e. not stale
-; after a TOML edit or pull. FileGetTime "M" is YYYYMMDDHH24MISS, ordering
-; chronologically as a plain integer. The comparison is `>=` (a TOML whose mtime
-; equals the .tsv's is treated as stale): mtime is second-granular and a rebuild
-; writes the .tsv in the SAME wall-clock second it read the TOMLs, so a TOML
-; re-saved within that second would otherwise tie and be served stale until the
-; next boot. Equal-second ties rebuild — the safe direction (one extra rebuild on
-; the rare tie, never a silently ignored edit). Any stat failure returns false so
-; the caller rebuilds defensively (mirrors _I18nTsvIsFresh).
-_HotstringsCacheIsFresh(TsvPath) {
-	global _SharedDir
+; Derive the full physical inventory from one canonical index input. Every
+; category and its route belongs to that same generation, including absences.
+_HotstringsCacheSourcePaths(Source) {
+	Paths := Map()
+	for Category in _HotstringsCommonCategoriesFrom(Source)
+		Paths[StrLower(Category)] := _HotstringsPhysicalBundledTomlPath(Category, Source)
+	for Pack in _HotstringsLanguagePacksFrom(Source)
+		for Stem in Pack["categories"] {
+			Category := StrLower(HotstringsLanguageGroupId(Pack["id"], Stem))
+			if Paths.Has(Category)
+				throw Error("Hotstring source categories overlap.")
+			Paths[Category] := _HotstringsPhysicalBundledTomlPath(Category, Source)
+		}
+	return Paths
+}
+
+_HotstringsCachePathKey(Path) {
+	return StrLower(StrReplace(Path, "/", "\"))
+}
+
+; Only the candidate actually parsed for loading may lend its receipt. Fresh
+; native reads verify it; the canonical memo never pretends to be a fresh read.
+_HotstringsCacheInventoryMatches(Rows, RequireTerminalReceipt := true) {
 	try {
-		TsvTime := FileGetTime(TsvPath, "M")
-		if FileGetTime(_SharedDir . "\modules\hotstrings\_index.toml", "M") >= TsvTime
+		if !(Rows is Map) || !Rows.HasOwnProp("SourceIndex") || !Rows.HasOwnProp("SourceInventory")
 			return false
-		for Category in HotstringsBundledCategories() {
-			TomlPath := _HotstringsCacheTomlPath(Category)
-			if FileExist(TomlPath) and FileGetTime(TomlPath, "M") >= TsvTime
+		if RequireTerminalReceipt && (!Rows.HasOwnProp("SourceReceiptComplete") || !Rows.SourceReceiptComplete)
+			return false
+		Source := _HotstringsIndexSource()
+		Index := Rows.SourceIndex
+		if !RegExMatch(Index.hash, "^[0-9a-f]{64}$")
+			return false
+		if _HotstringsCachePathKey(Index.path) != _HotstringsCachePathKey(Source.path)
+			|| CryptoSha256(Source.content) != Index.hash
+			|| CryptoSha256(FileRead(Source.path, "UTF-8")) != Index.hash
+			return false
+		Paths := _HotstringsCacheSourcePaths(Source)
+		if Rows.SourceInventory.Length != Paths.Count
+			return false
+		Position := 0
+		for Category, Path in Paths {
+			Receipt := Rows.SourceInventory[++Position]
+			if StrCompare(Category, Receipt.category, true) != 0
+				|| _HotstringsCachePathKey(Path) != _HotstringsCachePathKey(Receipt.path)
+				return false
+			Present := FSStrictExists(Path) ? 1 : 0
+			if Present != Receipt.present
+				return false
+			if !(Receipt.present is Integer) || (Receipt.present != 0 && Receipt.present != 1)
+				|| (Present ? !RegExMatch(Receipt.hash, "^[0-9a-f]{64}$") : Receipt.hash != "-")
+				return false
+			if Present && CryptoSha256(FileRead(Path, "UTF-8")) != Receipt.hash
 				return false
 		}
 		return true
 	} catch {
 		return false
 	}
+}
+
+; Compatibility wrapper for direct freshness callers. Ensure below parses once
+; and validates the same Rows object it will publish, rather than reopening TSV.
+_HotstringsCacheIsFresh(TsvPath) {
+	try return _HotstringsCacheInventoryMatches(_HotstringsCacheReadTsv(FileRead(TsvPath, "UTF-8")))
+	catch
+		return false
 }
 
 
@@ -427,17 +497,24 @@ _HotstringsCacheBuildRows(CategoryPaths := 0) {
 	Rows := Map()
 	Rows.SourceOrder := []
 	Rows.SourceOrderVersion := true
-	if !(CategoryPaths is Map) {
-		CategoryPaths := Map()
-		for Category in HotstringsBundledCategories()
-			CategoryPaths[Category] := _HotstringsCacheTomlPath(Category)
+	HasSourceReceipt := !(CategoryPaths is Map)
+	if HasSourceReceipt {
+		IndexSource := _HotstringsIndexSource()
+		CategoryPaths := _HotstringsCacheSourcePaths(IndexSource)
+		Rows.SourceIndex := {path: IndexSource.path, hash: CryptoSha256(IndexSource.content)}
+		Rows.SourceInventory := []
 	}
 	for Category, TomlPath in CategoryPaths {
-		if !FileExist(TomlPath)
+		Present := FSStrictExists(TomlPath) ? 1 : 0
+		Content := Present ? FileRead(TomlPath, "UTF-8") : ""
+		if HasSourceReceipt
+			Rows.SourceInventory.Push({category: StrLower(Category), path: TomlPath,
+				present: Present, hash: Present ? CryptoSha256(Content) : "-"})
+		if !Present
 			continue
 		CategoryLower := StrLower(Category)
 		CurrentSection := ""
-		loop parse, FileRead(TomlPath, "UTF-8"), "`n", "`r" {
+		loop parse, Content, "`n", "`r" {
 			Line := Trim(A_LoopField, " `t")
 			if (Line == "" or SubStr(Line, 1, 1) == "#")
 				continue
@@ -519,6 +596,7 @@ _HotstringsCacheBuildRows(CategoryPaths := 0) {
 ; every boot keeps rebuilding from the TOML (mirrors _I18nWriteTsvCache).
 _HotstringsCacheWriteTsv(TsvPath, Rows) {
 	try {
+		PhysicalPath := FSResolveAbsolutePath(TsvPath)
 		Content := "# source-order-v1`n"
 		if !Rows.HasOwnProp("SourceOrder")
 			throw Error("Hotstring cache source order is unavailable.")
@@ -534,16 +612,42 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 			Line .= (Row[6] ? "1" : "0") . "`t" . (Row.Length >= 7 ? Row[7] : "") . "`n"
 			Content .= Line
 		}
-		; Finish and verify the temporary cache before the write-through atomic
-		; replacement. FileAppend cannot expose a short write, so it could publish a
-		; valid-looking prefix that the cache reader would accept on the next boot.
-		TmpPath := TsvPath . ".tmp"
-		if !FSWriteDurable(TmpPath, Content)
-			throw Error("hotstring cache stage write was incomplete")
-		if !FSUtf8ExactMatches(TmpPath, Content)
-			throw Error("hotstring cache stage bytes did not verify")
-		if !FSAtomicMoveReplace(TmpPath, TsvPath)
-			throw Error("hotstring cache stage could not be published")
+		; Receipt and rows are one verified atomic file. Never derive a new
+		; receipt from current disk state for rows captured from an older input.
+		if Rows.HasOwnProp("SourceIndex") && Rows.HasOwnProp("SourceInventory") {
+			Index := Rows.SourceIndex
+			if !RegExMatch(Index.hash, "^[0-9a-f]{64}$")
+				throw Error("hotstring index receipt is unavailable")
+			Content .= "# index-v1`t" . _HsCacheEscape(Index.path) . "`t" . Index.hash . "`n"
+			for Receipt in Rows.SourceInventory {
+				if !(Receipt.present is Integer) || (Receipt.present != 0 && Receipt.present != 1)
+					|| (Receipt.present ? !RegExMatch(Receipt.hash, "^[0-9a-f]{64}$") : Receipt.hash != "-")
+					throw Error("hotstring source receipt is unavailable")
+				Content .= "# source-v1`t" . _HsCacheEscape(Receipt.category) . "`t"
+					. _HsCacheEscape(Receipt.path) . "`t" . Receipt.present . "`t" . Receipt.hash . "`n"
+			}
+			Digest := CryptoSha256(Content)
+			if !RegExMatch(Digest, "^[0-9a-f]{64}$")
+				throw Error("hotstring cache receipt checksum is unavailable")
+			Content .= "# receipt-v1`t" . Rows.SourceInventory.Length . "`t" . Records.Length . "`t" . Digest . "`n"
+		}
+		; The cache is best effort, but never borrows an existing sidecar.
+		; Retain one exclusive native stage through readback, rename and cleanup.
+		static WriteSeq := 0
+		Suffix := "." . A_ScriptHwnd . "-" . (++WriteSeq) . ".tmp"
+		Stage := {handle: -1}
+		CreateStage(Folder, Name, Attributes) {
+			Stage.handle := _FSCreateHeldStage(Folder, Name, Attributes)
+			return Stage.handle
+		}
+		VerifyStage() {
+			_FSRewind(Stage.handle)
+			Readback := _FSReadUtf8ExactHandle(Stage.handle, 0, false)
+			return (Readback is String) && Readback == Content
+		}
+		if !FSWriteReplaceOwned(PhysicalPath, Content, Suffix, &Detail,
+				CreateStage, VerifyStage, 0, true, &Publication)
+			throw Error("hotstring cache publication was not fully acknowledged: " . Detail)
 	} catch as err {
 		try LoggerWarn("Hotstrings", "Could not write hotstring cache '{1}' ({2}); TOML path stays active.", TsvPath, err.Message)
 	}
@@ -563,13 +667,61 @@ _HotstringsCacheReadTsv(Content) {
 	if StrCompare(SubStr(Content, 1, StrLen("# source-order-v1`n")), "# source-order-v1`n", true) != 0
 		throw ValueError("Hotstring cache source-order header is invalid.")
 	Rows.SourceOrderVersion := true
+	Rows.SourceReceiptComplete := false
+	Rows.SourceInventory := []
+	SeenCategories := Map(), SeenPaths := Map()
+	Payload := "# source-order-v1`n", HasIndex := false, HasFooter := false
 	loop parse, Content, "`n", "`r" {
 		Line := A_LoopField
 		if A_Index == 1
 			continue
-		if (Line == "")
+		if HasFooter {
+			if Line != ""
+				throw ValueError("Hotstring cache receipt is not terminal.")
 			continue
+		}
+		if Line == "" {
+			Payload .= "`n"
+			continue
+		}
 		Fields := StrSplit(Line, "`t")
+		if Fields[1] == "# receipt-v1" {
+			if Fields.Length != 4 || !HasIndex
+				|| StrCompare(Fields[2], String(Rows.SourceInventory.Length), true) != 0
+				|| StrCompare(Fields[3], String(Rows.SourceOrder.Length), true) != 0
+				|| !RegExMatch(Fields[4], "^[0-9a-f]{64}$") || CryptoSha256(Payload) != Fields[4]
+				throw ValueError("Hotstring cache source receipt is incomplete.")
+			HasFooter := true
+			Rows.SourceReceiptComplete := true
+			continue
+		}
+		Payload .= Line . "`n"
+		if Fields[1] == "# index-v1" {
+			if Fields.Length != 3 || HasIndex || !RegExMatch(Fields[3], "^[0-9a-f]{64}$")
+				throw ValueError("Hotstring cache index receipt is invalid.")
+			Path := _HsCacheUnescape(Fields[2])
+			if Path == "" || RegExMatch(Path, "\x00")
+				throw ValueError("Hotstring cache index path is invalid.")
+			Rows.SourceIndex := {path: Path, hash: Fields[3]}
+			HasIndex := true
+			continue
+		}
+		if Fields[1] == "# source-v1" {
+			if Fields.Length != 5 || !HasIndex
+				|| (Fields[4] !== "0" && Fields[4] !== "1")
+				|| (Fields[4] == "1" ? !RegExMatch(Fields[5], "^[0-9a-f]{64}$") : Fields[5] != "-")
+				throw ValueError("Hotstring cache source receipt is invalid.")
+			Category := _HsCacheUnescape(Fields[2]), Path := _HsCacheUnescape(Fields[3])
+			Key := _HotstringsCachePathKey(Path)
+			if Category == "" || Path == "" || RegExMatch(Category . Path, "\x00")
+				|| SeenCategories.Has(Category) || SeenPaths.Has(Key)
+				throw ValueError("Hotstring cache source receipt is duplicated or empty.")
+			SeenCategories[Category] := true, SeenPaths[Key] := true
+			Rows.SourceInventory.Push({category: Category, path: Path, present: Integer(Fields[4]), hash: Fields[5]})
+			continue
+		}
+		if HasIndex
+			throw ValueError("Hotstring cache rules cannot follow their source inventory.")
 		if Fields.Length != 9
 			throw ValueError("Hotstring cache record has an invalid column count.")
 		Priority := ""
@@ -584,6 +736,8 @@ _HotstringsCacheReadTsv(Content) {
 		Rows[Key].Push(Row)
 		Rows.SourceOrder.Push([Key, Row])
 	}
+	if HasIndex && !HasFooter
+		throw ValueError("Hotstring cache source receipt has no terminal proof.")
 	return Rows
 }
 
@@ -597,43 +751,83 @@ _HotstringsCacheReadTsv(Content) {
 ; =================================================
 ; =================================================
 
-; Load the hotstring cache exactly once: read the fresh .tsv, else rebuild from
+; Load the hotstring cache exactly once: admit the exact parsed .tsv by its
+; captured source inventory, else rebuild from
 ; the TOML and rewrite the .tsv for next boot. Populates _GENERATED_HOTSTRINGS so
 ; LoadHotstringsSection's existing fast path resolves every cached section to the
 ; shared registrar. Idempotent and cheap after the first call.
 HotstringsCacheEnsure() {
 	global _HS_CACHE_LOADED, _HS_CACHE_ROWS, _GENERATED_HOTSTRINGS, _SharedDir
+	static Loading := false
 	if _HS_CACHE_LOADED
 		return
-	; Cannot resolve the source/cache paths without _SharedDir (set at boot in
-	; ErgoptiPlus.ahk). Bail without marking loaded so a later call can succeed —
-	; callers then fall through to the runtime TOML path. Relevant only to harnesses
-	; that invoke LoadHotstringsSection before _SharedDir exists.
 	if !IsSet(_SharedDir)
 		return
-	TsvPath := _HotstringsCacheTsvPath()
-	Rows := ""
-	Fast := false
-	if FileExist(TsvPath) and _HotstringsCacheIsFresh(TsvPath) {
-		try {
-			Rows := _HotstringsCacheReadTsv(FileRead(TsvPath, "UTF-8"))
-			Fast := true
-		} catch as err {
-			try LoggerWarn("Hotstrings", "Hotstring cache '{1}' unreadable ({2}); rebuilding from TOML.", TsvPath, err.Message)
-			Rows := ""
+	PreviousCritical := Critical("On")
+	try {
+		if _HS_CACHE_LOADED
+			return
+		if Loading
+			throw Error("Hotstring cache initialization is already in progress; retry after its owner completes.")
+		Loading := true
+	} finally Critical(PreviousCritical)
+	try {
+		TsvPath := _HotstringsCacheTsvPath()
+		Rows := "", Fast := false
+		if FileExist(TsvPath) {
+			try {
+				Candidate := _HotstringsCacheReadTsv(FileRead(TsvPath, "UTF-8"))
+				if _HotstringsCacheInventoryMatches(Candidate)
+					Rows := Candidate, Fast := true
+			} catch as Err {
+				try LoggerWarn("Hotstrings", "Hotstring cache '{1}' unreadable ({2}); rebuilding from TOML.", TsvPath, Err.Message)
+			}
 		}
+		if !(Rows is Map) || Rows.Count == 0 || !Rows.SourceOrderVersion {
+			Rows := ""
+			; One independent edit may settle on the retry. Persistent movement or
+			; a stale canonical index refuses instead of publishing an old image.
+			MaxBuildAttempts := 2
+			loop MaxBuildAttempts {
+				Candidate := _HotstringsCacheBuildRows()
+				_HotstringsCacheWriteTsv(TsvPath, Candidate)
+				; Cache publication may fail and log through a yielding observer.
+				; A verified source snapshot still loads without a writable cache.
+				if _HotstringsCacheInventoryMatches(Candidate, false) {
+					Rows := Candidate
+					break
+				}
+			}
+			if !(Rows is Map)
+				throw Error("Hotstring sources changed or could not be verified during cache initialization; no cache projection was published. Retry once the sources are stable.")
+			Fast := false
+		}
+		; There is no arbitrary callback between the final source witness and
+		; this memory-only publication. Logging below is post-publication.
+		PreviousCritical := Critical("On")
+		try {
+			_GENERATED_HOTSTRINGS := Map()
+			_HS_CACHE_ROWS := Rows
+			for Key, _RowList in Rows
+				_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)
+			_HS_CACHE_LOADED := true
+		} finally Critical(PreviousCritical)
+		try LoggerDone("Hotstrings", "Hotstring cache ready ({1} section(s), {2}).",
+			Rows.Count, Fast ? "fast" : "rebuilt")
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			_HS_CACHE_ROWS := Map()
+			_HS_CACHE_ROWS.SourceOrder := []
+			_GENERATED_HOTSTRINGS := Map()
+			_HS_CACHE_LOADED := false
+		} finally Critical(PreviousCritical)
+		throw Err
+	} finally {
+		PreviousCritical := Critical("On")
+		try Loading := false
+		finally Critical(PreviousCritical)
 	}
-	if !(Rows is Map) or Rows.Count == 0 or !Rows.SourceOrderVersion {
-		Rows := _HotstringsCacheBuildRows()
-		_HotstringsCacheWriteTsv(TsvPath, Rows)
-		Fast := false
-	}
-	_HS_CACHE_ROWS := Rows
-	for Key, _RowList in Rows
-		_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)
-	_HS_CACHE_LOADED := true
-	try LoggerDone("Hotstrings", "Hotstring cache ready ({1} section(s), {2}).",
-		Rows.Count, Fast ? "fast" : "rebuilt")
 }
 
 ; Register every cached hotstring of one section. Reproduces the runtime TOML

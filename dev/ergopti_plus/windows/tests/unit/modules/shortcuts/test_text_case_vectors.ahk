@@ -78,3 +78,25 @@ _TCV_EveryTransformIsAGestureAction() {
 	AssertEqual(5, Count, "the five case actions must all have a transform")
 }
 Test("text case: every case transform is a registered action", _TCV_EveryTransformIsAGestureAction)
+
+; The title case of a first character takes the Unicode title forms StrUpper
+; lacks, the table the Lua drivers read (unicode-title-forms).
+_TCV_TitleTakesTheUnicodeTitleForms() {
+	AssertEqual("ǅungla", TextCaseTitle("ǆungla"), "a title-case digraph is not its uppercase")
+	AssertEqual("Ss", TextCaseTitleCharacter("ß"), "ß titles as Ss")
+	AssertEqual("Fi", TextCaseTitleCharacter("ﬁ"), "a ligature titles as its first letter capitalised")
+	AssertEqual("É", TextCaseTitleCharacter("é"), "control: an ordinary letter is its uppercase")
+	AssertEqual("3", TextCaseTitleCharacter("3"), "control: a digit is unchanged")
+}
+Test("text case: title case takes the generated Unicode title forms (unicode-title-forms)",
+	_TCV_TitleTakesTheUnicodeTitleForms)
+
+; The one-shot Shift titles its captured character with the same rule, not
+; Format("{:T}"), which has no title-case form (one-shot-unicode-title).
+_TCV_OneShotTitlesWithTheSharedRule() {
+	Body := _DriverFuncBody("OneShotShift")
+	Assert(InStr(Body, "TextCaseTitle(Scalar)") > 0, "the one-shot Shift titles through TextCaseTitle")
+	Assert(!InStr(Body, '{:T}'), "the one-shot Shift no longer titles with Format")
+}
+Test("one-shot Shift: the captured character is titled with the shared rule (one-shot-unicode-title)",
+	_TCV_OneShotTitlesWithTheSharedRule)

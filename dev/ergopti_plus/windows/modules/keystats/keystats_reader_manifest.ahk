@@ -106,11 +106,53 @@ KLR__SumSystemDay(db, manifest, where) {
 		}
 }
 
+; A detached reader receives only an immutable projection, never fabricated
+; hook/session state. Its parent retains and validates the native source owner.
+class KLRForegroundProjection {
+	static worker_snapshot := 0
+}
+
+KLR_ForegroundSnapshotValid(Snapshot) {
+	if !(Snapshot is Map) || Snapshot.Count != 6
+		return false
+	App := Snapshot.Get("app", 0), Day := Snapshot.Get("day", 0)
+	if !(App is String) || App == ""
+			|| !(Day is String) || !RegExMatch(Day, "^\d{4}-\d{2}-\d{2}$")
+		return false
+	loop StrLen(App)
+		if NumGet(StrPtr(App), (A_Index - 1) * 2, "UShort") == 0
+			return false
+	for Field in ["origin", "activity", "now", "timeout"]
+		if !(Snapshot.Get(Field, -1) is Integer) || Snapshot[Field] < 0
+			return false
+	return Snapshot["origin"] > 0 && Snapshot["origin"] <= Snapshot["now"]
+		&& Snapshot["activity"] <= Snapshot["now"] && Snapshot["timeout"] > 0
+}
+
+KLR_AddCapturedForegroundTime(Manifest, Snapshot, StartDate := "", EndDate := "") {
+	if !(Manifest is Map)
+		return
+	if !KLR_ForegroundSnapshotValid(Snapshot)
+		throw ValueError("Detached foreground projection requires a complete snapshot.")
+	Day := Snapshot["day"], Now := Snapshot["now"]
+	Elapsed := TickElapsed64(Snapshot["origin"], Now)
+	if Elapsed <= 0 || (Snapshot["activity"] > 0
+			&& TickElapsed64(Snapshot["activity"], Now) >= Snapshot["timeout"])
+		return
+	if (StartDate != "" && StrCompare(Day, StartDate) < 0)
+			|| (EndDate != "" && StrCompare(Day, EndDate) > 0)
+		return
+	Cell := KLR_GetCell(Manifest, Day, Snapshot["app"])
+	Cell["app_time_ms"] += Elapsed
+}
+
 ; Adds the foreground interval that has not yet ended in an app_switch event.
 ; Aggregates are persisted at focus changes, so without this projection-only
 ; addition a dashboard opened during a long uninterrupted task reports zero
 ; time for the current application until the user leaves it.
 KLR_AddLiveForegroundTime(manifest, start_date := "", end_date := "", Now := unset) {
+		if KLRForegroundProjection.worker_snapshot is Map
+				return KLR_AddCapturedForegroundTime(manifest, KLRForegroundProjection.worker_snapshot, start_date, end_date)
 		if !(manifest is Map)
 				return
 		; Snapshot mutable publication before the final clock observation.
@@ -186,7 +228,16 @@ KLR_ManifestSql(Name, Where) {
 		return KeystatsQuery(Name, Map("where", Where))
 }
 
+KLR_ManifestAppKey(app) {
+		return (app == "_system" || app == "_sys" || SubStr(app, 1, 1) == "~") ? "~" app : app
+}
+
+KLR_ManifestAppLabel(key) {
+		return SubStr(key, 1, 1) == "~" ? SubStr(key, 2) : key
+}
+
 KLR_GetCell(manifest, date_str, app) {
+		app := KLR_ManifestAppKey(app)
 		if !manifest.Has(date_str)
 				manifest[date_str] := Map()
 		d := manifest[date_str]

@@ -90,6 +90,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 	return Map(
 		MenuCommand.KEY_COMBINATIONS_TOGGLE, MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		MenuCommand.COMBO_SYMMETRIC, (*) => KeyCombinationChordToggleSymmetric(),
+		MenuCommand.COPY_TAP_TO_COMBO, (*) => KeyCombinationCopyTapsToChords(),
 		MenuCommand.SCOPE_RESTORE, (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
@@ -97,7 +98,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 ; « CapsWord : désactivation automatique », declared by caps_word_auto_off_group:
 ; the delay choice, one checkbox per delimiter of the hotstring catalogue and
 ; one per pointer kind of [shortcuts.caps_word.pointer]. Every row stores
-; through CapsWordAutoOffStore, which the next activation reads; no reload.
+; through CapsWordAutoOffStore, which re-arms an active CapsWord; no reload.
 _SC_CapsWordAutoOffSubmenu() {
 	Commands := Map(MenuCommand.CAPS_WORD_IDLE_TIMEOUT,
 		(Seconds, *) => CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, Seconds))
@@ -481,7 +482,7 @@ _WS_MenuAddCustom() {
 		return
 	}
 	LeftChar := Trim(IB1.Value, " `t")
-	if (StrLen(LeftChar) != 1) {
+	if !WrapSymbols_IsSingleSymbol(LeftChar) {
 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
 		return
 	}
@@ -492,7 +493,7 @@ _WS_MenuAddCustom() {
 		return
 	}
 	RightChar := Trim(IB2.Value, " `t")
-	if (RightChar != "" and StrLen(RightChar) != 1) {
+	if (RightChar != "" and !WrapSymbols_IsSingleSymbol(RightChar)) {
 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
 		return
 	}

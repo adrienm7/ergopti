@@ -333,36 +333,45 @@ _LPI_AgentCase(Private, OnlyText) {
 		Dispatch() {
 			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), Body)
 		}
+		; The agent feed binds its typing source and reads the privacy port, so
+		; the case runs inside the shared private RAM verdict of the bridge.
 		Body(Fx, Lines, Sent) {
-			global _LLM_Bridge_Active, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LPI_Marker
-			Saved := { Active: _LLM_Bridge_Active, Buffer: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding }
-			try {
-				_LLM_Bridge_Active := false
-				_LLM_Bridge_AgentFeeding := false
-				_LLM_Bridge_AgentBuffer := ""
-				AssertTrue(_LLM_Bridge_AgentFeedIsWanted(), "The real automatic policy must admit its separate typing feed")
-				LLM_Bridge_MirrorAgentEdit(0, "Before qzx")
-				_LPI_Expand(State)
-				State["bridge_contains_marker"] := InStr(_LLM_Bridge_AgentBuffer, _LPI_Marker) > 0
-				if !OnlyText {
-					AssertEqual("", _LLM_Bridge_AgentBuffer, "The Send-mode witness clears the separate agent context too")
-					AssertEqual(0, Fx.Remote.Length)
-					return
-				}
-				Pause := _LAG_TypeThroughBridge(Fx, " after typing please schedule a meeting tomorrow")
-				AssertTrue(HasMethod(Pause, "Call"), "The actual agent typing owner must arm a pause")
-				AssertTrue(Pause.Call(), "The actual pause must build a System1 prompt")
-				AssertEqual(1, Fx.Remote.Length, "The actual agent prompt must reach a capture-only HTTP port")
-				State["capture_count"] := Fx.Remote.Length
-				State["marker_in_prompt"] := InStr(Fx.Remote[1]["body"], _LPI_Marker) > 0
-				AssertEqual(!Private, State["marker_in_prompt"], "A private expansion must be absent from the automatic agent prompt")
-			} finally {
-				LLM_Engine_CancelTimer()
-				_LLM_Bridge_Active := Saved.Active
-				_LLM_Bridge_AgentBuffer := Saved.Buffer
-				_LLM_Bridge_AgentFeeding := Saved.Feeding
+			_LAG_WithBridgeOff(Fx, Typing)
+			Typing() {
+				_LPI_AgentTyping(Fx, State, OnlyText, Private)
 			}
 		}
+	}
+}
+
+_LPI_AgentTyping(Fx, State, OnlyText, Private) {
+	global _LLM_Bridge_Active, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LPI_Marker
+	Saved := { Active: _LLM_Bridge_Active, Buffer: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding }
+	try {
+		_LLM_Bridge_Active := false
+		_LLM_Bridge_AgentFeeding := false
+		_LLM_Bridge_AgentBuffer := ""
+		AssertTrue(_LLM_Bridge_AgentFeedIsWanted(), "The real automatic policy must admit its separate typing feed")
+		LLM_Bridge_MirrorAgentEdit(0, "Before qzx")
+		_LPI_Expand(State)
+		State["bridge_contains_marker"] := InStr(_LLM_Bridge_AgentBuffer, _LPI_Marker) > 0
+		if !OnlyText {
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "The Send-mode witness clears the separate agent context too")
+			AssertEqual(0, Fx.Remote.Length)
+			return
+		}
+		Pause := _LAG_TypeThroughBridge(Fx, " after typing please schedule a meeting tomorrow")
+		AssertTrue(HasMethod(Pause, "Call"), "The actual agent typing owner must arm a pause")
+		AssertTrue(Pause.Call(), "The actual pause must build a System1 prompt")
+		AssertEqual(1, Fx.Remote.Length, "The actual agent prompt must reach a capture-only HTTP port")
+		State["capture_count"] := Fx.Remote.Length
+		State["marker_in_prompt"] := InStr(Fx.Remote[1]["body"], _LPI_Marker) > 0
+		AssertEqual(!Private, State["marker_in_prompt"], "A private expansion must be absent from the automatic agent prompt")
+	} finally {
+		LLM_Engine_CancelTimer()
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_AgentBuffer := Saved.Buffer
+		_LLM_Bridge_AgentFeeding := Saved.Feeding
 	}
 }
 

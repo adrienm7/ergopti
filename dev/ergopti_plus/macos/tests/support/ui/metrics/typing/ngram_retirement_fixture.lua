@@ -80,6 +80,7 @@ function M.run(callback)
 					function db:nrows(sql)
 						local source = sql:match("FROM ([%w_]+)")
 						local bounds = sql:find("SELECT (SELECT MIN(date)", 1, true) ~= nil
+							or sql:find("SELECT DISTINCT date FROM ", 1, true) ~= nil
 						local fingerprint = sql:find("COUNT(*) AS n", 1, true) ~= nil
 						local lo = sql:match("date >= '([%d%-]+)'")
 						if state.sql_refusal and source == "ngram_chars" and not bounds
@@ -114,6 +115,7 @@ function M.run(callback)
 				end
 				package.loaded["modules.keystats.sqlite_reader"] = nil
 				local reader = require("modules.keystats.sqlite_reader")
+				reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 				local projection = require("ui.metrics_typing.projection")
 				local encoder = require("infra.paced_json").encode
 				state.reader, state.projection = reader, projection

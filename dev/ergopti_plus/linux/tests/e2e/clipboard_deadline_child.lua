@@ -40,7 +40,12 @@ local okay, detail = xpcall(function()
 	assert(uv.os_setenv("PATH", root .. ":" .. assert(os.getenv("PATH"))))
 	local Shell = require("adapters.shell_runner")
 	local current, delayed = Shell.quote(root .. "/current"), Shell.quote(root .. "/delayed")
-	write(root .. "/wl-paste", "#!/bin/sh\nexec cat " .. current .. "\n")
+	-- A text-only selection: the stage lists the advertised types before it
+	-- borrows the clipboard, and refuses one holding another format it cannot
+	-- restore. Any other request reads the current bytes.
+	write(root .. "/wl-paste", "#!/bin/sh\nfor argument in \"$@\"; do\n"
+		.. "\tif [ \"$argument\" = --list-types ]; then printf 'text/plain;charset=utf-8\\n'; exit 0; fi\n"
+		.. "done\nexec cat " .. current .. "\n")
 	write(root .. "/wl-copy", "#!/bin/sh\nset -eu\ncat > " .. Shell.quote(root .. "/input")
 		.. "\nif [ -f " .. delayed .. " ]; then exec sleep 2; fi\ncat "
 		.. Shell.quote(root .. "/input") .. " > " .. current .. "\n")

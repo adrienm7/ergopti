@@ -39,6 +39,9 @@
 ---    (modules/updater/release_installer.lua) before the controlled quit. Each
 ---    phase reaches the page through setInstallProgress(). The restore banner
 ---    posts restore_backup; the driver reloads on the restored configuration.
+---    A quit the coordinator refuses leaves the armed release waiting
+---    (restart_pending, with « Restart now » here and in the About menu) for
+---    as long as the swap worker waits; only then is it reported not installed.
 --- 6. Feed-only list: the Atom feed names no files and no digests, so a direct
 ---    install is refused (install_error_no_details). Sparkle verifies a release
 ---    on its own, against the EdDSA signature of the channel's appcast, and
@@ -184,8 +187,10 @@ local _last_list = nil
 -- The install session (created on the first request).
 local _install_session = nil
 local _failure_contract = nil
+-- The menu session's redraw, told when a release starts or stops waiting for its restart.
+local _pending_observer = nil
 
--- Test seam: { updater, backup, installer, coordinator, handoff }.
+-- Test seam: { updater, backup, installer, coordinator, handoff, timer }.
 M._deps = nil
 
 --- The owners the install and the restore go through.
@@ -198,6 +203,7 @@ local function deps()
 		installer = require("modules.updater.release_installer"),
 		coordinator = require("infra.termination_coordinator"),
 		handoff = require("modules.updater.feed_handoff"),
+		timer = require("adapters.timer_scheduler"),
 	}
 end
 
@@ -407,6 +413,7 @@ local function fetch_and_inject(channel)
 	if not session_is_current(owner, view, controller) then return end
 	if not registry_channel(channel, "release fetch") then return end
 	local request_generation = next_fetch_generation()
+	_last_list = nil
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
 	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
@@ -452,7 +459,6 @@ local function fetch_and_inject(channel)
 		end
 
 		local releases = data
-		_last_list = { kind = "json", releases = data }
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
@@ -460,6 +466,7 @@ local function fetch_and_inject(channel)
 				request_generation)
 			return
 		end
+		_last_list = { kind = "json", releases = data }
 
 		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
 			request_generation, #releases)
@@ -563,11 +570,25 @@ local function install_session()
 		end,
 		install_async = function(staged, release, asset, done)
 			return deps().installer.arm_swap(staged, function(armed, detail)
-				done(armed == true, ReleaseInstall.REASON.install, detail)
+				local reason = detail == "previous_backup_occupied" and ReleaseInstall.REASON.previous_backup
+					or ReleaseInstall.REASON.install
+				done(armed == true, reason, detail)
 			end) == true
 		end,
 		restart = function()
 			return deps().coordinator.request_user_exit("release_install") == true
+		end,
+		-- The armed swap worker waits SWAP_WAIT_SECONDS for the quit, from its
+		-- ARMED receipt, just before this refusal: past that it has replaced
+		-- nothing, so the held release is reported not installed.
+		pending_changed = function()
+			if _pending_observer then _pending_observer() end
+		end,
+		restart_pending_expiry = function(_, _, expire)
+			local timer, wait = deps().timer, deps().installer.SWAP_WAIT_SECONDS
+			if type(timer) ~= "table" or type(timer.after) ~= "function" or type(wait) ~= "number" then return false end
+			local _, committed = timer.after(wait, expire)
+			return committed == true
 		end,
 		report = function(message, native_owner)
 			-- Visibility does not cancel an accepted transaction. Only its original
@@ -607,15 +628,36 @@ local function restore_from_page(id)
 				or "changelog_window.restore_error_unexpected" })
 		return
 	end
-	answer({ phase = "restored", backup_path = pre and pre.path or nil })
-	local ok, accepted = pcall(deps().coordinator.request_reload, "config_restore")
-	if not ok or accepted ~= true then
-		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(accepted))
+	local backup_path = pre and pre.path or nil
+	-- The disk is restored either way; only an accepted, still-live handoff may
+	-- promise a restart. A refusal or a later abort leaves the old runtime up, so
+	-- the page reports the failure with the pre-restore copy, as on Windows.
+	local function reload_refused(detail)
+		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(detail))
+		answer({ phase = "failed", backup_path = backup_path,
+			reason_key = "changelog_window.restore_error_unexpected" })
 	end
+	local ok, accepted = pcall(deps().coordinator.request_reload_owned, "config_restore", reload_refused)
+	if not ok or accepted ~= true then
+		reload_refused(accepted)
+		return
+	end
+	answer({ phase = "restored", backup_path = backup_path })
 end
 
 -- The page's reason when the launcher did not take the hand-off.
 local HANDOFF_FAILED = "changelog_window.install_error_handoff"
+
+--- Reports a stale action while a replacement list is not yet available.
+local function report_missing_list(tag)
+	local owner = install_owner()
+	local reason = _install_session and _install_session.busy() and ReleaseInstall.REASON.busy
+		or ReleaseInstall.REASON.unknown_release
+	local message = js_value({ tag = tag, phase = "failed", reason_key = reason })
+	if message and install_owner_retained(owner) then
+		eval(string.format("setInstallProgress(%s)", message), owner.generation, nil, owner)
+	end
+end
 
 --- Hands the newest release of a feed-only list to Sparkle. The feed names no
 --- digest, so this host cannot verify a download itself; Sparkle verifies the
@@ -684,10 +726,11 @@ local function install_seed()
 	local ok, seed = pcall(function()
 		local blocked = install_blocked()
 		local backup = restorable_backup()
+		local pending = _install_session and _install_session.pending() or nil
 		return string.format("window.__installed_version=%s;window.__install_blocked_key=%s;"
-			.. "window.__restorable_backup=%s;window.__feed_install_handoff=true;",
+			.. "window.__restorable_backup=%s;window.__install_pending=%s;window.__feed_install_handoff=true;",
 			js_str(deps().updater.current_version()), js_str(blocked or ""),
-			backup and js_value(backup) or "null")
+			backup and js_value(backup) or "null", pending and js_value(pending) or "null")
 	end)
 	if not ok then
 		Logger.error(LOG, "The Versions page gets no install buttons: %s.", tostring(seed))
@@ -771,10 +814,18 @@ local function ensure_ucc(owner)
 			subscribe_from_page(body.channel)
 		elseif body.action == "install_release" then
 			-- Only this click installs a chosen release: nothing else calls the session.
-			install_session().install(body.tag, body.channel)
+			if _last_list == nil then
+				report_missing_list(body.tag)
+			else
+				install_session().install(body.tag, body.channel)
+			end
 		elseif body.action == "install_through_updater" then
 			-- A feed-only list's newest release: Sparkle verifies and asks the user.
-			hand_off_to_updater(body.tag, body.channel)
+			if _last_list == nil then report_missing_list(body.tag)
+			else hand_off_to_updater(body.tag, body.channel) end
+		elseif body.action == "complete_install_restart" then
+			-- « Restart now » of an installed release whose restart was refused.
+			if _install_session then _install_session.complete_restart() end
 		elseif body.action == "install_failure_action" then
 			if _install_session then
 				_install_session.failure_action(body.operation, body.epoch, body.id)
@@ -1009,6 +1060,27 @@ function M.open(opts)
 	end
 	Logger.success(LOG, "Changelog window created.")
 	return _focus_owner == owner and _wv_committed == true
+end
+
+--- The installed release that waits for a restart the coordinator refused.
+--- @return table|nil { tag, backup_path }
+function M.pending_install()
+	return _install_session and _install_session.pending() or nil
+end
+
+--- Names the menu session's redraw; the menu caches its tree, so the row that
+--- completes a held release appears only when this is told. A new menu
+--- session (a reload builds one) replaces the previous redraw.
+--- @param observer function
+function M.set_pending_install_observer(observer)
+	assert(type(observer) == "function", "the held-install observer must be a function")
+	_pending_observer = observer
+end
+
+--- Asks again for the restart that completes the held release (the menu row).
+--- @return boolean accepted
+function M.complete_pending_install()
+	return _install_session ~= nil and _install_session.complete_restart() == true
 end
 
 --- The open window, for ui/window_toggle (nil when closed).

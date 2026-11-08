@@ -167,3 +167,38 @@ _OTV_EncodedNulNeverBecomesPathPrefix() {
 	}
 }
 Test("copy_selected_path: encoded NUL cannot truncate a file target (uri-decoded-nul)", _OTV_EncodedNulNeverBecomesPathPrefix)
+
+_OTV_ExactPunctuationPath() {
+	Root := A_Temp . "\ergopti-exact-path-" . A_ScriptHwnd . "-" . Random(100000, 999999)
+	Owned := false
+	try {
+		if !DllCall("Kernel32\CreateDirectoryW", "Str", Root, "Ptr", 0, "Int")
+			throw OSError(A_LastError, "Could not create exact-path fixture.")
+		Owned := true
+		Plain := Root . "\report"
+		Exact := Plain . ","
+		FileAppend("plain", Plain, "UTF-8")
+		FileAppend("exact", Exact, "UTF-8")
+		Launched := []
+		Launch := (Target, WorkingDir := "", Options := "") => Launched.Push(Target)
+		Report := (Key, Target, Reason) => 0
+		; Bare, quoted and file URI spellings must all name the exact file.
+		Uri := "file:///" . StrReplace(Exact, "\", "/")
+		for Selection in [Exact, '"' . Exact . '"', Uri] {
+			Launched := []
+			AssertTrue(SearchPath(Selection, Launch, Report), "the exact existing file is opened")
+			AssertTrue(Launched[1] == '"' . Exact . '"', "never substitute the distinct plain file")
+		}
+		FileDelete(Exact)
+		Launched := []
+		AssertTrue(SearchPath(Exact, Launch, Report), "prose punctuation still falls back")
+		AssertTrue(Launched[1] == '"' . Plain . '"', "only the cleaned file exists")
+		Launched := []
+		AssertFalse(SearchPath(Exact, Launch, Report, (*) => "error"), "an unreadable exact path refuses fallback")
+		AssertEqual(0, Launched.Length, "metadata refusal cannot open a different file")
+	} finally {
+		if Owned
+			DirDelete(Root, 1)
+	}
+}
+Test("copy_selected_path: prefer exact selected filename ending in punctuation", _OTV_ExactPunctuationPath)

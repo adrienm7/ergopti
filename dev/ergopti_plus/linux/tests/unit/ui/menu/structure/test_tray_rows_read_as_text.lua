@@ -31,7 +31,7 @@ local function every_category_on()
 		config = { any_enabled = on, get_groups = function() return {} end, is_group_enabled = on,
 			is_section_enabled = on, get_category = function() return nil end, get_categories = function() return {} end },
 		shortcuts = { is_enabled = on, toggle = noop, is_caps_word_active = function() return false end,
-			get_wrap_pairs = function() return {} end },
+			get_wrap_pairs = function() return {} end, get_wrap_pair_list = function() return {} end },
 		keystats = { is_enabled = on, toggle = noop,
 			get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end },
 		dyn_hotstrings = { is_enabled = on, set_enabled = noop, get_rules_count = function() return 0 end,
@@ -104,4 +104,25 @@ helpers.describe("the real Linux tray reads as text", function()
 			helpers.assert_eq(defects, {}, "a row must read as text")
 		end)
 	end
+
+	-- While no driver can deliver an action bound to a physical key, the
+	-- editor's row says so instead of « Try reopening it » (physical-delivery-unqualified).
+	helpers.it("the physical shortcut editor row names its real cause", function()
+		local catalogue = check.catalogue(SHARED_ROOT, "en", require("json").decode)
+		local label = catalogue["physical_shortcuts.window_title"]
+		local reason = catalogue["physical_shortcuts.delivery_unqualified"]
+		local head = reason:match("^(.-):")
+		local found = nil
+		local function walk(rows)
+			for _, row in ipairs(rows or {}) do
+				if type(row.title) == "string" and row.title:sub(1, #label) == label then found = row end
+				walk(row.menu)
+			end
+		end
+		walk(tray("en"))
+		helpers.assert_true(found ~= nil, "the editor row is drawn")
+		helpers.assert_eq(found.disabled, true)
+		helpers.assert_true(found.title:find(head, 1, true) ~= nil, found.title)
+		helpers.assert_true(found.title:find("reopening", 1, true) == nil, found.title)
+	end)
 end)

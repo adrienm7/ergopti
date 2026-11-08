@@ -23,8 +23,12 @@
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
 --- 4. Driver-native handlers ([call_handlers].macos in layer_actions.toml) and
----    the `none` action have Karabiner forms of their own; a repeat count has
----    none on macOS and raises.
+---    the `none` action have Karabiner forms of their own. A repeat count is
+---    the Karabiner variable nav_repeat_count, Windows' NumberOfRepetitions: a
+---    repeat_count:<N> key sets it, a repeatable action has one variant per
+---    count the layer sets that sends its last chord that many times, every
+---    keystroke resets it to 1, and so does entering the layer (generator.lua
+---    prepend_nav_layer_sentinel).
 --- 5. No binding, no rule: Karabiner refuses a rule without manipulators, and
 ---    an absent layers.toml means the keys behave natively.
 --- 6. The wheel stays out of the Karabiner rule, which cannot take wheel input:
@@ -101,6 +105,13 @@ M.KEYBOARD_FORM = KEYBOARD_FORM
 -- The Karabiner variable the hold actions set while the layer is held.
 local LAYER_ACTIVE_VAR_NAME = "layer_active"
 local LAYER_ACTIVE_ON_VALUE = 1
+
+-- The Karabiner variable holding the repeat count (lease-scoped like
+-- layer_active, platform/remap/lease_contract.lua), and its resting value.
+local REPEAT_COUNT_VAR_NAME = "nav_repeat_count"
+local REPEAT_COUNT_RESET_VALUE = 1
+M.REPEAT_COUNT_VAR_NAME = REPEAT_COUNT_VAR_NAME
+M.REPEAT_COUNT_RESET_VALUE = REPEAT_COUNT_RESET_VALUE
 
 -- Karabiner's mirror of "Use F1, F2, etc. keys as standard function keys".
 local FKEYS_STANDARD_VAR_NAME = "system.use_fkeys_as_standard_function_keys"
@@ -243,13 +254,19 @@ local function base_manipulator(code, registry, description, extra_condition)
 	local from = karabiner_event(code, registry)
 	from.modifiers = { optional = { "any" } }
 	local conditions = { { type = "variable_if", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE } }
-	if extra_condition then conditions[#conditions + 1] = extra_condition end
+	-- Copied: the generator rewrites runtime variable names in place.
+	if extra_condition then
+		local condition = {}
+		for key, value in pairs(extra_condition) do condition[key] = value end
+		conditions[#conditions + 1] = condition
+	end
 	return { type = "basic", description = description, conditions = conditions, from = from }
 end
 
 --- What a resolution is called in a manipulator's description.
 local function resolution_label(resolution)
 	if resolution.action then return resolution.action end
+	if resolution.kind == "repeat_count" then return "repeat_count:" .. tostring(resolution.count) end
 	local parts = {}
 	for _, chord in ipairs(resolution.chords or {}) do
 		local tokens = {}
@@ -260,23 +277,66 @@ local function resolution_label(resolution)
 	return table.concat(parts, ", ")
 end
 
+--- The chords of a repeatable resolution sent `times` times: every chord
+--- once, then the last one again until it has been sent `times` times.
+local function counted_chords(chords, times)
+	local out = {}
+	for _, chord in ipairs(chords) do out[#out + 1] = chord end
+	for _ = 2, times do out[#out + 1] = chords[#chords] end
+	return out
+end
+
+--- The set_variable event that puts the repeat count back to rest.
+local function repeat_reset_event()
+	return { set_variable = { name = REPEAT_COUNT_VAR_NAME, value = REPEAT_COUNT_RESET_VALUE } }
+end
+
+--- The keystroke manipulators of one top-row variant: a counted one per count
+--- the layer sets (first: Karabiner runs the first manipulator that matches),
+--- then the plain one. With no count in the layer, the plain one alone, as
+--- before repeat counts existed.
+local function keystroke_variants(code, resolution, registry, product, label, add_fn, condition, counts)
+	local manipulators = {}
+	if resolution.repeatable then
+		for _, times in ipairs(counts) do
+			local counted = base_manipulator(code, registry, label .. " (×" .. times .. ")", condition)
+			counted.conditions[#counted.conditions + 1] = { type = "variable_if", name = REPEAT_COUNT_VAR_NAME, value = times }
+			counted.to = keystroke_events(counted_chords(resolution.chords, times), registry, add_fn, product)
+			counted.to[#counted.to + 1] = repeat_reset_event()
+			manipulators[#manipulators + 1] = counted
+		end
+	end
+	local plain = base_manipulator(code, registry, label, condition)
+	plain.to = keystroke_events(resolution.chords, registry, add_fn, product)
+	if counts.any then plain.to[#plain.to + 1] = repeat_reset_event() end
+	manipulators[#manipulators + 1] = plain
+	return manipulators
+end
+
 --- The manipulators of one bound key.
+--- @param counts table The counts above 1 the layer's repeat_count keys set,
+---   ascending, with `any` true when the layer binds a repeat_count at all.
 --- @return table manipulators
-local function manipulators_for(code, resolution, registry, product)
+local function manipulators_for(code, resolution, registry, product, counts)
 	local label = "Navigation layer: " .. code .. " — " .. resolution_label(resolution)
 	if resolution.kind == "keystroke" then
 		if not sends_function_key(resolution.chords, registry) then
-			local manipulator = base_manipulator(code, registry, label)
-			manipulator.to = keystroke_events(resolution.chords, registry, false, product)
-			return { manipulator }
+			return keystroke_variants(code, resolution, registry, product, label, false, nil, counts)
 		end
-		local media = base_manipulator(code, registry, label .. " (Fn added: the top row is media keys)",
-			{ type = "variable_unless", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		media.to = keystroke_events(resolution.chords, registry, true, product)
-		local standard = base_manipulator(code, registry, label .. " (the top row is standard function keys)",
-			{ type = "variable_if", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		standard.to = keystroke_events(resolution.chords, registry, false, product)
-		return { media, standard }
+		local manipulators = keystroke_variants(code, resolution, registry, product,
+			label .. " (Fn added: the top row is media keys)", true,
+			{ type = "variable_unless", name = FKEYS_STANDARD_VAR_NAME, value = true }, counts)
+		for _, standard in ipairs(keystroke_variants(code, resolution, registry, product,
+			label .. " (the top row is standard function keys)", false,
+			{ type = "variable_if", name = FKEYS_STANDARD_VAR_NAME, value = true }, counts)) do
+			manipulators[#manipulators + 1] = standard
+		end
+		return manipulators
+	end
+	if resolution.kind == "repeat_count" then
+		local manipulator = base_manipulator(code, registry, label)
+		manipulator.to = { { set_variable = { name = REPEAT_COUNT_VAR_NAME, value = resolution.count } } }
+		return { manipulator }
 	end
 	if resolution.kind == "none" then
 		local manipulator = base_manipulator(code, registry, label)
@@ -291,6 +351,17 @@ local function manipulators_for(code, resolution, registry, product)
 		return { manipulator }
 	end
 	error("nav_layer: Karabiner has no " .. tostring(resolution.kind) .. " resolution", 3)
+end
+
+--- Whether a layer binds a repeat_count key, and so needs the count reset
+--- when it is entered (generator.lua prepend_nav_layer_sentinel).
+--- @param bindings table|nil Key code -> resolution, resolved for macOS.
+--- @return boolean
+function M.binds_repeat_count(bindings)
+	for _, resolution in pairs(bindings or {}) do
+		if type(resolution) == "table" and resolution.kind == "repeat_count" then return true end
+	end
+	return false
 end
 
 --- Builds the Karabiner rule of the navigation layer.
@@ -316,9 +387,23 @@ function M.build_rule(bindings, registry, product)
 	-- Sorted: Lua tables have no order, and a stable rule keeps the deployed
 	-- karabiner.json identical from one regeneration to the next.
 	table.sort(codes)
+	-- The counts the layer's repeat_count keys set: a count of 1 is the resting
+	-- value, which the plain manipulator already sends.
+	local counts, seen = { any = false }, {}
+	for _, code in ipairs(codes) do
+		local resolution = bindings[code]
+		if resolution.kind == "repeat_count" then
+			counts.any = true
+			if resolution.count > REPEAT_COUNT_RESET_VALUE and not seen[resolution.count] then
+				seen[resolution.count] = true
+				counts[#counts + 1] = resolution.count
+			end
+		end
+	end
+	table.sort(counts)
 	local manipulators = {}
 	for _, code in ipairs(codes) do
-		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry, product)) do
+		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry, product, counts)) do
 			manipulators[#manipulators + 1] = manipulator
 		end
 	end
@@ -706,6 +791,43 @@ function M.reconcile_wheel(label)
 	end
 end
 
+-- A refused publication or undo can retain the exact writer capability. Keep
+-- it until cleanup settles before allowing another hold mutation to proceed.
+local pending_hold_cleanups = {}
+local hold_cleanup_running = false
+
+local function settle_hold_cleanup()
+	if #pending_hold_cleanups == 0 then return true end
+	if hold_cleanup_running then return false end
+	hold_cleanup_running = true
+	while #pending_hold_cleanups > 0 do
+		local record = pending_hold_cleanups[1]
+		local called, settled = pcall(M.undo_import, record)
+		if not called or settled ~= true then
+			hold_cleanup_running = false
+			Logger.error(LOG, "Navigation layer cleanup remains pending; hold change refused.")
+			return false
+		end
+		table.remove(pending_hold_cleanups, 1)
+	end
+	hold_cleanup_running = false
+	return true
+end
+
+--- Retains the exact cleanup owner until its undo succeeds.
+function M.undo_owned(record)
+	if record ~= nil then pending_hold_cleanups[#pending_hold_cleanups + 1] = record end
+	return settle_hold_cleanup()
+end
+
+--- Imports a wizard layer while retaining failed publication cleanup.
+function M.import_owned(opts)
+	if not settle_hold_cleanup() then return nil, "navigation layer cleanup remains pending" end
+	local imported, err, failed = M.import_recommended(opts)
+	if not imported and failed then M.undo_owned(failed) end
+	return imported, err
+end
+
 --- Runs a hold setter with the layer its action enters. A hold on the
 --- navigation layer creates the folder's layers.toml from Ergopti's
 --- recommended layer when there is none, before the setter saves: a key set
@@ -717,10 +839,14 @@ end
 --- @param commit function Saves the hold; returns true once it is committed.
 --- @return boolean committed
 function M.commit_hold(label, action_id, commit)
+	if not settle_hold_cleanup() then return false end
 	local layer = nil
 	if action_id == M.HOLD_ACTION_ID then
-		local import, layer_err = M.import_recommended()
+		local import, layer_err, failed = M.import_recommended()
 		if not import then
+			if failed then
+				M.undo_owned(failed)
+			end
 			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
 				tostring(label), tostring(layer_err))
 			return false
@@ -729,7 +855,9 @@ function M.commit_hold(label, action_id, commit)
 	end
 	local committed = commit()
 	if committed ~= true then
-		M.undo_import(layer)
+		if layer then
+			M.undo_owned(layer)
+		end
 		return committed
 	end
 	if layer and layer.status == require("keymap.layer_preset").IMPORTED then

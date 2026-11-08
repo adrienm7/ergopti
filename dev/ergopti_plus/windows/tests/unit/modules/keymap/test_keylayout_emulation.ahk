@@ -158,8 +158,139 @@ _KLT_VectorsCase() {
 				Failures.Push(Vector["id"] . " sent [" . Sent . "] instead of [" . Vector["sends"] . "]")
 		}
 	}
-	AssertEqual(2, Layouts.Count, "the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
+	; Further layouts (Ergopti+) may join; both conventions must stay covered.
+	Assert(Layouts.Has("ergol") && Layouts.Has("ergopti"),
+		"the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
 	Assert(Presses >= 25 && Shortcuts >= 4, "both vector kinds must be replayed")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("keylayout emulation: the shared [layout] options vectors decide as the Lua emulation does (layout-registry-emulation)",
+	() => _KLT_WithEmulation(_KLT_OptionsVectorsCase))
+
+; Modifier word of an options-vector press -> the hotkey prefix of its chord.
+_KLT_ChordPrefix(Mods) => Mods.Has("ctrl") ? "^" : (Mods.Has("alt") ? "!" : "#")
+
+; Decides one press of emulation_vectors.json the way the registered hotkeys
+; do, through the production criteria and handlers' own functions: the
+; criterion of the hotkey that would catch the press, then the same output
+; call as its handler (_KLE_OnKey, _KLE_OnAltGr, _KLE_OnShortcut, the reset
+; keys). The vectors name the OS layout's character (native=), where the
+; handler reads the machine's, so the completion goes through
+; KeylayoutEmulation_ComposeNative.
+; @param Press {String} "[mods] SCnnn [native=text]".
+; @returns {Map} "decides" (pass, type, type_pass or shortcut) and "text".
+_KLT_OptionsDecide(Press) {
+	global KLE_KeyCodes, KLE_DEAD_RESET_KEYS, KLE_NATIVE_CHORD_KEYS
+	Mods := Map()
+	Sc := ""
+	NativeText := ""
+	for Word in StrSplit(Press, " ") {
+		if SubStr(Word, 1, 7) == "native="
+			NativeText := SubStr(Word, 8)
+		else if RegExMatch(Word, "^SC[0-9A-F]{3}$")
+			Sc := Word
+		else
+			Mods[Word] := true
+	}
+	Assert(Sc != "", "a vector press names a scan code: " . Press)
+	Pass := Map("decides", "pass", "text", "")
+	for Key in KLE_DEAD_RESET_KEYS {
+		if Key == Sc {
+			KeylayoutEmulation_ResetDeadKey()
+			return Pass
+		}
+	}
+	; No hotkey exists for a key the layout table does not hold.
+	if !KLE_KeyCodes.Has(Sc)
+		return Pass
+	if Mods.Has("ctrl") || Mods.Has("alt") || Mods.Has("win") {
+		Prefix := _KLT_ChordPrefix(Mods)
+		if KLE_NATIVE_CHORD_KEYS.Has(Sc) || !_KLE_ShortcutCriterion(Prefix . Sc)
+			return Pass
+		KeylayoutEmulation_ResetDeadKey()
+		Char := KeylayoutEmulation_ShortcutChar(Sc, Prefix)
+		return Char == "" ? Pass : Map("decides", "shortcut", "text", Char)
+	}
+	Shift := Mods.Has("shift")
+	Caps := Mods.Has("caps")
+	if Mods.Has("altgr") {
+		if !_KLT_AltGrRowOnKanaFamily(_KLE_AltGrCriterion.Bind("SC138 & " . Sc))
+			return Pass
+		return Map("decides", "type", "text", KeylayoutEmulation_Press(Sc, Shift, Caps, true))
+	}
+	if !_KLE_BaseCriterion(Sc, Shift)
+		return Pass
+	if LayoutRowIsEmulated(Sc) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift)
+		return Map("decides", "type", "text", KeylayoutEmulation_Press(Sc, Shift, Caps, false))
+	Step := KeylayoutEmulation_ComposeNative({Count: StrLen(NativeText) > 0 ? 1 : 0, Text: NativeText})
+	return Map("decides", Step["Native"] ? "type_pass" : "type", "text", Step["Output"])
+}
+
+; The vectors that order the number row (digits or symbols first) with the row
+; emulated: the ordering in effect is the foreground OS layout's, which a unit
+; test cannot fix, so the Lua drivers replay them and AHK pins them by name
+; (number_row_levels.json and the number-row suites own the AHK side).
+_KLT_OptionsVectorIsOsDependent(Vector) {
+	Settings := Vector.Has("settings") ? Vector["settings"] : Map()
+	return Settings.Get("number_row", "native") != "native" && Settings.Get("emulate_number_row", true) ? true : false
+}
+
+_KLT_OptionsVectorsCase() {
+	global Features, CategoryEnabled, LayerEnabled, ScriptInformation
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(),
+		ScriptInformation["MagicKeySourceScan"], ScriptInformation["MagicKeySourceOverridesEmulation"]]
+	Vectors := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\emulation_vectors.json", "UTF-8"))["vectors"]
+	Assert(Vectors.Length >= 12, "the options corpus holds its vectors")
+	Failures := []
+	Skipped := []
+	Replayed := 0
+	try {
+		for Vector in Vectors {
+			if _KLT_OptionsVectorIsOsDependent(Vector) {
+				Skipped.Push(Vector["id"])
+				continue
+			}
+			Settings := Vector.Has("settings") ? Vector["settings"] : Map()
+			Layout := Map("emulated_layout", Vector["layout"], "ergopti_variant", "none",
+				"ergopti_base", Settings.Get("base", true) ? true : false,
+				"ergopti_alt_gr", Settings.Get("alt_gr", true) ? true : false,
+				"direct_access_digits", "native")
+			for Row in ["number_row", "top_row", "home_row", "bottom_row"]
+				Layout["emulate_" . Row] := Settings.Get("emulate_" . Row, true) ? true : false
+			Features := Map("layout", Layout,
+				"hotstrings", Map("magic_key", Map("replace", Map("enabled", Settings.Has("magic_key")))))
+			CategoryEnabled := Map("Layout", true)
+			LayerEnabled := false
+			State["initialized"] := false
+			MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+			ScriptInformation["MagicKeySourceScan"] := Settings.Get("magic_key", "")
+			ScriptInformation["MagicKeySourceOverridesEmulation"] := Settings.Has("magic_key")
+			_KLT_Load(Vector["layout"])
+			KeylayoutEmulation_ResetDeadKey()
+			Replayed += 1
+			for Position, Step in Vector["steps"] {
+				Label := Vector["id"] . " #" . Position . " (" . Step["press"] . ")"
+				Got := _KLT_OptionsDecide(Step["press"])
+				if Got["decides"] != Step["decides"]
+					Failures.Push(Label . " decided " . Got["decides"] . " instead of " . Step["decides"])
+				else if Step.Has("text") && Step["text"] !== Got["text"]
+					Failures.Push(Label . " gave [" . Got["text"] . "] instead of [" . Step["text"] . "]")
+			}
+		}
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		ScriptInformation["MagicKeySourceScan"] := Saved[5]
+		ScriptInformation["MagicKeySourceOverridesEmulation"] := Saved[6]
+	}
+	AssertEqual(5, Skipped.Length, "only the OS-dependent number-row orderings stay with the Lua replay: " . _KLT_Join(Skipped))
+	AssertEqual(Vectors.Length - 5, Replayed, "every other options vector is replayed")
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }
 
@@ -511,6 +642,98 @@ _KLT_IndependentLayersCase() {
 		State.Clear()
 		for Key, Value in Saved[5]
 			State[Key] := Value
+	}
+}
+
+Test("keylayout emulation: a pending dead key completes with the OS character on a row switched off (layout-row-pending-dead-key)",
+	() => _KLT_WithEmulation(_KLT_PendingDisabledRowCase))
+
+; DKW-001. Ergopti+'s home-row SC02B is the circumflex dead key and its top-row
+; SC012 types o. With the global base on and only the top row switched off, the
+; pending accent must compose the OS layout's character on SC012 (e -> ê), not
+; the selected layout's (o -> ô). The original registered callbacks are driven.
+_KLT_PendingDisabledRowCase() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, KLE_State, KLE_Compositions
+	global KEYLAYOUT_NEUTRAL_STATE, _Stub_RecordedSends, _HotstringRegistrar, _SendHook
+	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
+	State := MasterGateState()
+	; The suite runs with the recorder hooks installed: later cases read their
+	; sends from them, so this case hands back the hooks it found.
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
+		_KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture,
+		_KLE_ResetObserverGeneration, _HotstringRegistrar, _SendHook]
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergopti_plus", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_variant", "none", "direct_access_digits", "native",
+			"emulate_number_row", true, "emulate_top_row", false, "emulate_home_row", true,
+			"emulate_bottom_row", true))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		_KLT_Load("ergopti_plus")
+		KLE_Registered := false
+		Callbacks := Map()
+		Criteria := Map()
+		Current := {Criterion: 0}
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, *) => (Callbacks[Name] := Callback, Criteria[Name] := Current.Criterion),
+			(Args*) => Current.Criterion := Args.Length ? Args[1] : 0, 0,
+			(Scan, Callback, Criterion) => 0)
+		AssertTrue(KeylayoutEmulation_LayerIsActive("ergopti_base"), "the global base layer stays on")
+		AssertFalse(LayoutRowIsEmulated("SC012"), "the top row is switched off")
+		AssertTrue(LayoutRowIsEmulated("SC02B"), "the home row stays emulated")
+		Hkl := GetForegroundKeyboardLayout()
+		Plain := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, false, false)
+		Shifted := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, true, false)
+		Assert(Plain.Count == 1 && Plain.Text != "o", "the proof needs an OS layout whose SC012 is not o")
+		Circumflex := KLE_Compositions["s1_circumflex"]
+		Assert(Circumflex.Has(Plain.Text) && Circumflex.Has(Shifted.Text),
+			"Ergopti+ composes the circumflex over the OS character " . Plain.Text)
+		if Plain.Text == "e"
+			AssertEqual(Chr(0xEA), Circumflex["e"]["Output"], "the installed US letter e composes to ê")
+		AssertFalse(Criteria["SC012"].Call(), "neutral: the switched-off top row stays with the OS")
+		InstallHotstringHooks()
+		; Plain continuation on the switched-off row.
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		AssertEqual("s1_circumflex", KLE_State, "the home-row dead key arms its accent")
+		AssertTrue(Criteria["SC012"].Call(), "the pending accent owns the native continuation")
+		Callbacks["SC012"].Call("SC012")
+		AssertEqual(1, _Stub_RecordedSends.Length, "the continuation sends one result")
+		AssertEqual(Circumflex[Plain.Text]["Output"], _Stub_RecordedSends[1].args[1],
+			"the OS character completes the accent, not the selected layout's o")
+		AssertEqual(KEYLAYOUT_NEUTRAL_STATE, KLE_State, "the accent is settled")
+		; Shift continuation on the same row.
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		AssertTrue(Criteria["+SC012"].Call(), "the pending accent owns the Shift continuation")
+		Callbacks["+SC012"].Call("+SC012")
+		AssertEqual(1, _Stub_RecordedSends.Length)
+		AssertEqual(Circumflex[Shifted.Text]["Output"], _Stub_RecordedSends[1].args[1],
+			"Shift composes the OS uppercase character")
+		; Enabled-row control: a home-row continuation keeps the selected layout.
+		KLE_State := "s1_circumflex"
+		Selected := KeylayoutEmulation_Press("SC01E", false, KS_CapsLockToggleState(), false)
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		Callbacks["SC01E"].Call("SC01E")
+		AssertEqual(1, _Stub_RecordedSends.Length)
+		AssertEqual(Selected, _Stub_RecordedSends[1].args[1], "an emulated row composes the selected layout's key")
+	} finally {
+		_HotstringRegistrar := Saved[10]
+		_SendHook := Saved[11]
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_KLE_ResetObserverRegistering := Saved[6]
+		_KLE_ResetObserverCohort := Saved[7]
+		_KLE_ResetObserverCapture := Saved[8]
+		_KLE_ResetObserverGeneration := Saved[9]
 	}
 }
 

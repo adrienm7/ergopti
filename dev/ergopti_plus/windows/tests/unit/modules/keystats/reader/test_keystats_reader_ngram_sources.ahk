@@ -100,6 +100,30 @@ _KLRSource_AllDashboardPathsAgree() {
 Test("Keystats reader: every n-gram source projection sums device rows (ngram-source-projection)",
 	_KLRSource_AllDashboardPathsAgree)
 
+_KLRSource_FutureRangeAfterClockRollback() {
+	db := _KLRSource_OpenFixture()
+	try {
+		for date, count in Map("2026-10-24", 2, "2026-10-25", 5, "2026-10-26", 3) {
+			sql := "INSERT INTO ngram_chars (device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
+				. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q("editor.exe") . ","
+				. SQLite_Q("rollback-only") . "," . count . ",0,0,0," . SQLite_Q('{}') . ");"
+			AssertTrue(SQLite_Exec(db, sql), "the fixture must persist all three day buckets")
+		}
+		apps := ["editor.exe"]
+		split := KLR_ReadRangeSplitToday(db, "2026-10-24", "2026-10-26", apps, "2026-10-25")
+		AssertEqual(5, split["historical"]["c"]["rollback-only"]["c"], "past and explicitly requested future days must be combined")
+		AssertEqual(5, split["today"]["editor.exe"]["c"]["rollback-only"]["c"], "the snapshot day must appear only in today")
+		encoded := JsonParse(KLR_BuildRangeSplitTodayJson(db, "2026-10-24", "2026-10-26", apps, "2026-10-25"))
+		AssertEqual(5, encoded["historical"]["c"]["rollback-only"]["c"], "JSON range must preserve both non-today dates")
+		AssertEqual(5, encoded["today"]["editor.exe"]["c"]["rollback-only"]["c"], "JSON range must not double-count the snapshot day")
+		future := JsonParse(KLR_BuildRangeSplitTodayJson(db, "2026-10-26", "2026-10-26", apps, "2026-10-25"))
+		AssertEqual(3, future["historical"]["c"]["rollback-only"]["c"], "a future-only selection must not include the past")
+	} finally {
+		try SQLite_Close(db)
+	}
+}
+Test("Keystats reader: range preserves a future-dated bucket after clock rollback", _KLRSource_FutureRangeAfterClockRollback)
+
 _KLRAppFilter_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle

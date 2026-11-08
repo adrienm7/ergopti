@@ -90,6 +90,35 @@ local function check(name, test)
 	end
 end
 
+check("a colon in a caller field name cannot smuggle credentials into a redirect", function()
+	local before_initial, before_redirected = #initial, #redirected
+	local result, callbacks = nil, 0
+	local dispatched = HTTP.get(origin .. "/redirect", { ["X-Api-Key: " .. credential] = "value" },
+		{ owner = owner, timeout_ms = 1000, follow_redirects = true }, function(value)
+			result, callbacks = value, callbacks + 1
+		end)
+	assert(not dispatched and result and result.ok == false and callbacks == 1,
+		"malformed caller field name must be refused during admission")
+	uv.run("nowait")
+	assert(#initial == before_initial and #redirected == before_redirected,
+		"a refused field name must never reach either origin")
+end)
+
+check("a non-finite registry body limit cannot admit curl", function()
+	local Reader, Timings = require("toml_codec.reader"), require("timings")
+	local timings = Timings.new({ logger = { info = function() end }, log = "test", loaded_level = "info",
+		shared_path = function() return "/fixture/constants.toml" end,
+		parse = function() return Reader.parse_text("[limits]\nrelease_list_body_bytes = nan\n") end })
+	local limit = timings.count("limits", "release_list_body_bytes")
+	local before, result, callbacks = #initial, nil, 0
+	local dispatched = HTTP.get(origin .. "/direct", {}, { owner = owner, timeout_ms = 1000, max_body_bytes = limit },
+		function(value) result, callbacks = value, callbacks + 1 end)
+	assert(not dispatched and result and not result.ok and callbacks == 1,
+		"non-finite body limit must be refused before starting curl")
+	uv.run("nowait")
+	assert(#initial == before, "invalid body limit must not reach the origin")
+end)
+
 local sensitive = { "Api-Key", "Authorization", "Cookie", "Cookie2", "Proxy-Authorization", "X-Api-Key", "X-Goog-Api-Key" }
 for _, name in ipairs(sensitive) do
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do

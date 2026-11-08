@@ -30,6 +30,7 @@ local function fresh_apps()
 		"adapters.window_info",
 		"adapters.window_manager",
 		"adapters.synthetic_input",
+		"adapters.clipboard",
 		"infra.logger",
 		"infra.notifications",
 		"infra.i18n",
@@ -143,7 +144,12 @@ local function fresh_apps()
 		runningApplications = function() return {} end,
 		frontmostApplication = function() return front_app end,
 	}
+	local clipboard_generation = 0
 	hs_stub.pasteboard = {
+		changeCount = function() return clipboard_generation end,
+		allContentTypes = function()
+			local types = {}; for uti in pairs(fixture.clipboard) do types[#types + 1] = uti end; return { types }
+		end,
 		readAllData = function()
 			fixture.read_all_calls = fixture.read_all_calls + 1
 			if type(fixture.read_all_hook) == "function" then fixture.read_all_hook() end
@@ -151,7 +157,7 @@ local function fresh_apps()
 		end,
 		clearContents = function()
 			fixture.clear_calls = fixture.clear_calls + 1
-			fixture.clipboard = {}
+			fixture.clipboard = {}; clipboard_generation = clipboard_generation + 1
 			return nil
 		end,
 		getContents = function()
@@ -167,7 +173,7 @@ local function fresh_apps()
 			if mode == "false" then return false end
 			if mode == "nil" then return nil end
 			if mode == "throw" then error("clipboard restore exploded") end
-			fixture.clipboard = clone(snapshot)
+			fixture.clipboard = clone(snapshot); clipboard_generation = clipboard_generation + 1
 			return true
 		end,
 	}
@@ -627,5 +633,21 @@ helpers.describe("Apps composite owner: parent scopes", function()
 		helpers.assert_eq(f.subject.has_pending_apps_action(), true)
 		helpers.assert_eq(f.subject.resume_apps_actions("gestures"), true)
 		helpers.assert_eq(f.subject.open_settings("gestures"), true)
+	end)
+end)
+
+helpers.describe("ChatGPT URL diagnostics", function()
+	helpers.it("opens the exact conversation URL without logging it", function()
+		local fixture = fresh_apps()
+		local logger = require("infra.logger")
+		local original, logs = logger.debug, {}
+		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"
+		local ok, result = pcall(fixture.subject.open_chatgpt, url)
+		logger.debug = original
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(fixture.urls[1], url)
+		helpers.assert_true(not table.concat(logs, " "):find("private", 1, true))
 	end)
 end)

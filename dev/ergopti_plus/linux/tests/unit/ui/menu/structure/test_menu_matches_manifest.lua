@@ -375,6 +375,7 @@ local function full_context()
 			paste_plain         = noop,
 			wrap_selection      = noop,
 			get_wrap_pairs      = function() return { ["("] = { left = "(", right = ")" } } end,
+			get_wrap_pair_list  = function() return { { left = "(", right = ")" } } end,
 		},
 		gestures = {
 			-- The cached native status producer already consumed these collaborators.
@@ -389,6 +390,16 @@ local function full_context()
 			set_action     = noop,
 			get_slots      = function() return {} end,
 			get_sg_names   = function() return {} end,
+			-- Each swipe slot's mode and step rows, read from the genuine defaults:
+			-- without them the slot submenus drop the sensitivity header.
+			MODE_SINGLE           = require("modules.gestures.manager").MODE_SINGLE,
+			MODE_INCREMENTAL      = require("modules.gestures.manager").MODE_INCREMENTAL,
+			DEFAULT_MODES         = require("modules.gestures.manager").DEFAULT_MODES,
+			DEFAULT_SENSITIVITIES = require("modules.gestures.manager").DEFAULT_SENSITIVITIES,
+			get_mode        = function(slot) return require("modules.gestures.manager").DEFAULT_MODES[slot] end,
+			get_sensitivity = function(slot) return require("modules.gestures.manager").DEFAULT_SENSITIVITIES[slot] end,
+			set_mode        = noop,
+			set_sensitivity = noop,
 		},
 		-- `keystats`, which is what _build_metrics reads. Named `metrics` in a
 		-- first draft, and the metrics submenu then collapsed to "(métriques non
@@ -427,7 +438,11 @@ local function full_context()
 			set_enabled     = noop,
 			get_rules_count = function() return 0 end,
 			active_count    = function() return 0 end,
-			rule_families   = function() return {} end,
+			-- Two independent sections make the declared order controls reachable.
+			rule_families   = function() return {
+				{ id = "date_fr", section = "datefr", label = "French date", enabled = true },
+				{ id = "date", section = "date", label = "International date", enabled = true },
+			} end,
 			-- The programmable row reads the source problem when it is drawn.
 			user_code_problem = function() return nil end,
 			set_rule_enabled = noop,
@@ -693,6 +708,28 @@ helpers.describe("menu certification: no empty submenu", function()
 			"a submenu that opens onto nothing is worse than a missing one: the user "
 				.. "cannot tell it apart from a feature that failed to load. "
 				.. table.concat(empty, ", "))
+	end)
+
+	-- The group builder handed the renderer's finished rows back as row data:
+	-- none had a label, so « Rangées émulées » opened onto nothing.
+	helpers.it("lists the four emulated row switches under « Rangées émulées »", function()
+		local caption = i18n.get("menu.layout.emulated_rows")
+		local found
+		local function walk(items)
+			for _, item in ipairs(items or {}) do
+				if item.title == caption and type(item.menu) == "table" then found = item.menu end
+				if type(item.menu) == "table" then walk(item.menu) end
+			end
+		end
+		walk(build_full_menu(full_context()))
+		helpers.assert_eq(type(found), "table", "the emulated rows submenu is drawn")
+		local rows = { "number_row", "top_row", "home_row", "bottom_row" }
+		helpers.assert_eq(#found, #rows, "one switch per emulated row")
+		for index, row in ipairs(rows) do
+			helpers.assert_eq(found[index].title, i18n.get("menu.layout.emulate_" .. row))
+			helpers.assert_eq(type(found[index].fn), "function", row .. " can be switched")
+			helpers.assert_eq(type(found[index].checked), "boolean", row .. " shows its state")
+		end
 	end)
 
 end)
@@ -1065,7 +1102,8 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 					helpers.assert_eq(row.menu[3].disabled, true); helpers.assert_nil(row.menu[3].fn)
 					helpers.assert_eq(changes, 0); helpers.assert_eq(Sandbox.read_bytes(path), before)
 					local preset = assert(find_item(row.menu[1].menu, "50 ms"))
-					helpers.assert_type(preset.fn, "function"); helpers.assert_nil(preset.fn())
+					helpers.assert_type(preset.fn, "function")
+					helpers.assert_eq(preset.fn(), true, "the preset reports its committed write")
 					helpers.assert_eq(settings.get("debounce_ms"), 50); helpers.assert_eq(changes, 1)
 					helpers.assert_eq(Sandbox.read_bytes(path), before:gsub("debounce_ms = 500", "debounce_ms = 50"))
 					root[boundary.section] = nil

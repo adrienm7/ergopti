@@ -8,10 +8,11 @@
 
 local M = {}
 local PersonalFiles = require("hotstrings.personal_files")
-local hs            = hs
+local SectionOrder = require("hotstrings.section_order")
+local TableUtil = require("table_util")
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
-local text_utils = require("infra.text_utils")
+local ShellRunner   = require("adapters.shell_runner")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
@@ -23,6 +24,13 @@ local PersonalInfoSource = require("menu.frames.personal_info_source")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
+
+--- Reject extension changes unless the live pause owner confirms they are safe.
+local function extension_paused(ctx)
+	if ctx.paused == true or type(ctx.is_paused) ~= "function" then return true end
+	local ok, paused = pcall(ctx.is_paused)
+	return not ok or paused ~= false
+end
 
 --- Resolves a description value that may be a plain string or a multilingual table.
 --- Falls back to the "fr" locale, then to an empty string.
@@ -89,7 +97,8 @@ M.DEFAULT_STATE = {
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return false end
 	return DeferredWork.after(0, function()
-		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
+		local ok, started = pcall(ShellRunner.open, path)
+		if not ok or started ~= true then Logger.error(LOG, "The hotstring file could not be opened.") end
 	end, "menu_hotstrings.open_toml")
 end
 
@@ -342,7 +351,7 @@ function M.build_bound_section_rows(ctx, bound)
 					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
 					action   = (enabled and not ctx.paused) and function()
-						if ctx.paused or (type(ctx.is_paused) == "function" and ctx.is_paused())
+						if extension_paused(ctx)
 							or not groupEnabled(ctx, entry.group) then return false end
 						local enable = not ctx.keymap.is_section_enabled(entry.group, entry.section)
 						return M.commit_extension_selection(ctx, {}, { entry }, enable)
@@ -365,7 +374,7 @@ end
 --- @param enabled boolean Explicit choice.
 --- @return boolean committed
 function M.commit_extension_selection(ctx, groups, bound, enabled)
-	if ctx.paused or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+	if extension_paused(ctx) then return false end
 	local km = ctx.keymap
 	if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
 	local inventory = {}
@@ -478,27 +487,19 @@ function M.build_groups(ctx, only, counts)
 		}
 
 		if has_secs then
-			local override    = (type(ctx.state.sections_order_overrides) == "table" and ctx.state.sections_order_overrides)[name]
-			local ordered_secs
-
-			if type(override) == "table" then
-				local by_name = {}
-				for _, sec in ipairs(sections) do if type(sec) == "table" then by_name[sec.name] = sec end end
-				local seen = {}
-				ordered_secs = {}
-				for _, entry in ipairs(override) do
-					if entry == "-" then table.insert(ordered_secs, { name = "-" })
-					elseif by_name[entry] then
-						table.insert(ordered_secs, by_name[entry]); seen[entry] = true
-					end
+			local saved_orders = ctx.state.sections_order_overrides
+			local override = type(saved_orders) == "table" and saved_orders[name] or nil
+			local discovered, by_name, order_labels = {}, {}, {}
+			for _, section in ipairs(sections) do
+				if type(section) == "table" then
+					discovered[#discovered + 1] = section.name
+					by_name[section.name] = section
 				end
-				for _, sec in ipairs(sections) do
-					if type(sec) == "table" and not seen[sec.name] and sec.name ~= "-" then
-						table.insert(ordered_secs, sec)
-					end
-				end
-			else
-				ordered_secs = sections
+			end
+			local order = assert(SectionOrder.resolve(discovered, override), "hotstring section order is invalid")
+			local ordered_secs = {}
+			for _, section_name in ipairs(order) do
+				ordered_secs[#ordered_secs + 1] = section_name == "-" and { name = "-" } or by_name[section_name]
 			end
 
 			local sec_menu = {}
@@ -547,10 +548,31 @@ function M.build_groups(ctx, only, counts)
 									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
 							disabled = not enabled or ctx.paused or nil,
 						}
+						order_labels[sec.name] = sec_menu[#sec_menu].label
 						prev_was_sep = false
 					end
 				end
 			end
+			local order_rows = SectionOrder.menu(ManifestMenu.template_rows, order, order_labels, function(candidate)
+				if ctx.state.sections_order_overrides ~= saved_orders then return false end
+				local next_orders = TableUtil.shallow_copy(saved_orders or {})
+				next_orders[name] = candidate
+				ctx.state.sections_order_overrides = next_orders
+				local called, committed = pcall(ctx.save_prefs)
+				if not called or committed ~= true then
+					ctx.state.sections_order_overrides = saved_orders
+					Logger.error(LOG, "Hotstring section order was not persisted.")
+					require("config_save_failure").present(i18n.get, function(message)
+						notifications.notify(i18n.get("common.error_title"), message, "error")
+					end)
+					return false
+				end
+				ctx.updateMenu()
+				return true
+			end, function()
+				return not extension_paused(ctx) and ctx.state.sections_order_overrides == saved_orders
+			end)
+			for _, row in ipairs(order_rows) do sec_menu[#sec_menu + 1] = row end
 			if name == "dynamichotstrings" then
 				local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
 					function() return ProgrammableHotstrings.build(ctx) end)
@@ -571,7 +593,7 @@ function M.build_groups(ctx, only, counts)
 						if not toml_path then return {} end
 						local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
 							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
-							{ hotstring_file_ready = function() return type(hs.execute) == "function" end })
+							{ hotstring_file_ready = function() return type(ShellRunner.open) == "function" end })
 						return row and { row } or {}
 					end,
 					["hotstring_category_sections"] = function() return sec_menu end,

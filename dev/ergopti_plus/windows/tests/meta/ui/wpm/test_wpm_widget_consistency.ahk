@@ -64,7 +64,9 @@ _WWC_GraphBranchRebuilds() {
 	At := InStr(Body, "Graph mode tick threw")
 	Assert(At > 0, "the graph branch must log its failure")
 	Window := SubStr(Body, At, 300)
-	Assert(InStr(Window, "WPMWidget_BuildGraph") > 0,
+	; Both modes rebuild through one surface owner, which builds the graph widget.
+	Rebuild := _DriverFuncBody("_WPMWidget_RebuildSurface")
+	Assert(InStr(Window, "_WPMWidget_RebuildSurface()") > 0 && InStr(Rebuild, "WPMWidget_BuildGraph()") > 0,
 		"the graph branch must rebuild after a failure. Clearing the handle alone leaves the widget dead until something else happens to rebuild it — which is what made this silent rather than merely noisy")
 }
 

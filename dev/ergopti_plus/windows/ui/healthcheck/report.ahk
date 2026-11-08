@@ -421,14 +421,21 @@ global HC_FOLDER_IDS := Map("config_dir", true, "logs_dir", true, "crash_dir", t
 ; @throws {Error} When the folder or the file cannot be written.
 _HCReport_Save(Dir, Name, Text, WriterFn := 0) {
 	DirCreate(Dir)
-	Path := Dir . "\" . Name
 	if !(WriterFn is Integer && WriterFn == 0) && !HasMethod(WriterFn, "Call")
 		throw TypeError("The diagnostics attachment writer must be callable or zero.")
-	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable
-	Written := ResolvedWriter.Call(Path, Text)
-	if !(Written is Integer) || Written != 1
-		throw Error("The complete diagnostics attachment could not be written.")
-	return Path
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateNewDurable
+	SplitPath(Name, , , &Ext, &Stem)
+	Suffix := Ext == "" ? "" : "." . Ext
+	Loop 1000 {
+		Index := A_Index - 1
+		Path := Dir . "\" . Stem . (Index == 0 ? "" : "-" . Index) . Suffix
+		Written := ResolvedWriter.Call(Path, Text)
+		if (Written is Integer) && Written == 1
+			return Path
+		if Written != "exists"
+			throw Error("The complete diagnostics attachment could not be written.")
+	}
+	throw Error("No unused diagnostics attachment name remains.")
 }
 
 ; Starts a command line through the shell's file associations.

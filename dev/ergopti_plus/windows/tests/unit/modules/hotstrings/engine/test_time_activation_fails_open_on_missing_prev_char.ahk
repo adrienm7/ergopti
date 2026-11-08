@@ -170,3 +170,37 @@ _TGC_Run(Vector) {
 
 for _TGC_Vector in _TGC_Vectors()
 	Test("time gate corpus: " . _TGC_Vector["id"] . " (time-gate-corpus)", _TGC_Run.Bind(_TGC_Vector))
+
+; The actual character timestamp writer owns the origin; only existing explicit
+; current-clock inputs are advanced. No physical input or 49-day uptime is claimed.
+_TGC_Native64Origin(Eras) {
+	global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
+	PreviousCritical := Critical("On")
+	SavedTimes := LastSentCharacterKeyTime
+	SavedComplex := LastSentCharacterKeyComplex
+	try {
+		LastSentCharacterKeyTime := Map()
+		LastSentCharacterKeyComplex := Map()
+		AppState_TouchLastSentKey("a")
+		Origin := LastSentCharacterKeyTime["a"]
+		Now := Origin + Eras * 0x100000000 + 100
+		Spec := {Replacement: "replacement", TimeActivationSeconds: 1,
+			PrevCharKey: "a", Length: 1, Category: "autocorrection"}
+		Expired := IsTimeActivationExpired("a", 1, Now)
+		Decision := _HSE_PrepareDispatchDecision(Spec, "a", "", false, "replacement", Now)
+		_TestPrint("# hotstring-timegate-native64 eras=" . Eras . " origin=" . Origin
+			. " now=" . Now . " expired=" . Expired . " decision=" . IsObject(Decision))
+		AssertEqual(Origin, LastSentCharacterKeyTime["a"], "The original producer receipt must not be retimestamped.")
+		AssertEqual(Eras > 0, Expired, "A native-duration gate must expire after a full DWORD era.")
+		AssertEqual(Eras == 0, IsObject(Decision),
+			"The canonical dispatch decision must refuse a reference older than its one-second activation window.")
+	} finally {
+		LastSentCharacterKeyTime := SavedTimes
+		LastSentCharacterKeyComplex := SavedComplex
+		Critical(PreviousCritical)
+	}
+}
+
+for _TGC_Native64Eras in [0, 1, 2]
+	Test("hotstring native activation age: eras=" . _TGC_Native64Eras . " (hotstring-timegate-native64)",
+		_TGC_Native64Origin.Bind(_TGC_Native64Eras))

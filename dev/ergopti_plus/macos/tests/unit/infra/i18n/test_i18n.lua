@@ -226,6 +226,19 @@ helpers.describe("i18n: detect_system_locale()", function()
 			"fr_FR must resolve to 'fr'")
 	end)
 
+	helpers.it("chooses Norwegian for the system's Bokmål locale on first launch", function()
+		set_system_locale("nb_NO")
+		local i18n = load_i18n()
+		i18n.init()
+		helpers.assert_eq(i18n.get_locale(), "no")
+	end)
+
+	helpers.it("uses the Norwegian catalogue for the Nynorsk system locale", function()
+		set_system_locale("nn_NO")
+		local i18n = load_i18n()
+		helpers.assert_eq(i18n.detect_system_locale(), "no")
+	end)
+
 	helpers.it("returns known 2-letter prefix from en_GB", function()
 		set_system_locale("en_GB")
 		local i18n = load_i18n()
@@ -386,6 +399,564 @@ end)
 
 helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", function()
 	helpers.before_each(reset_state)
+
+	helpers.it("restores configured locale bytes when native persistence refuses", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr" # preserve comment\n'
+		local file = assert(io.open(path, "wb")); file:write(original); file:close()
+		local Paths = require("infra.config_paths")
+		local prior = Paths.get
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior(key) end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			with_settings_refusal("false", function() helpers.assert_eq(i18n.set_locale("de"), false) end)
+			local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+			helpers.assert_eq(actual, original, "a refused locale must not survive in config.toml")
+		end, debug.traceback)
+		Paths.get = prior; package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("restores configured locale bytes when reload scheduling refuses", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr" # existing\n'
+		local file = assert(io.open(path, "wb")); file:write(original); file:close()
+		local Paths = require("infra.config_paths")
+		local prior, prior_scheduler = Paths.get, package.loaded["adapters.timer_scheduler"]
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior(key) end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler("settled")
+			helpers.assert_eq(i18n.set_locale("de"), false)
+			local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+			helpers.assert_eq(actual, original)
+			helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+		end, debug.traceback)
+		Paths.get = prior; package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("retains exact locale rollback debt without overwriting a concurrent file edit", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr" # original\n'
+		local concurrent = '[script]\nlocale = "ja" # concurrent\n'
+		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
+		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
+		write(original)
+		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["adapters.timer_scheduler"]
+		local prior_get, prior_set = Paths.get, hs.settings.set
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		local published
+		hs.settings.set = function() published = read(); write(concurrent); return false end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_eq(read(), concurrent, "rollback must not overwrite another writer")
+			hs.settings.set = prior_set
+			helpers.assert_eq(i18n.persist_locale("en"), false, "unsettled inverse blocks a new change")
+			helpers.assert_eq(read(), concurrent)
+			write(published)
+			helpers.assert_true(i18n.persist_locale("en"), "retry restores the exact predecessor before continuing")
+			helpers.assert_contains(read(), 'locale = "en"')
+		end, debug.traceback)
+		Paths.get, hs.settings.set = prior_get, prior_set
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("refuses a locale whose config is replaced during a successful native write", function()
+		local path = os.tmpname()
+		local original, concurrent = '[script]\nlocale = "fr"\n', '[script]\nlocale = "ja"\n'
+		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
+		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
+		write(original)
+		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["adapters.timer_scheduler"]
+		local prior_get, prior_set = Paths.get, hs.settings.set
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		prior_set("ergopti.i18n_locale", "fr")
+		hs.settings.set = function(key, value)
+			local result = prior_set(key, value)
+			if value == "de" then write(concurrent) end
+			return result
+		end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_eq(read(), concurrent)
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "fr")
+		end, debug.traceback)
+		Paths.get, hs.settings.set = prior_get, prior_set
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("checks the config snapshot even when no locale rewrite was needed", function()
+		local path = os.tmpname()
+		local original, concurrent = '[script]\nshow_error_dialog = true\n', '[script]\nlocale = "ja"\n'
+		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
+		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
+		write(original)
+		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["adapters.timer_scheduler"]
+		local prior_get, prior_set = Paths.get, hs.settings.set
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		prior_set("ergopti.i18n_locale", "fr")
+		hs.settings.set = function(key, value)
+			local result = prior_set(key, value)
+			if value == "de" then write(concurrent) end
+			return result
+		end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_eq(read(), concurrent)
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "fr")
+		end, debug.traceback)
+		Paths.get, hs.settings.set = prior_get, prior_set
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("restores a native locale setter that mutates then refuses", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr"\n'
+		local file = assert(io.open(path, "wb")); file:write(original); file:close()
+		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["adapters.timer_scheduler"]
+		local prior_get, prior_set = Paths.get, hs.settings.set
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		prior_set("ergopti.i18n_locale", "fr")
+		hs.settings.set = function(key, value)
+			prior_set(key, value)
+			if value == "de" then return false end
+			return true
+		end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "fr")
+			local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+			helpers.assert_eq(actual, original)
+		end, debug.traceback)
+		Paths.get, hs.settings.set = prior_get, prior_set
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not overwrite a concurrent native locale on rollback", function()
+		local prior_set = hs.settings.set
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		prior_set("ergopti.i18n_locale", "fr")
+		hs.settings.set = function(key, value)
+			if value == "de" then prior_set(key, "ja"); return false end
+			return prior_set(key, value)
+		end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "ja")
+			hs.settings.set = prior_set
+			helpers.assert_eq(i18n.persist_locale("en"), false)
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "ja")
+			prior_set("ergopti.i18n_locale", "fr")
+			helpers.assert_true(i18n.persist_locale("en"))
+		end, debug.traceback)
+		hs.settings.set = prior_set; package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("fences reentrant locale mutations during native publication", function()
+		local prior_set = hs.settings.set
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local i18n = load_i18n_with_scheduler()
+		local nested, competing
+		hs.settings.set = function(key, value)
+			nested = i18n.set_locale_no_reload("ja")
+			competing = require("adapters.storage").set("i18n_locale", "ja")
+			return prior_set(key, value)
+		end
+		local ok, err = xpcall(function()
+			helpers.assert_true(i18n.persist_locale("de"))
+			helpers.assert_eq(nested, false)
+			helpers.assert_eq(competing, false, "the exact alias is held during publication")
+			helpers.assert_eq(i18n.get_locale(), "fr")
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de")
+		end, debug.traceback)
+		hs.settings.set = prior_set; package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("holds the real storage cohort and removes its exact backup after commit", function()
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
+		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["adapters.timer_scheduler"]
+		local prior_get, prior_set = Paths.get, hs.settings.set
+		local directory, base = path:match("^(.*)/([^/]+)$")
+		local function backups()
+			local result = {}
+			for name in require("lfs").dir(directory) do
+				if name:sub(1, #base + 8) == base .. ".locale-" then result[#result + 1] = directory .. "/" .. name end
+			end
+			return result
+		end
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		local blocked, captured
+		hs.settings.set = function(key, value)
+			local matches = backups()
+			if key == "ergopti.i18n_locale" and value == "de" then
+				captured = #matches
+				blocked = require("adapters.storage").set("i18n_locale", "ja")
+			end
+			return prior_set(key, value)
+		end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.persist_locale("de"))
+			helpers.assert_eq(captured, 1, "backup must exist before native publication")
+			helpers.assert_eq(blocked, false, "cooperating same-alias mutation must be fenced")
+			helpers.assert_eq(#backups(), 0, "the committed exact backup must be removed")
+		end, debug.traceback)
+		Paths.get, hs.settings.set = prior_get, prior_set
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		for _, backup in ipairs(backups()) do os.remove(backup) end
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("retains an acquired alias when capture and initial release both refuse", function()
+		local Storage = require("adapters.storage")
+		local prior_capture, prior_release = Storage.capture_owned, Storage.release_owned
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local releases = 0
+		Storage.capture_owned = function() return nil end
+		Storage.release_owned = function(owner)
+			releases = releases + 1
+			if releases == 1 then return false end
+			return prior_release(owner)
+		end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_eq(Storage.set("i18n_locale", "ja"), false, "failed release keeps the same alias gated")
+			Storage.capture_owned = prior_capture
+			helpers.assert_true(i18n.persist_locale("en"), "the next request retries the retained release")
+		end, debug.traceback)
+		Storage.capture_owned, Storage.release_owned = prior_capture, prior_release
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not rewrite config while another owner holds the locale alias", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr"\n'
+		local file = assert(io.open(path, "wb")); file:write(original); file:close()
+		local Paths, Storage = require("infra.config_paths"), require("adapters.storage")
+		local prior_get, prior_scheduler = Paths.get, package.loaded["adapters.timer_scheduler"]
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		local foreign = {}
+		helpers.assert_true(Storage.acquire_owned(foreign, { "i18n_locale" }))
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+			helpers.assert_eq(actual, original)
+			helpers.assert_true(Storage.release_owned(foreign))
+			helpers.assert_true(i18n.persist_locale("de"))
+		end, debug.traceback)
+		pcall(Storage.release_owned, foreign)
+		Paths.get = prior_get; package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	for _, boundary in ipairs({ "release", "forget", "backup" }) do
+	helpers.it("waits for retained locale " .. boundary .. " cleanup before reloading", function()
+		local Storage = require("adapters.storage")
+		local Files = require("adapters.file_system")
+		local prior_release, prior_forget, prior_remove = Storage.release_owned, Storage.forget_owned, Files.remove_if_unchanged
+		local prior_scheduler, prior_reload = package.loaded["adapters.timer_scheduler"], hs.reload
+		local refusals, reloads = 2, 0
+		Storage.release_owned = function(owner)
+			if boundary == "release" and refusals > 0 then refusals = refusals - 1; return false end
+			return prior_release(owner)
+		end
+		Storage.forget_owned = function(owner, receipt)
+			if boundary == "forget" and refusals > 0 then refusals = refusals - 1; return false end
+			return prior_forget(owner, receipt)
+		end
+		Files.remove_if_unchanged = function(...)
+			if boundary == "backup" and refusals > 0 then refusals = refusals - 1; return false end
+			return prior_remove(...)
+		end
+		hs.reload = function() reloads = reloads + 1 end
+		local ok, err = xpcall(function()
+			local i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			local first = scheduler.calls[1]
+			first.handle.timer = nil; first.callback()
+			helpers.assert_eq(reloads, 0, "a held storage owner must survive timer delivery")
+			helpers.assert_eq(#scheduler.calls, 2, "cleanup refusal schedules another exact check")
+			local second = scheduler.calls[2]
+			second.handle.timer = nil; second.callback()
+			helpers.assert_eq(reloads, 1, "reload starts only after cleanup settles")
+		end, debug.traceback)
+		Storage.release_owned, Storage.forget_owned, Files.remove_if_unchanged = prior_release, prior_forget, prior_remove
+		hs.reload = prior_reload
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+	end
+
+	helpers.it("defers timer delivery during locale publication", function()
+		local prior_set, prior_reload = hs.settings.set, hs.reload
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local reloads, scheduler = 0, nil
+		hs.reload = function() reloads = reloads + 1 end
+		hs.settings.set = function(key, value)
+			local result = prior_set(key, value)
+			if key == "ergopti.i18n_locale" and value == "de" then
+				local timer = scheduler.calls[1]
+				timer.handle.timer = nil; timer.callback()
+				helpers.assert_eq(reloads, 0, "publication must unwind before reload")
+			end
+			return result
+		end
+		local ok, err = xpcall(function()
+			local i18n
+			i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			helpers.assert_eq(#scheduler.calls, 2)
+			local retry = scheduler.calls[2]
+			retry.handle.timer = nil; retry.callback()
+			helpers.assert_eq(reloads, 1)
+		end, debug.traceback)
+		hs.settings.set, hs.reload = prior_set, prior_reload
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps the owner when a cleanup retry timer cannot be armed", function()
+		local Storage = require("adapters.storage")
+		local prior_release, prior_reload = Storage.release_owned, hs.reload
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local refusals, reloads = 2, 0
+		Storage.release_owned = function(owner)
+			if refusals > 0 then refusals = refusals - 1; return false end
+			return prior_release(owner)
+		end
+		hs.reload = function() reloads = reloads + 1 end
+		local ok, err = xpcall(function()
+			local i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			scheduler.failure = "settled"
+			local timer = scheduler.calls[1]
+			timer.handle.timer = nil; timer.callback()
+			helpers.assert_eq(reloads, 0)
+			helpers.assert_eq(Storage.set("i18n_locale", "ja"), false, "the unresolved alias remains owned")
+			helpers.assert_true(i18n.persist_locale("de"), "a later request retries exact cleanup")
+		end, debug.traceback)
+		Storage.release_owned, hs.reload = prior_release, prior_reload
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("defers timer delivery during committed storage cleanup", function()
+		local Storage = require("adapters.storage")
+		local prior_release, prior_reload = Storage.release_owned, hs.reload
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local reloads, scheduler, delivered = 0, nil, false
+		hs.reload = function() reloads = reloads + 1 end
+		Storage.release_owned = function(owner)
+			if not delivered then
+				delivered = true
+				local timer = scheduler.calls[1]
+				timer.handle.timer = nil; timer.callback()
+				helpers.assert_eq(reloads, 0, "cleanup must unwind before reload")
+			end
+			return prior_release(owner)
+		end
+		local ok, err = xpcall(function()
+			local i18n
+			i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			helpers.assert_eq(#scheduler.calls, 2)
+			local retry = scheduler.calls[2]
+			retry.handle.timer = nil; retry.callback()
+			helpers.assert_eq(reloads, 1)
+		end, debug.traceback)
+		Storage.release_owned, hs.reload = prior_release, prior_reload
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("fences reentrant locale changes during the timer's cleanup retry", function()
+		local Storage = require("adapters.storage")
+		local prior_release, prior_reload = Storage.release_owned, hs.reload
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local calls, nested, i18n = 0, nil, nil
+		hs.reload = function() end
+		Storage.release_owned = function(owner)
+			calls = calls + 1
+			if calls == 1 then return false end
+			if calls == 2 then nested = i18n.persist_locale("en") end
+			return prior_release(owner)
+		end
+		local ok, err = xpcall(function()
+			local scheduler
+			i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			local timer = scheduler.calls[1]
+			timer.handle.timer = nil; timer.callback()
+			helpers.assert_eq(nested, false, "a cleanup callback cannot publish another locale")
+			helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de")
+		end, debug.traceback)
+		Storage.release_owned, hs.reload = prior_release, prior_reload
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not reload or discard a successor started during timer cancellation", function()
+		local prior_scheduler, prior_reload = package.loaded["adapters.timer_scheduler"], hs.reload
+		local reloads, nested = 0, nil
+		hs.reload = function() reloads = reloads + 1 end
+		local ok, err = xpcall(function()
+			local i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			local timer_port = package.loaded["adapters.timer_scheduler"]
+			local cancel, entered = timer_port.cancel, false
+			timer_port.cancel = function(handle)
+				if not entered then
+					entered = true
+					nested = i18n.set_locale("en")
+				end
+				return cancel(handle)
+			end
+			local first = scheduler.calls[1]
+			first.callback()
+			helpers.assert_true(nested)
+			helpers.assert_eq(reloads, 0, "retired timer cannot reload over its successor")
+			helpers.assert_eq(#scheduler.calls, 2)
+			local successor = scheduler.calls[2]
+			successor.handle.timer = nil; successor.callback()
+			helpers.assert_eq(reloads, 1, "successor retains its own reload")
+		end, debug.traceback)
+		hs.reload = prior_reload; package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not replace a successor started while a cleanup retry is armed", function()
+		local Storage = require("adapters.storage")
+		local prior_release, prior_reload = Storage.release_owned, hs.reload
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		local refusals, reloads = 2, 0
+		Storage.release_owned = function(owner)
+			if refusals > 0 then refusals = refusals - 1; return false end
+			return prior_release(owner)
+		end
+		hs.reload = function() reloads = reloads + 1 end
+		local ok, err = xpcall(function()
+			local i18n, scheduler = load_i18n_with_scheduler()
+			helpers.assert_true(i18n.set_locale("de"))
+			local timer_port = package.loaded["adapters.timer_scheduler"]
+			local after, entered = timer_port.after, false
+			timer_port.after = function(delay, callback)
+				local handle, accepted = after(delay, callback)
+				if not entered then entered = true; helpers.assert_true(i18n.set_locale("en")) end
+				return handle, accepted
+			end
+			local first = scheduler.calls[1]
+			first.handle.timer = nil; first.callback()
+			helpers.assert_eq(#scheduler.calls, 3)
+			scheduler.calls[2].callback()
+			helpers.assert_eq(reloads, 0, "superseded retry must not reload")
+			local successor = scheduler.calls[3]
+			successor.handle.timer = nil; successor.callback()
+			helpers.assert_eq(reloads, 1, "successor must retain its own timer")
+		end, debug.traceback)
+		Storage.release_owned, hs.reload = prior_release, prior_reload
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler
+		if not ok then error(err, 0) end
+	end)
+
+	-- MCF-001 timer-race subtype: a refused later switch cancelled the reload an
+	-- accepted earlier switch still owed, so the accepted locale never loaded.
+	for _, refusal in ipairs({ "timer", "settings" }) do
+		helpers.it("(locale-superseded-reload) a " .. refusal .. " refusal hands the accepted reload back", function()
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
+			local Paths = require("infra.config_paths")
+			local prior_get, prior_reload = Paths.get, hs.reload
+			local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+			local reloads = {}
+			Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+			hs.reload = function() reloads[#reloads + 1] = hs.settings.get("ergopti.i18n_locale") end
+			local ok, err = xpcall(function()
+				local i18n, scheduler = load_i18n_with_scheduler()
+				helpers.assert_true(i18n.set_locale("de"))
+				local accepted = assert(io.open(path, "rb")); local accepted_bytes = accepted:read("*a"); accepted:close()
+				if refusal == "timer" then
+					scheduler.failure = "settled"
+					helpers.assert_eq(i18n.set_locale("en"), false)
+				else
+					with_settings_refusal("false", function() helpers.assert_eq(i18n.set_locale("en"), false) end)
+				end
+				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, accepted_bytes, "the refused locale must not survive in config.toml")
+				helpers.assert_eq(i18n.get_locale(), "de")
+				helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de")
+				for _, call in ipairs(scheduler.calls) do
+					if call.handle.committed and call.handle.timer ~= nil then
+						call.handle.timer = nil; call.callback()
+					end
+				end
+				helpers.assert_eq(reloads, { "de" }, "the accepted switch keeps exactly its own reload")
+			end, debug.traceback)
+			Paths.get, hs.reload = prior_get, prior_reload
+			package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("retains rollback debt when the publisher claims success without restoring bytes", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr"\n'
+		local file = assert(io.open(path, "wb")); file:write(original); file:close()
+		local Paths, Writer = require("infra.config_paths"), require("toml_codec.writer")
+		local prior_get, prior_publish = Paths.get, Writer.publish_if_unchanged
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		Writer.publish_if_unchanged = function() return true end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			with_settings_refusal("false", function() helpers.assert_eq(i18n.persist_locale("de"), false) end)
+			local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+			helpers.assert_contains(actual, 'locale = "de"')
+			helpers.assert_eq(i18n.persist_locale("en"), false, "unverified restoration blocks new writes")
+			Writer.publish_if_unchanged = prior_publish
+			helpers.assert_true(i18n.persist_locale("en"))
+		end, debug.traceback)
+		Paths.get, Writer.publish_if_unchanged = prior_get, prior_publish
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("refuses locale publication when config rewrite readback is unchanged", function()
+		local path = os.tmpname()
+		local original = '[script]\nlocale = "fr"\n'
+		local file = assert(io.open(path, "wb")); file:write(original); file:close()
+		local Paths, Writer = require("infra.config_paths"), require("toml_codec.writer")
+		local prior_get, prior_batch = Paths.get, Writer.batch_write
+		local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+		Writer.batch_write = function() return true, nil, '[script]\nlocale = "de"\n' end
+		local ok, err = xpcall(function()
+			local i18n = load_i18n_with_scheduler()
+			helpers.assert_eq(i18n.persist_locale("de"), false)
+			helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+			local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+			helpers.assert_eq(actual, original)
+		end, debug.traceback)
+		Paths.get, Writer.batch_write = prior_get, prior_batch
+		package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("set_locale() persists to hs.settings and schedules a debounced reload", function()
 		-- Start with fr (default).

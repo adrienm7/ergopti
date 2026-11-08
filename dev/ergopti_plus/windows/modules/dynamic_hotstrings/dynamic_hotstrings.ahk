@@ -54,7 +54,7 @@ _DynamicHotstringDelay() {
 SpacedPrefix(SpacedStr, RawCount) {
 	Seen := 0
 	Loop Parse, SpacedStr {
-		if A_LoopField != " "
+		if !RegExMatch(A_LoopField, "^[\s" . Chr(0xA0) . Chr(0x202F) . "]$")
 			Seen++
 		if Seen >= RawCount
 			return SubStr(SpacedStr, 1, A_Index)
@@ -69,11 +69,10 @@ SpacedPrefix(SpacedStr, RawCount) {
 ; ===== 1.1) Date =====
 ; =====================
 
-; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
-; "??" flag required: after a prior expansion the output lands immediately
-; before the next "@", so the word boundary before "@" is a digit or letter —
-; not a terminator. Without "?", HSE rejects the match and the shorter
-; "t★" (InWord=true) wins instead.
+; dt★, td★, date★ resolved at fire time — cannot be static TOML entries.
+; Bare triggers (no "@"), as on macOS and Linux (maintainer decision 2026-11-06).
+; No "?" flag: the shared word-start rule applies (HSE_IsWordChar), so "update★"
+; never fires "date" and a trigger needs a boundary or a buffer start before it.
 _DateShortFr(*) {
 	return FormatTime(, "dd/MM/yyyy")
 }
@@ -116,6 +115,21 @@ _DateIso(*) {
 
 
 
+; ====================================
+; ===== 1.2) International phone =====
+; ====================================
+
+; The "+33" form of a French number. Only a leading national trunk "0" is
+; dropped, as on macOS and Linux: a number that does not start with 0 keeps
+; every digit (cutting whatever came first would corrupt it).
+; @param Phone {String} The stored phone number.
+; @returns {String}
+_DynHS_InternationalPhone(Phone) {
+	return "+33" . (SubStr(Phone, 1, 1) == "0" ? SubStr(Phone, 2) : Phone)
+}
+
+
+
 ; ==========================================
 ; ==========================================
 ; ======= 2/ Registration ==================
@@ -135,13 +149,13 @@ _DynHS_RegisterAll() {
 	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
 		"Category", "dynamichotstrings")
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_FR]["enabled"] {
-		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
+		CreateHotstring("*", "dt" . MK, _DateShortFr, _DynOpts)
 	}
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_LONG_FR]["enabled"] {
-		CreateHotstring("*?", "@date" . MK, _DateLongFr, _DynOpts)
+		CreateHotstring("*", "date" . MK, _DateLongFr, _DynOpts)
 	}
 	if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
-		CreateHotstring("*?", "@td" . MK, _DateIso, _DynOpts)
+		CreateHotstring("*", "td" . MK, _DateIso, _DynOpts)
 	}
 
 
@@ -169,19 +183,20 @@ _DynHS_RegisterAll() {
 		"IsPrivate", True, "Category", "dynamichotstrings")
 
 	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
-	SsnRaw  := StrReplace(Ssn,  " ", "")
-	IbanRaw := StrReplace(Iban, " ", "")
+	SsnRaw  := RegExReplace(Ssn, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
+	IbanRaw := RegExReplace(Iban, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
 
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.PHONE_PREFIXES]["enabled"] {
+		IntlPhone := _DynHS_InternationalPhone(Phone)
 		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
 		MK := ScriptInformation["MagicKey"]
 		if StrLen(Phone) >= 2 {
 			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynPrivateOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => "+33" . SubStr(Phone, 2), _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => IntlPhone, _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 4 {
 			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynPrivateOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => "+33" . SubStr(Phone, 2), _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => IntlPhone, _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 6 {
 			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynPrivateOpts)
@@ -212,7 +227,7 @@ _DynHS_RegisterAll() {
 			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
 			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
 			; No C flag = case-insensitive matching for the letter prefix (e.g. "fr76")
-			CreateHotstring("*", IbanRawPrefix,  (*) => StrReplace(Iban, " ", ""), _DynPrivateOpts)
+			CreateHotstring("*", IbanRawPrefix,  (*) => IbanRaw, _DynPrivateOpts)
 			if IbanSpacedPfx != IbanRawPrefix {
 				CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynPrivateOpts)
 			}

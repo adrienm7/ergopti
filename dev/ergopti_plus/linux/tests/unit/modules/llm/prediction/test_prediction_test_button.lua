@@ -32,7 +32,7 @@ end
 --- @return table engine, table seen
 local function fixture(state)
 	local seen = { chats = {}, notices = {} }
-	replace("logger.shim", helpers.make_logger_stub())
+	replace("logger.shim", state.logger or helpers.make_logger_stub())
 	replace("modules.llm.profiles", {
 		init = function() end,
 		is_enabled = function() return state.enabled ~= false end,
@@ -86,6 +86,24 @@ helpers.describe("Linux test prediction engine", function()
 			helpers.assert_true(Bridge.TEST_PREDICTION_TEMPERATURE > Settings.get("temperature"), "above the setting")
 			engine.test_prediction()
 			helpers.assert_eq(seen.chats[1].opts.temperature, Bridge.TEST_PREDICTION_TEMPERATURE)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("shows but does not log the backend's untrusted failure text", function()
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logs = {}
+		logger.set_level("trace")
+		logger.set_sink(function(line) logs[#logs + 1] = line end)
+		local engine, seen = fixture({ model = "local-a", logger = logger })
+		local ok, err = pcall(function()
+			engine.test_prediction()
+			seen.chats[1].on_done(nil, "HTTP 400: private_echo_892")
+			helpers.assert_true(latest(seen):find("private_echo_892", 1, true) ~= nil, "notice retains diagnostic")
+			local output = table.concat(logs, "\n")
+			helpers.assert_nil(output:find("private_echo_892", 1, true))
+			helpers.assert_true(output:find("HTTP 400", 1, true) ~= nil)
 		end)
 		restore()
 		if not ok then error(err, 0) end

@@ -121,7 +121,7 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 				helpers.assert_eq(hotfiles, {}, "cold startup never advertises a refused common group")
 				helpers.assert_nil(hotfile_paths.autocorrection)
 				helpers.assert_eq(state.mappings, before, "cold refusal also leaves prior unrelated native rows intact")
-				helpers.assert_true(require("adapters.storage").set("hotstrings_section_french_autocorrection_names", true))
+				helpers.assert_true(require("adapters.storage").set(require("modules.keymap.section_keys").current("french_autocorrection", "names"), true))
 				local french_path = helpers.shared("modules/hotstrings/french/autocorrection.toml")
 				local admitted = Boot.load(Registry, "french_autocorrection", french_path, nil, hotfiles, hotfile_paths)
 				helpers.assert_eq(admitted, { committed = true, complete = true, unavailable = {} })

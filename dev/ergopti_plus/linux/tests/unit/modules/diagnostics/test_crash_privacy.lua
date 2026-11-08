@@ -339,6 +339,53 @@ if package.config:sub(1, 1) == "/" then
 			if not ok then error(err, 0) end
 		end)
 
+		helpers.it("native retention preserves a foreign undelimited timestamp file", function()
+			local uv = require("luv")
+			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-retention-XXXXXX"))
+			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+			local date, Sink, Logger = os.date
+			local ok, err = xpcall(function()
+				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
+				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
+				local reports = directory .. "/crash_reports"
+				assert(uv.fs_mkdir(reports, 448))
+				local function write(name, bytes)
+					local file = assert(io.open(reports .. "/" .. name, "wb")); assert(file:write(bytes)); assert(file:close())
+				end
+				local foreign = reports .. "/2025-01-01T00-00-00Z42.json"
+				write("2025-01-01T00-00-00Z42.json", "foreign bytes remain")
+				local policy = require("crash_report")
+				for i = 1, policy.MAX_REPORTS do write(string.format("2026-01-01T00-00-%02dZ.json", i), "old report") end
+				local Reporter = require("modules.diagnostics.crash_reporter")
+				os.date = function(format, ...)
+					if format == "!%Y-%m-%dT%H:%M:%SZ" then return "2026-01-02T00:00:00Z" end
+					return date(format, ...)
+				end
+				helpers.assert_eq(Reporter.dump("engine", "REAL_RETENTION_MARKER"), true)
+				local f = assert(io.open(foreign, "rb")); helpers.assert_eq(f:read("*a"), "foreign bytes remain"); assert(f:close())
+				helpers.assert_nil(uv.fs_stat(reports .. "/2026-01-01T00-00-01Z.json"))
+				local scanner = assert(uv.fs_scandir(reports)); local count = 0
+				while true do local name = uv.fs_scandir_next(scanner); if not name then break end
+					if policy.parse_name(name) then count = count + 1 end
+				end
+				helpers.assert_eq(count, policy.MAX_REPORTS)
+			end, debug.traceback)
+			os.date = date
+			if Sink then Sink.uninstall(Logger) end
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			for _, folder in ipairs({ directory .. "/crash_reports", directory }) do
+				local scanner = uv.fs_scandir(folder)
+				if scanner then
+					while true do local name, kind = uv.fs_scandir_next(scanner); if not name then break end
+						if kind == "file" then assert(uv.fs_unlink(folder .. "/" .. name)) end
+					end
+					assert(uv.fs_rmdir(folder))
+				end
+			end
+			if not ok then error(err, 0) end
+		end)
+
 		helpers.it("preserves same-second reports across reporter reloads (crash-exclusive-history)", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-history-XXXXXX"))

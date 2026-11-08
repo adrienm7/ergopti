@@ -77,10 +77,8 @@ local function read_shared_json(relative)
 	if not ok_paths or not Paths then return nil end
 	local root = Paths.shared_root()
 	if not root then return nil end
-	local handle = io.open(root .. "/" .. relative, "r")
-	if not handle then return nil end
-	local body = handle:read("*a")
-	handle:close()
+	local body, status = require("toml_codec.writer").read_classified(root .. "/" .. relative)
+	if status ~= "ok" then return nil end
 	local ok_bridge, Bridge = pcall(require, "infra.llm_bridge")
 	if not ok_bridge or not Bridge or not Bridge.json_decode then return nil end
 	local ok, parsed = pcall(Bridge.json_decode, body)
@@ -244,6 +242,9 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		runtime_current = response_current, runtime_receipt = runtime_receipt, origin = base_url }
 	if not runtime_current(response) then return false end
 	if _active_request and M.cancel() ~= true then return false end
+	-- The cancelled request's terminal callback may reenter and admit a
+	-- successor; that successor owns the slot and this interrupted call yields.
+	if _active_request then return false end
 	_request_epoch = _request_epoch + 1
 
 	local stream = options.stream ~= false  -- default: streaming on
@@ -367,6 +368,9 @@ function M.cancel()
 	local request = _active_request
 	local cancelled = HttpClient.cancel()
 	if cancelled ~= true then return false end
+	-- Native cancellation may settle the request synchronously, and its terminal
+	-- callback may admit a successor: that successor's epoch must stay current.
+	if request.terminal then return true end
 	_request_epoch = _request_epoch + 1
 	finish_request(request, "cancelled")
 	Logger.debug(LOG, "Request cancellation %s.", cancelled and "committed" or "failed")

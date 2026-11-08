@@ -17,6 +17,7 @@ local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local plain_markup = require("ui.menu.menu_dialogs").plain_markup
+local show_error = require("ui.menu.menu_dialogs").show_error
 
 local LOG = "ui.menu.menu_metrics"
 
@@ -47,6 +48,32 @@ local function _migration_row(k)
 			if type(k.cancel_migration) == "function" then k.cancel_migration() end
 		end,
 	}
+end
+
+--- The metrics this session cannot measure, one inert row each with its reason.
+--- PROVIDER data for the `metrics_availability` list: a label naming the metric
+--- and why, so an empty dashboard column reads as unmeasured, not as zero.
+--- @param k table The keystats module.
+--- @return table rows Possibly empty.
+local function _availability_rows(k)
+	local rows = {}
+	local function add(name_key, availability)
+		if type(availability) == "table" and availability.measured == false then
+			rows[#rows + 1] = {
+				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key),
+					i18n_safe(assert(availability.reason, "an unmeasured metric names its reason"))),
+				disabled = true,
+			}
+		end
+	end
+	if type(k.pointer_distance_availability) == "function" then
+		add("menu.metrics.pointer_distance", k.pointer_distance_availability())
+	end
+	local ok, SystemMetrics = pcall(require, "modules.keystats.system_metrics")
+	if ok and type(SystemMetrics.space_change_availability) == "function" then
+		add("menu.metrics.space_changes", SystemMetrics.space_change_availability())
+	end
+	return rows
 end
 
 --- Renders the rows of the metrics submenu that the manifest describes.
@@ -227,12 +254,20 @@ local function _manifest_metrics_rows(ctx, k)
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
 		[require("config_keys").COMMAND.SCOPE_RESTORE] = restore_metrics_scope,
 		[require("config_keys").COMMAND.METRICS_TOGGLE] = function()
-			if type(k.set_enabled) ~= "function" then
+			if type(k.set_enabled) ~= "function" or type(k.is_enabled) ~= "function" then
 				Logger.error(LOG, "The keystats exposes no set_enabled — the gate does nothing.")
-				return
+				return false
 			end
-			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
+			local read, enabled = pcall(k.is_enabled)
+			if not read or type(enabled) ~= "boolean" then return false end
+			local saved = k.set_enabled(not enabled)
+			if saved ~= true then
+				Logger.error(LOG, "Metrics collection setting could not be saved.")
+				show_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title"))
+				return false
+			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
 		end,
 		-- `command` rows since 2026-08-07: the label and the greying are the
 		-- manifest's, so this driver supplies only the window each one opens.
@@ -308,6 +343,7 @@ local function _manifest_metrics_rows(ctx, k)
 	-- is the progress itself.
 	local providers = {
 		["metrics_migration"] = function() return { _migration_row(k) } end,
+		["metrics_availability"] = function() return _availability_rows(k) end,
 		-- The applications whose typing is never recorded: the same submenu the
 		-- other two drivers draw, over this driver's own keystats list.
 		["exclude_apps"] = function()

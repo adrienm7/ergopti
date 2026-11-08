@@ -196,6 +196,11 @@ _SCSC_Revoke(State, Boundary) {
 			Suspend(true)
 			GetSelectionCancel()
 			Suspend(false)
+		; External changes leave every helper input alone: only the window,
+		; the focused control or the physical-input generation moves (WCP-001).
+		case "foreground": State["foreground"] := 102
+		case "focus": State["control"] := 202
+		case "generation": State["generation"] += 1
 		case "new":
 			State["nested"] := GetSelectionAsync((*) => 0, State["ports"])
 			AssertFalse(State["nested"], "the newer request cannot snapshot an in-flight clear")
@@ -247,10 +252,12 @@ _SCSC_Startup(Boundary, Action) {
 	PreviousSettle := CBClipboardOwner.settle_hook
 	State := Map("boundary", Boundary, "action", Action, "revoked", false,
 		"saves", 0, "clears", 0, "sequences", 0, "sends", 0,
-		"restores", 0, "job", 0, "deliveries", 0, "nested", true)
+		"restores", 0, "job", 0, "deliveries", 0, "nested", true,
+		"foreground", 101, "control", 201, "generation", 7)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => State["control"],
+		"foreground", (*) => State["foreground"], "physical_generation", (*) => State["generation"])
 	State["ports"] := Ports
 	try {
 		CBClipboardOwner.settle_hook := 0
@@ -264,7 +271,7 @@ _SCSC_Startup(Boundary, Action) {
 			AssertEqual(1, CBClipboardOwner.active.Count)
 			_SelectionCaptureFinish(_SelectionCaptureJob, "captured selection", true, "ready",
 				Ports["restore"], Ports["sequence"],
-				(J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
+				(J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"]))
 		} else {
 			AssertFalse(Accepted, "a revoked startup cannot report accepted")
 			AssertTrue(State["revoked"], "the requested boundary must be reached")
@@ -299,6 +306,8 @@ _SCSC_Startup(Boundary, Action) {
 			CB_EndOwnedTransaction(State["job"]["owner_token"])
 			State["job"]["callback"] := 0
 			State["job"]["timer"] := 0
+			for Observer in ["control_fn", "foreground_fn", "generation_fn"]
+				State["job"][Observer] := 0
 		}
 		State.Delete("ports")
 		CBClipboardOwner.settle_hook := PreviousSettle
@@ -310,13 +319,46 @@ _SCSC_Startup(Boundary, Action) {
 }
 
 for Boundary in ["snapshot", "clear", "sequence", "send"] {
-	for Action in ["pause", "cancel", "pause-resume", "new"] {
+	for Action in ["pause", "cancel", "pause-resume", "new", "foreground", "focus", "generation"] {
 		Test("hotstrings: selection startup " . Action . " during " . Boundary
 			. " (selection-startup-revocation)", _SCSC_Startup.Bind(Boundary, Action))
 	}
 }
 Test("hotstrings: ordinary selection startup retains its native timer (selection-startup-revocation)",
 	_SCSC_Startup.Bind("none", "none"))
+
+; A paste prepared on the clipboard belongs to the window, the pause state and
+; the physical action current when it was asked for (WCP-002).
+_SCSC_AdmittedTarget() {
+	global _KS_PhysicalInputGeneration
+	PreviousSuspended := A_IsSuspended
+	PreviousGeneration := _KS_PhysicalInputGeneration
+	Window := Gui("+AlwaysOnTop", "Private admitted paste target")
+	try {
+		Field := Window.AddEdit("w200")
+		Window.Show()
+		WinActivate("ahk_id " . Window.Hwnd)
+		Field.Focus()
+		AssertTrue(WinWaitActive("ahk_id " . Window.Hwnd, , 1), "the private target must own the foreground")
+		Suspend(false)
+		Target := _SendInstantCaptureAdmittedTarget()
+		AssertTrue(Target is Map, "an active unpaused window yields a target")
+		AssertTrue(_SendInstantTargetCurrent(Target), "nothing changed yet")
+		_KS_PhysicalInputGeneration += 1
+		AssertFalse(_SendInstantTargetCurrent(Target), "a newer physical action revokes the paste")
+		_KS_PhysicalInputGeneration := PreviousGeneration
+		AssertTrue(_SendInstantTargetCurrent(Target), "the same generation admits it again")
+		Suspend(true)
+		AssertFalse(_SendInstantTargetCurrent(Target), "a pause revokes the paste")
+		AssertFalse(_SendInstantCaptureAdmittedTarget(), "a paused driver yields no target")
+	} finally {
+		_KS_PhysicalInputGeneration := PreviousGeneration
+		Suspend(PreviousSuspended)
+		Window.Destroy()
+	}
+}
+Test("hotstrings: a prepared paste refuses a pause or a newer physical action (sendinstant-admitted-target)",
+	_SCSC_AdmittedTarget)
 
 class _SCL_Callback {
 	__New(State) {
@@ -347,7 +389,7 @@ _SCL_TimerLifetime(Reason) {
 		"deliveries", 0, "text", "", "deleted", 0, "throw", Reason == "callback error")
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
 	Job := 0
 	RetiredTimer := 0
 	OnReady := _SCL_Callback(State)
@@ -364,7 +406,7 @@ _SCL_TimerLifetime(Reason) {
 		} else {
 			_SelectionCaptureFinish(Job, "captured selection", true, "ready",
 				Ports["restore"], Ports["sequence"],
-				(J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
+				(J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"]))
 		}
 		AssertFalse(IsObject(_SelectionCaptureJob))
 		AssertEqual(0, Job["timer"], "retirement must detach the exact bound callback")
@@ -435,7 +477,7 @@ _SCO_StartupSettlement(ExternalCopy) {
 		"job", 0, "successor", 0, "successor_started", false, "external", ExternalCopy)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCO_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
 	try {
 		Suspend(false)
 		CBClipboardOwner.settle_hook := ExternalCopy ? 0 : _SCO_Settle.Bind(State, Ports)
@@ -512,7 +554,7 @@ _SCCR_PollReason(Mode) {
 		"saves", 0, "clears", 0, "sequences", 0, "sends", 0, "restores", 0, "deliveries", 0)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => -1)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => -1)
 	Job := 0
 	try {
 		CBClipboardOwner.settle_hook := 0
@@ -603,7 +645,7 @@ _SCBusy_Run() {
 		"clear", (*) => (State["clears"] += 1, true),
 		"send", (*) => State["sends"] += 1,
 		"restore", (Saved) => (State["restores"] += 1, true),
-		"sequence", (*) => 42, "foreground", (*) => 101,
+		"sequence", (*) => 42, "control", (*) => 201, "foreground", (*) => 101,
 		"report_busy", (*) => State["busy"] += 1)
 	try {
 		AssertFalse(GetSelectionAsync((*) => 0, Ports), "a busy clipboard cannot start a capture")

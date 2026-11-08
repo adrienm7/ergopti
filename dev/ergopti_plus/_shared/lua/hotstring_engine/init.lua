@@ -57,6 +57,8 @@ local TableUtil = require("table_util")
 local PersonalFiles = require("hotstrings.personal_files")
 local Cascade = require("hotstring_engine.cascade")
 local InjectionPlan = require("hotstring_engine.injection_plan")
+-- Lua 5.4 only: LuaJIT has no integer subtype, so the guarded use stays inert there.
+local math_type = math.type
 
 local LOG = "shared.hotstring_engine"
 
@@ -180,7 +182,7 @@ function M.decide(mapping, plain, typed, prev_char, start_is_boundary)
 	if mode == "exact" then
 		if typed == mapping.trigger then eff = plain end
 	elseif mode == "fold" then
-		if text_utils.trig_lower(typed) == mapping.trigger_folded then eff = plain end
+		if text_utils.trig_fold(typed) == mapping.trigger_folded then eff = plain end
 	elseif mode == "conform" then
 		if text_utils.trig_lower(typed) == mapping.trigger then
 			eff = text_utils.conform_replacement(plain, typed, mapping.trigger)
@@ -273,7 +275,7 @@ function M.best_match_at(buf_cps, buckets, body_len, want_auto, start_is_boundar
 	if type(buf_cps) ~= "table" or type(buckets) ~= "table" then return nil end
 	if type(body_len) ~= "number" or body_len < 1 then return nil end
 
-	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	local bucket = buckets[text_utils.trig_fold(buf_cps[body_len])]
 	if not bucket then return nil end
 
 	-- The bucket is sorted longest-first, so the first survivor is the longest
@@ -303,7 +305,7 @@ end
 --- @param auto_map table The immediate candidate.
 --- @return boolean
 function M.final_end_outranks(buf_cps, buckets, body_len, start_is_boundary, auto_map)
-	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	local bucket = buckets[text_utils.trig_fold(buf_cps[body_len])]
 	if not bucket then return false end
 	for _, mapping in ipairs(bucket) do
 		if not mapping.auto_expand and mapping.final_result
@@ -342,7 +344,7 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 	if type(buf_cps) ~= "table" or type(buckets) ~= "table" then return out end
 	if type(body_len) ~= "number" or body_len < 1 then return out end
 
-	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	local bucket = buckets[text_utils.trig_fold(buf_cps[body_len])]
 	if not bucket then return out end
 
 	-- The first survivor of the auto_expand pass is the one that would actually
@@ -505,7 +507,11 @@ function M.idle_resets_word(last_ms, now_ms, idle_seconds, resolution_ms)
 			.. tostring(resolution_ms), 2)
 	end
 	if idle_seconds == 0 or last_ms == nil then return false end
-	return now_ms - last_ms - resolution_ms >= idle_seconds * 1000
+	-- Preserve exact reachable integer deadlines. Beyond this Int64 quotient,
+	-- floating scaling prevents Lua 5.4 integer wrap without capping the setting.
+	local exact_integer = math_type and math_type(idle_seconds) == "integer"
+	local milliseconds = exact_integer and idle_seconds <= 9223372036854775 and idle_seconds * 1000 or idle_seconds * 1000.0
+	return now_ms - last_ms - resolution_ms >= milliseconds
 end
 
 
@@ -524,6 +530,7 @@ end
 function M.new()
 	-- Tail-char buckets: key = lower-cased last codepoint of trigger.
 	local _buckets = {}
+	local _trigger_index = nil
 	local _mapping_state = { generation = 0, mappings = 0, entries = 0, buckets = 0 }
 	-- Rolling buffer stored as an array of UTF-8 codepoint byte-strings.
 	local _buf_cps = {}
@@ -626,10 +633,10 @@ function M.new()
 		local function register(trigger, replacement, mode, source)
 			local cps, n = utf8_codepoints(trigger)
 			if n == 0 then return end
-			-- Bucket key: the tail codepoint, Unicode-folded. trig_lower rather than
+			-- Bucket key: the tail codepoint, Unicode-folded. trig_fold rather than
 			-- string.lower because the latter is ASCII-only, so an accented tail typed
 			-- as "Ê" probed a bucket registered under "ê" and never matched.
-			local key    = text_utils.trig_lower(cps[n])
+			local key    = text_utils.trig_fold(cps[n])
 			local bucket = candidate_buckets[key]
 			if not bucket then bucket = {} ; candidate_buckets[key] = bucket end
 			bucket[#bucket + 1] = {
@@ -637,7 +644,7 @@ function M.new()
 				-- Canonical side of a "fold" compare, precomputed so the hot path folds
 				-- only what the user typed. The trigger itself stays AS WRITTEN, because
 				-- it is what every consumer of a match result sees.
-				trigger_folded = mode == "fold" and text_utils.trig_lower(trigger) or nil,
+				trigger_folded = mode == "fold" and text_utils.trig_fold(trigger) or nil,
 				replacement  = replacement,
 				tlen         = n,
 				match_mode   = mode,
@@ -767,7 +774,15 @@ function M.new()
 		local bucket_count = TableUtil.count(candidate_buckets)
 		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
 			loaded, registered, bucket_count)
+		-- Project only the compiled catalogue that is about to become live. A
+		-- refused reload retains the previous set just like the matching buckets.
+		local compiled = {}
+		for _, bucket in pairs(candidate_buckets) do
+			for _, entry in ipairs(bucket) do compiled[#compiled + 1] = entry end
+		end
+		local index = require("keystats.trigger_roi").trigger_index(compiled)
 		_buckets = candidate_buckets
+		_trigger_index = index
 		_mapping_state = {
 			generation = _mapping_state.generation + 1,
 			mappings = loaded,
@@ -775,6 +790,13 @@ function M.new()
 			buckets = bucket_count,
 		}
 		return true
+	end
+
+	--- Whether a word normalized by the qualified ROI case profile is already a live trigger, irrespective of case mode.
+	--- @param word string Physical word normalized by the qualified ROI case profile.
+	--- @return boolean|nil Nil until a catalogue has been admitted.
+	function engine:is_known_trigger(word)
+		return require("keystats.trigger_roi").known_trigger(_trigger_index, word)
 	end
 
 	--- Returns detached metadata for the last successfully published catalogue.

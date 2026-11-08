@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of the one-time legacy folder migration (_shared/lua/legacy_folder_migration.lua and windows/infra/legacy_folder_migration.ahk). A tree lists every file and directory that exists, a directory ending with a slash. A plan step is a single move (from, to, backup) or a merge (from_dir, to_dir, backup_dir, optional entries). after is the complete tree once the plan ran; moved, backed_up and removed count the report rows, kept_reasons lists the reasons of the entries left in place, in order. A paths_text row rewrites paths.toml text: expected is null when nothing changes; a row whose os is windows spells Windows paths, where a backslash is a separator, and is replayed only where it is one.",
+	"_comment": "Vectors of the one-time legacy folder migration (_shared/lua/legacy_folder_migration.lua and windows/infra/legacy_folder_migration.ahk). A tree lists every file and directory that exists, a directory ending with a slash. A plan step is a single move (from, to, backup) or a merge (from_dir, to_dir, backup_dir, optional entries). after is the complete tree once the plan ran; moved, backed_up and removed count the report rows, kept_reasons lists the reasons of the entries left in place, in order. A paths_text row rewrites paths.toml text: expected is null when nothing changes; a row whose os is windows spells Windows paths, where a backslash is a separator, and is replayed only where it is one. A rewrite rule maps the old folder itself to new, and a folder chosen below it to the same folder below under (new when absent).",
 	"moves": [
 		{
 			"name": "moves a whole folder when the destination is free",
@@ -184,6 +184,81 @@
 				}
 			],
 			"expected": "ConfigDirPath = \"C:\\\\Users\\\\u\\\\AppData\\\\Local\\\\Root\\\\config\\\\\"\n"
+		},
+		{
+			"name": "rebases a folder chosen below an old default folder",
+			"text": "ConfigDirPath = \"/h/.config/old/profiles/private/\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "ConfigDirPath = \"/h/root/config/profiles/private/\"\n"
+		},
+		{
+			"name": "rebases a chosen folder below where its old folder went, the backup included",
+			"text": "ConfigDirPath = \"/h/.config/old/custom\"\n",
+			"rewrites": [
+				{
+					"key": "ConfigDirPath",
+					"old": ["/h/.config/old"],
+					"new": "/h/root/config",
+					"under": "/h/root/bak/.config/old"
+				}
+			],
+			"expected": "ConfigDirPath = \"/h/root/bak/.config/old/custom\"\n"
+		},
+		{
+			"name": "keeps a sibling folder that only shares the old name as a prefix",
+			"text": "ConfigDirPath = \"/h/.config/older/mine\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": null
+		},
+		{
+			"name": "rebases a chosen folder whatever the case and separators of its old folder",
+			"os": "windows",
+			"text": "ConfigDirPath = \"C:/Users/u/.config/OLD/profiles/p/\"\n",
+			"rewrites": [
+				{
+					"key": "ConfigDirPath",
+					"old": ["C:\\\\Users\\\\u\\\\.config\\\\old"],
+					"new": "C:\\\\Users\\\\u\\\\AppData\\\\Local\\\\Root\\\\config"
+				}
+			],
+			"expected": "ConfigDirPath = \"C:/Users/u/AppData/Local/Root/config/profiles/p/\"\n"
+		},
+		{
+			"name": "reads a quoted key as the boot TOML reader does",
+			"text": "\"ConfigDirPath\" = \"/h/.config/old/\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "\"ConfigDirPath\" = \"/h/root/config/\"\n"
+		},
+		{
+			"name": "reads a literal string and keeps it literal",
+			"text": "ConfigDirPath = '/h/.config/old' # chosen\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "ConfigDirPath = '/h/root/config' # chosen\n"
+		},
+		{
+			"name": "decodes a basic-string escape before comparing",
+			"text": "ConfigDirPath = \"/h/.config/\\u006Fld/\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "ConfigDirPath = \"/h/root/config/\"\n"
+		},
+		{
+			"name": "leaves a line the TOML reader would refuse",
+			"text": "ConfigDirPath = \"/h/.config/old\\q\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": null
+		},
+		{
+			"name": "keeps the backslashes of a Windows literal string",
+			"os": "windows",
+			"text": "ConfigDirPath = 'C:\\Users\\u\\.config\\old\\'\n",
+			"rewrites": [
+				{
+					"key": "ConfigDirPath",
+					"old": ["C:/Users/u/.config/old"],
+					"new": "C:\\\\Users\\\\u\\\\AppData\\\\Local\\\\Root\\\\config"
+				}
+			],
+			"expected": "ConfigDirPath = 'C:\\Users\\u\\AppData\\Local\\Root\\config\\'\n"
 		}
 	]
 }

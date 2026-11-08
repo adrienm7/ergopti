@@ -17,15 +17,17 @@
 #NoTrayIcon
 
 ; The driver re-runs this entry (or its compiled executable) with a worker flag
-; for the detached keystats-prefetch and UIA-selection workers. AutoHotkey
+; for the detached keystats-prefetch and UIA-selection workers and for the
+; bundled apps (App Cloner, Encryptor). AutoHotkey
 ; creates a script's tray icon, main window and load-time hotkeys BEFORE its
 ; first statement runs, so each worker looked like a second driver: an
 ; "ErgoptiPlus" tray icon (the default green H in source mode), the driver's
 ; exact window title, which Reload and #SingleInstance search to find the
 ; instance they close, and every static hotkey armed in a second keyboard hook.
 ; Before any other statement a worker therefore releases those hotkeys and takes
-; a title of its own. Both predicates read only A_Args and are hoisted.
+; a title of its own. Every predicate reads only A_Args and is hoisted.
 global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
+	|| BundledApp_IsInvocation()
 if _DriverIsDetachedWorker {
 	Suspend(true)
 	; A pure HWND reaches the hidden main window whatever DetectHiddenWindows
@@ -431,6 +433,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/window_manager.ahk
 #Include adapters/system_control.ahk
 #Include adapters/graphics_renderer.ahk
+#Include adapters/notify_icon.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
 #Include ../_shared/modules/actions/brightness.ahk
@@ -632,6 +635,17 @@ BootProfile_Stamp("Keystats modules initialised")
 ; generation before atomically making that file visible to a dashboard.
 if KLPF_IsWorkerInvocation()
 		KLPF_WorkerMain()
+
+; A bundled app (App Cloner, Encryptor, windows/apps/) reuses this executable in
+; a compiled release, as the workers above do; a source run starts
+; apps/bundled_app_entry.ahk instead. It never returns into the driver's boot.
+#Include adapters/bundled_apps_native.ahk
+#Include apps/app_strings.ahk
+#Include apps/encryptor_core.ahk
+#Include apps/app_cloner_core.ahk
+#Include apps/bundled_apps.ahk
+if BundledApp_IsInvocation()
+	BundledApp_Main(_SharedDir)
 KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
@@ -1241,6 +1255,7 @@ global _ParseExtTomlSectionsCache := Map()
 ; Loaded with Metrics off too: SaveFullConfig writes the widget booleans back, so
 ; they must carry the user's or the manifest's answer, not the class placeholders.
 WPMWidget_LoadConfig(_BootMetricsCache)
+WPMTrayReadout_LoadConfig(_BootMetricsCache)
 
 BootProfile_StageEnd("shortcuts", KeyboardShortcutAssignments.Count . " configured keyboard slot(s) read")
 BootProfile_Mark("Config, features & shortcuts loaded")
@@ -1263,6 +1278,7 @@ TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
 TapHoldLoneTapReadConfig(_IniCache)
+TapHoldOneShotTimeoutReadConfig(_IniCache)
 #Include infra/quit_admission.ahk
 #Include infra/lifecycle.ahk
 ; Cleanup must own windows before the configured menu admits diagnostic clicks.
@@ -1507,11 +1523,23 @@ _DriverInputInitPending := false
 LLM_Menu_ActivateRuntime()
 if !ConfigMigrateBootReadsClose(ConfigurationFile)
 	LoggerError("ErgoptiPlus", "The configuration registry changed during boot; every later write of this session is refused.")
+; The stretch served its boot consumers one admitted snapshot; prove it once.
+if !ConfigTomlBootReadsRelease(ConfigurationFile)
+	LoggerError("ErgoptiPlus", "The configuration snapshot the boot read is no longer its admitted generation.")
 _DriverReady := true
 if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
+; The layout of the live pause state, as macOS applies once its boot settles. A
+; quarantined smoke never touches the user's keyboard layout.
+if !_DriverSmokeInputQuarantined {
+	try {
+		if !PauseLayoutSwitch_ApplyStartup(A_IsSuspended ? 1 : 0)
+			LoggerError("ErgoptiPlus", "The startup keyboard layout switch was refused.")
+	} catch as _StartupLayoutErr
+		LoggerError("ErgoptiPlus", "The startup keyboard layout switch failed: {1}.", _StartupLayoutErr.Message)
+}
 SetTimer(ShellRunner_CheckWinPsAtStart, -1)
 ProxyOverride_ScheduleSealAtStart()
 HTTP_ScheduleCurlCheck(_LLM_Menu.Get("enabled", false))
@@ -1702,8 +1730,11 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 	; path rather than as a ~110 ms tooltip blip when the widget first appears.
 	if WPMWidget.show_graph
 		SetTimer(WPMWidget_PrewarmGraph, -WPMWidgetConst.PREWARM_DELAY_MS)
-	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
+	SetTimer(WPMWidget_BootShow, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
 }
+; The notification-area readout follows its own choice; it stays hidden until
+; the user types, and hides itself while metrics are off.
+WPMTrayReadout_BootStart()
 ; Publish the metrics dashboards' sidecars in a background worker once boot has
 ; settled, so the first open paints from disk at once instead of waiting for a
 ; cold projection (keystats_webview.ahk, background sidecar warm-up).
@@ -1725,6 +1756,7 @@ global _PENDING_KEYBOARD_HKL := 0
 #Include modules/keymap/layout_poll_helper.ahk
 ; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
 #Include modules/keymap/pause_layout_switch.ahk
+#Include modules/keymap/system_layout_install.ahk
 
 ; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
 ; reload reports a refused stage without the "save failed" notice, and it asks

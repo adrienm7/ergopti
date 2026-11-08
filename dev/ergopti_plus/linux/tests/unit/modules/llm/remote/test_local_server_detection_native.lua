@@ -23,7 +23,7 @@ local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("modu
 -- Answers GET <anything>/models like an OpenAI-compatible server. The port
 -- comes from the flag the real server takes, else from FAKE_PORT.
 local SERVER = [[
-import http.server, json, os, sys
+import http.server, json, os, socket, sys
 port = None
 for flag in ("--port", "--api-port"):
     if flag in sys.argv:
@@ -39,28 +39,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
     def log_message(self, *args):
         pass
-http.server.HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+server = http.server.HTTPServer(("127.0.0.1", port), Handler, bind_and_activate=False)
+server.socket.close()
+server.socket = socket.socket(fileno=3)
+server.server_address = server.socket.getsockname()
+server.server_name, server.server_port = server.server_address
+assert server.server_port == port
+with open(os.environ["FAKE_READY"], "w") as ready:
+    ready.write(str(port))
+server.serve_forever()
 ]]
 
 -- One launch per row: the script path (relative to the scratch folder) the
 -- command line shows, its arguments, the port it listens on and how the scan
 -- must find it. A port only in FAKE_PORT is found from the listening socket.
 local LAUNCHES = {
-	{ server = "sglang", module = "sglang.launch_server", args = { "--model-path", "Qwen/Qwen3-4B", "--port", "47802" },
-		port = 47802, source = "cli" },
-	{ server = "koboldcpp", script = "koboldcpp-linux-x64", args = { "--model", "q.gguf", "--port", "47803" },
-		port = 47803, source = "cli" },
-	{ server = "textgen_webui", script = "text-generation-webui/server.py", args = { "--api", "--api-port", "47804" },
-		port = 47804, source = "cli" },
-	{ server = "gpt4all", script = "gpt4all/bin/chat", args = {}, port = 47805, source = "listening" },
-	{ server = "lemonade", script = "bin/lemond", args = {}, port = 47806, source = "config" },
-	{ server = "docker_model_runner", script = "app/model-runner", args = {}, port = 47807, source = "listening" },
-	{ server = "exo", script = "venv/bin/exo", args = { "--api-port", "47808" }, port = 47808, source = "cli" },
-	{ server = "llamacpp", script = "models/Qwen3-4B.llamafile", args = { "--server", "--port", "47809" },
-		port = 47809, source = "cli" },
-	{ server = "vllm", script = "venv/bin/vllm", args = { "serve", "Qwen/Qwen3-4B", "--port", "47810" },
-		port = 47810, source = "cli" },
-	{ server = "tabbyapi", script = "tabbyAPI/start.py", args = { "--port", "47811" }, port = 47811, source = "cli" },
+	{ server = "sglang", module = "sglang.launch_server", args = { "--model-path", "Qwen/Qwen3-4B", "--port", "{PORT}" },
+		source = "cli" },
+	{ server = "koboldcpp", script = "koboldcpp-linux-x64", args = { "--model", "q.gguf", "--port", "{PORT}" },
+		source = "cli" },
+	{ server = "textgen_webui", script = "text-generation-webui/server.py", args = { "--api", "--api-port", "{PORT}" },
+		source = "cli" },
+	{ server = "gpt4all", script = "gpt4all/bin/chat", args = {}, source = "listening" },
+	{ server = "lemonade", script = "bin/lemond", args = {}, source = "config" },
+	{ server = "docker_model_runner", script = "app/model-runner", args = {}, source = "listening" },
+	{ server = "exo", script = "venv/bin/exo", args = { "--api-port", "{PORT}" }, source = "cli" },
+	{ server = "llamacpp", script = "models/Qwen3-4B.llamafile", args = { "--server", "--port", "{PORT}" },
+		source = "cli" },
+	{ server = "vllm", script = "venv/bin/vllm", args = { "serve", "Qwen/Qwen3-4B", "--port", "{PORT}" },
+		source = "cli" },
+	{ server = "tabbyapi", script = "tabbyAPI/start.py", args = { "--port", "{PORT}" }, source = "cli" },
 }
 
 --- Writes a file, creating its folders.
@@ -105,10 +113,24 @@ helpers.describe("Local server detection against real processes (local-server-de
 		assert(status == 0 or status == true, "ss is required to scan local servers")
 		local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-local-servers-XXXXXX"))
 		local home = root .. "/home"
-		local processes, started = {}, {}
+		local processes, reservations, started, launches = {}, {}, {}, {}
 		local ok, err = pcall(function()
-			write(home .. "/.config/lemonade/config.json", Json.encode({ port = 47806, host = "localhost" }))
-			for _, launch in ipairs(LAUNCHES) do
+			for _, spec in ipairs(LAUNCHES) do
+				local launch = {}
+				for key, value in pairs(spec) do launch[key] = value end
+				launches[#launches + 1] = launch
+				-- Keep the kernel-assigned port reserved until the child inherits the
+				-- listening socket. No fixed port or close/rebind race is involved.
+				local reservation = assert(uv.new_tcp())
+				reservations[#reservations + 1] = reservation
+				assert(reservation:bind("127.0.0.1", 0))
+				assert(reservation:listen(16, function() end))
+				local port = assert(reservation:getsockname()).port
+				launch.port = port
+				launch.ready = root .. "/" .. launch.server .. ".ready"
+				if launch.server == "lemonade" then
+					write(home .. "/.config/lemonade/config.json", Json.encode({ port = port, host = "localhost" }))
+				end
 				local args, cwd = {}, root
 				if launch.module then
 					-- A regular package on PYTHONPATH: python -m never depends on the cwd
@@ -120,19 +142,23 @@ helpers.describe("Local server detection against real processes (local-server-de
 					write(root .. "/" .. launch.script, SERVER)
 					args = { root .. "/" .. launch.script }
 				end
-				for _, value in ipairs(launch.args) do args[#args + 1] = value end
+				for _, value in ipairs(launch.args) do
+					args[#args + 1] = value == "{PORT}" and tostring(port) or value
+				end
 				local handle, pid = uv.spawn("python3", { args = args, cwd = cwd,
-					env = { "PATH=" .. (os.getenv("PATH") or "/usr/bin:/bin"), "FAKE_PORT=" .. launch.port,
-						"PYTHONPATH=" .. root } },
+					stdio = { 0, 1, 2, assert(uv.fileno(reservation)) },
+					env = { "PATH=" .. (os.getenv("PATH") or "/usr/bin:/bin"), "FAKE_PORT=" .. port,
+						"FAKE_READY=" .. launch.ready, "PYTHONPATH=" .. root } },
 					function(code, signal) launch.exit = tostring(code) .. "/" .. tostring(signal) end)
 				assert(handle, "python3 is required to stand in for " .. launch.server .. ": " .. tostring(pid))
+				reservation:close()
 				processes[#processes + 1] = handle
 				started[launch.server] = launch
 			end
-			for _, launch in ipairs(LAUNCHES) do
+			for _, launch in ipairs(launches) do
 				local deadline = now_ms() + 10000
-				while not accepting(launch.port) and now_ms() < deadline do uv.sleep(50) end
-				assert(accepting(launch.port), launch.server .. " stand-in never listened on " .. launch.port
+				while not uv.fs_stat(launch.ready) and now_ms() < deadline do uv.run("nowait"); uv.sleep(10) end
+				assert(uv.fs_stat(launch.ready) and accepting(launch.port), launch.server .. " stand-in never listened on " .. launch.port
 					.. " (exit " .. tostring(launch.exit) .. ")")
 			end
 			local Ports = helpers.load_module("modules.llm.local_server_ports")
@@ -143,27 +169,35 @@ helpers.describe("Local server detection against real processes (local-server-de
 				entries[#entries + 1] = { id = id, base_url = CATALOGUE.servers[id].base_url,
 					descriptor = assert(Policy.descriptor(id, CATALOGUE.servers[id].discovery)) }
 			end
-			for _, launch in ipairs(LAUNCHES) do
+			for _, launch in ipairs(launches) do
 				assert(CATALOGUE.servers[launch.server], launch.server .. " is a catalogue server")
 			end
-			local results
-			Ports.scan(entries, function(value) results = value end)
-			local deadline = now_ms() + 15000
-			while results == nil and now_ms() < deadline do uv.run("nowait"); uv.sleep(5) end
-			assert(results, "the scan settles")
-			for _, id in ipairs(CATALOGUE.server_order) do
-				local result, launch = results[id], started[id]
-				if launch then
-					helpers.assert_true(result.running, id .. " is found running: " .. Policy.describe(result))
-					helpers.assert_eq(result.port, launch.port, id .. " port")
-					helpers.assert_eq(result.source, launch.source, id .. " port source")
-					local path = CATALOGUE.servers[id].base_url:match("^https?://[^/]+(/.*)$")
-					helpers.assert_eq(result.base_url, "http://127.0.0.1:" .. launch.port .. path, id .. " base URL")
-				else
-					helpers.assert_eq(result.running, false, id .. " runs no process here")
+			for _, method in ipairs({ "scan", "scan_owned" }) do
+				local results
+				local owned = Ports[method](entries, function(value) results = value end)
+				local deadline = now_ms() + 15000
+				while (results == nil or (owned and not owned:is_settled())) and now_ms() < deadline do
+					uv.run("nowait"); uv.sleep(5)
+				end
+				assert(results, method .. " produces a result")
+				if owned then helpers.assert_true(owned:is_settled(), "the owned scan physically settles") end
+				for _, id in ipairs(CATALOGUE.server_order) do
+					local result, launch = results[id], started[id]
+					if launch then
+						helpers.assert_true(result.running, id .. " is found running: " .. Policy.describe(result))
+						helpers.assert_eq(result.port, launch.port, id .. " port")
+						helpers.assert_eq(result.source, launch.source, id .. " port source")
+						local path = CATALOGUE.servers[id].base_url:match("^https?://[^/]+(/.*)$")
+						helpers.assert_eq(result.base_url, "http://127.0.0.1:" .. launch.port .. path, id .. " base URL")
+					else
+						helpers.assert_eq(result.running, false, id .. " runs no process here")
+					end
 				end
 			end
 		end)
+		for _, reservation in ipairs(reservations) do
+			if not uv.is_closing(reservation) then reservation:close() end
+		end
 		for _, handle in ipairs(processes) do
 			pcall(uv.process_kill, handle, "sigterm")
 			handle:close()

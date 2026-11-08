@@ -49,8 +49,18 @@ local function copy_fields(value, shape, active)
 	active[value] = true
 	local copy, count = {}, 0
 	local row_chords = shape == "row" and rawget(value, "chords") ~= nil
+	local row_count = shape == "row" and rawget(value, "repeat_count") ~= nil
 	for key, item in pairs(value) do
 		local child
+		-- The two scalar row fields: a repeatable sequence's `counted` flag and
+		-- the count a repeat_count row sets.
+		if shape == "row" and (row_chords and key == "counted" or row_count and key == "repeat_count") then
+			if not (key == "counted" and item == true or key == "repeat_count" and type(item) == "number"
+				and item >= 1 and item % 1 == 0 and item ~= math.huge) then active[value] = nil; return nil, false end
+			copy[key] = item
+			count = count + 1
+			goto next_field
+		end
 		if shape == "map" or shape == "chords" or shape == "numbers" then
 			if type(key) ~= "number" or key ~= key or math.abs(key) == math.huge
 				or key % 1 ~= 0 or key < (shape == "map" and 0 or 1) then active[value] = nil; return nil, false end
@@ -69,13 +79,16 @@ local function copy_fields(value, shape, active)
 			copy[key] = copied
 		end
 		count = count + 1
+		::next_field::
 	end
 	active[value] = nil
 	if shape == "numbers" or shape == "chords" then
 		for index = 1, count do if rawget(copy, index) == nil then return nil, false end end
 		if shape == "chords" and count == 0 then return nil, false end
-	elseif shape == "row" and row_chords then
+	elseif shape == "row" and row_count then
 		if count ~= 1 then return nil, false end
+	elseif shape == "row" and row_chords then
+		if count ~= (rawget(copy, "counted") and 2 or 1) then return nil, false end
 	elseif shape == "row" or shape == "chord" then
 		if count ~= 2 or rawget(copy, "mods") == nil or rawget(copy, "keys") == nil then return nil, false end
 	end
@@ -136,14 +149,19 @@ end
 --- @param bindings table Physical-key ids mapped to shared resolutions.
 --- @param registry table Canonical physical-key registry.
 --- @return table layer Evdev input codes mapped to native chord sequences.
---- The layer-table code of a source: its evdev key code, or for a wheel
---- direction the code infra/input_event.lua reserves for it above KEY_MAX.
+--- The layer-table code of a source: its evdev key or button code, or for a
+--- wheel direction the code infra/input_event.lua reserves for it above KEY_MAX.
 local function source_code(registry, name)
 	local entry = registry.keys[name]
 	if type(entry) == "table" and entry.kind == "wheel" then
 		local code = InputEvent.wheel_layer_code(entry.axis, entry.direction)
 		if code == nil then error("the native navigation engine has no wheel direction for " .. tostring(name), 2) end
 		return code
+	end
+	-- A mouse button is its own evdev code (BTN_LEFT ...): the keyboard hook
+	-- takes the mouse for the hold and hands the press to the layer.
+	if type(entry) == "table" and entry.kind == "mouse_button" and type(entry.evdev) == "number" then
+		return entry.evdev
 	end
 	return key_code(registry, name)
 end
@@ -166,7 +184,11 @@ function M.compile(bindings, registry)
 				chords[#chords + 1] = { mods = mods, keys = { key_code(registry, chord.key) } }
 			end
 			assert(#chords > 0, "a navigation keystroke needs at least one chord")
-			layer[code] = { chords = chords }
+			-- A repeatable action sends its last chord as many times as the
+			-- count a repeat_count key set (the engine's repeat_count).
+			layer[code] = { chords = chords, counted = resolved.repeatable == true or nil }
+		elseif resolved.kind == "repeat_count" then
+			layer[code] = { repeat_count = resolved.count }
 		else
 			error("unsupported native navigation resolution: " .. tostring(resolved.kind), 2)
 		end

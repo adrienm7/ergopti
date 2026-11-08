@@ -4,17 +4,17 @@
 --- MODULE: Typing Metrics Incremental Projection
 --- DESCRIPTION:
 --- Builds the JSON the typing dashboard publishes, reusing the part of the
---- previous projection that covers past days. Only days after the cached
---- watermark are read again; a changed past-data fingerprint discards the
---- cache and rebuilds from scratch. All reads go through
+--- previous projection that covers past days only when the reader can prove
+--- its fingerprint identifies the historical data exactly. The current SQLite
+--- reader cannot do so, so it rebuilds the projection on each request. All reads go through
 --- `modules.keystats.sqlite_reader`, the single owner of the aggregation.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact increments: manifest cells belong to one day, and every n-gram
 ---    field is a sum, so cached past days plus freshly read later days equal a
 ---    full read (`sqlite_reader.merge_ngrams` owns the addition).
---- 2. Proved invalidation: a cache is reused only while
----    `sqlite_reader.fingerprint` of its watermark is unchanged. The new
+--- 2. Proved invalidation: a cache is reused only when the reader explicitly
+---    certifies an exact fingerprint and its watermark is unchanged. The new
 ---    watermark's fingerprint is taken before any read, so a write racing the
 ---    job is detected by the next job instead of being cached as current.
 --- 3. Encoded once: past days keep their encoded JSON, so a live update
@@ -152,6 +152,10 @@ function M.session(reader, sqlite_path, today, pacer)
 	local fingerprints = {}
 
 	local function fingerprint(through)
+		-- Aggregate totals are not an identity: compensated changes can leave
+		-- them unchanged. A reader must explicitly certify an exact witness
+		-- before any projection can be reused or advertised by serial.
+		if reader.history_fingerprint_exact ~= true then return nil end
 		if fingerprints[through] == nil then
 			local value, err = reader.fingerprint(sqlite_path, through, pacer)
 			if not value then
@@ -226,6 +230,7 @@ function M.session(reader, sqlite_path, today, pacer)
 		if end_date == "" then end_date = nil end
 		local through = reader.split_bounds(start_date, end_date, today).historical_end
 		local historical_json = EMPTY_NGRAMS_JSON
+		local historical_data = nil
 		local history_complete = true
 		local serial = nil
 		if not start_date or start_date <= through then
@@ -277,6 +282,21 @@ function M.session(reader, sqlite_path, today, pacer)
 				end
 			end
 			historical_json = json
+			historical_data = data
+		end
+		-- Future-dated rows can already exist after a local clock rollback. They
+		-- are outside the past-only cache fingerprint and must be read afresh.
+		local future_requested = (end_date and end_date > today)
+			or (start_date and start_date > today and not end_date)
+		if future_requested then
+			local first = reader.next_day(today)
+			if start_date and start_date > first then first = start_date end
+			local future, complete = reader.read_ngrams(sqlite_path, first, end_date, apps, pacer)
+			local merged = reader.merge_ngrams({}, historical_data or {}, pacer)
+			reader.merge_ngrams(merged, future, pacer)
+			historical_json = PacedJson.encode(merged, pacer)
+			history_complete = history_complete == true and complete == true
+			serial = nil
 		end
 		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
 		local range_complete = history_complete == true and today_complete == true

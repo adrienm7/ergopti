@@ -35,6 +35,10 @@ local function load_keymap()
 		reset_for_action_epoch = function() return true end,
 	}, { __index = function() return function() end end })
 
+	local scheduler = require("adapters.timer_scheduler")
+	local scheduler_hs = hs
+	local original_awake = scheduler.hotstring_time
+	scheduler.hotstring_time = function() return original_awake() + 10000 end
 	local state = nil
 	local RealState = require("modules.keymap.state")
 	package.loaded["modules.keymap.state"] = setmetatable({
@@ -90,10 +94,13 @@ local function load_keymap()
 	return {
 		keymap = keymap,
 		state = state,
-		now = function() return hs_stub.timer.secondsSinceEpoch() end,
+		clock_hs = scheduler_hs,
+		now = function() return scheduler.hotstring_time() end,
 		type_char = function(chars) return keydown(event(types.keyDown, 0, chars)) end,
+		backspace = function() return keydown(event(types.keyDown, 51, "")) end,
 		click = function() return mouse(event(types.leftMouseDown, 0)) end,
 		cleanup = function()
+			scheduler.hotstring_time = original_awake
 			for name in pairs(package.loaded) do
 				if type(name) == "string" and name:match("^modules%.keymap") then package.loaded[name] = nil end
 			end
@@ -122,6 +129,47 @@ local function mid_word(fixture, pause)
 	fixture.state.last_key_time = fixture.now() - pause
 end
 
+helpers.describe("hotstring backspace with composed characters (hotstring-grapheme-backspace)", function()
+	helpers.it("does not retain a fragment of a deleted combining sequence", function()
+		with_keymap(function(f)
+			for _, text in ipairs({
+				"ze" .. utf8.char(0x0301), "z👍🏽", "z👨‍👩‍👧", "z🇫🇷", "z❤️", "zé", "za",
+			}) do
+				f.state.buffer = text
+				f.state.start_is_word_boundary = true
+				f.backspace()
+				helpers.assert_eq(f.state.buffer, "z", "Backspace removes exactly the final composed character")
+			end
+			f.state.buffer = "e" .. utf8.char(0x0301)
+			f.backspace()
+			helpers.assert_eq(f.state.buffer, "", "the app deletes the composed character, not just its mark")
+			f.state.buffer = "z" .. string.char(0xFF)
+			f.state.start_is_word_boundary = true
+			f.backspace()
+			helpers.assert_eq(f.state.buffer, "")
+			helpers.assert_eq(f.state.start_is_word_boundary, false, "invalid UTF-8 cannot prove a word boundary")
+		end)
+	end)
+end)
+
+helpers.describe("hotstring Unicode buffer cap (hotstring-buffer-codepoints)", function()
+	helpers.it("keeps at most 500 codepoints without dropping shorter multibyte text", function()
+		with_keymap(function(f)
+			f.state.buffer = ""
+			f.type_char(string.rep("a", 501))
+			helpers.assert_eq(f.state.buffer, string.rep("a", 500), "ASCII is capped by characters, not bytes")
+			helpers.assert_eq(f.state.start_is_word_boundary, false)
+			f.state.buffer, f.state.start_is_word_boundary = "", true
+			f.type_char(string.rep("é", 300))
+			helpers.assert_eq(f.state.buffer, string.rep("é", 300), "300 multibyte characters fit")
+			helpers.assert_eq(f.state.start_is_word_boundary, true, "an untrimmed boundary remains valid")
+			f.state.buffer = ""
+			f.type_char(string.rep("😀", 501))
+			helpers.assert_eq(f.state.buffer, string.rep("😀", 500), "emoji count as codepoints")
+		end)
+	end)
+end)
+
 helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", function()
 	helpers.it("ships 3 s and a click that starts a word, from the manifest", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.idle_reset_seconds"), 3)
@@ -131,6 +179,42 @@ helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", fun
 			helpers.assert_eq(f.state.WORD_TIMEOUT_SEC, 3,
 				"the delays must no longer turn the shipped pause into never")
 			helpers.assert_eq(f.keymap.is_click_resets_word_enabled(), true)
+		end)
+	end)
+
+	helpers.it("expires suppression after wall-clock rollback on the real key tap (hotstring-clock-regression)", function()
+		with_keymap(function(f)
+			local scheduler = require("adapters.timer_scheduler")
+			local old_awake, old_wall = scheduler.hotstring_time, hs.timer.secondsSinceEpoch
+			local awake, wall = 1000, 1000
+			scheduler.hotstring_time = function() return awake end
+			hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = pcall(function()
+				f.state.suppress_rescan(0.5)
+				awake, wall = 1001, 941
+				f.type_char("d")
+				helpers.assert_eq(f.state.buffer, "d", "a civil clock rollback must not extend suppression")
+			end)
+			scheduler.hotstring_time, hs.timer.secondsSinceEpoch = old_awake, old_wall
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("expires suppression after sleep on the real key tap (hotstring-clock-wake)", function()
+		with_keymap(function(f)
+			local scheduler = require("adapters.timer_scheduler")
+			local old_awake, old_wall = scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch
+			local awake, wall = 20000, 50000
+			scheduler.awake_time = function() return awake end
+			f.clock_hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = pcall(function()
+				f.state.suppress_rescan(0.5)
+				awake, wall = 20000.1, 50060.1
+				f.type_char("d")
+				helpers.assert_eq(f.state.buffer, "d", "sleep must consume the suppression window")
+			end)
+			scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch = old_awake, old_wall
+			if not ok then error(err, 0) end
 		end)
 	end)
 
@@ -274,5 +358,7 @@ helpers.describe("shared idle-reset rule as the macOS driver uses it", function(
 		helpers.assert_true(tostring(err):find("idle delay", 1, true) ~= nil, "the refusal names the idle delay")
 	end)
 end)
+
+require("test.hotstring_idle_clock_contract").register(helpers)
 
 return true

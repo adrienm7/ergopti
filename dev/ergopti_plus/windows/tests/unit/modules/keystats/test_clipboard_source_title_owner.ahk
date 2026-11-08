@@ -95,3 +95,7 @@ Test("Clipboard source title: private origin is refused after focus advances (cl
 Test("Clipboard source title: excluded app is refused during hook lag (clipboard-source-title-owner)", _KCST_Case.Bind("excluded-app-lag"))
 Test("Clipboard source title: live private origin is refused (clipboard-source-title-owner)", _KCST_Case.Bind("private-title-live"))
 Test("Clipboard source title: public origin remains safe during hook lag (clipboard-source-title-owner)", _KCST_Case.Bind("public-lag"))
+
+for _KCST_PasteMode in ["paste-private-lag", "paste-excluded-lag", "paste-private-live", "paste-public-lag"]
+	Test("Clipboard paste title: " . _KCST_PasteMode . " respects the captured source (clipboard-paste-title-owner)",
+		_KCST_Case.Bind(_KCST_PasteMode))

@@ -132,4 +132,43 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 		end
 		helpers.assert_eq(characters, {}, "physical publication must not invent characters")
 	end)
+
+	helpers.it("measures admitted physical modifier and CapsLock holds without generating text", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local clock = require("infra.monotonic")
+		local previous, now, holds, characters, token = clock.now_ms, 100, {}, {}, {}
+		clock.now_ms = function() return now end
+		local ok, err = pcall(function()
+			local input = {}
+			for _, code in ipairs({ 42, 29, 56, 125, 58 }) do
+				input[#input + 1] = { type = 1, code = code, value = 1 }
+				input[#input + 1] = { type = 1, code = code, value = 0 }
+			end
+			kh._test_drive(input, {
+				onChar = function(char) characters[#characters + 1] = char end,
+				onPhysical = function(_, _, _, value) if value == 0 then now = now + 300 end end,
+				onHoldAdmission = function() return token end,
+				onHold = function(code, duration) holds[#holds + 1] = { code, duration } end,
+				onEmitRaw = function() return true end,
+				captureEvent = function() return nil, nil, nil end,
+			}, true)
+		end)
+		clock.now_ms = previous
+		if not ok then error(err, 0) end
+		helpers.assert_eq(holds, { { 42, 300 }, { 29, 300 }, { 56, 300 }, { 125, 300 }, { 58, 300 } })
+		helpers.assert_eq(characters, {})
+	end)
+
+	helpers.it("does not publish a modifier hold after admission is revoked", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local owner, holds = {}, {}
+		kh._test_drive({ { type = 1, code = 42, value = 1 }, { type = 1, code = 42, value = 0 } }, {
+			onPhysical = function(_, _, _, value) if value == 0 then owner = {} end end,
+			onHoldAdmission = function() return owner end,
+			onHold = function(code) holds[#holds + 1] = code end,
+			onEmitRaw = function() return true end,
+			captureEvent = function() return nil, nil, nil end,
+		}, true)
+		helpers.assert_eq(holds, {}, "an obsolete privacy owner cannot authorize a release measurement")
+	end)
 end)

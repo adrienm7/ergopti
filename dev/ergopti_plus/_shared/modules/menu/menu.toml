@@ -305,8 +305,9 @@ reason_key = "menu.agent.not_ready"
 [[menu.top_level]]
 id = "---"
 
-# macOS only: it lists the applications bundled with the macOS app. Linux had
-# one too, holding a single config-folder row, and that row now lives under
+# The bundled App Cloner and Encryptor, on every driver since 2026-11-06:
+# macOS bundles, linux/apps/*.lua, windows/apps/*.ahk, each run as a process of
+# its own. Linux once held a config-folder row here; it lives under
 # Configuration with the other two drivers' copy of it.
 [[menu.top_level]]
 type = "group"
@@ -314,15 +315,12 @@ id = "apps"
 i18n = "menu.apps.title"
 rows = []
 greyed_when_paused = true
-platforms = ["hs"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+platforms = ["ahk", "hs", "linux"]
 
-# The separator that closes the group of that row belongs to it: declared for
-# every driver, it stood right after the one above wherever the row is absent.
+# The separator that closes the group of that row belongs to it.
 [[menu.top_level]]
 id = "---"
-platforms = ["hs"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+platforms = ["ahk", "hs", "linux"]
 
 # Versions, Configuration, then Language (the maintainer's order of
 # 2026-10-02): what runs, how it is set up, how it speaks.
@@ -541,7 +539,7 @@ id = "llm_generation_settings"
 i18n = "menu.llm.generation_menu_title"
 disabled_when_off = true
 platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+reason_key = "platform_reason.llm_generation_settings_are_inline_on_linux"
 
 [[menu.llm_menu]]
 type = "list"
@@ -688,6 +686,16 @@ id = "llm_after_hotstring"
 i18n = "menu.llm.after_hotstring"
 checked_when = ["llm_after_hotstring_enabled"]
 disabled_when = ["llm_trigger_ready"]
+
+# Windows draws the same switch in its display section (llm_display_inline_control).
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_inline_autotype"
+i18n = "menu.llm.inline_autotype"
+checked_when = ["llm_inline_autotype_enabled"]
+disabled_when = ["llm_trigger_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
 
 # The enum feature owns the two values; the shared choice renderer owns the
 # ticks and the « label : value » caption on every driver.
@@ -885,16 +893,14 @@ caption_getter = "agent_system_model_caption"
 caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
-# The Applications submenu, macOS only: it lists the bundled applications
-# found on disk and launches them. Linux's copy held only the config-folder row,
-# which moved to configuration_menu; a row promising per-app settings must not
-# return there until it can carry an application identity through persistence
-# and focus changes.
+# The Applications submenu: one row per bundled app, each launching it. macOS
+# lists the bundles found on disk; Linux and Windows list their two apps. A row
+# promising per-app settings must not return here until it can carry an
+# application identity through persistence and focus changes.
 [[menu.apps_menu]]
 type = "list"
 id = "apps_installed"
-platforms = ["hs"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+platforms = ["ahk", "hs", "linux"]
 
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing
@@ -1293,6 +1299,13 @@ unavailable = "grey"
 reason_key = "physical_shortcuts.windows_unavailable"
 disabled_when = ["physical_shortcuts_editor_ready"]
 disabled_reason_key = "physical_shortcuts.window_unavailable"
+# The editor stays closed while the driver cannot deliver an action bound to
+# a physical key (each driver's keyboard_shortcuts.physical_delivery_available,
+# false until source, collision and output custody are qualified): the row
+# says so rather than inviting a retry.
+disabled_reasons = [
+	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
+]
 
 [[menu.shortcuts_menu]]
 type = "---"
@@ -1566,75 +1579,53 @@ type = "command"
 id = "wrap_symbols_enable_all"
 i18n = "menu.shortcuts.wrap_symbols_check_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "command"
 id = "wrap_symbols_disable_all"
 i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "command"
 id = "wrap_symbols_restore"
 i18n = "common.restore_recommended"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_group_controls]]
 type = "command"
 id = "wrap_symbols_enable_group"
 i18n = "menu.shortcuts.wrap_symbols_check_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_group_controls]]
 type = "command"
 id = "wrap_symbols_disable_group"
 i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_group_controls]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_custom_separator]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_custom_controls]]
 type = "command"
 id = "wrap_symbols_delete_custom"
 i18n = "button.delete"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_add_controls]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_add_controls]]
 type = "command"
 id = "wrap_symbols_add_custom"
 i18n = "menu.shortcuts.wrap_symbols_add_custom"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.key_combinations_group]]
 type = "toggle"
@@ -1663,8 +1654,8 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "---"
 platforms = ["ahk", "hs", "linux"]
 
-# Every OS: owned chords' symmetry and their activation delay. macOS and Linux
-# also offer the bulk copy of every pair's tap slot into its chord slot.
+# Every OS: owned chords' symmetry, their activation delay and the bulk copy of
+# every pair's tap slot into its chord slot.
 [[menu.key_combinations_group]]
 type = "check"
 id = "combo_symmetric"
@@ -1681,8 +1672,7 @@ platforms = ["ahk", "hs", "linux"]
 type = "command"
 id = "copy_tap_to_combo"
 i18n = "menu.tapholds.copy_tap_to_combo"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.key_combinations_group]]
 type = "---"
@@ -1734,6 +1724,33 @@ type = "---"
 [[menu.hotstring_category_menu]]
 type = "list"
 id = "hotstring_category_sections"
+
+# Section order is a menu preference, independent of expansion priority.
+[[menu.hotstring_order_parent]]
+type = "group"
+id = "hotstring_order_children"
+i18n = "menu.hotstrings.section_order"
+
+[[menu.hotstring_order_moves]]
+type = "command"
+id = "hotstring_order_up"
+i18n = "menu.hotstrings.move_up"
+disabled_when = ["hotstring_order_up_ready"]
+
+[[menu.hotstring_order_moves]]
+type = "command"
+id = "hotstring_order_down"
+i18n = "menu.hotstrings.move_down"
+disabled_when = ["hotstring_order_down_ready"]
+
+[[menu.hotstring_order_footer]]
+type = "---"
+
+[[menu.hotstring_order_footer]]
+type = "command"
+id = "hotstring_order_reset"
+i18n = "hs_config.btn_reset_default"
+disabled_when = ["hotstring_order_ready"]
 
 # The menu one pair of « Combinaisons de touches » opens on Windows, shown at
 # the pointer when its row is clicked: 182 pairs each carrying their slots and
@@ -1888,8 +1905,8 @@ type = "---"
 # the declaration, so this driver supplies only the toggle and the state behind
 # the tick. It was `dynamic`, which hands the id back and had the driver build a
 # checkbox the renderer already knows how to draw.
-# The typing-speed displays: the menu bar figure (macOS and Linux), then the
-# floating widget and its options, on every driver.
+# The typing-speed displays: the menu bar figure (the notification area on
+# Windows and Linux), then the floating widget and its options, on every driver.
 [[menu.metrics_menu]]
 type = "section_header"
 i18n = "menu.metrics.header_wpm"
@@ -1899,17 +1916,13 @@ type = "check"
 id = "wpm_menubar"
 i18n = "menu.metrics.show_wpm_menubar"
 checked_when = ["metrics_menubar_wpm"]
-platforms = ["hs", "linux"]
 disabled_when = ["keystats_enabled"]
-reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 [[menu.metrics_menu]]
 type = "check"
 id = "menubar_colors"
 i18n = "menu.metrics.colors_by_source"
 checked_when = ["metrics_menubar_colors"]
-platforms = ["hs", "linux"]
 disabled_when = ["keystats_enabled", "wpm_menubar_visible"]
-reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 
 # Linux joined on 2026-08-06. The restriction was accurate when written — that
 # driver had no floating widget at all — and is not any more: ui/wpm/widget.lua
@@ -2042,6 +2055,16 @@ id = "metrics_reset_session"
 i18n = "menu.metrics.reset_session"
 
 
+# The metrics this session cannot measure, each with its reason: Wayland gives a
+# client neither the cursor position (pointer distance in screen pixels) nor the
+# current desktop (desktop changes). Linux's alone: Windows and macOS measure
+# both on every session. Empty when everything is measured.
+[[menu.metrics_menu]]
+type = "list"
+id = "metrics_availability"
+platforms = ["linux"]
+reason_key = "platform_reason.only_linux_lacks_metric_sources"
+
 # The at-rest migration readout. Converting a year of stored rows takes minutes,
 # and without this row the user ticks « chiffrer au repos » and sees nothing
 # happen at all — so it reports progress and offers to stop. Linux's alone: it is
@@ -2069,22 +2092,18 @@ platforms = ["ahk"]
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # The keyboard-layout scope's restore and clear, right after the switch Windows
-# shows (the first group). Windows and macOS register both on their scope
-# owners. Not applicable on Linux, which has none of these settings (it types
-# through the XKB layout the system selects), so the rows are hidden there.
+# shows (the first group). Every driver registers both on its scope owner; on
+# Linux they cover the number-row ordering and edges of config.toml, which the
+# session loads before the request settles (infra/keyboard_layout_scope.lua).
 [[menu.layout_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.layout_menu]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 # Two sections, so a user reads at a glance which rows are about the custom
 # layout (the registry layouts the layout manager installs, the one typing
@@ -2121,21 +2140,50 @@ i18n = "menu.layout.manage"
 # Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
 # nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
 # and nothing to compare them against.
+# These .bundle rows are macOS's; Windows installs Ergopti from its own row
+# below and Linux for the user from the layout manager above (an Xorg session
+# needs the system installer, install.sh). The reason text tells the user where.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_bundle"
 status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+reason_key = "platform_reason.layout_install_is_the_macos_bundle"
+
+# Windows installs Ergopti as a system layout from the unsigned stand-alone
+# package every release publishes (Ergopti_windows_layout.zip, maintainer
+# decision of 2026-11-06). The exe carries neither that elevated installer nor
+# its DLL (provisional coordinator decision of 2026-11-07): this row says
+# whether the layout is installed and opens the package's download
+# (modules/keymap/system_layout_install.ahk). Once installed it is one of the
+# user's layouts, listed and switched by « Input sources » and the pause switch
+# below.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_system_install"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_system_install_is_windows"
+status_rows.installed = [{ type = "label", i18n = "menu.layout.system_layout_installed" }]
+status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_unreadable" }]
 
 # Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
 # LAYERS it types, under this header, and which keyboard ROWS, in the submenu
-# below. Read as one flat block they looked like the same switches twice.
+# below. Read as one flat block they looked like the same switches twice. The
+# three drivers emulate the layout (maintainer, 2026-11-06).
 [[menu.layout_menu]]
 type = "section_header"
 i18n = "menu.layout.header_layers"
-platforms = ["ahk"]
-unavailable = "hide"
+
+# The layout the emulation types over the system layout, as a submenu of
+# choices: none, the built-in Ergopti variants and the registry layouts the app
+# ships or the layout manager installed. It writes what the onboarding choice
+# writes. Windows picks it in the shared layout manager and reports it in the
+# custom_layouts status row above, where macOS and Linux list the system's own
+# input sources; the three drivers draw this row (Windows from its registry
+# catalogue, through the layout manager's acknowledged handoff).
+[[menu.layout_menu]]
+type = "list"
+id = "layout_emulation"
 
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
@@ -2144,62 +2192,41 @@ unavailable = "hide"
 type = "list"
 id = "layout_features_base"
 
-# AHK-only: the row draws ergopti_base, a Windows-only feature, so on the two
-# Lua drivers it had nothing to draw.
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+# The emulated layout's base and Shift layers (ergopti_base).
 
 # The Ergopti AltGr layer and its ➕ variant. Only these two: the digit row and
 # Ctrl+★ work on any layout and sit in the second section.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_features_altgr"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 # The rows the emulation types, one checkbox each (the layout.emulate_<row>
 # switches), in their own submenu: switching rows on one by one is how a user
-# learns the layout progressively. The other drivers emulate no layout: they
-# draw this submenu's row greyed with why.
+# learns the layout progressively. The same on the three drivers.
 [[menu.layout_menu]]
 type = "group"
 id = "layout_emulated_rows"
 i18n = "menu.layout.emulated_rows"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_number_row"
 i18n = "menu.layout.emulate_number_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_top_row"
 i18n = "menu.layout.emulate_top_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_home_row"
 i18n = "menu.layout.emulate_home_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_bottom_row"
 i18n = "menu.layout.emulate_bottom_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
 [[menu.layout_menu]]
@@ -2222,22 +2249,24 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 [[menu.layout_menu]]
 type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
-# The input sources macOS has enabled, under a header of their own (« Sources
-# de saisie »): without it the list read as more Ergopti settings.
+# The system's keyboard layouts, under a header of their own (« Sources de
+# saisie »): without it the list read as more Ergopti settings. The active one
+# is ticked and choosing another switches the system layout, on every driver
+# (maintainer, 2026-11-06): macOS selects the input source through TIS, Windows
+# requests the user's installed layout (WM_INPUTLANGCHANGEREQUEST) and Linux
+# asks the desktop's own owner (GNOME gsettings, the KDE keyboard daemon or
+# setxkbmap).
 [[menu.layout_menu]]
 type = "section_header"
 i18n = "menu.layout.active_layouts"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
+# A Linux desktop with no way to change its layout says why, as the pause
+# switch does.
 [[menu.layout_menu]]
 type = "list"
 id = "active_layouts"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.active_layouts_unsupported_desktop" }]
 
 [[menu.layout_menu]]
 type = "---"
@@ -2271,12 +2300,14 @@ id = "number_row_policy"
 
 # Works on every layout since 2026-09-21: the chords follow the key that types
 # the accented letter directly in the user's own layout, not Ergopti's positions.
+# Linux follows Windows (modules/shortcuts/accented_shortcuts.lua); a macOS
+# layout file carries its own Command and Control layer.
 [[menu.layout_menu]]
 type = "group"
 id = "accented_letters"
 i18n = "menu.shortcuts.group_accented"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 # Which layout to switch to when the driver pauses and when it resumes: the
 # choices are the system's input sources (macOS), the desktop's layouts
@@ -2285,7 +2316,7 @@ reason_key = "platform_reason.lists_windows_only_settings"
 type = "list"
 id = "layout_switching"
 # A Linux desktop with no way to change its layout (a Wayland compositor other
-# than GNOME) shows why instead of a switch that could never act.
+# than GNOME or KDE Plasma) shows why instead of a switch that could never act.
 status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_layout_unsupported_desktop" }]
 
 # The physical key whose replacement choice lives in Hotstrings Ergopti
@@ -2305,26 +2336,26 @@ reason_key = "platform_reason.lists_windows_only_settings"
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_grave"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_circ"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_acute"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "a_grave"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.hotstrings_menu]]
 type = "toggle"
@@ -2651,9 +2682,6 @@ checked_when = ["hotstrings_shortcut_resets_word"]
 type = "check"
 id = "tap_hold_resets_word"
 i18n = "menu.hotstrings.tap_hold_resets_word"
-platforms = ["ahk", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 checked_when = ["hotstrings_tap_hold_resets_word"]
 
 # The cascade depth: how many more hotstrings the text a hotstring produced may
@@ -2886,7 +2914,7 @@ type = "check"
 id = "gesture_mode_single"
 i18n = "menu.gestures.mode_single"
 checked_when = ["gesture_mode_is_single"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_slot_mode_commands]]
@@ -2894,26 +2922,26 @@ type = "check"
 id = "gesture_mode_incremental"
 i18n = "menu.gestures.mode_incremental"
 checked_when = ["gesture_mode_is_incremental"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "section_header"
 id = "gesture_sensitivity_heading"
 i18n = "menu.gestures.sensitivity_label"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "label"
 id = "gesture_sensitivity_hint"
 i18n = "menu.gestures.sensitivity_hint"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "---"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_change_action]]
@@ -2975,6 +3003,16 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.tap_holds_menu]]
 type = "list"
 id = "tap_hold_global_delay"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# How long a one-shot Shift waits for its key on Windows and Linux (macOS
+# draws its sticky delay among its own timing rows): a positive whole number of
+# milliseconds, 2000 until the user changes it. The maintainer's decision of
+# 2026-11-06 (align on macOS).
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_one_shot_delay"
 platforms = ["ahk", "linux"]
 unavailable = "hide"
 
@@ -3351,12 +3389,29 @@ type = "---"
 
 # The empty native Input Sources list still offers macOS Keyboard preferences.
 # The native owner retains its URL and launch behavior; the shared command owns presentation.
+# Shown when the system lists no layout: opens the system's keyboard settings
+# (macOS System Settings, Windows Settings > Language, GNOME or KDE settings).
 [[menu.layout_active_source_empty_commands]]
 type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
-platforms = ["hs"]
-unavailable = "hide"
+
+# The commands of Layout > « Download the Ergopti system layout installer »
+# (Windows): the download when the layout is not installed, and the update shown
+# under an installed one, since the driver ships no build to compare with.
+[[menu.layout_system_install_commands]]
+type = "command"
+id = "system_layout_install"
+i18n = "menu.layout.system_layout_install"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_system_install_is_windows"
+
+[[menu.layout_system_update_commands]]
+type = "command"
+id = "system_layout_update"
+i18n = "menu.layout.system_layout_update"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_system_install_is_windows"
 
 # A custom profile's child menu is shared; native ports own the exact transactions.
 # Windows retains its existing profile row click/dialog instead of a nested menu.
@@ -3448,16 +3503,6 @@ id = "llm_profile_custom_heading_title"
 i18n = "menu.profiles.header_custom_profiles"
 
 # Ordered frames consume native profile data without owning its callbacks.
-
-[[menu.llm_profile_lua_frame]]
-type = "include"
-section = "llm_profile_recommendation"
-present_when = "llm_profile_recommendation_present"
-
-[[menu.llm_profile_lua_frame]]
-type = "include"
-section = "llm_profile_paused_recommendation"
-present_when = "llm_profile_recommendation_paused"
 
 [[menu.llm_profile_lua_frame]]
 type = "include"
@@ -3571,27 +3616,11 @@ type = "include"
 section = "llm_profile_commands"
 row_id = "llm_profile_clone"
 
-[[menu.llm_profile_recommendation]]
-type = "command"
-id = "llm_profile_recommend"
-i18n = "menu.profiles.auto_detect"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.llm_profile_paused_recommendation]]
-type = "label"
-id = "llm_profile_recommend_paused"
-i18n = "menu.profiles.auto_detect"
-platforms = ["hs"]
-unavailable = "hide"
-
 [[menu.llm_profile_auto_detect_control]]
 type = "check"
 id = "llm_profile_auto_detect"
 i18n = "menu.profiles.auto_detect"
 checked_when = ["llm_profile_auto_detect_checked"]
-platforms = ["ahk", "linux"]
-unavailable = "hide"
 
 # Windows alone owns an ordered runtime registry of personal shortcut switches.
 # The other drivers keep their existing personal-file and general shortcut controls.
@@ -4874,6 +4903,25 @@ type = "---"
 [[menu.layout_switch_picker_choices_frame]]
 type = "list"
 id = "layout_picker_choices"
+
+# One accented-letter shortcut's picker (Linux; Windows draws its own letter
+# picker): off, then the 26 target letters the driver lists.
+[[menu.accented_letter_picker_frame]]
+type = "check"
+id = "accented_letter_off"
+platforms = ["linux"]
+reason_key = "platform_reason.menu_container_rows_are_built_per_driver"
+i18n = "common.disabled"
+checked_when = ["accented_letter_off_checked"]
+
+[[menu.accented_letter_picker_frame]]
+type = "---"
+
+[[menu.accented_letter_picker_frame]]
+type = "list"
+id = "accented_letter_choices"
+platforms = ["linux"]
+reason_key = "platform_reason.menu_container_rows_are_built_per_driver"
 
 # Complete macOS Layout frames; native providers supply exact records and callbacks.
 # Native record captions are literal data, never placeholder translation identities.

@@ -64,7 +64,8 @@ _MetaCheckInputCancelsGeneration() {
 	; loading spinner and in-flight generation, not only a shown prediction.
 	PaBody := _DriverFuncBody("LLM_Bridge_OnPointerActivity")
 	Assert(PaBody != "", "llm_bridge.ahk must define LLM_Bridge_OnPointerActivity()")
-	Assert(InStr(PaBody, "LLM_Bridge_HasActivePredictionWork("),
+	; The gate lives in the shared activity owner it delegates to, checked in (4).
+	Assert(InStr(PaBody, "LLM_Bridge_HasActivePredictionWork(") || InStr(PaBody, "LLM_Bridge_OnUserActivity("),
 		"LLM_Bridge_OnPointerActivity must gate on HasActivePredictionWork (incl. loading), "
 		. "so a click cancels the spinner — macOS mouse_tap dismisses in any phase")
 	Assert(!InStr(PaBody, "_LLM_Bridge_PredictionShown"),
@@ -76,11 +77,25 @@ _MetaCheckInputCancelsGeneration() {
 		"the move-tick must gate on HasActivePredictionWork so a deliberate move cancels "
 		. "during loading too (not only over a shown prediction)")
 
-	; (4) The shown-prediction grace shield is preserved: a real prediction in its
-	; minimum-display window is still protected from incidental input.
-	Assert(InStr(PaBody, "LLM_Tooltip_InGracePeriod("),
-		"LLM_Bridge_OnPointerActivity must still honour the minimum-display grace window "
-		. "so a freshly-rendered prediction is not killed the instant it appears")
+	; (4) No grace shield against activity (maintainer decision 2026-11-06:
+	; predictions run only while the user does nothing): pointer activity routes
+	; through the shared activity cancel, which hides even a fresh prediction.
+	Assert(!InStr(PaBody, "LLM_Tooltip_InGracePeriod("),
+		"LLM_Bridge_OnPointerActivity must not shield a prediction in its grace window")
+	Assert(InStr(PaBody, "LLM_Bridge_OnUserActivity("),
+		"LLM_Bridge_OnPointerActivity must route through LLM_Bridge_OnUserActivity")
+	UaBody := _DriverFuncBody("LLM_Bridge_OnUserActivity")
+	Assert(UaBody != "" && InStr(UaBody, "LLM_Bridge_HasActivePredictionWork(")
+		&& InStr(UaBody, "LLM_Engine_StopGeneration(") && !InStr(UaBody, "InGracePeriod"),
+		"LLM_Bridge_OnUserActivity must cancel any active work without a grace shield")
+	Assert(!InStr(UaBody, "_LLM_Bridge_ClearBuffer("),
+		"activity is not navigation: the AI context survives a pointer move or a key")
+	KdBody := _DriverFuncBody("_OnPrefixKeyDown")
+	Assert(KdBody != "" && InStr(KdBody, "LLM_Bridge_OnKeyActivity(VK)"),
+		"the physical key-down owner must report every key to LLM_Bridge_OnKeyActivity")
+	FgBody := _DriverFuncBody("_AltGrFamilyOnForeground")
+	Assert(FgBody != "" && InStr(FgBody, "LLM_Bridge_OnUserActivity("),
+		"the foreground-change owner must cancel a pending prediction")
 
 	; (5) The retired predicate must be fully removed (no dead code, §5.6).
 	Assert(_DriverFuncBodyOrEmpty("_LLM_Bridge_PredictionShown") == "",

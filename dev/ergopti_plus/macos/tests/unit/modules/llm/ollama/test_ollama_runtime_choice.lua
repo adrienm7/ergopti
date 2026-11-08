@@ -76,7 +76,7 @@ local function with_offer(selected, callback, native, user_ollama)
 				if user_ollama then return "/Applications/Ollama.app/Contents/Resources/ollama", "app" end
 				return nil
 			end,
-			pinned_version = function() fixture.pinned_calls = fixture.pinned_calls + 1; return "0.40.4" end,
+			pinned_version = function() fixture.pinned_calls = fixture.pinned_calls + 1; return "0.40.6" end,
 			native_managed_install_dir = function() return target end,
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()

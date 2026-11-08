@@ -123,6 +123,30 @@
 			"press": ["altgr shift SC039"],
 			"types": " - "
 		},
+		{
+			"id": "ergopti_plus_magic_key_in_dead_circumflex",
+			"layout": "ergopti_plus",
+			"press": ["SC02B", "SC02E"],
+			"types": "j"
+		},
+		{
+			"id": "ergopti_plus_magic_key_in_dead_greek",
+			"layout": "ergopti_plus",
+			"press": ["altgr shift SC021", "SC02E"],
+			"types": "ξ"
+		},
+		{
+			"id": "ergopti_plus_magic_key_in_dead_superscript",
+			"layout": "ergopti_plus",
+			"press": ["altgr shift SC020", "SC02E"],
+			"types": "ʲ"
+		},
+		{
+			"id": "ergopti_plus_magic_key_in_dead_subscript",
+			"layout": "ergopti_plus",
+			"press": ["altgr shift SC02D", "SC02E"],
+			"types": "ⱼ"
+		},
 		{ "id": "ergol_shortcut_base_level", "layout": "ergol", "shortcut": "SC010", "sends": "q" },
 		{ "id": "ergol_shortcut_dead_key", "layout": "ergol", "shortcut": "SC018", "sends": "" },
 		{

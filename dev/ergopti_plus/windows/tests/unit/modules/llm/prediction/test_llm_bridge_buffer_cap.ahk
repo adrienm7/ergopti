@@ -34,16 +34,39 @@
 ; ===================================================================
 
 _LBBC_Setup() {
-	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, _LLM_Engine
-	_LLM_Bridge_Buffer := ""
-	_LLM_Bridge_Active := true
-	_LLM_Engine["enabled"] := false
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, _LLM_Engine, _LLM_Agent_Auto, _LLM_Agent_Generation, _LLM_Menu
+	Saved := {Buffer: _LLM_Bridge_Buffer, Active: _LLM_Bridge_Active, Engine: _LLM_Engine,
+		AgentAuto: _LLM_Agent_Auto, AgentGeneration: _LLM_Agent_Generation, Menu: _LLM_Menu}
+	Saved.Privacy := _LLM_TestPrivacyEnter(Map("hwnd", 101, "control", 102))
+	try {
+		_LLM_Engine := _LLM_Engine.Clone()
+		_LLM_Agent_Auto := _LLM_Agent_Auto.Clone(), _LLM_Agent_Auto["timer"] := 0
+		_LLM_Menu := (_LLM_Menu is Map) ? _LLM_Menu.Clone() : Map()
+		_LLM_Menu[ConfigLeaf.AGENT_MODE] := "action"
+		; Never let the pure stress fixture cancel a preexisting timer or plan.
+		_LLM_Engine["pending_timer"] := "", _LLM_Engine["timer_active"] := false
+		if _LLM_Engine.Has("request_plan")
+			_LLM_Engine.Delete("request_plan")
+		_LLM_Bridge_Active := true
+		_LLM_Engine["enabled"] := false
+		AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(Map("hwnd", 101, "control", 102), true)))
+		_LLM_Bridge_Buffer := ""
+		return Saved
+	} catch Any as Failure {
+		_LBBC_Teardown(Saved)
+		throw Failure
+	}
 }
-
-_LBBC_Teardown() {
-	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
-	_LLM_Bridge_Buffer := ""
-	_LLM_Bridge_Active := false
+_LBBC_Teardown(Saved := unset) {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, _LLM_Engine, _LLM_Agent_Auto, _LLM_Agent_Generation, _LLM_Menu
+	if IsSet(Saved) {
+		_LLM_TestPrivacyExit(Saved.Privacy)
+		_LLM_Agent_Auto := Saved.AgentAuto, _LLM_Agent_Generation := Saved.AgentGeneration
+		_LLM_Menu := Saved.Menu
+		_LLM_Bridge_Buffer := Saved.Buffer, _LLM_Bridge_Active := Saved.Active, _LLM_Engine := Saved.Engine
+	} else {
+		_LLM_Bridge_Buffer := "", _LLM_Bridge_Active := false
+	}
 }
 
 
@@ -56,27 +79,29 @@ _LBBC_Teardown() {
 ; ===================================================================
 
 _LBBC_BufferNeverExceedsCap() {
-	_LBBC_Setup()
 	global _LLM_Bridge_Buffer, LLM_BRIDGE_BUFFER_MAX_CHARS
+	Saved := _LBBC_Setup()
+	try {
 	; Feed far more characters than the cap — a pathological unbroken typing run.
 	loop (LLM_BRIDGE_BUFFER_MAX_CHARS + 500)
 		LLM_Bridge_OnChar("a")
 	AssertEqual(LLM_BRIDGE_BUFFER_MAX_CHARS, StrLen(_LLM_Bridge_Buffer),
 		"_LLM_Bridge_Buffer must never grow past LLM_BRIDGE_BUFFER_MAX_CHARS, no matter how long the unbroken typing run (F47)")
-	_LBBC_Teardown()
+	} finally _LBBC_Teardown(Saved)
 }
 Test("llm_bridge: LLM_Bridge_OnChar caps the buffer at LLM_BRIDGE_BUFFER_MAX_CHARS (F47)", _LBBC_BufferNeverExceedsCap)
 
 _LBBC_KeepsTailNotHead() {
-	_LBBC_Setup()
 	global _LLM_Bridge_Buffer, LLM_BRIDGE_BUFFER_MAX_CHARS
+	Saved := _LBBC_Setup()
+	try {
 	loop (LLM_BRIDGE_BUFFER_MAX_CHARS)
 		LLM_Bridge_OnChar("x")
 	LLM_Bridge_OnChar("Z")  ; one char past the cap
 	AssertEqual("Z", SubStr(_LLM_Bridge_Buffer, -1),
 		"once capped, the buffer must drop the OLDEST characters and keep the most recent typing, not the reverse")
 	AssertEqual(LLM_BRIDGE_BUFFER_MAX_CHARS, StrLen(_LLM_Bridge_Buffer))
-	_LBBC_Teardown()
+	} finally _LBBC_Teardown(Saved)
 }
 Test("llm_bridge: capped buffer keeps the most recent characters, not the oldest (F47)", _LBBC_KeepsTailNotHead)
 

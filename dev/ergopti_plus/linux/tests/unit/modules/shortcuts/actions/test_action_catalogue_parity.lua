@@ -390,7 +390,9 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 					if type(row.title) == "string" and row.title:find(" → ", 1, true)
 						and type(row.menu) == "table" then
 						slot_rows = slot_rows + 1
-						helpers.assert_true(#row.menu <= 2,
+						-- The picker rows, plus a swipe's mode and step groups
+						-- (each a submenu of its own), never the whole catalogue.
+						helpers.assert_true(#row.menu <= 4,
 							row.title .. " inlines " .. #row.menu .. " row(s); the picker is the list")
 					end
 					walk(row.menu)

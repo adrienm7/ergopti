@@ -18,6 +18,7 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 
 local LOG = "ui.menu.menu_tap_holds"
 
@@ -196,7 +197,7 @@ local function _build_tap_holds(ctx)
 		local ms = tonumber(value)
 		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
 		if guard() ~= true then changed(false); return false end
@@ -222,11 +223,36 @@ local function _build_tap_holds(ctx)
 		local ms = tonumber(value)
 		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid global tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, math.floor(ms + 0.5) / 1000, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
+	--- Asks how long a one-shot Shift waits for its key, in milliseconds (macOS's
+	--- sticky delay row): a positive whole number, live once written.
+	local function ask_one_shot_delay(current_ms)
+		local guard, setter = edit_guard("set_one_shot_timeout_ms")
+		if not guard then changed(false); return false end
+		local value = prompt_text(i18n_safe("menu.tapholds.sticky_dialog_title"),
+			i18n_safe("menu.tapholds.sticky_dialog_prompt"), tostring(current_ms))
+		if value == nil then return false end
+		local ms = tonumber(value)
+		local Loader = require("platform.remap.tap_hold_loader")
+		if not ms or ms ~= ms or not Loader.valid_one_shot_timeout_ms(math.floor(ms)) then
+			Logger.warn(LOG, "Invalid one-shot timeout '%s' — ignored.", tostring(value))
+			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
+			return false
+		end
+		if guard() ~= true then changed(false); return false end
+		local call_ok, persisted = pcall(setter, math.floor(ms), guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
@@ -330,6 +356,13 @@ local function _build_tap_holds(ctx)
 			return { {
 				label = string.format(i18n_safe("menu.tapholds.tap_hold_title"), global_ms .. " ms"),
 				action = function() return ask_global_delay(global_ms) end,
+			} }
+		end,
+		["tap_hold_one_shot_delay"] = function()
+			local current_ms = th.one_shot_timeout_ms()
+			return { {
+				label = string.format(i18n_safe("menu.tapholds.sticky_title"), current_ms .. " ms"),
+				action = function() return ask_one_shot_delay(current_ms) end,
 			} }
 		end,
 		["tap_hold_lone_tap"] = function()

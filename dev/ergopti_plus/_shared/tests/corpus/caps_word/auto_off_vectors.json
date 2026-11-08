@@ -84,6 +84,22 @@
 			"reason": "invalid_idle_timeout"
 		},
 		{
+			"name": "positive delay rounding to zero milliseconds",
+			"idle": 0.0004,
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "invalid_idle_timeout"
+		},
+		{
+			"name": "smallest delay keeping one millisecond",
+			"idle": 0.0005,
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": true,
+			"idle_ms": 1
+		},
+		{
 			"name": "text delay",
 			"idle": "5",
 			"terminators": ["space"],

@@ -64,6 +64,10 @@ class KLWConst {
 		static CASCADE_MIN_BS            := 3
 		static HOLD_THRESHOLD_MS         := 0   ; <- keystats.hold_threshold_ms
 		static TITLE_CAP_PER_APP_DAY     := 100
+		; A wake earlier than this after local midnight is a night wake. A pinned
+		; copy of keystats.night_wake_end_ms rather than a boot-loaded one: the
+		; dashboard worker receives only the six walk thresholds.
+		static NIGHT_WAKE_END_MS         := 21600000
 }
 
 ; Reassign the KLWConst timing thresholds from the shared registry. Called once
@@ -294,9 +298,32 @@ KLW_NewActivity() {
 				"bs_run_len", 0, "last_was_bs", false, "recent_typing", [])
 }
 
+; Internal tuple keys never contain NUL; separators occur only between fields.
+; The ordinary-key fast path preserves existing readable keys byte for byte.
+KLW_KeyPart(Value) {
+		Text := String(Value)
+		if !RegExMatch(Text, "[\x00-\x02]")
+				return Text
+		Encoded := ""
+		Loop StrLen(Text) {
+				Character := SubStr(Text, A_Index, 1)
+				Code := Ord(Character)
+				Encoded .= Code <= 2 ? Chr(2) . String(Code) : Character
+		}
+		return Encoded
+}
+
+KLW_Key(Parts*) {
+		Key := ""
+		for Index, Part in Parts
+				Key .= (Index > 1 ? Chr(1) : "") . KLW_KeyPart(Part)
+		return Key
+}
+
 ; Get-or-create the per-app walking context.
 KLW_GetAppCtx(app) {
-		if !KLW.ctx.Has(app) {
+		AppKey := KLW_KeyPart(app)
+		if !KLW.ctx.Has(AppKey) {
 				ctx := Map(
 						"p1", "", "p2", "", "p3", "", "p4", "", "p5", "", "p6", "",
 						"cur_word", "", "word_err", false, "hist", [],
@@ -306,9 +333,9 @@ KLW_GetAppCtx(app) {
 						ctx[Field] := Value
 				; ``current_burst`` / ``current_session`` are added on demand below;
 				; their *absence* from the Map signals "no burst / session in flight".
-				KLW.ctx[app] := ctx
+				KLW.ctx[AppKey] := ctx
 		}
-		return KLW.ctx[app]
+		return KLW.ctx[AppKey]
 }
 
 KLW_GetMap(m, k, default_val := "") {
@@ -318,12 +345,13 @@ KLW_GetMap(m, k, default_val := "") {
 }
 
 ; Bump a metric in the n-gram batch dict. Mirrors `_add_ngram_metric` Lua.
-KLW_AddNgramMetric(table_name, key, delay, is_error, synth_type) {
+KLW_AddNgramMetric(table_name, key, delay, is_error, synth_type, Date, App, Token) {
 		if !KLW.batch["ngram"].Has(table_name)
 				return
 		tbl := KLW.batch["ngram"][table_name]
 		if !tbl.Has(key)
-				tbl[key] := Map("c", 0, "td", 0, "cd", 0, "e", 0, "esrc", Map())
+				tbl[key] := Map("date", Date, "app", App, "token", Token,
+						"c", 0, "td", 0, "cd", 0, "e", 0, "esrc", Map())
 		item := tbl[key]
 		if is_error {
 				item["e"] += 1
@@ -342,13 +370,13 @@ KLW_AddNgramMetric(table_name, key, delay, is_error, synth_type) {
 }
 
 KLW_PushNgram(table_name, date_str, app, token, delay, is_error, synth_type) {
-		key := date_str . Chr(1) . app . Chr(1) . token
-		KLW_AddNgramMetric(table_name, key, delay, is_error, synth_type)
+		key := KLW_Key(date_str, app, token)
+		KLW_AddNgramMetric(table_name, key, delay, is_error, synth_type, date_str, app, token)
 }
 
 ; Bump a per-app-day numeric counter on KLW.batch["app_day"].
 KLW_BumpAppDay(date_str, app, field, value) {
-		key := date_str . Chr(1) . app
+		key := KLW_Key(date_str, app)
 		if !KLW.batch["app_day"].Has(key)
 				KLW.batch["app_day"][key] := Map("date", date_str, "app", app)
 		row := KLW.batch["app_day"][key]
@@ -368,7 +396,7 @@ KLW_BumpAppDay(date_str, app, field, value) {
 KLW_FinalizeBurst(date_str, app, b) {
 		if !(b is Map) || b["char_count"] <= 0
 				return
-		key := date_str . Chr(1) . app
+		key := KLW_Key(date_str, app)
 		if !KLW.batch["bursts"].Has(key) {
 				KLW.batch["bursts"][key] := Map(
 						"date", date_str, "app", app,
@@ -397,7 +425,7 @@ KLW_FinalizeBurst(date_str, app, b) {
 }
 
 KLW_GetErrorRow(Day, App) {
-		Key := Day . Chr(1) . App
+		Key := KLW_Key(Day, App)
 		if !KLW.batch["errors"].Has(Key)
 				KLW.batch["errors"][Key] := Map("date", Day, "app", App,
 						"bs_total", 0, "cascade_count", 0, "cascade_max_len", 0,
@@ -417,7 +445,7 @@ KLW_FinalizeCascade(Day, App, Count) {
 KLW_FinalizeSession(date_str, app, s) {
 		if !(s is Map) || s["char_count"] <= 0
 				return
-		key := date_str . Chr(1) . app
+		key := KLW_Key(date_str, app)
 		if !KLW.batch["sessions"].Has(key) {
 				KLW.batch["sessions"][key] := Map(
 						"date", date_str, "app", app,

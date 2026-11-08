@@ -137,11 +137,23 @@ final class UninstallWorkerTests: XCTestCase {
 			validate: { calls.append("validate") },
 			authorize: { true },
 			waitForCleanExit: { true },
+			checkLeaseRetirement: { calls.append("lease") },
 			retireOwnedRuntime: { calls.append("owned") },
 			unregister: { calls.append("unregister") },
 			trash: { calls.append("trash") }
 		)
-		XCTAssertEqual(calls, ["validate", "validate", "owned", "unregister", "validate", "trash"])
+		XCTAssertEqual(calls, ["validate", "validate", "lease", "owned", "unregister", "validate", "trash"])
+	}
+
+	func testActiveLeasePreventsRuntimeRetirementAndRemoval() {
+		var destructiveCalls = 0
+		XCTAssertThrowsError(try performConfirmedUninstall(
+			validate: {}, authorize: { true }, waitForCleanExit: { true },
+			checkLeaseRetirement: { throw UninstallFailure.activeLease },
+			retireOwnedRuntime: { destructiveCalls += 1 },
+			unregister: { destructiveCalls += 1 }, trash: { destructiveCalls += 1 }
+		))
+		XCTAssertEqual(destructiveCalls, 0)
 	}
 
 	func testRefusedOwnedRuntimeRetirementNeverReachesTheBundle() {

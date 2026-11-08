@@ -20,7 +20,7 @@
 --- remove. The channel has to be non-forking, not batched.
 ---
 --- FEATURES & RATIONALE:
---- 1. Pure encoder. `encode_event()` builds the 24-byte `struct input_event`
+--- 1. Pure encoder. `encode_event()` builds the native `struct input_event`
 ---    with hand-rolled little-endian packing rather than `string.pack`, which
 ---    LuaJIT (5.1) does not have. One code path on every interpreter beats a
 ---    version branch that only one side of CI ever executes.
@@ -73,7 +73,7 @@ local SYN_REPORT = 0x00
 -- The relative axes the device can send: pointer motion and both wheels, in
 -- their classic and high-resolution reports. The keyboard hook forwards a mouse
 -- through them while the navigation layer owns its wheel (adapters/keyboard_hook).
-local RELATIVE_AXES = { 0x00, 0x01, 0x06, 0x08, 0x0b, 0x0c }
+local RELATIVE_AXES = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0b, 0x0c }
 local RELATIVE_AXIS = {}
 for _, axis in ipairs(RELATIVE_AXES) do RELATIVE_AXIS[axis] = true end
 local RELATIVE_VALUE_LIMIT = 0x7FFFFFFF
@@ -103,9 +103,9 @@ local KEY_CODE_MAX = 0x2FF
 -- File descriptors are non-negative signed native int values.
 local MAX_DESCRIPTOR = 0x7FFFFFFF
 
--- struct input_event is 24 bytes on 64-bit: timeval (2 × 8) + type/code (2 × 2)
--- + value (4).
-local INPUT_EVENT_SIZE = 24
+-- The payload is always 8 bytes; the two timeval fields use the native long width.
+local INPUT_EVENT_SIZE = require("infra.input_event").native_size()
+local TIME_FIELD_SIZE = (INPUT_EVENT_SIZE - 8) / 2
 
 -- Bus type and identifiers reported by the virtual device (linux/input.h).
 -- BUS_VIRTUAL is what a software-synthesised keyboard should claim; a real bus
@@ -186,10 +186,10 @@ end
 --- @param value integer Event value (0 release, 1 press, 2 autorepeat).
 --- @param sec integer|nil tv_sec, default 0.
 --- @param usec integer|nil tv_usec, default 0.
---- @return string A 24-byte struct.
+--- @return string A native-size struct.
 function M.encode_event(ev_type, code, value, sec, usec)
-	return pack_uint_le(sec or 0, 8)
-		.. pack_uint_le(usec or 0, 8)
+	return pack_uint_le(sec or 0, TIME_FIELD_SIZE)
+		.. pack_uint_le(usec or 0, TIME_FIELD_SIZE)
 		.. pack_uint_le(ev_type, 2)
 		.. pack_uint_le(code, 2)
 		.. pack_i32_le(value)
@@ -241,6 +241,7 @@ local _generation = 0
 local _strict_constructor = false
 local _constructor_ports = nil
 local _legacy_wire = false
+local _legacy_failed = false
 local encode_event = M.encode_event
 local encode_setup = M.encode_setup
 
@@ -310,7 +311,7 @@ local function emit_relative_owned(capability, axis, value)
 	if _busy or _debt or _transaction ~= nil or not output_identity(output)
 		or not rawequal(capability, output.capability) then return false end
 	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
-		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then return false end
+		or value < -RELATIVE_VALUE_LIMIT - 1 or value > RELATIVE_VALUE_LIMIT then return false end
 	_busy = true
 	output.write_epoch = output.write_epoch + 1
 	local called, acknowledged = pcall(function()
@@ -391,6 +392,7 @@ function M._reset_backend()
 	_fd = nil
 	_strict_constructor = false
 	_legacy_wire = false
+	_legacy_failed = false
 	pcall(Logger.debug, LOG, "Backend reset.")
 	_busy = false
 end
@@ -410,6 +412,9 @@ end
 local function build_kernel_node_ports(ffi)
 	if not ffi.abi("64bit") or (ffi.arch ~= "x64" and ffi.arch ~= "arm64") then return nil end
 	if not kernel_declared[ffi] then
+	-- ffi.C is one namespace per process: a typed global statx would make every
+	-- later void* declaration a no-op and break the file readers and writers'
+	-- descriptor fallback. A private symbol alias keeps this type to itself.
 	ffi.cdef([[
 		typedef struct { int64_t tv_sec; uint32_t tv_nsec; int32_t reserved; } ErgoptiStatxTime107;
 		typedef struct {
@@ -422,7 +427,8 @@ local function build_kernel_node_ports(ffi)
 			uint64_t subvol; uint32_t atomic_write_unit_min, atomic_write_unit_max;
 			uint32_t atomic_write_segments_max, spare1; uint64_t spare3[9];
 		} ErgoptiStatx107;
-		int statx(int dirfd, const char *pathname, int flags, unsigned int mask, ErgoptiStatx107 *buf);
+		int ergopti_uinput_statx107(int dirfd, const char *pathname, int flags, unsigned int mask,
+			ErgoptiStatx107 *buf) __asm__("statx");
 		int openat(int dirfd, const char *pathname, int flags, ...);
 		long pread(int fd, void *buf, unsigned long count, long offset);
 	]])
@@ -433,10 +439,10 @@ local function build_kernel_node_ports(ffi)
 		or ffi.offsetof("ErgoptiStatx107", "rdev_major") ~= 128
 		or ffi.offsetof("ErgoptiStatx107", "rdev_minor") ~= 132 then return nil end
 	-- These are additional optional ports; existing ordinary Writer ports stay intact.
-	local ports = { openat = ffi.C.openat, statx = ffi.C.statx, pread = ffi.C.pread,
+	local ports = { openat = ffi.C.openat, statx = ffi.C.ergopti_uinput_statx107, pread = ffi.C.pread,
 		close = ffi.C.close, ioctl = ffi.C.ioctl, new = ffi.new, string = ffi.string, errno = ffi.errno }
 	local function ports_current()
-		return ffi.C.openat == ports.openat and ffi.C.statx == ports.statx and ffi.C.pread == ports.pread
+		return ffi.C.openat == ports.openat and ffi.C.ergopti_uinput_statx107 == ports.statx and ffi.C.pread == ports.pread
 			and ffi.C.close == ports.close and ffi.C.ioctl == ports.ioctl
 			and ffi.new == ports.new and ffi.string == ports.string and ffi.errno == ports.errno
 	end
@@ -721,7 +727,7 @@ end
 --- @return boolean True when the device is ready to accept events.
 function M.open()
 	if _busy or _debt then return false end
-	if _fd then return true end
+	if _fd then return not _legacy_failed end
 	-- Reserve before lazy FFI loading: even require/cdef can reenter the writer.
 	_busy = true
 	local backend, descriptor = _backend, nil
@@ -780,6 +786,7 @@ function M.open()
 	_strict_constructor = strict and type(descriptor) == "number"
 		and descriptor == math.floor(descriptor) and descriptor >= 0 and descriptor <= MAX_DESCRIPTOR
 	_legacy_wire = false
+	_legacy_failed = false
 	pcall(Logger.success, LOG, "Virtual keyboard created on %s.", _uinput_path)
 	_busy = false
 	return true
@@ -789,16 +796,27 @@ end
 function M.close()
 	if _busy or _debt then return false end
 	if _output ~= nil then return close_owned(_output.capability) end
-	if not _fd then return end
+	if not _fd then return true end
 	_busy = true
 	pcall(Logger.start, LOG, "Destroying the virtual keyboard…")
-	pcall(_backend.ioctl, _fd, UI_DEV_DESTROY, 0)
-	pcall(_backend.close, _fd)
-	_fd = nil
-	_strict_constructor = false
-	_legacy_wire = false
-	pcall(Logger.success, LOG, "Virtual keyboard destroyed.")
+	local fd, ports = _fd, _constructor_ports
+	local destroyed, destroy_ack = pcall(ports.ioctl, fd, UI_DEV_DESTROY, 0)
+	local closed, close_ack = pcall(ports.close, fd)
+	if closed and close_ack == true then _fd = nil end
+	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true
+	if acknowledged then
+		_strict_constructor = false
+		_legacy_wire = false
+		_legacy_failed = false
+		pcall(Logger.success, LOG, "Virtual keyboard destroyed.")
+	else
+		-- A refused close may have recycled the descriptor already. Preserve the
+		-- debt, but never retry an fd that could now belong to another owner.
+		_debt = true
+		pcall(Logger.error, LOG, "Virtual keyboard retirement remains unacknowledged.")
+	end
 	_busy = false
+	return acknowledged
 end
 
 --- @return boolean True when the device is open and emit() will work.
@@ -824,6 +842,21 @@ end
 -- ===========================================
 -- ===========================================
 
+-- Once either write is unacknowledged a later SYN could publish a withheld
+-- event. Only closing and recreating the device can safely resume output.
+local function legacy_emit(event_type, code, value)
+	if _legacy_failed then return false end
+	_busy, _legacy_wire = true, true
+	local called, acknowledged = pcall(function()
+		return _backend.write(_fd, M.encode_event(event_type, code, value)) == true
+			and _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) == true
+	end)
+	if not called or acknowledged ~= true then _legacy_failed = true end
+	_busy = false
+	if _legacy_failed then pcall(Logger.warn, LOG, "Unacknowledged input write; recreate the virtual device before retrying.") end
+	return called and acknowledged == true
+end
+
 --- Emits one key event, followed by the SYN_REPORT that makes it visible.
 ---
 --- Without the SYN_REPORT the kernel buffers the event and the application sees
@@ -847,7 +880,8 @@ function M.emit(code, value)
 	end
 	if _busy or _debt or _transaction ~= nil then return false end
 	if _output ~= nil then return emit_owned(_output.capability, code, value) end
-	if type(code) ~= "number" or type(value) ~= "number" then
+	if type(code) ~= "number" or code ~= math.floor(code) or code < 1 or code > KEY_CODE_MAX
+		or (value ~= 0 and value ~= 1 and value ~= 2) then
 		Logger.error(LOG, "emit(): invalid arguments — code=%s value=%s.",
 			tostring(code), tostring(value))
 		return false
@@ -857,28 +891,19 @@ function M.emit(code, value)
 		return false
 	end
 
-	_legacy_wire = true
-	if not _backend.write(_fd, M.encode_event(EV_KEY, code, value)) then
-		Logger.warn(LOG, "emit(%d:%d): key write failed.", code, value)
-		return false
-	end
-	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
-		Logger.warn(LOG, "emit(%d:%d): SYN_REPORT write failed — the key stays buffered.", code, value)
-		return false
-	end
-	return true
+	return legacy_emit(EV_KEY, code, value)
 end
 
 --- Writes one relative report (a pointer movement or a wheel notch) and its SYN.
 --- Refused while a key transaction or a dispatch owns the channel.
---- @param axis integer REL_X, REL_Y, REL_HWHEEL, REL_WHEEL or a high-resolution wheel.
+--- @param axis integer A non-reserved Linux REL_* axis.
 --- @param value integer Signed delta.
 --- @return boolean written
 function M.emit_relative(axis, value)
 	if _dispatch or _busy or _debt or _transaction ~= nil then return false end
 	if _output ~= nil then return emit_relative_owned(_output.capability, axis, value) end
 	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
-		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then
+		or value < -RELATIVE_VALUE_LIMIT - 1 or value > RELATIVE_VALUE_LIMIT then
 		Logger.error(LOG, "emit_relative(): invalid arguments — axis=%s value=%s.", tostring(axis), tostring(value))
 		return false
 	end
@@ -886,16 +911,7 @@ function M.emit_relative(axis, value)
 		Logger.error(LOG, "emit_relative(): device is not open.")
 		return false
 	end
-	_legacy_wire = true
-	if not _backend.write(_fd, M.encode_event(EV_REL, axis, value)) then
-		Logger.warn(LOG, "emit_relative(%d:%d): write failed.", axis, value)
-		return false
-	end
-	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
-		Logger.warn(LOG, "emit_relative(%d:%d): SYN_REPORT write failed.", axis, value)
-		return false
-	end
-	return true
+	return legacy_emit(EV_REL, axis, value)
 end
 
 --- Captures a fresh, strictly acknowledged channel before any untracked wire attempt.

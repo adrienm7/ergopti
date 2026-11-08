@@ -27,7 +27,8 @@ _CFGFM_OwnerSpansCollectionAndAcknowledgement() {
 			"the path match must consume the detached selected-path snapshot")
 	} else
 		MatchPos := InStr(Body, "_ConfigFullSavePathMatches(ConfigurationFile)")
-	OwnerPos := InStr(Body, "_ConfigWriteLeaseTryAcquire")
+	; The acquiring call, not the active-write probe a retry consults before admission.
+	OwnerPos := InStr(Body, 'OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath, "full")')
 	CapturePos := InStr(Body, "TargetGeneration := _ConfigFullSaveCapture()")
 	SourcePos := InStr(Body, "SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])")
 	ClassifyPos := InStr(Body, 'ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])')
@@ -314,6 +315,11 @@ _ConfigPublicationHasRecoveryDebt(Path) {
 }
 _ConfigWriteTerminalIsActive() {
 	return false
+}
+; The optional boot-source capture reads the retained boot snapshot from disk;
+; this inert child retains none, as after any boot that rewrote its config.
+_ConfigFullSaveCaptureOptionalBootSource(Path) {
+	return 0
 }
 FileReadActivityBusy(Path) {
 	return false

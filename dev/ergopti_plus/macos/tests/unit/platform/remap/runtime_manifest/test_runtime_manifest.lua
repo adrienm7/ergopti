@@ -34,6 +34,7 @@ local function complete()
 		},
 		virtual_hid_device = {
 			version = "8.5.0",
+			extension_version = "1.8.0",
 			team_identifier = "G43BCU2T37",
 			file_name = "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
 			source_url = "https://example.test/dl/v8.5.0/Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
@@ -100,15 +101,29 @@ helpers.describe("owned runtime manifest: what ships", function()
 			'identifier "com.ergoptiplus.app" and certificate leaf = H"759d8aae58886bac8886d834f9eeae52274051bc"')
 	end)
 
-	helpers.it("hands the owner the shipped driver version and capture declaration", function()
+	-- pqrs' package 8.5.0 installs driver extension 1.8.0, and `systemextensionsctl list`
+	-- reports only the extension's version: judging it by "8.5.0" refused the pinned driver
+	-- itself (field report 2026-11-06, listing "(1.8.0/1.8.0) [activated enabled]").
+	helpers.it("hands the owner the shipped driver extension version and capture declaration", function()
 		local pinned, reason = load_module().pinned(shipped())
 		helpers.assert_nil(reason)
-		helpers.assert_eq(pinned.virtual_hid_version, "8.5.0")
+		helpers.assert_eq(pinned.virtual_hid_version, "1.8.0")
 		helpers.assert_eq(pinned.capture.batch_limit, 64)
 	end)
 
 	helpers.it("hands the field check the pinned driver version", function()
 		helpers.assert_eq(load_module().virtual_hid_version(shipped()), "8.5.0")
+		helpers.assert_eq(load_module().virtual_hid_extension_version(shipped()), "1.8.0")
+	end)
+
+	helpers.it("judges the field report's listing of the pinned driver as compatible", function()
+		local Vhid = require("platform.remap.runtime_vhid")
+		local listing = "1 extension(s)\n--- com.apple.system_extension.driver_extension\n"
+			.. "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]\n"
+			.. "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)\t"
+			.. "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice\t[activated enabled]\n"
+		local pinned = load_module().pinned(shipped())
+		helpers.assert_true(Vhid.assess(Vhid.parse(listing), pinned.virtual_hid_version).ok)
 	end)
 
 	helpers.it("names the upstream revision the plan anchors the fork on", function()
@@ -133,7 +148,7 @@ helpers.describe("owned runtime manifest: a complete pin", function()
 		local pinned, reason = Manifest.pinned(complete())
 		helpers.assert_nil(reason)
 		helpers.assert_eq(pinned, {
-			virtual_hid_version = "8.5.0",
+			virtual_hid_version = "1.8.0",
 			capture = { requirement = 'identifier "com.ergoptiplus.app"', batch_limit = 64, frame_limit = 65536,
 				history_capacity = 4096 },
 		})
@@ -156,6 +171,10 @@ helpers.describe("owned runtime manifest: a complete pin", function()
 		helpers.assert_nil(Manifest.virtual_hid_version(foreign))
 		helpers.assert_nil(Manifest.virtual_hid_version({ schema = 2 }))
 		helpers.assert_nil(Manifest.virtual_hid_version(nil))
+		helpers.assert_eq(Manifest.virtual_hid_extension_version(complete()), "1.8.0")
+		local no_extension = complete()
+		no_extension.virtual_hid_device.extension_version = nil
+		helpers.assert_nil(Manifest.virtual_hid_extension_version(no_extension))
 	end)
 
 	helpers.it("treats every field as required: removing or nulling any one unpins the manifest", function()

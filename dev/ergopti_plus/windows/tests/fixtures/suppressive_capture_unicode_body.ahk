@@ -43,6 +43,7 @@ if !_UNC_Allowed.Has(A_Args[2]) {
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605))
 global OneShotShiftEnabled := false, InDeadKeySequence := false
+global _TH_SyntheticEpoch := 0
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
 global _UNC := { Case: A_Args[2], Gui: 0, Edit: 0, Hwnd: 0, EditHwnd: 0, Thread: 0,
 	Pid: DllCall("GetCurrentProcessId", "UInt"), Guard: 0, Observer: 0, Target: 0, Token: 0,
@@ -558,8 +559,14 @@ _UNC_Run() {
 			ExpectedEmits := [ExpectedTarget]
 	} else {
 		ExpectedEmits := Kind == "a" ? [[0xE4]] : [[0xA8], ExpectedTarget]
-		if NamedControl != ""
-			ExpectedControls := ["{" . NamedControl . "}"]
+		; A dead key replays its ending control through the result sender with
+		; the modifiers held with it, as OneShotShift does (OSW-001).
+		if NamedControl != "" {
+			ControlUnits := []
+			for Unit in StrSplit("{" . NamedControl . "}")
+				ControlUnits.Push(Ord(Unit))
+			ExpectedEmits.Push(ControlUnits)
+		}
 	}
 	_UNC_Require(_TapHoldOneShotTable()["results"].Count > 0 && _UNC.Logs == 0,
 		"The canonical shared JSON must load without fallback before capture.")

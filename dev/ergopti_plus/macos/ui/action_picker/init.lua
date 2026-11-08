@@ -27,6 +27,7 @@ local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
 local Json       = require("json")
+local WebviewResult = require("adapters.webview_result")
 local ControllerPool = require("ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
@@ -256,9 +257,23 @@ function M.open(opts, on_confirm)
 			if _active_session == session then close_session(session) end
 			return
 		end
-		if ok_enc and js then
-			pcall(function() session.webview:evaluateJavaScript("init(" .. js .. ")") end)
+		-- Fixed metadata only: the catalogue and native errors can echo user data.
+		-- One report per failure kind and page, like the editor siblings.
+		local function report(kind)
+			if session.retired or session.webview ~= target then return end
+			session.init_failures = session.init_failures or {}
+			if session.init_failures[kind] then return end
+			session.init_failures[kind] = true
+			Logger.error(LOG, "Action picker initialization %s; the page stays without its catalogue.", kind)
 		end
+		if not ok_enc or type(js) ~= "string" then return report("could not be encoded") end
+		local submitted, result = pcall(function()
+			return target:evaluateJavaScript("init(" .. js .. ")", function(_, script_error)
+				if WebviewResult.is_error(script_error) then report("failed in the page") end
+			end)
+		end)
+		if not submitted then return report("submission raised") end
+		if result ~= target then report("submission was refused") end
 	end
 
 	local bound, bind_error = ControllerPool.bind(controller_lease, function(msg)

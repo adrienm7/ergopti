@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\number.ahk
 
 
 
@@ -54,6 +55,7 @@ _BuildTapHoldsSubmenu(TargetMenu := unset) {
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
 		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
+		"tap_hold_one_shot_delay", (*) => _TH_OneShotDelayRows(),
 		"tap_hold_lone_tap", (*) => _TH_LoneTapRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
@@ -68,6 +70,67 @@ _TH_GlobalDelayRows() {
 	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
 	Label := StrReplace(t("menu.tapholds.tap_hold_title"), "%s", GlobalMs . " ms")
 	return [Map("label", Label, "action", _TH_MakeGlobalDelayFn())]
+}
+
+; The one-shot Shift timeout row (tap_holds.sticky_timeout_ms, macOS's sticky
+; delay): the label carries the value in force; the click asks for a new one.
+; @returns {Array} One row.
+_TH_OneShotDelayRows() {
+	Label := StrReplace(t("menu.tapholds.sticky_title"), "%s", TapHoldOneShotTimeoutMs() . " ms")
+	return [Map("label", Label, "action", (*) => _TH_PromptOneShotDelay())]
+}
+
+/**
+ * Asks for the one-shot Shift timeout in milliseconds, then commits it.
+ * @param {Func} PromptFn Replaces the input box in tests.
+ * @param {String} Path The config.toml to write; ConfigurationFile by default.
+ * @param {Func} ReloadFn Replaces the reload in tests.
+ * @returns {Boolean} False when nothing was committed.
+ */
+_TH_PromptOneShotDelay(PromptFn := 0, Path := "", ReloadFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_PromptOneShotDelay(PromptFn, Path, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	CurrentMs := TapHoldOneShotTimeoutMs()
+	Prompt := t("menu.tapholds.sticky_dialog_prompt")
+	Title := t("menu.tapholds.sticky_dialog_title")
+	try {
+		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
+			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
+		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
+			return false
+		Raw := Trim(Answer.Value, " `t")
+		if !IsInteger(Raw) || !NumberTryParseInputInteger(Raw, &Ms)
+			return false
+	} catch as Err {
+		try LoggerError("TapHoldMenu", "The one-shot Shift timeout prompt was refused: {1}.", Err.Message)
+		return false
+	}
+	return _TH_CommitOneShotTimeoutMs(Ms, Path, ReloadFn)
+}
+
+; Persists the one-shot Shift timeout, then reloads. The registry default is
+; written as an absent leaf, as macOS does.
+; @param Ms {Integer} A positive whole number of milliseconds.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Boolean} False when nothing was committed.
+_TH_CommitOneShotTimeoutMs(Ms, Path := "", ReloadFn := 0) {
+	global ConfigurationFile
+	try TapHoldValidOneShotTimeoutMs(Ms)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The one-shot Shift timeout is refused: {1}.", Err.Message)
+		return false
+	}
+	IsDefault := Ms == TimingsGet("tap_hold", "one_shot_shift_timeout_ms")
+	Rows := [ManifestConfigRow(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS, Ms, IsDefault)]
+	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the one-shot Shift timeout")
+		return false
+	try LoggerInfo("TapHoldMenu", "One-shot Shift timeout set to {1} ms (pid={2}).", Ms, DriverPid)
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
 ; The lone tap window's choices in milliseconds, in menu order; 0 is off (the
@@ -563,7 +626,9 @@ _TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		Raw := Trim(Answer.Value, " `t")
 		if !IsNumber(Raw)
 			return false
-		Ms := Round(Raw + 0)
+		if !(IsInteger(Raw) ? NumberTryParseInputInteger(Raw, &Ms) : NumberTryParseFiniteFloat(Raw, &Ms))
+			return false
+		Ms := Round(Ms)
 		if Ms <= 0 || !_TH_DurationValueValid(Ms / 1000)
 			return false
 	} catch as Err {
@@ -666,7 +731,8 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		Raw := Trim(Answer.Value, " `t")
 		if !IsNumber(Raw)
 			return false
-		Ms := Raw + 0
+		if !(IsInteger(Raw) ? NumberTryParseInputInteger(Raw, &Ms) : NumberTryParseFiniteFloat(Raw, &Ms))
+			return false
 		if !_TH_DurationValueValid(Ms / 1000)
 			return false
 		Ms := Round(Ms)

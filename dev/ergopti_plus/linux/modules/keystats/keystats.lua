@@ -25,7 +25,9 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 local TableUtil = require("table_util")
+local StrictUtf8 = require("compat.utf8")
 local ErrorDescription = require("error_description")
 local Calendar = require("modules.keystats.calendar")
 
@@ -57,9 +59,12 @@ local function new_live_tracker()
 		window_ms = Timings.ms("keystats", "wpm_window_ms"),
 		min_duration_ms = Timings.ms("keystats", "wpm_min_duration_ms"),
 		idle_reset_ms = Timings.ms("keystats", "wpm_idle_reset_ms"),
+		source_hold_ms = Timings.ms("ui", "wpm_color_hold_ms"),
 	})
 end
 local _live = new_live_tracker()
+local Roi = { owner = require("keystats.trigger_roi"), pending = {} }
+Roi.state = Roi.owner.new(Monotonic.now_ms(), false)
 
 -- The typing session's start and end and its idle spans (events_session), the
 -- state machine macOS and Windows run, ticked by the periodic flush.
@@ -112,6 +117,8 @@ local TextCipher = require("modules.keystats.text_cipher")
 -- toggle only ever protects the future, which is not what a user with a year of
 -- logs is asking for when they tick it.
 local TextMigration = require("modules.keystats.text_migration")
+-- The per-device data.sql the macOS and Windows drivers import.
+local MetricsLedger = require("modules.keystats.metrics_ledger")
 local MigrationPlan = require("keystats.text_migration")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
@@ -166,6 +173,8 @@ local _pending_shortcut_events = {}
 -- LLM prediction events (generation, suggested, dismissed, accepted), buffered like their
 -- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
 local _pending_llm_events = {}
+-- Connectivity transitions (network_metrics), the Windows events_network rows.
+local _pending_network_events = {}
 local _pending_app_switch_events = {}
 -- Window title changes, written to events_window_switch as Windows and macOS do:
 -- the dashboard's per-application context shifts read them.
@@ -219,6 +228,9 @@ local _session_reset_flush = nil
 local _reset_request, _reset_request_running = nil, false
 local _reset_receipts = setmetatable({}, { __mode = "k" })
 local reset_session_step, has_reset_input
+-- The dashboard's one Export or Purge, owned until its flush settles. One
+-- table: the main chunk sits at LuaJIT's limit of 200 locals.
+local _maintenance = { request = nil, running = false }
 local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
 local _flush_listeners = {}
 local _last_flush_committed = false
@@ -264,11 +276,20 @@ local _recovered_walks = nil
 local _persisted_open_walk = nil
 -- Assigned beside the flush capture; declared here so init() binds the local.
 local decode_open_walk
+-- Assigned beside init(); declared here so init() binds the table.
+local LedgerSetup = {}
 -- The monotonic stamp of each application's last manual keystroke. Kept
 -- across flushes: a fresh pending buffer has none, and its first keystroke
 -- then read as zero milliseconds after the previous one, however long ago
 -- that was, and every expansion typed first in a flush had no stamp at all.
 local _typing_last_key_at = {}
+-- Counts the capture exclusions entered (pause, private window, secure field,
+-- suppression, metrics off). Each application remembers the count its last
+-- typed key and its last per-app key saw; a different count means keys were
+-- hidden in between, so neither a sequence nor an interval may span them.
+local _capture_boundary = 0
+local _typing_boundary = {}
+local _app_key_boundary = {}
 
 -- Persisted manifest cache keyed by SQLite's monotonic revision. The live
 -- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
@@ -410,12 +431,16 @@ local _secure_apps = _default_secure_apps()
 -- Active full list, kept for diagnostics and the stats snapshot.
 local _password_apps = _default_password_apps()
 
+-- A partially admitted SQLite store cannot safely accept or durably retain
+-- raw events. Keep the persisted user preference separate from this gate.
+local _storage_blocked = false
+
 --- The single decision point for "may this keystroke be recorded?".
 --- Every recording entry point asks this and nothing else, so a new filter is
 --- added in one place and cannot be forgotten on one of the five paths.
 --- @return boolean
 local function may_record()
-	if _flush_stopping then return false end
+	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
 	if _suppressed or _suspended then return false end
 	if _secure_filter_enabled and _secure_field then return false end
@@ -433,9 +458,23 @@ local _log_dir = nil
 
 -- SQLite database path (primary persistence).
 local _sqlite_path = nil
+local _sqlite_admitted = false
 
--- Device identifier for SQLite registration (derived from hostname).
+-- Availability alone does not acknowledge migration and device registration.
+local function sqlite_available()
+	return _sqlite_admitted and SqliteWriter and SqliteWriter.is_available() == true
+end
+
+-- Device identifier: the by_device/ folder this host owns (metrics_ledger).
 local _device_id = "linux-unknown"
+
+-- The per-device ledger: `exporter` (nil when refused, with `refusal`),
+-- `saw_migration` (the at-rest migration ran at the previous pump) and
+-- `pending` (committed rows may await export; no query is spawned otherwise).
+-- `importer` replays the other devices' ledgers once this one is exported;
+-- `import_after` is the monotonic instant of the next scan while all are caught up.
+local _ledger = { exporter = nil, refusal = nil, saw_migration = false, pending = false,
+	importer = nil, import_after = 0 }
 
 -- Session start timestamp for export.
 local _session_started_at = nil
@@ -625,8 +664,107 @@ local function migrate_legacy_categories()
 	end
 end
 
+--- Reads one line of a kernel or system identity file.
+--- @param path string
+--- @return string|nil
+local function read_identity_line(path)
+	local handle = io.open(path, "rb")
+	if not handle then return nil end
+	local line = handle:read("*l")
+	handle:close()
+	line = type(line) == "string" and line:gsub("%s+", "") or ""
+	return line ~= "" and line or nil
+end
+
+--- Resolves this host's ledger identity (metrics_ledger.resolve_identity).
+--- @param hostname string Kernel nodename.
+--- @param metrics_dir string|nil Override of <config>/metrics (tests).
+--- @return table|string identity, or the refusal.
+LedgerSetup.resolve = function(hostname, metrics_dir)
+	local ConfigPaths = require("infra.config_paths")
+	local ports = MetricsLedger.native_ports()
+	local identity, reason = MetricsLedger.resolve_identity({
+		metrics_dir = metrics_dir or ConfigPaths.config("metrics"),
+		-- The systemd machine id, the stable per-installation identity the
+		-- dbus copy mirrors on hosts without systemd.
+		host_signature = read_identity_line("/etc/machine-id") or read_identity_line("/var/lib/dbus/machine-id"),
+		hostname = hostname, os_version = read_identity_line("/proc/sys/kernel/osrelease") or "",
+		legacy_registered = function(id)
+			local rows = SqliteWriter.query_rows("SELECT count(*) FROM devices WHERE device_id='"
+				.. require("modules.keystats.sqlite_command").escape_literal(id) .. "';")
+			return rows ~= nil and rows[1] ~= nil and rows[1] ~= "0"
+		end,
+		random_bytes = function(count)
+			local handle = io.open("/dev/urandom", "rb")
+			if not handle then return nil end
+			local bytes = handle:read(count)
+			handle:close()
+			return bytes
+		end,
+		now_ts = os.date("%Y-%m-%d %H:%M:%S") .. ".000",
+		list = ports.list, read = ports.read,
+	})
+	if not identity then return reason end
+	return identity
+end
+
+--- Creates and prepares the exporter of this device's ledger.
+--- @param identity table Resolved identity.
+--- @param metrics_dir string|nil Override of <config>/metrics (tests).
+LedgerSetup.start = function(identity, metrics_dir)
+	local ledger = MetricsLedger.new({
+		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		identity = identity,
+		store = { query_rows = SqliteWriter.query_rows, get_meta = SqliteWriter.get_meta, exec_sql = SqliteWriter.exec_sql },
+		fs = MetricsLedger.native_ports(),
+		now_ts = function() return os.date("%Y-%m-%d %H:%M:%S") .. ".000" end,
+		logger = Logger,
+	})
+	local prepared, reason = ledger:prepare()
+	if not prepared then
+		_ledger.refusal = tostring(reason)
+		Logger.error(LOG, "Metrics ledger refused (%s); metrics stay on this device only.", _ledger.refusal)
+		return
+	end
+	_ledger.exporter, _ledger.pending = ledger, true
+	Logger.info(LOG, "Metrics ledger ready: %s.", ledger.path)
+	LedgerSetup.start_import(identity, metrics_dir)
+end
+
+--- Creates the importer of the other devices' ledgers (ledger_import).
+--- @param identity table This device's identity.
+--- @param metrics_dir string|nil Override of <config>/metrics (tests).
+LedgerSetup.start_import = function(identity, metrics_dir)
+	local LedgerImport = require("modules.keystats.ledger_import")
+	local LedgerRebuild = require("modules.keystats.ledger_rebuild")
+	local Paths = require("infra.paths")
+	local schema_path = Paths.shared("data/db/schema.sql")
+	local schema = schema_path and require("adapters.file_system").read(schema_path)
+	local Digest = require("infra.openssl_digest")
+	if type(schema) ~= "string" or not Digest.streaming then
+		Logger.error(LOG, "Foreign metrics import refused (%s); other devices' metrics are not shown.",
+			type(schema) ~= "string" and "schema.sql is unreadable" or "no streaming SHA-256")
+		return
+	end
+	local store = { query_rows = SqliteWriter.query_rows, exec_sql = SqliteWriter.exec_sql }
+	_ledger.importer = LedgerImport.new({
+		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		local_device_id = identity.device_id, schema = schema, store = store,
+		fs = LedgerImport.native_ports(), digest_stream = Digest.stream,
+		rebuild = function(device_id)
+			return LedgerRebuild.render({ store = store, device_id = device_id, schema = schema,
+				decrypt = TextCipher.decrypt,
+				statement = SqliteWriter.derived_statement })
+		end,
+		now_ts = function() return os.date("%Y-%m-%d %H:%M:%S") .. ".000" end,
+		logger = Logger,
+	})
+	_ledger.import_after = 0
+	Logger.info(LOG, "Foreign metrics import ready.")
+end
+
 --- Initialises the keystats.
---- @param opts table { log_dir?, password_apps? }
+--- @param opts table { log_dir?, password_apps?, sqlite_path?, metrics_dir? }
 function M.init(opts)
 	if _flush_state or _flush_stopping or _reset_request then return false end
 	if not Preferences.admit() then return false end
@@ -660,9 +798,44 @@ function M.init(opts)
 	hostname = hostname:gsub("%s+", "")
 	_device_id = "linux-" .. hostname
 
-	-- Open the SQLite database (bootstraps schema on first run).
-	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) and SqliteWriter.ensure_token_encoding() then
-		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+	-- A usable writer must also acknowledge migration and actual registration.
+	_sqlite_admitted = false
+	local open_called, open_result, open_reason = false, false, "sqlite_unavailable"
+	if SqliteWriter then open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path) end
+	local sqlite_opened = open_called and open_result == true
+	-- The device id is the one of this host's by_device/ folder, which the
+	-- other drivers import; the ledger is refused, never the local store.
+	_ledger.exporter, _ledger.refusal = nil, nil
+	local identity = nil
+	if sqlite_opened then
+		local resolved, identity_or_reason = pcall(LedgerSetup.resolve, hostname, options.metrics_dir)
+		if resolved and type(identity_or_reason) == "table" then
+			identity = identity_or_reason
+			_device_id = identity.device_id
+		else
+			_ledger.refusal = tostring(identity_or_reason)
+			Logger.error(LOG, "Metrics ledger refused (%s); metrics stay on this device only.", _ledger.refusal)
+		end
+	end
+	_pointer.bind_fractions(_sqlite_path, _device_id)
+	-- Verify the real device registration before any n-gram rewrite. A schema
+	-- can contain the word "linux" in an unrelated constraint and still reject
+	-- this OS; a failed transactional registration must leave keys untouched.
+	local registration_ok, registered = false, false
+	if sqlite_opened then
+		registration_ok, registered = pcall(SqliteWriter.register_device, _device_id, hostname, "linux",
+			identity and identity.os_version or "", identity and identity.host_signature or hostname)
+	end
+	local migration_ok, migrated = false, false
+	if registration_ok and registered == true then
+		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
+	end
+	local sqlite_ready = migration_ok and migrated == true
+	if sqlite_ready and identity then LedgerSetup.start(identity, options.metrics_dir) end
+	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
+	_storage_blocked = not sqlite_ready and not sqlite_unavailable
+	if sqlite_ready then
+		_sqlite_admitted = true
 		if SqliteReader then migrate_legacy_categories() end
 		-- A live walk owns the record; only a fresh process reads back what the
 		-- previous one left open when it stopped without its final flush.
@@ -688,7 +861,15 @@ function M.init(opts)
 		end
 		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
 	else
-		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+		if sqlite_opened then
+			local closed, detail = pcall(SqliteWriter.close_db)
+			if not closed or detail == false then Logger.error(LOG, "SQLite cleanup after failed admission was refused.") end
+		end
+		if _storage_blocked then
+			Logger.error(LOG, "Metrics capture blocked: the SQLite store, migration or device registration was refused.")
+		else
+			Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+		end
 	end
 
 	-- The stored encryption choice, read before the cipher is configured below:
@@ -704,12 +885,15 @@ function M.init(opts)
 		Logger.error(LOG, "At-rest encryption is configured on but unavailable — retaining ON and refusing plaintext persistence.")
 	end
 	TextCipher.set_enabled(_encrypt_enabled)
+	Roi.sync(true)
 	-- Resume only a pass a previous run left unfinished. Starting one
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
-	TextMigration.resume(
-		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
-		_device_id)
+	if sqlite_available() then
+		TextMigration.resume(
+			_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+			_device_id)
+	end
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
 	-- than at module load: see the note beside the declarations.
@@ -739,6 +923,7 @@ function M.init(opts)
 
 	Logger.success(LOG, "Keystats initialised (log_dir=%s, password_apps=%d).",
 		_log_dir, #_password_apps)
+	return not _storage_blocked
 end
 
 
@@ -750,7 +935,7 @@ end
 
 --- Records a single keypress event with app context.
 --- @param ch           string  The character typed.
---- @param timestamp_ms number  Wall-clock timestamp in ms.
+--- @param timestamp_ms number  Monotonic timestamp in ms.
 --- @param app_id       string|nil  The focused app identifier (from window_info).
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
 local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
@@ -767,6 +952,9 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
+	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+		LiveWpm.record_input(_live, timestamp_ms)
+	end
 	if not is_correction and type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, 1, timestamp_ms)
 	end
@@ -777,10 +965,12 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	if type(ch) == "string" and ch ~= "" then
 		record_app_key(resolved_app, ch, timestamp_ms, clock)
-		local pending = ensure_pending(resolved_app, clock)
+		local crossed = _typing_boundary[resolved_app] ~= nil and _typing_boundary[resolved_app] ~= _capture_boundary
+		_typing_boundary[resolved_app] = _capture_boundary
+		local pending = ensure_pending(resolved_app, clock, crossed)
 		local delay = 0
 		local previous_at = _typing_last_key_at[resolved_app]
-		if type(previous_at) == "number" and type(timestamp_ms) == "number" then
+		if not crossed and type(previous_at) == "number" and type(timestamp_ms) == "number" then
 			delay = math.max(0, math.min(timestamp_ms - previous_at, MAX_TYPING_INTERVAL_MS))
 		end
 		_typing_last_key_at[resolved_app] = timestamp_ms
@@ -841,7 +1031,9 @@ record_app_key = function(app_id, ch, timestamp_ms, clock)
 	if not may_record() then return end
 	local live, dated = app_pair(app_id, timestamp_ms, clock)
 	local interval = 0
-	if type(live.last_key_at) == "number" then
+	local crossed = _app_key_boundary[app_id] ~= nil and _app_key_boundary[app_id] ~= _capture_boundary
+	_app_key_boundary[app_id] = _capture_boundary
+	if not crossed and type(live.last_key_at) == "number" then
 		local elapsed = timestamp_ms - live.last_key_at
 		if elapsed > 0 then interval = math.min(elapsed, MAX_TYPING_INTERVAL_MS) end
 	end
@@ -960,6 +1152,8 @@ end
 function M.record_physical_key(app_id, scancode, timestamp_ms)
 	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
+	-- The history stamp is rounded; pointer activity uses this same precise clock.
+	LiveWpm.record_input(_live, Monotonic.now_ms())
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	local live, dated = app_pair(resolved_app, timestamp_ms)
 	local code = math.floor(scancode)
@@ -968,13 +1162,15 @@ function M.record_physical_key(app_id, scancode, timestamp_ms)
 	end
 end
 
-ensure_pending = function(app_id, clock)
+ensure_pending = function(app_id, clock, after_exclusion)
 	assert(type(clock) == "table" and type(clock.layout) == "string", "Raw metrics require captured physical context")
 	local pending = _pending_typing_events[app_id]
 	if not pending then pending = { runs = {} }; _pending_typing_events[app_id] = pending end
 	local run = pending.runs[#pending.runs]
-	if not run or run.date ~= clock.date or run.layout ~= clock.layout then
-		run = { date = clock.date, ts = clock.ts, layout = clock.layout,
+	if after_exclusion or not run or run.date ~= clock.date or run.layout ~= clock.layout then
+		-- A run that follows an exclusion settles the walk before it, so its
+		-- first key continues no sequence typed before the hidden span.
+		run = { date = clock.date, ts = clock.ts, layout = clock.layout, after_exclusion = after_exclusion == true,
 			text = {}, events = {}, times = {}, wall_times = {} }
 		pending.runs[#pending.runs + 1] = run
 	end
@@ -1082,17 +1278,138 @@ end
 --- @param timestamp_ms number|nil
 function M.record_suggestion(app_id, kind, timestamp_ms)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	local field = (kind == "llm") and "llm_suggested" or "hs_suggested"
 	local live, dated = app_pair(app_id, timestamp_ms)
 	for _, app in ipairs({ live, dated }) do app[field] = app[field] + 1 end
 	Logger.debug(LOG, "Suggestion offered (%s).", field)
 end
 
+--- Purges newly collected text while preserving cumulative numerical snapshots.
+function Roi.close_text()
+	Roi.owner.set_text_enabled(Roi.state, false)
+	for index = #Roi.pending, 1, -1 do
+		if Roi.pending[index].kind ~= "roi_snapshot" then table.remove(Roi.pending, index) end
+	end
+	-- During allocation the payload still aliases this provisional source. A
+	-- reentrant activation retires it before the writer can begin a new append.
+	-- After allocation returns, uncertain or acquired owners retain their debt.
+	if _flush_state and _flush_state.constructing == true then
+		local events = _flush_state.snapshot.buffers.roi
+		for index = #events, 1, -1 do
+			if events[index].kind ~= "roi_snapshot" then table.remove(events, index) end
+		end
+	end
+end
+
+--- Applies the requested and effective cipher policy without reopening old text.
+--- @param current boolean|nil Re-read canonical policy outside input callbacks.
+function Roi.sync(current)
+	local policy = require("modules.keystats.roi_policy")
+	if current == true then Roi.canonical_off = policy.current() end
+	local known_off = Roi.canonical_off == true
+	-- A refused activation with an unsettled owner must not reopen capture.
+	-- Only an off-input canonical observation after retirement can release it.
+	if current == true and Roi.activation_blocked and known_off and _encrypt_enabled == false
+		and not M.has_flush_debt() and not _flush_stopping then Roi.activation_blocked = false end
+	local enabled = not Roi.activation_blocked and policy.text_enabled(_encrypt_enabled)
+		and known_off
+	if enabled then Roi.owner.set_text_enabled(Roi.state, true) else Roi.close_text() end
+	return enabled
+end
+
+--- Transfers admitted ROI events to the same owned flush queue as other raw rows.
+function Roi.queue(clock)
+	return Roi.owner.drain(Roi.state, function(event)
+		local meta = {}
+		for key, value in pairs(event) do
+			if key ~= "type" and key ~= "app" and key ~= "timestamp" then meta[key] = value end
+		end
+		Roi.pending[#Roi.pending + 1] = {
+			ts = event.timestamp, date = clock.date, kind = event.type,
+			app = dashboard_app_name(event.app), meta = meta,
+		}
+		return true
+	end)
+end
+
+--- Counts only a completed expansion admitted by record_hotstring.
+function Roi.record_hotstring(app_id, trigger, replacement, timestamp_ms, is_private, clock)
+	Roi.sync()
+	Roi.owner.hotstring(Roi.state, trigger, replacement, is_private, timestamp_ms or clock.mono_ms, app_id, clock.ts)
+	Roi.queue(clock)
+end
+
+--- Drops an interrupted physical fragment without resetting accepted ROI counters.
+function M.discard_roi()
+	Roi.owner.discard(Roi.state)
+end
+
+--- Admits metadata already joined by the existing privacy owner to a native window.
+--- @param context table|nil { app_id, native_identity, title }.
+--- @return table|nil Portable context stamped at this observation.
+--- @return table|nil Capture clock, only after policy and identity admit the input.
+function Roi.context(context)
+	-- Cipher synchronisation must still retire pending text when another gate
+	-- refuses capture. Neither refusal may consult physical or calendar owners.
+	if not Roi.sync() or not may_record() or type(context) ~= "table" or M.is_unrecorded_app(context.app_id) then
+		Roi.owner.discard(Roi.state)
+		return nil
+	end
+	local portable = { app = context.app_id, window = context.native_identity, title = context.title }
+	if not Roi.owner.valid_context_identity(portable) then Roi.owner.discard(Roi.state); return nil end
+	local clock = capture_input_clock()
+	portable.timestamp = clock.ts
+	return portable, clock
+end
+
+--- Publishes focus observations even when no character was typed between windows.
+--- @param context table|nil Existing privacy owner's joined native context.
+function M.observe_roi_context(context)
+	local portable = Roi.context(context)
+	if not portable then return false end
+	return Roi.owner.observe(Roi.state, portable)
+end
+
+--- Observes admitted physical text and excludes the live catalogue's known triggers.
+--- @param text string Physical text, never synthetic output.
+--- @param context table Existing privacy owner's joined native context.
+--- @param known_trigger function Returns exactly false only for an unknown trigger.
+function M.record_roi_text(text, context, known_trigger)
+	local portable, clock = Roi.context(context)
+	if not portable then return false end
+	local admitted = Roi.owner.text(Roi.state, text, portable, known_trigger)
+	Roi.queue(clock)
+	return admitted
+end
+
+--- Observes a physical editing key in the keyboard hook's control vocabulary.
+--- @param key string Linux control-key name.
+--- @param detail table|nil Modifier metadata captured with the physical event.
+--- @param context table Existing privacy owner's joined native context.
+--- @param known_trigger function Live catalogue lookup.
+function M.record_roi_key(key, detail, context, known_trigger)
+	local names = { backspace = "Backspace", enter = "Enter", tab = "Tab", escape = "Escape",
+		pageup = "PageUp", pagedown = "PageDown", home = "Home", ["end"] = "End",
+		left = "Left", right = "Right", up = "Up", down = "Down", delete = "Delete", insert = "Delete" }
+	local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+	if key == "shortcut" or mods.ctrl or mods.alt or mods.meta then Roi.sync(); Roi.owner.discard(Roi.state); return false end
+	local portable, clock = Roi.context(context)
+	if not portable then return false end
+	local admitted = Roi.owner.key(Roi.state, names[key], portable, known_trigger)
+	Roi.queue(clock)
+	return admitted
+end
+
 --- @param replay_terminator string|nil Already typed delimiter erased and replayed after the replacement.
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
-	if type(replacement) ~= "string" or replacement == "" then return end
-	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
+	if M.is_unrecorded_app(app_id) then return end
+	if type(replacement) ~= "string" then return end
+	local clock = capture_input_clock()
+	Roi.record_hotstring(app_id, trigger, replacement, timestamp_ms, is_private, clock)
+	if replacement == "" then return end
+	local live, dated = app_pair(app_id, timestamp_ms, clock)
 	for _, app in ipairs({ live, dated }) do
 		app.hs_chars = app.hs_chars + char_count(replacement)
 		app.hs_triggers = app.hs_triggers + 1
@@ -1145,6 +1462,7 @@ end
 ---   stamps its own time.
 function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	if not may_record() then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(key) ~= "string" or key == "" then
 		Logger.warn(LOG, "record_shortcut(): no key name — the event would say only that "
 			.. "something fired, so it is dropped.")
@@ -1159,17 +1477,42 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	}
 end
 
+--- Binds the cursor position the pointer distance is measured from, in the
+--- screen pixels Windows and macOS store, or no source with the reason.
+--- @param read function|nil Returns x, y, or nil with a reason.
+--- @param clock function|nil Monotonic milliseconds.
+--- @param reason string|nil i18n key of why the distance is not measured.
+function M.bind_pointer_position(read, clock, reason)
+	_pointer.bind_position(read, clock, reason)
+end
+
+--- Whether the pointer distance is measured, for the menu and diagnostics.
+--- @return table { measured, unit?, reason? }
+function M.pointer_distance_availability()
+	return _pointer.availability()
+end
+
 --- Records one report of an observed pointer for the mouse columns of
 --- events_typing. The clicks, wheel turns and distance accumulate under the
 --- focused application and are written with its next typing row, as macOS
 --- carries them to the next flushed run. Gated like every recording entry
 --- point, and never for an application whose input stays out of the metrics.
---- @param kind string "press", "motion" or "frame" (pointer_metrics).
---- @param code integer evdev code.
---- @param value integer evdev value.
-function M.record_pointer(kind, code, value)
-	local delta = _pointer.observe(kind, code, value)
-	if not delta or not may_record() then return end
+--- @param kind string "press", "motion", "frame", "dropped" or "reset" (pointer_metrics).
+--- @param code integer|nil evdev code.
+--- @param value integer|nil evdev value.
+--- @param source any|nil Pointer device identity.
+function M.record_pointer(kind, code, value, source)
+	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
+		_pointer.discard_frames()
+		_pointer.forget_position()
+		-- Keep device lifecycle and queue-loss state in sync while collection is off.
+		if kind == "reset" or kind == "dropped" or kind == "frame" then
+			_pointer.observe(kind, code, value, source)
+		end
+		return
+	end
+	local delta = _pointer.observe(kind, code, value, source)
+	if not delta then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
 	local app_id = _focused_app_id
@@ -1202,6 +1545,7 @@ local LLM_EVENT_FIELDS = {
 --- @param fields table|nil The fields of that kind (LLM_EVENT_FIELDS).
 function M.record_llm_event(app_id, kind, fields)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	local allowed = LLM_EVENT_FIELDS[kind]
 	if not allowed then
 		Logger.error(LOG, "record_llm_event(): '%s' is not an events_llm kind; the event is dropped.", tostring(kind))
@@ -1220,12 +1564,31 @@ function M.record_llm_event(app_id, kind, fields)
 	_pending_llm_events[#_pending_llm_events + 1] = row
 end
 
+--- Records one connectivity transition (network_metrics) in events_network.
+--- @param kind string One of network_metrics.KINDS.
+--- @param fields table|nil Metadata; only the kind's own keys are kept.
+function M.record_network_event(kind, fields)
+	if not may_record() then return end
+	local allowed = require("modules.keystats.network_metrics").KINDS[kind]
+	assert(allowed, "not an events_network kind: " .. tostring(kind))
+	fields = type(fields) == "table" and fields or {}
+	local clock = observe_calendar()
+	local meta = {}
+	for _, name in ipairs(allowed) do meta[name] = fields[name] end
+	_pending_network_events[#_pending_network_events + 1] = {
+		ts = clock.ts, date = clock.date, kind = kind,
+		app = dashboard_app_name(M.last_app() or "unknown"), meta = meta,
+	}
+end
+
 --- Records successful automated output that is not a static hotstring (LLM,
 --- clipboard expansion, etc.) in the same portable event format. It is called
 --- only after the producer confirms success, so cancelled streamed output never
 --- appears as a false logical keystroke.
 function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
+	Roi.owner.discard(Roi.state)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(text) ~= "string" or text == "" then return end
 	local kind = type(source) == "string" and source or "other"
 	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
@@ -1248,6 +1611,7 @@ end
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
+	if _focused_app_id ~= app_id then _pointer.discard_frames(); _pointer.reseed() end
 	M.observe_hold_focus(app_id)
 	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
@@ -1255,7 +1619,7 @@ function M.on_app_focus(app_id, timestamp_ms)
 	-- forbidden would persist them on the next flush. The in-flight interval
 	-- is forgotten rather than closed — time that must not be recorded
 	-- cannot be credited later without backfilling the forbidden gap.
-	if not may_record() then
+	if not may_record() or M.is_unrecorded_app(app_id) then
 		_focused_app_id, _focused_app_started_at = nil, nil
 		_current_title, _title_since, _current_title_app = nil, nil, nil
 		return
@@ -1398,12 +1762,13 @@ local function add_live_manifest_delta(manifest)
 		result[date] = TableUtil.shallow_copy(manifest[date] or {})
 		for app, state in pairs(apps) do
 			local previous = (_flushed_app_totals[date] or {})[app] or {}
-			local entry = TableUtil.shallow_copy(result[date][app] or { category = "Unknown" })
+			local app_key = ManifestKeys.encode(app)
+			local entry = TableUtil.shallow_copy(result[date][app_key] or { category = "Unknown" })
 			for field, value in pairs(state.totals) do
 				local output = field == "time_ms" and "time" or field
 				entry[output] = (entry[output] or 0) + math.max(0, value - (previous[field] or 0))
 			end
-			result[date][app] = entry
+			result[date][app_key] = entry
 		end
 	end
 	return result
@@ -1412,7 +1777,8 @@ end
 --- @return table manifest Persisted manifest, partial when a query failed.
 --- @return boolean complete Whether every native query was accepted.
 local function persisted_manifest()
-	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {}, true end
+	-- An unavailable store cannot certify that no historical rows exist.
+	if not (sqlite_available() and SqliteReader) then return {}, false end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
 		return _manifest_cache.manifest, true
@@ -1439,17 +1805,33 @@ function M.clear_cache()
 	return true
 end
 
---- Records the category and score a user assigned to an application.
----
---- Stored in the shared category file the dashboard page reads back as
---- `user_categories`, the same document macOS keeps. An unhandled edit is a
---- control that appears to work and silently discards what the user typed into
---- it, so every refusal is logged and answered false.
+-- An editor retains the exact file image observed before its native dialogs.
+local app_category_edits = setmetatable({}, { __mode = "k" })
+
+--- Captures an opaque, single-use category source for an interactive edit.
+--- @return table|nil receipt Source authority, or nil when capture is refused.
+function M.capture_app_category_edit()
+	if M.has_flush_debt() or _flush_stopping then return nil end
+	local model, _, source = AppCategoryFile.load_owned()
+	if not model or not source then return nil end
+	local receipt = {}
+	app_category_edits[receipt] = { model = model, source = source }
+	return receipt
+end
+
+--- Stores a category in the shared dashboard file, optionally against an interactive edit receipt.
 --- @param app_name string
 --- @param category string
---- @param score number|nil Productivity score, as the shared page defines it.
---- @return boolean Whether it was persisted.
-function M.set_app_category(app_name, category, score)
+--- @param score number|nil
+--- @param receipt table|nil Single-use receipt from capture_app_category_edit().
+--- @return boolean persisted
+function M.set_app_category(app_name, category, score, receipt)
+	local edit
+	if receipt ~= nil then
+		edit = app_category_edits[receipt]
+		if not edit then return false end
+		app_category_edits[receipt] = nil
+	end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "set_app_category(): an application name is required.")
@@ -1459,14 +1841,20 @@ function M.set_app_category(app_name, category, score)
 		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
 		return false
 	end
-	local model = AppCategoryFile.load()
+	local model, source
+	if edit then
+		model, source = edit.model, edit.source
+	else
+		local reason
+		model, reason, source = AppCategoryFile.load()
+	end
 	if not model then return false end
 	local stored, reason = AppCategoryStore.set(model, app_name, category, tonumber(score) or 0)
 	if not stored then
 		Logger.error(LOG, "set_app_category(): refused for '%s': %s.", app_name, tostring(reason))
 		return false
 	end
-	if not AppCategoryFile.save(model) then return false end
+	if not AppCategoryFile.save(model, source) then return false end
 	-- The cached manifest was built before the edit, and the page re-reads
 	-- immediately after it. Without this the user sees their change reverted and
 	-- tries again.
@@ -1516,10 +1904,11 @@ local function add_live_ngram_delta(payload, apps, start_date, end_date, clock)
 		if type(app) == "string" and app ~= "" then selected[app] = true end
 	end
 	local unrestricted = next(selected) == nil
+	local future_requested = SqliteReader.includes_future(start_date, end_date, clock.date)
 	for date, entries in pairs(snapshot_calendar(clock).values) do
-		if date <= clock.date and SqliteReader.includes_date(date, start_date, end_date) then
+		if (date <= clock.date or future_requested) and SqliteReader.includes_date(date, start_date, end_date) then
 			for app, stats in pairs(entries) do
-				if unrestricted or selected[app] then
+				if unrestricted or app == "Unknown" or selected[app] then
 					local target = payload.historical
 					if date == clock.date then
 						payload.today[app] = payload.today[app] or empty_ngrams()
@@ -1543,7 +1932,7 @@ function M.get_dashboard_payload(opts)
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local options = type(opts) == "table" and opts or {}
 	local categories = {}
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		local model = AppCategoryFile.load()
 		if model == nil then return nil, "app category file unavailable" end
 		categories = AppCategoryStore.projection(model)
@@ -1560,8 +1949,23 @@ function M.get_dashboard_payload(opts)
 		app_icons        = {},
 		_prefetch_data   = prefetch,
 		metrics_manifest_incomplete = not manifest_complete or nil,
-		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },
+		driver_meta      = { os = "linux", heatmap_id = "sc_kb", unmeasured = M.unmeasured_kpis() },
 	}
+end
+
+--- The dashboard KPIs this session cannot measure, each with the i18n key of
+--- its reason, so the page shows « — » and why instead of a zero that reads as
+--- measured. The Metrics menu names the same ones.
+--- @return table { [kpi] = reason_key }
+function M.unmeasured_kpis()
+	local out = {}
+	if SystemMetrics and type(SystemMetrics.space_change_availability) == "function" then
+		local availability = SystemMetrics.space_change_availability()
+		if type(availability) == "table" and availability.measured == false then
+			out.space_switches = assert(availability.reason, "an unmeasured metric names its reason")
+		end
+	end
+	return out
 end
 
 --- Returns n-grams for one UI-selected range without rebuilding the manifest.
@@ -1573,8 +1977,9 @@ function M.get_range_payload(start_date, end_date, apps)
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local clock = observe_calendar()
 	local bounds = SqliteReader.split_bounds(start_date, end_date, clock.date)
-	local payload, complete = { historical = empty_ngrams(), today = {} }, true
-	if SqliteWriter and SqliteWriter.is_available() then
+	-- RAM remains useful, but unavailable SQLite history is not a complete range.
+	local payload, complete = { historical = empty_ngrams(), today = {} }, false
+	if sqlite_available() then
 		payload, complete = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
 	-- The page shows the partial counts and says the history is incomplete
@@ -1642,7 +2047,11 @@ end
 
 local hold_password_app = M.is_unrecorded_app
 settle_capture_policy = function()
+	if not may_record() then _capture_boundary = _capture_boundary + 1 end
 	if not may_record() or hold_password_app(_hold_focus_app) then
+		Roi.owner.discard(Roi.state)
+		_pointer.discard_frames()
+		_pointer.forget_position()
 		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its
@@ -1813,6 +2222,7 @@ end
 function M.suspend_collection()
 	if not _suspended then
 		_suspended = true
+		_live = new_live_tracker()
 		settle_capture_policy()
 		Logger.info(LOG, "Metrics collection suspended by the user.")
 	end
@@ -1843,6 +2253,7 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = wanted
+	if not wanted then _live = new_live_tracker() end
 	settle_capture_policy()
 	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
 	return true
@@ -1968,15 +2379,18 @@ end
 --- @param enabled boolean
 --- @return boolean The posture actually in force after the call.
 function M.set_encrypt_enabled(enabled)
+	local want = (enabled == true)
+	if want then Roi.activation_blocked = true; Roi.close_text() end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if not Preferences.admit() then return false end
-	local want = (enabled == true)
 	if want and not TextCipher.is_available() then
 		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
+		Roi.sync(true)
 		return false
 	end
 	if not store_bool(KEY.METRICS_ENCRYPT, want) then
 		Logger.error(LOG, "At-rest encryption state was not persisted — it was not changed.")
+		Roi.sync(true)
 		return false
 	end
 	local changed = (want ~= _encrypt_enabled)
@@ -1985,6 +2399,7 @@ function M.set_encrypt_enabled(enabled)
 	-- plaintext untouched while the toggle is off, so an encrypting pass launched
 	-- first would convert nothing and report success.
 	TextCipher.set_enabled(want)
+	Roi.sync(true)
 	-- Persisted like its siblings. This one matters most of the three: a user who
 	-- turned encryption ON and found it off after a reboot would have a database
 	-- half encrypted and half not, with nothing saying when the posture changed.
@@ -1997,7 +2412,7 @@ end
 --- posture. Idempotent: a pass over an already-converted table skips every row.
 --- @return boolean True when a pass is in flight.
 function M.migrate_stored_text()
-	if M.has_flush_debt() or _flush_stopping then return false end
+	if M.has_flush_debt() or _flush_stopping or not sqlite_available() then return false end
 	if not Preferences.admit() then return false end
 	TextMigration.cancel()
 	return TextMigration.start(
@@ -2010,8 +2425,57 @@ end
 --- one openssl spawn per value, and the flush path runs on the keystroke side of
 --- the daemon where that cost would be felt as input lag.
 function M.pump_migration()
-	if M.has_flush_debt() then return end
+	if M.has_flush_debt() or not sqlite_available() then return end
 	TextMigration.pump()
+end
+
+--- Exports the next bounded slice of committed rows to this device's ledger.
+--- Driven from the daemon's periodic tick, between flushes: the export reads
+--- only committed rows and must not race the flush owner's transaction. A
+--- finished at-rest migration rewrote stored text, so it regenerates the file.
+function M.pump_ledger()
+	if not _ledger.exporter or M.has_flush_debt() or _flush_stopping or not sqlite_available() then return end
+	local migrating = TextMigration.is_running()
+	if migrating then _ledger.saw_migration = true; return end
+	if _ledger.saw_migration then
+		_ledger.saw_migration = false
+		_ledger.exporter:request_rebuild()
+		_ledger.pending = true
+	end
+	if not _ledger.pending then
+		M.pump_import()
+		return
+	end
+	local status, reason = _ledger.exporter:step()
+	if status == "idle" then _ledger.pending = false end
+	if status == "failed" and reason ~= _ledger.refusal then
+		_ledger.refusal = reason
+		Logger.error(LOG, "Metrics ledger export failed: %s.", tostring(reason))
+	elseif status ~= "failed" and _ledger.refusal ~= nil then
+		_ledger.refusal = nil
+	end
+end
+
+--- Imports the next bounded slice of the other devices' ledgers. Runs only
+--- once this device's own export is idle; while every device is caught up it
+--- rescans at the ingest cadence, the one macOS syncs foreign ledgers at.
+function M.pump_import()
+	if not _ledger.importer or M.has_flush_debt() or _flush_stopping or not sqlite_available() then return end
+	if TextMigration.is_running() then return end
+	local now = Monotonic.now_ms()
+	if now < _ledger.import_after then return end
+	local status = _ledger.importer:step()
+	_ledger.import_after = status == "more" and 0 or now + Timings.ms("keystats", "ingest_tick_ms")
+end
+
+--- The ledger's state, for diagnostics.
+--- @return table { available, path?, device_id, refusal? }
+function M.ledger_status()
+	if not _ledger.exporter then return { available = false, device_id = _device_id, refusal = _ledger.refusal } end
+	local status = _ledger.exporter:status()
+	status.available = true
+	status.refusal = _ledger.refusal
+	return status
 end
 
 --- Snapshot of the at-rest migration, for the menu and for diagnostics.
@@ -2056,6 +2520,10 @@ end
 --- @param candidate table Configuration snapshot to apply or restore.
 --- @return boolean acknowledged
 function M.apply_configuration(candidate)
+	if type(candidate) == "table" and (candidate.encrypt == true or candidate.cipher_enabled == true) then
+		Roi.activation_blocked = true
+		Roi.close_text()
+	end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
 	for _, key in ipairs({ LEAF.ENABLED, LEAF.PRIVATE_FILTER_ENABLED, LEAF.SECURE_FILTER_ENABLED,
@@ -2082,6 +2550,7 @@ function M.apply_configuration(candidate)
 	_secure_filter_enabled = candidate.secure_filter_enabled
 	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
 	_encrypt_enabled = candidate.encrypt
+	Roi.sync(true)
 	_disabled_list = {}
 	for index, app in ipairs(candidate.disabled_apps) do _disabled_list[index] = app end
 	_disabled_apps = exclusion_set(_disabled_list)
@@ -2095,6 +2564,7 @@ end
 function M.get_privacy_state()
 	return {
 		enabled                    = _enabled,
+		storage_blocked            = _storage_blocked,
 		private_filter_enabled     = _private_filter_enabled,
 		secure_filter_enabled      = _secure_filter_enabled,
 		system_auth_filter_enabled = _system_auth_filter_enabled,
@@ -2121,7 +2591,7 @@ function M.export_session()
 	local wpm = 0.0
 	if Metrics then
 		stats = Metrics.get_session_stats()
-		wpm   = Metrics.get_wpm()
+		wpm   = Metrics.get_wpm(Monotonic.now_ms())
 	end
 	local apps  = M.get_app_stats()
 
@@ -2138,11 +2608,18 @@ function M.export_session()
 	}
 end
 
---- Serialises the session to a JSON string.
---- @return string
+--- Serialises the session only when the result is valid UTF-8 JSON.
+--- @return string|nil json JSON text, or nil when native bytes are not UTF-8.
+--- @return string|nil reason Refusal reason when no JSON could be published.
 function M.export_json()
 	local data = M.export_session()
-	return _to_json(data)
+	-- Application ids and evdev codes are maps even when empty or when their
+	-- numeric keys happen to form an array prefix.
+	local objects = { [data.apps] = true }
+	for _, app in pairs(data.apps) do objects[app.physical_scancodes] = true end
+	local json = _to_json(data, objects)
+	if not StrictUtf8.len(json) then return nil, "session contains invalid UTF-8" end
+	return json
 end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
@@ -2214,11 +2691,12 @@ end
 
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush(close_session)
+	Roi.sync(true)
 	local clock = observe_calendar()
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, media = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {}, network = {}, roi = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2228,11 +2706,13 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
+		network = _pending_network_events, roi = Roi.pending,
 		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
+	local _pending_network_events = buffers.network
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
@@ -2247,6 +2727,7 @@ local function capture_flush(close_session)
 	-- 1. Compose buffered physical key events and their matching aggregates. This is
 	-- the canonical, replayable source shared with the macOS/AHK drivers.
 	local typing_batch = {}
+	local pointer_fractions = _pointer.snapshot_fractions()
 	-- The nine n-gram families, walked from the SAME buffered stream the raw
 	-- events are built from. Built here rather than accumulated per keystroke
 	-- because a sequence is only knowable in context — a bigram needs the
@@ -2261,6 +2742,13 @@ local function capture_flush(close_session)
 			-- Pointer activity alone is a row too, with no text, as macOS flushes it.
 			local mouse = pending.mouse
 			if #pending.events > 0 or mouse then
+				local distance = 0
+				if mouse then
+					pointer_fractions[date] = pointer_fractions[date] or {}
+					local exact = mouse.distance + (pointer_fractions[date][app_id] or 0)
+					distance = math.floor(exact)
+					pointer_fractions[date][app_id] = exact - distance
+				end
 				local total_time_ms = 0
 				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
 				typing_batch[#typing_batch + 1] = {
@@ -2271,11 +2759,18 @@ local function capture_flush(close_session)
 					events_json = _to_json(pending.events),
 					mouse_clicks = mouse and mouse.clicks or 0,
 					mouse_scrolls = mouse and mouse.scrolls or 0,
-					mouse_distance_px = mouse and math.floor(mouse.distance) or 0,
+					mouse_distance_px = distance,
 				}
 			end
 			if #pending.events > 0 then
 				walker_contexts[app_id] = walker_contexts[app_id] or {}
+				if pending.after_exclusion then
+					local ok_settle, settled = pcall(AggregateWalker.settle, walker_contexts[app_id], nil, ngram_batch, true)
+					if not ok_settle then
+						return nil, "Typing aggregate settlement failed; pending source remains unacknowledged"
+					end
+					ngram_batch = settled
+				end
 				local ok_walk, walked = pcall(AggregateWalker.walk,
 					pending.events, date, dashboard_app_name(app_id), ngram_batch,
 					{ times = pending.times, wall_times = pending.wall_times,
@@ -2336,6 +2831,11 @@ local function capture_flush(close_session)
 	if #_pending_shortcut_events > 0 then
 		payload.raw.shortcuts = _pending_shortcut_events
 		_pending_shortcut_events = {}
+	end
+	payload.raw.roi = buffers.roi
+	if #_pending_network_events > 0 then
+		payload.raw.network = _pending_network_events
+		_pending_network_events = {}
 	end
 	if #_pending_llm_events > 0 then
 		payload.raw.llm = _pending_llm_events
@@ -2502,6 +3002,7 @@ local function capture_flush(close_session)
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
 			walker = walker_contexts, open_walk = open_walk, recovered = recovered ~= nil,
+			pointer_fractions = pointer_fractions,
 		},
 	}
 end
@@ -2604,7 +3105,10 @@ end
 function M.pump_flush()
 	if _flush_pumping then return _flush_state == nil end
 	local state = _flush_state
-	if not state then advance_reset_request(); publish_flush_observation(); return _flush_state == nil end
+	if not state then
+		advance_reset_request(); _maintenance.advance(); publish_flush_observation()
+		return _flush_state == nil
+	end
 	if not state.operation then return false end
 	_flush_pumping = true
 	local called, settled = pcall(state.operation.pump, state.operation)
@@ -2621,11 +3125,14 @@ function M.pump_flush()
 			local marks = state.snapshot.watermarks
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
+			_pointer.commit_fractions(marks.pointer_fractions)
 			_walker_contexts = marks.walker
 			_persisted_open_walk = marks.open_walk
 			if marks.recovered then _recovered_walks = nil end
 			_manifest_cache = { revision = nil, manifest = nil }
 			_last_flush_committed, _flush_state = true, nil
+			-- Committed rows wait for the ledger's next bounded export.
+			_ledger.pending = true
 			prune_calendar(state.snapshot.calendar)
 			if state.snapshot.system then SystemMetrics.acknowledge(state.snapshot.system) end
 			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")
@@ -2636,6 +3143,7 @@ function M.pump_flush()
 	end
 	_flush_pumping = false
 	advance_reset_request()
+	_maintenance.advance()
 	publish_flush_observation()
 	return _flush_state == nil
 end
@@ -2651,7 +3159,7 @@ local function restore_flush_buffers(buffers)
 		local newer = _pending_typing_events[app]
 		if newer then
 			local tail, head = older.runs[#older.runs], newer.runs[1]
-			if tail and head and tail.date == head.date and tail.layout == head.layout then
+			if tail and head and tail.date == head.date and tail.layout == head.layout and not head.after_exclusion then
 				for _, field in ipairs({ "text", "events", "times", "wall_times" }) do
 					tail[field] = prepend(tail[field], head[field])
 				end
@@ -2670,6 +3178,16 @@ local function restore_flush_buffers(buffers)
 	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
+	_pending_network_events = prepend(buffers.network, _pending_network_events)
+	-- A reentrant activation can retire text while this source is detached.
+	-- Nil acquisition owns no append: purge before clearing the reservation or
+	-- a subsequent known-OFF observation would resurrect the revoked source.
+	if not Roi.sync(true) then
+		for index = #buffers.roi, 1, -1 do
+			if buffers.roi[index].kind ~= "roi_snapshot" then table.remove(buffers.roi, index) end
+		end
+	end
+	Roi.pending = prepend(buffers.roi, Roi.pending)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_system_events = prepend(buffers.system, _pending_system_events)
@@ -2699,6 +3217,7 @@ local function dispatch_flush(close_session)
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
+		and #payload.raw.network == 0 and #payload.raw.roi == 0
 		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
@@ -2712,12 +3231,16 @@ local function dispatch_flush(close_session)
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
+	_pending_network_events = {}
+	Roi.pending = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
 	-- Media left out of this flush (no media store yet) stays pending.
 	if #payload.raw.media > 0 then _pending_media_events = {} end
+	state.constructing = true
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
+	state.constructing = false
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
 		return false
@@ -2754,7 +3277,12 @@ local function flush_json()
 		Logger.error(LOG, "flush(): cannot read the previous summary at '%s' — %s.", path, tostring(read_err or status))
 		return false
 	end
-	local written, write_err = FileSystem.write_if_unchanged(path, M.export_json() .. "\n", { status = status, content = previous })
+	local json, export_err = M.export_json()
+	if not json then
+		Logger.error(LOG, "flush(): cannot encode session summary — %s.", tostring(export_err))
+		return false
+	end
+	local written, write_err = FileSystem.write_if_unchanged(path, json .. "\n", { status = status, content = previous })
 	if written ~= true then
 		Logger.error(LOG, "flush(): cannot publish the summary at '%s' — %s.", path, tostring(write_err))
 		return false
@@ -2774,7 +3302,7 @@ local function flush_dispatch(close_session)
 		end
 		return M.pump_flush()
 	end
-	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush(close_session) end
+	if sqlite_available() then return dispatch_flush(close_session) end
 	_last_flush_committed = false
 	flush_json()
 	return false
@@ -2785,9 +3313,14 @@ end
 --- @return boolean True only after durable COMMIT and native cleanup ACK.
 function M.flush()
 	if _flush_stopping then return false end
+	Roi.sync(true)
 	local clock = observe_calendar()
 	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
-	if may_record() then queue_session_events(forward_session(clock, "tick", clock.mono_ms), clock) end
+	if may_record() then
+		queue_session_events(forward_session(clock, "tick", clock.mono_ms), clock)
+		Roi.owner.tick(Roi.state, clock.mono_ms, _focused_app_id or "Unknown", clock.ts)
+		Roi.queue(clock)
+	end
 	-- The sampler admits raw transitions at capture, independently of machine
 	-- aggregates. Retain the existing conservative drain gate as well: reopening
 	-- recording cannot authorize a forbidden sample, and closing it drops queues.
@@ -2822,11 +3355,16 @@ end
 --- @return boolean True only when no native flush work remains acquired.
 function M.stop()
 	if not _flush_stopping then
+		Roi.sync(true)
 		local clock = observe_calendar()
 		-- The open session ends with the daemon, before the final flush takes it.
 		if may_record() then queue_session_events(forward_session(clock, "stop"), clock) end
+		Roi.owner.finish(Roi.state, _focused_app_id or "Unknown", clock.ts)
+		Roi.queue(clock)
 		_flush_stopping = true
+		_live = new_live_tracker()
 		if _reset_request then finish_reset_request(_reset_request, false) end
+		_maintenance.advance()
 		_flush_generation = _flush_generation + 1
 		_flush_listeners = {}
 	end
@@ -2846,7 +3384,7 @@ function M.stop()
 	end
 	if _stop_final_dispatched then return true end
 	_stop_final_dispatched = true
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		if dispatch_flush() then return true end
 		if _flush_state then return M.stop() end
 		if SqliteWriter.flush_transport_available() then
@@ -2875,7 +3413,7 @@ end
 --- @return number
 function M.get_wpm()
 	if not Metrics then return 0.0 end
-	return Metrics.get_wpm()
+	return Metrics.get_wpm(Monotonic.now_ms())
 end
 
 --- The readouts' live numbers: { wpm, source, source_variant, source_time (s) }.
@@ -2905,7 +3443,7 @@ end
 --- Whether fresh capture still needs a durable reset boundary.
 has_reset_input = function()
 	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
-		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0 or #Roi.pending > 0
 		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
 		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
 end
@@ -2915,7 +3453,7 @@ end
 --- @return boolean acknowledged False while persistence is refused or pending.
 reset_session_step = function()
 	if _session_reset_attempt or M.has_flush_debt() or _flush_stopping then return false end
-	if not (SqliteWriter and SqliteWriter.is_available()) then
+	if not (sqlite_available()) then
 		Logger.error(LOG, "Metrics session reset refused: durable SQLite persistence is unavailable.")
 		return false
 	end
@@ -2977,6 +3515,7 @@ reset_session_step = function()
 		app.last_key_at, app.wpm_ring, app.char_window = nil, {}, {}
 	end
 	_typing_last_key_at = {}
+	_typing_boundary, _app_key_boundary = {}, {}
 	_live = new_live_tracker()
 	_session = new_session_tracker()
 	_session_started_at = os.time() * 1000
@@ -3001,6 +3540,97 @@ function M.request_session_reset(complete)
 	if _reset_request or _session_reset_attempt or _flush_state or _flush_stopping then return false end
 	_reset_request = { complete = complete, origin = _flush_generation }
 	advance_reset_request(true)
+	return true
+end
+
+--- Completes the dashboard request once, with its receipt.
+--- @param request table The owned request.
+--- @param success boolean Whether the operation committed.
+--- @param path string|nil The Export copy.
+function _maintenance.finish(request, success, path)
+	if _maintenance.request ~= request then return end
+	_maintenance.request = nil
+	if success then
+		Logger.success(LOG, "Metrics %s done.", request.kind)
+	else
+		Logger.error(LOG, "Metrics %s refused; the store is unchanged.", request.kind)
+	end
+	local called, err = pcall(request.complete, success, path)
+	if not called then
+		Logger.error(LOG, "Metrics %s completion callback raised: %s.", request.kind, ErrorDescription.describe(err))
+	end
+end
+
+--- Takes the Export copy of the settled store.
+--- @param request table The owned request.
+function _maintenance.export(request)
+	local Maintenance = require("keystats.metrics_maintenance")
+	local folder, reason = Maintenance.downloads_dir(os.getenv)
+	if not folder then
+		Logger.error(LOG, "Metrics export has no destination: %s.", reason)
+		return _maintenance.finish(request, false)
+	end
+	if not require("adapters.file_system").exists(folder) then
+		Logger.error(LOG, "Metrics export destination %s does not exist.", folder)
+		return _maintenance.finish(request, false)
+	end
+	local path = folder .. "/" .. Maintenance.export_file_name(os.time())
+	local sql = require("keystats.queries").render("export.vacuum_into", "cli_json", { path = path })
+	local copied = SqliteWriter.exec_sql(sql) == true
+	_maintenance.finish(request, copied, copied and path or nil)
+end
+
+--- Drives the dashboard request: it waits for the flush to settle, then the
+--- Export copies the store, or the Purge flushes its tombstone and completes
+--- once that flush commits.
+function _maintenance.advance()
+	local request = _maintenance.request
+	if not request or _maintenance.running then return end
+	if _flush_stopping or not sqlite_available() then return _maintenance.finish(request, false) end
+	if _flush_state then return end
+	_maintenance.running = true
+	local called, err = pcall(function()
+		if request.kind == "export" then return _maintenance.export(request) end
+		if request.tombstone then
+			-- A failed COMMIT retains its snapshot in _flush_state, so a settled
+			-- store after the tombstone's dispatch is that tombstone committed.
+			_manifest_cache = { revision = nil, manifest = nil }
+			if _last_flush_committed ~= true then
+				-- Never let a refused purge commit later with a later flush.
+				for index, event in ipairs(_pending_system_events) do
+					if event == request.tombstone then table.remove(_pending_system_events, index); break end
+				end
+			end
+			return _maintenance.finish(request, _last_flush_committed == true)
+		end
+		local Maintenance = require("keystats.metrics_maintenance")
+		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)
+		_pending_system_events[#_pending_system_events + 1] = request.tombstone
+		flush_dispatch()
+	end)
+	_maintenance.running = false
+	if not called then
+		Logger.error(LOG, "Metrics %s raised: %s.", request.kind, ErrorDescription.describe(err))
+		return _maintenance.finish(request, false)
+	end
+	if request.tombstone and _maintenance.request == request and not _flush_state then _maintenance.advance() end
+end
+
+--- Owns one dashboard Export or Purge through this single writer. Both wait
+--- for the flush to settle; a Purge appends a tombstone to the ledger that
+--- every device applies while replaying (purge_schema.sql).
+--- @param kind string "export" or "purge".
+--- @param complete function Receives success and, for an Export, its path.
+--- @return boolean accepted Whether this request owns its completion.
+function M.request_metrics_maintenance(kind, complete)
+	if not require("keystats.metrics_maintenance").KINDS[kind] or type(complete) ~= "function" then
+		Logger.error(LOG, "Metrics maintenance needs a known kind and a completion callback.")
+		return false
+	end
+	if _maintenance.request or _reset_request or _flush_stopping or not sqlite_available() then return false end
+	_maintenance.request = { kind = kind, complete = complete }
+	Logger.start(LOG, "Metrics %s requested; waiting for the flush to settle.", kind)
+	if _flush_state then flush_dispatch() else _maintenance.advance() end
 	return true
 end
 
@@ -3029,7 +3659,7 @@ end
 --- NOTE: assigned (not "local function") so it writes to the forward-declared
 --- upvalue.  Using "local function" would create a shadow local and leave the
 --- upvalue nil for closures defined between the forward-decl and this point.
-_to_json = function(val)
+_to_json = function(val, objects)
 	if type(val) == "nil" then return "null" end
 	if type(val) == "boolean" then return val and "true" or "false" end
 	if type(val) == "number" then
@@ -3054,15 +3684,15 @@ _to_json = function(val)
 		end) .. '"'
 	end
 	if type(val) == "table" then
-		local is_array = #val > 0 or next(val) == nil
+		local is_array = not (objects and objects[val]) and (#val > 0 or next(val) == nil)
 		if is_array then
 			local parts = {}
-			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v) end
+			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v, objects) end
 			return "[" .. table.concat(parts, ",") .. "]"
 		else
 			local parts = {}
 			for k, v in pairs(val) do
-				parts[#parts + 1] = _to_json(tostring(k)) .. ":" .. _to_json(v)
+				parts[#parts + 1] = _to_json(tostring(k), objects) .. ":" .. _to_json(v, objects)
 			end
 			return "{" .. table.concat(parts, ",") .. "}"
 		end
@@ -3076,13 +3706,14 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
+		+ #_pending_network_events + #Roi.pending
 		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, stream in pairs(_pending_typing_events) do
 		for _, pending in ipairs(stream.runs) do count = count + #pending.events end
 	end
 	if _flush_state then
 		local held = _flush_state.snapshot.buffers
-		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches + #held.windows
+		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches + #held.windows + #held.roi
 		for _, stream in pairs(held.typing) do
 			for _, pending in ipairs(stream.runs) do count = count + #pending.events end
 		end

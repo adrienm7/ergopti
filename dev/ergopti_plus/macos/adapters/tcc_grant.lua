@@ -21,6 +21,9 @@
 --- ==============================================================================
 
 local M = {}
+local Logger = require("infra.logger")
+
+local LOG = "adapters.tcc_grant"
 
 local TCCUTIL_BIN = "/usr/bin/tccutil"
 
@@ -56,6 +59,11 @@ function M.reset(service, bundle_id, on_done)
 		error("tcc_grant.reset: bundle_id must be a non-empty string", 2)
 	end
 	if type(on_done) ~= "function" then error("tcc_grant.reset: on_done must be a function", 2) end
+	local own_bundle_id = M.bundle_id()
+	if own_bundle_id == nil or bundle_id ~= own_bundle_id then
+		Logger.error(LOG, "Refusing to reset a privacy grant outside this process's bundle identity.")
+		return false
+	end
 	local ShellRunner = require("adapters.shell_runner")
 	local handle = ShellRunner.spawn(TCCUTIL_BIN, { "reset", service, bundle_id },
 		function(exit_code, stdout, stderr)
@@ -66,7 +74,18 @@ function M.reset(service, bundle_id, on_done)
 					tostring(stderr ~= "" and stderr or stdout)))
 			end
 		end)
-	return handle.start() == true
+	if handle.start() == true then return true end
+	-- A refused start can still have launched the native process. ShellRunner
+	-- retains it until its exact exit; keep the caller's permission gate closed
+	-- until that settlement proves tccutil can no longer revoke the grant.
+	if handle.isSettled() then return false end
+	local registered = handle.onSettled(function()
+		on_done(false, "tccutil start was refused after an unsettled launch")
+	end)
+	if registered ~= true then
+		Logger.error(LOG, "Could not observe the unsettled tccutil process; retaining the permission gate.")
+	end
+	return true
 end
 
 return M

@@ -39,6 +39,7 @@ _WPMWidget_DarkenHex(hex) {
 
 
 WPMWidget_BuildCompact() {
+		Existing := WPMWidget._gui
 		w       := WPMWidgetConst.W
 		h       := WPMWidgetConst.H
 		h_num   := WPMWidgetConst.H_NUMBER
@@ -48,38 +49,50 @@ WPMWidget_BuildCompact() {
 		dark_bg := _WPMWidget_DarkenHex(WPMWidgetConst.COLOR_BG_IDLE)
 
 		g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM")
-		g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
-		g.MarginX   := 0
-		g.MarginY   := 0
-
-		; Large WPM number — vertically centred in the upper zone.
-		g.SetFont("s" . WPMWidgetConst.NUMBER_FONT_SIZE . " w700 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
-		lbl_wpm := g.AddText("x0 y0 w" . w . " h" . h_num . " Center BackgroundTrans +0x200", "—")
-
-		; Darker strip behind the unit label (drawn before the label so it appears below it).
-		g.SetFont("s1", "Segoe UI")
-		lbl_strip := g.AddText("x0 y" . strip_y . " w" . w . " h" . h_unit . " Background" . dark_bg, "")
-
-		; Unit label text drawn on top of the strip.
-		g.SetFont("s" . WPMWidgetConst.UNIT_FONT_SIZE . " w600 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
-		lbl_unit := g.AddText("x0 y" . strip_y . " w" . w . " h" . h_unit . " Center BackgroundTrans",
-				t("menu.metrics.wpm_unit"))
-
-		lbl_wpm.OnEvent("Click",   WPMWidget_DragStart)
-		lbl_unit.OnEvent("Click",  WPMWidget_DragStart)
-		lbl_strip.OnEvent("Click", WPMWidget_DragStart)
-		g.OnEvent("Close", WPMWidget_Close)
-		; WM_EXITSIZEMOVE fires after the OS native move loop completes (PostMessage WM_NCLBUTTONDOWN).
-		OnMessage(0x0232, WPMWidget_DragEnd, 1)
-		; Rounded corners of the canon's radius, as on macOS and Linux: the pill
-		; used to be the only square one.
-		Diameter := 2 * WPMWidgetConst.CORNER_R
-		_WPMWidget_ApplyRoundedRegion(g.Hwnd, w, h, Diameter)
-
-		WPMWidget._gui       := g
-		WPMWidget._lbl_wpm   := lbl_wpm
-		WPMWidget._lbl_unit  := lbl_unit
-		WPMWidget._lbl_strip := lbl_strip
+		try {
+			g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
+			g.MarginX   := 0
+			g.MarginY   := 0
+			; Large WPM number — vertically centred in the upper zone.
+			g.SetFont("s" . WPMWidgetConst.NUMBER_FONT_SIZE . " w700 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
+			lbl_wpm := g.AddText("x0 y0 w" . w . " h" . h_num . " Center BackgroundTrans +0x200", "—")
+			; Darker strip behind the unit label (drawn before the label so it appears below it).
+			g.SetFont("s1", "Segoe UI")
+			lbl_strip := g.AddText("x0 y" . strip_y . " w" . w . " h" . h_unit . " Background" . dark_bg, "")
+			; Unit label text drawn on top of the strip.
+			g.SetFont("s" . WPMWidgetConst.UNIT_FONT_SIZE . " w600 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
+			lbl_unit := g.AddText("x0 y" . strip_y . " w" . w . " h" . h_unit . " Center BackgroundTrans",
+					t("menu.metrics.wpm_unit"))
+			lbl_wpm.OnEvent("Click",   WPMWidget_DragStart)
+			lbl_unit.OnEvent("Click",  WPMWidget_DragStart)
+			lbl_strip.OnEvent("Click", WPMWidget_DragStart)
+			g.OnEvent("Close", WPMWidget_Close)
+			; WM_EXITSIZEMOVE fires after the OS native move loop completes (PostMessage WM_NCLBUTTONDOWN).
+			OnMessage(0x0232, WPMWidget_DragEnd, 1)
+			; Rounded corners of the canon's radius, as on macOS and Linux: the pill
+			; used to be the only square one.
+			Diameter := 2 * WPMWidgetConst.CORNER_R
+			_WPMWidget_ApplyRoundedRegion(g.Hwnd, w, h, Diameter)
+		} catch Any as Err {
+			try g.Destroy()
+			throw Err
+		}
+		Published := false
+		PreviousCritical := Critical("On")
+		try {
+			if WPMWidget._gui == Existing {
+				WPMWidget._gui       := g
+				WPMWidget._lbl_wpm   := lbl_wpm
+				WPMWidget._lbl_unit  := lbl_unit
+				WPMWidget._lbl_strip := lbl_strip
+				Published := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Published {
+			g.Destroy()
+			return false
+		}
+		return g
 }
 
 
@@ -116,28 +129,43 @@ _WPMWidget_ApplyRoundedRegion(Hwnd, W, H, Diameter, RegionFn := 0) {
 
 
 WPMWidget_BuildGraph() {
+		Existing := WPMWidget._graph_gui
 		g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM Graph")
-		g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
-		g.MarginX   := 0
-		g.MarginY   := 0
-
-		; The graph surface is painted entirely by GDI+ and used to carry NO control,
-		; so a click on it went straight to DefWindowProc: the widget could not be
-		; dragged in graph mode at all, even though the module docstring advertises it
-		; as draggable, WPMWidget_ResetPosition moves this very window, and the
-		; show_graph branches of DragStart/DragEnd — including the anchor conversion —
-		; sat here as unreachable code. A full-size transparent Text gives the graph
-		; the same entry point the three compact labels give the compact mode.
-		; UpdateLayeredWindow paints the window from its own bitmap and never renders
-		; child controls, so this one is invisible and serves purely as a hit target.
-		drag_area := g.AddText("x0 y0 w" . WPMWidgetConst.GRAPH_W
-				. " h" . WPMWidgetConst.GRAPH_H . " BackgroundTrans", "")
-		drag_area.OnEvent("Click", WPMWidget_DragStart)
-
-		g.OnEvent("Close", WPMWidget_Close)
-		OnMessage(0x0232, WPMWidget_DragEnd, 1)
-
-		WPMWidget._graph_gui := g
+		try {
+			g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
+			g.MarginX   := 0
+			g.MarginY   := 0
+			; The graph surface is painted entirely by GDI+ and used to carry NO control,
+			; so a click on it went straight to DefWindowProc: the widget could not be
+			; dragged in graph mode at all, even though the module docstring advertises it
+			; as draggable, WPMWidget_ResetPosition moves this very window, and the
+			; show_graph branches of DragStart/DragEnd — including the anchor conversion —
+			; sat here as unreachable code. A full-size transparent Text gives the graph
+			; the same entry point the three compact labels give the compact mode.
+			; UpdateLayeredWindow paints the window from its own bitmap and never renders
+			; child controls, so this one is invisible and serves purely as a hit target.
+			drag_area := g.AddText("x0 y0 w" . WPMWidgetConst.GRAPH_W
+					. " h" . WPMWidgetConst.GRAPH_H . " BackgroundTrans", "")
+			drag_area.OnEvent("Click", WPMWidget_DragStart)
+			g.OnEvent("Close", WPMWidget_Close)
+			OnMessage(0x0232, WPMWidget_DragEnd, 1)
+		} catch Any as Err {
+			try g.Destroy()
+			throw Err
+		}
+		Published := false
+		PreviousCritical := Critical("On")
+		try {
+			if WPMWidget._graph_gui == Existing {
+				WPMWidget._graph_gui := g
+				Published := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Published {
+			g.Destroy()
+			return false
+		}
+		return g
 }
 
 ; Gui.Close hides a window by default after its callback returns. Always return
@@ -278,7 +306,17 @@ WPMWidget_RenderGraph(Label, AccentHex, Native := _WPMGdipFrameNative) {
 						if !FrameResult["ok"]
 								throw Error("WPM GDI+ frame failed: " . FrameResult["error"])
 				}
-				GR_DrawBitmap(g.Hwnd, DrawFn)
+				; The adapter answers false when the native upload refuses (and has
+				; already settled its own GDI cleanup). Report it: the previous bitmap
+				; is still on screen, or nothing was ever uploaded, so the caller must
+				; not reveal the surface or count the frame as presented.
+				if GR_DrawBitmap(g.Hwnd, DrawFn) != true {
+						if !WPMWidget._graph_upload_refused
+								try LoggerError("WPMWidget", "Graph frame upload refused by the native bitmap owner; the surface is not revealed.")
+						WPMWidget._graph_upload_refused := true
+						return false
+				}
+				WPMWidget._graph_upload_refused := false
 				return true
 		} finally {
 				PreviousCritical := Critical("On")

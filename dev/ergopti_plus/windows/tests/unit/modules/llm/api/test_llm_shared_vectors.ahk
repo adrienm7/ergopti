@@ -82,15 +82,35 @@ _LSV_PriceAdmission() {
 
 
 
+; ====================================
+; ====================================
+; ======= 3/ Auth Failures ===========
+; ====================================
+; ====================================
+
+_LSV_AuthCorpus() {
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\auth_failure_vectors.json", "UTF-8"))
+}
+
+_LSV_AuthFailure(Vector) {
+	Failure := Vector["failure"]
+	Want := Vector["authentication"] ? true : false
+	AssertEqual(Want, LLM_ApiCommon_IsAuthenticationFailure(Failure) ? true : false, Vector["name"])
+}
+
+
+
+
+
 ; =================================
 ; =================================
-; ======= 3/ Registration =========
+; ======= 4/ Registration =========
 ; =================================
 ; =================================
 
 _LSV_Register() {
 	Temperature := _LSV_TemperatureCorpus(), Usage := _LSV_UsageCorpus()
-	if Temperature["vectors"].Length != 15 || Usage["usage_vectors"].Length != 8 || Usage["cost_vectors"].Length != 5
+	if Temperature["vectors"].Length != 15 || Usage["usage_vectors"].Length != 12 || Usage["cost_vectors"].Length != 5
 		throw Error("The independent LLM figures corpus requires explicit review.")
 	for Vector in Temperature["vectors"]
 		Test("llm shared vectors: temperature " . Vector["id"], _LSV_Temperature.Bind(Vector, Temperature["policy"]))
@@ -99,5 +119,10 @@ _LSV_Register() {
 	for Vector in Usage["cost_vectors"]
 		Test("llm shared vectors: cost " . Vector["id"], _LSV_Cost.Bind(Vector, Usage["model_prices"]))
 	Test("llm shared vectors: the price table admits finite nonnegative rows only", _LSV_PriceAdmission)
+	Auth := _LSV_AuthCorpus()
+	if Auth["vectors"].Length != 16
+		throw Error("The authentication failure corpus requires explicit review.")
+	for Vector in Auth["vectors"]
+		Test("llm shared vectors: authentication failure " . Vector["name"], _LSV_AuthFailure.Bind(Vector))
 }
 _LSV_Register()

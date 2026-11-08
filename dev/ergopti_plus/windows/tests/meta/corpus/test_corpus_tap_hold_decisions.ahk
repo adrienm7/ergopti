@@ -169,7 +169,7 @@ class _CTHD_World {
 				AssertEqual("", TapHoldOneShotResult(Key, ScriptInformation["MagicKey"]),
 					"a corpus letter has no special one-shot result")
 				; OneShotShift title-cases a character with no special result.
-				this.Strokes.Push(Format("{:T}", Key) == StrUpper(Key) ? "shift+" . Key : Key)
+				this.Strokes.Push(TextCaseTitle(Key) == StrUpper(Key) ? "shift+" . Key : Key)
 				return
 			}
 		}
@@ -266,12 +266,16 @@ class _CTHD_World {
 			if TapHoldKeyRolls(Key) {
 				if TapHoldRollUndecided()
 					throw Error("a vector with two undecided typing keys would replay outside the seam")
+				; One owner spans the press, the hold and the roll, as in TapHoldOwnHoldModifier.
+				Owner := TapHoldNewOwner()
+				Owner.KeyId := Key
 				TapFn := () => _CTHD_FireTap(World, Key)
-				PressFn := _TapHoldRollPressModifier.Bind(Key, ModKey)
+				PressFn := _TapHoldRollPressModifier.Bind(Key, ModKey, Owner)
 				OwnFn := (Pressed) => TapHoldOwnImmediateModifier(Key, Info.Wait, ModKey, Seconds,
-					Wait, (Name) => World.Physical.Has(Key), Tick, Pressed ? (*) => true : 0)
+					Wait, (Name) => World.Physical.Has(Key), Tick, Pressed ? (*) => true : 0,
+					0, 0, false, 0, Owner)
 				TapHoldOwnRoll(Key, Info.Wait, Seconds, TapFn, PressFn, OwnFn,
-					Map("wait_release", Wait, "tick", Tick))
+					Map("wait_release", Wait, "tick", Tick), Owner)
 				return
 			}
 			; A native modifier held as itself passes through: its own edge holds it.
@@ -425,7 +429,7 @@ Test("tap_hold decision corpus: holds the pinned number of vectors", _CTHD_Count
 _CTHD_OneShotSourcePinned() {
 	Body := _DriverFuncBody("OneShotShift")
 	AssertTrue(Body != "", "OneShotShift must exist")
-	AssertTrue(InStr(Body, 'Format("{:T}", Scalar)') > 0, "the replay reads a capitalised letter through this title-casing")
+	AssertTrue(InStr(Body, "TextCaseTitle(Scalar)") > 0, "the replay reads a capitalised letter through this title-casing")
 	AssertTrue(InStr(Body, "TapHoldOneShotResult(Scalar, MagicKey)") > 0, "the replay reads special results through this table")
 	AssertTrue(InStr(Body, 'InputHook("L2 T" . TimeoutSec') > 0, "the native capture must time out at the shared timeout the replay reads")
 }

@@ -193,21 +193,41 @@ _OpenTarget_ValidTail(Tail) {
 ; @returns {Boolean} Whether the text is an IPv6 address without brackets,
 ;   port or zone.
 _OpenTarget_ValidIPv6(Text) {
+	if (Text == "::")
+		return true
+	; The dotted IPv4 tail occupies two IPv6 groups.
+	if InStr(Text, ".") {
+		if !RegExMatch(Text, "^(.*:)(\d+)\.(\d+)\.(\d+)\.(\d+)$", &Mapped)
+			return false
+		Loop 4 {
+			Octet := Mapped[A_Index + 1]
+			if (StrLen(Octet) > 3 || (StrLen(Octet) > 1 && SubStr(Octet, 1, 1) == "0")
+					|| Integer(Octet) > 255)
+				return false
+		}
+		Text := Mapped[1] . "0:0"
+	}
 	if !RegExMatch(Text, "^[0-9A-Fa-f:]+$") || !RegExMatch(Text, "[0-9A-Fa-f]")
 		return false
 	Colons := _OpenTarget_Count(Text, ":")
 	Compressed := _OpenTarget_Count(Text, "::")
-	if (Colons < 2 || Colons > 7 || Compressed > 1 || InStr(Text, ":::"))
+	if (Colons < 2 || Colons > 8 || Compressed > 1 || InStr(Text, ":::"))
 		return false
 	if (Compressed = 0 && Colons != 7)
 		return false
 	if ((SubStr(Text, 1, 1) == ":" && SubStr(Text, 1, 2) != "::")
 			|| (SubStr(Text, -1) == ":" && SubStr(Text, -2) != "::"))
 		return false
+	Groups := 0
 	for _, Group in StrSplit(Text, ":") {
 		if (StrLen(Group) > 4)
 			return false
+		if (Group != "")
+			Groups += 1
 	}
+	; Compression must replace at least one of eight groups.
+	if (Compressed = 1 && Groups >= 8)
+		return false
 	return true
 }
 
@@ -362,7 +382,7 @@ _OpenTarget_Address(Text) {
 		return ""
 	if RegExMatch(Text, "^([A-Za-z0-9._%+\-]+)@([A-Za-z0-9.\-]+)$", &Mail) && _OpenTarget_DomainTld(Mail[2]) != ""
 		return _OpenTarget_Result("url", "mailto:" . Text)
-	if RegExMatch(Text, "^\[([0-9A-Fa-f:]+)\](.*)$", &Bracketed)
+	if RegExMatch(Text, "^\[([0-9A-Fa-f:.]+)\](.*)$", &Bracketed)
 			&& _OpenTarget_ValidIPv6(Bracketed[1]) && _OpenTarget_ValidTail(Bracketed[2])
 		return _OpenTarget_Result("url", "http://" . Text)
 	if RegExMatch(Text, "^(\d+)\.(\d+)\.(\d+)\.(\d+)(.*)$", &Ip) {
@@ -446,8 +466,12 @@ OpenTarget_Classify(Text, EnvFn := EnvGet) {
 	Cleaned := _OpenTarget_StripTrailing(Candidate)
 	if (Cleaned !== Candidate && Cleaned != "") {
 		Retry := _OpenTarget_Token(Cleaned, EnvFn)
-		if (Retry is Map) && (!(Found is Map) || Retry["kind"] == Found["kind"])
+		if (Retry is Map) && (!(Found is Map) || Retry["kind"] == Found["kind"]) {
+			; Preserve the decoded and expanded spelling for the filesystem owner.
+			if (Found is Map) && Found["kind"] == "path" && Found["target"] !== Retry["target"]
+				Retry["exact_path"] := Found["target"]
 			Found := Retry
+		}
 	}
 	return (Found is Map) ? Found : _OpenTarget_Result("search", Trimmed)
 }

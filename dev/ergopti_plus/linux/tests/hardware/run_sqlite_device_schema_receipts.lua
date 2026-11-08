@@ -119,6 +119,13 @@ COMMIT;
 ]]))
 	Writer.close_db()
 	assert(Writer.open_db(database), "real legacy schema failed to migrate")
+	-- The store already held the shipped purge triggers, which read devices:
+	-- the upgrade drops them and the same open recreates them on the new table.
+	local purge_file = assert(io.open("../_shared/data/db/purge_schema.sql", "rb"))
+	local purge = assert(purge_file:read("*a")); assert(purge_file:close())
+	local _, shipped = purge:gsub("CREATE TRIGGER IF NOT EXISTS [%w_]+", "")
+	local triggers = assert(Writer.query_rows("SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'metrics_purge_%' AND sql NOT LIKE '%devices_pre_linux%';"))
+	assert(shipped > 0 and tonumber(triggers[1]) == shipped, "the purge triggers must survive the registry upgrade on devices")
 	local rows = assert(Writer.query_rows("SELECT name,created_at,imported_data_sql_size,imported_data_sql_sha256 FROM devices WHERE device_id='legacy';"))
 	assert(#rows == 1 and rows[1] == "Legacy|first|53|legacy-digest")
 	Writer.register_device("new-linux", "Native", "linux", "", "native-signature")
@@ -128,6 +135,112 @@ COMMIT;
 	Writer.close_db()
 	assert(Writer.open_db(database))
 	assert(assert(Writer.query_rows("PRAGMA schema_version;"))[1] == before, "legacy migration repeated after succeeding")
+end)
+
+check("shipped legacy DDL migrates with a real SQLite database", function()
+	Writer.close_db()
+	local schema_file = assert(io.open("../_shared/data/db/schema.sql", "rb"))
+	local schema = assert(schema_file:read("*a")); assert(schema_file:close())
+	local ddl = assert(schema:match("(CREATE TABLE IF NOT EXISTS devices%s*%b())%s*;"))
+	local legacy, replacements = ddl:gsub(",%s*'linux'", "", 1)
+	assert(replacements == 1, "canonical legacy transform must remove one Linux value")
+	-- The whole shipped store with only the registry's old CHECK, as a store from
+	-- before Linux holds the event tables the purge triggers of the open read.
+	local start, finish = assert(schema:find(ddl, 1, true))
+	local historical = schema:sub(1, start - 1) .. legacy .. schema:sub(finish + 1)
+	local path = root .. "/historical.sqlite"
+	local handle = ffi.new("sqlite3 *[1]")
+	assert(sqlite.sqlite3_open_v2(path, handle, 6, nil) == 0)
+	assert(sqlite.sqlite3_exec(handle[0], historical, nil, nil, nil) == 0)
+	assert(sqlite.sqlite3_close(handle[0]) == 0)
+	assert(Writer.open_db(path), "the actual shipped legacy DDL must migrate")
+	Writer.close_db()
+end)
+
+check("unknown legacy CHECK is refused and retained", function()
+	local path = root .. "/extra-check.sqlite"
+	local handle = ffi.new("sqlite3 *[1]")
+	assert(sqlite.sqlite3_open_v2(path, handle, 6, nil) == 0)
+	local ddl = [[CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL CHECK(length(name)>0),
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+);]]
+	assert(sqlite.sqlite3_exec(handle[0], ddl, nil, nil, nil) == 0)
+	assert(sqlite.sqlite3_close(handle[0]) == 0)
+	assert(Writer.open_db(path) == false, "unrecognized CHECK cannot be dropped")
+	assert(sqlite.sqlite3_open_v2(path, handle, 2, nil) == 0)
+	local inserted = sqlite.sqlite3_exec(handle[0], [[INSERT INTO devices VALUES
+ ('id','','darwin','','host','created','updated',0,'');]], nil, nil, nil)
+	assert(inserted ~= 0, "the original CHECK remains enforced")
+	assert(sqlite.sqlite3_close(handle[0]) == 0)
+end)
+
+check("refused Linux registration leaves legacy n-gram keys untouched", function()
+	Writer.close_db()
+	local path = root .. "/registration-refused.sqlite"
+	assert(Writer.open_db(path))
+	assert(Writer.register_device("legacy", "Legacy", "darwin", "", "fixture"))
+	assert(Writer.exec_sql([[INSERT INTO ngram_chars (device_id,date,app,token,c,td,e,esrc_json)
+ VALUES ('legacy','2026-10-01','owned','[',1,0,0,'{}');]]))
+	assert(Writer.exec_sql([[BEGIN;
+ALTER TABLE devices RENAME TO devices_current;
+CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL CHECK(name <> 'linux'),
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+);
+INSERT INTO devices SELECT * FROM devices_current;
+DROP TABLE devices_current;
+DELETE FROM meta WHERE key='ngram_token_encoding';
+COMMIT;]]))
+	Writer.close_db()
+	local k = require("modules.keystats.keystats")
+	require("tests.support.metrics_preferences_fixture").with(function()
+		assert(k.init({ sqlite_path = path, log_dir = root }) == false)
+		assert(k.get_privacy_state().storage_blocked == true)
+	end)
+	assert(Writer.open_db(path), "direct open still admits this unrecognized registry")
+	local keys = assert(Writer.query_rows("SELECT hex(token) FROM ngram_chars;"))
+	assert(#keys == 1 and keys[1] == "5B", "registration refusal cannot rewrite legacy key bytes")
+	local marker = assert(Writer.query_rows("SELECT value FROM meta WHERE key='ngram_token_encoding';"))
+	assert(#marker == 0, "registration refusal cannot record a migration")
+	Writer.close_db()
+end)
+
+check("Linux in a comment cannot cause legacy n-gram migration", function()
+	Writer.close_db()
+	local path = root .. "/comment-refused.sqlite"
+	assert(Writer.open_db(path))
+	assert(Writer.register_device("legacy", "Legacy", "darwin", "", "fixture"))
+	assert(Writer.exec_sql([[INSERT INTO ngram_chars (device_id,date,app,token,c,td,e,esrc_json)
+ VALUES ('legacy','2026-10-01','owned','[',1,0,0,'{}');]]))
+	assert(Writer.exec_sql([[BEGIN;
+ALTER TABLE devices RENAME TO devices_current;
+CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL /* linux */,
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+);
+INSERT INTO devices SELECT * FROM devices_current;
+DROP TABLE devices_current;
+DELETE FROM meta WHERE key='ngram_token_encoding';
+COMMIT;]]))
+	Writer.close_db()
+	local k = require("modules.keystats.keystats")
+	require("tests.support.metrics_preferences_fixture").with(function()
+		assert(k.init({ sqlite_path = path, log_dir = root }) == false)
+		assert(k.get_privacy_state().storage_blocked == true)
+	end)
+	assert(Writer.open_db(path), "direct open still admits this unrecognized registry")
+	local keys = assert(Writer.query_rows("SELECT hex(token) FROM ngram_chars;"))
+	assert(#keys == 1 and keys[1] == "5B", "registration refusal cannot rewrite legacy key bytes")
+	local marker = assert(Writer.query_rows("SELECT value FROM meta WHERE key='ngram_token_encoding';"))
+	assert(#marker == 0, "registration refusal cannot record a migration")
+	Writer.close_db()
 end)
 
 Writer.close_db()

@@ -63,6 +63,39 @@ local function it(name, scenario)
 end
 
 helpers.describe("search result retains only its exact native clipboard generation", function()
+	it("preserves a user copy just before the search clears the clipboard", function(f)
+		local native_count, reads = f.board.changeCount, 0
+		f.board.changeCount = function()
+			reads = reads + 1
+			if reads == 3 then f.external("LATER USER COPY") end
+			return native_count()
+		end
+		f.start()
+		helpers.assert_eq(f.board.getContents(), "LATER USER COPY")
+		helpers.assert_eq(f.restores, 0)
+	end)
+
+	it("preserves a user copy that arrives during search snapshot acquisition", function(f)
+		local read = f.board.readAllData
+		local switched = false
+		f.board.readAllData = function()
+			if not switched then switched = true; f.external("NEW USER COPY") end
+			return read()
+		end
+		f.start()
+		helpers.assert_eq(f.board.getContents(), "NEW USER COPY")
+		helpers.assert_eq(f.restores, 0)
+	end)
+
+	it("does not clear a multi-item clipboard for a search", function(f)
+		f.board.allContentTypes = function() return { { "public.utf8-plain-text" }, { "public.file-url" } } end
+		local count = f.board.changeCount()
+		f.start()
+		helpers.assert_eq(f.board.changeCount(), count)
+		helpers.assert_eq(f.board.readAllData(), f.original)
+		helpers.assert_eq(f.restores, 0)
+	end)
+
 	it("keeps the healthy selected-text search and all-type restoration", function(f)
 		f.start(); f.fire()
 		helpers.assert_eq(f.board.readAllData(), f.original)

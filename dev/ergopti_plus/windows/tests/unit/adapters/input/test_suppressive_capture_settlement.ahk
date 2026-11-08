@@ -3,12 +3,12 @@
 _SICS_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the real capture dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine capture function must exist: " . Name)
 		if Name == "DeadKey" || Name == "OneShotShift" {
@@ -97,12 +97,12 @@ for _SICS_Owner in ["one-shot", "dead-key"]
 _SICU_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the native capture dependency requires its real owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
 		"MagicKeyEditor", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the native capture function requires its genuine body: " . Name)
@@ -339,3 +339,266 @@ Test("scalar completion: single named Escape stays cancellation (inputhook-named
 for _SICU_PacketMode in ["delete", "enter", "backspace", "unicode"]
 	Test("control packet ABI: " . _SICU_PacketMode . " preserves physical and Unicode identity (inputhook-control-packet-abi)",
 		_SICU_Case.Bind("packet", _SICU_PacketMode))
+
+_SNR_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The genuine scalar capture dependency must exist: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix",
+		"_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "The unchanged scalar producer must exist: " . Name)
+		Code .= Definition . "`n"
+	}
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\scalar_nontext_receiving_body.ahk")
+}
+_SNR_NativeCase(Owner, Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_scalar_nontext_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Root . "\subject.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native scalar fixture must exclusively acquire its own source directory.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SNR_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-scalar-nontext", Owner, Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine scalar receiving child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned scalar receiving child must settle once.")
+		_TestPrint("# scalar-native " . Owner . " " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native scalar capture suppression failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS scalar-nontext " . Owner . " " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := Handle
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _SNR_Owner in ["one-shot", "dead-key"]
+	for _SNR_Mode in ["letter", "enter", "backspace"]
+		Test("scalar native nontext receiving: " . _SNR_Owner . " " . _SNR_Mode . " (scalar-native-nontext-receiving)",
+			_SNR_NativeCase.Bind(_SNR_Owner, _SNR_Mode))
+
+; Shared SPENT_UNSHIFTED distinguishes these controls from navigation/function
+; keys. Do not infer the native hook's ending behavior from the EndChars table:
+; the receiver and independent following letter are the business oracle.
+_OSPC_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "_TextTailCodeUnits", "TextCaseTitle"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The real one-shot/control dependency must exist: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable",
+		"TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_SendVerdictSucceeded", "_EmitReachedScreen", "_TextSenderAtSendLevel",
+		"KS_AltGrKeyName", "KS_AltGrSendKey", "KS_IsMenuModifier", "TapHoldSyntheticKeyDown", "TapHoldSyntheticKeyUp", "TapHoldReleaseSyntheticKeys", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList", "_TH_SyntheticKeyLabel", "_TH_UserHoldsDeliveredKey", "_TH_SyntheticReleaseStaysWithUser", "_TH_ForgetSyntheticKeyForUser", "_TH_MarkSyntheticKeyReleasePending", "_TH_RetrySyntheticKeyRelease", "TextPressKey", "TextSendMenuMask", "_TextSenderNormalizeModifierKey", "_TextSenderModifierPrefix", "_TextSenderModifierWords", "_TextSenderKeystroke", "_TextSenderSustainedKey", "_TextSenderSendInput"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "The unchanged one-shot owner must exist: " . Name)
+		Code .= Definition . "`n"
+	}
+	Constants := FSReadStrict(_DriverProductionFileForSymbol("TapHoldSyntheticKeyDown"))
+	AssertTrue(RegExMatch(Constants, "m)^global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := [0-9]+[^`r`n]*", &RetryDeclaration),
+		"The native child must retain the production bounded-release policy")
+	Code .= RetryDeclaration[0] . "`n"
+	Body := _DriverFuncBody("SendNewResult")
+	AssertTrue(Body != "")
+	Masked := _DriverMaskNonCode(&Body)
+	Position := 1, Overlaid := "", Count := 0
+	while RegExMatch(Masked, "\bSendEvent(?=[ `t]*\()", &Site, Position) {
+		Overlaid .= SubStr(Body, Position, Site.Pos - Position) . "_OSPC_NativeReplay"
+		Position := Site.Pos + Site.Len
+		Count += 1
+	}
+	AssertEqual(2, Count, "Only the original native text/key SendEvent boundaries may receive owned-target guards")
+	Code .= Overlaid . SubStr(Body, Position) . "`n"
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_spent_controls_body.ahk")
+}
+_OSPC_Case(Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_one_shot_controls_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Root . "\subject.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
+	PreviousCritical := Critical("Off")
+	try {
+		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
+		PolicyMode := Mode == "escape-native" ? "escape" : Mode
+		DeclaredSpent := !!RegExMatch(Policy, "m)^local SPENT_UNSHIFTED\s*=\s*\{[^}\r\n]*\b" . PolicyMode . "\s*=\s*true")
+		AssertEqual(Mode != "left", DeclaredSpent,
+			"The canonical policy must distinguish spent controls from native navigation which remains armed.")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native one-shot fixture must exclusively acquire its own source directory.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _OSPC_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-one-shot-controls", Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine one-shot control child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned one-shot control child must settle once.")
+		_TestPrint("# one-shot-spent-control " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native one-shot spent-control contract failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS one-shot-spent-control " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := Handle
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _OSPC_Mode in ["enter", "tab", "escape", "left", "escape-native"]
+	Test("one-shot native spent control: " . _OSPC_Mode . " retains its native control and following-letter policy (one-shot-native-spent-controls)",
+		_OSPC_Case.Bind(_OSPC_Mode))
+
+_OSCF_ChildSource() {
+	global _DriverDir
+	Code := _OSPC_ChildSource()
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_spent_controls_body.ahk")
+	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the owned receiving fixture may change; real capture and replay remain intact")
+	return SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
+		. FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_control_flags_body.ahk")
+}
+_OSCF_Case(Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_one_shot_control_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Root . "\subject.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
+	PreviousCritical := Critical("Off")
+	try {
+		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
+		AssertTrue(InStr(Policy, "without changing that key"), "The shared control policy must preserve the captured key's flags")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native one-shot fixture must exclusively acquire its own source directory.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _OSCF_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-one-shot-control-flags", Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine one-shot control child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned one-shot control child must settle once.")
+		_TestPrint("# one-shot-control-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native one-shot spent-control contract failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS one-shot-control-flags " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := Handle
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _OSCF_Mode in ["plain", "ctrl", "shift", "ctrl-shift"]
+	Test("one-shot native captured control flags: " . _OSCF_Mode . " (one-shot-native-control-flags)", _OSCF_Case.Bind(_OSCF_Mode))
+
+for _OSCF_TabMode in ["tab", "tab-shift"]
+	Test("one-shot native captured Tab flags: " . _OSCF_TabMode . " (one-shot-native-tab-flags)", _OSCF_Case.Bind(_OSCF_TabMode))
+
+for _OSCF_KanaMode in ["kana-plain", "kana-released"]
+	Test("one-shot native custom flags: " . _OSCF_KanaMode . " retains the original control modifier (one-shot-native-kana-flags)",
+		_OSCF_Case.Bind(_OSCF_KanaMode))
+
+for _OSCF_BalanceMode in ["kana-control-refuse", "kana-control-throw", "kana-up-retry", "kana-held-original"]
+	Test("one-shot custom modifier balancing: " . _OSCF_BalanceMode . " preserves exact ownership (one-shot-native-kana-balancing)",
+		_OSCF_Case.Bind(_OSCF_BalanceMode))
+
+Test("one-shot restoration: a delivered Down followed by port exception retains release ownership (one-shot-native-failed-down)",
+	_OSCF_Case.Bind("kana-down-delivered-throw"))

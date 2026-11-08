@@ -63,7 +63,7 @@ local function owned_inverse()
 end
 
 local LOG = "adapters.storage"
-local ENOENT = 2 -- Native Linux errno: only a proven missing store may start empty.
+local ENOENT, EINVAL = 2, 22 -- Native Linux errno: absence and non-regular source.
 
 
 -- ========================================
@@ -160,10 +160,14 @@ local function _next_recovery_path()
 		local queried, inspected, kind = pcall(Shell.exec_checked, query)
 		if not queried or inspected ~= true or (kind ~= "special" and kind ~= "ordinary") then return nil end
 		if kind == "ordinary" then
-			local ok, fh, _, errno = pcall(io.open, candidate, "r")
+			-- The candidate may change after the advisory shell inspection. Pin
+			-- and classify its descriptor so a substituted FIFO cannot block.
+			local ok, fh, _, errno = pcall(require("infra.regular_file_reader").open_source, candidate)
 			if not ok then return nil end
-			if not fh then return errno == ENOENT and candidate or nil end
-			_close(fh)
+			if not fh then
+				if errno == ENOENT then return candidate end
+				if errno ~= EINVAL then return nil end
+			elseif not _close(fh) then return nil end
 		end
 		suffix = suffix + 1
 		candidate = _CORRUPT_PATH .. "." .. suffix
@@ -909,8 +913,9 @@ end
 --- @param updates table|nil Explicit root cells; nil only for clear_all.
 --- @param clear_all boolean|nil Explicit whole-store deletion.
 --- @return boolean committed
-local function released_source_commit(updates, clear_all)
+local function released_source_commit(updates, clear_all, expected)
 	if _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil or next(_owned_aliases) ~= nil then return false end
+	if expected and _ordinary_debt ~= nil then return false end
 	if _ordinary_debt ~= nil then
 		local previous = _ordinary_debt
 		_ordinary_commit_busy = true
@@ -930,6 +935,9 @@ local function released_source_commit(updates, clear_all)
 		local identity = { methods = owned_methods() }
 		local source, document, proof = released_store_source()
 		if not source or not owned_live(identity) then return false end
+		if expected and (not owned_live(expected) or not owned_source_cells_safe({ expected.key }, document, proof)
+			or not owned_cell_equal(owned_document_cells({ expected.key }, document)[expected.key], expected.cell)
+			or (_owned_generations[expected.key] or 0) ~= expected.generation) then return false end
 		if clear_all then
 			updates = {}
 			for key in pairs(document) do updates[key] = { present = false } end
@@ -971,6 +979,42 @@ local function released_source_commit(updates, clear_all)
 	end)
 	_ordinary_commit_busy = false
 	return okay and result == true
+end
+
+-- A modal edit needs a fresh physical cell and a one-shot authority to compare
+-- it with the source used by the ordinary conditional publisher after the dialog.
+local _string_edit_receipts = setmetatable({}, { __mode = "k" })
+
+--- Captures a fresh setting cell for a later string replacement.
+--- @param key string
+--- @return any value
+--- @return table|nil receipt nil if the source or value cannot be admitted.
+function M.capture_string_edit(key)
+	if type(key) ~= "string" or key == "" or _owned_io_busy or _ordinary_commit_busy
+		or _ordinary_debt ~= nil or _owned_file_debt ~= nil or next(_owned_aliases) ~= nil
+		or _load_blocked or not rawequal(package.loaded["adapters.storage"], M) then return nil end
+	local identity = { methods = owned_methods() }
+	local source, document, proof = released_store_readback()
+	if not source or not owned_live(identity) or not owned_source_cells_safe({ key }, document, proof) then return nil end
+	-- Do not run legacy recovery after a dialog if an external writer has since
+	-- produced malformed bytes: the captured source already initializes safely.
+	if _cache == nil then owned_cache_source(source) end
+	local cell = owned_document_cells({ key }, document)[key]
+	local receipt = {}
+	_string_edit_receipts[receipt] = { key = key, cell = cell, methods = identity.methods, generation = _owned_generations[key] or 0 }
+	return owned_copy(cell.value), receipt
+end
+
+--- Publishes a string only while its captured cell remains admitted.
+--- @param receipt table Opaque receipt from capture_string_edit.
+--- @param value string
+--- @return boolean committed
+function M.commit_string_edit(receipt, value)
+	if type(receipt) ~= "table" then return false end
+	local expected = _string_edit_receipts[receipt]
+	_string_edit_receipts[receipt] = nil
+	if not expected or type(value) ~= "string" or not rawequal(package.loaded["adapters.storage"], M) then return false end
+	return released_source_commit({ [expected.key] = { present = true, value = value } }, false, expected)
 end
 
 -- =========================================
@@ -1035,6 +1079,22 @@ function M.get(key, default_value)
 	end
 	if result == nil then return default_value end
 	return result
+end
+
+--- Reads a key while distinguishing absence from an unavailable store.
+function M.read_exact(key)
+	local loaded, ready = pcall(_ensure_loaded)
+	if not loaded or ready ~= true then return false, nil end
+	local ok, value = pcall(function()
+		local stored = _cache[tostring(key)]
+		if type(stored) == "table" then return json.decode(json.encode(stored)) end
+		return stored
+	end)
+	if not ok then
+		Logger.error(LOG, "read_exact(): failed to read key '%s'.", tostring(key))
+		return false, nil
+	end
+	return true, value
 end
 
 --- Deletes the entry for the given key from the persistent store.

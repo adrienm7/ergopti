@@ -162,9 +162,10 @@ Test("preview: the live-rebuild fence keeps every candidate closed",
 
 TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RepeatEnabled
-	global ScriptInformation
+	global ScriptInformation, LastSentCharacterKeyTime
 	MK := ScriptInformation["MagicKey"]
 	SavedRepeat := HSE_RepeatEnabled
+	SavedStamps := LastSentCharacterKeyTime
 	HSE_RegistryClear()
 	try {
 		HSE_RepeatEnabled := true
@@ -172,6 +173,9 @@ TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback() {
 			Map("Replacement", "ok" . MK, "Category", "test", "Section", "noop"))
 		HSE_Buffer := "ok"
 		HSE_StartIsWordBoundary := true
+		; The repeat answers within the magic key's window, measured from the
+		; repeated letter (repeat-window): this buffer was set, not typed.
+		LastSentCharacterKeyTime := Map("k", A_TickCount)
 
 		Decision := HSE_PreviewNextDecision(HSE_Buffer, MK)
 		Assert(IsObject(Decision) and Decision.Spec.HasOwnProp("TransientKind")
@@ -182,6 +186,7 @@ TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback() {
 		AssertEqual(0, _PrefixCollectCandidates().Length,
 			"the tooltip must advertise neither the rejected no-op mapping nor the doubling that beats it")
 	} finally {
+		LastSentCharacterKeyTime := SavedStamps
 		HSE_RepeatEnabled := SavedRepeat
 		HSE_RegistryClear()
 		HSE_HardReset()

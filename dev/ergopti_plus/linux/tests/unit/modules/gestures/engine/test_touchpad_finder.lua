@@ -19,12 +19,9 @@
 --- that machine twenty of the declared gesture slots can never fire, whatever the
 --- software does.
 ---
---- THE ASSUMPTION UNDER TEST:
---- The bitmaps are printed as 64-bit words, most significant first, with leading
---- zero words omitted. That is right on every machine this driver targets and
---- wrong on a 32-bit kernel, and there is no way to tell from the text. What
---- makes it acceptable is the DIRECTION of the failure, which the last case here
---- pins: an unreadable capability offers every gesture rather than none.
+--- BITMAP WIDTH:
+--- A 32-bit kernel prints narrower words, and text alone can be ambiguous.
+--- Device selection confirms an ambiguous capability through its fd.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -83,6 +80,95 @@ end
 -- ======= 1/ Reading a printed bitmap =============================
 -- =================================================================
 -- =================================================================
+
+helpers.describe("touchpad finder: 32-bit kernel bitmap", function()
+	local candidate = [[
+I: Bus=0018 Vendor=0002 Product=0007 Version=01b1
+N: Name="Touchpad"
+H: Handlers=mouse1 event7
+B: PROP=5
+B: EV=b
+B: KEY=1e520 0 0 0 0 0 0 0 0 0 0
+B: ABS=8000 0
+]]
+	helpers.it("admits an ambiguous 32-bit touchpad only after fd confirmation", function()
+		local calls = 0
+		local found = Finder.find(candidate, function(path)
+			calls = calls + 1
+			helpers.assert_eq(path, "/dev/input/event7")
+			return { slot = true, max_fingers = 3 }
+		end)
+		helpers.assert_true(found ~= nil)
+		helpers.assert_eq(found.max_fingers, 3)
+		helpers.assert_eq(calls, 1)
+	end)
+	helpers.it("reads ambiguous capabilities using the requested native bitmaps", function()
+		local previous_ffi, previous_open = package.loaded.ffi, io.open
+		local calls, closes = {}, 0
+		local fake = { os = "Linux", cdef = function() end,
+			new = function(kind)
+				local size = tonumber(kind:match("%[(%d+)%]"))
+				local result = {}; for i = 0, size - 1 do result[i] = 0 end
+				return result
+			end }
+		fake.C = {
+			open = function(path, flags) helpers.assert_eq(path, "/dev/input/event7"); helpers.assert_eq(flags, 0x80800); return 31 end,
+			close = function(fd) helpers.assert_eq(fd, 31); closes = closes + 1; return 0 end,
+			ioctl = function(fd, request, bytes)
+				helpers.assert_eq(fd, 31); calls[#calls + 1] = request
+				if request == 0x80084523 then bytes[5] = 128; return 8 end
+				if request == 0x802a4521 then bytes[40] = 32; bytes[41] = 32; return 42 end
+				error("unexpected ioctl")
+			end,
+		}
+		package.loaded.ffi = fake
+		io.open = function(path, mode)
+			if path ~= "/proc/bus/input/devices" then return previous_open(path, mode) end
+			return { read = function() return candidate end, close = function() return true end }
+		end
+		local ok, err = xpcall(function()
+			local found = Finder.find()
+			helpers.assert_true(found ~= nil)
+			helpers.assert_eq(found.max_fingers, 2)
+			helpers.assert_eq(calls, { 0x80084523, 0x802a4521 })
+			helpers.assert_eq(closes, 1)
+		end, debug.traceback)
+		package.loaded.ffi, io.open = previous_ffi, previous_open
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps a confirmed slot when the separate finger-count query fails", function()
+		local previous_ffi, previous_open = package.loaded.ffi, io.open
+		local closes = 0
+		local fake = { os = "Linux", cdef = function() end, new = function(kind)
+			local result = {}; for i = 0, tonumber(kind:match("%[(%d+)%]")) - 1 do result[i] = 0 end
+			return result
+		end }
+		fake.C = { open = function() return 31 end, close = function() closes = closes + 1; return 0 end,
+			ioctl = function(_, request, bytes)
+				if request == 0x80084523 then bytes[5] = 128; return 8 end
+				return -1
+			end }
+		package.loaded.ffi = fake
+		io.open = function(path, mode)
+			if path ~= "/proc/bus/input/devices" then return previous_open(path, mode) end
+			return { read = function() return candidate end, close = function() return true end }
+		end
+		local ok, err = xpcall(function()
+			local found = Finder.find()
+			helpers.assert_true(found ~= nil, "an unavailable finger count cannot erase a confirmed slot")
+			helpers.assert_eq(found.max_fingers, 0)
+			helpers.assert_eq(closes, 1)
+		end, debug.traceback)
+		package.loaded.ffi, io.open = previous_ffi, previous_open
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not admit an ambiguous non-touchpad on an fd refusal", function()
+		local found = Finder.find(candidate, function() return { slot = false, max_fingers = 3 } end)
+		helpers.assert_nil(found)
+	end)
+end)
 
 helpers.describe("touchpad finder: the bitmap reader", function()
 
@@ -228,9 +314,7 @@ end)
 helpers.describe("touchpad finder: what an unknown capability must do", function()
 
 	helpers.it("offers every slot when the finger count is unknown", function()
-		-- The whole safety argument for reading a printed bitmap under a word-size
-		-- ASSUMPTION rests on this. A wrong parse may fail to explain a gesture
-		-- that cannot work; it must never remove one that can.
+		-- An unavailable finger-count probe must not hide a working gesture.
 		for _, slot in ipairs({ "swipe_5_up", "tap_5", "swipe_2_left", "swipe_3_horiz" }) do
 			helpers.assert_true(Finder.slot_is_reachable(slot, 0),
 				slot .. " must be offered when the hardware could not be read")
@@ -289,3 +373,25 @@ B: ABS=661800011000003
 	end)
 
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("touchpad finder refuses an incomplete device snapshot " .. fault, function()
+		local original, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/bus/input/devices" then return original(path, mode) end
+			return { read = function()
+				if fault == "read_throw" then error("injected read failure") end
+				return DEVICES
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close failure") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, devices = pcall(Finder.list)
+		io.open = original
+		helpers.assert_true(called)
+		helpers.assert_eq(devices, {}, "an unacknowledged snapshot must not select a touchpad")
+		helpers.assert_eq(closes, 1)
+	end)
+end

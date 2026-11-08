@@ -11,7 +11,12 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system", "infra.config_paths", "platform.remap", "json" }, function()
+		"adapters.file_system", "infra.config_paths", "platform.remap", "json",
+		"modules.keymap.number_row_live" }, function()
+		-- No layout of ours types in the fixture: the number-row order is greyed.
+		package.loaded["modules.keymap.number_row_live"] = {
+			available = function() return false, "no_source_layout" end,
+		}
 		-- Distinctive rule: a wizard that derived the path itself cannot match it.
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/virtual/current/" end,

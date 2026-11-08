@@ -17,8 +17,8 @@
 # windows/tests/fixtures/nav_layer_golden.json;
 # tools/test/test-nav-layer-recommended-golden.cjs fails on any difference. The
 # number row, Space and Tab mean different things on each OS, so they live in
-# the OS tables: a repeat count on Windows, F1-F12, Spotlight and window
-# cycling on macOS, nothing on Linux. macOS also keeps Escape on the right
+# the OS tables: a repeat count on Windows and Linux, F1-F12, Spotlight and
+# window cycling on macOS. macOS also keeps Escape on the right
 # Command key, which sits where the right Alt key sits on a PC board. The wheel
 # is volume on the three OS, in each OS table: the `all` table stays the frozen
 # Windows golden.
@@ -96,6 +96,17 @@ schema_version = 1
 # The wheel: volume instead of scroll, while the layer holds the mouse.
 "WheelUp" = "vol_up"
 "WheelDown" = "vol_down"
+# The number row: how many times the next repeatable action runs.
+"Digit1" = "repeat_count:1"
+"Digit2" = "repeat_count:2"
+"Digit3" = "repeat_count:3"
+"Digit4" = "repeat_count:4"
+"Digit5" = "repeat_count:5"
+"Digit6" = "repeat_count:6"
+"Digit7" = "repeat_count:7"
+"Digit8" = "repeat_count:8"
+"Digit9" = "repeat_count:9"
+"Digit0" = "repeat_count:10"
 
 [layers.nav.windows]
 # The wheel: volume instead of scroll.

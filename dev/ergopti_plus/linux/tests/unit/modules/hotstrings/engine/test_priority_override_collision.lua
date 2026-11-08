@@ -292,7 +292,7 @@ end)
 
 
 helpers.describe("hotstring override leaf ownership", function()
-	local function with_owner(content, action, before_init)
+	local function with_owner(content, action, before_init, engine)
 		local root = assert(os.tmpname())
 		assert(os.remove(root))
 		local made = os.execute("mkdir -p '" .. root .. "'")
@@ -325,7 +325,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			assert(config._set_config_file_for_test(choices))
 			if before_init then before_init(path) end
 			local changes = 0
-			assert(config.init(nil, "/fixture/catalogue.toml", function() changes = changes + 1 end))
+			assert(config.init(engine, "/fixture/catalogue.toml", function() changes = changes + 1 end))
 			action(config, path, read, write, function() return changes end)
 		end, debug.traceback)
 		io.open, os.rename, os.remove, NativeWriter.open = old_open, old_rename, old_remove, old_stage
@@ -545,24 +545,34 @@ helpers.describe("hotstring override leaf ownership", function()
 			local original = config.configuration_snapshot()
 			local owner = {}
 			local candidate = source:gsub("delay_offset = 0.5", "delay_offset = 7.75")
-			-- The scope's runtime catalogue port is controlled; both file boundaries
-			-- and all public leaf operations still use the actual writer.
-			config.load_all = function() return {}, true end
-			helpers.assert_true(config.acquire(owner))
-			helpers.assert_true(config.apply_configuration(owner, {}, candidate, { status = "ok", content = candidate }))
-			helpers.assert_eq(config.set_override("ext:future:pack", "literal.section", "delay", 4), false)
-			helpers.assert_true(writer.publish_if_unchanged(path, candidate, nil, original.override_source))
-			helpers.assert_true(config.release(owner))
-			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 9.5))
-			helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 8.75"))
-			local applied = config.configuration_snapshot()
-			helpers.assert_true(config.acquire(owner))
-			helpers.assert_true(writer.publish_if_unchanged(path, source, nil, applied.override_source))
-			helpers.assert_true(config.restore_configuration(owner, original))
-			helpers.assert_true(config.release(owner))
-			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 2.5))
-			helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 1.75"))
-		end)
+			-- The scope's runtime catalogue port is controlled at the loader, which
+			-- both the candidate and the exact restoration publish through to a real
+			-- engine; both file boundaries and all public leaf operations still use
+			-- the actual writer.
+			local Loader = require("modules.hotstrings.loader")
+			local load_catalogue = Loader.load_catalogue
+			Loader.load_catalogue = function()
+				return { committed = true, errors = 0, mappings = {}, categories = {} }
+			end
+			local okay, failure = xpcall(function()
+				helpers.assert_true(config.acquire(owner))
+				helpers.assert_true(config.apply_configuration(owner, {}, candidate, { status = "ok", content = candidate }))
+				helpers.assert_eq(config.set_override("ext:future:pack", "literal.section", "delay", 4), false)
+				helpers.assert_true(writer.publish_if_unchanged(path, candidate, nil, original.override_source))
+				helpers.assert_true(config.release(owner))
+				helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 9.5))
+				helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 8.75"))
+				local applied = config.configuration_snapshot()
+				helpers.assert_true(config.acquire(owner))
+				helpers.assert_true(writer.publish_if_unchanged(path, source, nil, applied.override_source))
+				helpers.assert_true(config.restore_configuration(owner, original))
+				helpers.assert_true(config.release(owner))
+				helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 2.5))
+				helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 1.75"))
+			end, debug.traceback)
+			Loader.load_catalogue = load_catalogue
+			if not okay then error(failure, 0) end
+		end, nil, require("hotstring_engine").new())
 	end)
 
 	helpers.it("retains the actual absent or present-empty scope target before ordinary setters", function()

@@ -381,12 +381,18 @@ _HotPathReportSlow(Report, NowMs) {
 		try LoggerWarn("HotPath", "Slow {1} detail: {2}.", Report.Segment, Report.Detail)
 }
 
-/** Forgets every open frame and the rate limiter. Tests only. */
+/**
+ * Forgets every open frame and the rate limiter. Tests only. A discarded frame's
+ * billed child time goes with it: Open reuses the slot as it finds it, so a
+ * stale count would be subtracted from the next segment opened at that depth.
+ */
 _HotPathResetForTest() {
 	Owner := _HotPathNestingOwner()
 	Owner.Tracker.Depth := 0
-	loop HotPathNesting.MAX_DEPTH
+	loop HotPathNesting.MAX_DEPTH {
 		Owner.Tracker.Pending[A_Index] := ""
+		Owner.Tracker.Nested[A_Index] := 0
+	}
 	Owner.Gate.Reset()
 }
 
@@ -717,6 +723,11 @@ PerfCounters_Flush() {
 		try LoggerEvidence("Perf", "Interval counters ({1} ms): {2}.", IntervalMs, PerfCountersText(Counts))
 	if Refused > 0
 		try LoggerWarn("Perf", "Interval counters refused {1} increment(s) beyond the registry capacity.", Refused)
+	if IsSet(TOML_DocumentParseOwnersTake) {
+		ParseOwners := TOML_DocumentParseOwnersTake()
+		if ParseOwners.Count > 0
+			try LoggerEvidence("Perf", "Document parses by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(ParseOwners))
+	}
 	State := PerfProcessState()
 	; The log-volume figures ride on this record as they ride on the macOS memory
 	; record: both are process-wide and one record per interval is what is read back.

@@ -48,6 +48,7 @@ function M.ask(title, prompt, initial, hidden, choices)
 		.. " --text=" .. shell_quote(prompt)
 		.. " --entry-text=" .. shell_quote(initial or "")
 		.. (hidden and " --hide-text" or "")
+	command = command .. " --"
 	for _, choice in ipairs(type(choices) == "table" and choices or {}) do
 		command = command .. " " .. shell_quote(choice)
 	end

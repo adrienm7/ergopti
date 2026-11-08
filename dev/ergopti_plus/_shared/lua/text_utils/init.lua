@@ -247,10 +247,16 @@ end
 function M.unescape_text(s)
 	if type(s) ~= "string" then return "" end
 
-	-- 1. Decode Unicode escapes: \uXXXX
+	-- Decode UTF-16 pairs first; a surrogate by itself is not a Unicode scalar.
+	s = s:gsub("\\u([dD][89aAbB]%x%x)\\u([dD][cCdDeEfF]%x%x)", function(high, low)
+		local code = 0x10000 + (tonumber(high, 16) - 0xD800) * 0x400 + (tonumber(low, 16) - 0xDC00)
+		return utf8_lib.char(code)
+	end)
+
+	-- 1. Decode remaining Unicode escapes: \uXXXX
 	s = s:gsub("\\u(%x%x%x%x)", function(hex)
 		local code = tonumber(hex, 16)
-		if code then
+		if code and (code < 0xD800 or code > 0xDFFF) then
 			local ok, char = pcall(utf8_lib.char, code)
 			if ok then return char end
 		end
@@ -453,12 +459,27 @@ M.UPPER_LETTERS = {
 
 M.LOWER_LETTERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.LOWER_LETTERS[v] = k end
+-- Extend the French overrides with generated Unicode simple case pairs that
+-- preserve one Unicode scalar. Multi-scalar uppercase mappings require a
+-- separate matching path and are not admitted here.
+local unicode_case_data = require("unicode_case.data")
+for lower, upper in pairs(unicode_case_data.upper) do
+	if lower:byte(1) > 127 and strict_utf8_lib.len(upper) == 1
+		and M.UPPER_LETTERS[lower] == nil then M.UPPER_LETTERS[lower] = upper end
+end
+for upper, lower in pairs(unicode_case_data.lower) do
+	if upper:byte(1) > 127 and strict_utf8_lib.len(lower) == 1
+		and M.LOWER_LETTERS[upper] == nil then M.LOWER_LETTERS[upper] = lower end
+end
 -- The ASCII fast paths of trig_lower and repl_upper are exact only while both
 -- tables hold multibyte keys alone; a new ASCII key must fail loudly here.
 local NON_ASCII_BYTE = "[\128-\255]"
-for lower, upper in pairs(M.UPPER_LETTERS) do
-	assert(upper:find(NON_ASCII_BYTE) and lower:find(NON_ASCII_BYTE),
+for lower in pairs(M.UPPER_LETTERS) do
+	assert(lower:find(NON_ASCII_BYTE),
 		"case tables must hold multibyte keys only: " .. lower)
+end
+for upper in pairs(M.LOWER_LETTERS) do
+	assert(upper:find(NON_ASCII_BYTE), "case tables must hold multibyte keys only: " .. upper)
 end
 
 M.UPPER_TRIGGERS = {}
@@ -542,6 +563,19 @@ function M.trig_lower(s)
 	if not s:find(NON_ASCII_BYTE) then return (s:lower()) end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
 		return M.LOWER_LETTERS[c] or string.lower(c)
+	end))
+end
+
+--- Folds each trigger scalar using Unicode's locale-independent simple fold.
+--- Unlike lowercasing this equates final sigma and sigma without changing the
+--- number of scalars consumed by either driver's hotstring matcher.
+--- @param s string Trigger or typed text.
+--- @return string folded
+function M.trig_fold(s)
+	if type(s) ~= "string" then return "" end
+	if not s:find(NON_ASCII_BYTE) then return s:lower() end
+	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
+		return unicode_case_data.simple_fold[c] or c
 	end))
 end
 

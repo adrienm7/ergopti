@@ -105,6 +105,15 @@ Test("NetworkCheck: the proxy kinds are named from the settings and the environm
 _TNC_PacVerdict() {
 	Good := _TNC_Bytes("function FindProxyForURL(url, host) { return 'DIRECT'; }")
 	AssertEqual("ok", NetworkCheck_JudgePac(200, Good))
+	for WrongName in ["findproxyforurl", "FINDPROXYFORURL", "FindProxyForUrl"] {
+		Script := "function " . WrongName . "(){return 'DIRECT';}"
+		AssertEqual("error", NetworkCheck_JudgePac(200, _TNC_Bytes(Script)),
+			"PAC entry point is case sensitive: " . WrongName)
+		AssertEqual("error", _HC_PacAnswer(200, Script)["result"]["state"],
+			"health diagnostics use the same exact entry point")
+	}
+	AssertEqual("ok", _HC_PacAnswer(200, "function FindProxyForURL(){return 'DIRECT';}")["result"]["state"])
+
 	AssertEqual("error", NetworkCheck_JudgePac(404, Good), "a non-200 answer is an error")
 	AssertEqual("error", NetworkCheck_JudgePac(0, ""), "a failed request is an error")
 	AssertEqual("error", NetworkCheck_JudgePac(200, Buffer(0)), "an empty PAC is an error")
@@ -121,7 +130,39 @@ _TNC_PacVerdict() {
 	AssertEqual("ok", NetworkCheck_JudgePac(200, Marked), "a UTF-8 byte-order mark is accepted")
 	Wide := Buffer(4, 0)
 	NumPut("UChar", 0xFF, Wide, 0), NumPut("UChar", 0xFE, Wide, 1)
-	AssertEqual("ok", NetworkCheck_JudgePac(200, Wide), "a UTF-16 PAC is accepted as the download accepts it")
+	AssertEqual("error", NetworkCheck_JudgePac(200, Wide), "a BOM with NUL is not a PAC")
+	for BigEndian in [false, true] {
+		Text := "// é " . Chr(0x1F600) . " " . Chr(0xFFFD) . "`nfunction FindProxyForURL(){return 'DIRECT';}"
+		Units := StrLen(Text)
+		Storage := Buffer(2 + (Units + 1) * 2, 0)
+		Valid := Buffer(2 + Units * 2, 0)
+		NumPut("UShort", 0xFEFF, Storage)
+		StrPut(Text, Storage.Ptr + 2, Units + 1, "UTF-16")
+		DllCall("RtlMoveMemory", "Ptr", Valid, "Ptr", Storage, "UPtr", Valid.Size)
+		if BigEndian {
+			Loop Valid.Size // 2 {
+				At := (A_Index - 1) * 2
+				Word := NumGet(Valid, At, "UShort")
+				NumPut("UShort", ((Word & 0xFF) << 8) | (Word >> 8), Valid, At)
+			}
+		}
+		AssertEqual("ok", NetworkCheck_JudgePac(200, Valid), "real UTF-16 PAC survives strict decoding")
+	}
+	for Hex in ["FFFE", "FEFF", "FFFE41", "FEFF00", "FFFE00D8", "FEFFDC00", "FFFE4100", "FEFF0041"] {
+		Bad := Buffer(StrLen(Hex) // 2)
+		Loop Bad.Size
+			NumPut("UChar", Integer("0x" . SubStr(Hex, A_Index * 2 - 1, 2)), Bad, A_Index - 1)
+		AssertEqual("error", NetworkCheck_JudgePac(200, Bad), "malformed or absent UTF-16 script: " . Hex)
+	}
+	Expanded := Buffer(Valid.Size + 800000, 0)
+	DllCall("RtlMoveMemory", "Ptr", Expanded, "Ptr", Storage, "UPtr", Valid.Size)
+	Loop 400000
+		NumPut("UShort", 0x0800, Expanded, Valid.Size + (A_Index - 1) * 2)
+	AssertTrue(Expanded.Size < NetworkCheck_PacMaxBytes(), "raw UTF-16 is within the byte bound")
+	AssertEqual("error", NetworkCheck_JudgePac(200, Expanded), "normalized UTF-8 exceeds the byte bound")
+	WithNul := Buffer(Good.Size + 1, 0)
+	DllCall("RtlMoveMemory", "Ptr", WithNul, "Ptr", Good, "UPtr", Good.Size)
+	AssertEqual("error", NetworkCheck_JudgePac(200, WithNul), "valid script followed by NUL is refused")
 	; A valid script padded past the limit, so only the size can refuse it
 	Big := Buffer(NetworkCheck_PacMaxBytes() + 1, 0x20)
 	DllCall("RtlMoveMemory", "Ptr", Big, "Ptr", Good, "UPtr", Good.Size)

@@ -13,7 +13,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Armed per Activation: ToggleCapsWord arms the listeners with the policy of
 ;    that moment and DisableCapsWord disarms them, so nothing listens while
-;    CapsWord is off. Every handler also checks CapsWordEnabled first: a path
+;    CapsWord is off. A menu change re-arms an active CapsWord with the new
+;    policy, so it applies from the next event, as on macOS and Linux. Every handler also checks CapsWordEnabled first: a path
 ;    that clears the flag without DisableCapsWord (the fatal error net) leaves
 ;    inert listeners that disarm themselves on their next event.
 ; 2. Typed Delimiters: the HookDispatcher InputHook (I1) sees what the user
@@ -31,6 +32,11 @@
 ; 4. Defaults: Space, Tab, Enter and every pointer kind, no delay — Space,
 ;    Enter and the left and right clicks ended CapsWord before; Tab, the middle
 ;    and X buttons and the pointer motion join them for parity with macOS.
+; 5. Fixed Exits and Activity: Escape, Delete, the arrows, Home/End, Page
+;    Up/Down and F1-F12 always end CapsWord, and a modifier pressed alone is no
+;    keystroke for the delay, as on macOS (decision of 2026-11-06). The names
+;    are the shared policy's FIXED_EXIT_KEYS (_shared/lua/caps_word/auto_off.lua),
+;    pinned by tools/test/test-capsword-fixed-exits-single-source.cjs.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -72,6 +78,18 @@ class CapsWordAutoOff {
 ; ===========================
 ; ===========================
 
+; Virtual-key code -> shared fixed-exit name (FIXED_EXIT_KEYS).
+global CAPSWORD_FIXED_EXIT_VKS := Map(
+	0x1B, "escape", 0x2E, "delete", 0x26, "up", 0x28, "down", 0x25, "left", 0x27, "right",
+	0x24, "home", 0x23, "end", 0x21, "page_up", 0x22, "page_down",
+	0x70, "f1", 0x71, "f2", 0x72, "f3", 0x73, "f4", 0x74, "f5", 0x75, "f6",
+	0x76, "f7", 0x77, "f8", 0x78, "f9", 0x79, "f10", 0x7A, "f11", 0x7B, "f12")
+
+; Modifier virtual-key codes: pressed alone they are no keystroke for the delay.
+global CAPSWORD_MODIFIER_VKS := Map(
+	0x10, true, 0x11, true, 0x12, true, 0xA0, true, 0xA1, true, 0xA2, true,
+	0xA3, true, 0xA4, true, 0xA5, true, 0x5B, true, 0x5C, true)
+
 ; The pointer kinds the manifest declares for this platform, in order.
 ; @returns {Array}
 CapsWordAutoOffPointerKinds() {
@@ -83,15 +101,50 @@ CapsWordAutoOffPointerKinds() {
 	return Kinds
 }
 
-; The stored delay, or its default when absent or not a number of seconds.
-_CapsWordAutoOffReadIdle(Cache) {
+; The shared policy admits finite seconds; Windows can arm only its native
+; timer domain. Zero alone disables the timer; a smaller positive duration
+; still receives the native minimum one millisecond.
+_CapsWordAutoOffNativeIdleMs(Seconds, &Reason := "") {
+	if !CapsWordAutoOffValidateIdleTimeout(Seconds, &Reason)
+		return ""
+	if Seconds == 0
+		return 0
+	Milliseconds := TimerDelayMsFromSeconds(Seconds)
+	if Milliseconds is Number {
+		try {
+			TimerRequireDelayMs(Milliseconds, "CapsWord auto-off")
+			return Max(1, Round(Milliseconds))
+		} catch ValueError {
+			; An unsupported native period is refused before publication.
+		}
+	}
+	Reason := "invalid_idle_timeout"
+	return ""
+}
+
+; Validates the Windows period before the shared compiler's arithmetic, then
+; retains the portable delimiter/pointer policy with the admitted native delay.
+_CapsWordAutoOffCompileNativePolicy(Values, &Reason := "") {
+	Delay := _CapsWordAutoOffNativeIdleMs(Values.Get(ConfigLeaf.IDLE_TIMEOUT_SECONDS, ""), &Reason)
+	if !(Delay is Number)
+		return ""
+	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	if Policy is Map
+		Policy["idle_ms"] := Delay
+	return Policy
+}
+
+; The stored delay, or its default when absent or not a native timer duration.
+_CapsWordAutoOffReadIdle(Cache, Snapshot := 0) {
 	Default := ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS)
 	Raw := IniCacheGet(Cache, ConfigKey.SHORTCUTS_CAPS_WORD, ConfigLeaf.IDLE_TIMEOUT_SECONDS)
+	if IsObject(Snapshot)
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigKey.SHORTCUTS_CAPS_WORD, ConfigLeaf.IDLE_TIMEOUT_SECONDS, &Raw)
 	if Raw == "_"
 		return Default
-	if CapsWordAutoOffValidateIdleTimeout(Raw)
+	if _CapsWordAutoOffNativeIdleMs(Raw) is Number
 		return Raw
-	LoggerWarn("CapsWord", "shortcuts.caps_word.idle_timeout_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
+	LoggerWarn("CapsWord", "shortcuts.caps_word.idle_timeout_seconds '{1}' is not a supported native inactivity delay — using {2} s.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
 }
@@ -126,11 +179,13 @@ _CapsWordAutoOffReadTerminators(Cache) {
 }
 
 ; The stored pointer switches, each its default when absent or no boolean.
-_CapsWordAutoOffReadPointer(Cache, Kinds) {
+_CapsWordAutoOffReadPointer(Cache, Kinds, Snapshot := 0) {
 	Values := Map()
 	for Kind in Kinds {
 		Path := "shortcuts.caps_word.pointer." . Kind
 		Raw := IniCacheGet(Cache, "shortcuts.caps_word.pointer", Kind)
+		if IsObject(Snapshot)
+			ConfigTomlBootSnapshotValue(Snapshot, "shortcuts.caps_word.pointer", Kind, &Raw)
 		if Raw == "_" {
 			Values[Kind] := ManifestDefaultFor(Path) ? 1 : 0
 		} else if Type(Raw) == "Integer" && (Raw == 0 || Raw == 1) {
@@ -149,15 +204,18 @@ _CapsWordAutoOffReadPointer(Cache, Kinds) {
 ; @param Cache {Map} The parsed configuration cache (Map() for the defaults).
 ; @returns {Map} "idle_timeout_seconds", "terminators", "pointer".
 CapsWordAutoOffReadValues(Cache) {
+	; Read the admitted source once for all leaves: native booleans have lost
+	; their type distinction from integers in the compatibility cache.
+	Snapshot := ConfigTomlBootSnapshot(Cache)
 	return Map(
-		ConfigLeaf.IDLE_TIMEOUT_SECONDS, _CapsWordAutoOffReadIdle(Cache),
+		ConfigLeaf.IDLE_TIMEOUT_SECONDS, _CapsWordAutoOffReadIdle(Cache, Snapshot),
 		"terminators", _CapsWordAutoOffReadTerminators(Cache),
-		"pointer", _CapsWordAutoOffReadPointer(Cache, CapsWordAutoOffPointerKinds()))
+		"pointer", _CapsWordAutoOffReadPointer(Cache, CapsWordAutoOffPointerKinds(), Snapshot))
 }
 
 ; Compiles settings that passed the reader. A refusal is a driver defect.
 _CapsWordAutoOffCompileValues(Values) {
-	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	Policy := _CapsWordAutoOffCompileNativePolicy(Values, &Reason)
 	if !(Policy is Map)
 		throw Error("CapsWord auto-off settings refused after validation: " . Reason)
 	return Policy
@@ -174,6 +232,10 @@ CapsWordAutoOffCompileConfig(Cache) {
 _CapsWordAutoOffPublish(Values, Policy, Verb) {
 	CapsWordAutoOff.Values := Values
 	CapsWordAutoOff.Configured := Policy
+	_CapsWordAutoOffLog(Values, Policy, Verb)
+}
+
+_CapsWordAutoOffLog(Values, Policy, Verb) {
 	Delimiters := ""
 	for Key in Values["terminators"]
 		Delimiters .= (Delimiters == "" ? "" : ",") . Key
@@ -207,9 +269,10 @@ CapsWordAutoOffValues() {
 		? CapsWordAutoOff.Values : CapsWordAutoOffReadValues(Map()))
 }
 
-; Stores one [shortcuts.caps_word] setting and publishes it to the next
-; activation, without a reload: no hotkey is registered from these settings.
-; An active CapsWord keeps the settings it was armed with.
+; Stores one [shortcuts.caps_word] setting and publishes it without a reload:
+; no hotkey is registered from these settings. An active CapsWord is re-armed
+; with the new policy, so the change applies from its next event (decision of
+; 2026-11-06, as on macOS and Linux) and its delay restarts from the change.
 ; @param Path {String} "shortcuts.caps_word.idle_timeout_seconds",
 ;   "shortcuts.caps_word.terminators" or "shortcuts.caps_word.pointer.<kind>".
 ; @param Value {Any} The new value, in its stored shape.
@@ -217,7 +280,47 @@ CapsWordAutoOffValues() {
 ; @returns {Boolean} False when the write was refused (already reported).
 CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 	global ConfigurationFile
-	Values := CapsWordAutoOffValues()
+	; Validate only the requested setting against defaults before entering the
+	; gateway, preserving invalid-input exceptions without capturing live state.
+	_CapsWordAutoOffPrepareStore(Path, Value, CapsWordAutoOffReadValues(Map()))
+	Outcome := {candidate: 0}
+	Saved := ConfigCommitBuilt(ConfigPath != "" ? ConfigPath : ConfigurationFile,
+		"the CapsWord auto-off settings", _CapsWordAutoOffBuildStore.Bind(Path, Value, Outcome))
+	if Saved {
+		; Logging describes this acknowledged commit after its owner has retired;
+		; failure to log cannot turn a durable memory publication into a refusal.
+		try _CapsWordAutoOffLog(Outcome.candidate.values, Outcome.candidate.policy, "changed (" . Path . ")")
+		_CapsWordAutoOffRearmActive()
+	}
+	return Saved
+}
+
+; Re-arms the active CapsWord with the published policy: its subscriptions,
+; idle timer and motion poll then follow the new settings. Runs after the
+; configuration owner has retired, so it reads the latest acknowledged policy.
+; @returns {Boolean} True when an active CapsWord was re-armed.
+_CapsWordAutoOffRearmActive() {
+	global CapsWordEnabled
+	if !(CapsWordAutoOff.Armed is Map) || !IsSet(CapsWordEnabled) || !CapsWordEnabled
+		return false
+	EndFn := CapsWordAutoOff.EndFn
+	if !HasMethod(EndFn, "Call")
+		throw Error("CapsWord auto-off: an armed CapsWord has no end function.")
+	return CapsWordAutoOffArm(EndFn)
+}
+
+; The detached next-activation policy is captured and published while the same
+; configuration owner retains the path, so another menu commit cannot be lost.
+_CapsWordAutoOffBuildStore(Path, Value, Outcome) {
+	Candidate := _CapsWordAutoOffPrepareStore(Path, Value, CapsWordAutoOffValues())
+	Outcome.candidate := Candidate
+	return {
+		updates: [ManifestSparseOperation(Path, Candidate.value)],
+		publish: _CapsWordAutoOffPublishStore.Bind(Candidate.values, Candidate.policy),
+	}
+}
+
+_CapsWordAutoOffPrepareStore(Path, Value, Values) {
 	if Path == ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS || Path == "shortcuts.caps_word.terminators" {
 		Values[SubStr(Path, StrLen("shortcuts.caps_word.") + 1)] := ManifestCloneValue(Value)
 	} else if InStr(Path, "shortcuts.caps_word.pointer.") == 1 {
@@ -229,13 +332,15 @@ CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 	} else {
 		throw ValueError("No CapsWord auto-off setting at '" . Path . "'.")
 	}
-	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	Policy := _CapsWordAutoOffCompileNativePolicy(Values, &Reason)
 	if !(Policy is Map)
 		throw ValueError("CapsWord auto-off: '" . Path . "' refused (" . Reason . ").")
-	if !ConfigCommitUpdates(ConfigPath != "" ? ConfigPath : ConfigurationFile,
-			[ManifestSparseOperation(Path, Value)], "the CapsWord auto-off settings")
-		return false
-	_CapsWordAutoOffPublish(Values, Policy, "changed (" . Path . ")")
+	return {values: Values, policy: Policy, value: Value}
+}
+
+_CapsWordAutoOffPublishStore(Values, Policy) {
+	CapsWordAutoOff.Values := Values
+	CapsWordAutoOff.Configured := Policy
 	return true
 }
 
@@ -308,9 +413,9 @@ CapsWordAutoOffArm(EndFn) {
 	Generation := CapsWordAutoOffDisarm()
 	Policy := CapsWordAutoOffCurrentPolicy()
 	Callbacks := _CapsWordAutoOffBindCallbacks(Generation)
-	Subscriptions := [[HookDispatcherConst.EVT_KB_CHAR, Callbacks["char"]]]
-	if Policy["idle_ms"] > 0
-		Subscriptions.Push([HookDispatcherConst.EVT_KB_DOWN, Callbacks["key_down"]])
+	; Key-downs always: the fixed exits end CapsWord even without a delay.
+	Subscriptions := [[HookDispatcherConst.EVT_KB_CHAR, Callbacks["char"]],
+		[HookDispatcherConst.EVT_KB_DOWN, Callbacks["key_down"]]]
 	for Event, Kind in CapsWordAutoOffPointerEvents() {
 		if CapsWordAutoOffEndsOnPointer(Policy, Kind)
 			Subscriptions.Push([Event, Callbacks[Event]])
@@ -478,7 +583,14 @@ _CapsWordAutoOff_OnChar(Generation, Hook, Char) {
 }
 
 _CapsWordAutoOff_OnKeyDown(Generation, Hook, Vk, Sc) {
-	if !_CapsWordAutoOffActive(Generation) || !CapsWordAutoOff.IdleRunning
+	global CAPSWORD_FIXED_EXIT_VKS, CAPSWORD_MODIFIER_VKS
+	if !_CapsWordAutoOffActive(Generation)
+		return
+	if CAPSWORD_FIXED_EXIT_VKS.Has(Vk) {
+		_CapsWordAutoOffEnd(Generation, "editing key " . CAPSWORD_FIXED_EXIT_VKS[Vk])
+		return
+	}
+	if CAPSWORD_MODIFIER_VKS.Has(Vk) || !CapsWordAutoOff.IdleRunning
 		return
 	; A keystroke restarts the delay; the timer adapter replaces its pending period.
 	PreviousCritical := Critical("On")

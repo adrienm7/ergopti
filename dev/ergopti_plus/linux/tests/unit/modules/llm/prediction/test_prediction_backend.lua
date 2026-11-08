@@ -214,6 +214,43 @@ helpers.describe("prediction backend: requests are paced, variants are diverse",
 		helpers.assert_eq(after_interval, 6, "then all its variants follow without waiting")
 	end)
 
+	helpers.it("retains a refused rate timer after dismissing the request", function()
+		local engine, _, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 500 })
+		local original, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return original(handle) end
+		engine.predict("Bonjour à tous")
+		engine.predict("Bonjour à tous, et vous")
+		helpers.assert_true(scheduler.activeCount() > 0)
+		engine.dismiss()
+		local owner = { pending = function() return false end }
+		helpers.assert_true(engine.acquire_configuration(owner))
+		helpers.assert_nil(engine.configuration_snapshot(owner), "a refused pacing timer remains owned")
+		refused = false
+		helpers.assert_true(engine.release_configuration(owner))
+		helpers.assert_eq(engine.runtime_pending(), false)
+		restore()
+	end)
+
+	helpers.it("a stale pacing callback cannot discard its successor timer", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 500 })
+		local original, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return original(handle) end
+		engine.predict("Bonjour à tous")
+		engine.predict("Bonjour à tous, et vous")
+		local old
+		for _, timer in pairs(scheduler.pending) do old = timer end
+		helpers.assert_not_nil(old)
+		engine.predict("Bonjour à tous, nouvelle phrase")
+		scheduler.pending[old.id], old.armed, old.fired = nil, false, true
+		old.fn()
+		helpers.assert_eq(#calls.remote, 3, "a stale callback must not dispatch")
+		refused = false
+		engine.dismiss()
+		helpers.assert_eq(engine.runtime_pending(), false)
+		helpers.assert_eq(scheduler.activeCount(), 0, "the successor must still be cancelled")
+		restore()
+	end)
+
 	helpers.it("waits the interval the user set between two requests, not the backend's old fixed one (request-floor-setting)", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 1200 })
 		engine.predict("Bonjour à tous")
@@ -264,6 +301,13 @@ helpers.describe("prediction backend: requests are paced, variants are diverse",
 			scheduler.settle()
 			calls.remote[3].done(" troisième suite", nil, { prompt_tokens = 50, completion_tokens = 5,
 				total_tokens = 55, est_cost_usd = 0.5 })
+			-- This fixture's parser keeps none of them, so the retry budget (3 x 2)
+			-- is spent before the prediction reports its single generation row.
+			for index = 4, 6 do
+				scheduler.settle()
+				calls.remote[index].done(" autre suite", nil)
+			end
+			helpers.assert_eq(#calls.remote, 6, "the shared attempt budget bounds the retries")
 			helpers.assert_eq(#calls.generations, 1, "one generation row per prediction")
 			local info = calls.generations[1]
 			helpers.assert_eq(info.prompt_tokens, 150)
@@ -1112,18 +1156,19 @@ helpers.describe("prediction resident global privacy admission", function()
 		local okay, problem = pcall(function()
 			-- An automatic request (no prompt override): its variants go back to back.
 			engine.predict("Bonjour à tous")
-			for index = 1, 3 do calls.remote[index].done(" que tout le monde aille bien", nil) end
-			helpers.assert_eq(#calls.remote, 3, "the variants of one request are never held")
+			-- Identical answers spend the whole shared retry budget (3 x 2) refilling.
+			for index = 1, 6 do calls.remote[index].done(" que tout le monde aille bien", nil) end
+			helpers.assert_eq(#calls.remote, 6, "the variants of one request are never held")
 			-- The next automatic request is inside the interval: it waits.
 			engine.predict("Bonjour à tous, et vous")
-			helpers.assert_eq(#calls.remote, 3, "the next request must still be paced")
+			helpers.assert_eq(#calls.remote, 6, "the next request must still be paced")
 			blocked = true; scheduler.settle()
-			helpers.assert_eq(#calls.remote, 3, "revoked context must not send the next request")
+			helpers.assert_eq(#calls.remote, 6, "revoked context must not send the next request")
 			helpers.assert_eq(engine.has_suggestions(), false)
 			helpers.assert_true(engine.is_enabled())
 			blocked = false; request(engine); scheduler.settle()
-			helpers.assert_eq(#calls.remote, 4, "privacy recovery permits a new independent request")
-			calls.remote[4].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 7, "privacy recovery permits a new independent request")
+			calls.remote[7].done(" que tout le monde aille bien", nil)
 			helpers.assert_true(engine.accept(1))
 		end)
 		restore(); if not okay then error(problem, 0) end

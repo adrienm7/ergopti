@@ -141,9 +141,9 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 	package.loaded["hs"] = hs_stub
 
 	local selection_reads = 0
-	hs_stub.pasteboard.readAllData = function()
-		return { ["public.utf8-plain-text"] = "ORIGINAL" }
-	end
+	-- Seed the stub's own store so readAllData, allContentTypes and changeCount
+	-- agree, as the guarded clipboard snapshot requires of the native API.
+	assert(hs_stub.pasteboard.setContents("ORIGINAL"))
 	hs_stub.pasteboard.clearContents = function() return true end
 	hs_stub.pasteboard.getContents = function()
 		selection_reads = selection_reads + 1

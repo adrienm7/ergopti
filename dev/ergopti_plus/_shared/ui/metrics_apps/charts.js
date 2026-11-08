@@ -6,8 +6,6 @@
 // Active mode for the hour×weekday heatmap; flipped by setHourWeekdayMode().
 let _hourWeekdayMode = 'chars'; // "chars" | "time"
 
-const WEEKDAY_LABELS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-
 /**
  * Renders a 24×7 heatmap of activity by hour-of-day × day-of-week. Reads
  * aggData.rich.hour_weekday and renders SVG cells coloured by intensity
@@ -16,6 +14,7 @@ const WEEKDAY_LABELS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
  * @param {Object} aggData - Result of getAggregatedData()
  */
 function renderHourWeekdayHeatmap(aggData) {
+	const weekdayLabels = metricWeekdayLabels();
 	const container = document.getElementById('hour_weekday_heatmap_container');
 	if (!container) return;
 	const grid = (aggData && aggData.rich && aggData.rich.hour_weekday) || {};
@@ -65,7 +64,7 @@ function renderHourWeekdayHeatmap(aggData) {
 	let labels_x = '';
 	for (let wd = 0; wd < W; wd++) {
 		const cx = LABEL_LEFT + wd * (CELL + GAP) + CELL / 2;
-		labels_x += `<text x="${cx}" y="14" text-anchor="middle" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${WEEKDAY_LABELS_FR[wd]}</text>`;
+		labels_x += `<text x="${cx}" y="14" text-anchor="middle" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${escapeHtml(weekdayLabels[wd])}</text>`;
 	}
 	let labels_y = '';
 	HOURS.forEach((hh, h_idx) => {
@@ -77,9 +76,16 @@ function renderHourWeekdayHeatmap(aggData) {
 			const cell = grid[`${hh}|${wd}`];
 			const v = !cell ? 0 : mode === 'time' ? cell.time_ms || 0 : cell.chars || 0;
 			const fill = heat(v);
-			const tip_v = mode === 'time' ? (v > 0 ? formatDuration(v) : '0') : v > 0 ? `${v} car.` : '0';
-			const tip = `${WEEKDAY_LABELS_FR[wd]} ${hh}h — ${tip_v}`;
-			cells += `<rect x="${cx}" y="${cy2}" width="${CELL}" height="${CELL}" rx="3" fill="${fill}"><title>${tip}</title></rect>`;
+			const tip_v =
+				mode === 'time'
+					? v > 0
+						? formatDuration(v)
+						: '0'
+					: v > 0
+						? `${v} ${_t('ui_apps.col_chars')}`
+						: '0';
+			const tip = `${weekdayLabels[wd]} ${hh}h — ${tip_v}`;
+			cells += `<rect x="${cx}" y="${cy2}" width="${CELL}" height="${CELL}" rx="3" fill="${fill}"><title>${escapeHtml(tip)}</title></rect>`;
 		}
 	});
 
@@ -101,6 +107,7 @@ function renderRibbon(aggData) {
 	const legend = document.getElementById('ribbon_legend');
 	if (!container) return;
 
+	const weekdayLabels = metricWeekdayLabels();
 	const ribbon = (aggData && aggData.rich && aggData.rich.ribbon) || {};
 	const days = Object.keys(ribbon).sort(); // ascending date
 	if (days.length === 0) {
@@ -137,8 +144,8 @@ function renderRibbon(aggData) {
 		const dow = (new Date(ts).getUTCDay() + 6) % 7;
 		const dd = String(new Date(ts).getUTCDate()).padStart(2, '0');
 		const mm = String(new Date(ts).getUTCMonth() + 1).padStart(2, '0');
-		const label = `${WEEKDAY_LABELS_FR[dow]} ${dd}/${mm}`;
-		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${label}</text>`;
+		const label = `${weekdayLabels[dow]} ${dd}/${mm}`;
+		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${escapeHtml(label)}</text>`;
 
 		HOURS.forEach((hh, hi) => {
 			const x = LABEL_LEFT + hi * CELL_W;
@@ -159,7 +166,7 @@ function renderRibbon(aggData) {
 			const opacity = Math.min(1, totalMs / (60 * 60 * 1000)) || 0.05;
 			const tip = topCat
 				? `${label} · ${hh}h — ${topCat} (${formatDuration(totalMs)})`
-				: `${label} · ${hh}h — inactif`;
+				: `${label} · ${hh}h — 0`;
 			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${escapeHtml(tip)}</title></rect>`;
 		});
 	});
@@ -227,8 +234,8 @@ function renderSankey(aggData) {
 	const H = PAD_TOP * 2 + Math.max(leftApps.length, rightApps.length) * ROW_H;
 
 	// Y for each app on each side
-	const leftY = {};
-	const rightY = {};
+	const leftY = Object.create(null);
+	const rightY = Object.create(null);
 	leftApps.forEach((n, i) => (leftY[n] = PAD_TOP + i * ROW_H + ROW_H / 2));
 	rightApps.forEach((n, i) => (rightY[n] = PAD_TOP + i * ROW_H + ROW_H / 2));
 
@@ -280,41 +287,21 @@ let dailyBoundsChart = null;
  * Apps are colored by their dominant icon colour; markers for system events
  * are omitted because the manifest only stores counts, not timestamps.
  */
-function renderDayTimeline() {
+function renderDayTimeline(aggData) {
 	const container = document.getElementById('day_timeline_container');
 	if (!container) return;
-
-	// Pick the target day: explicit selection if any, otherwise the most
-	// recent day in manifestData.
-	let targetDay = currentSelectedDate;
-	if (!targetDay || !manifestData[targetDay]) {
-		const dates = Object.keys(manifestData).sort();
-		targetDay = dates[dates.length - 1] || null;
-	}
+	const projection = aggData || getAggregatedData();
+	const day = projection.rich.timeline_day;
+	const targetDay = day.date;
 	if (!targetDay) {
 		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_day')}</div>`;
 		return;
 	}
-
-	const dayData = manifestData[targetDay] || {};
-	// hourly[hh] → array of {app, ms}
 	const byHour = {};
 	for (let h = 0; h < 24; h++) byHour[String(h).padStart(2, '0')] = [];
-
-	Object.entries(dayData).forEach(([appName, appData]) => {
-		if (appName === '_sys' || appName === '_system') return;
-		if (!appData.hourly) return;
-		Object.entries(appData.hourly).forEach(([hh, hData]) => {
-			let ms = hData.time_ms || 0;
-			if (ms === 0 && hData.c > 0) {
-				// Estimate from chars proportion if time_ms missing
-				let totalChars = 0;
-				Object.values(appData.hourly).forEach((h) => (totalChars += h.c || 0));
-				if (totalChars > 0) ms = (hData.c / totalChars) * (appData.app_time_ms || 0);
-			}
-			if (ms > 0 && byHour[hh]) byHour[hh].push({ app: appName, ms });
-		});
-	});
+	for (const row of day.rows) {
+		if (byHour[row.hour]) byHour[row.hour].push(row);
+	}
 
 	const ROW_H = 18;
 	const GAP = 3;
@@ -327,7 +314,9 @@ function renderDayTimeline() {
 	for (let h = 0; h < 24; h++) {
 		const hh = String(h).padStart(2, '0');
 		const slots = byHour[hh] || [];
-		const totalMs = Math.min(
+		// Estimates can assign more than one hour to a single slot. Scale all
+		// contributions together while keeping their original values in tooltips.
+		const scaleMs = Math.max(
 			slots.reduce((s, x) => s + x.ms, 0),
 			60 * 60 * 1000
 		);
@@ -339,7 +328,7 @@ function renderDayTimeline() {
 		slots.sort((a, b) => b.ms - a.ms);
 		let cursor = 0;
 		slots.forEach((s) => {
-			const w = (s.ms / (60 * 60 * 1000)) * HOUR_W;
+			const w = (s.ms / scaleMs) * HOUR_W;
 			const col = getAppColor(s.app, 0);
 			const tip = `${s.app} · ${formatDuration(s.ms)} (${hh}h)`;
 			svg += `<rect x="${LABEL_LEFT + cursor}" y="${y}" width="${w}" height="${ROW_H}" rx="2" fill="${col}" fill-opacity="0.9"><title>${escapeHtml(tip)}</title></rect>`;
@@ -348,7 +337,7 @@ function renderDayTimeline() {
 	}
 
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Jour : ${escapeHtml(formatDisplayDate(targetDay))}</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${escapeHtml(_t('ui_apps.col_day'))} : ${escapeHtml(formatDisplayDate(targetDay))}</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
 }
 
@@ -579,24 +568,12 @@ function renderTopWindowsTable(aggData) {
  * Renders the top sessions table (#37). Uses per-app-day session_longest_ms
  * as a proxy: for each (date, app) row we surface its longest single session.
  */
-function renderTopSessionsTable() {
+function renderTopSessionsTable(aggData) {
 	const tbody = document.getElementById('top_sessions_tbody');
 	if (!tbody) return;
-	const rows = [];
-	Object.entries(manifestData || {}).forEach(([dateStr, dayData]) => {
-		Object.entries(dayData || {}).forEach(([appName, appData]) => {
-			if (appName === '_sys' || appName === '_system') return;
-			const longest = Number(appData.session_longest_ms) || 0;
-			if (longest > 0) {
-				rows.push({
-					date: dateStr,
-					app: appName,
-					ms: longest,
-					chars: Number(appData.session_longest_chars) || 0
-				});
-			}
-		});
-	});
+	// Sort a copy: the cached projection belongs to all dashboard consumers.
+	const projection = aggData || getAggregatedData();
+	const rows = [...(projection.rich.sessions.rows || [])];
 	rows.sort((a, b) => b.ms - a.ms);
 	const top = rows.slice(0, 30);
 	if (top.length === 0) {
@@ -699,7 +676,7 @@ function renderDailyTrajectories(aggData) {
 				datasets: [
 					{
 						label: _t('ui_apps.ds_focus_h'),
-						data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),
+						data: dates.map((d) => byDate[d].time_ms / 3600000),
 						borderColor: ThemeTokens.color('blue-dark'),
 						backgroundColor: 'rgba(10,132,255,0.15)',
 						tension: 0.25,
@@ -754,15 +731,16 @@ function renderDailyTrajectories(aggData) {
 	if (c30) {
 		const ratios = dates.map((d) => {
 			const eff = Math.max(0, (byDate[d].time_ms || 0) - (byDate[d].passive_ms || 0));
-			return eff > 0 ? +(((byDate[d].active_ms || 0) / eff) * 100).toFixed(1) : 0;
+			return eff > 0 ? ((byDate[d].active_ms || 0) / eff) * 100 : 0;
 		});
-		const colors = ratios.map((r) =>
-			r >= 60
+		const colors = ratios.map((value) => {
+			const r = +value.toFixed(1);
+			return r >= 60
 				? ThemeTokens.color('green-dark')
 				: r >= 30
 					? ThemeTokens.color('yellow-dark')
-					: ThemeTokens.color('red-dark')
-		);
+					: ThemeTokens.color('red-dark');
+		});
 		if (dailyActiveRatioChart) dailyActiveRatioChart.destroy();
 		dailyActiveRatioChart = new Chart(c30.getContext('2d'), {
 			type: 'bar',
@@ -780,7 +758,20 @@ function renderDailyTrajectories(aggData) {
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				plugins: { legend: { display: false } },
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							label: (context) =>
+								Chart.defaults.plugins.tooltip.callbacks.label({
+									...context,
+									formattedValue: Number(context.parsed.y.toFixed(1)).toLocaleString(
+										context.chart?.options?.locale
+									)
+								})
+						}
+					}
+				},
 				scales: {
 					x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-888') } },
 					y: {
@@ -802,7 +793,7 @@ function renderDailyTrajectories(aggData) {
 		const catList = [...allCats];
 		const datasets = catList.map((cat) => ({
 			label: cat,
-			data: dates.map((d) => +(((byDate[d].by_category || {})[cat] || 0) / 3600000).toFixed(2)),
+			data: dates.map((d) => ((byDate[d].by_category || {})[cat] || 0) / 3600000),
 			backgroundColor: getCategoryColor(cat, 0),
 			borderColor: getCategoryColor(cat, 0),
 			fill: true,
@@ -965,7 +956,7 @@ function renderBurstHistogram(aggData) {
 	const data = [];
 	ORDER.forEach((k) => {
 		if (buckets[k] != null) {
-			labels.push(`≤ ${k}`);
+			labels.push(k === '500+' ? '> 500' : `≤ ${k}`);
 			data.push(buckets[k]);
 		}
 	});
@@ -1024,21 +1015,6 @@ window.setHourWeekdayMode = function (mode) {
 
 let _calendarMode = 'chars';
 
-const MONTHS_FR_SHORT = [
-	'Jan',
-	'Fév',
-	'Mar',
-	'Avr',
-	'Mai',
-	'Juin',
-	'Juil',
-	'Août',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Déc'
-];
-
 /**
  * Renders a GitHub-style 53-week × 7-day calendar covering the last 365
  * days. Intensity per cell scales with either characters typed (default)
@@ -1079,13 +1055,14 @@ function renderActivityCalendar() {
 		const key = formatMetricsDateKey(cursor.getTime());
 		const day = per_day[key];
 		const v = !day ? 0 : _calendarMode === 'time' ? day.time_ms || 0 : day.chars || 0;
-		if (v > max_v) max_v = v;
+		const inWindow = cursor >= start && cursor <= today;
+		if (inWindow && v > max_v) max_v = v;
 		cells.push({
 			key,
 			date: new Date(cursor),
 			weekday: (cursor.getUTCDay() + 6) % 7, // 0=Mon … 6=Sun
 			value: v,
-			in_window: cursor >= start && cursor <= today
+			in_window: inWindow
 		});
 		cursor.setUTCDate(cursor.getUTCDate() + 1);
 	}
@@ -1120,15 +1097,15 @@ function renderActivityCalendar() {
 		if (c.date.getUTCDate() <= 7 && c.date.getUTCMonth() !== last_label_month) {
 			last_label_month = c.date.getUTCMonth();
 			const cx = LABEL_W + col * (CELL + GAP);
-			month_labels += `<text x="${cx}" y="12" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getUTCMonth()]}</text>`;
+			month_labels += `<text x="${cx}" y="12" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${escapeHtml(_t(`ui_typing.calendar_month_${c.date.getUTCMonth()}`))}</text>`;
 		}
 	});
 
-	const wd_labels_short = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+	const wd_labels_short = metricWeekdayLabels();
 	let wd_labels = '';
 	[1, 3, 5].forEach((wd_i) => {
 		const cy = HEAD_H + wd_i * (CELL + GAP) + 9;
-		wd_labels += `<text x="0" y="${cy}" fill="${ThemeTokens.color('grey-666')}" font-size="9" font-family="system-ui">${wd_labels_short[wd_i]}</text>`;
+		wd_labels += `<text x="0" y="${cy}" fill="${ThemeTokens.color('grey-666')}" font-size="9" font-family="system-ui">${escapeHtml(wd_labels_short[wd_i])}</text>`;
 	});
 
 	let rects = '';
@@ -1149,9 +1126,9 @@ function renderActivityCalendar() {
 					? formatDuration(c.value)
 					: '0'
 				: c.value > 0
-					? `${c.value} car.`
+					? `${c.value} ${_t('ui_apps.col_chars')}`
 					: '0';
-		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${dt} — ${v_txt}</title></rect>`;
+		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${escapeHtml(`${dt} — ${v_txt}`)}</title></rect>`;
 	});
 
 	container.innerHTML =
@@ -1188,7 +1165,7 @@ function renderCpmByHourChart(aggData) {
 		labels.push(`${hh}h`);
 		const slot = by_hour[hh] || { time_ms: 0, chars: 0 };
 		const minutes = slot.time_ms / 60000;
-		cpm.push(minutes > 0 ? Math.round(slot.chars / minutes) : 0);
+		cpm.push(minutes > 0 ? slot.chars / minutes : 0);
 		chars.push(slot.chars || 0);
 	}
 
@@ -1228,7 +1205,11 @@ function renderCpmByHourChart(aggData) {
 				legend: { labels: { color: ThemeTokens.color('grey-ddd'), font: { size: 11 } } },
 				tooltip: {
 					callbacks: {
-						title: (items) => (items[0] ? items[0].label : '')
+						title: (items) => (items[0] ? items[0].label : ''),
+						label: (context) =>
+							context.dataset.yAxisID === 'y_cpm'
+								? formatCpmTooltip(context)
+								: Chart.defaults.plugins.tooltip.callbacks.label(context)
 					}
 				}
 			},

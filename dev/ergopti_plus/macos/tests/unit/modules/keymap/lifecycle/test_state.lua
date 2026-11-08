@@ -181,3 +181,26 @@ helpers.describe("State.new: suppress_rescan", function()
 		helpers.assert_true(s.no_rescan_until > 0)
 	end)
 end)
+
+helpers.describe("hotstring suppression monotonic timing (hotstring-clock-regression)", function()
+	helpers.it("expires both suppression modes despite civil clock changes", function()
+		local scheduler = require("adapters.timer_scheduler")
+		local original = scheduler.hotstring_time
+		local original_wall = hs.timer.secondsSinceEpoch
+		local awake, wall = 100, 100
+		hs.timer.secondsSinceEpoch = function() return wall end
+		scheduler.hotstring_time = function() return awake end
+		local ok, err = pcall(function()
+			local state = State.new(make_defaults(), {})
+			state.suppress_rescan(0.5)
+			awake, wall = 101, 41
+			helpers.assert_true(awake >= state.no_rescan_until, "suppression expires on elapsed time")
+			state.suppress_rescan_keep_buffer(0.5)
+			awake, wall = 102, 500
+			helpers.assert_true(awake >= state.no_rescan_until, "chain suppression expires on elapsed time")
+		end)
+		scheduler.hotstring_time = original
+		hs.timer.secondsSinceEpoch = original_wall
+		if not ok then error(err, 0) end
+	end)
+end)

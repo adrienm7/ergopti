@@ -191,6 +191,9 @@ local function normalize_config_dir_override(value, key)
 	if type(value) ~= "string" then
 		return nil, key .. " must be a string or empty"
 	end
+	if value:find("\0", 1, true) then
+		return nil, key .. " must not contain NUL"
+	end
 	if not NativePath.is_absolute(value) then
 		return nil, key .. " must be an absolute path"
 	end
@@ -314,12 +317,16 @@ local function logs_dir()
 end
 
 --- Ensures a directory exists (idempotent), creating parents as needed.
---- Memoised per session; prefers the in-process hs.fs API over a shell fork.
+--- Cached paths are rechecked in-process; creation prefers hs.fs over a shell fork.
 --- @param path string Absolute path with trailing slash.
 --- @return boolean ensured True only when the directory exists after the call.
 local function ensure_dir(path)
 	if not path or path == "" then return false end
-	if _ensured_dirs[path] then return true end
+	if _ensured_dirs[path] then
+		local ok, attr = pcall(hs.fs.attributes, path)
+		if ok and type(attr) == "table" and attr.mode == "directory" then return true end
+		_ensured_dirs[path] = nil
+	end
 
 	-- hs.fs.mkdir creates a single level only, so walk the ancestors first to
 	-- reproduce "mkdir -p" without leaving the process.
@@ -354,7 +361,7 @@ local function ensure_dir(path)
 	-- remembering the failure would skip every later attempt — leaving the config
 	-- directory missing for the whole session while every save silently no-ops.
 	local ok_final, final_attr = pcall(hs.fs.attributes, path)
-	if ok_final and final_attr then
+	if ok_final and type(final_attr) == "table" and final_attr.mode == "directory" then
 		_ensured_dirs[path] = true
 		return true
 	else
@@ -652,7 +659,10 @@ function M.init(base_dir)
 	-- configured; otherwise the user ends up with an unwanted
 	-- ~/Library/Application Support/Ergopti/config/ on every reload.
 	local resolved = config_dir()
-	if resolved == _default_config_dir then ensure_dir(_default_config_dir) end
+	if resolved == _default_config_dir and not ensure_dir(_default_config_dir) then
+		Logger.error(LOG, "The default configuration directory is unavailable; initialization refused.")
+		return false
+	end
 	_initialized = true
 	follow_config_dir_in_logs()
 	Logger.success(LOG, "Config paths initialized (base: '%s', config: '%s').", base_dir, resolved)
@@ -793,7 +803,7 @@ end
 --- @return boolean changed True when the stored value actually moved.
 --- @return string|nil error_message Validation or publication failure.
 function M.set_config_dir(new_dir)
-	return M.set_paths(new_dir or "", nil)
+	return M.set_paths(new_dir == nil and "" or new_dir, nil)
 end
 
 --- Metrics store directory of a configuration directory. The single rule shared

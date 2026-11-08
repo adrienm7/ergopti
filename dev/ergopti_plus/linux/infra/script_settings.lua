@@ -159,20 +159,17 @@ end
 --- @param value any
 --- @return boolean Whether persistence and application both succeeded.
 function M.set(value)
-	if not _scope.admit_change() then return false end
+	local script_scope = require("infra.script_scope")
+	if not script_scope.retry_edit(FEATURE_PATH) or not _scope.admit_change() then return false end
 	local level = canonical(value)
 	if not level then
 		Logger.error(LOG, "Refusing invalid log level '%s'.", tostring(value))
 		return false
 	end
-	-- config.toml's [script] log_level wins at start: rewrite it first.
-	if not require("infra.script_scope").rewrite_configured(FEATURE_PATH, level)
-		or Storage.set(FEATURE_PATH, level) ~= true then
+	if not script_scope.edit_setting(FEATURE_PATH, level) then
 		Logger.error(LOG, "Log level '%s' could not be persisted — active state is unchanged.", level)
 		return false
 	end
-	Logger.set_level(threshold(level))
-	_active = level
 	return true
 end
 

@@ -28,6 +28,7 @@
 #Requires Autohotkey v2.0+
 #Include keystats_webview_range_script.ahk
 #Include keystats_webview_range_mount.ahk
+#Include keystats_maintenance.ahk
 #Include keystats_apps_editor.ahk
 
 
@@ -423,7 +424,7 @@ KLWV_Open(which, metrics_dir) {
 			)
 			if KLWV.close_during_open.Get(which, false)
 					KLWV_Hide(which, g)
-			SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -TimingsGet("keystats", "first_push_delay_ms"))
+			TimerArmOneShotMs(KLWV_DelayedFirstPush.Bind(which, Epoch), TimingsGet("keystats", "first_push_delay_ms"))
 			KLWV_ArmRebuildWatch(which, Epoch)
 			KLWV_FitWebView(which)
 			KLWV_OpenTimingMark(which, "navigate", Timing)
@@ -489,7 +490,7 @@ KLWV_Hide(which, GuiObj) {
 	} finally {
 		KLWV.retiring.Delete(which)
 		if Pending.Has("metrics_dir")
-			SetTimer(KLWV_Open.Bind(which, Pending["metrics_dir"]), -1)
+			TimerArmOneShotMs(KLWV_Open.Bind(which, Pending["metrics_dir"]), 1)
 	}
 	return 1
 }
@@ -660,6 +661,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 				KLWV_QueueAppsEditor(entry, Epoch, msg)
 		case "range_consumed":
 			KLWV_ConsumeRangeStage(which, Epoch, entry, msg)
+		case "metrics_export", "metrics_purge":
+			; The writer drains the journal first; run it after this callback
+			; returns so no ingest work nests inside the WebView message loop.
+			if !RegExMatch(msg, '"maintenance_id"\s*:\s*(\d{1,15})\b', &mid)
+				return
+			TimerArmOneShotMs(KLWV_RunMaintenance.Bind(which, Epoch, SubStr(action, StrLen("metrics_") + 1),
+				Integer(mid[1]), entry["metrics_dir"]), 1)
 				case "ready":
 						; Page just finished loading and signals it's ready to
 						; receive pushes. Inject i18n strings first (fetch() is
@@ -711,6 +719,12 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path)
 								KLPF_LAST_JSON.Delete(path)
 						try FileDelete(path)
+						; The durable reader image would otherwise be restored by the
+						; successor build, so an explicit reset must retire it too.
+						if !KLR_CacheRetire(entry["metrics_dir"]) {
+								LoggerError("Keystats", "KLWV_OnWebMessage: the reader image could not be retired; caches were not fully purged.")
+								return
+						}
 						if KLWV_IsCurrent(which, Epoch)
 								KLWV.windows[which]["full_build_done"] := false
 						try LoggerDebug("Keystats", "KLWV_OnWebMessage: dashboard caches purged.")
@@ -903,6 +917,24 @@ KLWV_QueueRangeTerminal(which, Epoch, request_id, status) {
 				return false
 		entry["pending_range_terminal"] := Map(
 				"epoch", Epoch, "request_id", request_id, "status", status)
+		return true
+}
+
+; Runs one dashboard Export or Purge and answers the page that asked for it.
+KLWV_RunMaintenance(which, Epoch, Kind, MaintenanceId, MetricsDir) {
+		Result := KL_RunMetricsMaintenance(Kind, MetricsDir)
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		; Built by hand: the page requires a JSON boolean, which AHK has no type for.
+		msg := '{"type":"metrics_maintenance","maintenance_id":' . MaintenanceId
+				. ',"ok":' . (Result["ok"] ? "true" : "false")
+				. ',"path":' . JsonStringLiteral(Result["path"]) . '}'
+		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
+		catch as err {
+				try LoggerError("Keystats", "KLWV_RunMaintenance: the outcome could not reach '{1}': {2}", which, err.Message)
+				return false
+		}
 		return true
 }
 

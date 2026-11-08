@@ -620,6 +620,7 @@ end
 function M.teleport_mouse(parent)
 	local admitted, scope = mouse_action_admission_open("Mouse teleport", parent)
 	if not admitted then return false end
+	local generation = scope.generation
 	local ok_cur, current = pcall(hs.mouse.getCurrentScreen)
 	if not ok_cur or not current then
 		Logger.warn(LOG, "teleport_mouse: could not determine current screen.")
@@ -638,17 +639,26 @@ function M.teleport_mouse(parent)
 	end
 
 	-- Find the next screen in the list, wrapping around
-	local target     = nil
-	local current_id = current:id()
-	for i, s in ipairs(all) do
-		if s:id() == current_id then
-			target = all[(i % #all) + 1]
-			break
+	local resolved, f, target_name = xpcall(function()
+		local target
+		local current_id = current:id()
+		for i, s in ipairs(all) do
+			if s:id() == current_id then
+				target = all[(i % #all) + 1]
+				break
+			end
 		end
+		if not target then target = all[1] end
+		local frame = target:frame()
+		local name_ok, name = pcall(function() return target:name() end)
+		return frame, name_ok and name or "unknown"
+	end, debug.traceback)
+	if not resolved or type(f) ~= "table" or type(f.x) ~= "number"
+		or type(f.y) ~= "number" or type(f.w) ~= "number" or type(f.h) ~= "number"
+		or scope.paused or scope.generation ~= generation then
+		Logger.warn(LOG, "teleport_mouse: target screen could not be resolved.")
+		return false
 	end
-	if not target then target = all[1] end
-
-	local f = target:frame()
 	local move_ok, moved, current_after_move = invoke_mouse_native_boundary(scope,
 		function()
 			return MouseControl.setPos(
@@ -658,7 +668,7 @@ function M.teleport_mouse(parent)
 		end)
 
 	if move_ok and moved == true and current_after_move then
-		Logger.info(LOG, "Mouse teleported to screen '%s'.", target:name() or "unknown")
+		Logger.info(LOG, "Mouse teleported to screen '%s'.", tostring(target_name or "unknown"))
 		-- Brief spotlight so the cursor is immediately visible at its new location
 		return M.spotlight_mouse(SPOTLIGHT_TELEPORT_DURATION_S, scope.id) == true
 	else
@@ -746,10 +756,19 @@ cg = ctypes.cdll.LoadLibrary(CG)
 cg.CGGetOnlineDisplayList.restype = ctypes.c_int32
 cg.CGMainDisplayID.restype        = ctypes.c_uint32
 cg.CGDisplayIsInMirrorSet.restype = ctypes.c_bool
+cg.CGBeginDisplayConfiguration.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+cg.CGConfigureDisplayMirrorOfDisplay.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32]
+cg.CGCompleteDisplayConfiguration.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+cg.CGCancelDisplayConfiguration.argtypes = [ctypes.c_void_p]
+
+def check(stage, code):
+    if code != 0:
+        raise RuntimeError(f"{stage} failed with CoreGraphics error {code}")
+
 MAX = 16
 n   = ctypes.c_uint32(0)
 ids = (ctypes.c_uint32 * MAX)()
-cg.CGGetOnlineDisplayList(MAX, ids, ctypes.byref(n))
+check("CGGetOnlineDisplayList", cg.CGGetOnlineDisplayList(MAX, ids, ctypes.byref(n)))
 count = n.value
 if count < 2:
     print("single_screen")
@@ -757,19 +776,17 @@ if count < 2:
 main      = cg.CGMainDisplayID()
 mirroring = any(cg.CGDisplayIsInMirrorSet(ids[i]) for i in range(count) if ids[i] != main)
 cfg = ctypes.c_void_p()
-cg.CGBeginDisplayConfiguration(ctypes.byref(cfg))
-if mirroring:
+check("CGBeginDisplayConfiguration", cg.CGBeginDisplayConfiguration(ctypes.byref(cfg)))
+try:
     for i in range(count):
         if ids[i] != main:
-            cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], 0)
-    cg.CGCompleteDisplayConfiguration(cfg, 1)
-    print("mirror_disabled")
-else:
-    for i in range(count):
-        if ids[i] != main:
-            cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], main)
-    cg.CGCompleteDisplayConfiguration(cfg, 1)
-    print("mirror_enabled")
+            check("CGConfigureDisplayMirrorOfDisplay",
+                  cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], 0 if mirroring else main))
+except Exception:
+    cg.CGCancelDisplayConfiguration(cfg)
+    raise
+check("CGCompleteDisplayConfiguration", cg.CGCompleteDisplayConfiguration(cfg, 1))
+print("mirror_disabled" if mirroring else "mirror_enabled")
 ]]
 
 	-- Asynchronous: a Python interpreter start plus a display-configuration round

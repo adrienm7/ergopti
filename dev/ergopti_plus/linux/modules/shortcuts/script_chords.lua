@@ -69,6 +69,7 @@ local _chords_on = nil
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _defer = nil
+local _pause_epoch = nil
 
 local _configuration_owner = nil
 local _dispatch_generation = 0
@@ -108,13 +109,9 @@ end
 function M.catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared(CATALOGUE_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("script_chords: cannot read " .. tostring(path)) end
-	local read_ok, body = pcall(handle.read, handle, "*a")
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-		error("script_chords: cannot complete read of " .. tostring(path))
-	end
+	local body, status
+	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then error("script_chords: cannot read " .. tostring(path)) end
 	local ok, parsed = pcall(require("json").decode, body)
 	if not ok or type(parsed) ~= "table" then
 		error("script_chords: " .. tostring(path) .. " is malformed")
@@ -276,9 +273,25 @@ end
 --- @return boolean committed
 local function persist(key, value)
 	local path = require("infra.config_paths").config("config.toml")
+	local assignments, enabled, generation = _assignments, _chords_on, _dispatch_generation
+	local bytes, status = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function()
+		return M.configuration_candidate(TomlCodec.decode(bytes or ""))
+	end)
+	if not ok or type(expected) ~= "table" or type(expected.assignments) ~= "table"
+		or _assignments ~= assignments or _chords_on ~= enabled or _dispatch_generation ~= generation
+		or _configuration_owner ~= nil then return false end
+	local same = expected.chords_on == enabled
+	for id, action in pairs(assignments) do if expected.assignments[id] ~= action then same = false end end
+	for id, action in pairs(expected.assignments) do if assignments[id] ~= action then same = false end end
+	if not same then
+		Logger.warn(LOG, "Script chord configuration changed externally; reload shortcuts before editing.")
+		return false
+	end
 	local committed, detail = TomlWriter.batch_write(path, {
 		Manifest.sparse_operation(SECTION .. "." .. key, value),
-	})
+	}, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "Could not persist script chord '%s': %s.", key, tostring(detail))
 		return false
@@ -350,13 +363,18 @@ end
 
 --- Wires the daemon's state in.
 --- @param opts table { is_paused = fn() -> boolean, defer = fn(fn) -> boolean }
+---   Optional pause_epoch = fn() -> number identifies the active pause lifetime.
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_paused) ~= "function" or type(opts.defer) ~= "function" then
 		error("script_chords.init() needs is_paused and defer functions")
 	end
+	if opts.pause_epoch ~= nil and type(opts.pause_epoch) ~= "function" then
+		error("script_chords.init() pause_epoch must be a function")
+	end
 	_is_paused = opts.is_paused
 	_defer = opts.defer
+	_pause_epoch = opts.pause_epoch
 	-- Read at boot, not at the first AltGr chord: a malformed catalogue stops
 	-- the daemon instead of a key press.
 	M.catalogue()
@@ -384,14 +402,27 @@ function M.on_key(detail)
 		Logger.error(LOG, "Script chord '%s' pressed before init() — the key goes to the application.", slot_id)
 		return false
 	end
-	local generation, paused, runs = _dispatch_generation, _is_paused, M.slot_runs
+	local generation, paused, runs, epoch_reader = _dispatch_generation, _is_paused, M.slot_runs, _pause_epoch
 	local action = _assignments[slot_id]
+	local script_action = require("modules.shortcuts.script_actions").is_script_action(action)
+	local epoch
+	if epoch_reader and not script_action then
+		local called, value = pcall(epoch_reader)
+		if not called or type(value) ~= "number" then return false end
+		epoch = value
+	end
+	local function epoch_current()
+		if _pause_epoch ~= epoch_reader then return false end
+		if script_action or not epoch_reader then return true end
+		local called, value = pcall(epoch_reader)
+		return called and value == epoch and _pause_epoch == epoch_reader
+	end
 	local function current()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation
-			or _is_paused ~= paused or M.slot_runs ~= runs then return false end
+			or _is_paused ~= paused or M.slot_runs ~= runs or not epoch_current() then return false end
 		local admitted = runs(slot_id)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation
-			and _is_paused == paused and M.slot_runs == runs
+			and _is_paused == paused and M.slot_runs == runs and epoch_current()
 	end
 	local queued = _defer(function()
 		-- A pause that began after the press: the chord was taken, and only a
@@ -425,6 +456,7 @@ function M._reset()
 	_chords_on = nil
 	_is_paused = NEVER_PAUSED
 	_defer = nil
+	_pause_epoch = nil
 end
 
 

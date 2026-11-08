@@ -94,12 +94,17 @@ KL_SaveState() {
 _KL_IngestRequeueUnwritten(Snapshot, LoggedCount) {
 	if !(LoggedCount is Integer) || LoggedCount < 0 || LoggedCount > Snapshot.Length
 		throw ValueError("Invalid journaled entry count during ingestion recovery.")
-	Count := Snapshot.Length - LoggedCount
-	if Count {
+	Count := 0
+	if Snapshot.Length > LoggedCount {
 		PreviousCritical := Critical("On")
 		try {
-			Loop Count
-				Keystats._pending_entries.InsertAt(A_Index, Snapshot[LoggedCount + A_Index])
+			Loop Snapshot.Length - LoggedCount {
+				Entry := Snapshot[LoggedCount + A_Index]
+				if KL_Roi_KeepPendingEntry(Entry) {
+					Count += 1
+					Keystats._pending_entries.InsertAt(Count, Entry)
+				}
+			}
 		} finally Critical(PreviousCritical)
 	}
 	return Count
@@ -207,7 +212,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 		if source_eof {
 			previous_critical := Critical("On")
 			try {
-				pending_snapshot := Keystats._pending_entries
+				pending_snapshot := KL_Roi_PreparePending(Keystats._pending_entries)
 				Keystats._pending_entries := []
 			} finally {
 				Critical(previous_critical)
@@ -236,13 +241,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 					throw ValueError("Journal position must be a nonnegative byte boundary.")
 			} catch as err {
 				; Nothing reached today.log, so the ENTIRE snapshot returns to RAM.
-				previous_critical := Critical("On")
-				try {
-					loop pending_snapshot.Length
-						Keystats._pending_entries.InsertAt(A_Index, pending_snapshot[A_Index])
-				} finally {
-					Critical(previous_critical)
-				}
+				_KL_JournalRestoreSnapshot(pending_snapshot)
 				; Leave today_log_offset alone so the next tick retries the same chunk.
 				try LoggerError("Keystats",
 					"Cannot open today.log: {1}; {2} pending entry(ies) re-queued.",
@@ -251,14 +250,22 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 			}
 			if IsObject(fh) {
 				append_failed := false
-				for _, e in pending_snapshot {
+				pending_index := 1
+				while pending_index <= pending_snapshot.Length {
+					e := pending_snapshot[pending_index]
 					try {
-						line := KL_JsonEncode(e)
+						; The same sealing encoder as the durable handoff: one journal form.
+						line := _KL_JournalEncodeDefault(e)
 						line := StrReplace(line, "`n", "\n")
 						line := StrReplace(line, "`r", "")
+						if !KL_Roi_ClaimTextAppend(e) {
+							pending_snapshot.RemoveAt(pending_index)
+							continue
+						}
 						if !_KL_JournalAppendDefault(fh, line)
 							throw Error("today.log append was incomplete")
 						pending_logged_count += 1
+						pending_index += 1
 					} catch as err {
 						append_failed := true
 						try LoggerError("Keystats",
@@ -269,7 +276,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 				}
 				if append_failed {
 					rollback_ok := Scope.Owner.Rollback(Scope.Token, fh, batch_start,
-						_KL_JournalRollbackAppend)
+						KL_Roi_RepairTextAppends.Bind(pending_snapshot, _KL_JournalRollbackAppend))
 					_KL_JournalRestoreSnapshot(pending_snapshot)
 					try LoggerError("Keystats",
 						"Journal append failed; batch retained (rollback={1}, queued_lines={2}).",
@@ -287,7 +294,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 				; source_eof, so the writer's position and the reader's bookmark agree.
 				if !KL_FlushTodayFh(fh) {
 					rollback_ok := Scope.Owner.Rollback(Scope.Token, fh, batch_start,
-						_KL_JournalRollbackAppend)
+						KL_Roi_RepairTextAppends.Bind(pending_snapshot, _KL_JournalRollbackAppend))
 					_KL_JournalRestoreSnapshot(pending_snapshot)
 					try LoggerError("Keystats",
 						"Cannot durably flush today.log; batch retained in RAM (rollback={1}).",
@@ -295,6 +302,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 					return Map("ok", false, "eof", false,
 						"reason", rollback_ok ? "today_log_flush_failed" : "journal_repair_pending")
 				}
+				KL_Roi_SettleTextAppends(pending_snapshot, true)
 				new_offset := fh.Pos
 			}
 		}

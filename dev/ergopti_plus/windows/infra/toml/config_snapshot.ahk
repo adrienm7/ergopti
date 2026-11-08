@@ -17,6 +17,8 @@ global _ConfigTomlSnapshots := Map()
 ; Monotonic count of snapshot reads. Each one compares the whole snapshot with
 ; its shadow, so tests pin how many a step spends.
 global _ConfigTomlSnapshotReads := 0
+; The snapshot the open boot read stretch serves (ConfigTomlBootSnapshot), or 0.
+global _ConfigTomlBootReadMemo := 0
 
 /**
  * Reads manifest intent only from the published native bootstrap cache. Detached
@@ -42,15 +44,45 @@ ConfigTomlTryReadBootValue(Cache, Section, Key, &Value) {
  * @returns {Object|Integer} The snapshot, or 0 when Cache is not the bootstrap cache.
  */
 ConfigTomlBootSnapshot(Cache) {
-	global ConfigurationFile, _ParseTomlCache
+	global ConfigurationFile, _ParseTomlCache, _ConfigTomlSnapshots
+	global ConfigMigrateBootReadProof, _ConfigTomlBootReadMemo
 	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
 			|| !IsSet(_ParseTomlCache) || !_ParseTomlCache.Has(ConfigurationFile)
 			|| _ParseTomlCache[ConfigurationFile] != Cache
+			|| !IsSet(_ConfigTomlSnapshots) || !_ConfigTomlSnapshots.Has(ConfigurationFile)
+			|| _ConfigTomlSnapshots[ConfigurationFile].Cache != Cache
 		return 0
+	; The boot read stretch serves every bootstrap consumer from the one snapshot
+	; it admitted while that snapshot is still the published generation: each
+	; read re-proves an unchanged image with two whole-snapshot comparisons, and
+	; the boot's consumers made fourteen. ConfigTomlBootReadsRelease proves the
+	; image once more when the stretch closes.
+	Stretch := IsSet(ConfigMigrateBootReadProof) && ConfigMigrateBootReadProof.open
+	if Stretch && IsObject(_ConfigTomlBootReadMemo)
+			&& _ConfigTomlSnapshots[ConfigurationFile] == _ConfigTomlBootReadMemo
+		return _ConfigTomlBootReadMemo
 	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
 	if Snapshot.Cache != Cache
 		throw Error("The early configuration reader lost its admitted cache")
+	_ConfigTomlBootReadMemo := Stretch ? Snapshot : 0
 	return Snapshot
+}
+
+/**
+ * Ends the boot stretch's snapshot reuse with one admitted read: the snapshot
+ * it served must still be the native generation, never a mutated or replaced one.
+ * @param {String} Path - The boot configuration path.
+ * @returns {Boolean} True when no snapshot was served or it is still current.
+ */
+ConfigTomlBootReadsRelease(Path) {
+	global _ConfigTomlBootReadMemo
+	Served := _ConfigTomlBootReadMemo
+	_ConfigTomlBootReadMemo := 0
+	if !IsObject(Served)
+		return true
+	try return ConfigTomlReadSnapshot(Path) == Served
+	catch
+		return false
 }
 
 /**

@@ -16,12 +16,12 @@
 --- that as awake time would report a laptop shut overnight as eight hours of
 --- use, which is the single most misleading number this table could produce.
 ---
---- WHAT IS DELIBERATELY LEFT AT ZERO:
---- Virtual-desktop switches, because X11 and each Wayland compositor report them
---- differently and several not at all — there is no reading that means the same
---- thing on two machines. And the two macOS wake counters, which are derived
---- there from wake reasons the kernel does not expose here. A zero is honest; a
---- plausible number would not be.
+--- PASSIVE PERIODS, LOAD AND DESKTOPS:
+--- A completed suspension or screen lock is one passive period, as on macOS;
+--- CPU and memory are sampled from /proc as the Windows system_load event; the
+--- X server's current desktop feeds space_switches, and without that source the
+--- KPI is unavailable with its reason. A resume before [keystats]
+--- night_wake_end_ms after local midnight is a night wake, as on macOS and Windows.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -76,6 +76,9 @@ local function with_shell(answers, body)
 	local ok, err = pcall(function()
 		local metrics = require(module_name)
 		metrics._reset()
+		-- No load fixture unless a test gives one: the host's /proc would make
+		-- every event list depend on the machine running the suite.
+		metrics._set_proc_paths("/nonexistent/ergopti-stat", "/nonexistent/ergopti-meminfo")
 		metrics.bind_event_capture(function() return true end)
 		local function sample(now, date)
 			clock = build_clock(now, date)
@@ -248,6 +251,15 @@ end)
 -- =================================================================
 
 helpers.describe("system metrics: awake, locked, asleep", function()
+	helpers.it("reads the native suspend-aware clock in Linux LuaJIT", function()
+		if not jit then return end -- The supported Lua 5.4 test mode has no FFI.
+		local clock = require("modules.keystats.calendar").capture(true)
+		local file = assert(io.open("/proc/uptime", "r"))
+		local line = assert(file:read("*l")); assert(file:close())
+		local uptime = assert(tonumber(line:match("^[%d%.]+"))) * 1000
+		helpers.assert_true(type(clock.boot_ms) == "number")
+		helpers.assert_true(math.abs(clock.boot_ms - uptime) < 5000, "CLOCK_BOOTTIME matches kernel uptime")
+	end)
 
 	helpers.it("counts the time between samples as awake", function()
 		with_shell({
@@ -277,6 +289,125 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 		end)
 	end)
 
+	helpers.it("linux-night-wake: a resume before the night's end counts once, a daytime one does not", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step = metrics._sample_interval_ms()
+			local hour = 3
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				-- The suspension ends at hour:00 local, the noon of sample_clock moved.
+				clock.wall_ms = clock.wall_ms + (hour - 12) * 3600 * 1000
+				clock.boot_ms = now; clock.mono_ms = now == 0 and 0 or step
+				return clock
+			end)
+			sample(0, "2026-08-06"); sample(step * 8, "2026-08-06")
+			helpers.assert_eq(metrics.current().night_wake_count, 1)
+			hour = 12
+			sample(step * 16, "2026-08-06")
+			helpers.assert_eq(metrics.current().night_wake_count, 1, "a noon resume is no night wake")
+		end)
+	end)
+
+	helpers.it("keeps a long active sampling delay out of sleep time", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step = metrics._sample_interval_ms()
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date); clock.boot_ms = now; return clock
+			end)
+			sample(0, "2026-08-06"); sample(step * 4, "2026-08-06")
+			helpers.assert_eq(metrics.current().awake_ms, step * 4)
+			helpers.assert_eq(metrics.current().sleep_ms, 0)
+			helpers.assert_eq(metrics.take_events(), {})
+		end)
+	end)
+
+	helpers.it("separates active and suspended time in one sampling interval", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step = metrics._sample_interval_ms()
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				clock.boot_ms = now; clock.mono_ms = now == 0 and 0 or step * 2
+				return clock
+			end)
+			sample(0, "2026-08-06"); sample(step * 8, "2026-08-06")
+			helpers.assert_eq(metrics.current().awake_ms, step * 2)
+			helpers.assert_eq(metrics.current().sleep_ms, step * 6)
+			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 8, "2026-08-06", { asleep_ms = step * 6 }),
+				sample_event("passive_period", step * 8, "2026-08-06", { kind = "sleep", duration_ms = step * 6 }) })
+			helpers.assert_eq(metrics.current().passive_count, 1)
+		end)
+	end)
+
+	helpers.it("credits only active time to lock and mute across a suspension", function()
+		with_shell({ { match = "LockedHint", out = "yes" }, { match = "pactl get-sink-mute", out = "Mute: yes" } },
+			function(metrics, sample, set_clock)
+				local step = metrics._sample_interval_ms()
+				set_clock(function(now, date)
+					local clock = sample_clock(now, date)
+					clock.boot_ms = now; clock.mono_ms = now == 0 and 0 or step * 2
+					return clock
+				end)
+				sample(0, "2026-08-06"); sample(step * 8, "2026-08-06")
+				local day = metrics.current()
+				helpers.assert_eq(day.sleep_ms, step * 6)
+				helpers.assert_eq(day.locked_ms, step * 2)
+				helpers.assert_eq(day.audio_muted_ms, step * 2)
+				helpers.assert_eq(day.awake_ms, 0)
+			end)
+	end)
+
+	helpers.it("counts suspension even when the Linux monotonic clock stops", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step = metrics._sample_interval_ms()
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				clock.boot_ms = now
+				clock.mono_ms = now == 0 and 0 or step
+				return clock
+			end)
+			sample(0, "2026-08-06")
+			sample(step * 100, "2026-08-06")
+			helpers.assert_eq(metrics.current().sleep_ms, step * 99)
+			helpers.assert_eq(metrics.current().awake_ms, step)
+			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 100, "2026-08-06", { asleep_ms = step * 99 }),
+				sample_event("passive_period", step * 100, "2026-08-06", { kind = "sleep", duration_ms = step * 99 }) })
+		end)
+	end)
+
+	helpers.it("partitions a suspended interval at local midnight", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local midnight = assert(os.time({ year = 2026, month = 8, day = 7, hour = 0, min = 0, sec = 0 }))
+			set_clock(function(now)
+				local wall = midnight * 1000 - 60000 + now
+				return { wall_ms = wall, mono_ms = now == 0 and 0 or 1000, boot_ms = now,
+					date = os.date("%Y-%m-%d", wall / 1000), ts = os.date("!%Y-%m-%d %H:%M:%S", wall / 1000) }
+			end)
+			sample(0, "2026-08-06"); sample(120000, "2026-08-07")
+			local days = metrics.snapshot().values
+			helpers.assert_eq(days["2026-08-06"].sleep_ms, 59500)
+			helpers.assert_eq(days["2026-08-07"].sleep_ms, 59500)
+			helpers.assert_eq(days["2026-08-06"].awake_ms, 500)
+			helpers.assert_eq(days["2026-08-07"].awake_ms, 500)
+		end)
+	end)
+
+	helpers.it("retains the old clock domain when a suspend-aware reading fails", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step, boot = metrics._sample_interval_ms(), 0
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				clock.boot_ms = boot
+				return clock
+			end)
+			sample(0, "2026-08-06")
+			boot = nil
+			helpers.assert_nil(sample(step, "2026-08-06"))
+			boot = step * 2
+			sample(step * 2, "2026-08-06")
+			helpers.assert_eq(metrics.current().awake_ms, step * 2)
+		end)
+	end)
+
 	helpers.it("calls a long gap sleep rather than use", function()
 		with_shell({
 			{ match = "power_supply", out = "50" },
@@ -291,7 +422,8 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 				"counting the gap as awake would report a laptop shut overnight as "
 					.. "eight hours of use — the single most misleading number this "
 					.. "table could produce")
-			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 100, "2026-08-06", { asleep_ms = step * 100 }) })
+			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 100, "2026-08-06", { asleep_ms = step * 100 }),
+				sample_event("passive_period", step * 100, "2026-08-06", { kind = "sleep", duration_ms = step * 100 }) })
 		end)
 	end)
 
@@ -311,7 +443,9 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			sample(step * 3, "2026-08-06")
 			locked = "yes"
 			sample(step * 4, "2026-08-06")
-			helpers.assert_eq(metrics.take_events(), { sample_event("lock", step, "2026-08-06"), sample_event("unlock", step * 2, "2026-08-06") })
+			helpers.assert_eq(metrics.take_events(), { sample_event("lock", step, "2026-08-06"), sample_event("unlock", step * 2, "2026-08-06"),
+				sample_event("passive_period", step * 2, "2026-08-06", { kind = "lock", duration_ms = step }) })
+			helpers.assert_eq(metrics.current().passive_count, 1, "a lock with no observed start is no measured period")
 		end)
 	end)
 
@@ -327,6 +461,40 @@ end)
 -- =================================================================
 
 helpers.describe("system metrics: network changes", function()
+
+	helpers.it("keeps network changes readable under a translated nmcli locale", function()
+		local real_shell = require("adapters.shell_runner")
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(real_shell.run("mkdir -- " .. real_shell.quote(dir)))
+		local executable = dir .. "/nmcli"
+		local file = assert(io.open(executable, "w"))
+		-- nmcli translates ACTIVE even in terse mode; its shell pipeline must
+		-- receive a machine locale before filtering the English yes token.
+		file:write('#!/bin/sh\ncase "${LC_ALL-}" in C) active=yes;; *) active=oui;; esac\n',
+			'printf "%s:%s\\n" "$active" "$ERGOPTI_TEST_SSID"\n')
+		assert(file:close())
+		assert(real_shell.run("chmod +x -- " .. real_shell.quote(executable)))
+		local okay, detail = pcall(function()
+			local ssid = "maison"
+			with_shell({ missing = { iwgetid = true } }, function(metrics, sample)
+				local shell = package.loaded["adapters.shell_runner"]
+				shell.exec_line = function(command)
+					if not command:find("nmcli", 1, true) then return "" end
+					return real_shell.exec_line("PATH=" .. real_shell.quote(dir .. ":/usr/bin:/bin")
+						.. " LC_ALL=fr_FR.UTF-8 ERGOPTI_TEST_SSID=" .. real_shell.quote(ssid) .. " " .. command)
+				end
+				metrics._set_wireless_path(dir .. "/no-wireless")
+				sample(0, "2026-08-06")
+				ssid = "bureau"
+				sample(metrics._sample_interval_ms(), "2026-08-06")
+				helpers.assert_eq(metrics.current().wifi_changes, 1)
+			end)
+		end)
+		os.remove(executable)
+		assert(real_shell.run("rmdir -- " .. real_shell.quote(dir)))
+		helpers.assert_true(okay, tostring(detail))
+	end)
 
 	helpers.it("counts a change of network", function()
 		with_shell({
@@ -345,6 +513,24 @@ helpers.describe("system metrics: network changes", function()
 			helpers.assert_eq(metrics.take_events(), { sample_event("wifi_change", step, "2026-08-06") },
 				"the event names no network: the name is a fingerprint, never stored")
 			helpers.assert_eq(metrics.take_events(), {}, "taken once")
+		end)
+	end)
+
+	helpers.it("does not mistake a different network reader for a network change", function()
+		local nmcli, iwgetid = "yes:maison", ""
+		with_shell({
+			{ match = "nmcli", out = function() return nmcli end },
+			{ match = "iwgetid", out = function() return iwgetid end },
+		}, function(metrics, sample)
+			local step = metrics._sample_interval_ms()
+			sample(0, "2026-08-06")
+			nmcli, iwgetid = "", "maison"
+			sample(step, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 0, "the readers have different representations")
+			iwgetid = "bureau"
+			sample(step * 2, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 1, "the same reader still detects a change")
+			helpers.assert_eq(metrics.take_events(), { sample_event("wifi_change", step * 2, "2026-08-06") })
 		end)
 	end)
 
@@ -416,12 +602,67 @@ helpers.describe("system metrics: network changes", function()
 		with_shell({ { match = "power_supply", out = "50" } }, function(metrics, sample)
 			sample(0, "2026-08-06")
 			local day = metrics.current()
-			helpers.assert_eq(day.space_switches, 0,
-				"X11 and each Wayland compositor report virtual-desktop changes "
-					.. "differently and several not at all — there is no reading that "
-					.. "means the same thing on two machines, and a plausible number "
-					.. "would be worse than a zero")
+			helpers.assert_eq(day.space_switches, 0, "no desktop source: nothing is counted")
+			helpers.assert_eq(metrics.space_change_availability(),
+				{ measured = false, reason = "platform_reason.desktop_changes_need_x11" })
 			helpers.assert_eq(day.night_wake_count, 0)
+		end)
+	end)
+
+	helpers.it("linux-space-change: counts a change of the current desktop between two answers", function()
+		with_shell({}, function(metrics, sample)
+			sample(0, "2026-08-06")
+			local desktop = 0
+			metrics.bind_desktop_source(function() return desktop end)
+			helpers.assert_eq(metrics.observe_desktop(), false, "the first answer is a baseline")
+			desktop = 2
+			helpers.assert_eq(metrics.observe_desktop(), true)
+			helpers.assert_eq(metrics.observe_desktop(), false, "an unchanged desktop is no switch")
+			desktop = nil
+			helpers.assert_nil(metrics.observe_desktop())
+			desktop = 1
+			helpers.assert_eq(metrics.observe_desktop(), false, "no change is counted across an unanswered read")
+			desktop = 0
+			helpers.assert_eq(metrics.observe_desktop(), true)
+			helpers.assert_eq(metrics.current().space_switches, 2)
+			local actions = {}
+			for _, event in ipairs(metrics.take_events()) do actions[#actions + 1] = event.action end
+			helpers.assert_eq(actions, { "space_change", "space_change" })
+			helpers.assert_eq(metrics.space_change_availability().measured, true)
+		end)
+	end)
+
+	helpers.it("linux-system-load: samples CPU and memory from /proc as the Windows system_load event", function()
+		with_shell({}, function(metrics, sample)
+			local dir = os.tmpname()
+			os.remove(dir)
+			os.execute("mkdir -p " .. dir)
+			local function write(name, text)
+				local handle = assert(io.open(dir .. "/" .. name, "wb"))
+				handle:write(text)
+				handle:close()
+			end
+			write("stat", "cpu  100 0 50 800 50 0 0 0 0 0\ncpu0 1 1 1 1\n")
+			write("meminfo", "MemTotal:        8000000 kB\nMemFree:  100 kB\nMemAvailable:    2000000 kB\n")
+			metrics._set_proc_paths(dir .. "/stat", dir .. "/meminfo")
+			sample(0, "2026-08-06")
+			local first = metrics.take_events()
+			helpers.assert_eq(#first, 1)
+			helpers.assert_eq(first[1].action, "system_load")
+			helpers.assert_eq(first[1].metadata, { ram_used_pct = 75, ram_total_mb = 7813, ram_free_mb = 1953 },
+				"the first sample has no CPU interval yet")
+			-- 1000 more ticks: 300 user, 100 system, 600 idle.
+			write("stat", "cpu  400 0 150 1400 50 0 0 0 0 0\n")
+			local poll = require("infra.timings").ms("keystats", "system_load_poll_ms")
+			sample(metrics._sample_interval_ms(), "2026-08-06")
+			helpers.assert_eq(metrics.take_events(), {}, "load waits for its own poll interval")
+			for at = 2 * metrics._sample_interval_ms(), poll, metrics._sample_interval_ms() do sample(at, "2026-08-06") end
+			local load = metrics.take_events()
+			helpers.assert_eq(#load, 1)
+			helpers.assert_eq(load[1].action, "system_load")
+			helpers.assert_eq(load[1].metadata.cpu_pct, 40)
+			helpers.assert_eq(load[1].metadata.cpu_user_percent, 30)
+			os.execute("rm -rf " .. dir)
 		end)
 	end)
 
@@ -590,6 +831,33 @@ helpers.describe("system metrics: owned restart hydration", function()
 end)
 
 helpers.describe("capture calendar ownership", function()
+	helpers.it("splits at the observation when the local timezone changes its date", function()
+		local calendar = require("modules.keystats.calendar")
+		local today = os.date("*t")
+		local noon = os.time({ year = today.year, month = today.month, day = today.day, hour = 12 })
+		local old_date = os.date("%Y-%m-%d", noon - 86400)
+		local new_date = os.date("%Y-%m-%d", noon)
+		local cuts = {}
+		calendar.boundaries({ wall_ms = noon * 1000, mono_ms = 1000, date = old_date },
+			{ wall_ms = (noon + 60) * 1000, mono_ms = 61000, date = new_date },
+			function(...) cuts[#cuts + 1] = { ... } end)
+		helpers.assert_eq(cuts, { { 61000, old_date, new_date, (noon + 60) * 1000 } })
+	end)
+
+	helpers.it("still splits at an observed local midnight", function()
+		local calendar = require("modules.keystats.calendar")
+		local today = os.date("*t")
+		local noon = os.time({ year = today.year, month = today.month, day = today.day, hour = 12 })
+		local midnight = calendar.next_midnight(noon * 1000)
+		local previous_wall, current_wall = midnight - 60000, midnight + 60000
+		local previous_date = os.date("%Y-%m-%d", previous_wall / 1000)
+		local current_date = os.date("%Y-%m-%d", current_wall / 1000)
+		local cuts = {}
+		calendar.boundaries({ wall_ms = previous_wall, mono_ms = 1000, date = previous_date },
+			{ wall_ms = current_wall, mono_ms = 121000, date = current_date },
+			function(...) cuts[#cuts + 1] = { ... } end)
+		helpers.assert_eq(cuts, { { 61000, previous_date, current_date, midnight } })
+	end)
 	helpers.it("retires closed sources only after their complete exact prefix is acknowledged", function()
 		local calendar = require("modules.keystats.calendar")
 		local store = calendar.new(function() return { count = 0 } end)
@@ -650,3 +918,34 @@ helpers.describe("system-event-capture-policy", function()
 		end)
 	end)
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("wireless sample refuses an incomplete listing " .. fault, function()
+		with_shell({ missing = { nmcli = true, iwgetid = true } }, function(metrics, sample)
+			local original, failing, closes = io.open, false, 0
+			io.open = function(path, mode)
+				if path ~= "/proc/net/wireless" then return original(path, mode) end
+				local lines = { "header", "header", failing and "wlan1: 0000" or "wlan0: 0000" }
+				local index = 0
+				return { read = function()
+					index = index + 1
+					if failing and fault == "read_throw" then error("injected read failure") end
+					return lines[index]
+				end, close = function()
+					closes = closes + 1
+					if failing and fault == "close_throw" then error("injected close failure") end
+					return not (failing and fault == "close_false")
+				end }
+			end
+			local called, detail = pcall(function()
+				sample(0, "2026-08-06")
+				failing = true
+				sample(metrics._sample_interval_ms(), "2026-08-06")
+			end)
+			io.open = original
+			assert(called, detail)
+			helpers.assert_eq(closes, 2, "each listing is closed even after a read exception")
+			helpers.assert_eq(metrics.current().wifi_changes, 0, "an unacknowledged listing is not a network change")
+		end)
+	end)
+end

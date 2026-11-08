@@ -57,9 +57,27 @@ function ConvertTo-CrashDocument {
 	return "{`n" + ($lines -join ",`n") + "`n}"
 }
 
+# Writes the complete document to a fresh hidden staging file this call created.
+# A write or close refusal deletes only that exclusively created staging file and
+# rethrows, so no truncated report ever carries a canonical .json name.
+function Write-CrashStagingFile {
+	param(
+		[Parameter(Mandatory = $true)][string]$Path,
+		[Parameter(Mandatory = $true)][byte[]]$Bytes
+	)
+	$stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+	try {
+		try { $stream.Write($Bytes, 0, $Bytes.Length); $stream.Flush() } finally { $stream.Dispose() }
+	} catch {
+		[IO.File]::Delete($Path)
+		throw
+	}
+}
+
 # Writes the document under the shared name, <timestamp>.json then <timestamp>-2.json
-# for a second report within the same second. CreateNew refuses an existing file, so
-# a concurrent writer can never be replaced.
+# for a second report within the same second. The bytes are staged first and only a
+# complete file is published; File.Move never replaces an existing destination, so a
+# concurrent writer can never be replaced either.
 function Write-CrashDocument {
 	param(
 		[Parameter(Mandatory = $true)][string]$Directory,
@@ -71,19 +89,25 @@ function Write-CrashDocument {
 	}
 	$stem = $Timestamp.Replace(":", "-")
 	$bytes = [Text.UTF8Encoding]::new($false).GetBytes($Document)
-	$attempt = 1
-	while ($true) {
-		$name = if ($attempt -eq 1) { "$stem.json" } else { "$stem-$attempt.json" }
-		$path = Join-Path $Directory $name
-		try {
-			$stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
-		} catch [IO.IOException] {
-			if (-not [IO.File]::Exists($path)) { throw }
-			$attempt += 1
-			continue
+	$staging = Join-Path $Directory (".$stem." + [Guid]::NewGuid().ToString("N") + ".partial")
+	Write-CrashStagingFile -Path $staging -Bytes $bytes
+	try {
+		$attempt = 1
+		while ($true) {
+			$name = if ($attempt -eq 1) { "$stem.json" } else { "$stem-$attempt.json" }
+			$path = Join-Path $Directory $name
+			try {
+				[IO.File]::Move($staging, $path)
+			} catch [IO.IOException] {
+				if (-not [IO.File]::Exists($path)) { throw }
+				$attempt += 1
+				continue
+			}
+			return $path
 		}
-		try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
-		return $path
+	} catch {
+		[IO.File]::Delete($staging)
+		throw
 	}
 }
 
@@ -130,7 +154,9 @@ try {
 
 try {
 	if (Test-CrashFault "architecture") { throw "Injected architecture fault" }
-	Set-CrashField $snapshot "os_arch" $env:PROCESSOR_ARCHITECTURE
+	# Process environment describes the worker under WOW64, not the host OS.
+	$osArchitecture = if ([Environment]::Is64BitOperatingSystem) { "64 bits" } else { "32 bits" }
+	Set-CrashField $snapshot "os_arch" $osArchitecture
 } catch { $enrichmentErrors.Add("architecture: " + $_.Exception.Message) }
 
 try {
@@ -149,9 +175,17 @@ try {
 
 try {
 	if (Test-CrashFault "cpu") { throw "Injected processor CIM fault" }
-	$processor = Get-CimInstance Win32_Processor | Select-Object -First 1
-	Set-CrashField $snapshot "cpu_name" ([string]$processor.Name)
-	Set-CrashField $snapshot "cpu_cores" ([string]$processor.NumberOfLogicalProcessors)
+	$processors = @(Get-CimInstance Win32_Processor)
+	if ($processors.Count -eq 0) { throw "No processor instance was returned" }
+	$logicalCores = 0L
+	foreach ($processor in $processors) {
+		$instanceCores = [long]$processor.NumberOfLogicalProcessors
+		if ($instanceCores -lt 1) { throw "Processor instance has no logical processor count" }
+		$logicalCores += $instanceCores
+	}
+	# Win32_Processor counts one socket per instance; retain the first model name.
+	Set-CrashField $snapshot "cpu_name" ([string]$processors[0].Name)
+	Set-CrashField $snapshot "cpu_cores" ([string]$logicalCores)
 } catch { $enrichmentErrors.Add("cpu: " + $_.Exception.Message) }
 
 # A compiled build already named its commit from the BUNDLE_COMMIT stamp; a
@@ -178,4 +212,13 @@ $reportDir = $transportReportsDir
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
 Remove-CrashTransportFields $snapshot
 $reportPath = Write-CrashDocument $reportDir ([string]$snapshot.timestamp) (ConvertTo-CrashDocument $snapshot)
-Write-Output ("OK:" + $reportPath)
+# This receipt contains a native Unicode path. Its explicit byte preamble lets
+# the parent's FileRead detect UTF-8 regardless of console/ANSI code pages.
+$ReceiptEncoding = [Text.UTF8Encoding]::new($true)
+[byte[]]$ReceiptBytes = $ReceiptEncoding.GetPreamble() +
+	$ReceiptEncoding.GetBytes("OK:" + $reportPath + [Environment]::NewLine)
+$ReceiptOutput = [Console]::OpenStandardOutput()
+try {
+	$ReceiptOutput.Write($ReceiptBytes, 0, $ReceiptBytes.Length)
+	$ReceiptOutput.Flush()
+} finally { $ReceiptOutput.Dispose() }

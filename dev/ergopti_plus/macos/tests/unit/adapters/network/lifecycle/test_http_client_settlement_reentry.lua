@@ -14,13 +14,18 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives client, scheduler and independent observations.
 local function with_client(scenario)
 	helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler", "infra.logger",
-		"error_description", "number_policy" }, function()
+		"error_description", "number_policy", "infra.http_header_policy" }, function()
+		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
 		local h = { timers = {}, requests = {}, refused = {}, errors = {} }
 		local function native_request(url, callback)
 			-- This reentry fixture requires actual cancellation acknowledgement.
 			-- Pinned Hammerspoon taskless ownership has separate terminal-only tests.
 			local task = { active = true }
-			function task:cancel() self.active = false; return true end
+			function task:cancel()
+				if h.on_cancel then h.on_cancel() end
+				self.active = false
+				return true
+			end
 			h.requests[#h.requests + 1] = { url = url, callback = callback, task = task }
 			return task
 		end
@@ -35,6 +40,7 @@ local function with_client(scenario)
 				function timer:start() self.active = true; return self end
 				function timer:stop()
 					if h.refused[self] then return false end
+					if h.on_stop then h.on_stop() end
 					self.active = false; return self
 				end
 				function timer:running() return self.active end
@@ -88,6 +94,66 @@ local function settled(client, scheduler, h)
 end
 
 helpers.describe("HTTP admission respects reentrant settlement authority", function()
+	helpers.it("retains cancellation debt when the native error cannot be formatted", function()
+		with_client(function(client, scheduler, h)
+			local opaque = setmetatable({}, { __tostring = function() error("cannot stringify") end })
+			assert(h.post("A"))
+			h.on_cancel = function() error(opaque) end
+			local ok, cancelled = pcall(client.cancel)
+			helpers.assert_true(ok, "cancellation must contain an opaque native failure")
+			helpers.assert_eq(cancelled, false)
+			helpers.assert_eq(client.isSettled(), false)
+			h.on_cancel = nil
+			helpers.assert_true(client.cancel())
+			settled(client, scheduler, h)
+		end)
+	end)
+	helpers.it("continues settlement after an observer throws an unprintable value", function()
+		with_client(function(client, scheduler, h)
+			local later = 0
+			local opaque = setmetatable({}, { __tostring = function() error("cannot stringify") end })
+			assert(h.post("A"))
+			assert(client.onSettled(function() error(opaque) end))
+			assert(client.onSettled(function() later = later + 1 end))
+			local ok = pcall(h.complete, 1)
+			helpers.assert_true(ok, "an opaque error must not escape the native callback")
+			helpers.assert_eq(later, 1, "one observer cannot discard later settlement observers")
+			settled(client, scheduler, h)
+		end)
+	end)
+	helpers.it("does not deliver an old timeout after cancellation starts a new request", function()
+		with_client(function(client, scheduler, h)
+			local old, current = 0, 0
+			assert(h.post("A", function() old = old + 1 end))
+			h.on_cancel = function()
+				h.on_cancel = nil
+				h.complete(1)
+				assert(h.post("B", function() current = current + 1 end))
+			end
+			h.timers[1].callback()
+			helpers.assert_eq(old, 0)
+			helpers.assert_true(client.isActive())
+			h.complete(2)
+			helpers.assert_eq(current, 1)
+			settled(client, scheduler, h)
+		end)
+	end)
+	helpers.it("does not deliver an old response after a new request starts during timer release", function()
+		with_client(function(client, scheduler, h)
+			local old, current = 0, 0
+			assert(h.post("A", function() old = old + 1 end))
+			h.on_stop = function()
+				h.on_stop = nil
+				assert(h.post("B", function() current = current + 1 end))
+			end
+			h.complete(1)
+			helpers.assert_eq(old, 0)
+			helpers.assert_true(client.isActive())
+			h.complete(2)
+			helpers.assert_eq(current, 1)
+			settled(client, scheduler, h)
+		end)
+	end)
 	helpers.it("preserves ordinary supersession and complete timeout retirement", function()
 		with_client(function(client, scheduler, h)
 			local old, current = 0, 0

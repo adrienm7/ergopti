@@ -204,6 +204,43 @@ end)
 -- =====================================
 
 helpers.describe("owned runtime owner: a lost capture", function()
+	helpers.it("waits for failed capture retirement before a resumed reload (owned-failed-capture-resume)", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		world.capture_settles_sync = false
+		owner.init(world.ports)
+		local reloads = 0
+		local activation = require("platform.remap.runtime_activation").new({
+			owner = owner, restore = function(done) done(true) end,
+			marker = { get = function() return false end, clear = function() return true end },
+			reload = function() reloads = reloads + 1 end, close_other_instances = function() return true end,
+		})
+		activation.reconcile(true, function() start_peers(owner) end)
+		admit_stream(world)
+		world.lost_callback("stream ended")
+		activation.reconcile(true)
+		helpers.assert_eq(reloads, 0, "a failed capture is still owned until its stop settles")
+		world.capture_stop_callback()
+		helpers.assert_eq(reloads, 1)
+	end)
+	helpers.it("waits for a failed capture to settle before restoring the other runtime (owned-failed-capture-restore)", function()
+		local owner, world = admitted(function(w) w.capture_settles_sync = false end)
+		start_peers(owner)
+		admit_stream(world)
+		world.lost_callback("stream ended")
+		helpers.assert_eq(owner.status().state, "failed")
+		local restores, marker = 0, true
+		local activation = require("platform.remap.runtime_activation").new({
+			owner = owner, restore = function(done) restores = restores + 1; done(true) end,
+			marker = { get = function() return marker end, clear = function() marker = false; return true end },
+			reload = function() end, close_other_instances = function() return true end,
+		})
+		helpers.assert_eq(activation.reconcile(false), "stop")
+		helpers.assert_eq(restores, 0, "capture termination is still pending")
+		helpers.assert_true(marker)
+		world.capture_stop_callback()
+		helpers.assert_eq(restores, 1)
+		helpers.assert_eq(marker, false)
+	end)
 	helpers.it("reports the loss once, revokes the capture and never restarts by itself", function()
 		local owner, world = admitted()
 		start_peers(owner)
@@ -262,6 +299,84 @@ end)
 -- ===================================
 
 helpers.describe("owned runtime owner: stop", function()
+	helpers.it("waits for an in-flight close before restoring Karabiner on pause (owned-close-pause-race)", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		world.others = 1
+		local marker, restores, finish_close = false, 0, nil
+		local Activation = require("platform.remap.runtime_activation")
+		world.ports.coexistence.close = Activation.remembering_close(function(done) finish_close = done end,
+			{ set = function() marker = true; return true end })
+		owner.init(world.ports)
+		local activation = Activation.new({
+			owner = owner, restore = function(done) restores = restores + 1; done(true) end,
+			marker = { get = function() return marker end, clear = function() marker = false; return true end },
+			reload = function() end, close_other_instances = function() return true end,
+		})
+		activation.reconcile(true)
+		helpers.assert_true(type(finish_close) == "function")
+		activation.reconcile(false)
+		helpers.assert_eq(restores, 0)
+		finish_close(true)
+		helpers.assert_eq(restores, 1, "a close completing after pause must still be restored")
+		helpers.assert_eq(marker, false)
+	end)
+	helpers.it("waits for capture retirement when resuming during stop (owned-resume-during-stop)", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		world.capture_settles_sync = false
+		owner.init(world.ports)
+		local restores, reloads = 0, 0
+		local activation = require("platform.remap.runtime_activation").new({
+			owner = owner, restore = function(done) restores = restores + 1; done(true) end,
+			marker = { get = function() return true end, clear = function() return true end },
+			reload = function() reloads = reloads + 1 end, close_other_instances = function() return true end,
+		})
+		activation.reconcile(true, function() start_peers(owner) end)
+		admit_stream(world)
+		activation.reconcile(false)
+		activation.reconcile(true)
+		helpers.assert_eq(reloads, 0, "a new driver cannot start while capture retirement is pending")
+		helpers.assert_eq(restores, 0)
+		world.capture_stop_callback()
+		helpers.assert_eq(reloads, 1, "resume reloads only after the old capture retires")
+		helpers.assert_eq(restores, 0, "a resumed driver must not restore the competing runtime")
+	end)
+
+	helpers.it("honors a new pause before a pending capture stop settles (owned-resume-during-stop)", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		world.capture_settles_sync = false
+		owner.init(world.ports)
+		local restores, reloads = 0, 0
+		local activation = require("platform.remap.runtime_activation").new({
+			owner = owner, restore = function(done) restores = restores + 1; done(true) end,
+			marker = { get = function() return true end, clear = function() return true end },
+			reload = function() reloads = reloads + 1 end, close_other_instances = function() return true end,
+		})
+		activation.reconcile(true, function() start_peers(owner) end)
+		admit_stream(world)
+		activation.reconcile(false)
+		activation.reconcile(true)
+		activation.reconcile(false)
+		world.capture_stop_callback()
+		helpers.assert_eq(reloads, 0)
+		helpers.assert_eq(restores, 1)
+	end)
+	helpers.it("retries the same stop while activation reconciliation repeats (owned-stop-observer-identity)", function()
+		local owner, world = admitted(function(w) w.capture_settles_sync = false end)
+		start_peers(owner)
+		admit_stream(world)
+		local restores = 0
+		local activation = require("platform.remap.runtime_activation").new({
+			owner = owner, restore = function(done) restores = restores + 1; done(true) end,
+			marker = { get = function() return true end, clear = function() return true end },
+			reload = function() end, close_other_instances = function() return true end,
+		})
+		activation.reconcile(false)
+		activation.reconcile(false)
+		helpers.assert_eq(world.calls.capture_stop, 2, "a second reconciliation must retry the exact retained capture")
+		helpers.assert_eq(restores, 0)
+		world.capture_stop_callback()
+		helpers.assert_eq(restores, 1)
+	end)
 	helpers.it("stops the capture and settles only when it is observed settled", function()
 		local owner, world = admitted(function(w) w.capture_settles_sync = false end)
 		start_peers(owner)

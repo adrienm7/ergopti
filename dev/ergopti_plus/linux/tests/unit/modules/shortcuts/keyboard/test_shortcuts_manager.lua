@@ -98,10 +98,8 @@ helpers.describe("modules.shortcuts.manager", function()
     local expected = {}
     for _, group in ipairs(data.groups) do
       for _, pair in ipairs(group.pairs or {}) do
-        expected[pair.left] = { left = pair.left, right = pair.right }
-        if pair.right ~= pair.left then
-          expected[pair.right] = { left = pair.left, right = pair.right }
-        end
+        -- Every trigger form of both ends (bare and space-variant guillemets).
+        require("wrap_pair").register(expected, pair)
       end
     end
 

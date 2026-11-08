@@ -12,8 +12,13 @@
 
 global _TakeNotePending := Map()
 global _TakeNoteNextId := 0
+global _TakeNoteGeneration := 0
 global TAKE_NOTE_POLL_INTERVAL_MS := 50
 global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
+; Notepad window -> the lowercased full path of the note this module opened in
+; it. Notepad titles a document by its file name alone, so two folders' Notes.txt
+; read the same; this binding is what tells their windows apart.
+global _TakeNoteDocumentWindows := Map()
 
 
 _TakeNoteTitleMatchesFile(Title, FileName) {
@@ -34,6 +39,17 @@ _TakeNoteTitleMatchesFile(Title, FileName) {
 ; Injectable OS boundary. Tests replace this class with a deterministic clock
 ; and manually-driven timer queue, so they never launch or focus a real window.
 class _TakeNoteNative {
+	; Win32 paths are NUL-terminated; inspect the original counted units before
+	; a query or effect could silently select the shorter prefix.
+	static _HasNativeNul(Path) {
+		if !(Path is String)
+			return false
+		loop StrLen(Path)
+			if NumGet(StrPtr(Path), (A_Index - 1) * 2, "UShort") == 0
+				return true
+		return false
+	}
+
 	static NowTick() {
 		return A_TickCount
 	}
@@ -43,20 +59,26 @@ class _TakeNoteNative {
 	}
 
 	static FileExists(Path) {
-		return FileExist(Path) != ""
+		return !_TakeNoteNative._HasNativeNul(Path) && FileExist(Path) != ""
 	}
 
 	static CreateEmptyFile(Path) {
+		if _TakeNoteNative._HasNativeNul(Path)
+			throw ValueError("note path cannot contain a NUL code unit")
 		FileAppend("", Path)
 		return true
 	}
 
 	static Launch(Path) {
+		if _TakeNoteNative._HasNativeNul(Path)
+			throw ValueError("note path cannot contain a NUL code unit")
 		Run('notepad.exe "' . Path . '"')
 		return true
 	}
 
-	static FindWindow(FileName) {
+	; @param Admits {Func|0} Admits(Hwnd) is false for a window that cannot stand
+	;   for the requested note (one bound to another folder's note of that name).
+	static FindWindow(FileName, Admits := 0) {
 		try Hwnds := WinGetList("ahk_exe notepad.exe")
 		catch
 			return 0
@@ -65,6 +87,7 @@ class _TakeNoteNative {
 			catch
 				continue
 			if _TakeNoteTitleMatchesFile(Title, FileName)
+					&& (!HasMethod(Admits, "Call") || Admits.Call(Hwnd))
 				return Hwnd
 		}
 		return 0
@@ -112,6 +135,24 @@ class _TakeNoteNative {
 }
 
 
+; Whether a Notepad window may stand for the note at PathKey: a window this
+; module opened for another folder's note of the same name never does.
+; @param PathKey {String} The job's lowercased full note path.
+; @param Hwnd {Integer} A Notepad window whose title names the note's file.
+; @returns {Boolean}
+_TakeNoteWindowAdmits(PathKey, Hwnd) {
+	global _TakeNoteDocumentWindows
+	return !_TakeNoteDocumentWindows.Has(Hwnd) || _TakeNoteDocumentWindows[Hwnd] == PathKey
+}
+
+; Records that Hwnd shows the note at PathKey, once the job proved it focused.
+_TakeNoteBindWindow(Hwnd, PathKey) {
+	global _TakeNoteDocumentWindows
+	if !(_TakeNoteDocumentWindows is Map)
+		throw TypeError("The TakeNote window bindings are not a Map.")
+	_TakeNoteDocumentWindows[Hwnd] := PathKey
+}
+
 ; Resolve the feature settings once, without performing any OS or file work.
 ; Both the Win+N shortcut and the gesture action call this same entry seam.
 _TakeNoteQueueFromFeatures(AppendNewlineOnLaunch := true, Ops := _TakeNoteNative) {
@@ -151,30 +192,51 @@ TakeNote(*) {
 ; Build and enqueue one note job. Scheduling is the only side effect before the
 ; caller returns; even FileExist and Run belong to the deferred state machine.
 TakeNoteRequest(DatedNotes, DestinationFolder, AppendNewlineOnLaunch := true, Ops := _TakeNoteNative) {
+	global _TakeNoteGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended
+			return 0
+		Generation := _TakeNoteGeneration
+	} finally Critical(PreviousCritical)
 	try {
 		if !(DestinationFolder is String) or Trim(DestinationFolder) = ""
 			throw ValueError("note destination folder must be a non-empty string")
+		if _TakeNoteNative._HasNativeNul(DestinationFolder)
+			throw ValueError("note destination folder cannot contain a NUL code unit")
 		FileName := DatedNotes
 			? "Notes_" . FormatTime(, "dd_MM_yyyy") . ".txt"
 			: "Notes.txt"
 		FilePath := RTrim(DestinationFolder, "\/") . "\" . FileName
 		Pattern := FileName . " ahk_exe notepad.exe"
 		return _TakeNoteQueueFinalize(FilePath, FileName, Pattern,
-			AppendNewlineOnLaunch, Ops)
+			AppendNewlineOnLaunch, Ops, Generation)
 	} catch as Err {
-		try Ops.ReportError(Err.Message)
+		PreviousCritical := Critical("On")
+		try Current := !A_IsSuspended && Generation == _TakeNoteGeneration
+		finally Critical(PreviousCritical)
+		if Current
+			try Ops.ReportError(Err.Message)
 		return 0
 	}
 }
 
 
 _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
-		AppendNewlineOnLaunch, Ops := _TakeNoteNative) {
-	global _TakeNotePending, _TakeNoteNextId
+		AppendNewlineOnLaunch, Ops := _TakeNoteNative, Generation := unset) {
+	global _TakeNotePending, _TakeNoteNextId, _TakeNoteGeneration
 	global TAKE_NOTE_POLL_INTERVAL_MS, TAKE_NOTE_LAUNCH_TIMEOUT_MS
+	if !IsSet(Generation) {
+		PreviousCritical := Critical("On")
+		try Generation := _TakeNoteGeneration
+		finally Critical(PreviousCritical)
+	}
 	PathKey := StrLower(StrReplace(FilePath, "/", "\"))
+	StartedTick := Ops.NowTick()
 	PreviousCritical := Critical("On")
 	try {
+		if A_IsSuspended || Generation != _TakeNoteGeneration
+			return 0
 		; One exact note path owns at most one launch/focus transaction. Without
 		; this admission gate, two rapid shortcut/gesture callbacks both observe
 		; the pre-window state, launch Notepad twice, then inject into the same
@@ -185,7 +247,7 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 		}
 		JobId := ++_TakeNoteNextId
 		TimerFn := _TakeNotePoll.Bind(JobId)
-		_TakeNotePending[JobId] := Map(
+		Job := Map(
 			"phase", "queued",
 			"file_path", FilePath,
 			"path_key", PathKey,
@@ -194,11 +256,12 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 			"append_on_launch", AppendNewlineOnLaunch,
 			"append_newline", false,
 			"waited", "window",
-			"started_tick", Ops.NowTick(),
+			"started_tick", StartedTick,
 			"timeout_ms", TAKE_NOTE_LAUNCH_TIMEOUT_MS,
 			"timer", TimerFn,
 			"ops", Ops
 		)
+		_TakeNotePending[JobId] := Job
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -206,19 +269,48 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 		if !Ops.Schedule(TimerFn, TAKE_NOTE_POLL_INTERVAL_MS)
 			throw Error("initial timer scheduling was refused")
 	} catch as Err {
-		_TakeNoteFinish(JobId)
+		if !_TakeNoteFinish(JobId, Job)
+			return 0
 		throw Err
 	}
-	return JobId
+	; A short one-shot may already have completed normally before Schedule
+	; returns. Preserve its original ID unless the request's epoch was revoked.
+	PreviousCritical := Critical("On")
+	try CurrentGeneration := !A_IsSuspended && Generation == _TakeNoteGeneration
+	finally Critical(PreviousCritical)
+	return CurrentGeneration ? JobId : 0
 }
 
+; RAM-only revocation: the already scheduled one-shot callbacks retain no
+; authority after this map is replaced, even when native Suspend resumes.
+TakeNoteRevokePending() {
+	global _TakeNotePending, _TakeNoteGeneration
+	PreviousCritical := Critical("On")
+	try {
+		; Keep old jobs alive until the native scheduler is restored below.
+		Retired := _TakeNotePending
+		_TakeNoteGeneration += 1
+		_TakeNotePending := Map()
+	}
+	finally Critical(PreviousCritical)
+	return true
+}
 
-_TakeNoteFinish(JobId) {
+_TakeNoteCurrent(JobId, Job) {
+	global _TakeNotePending
+	PreviousCritical := Critical("On")
+	try return _TakeNotePending.Has(JobId) && _TakeNotePending[JobId] == Job
+	finally Critical(PreviousCritical)
+}
+
+_TakeNoteFinish(JobId, Job := unset) {
 	global _TakeNotePending
 	PreviousCritical := Critical("On")
 	try {
-		if _TakeNotePending.Has(JobId)
-			_TakeNotePending.Delete(JobId)
+		if !_TakeNotePending.Has(JobId) || (IsSet(Job) && _TakeNotePending[JobId] != Job)
+			return false
+		_TakeNotePending.Delete(JobId)
+		return true
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -226,19 +318,22 @@ _TakeNoteFinish(JobId) {
 
 
 _TakeNoteExpire(JobId, Job) {
+	if !_TakeNoteFinish(JobId, Job)
+		return false
 	try Job["ops"].WarnTimeout(Job["pattern"], Job["waited"])
-	_TakeNoteFinish(JobId)
+	return true
 }
 
 
 _TakeNoteReschedule(JobId, Job) {
 	global TAKE_NOTE_POLL_INTERVAL_MS
 	Ops := Job["ops"]
-	if TickExpired64(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
-		_TakeNoteExpire(JobId, Job)
+	if _TakeNoteAbortIfUnavailable(JobId, Job)
 		return false
-	}
-	if !Ops.Schedule(Job["timer"], TAKE_NOTE_POLL_INTERVAL_MS)
+	Scheduled := Ops.Schedule(Job["timer"], TAKE_NOTE_POLL_INTERVAL_MS)
+	if !_TakeNoteCurrent(JobId, Job)
+		return false
+	if !Scheduled
 		throw Error("poll timer scheduling was refused")
 	return true
 }
@@ -248,12 +343,24 @@ _TakeNoteReschedule(JobId, Job) {
 ; the terminal conditions again before every later externally visible effect so
 ; a suspension or deadline that lands mid-tick cannot continue the transaction.
 _TakeNoteAbortIfUnavailable(JobId, Job) {
+	if !_TakeNoteCurrent(JobId, Job)
+		return true
 	Ops := Job["ops"]
-	if Ops.IsSuspended() {
-		_TakeNoteFinish(JobId)
+	Suspended := Ops.IsSuspended()
+	if !_TakeNoteCurrent(JobId, Job)
+		return true
+	if Suspended || A_IsSuspended {
+		_TakeNoteFinish(JobId, Job)
 		return true
 	}
-	if TickExpired64(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
+	Now := Ops.NowTick()
+	if !_TakeNoteCurrent(JobId, Job)
+		return true
+	if A_IsSuspended {
+		_TakeNoteFinish(JobId, Job)
+		return true
+	}
+	if TickExpired64(Job["started_tick"], Job["timeout_ms"], Now) {
 		_TakeNoteExpire(JobId, Job)
 		return true
 	}
@@ -266,10 +373,14 @@ _TakeNoteAbortIfUnavailable(JobId, Job) {
 ; or final input so a stale/foreign window never receives the action.
 _TakeNotePoll(JobId) {
 	global _TakeNotePending
-	if !_TakeNotePending.Has(JobId)
-		return
-	Job := _TakeNotePending[JobId]
+	PreviousCritical := Critical("On")
+	try {
+		if !_TakeNotePending.Has(JobId)
+			return
+		Job := _TakeNotePending[JobId]
+	} finally Critical(PreviousCritical)
 	Ops := Job["ops"]
+	Admits := _TakeNoteWindowAdmits.Bind(Job["path_key"])
 	try {
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
@@ -283,7 +394,7 @@ _TakeNotePoll(JobId) {
 				throw Error("note file creation was refused")
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
-			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"]) != 0
+			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"], Admits) != 0
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
 			Job["append_newline"] := Job["append_on_launch"] and !WindowAlreadyOpen
@@ -294,7 +405,7 @@ _TakeNotePoll(JobId) {
 				return
 		}
 
-		WindowHwnd := Ops.FindWindow(Job["file_name"])
+		WindowHwnd := Ops.FindWindow(Job["file_name"], Admits)
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
 		if !WindowHwnd {
@@ -305,10 +416,16 @@ _TakeNotePoll(JobId) {
 		Activated := Ops.Activate(WindowHwnd)
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
-		if !Activated or !Ops.IsActive(WindowHwnd)
-			or !Ops.IsExactWindow(WindowHwnd, Job["file_name"]) {
+		if Activated {
+			Active := Ops.IsActive(WindowHwnd)
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
+			Exact := Active ? Ops.IsExactWindow(WindowHwnd, Job["file_name"]) : false
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
+		} else
+			Active := false, Exact := false
+		if !Activated || !Active || !Exact {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
@@ -318,20 +435,24 @@ _TakeNotePoll(JobId) {
 			throw Error("Notepad maximize was refused")
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
-		if !Ops.IsActive(WindowHwnd)
-			or !Ops.IsExactWindow(WindowHwnd, Job["file_name"]) {
-			if _TakeNoteAbortIfUnavailable(JobId, Job)
-				return
+		Active := Ops.IsActive(WindowHwnd)
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
+		Exact := Active ? Ops.IsExactWindow(WindowHwnd, Job["file_name"]) : false
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
+		if !Active || !Exact {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
+		_TakeNoteBindWindow(WindowHwnd, Job["path_key"])
 		if Job["append_newline"] and !Ops.SendFinal("^{End}{Enter}")
 			throw Error("final note input was refused")
-		_TakeNoteFinish(JobId)
+		_TakeNoteFinish(JobId, Job)
 	} catch as Err {
-		_TakeNoteFinish(JobId)
-		try Ops.ReportError(Err.Message)
+		if _TakeNoteFinish(JobId, Job)
+			try Ops.ReportError(Err.Message)
 	}
 }

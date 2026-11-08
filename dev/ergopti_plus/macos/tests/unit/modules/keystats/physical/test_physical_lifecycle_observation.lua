@@ -104,6 +104,15 @@ local function with_fixture(options, scenario)
 	end
 	function audio.isRunning() return audio.running end
 	fixture.audio = audio
+	local device = { running = false, callback = nil, stop_calls = 0 }
+	function device:uid() return "output-1" end
+	function device:volume() return 40 end
+	function device:muted() return false end
+	function device:watcherCallback(cb) self.callback = cb; return self end
+	function device:watcherStart() self.running = true; return self end
+	function device:watcherStop() self.stop_calls = self.stop_calls + 1; self.running = false; return self end
+	function device:watcherIsRunning() return self.running end
+	fixture.audio_device = device
 
 	local hs_stub = {
 		timer = { absoluteTime = function() fixture.clock_reads = (fixture.clock_reads or 0) + 1; return fixture.now_ms * 1000000 + fixture.clock_reads end },
@@ -145,12 +154,7 @@ local function with_fixture(options, scenario)
 		},
 		audiodevice = {
 			watcher = audio,
-			defaultOutputDevice = function()
-				return {
-					volume = function() return 40 end,
-					muted = function() return false end,
-				}
-			end,
+			defaultOutputDevice = function() return fixture.audio_device end,
 		},
 	}
 	_G.hs = hs_stub
@@ -172,6 +176,7 @@ local function with_fixture(options, scenario)
 		start = function() return false end,
 	}
 	local scheduler = {}
+	function scheduler.hotstring_time() return fixture.now_ms / 1000 end
 	function scheduler.after(_, callback)
 		local mode = options.after_mode or "commit"
 		if mode == "throw" then error("context timer constructor exploded") end

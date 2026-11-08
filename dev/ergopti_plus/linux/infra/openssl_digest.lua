@@ -11,6 +11,7 @@ local DIGEST_BYTES = 32 -- SHA-256's native ABI output size.
 local Native = require("infra.openssl_library")
 local ffi = Native.ffi
 local library, null_pointer
+local streaming = false
 if ffi then
 	local declared = pcall(ffi.cdef, [[
 		unsigned char *SHA256(const unsigned char *data, size_t length, unsigned char *digest);
@@ -21,6 +22,58 @@ if ffi then
 			M.available = true
 		end
 	end
+	-- The streaming calls keep their state in a caller-owned SHA256_CTX, the
+	-- layout OpenSSL 1.1 and 3 both export (deprecated in 3, still exported).
+	streaming = M.available and pcall(ffi.cdef, [[
+		typedef struct ergopti_sha256_ctx {
+			unsigned int h[8]; unsigned int Nl, Nh; unsigned int data[16]; unsigned int num, md_len;
+		} ergopti_sha256_ctx;
+		int SHA256_Init(ergopti_sha256_ctx *c);
+		int SHA256_Update(ergopti_sha256_ctx *c, const void *data, size_t len);
+		int SHA256_Final(unsigned char *md, ergopti_sha256_ctx *c);
+	]]) and pcall(function() return library.SHA256_Init, library.SHA256_Update, library.SHA256_Final end)
+end
+
+--- Whether streaming digests (M.stream) are available.
+M.streaming = streaming
+
+local function hex_of(buffer)
+	local hex = {}
+	for index = 0, DIGEST_BYTES - 1 do hex[#hex + 1] = string.format("%02x", tonumber(buffer[index])) end
+	return table.concat(hex)
+end
+
+--- Starts a streaming SHA-256 whose state can be copied, so a reader that has
+--- hashed a prefix can extend it without hashing the prefix again.
+--- @return table|nil stream { update(bytes):boolean, digest():string|nil, copy():table }
+--- @return string|nil reason
+function M.stream()
+	if not streaming then return nil, "OpenSSL streaming SHA256 binding unavailable" end
+	local function wrap(ctx)
+		local self = {}
+		function self.update(bytes)
+			assert(type(bytes) == "string", "a digest update takes bytes")
+			if #bytes == 0 then return true end
+			return library.SHA256_Update(ctx, bytes, #bytes) == 1
+		end
+		function self.copy()
+			local clone = ffi.new("ergopti_sha256_ctx")
+			ffi.copy(clone, ctx, ffi.sizeof("ergopti_sha256_ctx"))
+			return wrap(clone)
+		end
+		--- The digest of every byte so far; the stream itself stays extendable.
+		function self.digest()
+			local clone = ffi.new("ergopti_sha256_ctx")
+			ffi.copy(clone, ctx, ffi.sizeof("ergopti_sha256_ctx"))
+			local buffer = ffi.new("unsigned char[?]", DIGEST_BYTES)
+			if library.SHA256_Final(buffer, clone) ~= 1 then return nil end
+			return hex_of(buffer)
+		end
+		return self
+	end
+	local ctx = ffi.new("ergopti_sha256_ctx")
+	if library.SHA256_Init(ctx) ~= 1 then return nil, "OpenSSL refused to start a SHA256 stream" end
+	return wrap(ctx)
 end
 
 --- Computes an independent native digest over every byte of the input.

@@ -37,6 +37,39 @@ local function with_runner(faults, body)
 end
 
 helpers.describe("private shell output retains native cleanup ownership", function()
+	helpers.it("retains a refused output close before unlink and retries it", function()
+		with_runner({}, function(runner, native)
+			local open, refuse, closes = native.open, true, 0
+			native.open = function(path, mode)
+				local file = assert(open(path, mode))
+				return { read = function(_, format) return file:read(format) end,
+					close = function() closes = closes + 1; if refuse then return false end; return file:close() end }
+			end
+			helpers.assert_nil(runner.exec_private_stdin(COMMAND, INPUT))
+			helpers.assert_eq(#native.leftover_files(), 1)
+			helpers.assert_nil(runner.exec_private_stdin(COMMAND, INPUT))
+			helpers.assert_eq(native.allocation_count(), 1)
+			refuse = false
+			helpers.assert_eq(runner.exec_private_stdin(COMMAND, INPUT), "C" .. Double.to_hex(INPUT))
+			helpers.assert_eq(#native.leftover_files(), 0)
+			helpers.assert_true(closes >= 2)
+		end)
+	end)
+
+	helpers.it("closes the private output handle even when reading raises", function()
+		with_runner({}, function(runner, native)
+			local open, closes = native.open, 0
+			native.open = function(path, mode)
+				local file = assert(open(path, mode))
+				return { read = function() error("read failed") end,
+					close = function() closes = closes + 1; return file:close() end }
+			end
+			helpers.assert_nil(runner.exec_private_stdin(COMMAND, INPUT))
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(#native.leftover_files(), 0)
+		end)
+	end)
+
 	helpers.it("refuses publication and new allocations after nil-error unlink refusal (private-output-unlink)", function()
 		local faults = { cleanup_refused = true }
 		with_runner(faults, function(runner, native, logs)

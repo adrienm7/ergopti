@@ -80,6 +80,7 @@ local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 -- never reaches the keyboard hook's character callback, yet CapsWord must end
 -- on a delimiter it contains. One owner, set by the daemon.
 local _output_observer = nil
+local _mutation_observer = nil
 
 
 -- =========================================
@@ -580,7 +581,12 @@ end
 --- @return table fields Exact retained route for each original value.
 local function prepare_fields(values, owner, publication)
 	local fields = {}
-	for index, value in ipairs(values) do fields[index] = prepare_replacement(value, publication, owner) end
+	-- Only the FIRST field is bound to the destination captured when the trigger
+	-- was typed: the intended Tabs move focus to the following fields, so holding
+	-- those to the original destination would refuse the feature itself.
+	for index, value in ipairs(values) do
+		fields[index] = prepare_replacement(value, index == 1 and publication or nil, owner)
+	end
 	local active = 1
 	local batch = { channel = owner.channel }
 	function batch.current()
@@ -607,10 +613,21 @@ end
 --- @param prepared table|nil Ordinary replacement guards checked before any output reservation.
 --- @param data_attempt function|nil Private mutation latch after admission, before native ACK.
 --- @return table Commit result.
-local function run_transaction(label, body, publication, prepared, data_attempt)
+local function private_failure(reason, is_private)
+	if is_private and reason ~= Errors.PROGRAMMABLE_PUBLICATION_STALE then return "private replacement failed" end
+	return tostring(reason)
+end
+
+local function run_transaction(label, body, publication, prepared, data_attempt, is_private, physical_input)
 	if prepared then
 		local checked, reason = pcall(prepared.current)
-		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
+		if not checked then return { ok = false, error = private_failure(reason, is_private), failed_phase = "replacement preflight", cleanup_ok = true } end
+	end
+	-- A later refusal can follow real deletion or partial output. Retire physical
+	-- fragments before synthetic mutation, without publishing successful text.
+	if physical_input ~= true and _mutation_observer then
+		local observed, failure = pcall(_mutation_observer)
+		if not observed then Logger.error(LOG, "The mutation observer failed: %s.", private_failure(failure, is_private)) end
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	Perf.count("hotstring.expansions")
@@ -666,6 +683,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
 	Perf.span("hotstring.expand", transaction_started)
+	if not result.ok then result.error = private_failure(result.error, is_private) end
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
 		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
 	return result
@@ -815,15 +833,19 @@ function M.close_fast_channel()
 	local clipboard_closed = retire_clipboard()
 	if not _uinput then return clipboard_closed end
 	local Broker = require("adapters.modifier_broker")
-	if Broker.for_channel(_uinput) then
-		local acknowledged = _uinput.close() == true
-		if not acknowledged and (not _uinput.is_open()) and not _uinput.has_output_debt() then acknowledged = true end
+	local channel, broker = _uinput, Broker.for_channel(_uinput)
+	if broker then
+		local acknowledged = channel.close() == true
+		if not acknowledged and (not channel.is_open()) and not channel.has_output_debt() then acknowledged = true end
 		if not acknowledged then
 			Logger.error(LOG, "Output channel retirement remains unacknowledged.")
 			return false
 		end
-		Broker.detach(_uinput)
-	else _uinput.close() end
+		if _uinput ~= channel or Broker.for_channel(channel) ~= broker then return false end
+		Broker.detach(channel)
+	else
+		if channel.close() ~= true or _uinput ~= channel then return false end
+	end
 	_uinput = nil
 	Logger.done(LOG, "Non-forking uinput channel closed.")
 	return clipboard_closed
@@ -838,9 +860,11 @@ end
 --- Sets the one observer told of each successful injection's typed text.
 --- A second observer is refused: two owners would each believe they see all
 --- output. Pass nil to clear it (tests, a stopped daemon).
---- @param fn function|nil fn(text) called after the text was typed.
+--- @param fn function|nil fn(text, physical_input) called after the text was typed.
+--- @param before_mutation function|nil Called before admitted synthetic mutation, even if it later fails.
 --- @return boolean accepted
-function M.set_output_observer(fn)
+function M.set_output_observer(fn, before_mutation)
+	if before_mutation ~= nil and (type(before_mutation) ~= "function" or fn == nil) then return false end
 	if fn ~= nil and type(fn) ~= "function" then
 		Logger.error(LOG, "set_output_observer(): a function or nil is required, got %s.", type(fn))
 		return false
@@ -849,17 +873,17 @@ function M.set_output_observer(fn)
 		Logger.error(LOG, "set_output_observer(): an output observer is already installed.")
 		return false
 	end
-	_output_observer = fn
+	_output_observer, _mutation_observer = fn, before_mutation
 	return true
 end
 
 --- Tells the observer of typed text; its failure is logged, never raised into
 --- an injection that already succeeded.
 --- @param text string Exactly what was typed.
-local function notify_output(text)
+local function notify_output(text, is_private, physical_input)
 	if not _output_observer or text == "" then return end
-	local ok, err = pcall(_output_observer, text)
-	if not ok then Logger.error(LOG, "The output observer failed: %s.", tostring(err)) end
+	local ok, err = pcall(_output_observer, text, physical_input == true)
+	if not ok then Logger.error(LOG, "The output observer failed: %s.", private_failure(err, is_private)) end
 end
 
 --- Performs a hotstring injection: erases the trigger then types the replacement.
@@ -873,7 +897,8 @@ end
 ---   log, which the driver keeps for 14 days at a level that prints TRACE.
 --- @param replay_terminator string|nil Exact non-consumed carrier to type last.
 --- @param publication table|nil Retained full-phase and cached-key admission guards.
-function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication)
+--- @param physical_input boolean|nil A consumed physical key, only without edits or private output.
+function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication, on_payload_attempt, physical_input)
 	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string"
 			or (replay_terminator ~= nil and type(replay_terminator) ~= "string") then
 		-- The TYPES, not the values. This branch is reached BECAUSE the arguments
@@ -901,20 +926,21 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	end
 	local checked, prepared = pcall(prepare_replacement, replacement_text, publication, owner)
 	if not checked then
-		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
+		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure (content withheld).")
 		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
-		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 	local ready, preparation_error = pcall(prepared.prepare_clipboard)
 	if not ready then
 		local closed = prepared.close_clipboard()
-		local failure = { ok = false, error = closed and tostring(preparation_error) or "clipboard restoration failed",
+		local failure = { ok = false, error = closed and private_failure(preparation_error, is_private) or "clipboard restoration failed",
 			failed_phase = "replacement preflight", cleanup_ok = closed }
 		if not closed then failure.native_cleanup_ok = true end
 		if not closed then stop_after_failure(failure, "inject()") end
 		return failure
 	end
 
+	local payload_attempted = false
 	local ran, result = pcall(run_transaction, "inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
@@ -933,8 +959,15 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication, prepared)
-	local clipboard_closed = prepared.close_clipboard()
+	end, publication, prepared, function(code, phase)
+		if phase == Errors.REPLACEMENT_KEY_DOWN
+			or (phase == Errors.CLIPBOARD_PASTE_CHORD and code ~= EvdevCodes.KEY_LEFTCTRL) then
+			payload_attempted = true
+			if type(on_payload_attempt) == "function" then on_payload_attempt() end
+		end
+	end, is_private, physical_input == true and backspace_count == 0 and not is_private and replay_terminator == nil)
+	local closed_ok, clipboard_closed = pcall(prepared.close_clipboard)
+	clipboard_closed = closed_ok and clipboard_closed == true
 	if not ran then
 		result = { ok = false, error = "output transaction raised before its cleanup receipt", failed_phase = "output transaction",
 			cleanup_ok = false, native_cleanup_ok = false }
@@ -945,9 +978,11 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	end
 	if not ran or not clipboard_closed then stop_after_failure(result, "inject()") end
 
+	result.payload_attempted = payload_attempted
 	if result.ok then
 		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
-		notify_output(replacement_text .. (replay_terminator or ""))
+		notify_output(replacement_text .. (replay_terminator or ""), is_private,
+			physical_input == true and backspace_count == 0 and not is_private and replay_terminator == nil)
 	end
 	return result
 end
@@ -981,8 +1016,8 @@ function M.type_directly(text)
 	end
 	local result = run_transaction("type_directly()", function(tx)
 		if not send_text_native(tx, text) then error(tx.error() or "the key presses were refused", 0) end
-	end)
-	if result.ok then notify_output(text) end
+	end, nil, nil, nil, false, true)
+	if result.ok then notify_output(text, false, true) end
 	return result
 end
 
@@ -1002,7 +1037,8 @@ end
 --- @param backspace_count integer Characters to erase before typing.
 --- @param values table Array of strings, in the order they are typed.
 --- @param is_private boolean|nil True when the values are PII and must not be logged.
-function M.inject_fields(backspace_count, values, is_private)
+--- @param publication table|nil Retained text destination captured when the trigger was typed.
+function M.inject_fields(backspace_count, values, is_private, publication)
 	if type(backspace_count) ~= "number" or type(values) ~= "table" then
 		Logger.error(LOG, "inject_fields(): invalid arguments — bc is %s, values is %s.",
 			type(backspace_count), type(values))
@@ -1023,7 +1059,7 @@ function M.inject_fields(backspace_count, values, is_private)
 	-- inject() keeps a single implementation of the modifier neutralisation, the
 	-- two-phase timing and the clipboard fallback.
 	if #values == 1 then
-		return M.inject(backspace_count, values[1], is_private)
+		return M.inject(backspace_count, values[1], is_private, nil, publication)
 	end
 	local owner = capture_replacement_owner()
 	if not retire_clipboard() then
@@ -1036,17 +1072,21 @@ function M.inject_fields(backspace_count, values, is_private)
 	else
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
 	end
-	local checked, prepared, fields = pcall(prepare_fields, values, owner)
+	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
 	if not checked then
 		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)
-		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_fields()", function(tx)
+		-- The first erase and the first value must still belong to the field the
+		-- trigger was typed in; later fields are reached through the Tabs below.
+		require_publication(publication, false)
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
 			sleep_ms(INTER_PHASE_DELAY_MS)
 		end
+		require_publication(publication, false)
 
 		for index, value in ipairs(values) do
 			if not send_text(tx, value, is_private, fields[index]) then error(tx.error(), 0) end
@@ -1062,11 +1102,11 @@ function M.inject_fields(backspace_count, values, is_private)
 				sleep_ms(INTER_PHASE_DELAY_MS)
 			end
 		end
-	end, nil, prepared)
+	end, nil, prepared, nil, is_private)
 
 	if result.ok then
 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
-		notify_output(table.concat(values, "\t"))
+		notify_output(table.concat(values, "\t"), is_private)
 	end
 	return result
 end
@@ -1100,7 +1140,7 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
 	if not checked then
 		Logger.error(LOG, "Cannot prepare a replacement with keys before erasure (content withheld).")
-		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_tokens()", function(tx)
@@ -1130,11 +1170,11 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication, prepared)
+	end, publication, prepared, nil, is_private)
 
 	if result.ok then
 		Logger.done(LOG, "inject_tokens(): done (bc=%d).", backspace_count)
-		notify_output(table.concat(values) .. (replay_terminator or ""))
+		notify_output(table.concat(values) .. (replay_terminator or ""), is_private)
 	end
 	return result
 end

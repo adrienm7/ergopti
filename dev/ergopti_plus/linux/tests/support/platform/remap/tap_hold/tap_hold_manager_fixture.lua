@@ -33,7 +33,7 @@ local function write(path, text)
 end
 
 --- A fresh manager on the shared defaults and a temporary user file.
-local function manager(user_text)
+local function manager(user_text, opts)
 	-- Earlier enrolled fixtures reload the shared Writer. A fresh Manager's
 	-- original Nav issuer must capture that same current dependency graph.
 	helpers.load_module("platform.remap.nav_layer")
@@ -43,7 +43,8 @@ local function manager(user_text)
 	local hook, actions, resets = fake_hook(), {}, {}
 	Manager.init({
 		keyboard_hook = hook,
-		execute_action = function(action, binding) actions[#actions + 1] = action .. "@" .. binding end,
+		capture_copy_owner = opts and opts.capture_copy_owner,
+		execute_action = opts and opts.execute_action or function(action, binding) actions[#actions + 1] = action .. "@" .. binding end,
 		action_names = require("modules.gestures.manager").get_executable_action_names,
 		on_text_injected = function(text) resets[#resets + 1] = text end,
 		defaults_path = DEFAULTS,

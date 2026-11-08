@@ -112,6 +112,10 @@ TapHoldLoneTapReadConfig(Cache) {
 		return
 	}
 	Value := Stored[ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS]
+	; Native Boolean and numeric values share AHK Integer storage; the actual
+	; boot source owns the authored type. Detached runtime maps keep their reader.
+	if ConfigTomlTryReadBootValue(Cache, ConfigLeaf.TAP_HOLDS, ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS, &Admitted)
+		Value := Admitted
 	try TapHoldSetLoneTapMaxMs(IsInteger(Value) ? Integer(Value) : Value)
 	catch as Err {
 		LoggerWarn("TapHold", "[tap_holds] lone_modifier_tap_max_ms = '{1}' is refused ({2}): the default {3} ms applies.",
@@ -119,6 +123,51 @@ TapHoldLoneTapReadConfig(Cache) {
 		return
 	}
 	LoggerInfo("TapHold", "Lone modifier tap window read: {1} ms.", TapHoldLoneTapMaxMs())
+}
+
+; Refuses a one-shot timeout that is not a positive whole number of
+; milliseconds (tap_holds.sticky_timeout_ms, the leaf macOS reads). No zero
+; or unlimited value: macOS refuses them too (decision of 2026-11-06).
+; @param Ms {Number} Milliseconds.
+; @returns {Integer}
+TapHoldValidOneShotTimeoutMs(Ms) {
+	if !(Ms is Integer) || Ms <= 0
+		throw ValueError("tap_holds.sticky_timeout_ms must be a positive whole number of milliseconds.", -1, String(Ms))
+	return Ms
+}
+
+; Reads the one-shot Shift timeout from config.toml at boot, after
+; TapHoldsLoadTimings(): absent, the timing registry's default stays; a value
+; that is not a positive whole number is reported and the default stays.
+; @param Cache {Map} The parsed config (IniCacheGet's source).
+TapHoldOneShotTimeoutReadConfig(Cache) {
+	global ONE_SHOT_SHIFT_TIMEOUT_SEC
+	DefaultMs := TimingsGet("tap_hold", "one_shot_shift_timeout_ms")
+	ONE_SHOT_SHIFT_TIMEOUT_SEC := DefaultMs / 1000
+	Stored := (Cache is Map) && Cache.Has(ConfigLeaf.TAP_HOLDS) && (Cache[ConfigLeaf.TAP_HOLDS] is Map)
+		? Cache[ConfigLeaf.TAP_HOLDS] : Map()
+	if !Stored.Has(ConfigLeaf.STICKY_TIMEOUT_MS) {
+		LoggerInfo("TapHold", "One-shot Shift timeout not set: the default {1} ms applies.", DefaultMs)
+		return
+	}
+	Value := Stored[ConfigLeaf.STICKY_TIMEOUT_MS]
+	if ConfigTomlTryReadBootValue(Cache, ConfigLeaf.TAP_HOLDS, ConfigLeaf.STICKY_TIMEOUT_MS, &Admitted)
+		Value := Admitted
+	try Ms := TapHoldValidOneShotTimeoutMs(IsInteger(Value) ? Integer(Value) : Value)
+	catch as Err {
+		LoggerWarn("TapHold", "[tap_holds] sticky_timeout_ms = '{1}' is refused ({2}): the default {3} ms applies.",
+			(Value is Object) ? Type(Value) : Value, Err.Message, DefaultMs)
+		return
+	}
+	ONE_SHOT_SHIFT_TIMEOUT_SEC := Ms / 1000
+	LoggerInfo("TapHold", "One-shot Shift timeout read: {1} ms.", Ms)
+}
+
+; The one-shot Shift timeout in force, in milliseconds.
+; @returns {Integer}
+TapHoldOneShotTimeoutMs() {
+	global ONE_SHOT_SHIFT_TIMEOUT_SEC
+	return Round(ONE_SHOT_SHIFT_TIMEOUT_SEC * 1000)
 }
 
 ; The longest press (ms) that still types KeyId's tap: its threshold, or the
@@ -183,6 +232,10 @@ global _TH_TapHoldTrackState := Map()
 ; already-running KeyWait pseudo-thread, so its normal finally can be seconds
 ; too late and the synthetic modifier would alter physical input while paused.
 global _TH_SyntheticHeldKeys := Map()
+; Teardown revokes complete gestures, including frames that have not sent Down.
+global _TH_SyntheticEpoch := 0
+global _TH_ModifierOwners := Map()
+global _TH_TabAltOwner := 0
 ; A zero-count key whose final Up was not proven must remain owned separately
 ; from active reference counts. Lifecycle cleanup retries this ledger instead
 ; of forgetting an OS-level modifier that may still be logically down.
@@ -402,7 +455,7 @@ _TH_TakePressTakenByCombination(KeyId, GuardMs, TickNow := unset) {
 		return false
 	TakenAt := _TH_PressesTakenByCombination[KeyId]
 	_TH_PressesTakenByCombination.Delete(KeyId)
-	return TickElapsed(TakenAt, IsSet(TickNow) ? TickNow : A_TickCount) <= GuardMs
+	return TickElapsed64(TakenAt, IsSet(TickNow) ? TickNow : A_TickCount) <= GuardMs
 }
 
 ; Return the cancellation reason for this tap dispatch, or "" when dispatch is allowed.
@@ -476,10 +529,27 @@ _TapHoldModifierIsSuspended() {
 ; so it is sent whenever the held modifier includes Alt or Win.
 ; @param ModKey {String|Array} The owned modifier key name, or a combination.
 ; @return {Boolean} True when the release was proven.
-_TapHoldReleaseOwnedModifier(ModKey) {
-	if !_TH_MaskMenuModifierRelease(ModKey)
+_TapHoldReleaseOwnedModifier(ModKey, Owner := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner)
+				return false
+			if Owner.Closed
+				return Owner.ReleaseOk
+		}
+		MaskSent := _TH_MaskMenuModifierRelease(ModKey)
+	} finally Critical(PreviousCritical)
+	if !MaskSent
 		try LoggerError("TapHoldDispatch", "Menu mask before releasing '{1}' could not be sent.", _TH_SyntheticKeyLabel(ModKey))
-	return TapHoldSyntheticKeyUp(ModKey)
+	return TapHoldSyntheticKeyUp(ModKey, Owner)
+}
+
+; The native Tab-up fallback and its waiting Down frame share one receipt.
+_TapHoldReleaseTabAltOwner() {
+	global _TH_TabAltOwner
+	Owner := _TH_TabAltOwner
+	return IsObject(Owner) ? _TapHoldReleaseOwnedModifier("LAlt", Owner) : false
 }
 
 ; Send the menu mask once when Key (a name or a combination) includes an Alt or
@@ -527,6 +597,38 @@ _TapHoldEndPressClaim(KeyId) {
 		_TH_OwnedPresses.Delete(KeyId)
 }
 
+; One physical gesture owns one acquisition and one acknowledged release.
+TapHoldNewOwner() {
+	global _TH_SyntheticEpoch
+	return {Epoch: _TH_SyntheticEpoch, Held: false, Closed: false,
+		ReleaseOk: false, Retracted: false}
+}
+
+TapHoldOwnerCurrent(Owner) {
+	global _TH_SyntheticEpoch
+	; A roll-key #HotIf can ask before the epoch's assignment runs at boot.
+	return IsObject(Owner) && IsSet(_TH_SyntheticEpoch) && Owner.Epoch == _TH_SyntheticEpoch
+}
+
+; Publishing the name and its authority is one bounded RAM transaction.
+_TapHoldPublishModifierOwner(KeyId, ModKey, Owner) {
+	global _TH_OwnedModifiers, _TH_ModifierOwners
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
+		if Owner.Closed
+			return Owner.Retracted && _TH_ModifierOwners.Has(KeyId) && _TH_ModifierOwners[KeyId] == Owner
+		if _TH_ModifierOwners.Has(KeyId) && _TH_ModifierOwners[KeyId] != Owner
+				&& TapHoldOwnerCurrent(_TH_ModifierOwners[KeyId])
+			return false
+		Owner.Held := true
+		_TH_OwnedModifiers[KeyId] := ModKey
+		_TH_ModifierOwners[KeyId] := Owner
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ; Own one configured synthetic-modifier gesture from physical key-down through
 ; release. The Down is published before the first interruptible wait, so the
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
@@ -541,7 +643,13 @@ _TapHoldEndPressClaim(KeyId) {
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
 	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
-	PhysicalModifierPassthrough := false, IsSuspendedFn := 0) {
+	PhysicalModifierPassthrough := false, IsSuspendedFn := 0, Owner := 0) {
+	global _TH_ModifierOwners, _TH_OwnedModifiers
+	if !IsObject(Owner)
+		Owner := TapHoldNewOwner()
+	if !TapHoldOwnerCurrent(Owner)
+		return Map("activated", false, "released", false, "tap", false, "elapsed_ms", 0)
+	Owner.KeyId := KeyId
 	if !IsObject(WaitReleaseFn)
 		WaitReleaseFn := _TapHoldModifierWaitRelease
 	if !IsObject(KeyIsDownFn)
@@ -549,9 +657,9 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	if !IsObject(TickNowFn)
 		TickNowFn := _TapHoldModifierTickNow
 	if !IsObject(KeyDownFn)
-		KeyDownFn := TapHoldSyntheticKeyDown
+		KeyDownFn := (Key) => TapHoldSyntheticKeyDown(Key, Owner)
 	if !IsObject(KeyUpFn)
-		KeyUpFn := _TapHoldReleaseOwnedModifier
+		KeyUpFn := (Key) => _TapHoldReleaseOwnedModifier(Key, Owner)
 	if !IsObject(CancelTapFn)
 		CancelTapFn := TapHoldShouldCancelTap
 	if !IsObject(IsSuspendedFn)
@@ -573,6 +681,8 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		_TapHoldClaimPress(KeyId)
 	try {
 		StartedAt := TickNowFn.Call()
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return Map("activated", false, "released", false, "tap", false, "elapsed_ms", 0)
 		if OwnerPresses {
 			if !KeyDownFn.Call(ModKey) {
 				return Map("activated", false, "released", false,
@@ -580,20 +690,24 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			}
 			; Published so the press can be handed back mid-hold when it turns
 			; out to be AltGr's fake LCtrl (TapHoldAltGrTakesItsLCtrl).
-			_TH_OwnedModifiers[KeyId] := ModKey
+			if !_TapHoldPublishModifierOwner(KeyId, ModKey, Owner) {
+				if TapHoldOwnerCurrent(Owner)
+					KeyUpFn.Call(ModKey)
+				return Map("activated", false, "released", false, "tap", false, "elapsed_ms", 0)
+			}
 		}
 
 		Released := false
 		ReleaseProved := false
 		try {
 			loop {
-				if IsSuspendedFn.Call()
+				if !TapHoldOwnerCurrent(Owner) || IsSuspendedFn.Call()
 					break
 				if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
 					Released := true
 					break
 				}
-				if IsSuspendedFn.Call()
+				if !TapHoldOwnerCurrent(Owner) || IsSuspendedFn.Call()
 					break
 				if !KeyIsDownFn.Call(KeyName) {
 					Released := true
@@ -606,12 +720,16 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			; second synthetic Down would race the following key's hotkey admission.
 			; A hold handed back mid-press was released then, and its press was
 			; AltGr's, never a tap; the LCtrl given to that AltGr ends with it.
-			Retracted := _TH_TakeRetractedOwner(KeyId)
-			if !OwnerPresses or Retracted
+			Retracted := _TH_TakeRetractedOwner(KeyId, Owner)
+			if !TapHoldOwnerCurrent(Owner)
+				ReleaseProved := false
+			else if !OwnerPresses
 				ReleaseProved := true
+			else if Retracted
+				ReleaseProved := Owner.ReleaseOk
 			else
 				ReleaseProved := KeyUpFn.Call(ModKey)
-			if !_TH_ReleaseAltGrLCtrl(KeyId)
+			if !_TH_ReleaseAltGrLCtrl(KeyId, Owner)
 				ReleaseProved := false
 		}
 
@@ -623,26 +741,34 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			GuardMs := 250
 		Suspended := IsSuspendedFn.Call()
 		CancelReason := ""
-		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
+		if (Released and ReleaseProved and !Suspended and !A_IsSuspended and TapHoldOwnerCurrent(Owner))
 			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
 		; A release sooner than the shared tap minimum is a key bounce: CapsLock held
 		; as Ctrl typed its tap on a 20 ms brush (tap_hold/decision_vectors.json).
 		; Owned here so no hold-modifier hotkey can miss it, as Linux does in its engine.
 		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended and !Retracted
+			and TapHoldOwnerCurrent(Owner)
 			and ElapsedMs >= TapMinDurationMs() and ElapsedMs <= TapMaxMs and CancelReason == ""
 		if LoggerIsDebugEnabled() {
 			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
 				KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
 				Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
 		}
+		TapAllowed := TapAllowed && TapHoldOwnerCurrent(Owner) && !A_IsSuspended
 		return Map(
 			"activated", true,
 			"released", ReleaseProved,
 			"tap", TapAllowed,
 			"elapsed_ms", ElapsedMs)
 	} finally {
-		if _TH_OwnedModifiers.Has(KeyId)
-			_TH_OwnedModifiers.Delete(KeyId)
+		PreviousCritical := Critical("On")
+		try {
+			if _TH_ModifierOwners.Has(KeyId) && _TH_ModifierOwners[KeyId] == Owner {
+				_TH_ModifierOwners.Delete(KeyId)
+				if _TH_OwnedModifiers.Has(KeyId)
+					_TH_OwnedModifiers.Delete(KeyId)
+			}
+		} finally Critical(PreviousCritical)
 		if Claimed
 			_TapHoldEndPressClaim(KeyId)
 	}
@@ -812,8 +938,9 @@ TapHoldReleasePhysicalKey(Key) {
 ; counting keeps independently overlapping tap-hold branches from releasing a
 ; key another branch still owns; the physical Send happens only on the 0->1 and
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
-TapHoldSyntheticKeyDown(Key) {
+TapHoldSyntheticKeyDown(Key, Owner := 0) {
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
+	global _TH_ModifierOwners, _TH_OwnedModifiers, _TapHoldKeyIsDown
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
 		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
@@ -831,6 +958,16 @@ TapHoldSyntheticKeyDown(Key) {
 	RollbackFailedKeys := []
 	PressedKeys := []
 	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner) || Owner.Closed
+				return false
+			if Owner.Held
+				return true
+			if Owner.HasOwnProp("KeyId") && _TH_ModifierOwners.Has(Owner.KeyId)
+					&& _TH_ModifierOwners[Owner.KeyId] != Owner
+					&& TapHoldOwnerCurrent(_TH_ModifierOwners[Owner.KeyId])
+				return false
+		}
 		if A_IsSuspended {
 			Ok := false
 			FailureKind := "suspended"
@@ -853,25 +990,56 @@ TapHoldSyntheticKeyDown(Key) {
 
 			; Snapshot, before this owner presses them, the keys the user already
 			; holds down and delivered: the last owner leaves those to the user.
-			UserHeld := []
+			UserHeld := [], PhysicalBefore := Map()
 			if Ok {
 				for _, Name in KeysToPress {
+					PhysicalBefore[Name] := !!_TapHoldKeyIsDown.Call(Name, "P")
 					if _TH_UserHoldsDeliveredKey(Name)
 						UserHeld.Push(Name)
 				}
 			}
-			; TextPressKey's Array branch is the sender-owned transaction: a
-			; second Down failure rolls earlier Downs back in reverse order and
-			; reports any rollback Up that could not be proven. Those keys may
-			; still be down at the OS, so retain them before leaving Critical.
+			; The sender retains proven and uncertain Down attempts. This owner
+			; defers rollback so user and sibling custody are checked before every
+			; release, and an unproven Up survives in the existing pending ledger.
 			if Ok and KeysToPress.Length > 0 {
-				Transition := { RollbackFailedKeys: [] }
+				Transition := { RollbackFailedKeys: [], SentKeys: [], AttemptedKey: "", DeferRollback: true }
 				if !TextPressKey(KeysToPress, "Down", false, Transition) {
 					Ok := false
 					FailureKind := "down transaction"
-					for _, Name in Transition.RollbackFailedKeys {
+					; The failed port may have emitted its Down before refusing.
+					; Recover every edge through this ledger, never an adapter's
+					; blind Up of a key a user or reentrant sibling now owns.
+					Recover := Transition.SentKeys.Clone()
+					if Transition.AttemptedKey != ""
+						Recover.Push(Transition.AttemptedKey)
+					for _, Name in Transition.RollbackFailedKeys
+						Recover.Push(Name)
+					Admitted := Map(), UserOwned := Map(), Recovered := Map()
+					for _, Name in KeysToPress
+						Admitted[Name] := true
+					for _, Name in UserHeld
+						UserOwned[Name] := true
+					loop Recover.Length {
+						Name := Recover[Recover.Length - A_Index + 1]
+						if !Admitted.Has(Name) || Recovered.Has(Name)
+							continue
+						Recovered[Name] := true
+						if _TH_SyntheticHeldKeys.Has(Name)
+							continue
+						if UserOwned.Has(Name) {
+							if _TapHoldKeyIsDown.Call(Name, "P")
+								continue
+						} else if !PhysicalBefore[Name] && _TH_UserHoldsDeliveredKey(Name)
+							continue
+						; A new physical hold can arrive while the native port runs.
+						; An already suppressed own press is not that new custody:
+						; our uncertain injected Down alone made it logically down.
+						; Recheck after the key-state port before touching counts.
+						if _TH_SyntheticHeldKeys.Has(Name)
+							continue
 						_TH_MarkSyntheticKeyReleasePending(Name)
-						RollbackFailedKeys.Push(Name)
+						if !_TH_RetrySyntheticKeyRelease(Name)
+							RollbackFailedKeys.Push(Name)
 					}
 				}
 				if Ok {
@@ -886,6 +1054,15 @@ TapHoldSyntheticKeyDown(Key) {
 					_TH_SyntheticHeldKeys[Name] := _TH_SyntheticHeldKeys.Get(Name, 0) + 1
 				for _, Name in UserHeld
 					_TH_SyntheticUserHeldKeys[Name] := true
+				if IsObject(Owner) {
+					Owner.Held := true
+					; A DEBUG callout below may deliver AltGr's handback. Publish
+					; its exact parent before releasing the native admission fence.
+					if Owner.HasOwnProp("KeyId") {
+						_TH_OwnedModifiers[Owner.KeyId] := Key
+						_TH_ModifierOwners[Owner.KeyId] := Owner
+					}
+				}
 			}
 		}
 	}
@@ -912,7 +1089,7 @@ TapHoldSyntheticKeyDown(Key) {
 	return Ok
 }
 
-TapHoldSyntheticKeyUp(Key) {
+TapHoldSyntheticKeyUp(Key, Owner := 0) {
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
@@ -926,6 +1103,16 @@ TapHoldSyntheticKeyUp(Key) {
 	SkippedKeys := []
 	ReleasedKeys := []
 	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner)
+				return false
+			if Owner.Closed
+				return Owner.ReleaseOk
+			Owner.Closed := true
+			if !Owner.Held
+				return false
+			Owner.Held := false
+		}
 		for _, Name in Keys {
 			; A tracked pending release is safe and necessary even during
 			; Suspend. Only the untracked fallback is forbidden while paused.
@@ -975,6 +1162,8 @@ TapHoldSyntheticKeyUp(Key) {
 				FailedKeys.Push(Name)
 			}
 		}
+		if IsObject(Owner)
+			Owner.ReleaseOk := Ok
 	}
 	finally {
 		Critical(PreviousCritical)
@@ -991,13 +1180,22 @@ TapHoldSyntheticKeyUp(Key) {
 }
 
 TapHoldReleaseSyntheticKeys() {
+	; Deferred copy retries are synthetic input owners too: revoke them before
+	; the first yielding key-release operation of suspend or shutdown.
+	TapCopyCheckStop()
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global _TH_SyntheticEpoch, _TH_OwnedModifiers, _TH_ModifierOwners, _TH_AltGrLCtrlOwners
+	global LayerEnabled, _TH_LayerOwner, NumberOfRepetitions, _TH_TabAltOwner
 	Keys := []
 	Seen := Map()
 	FailedKeys := []
 	MaskSent := true
 	PreviousCritical := Critical("On")
 	try {
+		_TH_SyntheticEpoch += 1
+		LayerWasEnabled := IsSet(LayerEnabled) && LayerEnabled
+		LayerEnabled := false, _TH_LayerOwner := 0, NumberOfRepetitions := 1
+		_TH_OwnedModifiers := Map(), _TH_ModifierOwners := Map(), _TH_AltGrLCtrlOwners := Map(), _TH_TabAltOwner := 0
 		UserKeys := []
 		for Name in _TH_SyntheticHeldKeys {
 			Seen[Name] := true
@@ -1035,6 +1233,12 @@ TapHoldReleaseSyntheticKeys() {
 	}
 	finally {
 		Critical(PreviousCritical)
+	}
+
+	if LayerWasEnabled && IsSet(UpdateCapsLockLED) {
+		try UpdateCapsLockLED()
+		catch as Err
+			try LoggerWarn("TapHoldDispatch", "Could not refresh the navigation layer indicator after input retirement: {1}.", Err.Message)
 	}
 
 	if !MaskSent
@@ -1111,32 +1315,47 @@ TapHoldSendWithOwnedKeyUp(Name, SendFn) {
 ; Press Name again after an output that lifted it, when a synthetic owner still
 ; holds it, or when the user held it down before the lift (UserHeld) and still
 ; holds it physically; the user's own release then passes through as usual.
-; The owner check and the Down share one Critical span so an owner cannot
-; release between them. The user's release is an OS event Critical cannot hold
-; back, so it is read again after the Down: one that landed in between would
-; otherwise leave the key logically down with nobody holding it.
+; The native attempt and recovery share one Critical span. Native user input
+; and an emission port can still change custody during that attempt, so current
+; counts and physical custody are checked again even when Down returned false.
 ; @param UserHeld {Boolean} _TH_UserHoldsDeliveredKey(Name) before the lift.
 ; @return {Boolean} False when a Down or Up could not be sent.
 TapHoldRestoreLiftedKey(Name, UserHeld := false) {
 	global _TH_SyntheticHeldKeys, _TapHoldKeyIsDown
 	PreviousCritical := Critical("On")
-	RacedRelease := false
+	ReleaseFailed := false
 	try {
 		Owned := _TH_SyntheticHeldKeys.Has(Name)
-		if !Owned and !(UserHeld and _TapHoldKeyIsDown.Call(Name, "P"))
+		if !Owned && !UserHeld
 			return true
-		Ok := TextPressKey(Name, "Down", false)
-		if (Ok and !Owned and !_TapHoldKeyIsDown.Call(Name, "P")) {
-			RacedRelease := true
-			Ok := TextPressKey(Name, "Up", false)
+		PhysicalBefore := !!_TapHoldKeyIsDown.Call(Name, "P")
+		if !Owned && !PhysicalBefore
+			return true
+		; The one-key transaction retains an uncertain Down even when its port
+		; reports failure after delivery. Its Boolean ACK remains unchanged.
+		Transition := { AttemptedKey: "", DeferRollback: true }
+		Ok := TextPressKey([Name], "Down", false, Transition)
+		if !_TH_SyntheticHeldKeys.Has(Name) {
+			PhysicalNow := !!_TapHoldKeyIsDown.Call(Name, "P")
+			UserStillHolds := PhysicalNow && (UserHeld || !PhysicalBefore)
+			; The sender or state port may have published a sibling owner. An
+			; old captured Owned Boolean cannot authorize releasing that key.
+			if !UserStillHolds && !_TH_SyntheticHeldKeys.Has(Name)
+					&& (Ok || Transition.AttemptedKey == Name) {
+				_TH_MarkSyntheticKeyReleasePending(Name)
+				Released := _TH_RetrySyntheticKeyRelease(Name)
+				ReleaseFailed := !Released
+				if Ok
+					Ok := Released
+			}
 		}
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if (!Ok and RacedRelease) {
-		try LoggerError("TapHoldDispatch", "Could not release '{1}' after the user let go of it during its re-press; it stays down until the key is pressed again.", Name)
+	if ReleaseFailed {
+		try LoggerError("TapHoldDispatch", "Could not balance restoration of '{1}' after its holder released it; the exact Up remains pending for retry.", Name)
 	} else if !Ok {
-		try LoggerError("TapHoldDispatch", "Could not give '{1}' back to its holder after an output; it stays up until the key is pressed again.", Name)
+		try LoggerError("TapHoldDispatch", "Restoring '{1}' after an output was not acknowledged; any unowned attempted Down was reconciled through the synthetic release owner.", Name)
 	}
 	return Ok
 }
@@ -1274,6 +1493,7 @@ TapHoldTapProvenance() {
 ; @return {Boolean} True when TapFn ran, false when the tap was suppressed.
 TapHoldDispatchTap(KeyId, TapFn) {
 	global TapHold, _TapHoldTapInDispatch
+	Owner := TapHoldNewOwner()
 	try {
 		if A_IsSuspended {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' because script is suspended.", KeyId)
@@ -1283,6 +1503,8 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		if (LimitMs < 250)
 			LimitMs := 250
 		CancelReason := TapHoldShouldCancelTap(KeyId, LimitMs)
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		; The keys struck around the tap of a typing key are text, not a chord:
 		; only a click or the wheel makes its press something else than a tap.
 		if (CancelReason == TAPHOLD_CANCEL_BY_OTHER_KEY && TapHoldRollTapIsRunning(KeyId))
@@ -1304,17 +1526,23 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; keys. DisableCapsWord is a no-op when CapsWord is inactive.
 		if _TapHoldTapEndsCapsWord(KeyId)
 			DisableCapsWord()
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		; A command tap (paste, a window switch…) starts a new word, or leaves
 		; the word open, as hotstrings.tap_hold_resets_word says; its keystroke,
 		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
 		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
 			HS_ApplyEventWordReset(ConfigLeaf.TAP_HOLD_RESETS_WORD, "tap of " . KeyId)
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		; A tap that types Enter or Tab goes out through the driver's own send, which
 		; the watcher never sees: it completes a hotstring here, as Space does.
 		EndChar := HotstringEndCharOfTap(KeyId)
 		if (EndChar != "" and HotstringCompleteEndKey(EndChar,
 				TapHoldRollTapIsRunning(KeyId) ? TapHoldRollTapDownTick() : 0))
 			return true
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()
@@ -1322,7 +1550,9 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		return true
 	}
 	finally {
-		TapHoldForgetTrackedKey(KeyId)
+		; A retired dispatch must not erase the resumed physical press.
+		if TapHoldOwnerCurrent(Owner)
+			TapHoldForgetTrackedKey(KeyId)
 	}
 }
 
@@ -1400,7 +1630,28 @@ _TapHoldTapEndsCapsWord(KeyId) {
 	; shortcuts/capsword.ahk is not loaded (standalone tests, tools).
 	if !IsSet(CapsWordEnabled) or !CapsWordEnabled or !IsSet(DisableCapsWord)
 		return false
-	return CapsWordAutoOffIsTerminatorKey(KeyId) and CapsWordAutoOffEndsOnNativeKey(KeyId)
+	Emitted := _TapHoldTapEmittedKey(KeyId)
+	return CapsWordAutoOffIsTerminatorKey(Emitted) and CapsWordAutoOffEndsOnNativeKey(Emitted)
+}
+
+; The key a tap actually types, which is what CapsWord's delimiters judge: the
+; physical carrier is only where the tap came from (Tab remapped to Backspace
+; types no Tab, CapsLock remapped to Enter types one). A tap without a
+; configured action passes the physical key through; a command, or a keystroke
+; under held modifiers, is no delimiter keystroke.
+; @param KeyId {String} Canonical tap-hold key id.
+; @returns {String} The emitted key's id, "" when the tap types no plain key.
+_TapHoldTapEmittedKey(KeyId) {
+	global GESTURE_ACTIONS, TapHold
+	ActionId := TapHoldTapAction(TapHold, KeyId)
+	if (ActionId == "")
+		return KeyId
+	if !GESTURE_ACTIONS.Has(ActionId)
+		return ""
+	Action := GESTURE_ACTIONS[ActionId]
+	if !Action.HasOwnProp("Key") || (Action.HasOwnProp("Mods") && Action.Mods.Length > 0)
+		return ""
+	return ActionId
 }
 
 ; Invoke the configured GESTURE_ACTIONS callback without applying guards. This
@@ -1466,74 +1717,140 @@ global _TapCopyGeneration := 0
 ; Seams for the test suite: the counter, the timer and the notice.
 global _TapCopyCounterFn := () => CB_GetSequenceNumber()
 global _TapCopyTimerFn := (Callback, DelayMs) => TimerAfter(DelayMs / 1000, Callback)
+global _TapCopyFocusFn := () => WIGetFocusedControlToken()
+global _TapCopyPhysicalTickFn := () => (A_TickCount - A_TimeIdlePhysical) & 0xFFFFFFFF
 global _TapCopyWarnFn := () => NotifierSend(t("notify.tap_hold.copy_failed"), Map("level", "warning"))
 
 ; Sends one tap-hold copy and starts its check.
 ; @param KeyId {String} The tap-hold key that tapped, for the log.
 ; @param SendFn {Func} Sends the copy keystroke; returns the sender's verdict.
 ;   The retry calls it again.
+; A missing focus or physical-input timestamp cannot establish a safe retry.
+_TapCopyContext() {
+	global _TapCopyFocusFn, _TapCopyPhysicalTickFn
+	try {
+		Focus := _TapCopyFocusFn.Call()
+		Tick := _TapCopyPhysicalTickFn.Call()
+		if !(Focus is Integer) or Focus == 0 or !(Tick is Integer)
+			return 0
+		return Map("focus", Focus, "tick", Tick)
+	} catch {
+		return 0
+	}
+}
+
+_TapCopySameContext(First, Second) {
+	return IsObject(First) and IsObject(Second)
+		and First["focus"] == Second["focus"] and First["tick"] == Second["tick"]
+}
+
 TapCopySend(KeyId, SendFn) {
 	global _TapCopyCounterFn
+	if A_IsSuspended
+		return false
+	Generation := TapCopyCheckStop()
 	Baseline := _TapCopyCounterFn.Call()
+	Context := _TapCopyContext()
+	if !_TapCopyGenerationCurrent(Generation)
+		return false
 	Sent := SendFn.Call()
-	TapCopyCheckStart(Baseline, KeyId, SendFn)
+	if !_TapCopySameContext(Context, _TapCopyContext())
+		Context := 0
+	if _TapCopyGenerationCurrent(Generation)
+		TapCopyCheckStart(Baseline, KeyId, SendFn, Generation, Context)
 	return Sent
 }
 
-; Starts checking one copy keystroke.
-; @param Baseline {Integer} The sequence number read before the keystroke.
-; @param Source {String} What sent the copy, for the log.
-; @param SendFn {Func} Sends the copy keystroke again for the retry.
-; @return {Boolean} Whether a check is now pending.
-TapCopyCheckStart(Baseline, Source, SendFn) {
+; Starts checking only the copy whose sender still owns this lifecycle generation.
+; @param Context {Map|Integer} The focus and physical-input proof, or 0 when none.
+TapCopyCheckStart(Baseline, Source, SendFn, ExpectedGeneration := unset, Context := 0) {
 	global _TapCopyPending, _TapCopyGeneration, _TapCopyTimerFn, TAP_COPY_VERIFY_MS
-	if IsObject(_TapCopyPending)
-		try LoggerDebug("TapHoldCopy", "Tap-hold copy check from {1} superseded by a newer copy.", _TapCopyPending["source"])
-	_TapCopyGeneration += 1
-	_TapCopyPending := 0
-	; GetClipboardSequenceNumber returns 0 when the session gives no access to
-	; the clipboard (a locked or another window station): nothing can be checked.
-	if !(Baseline is Integer) or Baseline == 0 {
-		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Source)
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || (IsSet(ExpectedGeneration) && ExpectedGeneration != _TapCopyGeneration)
+			return false
+		_TapCopyGeneration += 1
+		Generation := _TapCopyGeneration
+		_TapCopyPending := 0
+		if (Baseline is Integer) && Baseline != 0 {
+			Pending := Map("baseline", Baseline, "attempts", 1, "source", Source,
+				"generation", Generation, "send", SendFn, "context", Context)
+			_TapCopyPending := Pending
+		}
+	} finally Critical(PreviousCritical)
+	; GetClipboardSequenceNumber returns zero when the session cannot access it.
+	if !IsSet(Pending) {
+		if _TapCopyGenerationCurrent(Generation)
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Source)
 		return false
 	}
-	_TapCopyPending := Map("baseline", Baseline, "attempts", 1, "source", Source,
-		"generation", _TapCopyGeneration, "send", SendFn)
-	Generation := _TapCopyGeneration
+	if !_TapCopyCheckCurrent(Pending)
+		return false
 	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
-	return true
+	return _TapCopyCheckCurrent(Pending)
 }
 
-; Abandons the pending check without a report (pause, reload).
+; Abandons both a pending check and any sender that has not published one yet.
 TapCopyCheckStop() {
 	global _TapCopyPending, _TapCopyGeneration
-	_TapCopyPending := 0
-	_TapCopyGeneration += 1
+	PreviousCritical := Critical("On")
+	try {
+		_TapCopyPending := 0
+		_TapCopyGeneration += 1
+		return _TapCopyGeneration
+	} finally Critical(PreviousCritical)
 }
 
-; Reads the counter once an attempt has had its time.
-; @param Generation {Integer} The check this timer belongs to.
+_TapCopyGenerationCurrent(Generation) {
+	global _TapCopyGeneration
+	return !A_IsSuspended && Generation == _TapCopyGeneration
+}
+_TapCopyCheckCurrent(Pending) {
+	global _TapCopyPending
+	return IsObject(Pending) && _TapCopyPending == Pending
+		&& _TapCopyGenerationCurrent(Pending["generation"])
+}
+
+; Completion may retire only its exact record, never a copy started in a callout.
+_TapCopyCheckRetire(Pending, Revoke := false) {
+	global _TapCopyPending, _TapCopyGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Pending) || _TapCopyPending != Pending || Pending["generation"] != _TapCopyGeneration
+			return false
+		_TapCopyPending := 0
+		if Revoke
+			_TapCopyGeneration += 1
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _TapCopyCheckTick(Generation) {
-	global _TapCopyPending, _TapCopyCounterFn, _TapCopySendFn, _TapCopyTimerFn, _TapCopyWarnFn
+	global _TapCopyPending, _TapCopyCounterFn, _TapCopyTimerFn
 	global TAP_COPY_RETRIES, TAP_COPY_VERIFY_MS
 	Pending := _TapCopyPending
-	if !IsObject(Pending) or Pending["generation"] != Generation
+	if !IsObject(Pending) || Pending["generation"] != Generation
 		return
-	; A paused driver sends nothing: the check ends with the pause.
 	if A_IsSuspended {
-		_TapCopyPending := 0
+		_TapCopyCheckRetire(Pending, true)
 		return
 	}
 	Counter := _TapCopyCounterFn.Call()
+	if !_TapCopyCheckCurrent(Pending) {
+		if A_IsSuspended
+			_TapCopyCheckRetire(Pending, true)
+		return
+	}
 	WaitedMs := Pending["attempts"] * TAP_COPY_VERIFY_MS
-	if !(Counter is Integer) or Counter == 0 {
-		_TapCopyPending := 0
-		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Pending["source"])
+	if !(Counter is Integer) || Counter == 0 {
+		if _TapCopyCheckRetire(Pending) && _TapCopyGenerationCurrent(Generation)
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Pending["source"])
 		return
 	}
 	if Counter != Pending["baseline"] {
-		_TapCopyPending := 0
-		if (Pending["attempts"] > 1) {
+		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
+			return
+		if Pending["attempts"] > 1 {
 			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} reached the clipboard only when sent again ({2} ms).", Pending["source"], WaitedMs)
 		} else {
 			try LoggerDebug("TapHoldCopy", "Tap-hold copy from {1} verified: the clipboard changed within {2} ms.", Pending["source"], WaitedMs)
@@ -1541,32 +1858,52 @@ _TapCopyCheckTick(Generation) {
 		return
 	}
 	if Pending["attempts"] > TAP_COPY_RETRIES {
-		_TapCopyPending := 0
+		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
+			return
 		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (not_copied after {2} ms); the user is warned.", Pending["source"], WaitedMs)
-		_TapCopyWarnUser()
+		_TapCopyWarnUser(Generation)
 		return
 	}
-	Pending["attempts"] += 1
-	Pending["baseline"] := Counter
+	Context := _TapCopyContext()
+	if !_TapCopyCheckCurrent(Pending)
+		return
+	if !_TapCopySameContext(Pending["context"], Context) {
+		if _TapCopyCheckRetire(Pending) && _TapCopyGenerationCurrent(Generation)
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be retried because its original context is no longer proven.", Pending["source"])
+		return
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if !_TapCopyCheckCurrent(Pending)
+			return
+		Pending["attempts"] += 1
+		Pending["baseline"] := Counter
+	} finally Critical(PreviousCritical)
 	Refusal := ""
+	if !_TapCopyCheckCurrent(Pending)
+		return
 	try {
 		if !Pending["send"].Call()
 			Refusal := "the sender refused the keystroke"
-	} catch as Err {
+	} catch as Err
 		Refusal := Err.Message
-	}
-	if (Refusal != "") {
-		_TapCopyPending := 0
+	if !_TapCopyCheckCurrent(Pending)
+		return
+	if Refusal != "" {
+		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
+			return
 		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (retry_refused after {2} ms: {3}); the user is warned.", Pending["source"], WaitedMs, Refusal)
-		_TapCopyWarnUser()
+		_TapCopyWarnUser(Generation)
 		return
 	}
 	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
 }
 
 ; Shows the localized notice; a refused notice is logged, never fatal.
-_TapCopyWarnUser() {
+_TapCopyWarnUser(Generation) {
 	global _TapCopyWarnFn
+	if !_TapCopyGenerationCurrent(Generation)
+		return
 	try {
 		Shown := _TapCopyWarnFn.Call()
 	} catch as Err {
@@ -1686,23 +2023,38 @@ TapHoldUserLCtrlHeld(KeyIsDownFn := 0, RealPressFn := 0) {
 ; Its owner then releases nothing more and dispatches no tap.
 ; @param KeyId {String} Tap-hold key id.
 ; @return {Boolean} True when a hold was handed back.
-TapHoldRetractOwnedModifier(KeyId) {
-	global _TH_OwnedModifiers, _TH_RetractedOwners
-	if !_TH_OwnedModifiers.Has(KeyId) or _TH_RetractedOwners.Has(KeyId)
-		return false
-	_TH_RetractedOwners[KeyId] := true
-	if !_TapHoldReleaseOwnedModifier(_TH_OwnedModifiers[KeyId])
+TapHoldRetractOwnedModifier(KeyId, ExpectedOwner := 0) {
+	global _TH_OwnedModifiers, _TH_ModifierOwners, _TH_RetractedOwners
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_OwnedModifiers.Has(KeyId) || !_TH_ModifierOwners.Has(KeyId)
+			return false
+		Owner := _TH_ModifierOwners[KeyId]
+		if IsObject(ExpectedOwner) && Owner != ExpectedOwner
+			return false
+		if !TapHoldOwnerCurrent(Owner) || Owner.Retracted
+			return false
+		ModKey := _TH_OwnedModifiers[KeyId]
+		Owner.Retracted := true
+		_TH_RetractedOwners[KeyId] := Owner
+	} finally Critical(PreviousCritical)
+	if !_TapHoldReleaseOwnedModifier(ModKey, Owner)
 		try LoggerError("TapHoldDispatch", "Could not hand back the hold of '{1}'.", KeyId)
 	return true
 }
 
 ; Whether KeyId's hold was handed back during this press; clears the mark.
-_TH_TakeRetractedOwner(KeyId) {
+_TH_TakeRetractedOwner(KeyId, ExpectedOwner := 0) {
 	global _TH_RetractedOwners
-	if !_TH_RetractedOwners.Has(KeyId)
-		return false
-	_TH_RetractedOwners.Delete(KeyId)
-	return true
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_RetractedOwners.Has(KeyId)
+			return false
+		if IsObject(ExpectedOwner) && _TH_RetractedOwners[KeyId] != ExpectedOwner
+			return false
+		_TH_RetractedOwners.Delete(KeyId)
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 ; On a standard AltGr layout every AltGr press starts with a fake LCtrl, which
@@ -1720,23 +2072,44 @@ _TH_TakeRetractedOwner(KeyId) {
 ;        AltGr key holds another modifier (its owner presses that one).
 ; @return {Boolean} True when the press was AltGr's.
 TapHoldAltGrTakesItsLCtrl(AsAltGr) {
-	global _TapHoldKeyIsDown, _TH_OwnedModifiers, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
+	global _TapHoldKeyIsDown, _TH_OwnedModifiers, _TH_ModifierOwners, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
+	Companion := TapHoldNewOwner()
 	if !KS_AltGrAddsFakeLCtrl()
 		return false
 	if !_TapHoldKeyIsDown.Call("SC01D", "P")
 		return false
-	; Whatever the left_ctrl tap-hold holds, this LCtrl press was AltGr's: it is
-	; no Ctrl the user typed (see _TH_TakeAltGrPress).
-	_TH_AltGrPresses["left_ctrl"] := true
-	if !_TH_OwnedModifiers.Has("left_ctrl")
-		return true
-	TapHoldRetractOwnedModifier("left_ctrl")
-	if (AsAltGr and !_TH_AltGrLCtrlOwners.Has("left_ctrl")) {
-		; An unproven Down leaves this AltGr press without its LCtrl; the
-		; sender has logged why, and the hold was handed back all the same.
-		if !TapHoldSyntheticKeyDown("LCtrl")
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Companion) || A_IsSuspended
 			return true
-		_TH_AltGrLCtrlOwners["left_ctrl"] := true
+		_TH_AltGrPresses["left_ctrl"] := true
+		if !_TH_OwnedModifiers.Has("left_ctrl") || !_TH_ModifierOwners.Has("left_ctrl")
+			return true
+		Parent := _TH_ModifierOwners["left_ctrl"]
+		if !TapHoldOwnerCurrent(Parent) || Companion.Epoch != Parent.Epoch
+			return true
+	} finally Critical(PreviousCritical)
+	TapHoldRetractOwnedModifier("left_ctrl", Parent)
+	if !AsAltGr
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Parent) || !_TH_ModifierOwners.Has("left_ctrl")
+				|| _TH_ModifierOwners["left_ctrl"] != Parent || _TH_AltGrLCtrlOwners.Has("left_ctrl")
+			return true
+		Companion.Parent := Parent
+		_TH_AltGrLCtrlOwners["left_ctrl"] := Companion
+	} finally Critical(PreviousCritical)
+	try {
+		if !TapHoldSyntheticKeyDown("LCtrl", Companion)
+			return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if (!TapHoldOwnerCurrent(Companion) || !Companion.Held)
+					&& _TH_AltGrLCtrlOwners.Has("left_ctrl") && _TH_AltGrLCtrlOwners["left_ctrl"] == Companion
+				_TH_AltGrLCtrlOwners.Delete("left_ctrl")
+		} finally Critical(PreviousCritical)
 	}
 	return true
 }
@@ -1769,12 +2142,18 @@ TapHoldRecordLCtrlPress() {
 
 ; End the LCtrl held for AltGr by KeyId's press, if any.
 ; @return {Boolean} False only when its release could not be proven.
-_TH_ReleaseAltGrLCtrl(KeyId) {
+_TH_ReleaseAltGrLCtrl(KeyId, ExpectedParent := 0) {
 	global _TH_AltGrLCtrlOwners
-	if !_TH_AltGrLCtrlOwners.Has(KeyId)
-		return true
-	_TH_AltGrLCtrlOwners.Delete(KeyId)
-	return TapHoldSyntheticKeyUp("LCtrl")
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_AltGrLCtrlOwners.Has(KeyId)
+			return true
+		Owner := _TH_AltGrLCtrlOwners[KeyId]
+		if IsObject(ExpectedParent) && Owner.Parent != ExpectedParent
+			return true
+		_TH_AltGrLCtrlOwners.Delete(KeyId)
+	} finally Critical(PreviousCritical)
+	return TapHoldSyntheticKeyUp("LCtrl", Owner)
 }
 
 ; A key-down the hook passed to the system, seen by HookDispatcher: an AltGr

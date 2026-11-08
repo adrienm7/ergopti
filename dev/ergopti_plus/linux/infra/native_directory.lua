@@ -45,6 +45,10 @@ local READDIR_BATCH = 64
 --- libuv entry and stat types this module names; any other one is "other".
 local KINDS = { file = "file", directory = "directory", link = "link" }
 
+local function valid_path(path)
+	return type(path) == "string" and path ~= "" and not path:find("\0", 1, true)
+end
+
 local Native = (function()
 	local ok, uv = pcall(require, "luv")
 	if not ok or type(uv) ~= "table" then return nil end
@@ -93,6 +97,7 @@ end
 --- @return string|nil message libuv's refusal.
 --- @return string|nil code libuv's error code (e.g. "ENOENT").
 function M.stat(path)
+	if not valid_path(path) then return nil, "invalid native directory path", "EINVAL" end
 	local stat, message, code = native().lstat(path)
 	if type(stat) ~= "table" then return nil, message, code end
 	local mtime, modified = stat.mtime, nil
@@ -100,6 +105,18 @@ function M.stat(path)
 		modified = mtime.sec + mtime.nsec / 1e9
 	end
 	return { kind = KINDS[stat.type] or "other", modified = modified }
+end
+
+--- Reads one physical directory's device and inode without following a link.
+--- @return table|nil identity
+--- @return string|nil detail
+function M.directory_identity(path)
+	local stat, message = native().lstat(path)
+	if type(stat) ~= "table" or stat.type ~= "directory"
+		or type(stat.dev) ~= "number" or type(stat.ino) ~= "number" then
+		return nil, message or "directory identity unavailable"
+	end
+	return { dev = stat.dev, ino = stat.ino }
 end
 
 --- Kind of a path itself, without following a final symbolic link.
@@ -120,6 +137,7 @@ end
 --- @return string|nil message libuv's refusal (a dangling link is ENOENT).
 --- @return string|nil code libuv's error code (e.g. "ENOENT").
 function M.target_kind(path)
+	if not valid_path(path) then return nil, "invalid native directory path", "EINVAL" end
 	local stat, message, code = native().stat(path)
 	if type(stat) ~= "table" then return nil, message, code end
 	return KINDS[stat.type] or "other"
@@ -132,6 +150,7 @@ end
 --- @return string|nil message libuv's refusal.
 --- @return string|nil code libuv's error code.
 function M.entries(path)
+	if not valid_path(path) then return nil, "invalid native directory path", "EINVAL" end
 	local backend = native()
 	local dir, open_message, open_code = backend.opendir(path, nil, READDIR_BATCH)
 	if dir == nil then return nil, open_message, open_code end

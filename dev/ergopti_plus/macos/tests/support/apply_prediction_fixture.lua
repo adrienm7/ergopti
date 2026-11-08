@@ -54,6 +54,7 @@ function M.run(options)
 	local clipboard_value = "original"
 	local clipboard_restores = 0
 	hs_stub.pasteboard.getContents = function() return clipboard_value end
+	hs_stub.pasteboard.allContentTypes = function() return { { "text" } } end
 	hs_stub.pasteboard.readAllData = function() return { text = clipboard_value } end
 	hs_stub.pasteboard.setContents = function(value)
 		clipboard_generation = clipboard_generation + 1
@@ -167,6 +168,7 @@ function M.run(options)
 		stop_timer = function() return true end,
 		perform_check = noop,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		navigate = noop,
 	}
 	package.loaded["modules.llm.prediction_engine"] = engine
@@ -263,6 +265,10 @@ function M.run(options)
 			suppress_count = suppress_count + 1
 		end,
 	}
+	local context = (options.llm_private_mark or "") .. (options.llm_buffer or options.buffer or "prefix ")
+	-- Malformed hotstring buffers exercise rejection independently of AI state.
+	if not utf8.len(context) then context = "" end
+	require("modules.keymap.llm_context").seed(state, context, options.llm_private_mark or "")
 	bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,

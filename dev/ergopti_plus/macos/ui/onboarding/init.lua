@@ -62,9 +62,12 @@ local RELOAD_DELAY_SEC = 1.5
 -- the wizard reloads without its answer: its deployment waits on the remap
 -- guardian (20 s at most to register) and the lease, never on the user.
 local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
+-- How long the reload waits for the live number-row rebuild of a stored order.
+local NUMBER_ROW_APPLY_TIMEOUT_SEC = 20
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
+local _config_path_unresolved = false
 
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
@@ -347,6 +350,79 @@ end
 
 --- Sends the initData payload (locale, strings, folders and the values in
 --- force) so the first step renders correctly on open.
+--- The number-row order capability the page asks, as the Linux bridge answers
+--- it: true when a layout of ours types now (the menu's own availability,
+--- modules/keymap/number_row_live.lua), else the locale key of why not.
+--- @return boolean|string
+function M._number_row_capability()
+	local called, available, why = pcall(function() return M._number_row_live().available() end)
+	if called and available == true then return true end
+	if not called then
+		Logger.error(LOG, "The number-row capability could not be read: %s.", tostring(available))
+	end
+	if called then Logger.debug(LOG, "The wizard greys the number-row order: %s.", tostring(why)) end
+	return "platform_reason.number_row_live_no_layout"
+end
+
+--- The live number-row owner; a test seam.
+function M._number_row_live() return require("modules.keymap.number_row_live") end
+
+--- The number-row order a batch writes, or nil when it writes none.
+--- @param rows table The batch's `{ section, key, value | delete }` rows.
+--- @return string|nil order
+function M._number_row_order_written(rows)
+	for _, row in ipairs(rows or {}) do
+		if row.section == "layout" and row.key == require("config_keys").LEAF.DIRECT_ACCESS_DIGITS and type(row.value) == "string" then
+			return row.value
+		end
+	end
+	return nil
+end
+
+--- Applies a number-row order the wizard stored to the typing layout, as the
+--- menu row does, then runs `done`: a reload started earlier would cut the
+--- rebuild short. A refused application keeps the stored choice and still
+--- runs `done`, so the rest of the answers apply.
+--- @param order string The stored order ("native", "digits", "symbols").
+--- @param config_path string The config.toml the answers were written to.
+--- @param done function Called once the application has settled.
+function M._apply_number_row_then(order, config_path, done)
+	-- The edges option is the menu's, kept as config.toml holds it.
+	local edges = false
+	local content, status = FileSystem.read_with_status(config_path)
+	local decoded_ok, decoded = false, nil
+	if status == "ok" and type(content) == "string" then decoded_ok, decoded = pcall(toml_codec.decode, content) end
+	if decoded_ok and type(decoded) == "table" and type(decoded.layout) == "table" then
+		edges = decoded.layout.number_row_reorder_edges == true
+	end
+	local settled = false
+	local function settle()
+		if settled then return end
+		settled = true
+		done()
+	end
+	if DeferredWork.after(NUMBER_ROW_APPLY_TIMEOUT_SEC, function()
+		if not settled then Logger.warn(LOG, "The onboarding number-row rebuild did not answer; the reload goes on.") end
+		settle()
+	end, "onboarding.number_row") ~= true then
+		Logger.error(LOG, "The onboarding number-row rebuild could not be bounded; the reload goes on now.")
+		return settle()
+	end
+	local dispatched, dispatch_err = pcall(M._number_row_live().apply, { order = order, edges = edges },
+		function(applied, code)
+			if applied then
+				Logger.success(LOG, "The onboarding number-row order %s is applied to the typing layout.", order)
+			else
+				Logger.warn(LOG, "The onboarding number-row order %s is stored, not applied: %s.", order, tostring(code))
+			end
+			settle()
+		end)
+	if not dispatched then
+		Logger.error(LOG, "The onboarding number-row order could not be applied: %s.", tostring(dispatch_err))
+		settle()
+	end
+end
+
 local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) then return end
 
@@ -394,8 +470,14 @@ local function inject_init_data(owner, view, config_path)
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	local _, admitted = submit_data(owner, view, "initData", {
 		platform           = CATALOGUE_DRIVER,
-		-- Gesture registration with the system is a Windows host action only.
-		capabilities       = { gesture_registration = false },
+		-- Gesture registration with the system is a Windows host action only. The
+		-- number-row order is rebuilt live into the layout of ours typing now.
+		capabilities       = {
+			gesture_registration = false,
+			-- A Unix path is read literally: a trailing space is part of a valid name.
+			literal_absolute_paths = true,
+			number_row_live = M._number_row_capability(),
+		},
 		locale             = current_locale,
 		strings            = strings,
 		-- One locale order for the wizard and every tray language menu.
@@ -498,18 +580,17 @@ end
 --- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
 --- from the injected resolver, so the retarget is testable without a webview.
 --- @param menu_paths table The ui.menu.menu_paths module (or a test double).
---- @param fallback string Path to keep when the resolver yields nothing usable.
---- @return string Absolute path to config.toml.
+--- @param fallback string Previously captured path, used only for diagnostics.
+--- @return string|nil Absolute path to config.toml, or nil on resolution failure.
 function M._resolve_commit_path(menu_paths, fallback)
 	if type(menu_paths) ~= "table" or type(menu_paths.get) ~= "function" then
-		return fallback
+		return nil
 	end
 	local ok, resolved = pcall(menu_paths.get, CONFIG_TOML_PATH_KEY)
-	-- A resolver that throws or hands back anything but a usable path must never
-	-- redirect the write: keeping the fallback still lands the answers somewhere
-	-- readable, whereas an empty target would drop them on the floor.
-	if not ok or type(resolved) ~= "string" or resolved == "" then
-		return fallback
+	-- The old capture is no longer authoritative once the folder changed.
+	if not ok or type(resolved) ~= "string" or not NativePath.is_absolute(resolved)
+		or resolved:find("\0", 1, true) then
+		return nil
 	end
 	if resolved ~= fallback then
 		Logger.info(LOG, "Config write retargeted to '%s' (was '%s').", resolved, tostring(fallback))
@@ -635,7 +716,7 @@ local function import_nav_layer(keys)
 		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
 			return nil, false
 		end
-		local imported = NavLayer.import_recommended({ config_dir = require("infra.config_paths").get_config_dir() })
+		local imported = NavLayer.import_owned({ config_dir = require("infra.config_paths").get_config_dir() })
 		return imported, imported == nil
 	end)
 	if not ok then
@@ -718,37 +799,95 @@ local function commit_owned(answers, publication)
 	-- empty / unchanged path is a no-op (menu_paths handles the
 	-- "drop the override" case internally).
 	local previous_config_path = _config_path
+	local previous_unresolved = _config_path_unresolved
+	local previous_locale = i18n.get_locale()
+	-- The folder and the language are published before the destination is
+	-- versioned and the answers written. A refused Finish takes both back, so
+	-- later saves never target a folder whose answers were not written.
+	local published_dir, previous_dir, menu_paths = nil, nil, nil
+	local locale_switched, locale_published = false, false
+	local function restore_previous_choices()
+		local restored = true
+		if locale_switched and i18n.get_locale() == answers.locale then
+			if locale_published then
+				local ok, persisted = pcall(i18n.persist_locale, previous_locale)
+				if not ok or persisted ~= true then
+					restored = false
+					Logger.error(LOG, "The previous language could not be saved again: %s.", tostring(persisted))
+				end
+			end
+			i18n.set_locale_no_reload(previous_locale)
+		end
+		if published_dir ~= nil then
+			local ConfigPaths = require("infra.config_paths")
+			if ConfigPaths.get_config_dir() ~= published_dir then
+				-- Something else chose a folder since: that newer choice stands.
+				Logger.warn(LOG, "The configuration folder changed during Finish; it is kept.")
+			else
+				local persisted, persist_err = M._persist_config_dir(menu_paths, previous_dir)
+				if not persisted then
+					restored = false
+					Logger.error(LOG, "The previous configuration folder could not be restored: %s.",
+						tostring(persist_err))
+				end
+			end
+		end
+		if restored then
+			_config_path = previous_config_path
+			_config_path_unresolved = previous_unresolved
+			Logger.info(LOG, "The refused Finish left the previous folder and language in force.")
+		end
+	end
+	local function fail_published(title_key, body)
+		restore_previous_choices()
+		fail_commit(title_key, body)
+	end
 	if answers.config_dir ~= "" then
-		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-		local persisted, persist_err = M._persist_config_dir(
-			ok_mp and menu_paths or nil,
-			answers.config_dir
-		)
+		_config_path_unresolved = true
+		local ok_mp, loaded_menu_paths = pcall(require, "ui.menu.menu_paths")
+		menu_paths = ok_mp and loaded_menu_paths or nil
+		previous_dir = require("infra.config_paths").get_config_dir()
+		local persisted, persist_err = M._persist_config_dir(menu_paths, answers.config_dir)
 		if not persisted then
 			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
 			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
 			return
 		end
+		published_dir = require("infra.config_paths").get_config_dir()
 		-- _config_path was captured in M.run() from the config dir as it stood
 		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
 		-- through the stale path would leave the NEW directory without config.toml,
 		-- so should_run() would reopen the wizard with every answer lost.
-		_config_path = M._resolve_commit_path(menu_paths, _config_path)
+		local resolved_path = M._resolve_commit_path(menu_paths, _config_path)
+		if not resolved_path then
+			Logger.error(LOG, "The selected configuration path could not be resolved; onboarding answers were not written.")
+			fail_published("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			return
+		end
+		_config_path = resolved_path
+		_config_path_unresolved = false
+	elseif _config_path_unresolved then
+		Logger.error(LOG, "The selected configuration folder must be confirmed again; onboarding answers were not written.")
+		fail_commit("paths_editor.save_failed_title", i18n.get("onboarding.error.commit_redirect_render"))
+		return
 	end
 
 	-- Switch to the chosen locale before writing so success messages are translated,
 	-- AND persist it to hs.settings so it survives the reload below (the in-memory
 	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
 	i18n.set_locale_no_reload(answers.locale)
+	locale_switched = answers.locale ~= previous_locale
 	local locale_ok, locale_persisted = xpcall(function()
 		return i18n.persist_locale(answers.locale)
 	end, debug.traceback)
 	if not locale_ok or locale_persisted ~= true then
 		Logger.error(LOG, "commit: locale persistence failed — %s.",
 			tostring(locale_persisted))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
+		-- The refused language transaction rolled its own storage back.
+		fail_published("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
 		return
 	end
+	locale_published = locale_switched
 
 	local committed, err = Answers.commit({
 		index      = index,
@@ -760,19 +899,26 @@ local function commit_owned(answers, publication)
 	})
 	if not committed then
 		Logger.error(LOG, "commit: the configuration batch failed — %s.", tostring(err))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
+		fail_published("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
 		return
 	end
 
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 	close_webview()
 
-	local function announce_and_reload()
+	local function schedule_reload()
 		notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
 		if DeferredWork.after(RELOAD_DELAY_SEC, reload_applying_answers, "onboarding.reload") ~= true then
 			Logger.error(LOG, "The reload that applies the onboarding answers could not be scheduled.")
 			deferred_notice("onboarding.error.reload_pending")
 		end
+	end
+	-- A number-row order the batch wrote is stored; a reload does not rebuild
+	-- the typing layout, so it is applied live first and the reload waits.
+	local order = M._number_row_order_written(rows)
+	local function announce_and_reload()
+		if order == nil then return schedule_reload() end
+		M._apply_number_row_then(order, _config_path, schedule_reload)
 	end
 	if #tap_hold_keys == 0 then
 		announce_and_reload()
@@ -814,7 +960,7 @@ local function commit_owned(answers, publication)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.
-		if not ok then require("platform.remap.nav_layer").undo_import(layer) end
+		if not ok then require("platform.remap.nav_layer").undo_owned(layer) end
 		if settled then
 			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
 				tostring(detail))
@@ -1019,7 +1165,7 @@ function M.run(config_path)
 	-- Retained cleanup authority cannot retarget its captured configuration.
 	-- Same-source reuse keeps the existing singleton acknowledgment and revoked page.
 	if _webview and _focus_owner == nil and config_path ~= _config_path then return false end
-	_config_path = config_path
+	if _webview and not _config_path_unresolved then _config_path = config_path end
 
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
@@ -1032,6 +1178,8 @@ function M.run(config_path)
 		end
 		return true
 	end
+	_config_path = config_path
+	_config_path_unresolved = false
 	if _usercontent and close_webview() ~= true then
 		Logger.error(LOG, "Cannot open onboarding while bridge cleanup remains pending.")
 		return false

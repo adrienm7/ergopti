@@ -157,6 +157,7 @@ local engine_stub = {
 	navigate                      = function() end,
 	consume                       = function() return nil, {} end,
 	handle_chain_signal           = function() return false end,
+	has_pending_work              = function() return false end,
 	arm_chain                     = function() end,
 	stop_timer                    = function() return true end,
 	start_timer                   = function() end,
@@ -234,6 +235,7 @@ local function make_state(sentinel)
 		DELAYS           = {},
 		is_repeat_feature_enabled  = function() return false end,
 	}
+	require("modules.keymap.llm_context").seed(state, "", "")
 	local defaults = {
 		preview_star_enabled        = true,
 		preview_autocorrect_enabled = true,

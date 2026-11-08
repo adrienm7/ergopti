@@ -73,9 +73,9 @@ function M.exit_code(status, how, code)
 	if status == true then return 0 end
 	if how == "exit" and type(code) == "number" then return code end
 	if type(status) ~= "number" then return nil end
-	-- A small number is already an exit code (a test double); a wait status
-	-- carries the code in its second byte and no signal in its first.
-	if status < 256 then return status end
+	-- Numeric results are POSIX wait statuses, including a signal in the low
+	-- byte. In particular, SIGHUP (1) is not the dialog's cancellation exit.
+	if status < 0 or status % 1 ~= 0 then return nil end
 	if status % 256 ~= 0 then return nil end
 	return math.floor(status / 256)
 end

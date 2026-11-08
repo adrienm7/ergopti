@@ -242,8 +242,15 @@ end
 --- @param is_error    boolean True if this is an error event.
 --- @param synth_type  string Synthetic type tag.
 function M.push_ngram(agg_batch, table_name, date_str, app, token, delay, is_error, synth_type)
-	local key = date_str .. "\1" .. app .. "\1" .. token
+	-- Ordinary keys keep their established form. A separator in the app needs
+	-- a disjoint length-delimited key and the original tuple for both writers.
+	local has_separator = app:find("\1", 1, true) ~= nil
+	local key = has_separator
+		and ("\2" .. #date_str .. ":" .. date_str .. #app .. ":" .. app .. token)
+		or (date_str .. "\1" .. app .. "\1" .. token)
 	M.add_ngram_metric(agg_batch, table_name, key, delay, is_error, synth_type)
+	local row = agg_batch.ngram[table_name] and agg_batch.ngram[table_name][key]
+	if has_separator and row then row.identity = { date = date_str, app = app, token = token } end
 end
 
 -- ============================================================================
@@ -260,6 +267,19 @@ function M.bump_app_day(agg_batch, date_str, app, field, value)
 	local key = date_str .. "\1" .. app
 	local row = M.gc(agg_batch.app_day, key, { date = date_str, app = app })
 	row[field] = (row[field] or 0) + value
+end
+
+--- Whether a wake stamped at this local timestamp is a night wake: earlier
+--- than `end_ms` after local midnight ([keystats] night_wake_end_ms).
+--- @param timestamp string|nil "YYYY-MM-DD HH:MM:SS[.mmm]" in local time.
+--- @param end_ms number Milliseconds after midnight the night ends at.
+--- @return boolean
+function M.is_night_wake(timestamp, end_ms)
+	assert(type(end_ms) == "number" and end_ms > 0, "the night end is a positive duration")
+	if type(timestamp) ~= "string" then return false end
+	local hour, minute, second = timestamp:match("^%d%d%d%d%-%d%d%-%d%d[ T](%d%d):(%d%d):(%d%d)")
+	if not hour then return false end
+	return ((tonumber(hour) * 60 + tonumber(minute)) * 60 + tonumber(second)) * 1000 < end_ms
 end
 
 -- ============================================================================

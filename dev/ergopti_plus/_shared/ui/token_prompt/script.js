@@ -5,6 +5,9 @@
 
 const post = makeHostBridge('token_bridge');
 
+const FOCUS_RETRY_FIRST_MS = 50; // [ui] token_prompt_focus_retry_first_ms
+const FOCUS_RETRY_SECOND_MS = 150; // [ui] token_prompt_focus_retry_second_ms
+
 function doOpenLink() {
 	post('open_link');
 }
@@ -25,15 +28,14 @@ function doValidate() {
 window.addEventListener('load', function () {
 	const input = document.getElementById('token-input');
 	if (input) {
-		// Multi-step focus to ensure visibility
-		input.focus();
-		setTimeout(() => {
-			input.focus();
-			input.select();
-		}, 50);
-		setTimeout(() => {
-			input.focus();
-		}, 150);
+		// Retry focus only while no control has been chosen. Selecting the input
+		// later would replace a token the user has already started typing.
+		const focusIfUnclaimed = () => {
+			if (document.activeElement === document.body) input.focus();
+		};
+		focusIfUnclaimed();
+		setTimeout(focusIfUnclaimed, FOCUS_RETRY_FIRST_MS);
+		setTimeout(focusIfUnclaimed, FOCUS_RETRY_SECOND_MS);
 
 		input.addEventListener('keypress', function (e) {
 			if (e.key === 'Enter') {
@@ -46,7 +48,7 @@ window.addEventListener('load', function () {
 // Also try to focus immediately
 document.addEventListener('DOMContentLoaded', function () {
 	const input = document.getElementById('token-input');
-	if (input) {
+	if (input && document.activeElement === document.body) {
 		input.focus();
 	}
 });

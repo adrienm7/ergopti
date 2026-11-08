@@ -24,6 +24,7 @@
 local M = {}
 
 local Shared = require("llm.prompt_builder")
+local Utf8   = require("compat.utf8")
 local Logger = require("infra.logger")
 
 local LOG = "llm.prompt_builder"
@@ -70,8 +71,10 @@ function M.build(buffer, config, last_signature, force_trigger)
 		if #p.context_tail == 0 then
 			return nil, "empty buffer", nil
 		end
-		if #p.context_tail < 2 then
-			return nil, string.format("context too short (%d chars)", #p.context_tail), nil
+		local tail_length = Utf8.len(p.context_tail)
+		if tail_length == nil then return nil, "context is not valid UTF-8", nil end
+		if tail_length < 2 then
+			return nil, string.format("context too short (%d chars)", tail_length), nil
 		end
 		if last_signature == sig then
 			return nil, "buffer unchanged (freshness)", nil

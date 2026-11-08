@@ -262,6 +262,26 @@ local function select_profile(deps, state, pid, opts)
 	return true, intent_lease
 end
 
+--- A profile the user picks by hand: as on Windows and Linux, it turns the
+--- automatic profile off, or the next model change would replace the choice.
+--- @param deps table Global dependencies.
+--- @param state table Mutable menu state.
+--- @param pid string Profile id.
+--- @return boolean committed
+local function select_manual_profile(deps, state, pid)
+	local committed = select_profile(deps, state, pid)
+	if committed ~= true or state.llm_auto_profile_for_model ~= true then return committed end
+	state.llm_auto_profile_for_model = false
+	local saved_ok, saved = xpcall(deps.save_prefs, debug.traceback)
+	if not saved_ok or saved ~= true then
+		state.llm_auto_profile_for_model = true
+		Logger.error(LOG, "The automatic profile could not be switched off after a manual choice: %s.", tostring(saved))
+		return false
+	end
+	Logger.info(LOG, "Automatic profile switched off by the manual choice of '%s'.", pid)
+	return true
+end
+
 --- Creates the exact registry owner shared by Clone and Create.
 --- @param deps table Global dependencies.
 --- @return function activate_candidate Candidate activation transaction.
@@ -1007,23 +1027,6 @@ local function build_profile_menu(
 	deps, models_mgr, delete_profile, activate_candidate, replace_profile)
 	local state  = deps.state
 	local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
-	local function recommend_profile()
-		if not settle_profile_mutation_recovery(deps) then return false end
-		if type(deps.apply_recommended_prompt_profile) == "function" then
-			return deps.apply_recommended_prompt_profile({
-				dialog_title = i18n.get("menu.profiles.recommended_profile"),
-				force_dialog = true,
-			})
-		end
-
-		Logger.callback(LOG, "Recommended-profile unavailable notification",
-			notifications.notify,
-			i18n.get("menu.profiles.recommended_unavailable_title"),
-			i18n.get("menu.profiles.recommended_unavailable_body"),
-			"warning")
-		return false
-	end
-
 	local function create_ready()
 		if type(deps.script_control) ~= "table"
 			or type(deps.script_control.is_paused) ~= "function" then return false end
@@ -1031,6 +1034,27 @@ local function build_profile_menu(
 		return ok and current == false
 	end
 
+
+	--- Switches the automatic profile; switched on, the profile follows the
+	--- current model at once, as the next model change would.
+	local function toggle_auto_profile()
+		if not create_ready() or not settle_profile_mutation_recovery(deps) then return false end
+		local before = state.llm_auto_profile_for_model == true
+		state.llm_auto_profile_for_model = not before
+		local saved_ok, saved = xpcall(deps.save_prefs, debug.traceback)
+		if not saved_ok or saved ~= true then
+			state.llm_auto_profile_for_model = before
+			Logger.error(LOG, "The automatic profile switch was not saved: %s.", tostring(saved))
+			return false
+		end
+		if not before and type(deps.apply_recommended_prompt_profile) == "function"
+			and deps.apply_recommended_prompt_profile({}) ~= true then
+			Logger.warn(LOG, "The automatic profile is on; the recommended profile applies at the next model change.")
+		end
+		local menu_ok, menu_result = xpcall(deps.update_menu, debug.traceback)
+		if not menu_ok then Logger.error(LOG, "Menu refresh after the automatic profile switch failed: %s.", tostring(menu_result)) end
+		return true
+	end
 
 	local function builtin_rows()
 		local rows = {}
@@ -1055,7 +1079,7 @@ local function build_profile_menu(
 				label    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
 				checked  = (state.llm_active_profile == pid) or nil,
 				disabled = paused or nil,
-				action       = not paused and function() return select_profile(deps, state, pid) end or nil,
+				action       = not paused and function() return select_manual_profile(deps, state, pid) end or nil,
 			})
 		end
 		return rows
@@ -1080,7 +1104,7 @@ local function build_profile_menu(
 			
 			-- User profiles get a sub-menu for Editing/Deleting
 			local child_commands = {
-				[ConfigKeys.COMMAND.LLM_PROFILE_USE] = function() return select_profile(deps, state, pid) end,
+				[ConfigKeys.COMMAND.LLM_PROFILE_USE] = function() return select_manual_profile(deps, state, pid) end,
 				[ConfigKeys.COMMAND.LLM_PROFILE_SHORTCUT] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
@@ -1261,15 +1285,14 @@ local function build_profile_menu(
 	end
 
 	local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
-		[ConfigKeys.COMMAND.LLM_PROFILE_RECOMMEND] = recommend_profile,
+		[ConfigKeys.COMMAND.LLM_PROFILE_AUTO_DETECT] = toggle_auto_profile,
 		[ConfigKeys.COMMAND.LLM_PROFILE_CLONE] = function()
 			return clone_builtin_profile(
 				deps, state, active_builtin, activate_candidate, replace_profile, create_ready)
 		end,
 		[ConfigKeys.COMMAND.LLM_PROFILE_CREATE] = create_profile,
 	}, {
-		["llm_profile_recommendation_present"] = function() return not paused end,
-		["llm_profile_recommendation_paused"] = function() return not not paused end,
+		["llm_profile_auto_detect_checked"] = function() return state.llm_auto_profile_for_model == true end,
 		["llm_profile_custom_present"] = custom_present,
 		["llm_profile_clone_present"] = clone_present,
 		["llm_profile_create_ready"] = create_ready,

@@ -33,6 +33,23 @@ local Fixture = require("tests.support.modules.hotstrings.menu.shortcuts_menu_di
 local helpers, fake_shortcuts, shortcuts_menu, find_row, find_row_prefix, with_keyboard_slot_picker, with_shortcut_locale =
 	Fixture.helpers, Fixture.fake_shortcuts, Fixture.shortcuts_menu, Fixture.find_row, Fixture.find_row_prefix, Fixture.with_keyboard_slot_picker, Fixture.with_shortcut_locale
 
+--- The pair rows of the wrap submenu: every catalogue group's toggles, in order.
+--- @param menu table The rendered wrap-symbols submenu.
+--- @return table rows
+local function wrap_pair_rows(menu)
+	local found = {}
+	for _, row in ipairs(menu) do
+		if type(row.menu) == "table" then
+			for _, child in ipairs(row.menu) do
+				if type(child.title) == "string" and child.title:find(" \226\128\166 ", 1, true) then
+					found[#found + 1] = child
+				end
+			end
+		end
+	end
+	return found
+end
+
 
 
 
@@ -64,33 +81,69 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 		end
 	end)
 
-	helpers.it("orders the wrapping pairs, so a rebuild does not shuffle them", function()
-		local rows = shortcuts_menu()
-		-- By its label, not by "the last submenu with more than one row". That
-		-- shortcut passed here and failed in CI, where the bundled demo extension's
-		-- shortcuts/menu.lua resolves and adds a second submenu after this one —
-		-- so the test was asserting the ordering of an extension's rows, which are
-		-- its author's to order.
-		local wanted = require("infra.i18n").get("menu.shortcuts.wrap_symbols")
-		local wrap = nil
-		for _, row in ipairs(rows) do
-			if row.title == wanted and type(row.menu) == "table" then wrap = row.menu end
+	helpers.it("lists every catalogue pair once even when two pairs share an endpoint (WSL-002)", function()
+		local shortcuts = fake_shortcuts()
+		-- The alias map keeps one owner per key: the lower pair's closing quote
+		-- overwrote the standard pair's opener, so a menu built from it lost a pair.
+		local standard = { left = "\226\128\156", right = "\226\128\157" }
+		local lower = { left = "\226\128\158", right = "\226\128\156" }
+		shortcuts.get_wrap_pair_list = function() return { standard, lower } end
+		shortcuts.get_wrap_groups = function()
+			return { { i18n = "menu.shortcuts.wrap_symbols_title", pairs = { standard, lower } } }
 		end
-		helpers.assert_not_nil(wrap, "the wrapping-symbols submenu is present")
+		local rows = shortcuts_menu({ shortcuts = shortcuts })
+		local wrap = assert(find_row(rows, require("infra.i18n").get("menu.shortcuts.wrap_symbols")))
+		local titles = {}
+		for _, row in ipairs(wrap_pair_rows(wrap.menu)) do titles[#titles + 1] = row.title end
+		helpers.assert_eq(titles, { standard.left .. " \226\128\166 " .. standard.right,
+			lower.left .. " \226\128\166 " .. lower.right }, "both quotation pairs are menu choices")
+	end)
 
-		local seen = {}
-		for _, row in ipairs(wrap) do seen[#seen + 1] = row.title end
-		local sorted = {}
-		for index, title in ipairs(seen) do sorted[index] = title end
-		table.sort(sorted)
-		for index, title in ipairs(seen) do
-			helpers.assert_eq(title, sorted[index],
-				"get_wrap_pairs returns a map, and `pairs` would give the user a "
-					.. "different order on every menu rebuild")
+	helpers.it("orders the wrapping pairs, so a rebuild does not shuffle them", function()
+		local function titles()
+			local wrap = assert(find_row(shortcuts_menu(), require("infra.i18n").get("menu.shortcuts.wrap_symbols")))
+			local out = {}
+			for _, row in ipairs(wrap_pair_rows(wrap.menu)) do out[#out + 1] = row.title end
+			return out
 		end
-		helpers.assert_eq(#wrap, 2,
-			"one row per PAIR, not per character — each pair is stored under both "
-				.. "of its ends and listing both would double the submenu")
+		-- The catalogue's own order, one row per PAIR: each pair is stored under
+		-- both of its ends, and listing both would double the submenu.
+		helpers.assert_eq(titles(), { "( \226\128\166 )", "\194\171 \226\128\166 \194\187" })
+		helpers.assert_eq(titles(), titles())
+	end)
+
+	helpers.it("switches a pair off, adds and deletes one, as Windows and macOS do", function()
+		local log = {}
+		local shortcuts = fake_shortcuts(log)
+		local redraws = 0
+		local function wrap()
+			return assert(find_row(shortcuts_menu({ shortcuts = shortcuts, on_menu_changed = function() redraws = redraws + 1 end }),
+				require("infra.i18n").get("menu.shortcuts.wrap_symbols"))).menu
+		end
+		local pair = wrap_pair_rows(wrap())[1]
+		helpers.assert_eq(pair.checked, true)
+		pair.fn()
+		helpers.assert_eq(log.wrap_states["("], false)
+		helpers.assert_eq(wrap_pair_rows(wrap())[1].checked, false, "the redrawn row shows the choice")
+		local i18n = require("infra.i18n")
+		assert(find_row(wrap(), i18n.get("menu.shortcuts.wrap_symbols_check_all"))).fn()
+		helpers.assert_eq(log.wrap_states["("], true)
+		local answers = { "§", "" }
+		local TextPrompt = require("ui.text_prompt")
+		local original = TextPrompt.ask
+		TextPrompt.ask = function() return table.remove(answers, 1) end
+		local ok, detail = pcall(function()
+			assert(find_row(wrap(), i18n.get("menu.shortcuts.wrap_symbols_add_custom"))).fn()
+		end)
+		TextPrompt.ask = original
+		assert(ok, detail)
+		helpers.assert_eq(log.wrap_custom, { { left = "§", right = "§" } }, "an empty closing symbol is symmetric")
+		local custom = assert(find_row(wrap(), "§ (" .. i18n.get("menu.shortcuts.wrap_symbols_custom_label") .. ")"))
+		assert(find_row(custom.menu, i18n.get("button.delete"))).fn()
+		helpers.assert_eq(log.wrap_custom, {})
+		assert(find_row(wrap(), i18n.get("common.restore_recommended"))).fn()
+		helpers.assert_eq(log.wrap_states, {})
+		helpers.assert_eq(redraws, log.wrap_commits)
 	end)
 
 end)
@@ -619,14 +672,14 @@ helpers.describe("declared Shortcut wrap presentation source", function()
 		local log = {}
 		local ok, detail = xpcall(function()
 			local current = assert(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label))
-			helpers.assert_eq(#current.menu, 2, "the actual source returns sorted unique pairs")
+			helpers.assert_eq(#wrap_pair_rows(current.menu), 2, "the actual source returns each catalogue pair once")
 			root.shortcut_wrap_frame = nil
 			helpers.assert_nil(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label), "no undeclared parent is fabricated")
 			helpers.assert_nil(log.wrapped, "presentation withdrawal never invokes a native selection action")
 			root.shortcut_wrap_frame = original
 			local repaired = assert(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label))
-			repaired.menu[1].fn()
-			helpers.assert_eq(log.wrapped, "()")
+			wrap_pair_rows(repaired.menu)[1].fn()
+			helpers.assert_eq(log.wrap_states["("], false)
 		end, debug.traceback)
 		root.shortcut_wrap_frame = original
 		if not ok then error(detail, 0) end
@@ -691,19 +744,18 @@ helpers.describe("Shortcut frame genuine translated hierarchy", function()
 				local cold = assert(build())
 				local parent = assert(find_row(cold, expected.lua_wrap))
 				local live = assert(find_row(cold, expected.linux_wrap_feature))
-				helpers.assert_eq(#parent.menu, 2)
-				helpers.assert_eq(parent.menu[1].title, "( … )")
-				helpers.assert_eq(parent.menu[2].title, "« … »")
+				local pairs_rows = wrap_pair_rows(parent.menu)
+				helpers.assert_eq(#pairs_rows, 2)
+				helpers.assert_eq(pairs_rows[1].title, "( … )")
+				helpers.assert_eq(pairs_rows[2].title, "« … »")
 				helpers.assert_eq(live.checked, false)
 				helpers.assert_eq(writes + redraws, 0, "building the complete hierarchy cannot apply native state")
-				parent.menu[1].fn()
-				helpers.assert_eq(log.wrapped, "()")
 				helpers.assert_eq(live.fn(), true)
 				helpers.assert_eq(writes, 1)
 				helpers.assert_eq(redraws, 1)
 				local warm = assert(build())
 				helpers.assert_eq(assert(find_row(warm, expected.linux_wrap_feature)).checked, true)
-				helpers.assert_eq(#assert(find_row(warm, expected.lua_wrap)).menu, 2)
+				helpers.assert_eq(#wrap_pair_rows(assert(find_row(warm, expected.lua_wrap)).menu), 2)
 				helpers.assert_eq(writes + redraws, 2, "a warm rebuild retains state without repeating the setter")
 			end)
 		end)

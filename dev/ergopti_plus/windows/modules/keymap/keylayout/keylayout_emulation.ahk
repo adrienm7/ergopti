@@ -580,6 +580,18 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 		if Swapped != ""
 			Native := {Count: 1, Text: Swapped}
 	}
+	return KeylayoutEmulation_ComposeNative(Native)
+}
+
+/**
+ * Completes the pending registry dead key with what the OS layout types.
+ * Split from KeylayoutEmulation_PressNative so the shared emulation vectors
+ * can feed the OS character the corpus names instead of reading the machine's.
+ * @param {Object} Native - {Count, Text}: the OS character, Count 0 for none.
+ * @returns {Map} Output and Native (whether the OS must receive the original key).
+ */
+KeylayoutEmulation_ComposeNative(Native) {
+	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
 	Transitions := KLE_Compositions.Get(KLE_State, Map())
 	if Native.Count > 0 && Transitions.Has(Native.Text) {
 		Step := Transitions[Native.Text]
@@ -747,7 +759,11 @@ _KLE_Emit(Sc, Shift, Option) {
 
 _KLE_OnKey(Sc, Shift, *) {
 	global _SHIFT_DIGIT_SCS
-	if NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
+	; A pending dead key admits every continuation (_KLE_BaseCriterion), but a
+	; row switched off still belongs to the OS layout: its native character
+	; completes the accent, whatever the global base switch says.
+	RowEmulated := LayoutRowIsEmulated(Sc)
+	if RowEmulated && NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
 			&& NumberRowSymbolsCapable(KS_CapsLockToggleState()) {
 		Code := Integer("0x" . SubStr(Sc, 3))
 		Level := NumberRowSymbolsLevel(Code, KS_CapsLockToggleState())
@@ -758,7 +774,7 @@ _KLE_OnKey(Sc, Shift, *) {
 			return
 		}
 	}
-	if Shift && _SHIFT_DIGIT_SCS.Has(Sc) {
+	if RowEmulated && Shift && _SHIFT_DIGIT_SCS.Has(Sc) {
 		Code := Integer("0x" . SubStr(Sc, 3))
 		Resolution := _DigitRowSwapResolution(Code, GetForegroundKeyboardLayout())
 		if Resolution["swap"] && Resolution["source"] == "emulated" {
@@ -769,7 +785,7 @@ _KLE_OnKey(Sc, Shift, *) {
 			return
 		}
 	}
-	if KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift) {
+	if RowEmulated && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift) {
 		_KLE_Emit(Sc, Shift, false)
 		return
 	}

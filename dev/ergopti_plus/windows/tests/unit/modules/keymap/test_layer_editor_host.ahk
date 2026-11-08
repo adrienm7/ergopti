@@ -153,8 +153,7 @@ _LEH_InvalidSavesWriteNothing() {
 		[Big, "invalid_payload"],
 		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"KeyA" = "format_disk"`n', "unknown_action"],
 		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"KeyA" = "keystroke:fn+KeyB"`n', "unavailable_on_os"],
-		; A wheel direction binds on all three OS; a pointer button is what Linux still refuses.
-		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"MouseMiddle" = "escape"`n', "unavailable_on_os"],
+		; No source kind is OS-specific any more: wheel and pointer sources bind on all three OS.
 		['[_meta]`nschema_version = 1`n[layers.nav.all]`n"KeyA" = { a = 1 }`n', "toml_invalid"]
 	]
 	Apply := _LEH_FakeApply()
@@ -240,17 +239,22 @@ _LEH_MessagesRouteToTheirAction() {
 		_LayerEditor_OnMessage(Host, Map("action", "format_disk"), Apply)
 		AssertEqual(0, Host.Scripts.Length + Host.Closed, "an unknown action does nothing")
 		_LayerEditor_OnMessage(Host, Map("action", "save", "text", _LEH_FixtureText()), Apply)
-		AssertEqual(1, Host.Scripts.Length, "a save answers once")
-		AssertTrue(InStr(Host.Scripts[1], "window.saveResult({" . '"saved":true,"applied":true'), "the answer is saveResult()")
+		AssertEqual(0, Host.Scripts.Length, "An unowned message cannot advertise a save receipt")
+		AssertEqual(0, Host.Closed, "An unowned save cannot retire the caller")
+		AssertEqual(0, Apply.Calls, "An unowned valid payload cannot request applying a layer")
+		AssertFalse(FileExist(Dir . "\layers.toml"), "An unowned payload cannot create a durable layer file")
+		AssertFalse(FileExist(Dir . "\layers.toml.tmp"), "An unowned payload cannot stage a write")
 		_LayerEditor_OnMessage(Host, Map("action", "save"), Apply)
-		AssertTrue(InStr(Host.Scripts[2], '"saved":false'), "a save without text is refused")
+		AssertEqual(0, Host.Scripts.Length, "An unowned malformed payload cannot borrow another page's response")
+		AssertEqual(0, Apply.Calls, "Malformed unowned messages cannot reach postcommit apply")
+		AssertFalse(FileExist(Dir . "\layers.toml"), "Neither unowned message can publish a file")
 		_TestEnsureErgoptiLayout()
 		_LayerEditor_OnMessage(Host, Map("action", "legends"), Apply)
-		AssertEqual(3, Host.Scripts.Length, '"legends" answers once')
-		AssertTrue(InStr(Host.Scripts[3], "window.setLegends({" . '"source":'), "the answer is setLegends()")
+		AssertEqual(1, Host.Scripts.Length, '"legends" answers once')
+		AssertTrue(InStr(Host.Scripts[1], "window.setLegends({" . '"source":'), "the answer is setLegends()")
 		_LayerEditor_OnMessage(Host, Map("action", "cancel"), Apply)
 		AssertEqual(1, Host.Closed, "cancel closes the window")
-		AssertEqual(1, Apply.Calls, "only the valid save reloads")
+		AssertEqual(0, Apply.Calls, "Only a genuine admitted page may request applying a saved layer")
 	} finally {
 		_SharedDir := SavedShared
 		_ConfigDir := SavedConfig

@@ -38,6 +38,7 @@ M.FIELDS = {
 	{ "runtime.sha256", "sha256" },
 	{ "runtime.size", "count" },
 	{ "virtual_hid_device.version", "version" },
+	{ "virtual_hid_device.extension_version", "version" },
 	{ "virtual_hid_device.team_identifier", "team" },
 	{ "virtual_hid_device.file_name", "file_name" },
 	{ "virtual_hid_device.source_url", "url" },
@@ -52,10 +53,18 @@ M.FIELDS = {
 --- The manifest schema this module understands.
 M.SCHEMA = 1
 
+--- A version is also used as one artifact-directory component.
+--- @param value any
+--- @return boolean
+function M.valid_version(value)
+	return type(value) == "string" and value:match("^%d+%.%d+%.%d+[%w%.%-+]*$") ~= nil
+		and not value:find("..", 1, true)
+end
+
 local SHAPES = {
 	text = function(value) return type(value) == "string" and value:match("^[%w%-_/.]+$") ~= nil end,
 	revision = function(value) return type(value) == "string" and value:match("^%x+$") ~= nil and #value == 40 end,
-	version = function(value) return type(value) == "string" and value:match("^%d+%.%d+%.%d+[%w%.%-+]*$") ~= nil end,
+	version = M.valid_version,
 	file_name = function(value)
 		return type(value) == "string" and value:match("^[%w][%w%._%-]*$") ~= nil
 	end,
@@ -113,6 +122,10 @@ end
 
 --- The pinned facts the runtime owner needs, or the reason there are none.
 --- @param manifest any Decoded manifest.
+--- `virtual_hid_version` is the driver extension's own version, the one
+--- `systemextensionsctl list` reports: pqrs' package 8.5.0 installs extension
+--- 1.8.0, so judging the listing by the package version refused every Mac,
+--- including one running the pinned driver (field report 2026-11-06).
 --- @return table|nil pinned { virtual_hid_version, capture = { requirement, batch_limit, frame_limit, history_capacity } }.
 --- @return string|nil reason Names the first unpinned path and how many follow.
 function M.pinned(manifest)
@@ -122,7 +135,7 @@ function M.pinned(manifest)
 		return nil, "the runtime manifest is not pinned (" .. missing[1] .. more .. ")"
 	end
 	return {
-		virtual_hid_version = manifest.virtual_hid_device.version,
+		virtual_hid_version = manifest.virtual_hid_device.extension_version,
 		capture = {
 			requirement = manifest.capture.requirement,
 			batch_limit = manifest.capture.batch_limit,
@@ -132,17 +145,34 @@ function M.pinned(manifest)
 	}
 end
 
---- The VirtualHIDDevice version the manifest pins, before the runtime itself is
---- built. The driver group is pinned from the pqrs release alone, so the field
---- check can judge the installed driver with the owner's own verdict while the
---- runtime and the capture requirement still wait for the hosted build.
+--- Reads one field of a fully pinned driver group.
 --- @param manifest any Decoded manifest.
---- @return string|nil version Nil unless every virtual_hid_device field is pinned.
-function M.virtual_hid_version(manifest)
+--- @param key string Field of the virtual_hid_device group.
+--- @return string|nil value Nil unless every virtual_hid_device field is pinned.
+local function pinned_driver_field(manifest, key)
 	for _, path in ipairs(M.unpinned(manifest)) do
 		if path:find("^virtual_hid_device%.") then return nil end
 	end
-	return manifest.virtual_hid_device.version
+	return manifest.virtual_hid_device[key]
+end
+
+--- The VirtualHIDDevice package version the manifest pins (pqrs' release, the
+--- one the update dialog names), before the runtime itself is built. The driver
+--- group is pinned from the pqrs release alone, so the field check can judge the
+--- installed driver while the runtime still waits for the hosted build.
+--- @param manifest any Decoded manifest.
+--- @return string|nil version Nil unless every virtual_hid_device field is pinned.
+function M.virtual_hid_version(manifest)
+	return pinned_driver_field(manifest, "version")
+end
+
+--- The driver extension version that package installs: what
+--- `systemextensionsctl list` reports, so the only version runtime_vhid.assess
+--- may compare against.
+--- @param manifest any Decoded manifest.
+--- @return string|nil version Nil unless every virtual_hid_device field is pinned.
+function M.virtual_hid_extension_version(manifest)
+	return pinned_driver_field(manifest, "extension_version")
 end
 
 return M

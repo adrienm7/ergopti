@@ -49,6 +49,7 @@ function M.new(options)
 	local dates = { M.PAST, M.NEXT }
 	if options.today then dates[#dates + 1] = M.TODAY end
 	local tables = { agg_app_day = {} }
+	state.tables = tables
 	for _, family in ipairs(M.FAMILIES) do
 		local rows = {}
 		tables[family.table] = rows
@@ -85,6 +86,7 @@ function M.new(options)
 			local source = sql:match("FROM ([%w_]+)")
 			local fingerprint = sql:find("COUNT(*) AS n", 1, true) ~= nil
 			local bounds = sql:find("SELECT (SELECT MIN(date)", 1, true) ~= nil
+				or sql:find("SELECT DISTINCT date FROM ", 1, true) ~= nil
 			state.reads[#state.reads + 1] = { source = source, fingerprint = fingerprint,
 				bounds = bounds, day = sql:match("date = '([%d%-]+)'"), first = sql:match("date >= '([%d%-]+)'"), last = sql:match("date <= '([%d%-]+)'") }
 			local today_query = sql:match("date = '([%d%-]+)'") == M.TODAY
@@ -134,6 +136,7 @@ function M.run(options, callback)
 		logger.warn = function(_, template, ...) state.warnings[#state.warnings + 1] = string.format(template, ...) end
 		package.loaded["infra.logger"] = logger
 		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = state.sqlite })
+		reader.history_fingerprint_exact = true -- The fixture owns all its rows and mutations.
 		local original_read = reader.read_ngrams
 		reader.read_ngrams = function(path, first, last, apps, pacer)
 			local data, complete = original_read(path, first, last, apps, pacer)

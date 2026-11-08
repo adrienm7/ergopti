@@ -59,7 +59,9 @@ _GKO_Source(OwnerReceipt) {
 	Bound := StrReplace(Bound, "Hook.Stop()", "_GKO_Stop(Hook)", true, &StopBindings)
 	AssertEqual(ClickSites, ClickBindings, "no additional mouse site may be changed in comments or strings")
 	AssertEqual(StopSites, StopBindings, "no additional Stop site may be changed in comments or strings")
-	AssertTrue(InStr(Bound, 'InputHook("V L3")', true) > 0, "InputHook construction remains native")
+	AssertTrue(InStr(Bound, 'InputHook("V L0")', true) > 0
+		&& InStr(Bound, 'Hook.KeyOpt("{All}", "NI")', true) > 0,
+		"Native construction must observe without collecting text or imposing a character limit")
 	OwnerReceipt["click_owner"] := Owner
 	OwnerReceipt["click_owner_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(Owner))
 	OwnerReceipt["click_bindings"] := ClickBindings
@@ -84,6 +86,26 @@ _GKO_Source(OwnerReceipt) {
 			Seen[Path] := true
 		}
 	}
+	ConfigOwner := _DriverProductionFileForSymbol("_GestureCommitAssignment")
+	AssertTrue(ConfigOwner != "", "the assignment publisher must have a real owner")
+	ConfigSource := FSReadStrict(ConfigOwner)
+	for Name in ["GestureSaveAssignment", "GestureBindingId", "_GestureCommitAssignment", "_GestureBuildAssignmentPlan",
+		"_GesturePublishAssignment", "_GestureCloneActionParameters", "_GestureRunAction"] {
+		Body := _DriverExtractFunctionBody(&ConfigSource, Name)
+		AssertTrue(Body != "", "the real assignment body must exist: " . Name)
+		Source .= Body . "`n"
+	}
+	Source .= "global GestureBindingWriteOwners := Map()`nglobal GestureAssignments := Map()`nglobal GestureActionParameters := Map()`nglobal ConfigurationFile := " . _GKO_Quote("fixture.toml") . "`n"
+	ActionOwner := _DriverProductionFileForSymbol("GestureActionIsAssignable")
+	AssertTrue(ActionOwner != "", "the real action catalogue must exist")
+	ActionSource := FSReadStrict(ActionOwner)
+	for Button in ["left", "right"] {
+		Pattern := '"' . Button . '_click_toggle",\s*\{\s*Fn:\s*([^\r\n]+),'
+		AssertTrue(RegExMatch(ActionSource, Pattern, &Match) > 0, "the real toggle callback must be found")
+		Source .= "global _GKO_" . Button . "Action := " . Match[1] . "`n"
+	}
+	Source .= 'global GESTURE_ACTIONS := Map("left_click_toggle", {Fn: _GKO_leftAction}, "right_click_toggle", {Fn: _GKO_rightAction})' . "`n"
+
 	Body := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_keywatcher_owner_body.ahk")
 	AssertTrue(Body != "", "the isolated native ownership fixture must exist")
 	OwnerReceipt["fixture_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\gesture_keywatcher_owner_body.ahk"))
@@ -106,13 +128,15 @@ _GKO_Case(Mode) {
 	Hash := CryptoSha256Bytes(FSReadBytesStrict(Script))
 	RuntimeHash := CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
 	_TestPrint("# gesture-keywatcher-source-built " . KL_JsonEncode(Map("mode", Mode, "source_sha256", Hash,
-		"runtime_sha256", RuntimeHash, "owners", Owners, "inputhook", "native", "callback_delivery", "controlled")))
+		"runtime_sha256", RuntimeHash, "owners", Owners, "inputhook", "native", "callback_delivery", InStr(Mode, "native-retry-") == 1 ? "native-sendevent-level0" : "controlled")))
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
 	Handle := 0, Primary := 0, Retired := false
 	PreviousCritical := Critical("Off")
 	try {
-		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", Script, Mode, Owners["click_owner_sha256"], Hash, RuntimeHash], _GKO_Complete.Bind(State))
+		Arguments := ["/ErrorStdOut=UTF-8", Script, Mode, Owners["click_owner_sha256"], Hash, RuntimeHash]
+		if InStr(Mode, "native-retry-") == 1
+			Arguments.Push("--allow-explicit-owned-edit-sendevent")
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Arguments, _GKO_Complete.Bind(State))
 		AssertTrue(Handle.start(), "the exact gesture ownership child must start")
 		Pid := Handle.processId()
 		Started := A_TickCount
@@ -139,7 +163,7 @@ _GKO_Case(Mode) {
 		AssertEqual(Hash, Receipt["source_sha256"])
 		AssertEqual(RuntimeHash, Receipt["runtime_sha256"])
 		AssertEqual(Owners["click_owner_sha256"], Receipt["click_owner_sha256"])
-		AssertEqual("controlled", Receipt["callback_delivery"])
+		AssertEqual(InStr(Mode, "native-retry-") == 1 ? "native-sendevent-level0" : "controlled", Receipt["callback_delivery"])
 		AssertTrue(Receipt["hooks_retired"])
 		AssertTrue(Receipt["subscriptions_retired"])
 		AssertFalse(Receipt["mouse_injected"])
@@ -190,5 +214,9 @@ _GKO_Case(Mode) {
 }
 
 for _GKO_Mode in ["retired-left-right", "retired-right-left", "current-left-right", "current-right-left",
-	"paused-left-up-refusal", "paused-right-up-refusal"]
+	"paused-left-up-refusal", "paused-right-up-refusal", "assignment-left", "assignment-right", "assignment-left-up-refusal", "assignment-right-up-refusal"]
 	Test("Gesture watcher ownership: " . _GKO_Mode . " (gesture-keywatcher-owner)", _GKO_Case.Bind(_GKO_Mode))
+
+for _GKO_LimitMode in ["native-retry-one", "native-retry-three", "native-retry-long"]
+	Test("Gesture watcher length: " . _GKO_LimitMode . " keeps keyboard release recovery alive (gesture-keywatcher-length)",
+		_GKO_Case.Bind(_GKO_LimitMode))

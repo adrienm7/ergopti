@@ -96,6 +96,35 @@
 					onclick="reset_filters()"
 					data-i18n="ui_typing.btn_reset"
 				></button>
+				<button
+					class="filter-btn"
+					id="btn_metrics_export"
+					onclick="ask_metrics_maintenance('export')"
+					data-i18n="ui_typing.maintenance_export"
+					data-i18n-title="ui_typing.maintenance_export_title"
+				></button>
+				<button
+					class="filter-btn filter-reset"
+					id="btn_metrics_purge"
+					onclick="ask_metrics_maintenance('purge')"
+					data-i18n="ui_typing.maintenance_purge"
+					data-i18n-title="ui_typing.maintenance_purge_title"
+				></button>
+				<div class="maintenance-bar" id="metrics_maintenance_bar" role="status" hidden>
+					<span id="metrics_maintenance_text"></span>
+					<button
+						class="filter-btn filter-reset"
+						id="btn_maintenance_confirm"
+						onclick="confirm_metrics_maintenance()"
+						data-i18n="ui_typing.maintenance_confirm"
+					></button>
+					<button
+						class="filter-btn"
+						id="btn_maintenance_cancel"
+						onclick="cancel_metrics_maintenance()"
+						data-i18n="ui_typing.maintenance_cancel"
+					></button>
+				</div>
 			</div>
 		</div>
 
@@ -1252,11 +1281,14 @@
 		<script src="../metrics_freshness.js"></script>
 		<script src="../dom_utils.js"></script>
 		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
+		<script src="../_generated/key_names.js"></script>
+		<script src="../key_names.js"></script>
 		<script src="_generated/keycode_data.js"></script>
 		<script src="_generated/keystats_tokens.js"></script>
 		<script src="key_tokens.js"></script>
 		<script src="state.js"></script>
 		<script src="../metrics_calendar.js"></script>
+		<script src="../metrics_manifest_keys.js"></script>
 		<script src="format.js"></script>
 		<script src="filters.js"></script>
 		<script src="modal.js"></script>
@@ -1264,6 +1296,7 @@
 		<script src="charts.js"></script>
 		<script src="table.js"></script>
 		<script src="heatmap_win.js"></script>
+		<script src="maintenance.js"></script>
 		<script src="main.js"></script>
 
 		<!--
@@ -1312,10 +1345,14 @@
 					// PC-scancode drivers render against macOS-style
 					// HS keycodes — translate the labels (and the n-gram
 					// data, below) so the heatmap geometry stays unchanged.
-					window.keycode_layout =
-						typeof window.build_keycode_layout_for_driver === 'function'
-							? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
-							: blob.keycode_layout || {};
+					window.keycode_layout_source = window.build_keycode_layout_for_driver(
+						window.driver_meta,
+						blob.keycode_layout
+					);
+					window.keycode_layout = window.name_keycode_layout(
+						window.keycode_layout_source,
+						window.driver_meta
+					);
 					let merged = null;
 					let next_historical = cached_historical;
 					let next_historical_incomplete = cached_historical_incomplete;
@@ -1333,6 +1370,15 @@
 							incoming_today = window.translate_win_today(incoming_today);
 							incoming_hist = window.translate_win_today(incoming_hist);
 						}
+						// An explicit partial delivery reuses the current selected history,
+						// which may have changed through a native range response.
+						if (
+							!Object.hasOwn(incoming, 'historical') &&
+							Object.hasOwn(incoming, 'today_partial_types')
+						) {
+							next_historical = app_state.historical_cache;
+							next_historical_incomplete = app_state.historical_cache_incomplete;
+						}
 						// Omission is a live delta; an explicit empty object clears history.
 						if (Object.prototype.hasOwnProperty.call(incoming, 'historical')) {
 							next_historical = incoming_hist;
@@ -1341,6 +1387,10 @@
 						merged = {
 							historical: next_historical || incoming_hist || {},
 							today: incoming_today,
+							...(Object.hasOwn(incoming, 'today_partial_types')
+								? { today_partial_types: incoming.today_partial_types }
+								: {}),
+							...(Object.hasOwn(incoming, 'today_date') ? { today_date: incoming.today_date } : {}),
 							incomplete: next_historical_incomplete || incoming.incomplete === true
 						};
 						window._prefetch_data = merged;
@@ -1472,6 +1522,16 @@
 						if (payload.type === 'range_terminal') {
 							if (typeof window.complete_range_request === 'function') {
 								window.complete_range_request(payload.request_id, payload.status);
+							}
+							return;
+						}
+						if (payload.type === 'metrics_maintenance') {
+							if (typeof window.complete_metrics_maintenance === 'function') {
+								window.complete_metrics_maintenance(
+									payload.maintenance_id,
+									payload.ok,
+									payload.path
+								);
 							}
 							return;
 						}

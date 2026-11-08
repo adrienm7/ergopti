@@ -40,9 +40,6 @@ local GUARDIAN_PERMISSION = {
 	not_used          = "not_used",
 }
 
--- The manifest's platform codes, as the drivers are named
-local PLATFORM_NAMES = { ahk = "Windows", hs = "macOS", linux = "Linux" }
-
 -- The words a USB product name is classified by; the name itself is opt-in
 local DEVICE_KINDS = {
 	{ pattern = "keyboard", kind = "keyboard" },
@@ -375,25 +372,7 @@ end
 --- translates each reason key.
 --- @return table { items = { { feature, platforms, reason } } }
 function H.collect_unavailable()
-	local explained, silent = require("infra.manifest_reader").coverage_gaps()
-	local items = {}
-	for _, gaps in ipairs({ explained, silent }) do
-		for _, gap in ipairs(gaps) do
-			local names = {}
-			for _, code in ipairs(gap.platforms or {}) do
-				local name = PLATFORM_NAMES[code]
-				if not name then error("the manifest names an unknown platform: " .. tostring(code)) end
-				names[#names + 1] = name
-			end
-			items[#items + 1] = {
-				feature   = gap.path,
-				platforms = table.concat(names, ", "),
-				reason    = (type(gap.reason_key) == "string" and gap.reason_key ~= "") and gap.reason_key or nil,
-			}
-		end
-	end
-	table.sort(items, function(a, b) return a.feature < b.feature end)
-	return { items = items }
+	return require("healthcheck.unavailable").collect(require("infra.manifest_reader"))
 end
 
 --- The AI section: the switch, the backend, the model and the profile.
@@ -430,33 +409,43 @@ local function permission_state(id, granted, detail)
 	return "unknown"
 end
 
+-- The reader of each macOS permission, never prompting. Accessibility and
+-- Screen Recording are TCC queries answered by another process (9.2 ms of a
+-- 10.2 ms phase A in the 2026-11-06 field report): the local_state probe reads
+-- them, one per step, after phase A.
+local PERMISSION_READERS = {
+	accessibility    = function()
+		return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
+	end,
+	screen_recording = function()
+		return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
+	end,
+	-- Hammerspoon has no query for Input Monitoring that does not prompt, and
+	-- the grant belongs to the Karabiner grabber rather than to this process
+	input_monitoring = function() return "unknown" end,
+	-- A remap owner that never loaded is unknown
+	login_items      = function()
+		local remap = package.loaded["platform.remap"]
+		if type(remap) ~= "table" or type(remap.guardian_state) ~= "function" then return "unknown" end
+		return GUARDIAN_PERMISSION[remap.guardian_state()] or "unknown"
+	end,
+}
+
+--- One macOS permission, read live without prompting.
+--- @param id string A schema permission id.
+--- @return table { id, state } with state "granted", "missing", "unknown" or a guardian state.
+function H.read_permission(id)
+	local reader = PERMISSION_READERS[id]
+	if not reader then error("no reader for the permission " .. tostring(id)) end
+	return { id = id, state = read("the permission " .. id, reader) or "unknown" }
+end
+
 --- The macOS permissions, read without prompting, in the schema's order.
 --- @param ids table The schema's permission ids for this driver, ordered.
 --- @return table
 function H.collect_permissions(ids)
-	local states = {
-		accessibility    = function()
-			return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
-		end,
-		screen_recording = function()
-			return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
-		end,
-		-- Hammerspoon has no query for Input Monitoring that does not prompt, and
-		-- the grant belongs to the Karabiner grabber rather than to this process
-		input_monitoring = function() return "unknown" end,
-		-- Phase A only reads memory: a remap owner that never loaded is unknown
-		login_items      = function()
-			local remap = package.loaded["platform.remap"]
-			if type(remap) ~= "table" or type(remap.guardian_state) ~= "function" then return "unknown" end
-			return GUARDIAN_PERMISSION[remap.guardian_state()] or "unknown"
-		end,
-	}
 	local items = {}
-	for _, id in ipairs(ids) do
-		local reader = states[id]
-		if not reader then error("no reader for the permission " .. tostring(id)) end
-		items[#items + 1] = { id = id, state = read("the permission " .. id, reader) or "unknown" }
-	end
+	for _, id in ipairs(ids) do items[#items + 1] = H.read_permission(id) end
 	return { items = items }
 end
 

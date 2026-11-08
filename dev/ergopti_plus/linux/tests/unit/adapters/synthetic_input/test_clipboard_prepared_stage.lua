@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 
 local function with_stage(body, options)
 	options = options or {}
@@ -26,7 +27,8 @@ local function with_stage(body, options)
 		s.backend_calls = s.backend_calls + 1; boundary("backend")
 		return not options.unavailable
 	end
-	function shell.exec_checked()
+	function shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 		s.reads = s.reads + 1; boundary("read")
 		if options.read_refused then return false, "", "controlled refusal" end
 		return true, s.value
@@ -45,6 +47,7 @@ local function with_stage(body, options)
 		-- The physical setter deliberately commits AFTER its callback returns.
 		s.value = value; s.writes[#s.writes + 1] = value; s.inside = false
 		if s.failure == phase then
+			if options.external_after_failure then s.value = "external copy" end
 			s.failure = nil
 			if options.throws then error("controlled native write exception") end
 			return false
@@ -83,6 +86,75 @@ local function with_stage(body, options)
 end
 
 helpers.describe("prepared clipboard exact lifetime", function()
+	helpers.it("refuses a foreign copy after preparation (clipboard-payload-replaced)", function()
+		with_stage(function(s)
+			helpers.assert_true(s.stage.prepare())
+			s.value = "external copy"
+			helpers.assert_eq(s.stage.paste(s.channel), false)
+			helpers.assert_eq(s.rows, {}, "never paste the other application's bytes")
+			helpers.assert_true(s.stage.close())
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(s.writes, { "replacement" })
+		end)
+	end)
+	for _, mode in ipairs({ "unreadable", "retired" }) do
+		helpers.it("refuses " .. mode .. " clipboard preflight before output (clipboard-payload-replaced)", function()
+			local options = {}
+			with_stage(function(s)
+				helpers.assert_true(s.stage.prepare())
+				if mode == "unreadable" then options.read_refused = true end
+				s.boundary = function(phase)
+					if mode == "retired" and phase == "read" then s.live = false end
+				end
+				helpers.assert_eq(s.stage.paste(s.channel), false)
+				helpers.assert_eq(s.rows, {})
+				options.read_refused, s.boundary = false, nil
+				helpers.assert_true(s.stage.close())
+				helpers.assert_eq(s.value, "original")
+			end, options)
+		end)
+	end
+	helpers.it("does not overwrite an external copy after a failed setter", function()
+		with_stage(function(s)
+			s.failure = "set"
+			helpers.assert_eq(s.stage.prepare(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 1)
+			helpers.assert_eq(s.stage.close(), false, "ambiguous restoration remains pending")
+			s.value = "replacement"
+			helpers.assert_true(s.stage.close(), "the inverse can settle when our payload is identifiable")
+			helpers.assert_eq(s.value, "original")
+		end, { external_after_failure = true })
+	end)
+
+	helpers.it("does not overwrite an external copy after a failed restore", function()
+		with_stage(function(s)
+			helpers.assert_true(s.stage.prepare())
+			s.failure = "restore"
+			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 2)
+		end, { external_after_failure = true })
+	end)
+
+	helpers.it("retains restoration when the ownership read is unavailable", function()
+		local options = {}
+		with_stage(function(s)
+			helpers.assert_true(s.stage.prepare())
+			s.value = "external copy"
+			options.read_refused = true
+			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 1)
+			options.read_refused = false
+			helpers.assert_true(s.stage.close())
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 1)
+		end, options)
+	end)
+
 	helpers.it("constructs and closes an unused stage without desktop IO or admission", function()
 		with_stage(function(s)
 			helpers.assert_eq({ s.backend_calls, s.reads, #s.writes, #s.rows, #s.waits, s.admissions }, { 0, 0, 0, 0, 0, 0 })
@@ -103,7 +175,7 @@ helpers.describe("prepared clipboard exact lifetime", function()
 				helpers.assert_eq(s.stage.prepare(), false, "preparation is one-shot")
 				helpers.assert_eq(s.stage.paste(s.channel), true)
 				helpers.assert_eq(s.rows, { { 29, 1 }, { 38, 1 }, { 38, 0 }, { 29, 0 } })
-				helpers.assert_eq({ s.reads, #s.writes, s.waits, s.lookups }, { 1, 1, { 30, 120 }, 0 })
+				helpers.assert_eq({ s.reads, #s.writes, s.waits, s.lookups }, { 2, 1, { 30, 120 }, 0 })
 				helpers.assert_eq(s.stage.close(), true)
 				helpers.assert_eq(s.value, saved)
 				helpers.assert_eq(s.writes, { "replacement", saved })
@@ -279,14 +351,14 @@ helpers.describe("prepared clipboard exact lifetime", function()
 			s.boundary = function(phase)
 				if phase ~= "admission" then return end
 				checks = checks + 1
-				if checks == 2 then
+				if checks == 3 then
 					helpers.assert_eq(s.stage.close(), false, "the paste frame still owns its native call")
 				end
 			end
 			local issued = s.stage.paste(s.channel)
 			helpers.assert_eq(s.rows, { { 29, 1 } }, "an affirmative stale admission cannot publish V after close")
 			helpers.assert_eq(issued, false)
-			helpers.assert_eq(checks, 2)
+			helpers.assert_eq(checks, 3)
 			helpers.assert_eq(s.stage.close(), true)
 			helpers.assert_eq(s.value, "original")
 		end)

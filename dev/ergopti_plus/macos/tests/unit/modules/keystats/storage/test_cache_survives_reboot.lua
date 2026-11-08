@@ -74,7 +74,7 @@ local function start(root, prepare, revision)
 			local rows = {}
 			if sql:find("key='today_log_offset'", 1, true) then rows = { { value = tostring(SAVED_OFFSET) } }
 			elseif sql:find("key='today_log_date'", 1, true) then rows = { { value = "2026-10-28" } }
-			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = revision or "3" } }
+			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = revision or "6" } }
 			elseif sql:find("key='ngram_ctx_json'", 1, true) then rows = { { value = "{}" } }
 			elseif sql:find("key='local_data_sql_outbox'", 1, true) then rows = { { value = "" } } end
 			local index = 0
@@ -102,6 +102,21 @@ local function start(root, prepare, revision)
 		init = function() end, set_device_id = function() end, get_device_id = function() return nil end,
 		reset_batch = function() end, reset_ngram_ctx = function() end, get_ngram_ctx = function() return {} end,
 		set_ngram_ctx = function() end, flush = function() return true end,
+	}
+	-- Exercise the manager's complete snapshot publication contract on this
+	-- control database. The native snapshot implementation has real SQLite tests.
+	local witness = {}
+	local original_snapshot = package.loaded["modules.keystats.rebuild_snapshot"]
+	package.loaded["modules.keystats.rebuild_snapshot"] = {
+		witness = function() return witness end,
+		same = function(a, b) return a == b end,
+		open = function(owner) return { db = owner, captured = witness } end,
+		publish = function(snapshot, device, finish_sql)
+			seen.exec[#seen.exec + 1] = "PUBLISH " .. device
+			assert(snapshot.db:exec(finish_sql) == 0)
+			return true, witness, false
+		end,
+		close = function() return true end,
 	}
 	package.loaded["modules.keystats.export"] = { init = function() end, cleanup = function() return true end,
 		sync_foreign_data_sql = function() return {} end }
@@ -133,6 +148,7 @@ local function start(root, prepare, revision)
 		pcall(LM.stop, { process_exit = true })
 	end)
 	os.getenv = actual_getenv
+	package.loaded["modules.keystats.rebuild_snapshot"] = original_snapshot
 	seen.cache_exists, seen.legacy_exists = exists(paths.cache), exists(paths.legacy)
 	seen.last_error = last_error
 	seen.paths = paths
@@ -185,13 +201,15 @@ helpers.describe("keystats cache location: a reboot keeps the cache (L64)", func
 			write(paths.cache, "cache of revision 2")
 		end, "2")
 		helpers.assert_eq(seen.last_error, "", "no row loop of the start may leave a statement running")
-		local copied, rebuilt = nil, nil
+		local copied, published, rebuilt = nil, nil, nil
 		for index, sql in ipairs(seen.exec) do
 			if sql:find("VACUUM INTO", 1, true) and sql:find(".pre-ngram-encoding-2.bak", 1, true) then copied = index end
-			if sql:find("aggregate_cache_revision", 1, true) and sql:find("value='3'", 1, true) then rebuilt = index end
+			if sql:find("PUBLISH ", 1, true) then published = index end
+			if sql:find("aggregate_cache_revision", 1, true) and sql:find("value='6'", 1, true) then rebuilt = index end
 		end
 		helpers.assert_true(copied ~= nil, "the old cache must be copied aside")
-		helpers.assert_true(rebuilt ~= nil and copied < rebuilt, "the rebuild must follow the copy")
+		helpers.assert_true(published ~= nil and copied < published, "snapshot publication must follow the copy")
+		helpers.assert_true(rebuilt ~= nil and published < rebuilt, "only snapshot publication may certify the rebuilt cache")
 	end)
 
 	helpers.it("the production cache root is the user's Caches folder, from config_paths alone", function()

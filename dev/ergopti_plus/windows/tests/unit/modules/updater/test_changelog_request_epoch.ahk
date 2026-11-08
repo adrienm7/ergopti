@@ -69,6 +69,25 @@ _CRE_InstallFixture() {
 	return Previous
 }
 
+_CRE_RefreshRetiresInstallList() {
+	global _CLW_LastList, _CLW_RequestEpoch
+	Previous := _CRE_InstallFixture()
+	SavedList := _CLW_LastList
+	try {
+		_CLW_LastList := Map("kind", "json", "json", '[{"tag_name":"v1.0.0"}]',
+			"request_epoch", _CLW_RequestEpoch)
+		AssertTrue(_CLW_FindRelease("v1.0.0").Has("release"), "the current list permits its release")
+		_CLW_BeginFetchRequest("main")
+		Result := _CLW_FindRelease("v1.0.0")
+		AssertEqual("changelog_window.install_error_unknown_release", Result["reason"],
+			"a newer fetch revokes installation from the old list")
+	} finally {
+		_CLW_LastList := SavedList
+		_CRE_RestoreFixture(Previous)
+	}
+}
+Test("changelog: a release refresh revokes the old install list", _CRE_RefreshRetiresInstallList)
+
 _CRE_RestoreFixture(Previous) {
 	global _CLW_WindowEpoch, _CLW_RequestEpoch
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
@@ -291,8 +310,10 @@ _CRE_ProductionBoundariesCarryEpoch() {
 		"accepted page mutations must retain their request epoch through deferral")
 	AssertContains(RunBody, "_CLW_ScriptWorkEpochIsCurrent(Work)",
 		"ExecuteScript must atomically revalidate its epoch after the SetTimer yield")
-	AssertContains(ResetBody, "_CLW_InvalidateWindowSession()",
-		"window teardown must invalidate every old request and queued script")
+	AssertContains(ResetBody, "_CLW_WindowEpoch += 1",
+		"window teardown must invalidate every old window and queued script")
+	AssertContains(ResetBody, "_CLW_RequestEpoch += 1",
+		"window teardown must invalidate every old request")
 }
 
 Test("changelog: all async boundaries carry request/window epochs (AHK-30)",

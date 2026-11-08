@@ -24,6 +24,7 @@ local S = require("modules.keystats.aggregator.state")
 local C = require("modules.keystats.aggregator.core")
 local Physical = require("modules.keystats.aggregator.physical")
 local Walker = require("keystats.walker")
+local AggHelper = require("keystats.aggregator_helpers")
 
 
 
@@ -51,13 +52,37 @@ function M.walk_typing(entry)
 		local hour, minute = os.date("%H"), tonumber(os.date("%M"))
 		slot = { hour = hour, min5 = string.format("%s:%02d", hour, math.floor(minute / 5) * 5) }
 	end
-	C.walker.walk_typing(S.agg_batch, C.get_app_ctx(app), {
+	local date = timestamp and timestamp:match("^(%d%d%d%d%-%d%d%-%d%d)") or C.today()
+	local ctx = C.get_app_ctx(app)
+	-- The shared walker attributes a naturally completed word, burst or
+	-- session to the day of the event that completes it. Remember the last
+	-- event day for streams still open when a durable boundary arrives.
+	-- A date change alone never closes or resets the context.
+	if #entry.events > 0 then ctx.typing_date = date end
+	C.walker.walk_typing(S.agg_batch, ctx, {
 		app = app,
-		date = timestamp and timestamp:match("^(%d%d%d%d%-%d%d%-%d%d)") or C.today(),
+		date = date,
 		events = entry.events,
 		layout = entry.layout,
 		title = entry.title,
 	}, function() return slot end)
+end
+
+
+--- Finish every open logical stream using its captured day before retirement.
+--- Unknown historical owners cannot be assigned to a guessed day.
+function M.settle_contexts()
+	if not C.require_init("settle_contexts") then return false end
+	C.ensure_batch()
+	for app, ctx in pairs(S.ngram_ctx or {}) do
+		if type(ctx) ~= "table" then error("invalid aggregate context", 0) end
+		if ctx.typing_date then
+			C.walker.settle(S.agg_batch, ctx, ctx.typing_date, app, nil, true)
+		elseif (ctx.cur_word or "") ~= "" or ctx.current_burst or ctx.current_session or ctx.last_was_bs then
+			error("aggregate context has no typing date", 0)
+		end
+	end
+	return true
 end
 
 
@@ -175,9 +200,25 @@ function M.walk_system_event(entry)
 	})
 	if action == "wifi_change" then s.wifi_changes = s.wifi_changes + 1
 	elseif action == "space_change"    then s.space_switches = s.space_switches + 1
-	elseif action == "passive_period"  then s.passive_count  = s.passive_count  + 1
+	elseif action == "passive_period"  then
+		s.passive_count = s.passive_count + 1
+		-- The caffeinate watcher measures the interval here; its wake/unlock edge
+		-- carries no duration, so this row is the only owner of the measurement.
+		local duration = tonumber(entry.duration_ms) or 0
+		if entry.kind == "sleep" then s.sleep_ms = s.sleep_ms + duration
+		elseif entry.kind == "lock" then s.locked_ms = s.locked_ms + duration
+		-- A finished keep-awake session (shortcuts/actions/system.lua). Its
+		-- awake_focus companion names the app and is not a second interval.
+		elseif entry.kind == "awake" then s.awake_ms = s.awake_ms + duration
+		end
+	-- Legacy edges recorded before measured passive rows still carry their own
+	-- interval; a current edge has no duration and adds nothing.
 	elseif action == "unlock" then s.locked_ms = s.locked_ms + (entry.duration_ms or 0)
-	elseif action == "wake"   then s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
+	elseif action == "wake"   then
+		s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
+		if AggHelper.is_night_wake(entry.timestamp, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
+			s.night_wake_count = s.night_wake_count + 1
+		end
 	end
 end
 

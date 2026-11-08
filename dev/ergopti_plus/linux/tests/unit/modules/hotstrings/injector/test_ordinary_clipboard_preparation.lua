@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
 	"adapters.keyboard_layout", "adapters.xkb_capture", "adapters.shell_runner", "infra.display_server",
 	"logger.shim", "adapters.keyboard_hook", "adapters.modifier_broker", "input.modifier_custody", "adapters.uinput_writer" }
@@ -37,7 +38,8 @@ local function fixture(options, callback)
 		end,
 	}
 	local Shell = { has_command = function(name) return name == "xclip" end }
-	function Shell.exec_checked()
+	function Shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY, nil end
 		record("read")
 		if options.read_refuses then return false, "", "native pipe read failed" end
 		if options.retire_on_read then retire() end
@@ -79,7 +81,10 @@ local function fixture(options, callback)
 		if options.emit_throws and code == 47 and value == 1 then error("independent output exception") end
 		if value == 1 then world.down[code] = true else world.down[code] = nil end
 		if code == Codes.KEY_BACKSPACE and value == 1 then world.document = world.document:sub(1, -2) end
-		if code == 47 and value == 1 and world.down[Codes.KEY_LEFTCTRL] then world.document = world.document .. world.clipboard end
+		if code == 47 and value == 1 and world.down[Codes.KEY_LEFTCTRL] then
+			world.document = world.document .. world.clipboard
+			if options.retire_on_paste then retire() end
+		end
 		if options.retire_on_ctrl and code == Codes.KEY_LEFTCTRL and value == 1 then retire() end
 		return true
 	end
@@ -185,6 +190,26 @@ helpers.describe("ordinary clipboard preparation before erasure", function()
 	end
 	case("single-field injection uses the same preparation boundary", function()
 		fixture({ single_field = true, read_refuses = true }, function(world) unchanged(world, world.inject()) end)
+	end)
+	case("reports a paste attempt when destination retires after native output", function()
+		fixture({ retire_on_paste = true }, function(world)
+			local attempts = 0
+			local result = world.injector.inject(0, world.payload, true, nil, world.publication,
+				function() attempts = attempts + 1 end)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.payload_attempted, true)
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_eq(world.document, "prefix trg🙂", "the paste already reached the destination")
+			helpers.assert_eq(world.down, {})
+		end)
+	end)
+	case("does not claim a payload attempt when preparation refuses", function()
+		fixture({ read_refuses = true }, function(world)
+			local result = world.injector.inject(0, world.payload, true, nil, world.publication)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_true(result.payload_attempted ~= true)
+			helpers.assert_eq(world.document, "prefix trg")
+		end)
 	end)
 	case("destination retirement after Ctrl DOWN still releases all owned keys and restores clipboard", function()
 		fixture({ retire_on_ctrl = true }, function(world)

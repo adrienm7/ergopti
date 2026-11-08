@@ -68,22 +68,22 @@ h.describe("native dialog captions (linux-native-titles)", function()
 		package.loaded["ui.choice_prompt"] = nil
 		local ok, command = pcall(function()
 			return require("ui.choice_prompt").command("Vision provider", "Pick one",
-				{ { value = "openai", label = "OpenAI" } })
+				{ { value = "--question", label = "--title=OpenAI" } })
 		end)
 		package.loaded["ui.choice_prompt"] = nil
 		h.assert_true(ok, tostring(command))
 		h.assert_eq(command, DIALOG .. " --list --no-markup --hide-header --title='ErgoptiPlus — Vision provider'"
-			.. " --text='Pick one' --column='' --column='' --hide-column=1 --print-column=1 'openai' 'OpenAI' 2>/dev/null")
+			.. " --text='Pick one' --column='' --column='' --hide-column=1 --print-column=1 -- '--question' '--title=OpenAI' 2>/dev/null")
 	end)
 	h.it("(linux-native-titles) the text prompt brands chrome while retaining masking, choices and exact value", function()
 		scenario(function(observed)
 			observed.answer, observed.status = " exact value \n", 0
 			local value = require("ui.text_prompt").ask("Native 'caption'", "Preserved <body>", " Initial ", true,
-				{ "First choice", "Second 'choice'" })
+				{ "--hide-text", "Second 'choice'" })
 			h.assert_eq(value, " exact value ")
 			h.assert_eq(observed.modals, 1)
 			h.assert_eq(observed.commands[1], DIALOG .. " --entry --title='ErgoptiPlus — Native '\\''caption'\\'''"
-				.. " --text='Preserved <body>' --entry-text=' Initial ' --hide-text 'First choice' 'Second '\\''choice'\\''' 2>/dev/null")
+				.. " --text='Preserved <body>' --entry-text=' Initial ' --hide-text -- '--hide-text' 'Second '\\''choice'\\''' 2>/dev/null")
 		end)
 	end)
 	h.it("(linux-native-titles) a cancelled prompt remains nil and an accepted empty answer remains empty", function()
@@ -99,7 +99,9 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	h.it("(linux-native-titles) the application chooser keeps its filter and id", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/usr/share/applications/org.example.Native.desktop", 0
-			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application"), "org.example.Native")
+			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application", { resolve = function()
+				return observed.answer, "found"
+			end }), "org.example.Native")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --title='ErgoptiPlus — Choose application'"
 				.. " --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null")
 			h.assert_eq(observed.modals, 1)
@@ -142,11 +144,44 @@ end)
 
 
 h.describe("native menu dialog captions", function()
-	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
-		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
+	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation", function()
+		local names = { "ui.menu.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "ui.modal" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		local original_execute = os.execute
+		local previous_execute, options, deletions, live, paused = os.execute, nil, 0, true, false
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			bind_page = function(_, bound) options = bound end,
+			caption = function() return "model" end,
+		}
+		package.loaded["ui.modal"] = { run = function(fn) return fn() end }
+		os.execute = function() live = false; return 0 end
+		local ok, err = xpcall(function()
+			require("ui.menu.builder").build({ _version = "9.9.9", paused = false,
+				is_paused = function() return paused end, on_quit = function() end,
+				llm = { is_enabled = function() return false end,
+					delete_model = function() deletions = deletions + 1; return true end } })
+			h.assert_type(options, "table")
+			h.assert_eq(options.delete_model("model:1", function() return live end), false)
+			h.assert_eq(deletions, 0)
+			live = true
+			os.execute = function() paused = true; return 0 end
+			h.assert_eq(options.delete_model("model:1", function() return live end), false)
+			h.assert_eq(deletions, 0)
+		end, debug.traceback)
+		os.execute = previous_execute
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
+
+	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
+		-- The prompt captures its Shell owner; load it under this scenario's authority.
+		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows",
+			"ui.text_prompt" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local original_execute, original_checked = os.execute, Shell.exec_checked
+		local logger = require("logger.shim")
+		local original_error, original_info = logger.error, logger.info
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
 		package.loaded["ui.menu.llm_backend_rows"] = {
 			bind_page = function(_, options) dialogs = options.dialogs end,
@@ -192,8 +227,25 @@ h.describe("native menu dialog captions", function()
 			h.assert_eq(commands[5], DIALOG .. " --error --title='ErgoptiPlus'"
 				.. " --text='Preserved explicit empty caption' 2>/dev/null")
 			h.assert_eq(modals, 5)
+			dialogs.error("Invalid URL <host>&value")
+			h.assert_true(commands[6]:find("Invalid URL &lt;host&gt;&amp;value", 1, true) ~= nil)
+			dialogs.info("Information", "Model <name>&value")
+			h.assert_true(commands[7]:find("Model &lt;name&gt;&amp;value", 1, true) ~= nil)
+			Shell.exec_checked = function(command) commands[#commands + 1] = command; return true, "" end
+			dialogs.prompt("Prompt", "Provider <name>&value", "")
+			h.assert_true(commands[8]:find("Provider &lt;name&gt;&amp;value", 1, true) ~= nil)
+			local logs = {}
+			logger.error = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+			logger.info = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+			os.execute = function() return 1 end
+			dialogs.error("URL https://user:synthetic-secret@example.invalid")
+			dialogs.info("Result", "synthetic-private-response")
+			h.assert_eq(#logs, 2)
+			h.assert_true(not logs[1]:find("synthetic-secret", 1, true))
+			h.assert_true(not logs[2]:find("synthetic-private-response", 1, true))
 		end, debug.traceback)
-		os.execute = original_execute
+		os.execute, Shell.exec_checked = original_execute, original_checked
+		logger.error, logger.info = original_error, original_info
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
 	end)
@@ -280,9 +332,9 @@ h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
 			["ui.text_prompt"] = 1,
-			-- The application picker's two captions, and the open_path picker's two,
-			-- composed through window_titles and proven by test_user_actions.
-			["ui.app_chooser"] = 2,
+			-- The picker, its verification error and the open_path picker retain
+			-- their composed caption; test_app_chooser proves the error dialog.
+			["ui.app_chooser"] = 3,
 			["ui.config_dir_picker"] = 1,
 			["ui.gesture_conflicts"] = 1,
 			["modules.gestures.system_actions"] = 1,
@@ -294,6 +346,9 @@ h.describe("native caption consumer inventory", function()
 			["ui.field_check.window"] = 1,
 			-- The list prompt's caption is proven by the choice prompt case.
 			["ui.choice_prompt"] = 1,
+			-- The bundled apps' entry, question, message and file dialogs compose
+			-- their caption; test_bundled_apps_launcher proves each one.
+			["apps.dialogs"] = 4,
 		}
 		local observed = {}
 		local root = h.driver_root()
@@ -348,7 +403,8 @@ local function picker_exit_receipt(status, output, application_root)
 			.. "local modals = 0\n"
 			.. "package.loaded['ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
-			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application')\n"
+			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application', {resolve=function() return "
+				.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
 				or "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modals)\n")

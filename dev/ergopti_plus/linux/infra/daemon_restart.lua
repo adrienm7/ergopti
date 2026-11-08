@@ -37,6 +37,10 @@ function M.restart(opts)
 				or require("modules.updater.manager")._resolve_installation()
 		end
 	local under_unit = Restarter.under_unit(opts.cgroup)
+	if under_unit == nil then
+		Logger.error(LOG, "Restart for %s refused: the process cgroup is unavailable or invalid.", opts.reason)
+		return nil, "the process cgroup is unavailable or invalid"
+	end
 	local wrapper
 	if not under_unit then
 		local context = installation()

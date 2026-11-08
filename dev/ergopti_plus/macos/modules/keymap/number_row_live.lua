@@ -61,6 +61,8 @@ end
 function M.source(deps)
 	local resolved = resolve(deps)
 	local snapshot = resolved.registry.snapshot(resolved.registry_deps)
+	-- Do not override the registry's ambiguity refusal by matching a build name.
+	if snapshot.active_error then return nil, snapshot.active_error end
 	local id = snapshot.active ~= "" and snapshot.active or nil
 	if id == nil then
 		local current = resolved.build.current(resolved.build_deps)

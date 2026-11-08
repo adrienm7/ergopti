@@ -68,6 +68,44 @@ local function with_real_shortcut_prompt(raw, body)
 end
 
 helpers.describe("HS-033 shortcut prompt settlement propagation", function()
+	helpers.it("opens a repair prompt for malformed persisted modifier arrays", function()
+		for _, mods in ipairs({ { true }, { {} }, { [1] = "alt", [3] = "shift" }, { extra = "ctrl" }, false }) do
+			with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+				local current = { mods = mods, key = "a" }
+				helpers.assert_eq(shortcuts.shortcut_to_config_string(current), "")
+				helpers.assert_eq(shortcuts.shortcut_to_label(current, "none"), "none")
+				local applied = false
+				helpers.assert_true(shortcuts.prompt_shortcut({ current_shortcut = current,
+					on_apply = function() applied = true; return true end }))
+				helpers.assert_true(applied, "the user can replace the malformed shortcut")
+			end)
+		end
+		with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+			helpers.assert_eq(shortcuts.shortcut_to_config_string({ mods = { "ctrl" }, key = "a" }), "ctrl+a")
+			helpers.assert_eq(shortcuts.shortcut_to_label({ mods = { "ctrl" }, key = "a" }), "Ctrl + A")
+		end)
+	end)
+	for _, raw in ipairs({ "ctrrl+b", "ctrl++b", "+b", "ctrl+" }) do
+		helpers.it("rejects malformed shortcut without saving: " .. raw, function()
+			with_real_shortcut_prompt(raw, function(shortcuts)
+				local applied = false
+				helpers.assert_eq(shortcuts.prompt_shortcut({ default_mods = { "ctrl" },
+					on_apply = function() applied = true; return true end }), false)
+				helpers.assert_eq(applied, false, "invalid text must not silently change the shortcut")
+			end)
+		end)
+	end
+	helpers.it("retains valid modifier aliases and default modifiers", function()
+		with_real_shortcut_prompt(" Option + Control + B ", function(shortcuts)
+			local parsed = shortcuts.parse_shortcut_input(" Option + Control + B ", { "ctrl" })
+			helpers.assert_eq(parsed.key, "b")
+			helpers.assert_eq(#parsed.mods, 2)
+		end)
+		with_real_shortcut_prompt("b", function(shortcuts)
+			local parsed = shortcuts.parse_shortcut_input("b", { "ctrl" })
+			helpers.assert_eq(parsed.mods, { "ctrl" })
+		end)
+	end)
 	for _, raw in ipairs({"ctrl+b", ""}) do
 		for _, outcome in ipairs({"false", "nil", "throw"}) do
 			helpers.it("HS-033 prompt returns refusal for " .. outcome .. " callback on '" .. raw .. "'", function()

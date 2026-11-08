@@ -88,6 +88,7 @@ local UNGOVERNED_CHORDS = { backspace = true, delete = true, home = true, ["end"
 -- editor submits on Enter and ignores a Backspace at the start of the prompt.
 local TERMINAL_APPS = {
 	terminal = true, ["gnome-terminal"] = true, ["gnome-terminal-server"] = true,
+	["gnome-terminal-"] = true, -- Linux /proc/<pid>/comm truncates at 15 bytes.
 	console = true, kgx = true, ptyxis = true, konsole = true, yakuake = true,
 	kitty = true, alacritty = true, foot = true, footclient = true, wezterm = true,
 	["wezterm-gui"] = true, ghostty = true, tilix = true, terminator = true,
@@ -101,7 +102,7 @@ local TERMINAL_APPS = {
 -- Browsers, whose Ctrl+L selects the whole address of the address bar.
 local BROWSER_APPS = {
 	firefox = true, ["firefox-esr"] = true, librewolf = true, waterfox = true,
-	chromium = true, ["chromium-browser"] = true, ["google-chrome"] = true,
+	chromium = true, ["chromium-browser"] = true, ["chromium-browse"] = true, ["google-chrome"] = true,
 	chrome = true, brave = true, ["brave-browser"] = true, vivaldi = true,
 	["vivaldi-stable"] = true, opera = true, ["microsoft-edge"] = true,
 	epiphany = true, falkon = true, floorp = true, zen = true,
@@ -299,8 +300,10 @@ local function persist(path, key, value)
 		Logger.error(LOG, "Word-reset change refused: a hotstring configuration scope is still pending.")
 		return false
 	end
+	local owner, staged = _settings, nil
 	local called, committed, detail = pcall(function()
-		local _, source = read_settings()
+		local source
+		staged, source = read_settings()
 		return Writer.batch_write(Paths.config("config.toml"),
 			{ Manifest.sparse_operation(path, value) }, nil, source)
 	end)
@@ -308,9 +311,12 @@ local function persist(path, key, value)
 		Logger.error(LOG, "Word-reset change was not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
-	local updated = M.snapshot()
-	updated[key] = value
-	_settings = updated
+	-- Publish the complete image used for the write, unless a re-entrant
+	-- configuration owner already replaced the runtime cache.
+	if _settings == owner then
+		staged[key] = value
+		_settings = staged
+	end
 	Logger.info(LOG, "%s set to %s.", path, tostring(value))
 	return true
 end
@@ -473,6 +479,7 @@ local function selects_whole_field(detail, app_id)
 	if type(detail) ~= "table" or type(detail.key) ~= "string" or not M.deletes_previous_word(detail) then
 		return false
 	end
+	if detail.mods.shift == true then return false end
 	local key = detail.key:lower()
 	if key == "a" then return not M.is_terminal_app(app_id) end
 	return key == "l" and BROWSER_APPS[app_key(app_id)] == true
@@ -549,6 +556,48 @@ function M.apply_control(engine, key_name, detail, app_id)
 	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id),
 		ai_effect)
 	return at_word_start and "word_start" or "unknown"
+end
+
+-- The final key of a catalogue combination, as the catalogue spells it.
+local function combo_key(combo)
+	if type(combo) ~= "string" then return nil end
+	return combo:match("([^+]+)$")
+end
+
+local ARROW_COMBO_KEYS = { Left = true, Right = true, Up = true, Down = true }
+local DELIMITER_COMBO_KEYS = { Return = "enter", Tab = "tab" }
+
+--- Whether a catalogue combination is an arrow under any modifier (the declared
+--- arrow policy applies to every origin: physical, remap, gesture, tap-hold).
+--- @param combo string|nil X keysym combination such as "Left" or "ctrl+Right".
+--- @return boolean
+function M.is_arrow_combo(combo)
+	return ARROW_COMBO_KEYS[combo_key(combo)] == true
+end
+
+--- The hook's control-key name for a delimiter a catalogue combination presses.
+--- @param combo string|nil
+--- @return string|nil name "enter" or "tab", or nil for any other combination.
+function M.delimiter_key(combo)
+	return DELIMITER_COMBO_KEYS[combo_key(combo)]
+end
+
+--- Applies the arrow policy to an arrow the catalogue emitted and the virtual
+--- keyboard acknowledged. The keys never reach the hook, so this is the only
+--- place the engine hears of them. hotstrings.arrow_resets_word decides the
+--- word, whoever asked for the arrow; the AI context follows its own navigation
+--- preference through the engine.
+--- @param engine table Hotstring engine.
+--- @param combo string|nil The emitted combination.
+--- @return string effect "word_start", "kept", or "not_arrow".
+function M.apply_emitted_combo(engine, combo)
+	if not M.is_arrow_combo(combo) then return "not_arrow" end
+	if not M.arrow_resets_word() then
+		engine:navigated()
+		return "kept"
+	end
+	engine:reset(true, nil, "navigation")
+	return "word_start"
 end
 
 --- Applies a tap-hold key's own command (copy, paste, a window switch: any

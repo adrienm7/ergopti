@@ -117,6 +117,45 @@ helpers.describe("Managed daemon original-task lifecycle receiver", function()
 		helpers.assert_eq(receiver.finish(task, 0), false)
 	end)
 
+	helpers.it("(daemon-dead-unpublished-release) the pause releases an exited daemon that never published", function()
+		local Lifecycle = require("core.llm.managed_ollama_daemon_lifecycle")
+		local function build(published)
+			local task, nonce = owned_task()
+			local released = {}
+			local handle = assert(Lifecycle.new(task, nonce, {
+				max_protocol_bytes = 512,
+				start = function() return true end,
+				cancel = function() return true end,
+				is_settled = function(original) return original.settled end,
+				observe = function() return true end,
+			}, {
+				on_ready = function() end, on_done = function() end, on_debt = function() end,
+				on_released = function(_, reason) released[#released + 1] = reason end,
+			}))
+			assert(handle.start())
+			if published then handle.feed(frame(nonce, "ACTIVE") .. frame(nonce, "READY")) end
+			return task, handle, released
+		end
+		-- Exit 78 with no RETIRED frame and no READY: nothing holds a port.
+		local task, handle, released = build(false)
+		task.settled = true
+		local ok, state = handle.terminate()
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(state, "settled")
+		helpers.assert_eq(handle.isSettled(), true)
+		helpers.assert_eq(released[1], "dead_unpublished")
+		-- A live process, or a published daemon without its receipt, stays pending.
+		local live_task, live = build(false)
+		local _, live_state = live.terminate()
+		helpers.assert_eq(live_state, "pending")
+		helpers.assert_eq(live_task.settled, false)
+		local pub_task, pub = build(true)
+		pub_task.settled = true
+		local _, pub_state = pub.terminate()
+		helpers.assert_eq(pub_state, "pending")
+		helpers.assert_eq(pub.isSettled(), false)
+	end)
+
 	helpers.it("(daemon-foreign-task) rejects a borrowed task despite the exact same nonce", function()
 		local task, nonce = owned_task()
 		local receiver = assert(Receiver.new(task, nonce))

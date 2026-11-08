@@ -4,7 +4,7 @@
 ; MODULE: Regression — a callable Replacement must never reach the fire-log
 ;         drain (fire-log-callable-replacement-drops-the-record)
 ; DESCRIPTION:
-; The dynamic hotstrings (@dt, @date, @td and every phone / SSN / IBAN prefix)
+; The dynamic hotstrings (dt, date, td and every phone / SSN / IBAN prefix)
 ; are all default-enabled and all store a CALLABLE in Spec.Replacement, resolved
 ; at fire time so the date is computed on the keystroke.
 ;
@@ -45,7 +45,7 @@ _FLCR_QueueNeutralisesACallableReplacement() {
 	; Declare the drain already armed so this call leaves no live timer behind in
 	; the runner; the queue itself is what is under test.
 	_HSE_FireLogScheduled := true
-	Trigger := "@dt" . Chr(0x2605)
+	Trigger := "dt" . Chr(0x2605)
 	try {
 		_HSE_QueueFireLog(Trigger, (*) => "29/07/2026", "star", "dynamic", "date_fr")
 		AssertEqual(1, _HSE_FireLogQueue.Length,

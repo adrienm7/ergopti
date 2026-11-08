@@ -86,7 +86,7 @@ end
 --- @return string Active source name or "none".
 function M.get_active_source(stats, source_color_duration, now_sec)
 	local now = now_sec or (hs.timer.absoluteTime() / 1000000000)
-	return WPMModel.active_source(stats, source_color_duration, now)
+	return WPMModel.active_source(stats, source_color_duration, now, M.canon())
 end
 
 -- =====================================

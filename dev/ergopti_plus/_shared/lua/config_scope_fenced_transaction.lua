@@ -85,15 +85,15 @@ function M.new(options)
 		return release()
 	end
 	function owner.pending() return busy or inverse_owed or release_claim_limit ~= nil or #held > 0 or transaction.pending() end
-	function owner.apply(mode)
-		if owner.pending() or (mode ~= "clear" and mode ~= "recommended") then return false end
+	local function apply_operation(operation)
+		if owner.pending() then return false end
 		busy = true
 		local admitted, available = pcall(options.available)
 		if not admitted or available ~= true then busy = false; return false, "configuration admission refused" end
 		local acquired, detail = acquire()
 		if acquired ~= true then release(); busy = false; return false, detail end
 		local committed
-		committed, detail = transaction.apply(options.scope, mode)
+		committed, detail = operation()
 		if transaction.pending() then busy = false; return false, detail end
 		local released, release_detail = release()
 		if released ~= true then
@@ -104,6 +104,15 @@ function M.new(options)
 		end
 		busy = false
 		return committed, detail
+	end
+	function owner.apply(mode)
+		if mode ~= "clear" and mode ~= "recommended" then return false end
+		return apply_operation(function() return transaction.apply(options.scope, mode) end)
+	end
+	--- Publishes validated explicit edits behind the same claims and compensation.
+	function owner.apply_updates(updates)
+		if type(transaction.apply_updates) ~= "function" then return false end
+		return apply_operation(function() return transaction.apply_updates(options.scope, updates) end)
 	end
 	function owner.retry_restore()
 		if busy then return false end

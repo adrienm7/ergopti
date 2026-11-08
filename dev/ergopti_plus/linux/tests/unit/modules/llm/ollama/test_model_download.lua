@@ -128,6 +128,104 @@ helpers.describe("Ollama model download: streaming transaction", function()
 		if not ok then error(err) end
 	end)
 
+	helpers.it("keeps oversized progress finite and bounded for both views", function()
+		local Download, transport, window = load_fixture()
+		local told = {}
+		local ok, err = xpcall(function()
+			Download.set_progress_listener(function(_, percent) told[#told + 1] = percent end)
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk('{"status":"pulling","completed":1e308,"total":1e308}\n')
+			helpers.assert_eq(told[1], 100)
+			helpers.assert_eq(window.updates[1][2], 100)
+			transport.starts[1].on_chunk('{"status":"pulling","completed":1e309,"total":1e309}\n')
+			transport.starts[1].on_chunk('{"status":"pulling","completed":-1,"total":100}\n')
+			helpers.assert_eq(#told, 1)
+			helpers.assert_eq(window.updates[2][2], nil)
+			helpers.assert_eq(window.updates[3][2], nil)
+			transport.starts[1].on_chunk('{"status":"pulling","completed":"25","total":"100"}\n')
+			helpers.assert_eq(told[2], 25)
+			helpers.assert_eq(window.updates[4][2], 25)
+		end, debug.traceback)
+		Download.set_progress_listener(nil)
+		restore()
+		if not ok then error(err) end
+	end)
+
+
+	helpers.it("discards an oversized streamed frame and resumes on the next line", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk('{"status":"success","padding":"' .. string.rep("x", 1024 * 1024) )
+			transport.starts[1].on_chunk('"}\n{"status":"pulling","completed":25,"total":100}\n')
+			helpers.assert_eq(window.updates[#window.updates][2], 25)
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], false, "discarded oversized success cannot authorize completion")
+		end, debug.traceback)
+		restore()
+		if not ok then error(err) end
+	end)
+
+
+	helpers.it("admits exactly one MiB with split CRLF framing", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			local prefix, suffix = '{"status":"success","padding":"', '"}'
+			local exact = prefix .. string.rep("x", 1024 * 1024 - #prefix - #suffix) .. suffix
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk(exact .. "\r")
+			transport.starts[1].on_chunk("\n")
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], true)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err) end
+	end)
+
+	helpers.it("rejects oversized EOF and resets discard on retry", function()
+		local Download, transport, window, shown = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk(string.rep("x", 1024 * 1024))
+			transport.starts[1].on_chunk("x")
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], false)
+			helpers.assert_true(shown().on_retry())
+			transport.starts[2].on_chunk('{"status":"success"}\r\n')
+			transport.starts[2].on_done({ ok = true })
+			helpers.assert_eq(window.completions[2][2], true)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err) end
+	end)
+
+
+	helpers.it("does not admit an extra carriage return without its newline at EOF", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			local prefix, suffix = '{"status":"success","padding":"', '"}'
+			local exact = prefix .. string.rep("x", 1024 * 1024 - #prefix - #suffix) .. suffix
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk(exact .. "\r")
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], false)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err) end
+	end)
+
+	helpers.it("does not report success after an oversized frame hid a possible error", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk(string.rep("x", 1024 * 1024 + 1) .. '\n{"status":"success"}\n')
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], false)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err) end
+	end)
+
 	helpers.it("keeps a failed request retryable and cancels only its named owner", function()
 		local Download, transport, window, shown = load_fixture()
 		helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))

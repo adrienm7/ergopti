@@ -6,8 +6,8 @@
 --- The three one-click Mac checks over scripted ports:
 --- 1. lease: a missing tool, a failed phase or guardian, lease failures and lost
 ---    key events each fail their own step and no other;
---- 2. owned_runtime: the dormant invariants (legacy source, raw stream not
----    loaded) fail when broken, and the install state is information only;
+--- 2. owned_runtime: the dormant credit source fails when broken; whether the
+---    raw stream owner is loaded and the install state are information only;
 --- 3. key_accounting: Quartz presses against ledger credits, with the HS-274
 ---    double count named when the legacy ledger credits;
 --- 4. every external command is read-only and bounded, and no step value can
@@ -50,13 +50,16 @@ local function make_ports(overrides)
 end
 
 --- Runs one definition and returns its steps keyed by id.
+--- @param runtime string|nil Karabiner runtime to select first; nil keeps shared.
 --- @param name string Definition name.
 --- @param ports table Ports.
 --- @return table steps, table result
-local function run(name, ports)
+local function run_on(runtime, name, ports)
 	local steps, result
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["platform.remap.ke_paths"] = nil
+		if runtime then require("platform.remap.ke_paths").select_runtime(runtime) end
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		local Engine = require("infra.field_check")
@@ -66,6 +69,9 @@ local function run(name, ports)
 	for _, step in ipairs(result.steps) do steps[step.id] = step end
 	return steps, result
 end
+
+--- Runs one definition with the default (shared) runtime selected.
+local function run(name, ports) return run_on(nil, name, ports) end
 
 local CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
@@ -217,6 +223,47 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(polls, 60)
 	end)
 
+	-- Field report 2026-11-05: the lease ran before the owned runtime was
+	-- admitted, waited 30 s for a guardian nobody registers and failed the tool,
+	-- the guardian and the version the owned_* steps already reported missing.
+	helpers.it("skips the steps an unadmitted owned runtime cannot answer (lease-owned-not-admitted)", function()
+		local polls = 0
+		local ports, world = make_ports({
+			remap_facts = function()
+				return { enabled = true, phase = "idle", guardian = "unknown", owned_admitted = false }
+			end,
+			after = function(_, callback) polls = polls + 1; callback() end,
+		})
+		local steps, result = run_on("owned", "lease", ports)
+		helpers.assert_eq(polls, 0, "no guardian wait for an unadmitted owned runtime")
+		helpers.assert_eq(steps.cli_present.state, "skip")
+		helpers.assert_eq(steps.cli_present.value, "owned_runtime_not_admitted")
+		helpers.assert_eq(steps.guardian_state.state, "skip")
+		helpers.assert_eq(steps.guardian_state.value, "owned_runtime_not_admitted")
+		helpers.assert_eq(steps.cli_version.state, "skip")
+		helpers.assert_eq(steps.cli_version.value, "owned_runtime_not_admitted")
+		helpers.assert_nil(steps.guardian_wait)
+		helpers.assert_true(result.passed, "a runtime not yet admitted is not a broken lease")
+		for _, command in ipairs(world.commands) do
+			helpers.assert_true(command.executable ~= CLI, "no stock tool runs for the owned runtime")
+		end
+	end)
+
+	helpers.it("reads the selected runtime's own configuration (lease-config-selected-runtime)", function()
+		local ports, world = make_ports({
+			remap_facts = function()
+				return { enabled = true, phase = "ready", guardian = "ready", owned_admitted = true }
+			end,
+		})
+		world.existing["/Users/jane/.config/karabiner/karabiner.json"] = true
+		local steps = run_on("owned", "lease", ports)
+		helpers.assert_eq(steps.config_present.value, "no", "the shared file says nothing of the owned runtime")
+		world.existing["/Users/jane/Library/Application Support/"
+			.. require("app_dirs").owned_runtime.macos_folder_name .. "/karabiner/karabiner.json"] = true
+		helpers.assert_eq(run_on("owned", "lease", ports).config_present.value, "yes")
+		helpers.assert_eq(run("lease", ports).config_present.value, "yes", "the shared runtime keeps its own file")
+	end)
+
 	helpers.it("reports a command timeout instead of waiting", function()
 		local ports, world = make_ports()
 		world.existing[CLI] = true
@@ -306,11 +353,15 @@ helpers.describe("owned runtime check", function()
 		helpers.assert_eq(steps.dormant_source.value, "gap")
 	end)
 
-	helpers.it("fails when the raw stream owner was loaded", function()
+	-- Field report 2026-11-05: the owned runtime, now the default, loads the
+	-- raw stream owner on every boot, so this step failed every owned run.
+	helpers.it("reports a loaded raw stream owner as information (owned-capture-info)", function()
 		local ports = make_ports({ keystats_facts = function()
 			return { credit_source = "legacy", capture_loaded = true, ledger_drained = 0 }
 		end })
-		helpers.assert_eq(run("owned_runtime", ports).capture_unloaded.state, "fail")
+		local steps = run("owned_runtime", ports)
+		helpers.assert_eq(steps.capture_unloaded.state, "info")
+		helpers.assert_eq(steps.capture_unloaded.value, "no")
 	end)
 
 	helpers.it("parses the driver listing", function()

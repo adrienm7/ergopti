@@ -38,6 +38,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local TomlCodec = require("toml_codec")
+local Writer = require("toml_codec.writer")
 local HoldOptions = require("tap_hold.hold_options")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Manifest = require("infra.manifest_reader")
@@ -62,6 +63,21 @@ M.LONE_TAP_FIELD = ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS
 local LONE_TAP_FIELD = M.LONE_TAP_FIELD
 M.LONE_TAP_DEFAULT_MS = LoneTap.validate(Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 
+-- How long a one-shot Shift waits for its key ([tap_hold] sticky_timeout_ms,
+-- the leaf macOS keeps under [tap_holds]): a positive whole number of
+-- milliseconds within the timer ceiling, the timing registry's default when
+-- absent. No zero or unlimited value: macOS refuses them too.
+M.ONE_SHOT_TIMEOUT_FIELD = ConfigKeys.LEAF.STICKY_TIMEOUT_MS
+local ONE_SHOT_TIMEOUT_FIELD = M.ONE_SHOT_TIMEOUT_FIELD
+M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
+
+--- Whether a value is an admitted one-shot timeout.
+--- @param ms any
+--- @return boolean
+function M.valid_one_shot_timeout_ms(ms)
+	return type(ms) == "number" and require("number_policy").within_timer_ceiling(ms) and ms > 0 and ms % 1 == 0
+end
+
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
 
 -- The per-key fields that decide what a key does, compared by key_report(). A
@@ -80,10 +96,9 @@ local USER_FILE_NAME = "tap_hold.toml"
 --- @param path string
 --- @return table|nil parsed, string|nil err ("absent" when the file does not exist)
 local function read_toml(path, with_shapes)
-	local fh = io.open(path, "r")
-	if not fh then return nil, "absent" end
-	local text = fh:read("*a")
-	fh:close()
+	local text, status = Writer.read_classified(path)
+	if status == "absent" then return nil, "absent" end
+	if status ~= "ok" or type(text) ~= "string" then return nil, "unreadable" end
 	local parsed, shapes
 	if with_shapes then
 		parsed, shapes = TomlCodec.decode_with_shapes(text)
@@ -156,8 +171,8 @@ local function validated(key_id, fields, hold_picker, origin, global_seconds)
 		key.enabled = false
 	end
 	-- The key's own delay when it has a usable one, else the global delay.
-	local seconds = tonumber(key.time_activation_seconds)
-	if not seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
+	local seconds = key.time_activation_seconds
+	if type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
 		if key.time_activation_seconds ~= nil then
 			outdated(TIME_FIELD, string.format("%s is outside 0..%d s; the global delay %.3f s is used",
 				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, global_seconds))
@@ -287,6 +302,17 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 					tostring(stored_lone_tap), M.LONE_TAP_DEFAULT_MS))
 		end
 	end
+	local one_shot_timeout_ms = M.ONE_SHOT_TIMEOUT_DEFAULT_MS
+	local stored_one_shot = section[ONE_SHOT_TIMEOUT_FIELD]
+	if stored_one_shot ~= nil then
+		if M.valid_one_shot_timeout_ms(stored_one_shot) then
+			one_shot_timeout_ms = stored_one_shot
+		else
+			Outdated.report_in_file(user_file, { "tap_hold", ONE_SHOT_TIMEOUT_FIELD },
+				string.format("%s is not a positive whole number of milliseconds; the one-shot timeout stays %d ms",
+					tostring(stored_one_shot), M.ONE_SHOT_TIMEOUT_DEFAULT_MS))
+		end
+	end
 	-- Shipped data like the hold picker: a user file cannot move a key.
 	local catalog = KeyCatalog.for_platform(defaults, "linux")
 	local remappable = {}
@@ -352,6 +378,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 		global_seconds = global_seconds,
 		global_user_set = global_user_set,
 		lone_tap_max_ms = lone_tap_max_ms,
+		one_shot_timeout_ms = one_shot_timeout_ms,
 		user_error = user_err,
 		user_path = user_file,
 		user_fields = user_fields,

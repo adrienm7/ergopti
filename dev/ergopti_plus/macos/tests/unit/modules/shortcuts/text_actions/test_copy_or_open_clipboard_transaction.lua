@@ -15,13 +15,13 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps", "adapters.window_info",
-		"adapters.synthetic_input", "adapters.timer_scheduler", "infra.logger",
+		"adapters.synthetic_input", "adapters.timer_scheduler", "adapters.clipboard", "infra.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
 		["public.html"] = "<b>ORIGINAL</b>",
 	}
-	local current = original
+	local current, generation = original, 0
 	local timers = {}
 	local now = 0
 	local timer_calls = 0
@@ -65,14 +65,16 @@ local function load_fixture(options)
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
 	local pasteboard = {
+		changeCount = function() return generation end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function() snapshots = snapshots + 1; return original end,
-		clearContents = function() current = {} end,
+		clearContents = function() current = {}; generation = generation + 1 end,
 		getContents = function() return "selected words" end,
 		writeAllData = function(snapshot)
 			restore_calls = restore_calls + 1
 			local outcome = options.restore_outcomes and options.restore_outcomes[restore_calls]
 			if outcome == "false" then return false end
-			current = snapshot
+			current = snapshot; generation = generation + 1
 			return true
 		end,
 	}

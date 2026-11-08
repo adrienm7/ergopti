@@ -177,6 +177,7 @@ local function with_fixture(options, scenario)
 			function handle:start()
 				local result = wake_start_results[creation]
 				if result == "throw" then error("wake watcher start exploded") end
+				if result == "nil" then return nil end
 				if result == false then return false end
 				self.running = true
 				return self
@@ -313,6 +314,16 @@ helpers.describe("gestures recurring timers are exact lifecycle transactions", f
 			helpers.assert_eq(scheduler.primer_handles[2].running, true)
 			helpers.assert_true(scheduler.engine_init_calls >= 2,
 				"retry must restore the engine that startup rollback stopped")
+			helpers.assert_eq(gestures.stop(), true)
+		end)
+	end)
+
+	helpers.it("rejects a wake watcher that returns no start receipt", function()
+		with_fixture({ wake_start_results = { "nil", true } }, function(gestures, scheduler)
+			helpers.assert_eq(gestures.start(), false)
+			helpers.assert_eq(scheduler.wake_handles[1].stop_calls, 1)
+			helpers.assert_eq(scheduler.handles[1].active, false)
+			helpers.assert_eq(gestures.start(), true)
 			helpers.assert_eq(gestures.stop(), true)
 		end)
 	end)

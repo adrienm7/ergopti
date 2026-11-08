@@ -13,13 +13,13 @@ local Scope = require("tests.support.metrics_typing_scope")
 local safe_read = require("tests.support.file_system_write_stub").read_with_status
 
 local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'
-local VALID = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
+local VALID = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
 
 --- File content served for each read mode that reaches the payload.
 local CONTENT = {
 	success = VALID,
 	legacy_format = '{"manifest":"{}","app_icons":"{}","initial_data":"null","kc_layout":"{}"}',
-	truncated = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. (#PAYLOAD + 7) .. "\n" .. PAYLOAD,
+	truncated = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. (#PAYLOAD + 7) .. "\n" .. PAYLOAD,
 	old_version = "ERGOPTI_TYPING_METRICS_SNAPSHOT 1 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD,
 }
 

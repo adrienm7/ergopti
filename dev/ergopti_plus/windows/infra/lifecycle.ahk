@@ -519,9 +519,15 @@ _LifecycleStopUIAWorkerForSuspend() {
 }
 
 Ergopti_OnSuspendEnter() {
+	; Retire RAM-only note continuations before any suspend step can yield.
+	if IsSet(TakeNoteRevokePending)
+		TakeNoteRevokePending()
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
+	; A copy retry belongs to the pre-pause selection and must not survive a quick resume.
+	if IsSet(TapCopyCheckStop)
+		TapCopyCheckStop()
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
@@ -587,12 +593,21 @@ Ergopti_OnSuspendEnter() {
 			() => _SpaceHoldInputHook.Stop())
 	_LifecycleRunRequiredStep(Transition, "suppressive-input-hooks",
 		() => SIHO_StopAll())
+	; A registry layout's pending dead key is plain state, untouched by the
+	; hooks stopped above: pausing cancels it, so nothing composes after resume.
+	if IsSet(KeylayoutEmulation_ResetDeadKey)
+		_LifecycleRunRequiredStep(Transition, "keylayout-dead-key",
+			() => KeylayoutEmulation_ResetDeadKey())
 	if IsSet(_MagicKeyEditorInputHook) and IsObject(_MagicKeyEditorInputHook)
 		_LifecycleRunRequiredStep(Transition, "magic-key-editor-input-hook",
 			() => _MagicKeyEditorStopOwned(_MagicKeyEditorInputHook), true)
 	_LifecycleRunRequiredStep(Transition, "suspend-tooltip",
 		TooltipHide.Bind("Suspend", true))
 	_LifecycleRunRequiredStep(Transition, "llm-tooltip", LLM_Tooltip_Hide.Bind(true))
+	; The readout's refresh is skipped while paused, so the pause hides its icon;
+	; the first tick after resume shows it again.
+	if IsSet(WPMTrayReadout_HideForPause)
+		_LifecycleRunRequiredStep(Transition, "wpm-tray-readout", WPMTrayReadout_HideForPause, true)
 		; Pausing ends live mode: it is not resumed with the driver, the user
 		; turns it on again ("pause = tout éteint").
 	_LifecycleRunRequiredStep(Transition, "llm-live-mode",
@@ -1562,6 +1577,12 @@ Ergopti_OnShutdown(reason, code) {
 		catch as Err
 			try LoggerError("Lifecycle", "Shared browser warmup teardown failed: {1}.", Err.Message)
 		try OllamaWV_Close()
+		try {
+			if !WPMTrayReadout_Shutdown()
+				LoggerError("Lifecycle", "WPM notification-area readout teardown failed.")
+		} catch as Err {
+			try LoggerError("Lifecycle", "WPM notification-area readout teardown failed: {1}.", Err.Message)
+		}
 		try _Updater_AbortStagingOnExit()
 		if (TerminalHandoff is Map) {
 			TerminalFinished := false

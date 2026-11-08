@@ -4,7 +4,7 @@
 	"separator_positions": [4, 8, 11, 13, 17],
 	"visible_positions": {
 		"hs": [4, 8, 11, 13, 17],
-		"linux": [4, 8, 11, 17]
+		"linux": [4, 8, 11, 13, 17]
 	},
 	"linux_quit_boundary_position": 17,
 	"normalization_titles": ["First", "-", "Second", "-", "Third"],

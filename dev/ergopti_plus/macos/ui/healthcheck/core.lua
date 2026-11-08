@@ -432,6 +432,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.accessibility_copies",
+		contract = { "parse", "find" },
+		-- The Accessibility wait asks it for the other copies before any reset.
+		wired    = true,
+	},
+	{
 		id       = "adapters.screen_capture",
 		contract = { "permission_state", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
@@ -813,6 +819,7 @@ function M.local_state_steps(snapshot)
 		input       = {},
 		peripherals = {},
 		network     = {},
+		permissions = { items = {} },
 		developer   = { modules_ok = ok_list, modules_failed = failed },
 	}
 	local function fill(target, values)
@@ -833,6 +840,12 @@ function M.local_state_steps(snapshot)
 		end,
 		function() sections.network.wifi_signal = H.collect_network().wifi_signal end,
 	}
+	-- One permission per step: each TCC query is its own slice, so the run loop
+	-- turns between them; read live every time, never a remembered grant
+	local permission_ids = TableUtil.sorted_keys(M.config().schema.permissions[M.DRIVER] or {})
+	for index, id in ipairs(permission_ids) do
+		steps[#steps + 1] = function() sections.permissions.items[index] = H.read_permission(id) end
+	end
 	for _, spec in ipairs(ADAPTER_SPECS) do
 		steps[#steps + 1] = function() check_adapter(spec, ok_list, failed) end
 	end
@@ -925,7 +938,6 @@ function M.run(opts)
 	-- session, before the clock starts
 	local schema = M.config().schema
 	local started = hs.timer.absoluteTime()
-	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 
 	-- Each collector is isolated: a report exists to be read when things are
 	-- broken, so one collector raising costs its own section, never the window
@@ -958,7 +970,9 @@ function M.run(opts)
 		ai          = section("ai", H.collect_ai),
 		-- Filled by the local_state probe with the developer section's module check
 		network     = {},
-		permissions = section("permissions", function() return H.collect_permissions(permission_ids) end),
+		-- Filled by the local_state probe: the Accessibility and Screen
+		-- Recording queries are TCC calls, 9.2 ms of phase A's 10.2 ms
+		permissions = { items = {} },
 		peripherals = { items = {} },
 		issues      = section("issues", collect_issues),
 		developer   = section("developer", collect_developer),

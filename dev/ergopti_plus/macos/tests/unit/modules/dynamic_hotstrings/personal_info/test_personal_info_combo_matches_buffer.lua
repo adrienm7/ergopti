@@ -38,7 +38,7 @@ local function make_fake_keymap()
 		set_group_context         = function() end,
 		sort_mappings             = function() end,
 		add                       = function() end,
-		register_preview_provider = function() end,
+		register_preview_provider = function(fn) rec.preview = fn end,
 		register_interceptor      = function(fn) rec.interceptors[#rec.interceptors + 1] = fn end,
 		inject_dynamic            = function(deletes, text)
 			rec.injects[#rec.injects + 1] = { deletes = deletes, text = text }
@@ -62,13 +62,13 @@ end
 
 --- Boots personal_info alone against a fake keymap.
 --- @return table interceptor, table rec
-local function boot()
+local function boot(source)
 	package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 	local PI  = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
 	local rec = make_fake_keymap()
 	local path = os.tmpname()
 	local fh = assert(io.open(path, "w"))
-	fh:write('[info]\nemail_address = "a@b.fr"\n\n[letters]\ne = "email_address"\n')
+	fh:write(source or '[info]\nemail_address = "a@b.fr"\n\n[letters]\ne = "email_address"\n')
 	fh:close()
 	PI.start("", rec.km, path, function(_, publish) return publish() end)
 	PI.enable()
@@ -134,4 +134,58 @@ helpers.describe("personal_info: a pending @-combo the buffer no longer shows mu
 		helpers.assert_eq(verdict, nil)
 	end)
 
+end)
+
+helpers.describe("personal_info Unicode aliases", function()
+	local source = '[info]\ncity = "Lyon"\nfirst_name = "Marie"\n[letters]\n'
+		.. '"é" = "city"\n"ü" = "first_name"\n"ω" = "city"\n"𐐨" = "first_name"\n'
+
+	helpers.it("personal-unicode-alias: collects cased scalars and erases characters rather than bytes", function()
+		local interceptor, rec = boot(source)
+		local buffer = ""
+		for _, character in ipairs({ "@", "É", "ü", "Ω", "𐐀" }) do
+			interceptor(key(character), buffer)
+			buffer = buffer .. character
+		end
+		helpers.assert_not_nil(rec.preview(buffer), "the collected Unicode combo has a preview")
+		helpers.assert_eq(interceptor(key(TRIGGER), buffer), "consume")
+		helpers.assert_eq(#rec.injects, 1)
+		helpers.assert_eq(rec.injects[1].deletes, 5, "the sentinel and four scalars")
+		helpers.assert_eq(rec.injects[1].text, "LyonMarieLyonMarie")
+	end)
+
+	helpers.it("personal-unicode-alias: Backspace removes a whole supplementary scalar", function()
+		local interceptor, rec = boot(source)
+		interceptor(key("@"), "")
+		interceptor(key("é"), "@")
+		interceptor(key("𐐀"), "@é")
+		local backspace = key("")
+		backspace.getKeyCode = function() return 51 end
+		interceptor(backspace, "@é𐐀")
+		helpers.assert_not_nil(rec.preview("@é"))
+		helpers.assert_eq(interceptor(key(TRIGGER), "@é"), "consume")
+		helpers.assert_eq(rec.injects[1].deletes, 2)
+		helpers.assert_eq(rec.injects[1].text, "Lyon")
+	end)
+
+	helpers.it("personal-unicode-alias: refuses conflicting case twins without erasing the tag", function()
+		local interceptor, rec = boot(source .. '"É" = "first_name"\n')
+		interceptor(key("@"), "")
+		interceptor(key("é"), "@")
+		helpers.assert_nil(rec.preview("@é"))
+		helpers.assert_nil(interceptor(key(TRIGGER), "@é"))
+		helpers.assert_eq(#rec.injects, 0)
+	end)
+
+	for _, character in ipairs({ "1", "_", "😀", "\u{0301}", "éü" }) do
+		helpers.it("personal-unicode-alias: a non-letter or grouped payload ends collection " .. character, function()
+			local interceptor, rec = boot(source)
+			interceptor(key("@"), "")
+			interceptor(key("é"), "@")
+			interceptor(key(character), "@é")
+			helpers.assert_nil(rec.preview("@é" .. character))
+			helpers.assert_nil(interceptor(key(TRIGGER), "@é" .. character))
+			helpers.assert_eq(#rec.injects, 0)
+		end)
+	end
 end)

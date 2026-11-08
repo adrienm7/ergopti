@@ -212,7 +212,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		}
 		; Yield to a longer registered trigger that covers the same suffix.
 		; AHK native dispatches the most-recently-registered hotstring when two
-		; triggers overlap (e.g. "t★" fires before "@dt★" because the repeat
+		; triggers overlap (e.g. "t★" fires before "dt★" because the repeat
 		; section is registered last). HSE_LastMatch holds the longest match
 		; found by HSE_FeedChar on the same keystroke — if it is longer than our
 		; abbreviation, a better callback will fire (or already fired): abort.
@@ -338,7 +338,7 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds, NowTick 
 						return True
 				}
 				CharacterSentTime := LastSentCharacterKeyTime[PreviousCharacter]
-				if (TickElapsed(CharacterSentTime, Now) > ActivationDurationMs) {
+				if (TickElapsed64(CharacterSentTime, Now) > ActivationDurationMs) {
 						return True
 				}
 		}

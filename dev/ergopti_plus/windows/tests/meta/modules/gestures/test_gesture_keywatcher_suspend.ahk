@@ -35,15 +35,17 @@ _GKWS_SuspendGuardInOnKeyDown() {
 	Body := _DriverFuncBody("GestureOnKeyDown")
 	Assert(Body != "", "GestureOnKeyDown must exist in modules/gestures.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
-		"GestureOnKeyDown must check A_IsSuspended — InputHooks bypass Suspend and would otherwise suppress/re-inject keystrokes at Level 3 while the driver is paused (clickhold-inputhook-drops-keys)")
+		"GestureOnKeyDown must check A_IsSuspended — InputHooks bypass Suspend and must settle outstanding click-hold recovery while the driver is paused (clickhold-inputhook-drops-keys)")
 }
 Test("gestures: GestureOnKeyDown has A_IsSuspended guard (clickhold-inputhook-drops-keys)", _GKWS_SuspendGuardInOnKeyDown)
 
 _GKWS_InputHookIsNonConsuming() {
 	Body := _DriverFuncBody("GestureStartKeyboardWatcher")
 	Assert(Body != "", "GestureStartKeyboardWatcher must exist in modules/gestures.ahk")
-	Assert(InStr(Body, 'InputHook("V L3")') > 0 || InStr(Body, "InputHook('V L3')") > 0, "GestureStartKeyboardWatcher must use 'V' option to make the hook non-consuming (clickhold-inputhook-drops-keys)")
+	Assert(InStr(Body, 'InputHook("V L0")') > 0 || InStr(Body, "InputHook('V L0')") > 0, "GestureStartKeyboardWatcher must use 'V' option to make the hook non-consuming (clickhold-inputhook-drops-keys)")
 
+	Assert(InStr(Body, 'Hook.KeyOpt("{All}", "NI")') > 0,
+		"The observer must notify without retaining the user's text while release debt is pending.")
 	BodyOnKeyDown := _DriverFuncBody("GestureOnKeyDown")
 	Assert(InStr(BodyOnKeyDown, "SendLevel") == 0, "GestureOnKeyDown must not re-send keys using SendLevel, as the hook is now non-consuming")
 }

@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local fixture = require("tests.support.text_owner_fixture")
 
 --- Executes Main's actual initialization call while isolating configuration I/O.
@@ -42,17 +43,20 @@ local function with_action(session, action, change, body)
 		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
 		"adapters.event_loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
-		"adapters.window_info",
+		"adapters.window_info", "logger.shim",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector
 	local ok, detail = pcall(function()
 		fixture.with(function(guard, state, _, _, watch)
-			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0 }
+			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0, logs = {} }
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) world.logs[#world.logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
 			local pending, changed = nil, false
 			local function retire(point)
-				if changed or change ~= point then return end
+				if changed or (change ~= point and not (change == "snapshot-copy" and point == "snapshot")) then return end
 				changed = true
 				if change == "privacy" then state.role = 40 else state.path = "/field/successor" end
 				if point == "key-down" then watch.barrier() end
@@ -60,9 +64,14 @@ local function with_action(session, action, change, body)
 			package.loaded["adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
-				exec_checked = function()
+				exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 					world.reads = world.reads + 1
-					if world.reads == 1 then retire("snapshot") end
+					local snapshot = world.clipboard
+					if world.reads == 1 then
+						retire("snapshot")
+						if change == "snapshot-copy" then world.clipboard = "new user copy"; return true, snapshot end
+					end
 					if action == "paste_plain" and world.reads == 1 then
 						retire("privacy")
 						if change == "read-refused" then return false, "", "controlled clipboard read refusal" end
@@ -140,7 +149,11 @@ local function with_action(session, action, change, body)
 			if action == "wrap_selection" then helpers.assert_true(Gestures.set_action_parameter("tap_3", action, "(")) end
 			helpers.assert_true(Gestures.execute_action(action, "tap_3"))
 			world.original_current = original.current()
-			helpers.assert_eq(world.clipboard, "saved clipboard", "retirement must still restore the saved clipboard")
+			-- During the copy wait, a different clipboard value has not yet been
+			-- observed as ours. Preserve it: it may be a concurrent user copy.
+			local expected_clipboard = change == "copy-wait" and "source selection"
+				or change == "snapshot-copy" and "new user copy" or "saved clipboard"
+			helpers.assert_eq(world.clipboard, expected_clipboard, "retirement must respect clipboard ownership")
 			helpers.assert_eq(next(world.held), nil, "retirement must still release every owned key")
 			body(world)
 		end)
@@ -155,6 +168,16 @@ local function with_action(session, action, change, body)
 end
 
 helpers.describe("explicit selection actions retain the originating destination", function()
+	for _, session in ipairs({ "x11", "wayland" }) do
+		for _, action in ipairs({ "selection_uppercase", "wrap_selection" }) do
+			helpers.it("preserves a concurrent copy after destination retirement: " .. action .. " " .. session, function()
+				with_action(session, action, "snapshot-copy", function(world)
+					helpers.assert_eq(world.writes, {}, "no clipboard write is owed before the sentinel")
+					helpers.assert_eq(world.pasted, {})
+				end)
+			end)
+		end
+	end
 	for _, session in ipairs({ "x11", "wayland" }) do
 		for _, action in ipairs({ "selection_uppercase", "wrap_selection" }) do
 			helpers.it("selection-action-owner commits stable " .. session .. " " .. action, function()
@@ -183,6 +206,13 @@ end)
 
 helpers.describe("plain paste retains its destination before reading the clipboard", function()
 	for _, session in ipairs({ "x11", "wayland" }) do
+		helpers.it("plain paste keeps clipboard content out of trace logs " .. session, function()
+			with_action(session, "paste_plain", "stable", function(world)
+				helpers.assert_true(world.action_result)
+				helpers.assert_true(not table.concat(world.logs, "\n"):find("saved clipboard", 1, true),
+					"clipboard contents must not enter trace logs")
+			end)
+		end)
 		helpers.it("plain-paste-owner commits stable " .. session, function()
 			with_action(session, "paste_plain", "stable", function(world)
 				helpers.assert_true(world.action_result)
@@ -370,7 +400,8 @@ local function observe_configured_insertion(session, action, route, change)
 			package.loaded["adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
-				exec_checked = function()
+				exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 					world.reads = world.reads + 1
 					retire("snapshot")
 					return true, world.clipboard

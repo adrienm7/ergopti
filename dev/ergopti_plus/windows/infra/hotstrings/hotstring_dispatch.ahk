@@ -45,6 +45,9 @@ global _HSE_TerminalOwner := 0
 global _HSE_TerminalOwnerSerial := 0
 global _HSE_TerminalReplayPending := 0
 global _HSE_TerminalReplaying := false
+; The literal expansion an immediate Backspace may still undo (HSE_UndoExpansion),
+; "" when none: set by the atomic fire, taken by the very next key.
+global HSE_Undoable := ""
 
 /** Known terminal executables need no cross-process caption to select pacing. */
 _HSE_OutputHostNeedsTitle(Exe) {
@@ -184,6 +187,7 @@ _HSE_TerminalOwnerIsCurrent(Owner) {
 
 _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+	global HSE_PrivateAncestry
 	global _PrefixPrivateResidue
 	if HasMethod(Owner.Get("CommitFn", 0), "Call")
 		return Owner["CommitFn"].Call(Owner, TrailingText)
@@ -208,11 +212,13 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	}
 	BufferCritical := Critical("On")
 	PreviousBuffer := HSE_Buffer
+	PreviousAncestry := HSE_PrivateAncestry
 	PreviousBoundary := HSE_StartIsWordBoundary
 	try {
 		try {
 			if ClearAll {
 				HSE_Buffer := ""
+				HSE_PrivateAncestry := ""
 				HSE_StartIsWordBoundary := false
 			} else {
 				CurrentLength := StrLen(HSE_Buffer)
@@ -220,12 +226,14 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 					? SubStr(HSE_Buffer, 1, CurrentLength - DeleteCount) : ""
 				HSE_Buffer .= InsertedText
 				_HSE_TrimBufferToCapacity()
+				HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 				if Owner.Get("OutputIsFinal", false)
 					_HSE_ForgetFinalOutput(Effect)
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
 			HSE_Buffer := PreviousBuffer
+			HSE_PrivateAncestry := PreviousAncestry
 			HSE_StartIsWordBoundary := PreviousBoundary
 			throw
 		}
@@ -366,7 +374,7 @@ _HSE_DispatchTerminalRawCallback(Spec, EndChar, OutputHost, SchedulerFn := 0,
 		"Trigger", Spec.HasOwnProp("Trigger") ? Spec.Trigger : "",
 		"ReplacementForLog", Prepared.Ins,
 		"HType", IsSet(_ResolveFireHType) ? _ResolveFireHType(Spec) : "star",
-		"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
+		"Category", _ResolveFireCategory(Spec),
 		"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
 		"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 		"SyntheticOwner", SyntheticOwner,
@@ -646,7 +654,7 @@ _HSE_NewNotepadOwner(Spec, Replacement, EndCharPart, EraseUnits, Backspaces,
 		"LifecycleGeneration", DispatchState["LifecycleGeneration"],
 		"Trigger", Spec.Trigger, "ReplacementForLog", Replacement,
 		"HType", IsSet(_ResolveFireHType) ? _ResolveFireHType(Spec) : "star",
-		"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
+		"Category", _ResolveFireCategory(Spec),
 		"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
 		"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 		"SyntheticOwner", SyntheticOwner)
@@ -677,6 +685,7 @@ _HSE_RetainNotepadPrefixChar(Owner, Char) {
 /** TextSender calls this after its native output verdict, before completion. */
 _HSE_CommitNotepadOwner(Owner) {
 	global _HSE_TerminalOwner, HSE_Buffer, HSE_StartIsWordBoundary
+	global HSE_PrivateAncestry
 	global HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _PrefixPrivateResidue
 	global _PrefixContentGeneration
@@ -706,16 +715,19 @@ _HSE_CommitNotepadOwner(Owner) {
 		KnownBoundaryAfter: InsertedText != ""
 			&& _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet()) }
 	PreviousBuffer := HSE_Buffer
+	PreviousAncestry := HSE_PrivateAncestry
 	PreviousBoundary := HSE_StartIsWordBoundary
 	try {
 		HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - Owner["EraseUnits"]) . InsertedText
 		_HSE_TrimBufferToCapacity()
+		HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 		if Owner.Get("OutputIsFinal", false)
 			_HSE_ForgetFinalOutput(Effect)
 		_HSE_MirrorCanonicalEffectToLlm(Effect)
 		UpdateLastSentCharacter(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)))
 	} catch {
 		HSE_Buffer := PreviousBuffer
+		HSE_PrivateAncestry := PreviousAncestry
 		HSE_StartIsWordBoundary := PreviousBoundary
 		throw
 	}
@@ -1120,22 +1132,22 @@ HSE_ComplexDelayMultiplier(ExpanderComplex, ReferenceComplex, GapMs, Widenable) 
 		return 1
 }
 
-; Resolve every dispatch gate into one immutable decision shared by the preview
-; and the fire path. Keeping time, casing and callable resolution below in one
-; owner prevents a tooltip from advertising a matcher winner that dispatch will
-; subsequently refuse — or from showing one dynamic value and resolving another
-; after the user presses the completion key.
-; @param FrozenResolvedBase Optional value captured by a decision that is still
-;   visibly presented. When supplied, the callable is not invoked a second time.
-; @return Canonical decision object, or "" when dispatch must decline.
-_HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
-		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
+; The time-activation gate of one matched Spec, raw callbacks included: whether
+; its reference character was typed within the Spec's delay at NowTick. One
+; owner for the dispatcher's decision and the keystroke preflight, so an expired
+; winner is known before dispatch and the magic-key fallbacks can still answer.
+; @param Spec {Object} The matched Spec; no delay means no gate.
+; @param BufferAfterCompletion {String} The engine buffer with the completing char.
+; @param EndChar {String} The end character, "" on the auto path.
+; @param TypoNbspStripped {Boolean} Whether a no-break space preceded it.
+; @param GateOriginTick {Integer} Output: the reference character's tick, 0 without a gate.
+; @param GateDurationMs {Integer} Output: the widened delay, 0 without a gate.
+; @param RemainingMs {Integer} Output: what is left of it at NowTick.
+; @param NowTick {Integer} The instant measured; now when unset.
+; @returns {Boolean} False when the gate refuses (expired or unprovable).
+_HSE_EvaluateTimeGate(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped,
+		&GateOriginTick, &GateDurationMs, &RemainingMs, NowTick := unset) {
 		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
-		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
-				return ""
-		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
-				return ""
-
 		GateOriginTick := 0
 		GateDurationMs := 0
 		RemainingMs := 0
@@ -1143,10 +1155,10 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				and Spec.TimeActivationSeconds > 0 {
 				if !TickTryDurationMsFromSeconds(
 						Spec.TimeActivationSeconds, &GateDurationMs)
-						return ""
+						return false
 				if !Spec.HasOwnProp("PrevCharKey") or !IsSet(LastSentCharacterKeyTime)
 						or !(LastSentCharacterKeyTime is Map)
-						return ""
+						return false
 				PrevKey := Spec.PrevCharKey
 				if (Spec.HasOwnProp("CaseConform") and Spec.CaseConform) {
 						CompletionStripLen := StrLen(EndChar) + (TypoNbspStripped ? 1 : 0)
@@ -1160,9 +1172,9 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 								PrevKey := TypedPrev
 				}
 				if !LastSentCharacterKeyTime.Has(PrevKey)
-						return ""
+						return false
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
-				ElapsedMs := TickElapsed(GateOriginTick, NowTick?)
+				ElapsedMs := TickElapsed64(GateOriginTick, NowTick?)
 				; A complex keystroke widens the allowed delay, never the measured gap.
 				Widenable := !(Spec.HasOwnProp("Category") and Spec.Category = "autocorrection")
 				GateDurationMs := Min(0xFFFFFFFF, GateDurationMs * HSE_ComplexDelayMultiplier(
@@ -1173,9 +1185,41 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so
 				; it never paints a promise with no usable interaction window.
 				if (ElapsedMs > GateDurationMs)
-						return ""
+						return false
 				RemainingMs := Max(0, GateDurationMs - ElapsedMs)
 		}
+		return true
+}
+
+; Whether the dispatcher would refuse Spec on its time gate alone. The keystroke
+; path asks before dispatch, so an expired registered winner falls through to the
+; magic-key fallbacks, as on macOS and Linux (decision of 2026-11-06).
+; @returns {Boolean}
+HSE_TimeGateExpired(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped := false, NowTick := unset) {
+		if !IsObject(Spec)
+				return false
+		return !_HSE_EvaluateTimeGate(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped,
+				&OriginTick, &DurationMs, &RemainingMs, NowTick?)
+}
+
+; Resolve every dispatch gate into one immutable decision shared by the preview
+; and the fire path. Keeping time, casing and callable resolution below in one
+; owner prevents a tooltip from advertising a matcher winner that dispatch will
+; subsequently refuse — or from showing one dynamic value and resolving another
+; after the user presses the completion key.
+; @param FrozenResolvedBase Optional value captured by a decision that is still
+;   visibly presented. When supplied, the callable is not invoked a second time.
+; @return Canonical decision object, or "" when dispatch must decline.
+_HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
+		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
+		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
+				return ""
+		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
+				return ""
+
+		if !_HSE_EvaluateTimeGate(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped,
+				&GateOriginTick, &GateDurationMs, &RemainingMs, NowTick?)
+				return ""
 
 		if IsSet(FrozenResolvedBase) {
 				ResolvedBase := FrozenResolvedBase
@@ -1236,7 +1280,7 @@ _HSE_ExpansionPath(EndChar) {
 ; or forced by the caller.
 _HSE_EndCharConsumed(EndChar, ForceConsumeEndChar) {
 		global HSE_CONSUMED_DELIMITERS
-		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar, true))
 }
 
 ; The UTF-16 units an expansion strips from the engine buffer: the plan's erase
@@ -1293,8 +1337,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		EndCharOnScreen := true) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
 		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
-		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
+		global _PrefixInputContextGeneration, _PrefixDeferredGeneration, HSE_Undoable
 		CommittedEffect := 0
+		; A new fire attempt ends the previous expansion's undo, whatever it does.
+		HSE_Undoable := ""
 		if (Spec == "") {
 				return false
 		}
@@ -1486,7 +1532,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"Trigger", Spec.Trigger,
 									"ReplacementForLog", Spec.Replacement,
 									"HType", IsSet(_ResolveFireHType) ? _ResolveFireHType(Spec) : (EndChar != "" ? "endchar" : "star"),
-									"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
+									"Category", _ResolveFireCategory(Spec),
 									"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
 									"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 									"SyntheticOwner", SyntheticOwner,
@@ -1602,10 +1648,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					; a physical OnChar cannot land between the two buffers.
 					_BufferCrit := Critical("On")
 					try {
+							BufferBeforeFire := HSE_Buffer
 							ExpansionEffect := HSE_ApplyExpansion(
 									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
+							_HSE_RememberUndo(Spec, BufferBeforeFire, ExpansionEffect, CascadeUnits, OutputHost)
 					} finally {
 							Critical(_BufferCrit)
 					}
@@ -1645,5 +1693,107 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						KL_ClearSynthetic(SyntheticOwner)
 		}
 		; Reached only when the replacement was actually emitted.
+		return true
+}
+
+; Keeps an atomic literal expansion for an immediate Backspace, as Linux and macOS
+; do (decision of 2026-11-06): that Backspace means « not what I wanted » and
+; brings the trigger back. Only literal text is kept: a Send-key payload, a
+; dynamic or user-code replacement does not say what it typed, and a raw callback
+; never reaches this path. The Notepad and terminal owners emit later, outside
+; this keystroke, and keep no record. The typed trigger is read from the buffer
+; the fire erased, so a case-conformed or cascaded trigger comes back as typed.
+; @param Spec {Object} The matched Spec.
+; @param BufferBefore {String} HSE_Buffer before the expansion was applied.
+; @param Effect {Object} The committed canonical effect of HSE_ApplyExpansion.
+; @param CascadeUnits {Integer} Typed units a cascade erased beyond the trigger.
+; @param OutputHost {Map} The receipt of the window the burst went to.
+_HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
+		global HSE_Undoable, HSE_Buffer, _PrefixInputContextGeneration, _PrefixFocusedControlToken
+		HSE_Undoable := ""
+		if Effect.ClearAll or Effect.InsertedText == "" or HasMethod(Spec.Replacement)
+				or Spec.HasOwnProp("UserCodeGeneration")
+				or !IsSet(_PrefixInputContextGeneration) or !IsSet(_PrefixFocusedControlToken)
+				return
+		TriggerUnits := Spec.Length + CascadeUnits
+		Start := StrLen(BufferBefore) - Effect.DeleteFromEnd + 1
+		if (Start < 1 or TriggerUnits < 1 or TriggerUnits > Effect.DeleteFromEnd)
+				return
+		HSE_Undoable := {
+				Trigger: SubStr(BufferBefore, Start, TriggerUnits),
+				Typed: Effect.InsertedText,
+				IsPrivate: Effect.IsPrivate,
+				BufferAfter: HSE_Buffer,
+				InputGeneration: _PrefixInputContextGeneration,
+				FocusToken: _PrefixFocusedControlToken,
+				Hwnd: OutputHost["Hwnd"]
+		}
+}
+
+; Puts the trigger back for a Backspace pressed right after an expansion. The
+; physical Backspace has already reached the application and removed the last
+; character the expansion typed, so the burst erases what is left of it and types
+; the trigger, outside the buffers so it cannot fire again at once (Linux's undo).
+; Any edit, click, focus change or other window in between voids the record.
+; @param Undo {Object} The record _HSE_RememberUndo kept, already taken.
+; @param FocusToken {Integer} The focused control, probed live when unset.
+; @returns {Boolean} True when this function owns the Backspace's buffer effect:
+;   the trigger went out, or a failed send left the context reset.
+HSE_UndoExpansion(Undo, FocusToken := unset) {
+		global HSE_Buffer, HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook
+		global _PrefixInputContextGeneration, _PrefixFocusedControlToken
+		if !IsObject(Undo) or A_IsSuspended or !IsSet(_PrefixInputContextGeneration)
+				return false
+		if !_PrefixEnsureInputContext(FocusToken?)
+				return false
+		if (HSE_Buffer !== Undo.BufferAfter or _PrefixInputContextGeneration != Undo.InputGeneration
+				or _PrefixFocusedControlToken != Undo.FocusToken)
+				return false
+		Host := OutputHostResolve(_HSE_OutputHostNeedsTitle)
+		if !Host["Valid"] or Host["Hwnd"] != Undo.Hwnd or OutputHostTakesTextByPaste(Host)
+				or _HSE_IsTerminalInputHost(Host["Exe"], Host["Title"])
+				return false
+		Remaining := _TextCodepointLength(Undo.Typed)
+		if (Remaining < 1)
+				return false
+		Burst := (Remaining > 1 ? "{BackSpace " . (Remaining - 1) . "}" : "") . "{Text}" . Undo.Trigger
+		PrefixWatcherSuppress(true)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("hotstring", Undo.IsPrivate)
+		Sent := false
+		SendError := ""
+		try {
+				AtCritical := Critical("On")
+				try {
+						if _SendHook {
+								Hook := _SendHook
+								Sent := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
+						} else {
+								_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
+								Sent := true
+						}
+				} finally Critical(AtCritical)
+		} catch as Err {
+				SendError := Type(Err)
+		} finally {
+				SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+		}
+		; The restored trigger is not in the buffers and the caret follows it: the
+		; next key starts no known word, so a word-start rule cannot fire inside it.
+		; A failed or partial send leaves the line unknown, which the same reset says.
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+		_LSCResetFrom([])
+		if IsSet(LLM_Bridge_OnUnknownEdit)
+				try LLM_Bridge_OnUnknownEdit("Backspace undo")
+		if !Sent {
+				LoggerError("HSE", "Undo: restoring the trigger failed ({1}); the context is reset.",
+						SendError != "" ? SendError : "send refused")
+				return true
+		}
+		if Undo.IsPrivate
+				LoggerInfo("HSE", "Undo: restored a private trigger (content withheld).")
+		else
+				LoggerInfo("HSE", "Undo: restored the trigger ({1} char(s)).", _TextCodepointLength(Undo.Trigger))
 		return true
 }

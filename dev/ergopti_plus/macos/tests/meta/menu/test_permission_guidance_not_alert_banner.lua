@@ -55,12 +55,18 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 	helpers.it("the boot's Accessibility wait leaves the guidance to macOS's own prompt", function()
 		-- A second dialog asking to find the app with Cmd+Shift+G and + competed
 		-- with the macOS prompt, whose button adds the right entry (field report 2026-11-05).
+		-- The one dialog left names the other copies that can hold the switch.
 		local unit, err = helpers.read_driver_unit("AccessibilityWait.start({")
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local body = table.concat(code_lines(unit), "\n")
 		helpers.assert_true(body:find("guide_accessibility", 1, true) == nil,
-			"the boot must not open Ergopti's own Accessibility dialog")
+			"the boot must not open Ergopti's own Accessibility steps")
 		helpers.assert_true(body:find("show_guidance", 1, true) == nil, "the wait takes no guidance dialog")
+		helpers.assert_true(body:find("name_other_copies(AccessibilityPermission, paths)", 1, true) ~= nil,
+			"the copies that can hold the switch are named")
+		local dialog = helpers.read_module_source("ui.permission_dialog")
+		helpers.assert_true(dialog ~= nil and dialog:find("function M.guide_accessibility", 1, true) == nil,
+			"the retired Accessibility steps dialog must stay retired")
 	end)
 
 	helpers.it("reopening ErgoptiPlus during the wait asks for the prompt again", function()

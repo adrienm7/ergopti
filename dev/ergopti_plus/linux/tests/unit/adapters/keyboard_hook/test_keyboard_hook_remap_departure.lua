@@ -14,6 +14,112 @@ local function select_sources(s, ids)
 end
 
 helpers.describe("keyboard source departure retires remapper input", function()
+	helpers.it("(remap-source-departure) retires capture when a departed source close is unacknowledged", function()
+		local options = { position_bits = true, on_capture_reacquired = function() return true end }
+		Fixture.with_session(options, function(s)
+			options.fail_reader_close = true
+			select_sources(s, { "b" })
+			helpers.assert_eq(s.hook.isRunning(), false, "a failed source retirement cannot publish a new cohort")
+			helpers.assert_eq(s.hook.capture_input_owner(), nil)
+			options.fail_reader_close = false
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) releases a remapped hold before a source close is refused", function()
+		local options = { position_bits = true, on_capture_reacquired = function() return true end }
+		Fixture.with_session(options, function(s)
+			s.edge("a", 58, 1, 0)
+			helpers.assert_eq(s.rows, { { 29, 1 } })
+			options.fail_reader_close = true
+			select_sources(s, { "b" })
+			helpers.assert_eq(s.rows, { { 29, 1 }, { 29, 0 } })
+			helpers.assert_eq(s.hook.isRunning(), false)
+			options.fail_reader_close = false
+		end)
+	end)
+	helpers.it("(remap-source-departure) clears a blocker when its keyboard disappears", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2); s.edge("a", 58, 0, 3)
+			select_sources(s, { "a" })
+			s.edge("a", 56, 1, 10)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "the departed source must not keep blocking LAlt")
+			s.edge("a", 56, 0, 11)
+			helpers.assert_true(s.hook.isRunning())
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) does not revive a blocker when a new keyboard reuses its path", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("b", 58, 1, 1)
+			select_sources(s, { "a" })
+			s.held[s.paths.b] = {}
+			select_sources(s, { "a", "b" })
+			s.edge("b", 56, 1, 10)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "a fresh source has no inherited physical blocker")
+			s.edge("b", 56, 0, 11)
+			helpers.assert_true(s.hook.isRunning())
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) recognises a fresh blocker on a reused device path", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("b", 58, 1, 1)
+			select_sources(s, { "a" })
+			s.held[s.paths.b] = {}
+			select_sources(s, { "a", "b" })
+			s.edge("b", 58, 1, 2)
+			local before = #s.rows
+			s.edge("a", 56, 1, 3); s.edge("a", 56, 0, 4)
+			helpers.assert_eq(#s.rows, before, "the successor's own CapsLock blocks LAlt")
+			s.edge("b", 58, 0, 5)
+			s.edge("a", 56, 1, 6)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 })
+			s.edge("a", 56, 0, 7)
+			helpers.assert_true(s.hook.isRunning())
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) retains another keyboard's blocker after queue recovery", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2)
+			s.event("a", 0, 3, 0, 3); s.held[s.paths.a][58] = nil; s.event("a", 0, 0, 0, 4)
+			local before = #s.rows
+			s.edge("b", 56, 1, 5); s.edge("b", 56, 0, 6)
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(#s.rows, before, "the retained physical hold must still block LAlt")
+			s.edge("b", 58, 0, 7)
+			s.edge("b", 56, 1, 8)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "the blocker ends at its real release")
+			s.edge("b", 56, 0, 9)
+		end)
+	end)
+	helpers.it("(remap-source-departure) retires capture when a keyboard arrives during queue loss", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end }, function(s)
+			select_sources(s, { "a" })
+			s.event("a", 0, 3, 0, 100)
+			select_sources(s, { "a", "b" })
+			helpers.assert_eq(s.hook.isRunning(), false, "a revoked source cannot authorize a new cohort")
+			local before = #s.rows
+			s.edge("a", 30, 1, 110); s.edge("a", 30, 0, 120)
+			helpers.assert_eq(#s.rows, before, "events from the lost frame cannot reach retired output")
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) stops if capture refuses a departed modifier release", function()
+		local options = { position_bits = true, on_capture_reacquired = function() return true end }
+		Fixture.with_session(options, function(s)
+			s.edge("a", 42, 1, 0)
+			options.capture_error = function(code, value) return code == 42 and value == 0 end
+			select_sources(s, { "b" })
+			helpers.assert_eq(s.hook.isRunning(), false, "a stale XKB modifier cannot remain active")
+			helpers.assert_eq(s.reader.is_open("keyboard:" .. s.paths.b), false)
+		end)
+	end)
+
 	helpers.it("(remap-source-departure) accepts the first new hold on the surviving keyboard", function()
 		Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
 			s.edge("a", 58, 1, 0)
@@ -28,6 +134,42 @@ helpers.describe("keyboard source departure retires remapper input", function()
 			helpers.assert_eq(s.rows, { { 29, 1 }, { 29, 0 }, { 29, 1 }, { 29, 0 } })
 			helpers.assert_eq(s.action, nil, "neither removal nor a long hold invents a tap")
 			helpers.assert_eq(s.hook.held_modifiers(), {})
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) retains an orphan still held after queue loss", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 },
+				left_shift = { tap_action = "copy", hold_modifier = "shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 0); s.edge("b", 42, 1, 20)
+			select_sources(s, { "b" })
+			assert(s.hook.set_remapper(nil))
+			local retired = #s.rows
+			s.event("b", 0, 3, 0, 100); s.event("b", 0, 0, 0, 110)
+			s.edge("b", 42, 2, 200); s.edge("b", 42, 0, 300)
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(#s.rows, retired, "a still-held orphan cannot replay after reconciliation")
+			s.edge("b", 42, 1, 400); s.edge("b", 42, 0, 500)
+			helpers.assert_eq(#s.rows, retired + 2, "its next fresh press is forwarded")
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) forgets an orphan released during queue loss", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 },
+				left_shift = { tap_action = "copy", hold_modifier = "shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 0); s.edge("b", 42, 1, 20)
+			select_sources(s, { "b" })
+			local retired = #s.rows
+			s.event("b", 0, 3, 0, 100)
+			s.held[s.paths.b][42] = nil -- the release was lost with the evdev queue
+			s.event("b", 0, 0, 0, 110)
+			helpers.assert_true(s.hook.isRunning())
+			s.edge("b", 42, 1, 500)
+			helpers.assert_eq(#s.rows, retired + 1, "the next physical hold must not inherit the old orphan")
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 })
+			s.edge("b", 42, 0, 1000)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 0 })
 		end)
 	end)
 

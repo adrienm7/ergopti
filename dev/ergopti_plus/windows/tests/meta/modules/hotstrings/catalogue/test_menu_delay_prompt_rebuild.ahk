@@ -48,3 +48,69 @@ _MDPR_BothDelayPromptsRebuild() {
 }
 Test("menu: hotstring delay prompts rebuild only after strict durable success",
 	_MDPR_BothDelayPromptsRebuild)
+
+
+_MDPN_Source() {
+ global _DriverDir
+ Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
+ NumberOwner := _DriverProductionFileForSymbol("NumberTryParseInputInteger", _DriverDir)
+ AssertTrue(NumberOwner != "", "The canonical integer parser must have its genuine owner")
+ Source .= "#Include " . NumberOwner . "`n"
+ for Symbol in ["_HS_PromptDefaultDelay", "_HS_PromptCategoryDelay", "_HS_PromptPersonalFileField"] {
+  Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+  AssertTrue(Owner != "", "Every prompt must resolve its actual production owner")
+  Text := FSReadStrict(Owner)
+  Body := _DriverExtractFunctionBody(&Text, Symbol)
+  AssertTrue(Body != "", "Every production prompt body must be copied whole and unmodified")
+  Source .= Body . "`n"
+ }
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\menu_numeric_prompt_domain_body.ahk`n"
+}
+_MDPN_Done(State, Code, Output, ErrorText) {
+ State.Calls += 1, State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
+}
+_MDPN_Case(Mode) {
+ global _DriverDir
+ static Debt := 0
+ AssertFalse(IsObject(Debt), "A retained child prevents another timer case")
+ Root := A_Temp . "\ergopti_menu_numeric_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+ FSCreateDirectoryExclusiveStrict(Root)
+ State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+ PreviousCritical := Critical("Off")
+ try {
+  Script := Root . "\subject.ahk"
+  AssertEqual(1, FSWriteCreateDurable(Script, Chr(0xFEFF) . _MDPN_Source()))
+  _TestPrint("# menu-numeric-prompt-domain source=" . CryptoSha256Bytes(FSReadBytesStrict(Script)))
+  Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Script, Mode, Root, _DriverDir . "\..\_shared"], _MDPN_Done.Bind(State))
+  AssertTrue(Handle.start(), "The exact private timer child must really start")
+  Started := A_TickCount
+  while !State.Calls && TickElapsed64(Started) < 15000 {
+   _SR_TreePoll()
+   Sleep(10)
+  }
+  _TestPrint("# menu-numeric-prompt-domain mode=" . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+  AssertEqual(1, State.Calls)
+  AssertEqual("", State.ErrorText)
+  AssertEqual(0, State.Code, State.Output)
+  AssertContains(State.Output, "PASS menu-numeric-prompt-domain " . Mode)
+ } catch Any as Failure
+  Primary := Failure
+ try {
+  Receipt := IsObject(Handle) ? Handle.terminate() : 1
+  Retired := Receipt is Integer && Receipt == 1
+ } catch Any as Failure {
+  if !IsObject(Primary)
+   Primary := Failure
+ }
+ try {
+  if !Retired
+   Debt := {Root: Root, Handle: Handle}
+  else if !IsObject(Primary)
+   DirDelete(Root, true)
+ } finally Critical(PreviousCritical)
+ if IsObject(Primary)
+  throw Primary
+ AssertTrue(Retired, "The precise native process tree must retire before private cleanup")
+}
+for _MDPN_Mode in ["base", "category", "personal-delay", "personal-priority"]
+ Test("Hotstring menu numeric prompt: " . _MDPN_Mode . " rejects integer aliases (menu-numeric-prompt-domain)", _MDPN_Case.Bind(_MDPN_Mode))

@@ -234,6 +234,11 @@ INSERT INTO meta(key,value) VALUES ({{s key}},{{s value}}) ON CONFLICT(key) DO U
 -- doc: Creates a metadata key with its first value when it does not exist yet.
 INSERT OR IGNORE INTO meta (key, value) VALUES ({{s key}}, {{s value}});
 
+-- name: export.vacuum_into
+-- doc: The dashboard's Export: a consistent copy of the whole store, taken by the
+-- doc: owning writer once its flush has settled. Runs outside any transaction.
+VACUUM INTO {{s path}};
+
 -- name: meta.rev_bump
 -- doc: Advances the revision counter. The value is stored as text, which is the
 -- doc: column's own affinity, so every driver reads back the same string.
@@ -253,6 +258,11 @@ VALUES ({{s device_id}}, {{s name}}, {{s os}}, {{s os_version}}, {{s host_signat
 ON CONFLICT(device_id) DO UPDATE SET
   name = excluded.name, os = excluded.os, os_version = excluded.os_version,
   host_signature = excluded.host_signature, updated_at = excluded.updated_at;
+
+-- name: devices.import_watermark
+-- doc: Advances a device's imported data.sql watermark once its statements are
+-- doc: applied: the bytes read so far and the SHA-256 of that prefix.
+UPDATE devices SET imported_data_sql_size={{i size}}, imported_data_sql_sha256={{s digest}}, updated_at={{s updated_at}} WHERE device_id={{s device_id}};
 
 
 -- ============================================================================
@@ -467,6 +477,16 @@ VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s key}});
 -- doc: A transition of the machine: sleep, lock, network, power.
 INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json)
 VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s action}}, {{s? metadata_json}});
+
+-- name: events.network
+-- doc: A connectivity transition: Internet reachability or a VPN adapter (Windows keystats_network.ahk kinds).
+INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+
+-- name: events.roi
+-- doc: A cumulative savings snapshot, a manual-word candidate or a stale trigger warning.
+INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
 
 -- name: events.hotstring
 -- doc: A hotstring that fired, was suggested, dismissed or nearly typed.

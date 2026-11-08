@@ -478,6 +478,7 @@ local DAEMON_SCENARIOS = {
 	{ name = "an end-char trigger expands and keeps its terminator", keys = " adn ", screen = " ADN " },
 	{ name = "Enter is a terminator", keys = " adn{ENTER}", screen = " ADN\n" },
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
+	{ name = "input queued during an expansion can complete the next trigger", keys = "pk★z", screen = "parce queMATCH", queue_output = true, llm = true, queue_ai = "pk★xz" },
 	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
 	-- count it, or the first character of the replacement stays ("Aadn").
 	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
@@ -713,11 +714,17 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
 			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
+			if scenario.queue_ai then
+				local receipt = output:match("QUEUE_AI ([^\r\n]+)")
+				if receipt == scenario.queue_ai then pass(prefix .. scenario.name .. " (AI input order)")
+				else fail(prefix .. scenario.name .. " (AI input order)", scenario.queue_ai, receipt or "absent") end
+			end
 			if scenario.tap_collision_receipt then
 				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
 				if receipt == scenario.tap_collision_receipt then

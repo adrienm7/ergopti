@@ -47,6 +47,47 @@ require("test.metrics_widget_menu_contract").register(helpers, {
 })
 
 helpers.describe("Metrics widget commands", function()
+	helpers.it("metrics master toggle reports refused real persistence", function()
+		local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
+		local rename, execute, notices, attempts = os.rename, os.execute, 0, 0
+		local ok, err = xpcall(function()
+			require("test.config_unused_keys_contract").sandbox.with_config("[metrics]\nenabled = false\n", function(path)
+				package.loaded["infra.config_paths"] = { config = function() return path end }
+				package.loaded["infra.metrics_preferences"], package.loaded["modules.keystats.keystats"] = nil, nil
+				local stats = require("modules.keystats.keystats")
+				local changes = 0
+				local rows = helpers.load_module("ui.menu.builder").build({ keystats = stats,
+					on_menu_changed = function() changes = changes + 1 end })
+				local metrics
+				for _, row in ipairs(rows) do if row.title == require("infra.i18n").get("menu.metrics.title") then metrics = row.menu end end
+				local target = assert(metrics and metrics[1], "real metrics toggle exists")
+				os.rename = function(from, to) if to == path then attempts = attempts + 1; return false, "inert refusal" end; return rename(from, to) end
+				os.execute = function(command)
+					if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end
+					return execute(command)
+				end
+				helpers.assert_eq(target.fn(), false)
+				helpers.assert_eq(changes, 0)
+				helpers.assert_eq(notices, 1)
+				helpers.assert_eq(attempts, 1)
+				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); assert(file:close())
+				helpers.assert_eq(bytes, "[metrics]\nenabled = false\n")
+				helpers.assert_eq(stats.is_enabled(), false)
+				os.rename = rename
+				local setter = stats.set_enabled
+				stats.set_enabled = function(value) assert(setter(value) == true); error("inert post-save exception") end
+				local called = pcall(target.fn)
+				stats.set_enabled = setter
+				helpers.assert_eq(called, false)
+				helpers.assert_eq(notices, 1, "post-save errors cannot claim the setting was reverted")
+				helpers.assert_eq(stats.is_enabled(), true)
+			end)
+		end, debug.traceback)
+		os.rename, os.execute = rename, execute
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		helpers.assert_true(ok, tostring(err))
+	end)
 	for _, spec in ipairs(fixture.rows) do
 		for _, accepted in ipairs({ false, true }) do
 			helpers.it("metrics-widget-command " .. spec.id .. " " .. tostring(accepted), function()

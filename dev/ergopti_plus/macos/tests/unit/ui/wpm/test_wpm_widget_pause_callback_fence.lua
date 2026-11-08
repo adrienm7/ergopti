@@ -19,6 +19,7 @@ local FIXTURE_MODULES = {
 	"infra.i18n",
 	"infra.keycodes",
 	"infra.paths",
+	"adapters.storage",
 	"adapters.graphics_renderer",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -57,11 +58,22 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			local admission_fence = nil
 
 			local original_settings_set = hs_stub.settings.set
+			original_settings_set("ergopti.wpm_widget.pos_x", "1e999")
+			original_settings_set("ergopti.wpm_widget.pos_y", 50)
 			hs_stub.settings.set = function(key, value)
 				observed.settings_writes = observed.settings_writes + 1
 				return original_settings_set(key, value)
 			end
-			hs_stub.timer.absoluteTime = function() return 1000000000 end
+			local mouse_callback_active = false
+			hs_stub.timer.absoluteTime = function()
+				if mouse_callback_active then observed.event_reads = observed.event_reads + 1 end
+				return 1000000000
+			end
+			local function emit_mouse(tap, event)
+				mouse_callback_active = true
+				tap.callback(event)
+				mouse_callback_active = false
+			end
 			local mouse_position = { x = 30, y = 40 }
 			hs_stub.mouse.absolutePosition = function()
 				observed.mouse_reads = observed.mouse_reads + 1
@@ -111,7 +123,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			package.loaded["modules.keystats"] = {
 				get_live_stats = function()
 					observed.stats_reads = observed.stats_reads + 1
-					return { wpm = 42 }
+					return { wpm = 42, last_input_time = hs.timer.absoluteTime() / 1000000000 }
 				end,
 				resync_context = function() return true end,
 			}
@@ -157,6 +169,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 						self.mouse_callback = callback
 						return self
 					end
+					function canvas:canvasMouseEvents() return self end
 					canvases[#canvases + 1] = canvas
 					return canvas
 				end,
@@ -171,11 +184,12 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			helpers.assert_eq(#timer_handles, 1)
 			helpers.assert_eq(#tap_handles, 1)
 			helpers.assert_eq(#canvases, 1)
+			helpers.assert_true(canvases[1].current_frame.x ~= math.huge,
+				"a nonfinite stored coordinate must use the default anchor")
 			helpers.assert_true(type(canvases[1].mouse_callback) == "function")
 
 			local event = {
 				getType = function()
-					observed.event_reads = observed.event_reads + 1
 					return hs_stub.eventtap.event.types.leftMouseDown
 				end,
 			}
@@ -183,13 +197,18 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			timer_handles[1].callback()
 			helpers.assert_eq(observed.stats_reads, stats_before_control + 1,
 				"the retained timer callback must have a live positive control")
-			tap_handles[1].callback(event)
+			emit_mouse(tap_handles[1], event)
 			helpers.assert_eq(observed.event_reads, 1,
 				"the retained eventtap callback must have a live positive control")
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
 			helpers.assert_eq(observed.settings_writes, 2,
 				"the retained canvas callback must have a live positive control")
+			local prior_x = canvases[1].current_frame.x
+			canvases[1].current_frame.x = math.huge
+			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
+			helpers.assert_eq(observed.settings_writes, 2, "invalid native coordinates must not be persisted")
+			canvases[1].current_frame.x = prior_x
 			-- Begin another drag but deliberately omit mouseUp. PAUSE destroys this
 			-- canvas, so its release callback can never settle the module-level lease.
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
@@ -264,7 +283,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				frame_writes = observed.frame_writes,
 			}
 			timer_handles[1].callback()
-			tap_handles[1].callback(event)
+			emit_mouse(tap_handles[1], event)
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
 			for key, value in pairs(paused_snapshot) do
@@ -287,7 +306,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				frame_writes = observed.frame_writes,
 			}
 			timer_handles[1].callback()
-			tap_handles[1].callback(event)
+			emit_mouse(tap_handles[1], event)
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
 			for key, value in pairs(resumed_snapshot) do
@@ -299,7 +318,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			timer_handles[2].callback()
 			helpers.assert_eq(observed.frame_writes, frame_writes_before_reposition + 1,
 				"the resumed timer must reposition the new canvas after a drag loses mouseUp during PAUSE")
-			tap_handles[2].callback(event)
+			emit_mouse(tap_handles[2], event)
 			local frame_writes_after_reposition = observed.frame_writes
 			mouse_position = { x = 130, y = 140 }
 			canvases[2].mouse_callback(canvases[2], "mouseMove", 1, 0, 0)

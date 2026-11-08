@@ -26,6 +26,7 @@
 
 local M = {}
 local Direction = require("gestures.direction")
+local Incremental = require("gestures.incremental")
 
 
 
@@ -45,12 +46,10 @@ M.SWIPE_MIN   = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
 M.SWIPE_MIN_2 = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 M.DIAG_MIN_2  = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
 
--- Incremental mode: the first action fires once the swipe has travelled this
--- far, and each further action needs one more `sensitivity` (the slot's
--- distance per action). A short deliberate swipe therefore still fires once,
--- while a large step keeps a normal swipe to exactly one action. A slot whose
--- step is smaller than this fires its first action after one step, as before.
-M.INCREMENTAL_FIRST_STEP = 4.0
+-- Incremental mode: the shared step rule (_shared/lua/gestures/incremental.lua),
+-- the same one the Linux gesture manager counts with.
+M.INCREMENTAL_FIRST_STEP = Incremental.FIRST_STEP
+M.MAX_INCREMENTAL_ACTIONS_PER_FRAME = Incremental.MAX_ACTIONS_PER_FRAME
 
 -- Least share of the centroid's travel along the swipe axis that EVERY contact
 -- of a three-or-more-finger gesture must cover itself, in the same direction.
@@ -66,6 +65,25 @@ M.COHESION_MIN_SHARE = 0.3
 -- ===================================
 -- ======= 2/ Geometry Helpers =======
 -- ===================================
+-- ===================================
+
+--- Rejects a frame whose centroid cannot be computed from every contact.
+--- @param touches table Trackpad touch array.
+--- @return boolean valid
+function M.validPositions(touches)
+	for _, touch in ipairs(touches) do
+		local position = type(touch) == "table" and type(touch.absoluteVector) == "table"
+			and touch.absoluteVector.position or nil
+		if type(position) ~= "table" then return false end
+		for _, axis in ipairs({ "x", "y" }) do
+			local value = position[axis]
+			if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+				return false
+			end
+		end
+	end
+	return true
+end
 -- ===================================
 
 --- Calculates the central point among all current fingers.
@@ -105,6 +123,31 @@ function M.contactsAcross(touches, axis)
 	return contacts
 end
 
+--- Describes each contact of one frame for the log: its position and its
+--- major axis, the two values a far or oversized contact (a resting thumb
+--- joining a pair) can be told apart by. Ordered left to right.
+--- @param touches table Trackpad touch arrays.
+--- @return string One "(x, y major m)" group per contact, "none" when empty.
+function M.describeContacts(touches)
+	local contacts = {}
+	for _, t in ipairs(type(touches) == "table" and touches or {}) do
+		local p = type(t) == "table" and type(t.absoluteVector) == "table"
+			and t.absoluteVector.position or nil
+		if type(p) == "table" then
+			contacts[#contacts + 1] = { x = tonumber(p.x) or 0, y = tonumber(p.y) or 0,
+				major = tonumber(t.majorAxis) }
+		end
+	end
+	if #contacts == 0 then return "none" end
+	table.sort(contacts, function(a, b) return a.x < b.x end)
+	local parts = {}
+	for i, c in ipairs(contacts) do
+		parts[i] = string.format("(%.1f, %.1f major %s)", c.x, c.y,
+			c.major and string.format("%.2f", c.major) or "?")
+	end
+	return table.concat(parts, " ")
+end
+
 --- Tells whether every contact travelled along the axis with the centroid.
 --- @param origin table Contacts at the start, from contactsAcross().
 --- @param current table The same contacts now, from contactsAcross().
@@ -131,29 +174,8 @@ function M.movedTogether(origin, current, axis)
 	return share >= M.COHESION_MIN_SHARE, share
 end
 
---- Counts the incremental actions a swipe has earned over a distance.
---- The count only ever grows within one swipe: the engine holds the actions
---- already fired when the distance shrinks, so drift never takes one back or
---- earns it twice.
---- @param distance number Absolute travel along the swipe axis.
---- @param step number Distance per action after the first (the sensitivity).
---- @return integer steps
-function M.incrementalSteps(distance, step)
-	if type(step) ~= "number" or step <= 0 then error("incremental step must be a positive number") end
-	local first = math.min(M.INCREMENTAL_FIRST_STEP, step)
-	if distance < first then return 0 end
-	return 1 + math.floor((distance - first) / step)
-end
-
---- Distance a swipe must come back from its last action before it counts as a
---- reversal: half the first step, so lift-off drift neither reverses a swipe
---- nor, through the rebase, fires the opposite action.
---- @param step number Distance per action after the first (the sensitivity).
---- @param floor number Smallest reversal distance the engine accepts.
---- @return number distance
-function M.incrementalReverseMin(step, floor)
-	return math.max(floor, math.min(M.INCREMENTAL_FIRST_STEP, step) / 2)
-end
+M.incrementalSteps = Incremental.steps
+M.incrementalReverseMin = Incremental.reverse_min
 
 --- Infers the action configuration slot ID given fingers count and direction.
 --- @param mf number Number of fingers.

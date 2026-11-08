@@ -31,6 +31,44 @@ local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
 local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/control"
 
+if require("tests.win_compat").is_windows() then
+	helpers.it("SKIP [CONF-LINUX-RELOAD-CLI] — a Windows host lacks Linux flock, SIGUSR1 and procfs descriptors", function()
+		helpers.assert_eq(package.config:sub(1, 1), "\\")
+	end)
+else
+helpers.it("(linux-reload-cli-overlap) a second client cannot overwrite a pending request", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_overlap.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
+	helpers.assert_true(status == true or status == 0, "concurrent real CLI requests must retain the first request and refuse the second")
+end)
+
+helpers.it("(linux-reload-cli-lock-types) refuses FIFO, symlink and directory locks without blocking", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_lock_types.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
+	helpers.assert_true(status == true or status == 0, "invalid lock objects must be refused without changing them")
+end)
+
+helpers.it("(linux-reload-cli-decimal) accepts leading zeroes and refuses overflow before publication", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_decimal.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	for _, shell in ipairs({ "sh", "dash", "bash" }) do
+		local available = os.execute("command -v " .. quote(shell) .. " >/dev/null 2>&1")
+		if available == true or available == 0 then
+			local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool) .. " " .. quote(shell))
+			helpers.assert_true(status == true or status == 0, shell .. " must accept decimal timeouts and reject overflow before signalling")
+		end
+	end
+end)
+end
+
 --- A session over in-memory files.
 local NOW = 1700000000
 
@@ -43,6 +81,18 @@ local function world(reload, private, shared, pid, boot)
 		now = function() return clock.now end,
 		read = function(path) return files[path] end,
 		write = function(path, text) files[path] = text; return true end,
+		stage = function(path, text)
+			if files[path] ~= nil then return nil, "stage already exists" end
+			files[path] = text
+			return {
+				current = function(expected) return files[path] == expected end,
+				discard = function()
+					if files[path] ~= text then return false end
+					files[path] = nil
+					return true
+				end,
+			}
+		end,
 		remove = function(path) files[path] = nil; return true end,
 		rename = function(from, to) files[to] = files[from]; files[from] = nil; return true end,
 		exists = function(path) return files[path] ~= nil end,
@@ -63,6 +113,63 @@ local function request(files, token, id)
 end
 
 helpers.describe("Linux local driver control", function()
+	helpers.it("linux-control-session-read: retains unreadable session ownership until retry", function()
+		local session, files = world(function() return true end)
+		session:start()
+		local path = FOLDER .. "/session.json"
+		local original = files[path]
+		session.ports.read_status = function() return nil, "error", "controlled EIO" end
+		helpers.assert_eq(session:stop(), false, "an unreadable session is not proven absent")
+		helpers.assert_eq(files[path], original)
+		session.ports.read_status = function(target) return files[target], "ok" end
+		helpers.assert_eq(session:stop(), true)
+		helpers.assert_nil(files[path])
+	end)
+	for _, mode in ipairs({ "stage", "rename" }) do
+		helpers.it("linux-control-reload-receipt: refuses restart when requested record cannot " .. mode, function()
+			local session, files, calls = world(function() return true end)
+			session:start()
+			local original = session.ports[mode]
+			session.ports[mode] = function(...) return false end
+			request(files, TOKEN, "receipt-failure")
+			local handled = session:handle()
+			session.ports[mode] = original
+			helpers.assert_eq(handled, false)
+			helpers.assert_eq(#calls, 0, "a successor cannot claim a requested result that was not published")
+		end)
+	end
+	for _, kind in ipairs({ "session", "result" }) do
+		for _, collision in ipairs({ false, true }) do
+			helpers.it("(driver-control-owned-stage) " .. kind .. " collision=" .. tostring(collision), function()
+				local session, files, calls = world(function() return true end)
+				if kind == "result" then session:start() end
+				local target, stage = session:path(kind), session:path(kind) .. ".tmp-" .. tostring(session.pid)
+				local prior, foreign = "prior independent receipt", "foreign pending publication"
+				files[target] = prior
+				if collision then files[stage] = foreign end
+				if kind == "session" then
+					local ok = pcall(session.start, session)
+					helpers.assert_eq(ok, not collision, "session startup must honor its exclusive stage receipt")
+				else
+					request(files, TOKEN, "owned-stage")
+					-- A restart is owed only after its requested record is published.
+					helpers.assert_eq(session:handle(), not collision, "the genuine authenticated handler must dispatch")
+					helpers.assert_eq(#calls, collision and 0 or 1, "exactly one reload owner is called")
+				end
+				if collision then
+					helpers.assert_eq(files[stage], foreign, "foreign stage bytes survive untouched")
+					helpers.assert_eq(files[target], prior, "stage refusal preserves the old receipt")
+				else
+					local expected = kind == "session" and Policy.session_text(SPEC, "linux", session.pid, TOKEN)
+						or ('{"schema":1,"request_id":"owned-stage","state":"requested","driver_pid":4242,"successor_pid":null,"deadline":'
+							.. tostring(NOW + SPEC.pending_ttl_seconds) .. '}\n')
+					helpers.assert_eq(files[target], expected, "the actual owner publishes the exact shared protocol")
+					helpers.assert_nil(files[stage], "successful rename consumes the owned stage")
+				end
+			end)
+		end
+	end
+
 	helpers.it("publishes its session and writes a pending record for an authenticated reload", function()
 		local session, files, calls = world(function() return true end)
 		session:start()
@@ -235,6 +342,76 @@ helpers.describe("driver-control-declaration", function()
 			Reader.open, DriverControl.new, io.open = open, new, stdio_open
 			if not ok then error(err, 0) end
 		end)
+	end
+
+	-- Uses the actual native ports: the collision owner is acquired by O_EXCL.
+	-- No daemon, watcher, process or real reload is started by these cases.
+	if package.config:sub(1, 1) == "/" then
+		for _, kind in ipairs({ "session", "result" }) do
+			for _, collision in ipairs({ false, true }) do
+				helpers.it("(native-control-owned-stage) " .. kind .. " collision=" .. tostring(collision), function()
+					local uv = require("luv")
+					local Writer = require("infra.regular_file_writer")
+					local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/erg-control-stage-XXXXXX"))
+					local folder = root .. "/control"
+					assert(uv.fs_mkdir(folder, 448))
+					local pid, reloads = uv.os_getpid(), 0
+					local session = DriverControl.new({ spec = SPEC, folder = folder, pid = pid,
+						reload = function() reloads = reloads + 1; return true end })
+					session.ports.now = function() return NOW end
+					local target, stage = session:path(kind), session:path(kind) .. ".tmp-" .. tostring(pid)
+					local prior, foreign = "prior native receipt\n", "foreign native publication: é😀\n"
+					local function create(path, text)
+						local stream = assert(Writer.open(path, "wx"))
+						assert(stream:write(text)); assert(stream:close())
+					end
+					local ok, err = xpcall(function()
+						if kind == "result" then session:start() end
+						create(target, prior)
+						local before
+						if collision then create(stage, foreign); before = assert(uv.fs_lstat(stage)) end
+						local started
+						if kind == "session" then
+							started = pcall(session.start, session)
+						else
+							create(session:path("request"), string.format('{"schema":1,"token":"%s","request_id":"owned-stage"}', session.token))
+							-- A restart is owed only after its requested record is published.
+							helpers.assert_eq(session:handle(), not collision, "the actual authenticated native owner must dispatch")
+							helpers.assert_eq(reloads, collision and 0 or 1, "the inert reload boundary is reached exactly once")
+						end
+						print(string.format("NATIVE_STAGE kind=%s collision=%s stage_present=%s prior_target=%s",
+							kind, tostring(collision), tostring(uv.fs_lstat(stage) ~= nil), tostring(read(target) == prior)))
+						if kind == "session" then
+							helpers.assert_eq(started, not collision, "native startup must honor exclusive acquisition")
+						end
+						if collision then
+							helpers.assert_eq(read(stage), foreign, "native foreign bytes must survive")
+							helpers.assert_eq(read(target), prior, "native refusal preserves the previous receipt")
+							local after = assert(uv.fs_lstat(stage))
+							for _, key in ipairs({ "dev", "ino", "size" }) do helpers.assert_eq(after[key], before[key], key) end
+							helpers.assert_eq(after.mtime.sec, before.mtime.sec, "native write seconds survive")
+							helpers.assert_eq(after.mtime.nsec, before.mtime.nsec, "native write nanoseconds survive")
+						else
+							local expected = kind == "session" and Policy.session_text(SPEC, "linux", pid, session.token)
+								or string.format('{"schema":1,"request_id":"owned-stage","state":"requested","driver_pid":%d,"successor_pid":null,"deadline":%d}\n', pid, NOW + SPEC.pending_ttl_seconds)
+							helpers.assert_eq(read(target), expected, "native control bytes match the shared protocol")
+							helpers.assert_nil(uv.fs_lstat(stage), "the owned stage was consumed by native rename")
+						end
+					end, debug.traceback)
+					session:stop()
+					-- Only flat fixture-owned leaves are removed; no recursive operation.
+					for _, name in ipairs({ "session", "request", "result" }) do
+						for _, path in ipairs({ session:path(name), session:path(name) .. ".tmp-" .. tostring(pid) }) do
+							local removed, _, code = uv.fs_unlink(path)
+							assert(removed == true or code == "ENOENT")
+						end
+					end
+					assert(uv.fs_rmdir(folder))
+					assert(uv.fs_rmdir(root))
+					if not ok then error(err, 0) end
+				end)
+			end
+		end
 	end
 
 	if package.config:sub(1, 1) == "/" then

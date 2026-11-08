@@ -101,7 +101,7 @@ local function controlled_native_reader(rows, options, body)
 			buffer.bytes = bytes
 			return #bytes
 		end,
-		poll = function() return 1 end,
+		poll = function() return options.poll_result ~= nil and options.poll_result or 1 end,
 		close = function(fd)
 			log.closes = log.closes + 1
 			if options.before_close then options.before_close(reader, fd) end
@@ -114,7 +114,13 @@ local function controlled_native_reader(rows, options, body)
 		return {
 			cdef = function() if options.before_cdef then options.before_cdef(reader) end end,
 			sizeof = function() return 24 end,
-			new = function(kind) return kind == "struct pollfd[1]" and { [0] = {} } or { bytes = "" } end,
+			new = function(kind, count)
+				if kind == "struct pollfd[1]" then return { [0] = {} } end
+				if kind == "struct pollfd[?]" then
+					local result = {}; for index = 0, count - 1 do result[index] = {} end; return result
+				end
+				return { bytes = "" }
+			end,
 			cast = function(_, value) return value end,
 			string = function(buffer, count)
 				if options.before_string then options.before_string(reader) end

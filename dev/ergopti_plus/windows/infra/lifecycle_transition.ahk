@@ -8,7 +8,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"user-programs", "navigation-event", "llm-aux-context", "llm-local-servers", "keystats-system-intervals", "tap-hold-synthetic-keys",
 		"screen-brightness", "tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
 		"selection-capture", "space-hold-input-hook",
-		"suppressive-input-hooks", "magic-key-editor-input-hook",
+		"suppressive-input-hooks", "keylayout-dead-key", "magic-key-editor-input-hook",
 		"suspend-tooltip", "llm-tooltip", "llm-live-mode", "llm-generation-timer",
 		"llm-generation", "ollama-warmup", "llm-pointer-watch", "llm-agent-typing",
 		"metrics-focus-refresh", "updater-checks", "updater-self-update",
@@ -16,7 +16,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"keystats-prefetch-range", "uia-selection-worker",
 		"keystats-text-migration", "keep-awake", "gesture-left-hold",
 		"gesture-right-hold", "caps-word", "hotstring-engine", "user-hotstrings",
-		"keyboard-layout"
+		"keyboard-layout", "wpm-tray-readout"
 	],
 	"resume", [
 		"user-programs", "navigation-event", "hotstring-prefix-watcher", "prefix-buffer",

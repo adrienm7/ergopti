@@ -61,6 +61,13 @@ local function with_priority(body, no_engine)
 		return original_publish(...)
 	end
 	local ok, failure = xpcall(function()
+		-- Choices and hotstring preferences share config.toml in production.
+		-- Use a fresh owner routed to this fixture and initialize its generation
+		-- before recording the cached value the refusal must retain.
+		package.loaded["infra.hotstring_preferences"] = nil
+		local preferences = require("infra.hotstring_preferences")
+		assert(preferences._set_file_for_test(choices))
+		assert(preferences.refresh())
 		local Config = helpers.fresh_module("modules.hotstrings.hotstrings_config")
 		package.loaded["modules.hotstrings.hotstrings_config"] = Config
 		Config.discover_extensions = function() return {} end

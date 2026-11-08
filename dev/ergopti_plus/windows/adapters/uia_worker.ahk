@@ -214,6 +214,12 @@ UIASW_WorkerHandleRequest(ParentHwnd, RequestGeneration, RequestCode, Msg, Recei
 				Ranges := Pattern.GetSelection()
 				if (Ranges.Length > 0) {
 					Body := Ranges[1].GetText(MaxTextChars)
+					; GetText stops at the cap without saying so, so a result that
+					; fills it may be only the head of a longer selection. The output
+					; replaces the WHOLE selection, so such a capture is withheld
+					; ("empty") and the caller takes its complete-selection route.
+					if (StrLen(Body) >= MaxTextChars)
+						Body := ""
 					if (Body != "" && !RegExMatch(Body, "^(\r\n|\r|\n)+$"))
 						Status := "ok"
 				}

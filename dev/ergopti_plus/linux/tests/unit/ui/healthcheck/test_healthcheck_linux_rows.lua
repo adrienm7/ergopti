@@ -146,16 +146,16 @@ helpers.describe("healthcheck (linux): the daemon's own load", function()
 	-- The resident memory of the daemon, which a report of a slow or leaking
 	-- driver is read for (system-load)
 	helpers.it("reports the daemon's resident memory from /proc/self/status (system-load)", function()
-		local real_open = io.open
-		io.open = function(path, mode)
-			if path ~= "/proc/self/status" then return real_open(path, mode) end
-			local content = "Name:\tluajit\nUid:\t1000\t1000\t1000\t1000\nVmRSS:\t   51200 kB\nThreads:\t3\n"
-			return { read = function() return content end, close = function() return true end }
+		local reader = require("infra.regular_file_reader")
+		local real_read = reader.read_source
+		reader.read_source = function(path)
+			if path ~= "/proc/self/status" then return real_read(path) end
+			return "Name:\tluajit\nUid:\t1000\t1000\t1000\t1000\nVmRSS:\t   51200 kB\nThreads:\t3\n"
 		end
 		local ok, result = pcall(function()
 			return helpers.load_module("ui.healthcheck.bridge").build_snapshot({}, false)
 		end)
-		io.open = real_open
+		reader.read_source = real_read
 		helpers.assert_true(ok, tostring(result))
 		helpers.assert_eq(result.sections.system.process_memory, 51200 * 1024)
 		helpers.assert_eq(result.sections.system.elevated, false, "the same file answers the elevation")
@@ -211,5 +211,35 @@ helpers.describe("healthcheck (linux): the features the page lists", function()
 		local features = features_of({ config = hotstrings_config({ base = true }) })
 		helpers.assert_nil(features.shortcuts, "no shortcuts module: no row, rather than a guessed off")
 		helpers.assert_nil(features.gestures)
+	end)
+end)
+
+helpers.describe("healthcheck (linux): the features this driver lacks", function()
+	-- macOS alone published the manifest-derived `unavailable` section, so a
+	-- Linux user could not ask the page why a documented feature is missing.
+	helpers.it("lists every Linux absence of the generated manifest with its reason", function()
+		local unavailable = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
+			engine = {}, keystats = {}, config = {}, llm = {},
+		}, false).sections.unavailable
+		local explained, silent = require("infra.manifest_reader").coverage_gaps()
+		helpers.assert_true(type(unavailable) == "table" and type(unavailable.items) == "table",
+			"the snapshot carries the section")
+		helpers.assert_eq(#unavailable.items, #explained + #silent, "every absence, explained or not")
+		helpers.assert_true(#explained > 0, "the Linux manifest explains some absences")
+		local by_feature = {}
+		for _, item in ipairs(unavailable.items) do by_feature[item.feature] = item end
+		for _, gap in ipairs(explained) do
+			local item = by_feature[gap.path]
+			helpers.assert_true(item ~= nil, "listed: " .. tostring(gap.path))
+			helpers.assert_eq(item.reason, gap.reason_key)
+			helpers.assert_true(not item.platforms:find("Linux", 1, true), "Linux never offers what it lacks")
+		end
+		local schema = require("ui.healthcheck.bridge").config().schema
+		for _, section in ipairs(schema.sections) do
+			if section.id == "unavailable" then
+				helpers.assert_true(table.concat(section.platforms, ","):find("linux", 1, true) ~= nil,
+					"the page renders the section on Linux")
+			end
+		end
 	end)
 end)

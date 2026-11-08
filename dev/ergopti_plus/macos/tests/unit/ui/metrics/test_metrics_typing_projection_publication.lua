@@ -33,7 +33,7 @@ local function fake_reader(per_day, failing)
 			error(ABANDONED)
 		end
 	end
-	local reader = { next_day = Real.next_day }
+	local reader = { next_day = Real.next_day, history_fingerprint_exact = true }
 	function reader.split_bounds(_start, _end, today)
 		local y, m, d = today:match("^(%d+)%-(%d+)%-(%d+)$")
 		local yesterday = os.date("%Y-%m-%d", os.time({ year = y, month = m, day = d - 1, hour = 12 }))
@@ -81,6 +81,23 @@ end
 
 
 helpers.describe("typing projection publishes only complete, settled history", function()
+	helpers.it("includes explicitly selected future dates without caching them as past history", function()
+		local projection = load_projection()
+		local per_day = { ["2026-10-18"] = 1, ["2026-10-20"] = 9, ["2026-10-21"] = 3 }
+		local failing = {}
+		local reader, pacer = fake_reader(per_day, failing)
+		local session = projection.session(reader, "/db.sqlite", "2026-10-20", pacer)
+		local first = session.range("2026-10-18", "2026-10-21", nil)
+		helpers.assert_eq(count_of(first, "t1"), 4, "today is separate and the future date belongs to the requested range")
+		per_day["2026-10-21"] = 5
+		local second = session.range("2026-10-18", "2026-10-21", nil)
+		helpers.assert_eq(count_of(second, "t1"), 6, "future rows are reread rather than hidden by the historical cache")
+		local future_only = session.range("2026-10-21", "2026-10-21", nil)
+		helpers.assert_eq(count_of(future_only, "t1"), 5)
+		failing["2026-10-21"] = true
+		local incomplete = session.range("2026-10-18", "2026-10-21", nil)
+		helpers.assert_true(incomplete:find('"incomplete":true', 1, true) ~= nil)
+	end)
 	helpers.it("does not double-count days merged by an abandoned job (typing-range-abandon-2026-10-21)", function()
 		local projection = load_projection()
 		local per_day = { ["2026-10-18"] = 1, ["2026-10-19"] = 1, ["2026-10-20"] = 1 }

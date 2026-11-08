@@ -41,6 +41,12 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
 		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
+		-- An update watcher keeps the new installation only once the boot is complete.
+		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "updater.boot_ready"))
+		helpers.assert_true(position(state.events, "updater.boot_ready") < position(state.events, "hook.pump"))
+		helpers.assert_eq(state.boot_ready_reason, "daemon ready")
+		-- The WPM widget's window is pumped on the loop's tick, before the keyboard.
+		helpers.assert_true(position(state.events, "wpm.pump") < position(state.events, "hook.pump"))
 		helpers.assert_eq(state.pumps, 1)
 		helpers.assert_eq(state.pump_services, true)
 		helpers.assert_eq(state.loop_after_complete, false)
@@ -84,6 +90,29 @@ helpers.describe("actual Main startup capture admission", function()
 			local expected = tonumber(source:match("active_signals == (%d+)"))
 			helpers.assert_eq(expected, #started, child .. " must expect every signal handle Main installs")
 		end
+	end)
+	helpers.it("(signal-callback-isolation) a raising signal callback does not escape or disable later signals", function()
+		local callbacks, handled = {}, 0
+		local fake_luv = {
+			new_signal = function() return {} end,
+			signal_start = function(_, name, callback) callbacks[name] = callback; return 0 end,
+			signal_stop = function() return 0 end,
+			is_closing = function() return false end,
+			close = function(_, on_closed) on_closed() end,
+		}
+		local saved_luv, saved_signals = package.loaded.luv, package.loaded["infra.signal_handlers"]
+		package.loaded.luv, package.loaded["infra.signal_handlers"] = fake_luv, nil
+		local ok, err = pcall(function()
+			local signals = require("infra.signal_handlers")
+			helpers.assert_true(signals.start({ on_term = function() error("controlled signal callback failure") end,
+				on_hup = function(number) helpers.assert_eq(number, 1); handled = handled + 1 end }))
+			helpers.assert_true(pcall(callbacks.sigterm), "the native loop must not receive the exception")
+			callbacks.sighup()
+			helpers.assert_eq(handled, 1)
+			helpers.assert_true(signals.stop())
+		end)
+		package.loaded.luv, package.loaded["infra.signal_handlers"] = saved_luv, saved_signals
+		if not ok then error(err, 0) end
 	end)
 	helpers.it("(startup-late-grab) preserves the onboarding capture gate through the first pump", function()
 		local state = MainStartup.run()
@@ -457,6 +486,17 @@ local function coordinator_fixture(opts)
 end
 
 helpers.describe("shutdown coordinator: pre-wait ownership", function()
+	helpers.it("stops a hook that is waiting to reacquire its last source", function()
+		local calls = {}
+		local coordinator = ShutdownCoordinator.new({ pre_wait = {},
+			keyboard_hook = { isRunning = function() return false end, isRecovering = function() return true end,
+				stop = function() calls[#calls + 1] = "hook.stop" end,
+				emergency_stop = function() error("unexpected emergency") end },
+			event_loop = { stop = function() calls[#calls + 1] = "loop.stop" end } })
+		coordinator.request("quit")
+		helpers.assert_eq(calls, { "hook.stop", "loop.stop" })
+	end)
+
 	helpers.it("stops every external owner before the hook and loop", function()
 		local coordinator, calls = coordinator_fixture()
 		helpers.assert_true(coordinator.request("tray quit"))
@@ -495,7 +535,9 @@ helpers.describe("shutdown coordinator: daemon integration", function()
 		for _, owner in ipairs({
 			"updater background checks",
 			"LLM prediction request",
+			"screen capture cleanup",
 			"file watchers",
+			"Wayland clipboard watch",
 			"process lifecycle",
 			"tooltip preview",
 			"gesture reader",
@@ -591,8 +633,8 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		local registry = text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]")
 		helpers.assert_true(type(registry) == "string" and registry ~= "", "actual daemon registry must exist")
 		local state = { closed = false, context_closed = false, watch_closed = false, metrics_closed = false, stops = 0, loops = 0, cancelled = 0 }
-		local native_closed = { discovery = false, programs = false, watchers = false, layouts = false }
-		local native_calls = { discovery = 0, programs = 0, watchers = 0, layouts = 0 }
+		local native_closed = { discovery = false, programs = false, watchers = false, layouts = false, tooltip = false }
+		local native_calls = { discovery = 0, programs = 0, watchers = 0, layouts = 0, tooltip = 0 }
 		local function native_stop(name)
 			return function()
 				native_calls[name] = native_calls[name] + 1
@@ -608,7 +650,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 			dyn_hotstrings = { stop_user_code = native_stop("programs") },
 			updater = false, file_watchers = { stop = native_stop("watchers") },
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
-			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
+			webview_manager = false, tooltip_preview = { destroy = native_stop("tooltip") }, gestures = false, input_capture_gate = false,
 			prediction_engine = {
 				shutdown_runtime = function() state.stops = state.stops + 1; return state.closed end,
 				cancel = function() state.cancelled = state.cancelled + 1 end,
@@ -633,6 +675,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		helpers.assert_eq(state.loops, 0)
 		helpers.assert_true(coordinator.is_pending())
 		env.prediction_engine.shutdown_runtime = function() return true end
+		env.tooltip_preview.destroy = function() return true end
 		helpers.assert_eq(coordinator.poll(), false, "foreign public replacement cannot acknowledge retained cleanup")
 		state.closed = true
 		helpers.assert_eq(coordinator.poll(), false, "context and watcher cleanup remain independent debts")
@@ -655,6 +698,8 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		native_closed.watchers = true
 		helpers.assert_eq(coordinator.poll(), false, "layout helpers require their own physical retirement ACK")
 		native_closed.layouts = true
+		helpers.assert_eq(coordinator.poll(), false, "tooltip destruction must be acknowledged before loop exit")
+		native_closed.tooltip = true
 		helpers.assert_true(coordinator.poll())
 		helpers.assert_eq(state.loops, 1)
 		helpers.assert_eq(state.cancelled, 1, "existing prediction cleanup remains one-shot")
@@ -991,7 +1036,8 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 	helpers.it("completes final teardown only after destroy and close both acknowledge", function()
 		with_output("acknowledged", function(finish, injector, writer, broker, _, calls)
 			finish()
-			helpers.assert_eq(calls.success, 2)
+			-- Session ended, the withheld-input summary, then Daemon exiting.
+			helpers.assert_eq(calls.success, 3)
 			helpers.assert_eq(calls.destroy, 1)
 			helpers.assert_eq(calls.close, 1)
 			helpers.assert_eq(writer.is_open(), false)
@@ -1006,7 +1052,8 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 		with_output("absent", function(finish, injector, writer, _, _, calls)
 			helpers.assert_eq(injector.close_fast_channel(), true)
 			finish()
-			helpers.assert_eq(calls.success, 2)
+			-- Session ended, the withheld-input summary, then Daemon exiting.
+			helpers.assert_eq(calls.success, 3)
 			helpers.assert_eq(calls.destroy, 0)
 			helpers.assert_eq(calls.close, 0)
 			helpers.assert_eq(writer.has_output_debt(), false)
@@ -1578,13 +1625,21 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 
 	for _, mode in ipairs({ "deadline", "native-refused", "native-threw", "signal-refused", "input-refused", "runtime-first" }) do
 		helpers.it("(webview-main-shutdown-ack) retains " .. mode .. " until original native ACK", function()
-			local c = DocumentFixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, {})
+			local admitted, cancels, epoch = false, 0, nil
+			local fixture_state = {}
+			if mode == "input-refused" then
+				fixture_state.input_capture_gate = { release = function(app, supplied_epoch)
+					helpers.assert_eq(app, "changelog"); helpers.assert_eq(supplied_epoch, epoch)
+					return admitted
+				end }
+			end
+			local c = DocumentFixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, fixture_state)
 			local view = c.start_load()
-			local epoch, timer = c.manager.current_epoch("changelog"), c.timers[1]
+			epoch = c.manager.current_epoch("changelog")
+			local timer = c.timers[1]
 			local destroy, native_shutdown = view.destroy, c.manager.shutdown
 			local gobject = package.loaded.lgi.GObject
 			local disconnect = gobject.signal_handler_disconnect
-			local admitted, cancels = false, 0
 			local coordinator, state
 			local ok, detail = pcall(function()
 				coordinator, state = actual_main(c.manager, mode == "runtime-first")
@@ -1602,11 +1657,6 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 						if not admitted then return false end
 						return disconnect(...)
 					end
-				elseif mode == "input-refused" then
-					c.state.input_capture_gate = { release = function(app, supplied_epoch)
-						helpers.assert_eq(app, "changelog"); helpers.assert_eq(supplied_epoch, epoch)
-						return admitted
-					end }
 				end
 				helpers.assert_true(coordinator.request("tray quit"))
 				if mode == "runtime-first" then
@@ -1733,8 +1783,9 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		-- Accepted close and its later native callback are separate observations.
 		-- Cleanup also runs when the causal before-fix assertion fails.
 		scheduler.cancelAll, state.admitted = cancel_all, true
-		local cancelled = scheduler.cancelAll()
+		scheduler.cancelAll()
 		uv.run("nowait")
+		local cancelled = scheduler.cancelAll()
 		local _, owned = census(state.handle)
 		local _, witness = census(foreign)
 		local foreign_preserved = foreign ~= nil and witness == 1 and uv.is_active(foreign)
@@ -1780,13 +1831,16 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 					helpers.assert_eq(main.loops, 0)
 				end
 				state.admitted = true
-				helpers.assert_true(coordinator.poll(), "the same scheduler's true receipt admits loop stop")
-				helpers.assert_eq(main.loops, 1); helpers.assert_eq(main.hooks, 1)
-				helpers.assert_eq(coordinator.is_pending(), false)
+				helpers.assert_eq(coordinator.poll(), false, "scheduled close is not a physical acknowledgement")
+				helpers.assert_eq(main.loops, 0); helpers.assert_eq(main.hooks, 1)
+				helpers.assert_true(coordinator.is_pending())
 				helpers.assert_eq(token.timer, nil); helpers.assert_eq(scheduler.activeCount(), 0)
 				helpers.assert_true(uv.is_closing(state.handle), "successful cancellation has scheduled the actual close")
-				helpers.assert_eq(state.physical_closes, 0, "close acceptance is not the later physical close callback")
+				helpers.assert_eq(state.physical_closes, 0)
 				uv.run("nowait")
+				helpers.assert_true(coordinator.poll(), "the physical callback admits loop stop")
+				helpers.assert_eq(main.loops, 1)
+				helpers.assert_eq(coordinator.is_pending(), false)
 				local _, owned = census(state.handle)
 				helpers.assert_eq(state.physical_closes, 1); helpers.assert_eq(owned, 0)
 				helpers.assert_eq(state.allocations, 1); helpers.assert_eq(state.business_calls, 0)
@@ -1795,13 +1849,15 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		end)
 	end
 
-	helpers.it("(timer-main-shutdown-ack) accepts real cancellation before its separate physical close phase", function()
+	helpers.it("(timer-main-shutdown-ack) waits for real cancellation's physical close phase", function()
 		with_native_scheduler("accepted", function(scheduler, token, state, uv)
 			local coordinator, main = actual_main(nil, false, scheduler)
 			helpers.assert_true(coordinator.request("tray quit"))
-			helpers.assert_eq(coordinator.is_pending(), false); helpers.assert_eq(main.loops, 1)
+			helpers.assert_true(coordinator.is_pending()); helpers.assert_eq(main.loops, 0)
 			helpers.assert_eq(token.timer, nil); helpers.assert_eq(scheduler.activeCount(), 0)
 			helpers.assert_true(uv.is_closing(state.handle)); helpers.assert_eq(state.physical_closes, 0)
+			uv.run("nowait")
+			helpers.assert_true(coordinator.poll()); helpers.assert_eq(main.loops, 1)
 		end)
 	end)
 

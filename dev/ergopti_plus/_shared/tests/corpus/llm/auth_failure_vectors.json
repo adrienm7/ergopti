@@ -1,0 +1,69 @@
+{
+	"description": "Failures of one prediction call and whether the retry policy must skip them (authentication or authorization refusal). Replayed by the macOS, Linux and Windows suites.",
+	"vectors": [
+		{ "name": "http 401 string", "failure": "HTTP 401: Unauthorized", "authentication": true },
+		{ "name": "http 403 bare string", "failure": "HTTP 403", "authentication": true },
+		{
+			"name": "http 401 table",
+			"failure": { "status": 401, "reason": "http_401", "message": "" },
+			"authentication": true
+		},
+		{ "name": "http 403 reason only", "failure": { "reason": "http_403" }, "authentication": true },
+		{
+			"name": "gemini 400 invalid key",
+			"failure": {
+				"status": 400,
+				"reason": "http_400",
+				"message": "API key not valid. Please pass a valid API key."
+			},
+			"authentication": true
+		},
+		{
+			"name": "openai invalid key code",
+			"failure": { "status": 400, "message": "Incorrect API key provided: sk-***" },
+			"authentication": true
+		},
+		{
+			"name": "anthropic authentication error",
+			"failure": { "status": 400, "message": "authentication_error: invalid x-api-key" },
+			"authentication": true
+		},
+		{
+			"name": "missing key message",
+			"failure": "the API key is missing or invalid",
+			"authentication": true
+		},
+		{
+			"name": "local missing credential",
+			"failure": { "reason": "no_credential", "status": 0 },
+			"authentication": true
+		},
+		{
+			"name": "http 429 rate limit",
+			"failure": "HTTP 429: Too Many Requests",
+			"authentication": false
+		},
+		{
+			"name": "http 500",
+			"failure": { "status": 500, "reason": "http_500", "message": "internal error" },
+			"authentication": false
+		},
+		{
+			"name": "http 400 other",
+			"failure": { "status": 400, "message": "max_tokens is too large" },
+			"authentication": false
+		},
+		{ "name": "empty reply", "failure": "empty reply", "authentication": false },
+		{
+			"name": "timeout reason",
+			"failure": { "reason": "timeout", "status": 0, "message": "" },
+			"authentication": false
+		},
+		{
+			"name": "http status inside prose",
+			"failure": "retry after HTTP 401 seconds",
+			"authentication": false
+		},
+		{ "name": "nil failure", "failure": null, "authentication": false }
+	]
+}

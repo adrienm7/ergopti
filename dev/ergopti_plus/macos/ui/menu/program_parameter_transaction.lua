@@ -272,6 +272,12 @@ function M.new(options)
 			if publication.native.is_settled() ~= true then return false end
 		end
 		if saved.disk_native and saved.disk_native.is_settled() ~= true then return false end
+		-- A participant may retain a native admission until every inverse above
+		-- has settled. Its exact closure remains part of this debt until it ACKs.
+		if saved.mutation.recovery_settled ~= nil
+			and (type(saved.mutation.recovery_settled) ~= "function"
+				or not invoke("assignment recovery completion", saved.mutation.recovery_settled)) then return false end
+		if debt ~= saved then return false end
 		debt = nil
 		return true
 	end

@@ -43,6 +43,12 @@ window.toggle_hs_source = toggle_hs_source;
 window.toggle_llm_source = toggle_llm_source;
 window.reset_filters = reset_filters;
 
+// Export and Purge (maintenance.js)
+window.ask_metrics_maintenance = ask_metrics_maintenance;
+window.cancel_metrics_maintenance = cancel_metrics_maintenance;
+window.confirm_metrics_maintenance = confirm_metrics_maintenance;
+window.complete_metrics_maintenance = complete_metrics_maintenance;
+
 // Table interactions
 window.switch_tab = switch_tab;
 window.handle_search = handle_search;
@@ -307,6 +313,25 @@ function find_in_page(forward) {
 
 // Generated media labels are rendered again after the actual locale changes.
 document.addEventListener('i18n:applied', render_media_keys);
+
+// The heatmap's key names come from the locale: name them again once it lands.
+document.addEventListener('i18n:applied', () => {
+	if (window.keycode_layout_source)
+		window.keycode_layout = name_keycode_layout(window.keycode_layout_source, window.driver_meta);
+});
+
+// The remaining record labels are rendered from accepted data rather than
+// data-i18n attributes. Refresh them after a late native locale delivery.
+document.addEventListener('i18n:applied', () => {
+	render_sfb_kpi();
+	render_lexical_kpi();
+	render_rhythm_kpi();
+	render_sessions_kpi();
+	render_charmix_kpi();
+	render_records_kpi();
+	_render_activity_calendar();
+	render_apps_kpi();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
 	// Set Chart.js default tick/label color based on system color scheme.

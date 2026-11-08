@@ -827,7 +827,7 @@
 							<th data-i18n="ui_apps.col_day"></th>
 							<th data-i18n="ui_apps.col_app"></th>
 							<th style="text-align: right" data-i18n="ui_apps.col_duration"></th>
-							<th style="text-align: right" data-i18n="ui_apps.col_chars"></th>
+							<th style="text-align: right" data-i18n="ui_typing.lbl_longest_chars"></th>
 						</tr>
 					</thead>
 					<tbody id="top_sessions_tbody"></tbody>
@@ -1203,6 +1203,7 @@
 		<script src="../_generated/metrics_general_category_aliases.js"></script>
 		<!-- Load order: helpers (colors/format) → state → main (init+render) → charts → modal -->
 		<script src="../metrics_calendar.js"></script>
+		<script src="../metrics_manifest_keys.js"></script>
 		<script src="helpers.js"></script>
 		<script src="state.js"></script>
 		<script src="main.js"></script>
@@ -1233,6 +1234,8 @@
 							blob.metrics_manifest_incomplete === true
 						);
 					}
+					// The KPIs this host cannot measure, each with its reason key.
+					window.metricsUnmeasured = (blob.driver_meta && blob.driver_meta.unmeasured) || {};
 					const categories = blob.user_categories || {};
 					const icons = blob.app_icons || {};
 					if (typeof window.bootstrapMetricsAppsData === 'function') {

@@ -265,7 +265,19 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- refused save before it notifies: one call more.
 	-- The number-row rows in menu_keyboard_layout restore the previous choice
 	-- when the save is refused, before the layout is rebuilt: one call more.
-	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1,
+	-- The automatic profile (llm.profiles.auto_profile_for_model) in
+	-- menu_llm/profiles_manager restores the previous value on a refused save,
+	-- both from its check row and when a manual profile choice turns it off:
+	-- two calls more.
+	-- The layout emulation rows (emulated layout, Ergopti base and AltGr, the
+	-- four emulated rows) share one publisher in infra/layout_emulation_preferences
+	-- that restores every leaf it changed on a refused save: one call more.
+	-- The ChatGPT URL and script action rows left menu_shortcuts for their own
+	-- protected transactions: two calls moved, none added.
+	-- Hotstring section ordering adds one protected publisher in menu_hotstrings:
+	-- its refused save restores the prior override and never rebuilds the menu.
+	-- The remove/status/receipt/fallback mutations below pin that added call.
+	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1 + 2 + 1 + 1,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
@@ -300,6 +312,36 @@ helpers.describe("menu preference call sites fail closed", function()
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(err):find("every menu preference writer", 1, true) ~= nil)
 	end)
+
+	for _, mutation in ipairs({
+		{ name = "removing", before = "local called, committed = pcall(ctx.save_prefs)",
+			after = "local called, committed = true, true", reason = "reviewed post-retirement census" },
+		{ name = "discarding the protected status of", before = "if not called or committed ~= true then",
+			after = "if committed ~= true then", reason = "every menu preference writer" },
+		{ name = "accepting a truthy receipt for", before = "if not called or committed ~= true then",
+			after = "if not called or not committed then", reason = "every menu preference writer" },
+		{ name = "appending a truthy fallback to", before = "if not called or committed ~= true then",
+			after = "if not called or (committed or true) ~= true then", reason = "every menu preference writer" },
+	}) do
+		helpers.it("rejects " .. mutation.name .. " the hotstring section-order writer acknowledgement", function()
+			local owner, owner_error = helpers.read_driver_unit("local order_rows = SectionOrder.menu")
+			helpers.assert_not_nil(owner, owner_error)
+			local first = owner:find(mutation.before, 1, true)
+			helpers.assert_not_nil(first, "the mutation must reach the actual section-order publisher")
+			helpers.assert_nil(owner:find(mutation.before, first + 1, true), "the publisher is unique")
+			local altered_owner = owner:sub(1, first - 1) .. mutation.after
+				.. owner:sub(first + #mutation.before)
+			local source = helpers.read_driver_source("save_prefs")
+			local owner_start = source:find(owner, 1, true)
+			helpers.assert_not_nil(owner_start, "the complete census must include the section-order owner")
+			helpers.assert_nil(source:find(owner, owner_start + 1, true), "the inventory contains the owner once")
+			local changed = source:sub(1, owner_start - 1) .. altered_owner
+				.. source:sub(owner_start + #owner)
+			local ok, err = pcall(assert_guards, changed)
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(tostring(err), mutation.reason)
+		end)
+	end
 
 	for _, mutation in ipairs({
 		{ name = "removing", before = "local called, committed = xpcall(options.save_prefs, debug.traceback)",

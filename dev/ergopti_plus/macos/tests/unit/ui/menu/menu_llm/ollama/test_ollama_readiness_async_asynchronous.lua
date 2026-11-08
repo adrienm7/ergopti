@@ -239,25 +239,28 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				"a failed restart cannot schedule readiness work from a duplicate completion")
 		end)
 		with_fixture({}, function(fixture)
-			local cancellations = {}
-			fixture.manager.check_requirements("demo", function() end, function(reason)
+			local cancellations, details = {}, {}
+			fixture.manager.check_requirements("demo", function() end, function(reason, detail)
 				cancellations[#cancellations + 1] = reason
+				details[#details + 1] = detail
 			end, {is_current = function() return true end})
 			fixture.spawns[1].complete(28, "", "timeout")
 			-- Preserve the original nonzero7 input independently: exit alone
 			-- cannot certify a new native lifecycle that omitted RETIRED.
 			fixture.daemon.tasks[1].complete(7, "", "native exit without receipt")
-			helpers.assert_eq(cancellations, {"native lifecycle receipt unsettled"})
+			helpers.assert_eq(cancellations, {require("modules.llm.ollama_endpoint").UNREACHABLE})
+			helpers.assert_eq(details, {"restart_failed"})
 			helpers.assert_eq(#fixture.timers, 0)
 			helpers.assert_eq(fixture.daemon.tasks[1].settled, true,
 				"transport exit is observed but the native retirement receipt is absent")
+			-- MAINTAINER DECISION 2026-11-06: the daemon exited and never published
+			-- its port, so the retained debt is released instead of fencing the next owner.
 			local refused = {}
-			helpers.assert_eq(fixture.manager.check_requirements("next", function() end,
+			fixture.manager.check_requirements("next", function() end,
 				function(reason) refused[#refused + 1] = reason end,
-				{is_current = function() return true end}), false)
-			helpers.assert_eq(refused, {"prior_operation_unsettled"})
-			helpers.assert_eq(#fixture.daemon.tasks, 1,
-				"a physical exit cannot replace the missing native retirement authority")
+				{is_current = function() return true end})
+			helpers.assert_eq(refused[1] ~= "prior_operation_unsettled", true,
+				"an exited, never-published daemon no longer fences the next owner")
 		end)
 	end)
 

@@ -15,7 +15,8 @@
 ---    folders it moves. Its report is logged once the logger is ready.
 --- 2. Shared Rules: what moves and what is refused is _shared/lua/
 ---    legacy_folder_migration.lua; this module only resolves the folders and
----    owns the shell effects (POSIX test, ls, mkdir, rmdir and os.rename).
+---    owns the native effects (POSIX test, libuv scandir, mkdir, rmdir) and the
+---    no-replace rename of infra/no_replace_move.
 --- 3. Maintainer Machines Only: no Linux build was published with the old
 ---    folders; this exists for the maintainer's own installs and goes once they
 ---    are moved (docs/tooling/one-folder-name-handoff.md).
@@ -25,6 +26,10 @@ local M = {}
 
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
+local NoReplaceMove = require("infra.no_replace_move")
+-- The installer bundles luv; without it a folder is reported as unlistable
+-- (so nothing is merged, and no link can be mistaken for a second folder).
+local uv_loaded, uv = pcall(require, "luv")
 local quote = require("text_utils").shell_quote
 
 local LOG = "infra.legacy_folder_migration"
@@ -53,19 +58,35 @@ function M.native_ports()
 		exists = function(path)
 			return succeeds("test -e " .. quote(path) .. " || test -L " .. quote(path))
 		end,
+		-- libuv's scandir returns each name's exact bytes, a newline included,
+		-- and an error for a folder it cannot read: a line-split `ls` invented
+		-- names for a newline and reported a refused folder as empty.
 		list = function(dir)
-			local pipe = io.popen("ls -A -- " .. quote(dir) .. " 2>/dev/null")
-			if not pipe then return nil end
+			if not uv_loaded then return nil, "libuv (luv) is unavailable" end
+			local request, open_error = uv.fs_scandir(dir)
+			if not request then return nil, tostring(open_error) end
 			local names = {}
-			for line in pipe:lines() do
-				if line ~= "" then names[#names + 1] = line end
+			while true do
+				local name, next_error = uv.fs_scandir_next(request)
+				if not name then
+					if next_error ~= nil then return nil, tostring(next_error) end
+					return names
+				end
+				names[#names + 1] = name
 			end
-			pipe:close()
-			return names
 		end,
-		rename = function(from, to) return os.rename(from, to) end,
+		-- os.rename replaces an existing destination, so a file published after
+		-- the core's check would be lost; renameat2 RENAME_NOREPLACE never does.
+		rename = function(from, to) return NoReplaceMove.move(from, to) end,
 		make_dir = function(path) return succeeds("mkdir -p -- " .. quote(path) .. " 2>/dev/null") end,
 		remove_empty_dir = function(path) return succeeds("rmdir -- " .. quote(path) .. " 2>/dev/null") end,
+		-- stat follows links: a legacy folder linked to the new one has the new
+		-- one's device and inode.
+		same_object = function(a, b)
+			if not uv_loaded then return false end
+			local left, right = uv.fs_stat(a), uv.fs_stat(b)
+			return type(left) == "table" and type(right) == "table" and left.dev == right.dev and left.ino == right.ino
+		end,
 	}
 end
 
@@ -95,14 +116,49 @@ function M.plan(config_paths)
 	return plan
 end
 
+--- Points the bootstrap folder settings at where their folder moved.
+---
+--- A configuration or logs folder the user chose inside an old folder moved
+--- with it, while storage.json still named the old path. When the setting
+--- cannot be stored, the folder moves back to the path it names.
+--- @param report table Core report; receives relocated and restored rows.
+--- @param storage table|nil adapters.storage (get, set); loaded only after a move.
+--- @param ports table Native effects.
+local function follow_locators(report, storage, ports)
+	report.relocated, report.restored = {}, report.restored or {}
+	if #report.moved + #report.backed_up == 0 then return end
+	-- Loaded after the moves: its path is the default folder that now holds
+	-- the moved storage.json.
+	local store = storage or require("adapters.storage")
+	for _, key in ipairs(require("infra.config_paths").LOCATOR_STORAGE_KEYS) do
+		local value = store.get(key, nil)
+		local target, entry = nil, nil
+		if type(value) == "string" and value:sub(1, 1) == "/" then target, entry = Core.relocated(report, value) end
+		if target then
+			if store.set(key, target) then
+				report.relocated[#report.relocated + 1] = { key = key, from = value, to = target }
+			else
+				local back, why = ports.rename(entry.to, entry.from)
+				if back then
+					report.restored[#report.restored + 1] = { from = entry.to, to = entry.from }
+				else
+					report.kept[#report.kept + 1] = { from = entry.to, to = entry.from, reason = "restore_failed",
+						detail = why }
+				end
+			end
+		end
+	end
+end
+
 --- Runs the migration and prepares the cache folder.
---- @param options table|nil { config_paths, ports } test seams; defaults are the real ones.
+--- @param options table|nil { config_paths, ports, storage } test seams; defaults are the real ones.
 --- @return table report The shared core report, logged later by log().
 function M.run(options)
 	options = options or {}
 	local config_paths = options.config_paths or require("infra.config_paths")
 	local ports = options.ports or M.native_ports()
 	local report = Core.apply(M.plan(config_paths), ports)
+	follow_locators(report, options.storage, ports)
 	-- The updater sends a conditional request only when its cache folder exists
 	-- and never creates it from the event loop, so boot creates it here.
 	report.cache_ready = ports.make_dir(config_paths.cache())
@@ -114,6 +170,9 @@ end
 --- @param report table Report returned by run().
 function M.log(logger, report)
 	Core.log_report(logger, LOG, report)
+	for _, entry in ipairs(report.relocated or {}) do
+		logger.info(LOG, "The bootstrap setting %s now names %s, where %s moved.", entry.key, entry.to, entry.from)
+	end
 	if report.cache_ready == false then
 		logger.warn(LOG, "The cache folder could not be created; update checks will not be conditional.")
 	end

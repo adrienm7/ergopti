@@ -47,6 +47,101 @@ local function fixture()
 end
 
 helpers.describe("one-shot native boundary", function()
+	-- The generated punctuation of a one-shot Shift reaches the CapsWord output
+	-- observer once its returned events are handed off, so a space-only CapsWord
+	-- ends on " :" though the physical "." keeps it (one-shot-capsword-relay).
+	helpers.it("relays the serialized result to the CapsWord observer on handoff (one-shot-capsword-relay)", function()
+		local CapsWordOutput = require("infra.capsword_output")
+		local Policy = require("caps_word.auto_off")
+		local reported = {}
+		helpers.assert_true(CapsWordOutput.set_observer(function(text) reported[#reported + 1] = text end))
+		local ok, err = pcall(function()
+			local text = "."
+			local event = {
+				getFlags = function() return {} end,
+				rawFlags = function() return 0 end,
+				getCharacters = function() return text end,
+				setUnicodeString = function(_, value) text = value end,
+			}
+			local emitted = {}
+			package.loaded["adapters.one_shot_shift"] = nil
+			local adapter = require("adapters.one_shot_shift").new({
+				data = data, magic = function() return "★" end, now = function() return 10 end,
+				event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
+				translate = function(_, flags) return flags == 0 and "." or ":" end,
+				emit = function(value) emitted[#emitted + 1] = value; return true end,
+			})
+			adapter.arm(2)
+			helpers.assert_true(adapter.key_down(event, 47), "the special result is serialized")
+			helpers.assert_eq(#reported, 0, "nothing is reported before the handoff settles")
+			adapter.finish(true)
+			helpers.assert_eq(emitted, { " :" })
+			helpers.assert_eq(reported, { " :" }, "the CapsWord observer sees the generated text")
+			local space_only = assert(Policy.compile({ idle_timeout_seconds = 0, terminators = { "space" },
+				pointer = { left_click = false } }, { "left_click" }))
+			helpers.assert_true(Policy.ends_on_text(space_only, reported[1]), "the generated \" :\" ends a space-only CapsWord")
+			helpers.assert_eq(Policy.ends_on_text(space_only, "."), false, "control: the physical \".\" does not")
+			adapter.arm(2)
+			helpers.assert_true(adapter.key_down(event, 47))
+			adapter.finish(false)
+			helpers.assert_eq(#reported, 1, "a refused handoff reports nothing")
+		end)
+		CapsWordOutput.set_observer(nil)
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("checks the actual shifted Option combination before native emission (one-shot-option-shift)", function()
+		local emitted, raw, text = {}, 16, "é"
+		local event = {
+			getFlags = function() return { alt = true } end,
+			rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end,
+			getCharacters = function() return text end,
+			setUnicodeString = function(_, value) text = value end,
+		}
+		local adapter = require("adapters.one_shot_shift").new({
+			data = data, magic = function() return "★" end, now = function() return 10 end,
+			event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
+			translate = function(_, flags) return ({ [16] = "é", [2] = "É", [18] = "Ω" })[flags] end,
+			emit = function(value) emitted[#emitted + 1] = value; return true end,
+		})
+		adapter.arm(2)
+		helpers.assert_true(adapter.key_down(event, 1), "different Option+Shift output needs Unicode emission")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, { "É" })
+	end)
+	helpers.it("serializes the title when Caps Lock plus Shift would produce lowercase (one-shot-caps-lock, OSM-001)", function()
+		local CAPS, SHIFT = 65536, 2
+		local layout = { [0] = "a", [CAPS] = "A", [SHIFT] = "A", [CAPS | SHIFT] = "a" }
+		local function build(held, captured)
+			local emitted, raw, text = {}, held, captured or layout[held]
+			local event = {
+				getFlags = function() return {} end,
+				rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end,
+				getCharacters = function() return text end,
+				setUnicodeString = function(_, value) text = value end,
+			}
+			local adapter = require("adapters.one_shot_shift").new({
+				data = data, magic = function() return "★" end, now = function() return 10 end,
+				event = { rawFlagMasks = { shift = SHIFT } }, is_repeat = function() return false end,
+				translate = function(_, flags) return layout[flags] end,
+				emit = function(value) emitted[#emitted + 1] = value; return true end,
+			})
+			adapter.arm(2)
+			return adapter, event, emitted, function() return raw end
+		end
+		-- The audit's capture: the key read as "a" while Caps Lock is held. Shift on
+		-- top would type "a" again, so the title is serialized.
+		local adapter, event, emitted, flags = build(CAPS, "a")
+		helpers.assert_true(adapter.key_down(event, 0), "the key is replaced by the serialized title")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, { "A" }, "the first letter is a capital under Caps Lock")
+		helpers.assert_eq(flags(), CAPS, "the physical Caps Lock flag is not stripped")
+		-- Control: no Caps Lock, Shift alone is the title and stays a native flag.
+		adapter, event, emitted, flags = build(0)
+		helpers.assert_eq(adapter.key_down(event, 0), false, "an ordinary key gets the native Shift flag")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, {})
+		helpers.assert_eq(flags(), SHIFT)
+	end)
 	helpers.it("keeps native translation probes private to the synthetic adapter (one-shot-probe)", function()
 		helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance", "tests.stubs.hs" }, function()
 			package.loaded["adapters.synthetic_input"] = nil
@@ -149,6 +244,18 @@ helpers.describe("one-shot native boundary", function()
 		helpers.assert_eq(#calls.emitted, 1)
 		helpers.assert_true(adapter.key_up(event(1), 1))
 		helpers.assert_eq(adapter.claim_repeat(event(1, 0, nil, 1)), false)
+	end)
+	helpers.it("releases a transformed key with Shift after disarm (one-shot-disarm-native)", function()
+		local adapter, event = fixture()
+		adapter.arm(2)
+		local pressed = event(0, 128)
+		adapter.key_down(pressed, 0)
+		adapter.finish(true)
+		helpers.assert_eq(pressed:rawFlags(), 130)
+		adapter.disarm()
+		local released = event(0, 128)
+		helpers.assert_eq(adapter.key_up(released, 0), false)
+		helpers.assert_eq(released:rawFlags(), 130, "the release retains the press's Shift and unrelated flags")
 	end)
 	helpers.it("types a fresh press whose earlier release was missed (one-shot-stale-claim)", function()
 		-- A tap outage lets a release pass unseen. The claim used to outlive it

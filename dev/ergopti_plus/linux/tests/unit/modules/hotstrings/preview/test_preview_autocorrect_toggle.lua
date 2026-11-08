@@ -12,14 +12,15 @@ local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
 local saved = {}
-for _, name in ipairs({ "adapters.graphics_renderer", "adapters.timer_scheduler", "infra.hotstring_preferences",
-	"modules.hotstrings.preview_settings", "ui.tooltip.preview" }) do saved[name] = package.loaded[name] end
+local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "infra.hotstring_preferences",
+	"modules.hotstrings.preview_settings", "ui.tooltip.preview" }
+for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 
 local shown = 0
 package.loaded["adapters.graphics_renderer"] = {
 	is_available = function() return true end,
 	show = function() shown = shown + 1; return true end,
-	hide = function() end,
+	hide = function() return true end,
 	is_visible = function() return shown > 0 end,
 	destroy = function() end,
 }
@@ -68,4 +69,4 @@ helpers.describe("preview_autocorrect_enabled reaches the preview gate (linux-pr
 	end)
 end)
 
-for name, value in pairs(saved) do package.loaded[name] = value end
+for _, name in ipairs(names) do package.loaded[name] = saved[name].value end

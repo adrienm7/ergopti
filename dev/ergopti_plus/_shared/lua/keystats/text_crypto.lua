@@ -80,6 +80,9 @@ M.KDF_DIGEST = "sha256"
 --- The salt is therefore a constant: it separates this key from any other key
 --- derived from the same machine ID, which is all a salt can do here.
 --- (16 bytes, the ASCII of "ergopti-metrics1").
+--- OpenSSL enc's historical default consumes the first 8 bytes of this value.
+--- Specifying -saltlen 16 changes the key and makes existing rows unreadable;
+--- a future codec change must retain a reader for that historical derivation.
 M.KDF_SALT_HEX = "6572676f7074692d6d65747269637331"
 
 --- Length of an AES-256 key and of an AES block, in hex characters.

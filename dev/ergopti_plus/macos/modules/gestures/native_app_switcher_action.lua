@@ -8,7 +8,7 @@ local Runtime = require("adapters.system_switcher_runtime")
 local Timings = require("infra.timings")
 local Logger = require("infra.logger")
 local LOG = "gestures.native_app_switcher"
-local initialized, active = false, nil
+local initialized, input_initialized, active = false, false, nil
 local scopes = {}
 local function scope(parent)
 	if type(parent) ~= "string" or parent == "" then return nil end
@@ -22,7 +22,11 @@ local function configure()
 	if descriptor == nil then return false end
 	local policy = { deadline_sec = Timings.sec("gestures", "native_switcher_deadline_ms"),
 		poll_sec = Timings.sec("gestures", "native_switcher_poll_ms") }
-	if not Input.init_system_switcher(descriptor, policy) or not Facade.init(policy) then return false end
+	if not input_initialized then
+		if not Input.init_system_switcher(descriptor, policy) then return false end
+		input_initialized = true
+	end
+	if not Facade.init(policy) then return false end
 	initialized = true
 	return true
 end

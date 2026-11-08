@@ -55,7 +55,7 @@ local function with_save(mode, callback)
 				return {
 					write = function(self, header, payload)
 						state.writes = state.writes + 1
-						helpers.assert_true(header:find("^ERGOPTI_TYPING_METRICS_SNAPSHOT 2 %d+ " .. #payload .. "\n$") ~= nil,
+						helpers.assert_true(header:find("^ERGOPTI_TYPING_METRICS_SNAPSHOT 3 %d+ " .. #payload .. "\n$") ~= nil,
 							"the header carries the format version, the time and the payload length")
 						helpers.assert_eq(payload:sub(1, 12), '{"manifest":')
 						if state.mode == "write_throw" then error("PRIVATE_PAYLOAD") end

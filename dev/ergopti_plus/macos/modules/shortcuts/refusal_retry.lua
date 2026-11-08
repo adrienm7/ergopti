@@ -49,6 +49,17 @@ function M.new(log_tag, attempt)
 	local series = {}
 	local generation = 0
 	local handle = nil
+	local cleanup_debt = {}
+
+	local function settle_debt()
+		local settled = true
+		for pending in pairs(cleanup_debt) do
+			local ok, cancelled = pcall(TimerScheduler.cancel, pending)
+			if ok and cancelled == true then cleanup_debt[pending] = nil
+			else settled = false end
+		end
+		return settled
+	end
 
 	local function warn_exhausted()
 		Logger.warn(log_tag,
@@ -57,9 +68,16 @@ function M.new(log_tag, attempt)
 	end
 
 	local function arm(index)
+		if not settle_debt() then
+			Logger.error(log_tag, "Refused shortcut retry timer cleanup remains pending.")
+			return false
+		end
 		local armed_generation = generation
 		local ok, candidate, committed = pcall(TimerScheduler.after, M.DELAYS_SEC[index], function()
 			if armed_generation ~= generation then return end
+			-- after() stops its repeating native timer before calling us, but that
+			-- stop can fail. Keep the fired handle until its cleanup commits.
+			if type(handle) == "table" and handle.timer ~= nil then cleanup_debt[handle] = true end
 			handle = nil
 			local final = index == #M.DELAYS_SEC
 			local ok_attempt, settled = xpcall(attempt, debug.traceback, final, index)
@@ -77,6 +95,9 @@ function M.new(log_tag, attempt)
 			end
 		end)
 		if not ok or committed ~= true then
+			if ok and type(candidate) == "table" and candidate.timer ~= nil then
+				cleanup_debt[candidate] = true
+			end
 			Logger.error(log_tag, "Refused shortcut retry %d could not be scheduled: %s.",
 				index, tostring(candidate))
 			return false
@@ -90,20 +111,23 @@ function M.new(log_tag, attempt)
 	function series.cancel()
 		generation = generation + 1
 		local live = handle
-		handle = nil
-		if live == nil then return true end
-		local ok, cancelled = pcall(TimerScheduler.cancel, live)
-		if not ok or cancelled == false then
-			Logger.error(log_tag, "Refused shortcut retry timer did not cancel: %s.", tostring(cancelled))
-			return false
+		local settled = settle_debt()
+		if live ~= nil then
+			local ok, cancelled = pcall(TimerScheduler.cancel, live)
+			if not ok or cancelled ~= true then
+				Logger.error(log_tag, "Refused shortcut retry timer did not cancel: %s.", tostring(cancelled))
+				settled = false
+			elseif handle == live then
+				handle = nil
+			end
 		end
-		return true
+		return settled
 	end
 
 	--- Starts a fresh bounded series, replacing any running one.
 	--- @return boolean armed
 	function series.schedule()
-		series.cancel()
+		if series.cancel() ~= true then return false end
 		return arm(1)
 	end
 
@@ -115,7 +139,7 @@ function M.new(log_tag, attempt)
 	function series.resume(index)
 		assert(math.type(index) == "integer" and index >= 1 and index <= #M.DELAYS_SEC,
 			"refusal retry resume needs a retry index")
-		series.cancel()
+		if series.cancel() ~= true then return false end
 		if index == #M.DELAYS_SEC then
 			warn_exhausted()
 			return false

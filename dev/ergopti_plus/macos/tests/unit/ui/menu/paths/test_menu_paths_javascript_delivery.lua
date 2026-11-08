@@ -32,6 +32,19 @@ local function with_editor(callback)
 end
 
 helpers.describe("paths JavaScript delivery", function()
+	helpers.it("(paths-draft-init) ready and delayed navigation target the same document", function()
+		with_editor(function(_, calls, _, evaluations, pending)
+			calls.bridge_callback({ body = { action = "ready" } })
+			helpers.assert_eq(#evaluations, 1)
+			calls.options.on_navigation("didFinishNavigation")
+			helpers.assert_eq(#pending, 1)
+			pending[1]()
+			helpers.assert_eq(#evaluations, 2)
+			for _, evaluation in ipairs(evaluations) do
+				helpers.assert_true(evaluation.code:find("window.initData(", 1, true) ~= nil)
+			end
+		end)
+	end)
 	for _, mode in ipairs({ "false", "throw" }) do
 		helpers.it("(paths-js-delivery) construction scheduling refusal " .. mode .. " is visible", function()
 			with_editor(function(editor, calls, _, evaluations)

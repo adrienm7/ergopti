@@ -143,6 +143,16 @@ M.SCRIPTS = {
 -- The level the microphone had before this session muted it. Declared above
 -- every reader.
 local _mic_restore_level = nil
+local _mic_operation = nil
+
+-- PAUSE fences the result callback before terminating the process. Retain the
+-- marker until its parent reports settlement so another parent cannot race an
+-- old AppleScript that is still changing the same system input level.
+AuxOwner.register_pause_listener("system_actions_mic", function(parent)
+	if _mic_operation and _mic_operation.parent == parent then
+		_mic_operation.cancelled = true
+	end
+end)
 
 --- Shows a short notice for an action that had nothing to act on.
 --- @param key string Locale key of the notice.
@@ -365,12 +375,24 @@ end
 --- @param parent string|nil
 --- @return boolean started
 function M.mic_mute_toggle(parent)
+	if _mic_operation then
+		if _mic_operation.cancelled and not AuxOwner.has_pending(_mic_operation.parent) then
+			_mic_operation = nil
+		else
+			Logger.warn(LOG, "Microphone toggle refused while an earlier toggle is still owned.")
+			return false
+		end
+	end
+	local operation = { parent = type(parent) == "string" and parent ~= "" and parent or "gestures" }
+	_mic_operation = operation
 	local restore = _mic_restore_level or M.MIC_DEFAULT_RESTORE_LEVEL
 	Logger.start(LOG, "Toggle the microphone…")
 	local started = run_script(string.format(M.SCRIPTS.mic_toggle, restore), false, "Toggle the microphone",
 		function(ok, out)
+			if _mic_operation ~= operation or operation.cancelled then return end
 			if not ok or type(out) ~= "string" then
 				Logger.error(LOG, "The microphone could not be toggled.")
+				_mic_operation = nil
 				return
 			end
 			local level = out:match("^muted (%d+)$")
@@ -382,8 +404,12 @@ function M.mic_mute_toggle(parent)
 			else
 				Logger.error(LOG, "Unexpected microphone toggle result '%s'.", out)
 			end
+			if _mic_operation == operation then _mic_operation = nil end
 		end, parent)
-	if not started then Logger.error(LOG, "The microphone toggle could not start.") end
+	if not started then
+		if _mic_operation == operation then operation.cancelled = true end
+		Logger.error(LOG, "The microphone toggle could not start.")
+	end
 	return started
 end
 

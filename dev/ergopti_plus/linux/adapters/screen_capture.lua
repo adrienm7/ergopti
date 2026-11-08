@@ -32,6 +32,27 @@ local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "adapters.screen_capture"
 
+-- Captures waiting for the native child and their exact staging cleanup.
+local _pending_cleanup = {}
+
+function M.cleanup_pending() return next(_pending_cleanup) ~= nil end
+
+--- Cancels each original capture and waits for its process and files to retire.
+function M.shutdown()
+	for owner in pairs(_pending_cleanup) do
+		if owner.settled then
+			owner.cleanup()
+		else
+			if owner.cancel and not owner.cancel_requested then
+				owner.cancel_requested = true
+				pcall(owner.cancel)
+			end
+			if owner.observe then owner.observe() end
+		end
+	end
+	return not M.cleanup_pending()
+end
+
 
 
 
@@ -66,7 +87,9 @@ M.SCRIPT = table.concat({
 	'shot() {',
 	'	if [ "$mode" = region ]; then',
 	'		if [ -n "$WAYLAND_DISPLAY" ] && has slurp && has grim; then',
-	'			if g=$(slurp 2>&1); then grim -g "$g" "$out"; return; fi',
+	'			if g=$(slurp 2>"$out"); then rm -f -- "$out" || return 1; grim -g "$g" "$out"; return; fi',
+	'			g=; while IFS= read -r line || [ -n "$line" ]; do g="$g$line"; done < "$out"',
+	'			rm -f -- "$out" || return 1',
 	'			case "$g" in *ancel*) return ' .. M.EXIT_CANCELLED .. ';; esac',
 	'		fi',
 	'		if has gnome-screenshot; then gnome-screenshot -a -f "$out"; return; fi',
@@ -89,9 +112,11 @@ M.SCRIPT = table.concat({
 	'shot; s=$?',
 	'[ "$s" -eq 0 ] || exit "$s"',
 	'[ -s "$out" ] || exit ' .. M.EXIT_NO_FILE,
-	'if has magick; then magick "$out" -resize "${edge}x${edge}>" "$out" && exit 0',
-	'elif has convert; then convert "$out" -resize "${edge}x${edge}>" "$out" && exit 0',
+	'scaled="${out}.scaled.png"',
+	'if has magick; then magick "$out" -resize "${edge}x${edge}>" "$scaled" && [ -s "$scaled" ] && mv -f -- "$scaled" "$out" && exit 0',
+	'elif has convert; then convert "$out" -resize "${edge}x${edge}>" "$scaled" && [ -s "$scaled" ] && mv -f -- "$scaled" "$out" && exit 0',
 	'fi',
+	'rm -f -- "$scaled" || exit 1',
 	'echo ' .. M.UNSCALED_MARKER,
 }, "\n")
 
@@ -112,6 +137,9 @@ M.SCRIPT = table.concat({
 --- @return table { status = "ok"|"cancelled"|"failed", scaled = boolean, reason = string|nil (an adapter_errors id), detail = any|nil (the exit code or the runner's error) }
 function M.classify(mode, code, stdout, err)
 	if code == 0 then
+		if err ~= nil then
+			return { status = "failed", scaled = false, reason = Errors.SCREEN_CAPTURE_TOOL_FAILED, detail = err }
+		end
 		local unscaled = type(stdout) == "string" and stdout:find(M.UNSCALED_MARKER, 1, true) ~= nil
 		return { status = "ok", scaled = not unscaled }
 	end
@@ -172,20 +200,62 @@ function M.capture(mode, max_edge, on_done)
 	local dir = private_dir()
 	if not dir then return nil, "no private directory could be created" end
 	local path = dir .. "/screen.png"
-	local run, reason = ShellRunner.run_async("sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
+	local cleanup_owner = {}
+	_pending_cleanup[cleanup_owner] = true
+	local function remove_staging()
+		local removed_all = true
+		for _, item in ipairs({ path .. ".scaled.png", path, dir }) do
+			local removed, err = os.remove(item)
+			if not removed then
+				local checked, kind, _, code = pcall(function() return require("infra.native_directory").target_kind(item) end)
+				if not checked or kind ~= nil or code ~= "ENOENT" then
+					removed_all = false
+					Logger.error(LOG, "A screenshot file could not be deleted: %s", tostring(err))
+				end
+			end
+		end
+		if removed_all then _pending_cleanup[cleanup_owner] = nil end
+	end
+	cleanup_owner.cleanup = remove_staging
+	local function settled()
+		if cleanup_owner.settled then return end
+		cleanup_owner.settled = true
+		remove_staging()
+	end
+	local function observe(subscribe)
+		if cleanup_owner.settled or cleanup_owner.registered then return true end
+		if type(subscribe) ~= "function" then return false end
+		cleanup_owner.registered = true
+		local called, accepted = pcall(subscribe, settled)
+		if cleanup_owner.settled then return true end
+		if not called or accepted ~= true then cleanup_owner.registered = false; return false end
+		return true
+	end
+	local called, run, reason, cleanup = pcall(ShellRunner.run_async, "sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
 		{ timeout_ms = mode == "region" and REGION_TIMEOUT_MS or FULL_TIMEOUT_MS }, function(result)
-			local outcome = M.classify(mode, result.code, result.stdout, result.error)
+			local failure = result.error
+			if result.code == 0 and result.ok ~= true and failure == nil then failure = "capture completion was not acknowledged" end
+			local outcome = M.classify(mode, result.code, result.stdout, failure)
 			if outcome.status == "failed" and type(result.stderr) == "string" and result.stderr ~= "" then
 				Logger.debug(LOG, "Capture tool said: %s", result.stderr:sub(1, 200))
 			end
 			on_done(outcome)
 		end)
-	if not run then
-		os.remove(dir)
-		return nil, "the capture could not start: " .. tostring(reason)
+	if not called or not run then
+		-- A screenshot can already exist when a post-spawn pipe fails. Retire
+		-- it only once that exact child cannot write another image.
+		if cleanup then
+			local original_observer = cleanup.on_settled
+			cleanup_owner.observe = function() return observe(original_observer) end
+			if not cleanup_owner.observe() then Logger.error(LOG, "Screenshot cleanup could not be observed.") end
+		else settled() end
+		return nil, "the capture could not start: " .. tostring(called and reason or run)
 	end
 	Logger.debug(LOG, "Screen capture started (mode=%s).", mode)
-	return { path = path, dir = dir, cancel = run.cancel }, nil
+	local original_observer = run.on_settled
+	local function discard() return observe(original_observer) end
+	cleanup_owner.cancel, cleanup_owner.observe = run.cancel, discard
+	return { path = path, dir = dir, cancel = run.cancel, discard = discard }, nil
 end
 
 return M

@@ -69,9 +69,7 @@ local _state = {
 	graph = DEFAULTS.graph,
 	anchor = nil,
 	history = {},
-	last_active_s = 0,
 	last_mouse_s = 0,
-	pointer = nil,
 	last_draw_s = nil,
 	last_frame = nil,
 	shown = false,
@@ -80,6 +78,7 @@ local _state = {
 -- The drawing surface; replaceable by tests.
 local _surface = nil
 local _restore_debt = nil
+local _hide_pending = false
 
 local clone = TableUtil.deep_copy
 
@@ -126,13 +125,17 @@ local function position_keys()
 	return canon.position.storage_x, canon.position.storage_y
 end
 
+local function finite(value)
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
 --- The pill's saved top-left corner, or nil for the default place.
 local function stored_anchor()
 	local Storage = storage()
 	local x_key, y_key = position_keys()
 	if not Storage or not x_key then return nil end
 	local x, y = tonumber(Storage.get(x_key, nil)), tonumber(Storage.get(y_key, nil))
-	if not x or not y then return nil end
+	if not finite(x) or not finite(y) then return nil end
 	return { x = x, y = y }
 end
 
@@ -148,7 +151,7 @@ end
 --- @param x number The dropped frame's top-left corner.
 --- @param y number
 local function on_moved(x, y)
-	if _restore_debt or not Preferences.admit() then return end
+	if not finite(x) or not finite(y) or _restore_debt or not Preferences.admit() then return end
 	local frame = _state.last_frame
 	local canon = Constants.load()
 	if not frame or not canon then return end
@@ -271,10 +274,12 @@ local function hide()
 	local Surface = surface()
 	if Surface and type(Surface.hide) == "function" then
 		local called, hidden = pcall(Surface.hide)
-		if not called or hidden ~= true then return false end
+		if not called or hidden ~= true then _hide_pending = true; return false end
 	elseif _state.shown then
+		_hide_pending = true
 		return false
 	end
+	_hide_pending = false
 	_state.shown = false
 	return true
 end
@@ -282,7 +287,7 @@ end
 --- Captures the exact frame and choices without writing preferences.
 --- @return table snapshot Detached runtime state.
 function M.configuration_snapshot()
-	if _restore_debt then return nil end
+	if _restore_debt or _hide_pending then return nil end
 	return clone(_state)
 end
 
@@ -302,6 +307,7 @@ function M.apply_configuration(candidate)
 		local x, y = Model.frame_origin(canon, candidate.last_frame, candidate.anchor.x, candidate.anchor.y)
 		local called, drawn = pcall(Surface.draw, clone(candidate.last_frame), x, y)
 		if not called or drawn ~= true then return false end
+		_hide_pending = false
 	elseif hide() ~= true then
 		return false
 	end
@@ -400,14 +406,15 @@ end
 -- =========================================
 -- =========================================
 
---- Records whether the pointer moved since the last refresh.
-local function watch_pointer(Surface, now_s)
-	if type(Surface.pointer_position) ~= "function" then return end
-	local x, y = Surface.pointer_position()
-	if not x then return end
-	local last = _state.pointer
-	if last and (last.x ~= x or last.y ~= y) then _state.last_mouse_s = now_s end
-	_state.pointer = { x = x, y = y }
+--- Captures pointer activity at its callback time, before a later key can arrive.
+--- Polling position during rendering reverses mouse-then-key order within a tick.
+--- @param kind string Native pointer event kind.
+--- @param value number|nil Native value.
+--- @param now_s number Monotonic seconds.
+function M.observe_pointer(kind, value, now_s)
+	if kind == "press" or kind == "absolute_motion" or (kind == "motion" and value ~= 0) then
+		_state.last_mouse_s = now_s
+	end
 end
 
 --- Refreshes the widget. Called from the daemon's periodic tick; it redraws
@@ -418,6 +425,7 @@ end
 function M.tick(stats, now_s)
 	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
+	if _hide_pending and not hide() then return nil end
 	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
 	_state.last_draw_s = now_s
 	local canon = Constants.load()
@@ -425,17 +433,15 @@ function M.tick(stats, now_s)
 	if not canon or not Surface or not Surface.is_available() then return nil end
 
 	local opts = M.frame_options(now_s, _state.use_source_colors)
-	local source = Model.active_source(stats, HOLD_S, now_s)
+	local source = Model.active_source(stats, HOLD_S, now_s, canon)
 	local wpm = tonumber(stats and stats.wpm) or 0
 	Model.push_history(canon, _state.history, wpm, source)
-	watch_pointer(Surface, now_s)
 
-	local show, last_active = Model.widget_visible({
+	local show = Model.widget_visible({
 		wpm = wpm, source = source, tooltip_visible = M.tooltip_visible(), now_s = now_s,
-		last_active_s = _state.last_active_s, last_mouse_s = _state.last_mouse_s,
+		last_input_s = stats and stats.last_input_time, last_mouse_s = _state.last_mouse_s,
 		idle_hide_s = IDLE_HIDE_S,
 	})
-	_state.last_active_s = last_active
 	-- A drag moves the pointer; the widget the user is holding must not vanish.
 	if Surface.is_dragging() then show = true end
 	if not show then
@@ -456,7 +462,14 @@ function M.tick(stats, now_s)
 	end
 	local x, y = Model.frame_origin(canon, frame, _state.anchor.x, _state.anchor.y)
 	_state.last_frame = frame
-	_state.shown = Surface.draw(frame, x, y) == true
+	-- The surface can become visible before a later native draw step refuses.
+	-- Treat that attempt as shown until an acknowledged hide proves otherwise.
+	_state.shown = true
+	local called, drawn = pcall(Surface.draw, frame, x, y)
+	if not called or drawn ~= true then
+		hide()
+		return nil
+	end
 	return frame
 end
 
@@ -477,14 +490,13 @@ end
 --- Clears module state. Tests only.
 function M._reset()
 	_restore_debt = nil
+	_hide_pending = false
 	_state.running = false
 	_state.use_source_colors = DEFAULTS.source_colors
 	_state.graph = DEFAULTS.graph
 	_state.anchor = nil
 	_state.history = {}
-	_state.last_active_s = 0
 	_state.last_mouse_s = 0
-	_state.pointer = nil
 	_state.last_draw_s = nil
 	_state.last_frame = nil
 	_state.shown = false

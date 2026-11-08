@@ -18,7 +18,10 @@ local function with_installer(options, check)
 			helpers.assert_eq(path, "../macos/adapters/release_stage.sh")
 			return helpers.driver_root() .. "adapters/release_stage.sh"
 		end }
-		package.loaded["adapters.file_system"] = { read = function(path)
+		package.loaded["adapters.file_system"] = { classify_no_follow = function()
+			if options.previous then return { mode = "directory" }, "ok" end
+			return nil, "absent"
+		end, read = function(path)
 			local file = assert(io.open(path, "rb"))
 			local content = assert(file:read("a")); assert(file:close()); return content
 		end }
@@ -48,6 +51,14 @@ local function with_installer(options, check)
 end
 
 helpers.describe("detached installer waits for its arming receipt", function()
+	helpers.it("reports an occupied previous backup after an arming refusal", function()
+		with_installer({ previous = true }, function(installer, seen)
+			helpers.assert_true(installer.arm_swap("/tmp/stage/app/ErgoptiPlus.app", seen.done))
+			seen.completed(false, "", "")
+			helpers.assert_eq(seen.results[1][1], false)
+			helpers.assert_eq(seen.results[1][2], "previous_backup_occupied")
+		end)
+	end)
 	helpers.it("does not settle from dispatch alone (release-arming-receipt)", function()
 		with_installer(nil, function(installer, seen)
 			helpers.assert_eq(installer.arm_swap("/tmp/stage/app/ErgoptiPlus.app", seen.done), true)

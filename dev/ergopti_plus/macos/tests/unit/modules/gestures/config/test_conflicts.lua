@@ -274,7 +274,7 @@ helpers.describe("Conflicts — slots taken by a macOS gesture", function()
 		local armed, cancelled = 0, 0
 		local scheduler = {
 			every = function(_interval, _fn) armed = armed + 1; return { id = armed }, true end,
-			cancel = function() cancelled = cancelled + 1 end,
+			cancel = function() cancelled = cancelled + 1; return true end,
 		}
 		helpers.assert_true(conflicts.start_watch(scheduler))
 		helpers.assert_true(conflicts.start_watch(scheduler))
@@ -399,7 +399,9 @@ helpers.describe("Conflicts — the macOS settings read is started", function()
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(_, _, callback)
 				local settled = false
+				-- The real ShellRunner handle contract: start, isSettled and terminate.
 				local handle = { isSettled = function() return settled end }
+				handle.terminate = function() settled = true; return true end
 				handle.start = function()
 					started = started + 1
 					pending[#pending + 1] = function()

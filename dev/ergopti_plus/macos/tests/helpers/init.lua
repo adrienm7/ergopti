@@ -372,6 +372,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.system_mouse"] = nil
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
+	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
+		loaded["adapters.clipboard"] = nil
+	end
 	-- Every screen-capture owner shares the flow's once-per-process permission
 	-- prompt. A fresh owner must not inherit the previous fixture's prompt.
 	if module_name == "modules.shortcuts.actions.system"
@@ -447,7 +450,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- modules.keystats (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
 	-- (field 'ms')" the moment modules.keystats is not already cached.
-	loaded["infra.timings"] = nil
+	-- The real registry itself is immutable and survives: a fixture that
+	-- virtualised the file system installed it through M.provide_timings(), and
+	-- re-parsing constants.toml here would fail under that virtual file system.
+	if loaded["infra.timings"] ~= REAL_TIMINGS then loaded["infra.timings"] = nil end
+
+	-- Clipboard borrowing admission is process-global: each test starts with no
+	-- borrower registered by a previous test's module instances.
+	loaded["infra.clipboard_borrowers"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and

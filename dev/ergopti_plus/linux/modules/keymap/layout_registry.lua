@@ -252,7 +252,13 @@ function M.settings()
 	if not layouts then return nil, layouts_err end
 	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
 	if not updater then return nil, updater_err end
-	return Registry.resolve(layouts, updater, require("modules.updater.manager").installed_channel())
+	-- The daemon runs without the updater (Main loads it optionally), so its
+	-- absence is this function's refusal, not a raise that ends the daemon.
+	local loaded, Updater = pcall(require, "modules.updater.manager")
+	if not loaded or type(Updater) ~= "table" or type(Updater.installed_channel) ~= "function" then
+		return nil, "the updater cannot name the installed channel: " .. tostring(loaded and "no installed_channel" or Updater)
+	end
+	return Registry.resolve(layouts, updater, Updater.installed_channel())
 end
 
 --- The first candidate path that exists under the driver root.
@@ -346,6 +352,28 @@ end
 local function managed_python(confirm)
 	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
 	local native = require("luv")
+	local function managed_process(program, args, callback)
+		local delivered, constructing, pending = false, true, nil
+		local function deliver(result)
+			if delivered then return end
+			if constructing then pending = pending or result; return end
+			delivered = true
+			callback(result)
+		end
+		local started = ProcessRunner.run(program, args, { timeout_ms = timeout_ms }, deliver)
+		constructing = false
+		if pending ~= nil then
+			if started == true then deliver(pending)
+			else deliver({ exit_code = -1, error = "process was not admitted" }) end
+		elseif started ~= true and not delivered then
+			-- A false start may still retain native debt. Only a globally settled
+			-- runner proves that no process can still touch the staging tree.
+			local observed, settled = pcall(ProcessRunner.is_settled)
+			if observed and settled == true and not delivered then
+				deliver({ exit_code = -1, error = "process was not admitted" })
+			end
+		end
+	end
 	local deps = {
 		pin = require("_generated.native_runtime").managed_python,
 		data_dir = ConfigPaths.data(),
@@ -365,16 +393,33 @@ local function managed_python(confirm)
 		end,
 		unpack = function(archive, into, callback)
 			if not ShellRunner.has_command("tar") then callback(false, "tar is not installed") return end
-			ProcessRunner.run("tar", { "-xzf", archive, "-C", into, "--no-same-owner" }, { timeout_ms = timeout_ms },
+			managed_process("tar", { "-xzf", archive, "-C", into, "--no-same-owner" },
 				function(result) callback(result.exit_code == 0 and result.error == nil, result.error or result.stderr) end)
 		end,
-		ensure_dir = ensure_dir,
+		create_stage = function(root)
+			local parent = NativePath.dirname(root)
+			if not parent or not ensure_dir(parent) or type(native.fs_mkdtemp) ~= "function"
+				or type(native.fs_lstat) ~= "function" then return nil end
+			local stage = native.fs_mkdtemp(root .. ".staging.XXXXXX")
+			if type(stage) ~= "string" then return nil end
+			local identity = native.fs_lstat(stage)
+			local function exact_integer(value)
+				return type(value) == "number" and value >= 0 and value < 2 ^ 53 and value % 1 == 0
+			end
+			if type(identity) ~= "table" or identity.type ~= "directory"
+				or not exact_integer(identity.dev) or not exact_integer(identity.ino) then return nil end
+			local dev, ino = identity.dev, identity.ino
+			return stage, function()
+				local now = native.fs_lstat(stage)
+				return type(now) == "table" and now.type == "directory" and now.dev == dev and now.ino == ino
+			end
+		end,
 		remove_tree = function(path, callback)
-			ProcessRunner.run("rm", { "-rf", "--", path }, { timeout_ms = timeout_ms },
+			managed_process("rm", { "-rf", "--", path },
 				function(result) callback(result.exit_code == 0 and result.error == nil) end)
 		end,
 		delete = FileSystem.delete,
-		rename = os.rename,
+		rename = require("infra.no_replace_move").move,
 	}
 	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
 end
@@ -610,6 +655,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	local result, convert_err = XkbConverter.convert(canonical, {
 		keycodes = keycodes,
 		keysyms = keysym_table.keysyms,
+		locale_extended_prefixes = keysym_table.locale_extended_prefixes,
 		template = template,
 		layout_id = entry.id,
 		display_name = entry.name,
@@ -1329,6 +1375,27 @@ function M.read_local_copy(id, deps)
 	local text = resolved.read(resolved.local_dir .. id .. ".keylayout")
 	if type(text) ~= "string" then return nil, "the installed copy of '" .. tostring(id) .. "' is unreadable" end
 	return text, nil
+end
+
+--- The text and index entry of a layout the app ships, read from the shipped
+--- registry the offline install uses (the layout emulation's source of a layout
+--- the layout manager has not installed). macOS has the same function.
+--- @param id string Registry id.
+--- @param deps table|nil
+--- @return table|nil shipped { entry, text }
+--- @return string|nil error
+function M.shipped_layout(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local index = bundled_index(resolved)
+	for _, entry in ipairs(type(index) == "table" and index.layouts or {}) do
+		if entry.id == id then
+			local text = type(resolved.bundled_dir) == "string" and resolved.read(resolved.bundled_dir .. entry.file) or nil
+			if type(text) ~= "string" then return nil, "the shipped " .. id .. " layout is unreadable" end
+			return { entry = entry, text = text }, nil
+		end
+	end
+	return nil, "the app ships no " .. tostring(id) .. " layout"
 end
 
 --- The digest of a text, through the driver's own digest port (the Debug check of

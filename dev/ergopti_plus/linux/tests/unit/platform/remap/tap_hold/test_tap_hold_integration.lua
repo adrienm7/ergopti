@@ -509,12 +509,41 @@ end)
 -- The maintainer's rule of 2026-10-01: whatever option the hold picker offers
 -- (one modifier, every combination, the layer, none) is the hold the key has
 -- after the pick, on a key that held another one before.
+--
+-- Space is a typing key, decided by the order of the releases, and the
+-- installed manager decides one only from a native-origin receipt of its key
+-- press. The hook's _test_drive reads through a custom backend, which never
+-- mints one, so Space stayed itself whatever was picked: this case drives the
+-- controlled native Reader instead.
+
+--- Runs `body(s)` on the real Manager over the controlled native Reader, with
+--- the real writer on the same user file; s.drive feeds { code, value, at_ms }.
+local function with_native_session(user_text, body)
+	require("tests.support.input_owner_fixture").with_manager_session({ tap_hold_text = user_text, nav_fixture = true },
+		function(s)
+			local Writer = helpers.load_module("platform.remap.tap_hold_writer")
+			Writer.init({ path = s.tap_path, reload = s.manager.reload, is_tap_action = s.manager.is_tap_action,
+				canonical_hold = s.manager.canonical_hold })
+			s.writer = Writer
+			function s.drive(events)
+				local before, emitted = #s.rows, {}
+				for _, event in ipairs(events) do s.edge("a", event[1], event[2], event[3]) end
+				for index = before + 1, #s.rows do emitted[#emitted + 1] = s.rows[index][1] .. ":" .. s.rows[index][2] end
+				s.last = emitted
+				return table.concat(emitted, " ")
+			end
+			local ok, err = pcall(body, s)
+			Writer._reset_for_test()
+			if not ok then error(err, 0) end
+		end)
+end
+
 helpers.describe("tap-holds end to end: every option of the hold picker", function()
 
 	helpers.it("(hold-picker-every-option-2026-10-01) the hold a key gets is the option picked, after Shift", function()
 		local Engine = require("platform.remap.tap_hold_engine")
 		local SPACE = Engine.KEY_CODES.space
-		with_session('[tap_hold.keys.space]\nhold_modifier = "shift"\n', function(s)
+		with_native_session('[tap_hold.keys.space]\nhold_modifier = "shift"\n', function(s)
 			local options = s.manager.hold_options()
 			local kinds = { none = 0, modifier = 0, layer = 0 }
 			for index, option in ipairs(options) do

@@ -349,6 +349,9 @@ local function interceptor(event, km_buffer, ctx)
 	-- is synchronous; keeping it true beyond this point would block re-entrancy.
 	_is_injecting = false
 	if ok then
+		if keystats and type(keystats.log_private_hotstring) == "function" then
+			pcall(keystats.log_private_hotstring, rule.suffix .. _trigger, result)
+		end
 		Logger.info(LOG, "Dynamic rule injection completed.")
 	end
 
@@ -373,7 +376,13 @@ local function preview_provider(buf, start_is_boundary)
 	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard, start_is_boundary)
 	if not ResolutionOwner.current(resolution, _active_start_token, _km, _trigger,
 		match and match.rule.section) then return nil end
-	if not match then return require("modules.dynamic_hotstrings.user_code").preview(buf) end
+	if not match then
+		-- A programmable preview is declared display metadata and its callback
+		-- types literally, so it must not be projected as TOML output tokens.
+		local described = require("modules.dynamic_hotstrings.user_code").preview(buf)
+		if described == nil then return nil end
+		return { text = described, literal = true }
+	end
 	local token = {}
 	_preview_snapshot = {
 		buffer = buf,
@@ -412,15 +421,15 @@ local function prefix_values(personal_data)
 		and personal_data.social_security_number or tostring(personal_data.social_security_number or "")
 	local iban = type(personal_data.iban) == "string"
 		and personal_data.iban or tostring(personal_data.iban or "")
-	return phone, formatted_phone, ssn:gsub("%s+", ""), ssn,
-		iban:gsub("%s+", ""), iban
+	return phone, formatted_phone, SharedEngine.strip_prefix_spacing(ssn), ssn,
+		SharedEngine.strip_prefix_spacing(iban), iban
 end
 
 --- Publishes prefix counts into the exact section descriptors owned by the menu.
 --- @param personal_data table Personal-information snapshot.
 local function publish_prefix_counts(personal_data)
-	local phone, formatted_phone, ssn_raw, _, iban_raw = prefix_values(personal_data)
-	local counts = SharedEngine.compute_prefix_counts(phone, formatted_phone, ssn_raw, iban_raw)
+	local phone, formatted_phone, _, ssn, _, iban = prefix_values(personal_data)
+	local counts = SharedEngine.compute_prefix_counts(phone, formatted_phone, ssn, iban)
 	if type(_sections) ~= "table" then return end
 	for _, section in ipairs(_sections) do
 		if type(section) == "table" and counts[section.name] ~= nil then
@@ -469,7 +478,10 @@ local function register_prefix_entries()
 	-- out: the trigger prefix is itself a fragment of the secret (the first 5
 	-- digits of the SSN, the first 6 chars of the IBAN), so redacting only the
 	-- replacement would still leak
-	local base_opts = { is_word = true, auto_expand = true, is_case_sensitive = true, is_private = true }
+	-- literal_output: a personal value is user data, so a "{Tab}" inside it is typed
+	-- as text and never pressed as a key.
+	local base_opts = { is_word = true, auto_expand = true, is_case_sensitive = true, is_private = true,
+		literal_output = true }
 
 	--- Copies the shared flags and names the personal_info.toml field the value
 	--- came from.
@@ -509,26 +521,29 @@ local function register_prefix_entries()
 			local phone_opts  = opts_for("phone_number")
 			local phone_magic_opts = opts_for("phone_number", { is_magic_trigger = true })
 			local fphone_opts = opts_for("phone_number_clean")
-			if #phone >= 2 then
-				add_mapping(phone:sub(1, 2) .. _trigger, phone, phone_magic_opts)
-				add_mapping("+33" .. phone:sub(1, 2), "+33" .. phone, phone_opts)
+			-- A national trunk zero is not dialled after the French country code,
+			-- matching the Windows and Linux international output.
+			local international_phone = "+33" .. (phone:sub(1, 1) == "0" and phone:sub(2) or phone)
+			if text_utils.utf8_len(phone) >= 2 then
+				add_mapping(text_utils.utf8_sub(phone, 1, 2) .. _trigger, phone, phone_magic_opts)
+				add_mapping("+33" .. text_utils.utf8_sub(phone, 1, 2), international_phone, phone_opts)
 			end
-			if #phone >= 4 then
-				add_mapping(phone:sub(1, 4), phone, phone_opts)
-				add_mapping("+33" .. phone:sub(2, 4), "+33" .. phone, phone_opts)
+			if text_utils.utf8_len(phone) >= 4 then
+				add_mapping(text_utils.utf8_sub(phone, 1, 4), phone, phone_opts)
+				add_mapping("+33" .. text_utils.utf8_sub(phone, 2, 4), international_phone, phone_opts)
 			end
-			if #phone >= 6 then
-				add_mapping(phone:sub(2, 5), phone, phone_opts)
+			if text_utils.utf8_len(phone) >= 6 then
+				add_mapping(text_utils.utf8_sub(phone, 2, 5), phone, phone_opts)
 			end
-			if #fphone >= 5 then
-				add_mapping(fphone:sub(1, 5), fphone, fphone_opts)
+			if text_utils.utf8_len(fphone) >= 5 then
+				add_mapping(text_utils.utf8_sub(fphone, 1, 5), fphone, fphone_opts)
 			end
 		end
 
 		-- Register SSN prefixes: no-space trigger → SSN without spaces; spaced → SSN with spaces
 		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
-			if #ssn_raw >= 5 then
-				local ssn_raw_pfx    = ssn_raw:sub(1, 5)
+			if text_utils.utf8_len(ssn_raw) >= 5 then
+				local ssn_raw_pfx    = text_utils.utf8_sub(ssn_raw, 1, 5)
 				local ssn_spaced_pfx = SharedEngine.spaced_prefix(ssn, 5)
 				local ssn_opts       = opts_for("social_security_number")
 				add_mapping(ssn_raw_pfx, ssn_raw, ssn_opts)
@@ -541,13 +556,13 @@ local function register_prefix_entries()
 		-- Register IBAN prefixes: 6 raw chars (case-insensitive) → IBAN without spaces;
 		-- 7-char spaced trigger (e.g. "FR76 XX") → IBAN with spaces.
 		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ibanprefixes") then
-			if #iban_raw >= 6 then
-				local iban_raw_pfx    = iban_raw:sub(1, 6)
+			if text_utils.utf8_len(iban_raw) >= 6 then
+				local iban_raw_pfx    = text_utils.utf8_sub(iban_raw, 1, 6)
 				local iban_spaced_pfx = SharedEngine.spaced_prefix(iban, 6)
 				-- is_private for the same reason as `base_opts` above: the IBAN and its
 				-- 6-char prefix trigger are both secret
 				local opts_ci = opts_for("iban", { is_case_sensitive = false })
-				add_mapping(iban_raw_pfx, iban:gsub("%s+", ""), opts_ci)
+				add_mapping(iban_raw_pfx, iban_raw, opts_ci)
 				if iban_spaced_pfx ~= iban_raw_pfx then
 					add_mapping(iban_spaced_pfx, iban, opts_ci)
 				end

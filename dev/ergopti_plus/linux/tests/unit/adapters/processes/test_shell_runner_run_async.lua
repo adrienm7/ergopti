@@ -165,7 +165,7 @@ helpers.describe("shell_runner.run_async (linux)", function()
 			helpers.it("linux-shell-async-admission: " .. operation .. " " .. receipt .. " refuses once and retires the acquired run", function()
 				local luv, state = fake_luv({ start = operation, refusal = receipt })
 				local runner, callbacks = fresh_runner(luv), 0
-				local returned, token, reason = pcall(runner.run_async, "df", {}, { timeout_ms = 1000 },
+				local returned, token, reason, debt = pcall(runner.run_async, "df", {}, { timeout_ms = 1000 },
 					function() callbacks = callbacks + 1 end)
 				helpers.assert_true(returned, "explicit start refusal must stay inside the admission transaction")
 				helpers.assert_nil(token)
@@ -178,6 +178,10 @@ helpers.describe("shell_runner.run_async (linux)", function()
 					helpers.assert_eq(#state.kills, 0)
 				else
 					helpers.assert_eq(state.spawns, 1)
+					helpers.assert_true(type(debt) == "table", "a refused live child needs a settlement owner")
+					local settled = false
+					debt.on_settled(function() settled = true end)
+					helpers.assert_true(not settled)
 					helpers.assert_eq(#state.handles, 5)
 					helpers.assert_eq(state.reads, operation == "stdout" and 1 or 2, "stop admission at the failed reader")
 					helpers.assert_eq(state.kills, {
@@ -185,6 +189,7 @@ helpers.describe("shell_runner.run_async (linux)", function()
 					})
 					helpers.assert_eq(state.process.closing, false, "a started child must remain owned until its late exit")
 					state.on_exit(0, 0)
+					helpers.assert_true(settled, "the refusal debt retires only on native exit")
 					helpers.assert_true(state.process.closing)
 					state.on_exit(0, 0)
 					helpers.assert_eq(callbacks, 0, "late exit must preserve the silent refusal")

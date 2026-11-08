@@ -164,6 +164,8 @@ class MenuPopulation {
 	/** Seeds an existing detached picker without replacing its native identity. */
 	Fill(MenuObj, Rows, ListId, Depth) {
 		global MR_MAX_LIST_DEPTH
+		; Batches render later, one slice at a time: distinguish the whole list now.
+		Rows := _MR_NativeDistinctRows(Rows)
 		if Depth > MR_MAX_LIST_DEPTH {
 			_MR_RenderRows(MenuObj, Rows, ListId, Depth, 0)
 			return MenuObj

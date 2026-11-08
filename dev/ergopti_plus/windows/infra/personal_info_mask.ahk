@@ -68,7 +68,8 @@ global PI_MASK_NBSP := Chr(0xA0)
 ; The keys the shared [policy] block must carry. Named so a half-written
 ; declaration is reported by the key it is missing, instead of masking with an
 ; empty arithmetic operand and looking like a policy decision.
-global PI_MASK_REQUIRED_POLICY := ["mask_char", "reveal_head", "reveal_tail", "min_length_to_reveal"]
+global PI_MASK_REQUIRED_POLICY := ["mask_char", "reveal_head", "reveal_tail", "min_length_to_reveal",
+	"preserve_separators"]
 
 ; The parsed declaration, read once. The file ships with the driver and is not
 ; user-editable, so re-reading it per keystroke would be a file open on the
@@ -362,9 +363,18 @@ PersonalInfoMaskDeclaration() {
 	return _PIMaskDeclaration
 }
 
+; Only an explicit false flag permits display of a field. A malformed string
+; must not become permission merely because it is falsy in AutoHotkey.
+_PIMaskFieldIsMasked(Keys) {
+	if !(Keys is Map) || !Keys.Has("masked")
+		return true
+	Value := Keys["masked"]
+	return !(Value is TOML_Bool && !Value.Value)
+}
+
 ; Parse _shared/modules/personal_info/fields.toml into the shape above.
 ;
-; ParseTomlFile flattens `[fields.iban]` to the section name "fields.iban", so
+; The TOML parser flattens `[fields.iban]` to the section name "fields.iban", so
 ; the field name is the part after the prefix. A field entry with no `masked`
 ; key is treated as masked for the same reason an absent field is: the file
 ; states the decision, and anything that does not state it has not been made.
@@ -379,7 +389,7 @@ _PIMaskLoadDeclaration() {
 		try LoggerError("PersonalInfoMask", "'{1}' is missing — masking every personal-info preview.", Path)
 		return _PIMaskFailClosedDeclaration()
 	}
-	Parsed := ParseTomlFile(Path)
+	Parsed := TOML_ParseFreshFileTyped(Path)
 	; TOML_ReadFailed distinguishes "could not read it" from "it said nothing",
 	; and only the first deserves its own line in the log — both fail closed.
 	if TOML_ReadFailed(Path) {
@@ -391,6 +401,14 @@ _PIMaskLoadDeclaration() {
 		return _PIMaskFailClosedDeclaration()
 	}
 	Policy := Parsed["policy"]
+	; Keep TOML boolean intent until validation: numeric zero is not false.
+	if Policy is Map && Policy.Has("preserve_separators") {
+		if !(Policy["preserve_separators"] is TOML_Bool) {
+			try LoggerError("PersonalInfoMask", "The shared policy has a non-boolean preserve_separators — masking every personal-info preview.")
+			return _PIMaskFailClosedDeclaration()
+		}
+		Policy["preserve_separators"] := Policy["preserve_separators"].Value
+	}
 	Invalid := PersonalInfoMaskPolicyInvalidField(Policy)
 	if (Invalid != "") {
 		try LoggerError("PersonalInfoMask", "The shared policy is invalid at '{1}' — masking every personal-info preview.", Invalid)
@@ -406,7 +424,7 @@ _PIMaskLoadDeclaration() {
 		if (Name == "") {
 			continue
 		}
-		Fields[Name] := (Keys is Map and Keys.Has("masked") and !Keys["masked"]) ? false : true
+		Fields[Name] := _PIMaskFieldIsMasked(Keys)
 	}
 	if (Fields.Count == 0) {
 		try LoggerWarn("PersonalInfoMask", "'{1}' declares no field at all — every value stays masked.", Path)

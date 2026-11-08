@@ -17,7 +17,8 @@
 ; 1. Thin on purpose: each method is one native call with the arguments the
 ;    module chose, so the module's suite pins the exact message numbers,
 ;    command lines and paths through a recording double of this class.
-; 2. Launch() does not wait for the program. Defer() only lets the hotkey or
+; 2. Launch() and SpawnObserved() do not wait for the program; the second
+;    reports the worker's exit to a callback. Defer() only lets the hotkey or
 ;    gesture thread that dispatched an action return first: the deferred
 ;    action still runs on the script's one OS thread, so while a COM call or
 ;    BroadcastSettingChange waits (at most its timeout per window), remapped
@@ -94,16 +95,39 @@ global SYSTEM_CONTROL_DISPLAY_QUERY_ATTEMPTS := 3
 ; ======================================
 
 class SystemControl {
+	; Win32 launch and path APIs consume NUL-terminated text. Inspect original
+	; counted units before any coercion can alias a different prefix target.
+	static _ContainsNativeNul(Value) {
+		if !(Value is String)
+			return false
+		loop StrLen(Value)
+			if NumGet(StrPtr(Value), (A_Index - 1) * 2, "UShort") == 0
+				return true
+		return false
+	}
+
 	; Starts a program or opens a target without waiting for it.
 	; @param {String} Target Command line, path or URI.
 	; @param {String} WorkingDir Directory it starts in ("" = inherited).
 	; @param {String} Options Run options ("Hide", "Max", …).
 	; @returns {Integer} The process id (0 when the shell did not report one).
-	; @throws {Error} When Windows refuses the launch.
+	; @throws {Error} When Windows refuses the launch or an argument contains NUL.
 	Launch(Target, WorkingDir := "", Options := "") {
+		for _, Argument in [Target, WorkingDir, Options]
+			if SystemControl._ContainsNativeNul(Argument)
+				throw ValueError("Shell launch arguments cannot contain an embedded NUL.", -1)
 		Pid := 0
 		Run(Target, WorkingDir, Options, &Pid)
 		return Pid
+	}
+
+	; Starts a hidden worker without waiting for it, and observes its exit.
+	; @param {String} Executable Absolute path of the program.
+	; @param {Array} Args Its single-line arguments.
+	; @param {Func} OnDone Called once with (ExitCode, Output) when it exits.
+	; @returns {Boolean} Whether the worker started.
+	SpawnObserved(Executable, Args, OnDone) {
+		return ShellRunner_Spawn(Executable, Args, OnDone).start()
 	}
 
 	; Posts one message to every top-level window, without waiting.
@@ -392,6 +416,14 @@ class SystemControl {
 	; @returns {String} "removed", "absent" or "failed".
 	DeleteZoneIdentifier(Path) {
 		global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND
+		; Inspect the selected entry itself before touching its stream. A selected
+		; file symlink is an incomplete operation, not an absent target stream.
+		; This remains a cooperative pathname check, not an identity lease.
+		Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Path, "UInt")
+		if Attributes == 0xFFFFFFFF
+			return (A_LastError = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND) ? "absent" : "failed"
+		if Attributes & 0x400 ; FILE_ATTRIBUTE_REPARSE_POINT
+			return "failed"
 		if DllCall("DeleteFileW", "Str", Path . ":Zone.Identifier", "Int")
 			return "removed"
 		return (A_LastError = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND) ? "absent" : "failed"
@@ -412,7 +444,19 @@ class SystemControl {
 
 	; @returns {Boolean} Whether Path is a directory.
 	IsDirectory(Path) {
+		if SystemControl._ContainsNativeNul(Path)
+			return false
 		return InStr(FileExist(Path), "D") > 0
+	}
+
+	; True only when the whole value names an existing file. Wildcards and
+	; command-line quoting cannot be literal Windows file-name characters.
+	IsExistingFile(Path) {
+		if !(Path is String) || Path == "" || SystemControl._ContainsNativeNul(Path)
+				|| RegExMatch(Path, '[*?"<>|]')
+			return false
+		Attributes := FileExist(Path)
+		return Attributes != "" && !InStr(Attributes, "D")
 	}
 
 	; @returns {Array} Every file below a directory, recursively.
@@ -421,6 +465,66 @@ class SystemControl {
 		Loop Files, Dir . "\*", "FR"
 			Files.Push(A_LoopFileFullPath)
 		return Files
+	}
+
+	; Enumerate only ordinary entries for the confirmed unblock action. This is
+	; a cooperative pathname walk: a component may still be replaced concurrently.
+	; Every skipped reparse point, native enumeration failure or bound exhaustion
+	; is reported, while files already enumerated remain available to the caller.
+	; At most 65536 entries and 4 Mi UTF-16 path units are retained/visited.
+	EnumerateUnblockFiles(Dir, MaxEntries := 65536, MaxPathUnits := 4194304) {
+		Files := [], Pending := [Dir], Failed := 0, Entries := 0, Units := StrLen(Dir)
+		if MaxEntries < 1 || MaxPathUnits < Units
+			return { Files: Files, Failed: 1 }
+		Exhausted := false
+		while Pending.Length && !Exhausted {
+			Current := Pending.Pop(), Data := Buffer(592, 0)
+			; FindFirstFileW inspects children, so it cannot reject a selected root
+			; that is itself a junction. Recheck each queued directory before entry;
+			; descendants may also have changed since their enumeration receipt.
+			Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Current, "UInt")
+			if Attributes == 0xFFFFFFFF || !(Attributes & 0x10) || (Attributes & 0x400) {
+				Failed += 1
+				continue
+			}
+			FindHandle := DllCall("Kernel32\FindFirstFileW", "Str", RTrim(Current, "\/") . "\*", "Ptr", Data, "Ptr")
+			if FindHandle == -1 {
+				; No matches is a valid empty directory; all other failures are incomplete.
+				if A_LastError != 2
+					Failed += 1
+				continue
+			}
+			try {
+				loop {
+					Name := StrGet(Data.Ptr + 44, "UTF-16")
+					if Name != "." && Name != ".." {
+						Entries += 1
+						Path := RTrim(Current, "\/") . "\" . Name
+						Units += StrLen(Path)
+						if Entries > MaxEntries || Units > MaxPathUnits {
+							Failed += 1, Exhausted := true
+							break
+						}
+						Attributes := NumGet(Data, 0, "UInt")
+						if Attributes & 0x400 ; FILE_ATTRIBUTE_REPARSE_POINT
+							Failed += 1
+						else if Attributes & 0x10 ; FILE_ATTRIBUTE_DIRECTORY
+							Pending.Push(Path)
+						else
+							Files.Push(Path)
+					}
+					if !DllCall("Kernel32\FindNextFileW", "Ptr", FindHandle, "Ptr", Data, "Int") {
+						if A_LastError != 18 ; ERROR_NO_MORE_FILES
+							Failed += 1
+						break
+					}
+				}
+			} finally {
+				if !DllCall("Kernel32\FindClose", "Ptr", FindHandle, "Int")
+					Failed += 1
+			}
+		}
+		return { Files: Files, Failed: Failed }
 	}
 
 	; @returns {String} The Windows Terminal alias, or "" when it is not installed.

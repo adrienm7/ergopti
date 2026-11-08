@@ -45,7 +45,8 @@ _CWOC_Case(Mode) {
 	static Serial := 0, Debt := 0
 	AssertFalse(IsObject(Debt), "A previous unretired child prevents another component")
 	Root := A_Temp . "\ergopti_changelog_open_" . A_ScriptHwnd . "_" . ++Serial
-	FSCreateDirectoryExclusiveStrict(Root)
+	Creation := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue(Creation is Integer && Creation == 1, "The fixture must exclusively acquire its directory before writes or cleanup")
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0
 	Retired := false, AtDeadline := 0, ExportFailure := 0, PreviousCritical := Critical("Off")
 	try {
@@ -55,7 +56,7 @@ _CWOC_Case(Mode) {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Script, Mode, Root], _CWOC_Done.Bind(State))
 		AssertTrue(Handle.start(), "The exact changelog opening component must start")
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed64(Started) < 15000 {
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
 			_SR_TreePoll()
 			Sleep(10)
 		}
@@ -108,3 +109,14 @@ _CWOC_Case(Mode) {
 
 for _CWOC_Mode in ["cold-success", "cold-refusal", "close-refusal", "close-reopen-refusal", "close-success", "close-reopen-success"]
 	Test("Changelog opening generation: " . _CWOC_Mode . " preserves the current window (changelog-open-generation)", _CWOC_Case.Bind(_CWOC_Mode))
+
+for _CWOC_ShowMode in ["show-current", "show-close"]
+	Test("Changelog initial native Show: " . _CWOC_ShowMode . " respects actual Close (changelog-show-native-close)", _CWOC_Case.Bind(_CWOC_ShowMode))
+
+for _CWNS_Mode in ["native-destroy-current", "native-destroy-reopen"]
+	Test("Changelog native Close: " . _CWNS_Mode . " preserves exact successor ownership (changelog-native-destroy-successor)",
+		_CWOC_Case.Bind(_CWNS_Mode))
+
+for _CWSF_Mode in ["native-fault-current", "native-fault-successor"]
+	Test("Changelog explicit Show fault: " . _CWSF_Mode . " retires only its exact native owner (changelog-native-show-fault)",
+		_CWOC_Case.Bind(_CWSF_Mode))

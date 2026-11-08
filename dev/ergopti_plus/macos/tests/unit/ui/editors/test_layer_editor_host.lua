@@ -107,8 +107,23 @@ local function with_editor(scenario)
 			world.wheel_reconciles = world.wheel_reconciles + 1
 			return true
 		end }
+		local function publish(path, content, expected, _, admission)
+			if world.before_write then world.before_write() end
+			if admission and admission() ~= true then return false, "admission refused" end
+			local fh = io.open(path, "rb")
+			local actual = fh and fh:read("*a") or nil
+			if fh then fh:close() end
+			if (expected.status == "absent" and actual ~= nil)
+				or (expected.status == "ok" and actual ~= expected.content) then
+				return false, "source changed"
+			end
+			world.writes[#world.writes + 1] = { path = path, expected = expected.status }
+			write_file(path, content)
+			return true
+		end
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function(path)
+				if world.read_error then return nil, "error", "read refused" end
 				local fh = io.open(path, "rb")
 				if not fh then return nil, "absent" end
 				local content = fh:read("*a")
@@ -116,11 +131,8 @@ local function with_editor(scenario)
 				return content, "ok"
 			end,
 			write = function() error("the editor must publish against the content it read") end,
-			write_if_unchanged = function(path, content, expected)
-				world.writes[#world.writes + 1] = { path = path, expected = expected and expected.status }
-				write_file(path, content)
-				return true
-			end,
+			write_if_unchanged = publish,
+			write_if_unchanged_admitted = publish,
 		}
 		package.loaded["ui.ui_builder"] = {
 			get_app_geometry = function(id)
@@ -156,6 +168,7 @@ local function with_editor(scenario)
 		world.karabiner = {
 			regenerate = function()
 				world.regenerations = world.regenerations + 1
+				if world.on_regenerate then world.on_regenerate() end
 				return world.regenerate_accepts
 			end,
 			TAP_HOLD_KEYS = Json.decode(read_file(helpers.driver_root() .. "/platform/remap/data/tap_hold_keys.json")),
@@ -235,6 +248,7 @@ helpers.describe("macOS navigation layer editor host", function()
 	helpers.it("refuses, writes nothing and regenerates nothing for an invalid save", function()
 		with_editor(function(editor, world)
 			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
 			local refused = {
 				{ text = nil, code = "invalid_payload" },
 				{ text = 42, code = "invalid_payload" },
@@ -259,10 +273,104 @@ helpers.describe("macOS navigation layer editor host", function()
 		end)
 	end)
 
+	helpers.it("refuses a save before the page has received its opening source", function()
+		with_editor(function(editor, world)
+			editor.open({ karabiner = world.karabiner })
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			helpers.assert_eq(last_call(world, "saveResult").saved, false)
+			helpers.assert_eq(#world.writes, 0)
+			helpers.assert_eq(world.regenerations, 0)
+		end)
+	end)
+
+	helpers.it("does not adopt a file created after the original absent opening", function()
+		with_editor(function(editor, world)
+			local path = world.dir .. "/layers.toml"
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			write_file(path, "# another owner\n")
+			post(world, "ready")
+			helpers.assert_nil(last_call(world, "init").text, "duplicate ready must not replace the draft's source")
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			helpers.assert_eq(last_call(world, "saveResult").saved, false)
+			helpers.assert_eq(read_file(path), "# another owner\n")
+			helpers.assert_eq(world.regenerations, 0)
+		end)
+	end)
+
+	helpers.it("keeps an unreadable opening refused even if a later read would succeed", function()
+		with_editor(function(editor, world)
+			world.read_error = true
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			helpers.assert_eq(codes(last_call(world, "init")), "file_unreadable")
+			world.read_error = false
+			post(world, "ready")
+			helpers.assert_eq(codes(last_call(world, "init")), "file_unreadable")
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			helpers.assert_eq(last_call(world, "saveResult").saved, false)
+			helpers.assert_eq(#world.writes, 0)
+			helpers.assert_eq(world.regenerations, 0)
+		end)
+	end)
+
+	helpers.it("rechecks the configuration folder at the publication boundary", function()
+		with_editor(function(editor, world)
+			local original, other = world.dir, make_config_dir()
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			world.before_write = function() world.dir = other end
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			local result = last_call(world, "saveResult")
+			world.dir = original
+			remove_config_dir(other)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#world.writes, 0)
+			helpers.assert_eq(world.regenerations, 0)
+		end)
+	end)
+
+	helpers.it("refuses an external edit made after the page loaded", function()
+		with_editor(function(editor, world)
+			local path = world.dir .. "/layers.toml"
+			local opened = "# original\n"
+			local external = "# external\n"
+			write_file(path, opened)
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			helpers.assert_eq(last_call(world, "init").text, opened)
+			write_file(path, external)
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			helpers.assert_eq(last_call(world, "saveResult").saved, false)
+			helpers.assert_eq(read_file(path), external, "the later user's file must survive")
+			helpers.assert_eq(world.regenerations, 0)
+		end)
+	end)
+
+	helpers.it("refuses to retarget an open draft after the configuration folder changes", function()
+		with_editor(function(editor, world)
+			local original = world.dir
+			local destination = make_config_dir()
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			world.dir = destination
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			local result = last_call(world, "saveResult")
+			world.dir = original
+			local created = io.open(destination .. "/layers.toml", "rb")
+			if created then created:close(); os.remove(destination .. "/layers.toml") end
+			remove_config_dir(destination)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_nil(created, "the other folder must not be written")
+			helpers.assert_eq(world.regenerations, 0)
+		end)
+	end)
+
 	helpers.it("publishes the page's session, regenerates, closes, and the generated layer carries it (e2e)", function()
 		with_editor(function(editor, world)
 			local text = read_file(FIXTURE)
 			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
 			post(world, { action = "save", text = text })
 			local result = last_call(world, "saveResult")
 			helpers.assert_eq(result.saved, true)
@@ -300,10 +408,14 @@ helpers.describe("macOS navigation layer editor host", function()
 		with_editor(function(editor, world)
 			world.regenerate_accepts = false
 			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
 			post(world, { action = "save", text = read_file(FIXTURE) })
 			local result = last_call(world, "saveResult")
 			helpers.assert_eq(result.saved, true)
 			helpers.assert_eq(result.applied, false)
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			helpers.assert_eq(last_call(world, "saveResult").saved, true,
+				"a committed save must advance the source receipt for retry")
 			helpers.assert_eq(world.views[1].deleted, false, "a layer not applied keeps the window open")
 			-- A message WebKit had already queued when the window closed still
 			-- reaches the callback it was bound to.
@@ -315,7 +427,23 @@ helpers.describe("macOS navigation layer editor host", function()
 			stale({ body = "ready" })
 			stale({ body = { action = "save", text = read_file(FIXTURE) } })
 			helpers.assert_eq(#world.views[1].scripts, before, "a closed window's messages do nothing")
-			helpers.assert_eq(world.regenerations, 1)
+			helpers.assert_eq(world.regenerations, 2)
+		end)
+	end)
+
+	helpers.it("replies when regeneration changes the configuration destination", function()
+		with_editor(function(editor, world)
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			local original = world.dir
+			world.on_regenerate = function() world.dir = original .. "-other" end
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			local result = last_call(world, "saveResult")
+			helpers.assert_eq(result.saved, true)
+			helpers.assert_eq(result.applied, false)
+			helpers.assert_eq(world.wheel_reconciles, 0)
+			helpers.assert_eq(world.views[1].deleted, false)
+			world.dir = original
 		end)
 	end)
 

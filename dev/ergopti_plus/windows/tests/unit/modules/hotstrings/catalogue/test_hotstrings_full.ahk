@@ -42,7 +42,7 @@ TestHotstringsFull_SectionDelayBeatsCategory() {
 	SavedPath := _HotstringsOverridesPath
 	Path := A_Temp . "\hotstrings_full_precedence_overrides.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
 	Cat := "_hsfull_precedence_probe"
@@ -433,7 +433,7 @@ TestHSFull_BadDelayFallsBackToTheGlobalDefault() {
 	SavedPath := _HotstringsOverridesPath
 	Path := A_Temp . "\hotstrings_full_bad_delay_overrides.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
 	Cat := "_hsfull_baddelay_probe"
@@ -579,7 +579,8 @@ _UTG_ActivationMatrix() {
 	try {
 		for Origin in [1000, 0xFFFFFFF0] {
 			for Elapsed in [999, 1000, 1001] {
-				Now := (Origin + Elapsed) & 0xFFFFFFFF
+				; Ticks are 64-bit (TickElapsed64): a deadline past 2^32 continues, it never wraps.
+				Now := Origin + Elapsed
 				LastSentCharacterKeyTime := Map(Prior, Origin, Decoy, Now)
 				Spec := _UTG_MagicMeta("bar", "a" . Prior . "★")
 				AssertEqual(Prior, Spec.PrevCharKey, "metadata carries the complete prior scalar")

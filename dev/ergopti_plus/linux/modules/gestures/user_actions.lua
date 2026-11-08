@@ -71,7 +71,18 @@ M.TERMINAL_SCRIPT = '/bin/sh -c "$1"; exec "${SHELL:-/bin/sh}"'
 -- The commands in flight and whether new ones are admitted. Declared above
 -- every reader.
 local _handles = {}
+local _settled_waiters = {}
 local _paused = false
+
+local function publish_settled()
+	if next(_handles) ~= nil then return end
+	local listeners = _settled_waiters
+	_settled_waiters = {}
+	for _, listener in ipairs(listeners) do
+		local ok = pcall(listener)
+		if not ok then Logger.error(LOG, "User command settlement listener failed.") end
+	end
+end
 
 --- Shows a failure notice; a notice that cannot be shown is logged.
 --- @param key string Locale key.
@@ -86,7 +97,7 @@ function M.notify(key, ...)
 		if at then text = text:sub(1, at - 1) .. tostring((select(index, ...))) .. text:sub(at + #token) end
 	end
 	local ok, Notifier = pcall(require, "adapters.application_notifier")
-	if not ok or type(Notifier.send) ~= "function" or Notifier.send(text, { level = "error" }) ~= true then
+	if not ok or type(Notifier.send) ~= "function" or Notifier.send(text, { level = "error", private = true }) ~= true then
 		Logger.warn(LOG, "Notice '%s' could not be shown.", key)
 	end
 end
@@ -106,8 +117,9 @@ end
 --- @param text string The captured output.
 --- @param output string none, type or copy.
 --- @param max_typed number Longest text typed, in code points (send_keys.json).
+--- @param publication table|nil Destination retained when the command started.
 --- @return boolean delivered
-function M.deliver_output(text, output, max_typed)
+function M.deliver_output(text, output, max_typed, publication)
 	if output == "none" then return true end
 	local value = tostring(text or ""):gsub("[\r\n]+$", "")
 	if value == "" then
@@ -130,7 +142,14 @@ function M.deliver_output(text, output, max_typed)
 		M.notify("user_actions.output_too_long_to_type", max_typed)
 		return false
 	end
-	local typed = require("modules.shortcuts.manager").insert_text(value) == true
+	if publication then
+		local checked, current = pcall(publication.current)
+		if not checked or current ~= true then
+			Logger.warn(LOG, "Command output was not typed: its original destination changed.")
+			return false
+		end
+	end
+	local typed = require("modules.shortcuts.manager").insert_text(value, publication) == true
 	if not typed then Logger.error(LOG, "The output of a run_command binding could not be typed.") end
 	return typed
 end
@@ -205,7 +224,7 @@ end
 --- @param answer table ShellRunner.run_async's result.
 --- @param fields table The decoded parameter.
 --- @param max_typed number Longest text typed, in code points.
-local function finish_hidden(answer, fields, max_typed)
+local function finish_hidden(answer, fields, max_typed, publication)
 	if answer.timed_out then
 		Logger.error(LOG, "The command of a run_command binding was stopped after %d ms.", M.COMMAND_TIMEOUT_MS)
 		M.notify("user_actions.command_timeout", string.format("%.0f", M.COMMAND_TIMEOUT_MS / 1000))
@@ -226,7 +245,7 @@ local function finish_hidden(answer, fields, max_typed)
 		return
 	end
 	Logger.info(LOG, "The command of a run_command binding exited with code 0.")
-	M.deliver_output(answer.stdout, fields.output, max_typed)
+	M.deliver_output(answer.stdout, fields.output, max_typed, publication)
 end
 
 --- Runs a decoded run_command parameter.
@@ -254,20 +273,41 @@ function M.run_command(fields, max_typed)
 		end
 		return started
 	end
+	local publication
+	if fields.output == "type" then
+		local shortcuts = require("modules.shortcuts.manager")
+		publication = shortcuts.capture_text_destination()
+		if not publication or _paused then
+			Logger.warn(LOG, "run_command refused: no retained text destination.")
+			return false
+		end
+	end
 	local token, finished = {}, false
-	local handle, refusal = ShellRunner.run_async(M.SHELL_BIN, M.shell_args(fields.command),
+	local handle, refusal, cleanup = ShellRunner.run_async(M.SHELL_BIN, M.shell_args(fields.command),
 		{ timeout_ms = M.COMMAND_TIMEOUT_MS, max_output_bytes = M.MAX_OUTPUT_BYTES }, function(answer)
 			finished = true
 			_handles[token] = nil
-			finish_hidden(answer, fields, max_typed)
+			publish_settled()
+			finish_hidden(answer, fields, max_typed, publication)
 		end)
 	if not handle then
+		-- A child may have started before its output watcher was refused. Keep
+		-- its cleanup owner visible to pause until the native exit is observed.
+		if cleanup then
+			_handles[token] = cleanup
+			pcall(cleanup.on_settled, function() _handles[token] = nil; publish_settled() end)
+		end
 		Logger.error(LOG, "The command of a run_command binding could not start: %s.", tostring(refusal))
 		M.notify("user_actions.command_failed", tostring(refusal))
 		return false
 	end
 	-- A child that settled during admission has already reported itself
-	if not finished then _handles[token] = handle end
+	if not finished then
+		_handles[token] = handle
+		if type(handle.on_settled) == "function" then
+			pcall(handle.on_settled, function() _handles[token] = nil; publish_settled() end)
+		end
+	end
 	Logger.info(LOG, "Started the command of a run_command binding.")
 	return true
 end
@@ -286,11 +326,27 @@ end
 function M.stop()
 	local settled = true
 	for token, handle in pairs(_handles) do
-		_handles[token] = nil
 		local ok, cancelled = pcall(handle.cancel)
-		if not ok or cancelled == false then settled = false end
+		if ok and cancelled == true then
+			_handles[token] = nil
+		else
+			settled = false
+		end
 	end
-	return settled
+	publish_settled()
+	return settled and next(_handles) == nil
+end
+
+--- Notifies after every currently owned hidden command has settled.
+function M.when_settled(listener)
+	if type(listener) ~= "function" then return false end
+	if next(_handles) == nil then
+		local ok = pcall(listener)
+		if not ok then Logger.error(LOG, "User command settlement listener failed.") end
+	else
+		_settled_waiters[#_settled_waiters + 1] = listener
+	end
+	return true
 end
 
 --- Whether a hidden command is in flight.

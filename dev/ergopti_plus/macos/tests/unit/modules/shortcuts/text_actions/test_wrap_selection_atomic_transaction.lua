@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 
 
 local function clone(value, seen)
@@ -33,6 +34,7 @@ local function load_fixture(options)
 	options = options or {}
 	local saved = {
 		hs_global = _G.hs,
+		destination = package.loaded["modules.keymap.utils"],
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["infra.logger"],
 		synthetic = package.loaded["adapters.synthetic_input"],
@@ -122,6 +124,7 @@ local function load_fixture(options)
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
+		allContentTypes = function() return clone(options.item_types or { {} }) end,
 		readAllData = function()
 			calls.read = calls.read + 1
 			local outcome = next_outcome(read_outcomes, calls.read)
@@ -191,6 +194,7 @@ local function load_fixture(options)
 	}
 
 	package.loaded["adapters.timer_scheduler"] = nil
+	Destination.install()
 	local Text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
 		timer = timer,
@@ -220,6 +224,7 @@ local function load_fixture(options)
 			end
 		end,
 		restore = function()
+			package.loaded["modules.keymap.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["infra.logger"] = saved.logger
 			package.loaded["adapters.synthetic_input"] = saved.synthetic
@@ -251,6 +256,18 @@ helpers.describe("wrap_selection: atomic pre-commit contract", function()
 			f.fire(f.timers[1])
 			assert_deep_eq(f.clipboard(), f.initial,
 				"successful completion must restore every original pasteboard type")
+		end)
+	end)
+
+	helpers.it("refuses a multi-item pasteboard before any mutation instead of dropping later items (WSM-002)", function()
+		with_fixture({
+			item_types = { { "public.utf8-plain-text" }, { "public.png" } },
+		}, function(f)
+			helpers.assert_eq(f.wrap(), false, "a clipboard that cannot be restored whole must not be borrowed")
+			helpers.assert_eq(f.calls.write_text, 0, "no text may be written over the user's clipboard")
+			helpers.assert_eq(f.calls.emit_attempts, 0, "no paste may be emitted")
+			helpers.assert_eq(f.calls.restore, 0, "nothing was changed, so nothing is rewritten")
+			assert_deep_eq(f.clipboard(), f.initial)
 		end)
 	end)
 

@@ -57,6 +57,8 @@ local OWNERS = {
 	{ key = require("config_keys").LEAF.ARROW_RESETS_WORD, setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
 	{ key = require("config_keys").LEAF.SHORTCUT_RESETS_WORD, setter = "set_shortcut_resets_word",
 		getter = "is_shortcut_resets_word_enabled" },
+	{ key = require("config_keys").LEAF.TAP_HOLD_RESETS_WORD, setter = "set_tap_hold_resets_word",
+		getter = "is_tap_hold_resets_word_enabled" },
 	{ key = require("config_keys").LEAF.TRIGGER_CHAR, setter = "set_trigger_char", getter = "get_trigger_char" },
 	{ key = require("config_keys").LEAF.MAGIC_KEY_SOURCE, setter = "set_magic_key_source", getter = "get_magic_key_source" },
 	{ key = require("config_keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },

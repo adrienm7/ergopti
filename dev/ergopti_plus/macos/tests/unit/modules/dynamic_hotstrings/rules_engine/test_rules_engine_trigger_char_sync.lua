@@ -202,3 +202,31 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 		end)
 	end)
 end)
+
+helpers.describe("dynamic date calendar observation", function()
+	helpers.it("keeps the shared long-date expansion and previews on one calendar instant", function()
+		helpers.with_stub_scope({ "dynamic_hotstrings" }, function()
+			local engine = require("dynamic_hotstrings")
+			engine.reset_rules(); engine.register_date_rules("\\")
+			local old_date, old_time = os.date, os.time
+			local boundary = old_time({ year = 2024, month = 12, day = 31, hour = 23, min = 59, sec = 59 })
+			local calls = 0
+			os.time = function() return boundary end
+			os.date = function(format, instant)
+				if instant == nil then calls = calls + 1; instant = boundary + (calls > 1 and 1 or 0) end
+				return old_date(format, instant)
+			end
+			local ok, err = pcall(function()
+				local match = assert(engine.match_buffer("date", "dynamic", nil, true))
+				helpers.assert_eq(match.result, "mardi 31 décembre 2024")
+				calls = 0
+				local dates = engine.today_date_strings()
+				helpers.assert_eq(dates.iso, "2024_12_31")
+				helpers.assert_eq(dates.fr, "31/12/2024")
+				helpers.assert_eq(dates.long_fr, "mardi 31 décembre 2024")
+			end)
+			os.date, os.time = old_date, old_time
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)

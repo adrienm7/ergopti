@@ -56,7 +56,8 @@ _MDL_RetiresStage(Mode, Outcome) {
 		KLWV.windows := Map("typing", Entry)
 		Receipt := Map("calls", 0)
 		AssertTrue(KLPF_RequestBuild("typing", Root, Mode, 71,
-			_MDL_Terminal.Bind(Receipt, Outcome), true, Map("checkpoint", "owned")))
+			_MDL_Terminal.Bind(Receipt, Outcome), true, Map("checkpoint", "owned")),
+			"the delta build must start: " . KLPF_LastBuildRefusal())
 		Job := KLPFWorker.jobs["typing"]
 		Stage := Job["stage"]
 		Request := Job["request"]
@@ -167,7 +168,8 @@ _MDL_IncompleteFullIsShownNotPublished() {
 		for Round in ["incomplete", "incomplete", "ok"] {
 			Messages := View.Messages.Length
 			AssertTrue(KLPF_RequestBuild("typing", Root, "full", 71,
-				KLWV_OnFullBuildTerminal.Bind("typing", 71, 0)))
+				KLWV_OnFullBuildTerminal.Bind("typing", 71, 0)),
+				"the full build must start: " . KLPF_LastBuildRefusal())
 			Job := KLPFWorker.jobs["typing"]
 			Stages.Push(Job["stage"])
 			AssertTrue(FSWriteDurable(Job["stage"], Round = "ok" ? Full : Partial))
@@ -218,3 +220,20 @@ _MDL_IncompleteFullIsShownNotPublished() {
 }
 Test("metrics delta: an incomplete full read is shown, never published, retried (windows-metrics-incomplete-read)",
 	_KLRDC_CheckTeardown.Bind(_MDL_IncompleteFullIsShownNotPublished))
+
+; A refused build names its refusing step; the caller's false alone said nothing.
+_MDL_RefusalNamesItsStep() {
+	SavedJobs := KLPFWorker.jobs
+	try {
+		KLPFWorker.jobs := Map()
+		AssertFalse(KLPF_RequestBuild("typing", A_Temp, "unknown-mode"))
+		AssertEqual("an unknown dashboard, an empty store or an unknown mode", KLPF_LastBuildRefusal())
+		AssertFalse(KLPF_RequestBuild("unknown", A_Temp, "full"))
+		AssertEqual("an unknown dashboard, an empty store or an unknown mode", KLPF_LastBuildRefusal())
+		AssertEqual(0, KLPFWorker.jobs.Count, "a refused admission reserves no job")
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+	}
+}
+Test("metrics build: a refused request names its refusing step (metrics-build-refusal-reason)",
+	_MDL_RefusalNamesItsStep)

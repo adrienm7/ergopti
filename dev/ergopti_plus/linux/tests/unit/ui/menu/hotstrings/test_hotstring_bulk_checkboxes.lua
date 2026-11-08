@@ -142,6 +142,35 @@ local function assert_no_retired(rows)
 	helpers.assert_true(seen > 10, "the walk must have seen the tree, or the absence proves nothing")
 end
 
+helpers.describe("word delimiter admission", function()
+	helpers.it("reports an existing delimiter instead of silently refusing it", function()
+		local config = fake_config(true, true)
+		local menu = hotstrings_menu(config)
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if row.title == require("infra.i18n").get("menu.hotstrings.add_delimiter") then return row end
+				local found = find(row.menu); if found then return found end
+			end
+		end
+		local add = find(menu)
+		helpers.assert_true(add ~= nil)
+		local modal = require("ui.modal")
+		local previous, execute, calls, command = modal.run, os.execute, 0, nil
+		os.execute = function(text) command = text; return true end
+		modal.run = function(fn)
+			calls = calls + 1
+			if calls == 1 then return true, "," end
+			if calls == 3 then return fn() end
+			return true
+		end
+		local ok, err = pcall(add.fn)
+		modal.run, os.execute = previous, execute
+		assert(ok, err)
+		helpers.assert_eq(calls, 3, "entry, consumption question, then error dialog")
+		helpers.assert_true(command:find(string.format(require("infra.i18n").get("editor.hotstrings.err_id_exists"), ","), 1, true) ~= nil)
+	end)
+end)
+
 helpers.describe("hotstring bulk controls are one checkbox each (linux)", function()
 	for _, posture in ipairs({ true, false }) do
 		for _, enabled in ipairs({ true, false }) do
@@ -780,4 +809,48 @@ helpers.describe("personal-info editor original declared leaf (Linux)", function
 			end)
 		end)
 	end
+end)
+
+
+helpers.describe("hotstring section order native menu", function()
+	helpers.it("hotstring-section-order: original Linux menu persists and reloads the chosen order", function()
+		local preferences = require("infra.hotstring_preferences")
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); file:write(""); file:close()
+		local ok, detail = xpcall(function()
+			preferences._set_file_for_test(path)
+			local config = fake_config(true, true)
+			local get_category = config.get_category
+			config.get_category = function(id)
+				local category = get_category(id)
+				if id == "autocorrection" then category.sections_order = { "first", "-", "second" } end
+				return category
+			end
+			local menu = hotstrings_menu(config)
+			local category = assert(row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection"))
+			local parent = assert(row_for(category.menu, "menu.hotstrings.section_order"))
+			local up = assert(row_for(parent.menu[2].menu, "menu.hotstrings.move_up"))
+			helpers.assert_eq(up.fn(), true)
+			local written = assert(io.open(path, "rb")); local content = written:read("*a"); written:close()
+			helpers.assert_eq(require("toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "-", "first" })
+			menu = hotstrings_menu(config)
+			category = assert(row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection"))
+			parent = assert(row_for(category.menu, "menu.hotstrings.section_order"))
+			helpers.assert_eq(parent.menu[1].title, "second (2)")
+			local first_section
+			for index, row in ipairs(category.menu) do if row.title == "second (2)" then first_section = index end end
+			helpers.assert_not_nil(first_section)
+			helpers.assert_eq(category.menu[first_section + 1].title, "-", "the declared boundary survives a move")
+			helpers.assert_eq(category.menu[first_section + 2].title, "first (1)")
+			local dynamic = assert(row_for(menu, "category.dynamic_hotstrings"))
+			local dynamic_order = assert(row_for(dynamic.menu, "menu.hotstrings.section_order"))
+			local move = assert(row_for(dynamic_order.menu[2].menu, "menu.hotstrings.move_up"))
+			helpers.assert_eq(move.fn(), true)
+			local dynamic_file = assert(io.open(path, "rb")); local source = dynamic_file:read("*a"); dynamic_file:close()
+			helpers.assert_eq(require("toml_codec").decode(source).hotstrings.order_overrides.dynamichotstrings, { "tags", "dates" })
+		end, debug.traceback)
+		preferences._set_file_for_test(nil)
+		os.remove(path)
+		assert(ok, detail)
+	end)
 end)

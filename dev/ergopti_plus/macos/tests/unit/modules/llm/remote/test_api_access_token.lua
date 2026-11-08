@@ -126,6 +126,43 @@ local SPEC = { system_prompt = "Reply with exactly: OK", user_text = "ping", tem
 -- =========================================
 
 helpers.describe("Access-token providers (macOS)", function()
+	helpers.it("refuses synchronous success when access dispatch returns false", function()
+		local api = load_api()
+		local access = assert(find_upvalue(api.prepare_access, "_access_client"))
+		local calls = 0
+		access.post = function(_, _, _, callback)
+			calls = calls + 1
+			callback({ ok = true, status = 200, body = '{"access_token":"not-sent","expires_in":3600}' })
+			return false
+		end
+		local first, later
+		api.prepare_access("ibm_fixture", "ibm-api-key", function(ok, reason) first = { ok, reason } end)
+		api.prepare_access("ibm_fixture", "ibm-api-key", function(ok, reason) later = { ok, reason } end)
+		helpers.assert_eq(first[1], false)
+		helpers.assert_eq(later, first)
+		helpers.assert_eq(calls, 1)
+	end)
+	helpers.it("quarantines a throwing access transport even after a callback", function()
+		for _, early in ipairs({ false, true }) do
+			local api = load_api()
+			local access = assert(find_upvalue(api.prepare_access, "_access_client"))
+			local calls, callback = 0, nil
+			access.post = function(_, _, _, done)
+				calls, callback = calls + 1, done
+				if early then done({ ok = true, status = 200, body = '{"access_token":"early","expires_in":3600}' }) end
+				error("unknown native dispatch state")
+			end
+			local first, later
+			api.prepare_access("ibm_fixture", "ibm-api-key", function(ok, reason) first = { ok, reason } end)
+			helpers.assert_eq(first[1], false)
+			helpers.assert_true(first[2]:find("transport state is unknown", 1, true) ~= nil)
+			callback({ ok = true, status = 200, body = '{"access_token":"late","expires_in":3600}' })
+			api.prepare_access("ibm_fixture", "ibm-api-key", function(ok, reason) later = { ok, reason } end)
+			helpers.assert_eq(later, first)
+			helpers.assert_eq(calls, 1)
+		end
+	end)
+
 	helpers.it("the key is exchanged once, and the fresh token is reused", function()
 		local api, posts = load_api()
 		local got = {}

@@ -13,6 +13,14 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 local uv = require("luv")
 local checks, failures = 0, 0
+-- The foreign watchdog of a run that must end on its own callback (a healthy
+-- periodic or idle stop) bounds a hang only; it is no latency contract. A 25 ms
+-- bound let a cold or loaded runner fire the watchdog before the first 1 ms
+-- periodic tick, and a healthy restart read as refused.
+local HANG_DEADLINE_MS = 5000
+-- A run that must never fire its callbacks (a refused or never-due period)
+-- still ends on the watchdog, which these cases expect, so it stays short.
+local REFUSAL_WATCHDOG_MS = 25
 local function fresh()
 	package.loaded["adapters.event_loop"] = nil
 	return require("adapters.event_loop")
@@ -32,7 +40,7 @@ end
 local function execute(loop, period, milliseconds, idle_only)
 	local foreign = assert(uv.new_timer())
 	local watchdog, idle, periodic = false, 0, 0
-	assert(uv.timer_start(foreign, milliseconds or 25, 0, function()
+	assert(uv.timer_start(foreign, milliseconds or REFUSAL_WATCHDOG_MS, 0, function()
 		watchdog = true
 		loop.stop()
 	end))
@@ -61,8 +69,10 @@ for _, entry in ipairs({ {"NaN", 0/0}, {"positive infinity", math.huge}, {"negat
 		print(string.format("OBS %s accepted=%s idle=%d periodic=%d watchdog=%s elapsed=%.3f error=%s",
 			entry[1], tostring(receipt.ok), receipt.idle, receipt.periodic, tostring(receipt.watchdog), receipt.elapsed,
 			receipt.err))
-		local recovery = execute(loop, 0.001)
-		assert(recovery.ok and recovery.periodic == 1 and not recovery.watchdog, "healthy restart failed")
+		local recovery = execute(loop, 0.001, HANG_DEADLINE_MS)
+		assert(recovery.ok and recovery.periodic == 1 and not recovery.watchdog, string.format(
+			"healthy restart failed: accepted=%s periodic=%d watchdog=%s elapsed=%.3f error=%s", tostring(recovery.ok),
+			recovery.periodic, tostring(recovery.watchdog), recovery.elapsed, recovery.err))
 		assert(not receipt.ok and receipt.idle == 0 and receipt.periodic == 0 and not receipt.watchdog,
 			"nonfinite source or converted period admitted native callbacks")
 	end)
@@ -72,14 +82,14 @@ for _, entry in ipairs({ {"zero clamp", 0}, {"negative clamp", -0.005}, {"fracti
 	check("healthy periodic control: " .. entry[1], function()
 		local value = entry[2]
 		if value == false then value = nil end
-		local receipt = execute(fresh(), value, 400)
+		local receipt = execute(fresh(), value, HANG_DEADLINE_MS)
 		print(string.format("OBS %s accepted=%s idle=%d periodic=%d watchdog=%s elapsed=%.3f", entry[1], tostring(receipt.ok), receipt.idle, receipt.periodic, tostring(receipt.watchdog), receipt.elapsed))
 		assert(receipt.ok and receipt.periodic == 1 and not receipt.watchdog)
 	end)
 end
 for _, entry in ipairs({ {"NaN", 0/0}, {"infinity", math.huge}, {"converted overflow", 1e308} }) do
 	check("idle-only ignores unused periodic duration: " .. entry[1], function()
-		local receipt = execute(fresh(), entry[2], 25, true)
+		local receipt = execute(fresh(), entry[2], HANG_DEADLINE_MS, true)
 		assert(receipt.ok and receipt.idle == 1 and receipt.periodic == 0 and not receipt.watchdog)
 	end)
 end

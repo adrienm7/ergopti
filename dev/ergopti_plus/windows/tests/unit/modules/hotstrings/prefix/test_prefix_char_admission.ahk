@@ -120,6 +120,7 @@ _PCA_WithObserverFixture(Body) {
 	Schedule(Fn, Period) => State.Scheduled.Push({ Fn: Fn, Period: Period })
 	Focus() => State.Focus.Clone()
 	LLM_Bridge_CancelPrefixObserver()
+	Privacy := _LLM_TestPrivacyEnter(State.Focus)
 	try {
 		_LLM_Bridge_Active := true
 		_LLM_Bridge_Buffer := ""
@@ -127,6 +128,7 @@ _PCA_WithObserverFixture(Body) {
 		_LLM_Bridge_AgentFeeding := false
 		_LLM_Engine := Map("enabled", false, "request_id", 10,
 			"timer_active", false, "pending_timer", "")
+		AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(Focus(), true)))
 		Body.Call(State, Schedule, Focus)
 	} finally {
 		LLM_Bridge_CancelPrefixObserver()
@@ -138,6 +140,7 @@ _PCA_WithObserverFixture(Body) {
 		_LLM_Engine := Saved.Engine
 		_PrefixDeferredGeneration := Saved.Lifecycle
 		_KS_PhysicalInputGeneration := Saved.Physical
+		_LLM_TestPrivacyExit(Privacy)
 	}
 }
 
@@ -336,6 +339,11 @@ _PCA_DeadKeyChunk(Scenario) {
 		_HSResolveCache := Map("_chunk_probe|native", {
 			gen: _HSResolveGen, val: { ShowTooltip: false } })
 		LastSentCharacterKeyTime := Map()
+		; Initial was set, not typed: a scenario names the scalars it typed
+		; before the chunk, the reference a time gate measures from.
+		if Scenario.HasOwnProp("TypedBefore")
+			for Key in Scenario.TypedBefore
+				LastSentCharacterKeyTime[Key] := A_TickCount
 		HSE_WORD_TERMINATORS := Saved.Terminators . Chr(0x1F600)
 		if Scenario.HasOwnProp("Consume") && Scenario.Consume
 			HSE_CONSUMED_DELIMITERS := Saved.Consumed . "."
@@ -487,7 +495,7 @@ Test("prefix unicode-boundary-owner: the actual supplementary delimiter licenses
 Test("prefix unicode-boundary-owner: repeat dispatch agrees with actual native Unicode output", (*) =>
 	_PCA_DeadKeyChunk({ Initial: "a" . Chr(0x1F601), Chunk: "★", Magic: "★",
 		Flags: "", Trigger: "", Replacement: "", Expected: "a" . Chr(0x1F601) . Chr(0x1F601),
-		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601) }))
+		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601), TypedBefore: [Chr(0x1F601)] }))
 
 Test("prefix unicode-time-gate: supplementary penultimate scalar admits timed STAR", (*) =>
 	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C",
@@ -863,3 +871,32 @@ Test("prefix: a key typed after the verified Notepad edit follows the expansion 
 #Include test_prefix_bridge_idle_fragment.ahk
 
 #Include test_prefix_bridge_shortcut_fragment.ahk
+
+
+/** The preview and matcher agree on symbols outside the configured delimiter list. */
+_PCA_AsciiWordOpening() {
+	global HSE_WORD_TERMINATORS
+	Saved := HSE_WORD_TERMINATORS
+	try {
+		HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+		for Boundary in StrSplit("=-(+/<>{}[]!#$%&,:;?\^``|~") {
+			AssertTrue(_HSE_WordBoundaryAllows(Boundary . "teh", { Length: 3, InWord: false }),
+				"the existing matcher admits an ASCII symbol before the word")
+			AssertEqual("teh", _PrefixWordTail("earlier" . Boundary . "teh"),
+				"preview-word-opening: the current word starts after the same ASCII symbol")
+		}
+		for WordChar in ["a", "A", "7", "_", "@", "é", "★", Chr(0x1F601)]
+			AssertEqual("earlier" . WordChar . "teh", _PrefixWordTail("earlier" . WordChar . "teh"),
+				"word characters and the Unicode magic selector keep the preceding text")
+	} finally {
+		HSE_WORD_TERMINATORS := Saved
+	}
+}
+Test("prefix preview-word-opening: the recovered word follows the matcher symbol policy",
+	_PCA_AsciiWordOpening)
+Test("prefix preview-word-opening: a scalar symbol clears the current word", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: "=", Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo=", Sends: 0, End: "", Prefix: "" }))
+Test("prefix preview-word-opening: a grouped symbol starts the following word", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: "(th", Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo(th", Sends: 0, End: "", Prefix: "th" }))

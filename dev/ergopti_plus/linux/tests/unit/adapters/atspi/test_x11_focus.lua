@@ -19,7 +19,8 @@ local ATOM_STRING, ATOM_WM_NAME = 31, 39
 --- @param state table { active = id|nil, windows = { [id] = { title, wm_name, pid, wm_name_type } }, ... }
 --- @return table transport
 local function scripted(state)
-	local atoms = { _NET_ACTIVE_WINDOW = 301, _NET_WM_NAME = 302, UTF8_STRING = 303, _NET_WM_PID = 304, _NET_CLIENT_LIST = 305 }
+	local atoms = { _NET_ACTIVE_WINDOW = 301, _NET_WM_NAME = 302, UTF8_STRING = 303, _NET_WM_PID = 304, _NET_CLIENT_LIST = 305,
+		_NET_CURRENT_DESKTOP = 306 }
 	state.connects, state.interns, state.disconnects = 0, 0, 0
 	local function le32(value)
 		return string.char(value % 256, math.floor(value / 256) % 256,
@@ -34,11 +35,19 @@ local function scripted(state)
 		disconnect = function() state.disconnects = state.disconnects + 1 end,
 		healthy = function() return not state.broken end,
 		root = function() return 1 end,
+		pointer = function()
+			if not state.pointer then return nil end
+			return state.pointer[1], state.pointer[2]
+		end,
 		intern = function(name) state.interns = state.interns + 1; return atoms[name] end,
 		property = function(window, property)
 			if window == 1 and property == atoms._NET_ACTIVE_WINDOW then
 				if not state.active then return nil end
 				return { type = 33, format = 32, bytes = le32(state.active) }
+			end
+			if window == 1 and property == atoms._NET_CURRENT_DESKTOP then
+				if not state.desktop then return nil end
+				return { type = 6, format = 32, bytes = le32(state.desktop) }
 			end
 			if window == 1 and property == atoms._NET_CLIENT_LIST then
 				if not state.clients then return nil end
@@ -348,4 +357,27 @@ helpers.describe("window_info native process-name records", function()
 			if not called then error(detail, 0) end
 		end)
 	end
+end)
+
+helpers.describe("x11_focus: metrics readings of the root window", function()
+	helpers.it("linux-space-change: reads the EWMH current desktop, and says when there is none", function()
+		local state = { windows = {}, desktop = 3 }
+		local focus = bound(state)
+		helpers.assert_eq(focus.current_desktop(), 3)
+		state.desktop = nil
+		local desktop, reason = focus.current_desktop()
+		helpers.assert_nil(desktop)
+		helpers.assert_contains(reason, "no current desktop")
+	end)
+
+	helpers.it("pointer-distance-pixels: reads the cursor in screen pixels on the root window", function()
+		local state = { windows = {}, pointer = { 640, 360 } }
+		local focus = bound(state)
+		local x, y = focus.pointer_position()
+		helpers.assert_eq({ x, y }, { 640, 360 })
+		state.pointer = nil
+		local none, reason = focus.pointer_position()
+		helpers.assert_nil(none)
+		helpers.assert_contains(reason, "another screen")
+	end)
 end)

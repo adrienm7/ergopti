@@ -26,6 +26,34 @@ local with_switch_frame = Fixture.with_switch_frame
 
 
 helpers.describe("Layout owns install-state choices, bundle truth and every frozen original caption", function()
+	helpers.it("reports failed installs from the actual menu action (layout-install-visible-failure)", function()
+		local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
+		local labels = assert(require("json").decode(assert(file:read("*a")))); assert(file:close())
+		helpers.assert_true(labels["menu.layout.install_system_unavailable"]:find("verified safely", 1, true) ~= nil)
+		helpers.assert_true(labels["menu.layout.install_system_unavailable"]:find("old system copy", 1, true) ~= nil)
+		for _, case in ipairs({ { "launcher_unavailable", "menu.layout.install_launcher_required" },
+			{ "system_install_unavailable", "menu.layout.install_system_unavailable" },
+			{ "other_scope_occupied", "menu.layout.install_other_scope" },
+			{ "other_scope_unverified", "menu.layout.install_other_scope_unverified" },
+			{ "other", "menu.layout.install_failed" }, { "throw", "menu.layout.install_failed" } }) do
+			local notices = {}
+			with_switch_frame(function(build, fixture)
+				fixture.latest = "Ergopti_v2.2.2.bundle"
+				fixture.records = { { id = "Ergopti_v1_0_0_plus", name = "Ergopti+", selected = true } }
+				local row = assert(switch_row(assert(build()), "🔐 Install Ergopti (system — "))
+				assert(type(row.fn) == "function"); row.fn()
+				helpers.assert_eq(notices, { { labels[case[2]], "error" } })
+			end, labels, function(_, installer)
+				installer.install_system = function()
+					if case[1] == "throw" then error("installation exception") end
+					return false, case[1]
+				end
+				package.loaded["infra.notifications"] = { notify = function(message, _, level)
+					notices[#notices + 1] = { message, level }
+				end }
+			end)
+		end
+	end)
 	for _, state in ipairs({"fresh", "older", "current"}) do
 		helpers.it("retains system/user/status order for " .. state .. " actual native installation state", function()
 			local Json, Paths = require("json"), require("infra.paths")
@@ -41,8 +69,8 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 				if state == "current" then fixture.variants = {{name = "Ergopti_v2_2_2_plus", tis_id = "stable.plus", keylayout = "/actual/plus.keylayout"}} end
 				local rows = assert(build())
 				local expected = {
-					fresh = {"🔐 Install Ergopti (system) v2.2.2", "📥 Install Ergopti (user) v2.2.2", "Install the bundle first"},
-					older = {"Update Ergopti (system) v2.2.1 → v2.2.2", "Update Ergopti (user) v2.2.1 → v2.2.2", "Install the bundle first"},
+					fresh = {"🔐 Install Ergopti (system — " .. labels["menu.layout.install_system_reason"] .. ") v2.2.2", "📥 Install Ergopti (user) v2.2.2", "Install the bundle first"},
+					older = {"Update Ergopti (system — " .. labels["menu.layout.install_system_reason"] .. ") v2.2.1 → v2.2.2", "Update Ergopti (user) v2.2.1 → v2.2.2", "Install the bundle first"},
 					current = {"Ergopti (system) v2.2.2 — up to date ✅", "Ergopti (user) v2.2.2 — up to date ✅", "Add Ergopti v2.2.2 to input sources…"},
 				}
 				local index
@@ -95,7 +123,14 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 				local value = assert(Json.decode(assert(file:read("*a")))); assert(file:close()); return value
 			end
 			local expected = load("tests/corpus/menus/layout_complete_captions.json")[language]
-			with_switch_frame(function(_, _, binding)
+			with_switch_frame(function(build, fixture, binding)
+				fixture.latest = "Ergopti_v2.2.2.bundle"
+				local reason = load("data/locales/" .. language .. ".json")["menu.layout.install_system_reason"]
+				local found = false
+				for _, row in ipairs(assert(build())) do
+					if type(row.title) == "string" and row.title:find(reason, 1, true) then found = true end
+				end
+				helpers.assert_true(found, "the system installation reason must be visible in " .. language)
 				local getters = {
 					layout_install_scope = function() return "scope" end,
 					layout_install_emoji = function() return "🔐" end,
@@ -165,7 +200,8 @@ helpers.describe("Layout installation state remains native per scope", function(
 			fixture.variants = {{name = "Ergopti_v2_2_2_plus", tis_id = "stable.plus", keylayout = "/actual/plus.keylayout"}}
 			local rows = assert(build())
 			local index
-			for i, row in ipairs(rows) do if row.title == "🔐 Install Ergopti (system) v2.2.2" then index = i end end
+			local expected = "🔐 Install Ergopti (system — " .. labels["menu.layout.install_system_reason"] .. ") v2.2.2"
+			for i, row in ipairs(rows) do if row.title == expected then index = i end end
 			helpers.assert_not_nil(index)
 			helpers.assert_true(type(rows[index].fn) == "function")
 			helpers.assert_eq(rows[index + 1].title, "Ergopti (user) v2.2.2 — up to date ✅")

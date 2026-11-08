@@ -53,6 +53,13 @@ M.SIZE_64BIT = 24
 M.EV_SYN = 0x00
 M.EV_KEY = 0x01
 M.EV_REL = 0x02
+M.EV_ABS = 0x03
+
+-- The EV_ABS axes of a single-contact absolute pointer (a touchpad, a tablet)
+-- and the EV_KEY code of a finger landing on it.
+M.ABS_X     = 0x00
+M.ABS_Y     = 0x01
+M.BTN_TOUCH = 0x14a
 
 -- The EV_REL axes of a pointer movement and of a classic wheel notch.
 M.REL_X      = 0x00

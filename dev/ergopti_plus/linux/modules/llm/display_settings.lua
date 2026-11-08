@@ -88,30 +88,53 @@ end
 --- @param value number|boolean
 --- @param expected_source table|nil Exact canonical snapshot for guarded menu commands.
 --- @return boolean
-function M.set(name, value, expected_source)
+local function set(name, value, expected_source, on_notice, admission, publication_guard)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid display setting %s=%s.", tostring(name), tostring(value))
-		return false
+		return false, "invalid"
 	end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage; display setting '%s' was not changed.", name)
-		return false
+		return false, "unconfirmed"
 	end
+	local values_owner, previous_value = _values, _values[name]
 	local persisted
-	if expected_source ~= nil then
+	if on_notice then
+		persisted = Storage.set_many_with_notice({[PREF_PREFIX .. name] = value}, expected_source, admission, on_notice)
+	elseif expected_source ~= nil then
 		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source)
 	else
 		persisted = Storage.set(PREF_PREFIX .. name, value)
 	end
 	if persisted ~= true then
 		Logger.error(LOG, "Display setting '%s' could not be persisted; live state is unchanged.", name)
-		return false
+		return false, "unconfirmed"
 	end
-	_values[name] = value
+	local may_publish = not publication_guard or publication_guard()
+	if _values == values_owner and _values[name] == previous_value then
+		if may_publish then _values[name] = value
+		else _values[name] = nil end
+	end
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
+end
+
+function M.set(name, value, expected_source)
+	local committed = set(name, value, expected_source)
+	return committed
+end
+
+--- Sets one value and returns its refusal reason and own notice receipt.
+--- @return boolean committed
+--- @return string|nil reason
+--- @return boolean noticed
+function M.set_with_reason_notice(name, value, expected_source, admission, publication_guard)
+	local noticed = false
+	local receipt = { admit = admission, acknowledge = function() noticed = true end }
+	local committed, reason = set(name, value, expected_source, receipt, admission, publication_guard)
+	return committed, reason, noticed
 end
 
 --- Flips one boolean display setting.

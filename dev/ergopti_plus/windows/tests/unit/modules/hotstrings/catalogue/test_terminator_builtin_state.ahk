@@ -138,3 +138,189 @@ _HTBS_RecordsOwnTheirScalarOverTheLeaves() {
 Test("terminator-leaves: records add their scalar after the shipped delimiters",
 	_HTBS_Run.Bind("records-after", '[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "C"`nconsume = true`n',
 		_HTBS_RecordsOwnTheirScalarOverTheLeaves))
+
+_HTMK_Migration(Mode) {
+	global ConfigurationFile, _HotstringsTerminatorRecords
+	Snow := Chr(0x2603), Preferred := "custom_2603"
+	Before := FSReadUtf8Exact(ConfigurationFile)
+	Word := HSE_TerminatorDefaultWordDelimiters() . Snow
+	Consumed := HSE_TerminatorDefaultConsumedDelimiters() . Snow
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed),
+		"the actual configuration writer must acknowledge the legacy migration")
+	AssertTrue(InStr(HotstringsGetWordDelimiters(), Snow, true) > 0,
+		"a successfully migrated legacy delimiter must reach the actual engine string")
+	AssertTrue(InStr(HotstringsGetConsumedDelimiters(), Snow, true) > 0,
+		"the migrated consumed choice must reach the actual engine string")
+	Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+	Resolved := HotstringsTerminatorRecordsResolve(Document)
+	AssertEqual(0, Resolved.Rejected.Length, "key allocation cannot create a rejected duplicate record")
+	Found := 0
+	for Entry in Resolved.Records
+		if Entry.Char == Snow {
+			Found += 1
+			AssertTrue(Entry.Enabled)
+			AssertTrue(Entry.Consume)
+			if Mode == "record" || Mode == "state"
+				AssertTrue(Entry.Key != Preferred, "a new logical delimiter cannot borrow an existing record or future state key")
+		}
+	AssertEqual(1, Found)
+	if Mode == "record" {
+		AssertTrue(InStr(HotstringsGetWordDelimiters(), "¤", true) > 0,
+			"the existing independent currency delimiter must remain admitted")
+		AssertEqual("¤", Document["hotstrings"]["terminators"][1]["char"])
+		AssertEqual(Preferred, Document["hotstrings"]["terminators"][1]["key"])
+	} else if Mode == "state"
+		AssertEqual(false, Document["hotstrings"]["terminator_states"][Preferred].Value,
+			"the unrelated future false leaf must stay unchanged")
+	if Mode == "existing-character-control"
+		AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "an already owned delimiter needs no migration rewrite")
+	After := FSReadUtf8Exact(ConfigurationFile)
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed))
+	AssertEqual(After, FSReadUtf8Exact(ConfigurationFile), "the actual successful move must remain idempotent")
+	AssertEqual(After, _HotstringsTerminatorRecords.Source)
+}
+Test("terminator-move key allocation: existing record cannot hide the legacy character",
+	_HTBS_Run.Bind("key-move-record", '[[hotstrings.terminators]]`nkey="custom_2603"`nchar="¤"`nlabel="Existing currency"`nconsume=false`n', _HTMK_Migration.Bind("record")))
+Test("terminator-move key allocation: future false state cannot disable the legacy character",
+	_HTBS_Run.Bind("key-move-state", '[hotstrings.terminator_states]`ncustom_2603=false`n', _HTMK_Migration.Bind("state")))
+Test("terminator-move key allocation: ordinary fresh allocation remains admitted",
+	_HTBS_Run.Bind("key-move-fresh", "", _HTMK_Migration.Bind("fresh-control")))
+Test("terminator-move key allocation: an existing character is not duplicated",
+	_HTBS_Run.Bind("key-move-existing-char", '[[hotstrings.terminators]]`nkey="already_snow"`nchar="☃"`nlabel="Owned snow"`nconsume=true`n', _HTMK_Migration.Bind("existing-character-control")))
+
+_HTEI_MagicMove(Mode) {
+	global HSE_Terminators, _HotstringsTerminatorRecords
+	Saved := _HSDT_SaveState(), SavedTerms := HSE_Terminators
+	try {
+		HSE_Terminators := Terminators()
+		_HotstringsTerminatorRecords := 0
+		; The real detached factory owns this setup; migration is the subject.
+		HSE_Terminators.updateMagicKey("A")
+		_HSDT_Seed("magic-exact-move-" . Mode)
+		Legacy := Mode == "lower" ? "a" : "A"
+		AssertEqual(1, HotstringsTerminatorMigrateStrings(Legacy, Legacy))
+		AssertEqual(Legacy, HotstringsGetWordDelimiters(), "a configured magic A cannot claim the case-distinct legacy scalar a")
+		AssertEqual(Legacy, HotstringsGetConsumedDelimiters())
+	} finally {
+		HSE_Terminators := SavedTerms
+		_HSDT_Restore(Saved)
+	}
+}
+for _HTEI_MagicMode in ["upper", "lower"]
+	Test("terminator-move exact magic membership: " . _HTEI_MagicMode, _HTEI_MagicMove.Bind(_HTEI_MagicMode))
+
+_HTCC_Migration(Mode) {
+	global ConfigurationFile
+	Word := HSE_TerminatorDefaultWordDelimiters() . "Aa"
+	BaseConsumed := HSE_TerminatorDefaultConsumedDelimiters()
+	Selected := Mode == "upper" ? "A" : (Mode == "lower" ? "a" : (Mode == "both-control" ? "Aa" : ""))
+	Consumed := BaseConsumed . Selected
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed), "the real migration writer must acknowledge the intended scalar choices")
+	AssertEqual(Word, HotstringsGetWordDelimiters(), "both case-distinct valid scalars must remain active")
+	AssertEqual(Consumed, HotstringsGetConsumedDelimiters(),
+		"migration must not consume the case-distinct scalar absent from the actual consumed string")
+	Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+	Rows := Document["hotstrings"]["terminators"]
+	AssertEqual(2, Rows.Length)
+	AssertEqual("A", Rows[1]["char"])
+	AssertEqual("a", Rows[2]["char"])
+	AssertEqual(InStr(Selected, "A", true) > 0, Rows[1]["consume"].Value)
+	AssertEqual(InStr(Selected, "a", true) > 0, Rows[2]["consume"].Value)
+	Before := FSReadUtf8Exact(ConfigurationFile)
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed))
+	AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "repeating the successful move must preserve exact source")
+}
+for _HTCC_Mode in ["upper", "lower", "both-control", "neither-control"]
+	Test("terminator-move exact consumption: " . _HTCC_Mode,
+		_HTBS_Run.Bind("consumption-case-" . _HTCC_Mode, "", _HTCC_Migration.Bind(_HTCC_Mode)))
+
+_HOSG_CanonicalLegacyMigration(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HotstringsLegacyDelimiters
+	global _HotstringsCommonOverrideAdmitted, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted()}
+	Root := A_Temp . "\ergopti_override_legacy_syntax_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		if Mode == "literal"
+			Leaves := "word_delimiters = '.¤'`nconsumed_delimiters = '¤'`n"
+		else if Mode == "multiline-literal"
+			Leaves := "word_delimiters = '''.¤'''`nconsumed_delimiters = '''¤'''`n"
+		else if Mode == "quoted-keys"
+			Leaves := '"word_delimiters" = ".¤"`n"consumed_delimiters" = "¤"`n'
+		else
+			Leaves := 'word_delimiters = ".¤"`nconsumed_delimiters = "¤"`n'
+		Source := "[__global__]`n" . Leaves . "[magickey]`npriority = 25`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Typed := TOML_ParseDocument(FSReadStrict(Path))
+		AssertEqual(".¤", Typed["__global__"]["word_delimiters"])
+		AssertEqual("¤", Typed["__global__"]["consumed_delimiters"])
+		HotstringsConfigInit(Path)
+		AssertTrue(HotstringsDelimitersBoot(), "real native boot must durably transfer the legacy strings")
+		AssertEqual(".¤", HSE_WORD_TERMINATORS, "the canonical source strings must reach the actual delimiter owner")
+		AssertEqual("¤", HSE_CONSUMED_DELIMITERS)
+		Disk := TOML_ParseDocument(FSReadStrict(Path))
+		AssertFalse(Disk.Has("__global__"), "legacy source is retired only after its real destination commit")
+		AssertEqual(25, Disk["magickey"]["priority"])
+		AssertEqual("", _HotstringsLegacyDelimiters.Word)
+		AssertEqual("", _HotstringsLegacyDelimiters.Consumed)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSG_Mode in ["literal", "multiline-literal", "quoted-keys", "basic-control"]
+	Test("HotstringsConfig canonical legacy migration: " . _HOSG_Mode,
+		_HTBS_Run.Bind("canonical-legacy-" . _HOSG_Mode, "", _HOSG_CanonicalLegacyMigration.Bind(_HOSG_Mode)))
+
+_HOSR_LegacyRetirementReceipt(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HotstringsLegacyDelimiters
+	global _HotstringsCommonOverrideAdmitted
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted()}
+	Root := A_Temp . "\ergopti_override_retirement_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		Empty := Mode == "empty-control"
+		Source := "[__global__]`nword_delimiters = " . TOML_RenderString(Empty ? "" : ".")
+			. "`nconsumed_delimiters = " . TOML_RenderString(Empty ? "" : ".") . "`n[magickey]`npriority = 25`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		HotstringsConfigInit(Path)
+		Owner := _HotstringsOverrides
+		if Mode == "receipt-source-changed" {
+			Changed := StrReplace(Source, 'word_delimiters = "."', 'word_delimiters = ".¤"', true)
+			Move(Word, Consumed) {
+				Result := HotstringsTerminatorMigrateStrings(Word, Consumed)
+				AssertEqual(1, Result, "the original source must genuinely commit at its destination")
+				AssertTrue(FSWriteDurable(Path, Changed), "the real source changes after its old values were transferred")
+				return Result
+			}
+			AssertFalse(HotstringsDelimitersBoot(Move), "a receipt for the earlier values cannot retire the new source")
+			AssertEqual(Changed, FSReadStrict(Path))
+			AssertEqual(".", _HotstringsLegacyDelimiters.Word, "the unretired request remains retryable")
+		} else if Empty {
+			AssertTrue(HotstringsSetOverride("magickey", "", "color", "#123456"), "empty legacy strings carry no pending character intent")
+			Disk := TOML_ParseDocument(FSReadStrict(Path))
+			AssertEqual("#123456", Disk["magickey"]["color"])
+		} else {
+			Result := Mode == "ordinary-clear"
+				? HotstringsClearOverride("magickey", "", "priority")
+				: HotstringsSetOverride("magickey", "", "color", "#123456")
+			AssertFalse(Result, "ordinary writes cannot retire legacy delimiters before a destination acknowledgment")
+			AssertEqual(Source, FSReadStrict(Path))
+			AssertTrue(_HotstringsOverrides == Owner)
+		}
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSR_Mode in ["ordinary-set", "ordinary-clear", "receipt-source-changed", "empty-control"]
+	Test("HotstringsConfig delimiter retirement receipt: " . _HOSR_Mode,
+		_HTBS_Run.Bind("retirement-receipt-" . _HOSR_Mode, "", _HOSR_LegacyRetirementReceipt.Bind(_HOSR_Mode)))

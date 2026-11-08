@@ -498,6 +498,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			get_current_index       = function() return 1 end,
 			perform_check           = function() end,
 			handle_chain_signal     = function() return false end,
+			has_pending_work        = function() return false end,
 			arm_chain               = function() end,
 			get_navigation_mods     = function() return {} end,
 			get_validation_mods     = function() return {} end,

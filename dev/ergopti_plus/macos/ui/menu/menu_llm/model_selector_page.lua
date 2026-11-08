@@ -61,7 +61,7 @@ local _installing = {}
 local _install_refused = {}
 
 -- Whether a refresh is scheduled for a runtime probe still in flight.
-local _recheck_armed = false
+local _recheck_armed = nil
 
 
 
@@ -383,11 +383,17 @@ function M.build_payload(ctx, probes, collected)
 			-- probe's end: the page asks again until it has settled.
 			backends[index].reason_key = nil
 			if not _recheck_armed then
-				_recheck_armed = true
-				DeferredWork.after(Timings.sec("ui", "webview_ready_safety_flush_ms"), function()
-					_recheck_armed = false
+				local owner = {}
+				_recheck_armed = owner
+				local ok, accepted = pcall(DeferredWork.after, Timings.sec("ui", "webview_ready_safety_flush_ms"), function()
+					if _recheck_armed ~= owner then return end
+					_recheck_armed = nil
 					M.refresh()
 				end, "model_selector_page.runtime_probe")
+				if not ok or accepted ~= true then
+					if _recheck_armed == owner then _recheck_armed = nil end
+					Logger.error(LOG, "Runtime probe refresh could not be scheduled.")
+				end
 			end
 		end
 	end
@@ -414,10 +420,11 @@ function M.build_payload(ctx, probes, collected)
 	return payload
 end
 
---- Finds one row of the current payload by backend and name.
-local function find_row(payload, backend, name)
+--- Finds one row of the current payload by backend, name, and optional custom provenance.
+local function find_row(payload, backend, name, custom)
 	for _, row in ipairs(payload.models) do
-		if row.name == name and (backend == nil or row.backend == backend) then return row end
+		if row.name == name and (backend == nil or row.backend == backend)
+			and (custom == nil or (row.custom == true) == custom) then return row end
 	end
 	return nil
 end
@@ -441,11 +448,13 @@ end
 local function start_download(ctx, backend, name, custom)
 	local key = pending_key(backend, name)
 	if _pending[key] then return false end
+	local owner = { backend = backend, name = name }
 	local function settled()
+		if _pending[key] ~= owner then return end
 		_pending[key] = nil
 		M.refresh()
 	end
-	_pending[key] = { backend = backend, name = name }
+	_pending[key] = owner
 	Logger.info(LOG, "Model download requested via the selector page: %s/%s.", backend, name)
 	local ok, accepted
 	if backend == "mlx" then
@@ -459,7 +468,7 @@ local function start_download(ctx, backend, name, custom)
 		ok, accepted = Logger.callback(LOG, "Ollama model download", ctx.models_mgr.pull_ollama_model, tag, settled, settled)
 	end
 	if not ok or accepted ~= true then
-		_pending[key] = nil
+		if _pending[key] == owner then _pending[key] = nil end
 		Logger.error(LOG, "Model download of %s/%s was refused.", backend, name)
 		return false
 	end
@@ -670,7 +679,10 @@ function M.handle_action(ctx, body, probes, collected)
 		if ctx.models_mgr.backend_model_installed(b.id, body.name) then return true end
 		return start_download(ctx, b.id, body.name, true)
 	end
-	local row = type(body.name) == "string" and find_row(payload, body.backend, body.name) or nil
+	-- The remove button exists only on custom rows. A catalogue row may have
+	-- the same visible name but must not shadow that custom deletion target.
+	local custom = action == "remove_custom_model" and true or nil
+	local row = type(body.name) == "string" and find_row(payload, body.backend, body.name, custom) or nil
 	if not row then
 		Logger.warn(LOG, "Refused model selector action '%s' for an unknown row '%s'.", tostring(action), tostring(body.name))
 		return false
@@ -832,7 +844,7 @@ function M.open()
 	Logger.info(LOG, "Model selector page requested (backend=%s).", tostring(ctx.state.llm_backend))
 	-- A window shown from inside the still-open menu callback can silently fail
 	-- to appear, so the page opens on the next tick.
-	DeferredWork.after(0, function()
+	local scheduled = DeferredWork.after(0, function()
 		if _ctx ~= ctx or ctx.is_paused() ~= false then return false end
 		local ModelBrowser = require("ui.model_browser")
 		local opened = ModelBrowser.open({
@@ -846,6 +858,10 @@ function M.open()
 		list_api_models()
 		return true
 	end, "model_selector_page.open")
+	if scheduled ~= true then
+		Logger.error(LOG, "Model selector page could not be scheduled.")
+		return false
+	end
 	return true
 end
 

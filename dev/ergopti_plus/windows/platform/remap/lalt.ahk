@@ -62,7 +62,7 @@ _LAltIsBackspaceLayer() {
 _LAltIsSpecialTap() {
 	local action := TapHoldTapAction(TapHold, "left_alt")
 	return action == "one_shot_shift"
-		or action == "tab"
+		or (action == "tab" and TapHoldHoldLayer(TapHold, "left_alt") != "") ; Tab without a hold layer is a plain tap (generic tap-only branch)
 		or action == "alt_tab_monitor"
 		or action == "backspace"
 }
@@ -86,6 +86,7 @@ _LAltHoldModKey() {
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
 SC038:: {
+	Owner := TapHoldNewOwner()
 	if (
 		KS_IsDown("SC11D") ; RCtrl physically held
 		or KS_IsDown("SC03A") ; CapsLock physically held
@@ -98,16 +99,18 @@ SC038:: {
 
 	if !TapHoldReleasePhysicalKey("LAlt")
 		return
+	if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+		return
 	OneShotShift()
 	; Arm LShift for the hold, then release it in a finally so it can NEVER latch.
 	; The wait is capped (U T<timeout>) so a lost SC038 key-up (focus stolen by a
 	; UAC prompt, Suspend toggled mid-press) cannot block the release forever.
-	if !TapHoldSyntheticKeyDown("LShift")
+	if !TapHoldSyntheticKeyDown("LShift", Owner)
 		return
 	try {
 		KS_WaitReleased("SC038", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TapHoldSyntheticKeyUp("LShift")
+		TapHoldSyntheticKeyUp("LShift", Owner)
 	}
 }
 #HotIf
@@ -124,7 +127,7 @@ SC038:: {
 ; ==================================
 ; ==================================
 
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") != "" and not LayerEnabled
 *SC038::
 {
 	UpdateLastSentCharacter("LAlt")
@@ -162,26 +165,20 @@ SC11D & SC038:: {
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
 *SC038::
 {
-	if !TapHoldSyntheticKeyDown("LAlt")
+	Owner := TapHoldNewOwner()
+	if !TapHoldSyntheticKeyDown("LAlt", Owner)
 		return
-	tap := KS_WaitReleased("SC038", TapHoldDuration(TapHold, "left_alt"))
-	if tap {
-		; The synthetic LAlt Down armed above must always be released regardless
-		; of Suspend state; only the AltTabMonitor() side effect is guarded —
-		; native Suspend() never disarms this hotkey's own KeyWait/dispatch.
-		if !TapHoldSyntheticKeyUp("LAlt")
-			return
-		TapHoldDispatchTap("left_alt", AltTabMonitor)
-	} else {
-		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab
-		; focus steal, a UAC prompt, or Suspend toggled mid-press) can never latch Alt
-		; Down system-wide — this else is the SOLE release path (no SC038 Up:: fallback
-		; exists here, unlike tab.ahk) (hold-modifier-unbounded-keywait)
-		try {
+	try {
+		tap := KS_WaitReleased("SC038", TapHoldDuration(TapHold, "left_alt"))
+		if tap {
+			if !_TapHoldReleaseOwnedModifier("LAlt", Owner)
+				return
+			TapHoldDispatchTap("left_alt", () => (TapHoldOwnerCurrent(Owner) ? AltTabMonitor() : false))
+		} else {
 			KS_WaitReleased("SC038", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-		} finally {
-			TapHoldSyntheticKeyUp("LAlt")
 		}
+	} finally {
+		_TapHoldReleaseOwnedModifier("LAlt", Owner)
 	}
 }
 #HotIf
@@ -201,15 +198,23 @@ SC11D & SC038:: {
 #HotIf _LAltIsPlainBackspace() and not LayerEnabled
 *SC038::
 {
-	BackSpaceActionWithModifiers := BackSpaceLogic()
+	; Cleanup retires this callback even when the key remains held after resume.
+	RepeatEpoch := _TH_SyntheticEpoch
+	BackSpaceActionWithModifiers := BackSpaceLogic(RepeatEpoch)
 	if not BackSpaceActionWithModifiers {
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace") ; Event keeps hotstring engine in sync
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		while KS_IsDown("SC038") { ; key-repeat loop while LAlt physically held
-			if A_IsSuspended
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
 				break
 			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+				break
 		}
 	}
 }
@@ -359,19 +364,28 @@ _LAltDispatch() {
 ; Backspace has modifier-aware special handling, but is still a tap output and
 ; therefore runs inside TapHoldDispatchTap whenever LAlt has a hold behaviour.
 _LAltBackspaceTap() {
-	BackSpaceActionWithModifiers := BackSpaceLogic()
+	Epoch := _TH_SyntheticEpoch
+	BackSpaceActionWithModifiers := BackSpaceLogic(Epoch)
 	if not BackSpaceActionWithModifiers {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace")
 	}
 }
 
-BackSpaceLogic() {
+BackSpaceLogic(ExpectedEpoch := unset) {
+	Epoch := IsSet(ExpectedEpoch) ? ExpectedEpoch : _TH_SyntheticEpoch
+	; A retired invocation consumes its branch without permitting a plain fallback.
+	if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+		return True
 	RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 
 	if (
 		TapHoldUserLCtrlHeld() ; LCtrl physically held
 		and KS_IsDown("Shift") ; Shift physically held
 	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("Delete", "Ctrl")
 		return True
 	} else if (
@@ -379,6 +393,8 @@ BackSpaceLogic() {
 		and not RCtrlIsOneShotShift
 		and KS_IsDown("Shift") ; Shift physically held
 	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("Delete", "Ctrl")
 		return True
 	} else if (
@@ -386,31 +402,51 @@ BackSpaceLogic() {
 		and RCtrlIsOneShotShift
 		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
 	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		OneShotShiftFix()
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("Right", "Ctrl")
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("BackSpace", "Ctrl") ; = ^Delete without triggering Ctrl+Alt+Delete
 		return True
 	} else if (
 		RCtrlIsOneShotShift
 		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
 	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		OneShotShiftFix()
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("Right", "")
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("BackSpace", "") ; = Delete without triggering Ctrl+Alt+Delete
 		return True
 	} else if KS_IsDown("Shift") {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("Delete", "")
 		return True
 	} else if TapHoldUserLCtrlHeld() { ; LCtrl physically held
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("BackSpace", "Ctrl")
 		return True
 	} else if (
 		not RCtrlIsOneShotShift
 		and KS_IsDown("SC11D") ; RCtrl physically held
 	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
 		TextPressKey("BackSpace", "Ctrl")
 		return True
 	}
+	if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+		return True
 	return False
 }
 

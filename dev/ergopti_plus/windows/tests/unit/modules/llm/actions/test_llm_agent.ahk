@@ -805,6 +805,33 @@ _LAG_AiOffRefuses() {
 }
 Test("LLM agent: the manual actions refuse with the AI off, not with its backend not ready (ai-off-picker)", _LAG_AiOffRefuses)
 
+; An accepted connector runs on a timer thread; a pause or the AI switch that lands
+; before it starts must stop it, as for ordinary accepted text (accepted-agent policy).
+_LAG_AcceptedConnectorHonoursPauseAndAiOff() {
+	Screen := _LTN_Screen(LAG_SELECTION)
+	_LAG_Run(_LAG_Menu("action", "", "cerebras"), Screen, _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu
+		_LAG_Invoke("llm_agent_selection")
+		Fx.Remote[1]["on_success"].Call(LAG_ANSWER)
+		Final := _LPP_LastFinalRender()
+		_LLM_Menu["enabled"] := false
+		AssertFalse(Final.slots[1].OnAccept.Call(), "the AI switched off before the connector starts")
+		AssertEqual(0, Fx.Connector.Length, "no connector ran")
+		_LLM_Menu["enabled"] := true
+		Suspend(true)
+		try
+			AssertFalse(Final.slots[1].OnAccept.Call(), "paused before the connector starts")
+		finally
+			Suspend(false)
+		AssertEqual(0, Fx.Connector.Length, "still no connector ran")
+		AssertTrue(Final.slots[1].OnAccept.Call(), "the same acceptance runs when the script is live")
+		AssertEqual(1, Fx.Connector.Length, "the connector ran once")
+	}
+}
+Test("LLM agent: an accepted connector does not run after a pause or AI-off (accepted-agent-policy)",
+	_LAG_AcceptedConnectorHonoursPauseAndAiOff)
+
 _LAG_AnswersRefusedOrFailing() {
 	Screen := _LTN_Screen(LAG_SELECTION)
 	_LAG_Run(_LAG_Menu("action", "", "cerebras"), Screen, _Body)
@@ -849,3 +876,220 @@ _LAG_AnswersRefusedOrFailing() {
 }
 Test("LLM agent: invalid actions are dropped, failures reported, older answers ignored",
 	_LAG_AnswersRefusedOrFailing)
+
+
+; Exercise accepted model JSON through the real action schema before rendering.
+; Canonical line endings must not depend on how a JSON newline was spelled.
+_LAG_LineBreakPayload(Connector, Mode) {
+	Config := LLM_Agent_Config()
+	switch Mode {
+		case "lf-control":
+			Escaped := "\n", IcsExpected := "first\nsecond", MailExpected := "first%0D%0Asecond"
+		case "crlf-control":
+			Escaped := "\r\n", IcsExpected := "first\nsecond", MailExpected := "first%0D%0Asecond"
+		case "carriage":
+			Escaped := "\r", IcsExpected := "first\nsecond", MailExpected := "first%0D%0Asecond"
+		case "mixed":
+			Escaped := "\r\nmiddle\rfinal\n"
+			IcsExpected := "first\nmiddle\nfinal\nsecond"
+			MailExpected := "first%0D%0Amiddle%0D%0Afinal%0D%0Asecond"
+		case "literal-control":
+			Escaped := "\\r", IcsExpected := "first\\rsecond", MailExpected := "first%5Crsecond"
+		default:
+			throw ValueError("Unknown agent payload line break mode")
+	}
+	Raw := Connector == "calendar"
+		? '{"type":"calendar","title":"Fixture","start":"2026-10-01T14:00","notes":"first' . Escaped . 'second"}'
+		: '{"type":"mail","subject":"Fixture","body":"first' . Escaped . 'second"}'
+	Decoded := JsonParse(Raw)
+	Action := LLM_Agent_ValidateAction(Config, Decoded, [], &Reason)
+	AssertEqual("", Reason, "the actual schema accepts the genuinely decoded model field")
+	AssertTrue(Action is Map)
+	if Connector == "calendar" {
+		AssertEqual(Decoded["notes"], Action["notes"], "validation must preserve the original admitted newline spelling")
+		Payload := LLM_Agent_Ics(Config, Action, "owned-fixture", "20261105T000000Z")
+		ExpectedRecord := "DESCRIPTION:" . IcsExpected . "`r`n"
+		_TestPrint("# agent-payload-linebreak connector=" . Connector . " mode=" . Mode
+			. " exact_record=" . !!InStr(Payload, ExpectedRecord, true)
+			. " lone_break=" . !!RegExMatch(Payload, "(?<!\r)\n|\r(?!\n)"))
+		AssertFalse(RegExMatch(Payload, "(?<!\r)\n|\r(?!\n)"), "all physical iCalendar delimiters must be complete CRLF pairs")
+		AssertTrue(InStr(Payload, ExpectedRecord, true), "each accepted logical newline must be escaped within its original TEXT record")
+	} else {
+		AssertEqual(Decoded["body"], Action["body"])
+		Payload := LLM_Agent_Mailto(Action)
+		Expected := "mailto:?subject=Fixture&body=" . MailExpected
+		_TestPrint("# agent-payload-linebreak connector=" . Connector . " mode=" . Mode . " uri=" . Payload)
+		AssertEqual(Expected, Payload, "each accepted mail body newline must encode the complete RFC6068 CRLF sequence")
+	}
+}
+for _LAG_LB_Connector in ["calendar", "mail"] {
+	for _LAG_LB_Mode in ["lf-control", "crlf-control", "carriage", "mixed", "literal-control"]
+		Test("LLM agent payload line breaks: " . _LAG_LB_Connector . "/" . _LAG_LB_Mode . " (agent-payload-line-breaks)",
+			_LAG_LineBreakPayload.Bind(_LAG_LB_Connector, _LAG_LB_Mode))
+}
+
+; Simulates two sequential clock observations across a second boundary; it
+; does not change the Windows clock, registry or configured time zone.
+class _TZF_ClockProbe {
+	__New(UtcStamp) {
+		this.UtcStamp := UtcStamp, this.LocalCalls := 0, this.UtcCalls := 0, this.OffsetCalls := 0
+	}
+	Local() {
+		this.LocalCalls += 1
+		return "20261104150059"
+	}
+	Utc() {
+		this.UtcCalls += 1
+		return this.UtcStamp
+	}
+	OffsetMinutesEast() {
+		this.OffsetCalls += 1
+		return 60
+	}
+}
+_TZF_ContextFromMissingRegistry(Probe) {
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	PreviousCritical := Critical("On")
+	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
+	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED", "_LOGGER_VOLUME"]
+		SavedExtra[Name] := %Name%
+	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	try {
+		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
+		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
+		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		; No key is created. The actual registry adapter must observe this missing
+		; value before the real context producer follows its fallback branch.
+		RegistryKey := "HKCU\Software\ErgoptiMissingTimeZone-" . DllCall("GetCurrentProcessId")
+			. "-" . A_TickCount . "-" . Random(100000, 999999)
+		Critical("Off")
+		AssertFalse(Reg_TryRead(RegistryKey, "TimeZoneKeyName", &Ignored := ""),
+			"the native registry read confirms the fallback value is absent")
+		return _LLM_Agent_SystemContext(Probe, RegistryKey)
+	} finally {
+		Critical("On")
+		_TLOG_RestoreLoggerState(SavedLogger)
+		for Name, Value in SavedExtra
+			%Name% := Value
+		for Name, Saved in SavedOptional
+			%Name% := Saved.Present ? Saved.Value : unset
+		Critical(PreviousCritical)
+	}
+}
+_TZF_ContextCase(UtcStamp, Label) {
+	Probe := _TZF_ClockProbe(UtcStamp)
+	Context := _TZF_ContextFromMissingRegistry(Probe)
+	_TestAppendProgress("# agent timezone " . Label . " zone=" . Context["timezone"]
+		. " local_reads=" . Probe.LocalCalls . " utc_reads=" . Probe.UtcCalls . " offset_reads=" . Probe.OffsetCalls)
+	AssertTrue((Probe.LocalCalls == 1 && Probe.UtcCalls == 1 && Probe.OffsetCalls == 0)
+		|| (Probe.LocalCalls == 0 && Probe.UtcCalls == 0 && Probe.OffsetCalls == 1),
+		"the producer consulted exactly one clock strategy")
+	AssertEqual("UTC+01:00", Context["timezone"], "the simulated UTC+1 offset remains one hour")
+}
+Test("agent context: same-second timezone fallback (agent-timezone-native-fallback-control)",
+	_TZF_ContextCase.Bind("20261104140059", "same-second"))
+Test("agent context: timezone fallback across sampled second (agent-timezone-native-fallback-boundary)",
+	_TZF_ContextCase.Bind("20261104140100", "boundary"))
+
+; Independent native control: convert one UTC SYSTEMTIME to local time and
+; compare the resulting FILETIMEs, without changing the OS clock or zone.
+_TZF_ReferenceOffset() {
+	Utc := Buffer(16, 0), LocalTime := Buffer(16, 0)
+	UtcFile := Buffer(8, 0), LocalFile := Buffer(8, 0)
+	DllCall("Kernel32\GetSystemTime", "Ptr", Utc)
+	if !DllCall("Kernel32\SystemTimeToTzSpecificLocalTime", "Ptr", 0, "Ptr", Utc, "Ptr", LocalTime, "Int")
+		throw OSError(A_LastError, "native UTC-to-local conversion")
+	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", Utc, "Ptr", UtcFile, "Int")
+		throw OSError(A_LastError, "native UTC SYSTEMTIME conversion")
+	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", LocalTime, "Ptr", LocalFile, "Int")
+		throw OSError(A_LastError, "native local SYSTEMTIME conversion")
+	Ticks := NumGet(LocalFile, 0, "Int64") - NumGet(UtcFile, 0, "Int64")
+	if Mod(Ticks, 600000000) != 0
+		throw Error("The native time-zone offset was not an integral minute.")
+	return Ticks // 600000000
+}
+_TZF_NativeOffsetControl() {
+	Before := _TZF_ReferenceOffset()
+	Actual := NativeTimeZoneOffsetMinutesEast()
+	After := _TZF_ReferenceOffset()
+	_TestAppendProgress("# agent timezone native-reference before=" . Before . " observed=" . Actual . " after=" . After)
+	AssertEqual(Before, After, "the system time zone must remain stable during this observation")
+	AssertTrue(Actual is Integer, "the native time-zone adapter must return an offset")
+	AssertEqual(Before, Actual, "active bias agrees with an independent same-instant conversion")
+}
+Test("agent context: native active bias agrees with UTC-to-local conversion (agent-timezone-native-bias)", _TZF_NativeOffsetControl)
+
+class _TZF_MissingOffset extends _TZF_ClockProbe {
+	OffsetMinutesEast() {
+		this.OffsetCalls += 1
+		return ""
+	}
+}
+_TZF_OffsetUnavailable() {
+	Probe := _TZF_MissingOffset("20261104140100")
+	Context := _TZF_ContextFromMissingRegistry(Probe)
+	AssertEqual(1, Probe.OffsetCalls)
+	AssertEqual(0, Probe.LocalCalls + Probe.UtcCalls, "an unavailable offset cannot fall back to torn samples")
+	AssertEqual("", Context["timezone"], "an unavailable offset is not fabricated")
+}
+Test("agent context: unavailable timezone offset is not fabricated (agent-timezone-offset-refusal)", _TZF_OffsetUnavailable)
+
+
+; Retained callbacks must not erase the cancellation capability of a newer
+; pause. These units use the real agent and the existing scheduler port.
+_LAPO_Sequence(Mode, Fx, Lines, Sent) {
+	global _LLM_Agent_Auto
+	Fx.App := "Slack"
+	Gate := {Allowed: true}
+	AssertTrue(LLM_Agent_OnTyping(LAG_TYPED, () => Gate.Allowed))
+	Older := _LLM_Agent_Auto["timer"]
+	AssertTrue(HasMethod(Older, "Call"))
+	if Mode == "current" {
+		AssertTrue(Older.Call())
+		AssertEqual(0, _LLM_Agent_Auto["timer"])
+		AssertEqual(1, Fx.Remote.Length, "the admitted pause must dispatch its genuine System 1 request")
+		return
+	}
+	if Mode == "withdrawn" {
+		Gate.Allowed := false
+		AssertFalse(Older.Call())
+		AssertEqual(0, _LLM_Agent_Auto["timer"], "a withdrawn current pause still retires its own capability")
+		AssertEqual(0, Fx.Remote.Length)
+		return
+	}
+	AssertTrue(LLM_Agent_OnTyping(LAG_TYPED . " later"))
+	Newer := _LLM_Agent_Auto["timer"]
+	AssertTrue(HasMethod(Newer, "Call") && Newer != Older)
+	Before := Fx.Scheduled.Length
+	Result := Older.Call()
+	OwnerPreserved := _LLM_Agent_Auto["timer"] == Newer
+	; Subsequent actual invalidation must retain the exact timer cancellation
+	; operation, rather than merely changing a logical generation.
+	LLM_Agent_InvalidateTyping()
+	CancelledNewer := false
+	for Index, Entry in Fx.Scheduled {
+		if Index > Before && Entry["fn"] == Newer && Entry["period"] == 0
+			CancelledNewer := true
+	}
+	_TestPrint("# agent-pause-owner result=" . Result . " newer_owner=" . OwnerPreserved
+		. " cancelled_newer=" . CancelledNewer . " requests=" . Fx.Remote.Length)
+	AssertFalse(Result)
+	AssertTrue(OwnerPreserved, "a retired pause cannot erase the exact successor timer owner")
+	AssertTrue(CancelledNewer, "the current pause must remain cancellable after a stale callback")
+	AssertEqual(0, Fx.Remote.Length)
+}
+_LAPO_Case(Mode) {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _LAPO_Sequence.Bind(Mode))
+}
+for _LAPO_Mode in ["stale", "current", "withdrawn"]
+	Test("LLM agent pause ownership: " . _LAPO_Mode . " retains its exact cancellation capability (agent-pause-timer-owner)",
+		_LAPO_Case.Bind(_LAPO_Mode))

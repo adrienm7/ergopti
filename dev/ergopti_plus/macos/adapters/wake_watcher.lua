@@ -21,6 +21,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.wake_watcher"
 
@@ -43,20 +44,23 @@ function M.new(on_wake)
 			return hs.caffeinate.watcher.new(function(event)
 				if event ~= wake_event or not active or native ~= candidate then return end
 				local called, err = xpcall(on_wake, debug.traceback)
-				if not called then Logger.error(LOG, "Wake callback raised: %s.", tostring(err)) end
+				if not called then Logger.error(LOG, "Wake callback raised: %s.", ErrorDescription.describe(err)) end
 			end)
 		end, debug.traceback)
 		if not ok or candidate_or_err == nil then
-			Logger.error(LOG, "The wake watcher could not be created: %s.", tostring(candidate_or_err))
+			Logger.error(LOG, "The wake watcher could not be created: %s.", ErrorDescription.describe(candidate_or_err))
 			return false
 		end
 		candidate = candidate_or_err
+		-- Native start may fail after activation. Retain the exact handle before
+		-- calling it so a failed rollback remains available to stop().
+		native = candidate_or_err
 		local started, result_or_err = xpcall(function() return candidate_or_err:start() end, debug.traceback)
 		if not started or result_or_err ~= candidate_or_err then
-			Logger.error(LOG, "The wake watcher could not start: %s.", tostring(result_or_err))
+			Logger.error(LOG, "The wake watcher could not start: %s.", ErrorDescription.describe(result_or_err))
+			watcher.stop()
 			return false
 		end
-		native = candidate_or_err
 		active = true
 		return true
 	end
@@ -67,12 +71,13 @@ function M.new(on_wake)
 		-- Revoke callbacks before a native failure can leave the watcher running.
 		active = false
 		if native == nil then return true end
-		local ok, err = xpcall(function() native:stop() end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "The wake watcher could not stop: %s.", tostring(err))
+		local candidate = native
+		local ok, result = xpcall(function() return candidate:stop() end, debug.traceback)
+		if not ok or result ~= candidate then
+			Logger.error(LOG, "The wake watcher could not stop: %s.", ErrorDescription.describe(result))
 			return false
 		end
-		native = nil
+		if native == candidate then native = nil end
 		return true
 	end
 

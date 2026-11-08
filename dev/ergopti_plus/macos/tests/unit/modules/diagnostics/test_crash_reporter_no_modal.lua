@@ -101,7 +101,11 @@ local function load_with_tripwires(config_dir)
 
 	if config_dir then
 		-- The logger is the one resolver of the crash-reports folder.
-		require("infra.logger").crash_reports_dir = function() return config_dir .. "crash_reports/" end
+		local Logger = require("infra.logger")
+		Logger.crash_reports_dir = function() return config_dir .. "crash_reports/" end
+		-- save() refuses a report its privacy redactor cannot answer for (52525d33);
+		-- this test is about the notification, so the real logger gets its policy.
+		helpers.admit_logger_privacy(Logger)
 	end
 
 	return CrashReporter, modal, notifications

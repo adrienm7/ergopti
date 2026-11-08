@@ -44,8 +44,10 @@ helpers.describe("menu: no off-platform explanation is rendered on macOS", funct
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
 		helpers.assert_eq(found, {}, "a row another platform has must not reach the macOS tray")
-		helpers.assert_eq(greyed, 8,
-			"the Shortcuts restore and clear, the tap-hold word reset, the emulated-rows submenu row and its four switches are drawn greyed with their reason")
+		-- The tap-hold word reset is live on macOS since its Karabiner marker, and the
+		-- emulated-rows submenu since the macOS emulation (2026-11-06).
+		helpers.assert_eq(greyed, 2,
+			"the Shortcuts restore and clear are drawn greyed with their reason")
 	end)
 
 end)

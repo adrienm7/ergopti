@@ -29,7 +29,7 @@
 		"linux": {
 			"wrap": [
 				"existing wrap feature with live checked/readiness and unchanged strict native setter",
-				"menu.shortcuts.wrap_symbols group containing lexically sorted unique live pairs"
+				"menu.shortcuts.wrap_symbols group with the shared wrap controls and one toggle group per catalogue family, in catalogue order (since 2026-11-06)"
 			],
 			"extension": "genuine existing scanner/sandbox rows; error caption packname + emdash +common.error_title, no synthesized Mac personal registry"
 		}

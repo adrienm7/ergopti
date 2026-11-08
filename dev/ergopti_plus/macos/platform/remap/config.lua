@@ -64,9 +64,10 @@ local OUTDATED_ARRAY_REASON = "a remap dictionary is not an array; the neutral s
 local function timing_leaf(section, key, default, path, section_name)
 	if section[key] == nil then return default, false end
 	local called, value = pcall(tonumber, section[key])
-	if called and value ~= nil then return value, false end
+	if called and require("number_policy").within_timer_ceiling(value)
+		and value > 0 and value % 1 == 0 then return value, false end
 	Outdated.report_in_file(path, { section_name, key },
-		"a timing is numeric; the canonical default is used", Logger)
+		"a timing is a finite positive whole number of milliseconds; the canonical default is used", Logger)
 	return default, true
 end
 
@@ -292,6 +293,10 @@ local function name_modifier_holds(actions)
 			end
 			action.label = KeyNames.modifiers_heading(action.modifiers, "macos", i18n.get)
 			action.short_label = KeyNames.modifiers_label(action.modifiers, "macos", i18n.get)
+			if action.id == "hyper" then
+				action.label = "Hyper — " .. action.label
+				action.short_label = "Hyper"
+			end
 		end
 	end
 end
@@ -314,6 +319,43 @@ local function name_held_layers(actions)
 			end
 			action.label = "🗂 " .. text
 			action.short_label = text
+		end
+	end
+end
+
+--- Names the actions that stand for one key (those declaring `key_name`) from
+--- the shared key name table: its macOS glyph when it has one, then its name
+--- in the user's language. AltGr read « ⌥ AltGr (option droite — interne) »
+--- in French in every locale.
+--- @param actions table The decoded action list, mutated in place.
+local function name_key_actions(actions)
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and action.key_name ~= nil then
+			if type(action.key_name) ~= "string" or not KeyNames.canonical(action.key_name) then
+				error("remap action " .. tostring(action.id) .. " names no known key", 2)
+			end
+			local name = KeyNames.label(action.key_name, "macos", i18n.get)
+			local glyph = KeyNames.has_macos_symbol(action.key_name) and KeyNames.macos_symbol(action.key_name)
+			action.label = glyph and (glyph .. " " .. name) or name
+			action.short_label = name
+		end
+	end
+end
+
+--- Names each action's picker heading: `category` is an id of the
+--- remap.category.* locale keys. The headings read « Modificateurs »,
+--- « Touches » or « Keyboard shortcuts » whatever the user's language. A
+--- catalogue miss shows its dotted key, like every other label; an action
+--- without a category has no heading, as the picker already allows.
+--- @param actions table The decoded action list, mutated in place.
+local function name_categories(actions)
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and action.category ~= nil then
+			if type(action.category) ~= "string" or not action.category:match("^[a-z_]+$") then
+				error("remap action " .. tostring(action.id) .. ": category " .. tostring(action.category)
+					.. " is not a category id", 2)
+			end
+			action.category = i18n.get("remap.category." .. action.category)
 		end
 	end
 end
@@ -346,7 +388,7 @@ local function append_shared_modifier_chords(actions)
 				id = id_prefix .. "_" .. key_def.id,
 				short_label = label,
 				label = label,
-				category = "Keyboard shortcuts",
+				category = "keyboard_shortcuts",
 				holdable = false,
 			}
 			if key_def.karabiner_key then
@@ -441,7 +483,9 @@ function M.load_available_actions(actions_file)
 	localise_action_labels(list)
 	name_modifier_holds(list)
 	name_held_layers(list)
+	name_key_actions(list)
 	append_shared_modifier_chords(list)
+	name_categories(list)
 	local _, catalogue_err = ActionCatalogue.index_by_id(list)
 	if catalogue_err then
 		Logger.error(LOG, "Cannot load actions: %s.", catalogue_err)

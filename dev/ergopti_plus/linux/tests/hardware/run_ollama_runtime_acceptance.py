@@ -23,8 +23,8 @@ import tempfile
 
 
 MODEL = "granite4:350m-h"
-ARCHIVE_BYTES = 1436408810
-ARCHIVE_SHA256 = "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a"
+ARCHIVE_BYTES = 1438364593
+ARCHIVE_SHA256 = "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0"
 
 
 WORK_PHASES = frozenset(
@@ -497,7 +497,7 @@ def main():
         pins = json.loads(
             (repository / "static/ergopti_plus/_shared/modules/llm/ollama_release.json").read_text()
         )
-        assert pins["version"] == "0.40.4" and pins["assets"]["linux-amd64"] == {
+        assert pins["version"] == "0.40.6" and pins["assets"]["linux-amd64"] == {
             "filename": "ollama-linux-amd64.tar.zst",
             "bytes": ARCHIVE_BYTES,
             "sha256": ARCHIVE_SHA256,
@@ -613,7 +613,7 @@ def main():
             accepted = (
                 receipt.get("archive_sha256") == ARCHIVE_SHA256
                 and receipt.get("archive_bytes") == ARCHIVE_BYTES
-                and receipt.get("typed_version") == "0.40.4"
+                and receipt.get("typed_version") == "0.40.6"
                 and all(
                     type(receipt.get(key)) is int and receipt[key] == 1
                     for key in (

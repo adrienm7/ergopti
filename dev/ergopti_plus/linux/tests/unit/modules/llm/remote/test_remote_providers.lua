@@ -231,7 +231,11 @@ helpers.describe("Backboard: an assistant per key, then one message per request"
 			calls[1].callback({ ok = false, status = 401, body = "", error_body = '{"message":"Invalid API key"}' })
 			helpers.assert_eq(#calls, 1, "no message without an assistant")
 			helpers.assert_true(err1:find("HTTP 401: Invalid API key", 1, true) ~= nil, err1)
-			helpers.assert_eq(#logged(logs, "warn", "Backboard assistant could not be created: HTTP 401"), 1)
+			-- The provider's own text may echo the key: the log withholds it.
+			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: details withheld."), 1)
+			for _, line in ipairs(logs) do
+				helpers.assert_true(not line.text:find("Invalid API key", 1, true), "never the backend text: " .. line.text)
+			end
 			remote.chat(BACKBOARD, nil, MESSAGES, {}, nil, function(_, err) err2 = err end)
 			helpers.assert_eq(calls[2].url, Formats.backboard_assistant_request(base).url, "created again")
 			answer(calls, 2, { name = "no id" })
@@ -359,17 +363,19 @@ helpers.describe("Jev through Backboard: the questions in system_one, the answer
 		end)
 	end
 
-	helpers.it("without answers: a WARN naming the top-level keys only, never the content", function()
+	helpers.it("without answers: a WARN naming neither the keys nor the content", function()
 		with_remote(function(remote, calls, logs)
 			local got_err
 			remote.decide(JEV, "App: Mail\nText: jeudi", QUESTIONS, function(_, err) got_err = err end)
 			answer(calls, 1, { assistant_id = "asst-1" })
 			answer(calls, 2, { content = "SECRET reply text", thread_id = "t-1" })
 			helpers.assert_true(got_err ~= nil)
-			local warns = logged(logs, "warn", "top-level keys: content, thread_id")
-			helpers.assert_eq(#warns, 1, "the keys are logged")
+			-- An answer's keys are provider data too (error_log): none is logged.
+			local warns = logged(logs, "warn", "Backboard returned no Jev answers.")
+			helpers.assert_eq(#warns, 1, "the missing answers are diagnosed")
 			for _, line in ipairs(logs) do
 				helpers.assert_true(not line.text:find("SECRET", 1, true), "never the content: " .. line.text)
+				helpers.assert_true(not line.text:find("thread_id", 1, true), "never the keys: " .. line.text)
 			end
 		end)
 	end)

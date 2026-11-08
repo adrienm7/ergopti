@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local Atspi = require("adapters.atspi_focus")
 local Detector = require("adapters.secure_field_detector")
 local FocusGuard = require("modules.keystats.focus_guard")
@@ -201,6 +202,47 @@ local function with_configuration_scope(f, body)
 end
 
 helpers.describe("programmable native Linux runtime", function()
+	helpers.it("linux-hotstrings-scope-prefix: restores dynamic trigger and matcher after inverse refusal", function()
+		with_runtime(function(f)
+			with_configuration_scope(f, function(c)
+				local root = c.path:match("^(.*)/[^/]+$")
+				-- The effective configuration directory, where the manager reads it (PIL-002).
+				local folder = require("infra.config_paths").config()
+				assert(os.execute("mkdir -p '" .. folder .. "'"))
+				local info = assert(io.open(folder .. "/personal_info.toml", "w"))
+				assert(info:write('[info]\nphone_number = "0750123456"\n')); assert(info:close())
+				helpers.assert_true(c.Preferences.set("hotstrings.trigger_char", "§"))
+				helpers.assert_true(c.Dynamic.set_rule_enabled("phoneprefixes", true))
+				helpers.assert_true(c.Dynamic.init({ trigger_char = "§" }))
+				helpers.assert_true(c.Config.set_magic_key("§", "★"))
+				helpers.assert_true(c.Config.set_extra_mappings_provider(c.Dynamic.prefix_mappings))
+				local loaded, original = nil, f.engine.load_mappings
+				f.engine.load_mappings = function(self, mappings) loaded = mappings; return original(self, mappings) end
+				local _, initial = c.Config.load_all(); helpers.assert_true(initial)
+				local function has(trigger)
+					for _, mapping in ipairs(loaded or {}) do if mapping.trigger == trigger then return true end end
+					return false
+				end
+				helpers.assert_true(has("07§"), "fixture must begin with the custom trigger")
+				helpers.assert_true(c.scope.apply("recommended"))
+				helpers.assert_eq(c.Dynamic.get_trigger_char(), "★")
+				local init = c.Dynamic.init
+				local attempts = 0
+				c.Dynamic.init = function(options)
+					attempts = attempts + 1
+					if attempts == 1 then return false end
+					return init(options)
+				end
+				helpers.assert_eq(c.scope.revert(), false, "a refused dynamic inverse must retain debt")
+				helpers.assert_true(c.scope.pending())
+				helpers.assert_true(c.scope.retry_restore(), "retry must restore the dynamic owner even after preferences were restored")
+				c.Dynamic.init = init
+				helpers.assert_eq(attempts, 2)
+				helpers.assert_eq(c.Dynamic.get_trigger_char(), "§")
+				helpers.assert_true(has("07§"), "the restored matcher must use the previous trigger")
+			end)
+		end)
+	end)
 	helpers.it("(user-hotstrings-native) admits the actual installed-source storage reader through its complete private path surface", function()
 		local original = {}
 		for _, name in ipairs(DISCOVERY_OWNERS) do original[name] = package.loaded[name] end
@@ -299,7 +341,10 @@ helpers.describe("programmable native Linux runtime", function()
 			Shell.has_command = function() return true end
 			-- A completed write is what the next read sees, as on a real clipboard.
 			local clipboard = "owned original clipboard"
-			Shell.exec_checked = function() return true, clipboard end
+			Shell.exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
+				return true, clipboard
+			end
 			Shell.with_exact_stdin = function(command, content)
 				writes[#writes + 1] = content; return command
 			end

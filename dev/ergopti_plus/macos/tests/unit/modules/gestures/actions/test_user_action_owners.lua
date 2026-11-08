@@ -266,6 +266,20 @@ helpers.describe("the field run checks the Apple Shortcuts action (macOS)", func
 		helpers.assert_eq(steps[1], { "shortcuts_listed", "fail", "query_refused" })
 	end)
 
+	helpers.it("reports a synchronous listing refusal once even when start returns false", function()
+		local steps, finished = {}, 0
+		local report = { step = function(id, state, value) steps[#steps + 1] = { id, state, value } end }
+		Check.apple_shortcuts({ apple_shortcut_action = function()
+			return { list = function(callback)
+				callback(nil, "query_refused")
+				return false, "start_refused"
+			end }
+		end }, report, function() finished = finished + 1 end)
+		helpers.assert_eq(finished, 1)
+		helpers.assert_eq(steps, { { "shortcuts_listed", "fail", "query_refused" },
+			{ "field_test_shortcut", "skip", "no_listing" } })
+	end)
+
 	helpers.it("is one of the field run's checks", function()
 		helpers.assert_eq(require("infra.field_check_checks").checks.apple_shortcuts, Check.apple_shortcuts)
 	end)

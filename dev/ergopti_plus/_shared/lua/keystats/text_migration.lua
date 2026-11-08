@@ -39,6 +39,8 @@
 
 local M = {}
 local SqliteLiteral = require("sqlite.literal")
+local MAX_EXACT_ID = require("sqlite.event_id_policy").MAX_EXACT_LUA_CURSOR
+local MAX_EXACT_ID_TEXT = string.format("%.0f", MAX_EXACT_ID)
 
 
 
@@ -87,14 +89,35 @@ M.ROW_SEPARATOR = "|"
 -- ===============================
 -- ===============================
 
+--- Parses a SQLite row identity or cursor only within the exact integer range
+--- shared by LuaJIT and Lua 5.4. SQLite INTEGER itself supports larger values;
+--- rounding one here could update a different row of private text.
+--- @param value string|number Decimal SQLite id or cursor.
+--- @return number|nil Exact supported integer, or nil when unsafe.
+function M.exact_id(value)
+	local maximum = MAX_EXACT_ID_TEXT
+	if type(value) == "string" then
+		if not value:match("^%d+$") then return nil end
+		local digits = value:gsub("^0+", "")
+		if digits == "" then digits = "0" end
+		if #digits > #maximum or (#digits == #maximum and digits > maximum) then return nil end
+		return tonumber(digits)
+	end
+	if type(value) ~= "number" or value ~= value or value < 0
+		or value > MAX_EXACT_ID or value % 1 ~= 0 then return nil end
+	return value
+end
+
 --- Returns the identifier the per-row IV is derived from, for one column.
 --- @param row_id number|string The events_typing row id.
 --- @param column string        Column name, as listed in M.COLUMNS.
 --- @return string|nil The IV input id, or nil when the column is not migratable.
 function M.iv_event_id(row_id, column)
+	local id = M.exact_id(row_id)
+	if id == nil then return nil end
 	for _, spec in ipairs(M.COLUMNS) do
 		if spec.name == column then
-			return tostring(row_id) .. spec.iv_suffix
+			return string.format("%.0f", id) .. spec.iv_suffix
 		end
 	end
 	return nil
@@ -157,6 +180,8 @@ end
 ---   back through a CLI whose output separator can occur inside the text itself.
 --- @return string One SELECT statement.
 function M.select_batch_sql(device_id, after_id, limit, opts)
+	after_id = M.exact_id(after_id)
+	if after_id == nil then return nil end
 	opts = opts or {}
 	local projection
 	if opts.hex then
@@ -166,7 +191,7 @@ function M.select_batch_sql(device_id, after_id, limit, opts)
 		end
 		projection = table.concat(fields, string.format(" || '%s' || ", M.ROW_SEPARATOR))
 	else
-		local fields = { "id" }
+		local fields = { "CAST(id AS TEXT) AS id" }
 		for _, spec in ipairs(M.COLUMNS) do
 			fields[#fields + 1] = spec.name
 		end
@@ -188,7 +213,7 @@ end
 --- @param assignments table  Array of { name = column, value = new value }.
 --- @return string|nil One UPDATE statement, or nil when nothing changed.
 function M.update_row_sql(device_id, row_id, assignments)
-	if type(assignments) ~= "table" or #assignments == 0 then return nil end
+	if not M.exact_id(row_id) or type(assignments) ~= "table" or #assignments == 0 then return nil end
 	local sets = {}
 	for _, assignment in ipairs(assignments) do
 		if not M.is_migratable_column(assignment.name) then return nil end
@@ -254,7 +279,7 @@ function M.parse_hex_row(line)
 	for field in (line .. M.ROW_SEPARATOR):gmatch("([^" .. M.ROW_SEPARATOR .. "]*)" .. M.ROW_SEPARATOR) do
 		fields[#fields + 1] = field
 	end
-	local row_id = tonumber(fields[1])
+	local row_id = M.exact_id(fields[1])
 	if not row_id or #fields ~= #M.COLUMNS + 1 then return nil, nil end
 	local values = {}
 	for index, spec in ipairs(M.COLUMNS) do

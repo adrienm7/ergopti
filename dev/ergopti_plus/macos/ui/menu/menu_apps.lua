@@ -27,7 +27,7 @@ local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local text_utils = require("infra.text_utils")
+local FsDir = require("infra.fs_dir")
 
 local LOG = "menu_apps"
 
@@ -38,25 +38,39 @@ M._active_tasks = {}
 
 -- Session cache of discovered app bundles (names, descriptions, icons). The
 -- apps/ directory only changes on install, which requires an hs.reload() anyway,
--- so we scan it once and reuse — keeping the `find` subprocess, the per-app
+-- so we scan it once and reuse — keeping directory reads, the per-app
 -- Info.plist reads, and the icon loads off every menu open. Mirrors
 -- HotCounter._ext_meta_cache. Nil until the first discovery.
 local _apps_cache = nil
 local _scan_failures = {}
+local _icon_canvas = nil
+local _icon_canvas_busy = false
 
---- Enumerates sorted paths only after the shell command commits successfully.
+--- Releases a retained icon canvas before any successor is allocated.
+--- @return boolean settled
+local function release_icon_canvas()
+	if _icon_canvas_busy then return false end
+	if not _icon_canvas then return true end
+	local canvas = _icon_canvas
+	_icon_canvas_busy = true
+	local ok = pcall(function() canvas:delete() end)
+	_icon_canvas_busy = false
+	if not ok then
+		Logger.warn(LOG, "Application icon canvas cleanup failed; exact canvas retained.")
+		return false
+	end
+	if _icon_canvas == canvas then _icon_canvas = nil end
+	return true
+end
+
+--- Enumerates sorted paths only after the native directory read succeeds.
 --- @param directory string Directory to inspect.
---- @param pattern string Internal filename pattern.
+--- @param suffix string Internal filename suffix.
 --- @param category string Fixed diagnostic category.
 --- @return table|nil paths Nil on failure, including partial command output.
-local function scan_paths(directory, pattern, category)
-	local ok, output, succeeded, kind, code = pcall(hs.execute, string.format(
-		"find %s -maxdepth 1 -name %s -print0 2>/dev/null",
-		text_utils.shell_quote(directory), text_utils.shell_quote(pattern)
-	))
-	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0
-		or (output ~= "" and output:sub(-1) ~= "\0")
-		or output:sub(1, 1) == "\0" or output:find("\0\0", 1, true) then
+local function scan_paths(directory, suffix, category)
+	local names, listed = FsDir.try_entries_quiet(directory)
+	if listed ~= true or type(names) ~= "table" then
 		if not _scan_failures[category] then
 			_scan_failures[category] = true
 			Logger.warn(LOG, "Bundled app %s scan failed (details withheld; repeats suppressed).", category)
@@ -65,8 +79,12 @@ local function scan_paths(directory, pattern, category)
 	end
 	_scan_failures[category] = nil
 	local paths = {}
-	-- A native pathname may contain LF; only NUL is excluded by the filesystem.
-	for path in output:gmatch("([^%z]+)%z") do paths[#paths + 1] = path end
+	-- Keep symlinks and any native name, including embedded newlines, as find did.
+	for _, name in ipairs(names) do
+		if name ~= "." and name ~= ".." and name:sub(-#suffix) == suffix then
+			paths[#paths + 1] = directory .. "/" .. name
+		end
+	end
 	table.sort(paths)
 	return paths
 end
@@ -122,15 +140,22 @@ end
 --- @param img userdata An hs.image object.
 --- @return userdata A new 16×16 hs.image.
 local function resize_to_menu_icon(img)
+	if not release_icon_canvas() then return nil end
 	local c = hs.canvas.new({ x = 0, y = 0, w = 16, h = 16 })
-	c:appendElements({
-		type         = "image",
-		image        = img,
-		frame        = { x = 0, y = 0, w = 16, h = 16 },
-		imageScaling = "scaleToFit",
-	})
-	local out = c:imageFromCanvas()
-	c:delete()
+	if not c then return nil end
+	_icon_canvas = c
+	_icon_canvas_busy = true
+	local ok, out = pcall(function()
+		c:appendElements({
+			type         = "image",
+			image        = img,
+			frame        = { x = 0, y = 0, w = 16, h = 16 },
+			imageScaling = "scaleToFit",
+		})
+		return c:imageFromCanvas()
+	end)
+	_icon_canvas_busy = false
+	if not release_icon_canvas() or not ok then return nil end
 	return out
 end
 
@@ -154,7 +179,7 @@ local function load_icon(app_path, info)
 
 	-- Try the .icns declared in Info.plist
 	local icon_file = type(info) == "table" and info.CFBundleIconFile or nil
-	if icon_file then
+	if type(icon_file) == "string" and icon_file ~= "" then
 		local candidates = {
 			resources .. "/" .. icon_file,
 			resources .. "/" .. icon_file .. ".icns",
@@ -169,7 +194,7 @@ local function load_icon(app_path, info)
 	end
 
 	-- Last resort: any .icns found in Resources/
-	local paths = scan_paths(resources, "*.icns", "icon")
+	local paths = scan_paths(resources, ".icns", "icon")
 	if paths then
 		local icns_path = paths[1]
 		if icns_path then
@@ -196,7 +221,7 @@ local function discover_bundled_apps(ctx)
 	end
 
 	Logger.trace(LOG, "Scanning bundled app directory…")
-	local paths = scan_paths(dir, "*.app", "directory")
+	local paths = scan_paths(dir, ".app", "directory")
 	if not paths then return {} end
 
 	local entries = {}
@@ -204,8 +229,10 @@ local function discover_bundled_apps(ctx)
 		local raw_name = app_path:match("([^/]+)%.app$")
 		if raw_name then
 			local info    = hs.application.infoForBundlePath(app_path)
-			local display = (type(info) == "table" and info.CFBundleDisplayName ~= "" and info.CFBundleDisplayName)
-			             or (type(info) == "table" and info.CFBundleName ~= "" and info.CFBundleName)
+			local display = (type(info) == "table" and type(info.CFBundleDisplayName) == "string"
+				and info.CFBundleDisplayName ~= "" and info.CFBundleDisplayName)
+			             or (type(info) == "table" and type(info.CFBundleName) == "string"
+				and info.CFBundleName ~= "" and info.CFBundleName)
 			             or raw_name
 
 			table.insert(entries, {
@@ -304,6 +331,7 @@ end
 --- @param ctx table The global UI context.
 --- @return table The menu item representing the Applications submenu.
 function M.build(ctx)
+	release_icon_canvas()
 	local source = apps_source()
 	if source == nil then return nil end
 	Logger.trace(LOG, "Building applications submenu…")
@@ -369,18 +397,25 @@ function M.build(ctx)
 						function() return false end,
 						arguments
 					)
-					if not task then return end
+					if not task then return false end
 					M._active_tasks[task] = true
 					if not TaskLifecycle.start(task, "Bundled app launch") then
-						M._active_tasks[task] = nil
+						local inspected, running = pcall(function() return task:isRunning() end)
+						if inspected and running == false then
+							M._active_tasks[task] = nil
+						elseif M._active_tasks[task] then
+							TaskLifecycle.terminate(task, "Bundled app launch rollback")
+						end
+						return false
 					end
+					return true
 				end
 				-- App Cloner's helpers run on Ergopti's managed Python and its
 				-- pinned PyObjC, installed on the user's first agreement.
 				if app_name == APP_CLONER then
 					return require("ui.app_cloner_python_offer").open(require("modules.llm.managed_pyobjc").default(), launch)
 				end
-				launch({})
+				return launch({})
 			end,
 		})
 	end

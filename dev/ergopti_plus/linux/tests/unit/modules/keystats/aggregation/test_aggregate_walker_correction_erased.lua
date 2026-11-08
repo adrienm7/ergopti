@@ -24,5 +24,6 @@ require("test.keystats_correction_erased_contract")(Fixture.helpers, data, funct
 		end
 		batch = Fixture.Walker.walk(events, data.date, data.app, batch, Fixture.qwerty_clock(nil), ctx)
 	end
-	return batch.ngram
-end, 6)
+	local error_row = batch.errors[data.date .. "\1" .. data.app]
+	return batch.ngram, { bs_total = error_row.bs_total, cur_word = ctx.cur_word, word_err = ctx.word_err, hs_input_chars = (batch.app_day[data.date .. "\1" .. data.app] or {}).hs_input_chars or 0 }
+end, 11)

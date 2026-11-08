@@ -273,6 +273,7 @@ local _debounce = {
 	-- How long an automatic request that found its backend busy waits to ask again.
 	busy_recheck_ms = require("infra.timings").ms("llm", "backend_busy_recheck_ms"),
 	plan = require("llm.request_plan.debounce").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
+	retired = {}, timer_cancel = {}, retiring = {},
 }
 
 --- Asks the plan what pressing an explicit shortcut does while its previous
@@ -288,10 +289,37 @@ function _debounce.supersedes(key, in_flight)
 	return true
 end
 
+-- Retain every refused timer with the scheduler that originally owned it.
+function _debounce.own(timer, cancel)
+	if type(timer) == "table" then _debounce.timer_cancel[timer] = cancel end
+end
+function _debounce.retire(timer)
+	if not timer then return true end
+	if _debounce.retiring[timer] then return false end
+	local cancel = _debounce.timer_cancel[timer] or _scheduler.cancel
+	_debounce.retiring[timer] = true
+	local ok, closed = pcall(cancel, timer)
+	_debounce.retiring[timer] = nil
+	if ok and closed == true then
+		_debounce.retired[timer], _debounce.timer_cancel[timer] = nil, nil
+		return true
+	end
+	_debounce.retired[timer] = cancel
+	return false
+end
+function _debounce.drain_retired()
+	local pending = {}
+	for timer in pairs(_debounce.retired) do pending[#pending + 1] = timer end
+	for _, timer in ipairs(pending) do _debounce.retire(timer) end
+	return next(_debounce.retired) == nil
+end
+
 --- Cancels the native debounce timer and withdraws it from the plan.
 function _debounce.cancel()
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	local timer = _pending_trigger
+	_pending_trigger = nil
 	_debounce.plan:on_cancel()
+	if timer then _debounce.retire(timer) end
 end
 
 local function get_profiles()
@@ -381,7 +409,7 @@ local function clear_offer(defer_hide)
 		local shown = {}
 		for index, candidate in ipairs(_suggestions) do shown[index] = candidate.to_type end
 		local ok, err = pcall(_observers.dismiss, _suggestion_context, shown)
-		if not ok then Logger.warn(LOG, "Prediction dismissal observer failed: %s", tostring(err)) end
+		if not ok then Logger.warn(LOG, "Prediction dismissal observer failed: %s", require("modules.llm.error_log").describe(err)) end
 	end
 	-- Revoke the old offer before a native hide callback can publish a successor.
 	-- Accepted output defers that callback until its transport has been retired.
@@ -397,7 +425,7 @@ local function show_candidates(candidates, meta)
 		_offer_notified = true
 		if _observers.offer then
 			local ok, err = pcall(_observers.offer, _suggestion_context, #_suggestions)
-			if not ok then Logger.warn(LOG, "Prediction offer observer failed: %s", tostring(err)) end
+			if not ok then Logger.warn(LOG, "Prediction offer observer failed: %s", require("modules.llm.error_log").describe(err)) end
 		end
 	end
 	if not _overlay or type(_overlay.show) ~= "function" then return #_suggestions > 0 end
@@ -450,9 +478,9 @@ end
 local function live_config()
 	if _live_config then return _live_config end
 	local path = require("infra.paths").shared(LIVE_CONFIG_FILE)
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_live_config(text)
 	if not config then
 		Logger.error(LOG, "Live mode unavailable: %s.", tostring(reason))
@@ -534,17 +562,20 @@ end
 
 local function schedule(context, output_context, event, live)
 	if type(context) ~= "string" or context == "" then return false end
+	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return false end
 	local decisions = _debounce.input(event)
 	local arm
 	for _, decision in ipairs(decisions) do
 		if decision.action == "cancel" and _pending_trigger then
-			_scheduler.cancel(_pending_trigger)
+			local previous = _pending_trigger
 			_pending_trigger = nil
+			_debounce.retire(previous)
 		elseif decision.action == "arm" then
 			arm = decision
 		end
 	end
 	if not arm then return false end
+	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return false end
 	local captured = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
@@ -552,11 +583,19 @@ local function schedule(context, output_context, event, live)
 		-- automatic agent may replace this offer.
 		automatic = not live and not (type(output_context) == "table" and output_context.explicit == true),
 	}
-	local handle = _scheduler.after(arm.delay_ms / 1000, function()
+	local handle, fired_early
+	local cancel_timer = _scheduler.cancel
+	handle = _scheduler.after(arm.delay_ms / 1000, function()
+		if handle == nil then fired_early = true; return end
+		if _pending_trigger ~= handle then
+			_debounce.retire(handle)
+			return
+		end
+		_pending_trigger = nil
+		_debounce.retire(handle)
 		if _runtime_closed or _scope_owner then return end
 		-- A timer a newer keystroke or a cancel already superseded sends nothing.
 		if _debounce.plan:on_timer(arm.token)[1].action ~= "fire" then return end
-		_pending_trigger = nil
 		-- A preview drawn since the timer was armed keeps the window; its
 		-- expiry asks again (on_hotstring_expired).
 		if (captured.automatic or live) and _debounce.preview_holds(live) then
@@ -564,21 +603,23 @@ local function schedule(context, output_context, event, live)
 			return
 		end
 		if not live then
-			M.predict(context, captured)
+			M.predict(context, captured, nil, true)
 			return
 		end
 		-- A pause or the AI switch turn live mode off; checked again here, since
 		-- the timer may have been armed just before.
 		if _is_paused() or not _enabled then return end
 		local override = live_override()
-		if override then M.predict(context, captured, override) end
+		if override then M.predict(context, captured, override, true) end
 	end)
-	if type(handle) ~= "table" or handle.armed ~= true then
+	if fired_early or type(handle) ~= "table" or handle.armed ~= true then
+		if type(handle) == "table" then _debounce.own(handle, cancel_timer); _debounce.retire(handle) end
 		_pending_trigger = nil
 		_debounce.plan:on_cancel()
 		Logger.error(LOG, "%s prediction could not be scheduled: timer unavailable.", arm.why)
 		return false
 	end
+	_debounce.own(handle, cancel_timer)
 	_pending_trigger = handle
 	Logger.debug(LOG, "%s prediction scheduled in %d ms.", arm.why, math.max(0, arm.delay_ms))
 	return true
@@ -606,6 +647,14 @@ end
 --- refuses diagnostic output without treating it as a transport failure.
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
+	_debounce.cancel()
+	M.drop_agent_triage("engine reinitialised")
+	if _rate_timer then
+		local timer = _rate_timer
+		_rate_timer = nil
+		_debounce.retire(timer)
+	end
+	if not _debounce.drain_retired() then return false end
 	Collision.construction = nil
 	if stop_runtime_app and not stop_runtime_app() then return false end
 	if _runtime_closed or _scope_owner then return false end
@@ -827,9 +876,10 @@ end
 ---   mode's minimum word count), instead of the menu's profile (and its
 ---   automatic choice), count and minimum, which stay unchanged. `live` marks
 ---   the offer as live mode's, the one Tab accepts.
+--- @param automatic boolean|nil True when the typing trigger scheduled this request.
 --- @return string|nil refusal A MANUAL_REFUSAL_KEYS reason the user should be
 ---   told, when the request was refused for one.
-function M.predict(context, output_context, override)
+function M.predict(context, output_context, override, automatic)
 	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
@@ -838,7 +888,7 @@ function M.predict(context, output_context, override)
 		return false
 	end
 	-- The applications the user switched the trigger off in (llm.trigger.disabled_apps)
-	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil) then
+	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil, automatic) then
 		Logger.debug(LOG, "Prediction suppressed: the application is excluded.")
 		return false
 	end
@@ -866,6 +916,12 @@ function M.predict(context, output_context, override)
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
 	local requested = override and override.num_predictions or ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
+	-- Inline mode types the finished prediction instead of offering it, as
+	-- Windows does: one variant, since typing several would be chaos. Live
+	-- mode keeps its offer (it rewrites what is typed).
+	local inline = TriggerSettings.get(require("config_keys").LEAF.INLINE_AUTOTYPE) == true
+		and not (override ~= nil and override.live == true)
+	if inline then requested = 1 end
 	-- A request naming its own prompt keeps it; otherwise the profile the user mapped
 	-- to the application typed in wins over the menu's.
 	local profile = override and override.profile
@@ -907,6 +963,12 @@ function M.predict(context, output_context, override)
 	local messages = PromptBuilder.build_messages(system_prompt, params.context, params.context_tail)
 	local candidates = {}
 	local request_index = 0
+	-- Sequential variants share the retry policy of inference.json: failed,
+	-- empty and duplicate answers spend attempts until the requested count is
+	-- filled or the budget is gone. A batch asks once, as before.
+	local max_attempts = is_batch and batching.calls or Inference.max_attempts(requested)
+	-- The budget the next attempt uses after a failed or empty one, or nil
+	local retry_call = nil
 	-- The token counts the backend reported, summed over this prediction's variants
 	local tokens = {}
 	local meta = {
@@ -993,12 +1055,31 @@ function M.predict(context, output_context, override)
 			variant = request_index + 1,
 		}, now)[1]
 		if verdict.action == "defer" then
-			_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()
-				if _runtime_closed or _scope_owner then return end
+			local timers_closed = _debounce.drain_retired()
+			if not request_current(false) then return end
+			if not timers_closed then
+				_predicting = false
+				meta.loading = false
+				if #candidates > 0 then publish() else clear_offer() end
+				return
+			end
+			local timer, cancel_timer, fired_early
+			cancel_timer = _scheduler.cancel
+			timer = _scheduler.after(verdict.delay_ms / 1000, function()
+				if timer == nil then fired_early = true; return end
+				if _rate_timer ~= timer then
+					_debounce.retire(timer)
+					return
+				end
 				_rate_timer = nil
+				_debounce.retire(timer)
+				if _runtime_closed or _scope_owner then return end
 				dispatch()
 			end)
-			if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+			_debounce.own(timer, cancel_timer)
+			_rate_timer = timer
+			if fired_early or type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+				if _rate_timer then _debounce.retire(_rate_timer) end
 				_rate_timer = nil
 				_predicting = false
 				meta.loading = false
@@ -1019,21 +1100,36 @@ function M.predict(context, output_context, override)
 		end
 		_inflight_backend = backend
 		local dispatch_index, terminal_seen = request_index, false
+		-- A batch asks once, at the builder's temperature. Sequential variants
+		-- each start from the user's own temperature and, when "raise the
+		-- temperature" is on, get a little warmer so they differ. Warming the
+		-- builder's already-raised value heated them twice, and warming with
+		-- the switch off made the switch do nothing.
+		local sent_temperature = is_batch and params.temperature
+			or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
+			or base_temperature
+		-- A rewrite's budget follows its sentence; the continuation override
+		-- would truncate it and erase text it could not retype.
+		local sent_tokens = require("llm.request_plan.token_budget").for_call(
+			rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call)
+		if retry_call then
+			sent_tokens, sent_temperature = retry_call.tokens, retry_call.temperature
+			retry_call = nil
+		end
+		--- Gives the next attempt the retry policy's room after this one yielded nothing.
+		local function arm_retry()
+			local tokens, temperature = Inference.retry_budget(sent_tokens, sent_temperature)
+			retry_call = { tokens = tokens, temperature = temperature }
+		end
+		--- Whether another sequential attempt may still fill the requested count.
+		local function attempts_remain()
+			return not is_batch and #candidates < requested and request_index < max_attempts
+		end
 		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
 			stream = DisplaySettings.get("streaming") == true,
-			-- A batch asks once, at the builder's temperature. Sequential variants
-			-- each start from the user's own temperature and, when "raise the
-			-- temperature" is on, get a little warmer so they differ. Warming the
-			-- builder's already-raised value heated them twice, and warming with
-			-- the switch off made the switch do nothing.
-			temperature = is_batch and params.temperature
-				or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
-				or base_temperature,
-			-- A rewrite's budget follows its sentence; the continuation override
-			-- would truncate it and erase text it could not retype.
-			max_tokens = require("llm.request_plan.token_budget").for_call(
-				rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call),
+			temperature = sent_temperature,
+			max_tokens = sent_tokens,
 			-- Decided from the prompt, as macOS does: one continuation, unless the
 			-- prompt asks for the two-line correction format or a batch. By id, a
 			-- user's copy of "basic" never got the single-line stops.
@@ -1054,18 +1150,35 @@ function M.predict(context, output_context, override)
 				tokens.cost = (tokens.cost or 0) + (tonumber(usage.est_cost_usd) or 0)
 			end
 			if err then
+				if err ~= "cancelled" then
+					Logger.warn(LOG, "Prediction variant %d/%d failed: %s", request_index, max_attempts,
+						require("modules.llm.error_log").describe(err))
+				end
+				-- A refused key is refused again: no retry, no further variant.
+				local refused_key = require("llm.failure_class").is_authentication_failure(err)
+				if refused_key then
+					Logger.warn(LOG, "Prediction stopped: the credential was refused (no retry).")
+				end
+				if err ~= "cancelled" and not refused_key and attempts_remain() then
+					arm_retry()
+					dispatch()
+					return
+				end
 				_predicting = false
 				meta.loading = false
-				if err ~= "cancelled" then Logger.warn(LOG, "Prediction failed: %s", err) end
 				if #candidates > 0 then publish() else clear_offer() end
 				return
 			end
 			local clean = Parser.strip_thinking(full_text)
-			for _, candidate in ipairs(parse_response(clean, is_batch, trigger_chars)) do
+			local parsed = parse_response(clean, is_batch, trigger_chars)
+			for _, candidate in ipairs(parsed) do
 				append_unique(candidates, candidate, 0)
 			end
+			-- An empty or unusable answer is retried with more room; a duplicate
+			-- only spends its attempt, since its call was not too short.
+			if #parsed == 0 then arm_retry() end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
-			if request_index < batching.calls then
+			if attempts_remain() or (is_batch and request_index < batching.calls) then
 				-- Shown now: the next variant may wait for the backend's interval.
 				if #candidates > 0 and DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI) == true then publish() end
 				dispatch()
@@ -1079,9 +1192,23 @@ function M.predict(context, output_context, override)
 					total_tokens = tokens.prompt + tokens.completion, est_cost_usd = tokens.cost } or {}
 				reported.count = #candidates
 				local observed, observe_err = pcall(_observers.generation, _suggestion_context, reported)
-				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", tostring(observe_err)) end
+				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 			end
-			if #candidates > 0 then publish() else clear_offer() end
+			if #candidates > 0 then
+				publish()
+				-- Inline mode: the finished prediction goes through the same
+				-- acceptance as Tab, which rechecks the request, the focus, the
+				-- pause and privacy. A rewrite, or a correction that erases what
+				-- the user typed, keeps its offer: it is never applied without
+				-- the user's own accept.
+				local first = candidates[1]
+				if inline and not rewrite and (first.deletes or 0) <= trigger_chars and request_current(false) then
+					Logger.info(LOG, "Inline mode: typing the finished prediction (%d byte(s)).", #first.to_type)
+					M.accept(1)
+				elseif inline then
+					Logger.info(LOG, "Inline mode leaves an erasing prediction to the offer.")
+				end
+			else clear_offer() end
 		end)
 		-- A backend can refuse admission while its earlier native transport is
 		-- still settling. A synchronous completion may already own the next
@@ -1397,7 +1524,7 @@ local function finish_tone(generation, plan, focus, receipt, full_text, err)
 		return
 	end
 	if err then
-		if err ~= "cancelled" then Logger.warn(LOG, "Tone rewrite failed: %s", tostring(err)) end
+		if err ~= "cancelled" then Logger.warn(LOG, "Tone rewrite failed: %s", require("modules.llm.error_log").describe(err)) end
 		return
 	end
 	local text = Tone.extract(Parser.strip_thinking(full_text or ""))
@@ -1419,7 +1546,7 @@ local function finish_tone(generation, plan, focus, receipt, full_text, err)
 		if _on_output then
 			-- No context: the daemon attributes the output to the focused application.
 			local observed, observe_err = pcall(_on_output, text, nil)
-			if not observed then Logger.warn(LOG, "Tone output observer failed: %s", tostring(observe_err)) end
+			if not observed then Logger.warn(LOG, "Tone output observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 		end
 	end
 	local ok, accepted = pcall(_replace_selection, text, receipt, authorized, replaced)
@@ -1569,20 +1696,16 @@ function M.shift_tone(direction, cycle)
 	return accepted == true and completed ~= false
 end
 
---- Deletes a capture's image and its private directory. A file that is still
---- there afterwards is an error: the screenshot may show private messages.
---- @param capture table { path, dir }
+--- Requests cleanup through the capture owner after physical child retirement.
+--- @param capture table Original capture handle with a discard receipt.
 local function discard_capture(capture)
-	for _, path in ipairs({ capture.path, capture.dir }) do
-		local removed, err = os.remove(path)
-		if not removed then
-			local left = io.open(path, "rb")
-			if left then
-				left:close()
-				Logger.error(LOG, "A screenshot file could not be deleted: %s", tostring(err))
-			end
-		end
+	if type(capture) ~= "table" or type(capture.discard) ~= "function" then
+		Logger.error(LOG, "Screenshot cleanup owner is unavailable.")
+		return false
 	end
+	local called, accepted = pcall(capture.discard)
+	if not called or accepted ~= true then Logger.error(LOG, "Screenshot cleanup could not be registered.") end
+	return called and accepted == true
 end
 
 --- Drops the screen action in flight, if any: its capture is stopped and
@@ -1792,7 +1915,7 @@ local function request_screen_answers(spec, screen)
 					offer_missing_model(err, true)
 					return
 				end
-				Logger.warn(LOG, "Screen answer '%s' failed: %s", answer.id, tostring(err))
+				Logger.warn(LOG, "Screen answer '%s' failed: %s", answer.id, require("modules.llm.error_log").describe(err))
 			else
 				local text = Vision.extract(Parser.strip_thinking(full_text or ""), config.answer_tag)
 				if text then
@@ -1828,7 +1951,7 @@ local function finish_screen_read(flow, spec, text, err)
 	_vision_flow = nil
 	flow.reading = false
 	if err then
-		Logger.warn(LOG, "Vision request failed: %s", tostring(err))
+		Logger.warn(LOG, "Vision request failed: %s", require("modules.llm.error_log").describe(err))
 		clear_offer()
 		if not _is_paused() and _enabled and offer_missing_model(err, true) then return end
 		show_notice(VISION_READ_FAILED_KEY, "read_failed")
@@ -1879,9 +2002,8 @@ local function finish_capture(flow, spec, outcome)
 		_vision_unscaled_logged = true
 		Logger.info(LOG, "Screenshots are sent at their full size: install ImageMagick to downscale them.")
 	end
-	local handle = io.open(capture.path, "rb")
-	local image = handle and handle:read("*a") or nil
-	if handle then handle:close() end
+	local read_ok, image, read_status = pcall(require("toml_codec.writer").read_classified, capture.path)
+	if not read_ok or read_status ~= "ok" then image = nil end
 	discard_capture(capture)
 	if type(image) ~= "string" or image == "" then
 		_vision_flow = nil
@@ -2000,6 +2122,14 @@ function M.read_screen(action, value)
 			show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
 			return false
 		end
+		if type(handle.cancel) ~= "function" or type(handle.discard) ~= "function"
+			or type(handle.path) ~= "string" or handle.path == "" then
+			if type(handle.cancel) == "function" then pcall(handle.cancel) end
+			if _vision_flow == flow then _vision_flow = nil end
+			Logger.error(LOG, "Screen capture returned no cleanup owner.")
+			show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+			return false
+		end
 		flow.capture = handle
 		if flow.early then finish_capture(flow, spec, flow.early) end
 		return true
@@ -2072,7 +2202,7 @@ local function finish_translation(epoch, meta, config, full_text, err, focus)
 		return
 	end
 	if err then
-		Logger.warn(LOG, "Translation failed: %s", tostring(err))
+		Logger.warn(LOG, "Translation failed: %s", require("modules.llm.error_log").describe(err))
 		clear_offer()
 		show_notice(TRANSLATE_FAILED_KEY, "failed")
 		return
@@ -2183,8 +2313,23 @@ function M.translate_selection(value)
 				return
 			end
 			_inflight_backend = backend
-			backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
-				function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
+			local terminal_seen = false
+			local dispatched = backend.chat(backend_target, model, messages,
+				offer_request_opts(config.max_tokens, nil, runtime_response), nil,
+				function(full_text, err)
+					terminal_seen = true
+					finish_translation(epoch, meta, config, full_text, err, focus)
+				end)
+			-- A backend refuses admission while its earlier transport still settles;
+			-- nothing will then answer this offer, so it retires its own loading state.
+			if dispatched == false and not terminal_seen and epoch == _request_epoch
+				and not _runtime_closed and not _scope_owner then
+				_inflight_backend = nil
+				_predicting = false
+				meta.loading = false
+				Logger.warn(LOG, "Translation could not be dispatched: backend unavailable.")
+				clear_offer()
+			end
 		end)
 		return true
 	end
@@ -2254,7 +2399,9 @@ function M.test_prediction()
 				end
 			end,
 			info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
-			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+			warn = function(fmt, id, reason)
+				Logger.warn(LOG, fmt, id, require("modules.llm.error_log").describe(reason))
+			end,
 		})
 	end
 	return M._test_prediction.run()
@@ -2445,7 +2592,7 @@ end
 --- @return table|nil actions Nil when the answer holds no readable block.
 --- @return table rejected
 local function read_actions(config, tools, full_text)
-	local actions, rejected = Agent.parse_actions(config, Parser.strip_thinking(full_text or ""), Json.decode,
+	local actions, rejected = Agent.parse_actions(config, Parser.strip_thinking(full_text or ""), Json.decode_lossless,
 		{ tools = tools, is_null = Json.is_null })
 	-- The reasons name fields and rules, never the user's text.
 	for _, reason in ipairs(rejected) do Logger.info(LOG, "Agent action refused: %s.", tostring(reason)) end
@@ -2502,7 +2649,7 @@ local function finish_agent(epoch, meta, config, tools, full_text, err)
 		return
 	end
 	if err then
-		Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+		Logger.warn(LOG, "Agent request failed: %s", require("modules.llm.error_log").describe(err))
 		clear_offer()
 		if offer_missing_model(err, false) then return end
 		return fail(AGENT_KEYS.failed, "failed")
@@ -2693,8 +2840,9 @@ end
 function M.drop_agent_triage(reason)
 	_agent_generation = _agent_generation + 1
 	if _agent_timer then
-		_scheduler.cancel(_agent_timer)
+		local timer = _agent_timer
 		_agent_timer = nil
+		_debounce.retire(timer)
 	end
 	local triage = _agent_triage
 	if not triage then return end
@@ -2755,13 +2903,25 @@ local function send_when_free(generation, chat, what, send)
 	local wait_ms = verdict.action == "defer" and verdict.delay_ms or 0
 	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
 	if wait_ms > 0 or busy then
+		if not _debounce.drain_retired() or _runtime_closed or _scope_owner or generation ~= _agent_generation then return end
 		local delay_ms = math.max(wait_ms, busy and math.max(interval, _debounce.busy_recheck_ms) or 0)
 		Logger.debug(LOG, "%s waits %d ms for its backend.", what, delay_ms)
-		_agent_timer = _scheduler.after(delay_ms / 1000, function()
+		local timer, cancel_timer, fired_early
+		cancel_timer = _scheduler.cancel
+		timer = _scheduler.after(delay_ms / 1000, function()
+			if timer == nil then fired_early = true; return end
+			if _agent_timer ~= timer then
+				_debounce.retire(timer)
+				return
+			end
 			_agent_timer = nil
+			_debounce.retire(timer)
 			send_when_free(generation, chat, what, send)
 		end)
-		if type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+		_debounce.own(timer, cancel_timer)
+		_agent_timer = timer
+		if fired_early or type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+			if _agent_timer then _debounce.retire(_agent_timer) end
 			_agent_timer = nil
 			Logger.error(LOG, "%s could not wait for its backend: timer unavailable.", what)
 		end
@@ -2801,7 +2961,7 @@ local function auto_system2(generation, sentence, opts)
 			_agent_triage = nil
 			if err then
 				if not _is_paused() then LocalModelOffer.handle(err, { automatic = true }) end
-				Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+				Logger.warn(LOG, "Agent request failed: %s", require("modules.llm.error_log").describe(err))
 				return
 			end
 			if agent_blocked() then
@@ -2878,7 +3038,7 @@ local function agent_pause_elapsed(generation, buffer, app)
 			_agent_triage = nil
 			if err then
 				if not _is_paused() then LocalModelOffer.handle(err, { automatic = true }) end
-				Logger.warn(LOG, "Agent triage failed: %s", tostring(err))
+				Logger.warn(LOG, "Agent triage failed: %s", require("modules.llm.error_log").describe(err))
 				return
 			end
 			if not triage then
@@ -2917,13 +3077,29 @@ arm_agent = function(buffer, output_context)
 	if not _enabled then return end
 	local config = AgentSettings.config()
 	if not config then return end
-	if _agent_timer then _scheduler.cancel(_agent_timer) end
-	local generation = _agent_generation
-	_agent_timer = _scheduler.after(config.system1.pause_ms / 1000, function()
+	if _agent_timer then
+		local previous = _agent_timer
 		_agent_timer = nil
+		_debounce.retire(previous)
+	end
+	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return end
+	local generation = _agent_generation
+	local timer, cancel_timer, fired_early
+	cancel_timer = _scheduler.cancel
+	timer = _scheduler.after(config.system1.pause_ms / 1000, function()
+		if timer == nil then fired_early = true; return end
+		if _agent_timer ~= timer then
+			_debounce.retire(timer)
+			return
+		end
+		_agent_timer = nil
+		_debounce.retire(timer)
 		agent_pause_elapsed(generation, buffer, app)
 	end)
-	if type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+	_debounce.own(timer, cancel_timer)
+	_agent_timer = timer
+	if fired_early or type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+		if _agent_timer then _debounce.retire(_agent_timer) end
 		_agent_timer = nil
 		Logger.error(LOG, "The agent's typing pause could not be armed: timer unavailable.")
 	end
@@ -2979,7 +3155,7 @@ function M.dismiss(resync_owner)
 	-- Native cancellation can dispatch another user action synchronously. Detach
 	-- the old state first, then leave any successor request and offer untouched.
 	clear_offer(true)
-	if timer then _scheduler.cancel(timer) end
+	if timer then _debounce.retire(timer) end
 	if backend then
 		local ok, cancelled = pcall(backend.cancel)
 		if not ok or cancelled ~= true then
@@ -2987,6 +3163,28 @@ function M.dismiss(resync_owner)
 		end
 	end
 	if _request_epoch == retired_epoch then hide_overlay() end
+end
+
+
+--- Cancels a pending prediction because the user did something: moved the
+--- pointer, scrolled, touched the touchpad, switched window, or pressed a key
+--- the tooltip does not own. Predictions run only while the user does nothing
+--- (maintainer decision 2026-11-06): the debounce, the pacing timer and the
+--- request in flight (with its retries, which fail the epoch check) go, and the
+--- tooltip hides. The buffer stays: motion does not move the caret, and the
+--- next typing pause asks again. A tone or vision action the user asked for is
+--- left alone. The pointer stream calls this on every report, so an idle engine
+--- costs four field reads.
+--- @param reason string Diagnostic label of the activity.
+--- @return boolean cancelled True when pending prediction work was cancelled.
+function M.note_user_activity(reason)
+	if not _predicting and _pending_trigger == nil and _rate_timer == nil
+		and #_suggestions == 0 then return false end
+	if _runtime_closed or _scope_owner then return false end
+	_debounce.cancel()
+	M.dismiss()
+	Logger.debug(LOG, "User activity (%s) — pending prediction cancelled.", tostring(reason))
+	return true
 end
 
 
@@ -2998,7 +3196,11 @@ local function close_accepted_offer()
 	advance_request_epoch()
 	local retired_epoch = _request_epoch
 	_debounce.cancel()
-	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
+	if _rate_timer then
+		local timer = _rate_timer
+		_rate_timer = nil
+		_debounce.retire(timer)
+	end
 	local backend = _predicting and _inflight_backend or nil
 	_inflight_backend, _predicting = nil, false
 	clear_offer(true)
@@ -3136,7 +3338,7 @@ local function accept_candidate(index, complete)
 			context.acceptance = { chosen_index = tonumber(index), all_predictions = shown, deletes = candidate.deletes or 0 }
 		end
 		local observed, observe_err = pcall(output, candidate.to_type, context)
-		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
+		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 	end
 	if continuation_current and not continuation_current() then complete(true); return true end
 	if not current() then complete(true); return true end
@@ -3331,6 +3533,14 @@ function M.stop_runtime() return stop_runtime_app() end
 function M.shutdown_runtime()
 	_runtime_closed = true
 	_enable_generation = _enable_generation + 1
+	_debounce.cancel()
+	M.drop_agent_triage("runtime shutdown")
+	if _rate_timer then
+		local timer = _rate_timer
+		_rate_timer = nil
+		_debounce.retire(timer)
+	end
+	local timers_closed = _debounce.drain_retired()
 	-- Revoke ordinary probe/download authority before a native stop can reenter.
 	local probe_closed = not _enable_admission or _enable_admission.cancel() == true
 	local download_closed = M.cancel_model_download() == true
@@ -3341,7 +3551,7 @@ function M.shutdown_runtime()
 		local checked, acknowledged = pcall(_cancel_selection)
 		selection_closed = checked and acknowledged == true
 	end
-	return probe_closed and download_closed and delete_closed and runtime_closed and selection_closed
+	return timers_closed and probe_closed and download_closed and delete_closed and runtime_closed and selection_closed
 end
 
 --- Captures existing managed lifetime before origin/settings/native readers run.
@@ -3395,7 +3605,7 @@ function M.runtime_pending()
 	local inventory_pending = profiles ~= nil and (package.loaded["modules.llm.profiles"] ~= profiles
 		or profiles.model_inventory_pending ~= Collision.inventory.pending or type(Collision.inventory.pending) ~= "function"
 		or Collision.inventory.pending() ~= false)
-	return inventory_pending or (_runtime_request ~= nil and not _runtime_request:is_settled())
+	return not _debounce.drain_retired() or inventory_pending or (_runtime_request ~= nil and not _runtime_request:is_settled())
 		or (_runtime_owner ~= nil and _runtime_owner.controller:has_debt())
 end
 --- Builds native composition lazily and classifies construction refusal.
@@ -3949,6 +4159,16 @@ function M.get_cached_models()
 	return profiles and type(profiles.get_cached_models) == "function" and profiles.get_cached_models() or {}
 end
 
+--- Returns the current runtime's cached models without starting acquisition.
+--- @return table models
+--- @return boolean known
+--- @return table|nil identity Opaque identity of the exact published cache.
+function M.get_cached_models_status()
+	local profiles = get_profiles()
+	if not profiles or type(profiles.get_cached_models_status) ~= "function" then return {}, false end
+	return profiles.get_cached_models_status()
+end
+
 function M.get_current_model()
 	local profiles = get_profiles()
 	return profiles and type(profiles.get_current_model) == "function" and profiles.get_current_model() or nil
@@ -4061,7 +4281,7 @@ function M.get_max_tokens() return _max_tokens or PromptBuilder.DEFAULT_MAX_TOKE
 
 function M.set_max_tokens(value)
 	local tokens = tonumber(value)
-	if not tokens or tokens < 1 then return false end
+	if not tokens or tokens ~= tokens or tokens == math.huge or tokens < 1 then return false end
 	_max_tokens = math.floor(tokens)
 	return true
 end
@@ -4116,17 +4336,20 @@ function M.quiesce_configuration(owner)
 	if not stop_runtime_app() then return false end
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _pending_trigger then
-		if _scheduler.cancel(_pending_trigger) ~= true then return false end
+		local timer = _pending_trigger
 		_pending_trigger = nil
 		_debounce.plan:on_cancel()
+		if not _debounce.retire(timer) then return false end
 	end
 	if _rate_timer then
-		if _scheduler.cancel(_rate_timer) ~= true then return false end
+		local timer = _rate_timer
 		_rate_timer = nil
+		if not _debounce.retire(timer) then return false end
 	end
 	_tone_generation = _tone_generation + 1
 	M.drop_vision("configuration change")
 	M.drop_agent_triage("configuration change")
+	if not _debounce.drain_retired() then return false end
 	-- Backend connectivity probes share these owners, even when the prediction
 	-- engine did not start them. Model downloads have a separate HTTP owner.
 	local backends = { get_ollama(), get_remote() }
@@ -4144,7 +4367,7 @@ end
 --- @param owner table Admission identity.
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
-	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer
+	if _scope_owner ~= owner or next(_debounce.retired) ~= nil or _predicting or _pending_trigger or _rate_timer
 		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage
 		or (_enable_admission and _enable_admission.pending()) or M.runtime_pending() then return nil end
 	return { enabled = _enabled }

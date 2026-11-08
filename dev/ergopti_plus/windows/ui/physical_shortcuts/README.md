@@ -15,7 +15,9 @@ counterpart and shared assets do not prove native keyboard support.
 
 Windows continuation requires a WebView2 host with exact window/bridge lifetime
 ownership, authoritative configuration receipts and acknowledged joint edits.
-Its physical input owner must qualify physical positions, modifiers, collision
+Its init packet must carry `names` from the shared key name table, as
+`shortcuts.physical_editor_window` builds it: the page shows no key id or W3C
+code. Its physical input owner must qualify physical positions, modifiers, collision
 checks and output retirement with the shared model. Stale callbacks, refused
 cleanup and private parameter/source changes must refuse publication. Validate
 these contracts on Windows before enabling the canonical menu entry; retain

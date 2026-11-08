@@ -37,6 +37,8 @@ local function choose(parameter, clicked, refusal, picked)
 		DEFAULT_STATE = { gestures = true }, get_action = function() return assigned end,
 		get_all_actions = function() return { tap_2 = assigned } end,
 		is_assignable = function() return true end,
+		begin_click_binding_change = function(slot) return { slot = slot } end,
+		finish_click_binding_change = function() return true end,
 		get_sg_names = function() return { action_id } end,
 		get_action_label = function() return "Lookup" end,
 		set_action = function(_, action)

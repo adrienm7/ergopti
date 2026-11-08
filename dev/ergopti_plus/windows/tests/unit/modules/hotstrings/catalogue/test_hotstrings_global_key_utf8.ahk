@@ -26,8 +26,9 @@ _HGKU_Case(Mode) {
 		Ambient := A_FileEncoding
 		AssertEqual("CP1252", Ambient, "the fixture must exercise a real non-UTF-8 ambient code page")
 		if Mode == "writer" {
-			Overrides := Map("rolls", { Delay: 0.2, Color: "#112233", ShowTooltip: "",
-				Priority: "", Sections: Map() })
+			Overrides := _ParseOverrides(Path)
+			Overrides["rolls"] := { Delay: 0.2, Color: "#112233", ShowTooltip: "",
+				Priority: "", Sections: Map() }
 			AssertTrue(_SaveOverrides(Overrides, 0, 0, Path),
 				"the genuine override writer must publish its real BOM-less UTF-8 image")
 		} else {
@@ -70,3 +71,19 @@ _HGKU_Case(Mode) {
 for _HGKU_Mode in ["raw", "bom", "writer"]
 	Test("Hotstrings global UTF-8: " . _HGKU_Mode . " retains exact delimiters (hotstrings-global-key-utf8)",
 		_HGKU_Case.Bind(_HGKU_Mode))
+
+; Most installs have no override file. Its empty document must cost no parse:
+; every boot paid one for it (startup smoke, 2026-11-07).
+_HGKU_AbsentOverridesAreNotParsed() {
+	global _TOML_DocumentParses
+	Path := A_Temp . "\ergopti_absent_overrides_" . A_TickCount . "_" . Random(1000, 999999) . ".toml"
+	AssertFalse(FileExist(Path), "the probe path is genuinely absent")
+	Before := _TOML_DocumentParses
+	Overrides := _ParseOverrides(Path)
+	AssertEqual(Before, _TOML_DocumentParses, "an absent override file is not parsed")
+	AssertEqual(0, Overrides.Count, "and projects no category")
+	AssertEqual("", _ParseGlobalKey(Path, "word_delimiters"), "an absent file has no global key")
+	AssertEqual(Before, _TOML_DocumentParses)
+}
+Test("Hotstrings overrides: an absent file costs no document parse (hotstrings-absent-overrides-unparsed)",
+	_HGKU_AbsentOverridesAreNotParsed)

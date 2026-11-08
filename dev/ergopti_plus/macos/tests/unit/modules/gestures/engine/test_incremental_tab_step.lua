@@ -165,6 +165,33 @@ end
 -- =====================================
 
 helpers.describe("a three-finger swipe switches one tab (three-finger-tab-step)", function()
+	helpers.it("aborts an implausible finite touch jump without dispatching a burst", function()
+		local h = new_harness(1)
+		h.path({ 105 }, 105)
+		h.lift()
+		helpers.assert_eq(#h.fired, 0, "an over-limit frame must not be truncated into real actions")
+		for _ = 1, 100 do h.lift() end
+		h.path({ 4 }, 4)
+		h.lift()
+		helpers.assert_eq(#h.fired, 4, "a new physical gesture must work after the rejected frame")
+		h.finish()
+	end)
+
+	helpers.it("accepts a frame exactly at the bounded action limit", function()
+		local h = new_harness(1)
+		h.path({ 100 }, 100)
+		h.lift()
+		helpers.assert_eq(#h.fired, 100)
+		h.finish()
+	end)
+
+	helpers.it("rejects an extreme internal step even if state bypasses the setter", function()
+		local h = new_harness(1e-300)
+		h.path({ 4 }, 4)
+		h.lift()
+		helpers.assert_eq(#h.fired, 0)
+		h.finish()
+	end)
 	helpers.it("the logged 19.84-unit swipe switches exactly one tab", function()
 		assert_fires(swipe({ 19.84 }), 1, "tab_next", "sd 19.84 committed 3 steps at sensitivity 5")
 	end)

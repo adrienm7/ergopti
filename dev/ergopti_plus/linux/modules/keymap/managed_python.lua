@@ -103,7 +103,10 @@ local function settle(ok, value, detail)
 	local waiters = _waiters
 	_waiters = nil
 	if not ok then Logger.error(LOG, "Ergopti's Python is not installed: %s (%s).", tostring(value), tostring(detail)) end
-	for _, waiter in ipairs(waiters or {}) do waiter(ok, value, detail) end
+	for _, waiter in ipairs(waiters or {}) do
+		local delivered = pcall(waiter, ok, value, detail)
+		if not delivered then Logger.error(LOG, "A Python installation completion callback failed.") end
+	end
 end
 
 --- Runs the verified download, unpack and publication of one archive.
@@ -112,18 +115,24 @@ end
 --- @param archive table { url, sha256, bytes }
 local function install(deps, key, archive)
 	local root = M.root(deps, key)
-	local stage = root .. ".staging"
+	local acquired, stage, stage_current = pcall(deps.create_stage, root)
+	if not acquired or type(stage) ~= "string" or type(stage_current) ~= "function" then
+		settle(false, M.FAILURE_PUBLISH, "a private staging folder could not be reserved")
+		return
+	end
 	local download = stage .. "/archive.tar.gz"
+	local function current()
+		local checked, retained = pcall(stage_current)
+		return checked and retained == true
+	end
 	local function fail(code, detail)
+		if not current() then settle(false, code, detail); return end
 		deps.remove_tree(stage, function() settle(false, code, detail) end)
 	end
-	deps.remove_tree(stage, function(cleared)
-		if not cleared or not deps.ensure_dir(stage) then
-			settle(false, M.FAILURE_PUBLISH, "the staging folder " .. stage .. " cannot be prepared")
-			return
-		end
+	do
 		Logger.start(LOG, "Downloading Ergopti's Python (%d bytes) for %s…", archive.bytes, key)
-		deps.download(archive.url, download, archive.bytes, function(result)
+		local function downloaded(result)
+			if not current() then fail(M.FAILURE_PUBLISH, "the staging folder changed"); return end
 			if type(result) ~= "table" or result.ok ~= true or result.status ~= 200 then
 				fail(M.FAILURE_DOWNLOAD, type(result) == "table" and tostring(result.error or result.status) or "no result")
 				return
@@ -133,11 +142,13 @@ local function install(deps, key, archive)
 				return
 			end
 			deps.sha256(download, function(digest, err)
+				if not current() then fail(M.FAILURE_PUBLISH, "the staging folder changed"); return end
 				if digest ~= archive.sha256 then
 					fail(M.FAILURE_CHECKSUM, tostring(err or digest))
 					return
 				end
 				deps.unpack(download, stage, function(unpacked, unpack_err)
+					if not current() then fail(M.FAILURE_PUBLISH, "the staging folder changed"); return end
 					if not unpacked or not deps.exists(stage .. "/" .. M.INTERPRETER) then
 						fail(M.FAILURE_UNPACK, tostring(unpack_err or "no interpreter in the archive"))
 						return
@@ -146,6 +157,7 @@ local function install(deps, key, archive)
 						fail(M.FAILURE_PUBLISH, "the downloaded archive cannot be removed")
 						return
 					end
+					if not current() then fail(M.FAILURE_PUBLISH, "the staging folder changed"); return end
 					local renamed, rename_err = deps.rename(stage, root)
 					if not renamed then
 						fail(M.FAILURE_PUBLISH, tostring(rename_err))
@@ -155,14 +167,45 @@ local function install(deps, key, archive)
 					settle(true, root .. "/" .. M.INTERPRETER, nil)
 				end)
 			end)
-		end)
-	end)
+		end
+		-- The boolean alone cannot prove that a refused or completed transfer
+		-- has released its process, pipes and destination. Wait for its exact
+		-- physical receipt before reading or removing the staging directory.
+		local called, started, operation = pcall(deps.download, archive.url, download, archive.bytes, function() end)
+		if not called or type(started) ~= "boolean" or type(operation) ~= "table"
+			or operation.started ~= started or type(operation.is_settled) ~= "function"
+			or type(operation.on_settled) ~= "function" or type(operation.settled_result) ~= "function" then
+			Logger.error(LOG, "Python download ownership is unknown; staging remains reserved.")
+			return
+		end
+		local attaching, delivered, subscribed = true, false, false
+		local function settled()
+			if attaching or not subscribed or delivered then return end
+			local observed, closed = pcall(operation.is_settled, operation)
+			if not observed or closed ~= true then return end
+			local read, result = pcall(operation.settled_result, operation)
+			delivered = true
+			if not started or not read or type(result) ~= "table" then
+				fail(M.FAILURE_DOWNLOAD, "the download was not admitted or did not return a settled result")
+			else
+				downloaded(result)
+			end
+		end
+		local registered, accepted = pcall(operation.on_settled, operation, settled)
+		subscribed = registered and accepted == true
+		attaching = false
+		if not subscribed then
+			Logger.error(LOG, "Python download settlement registration failed; staging remains reserved.")
+			return
+		end
+		settled()
+	end
 end
 
 --- Calls on_done(true, interpreter) with Ergopti's Python, installing it first
 --- when the user agrees, or on_done(false, failure_code, detail).
 --- @param deps table { pin, data_dir, machine, exists, confirm, download, size,
----   sha256, unpack, ensure_dir, remove_tree, delete, rename }
+---   sha256, unpack, create_stage, remove_tree, delete, rename }
 --- @param on_done function
 function M.ensure(deps, on_done)
 	local installed = M.installed(deps)

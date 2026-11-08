@@ -155,11 +155,31 @@ Test("logs folder: pre-boot lines go to the default logs folder, not beside path
 ; ================================
 ; ================================
 
+_LDIR_OpenerScope(Callback) {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
+	global _LOGGER_REPEAT_ENABLED, _LOGGER_TEST_SINK, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	AssertEqual(0, _LOGGER_APPEND_DEBTS.Count, "Foreign native append debt cannot be parked")
+	AssertEqual(0, _LOGGER_APPEND_DEBT_REPAIRS.Count, "A foreign native repair cannot be parked")
+	AssertTrue(LoggerFlushSettled(), "A foreign logger owner must not be parked")
+	Saved := _TLOG_CaptureLoggerState(), Repeat := _LOGGER_REPEAT_ENABLED, Sink := _LOGGER_TEST_SINK
+	try {
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PATHS := Map(), _LOGGER_SUB_PENDING := Map()
+		_LOGGER_REPEAT_ENABLED := false, _LOGGER_TEST_SINK := 0
+		Callback.Call()
+	} finally {
+		_TLOG_RestoreLoggerState(Saved)
+		_LOGGER_REPEAT_ENABLED := Repeat, _LOGGER_TEST_SINK := Sink
+		_LoggerRefreshFastFlags()
+	}
+}
+
 _LDIR_MissingErrorsFileIsAnnounced() {
-	global _LogsDir
+	global _LogsDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	Saved := _LogsDir
 	Root := A_Temp . "\ergopti_ldir_openers_" . A_TickCount
 	_LogsDir := Root . "\" . AppDirsFolderName() . "\"
+	LOGGER_LOG_PATH := LoggerTodayLogPath(), LOGGER_ERRORS_LOG_PATH := LoggerTodayErrorsPath()
 	Launched := []
 	Notified := []
 	RecordLaunch(Command) {
@@ -187,15 +207,17 @@ _LDIR_MissingErrorsFileIsAnnounced() {
 	}
 }
 Test("log openers: a missing errors file is announced, an existing one is opened (logs-dir-resolver)",
-	_LDIR_MissingErrorsFileIsAnnounced)
+	_LDIR_OpenerScope.Bind(_LDIR_MissingErrorsFileIsAnnounced))
 
 ; The notice is the whole answer to the click, so a notice that never reached
 ; the user is a failed click, as on macOS and Linux, not a success.
 _LDIR_UndeliveredNoticeIsAFailure() {
-	global _LogsDir
+	global _LogsDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	Saved := _LogsDir
 	Root := A_Temp . "\ergopti_ldir_notice_" . A_TickCount
 	_LogsDir := Root . "\" . AppDirsFolderName() . "\"
+	LOGGER_LOG_PATH := LoggerTodayLogPath(), LOGGER_ERRORS_LOG_PATH := LoggerTodayErrorsPath()
+	DirCreate(_LogsDir)
 	Launched := []
 	RecordLaunch(Command) {
 		Launched.Push(Command)
@@ -213,13 +235,14 @@ _LDIR_UndeliveredNoticeIsAFailure() {
 	}
 }
 Test("log openers: an undelivered no-errors notice is a failure (logs-dir-resolver)",
-	_LDIR_UndeliveredNoticeIsAFailure)
+	_LDIR_OpenerScope.Bind(_LDIR_UndeliveredNoticeIsAFailure))
 
 _LDIR_OpenersUseTheResolver() {
-	global _LogsDir
+	global _LogsDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	Saved := _LogsDir
 	Root := A_Temp . "\ergopti_ldir_folder_" . A_TickCount
 	_LogsDir := Root . "\" . AppDirsFolderName() . "\"
+	LOGGER_LOG_PATH := LoggerTodayLogPath(), LOGGER_ERRORS_LOG_PATH := LoggerTodayErrorsPath()
 	Launched := []
 	RecordLaunch(Command) {
 		Launched.Push(Command)
@@ -236,4 +259,4 @@ _LDIR_OpenersUseTheResolver() {
 	}
 }
 Test("log openers: the folder and today's log come from the resolver (logs-dir-resolver)",
-	_LDIR_OpenersUseTheResolver)
+	_LDIR_OpenerScope.Bind(_LDIR_OpenersUseTheResolver))

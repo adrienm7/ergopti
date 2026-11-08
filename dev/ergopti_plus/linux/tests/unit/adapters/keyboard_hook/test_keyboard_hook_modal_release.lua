@@ -249,7 +249,7 @@ helpers.describe("keyboard_hook.while_released: running observe dialogs", functi
 		}
 		package.loaded[names[2]] = {
 			is_ready = function() return true end, reset_state = function() return true end,
-			modifier_role = function() end, cancel_compose = function() return true end,
+			modifier_role = function() end, restore_compose = function() return true end,
 			process = function(code, value)
 				local char = value ~= 0 and ({ [30] = "a", [48] = "b", [46] = "c" })[code] or nil
 				return char, char

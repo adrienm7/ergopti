@@ -1,4 +1,11 @@
 --- platform/network/digest_probe.lua
+-- The application-owned child is invoked directly, without a global Lua init.
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+if literal_driver and literal_driver ~= "" then
+	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+end
+
 
 --- Native read-only OpenSSL3 descriptor and EVP symbol admission. This does not
 --- allocate digest contexts or claim a completed FD digest/installed pipeline.

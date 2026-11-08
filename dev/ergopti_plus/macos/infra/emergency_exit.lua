@@ -19,6 +19,8 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
+local NumberPolicy = require("number_policy")
 
 local LOG = "infra.emergency_exit"
 
@@ -43,8 +45,8 @@ end
 local function describe_stage(describe)
 	if type(describe) ~= "function" then return "unknown" end
 	local ok, stage = xpcall(describe, debug.traceback)
-	if not ok then return "describer-failed: " .. tostring(stage) end
-	return tostring(stage)
+	if not ok then return "describer-failed: " .. ErrorDescription.describe(stage) end
+	return ErrorDescription.describe(stage)
 end
 
 --- Starts one bounded exit request.
@@ -59,7 +61,7 @@ function M.request(options)
 		or nil
 	if type(options) ~= "table"
 		or type(options.reason) ~= "string" or options.reason == ""
-		or type(options.deadline_seconds) ~= "number" or options.deadline_seconds <= 0
+		or NumberPolicy.timer_delay_ms(options.deadline_seconds) == nil or options.deadline_seconds <= 0
 		or not is_exit_code(options.exit_code, 0)
 		or not is_exit_code(forced_exit_code, 1)
 		or type(options.schedule) ~= "function"
@@ -79,17 +81,17 @@ function M.request(options)
 			local stop_ok, stop_result = xpcall(function() return deadline_timer:stop() end, debug.traceback)
 			if not stop_ok or stop_result == false then
 				report_error("Emergency exit deadline timer could not be stopped: %s",
-					tostring(stop_result))
+					ErrorDescription.describe(stop_result))
 			end
 			deadline_timer = nil
 		end
 		report_error("Forcing process exit so native stdin EOF revokes the exact lease: %s (pending stage: %s)",
-			tostring(detail), describe_stage(options.describe))
+			ErrorDescription.describe(detail), describe_stage(options.describe))
 		local exit_ok, exit_err = xpcall(function()
 			return options.exit(forced_exit_code)
 		end, debug.traceback)
 		if not exit_ok then
-			report_error("Emergency process exit failed: %s", tostring(exit_err))
+			report_error("Emergency process exit failed: %s", ErrorDescription.describe(exit_err))
 		end
 	end
 
@@ -98,8 +100,9 @@ function M.request(options)
 			force_exit("deadline-expired")
 		end)
 	end, debug.traceback)
-	if not schedule_ok or not timer_or_err then
-		report_error("Emergency exit deadline could not be armed: %s", tostring(timer_or_err))
+	local handle_ok, stop = pcall(function() return timer_or_err and timer_or_err.stop end)
+	if not schedule_ok or not handle_ok or type(stop) ~= "function" then
+		report_error("Emergency exit deadline could not be armed: %s", ErrorDescription.describe(timer_or_err))
 		force_exit("deadline-unavailable")
 		return false
 	end
@@ -111,7 +114,7 @@ function M.request(options)
 		local stop_ok, stop_result = xpcall(function() return deadline_timer:stop() end, debug.traceback)
 		if not stop_ok or stop_result == false then
 			report_error("Inline emergency deadline timer could not be stopped: %s",
-				tostring(stop_result))
+				ErrorDescription.describe(stop_result))
 		end
 		deadline_timer = nil
 		return false
@@ -119,11 +122,11 @@ function M.request(options)
 
 	local request_ok, accepted_or_err = xpcall(function()
 		return options.request_exit(options.reason, options.exit_code, function(detail)
-			force_exit("exact-fence-failed: " .. tostring(detail))
+			force_exit("exact-fence-failed: " .. ErrorDescription.describe(detail))
 		end)
 	end, debug.traceback)
 	if not request_ok or accepted_or_err ~= true then
-		report_error("Controlled emergency exit request failed: %s", tostring(accepted_or_err))
+		report_error("Controlled emergency exit request failed: %s", ErrorDescription.describe(accepted_or_err))
 		force_exit("request-rejected")
 		return false
 	end

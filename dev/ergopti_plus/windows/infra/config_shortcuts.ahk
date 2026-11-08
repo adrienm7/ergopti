@@ -233,15 +233,30 @@ _CS_ValidateMetricsSection(Section) {
 
 CS_Load() {
 		global CS_SECTION
+		; Loading may yield while observing a new canonical preference. Defaults
+		; cannot reopen text before that exact source and cipher are admitted.
+		KL_Roi_SetCanonicalPolicyKnown(false)
 		; Manifest first, disk second. Doing it here rather than in the class body
 		; keeps the ordering explicit: a class static initialiser would run at an
 		; unspecified point relative to the manifest include, and a privacy default
 		; that depends on include order is one refactor away from flipping.
 		MetricsFiltersApplyManifestDefaults()
 		data := CS_Read(&Snapshot, &SourcePath)
+		; Reuse the admitted raw source and manifest type predicate before the
+		; compatibility reader replaces outdated values with defaults. Only ROI
+		; text needs this separate unknown posture; other settings keep their API.
+		EncryptionPolicyKnown := IsObject(Snapshot)
+		if EncryptionPolicyKnown {
+				for Row in Snapshot.Rows {
+						if Row.Section == CS_SECTION && Row.Key == "encrypt"
+								EncryptionPolicyKnown := TomlConfigValueMatchesManifest(Row.Section, Row.Key,
+										Row.Value, &ExpectedType, TOML_StripInlineComment(Row.Raw))
+				}
+		}
 		if IsObject(Snapshot)
 				data := _CS_AdmitMetricsCache(data, Snapshot, SourcePath)
 		if !data.Has(CS_SECTION) {
+				KL_Roi_SetCanonicalPolicyKnown(EncryptionPolicyKnown)
 				return data
 		}
 		s := data[CS_SECTION]
@@ -249,8 +264,13 @@ CS_Load() {
 
 		; The cipher owns a second live subsystem. Commit that subsystem first;
 		; after it returns, every remaining assignment below is non-throwing.
-		if Validated.Has("encrypt")
+		if Validated.Has("encrypt") {
+				if !KL_Roi_RequestEncryption(Validated["encrypt"])
+						throw Error("The ROI encryption request is invalid.")
+				if Validated["encrypt"] && !KL_Roi_EncryptionReady()
+						throw Error("Encryption cannot change while a previous log write is unsettled.")
 				KL_Enc_SetEnabled(Validated["encrypt"])
+		}
 
 		if Validated.Has("enabled")
 				MetricsShortcuts.enabled := Validated["enabled"]
@@ -265,6 +285,10 @@ CS_Load() {
 				MetricsFilters.system_auth := Validated[ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED]
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
+		if Validated.Has("encrypt") && !KL_Roi_CommitEncryptionPolicy(Validated["encrypt"], EncryptionPolicyKnown)
+				throw Error("ROI text policy did not acknowledge the loaded encryption preference.")
+		if !Validated.Has("encrypt")
+				KL_Roi_SetCanonicalPolicyKnown(EncryptionPolicyKnown)
 
 		if Validated.Has(ConfigLeaf.DISABLED_APPS)
 				MetricsFilters.disabled_apps := Validated[ConfigLeaf.DISABLED_APPS]

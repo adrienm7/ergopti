@@ -180,7 +180,61 @@ function M._set_machine_id_command(command)
 	Cipher.reset_key()
 end
 
-M.set_enabled = Cipher.set_enabled
+-- Requested posture is independent of key readiness and starts unknown.
+local _requested_enabled = nil
+
+--- Admits textual ROI only when the requested and active postures are both known off.
+--- @return boolean
+function M.roi_text_enabled()
+	if _requested_enabled ~= false or Cipher.is_enabled() ~= false then return false end
+	local preferences = package.loaded["infra.preferences"]
+	if type(preferences) ~= "table" or type(preferences.roi_encryption_requested) ~= "function" then return false end
+	local called, requested = pcall(preferences.roi_encryption_requested)
+	return called and requested == false
+end
+
+--- Closes textual capture before checking encryption availability or publishing a posture.
+--- @return boolean settled Whether the exact prior journal receipt is settled.
+function M.prepare_roi_encryption()
+	_requested_enabled = true
+	-- Read only constructed owners: initialization must not recursively load them.
+	local engine = package.loaded["modules.keystats.init"] or package.loaded["modules.keystats"]
+	if type(engine) == "table" and type(engine.revoke_roi_text) == "function" then engine.revoke_roi_text() end
+	local manager = package.loaded["modules.keystats.log_manager"]
+	if type(manager) == "table" and type(manager.retire_roi_text) == "function"
+		and manager.retire_roi_text() ~= true then
+		Logger.error(LOG, "Encryption transition refused: a prior textual ROI journal write remains pending.")
+		return false
+	end
+	return true
+end
+
+--- Abandons a refused attempt only with a proven off preference and no journal debt.
+--- The retired words are never restored when fresh capture becomes available.
+--- @param requested boolean Canonical preference after refusal.
+--- @return boolean abandoned
+function M.abandon_roi_encryption(requested)
+	if requested ~= false or Cipher.is_enabled() ~= false then return false end
+	local manager = package.loaded["modules.keystats.log_manager"]
+	if type(manager) == "table" and type(manager.retire_roi_text) == "function"
+		and manager.retire_roi_text() ~= true then return false end
+	_requested_enabled = false
+	return true
+end
+
+--- Publishes encryption only after the prior textual journal receipt settles.
+--- @param value boolean Effective cipher posture.
+--- @param requested boolean|nil Requested policy; defaults to the effective posture.
+--- @return boolean committed
+function M.set_enabled(value, requested)
+	assert(type(value) == "boolean", "Encryption posture must be explicit")
+	if requested == nil then requested = value end
+	assert(type(requested) == "boolean", "Encryption policy must be explicit")
+	if (_requested_enabled ~= false or requested or value) and M.prepare_roi_encryption() ~= true then return false end
+	_requested_enabled = requested
+	return Cipher.set_enabled(value)
+end
+
 M.is_enabled = Cipher.is_enabled
 M.is_available = Cipher.is_available
 M.encrypt = Cipher.encrypt

@@ -8,19 +8,26 @@
 ; have behavioural global-barrier coverage.
 class WPMWidgetConst {
 	static CFG_VISIBLE := "wpm_widget_visible"
-	static STORE_X := ""
-	static STORE_Y := ""
+	static STORE_PAIR := ""
 	static CFG_COLORS := "wpm_widget_colors"
 	static CFG_GRAPH := "wpm_widget_graph"
 }
 
 class WPMWidget {
 	static visible := false
+	static _visibility_revision := 0
 	static pos_x := 0
 	static pos_y := 0
 	static use_colors := false
 	static show_graph := false
 	static _gdip_font := 0
 	static _gdip_fmt := 0
+}
+
+; The notification-area readout's two persisted choices, read by the same
+; full-save path (metrics.wpm_menubar_visible and wpm_menubar_colors).
+class WPMTrayReadout {
+	static running := false
+	static use_colors := false
 }
 

@@ -80,6 +80,9 @@ local _pending_count = 0
 --- Activated reservations retain context-revocation authority until native settlement.
 local _activated = {}
 
+--- Reservations whose cancellation refused remain owned until a retry settles.
+local _cancel_cleanup = {}
+
 --- Exact TimerScheduler handles whose native stop refused. Identity fences make
 --- their queued callbacks inert, but ownership remains here until a later
 --- lifecycle boundary successfully retries the same capability.
@@ -342,10 +345,11 @@ function M.prepare(spec)
 		return nil
 	end
 
-	local min_delay = tonumber(spec.min_delay) or 0
-	local dispatch_budget = tonumber(spec.dispatch_budget) or 0
-	if min_delay < 0 or min_delay ~= min_delay
-		or dispatch_budget < 0 or dispatch_budget ~= dispatch_budget then
+	local min_delay = spec.min_delay == nil and 0 or tonumber(spec.min_delay)
+	local dispatch_budget = spec.dispatch_budget == nil and 0 or tonumber(spec.dispatch_budget)
+	if min_delay == nil or dispatch_budget == nil or min_delay < 0 or min_delay ~= min_delay
+		or dispatch_budget < 0 or dispatch_budget ~= dispatch_budget
+		or min_delay + dispatch_budget == math.huge then
 		Logger.error(LOG, "arm(): delay plan is invalid — terminator NOT queued.")
 		return nil
 	end
@@ -372,6 +376,14 @@ function M.prepare(spec)
 	-- physical terminator. A refused watchdog/fence is therefore a complete
 	-- rollback: the caller can pass the original key through with no hidden owner.
 	local watchdog, watchdog_committed = acquire_recurring_timer(watchdog_delay, function()
+		if pending.cancel_requested then
+			if pending.cancel_refusal and not pending.cancel_warned then
+				Logger.error(LOG, "Terminator reservation cancellation remains pending: %s.", pending.cancel_refusal)
+				pending.cancel_warned = true
+			end
+			M.cancel_prepared(pending)
+			return
+		end
 		if not owns_pending(pending) then return end
 		-- A fixed timeout cannot prove ordering: paced target posts may legitimately
 		-- retry beyond their nominal plan. The recurring owner remains live after an
@@ -442,13 +454,16 @@ function M.prepare(spec)
 	local reserved_registered, reserved_registration_error = pcall(
 		SyntheticInput.on_reserved_complete, pending.reservation,
 		function(_transaction, status)
+			local queued = owns_pending(pending)
 			pending.native_settled = true
 			_activated[pending] = nil
-			if not owns_pending(pending) then return end
+			_cancel_cleanup[pending] = nil
+			pending.cancel_requested = false
 			remove_pending(pending)
 			pending._marker = nil
 			if pending.watchdog then cancel_owned_timer(pending.watchdog) end
 			if pending.fence then cancel_owned_timer(pending.fence) end
+			if not queued then return end
 			if status == "complete" then
 				Logger.done(LOG, "Terminator replay completed.")
 			else
@@ -456,9 +471,7 @@ function M.prepare(spec)
 			end
 		end)
 	if not reserved_registered then
-		pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
-		cancel_owned_timer(pending.watchdog)
-		if pending.fence then cancel_owned_timer(pending.fence) end
+		M.cancel_prepared(pending)
 		Logger.error(LOG, "arm(): reserved completion registration failed: %s.",
 			tostring(reserved_registration_error))
 		return nil
@@ -477,9 +490,7 @@ function M.prepare(spec)
 		M.flush_if_delivered(pending)
 	end)
 	if not registered then
-		pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
-		cancel_owned_timer(pending.watchdog)
-		if pending.fence then cancel_owned_timer(pending.fence) end
+		M.cancel_prepared(pending)
 		Logger.error(LOG, "arm(): replacement completion registration failed: %s.",
 			tostring(registration_error))
 		return nil
@@ -529,10 +540,19 @@ end
 --- @return boolean cancelled
 function M.cancel_prepared(pending)
 	if type(pending) ~= "table" or pending._marker ~= PREPARED_MARKER then return false end
-	remove_pending(pending)
 	if pending.reservation then
-		pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
+		local ok, cancelled = pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
+		if not ok or cancelled ~= true then
+			if pending.native_settled then return false end
+			pending.cancel_requested = true
+			_cancel_cleanup[pending] = true
+			pending.cancel_refusal = tostring(cancelled)
+			return false
+		end
 	end
+	_cancel_cleanup[pending] = nil
+	pending.cancel_requested = false
+	remove_pending(pending)
 	pending._marker = nil
 	if pending.watchdog then cancel_owned_timer(pending.watchdog); pending.watchdog = nil end
 	if pending.fence then cancel_owned_timer(pending.fence); pending.fence = nil end
@@ -662,7 +682,7 @@ end
 --- Reports whether every held key has reached a terminal native outcome.
 --- @return boolean
 function M.is_settled()
-	return _pending_count == 0 and next(_activated) == nil
+	return _pending_count == 0 and next(_activated) == nil and next(_cancel_cleanup) == nil
 end
 
 

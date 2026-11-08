@@ -958,10 +958,10 @@ requires_linux = ["tool:pactl"]
 platform = "all"
 
 [sg_actions.center_mouse]
-# The centre of the screen under the pointer. Linux, as for teleport_mouse, has
-# no compositor-independent way to warp the pointer.
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_pointer_cannot_be_moved_on_linux"
+# The centre of the screen under the pointer. Linux moves it on X11 only
+# (modules/gestures/pointer_warp.lua): Wayland lets no client warp the pointer.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 [sg_actions.run_program]
 # Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
@@ -1081,8 +1081,9 @@ platform = "hs,linux"
 reason_ahk = "platform_reason.action_executable_permission_is_unix"
 
 [sg_actions.open_terminal_here]
-# The folder of the active Finder or Explorer window. Linux is not
-# implemented, not impossible: its file managers expose no current folder.
+# The folder of the active Finder or Explorer window. Linux still needs a
+# file-manager-specific active-window/folder owner. Nautilus publishes all open
+# tab locations asynchronously; that list is not an active-folder receipt.
 platform = "hs,ahk"
 reason_linux = "platform_reason.action_file_manager_folder_is_unreadable_on_linux"
 
@@ -1252,17 +1253,15 @@ platform = "all"
 emit_ahk = "#."
 
 [sg_actions.take_note]
-platform = "ahk"
+platform = "ahk,linux"
 reason_hs = "platform_reason.action_take_note_uses_notepad"
-reason_linux = "platform_reason.action_take_note_uses_notepad"
+requires_linux = ["tool:xdg-open", "tool:xdg-mime"]
 
 [sg_actions.activity_simulation]
-# One keep-awake session per machine, stopped by the first physical input on
-# both drivers. Linux is not implemented, not impossible: the driver's own
-# uinput device could nudge the pointer the same way (an idle inhibitor would
-# be a different feature).
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_keep_awake_is_the_desktops_inhibitor"
+# Windows and macOS simulate activity until physical input. Linux holds the
+# session idle inhibitor until toggled off or the driver exits (2026-11-06).
+platform = "all"
+requires_linux = ["tool:systemd-inhibit"]
 
 [sg_actions.display_mirror_toggle]
 # macOS mirrors through the CoreGraphics display-configuration API, Windows
@@ -1317,11 +1316,11 @@ requires_linux = ["tool:xclip", "tool:xdg-open"]
 parameter = "search_url"
 
 [sg_actions.teleport_mouse]
-# Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/. Linux has no compositor-independent API for
-# warping the pointer, and Wayland intentionally forbids global pointer moves.
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_pointer_cannot_be_moved_on_linux"
+# Windows in modules/shortcuts, macOS in modules/shortcuts/actions/, Linux on
+# X11 only (modules/gestures/pointer_warp.lua): Wayland intentionally forbids
+# global pointer moves.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 # The case actions share one rule on every driver, pinned by the corpus
 # _shared/tests/corpus/text_case/vectors.json that the three suites replay:
@@ -1505,11 +1504,11 @@ requires_ahk = ["ai:on"]
 platform = "all"
 
 [sg_actions.spotlight_mouse]
-# Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
-# declaring it there made the action picker offer a binding that did nothing.
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_screen_overlay_is_not_on_linux"
+# Windows in modules/shortcuts, macOS in modules/shortcuts/actions/, Linux on
+# X11 only (modules/gestures/pointer_spotlight.lua): Wayland gives no client the
+# global pointer position nor a window placed at screen coordinates.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 [sg_actions.toggle_capslock]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
@@ -1531,10 +1530,9 @@ platform = "all"
 # --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
 
 [sg_actions.one_shot_shift]
-platform = "ahk"
+platform = "ahk,linux"
 reason_hs = "platform_reason.action_same_action_under_another_name"
 equivalent_hs = ["sticky_shift"]
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.caps_word]
 # Linux toggles the shortcuts manager's CapsWord, which locks CapsLock as
@@ -1725,7 +1723,8 @@ emit_hs_mods = ["cmd"]
 platform = "hs"
 reason_ahk = "platform_reason.action_same_action_under_another_name"
 equivalent_ahk = ["one_shot_shift"]
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_same_action_under_another_name"
+equivalent_linux = ["one_shot_shift"]
 
 [sg_actions.sticky_ctrl]
 platform = "ahk,hs"

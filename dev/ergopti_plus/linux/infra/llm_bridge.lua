@@ -169,7 +169,7 @@ function M.build_payload(buffer, config)
 	-- user message; context substitution upstream is handled by
 	-- PromptBuilder.build_params().
 	if system_prompt and system_prompt:find("{context}", 1, true) then
-		system_prompt = system_prompt:gsub("{context}", buffer or "", 1)
+		system_prompt = system_prompt:gsub("{context}", function() return buffer or "" end, 1)
 	end
 	if system_prompt and system_prompt ~= "" then
 		messages[#messages + 1] = { role = "system", content = system_prompt }

@@ -33,6 +33,10 @@ write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 
 local Writer = require("modules.keystats.sqlite_writer")
 local Bridge = require("ui.metrics_apps.bridge")
+-- The edit confirms the category and the score in two native prompts, a desktop
+-- dialog this storage receipt does not drive: each answers the value the page
+-- sent, which is the prompt's own initial text.
+Bridge._category_prompt = function(_, _, initial) return initial end
 local case_index = 0
 
 local function check(name, fn)
@@ -59,14 +63,19 @@ end
 local function start(legacy_app)
 	case_index = case_index + 1
 	Writer.close_db()
+	local previous = package.loaded["modules.keystats.keystats"]
 	package.loaded["modules.keystats.keystats"] = nil
 	package.loaded["modules.keystats.app_category_file"] = nil
 	local keystats = require("modules.keystats.keystats")
 	local path = root .. "/case-" .. case_index .. ".sqlite"
 	if legacy_app then
-		-- The previous store: a score in meta and the category on the day rows.
+		-- The previous store: a score in meta and the category on the day rows,
+		-- for the device this host already has. An earlier case resolved its
+		-- ledger identity in the shared configuration, which the next collector
+		-- keeps; "linux-<host>" is that device only on a host with no ledger.
 		local hostname = assert(io.open("/proc/sys/kernel/hostname")):read("*l"):gsub("%s+", "")
-		local device = "linux-" .. hostname
+		local device = assert(previous, "the legacy case follows a collector start").ledger_status().device_id
+		assert(type(device) == "string" and device ~= "")
 		assert(Writer.open_db(path))
 		Writer.register_device(device, hostname, "linux", "", hostname)
 		assert(Writer.upsert_app_day(device, "2000-01-01", legacy_app, { chars = 3 }))

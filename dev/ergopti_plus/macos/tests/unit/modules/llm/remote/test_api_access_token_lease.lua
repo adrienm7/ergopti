@@ -136,6 +136,55 @@ end
 
 helpers.describe("api_remote: the resolver lease owns the access-token exchange (access-token-lease)", function()
 
+	helpers.it("does not send an agent request after its account changes during token exchange", function()
+		with_remote(function(remote, io)
+			select_entry(remote, io, "old-key")
+			local failures = {}
+			remote.request_chat("ibm_fixture", "ibm/granite", { messages = {} }, function() end,
+				function(reason) failures[#failures + 1] = reason end)
+			helpers.assert_eq(#io.pending, 1)
+			io.pending[1].done(true, "old-key")
+			helpers.assert_eq(#exchanges(io), 1)
+			remote.set_entries({ { id = "w", provider = "ibm_fixture", token = "new-key", model = "ibm/granite",
+				base_url = "https://new.example/v1" } })
+			reply(exchanges(io)[1], 200, { access_token = "old-access", expires_in = 3600 })
+			helpers.assert_eq(#io.posts, 1, "only the token exchange may have been dispatched")
+			helpers.assert_eq(#failures, 1)
+			helpers.assert_eq(failures[1], "stale_identity")
+		end)
+	end)
+
+	helpers.it("does not send an agent request after selecting another account of the same provider", function()
+		with_remote(function(remote, io)
+			remote.set_entries({
+				{ id = "a", provider = "ibm_fixture", token = "key-a", model = "ibm/granite" },
+				{ id = "b", provider = "ibm_fixture", token = "key-b", model = "ibm/granite" },
+			})
+			remote.set_active_entry_id("a")
+			local failures = {}
+			remote.request_chat("ibm_fixture", "ibm/granite", { messages = {} }, function() end,
+				function(reason) failures[#failures + 1] = reason end)
+			io.pending[1].done(true, "key-a")
+			remote.set_active_entry_id("b")
+			reply(exchanges(io)[1], 200, { access_token = "old-access", expires_in = 3600 })
+			helpers.assert_eq(#io.posts, 1)
+			helpers.assert_eq(failures[1], "stale_identity")
+		end)
+	end)
+
+	helpers.it("sends the agent request when its account survives token exchange", function()
+		with_remote(function(remote, io)
+			select_entry(remote, io, "key")
+			local failures = {}
+			remote.request_chat("ibm_fixture", "ibm/granite", { messages = {} }, function() end,
+				function(reason) failures[#failures + 1] = reason end)
+			io.pending[1].done(true, "key")
+			reply(exchanges(io)[1], 200, { access_token = "access", expires_in = 3600 })
+			helpers.assert_eq(#io.posts, 2)
+			helpers.assert_eq(#failures, 0)
+		end)
+	end)
+
 	helpers.it("the first resolution waits for the token instead of being refused (access-token-lease)", function()
 		with_remote(function(remote, io)
 			select_entry(remote, io, "ibm-api-key")

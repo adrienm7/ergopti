@@ -95,6 +95,20 @@ helpers.describe("keystats system events: the recorder", function()
 			end)
 	end)
 
+	it("linux-network-recorder: a connectivity transition reaches events_network with the Windows metadata", function()
+		with_recorder({}, function(keystats, writer)
+			keystats.record_network_event("vpn_connected", { adapter = "vpn", address = "10.0.0.2" })
+			keystats.set_enabled(false)
+			keystats.record_network_event("internet_down")
+			keystats.set_enabled(true)
+			keystats.flush()
+			helpers.assert_eq(#writer.network_events, 1, "a transition seen while recording is off is dropped")
+			helpers.assert_eq(writer.network_events[1].row.kind, "vpn_connected")
+			helpers.assert_eq(writer.network_events[1].row.meta, { adapter = "vpn" },
+				"only the kind's own keys are kept: no address reaches a row")
+		end)
+	end)
+
 	it("drops the transitions seen while recording is forbidden", function()		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
 			keystats.set_enabled(false)
 			keystats.flush()
@@ -131,3 +145,69 @@ helpers.describe("keystats system events: the writer", function()
 		if not ok then error(failure, 0) end
 	end)
 end)
+
+for _, failure in ipairs({ "migration", "registration", "migration_throw", "registration_throw", "open_refused", "open_throw", "open_unavailable" }) do
+	it("metrics do not use SQLite after failed " .. failure, function()
+		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics", "modules.keystats.text_migration" }
+		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local starts, closes, registers, migrations, resumes, conversions = 0, 0, 0, 0, 0, 0
+		local writer = setmetatable({
+			open_db = function()
+				if failure == "open_throw" then error("injected open failure") end
+				if failure == "open_refused" then return false, "store_refused" end
+				if failure == "open_unavailable" then return false, "sqlite_unavailable" end
+				return true
+			end,
+			ensure_token_encoding = function()
+				migrations = migrations + 1
+				if failure == "migration_throw" then error("injected migration failure") end
+				return failure ~= "migration"
+			end,
+			register_device = function()
+				registers = registers + 1
+				if failure == "registration_throw" then error("injected registration failure") end
+				return failure ~= "registration"
+			end,
+			read_open_walk = function() return nil, true end,
+			is_available = function() return true end,
+			close_db = function() closes = closes + 1; return true end,
+		}, { __index = Fakes.sqlite_writer() })
+		require("tests.support.sqlite_flush_fake").attach(writer)
+		local start = writer.start_flush
+		writer.start_flush = function(...) starts = starts + 1; return start(...) end
+		package.loaded[names[1]], package.loaded[names[2]] = writer, nil
+		package.loaded[names[4]] = { resume = function() resumes = resumes + 1 end,
+			start = function() conversions = conversions + 1; return true end, cancel = function() end,
+			pump = function() end, is_running = function() return false end }
+		package.loaded[names[3]] = { bind = function() end, bind_event_capture = function() end,
+			current = function() return nil end, snapshot = function() return { values = {}, owners = {} } end,
+			acknowledge = function() end, take_events = function() return {} end }
+		local called, detail = pcall(function()
+			local keystats = require(names[2])
+			local blocked = failure ~= "open_unavailable"
+			helpers.assert_eq(keystats.init(Home.options()), not blocked, "only explicit missing sqlite uses fallback")
+			helpers.assert_eq(keystats.get_privacy_state().storage_blocked, blocked, "diagnostics can observe the capture gate")
+			helpers.assert_eq(resumes, 0, "an unadmitted store cannot resume historical conversion")
+			helpers.assert_eq(keystats.migrate_stored_text(), false)
+			helpers.assert_eq(conversions, 0, "an unadmitted store cannot start historical conversion")
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			keystats.on_keydown("a", 1000, "owned-app")
+			helpers.assert_eq(keystats.get_app_stats()["owned-app"] == nil, blocked, "rejected stores cannot capture unpersistable events")
+			keystats.flush()
+			helpers.assert_eq(starts, 0, "unadmitted SQLite must never accept a flush")
+			helpers.assert_eq(closes, (failure == "open_refused" or failure == "open_throw" or failure == "open_unavailable") and 0 or 1,
+				"only a successfully opened store is closed")
+			local opened = failure ~= "open_refused" and failure ~= "open_throw" and failure ~= "open_unavailable"
+			helpers.assert_eq(registers, opened and 1 or 0, "registration must precede migration")
+			helpers.assert_eq(migrations, (failure == "migration" or failure == "migration_throw") and 1 or 0,
+				"failed device registration cannot mutate n-gram encoding")
+			failure = "none"
+			helpers.assert_true(keystats.init(Home.options()), "healthy retry must restore admission")
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			keystats.on_keydown("b", 2000, "recovered-app")
+			helpers.assert_true(keystats.get_app_stats()["recovered-app"] ~= nil, "capture resumes after successful retry")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		assert(called, detail)
+	end)
+end

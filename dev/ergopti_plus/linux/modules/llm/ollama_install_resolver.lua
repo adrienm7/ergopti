@@ -56,11 +56,8 @@ local copy = TableUtil.shallow_copy
 local function catalogue()
 	local path = require("infra.paths").shared("modules/llm/ollama_release.json")
 	if not path then return nil, "ollama_release_unreadable" end
-	local file = io.open(path, "rb")
-	if not file then return nil, "ollama_release_unreadable" end
-	local data = file:read("*a")
-	local closed = file:close()
-	if not closed or type(data) ~= "string" then return nil, "ollama_release_unreadable" end
+	local data, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" or type(data) ~= "string" then return nil, "ollama_release_unreadable" end
 	local Json = require("json")
 	local decoded = Json.decode_lossless(data)
 	if type(decoded) ~= "table" or Json.is_array(decoded) then return nil, "ollama_release_unreadable" end

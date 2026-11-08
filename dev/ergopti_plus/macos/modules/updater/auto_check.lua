@@ -40,6 +40,7 @@
 --- ==============================================================================
 
 local M = {}
+local pending_session_cleanup = nil
 
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
@@ -132,6 +133,13 @@ local function header_value(headers, wanted)
 	return nil
 end
 
+--- An HTTP entity-tag is a quoted opaque value, optionally prefixed by W/.
+local function valid_etag(value)
+	if type(value) ~= "string" then return false end
+	local opaque = value:sub(1, 2) == "W/" and value:sub(3) or value
+	return opaque:match('^"[^"%c]*"$') ~= nil
+end
+
 
 
 
@@ -150,7 +158,7 @@ end
 local function stored_interval(state, timing)
 	local raw = state[M.STATE_KEY]
 	if raw == nil then return timing.default_check_interval_sec end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
 		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
 		return timing.default_check_interval_sec
 	end
@@ -188,7 +196,7 @@ end
 ---   on_available function(release) A new release { tag, channel } was found.
 ---   config table|nil load_config() result (tests pass one).
 ---   timer table { after(sec, fn) -> handle, committed; cancel(handle) -> boolean }
----   storage table { get(key, default), set(key, value) -> boolean }
+---   storage table { get(key, default), read_exact(key) -> ok, value, set(key, value) -> boolean }
 ---   http table Background transport { get(url, headers, callback(result)) -> boolean }.
 ---   manual_http table Distinct manual transport with the same contract.
 ---   now function(): number Wall clock in epoch seconds.
@@ -201,6 +209,9 @@ function M.new(opts)
 		or type(opts.storage) ~= "table" or type(opts.http) ~= "table"
 		or type(opts.manual_http) ~= "table" or opts.manual_http == opts.http or type(opts.now) ~= "function" then
 		error("the automatic update-check owner needs its state, save, channel, pause, callback and distinct transport ports", 2)
+	end
+	if type(opts.storage.read_exact) ~= "function" then
+		error("the automatic update-check owner needs an exact storage read", 2)
 	end
 	local config = opts.config or M.load_config()
 	if type(config.feed_url) ~= "string" or config.feed_url == "" then
@@ -221,11 +232,18 @@ function M.new(opts)
 	local generation = 0
 	-- Manual answers survive channel changes, but not a retired schedule owner.
 	local manual_generation = 0
+	local check_sequence = 0
+	local published_sequence = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
 		if record then return record end
-		local state, dropped = Schedule.sanitize_state(opts.storage.get(config.state_key, nil))
+		local called, read_ok, stored = pcall(opts.storage.read_exact, config.state_key)
+		if not called or read_ok ~= true then
+			Logger.error(LOG, "The update-check record could not be read; retrying without overwriting it.")
+			return nil
+		end
+		local state, dropped = Schedule.sanitize_state(stored)
 		for _, field in ipairs(dropped) do
 			Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
 		end
@@ -259,6 +277,21 @@ function M.new(opts)
 			Logger.warn(LOG, "Dropped the unusable stored copy of the release list: %s.", reason)
 			return nil
 		end
+		if not valid_etag(copy.etag) then
+			Logger.warn(LOG, "Dropped the stored release list with an invalid ETag.")
+			return nil
+		end
+		local decoded, decode_error = JsonCodec.decode(copy.body)
+		if decode_error or type(decoded) ~= "table" then
+			Logger.warn(LOG, "Dropped the malformed stored copy of the release list.")
+			return nil
+		end
+		for _, entry in pairs(decoded) do
+			if type(entry) ~= "table" or type(entry.tag_name) ~= "string" or entry.tag_name == "" then
+				Logger.warn(LOG, "Dropped the stored release list containing an invalid entry.")
+				return nil
+			end
+		end
 		return copy
 	end
 	list_cache = load_list_cache()
@@ -269,7 +302,7 @@ function M.new(opts)
 	--- @param etag string|nil The response's validator.
 	local function store_list_cache(decoded, etag)
 		-- An empty array would encode as a JSON object, which no copy may hold.
-		if not etag or #decoded == 0 then
+		if not valid_etag(etag) or #decoded == 0 then
 			list_cache = nil
 			if opts.storage.set(config.list_key, nil) ~= true then
 				Logger.error(LOG, "The stale copy of the release list could not be removed.")
@@ -341,9 +374,13 @@ function M.new(opts)
 	end
 
 	--- Records one completed check and announces a new release once.
-	local function complete(ok, release)
+	local function complete(ok, release, request_sequence)
 		in_flight = false
-		local state = Schedule.record_check(load_record(), opts.now(), ok)
+		if request_sequence < published_sequence then return end
+		published_sequence = request_sequence
+		local previous = load_record()
+		if not previous then return end
+		local state = Schedule.record_check(previous, opts.now(), ok)
 		save_record(state)
 		Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 			ok and "success" or "failure", state.failures)
@@ -364,6 +401,7 @@ function M.new(opts)
 			Logger.error(LOG, "Update notification was not accepted: %s.", tostring(accepted))
 			return
 		end
+		if not active or request_sequence ~= published_sequence then return end
 		notified.last_notified_tag = release.tag
 		save_record(notified)
 	end
@@ -390,9 +428,9 @@ function M.new(opts)
 	end
 
 	--- The headers of one list request, conditional on the stored copy.
-	local function list_headers()
+	local function list_headers(copy)
 		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
-		if list_cache then headers["If-None-Match"] = list_cache.etag end
+		if copy then headers["If-None-Match"] = copy.etag end
 		return headers
 	end
 
@@ -402,11 +440,11 @@ function M.new(opts)
 	--- @return string|nil body
 	--- @return string|nil reason
 	--- @return string|nil detail
-	local function read_response(result)
+	local function read_response(result, request_copy, may_store)
 		local status = type(result) == "table" and tonumber(result.status) or 0
-		if status == 304 and list_cache then
+		if status == 304 and request_copy then
 			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
-			return list_cache.body
+			return request_copy.body
 		end
 		if type(result) == "table" and result.ok == true and type(result.body) == "string"
 			and result.body:match("^%s*%[") then
@@ -419,7 +457,7 @@ function M.new(opts)
 					return nil, "parse_failed", "a release without a tag"
 				end
 			end
-			store_list_cache(decoded, header_value(result.headers, "etag"))
+			if may_store ~= false then store_list_cache(decoded, header_value(result.headers, "etag")) end
 			return result.body
 		end
 		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
@@ -460,8 +498,11 @@ function M.new(opts)
 	local function dispatch(channel)
 		in_flight = true
 		local request_generation = generation
+		check_sequence = check_sequence + 1
+		local request_sequence = check_sequence
 		local completed = false
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(result)
+		local request_copy = list_cache
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(request_copy), function(result)
 			if completed or not active or request_generation ~= generation then return end
 			completed = true
 			if channel ~= opts.channel() then
@@ -469,7 +510,7 @@ function M.new(opts)
 				Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
 				return
 			end
-			local body, reason, detail = read_response(result)
+			local body, reason, detail = read_response(result, request_copy, request_sequence >= published_sequence)
 			if not body and reason == "no_connection" then
 				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
 				read_feed(opts.http, detail, function(feed_body, feed_detail)
@@ -481,10 +522,10 @@ function M.new(opts)
 					end
 					if not feed_body then
 						Logger.warn(LOG, "Background check failed: %s.", feed_detail)
-						complete(false, nil)
+						complete(false, nil, request_sequence)
 						return
 					end
-					complete(true, read_list(feed_body, channel))
+					complete(true, read_list(feed_body, channel), request_sequence)
 				end)
 				return
 			end
@@ -494,15 +535,15 @@ function M.new(opts)
 				else
 					Logger.warn(LOG, "Background check failed: %s.", detail)
 				end
-				complete(false, nil)
+				complete(false, nil, request_sequence)
 				return
 			end
-			complete(true, read_list(body, channel))
+			complete(true, read_list(body, channel), request_sequence)
 		end)
 		if (not ok_dispatch or sent ~= true) and not completed and active and request_generation == generation then
 			completed = true
 			Logger.error(LOG, "The update-check request was not dispatched: %s.", tostring(sent))
-			complete(false, nil)
+			complete(false, nil, request_sequence)
 		end
 	end
 
@@ -511,9 +552,17 @@ function M.new(opts)
 	evaluate = function()
 		if not active then return false end
 		local now = opts.now()
+		if now < started_at then
+			Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+			started_at = now
+		end
+		local interval = owner.interval()
+		if interval == 0 then return true end
+		local current_record = load_record()
+		if not current_record then return arm(timing.reevaluate_sec) end
 		local due_at, reason = Schedule.next_due({
-			now = now, started_at = started_at, interval = owner.interval(),
-			state = load_record(), timing = timing,
+			now = now, started_at = started_at, interval = interval,
+			state = current_record, timing = timing,
 		})
 		if due_at == nil then
 			Logger.debug(LOG, "Automatic update checks are off.")
@@ -523,7 +572,12 @@ function M.new(opts)
 			return arm(Schedule.delay_until(due_at, now, timing))
 		end
 		if not arm(timing.reevaluate_sec) then return false end
-		if opts.is_paused() == true then
+		local pause_ok, paused = pcall(opts.is_paused)
+		if not pause_ok or type(paused) ~= "boolean" then
+			Logger.warn(LOG, "Update check deferred: the driver pause state is unavailable.")
+			return true
+		end
+		if paused then
 			Logger.debug(LOG, "Update check due (%s) but the driver is paused; the record is left as it is.", reason)
 			return true
 		end
@@ -549,6 +603,7 @@ function M.new(opts)
 	--- @return boolean dispatched
 	function owner.check_now(channel, on_result)
 		local request_generation = manual_generation
+		local request_sequence
 		local base = { channel = channel, current = current_version() }
 		local answered = false
 		local function answer(result)
@@ -559,7 +614,11 @@ function M.new(opts)
 		end
 		local function fail(reason, detail)
 			if answered or request_generation ~= manual_generation then return end
-			save_record(Schedule.record_check(load_record(), opts.now(), false))
+			if request_sequence >= published_sequence then
+				published_sequence = request_sequence
+				local previous = load_record()
+				if previous then save_record(Schedule.record_check(previous, opts.now(), false)) end
+			end
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
 			answer(CheckResult.failure(base, reason, detail))
 		end
@@ -569,6 +628,8 @@ function M.new(opts)
 			answer(CheckResult.failure(base, "unexpected", "not a registry channel"))
 			return false
 		end
+		check_sequence = check_sequence + 1
+		request_sequence = check_sequence
 		--- Answers the window from one release list, the API's or the feed's.
 		--- @param body string Release list JSON.
 		local function answer_from(body)
@@ -576,7 +637,14 @@ function M.new(opts)
 				registry = Updater.channels(), channel = channel,
 				current = base.current, installed = installed_channel(),
 			})
-			local state = Schedule.record_check(load_record(), opts.now(), true)
+			if request_sequence < published_sequence then
+				answer(result)
+				return
+			end
+			published_sequence = request_sequence
+			local previous = load_record()
+			if not previous then answer(result); return end
+			local state = Schedule.record_check(previous, opts.now(), true)
 			-- A channel switched while the request ran leaves the About row to the
 			-- new channel, as dispatch() does: the window still gets its answer
 			if channel ~= opts.channel() then
@@ -592,9 +660,12 @@ function M.new(opts)
 				result.state, channel, tostring(result.latest), #result.others)
 			answer(result)
 		end
-		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(), function(response)
-			if answered or request_generation ~= manual_generation then return end
-			local body, reason, detail = read_response(response)
+		local api_completed = false
+		local request_copy = list_cache
+		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(request_copy), function(response)
+			if api_completed or answered or request_generation ~= manual_generation then return end
+			api_completed = true
+			local body, reason, detail = read_response(response, request_copy, request_sequence >= published_sequence)
 			if body then return answer_from(body) end
 			if reason ~= "no_connection" then return fail(reason, detail) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
@@ -605,7 +676,7 @@ function M.new(opts)
 				answer_from(feed_body)
 			end)
 		end)
-		if not ok_dispatch or sent ~= true then
+		if (not ok_dispatch or sent ~= true) and not api_completed then
 			if not answered then fail("no_connection", ok_dispatch and "the request was refused" or tostring(sent)) end
 			return false
 		end
@@ -659,6 +730,8 @@ function M.new(opts)
 	--- Revokes pending results when the durable channel owner publishes a change.
 	function owner.on_channel_changed()
 		generation = generation + 1
+		check_sequence = check_sequence + 1
+		published_sequence = check_sequence
 		in_flight = false
 		latest = nil
 		if active and disarm() then return evaluate() end
@@ -728,6 +801,11 @@ end
 --- @param opts table { state, save, channel, is_paused, on_available } as for new().
 --- @return table owner The started owner.
 function M.start_session(opts)
+	if pending_session_cleanup then
+		local ok, stopped = pcall(pending_session_cleanup.stop)
+		if not ok or stopped ~= true then error("the previous update session still needs cleanup", 0) end
+		pending_session_cleanup = nil
+	end
 	local config = M.load_config()
 	local owner = M.new({
 		state = opts.state,
@@ -743,16 +821,19 @@ function M.start_session(opts)
 		now = os.time,
 	})
 	local watcher = require("adapters.wake_watcher").new(owner.on_wake)
-	if not watcher.start() then
+	local watcher_ok, watcher_started = pcall(watcher.start)
+	if not watcher_ok or watcher_started ~= true then
 		Logger.error(LOG, "The wake watcher did not start; a wake is caught at the next bounded re-evaluation.")
 	end
 	local stop_owner = owner.stop
 	function owner.stop()
-		local watcher_stopped = watcher.stop()
-		return stop_owner() == true and watcher_stopped == true
+		local watcher_ok, watcher_stopped = pcall(watcher.stop)
+		local owner_ok, owner_stopped = pcall(stop_owner)
+		return watcher_ok and watcher_stopped == true and owner_ok and owner_stopped == true
 	end
-	if not owner.start() then
-		owner.stop()
+	local started_ok, started = pcall(owner.start)
+	if not started_ok or started ~= true then
+		if not owner.stop() then pending_session_cleanup = owner end
 		error("the automatic update checks could not start", 0)
 	end
 	return owner

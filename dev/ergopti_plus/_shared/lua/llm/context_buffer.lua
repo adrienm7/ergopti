@@ -40,9 +40,11 @@ local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 o
 -- =============================================
 -- =============================================
 
---- The rolling window, in codepoints. Larger than every context_length the
---- menu offers, so the prompt builder is the only place the context is capped.
+--- Default rolling window in codepoints for callers without a configured limit.
 M.CAPACITY_CODEPOINTS = 2048
+
+--- Maximum accepted positive model context setting on the Lua drivers.
+M.MAX_CONTEXT_LENGTH = 4000
 
 
 
@@ -86,9 +88,9 @@ end
 
 --- What the model may see of a mirrored typing buffer after a private expansion.
 ---
---- macOS mirrors the hotstring buffer instead of editing a separate window, so
---- the text of a private expansion (personal information) stays inside the
---- mirrored text. The mark is the buffer content up to and including that
+--- macOS keeps observed context independently of its shorter hotstring window.
+--- The text of a private expansion (personal information) stays in the observed
+--- context. The mark is the context content up to and including that
 --- expansion; only what was typed after it is visible. The mark follows the
 --- tail edits the buffer undergoes: typing leaves it, a Backspace into it keeps
 --- the surviving part marked, and any other divergence (another field, a reset)
@@ -115,20 +117,32 @@ function M.after_private(text, mark)
 end
 
 --- Creates an empty context buffer.
---- @return table buffer With text(), length(), set(), append(), backspace(),
+--- @return table buffer With text(), length(), set_capacity(), set(), append(), backspace(),
 ---   replace_tail(), clear() and navigated().
 function M.new()
 	local current = ""
 	local count = 0
+	local capacity = M.CAPACITY_CODEPOINTS
 
 	local buffer = {}
 
 	--- Drops the oldest codepoints beyond the window.
 	local function trim()
-		if count <= M.CAPACITY_CODEPOINTS then return end
-		local start = utf8_lib.offset(current, count - M.CAPACITY_CODEPOINTS + 1)
+		if count <= capacity then return end
+		local start = utf8_lib.offset(current, count - capacity + 1)
 		current = current:sub(start)
-		count = M.CAPACITY_CODEPOINTS
+		count = capacity
+	end
+
+	--- Sets the current configured capacity and discards excess oldest text.
+	--- @param value integer Positive limit no larger than MAX_CONTEXT_LENGTH.
+	--- @return boolean accepted
+	function buffer:set_capacity(value)
+		if type(value) ~= "number" or value ~= value or value < 1
+			or value > M.MAX_CONTEXT_LENGTH or value ~= math.floor(value) then return false end
+		capacity = value
+		trim()
+		return true
 	end
 
 	--- The context as a string.

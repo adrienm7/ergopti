@@ -97,6 +97,28 @@ local function with_native_menu(fixture_state, body)
 end
 
 helpers.describe("native adopted personal file gates", function()
+	helpers.it("refuses a held control when a new personal directory cannot be enumerated", function()
+		fixture('', function(f)
+			helpers.assert_true(select(2, f.config.load_all()))
+			local binding = assert(f.config.personal_file_scope_binding(f.definitions[1].id))
+			local uv = require("luv")
+			local path = f.root .. "/hot/locked"
+			assert(uv.fs_mkdir(path, 448)); assert(uv.fs_chmod(path, 0))
+			local probe = uv.fs_opendir(path)
+			if probe then uv.fs_closedir(probe); uv.fs_chmod(path, 448); uv.fs_rmdir(path); return end
+			local called, current = pcall(binding.current)
+			local menu_ok, menu_err = pcall(function()
+				with_native_menu(f, function(render)
+					local row = assert(render("a__b ("))
+					helpers.assert_true(row.menu[1].disabled, "unprovable source controls must be disabled")
+				end)
+			end)
+			assert(uv.fs_chmod(path, 448)); assert(uv.fs_rmdir(path))
+			helpers.assert_true(called, "a source discovery refusal is a closed control, not an exception")
+			helpers.assert_eq(current, false)
+			if not menu_ok then error(menu_err, 0) end
+		end)
+	end)
 	helpers.it("102 native keeps empty personal sources reachable through actual file controls", function()
 		fixture('', function(f)
 			local item = f.definitions[2]
@@ -637,6 +659,46 @@ helpers.describe("native adopted personal file gates", function()
 			helpers.assert_not_nil(f.match(selected.trigger))
 		end)
 	end)
+	helpers.it("(hotstrings-reset-refusal) preserves real personal metadata and reports unavailable reset", function()
+		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
+			helpers.assert_eq(select(2, f.config.load_all()), true)
+			local selected = f.definitions[2]
+			helpers.assert_eq(f.config.set_override(selected.id, nil, "color", "#112233"), true)
+			local before, settings = Choices.read(selected.path), f.read()
+			local previous = package.loaded["ui.hotstrings_config_window.bridge"]
+			package.loaded["ui.hotstrings_config_window.bridge"] = nil
+			local bridge = require("ui.hotstrings_config_window.bridge")
+			local notices = {}
+			local ok, result = pcall(bridge.on_message, { action = "reset_all" },
+				{ config = f.config, notify_error = function(key) notices[#notices + 1] = key end })
+			package.loaded["ui.hotstrings_config_window.bridge"] = previous
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result, { reset = false })
+			helpers.assert_eq(notices, { "hs_config.reset_all_personal_unavailable" })
+			helpers.assert_eq(Choices.read(selected.path), before)
+			helpers.assert_eq(f.read(), settings)
+		end)
+	end)
+
+	helpers.it("(hotstrings-setting-validation) preserves real overrides on malformed edits", function()
+		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
+			helpers.assert_eq(select(2, f.config.load_all()), true)
+			helpers.assert_eq(f.config.set_override("personal", nil, "color", "#123456"), true)
+			local path = f.root .. "/hotstrings_overrides.toml"
+			local before = Choices.read(path)
+			local previous = package.loaded["ui.hotstrings_config_window.bridge"]
+			package.loaded["ui.hotstrings_config_window.bridge"] = nil
+			local bridge = require("ui.hotstrings_config_window.bridge")
+			local ok, detail = pcall(function()
+				bridge.on_message({ action = "set_color", category = "personal", hex = "broken" }, { config = f.config })
+				bridge.on_message({ action = "set_priority", category = "personal", priority = 1.5 }, { config = f.config })
+			end)
+			package.loaded["ui.hotstrings_config_window.bridge"] = previous
+			helpers.assert_true(ok, tostring(detail))
+			helpers.assert_eq(Choices.read(path), before)
+		end)
+	end)
+
 	helpers.it("102 native refuses a held file owner after external source changes without settings publication", function()
 		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)

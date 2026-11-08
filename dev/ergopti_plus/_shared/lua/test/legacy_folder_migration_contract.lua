@@ -76,6 +76,8 @@ function M.memory_ports(tree)
 		end
 		return true
 	end
+	-- The in-memory tree has no links: two names are one entry only when equal.
+	function ports.same_object(a, b) return a == b end
 	function ports.remove_empty_dir(path)
 		local names = ports.list(path)
 		if not names or #names > 0 then return false end
@@ -114,7 +116,7 @@ function M.run(helpers, shared_root)
 		end)
 
 		helpers.it("rewrites only the old default folders of paths.toml (legacy-folder-migration-paths)", function()
-			helpers.assert_eq(#corpus.paths_text, 4, "complete paths.toml vectors")
+			helpers.assert_eq(#corpus.paths_text, 13, "complete paths.toml vectors")
 			-- A Windows row spells backslash separators, a filename byte on POSIX;
 			-- the AutoHotkey replay holds it on Windows.
 			local backslash_separates = NativePath.separators():find("\\", 1, true) ~= nil
@@ -127,25 +129,146 @@ function M.run(helpers, shared_root)
 					helpers.assert_eq(rewritten, expected, row.name)
 				end
 			end
-			helpers.assert_true(replayed >= 3, "the POSIX paths.toml vectors replay")
+			helpers.assert_true(replayed >= 10, "the POSIX paths.toml vectors replay")
+		end)
+
+		helpers.it("rewrites a value the boot TOML reader decodes to the new folder (legacy-folder-migration-toml)", function()
+			-- The boot reader decodes quoted keys, literal strings and escapes: a
+			-- rewrite that matched a narrower spelling left such a locator naming
+			-- the old folder after it moved.
+			local Codec = require("toml_codec.codec")
+			local checked = 0
+			for _, row in ipairs(corpus.paths_text) do
+				if row.os ~= "windows" and type(row.expected) == "string" then
+					local decoded = assert(Codec.decode(row.expected), row.name .. " decodes")
+					for _, rule in ipairs(row.rewrites) do
+						local value = decoded[rule.key]
+						local base = rule.under or rule.new
+						if type(value) == "string" and value ~= "" then
+							helpers.assert_true(value:sub(1, #base) == base or value:sub(1, #rule.new) == rule.new,
+								row.name .. ": " .. rule.key .. " decodes to the new folder, not " .. value)
+							checked = checked + 1
+						end
+					end
+				end
+			end
+			helpers.assert_true(checked >= 7, "every rewritten POSIX vector is read back")
 		end)
 
 		helpers.it("keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)", function()
 			local files = { ["/r/paths.toml"] = 'ConfigDirPath = "/h/old/"\n' }
+			local refuse = {}
 			local ports = {
 				exists = function(path) return files[path] ~= nil end,
 				read = function(path) return files[path] end,
-				write = function(path, text) files[path] = text; return true end,
+				write = function(path, text)
+					if refuse[path] then
+						-- A refused write may already have truncated its own file.
+						files[path] = text:sub(1, 3)
+						return false
+					end
+					files[path] = text
+					return true
+				end,
+				rename = function(from, to)
+					if files[to] ~= nil or files[from] == nil then return nil, "refused" end
+					files[to], files[from] = files[from], nil
+					return true
+				end,
+				replace = function(from, to)
+					if files[from] == nil then return false end
+					files[to], files[from] = files[from], nil
+					return true
+				end,
+				remove = function(path) local had = files[path] ~= nil; files[path] = nil; return had end,
 			}
+			local old_text = 'ConfigDirPath = "/h/old/"\n'
 			local rewrites = { { key = "ConfigDirPath", old = { "/h/old" }, new = "/r/config" } }
 			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "rewritten")
-			helpers.assert_eq(files["/r/paths.toml.bak"], 'ConfigDirPath = "/h/old/"\n', "backup holds the old text")
+			helpers.assert_eq(files["/r/paths.toml.bak"], old_text, "backup holds the old text")
 			helpers.assert_eq(files["/r/paths.toml"], 'ConfigDirPath = "/r/config/"\n', "file names the new folder")
-			files["/r/paths.toml"] = 'ConfigDirPath = "/h/old/"\n'
-			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "backup_refused",
-				"an existing backup is never replaced")
-			helpers.assert_eq(files["/r/paths.toml"], 'ConfigDirPath = "/h/old/"\n', "nothing rewritten without a backup")
+			files["/r/paths.toml"] = 'ConfigDirPath = "/h/old/" # other\n'
+			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "backup_taken",
+				"a backup holding other text is never replaced")
+			helpers.assert_eq(files["/r/paths.toml"], 'ConfigDirPath = "/h/old/" # other\n',
+				"nothing rewritten without a backup")
+			files["/r/paths.toml"] = old_text
+			refuse["/r/paths.toml.migration-stage"] = true
+			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "write_refused",
+				"a refused write is reported as such, not as a backup refusal")
+			helpers.assert_eq(files["/r/paths.toml"], old_text, "a refused write never truncates the file")
+			helpers.assert_eq(files["/r/paths.toml.migration-stage"], nil, "its stage is removed")
+			refuse["/r/paths.toml.migration-stage"] = nil
+			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "rewritten",
+				"the next boot reuses the backup an interrupted one left with the same text")
 			helpers.assert_eq(Migration.rewrite_paths_file("/r/none.toml", rewrites, ".bak", ports), "absent")
+		end)
+
+		helpers.it("keeps a destination published after its check (legacy-folder-migration-race)", function()
+			-- Another writer publishes the destination between the core's check and
+			-- its rename: the no-replace rename refuses, and the old entry must go to
+			-- the backup instead of being reported as kept beside a lost slot.
+			local ports, snapshot = M.memory_ports({ "/h/old/storage.json", "/h/new/" })
+			local rename = ports.rename
+			local raced = false
+			ports.rename = function(from, to)
+				if to == "/h/new/storage.json" and not raced then
+					raced = true
+					assert(ports.make_dir("/h/new/storage.json/"))
+				end
+				return rename(from, to)
+			end
+			local report = Migration.apply({ { from_dir = "/h/old", to_dir = "/h/new", backup_dir = "/h/new/bak/old" } },
+				ports)
+			helpers.assert_true(raced, "the destination arrived after the check")
+			helpers.assert_eq(#report.moved, 0, "nothing reported as moved over the new entry")
+			helpers.assert_eq(#report.backed_up, 1, "the old entry went to its backup")
+			helpers.assert_eq(#report.kept, 0, "nothing left behind")
+			local after = table.concat(snapshot(), " ")
+			helpers.assert_true(after:find("/h/new/bak/old/storage.json", 1, true) ~= nil, "the old entry is in the backup")
+			helpers.assert_true(after:find("/h/new/storage.json/", 1, true) ~= nil, "the newer entry is untouched")
+		end)
+
+		helpers.it("reports a folder it cannot list or remove (legacy-folder-migration-list-refused)", function()
+			local ports, snapshot = M.memory_ports({ "/h/old/storage.json", "/h/new/", "/h/gone/" })
+			local list = ports.list
+			ports.list = function(dir)
+				if dir == "/h/old" then return nil, "Permission denied" end
+				return list(dir)
+			end
+			ports.remove_empty_dir = function() return false end
+			local report = Migration.apply({
+				{ from_dir = "/h/old", to_dir = "/h/new", backup_dir = "/h/new/bak/old" },
+				{ from_dir = "/h/gone", to_dir = "/h/new", backup_dir = "/h/new/bak/gone" },
+			}, ports)
+			helpers.assert_eq(#report.kept, 2, "both refusals are reported")
+			helpers.assert_eq(report.kept[1].reason, "list_failed", "an unlistable folder is not an empty one")
+			helpers.assert_eq(report.kept[1].detail, "Permission denied", "the refusal says why")
+			helpers.assert_eq(report.kept[2].reason, "remove_failed", "an emptied folder left behind is reported")
+			helpers.assert_true(table.concat(snapshot(), " "):find("/h/old/storage.json", 1, true) ~= nil,
+				"the unlisted entry stays where it is")
+			local lines = {}
+			Migration.log_report({ info = function() end,
+				warn = function(_, fmt, ...) lines[#lines + 1] = fmt:format(...) end }, "test", report)
+			helpers.assert_true(lines[1]:find("could not be listed", 1, true) ~= nil, lines[1])
+		end)
+
+		helpers.it("leaves an old folder that is the new one under another name (legacy-folder-migration-alias)", function()
+			local ports, snapshot = M.memory_ports({ "/h/new/config.toml", "/h/other/x" })
+			-- /h/old is a link to /h/new, and /h/other/x a link to /h/new/x.
+			local aliases = { ["/h/old"] = "/h/new", ["/h/other/x"] = "/h/new/x" }
+			local exists = ports.exists
+			ports.exists = function(path) return aliases[path] ~= nil or exists(path) end
+			ports.same_object = function(a, b) return (aliases[a] or a) == (aliases[b] or b) end
+			ports.make_dir("/h/new/x/")
+			local report = Migration.apply({
+				{ from_dir = "/h/old", to_dir = "/h/new", backup_dir = "/h/new/bak/old" },
+				{ from = "/h/other/x", to = "/h/new/x", backup = "/h/new/bak/x" },
+			}, ports)
+			helpers.assert_true(table.concat(snapshot(), " "):find("/h/new/config.toml", 1, true) ~= nil,
+				"the live entry stays where it is")
+			helpers.assert_eq(#report.backed_up + #report.moved + #report.kept, 0, "nothing is archived or moved")
+			helpers.assert_eq(#report.aliased, 2, "both aliases are recognised")
 		end)
 
 		helpers.it("refuses a plan without its ports or its backup", function()
@@ -169,6 +292,7 @@ function M.run(helpers, shared_root)
 				backed_up = { { from = "/c", to = "/bak/c", taken = "/d" } },
 				kept = { { from = "/e", to = "/bak/e", reason = "backup_exists" } },
 				removed = { "/old" },
+				aliased = {},
 				paths_file = "rewritten",
 			})
 			helpers.assert_eq(#lines, 5, "one line per outcome")

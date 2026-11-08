@@ -42,7 +42,10 @@ local function load_host()
 	package.loaded["ui.log_openers"] = { open_today_log = function() return true end }
 	ctx.urls = {}
 	package.loaded["ui.ui_builder"] = {
-		force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end,
+		force_focus = function(_, _, lifecycle)
+			ctx.focused = (ctx.focused or 0) + 1
+			ctx.focus_owner = lifecycle.is_current
+		end,
 		open_http_url = function(url) ctx.urls[#ctx.urls + 1] = url; return true end,
 	}
 	ctx.Host = helpers.load_with_stubs("ui.update_check")
@@ -188,11 +191,17 @@ helpers.describe("update-check window (macOS host)", function()
 			local second = fake_owners(available)
 			helpers.assert_true(ctx.Host.open(second))
 			helpers.assert_eq(ctx.focused, 1, "the open window is focused")
+			local focus_owner = ctx.focus_owner
+			helpers.assert_true(focus_owner())
 			helpers.assert_eq(second.checked, { "dev" }, "the new menu session's owner checks")
 			local shown = #view.messages
 			late(available("dev"))
 			helpers.assert_eq(#view.messages, shown, "the replaced session's late answer is not shown")
 			helpers.assert_true(ctx.Host._session() ~= session, "the window has a new session")
+			ctx.Host._set_window(nil, nil)
+			helpers.assert_eq(focus_owner(), false, "closed window cannot receive a focus retry")
+			ctx.Host._set_window(fake_view(), nil)
+			helpers.assert_eq(focus_owner(), false, "replacement does not revive the old retry")
 			ctx.Host._set_window(nil, nil)
 		end)
 	end)

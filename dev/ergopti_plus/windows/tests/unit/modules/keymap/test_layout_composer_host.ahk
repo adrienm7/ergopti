@@ -43,7 +43,7 @@ _LCH_Deps(Dir, Log, Selected := "") {
 		"local_dir", LayoutRegistry_LocalDir(Dir),
 		"push", (Name, Payload) => Log.Push(Map("push", Name, "payload", Payload)),
 		"selected", () => State.Selected,
-		"select", (Id) => (Log.Push(Map("call", "select " . Id)), true),
+		"select_settled", (Id, OnDone) => (Log.Push(Map("call", "select " . Id)), OnDone.Call(true), true),
 		"after", (Id, Action, OnDone) => (Log.Push(Map("call", "after " . Id . " " . Action)),
 			OnDone.Call(true), 1),
 		"state", State
@@ -235,6 +235,33 @@ _LCH_SaveCase() {
 
 Test("layout composer: a refused save writes nothing and says why (layout-composer)", _LCH_RefusedSaveCase)
 
+; Regression (AHK-003 / WI-002): a pending selection is only a launch
+; acceptance. The composer publishes "used" when the reload commits, and a
+; refusal that follows the launch becomes a failed result, never used=true.
+Test("layout composer: save-and-use publishes used only at the terminal selection outcome (WI-002)",
+	_LCH_UseWaitsForTerminal)
+
+_LCH_UseWaitsForTerminal() {
+	for Outcome in ["commit", "refuse"] {
+		Dir := _LCH_TempDir()
+		try {
+			Log := [], Pending := {Done: 0}
+			Deps := _LCH_Deps(Dir, Log)
+			Deps["select_settled"] := (Id, OnDone) => (Pending.Done := OnDone, true)
+			LayoutComposer_Handle("composer_save", Map("declaration", _LCH_Declaration(),
+				"keylayout", _LCH_Text(), "use", 1), Deps)
+			AssertEqual(0, _LCH_Pushed(Log, "composerResult"), "launch acceptance alone publishes no result")
+			if Outcome == "commit"
+				Pending.Done.Call(true)
+			else
+				Pending.Done.Call(false, "the driver refused the layout handoff")
+			Result := _LCH_Pushed(Log, "composerResult")
+			AssertEqual(Outcome == "commit" ? 1 : 0, Result["ok"])
+			AssertEqual(Outcome == "commit" ? 1 : 0, Result["used"], "used follows the terminal outcome")
+		} finally DirDelete(Dir, true)
+	}
+}
+
 _LCH_RefusedSaveCase() {
 	Dir := _LCH_TempDir()
 	try {
@@ -366,3 +393,25 @@ Test("layout composer: an unselected save does not reload and publishes one succ
 
 Test("layout composer: an already selected save-use publishes one refused result (composer-refresh-refusal)",
 	_LCH_RefreshRefusal.Bind(true, true))
+
+
+_LCH_RemoveReloadRefusalOnce() {
+	Dir := _LCH_TempDir()
+	try {
+		Payload := Map("declaration", _LCH_Declaration(), "keylayout", _LCH_Text(), "use", 0)
+		LayoutComposer_Handle("composer_save", Payload, _LCH_Deps(Dir, []))
+		Log := []
+		Deps := _LCH_Deps(Dir, Log, "composed")
+		Deps["after"] := (Id, Action, Done) => (Done.Call(false), Done.Call(false), false)
+		AssertTrue(LayoutComposer_Handle("composer_remove", Map(), Deps))
+		Counts := Map("composerResult", 0, "updateState", 0)
+		for Row in Log
+			if Row.Has("push") && Counts.Has(Row["push"])
+				Counts[Row["push"]] += 1
+		AssertEqual(1, Counts["composerResult"], "one removal owns one terminal result")
+		AssertEqual(1, Counts["updateState"], "duplicate refusal signals cannot republish state")
+		AssertEqual(0, _LCH_Pushed(Log, "composerResult")["ok"])
+	} finally DirDelete(Dir, true)
+}
+Test("layout composer: removal settles reload refusal once (composer-remove-refusal-once)",
+	_LCH_RemoveReloadRefusalOnce)

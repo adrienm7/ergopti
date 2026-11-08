@@ -394,11 +394,16 @@ local function submit_data(owner, webview, method, data)
 	return executed and owner_is_current(owner)
 end
 
---- Pushes preferences through the exact current native owner.
+--- Pushes only preferences, preserving unsaved edits and the source snapshot.
 local function push_update_to_webview()
 	local owner, webview = _owner, _webview
 	if not owner_is_current(owner) or not webview then return end
-	submit_data(owner, webview, "updateData", load_js_data(_pending_mode))
+	submit_data(owner, webview, "updatePreferences", {
+		trigger_char = _prefs.trigger_char,
+		compact_view = _prefs.compact_view,
+		auto_close = _prefs.auto_close,
+		default_section = _prefs.default_section,
+	})
 end
 
 
@@ -423,6 +428,9 @@ local function handle_message(msg, owner)
 	end
 
 	if action == "save" then
+		-- The page's automatic close follows its save without waiting for an
+		-- answer: until these bytes are committed, the draft lives only in the page.
+		owner.save_refused = true
 		local valid, reason = SaveValidation.validate(data)
 		if not valid then
 			if not owner.invalid_save_reported then
@@ -458,6 +466,7 @@ local function handle_message(msg, owner)
 		
 		if ok_write and written == true and type(committed_content) == "string" then
 			_source_snapshot = { status = "ok", content = committed_content }
+			owner.save_refused = false
 			local reload_ok, reloaded, reload_cause = xpcall(function()
 				if type(_keymap) ~= "table" or type(_keymap.reload_toml) ~= "function" then
 					return false, "the keymap reload API is unavailable"
@@ -496,10 +505,15 @@ local function handle_message(msg, owner)
 	end
 
 	if action == "save_pref" then
-		if type(data) == "table" and type(data.key) == "string" then
-			if data.key == "compact_view"    then _prefs.compact_view    = (data.value == true) end
-			if data.key == "auto_close"      then _prefs.auto_close      = (data.value == true) end
-			if data.key == "default_section" then _prefs.default_section = data.value end
+		if type(data) ~= "table" then return false end
+		local key, value = data.key, data.value
+		if (key == "compact_view" or key == "auto_close") and type(value) == "boolean" then
+			_prefs[key] = value
+		elseif key == "default_section" and (value == nil or type(value) == "string") then
+			_prefs.default_section = value
+		else
+			Logger.warn(LOG, "Hotstring editor preference message was malformed; no change applied.")
+			return false
 		end
 		invoke_controller("Hotstring preference update", _update_pref, data)
 		return
@@ -511,8 +525,15 @@ local function handle_message(msg, owner)
 		return
 	end
 
-	if action == "close" then 
-		M.close() 
+	if action == "close" then
+		-- Only the shortcut auto-close sends this, right after its save. Closing on
+		-- a refused save would destroy the only copy of the draft (audit MVB-002):
+		-- the window stays open with the entry the user can save again.
+		if owner.save_refused then
+			Logger.warn(LOG, "Hotstring editor kept open: its last save was refused, the draft would be lost.")
+			return false
+		end
+		M.close()
 	end
 end
 

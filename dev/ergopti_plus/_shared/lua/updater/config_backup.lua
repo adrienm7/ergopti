@@ -36,7 +36,20 @@ M.SCHEMA_VERSION = 1
 -- A backup id is a folder name; a release tag inside it keeps only these bytes.
 local TAG_SAFE = "[^%w%._%-]"
 local STAMP_PATTERN = "^%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$"
+local ISO_PATTERN = "^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$"
 local ROOT_ID_PATTERN = "^[a-z][a-z_]*$"
+
+--- A backup timestamp is a real UTC civil time, not merely sortable text.
+local function valid_iso(value)
+	if type(value) ~= "string" or not value:match(ISO_PATTERN) then return false end
+	local year, month, day, hour, minute, second = value:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)T(%d%d):(%d%d):(%d%d)Z$")
+	year, month, day = tonumber(year), tonumber(month), tonumber(day)
+	hour, minute, second = tonumber(hour), tonumber(minute), tonumber(second)
+	if year < 1 or month < 1 or month > 12 or hour > 23 or minute > 59 or second > 60 then return false end
+	local days = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+	if month == 2 and (year % 400 == 0 or (year % 4 == 0 and year % 100 ~= 0)) then days[2] = 29 end
+	return day >= 1 and day <= days[month]
+end
 
 
 
@@ -139,6 +152,14 @@ local function included(rules, name)
 	return false
 end
 
+--- Only compare identities represented exactly on every supported Lua runtime.
+local function valid_identity(identity)
+	local function component(value)
+		return type(value) == "number" and value >= 0 and value < 9007199254740992 and value % 1 == 0
+	end
+	return type(identity) == "table" and component(identity.dev) and component(identity.ino)
+end
+
 
 
 
@@ -152,8 +173,13 @@ end
 --- Creates the backup owner of one driver.
 --- @param options table {
 ---   rules = M.rules() result,
----   roots = array of { id, dir } (the first holds the backups) or { id, file },
+---   roots = array of { id, dir } (the first holds the backups), { id, file }, or
+---           { id, name, port = { read() -> content|nil, status ("absent" or an
+---           error), replace(content) -> true|nil, err } } for settings a driver
+---           keeps in a native store rather than a file (the macOS API entries),
 ---   io = { list(dir) -> entries|nil, err (entries: { name, kind = "file"|"dir"|"other" }),
+---          directory_status(path) -> "present"|"absent"|"error", detail,
+---          directory_identity(path) -> { dev, ino }|nil, err,
 ---          read(path) -> content|nil, status ("absent" or an error),
 ---          make_dir(path) -> true|nil, err, create(path, content) -> true|nil, err
 ---          (create-only), replace(path, content) -> true|nil, err (atomic) },
@@ -166,7 +192,9 @@ function M.new(options)
 	assert(type(options.roots) == "table" and #options.roots > 0, "config_backup needs its roots")
 	local io_port, json, clock = options.io, options.json, options.clock
 	assert(type(io_port) == "table" and type(io_port.list) == "function" and type(io_port.read) == "function"
-		and type(io_port.make_dir) == "function" and type(io_port.create) == "function"
+		and type(io_port.make_dir) == "function" and type(io_port.make_dir_exclusive) == "function" and type(io_port.create) == "function"
+		and type(io_port.directory_status) == "function"
+		and type(io_port.directory_identity) == "function"
 		and type(io_port.replace) == "function", "config_backup needs its file ports")
 	assert(type(json) == "table" and type(json.encode) == "function" and type(json.decode) == "function",
 		"config_backup needs a JSON codec")
@@ -179,10 +207,17 @@ function M.new(options)
 	for index, root in ipairs(options.roots) do
 		assert(type(root) == "table" and type(root.id) == "string" and root.id:match(ROOT_ID_PATTERN)
 			and not by_id[root.id], "config_backup roots need distinct ids")
+		local is_port = type(root.port) == "table"
 		assert((type(root.dir) == "string" and root.dir:sub(1, 1) == "/")
-			or (type(root.file) == "string" and root.file:sub(1, 1) == "/"), "config_backup roots are absolute")
+			or (type(root.file) == "string" and root.file:sub(1, 1) == "/")
+			or (is_port and type(root.port.read) == "function" and type(root.port.replace) == "function"
+				and type(root.name) == "string" and contained(root.name) and not root.name:find("/", 1, true)),
+			"config_backup roots are absolute folders or files, or named native ports")
 		assert(index > 1 or root.dir ~= nil, "the first config_backup root is the configuration folder")
-		local entry = { id = root.id, dir = root.dir and (root.dir:gsub("/+$", "")) or nil, file = root.file }
+		local dir = root.dir and (root.dir:gsub("/+$", "")) or nil
+		if dir == "" then dir = "/" end
+		local entry = { id = root.id, dir = dir, file = root.file,
+			name = is_port and root.name or nil, port = is_port and root.port or nil }
 		roots[#roots + 1] = entry
 		by_id[root.id] = entry
 	end
@@ -206,6 +241,12 @@ function M.new(options)
 				if relative == "" and err == "absent" then return files, nil, skipped end
 				return nil, "cannot list " .. dir .. ": " .. tostring(err), skipped
 			end
+			local present = {}
+			if relative == "" then
+				for _, entry in ipairs(entries) do
+					if type(entry.name) == "string" then present[entry.name] = true end
+				end
+			end
 			table.sort(entries, function(a, b) return a.name < b.name end)
 			for _, entry in ipairs(entries) do
 				local name = entry.name
@@ -213,7 +254,28 @@ function M.new(options)
 				if type(name) ~= "string" or not contained(name) then
 					return nil, "unexpected entry name in " .. dir, skipped
 				elseif entry.kind == "dir" then
-					if not (relative == "" and rules.excluded[name]) then pending[#pending + 1] = path end
+					local excluded = relative == "" and rules.excluded[name] == true
+					if relative == "" and not excluded then
+						for canonical in pairs(rules.excluded) do
+							if not present[canonical] and name:lower() == canonical:lower() then
+								local status, detail = io_port.directory_status(join(root.dir, canonical))
+								if status == "present" then
+									local actual, actual_err = io_port.directory_identity(join(root.dir, name))
+									local expected, expected_err = io_port.directory_identity(join(root.dir, canonical))
+									if not valid_identity(actual) or not valid_identity(expected) then
+										return nil, "cannot establish excluded folder identity: "
+											.. tostring(actual_err or expected_err), skipped
+									end
+									if actual.dev == expected.dev and actual.ino == expected.ino then excluded = true; break end
+									status = "absent" -- the probed directory is a distinct entry
+								end
+								if status ~= "absent" then
+									return nil, "cannot classify excluded folder " .. canonical .. ": " .. tostring(detail), skipped
+								end
+							end
+						end
+					end
+					if not excluded then pending[#pending + 1] = path end
 				elseif entry.kind == "file" then
 					if included(rules, name) then files[#files + 1] = { root = root.id, path = path } end
 				else
@@ -229,7 +291,7 @@ function M.new(options)
 	--- @param file string
 	--- @return boolean
 	local function inside_config(file)
-		local prefix = roots[1].dir .. "/"
+		local prefix = NativePath.with_trailing_separator(roots[1].dir)
 		return file:sub(1, #prefix) == prefix
 	end
 
@@ -252,6 +314,13 @@ function M.new(options)
 					end
 					entries[#entries + 1] = { root = root.id, path = file.path, source = source, content = content }
 				end
+			elseif root.port then
+				local content, status = root.port.read()
+				if type(content) == "string" then
+					entries[#entries + 1] = { root = root.id, path = root.name, source = root.id, content = content }
+				elseif status ~= "absent" then
+					return nil, "cannot read " .. root.id .. ": " .. tostring(status), skipped
+				end
 			elseif not inside_config(root.file) then
 				local content, status = io_port.read(root.file)
 				if content ~= nil then
@@ -273,6 +342,7 @@ function M.new(options)
 		local root = by_id[root_id]
 		if not root or not contained(path) then return nil end
 		if root.dir then return join(root.dir, path) end
+		if root.port then return root.name == path and root or nil end
 		return NativePath.basename(root.file) == path and root.file or nil
 	end
 
@@ -288,7 +358,7 @@ function M.new(options)
 		Logger.start(LOG, "Backing up the configuration (%s)…", kind)
 		local time = clock()
 		if type(time) ~= "table" or type(time.stamp) ~= "string" or not time.stamp:match(STAMP_PATTERN)
-			or type(time.iso) ~= "string" then
+			or not valid_iso(time.iso) then
 			Logger.error(LOG, "Configuration backup refused: the clock gave no usable time.")
 			return nil, "clock"
 		end
@@ -308,13 +378,37 @@ function M.new(options)
 			Logger.error(LOG, "Configuration backup refused: cannot create %s: %s.", folder, tostring(make_err))
 			return nil, "cannot create " .. folder
 		end
-		-- Two backups within one second get distinct folders: the manifest's
-		-- create-only write refuses an existing one.
-		local base, suffix, path = id, 1, join(folder, id)
-		while io_port.read(join(path, rules.manifest)) ~= nil or (io_port.list(path)) ~= nil do
-			suffix = suffix + 1
-			id = base .. "-" .. suffix
-			path = join(folder, id)
+		-- Keep collision suffixes monotonic even when an older backup was removed.
+		local base = id
+		local siblings, list_err = io_port.list(folder)
+		if not siblings then
+			Logger.error(LOG, "Configuration backup refused: cannot list its backup folder.")
+			return nil, "cannot list " .. folder .. ": " .. tostring(list_err)
+		end
+		local highest
+		for _, sibling in ipairs(siblings) do
+			local name = sibling.name
+			local suffix = type(name) == "string" and name:sub(1, #base + 1) == base .. "-"
+				and name:sub(#base + 2):match("^[1-9]%d*$") or nil
+			if name == base then suffix = "1" end
+			if suffix and (not highest or #suffix > #highest or (#suffix == #highest and suffix > highest)) then
+				highest = suffix
+			end
+		end
+		if highest then
+			local carry, digits = 1, {}
+			for index = #highest, 1, -1 do
+				local digit = tonumber(highest:sub(index, index)) + carry
+				if digit >= 10 then digit, carry = digit - 10, 1 else carry = 0 end
+				digits[index] = tostring(digit)
+			end
+			id = base .. "-" .. (carry == 1 and "1" or "") .. table.concat(digits)
+		end
+		local path = join(folder, id)
+		local path_ok, path_err = io_port.make_dir_exclusive(path)
+		if not path_ok then
+			Logger.error(LOG, "Configuration backup refused: cannot create %s: %s.", path, tostring(path_err))
+			return nil, "cannot create " .. path
 		end
 		local manifest_files = {}
 		for _, entry in ipairs(entries) do
@@ -347,10 +441,15 @@ function M.new(options)
 			Logger.error(LOG, "Configuration backup failed encoding its manifest: %s.", tostring(encode_err))
 			return nil, "cannot encode the manifest"
 		end
-		local wrote, manifest_err = io_port.create(join(path, rules.manifest), encoded)
+		local manifest_path = join(path, rules.manifest)
+		local wrote, manifest_err = io_port.create(manifest_path, encoded)
 		if not wrote then
 			Logger.error(LOG, "Configuration backup failed writing its manifest: %s.", tostring(manifest_err))
 			return nil, "cannot write the manifest"
+		end
+		if io_port.read(manifest_path) ~= encoded then
+			Logger.error(LOG, "Configuration backup failed: its manifest does not read back as written.")
+			return nil, "verification failed for the manifest"
 		end
 		record.path = path
 		Logger.success(LOG, "Configuration backed up to %s (%d file(s)).", path, #manifest_files)
@@ -369,16 +468,42 @@ function M.new(options)
 		local record, decode_err = json.decode(raw)
 		if type(record) ~= "table" or decode_err then return nil, "unreadable manifest" end
 		if record.schema_version ~= M.SCHEMA_VERSION or record.id ~= id
-			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil then
+			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil
+			or not valid_iso(record.created_at)
+			or type(record.tag) ~= "string" or type(record.from_version) ~= "string" then
 			return nil, "unexpected manifest"
 		end
-		for _, file in ipairs(record.files) do
+		local count = 0
+		for index in pairs(record.files) do
+			if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return nil, "unexpected manifest" end
+			count = count + 1
+		end
+		local seen = {}
+		for index = 1, count do
+			local file = record.files[index]
 			if type(file) ~= "table" or not target(file.root, file.path) then
 				return nil, "manifest names a file outside the configuration"
 			end
+			local identity = file.root .. "\0" .. file.path
+			if seen[identity] then return nil, "manifest repeats a configuration file" end
+			seen[identity] = true
 		end
 		record.path = path
 		return record, nil
+	end
+
+	--- Compare collision suffixes as decimal strings, without integer overflow.
+	local function newer(left, right)
+		if left.created_at ~= right.created_at then return left.created_at > right.created_at end
+		if left.tag == right.tag then
+			local left_base, left_suffix = left.id:match("^(.*)%-([1-9]%d*)$")
+			local right_base, right_suffix = right.id:match("^(.*)%-([1-9]%d*)$")
+			if left_base and left_base == right_base then
+				if #left_suffix ~= #right_suffix then return #left_suffix > #right_suffix end
+				return left_suffix > right_suffix
+			end
+		end
+		return left.id > right.id
 	end
 
 	--- The newest complete backup of one kind, or nil when there is none.
@@ -389,19 +514,30 @@ function M.new(options)
 		assert(prefix ~= nil, "unknown config_backup kind")
 		local entries = io_port.list(folder)
 		if entries == nil then return nil end
-		local best = nil
+		local candidates = {}
 		for _, entry in ipairs(entries) do
 			local name = entry.name
 			if entry.kind == "dir" and type(name) == "string" and name:sub(1, #prefix + 1) == prefix .. "-" then
 				local record = load(name)
-				if record and record.kind == kind
-					and (best == nil or tostring(record.created_at) > tostring(best.created_at)
-						or (record.created_at == best.created_at and record.id > best.id)) then
-					best = record
-				end
+				if record and record.kind == kind then candidates[#candidates + 1] = record end
 			end
 		end
-		return best
+		while #candidates > 0 do
+			local best = 1
+			for index = 2, #candidates do
+				if newer(candidates[index], candidates[best]) then best = index end
+			end
+			local record = table.remove(candidates, best)
+			local complete = true
+			for _, file in ipairs(record.files) do
+				if io_port.read(join(record.path, file.root .. "/" .. file.path)) == nil then
+					complete = false
+					break
+				end
+			end
+			if complete then return record end
+		end
+		return nil
 	end
 
 	--- Puts a backup back: backs the current configuration up first, checks
@@ -434,14 +570,24 @@ function M.new(options)
 		end
 		for index, file in ipairs(record.files) do
 			local destination = target(file.root, file.path)
-			local dir_ok, dir_err = io_port.make_dir(parent(destination))
-			local written, write_err = false, dir_err
-			if dir_ok then written, write_err = io_port.replace(destination, copies[index]) end
-			-- POSIX renames by name and neither OS denies a same-user process the
-			-- staging name, so a swap before the rename cannot be refused. Reading
-			-- the file back is what keeps a substituted file from reporting success.
-			if written and io_port.read(destination) ~= copies[index] then
-				written, write_err = false, "the published file does not hold the restored bytes"
+			local written, write_err = false, nil
+			if type(destination) == "table" then
+				-- A native port: written back, and read back, through its owner.
+				written, write_err = destination.port.replace(copies[index])
+				if written and destination.port.read() ~= copies[index] then
+					written, write_err = false, "the native store does not hold the restored value"
+				end
+				destination = destination.id
+			else
+				local dir_ok, dir_err = io_port.make_dir(parent(destination))
+				write_err = dir_err
+				if dir_ok then written, write_err = io_port.replace(destination, copies[index]) end
+				-- POSIX renames by name and neither OS denies a same-user process the
+				-- staging name, so a swap before the rename cannot be refused. Reading
+				-- the file back is what keeps a substituted file from reporting success.
+				if written and io_port.read(destination) ~= copies[index] then
+					written, write_err = false, "the published file does not hold the restored bytes"
+				end
 			end
 			if not written then
 				Logger.error(LOG, "Restore failed writing %s: %s; the replaced configuration is in %s.",

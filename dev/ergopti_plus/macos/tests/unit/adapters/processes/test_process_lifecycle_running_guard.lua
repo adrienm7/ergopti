@@ -62,14 +62,17 @@ local function load_adapter(options)
 				if options.start_throws_once and ctx.start_calls == 1 then
 					error("native start failed")
 				end
+				if options.start_returns_true_once and ctx.start_calls == 1 then return true end
 				return self
 			end
 			function candidate:stop()
 				ctx.stop_calls = ctx.stop_calls + 1
+				if options.stop_error_object and ctx.stop_calls == 1 then error(options.stop_error_object) end
 				if options.stop_throws_once and ctx.stop_calls == 1 then
 					error("native stop failed")
 				end
 				if options.stop_returns_nil_once and ctx.stop_calls == 1 then return nil end
+				if options.stop_returns_true_once and ctx.stop_calls == 1 then return true end
 				return self
 			end
 			return candidate
@@ -94,13 +97,18 @@ local function load_adapter(options)
 								error("native subscribe failed")
 							end
 							if options.subscribe_returns_nil_once and ctx.subscribe_calls == 1 then return nil end
+							if options.subscribe_returns_true_once and ctx.subscribe_calls == 1 then return true end
 							return self
 						end,
 						unsubscribeAll = function(self)
 							ctx.unsubscribe_calls = ctx.unsubscribe_calls + 1
+							if options.unsubscribe_error_object and ctx.unsubscribe_calls == 1 then
+								error(options.unsubscribe_error_object)
+							end
 							if options.unsubscribe_throws_once and ctx.unsubscribe_calls == 1 then
 								error("native unsubscribe failed")
 							end
+							if options.unsubscribe_returns_true_once and ctx.unsubscribe_calls == 1 then return true end
 							return self
 						end,
 					}
@@ -113,6 +121,105 @@ local function load_adapter(options)
 end
 
 helpers.describe("process_lifecycle: native ownership is transactional", function()
+	helpers.it("keeps both watcher cleanup debts if native error formatting raises (process-stop-error-object)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		local adapter, ctx = load_adapter({ stop_error_object = hostile, unsubscribe_error_object = hostile })
+		adapter.onFocusChange(function() end)
+		helpers.assert_true(adapter.start())
+		helpers.assert_eq(adapter.stop(), false)
+		helpers.assert_eq(ctx.stop_calls, 1)
+		helpers.assert_eq(ctx.unsubscribe_calls, 1, "a failed diagnostic must not skip sibling cleanup")
+		helpers.assert_true(adapter.stop())
+		helpers.assert_eq(ctx.stop_calls, 2)
+		helpers.assert_eq(ctx.unsubscribe_calls, 2)
+	end)
+
+	helpers.it("requires the exact watcher and filter receipts (process-lifecycle-exact-receipt)", function()
+		for _, case in ipairs({
+			{ option = "start_returns_true_once", start = true },
+			{ option = "subscribe_returns_true_once", start = true, focus = true },
+			{ option = "stop_returns_true_once" },
+			{ option = "unsubscribe_returns_true_once", focus = true },
+		}) do
+			local adapter, ctx = load_adapter({ [case.option] = true })
+			if case.focus then adapter.onFocusChange(function() end) end
+			if case.start then
+				helpers.assert_eq(adapter.start(), false, case.option .. " cannot prove activation")
+				helpers.assert_true(adapter.start(), "settled rollback permits a new start")
+			else
+				helpers.assert_true(adapter.start())
+				helpers.assert_eq(adapter.stop(), false, case.option .. " cannot prove cleanup")
+			end
+			helpers.assert_true(adapter.stop(), "the exact cleanup remains retryable")
+			helpers.assert_true(#ctx.errors >= 1)
+		end
+	end)
+
+	helpers.it("defers subscribers registered during dispatch to the next event (process-event-subscription)", function()
+		for _, event in ipairs({
+			{ method = "onAppLaunch", code = 1 },
+			{ method = "onAppQuit", code = 2 },
+			{ method = "onAppActivate", code = 3 },
+			{ method = "onFocusChange", focus = true },
+		}) do
+			local adapter, ctx = load_adapter()
+			local registered, newcomer_calls = false, 0
+			adapter[event.method](function()
+				if not registered then
+					registered = true
+					adapter[event.method](function() newcomer_calls = newcomer_calls + 1 end)
+				end
+			end)
+			helpers.assert_true(adapter.start())
+			local function deliver()
+				if event.focus then
+					ctx.filter_callbacks[1]({ application = function() return nil end, title = function() return "" end })
+				else
+					ctx.callbacks[1]("App", event.code, {})
+				end
+			end
+			deliver()
+			helpers.assert_eq(newcomer_calls, 0, event.method .. " delivered an event predating subscription")
+			deliver()
+			helpers.assert_eq(newcomer_calls, 1, event.method .. " missed the next event")
+			helpers.assert_true(adapter.stop())
+		end
+	end)
+
+	helpers.it("stops dispatching a retired event after subscriber restart (process-event-reentry)", function()
+		for _, event in ipairs({
+			{ method = "onAppLaunch", code = 1 },
+			{ method = "onAppQuit", code = 2 },
+			{ method = "onAppActivate", code = 3 },
+			{ method = "onFocusChange", focus = true },
+		}) do
+			local adapter, ctx = load_adapter()
+			local restarted, sibling_calls = false, 0
+			adapter[event.method](function()
+				if not restarted then
+					restarted = true
+					helpers.assert_true(adapter.stop())
+					helpers.assert_true(adapter.start())
+				end
+			end)
+			adapter[event.method](function() sibling_calls = sibling_calls + 1 end)
+			helpers.assert_true(adapter.start())
+			local function deliver(index)
+				if event.focus then
+					ctx.filter_callbacks[index]({ application = function() return nil end, title = function() return "" end })
+				else
+					ctx.callbacks[index]("App", event.code, {})
+				end
+			end
+			deliver(1)
+			helpers.assert_eq(sibling_calls, 0, event.method .. " delivered a retired event")
+			deliver(2)
+			helpers.assert_eq(sibling_calls, 1, event.method .. " lost the successor event")
+			helpers.assert_true(adapter.stop())
+		end
+	end)
+
+
 	helpers.it("retries after a watcher start throw (process-lifecycle-start-retry)", function()
 		local adapter, ctx = load_adapter({ start_throws_once = true })
 
@@ -218,6 +325,19 @@ end)
 -- ===========================================================
 
 helpers.describe("process_lifecycle: subscriber errors stay visible", function()
+	helpers.it("continues sibling delivery when a subscriber error cannot be formatted (process-callback-error-object)", function()
+		local adapter, ctx = load_adapter()
+		local hostile = setmetatable({}, { __tostring = function() error("formatting failed") end })
+		local healthy_calls = 0
+		adapter.onAppActivate(function() error(hostile) end)
+		adapter.onAppActivate(function() healthy_calls = healthy_calls + 1 end)
+		helpers.assert_true(adapter.start())
+		ctx.callbacks[1]("Safari", 3, {})
+		helpers.assert_eq(healthy_calls, 1)
+		helpers.assert_contains(ctx.errors[1], "error object (table)")
+		helpers.assert_true(adapter.stop())
+	end)
+
 	helpers.it("logs one throwing subscriber and continues healthy siblings (process-lifecycle-callback-visible)", function()
 		local adapter, ctx = load_adapter()
 		local healthy_calls = 0

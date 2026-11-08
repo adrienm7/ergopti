@@ -23,7 +23,8 @@
 --- verifies and installs it through the updater manager's update path and
 --- restarts the daemon on it. Each phase is pushed as install_progress. The
 --- restore banner posts restore_backup; the daemon restarts on the restored
---- configuration.
+--- configuration. An installed release whose daemon restart is refused waits
+--- (restart_pending): the page and the About menu offer to restart on it.
 --- ==============================================================================
 
 local M = {}
@@ -63,6 +64,8 @@ local _sources = nil
 local _last_list = nil
 -- The one install session of this window (created on the first request).
 local _install_session = nil
+-- The tray menu's redraw, told when a release starts or stops waiting for its restart.
+local _pending_observer = nil
 local _failure_contract = nil
 local _daemon_state = nil
 local _page_epoch, _page_document = nil, nil
@@ -180,10 +183,8 @@ load_sources = function()
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
-	local handle = io.open(path, "rb")
-	if not handle then return nil, "shared updater defaults are unreadable" end
-	local raw = handle:read("*a")
-	handle:close()
+	local raw, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" then return nil, "shared updater defaults are unreadable" end
 	local ok_json, decoded = pcall(Json.decode, raw)
 	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
 	local sources, err = ReleaseSources.resolve(decoded)
@@ -200,7 +201,13 @@ end
 --- @param callback function Receives status, body, err.
 local function default_http_get(url, headers, timeout_ms, callback)
 	local HttpClient = require("adapters.http_client")
-	HttpClient.get(url, headers, {
+	local completed = false
+	local function finish(status, body, err)
+		if completed then return end
+		completed = true
+		callback(status, body, err)
+	end
+	local started = HttpClient.get(url, headers, {
 		owner = HTTP_OWNER,
 		timeout_ms = timeout_ms,
 		max_body_bytes = MAX_CHANGELOG_BYTES,
@@ -208,8 +215,9 @@ local function default_http_get(url, headers, timeout_ms, callback)
 		https_only = true,
 	}, function(result)
 		result = type(result) == "table" and result or {}
-		callback(result.status, result.body, result.ok == true and nil or result.error)
+		finish(result.status, result.body, result.ok == true and nil or result.error)
 	end)
+	if started == false then finish(nil, nil, "HTTP request refused") end
 end
 
 --- Default page channel: the host->page response hook of the shared UI.
@@ -260,6 +268,7 @@ function M.start_fetch(channel)
 		return M._push(payload, document)
 	end
 	if not fetch_current() then return generation end
+	_last_list = nil
 	if not registry_channel(channel) then
 		Logger.error(LOG, "Refused a release fetch for a channel outside the registry.")
 		push({ action = "releases_error", error_key = "changelog_window.error_network" })
@@ -393,6 +402,8 @@ function M._install_context()
 		installed = Version.VERSION,
 		blocked_key = blocked or "",
 		backup = restorable_backup(),
+		-- An installed release whose daemon restart was refused, for a window opened later.
+		pending = _install_session and _install_session.pending() or nil,
 	}
 end
 
@@ -593,6 +604,9 @@ local function install_session()
 			end
 			return restart(accepted and accepted.tag or Parser.parse_tag(chunk)) == true
 		end,
+		pending_changed = function()
+			if _pending_observer then _pending_observer() end
+		end,
 		report = function(message, retained_owner)
 			local payload = { action = "install_progress" }
 			for key, value in pairs(message) do payload[key] = value end
@@ -625,11 +639,39 @@ local function restore(id)
 		return { action = "restore_progress", phase = "failed", reason_key = key,
 			backup_path = pre and pre.path or nil }
 	end
+	local backup_path = pre and pre.path or nil
 	local restart = type(_daemon_state) == "table" and _daemon_state.restart or nil
-	if type(restart) ~= "function" or restart("configuration restored") ~= true then
-		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it.")
+	local called, accepted = false, nil
+	if type(restart) == "function" then called, accepted = pcall(restart, "configuration restored") end
+	if not called or accepted ~= true then
+		-- The disk stays restored, but the old daemon keeps running: only an
+		-- accepted restart may promise one. Same failure report as Windows/macOS.
+		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it: %s.",
+			tostring(accepted))
+		return { action = "restore_progress", phase = "failed", backup_path = backup_path,
+			reason_key = "changelog_window.restore_error_unexpected" }
 	end
-	return { action = "restore_progress", phase = "restored", backup_path = pre and pre.path or nil }
+	return { action = "restore_progress", phase = "restored", backup_path = backup_path }
+end
+
+--- The installed release that waits for a daemon restart that was refused.
+--- @return table|nil { tag, backup_path }
+function M.pending_install()
+	return _install_session and _install_session.pending() or nil
+end
+
+--- Asks again for the restart that completes the held release (the tray row).
+--- @return boolean accepted
+function M.complete_pending_install()
+	return _install_session ~= nil and _install_session.complete_restart() == true
+end
+
+--- Names the tray menu's redraw, so its completing row appears and goes away
+--- with the held release. A later menu build replaces the previous redraw.
+--- @param observer function
+function M.set_pending_install_observer(observer)
+	assert(type(observer) == "function", "the held-install observer must be a function")
+	_pending_observer = observer
 end
 
 --- Clears cached state; used by tests.
@@ -638,6 +680,7 @@ function M._reset()
 	_sources = nil
 	_last_list = nil
 	_install_session = nil
+	_pending_observer = nil
 	_daemon_state = nil
 	_page_epoch, _page_document = nil, nil
 	M._config_backup = nil
@@ -705,7 +748,19 @@ function M.on_message(payload, state, context)
 
 	-- Only this click installs a chosen release: nothing else calls the session.
 	if action == "install_release" then
+		if _last_list == nil then
+			local reason = _install_session and _install_session.busy() and ReleaseInstall.REASON.busy
+				or ReleaseInstall.REASON.unknown_release
+			return { action = "install_progress", tag = payload.tag, phase = "failed",
+				reason_key = reason }
+		end
 		install_session().install(payload.tag, payload.channel)
+		return nil
+	end
+
+	-- « Restart now » of an installed release whose daemon restart was refused.
+	if action == "complete_install_restart" then
+		if _install_session then _install_session.complete_restart() end
 		return nil
 	end
 

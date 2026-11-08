@@ -293,9 +293,19 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 				assert(mode == nil or mode == "r" or mode == "rb", "foreign filesystem writes forbidden")
 				return previous_open(path, mode)
 			end
+			-- The save owner creates its attachment through the exclusive file owner.
+			local previous_files = package.loaded["adapters.file_system"]
+			package.loaded["adapters.file_system"] = setmetatable({
+				create_if_absent = function(path, text)
+					local fh = assert(io.open(path, "wb"))
+					assert(fh:write(text)); assert(fh:close())
+					return true
+				end,
+			}, { __index = previous_files })
 			local ok, approved = pcall(share_action, context, { action = "report",
 				text = "log at /Users/jdoe/Library/Logs by jdoe",
 				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } })
+			package.loaded["adapters.file_system"] = previous_files
 			io.open, hs.fs.attributes = previous_open, previous_attributes
 			package.loaded["adapters.shell_runner"] = previous_shell
 			helpers.assert_true(ok, tostring(approved))

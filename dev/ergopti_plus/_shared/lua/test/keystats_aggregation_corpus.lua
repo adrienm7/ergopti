@@ -111,6 +111,7 @@ M.READINGS = {
 	end,
 	switches_to_count = function(r) return count(r.batch.switches_to) end,
 	system_day_wifi_changes = function(r) return sum(r.batch.system_day, "wifi_changes") end,
+	system_day_night_wake_count = function(r) return sum(r.batch.system_day, "night_wake_count") end,
 	titles_count = function(r) return count(r.batch.titles) end,
 	titles_ms_total = function(r) return sum(r.batch.titles, "ms") end,
 	trigger_buckets_hs_count = function(r) return sum(r.batch.app_buckets, "hs_in_c") end,

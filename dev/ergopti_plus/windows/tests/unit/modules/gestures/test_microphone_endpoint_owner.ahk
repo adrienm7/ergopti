@@ -41,8 +41,11 @@ _MEOT_Source() {
 	Adapter := _MEOT_AdapterOwner()
 	Owner := _DriverProductionFileForSymbol("GestureSysMicMuteToggle", _DriverDir)
 	Text := FSReadStrict(Owner)
+	; The toggle compares the lifecycle transition it started under; no
+	; transition runs in this child, so the latest one stays the same.
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "#Include " . Adapter . "`n"
+		. "global _LifecycleLatestTransition := 0`n"
 	for Name in ["_GestureSys", "GestureSysMicMuteToggle"] {
 		Definition := _DriverExtractFunctionBody(&Text, Name)
 		AssertTrue(Definition != "", "The microphone child must retain its genuine public function: " . Name)

@@ -68,4 +68,29 @@ helpers.describe("WPM surface terminal hide", function()
 			end)
 		end
 	end)
+
+	helpers.it("(wpm-surface-pump) drains the widget's own events without a tray", function()
+		with_surface(function(surface)
+			local pending, iterations = 3, 0
+			local context = {
+				pending = function() return pending > 0 end,
+				iteration = function(_, blocking)
+					helpers.assert_eq(blocking, false)
+					pending, iterations = pending - 1, iterations + 1
+				end,
+			}
+			surface._set_binding_for_test({
+				Gtk = { Window = function() return setmetatable({
+					get_screen = function() return { get_rgba_visual = function() return nil end } end,
+					get_visible = function() return true end,
+				}, { __index = function() return function() end end }) end },
+				Gdk = { EventMask = { BUTTON_PRESS_MASK = 1, BUTTON_RELEASE_MASK = 2, POINTER_MOTION_MASK = 4 } },
+				GLib = { MainContext = { default = function() return context end } },
+			})
+			helpers.assert_eq(surface.pump(), 0, "no window, nothing to deliver")
+			helpers.assert_true(surface.draw({ width = 30, height = 20 }, 0, 0))
+			helpers.assert_eq(surface.pump(), 3)
+			helpers.assert_eq(iterations, 3)
+		end)
+	end)
 end)

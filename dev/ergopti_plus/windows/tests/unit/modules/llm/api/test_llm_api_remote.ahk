@@ -852,3 +852,33 @@ Test("_LLMRemoteExtractUsage: estimated cost is included in result map", _Remote
 
 
 #Include %A_LineFile%/../test_llm_api_remote_retirement.ahk
+
+_RemotePayload_RawHasNoSystem() {
+	for Fmt in ["openai", "anthropic", "gemini"] {
+		body := JsonParse(_LLMRemoteBuildPayload(Fmt, "model", "", "typed context", 0.2, 16))
+		if (Fmt == "gemini") {
+			AssertFalse(body.Has("systemInstruction"), "Gemini has no empty system instruction")
+			AssertEqual("typed context", body["contents"][1]["parts"][1]["text"])
+		} else {
+			AssertFalse(body.Has("system"), "Anthropic has no empty system field")
+			AssertEqual(1, body["messages"].Length, "only the user message remains")
+			AssertEqual("user", body["messages"][1]["role"])
+			AssertEqual("typed context", body["messages"][1]["content"])
+		}
+	}
+}
+Test("remote raw payload omits system instructions across providers", _RemotePayload_RawHasNoSystem)
+
+
+_RemoteUsage_OutputOnly(Format, Body) {
+	Usage := _LLMRemoteExtractUsage(Format, Body, "")
+	AssertEqual(0, Usage["prompt_tokens"])
+	AssertEqual(10, Usage["completion_tokens"])
+	AssertEqual(10, Usage["total_tokens"], "output tokens contribute even when the input count is zero")
+}
+Test("remote usage: OpenAI output-only total (remote-output-only-usage)",
+	_RemoteUsage_OutputOnly.Bind("openai", '{"usage":{"prompt_tokens":0,"completion_tokens":10}}'))
+Test("remote usage: Anthropic output-only total (remote-output-only-usage)",
+	_RemoteUsage_OutputOnly.Bind("anthropic", '{"usage":{"input_tokens":0,"output_tokens":10}}'))
+Test("remote usage: Gemini output-only total (remote-output-only-usage)",
+	_RemoteUsage_OutputOnly.Bind("gemini", '{"usageMetadata":{"promptTokenCount":0,"candidatesTokenCount":10}}'))

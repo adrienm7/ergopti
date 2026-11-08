@@ -4,8 +4,9 @@
 --- MODULE: Linux Menu Keyboard Layout Submenu
 --- DESCRIPTION:
 --- Builds the tray's keyboard layout submenu: the installed layouts with the
---- active one ticked, the custom layouts, the number-row policy and the pause
---- layout rows, with the notices a layout switch shows.
+--- active one ticked, the custom layouts, the desktop's input sources, the
+--- number-row policy and the pause layout rows, with the notices a layout
+--- switch shows.
 --- ==============================================================================
 
 local M = {}
@@ -126,6 +127,47 @@ local function _build_layouts(ctx)
 		end,
 	}
 
+	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- types over the session's XKB layout, its two layers and its four rows. A
+	-- change is stored, then the emulation reloads it at once.
+	local function emulation_changed(committed)
+		if not committed then show_error(i18n_safe("menu.layout.emulation_not_saved")) end
+		local reloaded = require("modules.keymap.layout_emulation").reload_if_started()
+		if committed and reloaded == false then show_error(i18n_safe("menu.layout.emulation_failed")) end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+	local EmulationRows = require("layouts.emulation_menu")
+	providers["layout_emulation"] = function()
+		local Preferences = require("infra.layout_emulation_preferences")
+		local Registry = require("modules.keymap.layout_registry")
+		return EmulationRows.choice_rows({
+			t = i18n_safe,
+			settings = Preferences.settings(),
+			status = require("modules.keymap.layout_emulation").status(),
+			snapshot = Registry.snapshot(),
+			choose = function(choice) emulation_changed(Preferences.choose(choice)) end,
+		})
+	end
+	local function switch_rows(path, label_key)
+		local Preferences = require("infra.layout_emulation_preferences")
+		return EmulationRows.switch_row({
+			t = i18n_safe, label_key = label_key, checked = Preferences.switch(path),
+			toggle = function(value) emulation_changed(Preferences.set_switch(path, value)) end,
+		})
+	end
+	providers["layout_features_base"] = function()
+		return { switch_rows(require("config_keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
+	end
+	providers["layout_features_altgr"] = function()
+		return { switch_rows(require("config_keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
+	end
+	render_ctx.feature_rows = {}
+	for path, row in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[path] = row end
+	for _, row in ipairs({ "number_row", "top_row", "home_row", "bottom_row" }) do
+		local path = "layout.emulate_" .. row
+		render_ctx.feature_rows[path] = function() return switch_rows(path, "menu.layout.emulate_" .. row) end
+	end
+
 	-- The physical magic key: the key typing the magic key, chosen by pressing it
 	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
 	-- are the shared ones macOS draws too.
@@ -174,16 +216,44 @@ local function _build_layouts(ctx)
 		})
 	end
 
+	-- The scope's restore and clear: the layout rows of config.toml (number-row
+	-- ordering and edges), loaded by the session before they settle.
+	local function apply_layout_scope(mode)
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local settled, committed = false, nil
+		require("infra.keyboard_layout_scope").request(mode, ctx.is_paused, function(ok, detail)
+			settled, committed = true, ok
+			if not ok then
+				Logger.error(LOG, "Keyboard layout scope '%s' was not applied: %s.", mode, tostring(detail))
+				show_error(i18n_safe("layouts.linux_rows_not_applied"))
+			end
+			-- The scope holds the emulation's rows too: it types what was restored.
+			require("modules.keymap.layout_emulation").reload_if_started()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end)
+		-- The session may answer later: a dispatched request is accepted now and
+		-- its refusal is told when it settles.
+		return not settled or committed == true
+	end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+		return apply_layout_scope("recommended")
+	end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_layout_scope("clear") end
+
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
 	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	providers["number_row_policy"] = function()
 		local NumberRowLive = require("modules.keymap.number_row_live")
 		local available, reason = NumberRowLive.available()
+		-- An emulation typing the number row applies the ordering itself.
+		local emulating = require("modules.keymap.layout_emulation").status().active == true
+		available = available or emulating
 		local stored = NumberRowLive.stored()
 		-- The choice is stored first; a refusal after that is told, except the two the
 		-- greyed row already explains.
 		local function applied(ok, code)
+			if emulating then require("modules.keymap.layout_emulation").reload_if_started() end
 			if not ok and code ~= "session_unsupported" and code ~= "no_source_layout" then
 				show_error(i18n_safe("layouts.linux_rows_not_applied"))
 			end
@@ -217,8 +287,77 @@ local function _build_layouts(ctx)
 			switch = ctx.pause_layout,
 		})
 	end
+	-- Input sources: the desktop's layouts, the active one ticked; choosing one
+	-- switches the desktop (ui/menu/active_layout_rows.lua), as macOS does.
+	providers["active_layouts"] = function()
+		if type(ctx.pause_layout) ~= "table" then
+			Logger.error(LOG, "No layout switch in the menu context — the input sources cannot be listed.")
+			return {}
+		end
+		return require("ui.menu.active_layout_rows").rows({
+			t = i18n_safe,
+			show_error = show_error,
+			on_changed = function()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+			switch = ctx.pause_layout,
+		})
+	end
+	-- « Raccourcis sur les lettres accentuées », the Windows letter pickers:
+	-- one submenu per letter, « Désactivé » then the 26 target letters.
+	local group_builders = {}
+	group_builders["accented_letters"] = function()
+		local Accented = require("modules.shortcuts.accented_shortcuts")
+		local settings = Accented.settings()
+		if not settings then
+			Logger.error(LOG, "The accented shortcuts cannot be read — their submenu is empty.")
+			return nil
+		end
+		local function choose(id, letter)
+			if not Accented.set(id, letter) then
+				require("config_save_failure").present(i18n_safe, function(message)
+					show_error(message, i18n_safe("common.error_title"))
+				end)
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local items = {}
+		for _, id in ipairs(Accented.IDS) do
+			local entry = settings[id]
+			local choices = {}
+			for code = string.byte("a"), string.byte("z") do
+				local letter = string.char(code)
+				choices[#choices + 1] = { label = letter:upper(), checked = entry.enabled and entry.letter == letter,
+					action = function() choose(id, letter) end }
+			end
+			local letters = ManifestMenu.template_rows("accented_letter_picker_frame", {
+				[require("config_keys").COMMAND.ACCENTED_LETTER_OFF] = function() choose(id, nil) end,
+			}, {
+				["accented_letter_off_checked"] = function() return not entry.enabled end,
+			}, { ["accented_letter_choices"] = function() return choices end }) or {}
+			-- The Windows title: « Tous les raccourcis sur la touche É correspondent
+			-- à ceux de » and the current letter (GetMenuTitleByPath).
+			local caption = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper()
+			items[#items + 1] = { label = caption, checked = entry.enabled, items = letters }
+		end
+		return { items = items }
+	end
+	-- « Rangées émulées »: the four layout.emulate_<row> switches of the
+	-- manifest's layout_emulated_rows_group, as Windows builds them. The
+	-- renderer hands back finished tray rows while `items` takes row data, so
+	-- they convert back first: passed as is, every row lacked a label and the
+	-- submenu opened onto nothing.
+	group_builders["layout_emulated_rows"] = function()
+		local rendered = ManifestMenu.build("layout_emulated_rows_group", "Layout", nil, nil, render_ctx, providers)
+		local child_rows = ManifestMenu.native_child_rows(rendered)
+		if child_rows == nil then
+			Logger.error(LOG, "The emulated rows could not be converted — their submenu is left out.")
+			return nil
+		end
+		return { items = child_rows }
+	end
 	local rows = ManifestMenu
-		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
+		and ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, providers)
 		or {}
 	return receive(rows, { layout_enabled = function() return nil end })
 end

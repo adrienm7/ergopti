@@ -34,6 +34,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Engine = require("dynamic_hotstrings")
+local TextUtils = require("text_utils")
 
 local LOG = "modules.dynamic_hotstrings.prefix_rules"
 
@@ -129,8 +130,9 @@ end
 --- @param is_section_enabled function|nil Predicate (group, section) → boolean.
 ---   Absent means every section is on, matching the shared engine's convention
 ---   for the same argument.
+--- @param magic_key string|nil Configured magic key; nil uses the manifest default.
 --- @return table Array of mapping tables, ready for the hotstring engine.
-function M.build(info, is_section_enabled)
+function M.build(info, is_section_enabled, magic_key)
 	local out, seen = {}, {}
 	if type(info) ~= "table" then return out end
 
@@ -139,40 +141,48 @@ function M.build(info, is_section_enabled)
 		return is_section_enabled(GROUP, section) and true or false
 	end
 
+	if magic_key == nil then
+		magic_key = require("infra.manifest_reader").default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+	end
 	local phone  = field(info, "phone_number")
 	local fphone = field(info, "phone_number_clean")
+	-- A national trunk zero is not dialled after the French country code.
+	local national_number = phone:sub(1, 1) == "0" and phone:sub(2) or phone
+	local international_phone = FRANCE_DIAL_PREFIX .. national_number
 	local ssn    = field(info, "social_security_number")
 	local iban   = field(info, "iban")
 
 	-- The decorative spaces are what the user wants typed BACK, but they must not
 	-- be part of what the prefix matches against.
-	local ssn_raw  = ssn:gsub("%s+", "")
-	local iban_raw = iban:gsub("%s+", "")
+	local ssn_raw  = Engine.strip_prefix_spacing(ssn)
+	local iban_raw = Engine.strip_prefix_spacing(iban)
 
 	if enabled("phoneprefixes") then
-		if #phone >= PHONE_MIN_FOR_SHORT then
-			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_SHORT), phone, true, "phone_number")
+		if TextUtils.utf8_len(phone) >= PHONE_MIN_FOR_SHORT then
+			if type(magic_key) == "string" and magic_key ~= "" then
+				add(out, seen, "phoneprefixes", TextUtils.utf8_sub(phone, 1, PHONE_MIN_FOR_SHORT) .. magic_key, phone, true, "phone_number")
+			end
 			add(out, seen, "phoneprefixes",
-				FRANCE_DIAL_PREFIX .. phone:sub(1, PHONE_MIN_FOR_SHORT),
-				FRANCE_DIAL_PREFIX .. phone, true, "phone_number")
+				FRANCE_DIAL_PREFIX .. TextUtils.utf8_sub(phone, 1, PHONE_MIN_FOR_SHORT),
+				international_phone, true, "phone_number")
 		end
-		if #phone >= PHONE_MIN_FOR_PLAIN then
-			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_PLAIN), phone, true, "phone_number")
+		if TextUtils.utf8_len(phone) >= PHONE_MIN_FOR_PLAIN then
+			add(out, seen, "phoneprefixes", TextUtils.utf8_sub(phone, 1, PHONE_MIN_FOR_PLAIN), phone, true, "phone_number")
 			add(out, seen, "phoneprefixes",
-				FRANCE_DIAL_PREFIX .. phone:sub(2, PHONE_MIN_FOR_PLAIN),
-				FRANCE_DIAL_PREFIX .. phone, true, "phone_number")
+				FRANCE_DIAL_PREFIX .. TextUtils.utf8_sub(national_number, 1, PHONE_MIN_FOR_PLAIN - (phone:sub(1, 1) == "0" and 1 or 0)),
+				international_phone, true, "phone_number")
 		end
-		if #phone >= PHONE_MIN_FOR_INNER then
-			add(out, seen, "phoneprefixes", phone:sub(2, 5), phone, true, "phone_number")
+		if TextUtils.utf8_len(phone) >= PHONE_MIN_FOR_INNER then
+			add(out, seen, "phoneprefixes", TextUtils.utf8_sub(phone, 2, 5), phone, true, "phone_number")
 		end
-		if #fphone >= PHONE_FORMATTED_CHARS then
-			add(out, seen, "phoneprefixes", fphone:sub(1, PHONE_FORMATTED_CHARS), fphone, true, "phone_number_clean")
+		if TextUtils.utf8_len(fphone) >= PHONE_FORMATTED_CHARS then
+			add(out, seen, "phoneprefixes", TextUtils.utf8_sub(fphone, 1, PHONE_FORMATTED_CHARS), fphone, true, "phone_number_clean")
 		end
 	end
 
 	if enabled("ssnprefixes") then
-		if #ssn_raw >= SSN_PREFIX_CHARS then
-			local raw_prefix    = ssn_raw:sub(1, SSN_PREFIX_CHARS)
+		if TextUtils.utf8_len(ssn_raw) >= SSN_PREFIX_CHARS then
+			local raw_prefix    = TextUtils.utf8_sub(ssn_raw, 1, SSN_PREFIX_CHARS)
 			local spaced_prefix = Engine.spaced_prefix(ssn, SSN_PREFIX_CHARS)
 			-- The no-space trigger gives back the no-space value and the spaced one
 			-- gives back the spaced value, so the user gets the form they started
@@ -185,8 +195,8 @@ function M.build(info, is_section_enabled)
 	end
 
 	if enabled("ibanprefixes") then
-		if #iban_raw >= IBAN_PREFIX_CHARS then
-			local raw_prefix    = iban_raw:sub(1, IBAN_PREFIX_CHARS)
+		if TextUtils.utf8_len(iban_raw) >= IBAN_PREFIX_CHARS then
+			local raw_prefix    = TextUtils.utf8_sub(iban_raw, 1, IBAN_PREFIX_CHARS)
 			local spaced_prefix = Engine.spaced_prefix(iban, IBAN_PREFIX_CHARS)
 			-- Case-INsensitive, alone among the three: an IBAN is conventionally
 			-- written in capitals and typed in whatever the user's hands produce.
@@ -215,8 +225,8 @@ function M.counts(info)
 	return Engine.compute_prefix_counts(
 		field(info, "phone_number"),
 		field(info, "phone_number_clean"),
-		(field(info, "social_security_number"):gsub("%s+", "")),
-		(field(info, "iban"):gsub("%s+", ""))
+		field(info, "social_security_number"),
+		field(info, "iban")
 	)
 end
 

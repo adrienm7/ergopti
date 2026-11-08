@@ -115,3 +115,57 @@ Test("gesture-clear-boot: native refusal restores the queued Gestures intent", _
 Test("gesture-clear-boot: backup refusal preserves the queued global intent", _GestureClearBootMarker.Bind("global", "clear", "backup"))
 Test("gesture-clear-boot: native refusal restores the queued global intent", _GestureClearBootMarker.Bind("global", "clear", "refused"))
 Test("gesture-clear-boot: backup refusal preserves the queued Gestures intent", _GestureClearBootMarker.Bind("gestures", "clear", "backup"))
+
+_GMBA_ActualBootMarker(Mode) {
+	global ConfigurationFile, _ConfigBootReadFailed, GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
+	SavedPath := ConfigurationFile, SavedFailed := _ConfigBootReadFailed
+	Root := A_Temp . "\ergopti_gesture_marker_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	Scheduled := []
+	Schedule(Action, Delay) {
+		AssertEqual("_DeferredGestureAutoConfigure", Action.Name)
+		AssertEqual(-GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS, Delay)
+		Scheduled.Push({ callback: Action, delay: Delay })
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		RawSource := Mode == "numeric-one" ? "1" : Mode == "true-control" ? "true" : "false"
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[gestures]`nauto_configure_on_next_start = " . RawSource . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		Cache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlBootSnapshot(Cache)
+		AssertTrue(IsObject(Snapshot))
+		Authored := Snapshot.Document["gestures"]["auto_configure_on_next_start"]
+		if Mode == "numeric-one"
+			AssertTrue(Authored is Integer && Authored == 1, "legacy bare1 retains the genuine source integer shape")
+		else
+			AssertTrue(Authored is TOML_Bool)
+		Raw := IniCacheGet(Cache, "gestures", "auto_configure_on_next_start")
+		; The real module's exact boot gate and real durable consumer, with only
+		; the existing scheduling port observed instead of starting hardware work.
+		if _GestureAutoConfigureFlagEnabled(Raw)
+			AssertTrue(GestureConsumeAutoConfigureFlag(Path, 0, (*) => 0, Schedule))
+		; The private owner accepts bare1 as legacy intent, like native true.
+		Expected := Mode == "false-control" ? 0 : 1
+		AssertEqual(Expected, Scheduled.Length, "native true and the private owner's legacy bare1 schedule exactly one setup")
+		if Expected {
+			Persisted := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertTrue(Persisted["gestures"]["auto_configure_on_next_start"] is TOML_Bool)
+			AssertFalse(Persisted["gestures"]["auto_configure_on_next_start"].Value)
+		} else
+			AssertEqual(Source, FSReadUtf8Exact(Path), "a rejected marker is not consumed or rewritten")
+	} finally {
+		ConfigurationFile := SavedPath, _ConfigBootReadFailed := SavedFailed
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+for _GMBA_Mode in ["numeric-one", "true-control", "false-control"]
+	Test("gesture actual boot marker admission: " . _GMBA_Mode, _GMBA_ActualBootMarker.Bind(_GMBA_Mode))

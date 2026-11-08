@@ -690,7 +690,9 @@ _THD_PersistedEmptyDurationReset(TargetPath) {
 	AssertEqual(0.42, Before["tap_hold"]["keys"]["left_ctrl"][ConfigLeaf.TIME_ACTIVATION_SECONDS],
 		"the independent file read proves the key existed before reset")
 	AssertEqual(1, WriteTapHoldDurationReset("left_ctrl"), "the actual reset persists the empty-key removal")
-	AssertFalse(TapHold["keys"].Has("left_ctrl"), "a reset removes a truly empty modeled key")
+	; The live model projects the file through the shipped defaults, so the key
+	; stays modeled with its default mapping but no longer owns a delay.
+	AssertFalse(TapHoldHasOwnDuration(TapHold, "left_ctrl"), "a reset removes the key's own delay from the model")
 	After := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
 	AssertFalse(After["tap_hold"]["keys"].Has("left_ctrl"), "the formerly persisted empty key is removed")
 	AssertEqual("copy", After["tap_hold"]["keys"]["tab"]["tap_action"], "the mapped neighbor remains persisted")
@@ -754,3 +756,36 @@ _THD_NewerFileRefusesBody(TargetPath) {
 }
 Test("tap-hold delay: a file saved by a newer build refuses every writer (tap-hold-versioned-file)",
 	() => _THHS_WithNativeFixture(_THD_NewerFileRefusesEveryWriter))
+
+
+_THD_NumericPromptBody(GlobalDelay, Raw, ExpectedMs, TargetPath) {
+ global TapHold, _THD_Answer, _THD_Setters, _THD_Reloads, _THGT_Writes
+ _THD_Reset()
+ _THD_Answer := {Result: "OK", Value: Raw}
+ Before := TapHold, SourceBefore := FileExist(TargetPath) ? FSReadUtf8Exact(TargetPath) : "absent"
+ SetterCalls := []
+ GlobalSetter := (Seconds) => (SetterCalls.Push(Seconds), _THD_GlobalWrite(Seconds))
+ Result := GlobalDelay ? _TH_PromptGlobalDelay(_THD_Prompt, GlobalSetter, _THD_Reload) : _THD_Ask()
+ if ExpectedMs == 0 {
+  AssertFalse(Result, "The original user magnitude must not alias an ordinary accepted delay")
+  AssertEqual(0, _THD_Setters.Length + SetterCalls.Length, "Rejected input must not reach either duration owner")
+  AssertEqual(0, _THGT_Writes.Length)
+  AssertEqual(0, _THD_Reloads.Length)
+  AssertEqual(ObjPtr(Before), ObjPtr(TapHold), "Rejected input cannot replace the actual live model")
+  AssertEqual(SourceBefore, FileExist(TargetPath) ? FSReadUtf8Exact(TargetPath) : "absent", "Rejected input cannot change private source bytes")
+ } else {
+  AssertEqual(1, Result)
+  Seconds := GlobalDelay ? SetterCalls[1] : _THD_Setters[1]["seconds"]
+  AssertEqual(ExpectedMs / 1000, Seconds, "Signed, hexadecimal, padded and fractional inputs retain their native meaning")
+  AssertEqual(1, _THD_Reloads.Length)
+  AssertEqual(1, _THGT_Writes.Length)
+ }
+}
+_THD_NumericPromptDomain(GlobalDelay) {
+ for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "", "0"]
+  _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 0))
+ for Raw in ["3", "0003", "+3", "0x3", "3.4", "3e0"]
+  _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 3))
+}
+Test("Tap-hold global delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(true))
+Test("Tap-hold key delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(false))

@@ -55,13 +55,13 @@ local C = require("modules.keystats.aggregator.core")
 --- parameter one site forgets, and the pattern below can only ever yield a bare
 --- SQL identifier ([%w_]+), so this diagnostic is structurally incapable of
 --- carrying user content no matter what a future statement interpolates.
+--- @param db table Database handle owning the transaction.
 --- @param sql string The statement to execute.
 --- @return boolean True on success; false when the db is unavailable or the
 --- statement failed (the row's caller must NOT drop its batch delta on false —
 --- see F-MED-2: a dropped delta here is unrecoverable, the source keystrokes
 --- are never replayed).
-local function exec(sql)
-	local db = SqliteWriter.get_db()
+local function execute(db, sql)
 	if not db then return false end
 	local rc = db:exec(sql)
 	if rc ~= sqlite3.OK then
@@ -78,11 +78,13 @@ end
 
 --- Encodes a number map or a list as the compact JSON text a statement stores.
 --- @param value table|nil The map, or nil.
---- @return string The JSON text, "{}" for anything that is not a table or cannot be encoded.
+--- @return string The JSON text, "{}" for an absent map. Encoding failures abort the transaction.
 local function json_text(value)
 	if type(value) ~= "table" then return "{}" end
 	local ok, encoded = pcall(json.encode, value)
-	if not ok then return "{}" end
+	if not ok or type(encoded) ~= "string" or encoded == "" then
+		error("Cannot encode aggregate distribution", 0)
+	end
 	return encoded
 end
 
@@ -114,11 +116,13 @@ end
 --- the current iteration key to nil inside pairs()); rows whose exec() call
 --- failed are left in S.agg_batch.X so the very next flush() tick retries
 --- them with the row's already-accumulated totals intact.
-function M.flush()
+--- @param db_override table|nil Transaction handle; defaults to the writer database.
+function M.flush(db_override)
 	if not C.require_init("flush") then return end
 	if not S.agg_batch then return end
-	local db = SqliteWriter.get_db()
+	local db = db_override or SqliteWriter.get_db()
 	if not db then return end
+	local function exec(sql) return execute(db, sql) end
 
 	for key, row in pairs(S.agg_batch.app_day) do
 		local cat = Export.get_native_app_category(row.app)
@@ -157,12 +161,16 @@ function M.flush()
 
 	for tbl_name, tbl in pairs(S.agg_batch.ngram) do
 		for key, item in pairs(tbl) do
-			local s, e = key:find("\1")
-			local date_str = key:sub(1, s - 1)
-			local rest = key:sub(e + 1)
-			local s2, e2 = rest:find("\1")
-			local app = rest:sub(1, s2 - 1)
-			local token = rest:sub(e2 + 1)
+			local date_str, app, token
+			if item.identity then
+				date_str, app, token = item.identity.date, item.identity.app, item.identity.token
+			else
+				local s, e = key:find("\1")
+				date_str = key:sub(1, s - 1)
+				local rest = key:sub(e + 1)
+				local s2, e2 = rest:find("\1")
+				app, token = rest:sub(1, s2 - 1), rest:sub(e2 + 1)
+			end
 			local ok = exec(Queries.render("agg.ngram", "native", {
 				table = tbl_name, device_id = tostring(S.device_id), date = date_str, app = app, token = token,
 				c = i(item.c), td = i(item.td), cd = i(item.cd), e = i(item.e),
@@ -202,18 +210,16 @@ function M.flush()
 		if ok then S.agg_batch.kc_hold[key] = nil end
 	end
 
-	-- Title-cap cleanup (DELETE ... NOT IN LIMIT N) must run against the FULL
-	-- set of app-day keys queued this tick, before any successful title row is
-	-- removed below — otherwise an app-day whose titles all inserted cleanly
-	-- would never get its cleanup DELETE and the table would grow unbounded.
-	local title_app_days_seen = {}
-	for key in pairs(S.agg_batch.titles) do
-		local s, e = key:find("\1")
-		local rest = key:sub(e + 1)
-		local s2, e2 = rest:find("\1")
-		local date_str = key:sub(1, s - 1)
-		local app = rest:sub(1, s2 - 1)
-		title_app_days_seen[date_str .. "\1" .. app] = { date = date_str, app = app }
+	-- Insert all deltas before pruning, so the limit and ranking include the
+	-- current batch. Keep every row until its app-day cleanup is acknowledged.
+	local title_app_days_seen, title_inserted = {}, {}
+	for key, row in pairs(S.agg_batch.titles) do
+		local ad_key = row.date .. "\1" .. row.app
+		title_app_days_seen[ad_key] = { date = row.date, app = row.app }
+		title_inserted[key] = exec(Queries.render("agg.title", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			title = tostring(row.title), c = i(row.c), ms = i(row.ms),
+		}))
 	end
 	local title_cleanup_ok = {}
 	for ad_key, ad in pairs(title_app_days_seen) do
@@ -223,15 +229,8 @@ function M.flush()
 		}))
 	end
 	for key, row in pairs(S.agg_batch.titles) do
-		local ok = exec(Queries.render("agg.title", "native", {
-			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
-			title = tostring(row.title), c = i(row.c), ms = i(row.ms),
-		}))
-		-- Only drop the row once BOTH the insert and this app-day's cleanup
-		-- DELETE succeeded — otherwise a failed cleanup would silently stop
-		-- enforcing the per-app-day title cap for this row's app-day forever.
 		local ad_key = row.date .. "\1" .. row.app
-		if ok and title_cleanup_ok[ad_key] then
+		if title_inserted[key] and title_cleanup_ok[ad_key] then
 			S.agg_batch.titles[key] = nil
 		end
 	end

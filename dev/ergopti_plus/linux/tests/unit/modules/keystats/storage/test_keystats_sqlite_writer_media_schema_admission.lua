@@ -159,8 +159,10 @@ helpers.describe("linux-sqlite-writer-receipts", function()
 				return {
 					read = function(_, mode)
 						if mode == "*l" then return "CREATE TABLE devices (os CHECK (os IN ('linux')))" end
+						local body = command:find("SELECT sql FROM sqlite_master", 1, true)
+							and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
 						return command:find("ERGOPTI_SQL_EXIT_STATUS=", 1, true)
-							and ("\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
+							and (body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
 					end,
 					close = function() return true end, -- LuaJIT's ambiguous success is deliberate.
 				}
@@ -309,7 +311,9 @@ helpers.describe("sqlite_writer", function()
               return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
             end
             -- Mirror the reservation SELECT and the actual terminal status.
-            local body = command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+            local body = command:find("SELECT sql FROM sqlite_master", 1, true)
+              and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n"
+              or (command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or "")
             return body .. "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
           close = function() return true end,
@@ -714,3 +718,132 @@ helpers.describe("linux-sqlite-raw-batch-transactions", function()
 	end
 end)
 
+
+it("SQLite device migration refuses an unreadable schema instead of rebuilding", function()
+	local command = require("modules.keystats.sqlite_command")
+	local build, execute, popen = command.build, os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+	local statements, current = {}, nil
+	command.build = function(selected, sql, options)
+		current = sql; statements[#statements + 1] = sql
+		return build(selected, sql, options)
+	end
+	os.execute = function() return 0 end
+	io.popen = function()
+		local status = current:find("SELECT sql FROM sqlite_master", 1, true) and 7 or 0
+		return { read = function() return "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+			close = function() return true end }
+	end
+	local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+	local called, opened = pcall(Writer.open_db, path)
+	command.build, os.execute, io.popen = build, execute, popen
+	Writer.close_db(); os.remove(path)
+	helpers.assert_true(called)
+	helpers.assert_eq(opened, false, "unknown schema must not be treated as an old schema")
+	for _, sql in ipairs(statements) do
+		helpers.assert_nil(sql:find("ALTER TABLE devices RENAME", 1, true), "failed schema inspection must not rebuild devices")
+	end
+end)
+
+for _, fault in ipairs({ "seek_throw", "close_throw" }) do
+	it("SQLite open safely refuses file inspection " .. fault, function()
+		local Reader = require("infra.regular_file_reader")
+		local open, execute, popen = Reader.open, os.execute, io.popen
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+		local closes, failing = 0, true
+		Reader.open = function(target, ...)
+			local stream, detail, code = open(target, ...)
+			if target ~= path or not stream or not failing then return stream, detail, code end
+			return { seek = function(_, ...)
+				if fault == "seek_throw" then error("injected seek failure") end
+				return stream:seek(...)
+			end, close = function()
+				closes = closes + 1; assert(stream:close())
+				if fault == "close_throw" then error("injected close failure") end
+				return true
+			end }, detail, code
+		end
+		os.execute = function() return 0 end
+		io.popen = function(command)
+			local content = command:find("SELECT sql FROM sqlite_master", 1, true)
+				and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
+			return { read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=0\n" end, close = function() return true end }
+		end
+		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local called, opened = pcall(Writer.open_db, path)
+		failing = false
+		local retry = called and opened == false and Writer.open_db(path)
+		Reader.open, os.execute, io.popen = open, execute, popen
+		Writer.close_db(); os.remove(path)
+		helpers.assert_true(called, "inspection exceptions must become explicit refusal")
+		helpers.assert_eq(opened, false)
+		helpers.assert_eq(closes, 1, "every inspected stream is closed")
+		helpers.assert_true(retry, "a later healthy inspection can reopen the store")
+	end)
+end
+
+for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
+	it("SQLite legacy device migration preserves dependent schema " .. receipt, function()
+		local command = require("modules.keystats.sqlite_command")
+		local build, execute, popen = command.build, os.execute, io.popen
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+		local statements, current = {}, nil
+		command.build = function(selected, sql, options)
+			current = sql; statements[#statements + 1] = sql
+			return build(selected, sql, options)
+		end
+		os.execute = function() return 0 end
+		io.popen = function()
+			local body, status = "", 0
+			if current:find("SELECT sql FROM sqlite_master", 1, true) then
+				body = [[CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+)]] .. "\n"
+				if receipt == "extra_check" then body = body:gsub("name TEXT NOT NULL", "name TEXT NOT NULL CHECK(length(name)>0)") end
+			elseif current:find("pragma_foreign_key_list", 1, true) then
+				if receipt == "error" then status = 7
+				elseif receipt == "1" then body = "1\n" else body = "0\n" end
+			end
+			return { read = function() return body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+				close = function() return true end }
+		end
+		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local called, opened = pcall(Writer.open_db, path)
+		command.build, os.execute, io.popen = build, execute, popen
+		Writer.close_db(); os.remove(path)
+		helpers.assert_true(called)
+		helpers.assert_eq(opened, receipt == "0", "only a proven known schema may be migrated")
+		local observed_guard, observed_migration = false, false
+		for _, sql in ipairs(statements) do
+			if sql:find("pragma_foreign_key_list", 1, true) then
+				observed_guard = true
+				helpers.assert_contains(sql, "pragma_table_xinfo")
+				helpers.assert_contains(sql, "pragma_index_list")
+			end
+			if sql:find("ALTER TABLE devices RENAME", 1, true) then observed_migration = true end
+		end
+		if receipt == "0" or receipt == "1" or receipt == "error" then helpers.assert_true(observed_guard) end
+		helpers.assert_eq(observed_migration, receipt == "0", "unsafe device migration cannot start")
+	end)
+end
+
+it("SQLite open distinguishes absent executable from refused store", function()
+	local prior_programs, prior_writer = package.loaded["infra.owned_programs"], package.loaded["modules.keystats.sqlite_writer"]
+	package.loaded["infra.owned_programs"] = { available = function() return false end, path = function() return "sqlite3" end }
+	package.loaded["modules.keystats.sqlite_writer"] = nil
+	local ok, detail = pcall(function()
+		local writer = require("modules.keystats.sqlite_writer")
+		local absent, why_absent = writer.open_db("/controlled/metrics.sqlite")
+		helpers.assert_eq(absent, false); helpers.assert_eq(why_absent, "sqlite_unavailable")
+		local rejected, why_rejected = writer.open_db("")
+		helpers.assert_eq(rejected, false); helpers.assert_eq(why_rejected, "store_refused")
+	end)
+	package.loaded["infra.owned_programs"], package.loaded["modules.keystats.sqlite_writer"] = prior_programs, prior_writer
+	if not ok then error(detail, 0) end
+end)

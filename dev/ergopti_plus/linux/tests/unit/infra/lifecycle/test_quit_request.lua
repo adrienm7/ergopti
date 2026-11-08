@@ -34,13 +34,14 @@ local function build(state)
 		reload_in_flight = function() return state.reload == true end,
 		abandon_reload = function()
 			calls.abandons = calls.abandons + 1
+			if state.abandon_throws then error("controlled restart cancellation failure") end
 			if state.abandon_fails then return false, "systemctl refused" end
 			state.reload = false
 			return true
 		end,
 		writer_active = function() return state.writer == true end,
 		publication_pending = function() return state.publication == true end,
-		apply_pause_layout = function() calls.layout = calls.layout + 1 end,
+		apply_pause_layout = function() calls.layout = calls.layout + 1; if state.layout_throws then error("controlled layout failure") end end,
 		schedule = function(_, callback) calls.timers[#calls.timers + 1] = callback; return true end,
 		now = function() return calls.clock end,
 		timeout = 10, poll = 1,
@@ -50,6 +51,17 @@ local function build(state)
 end
 
 helpers.describe("Linux tray Quit follows the shared admission (quit-admission)", function()
+	for _, fault in ipairs({ "layout_throws", "abandon_throws" }) do
+		helpers.it("linux-quit-port-exception: quit proceeds after " .. fault, function()
+			local state = { reload = fault == "abandon_throws" }
+			state[fault] = true
+			local on_quit, calls = build(state)
+			local called, accepted = pcall(on_quit)
+			helpers.assert_true(called, "a failed optional action cannot escape the quit owner")
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(calls.requests, { "tray quit" })
+		end)
+	end
 	helpers.it("admits a quit, applies the pause layout, then starts the shutdown", function()
 		local on_quit, calls = build({})
 		helpers.assert_eq(on_quit(), true)

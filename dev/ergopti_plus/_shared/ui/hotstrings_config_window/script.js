@@ -201,17 +201,18 @@ function bindDelay(field, cat, sec) {
 	// When the TOML default is 0, fall back to the global default as the hint
 	// so the user understands what value will actually be applied.
 	const defaultMs =
-		(sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms || 750;
+		((sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms) ?? 750;
 	const input = field.querySelector('input');
 	const reset = field.querySelector('.reset');
 
-	input.value = ms || defaultMs;
+	// Zero is the effective unlimited delay, not a missing value.
+	input.value = ms ?? defaultMs;
 	input.placeholder = defaultMs;
 	field.classList.toggle('overridden', !!overridden);
 
 	input.addEventListener('change', () => {
-		const v = parseInt(input.value, 10);
-		if (Number.isFinite(v) && v >= 0) {
+		const v = Number(input.value);
+		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0) {
 			send({
 				action: 'set_delay',
 				category: cat.name,
@@ -251,9 +252,24 @@ function bindPriority(field, cat, sec) {
 	if (typeof def === 'number') input.placeholder = def;
 	field.classList.toggle('overridden', !!overridden);
 
+	function clearPriority() {
+		send({
+			action: 'clear_priority',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
+		});
+	}
+
 	input.addEventListener('change', () => {
-		const v = parseInt(input.value, 10);
-		if (Number.isFinite(v) && v >= 0 && v <= 100) {
+		if (input.value === '' && !input.validity?.badInput) {
+			clearPriority();
+			return;
+		}
+		const v = Number(input.value);
+		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0 && v <= 100) {
 			send({
 				action: 'set_priority',
 				category: cat.name,
@@ -266,16 +282,7 @@ function bindPriority(field, cat, sec) {
 		}
 	});
 
-	reset.addEventListener('click', () => {
-		send({
-			action: 'clear_priority',
-			category: cat.name,
-			group: cat.group,
-			section: sec ? sec.name : '',
-			personal_path: cat.personal_path || '',
-			ext_id: cat.ext_id || ''
-		});
-	});
+	reset.addEventListener('click', clearPriority);
 }
 
 function bindColor(field, cat, sec) {

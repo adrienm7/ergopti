@@ -738,31 +738,34 @@ HotstringsTerminatorMigrateStrings(LegacyWord, LegacyConsumed, WriterFn := 0, No
 	RecordChars.CaseSense := "On"
 	for Record in Owner.Records
 		RecordChars[Record.Char] := true
-	Added := []
+	; Reserve the same raw record/state namespace as ordinary UI additions.
+	; Reconstruct it from the exact admitted source, including quarantined rows
+	; and future state leaves that do not appear in the effective projection.
+	Document := TOML_ParseDocument(Owner.Source)
+	Hotstrings := Document.Get("hotstrings", _TOML_DocumentTable())
+	Stored := (Hotstrings is Map) ? Hotstrings.Get("terminators", []) : 0
+	States := (Hotstrings is Map) ? Hotstrings.Get("terminator_states", _TOML_DocumentTable()) : 0
+	if !_HotstringsTerminatorRecordDenseArray(Stored) || !(States is Map) {
+		LoggerError("HotstringsConfig", "Delimiter migration refused: the record/state namespace is not addressable.")
+		return 0
+	}
+	Next := ManifestCloneValue(Stored)
+	AddedCount := 0
 	for Character in _TextCodepoints(Word) {
-		if Character == "`r" || Character == "`n" || InStr(Owned, Character) || RecordChars.Has(Character)
+		if Character == "`r" || Character == "`n" || InStr(Owned, Character, true) || RecordChars.Has(Character)
 			continue
 		if !HotstringsTerminatorRecordCharacter(Character) {
 			LoggerWarn("HotstringsConfig", "A delimiter of the old word_delimiters string is not a single character and is dropped.")
 			continue
 		}
 		RecordChars[Character] := true
-		Added.Push(Map("key", "custom_" . Format("{:X}", Ord(Character)), "char", Character,
-			"label", Character, "consume", TOML_Bool(InStr(Consumed, Character) ? 1 : 0)))
+		Key := _HotstringsTerminatorFreshKey(Next, States, "custom_" . Format("{:X}", Ord(Character)))
+		Next.Push(Map("key", Key, "char", Character,
+			"label", Character, "consume", TOML_Bool(InStr(Consumed, Character, true) ? 1 : 0)))
+		AddedCount += 1
 	}
-	if Added.Length {
-		Document := TOML_ParseDocument(Owner.Source)
-		Stored := Document.Has("hotstrings") && Document["hotstrings"] is Map
-			? Document["hotstrings"].Get("terminators", []) : []
-		if !_HotstringsTerminatorRecordDenseArray(Stored) {
-			LoggerError("HotstringsConfig", "Delimiter migration refused: the custom terminator list is not an array.")
-			return 0
-		}
-		Next := ManifestCloneValue(Stored)
-		for Record in Added
-			Next.Push(Record)
+	if AddedCount
 		Updates.Push({ Section: "hotstrings", Key: "terminators", Value: Next })
-	}
 	if Updates.Length == 0
 		return 1
 	if !ConfigCommitUpdates(ConfigurationFile, Updates, "the word expander migration", WriterFn, NotifyFn)

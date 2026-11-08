@@ -33,7 +33,7 @@ M.sections = {
 	["hotstrings.french_magickey"] = { description_key = "menu.hotstrings.magic_key", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.dynamic"] = { description_key = "menu.hotstrings.dynamic", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.personal"] = { description_key = "menu.hotstrings.personal", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["hotstrings.order_overrides"] = { description_key = "menu.hotstrings", platforms = { "hs" }, subsections = {  } },
+	["hotstrings.order_overrides"] = { description_key = "menu.hotstrings", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs", "linux" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -47,7 +47,7 @@ M.sections = {
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["shortcuts.wrap_symbols"] = { description_key = "menu.shortcuts.wrap_symbols", platforms = { "hs" }, subsections = {  } },
+	["shortcuts.wrap_symbols"] = { description_key = "menu.shortcuts.wrap_symbols", platforms = { "hs", "linux" }, subsections = {  } },
 	["shortcuts.tap_keys"] = { description_key = "menu.shortcuts.header_tap_keys", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts.caps_word"] = { description_key = "menu.caps_word.auto_off", platforms = { "ahk", "hs", "linux" }, subsections = { "pointer" } },
 	["shortcuts.caps_word.pointer"] = { description_key = "menu.caps_word.pointer_header", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -57,8 +57,8 @@ M.sections = {
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
 	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
-	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
-	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
+	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs", "linux" }, subsections = {  } },
+	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs", "linux" }, subsections = {  } },
 }
 
 M.features = {
@@ -105,7 +105,7 @@ M.features = {
 		path = "hotstrings.shortcut_resets_word", id = "shortcut_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.shortcut_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.tap_hold_word_reset_not_on_macos",
+		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "hotstrings.cascade_max_arrows", id = "cascade_max_arrows", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.cascade_max_arrows", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
@@ -411,7 +411,7 @@ M.features = {
 		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting",
 	},
 	{
-		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.llm_profile_follows_model_is_not_on_macos",
+		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "llm.trigger.disabled_apps", id = "disabled_apps", section = "llm.trigger", default = {  }, type = "array", description_key = "menu.llm.title", platforms = { "ahk", "hs", "linux" }, recommended = {  }, family = "setting",
@@ -432,7 +432,7 @@ M.features = {
 		path = "llm.trigger.while_hotstring_tooltip", id = "while_hotstring_tooltip", section = "llm.trigger", default = "wait", type = "enum", description_key = "menu.llm.while_hotstring_tooltip", platforms = { "ahk", "hs", "linux" }, recommended = "wait", family = "setting", enum_values = { "wait", "both" },
 	},
 	{
-		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "platform_reason.inline_autotype_is_windows", platforms = { "ahk" },
+		path = "llm.trigger.inline_autotype", id = "inline_autotype", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.inline_autotype", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
 	},
 	{
 		path = "llm.trigger.secure_filter_enabled", id = "secure_filter_enabled", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.secure_filter_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
@@ -477,10 +477,10 @@ M.features = {
 		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "hs", "linux" }, recommended = false, family = "setting", reason_key = "platform_reason.wpm_readout_needs_a_menubar",
+		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
 	},
 	{
-		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "hs", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.wpm_readout_needs_a_menubar",
+		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = false, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.category_master_is_a_gate_on_windows",
@@ -504,28 +504,28 @@ M.features = {
 		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.a_grave.enabled", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.a_grave.enabled", id = "enabled", section = "shortcuts.a_grave", default = false, type = "boolean", description_key = "menu.shortcuts.a_grave", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.a_grave.letter", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.a_grave.letter", id = "letter", section = "shortcuts.a_grave", default = "v", type = "string", description_key = "menu.shortcuts.a_grave.letter", platforms = { "ahk", "linux" }, recommended = "v", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_acute.enabled", section = "shortcuts.e_acute", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_acute.enabled", id = "enabled", section = "shortcuts.e_acute", default = false, type = "boolean", description_key = "menu.shortcuts.e_acute", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_acute.letter", section = "shortcuts.e_acute", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_acute.letter", id = "letter", section = "shortcuts.e_acute", default = "c", type = "string", description_key = "menu.shortcuts.e_acute.letter", platforms = { "ahk", "linux" }, recommended = "c", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_circ.enabled", section = "shortcuts.e_circ", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_circ.enabled", id = "enabled", section = "shortcuts.e_circ", default = false, type = "boolean", description_key = "menu.shortcuts.e_circ", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_circ.letter", section = "shortcuts.e_circ", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_circ.letter", id = "letter", section = "shortcuts.e_circ", default = "x", type = "string", description_key = "menu.shortcuts.e_circ.letter", platforms = { "ahk", "linux" }, recommended = "x", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_grave.enabled", section = "shortcuts.e_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_grave.enabled", id = "enabled", section = "shortcuts.e_grave", default = false, type = "boolean", description_key = "menu.shortcuts.e_grave", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_grave.letter", id = "letter", section = "shortcuts.e_grave", default = "z", type = "string", description_key = "menu.shortcuts.e_grave.letter", platforms = { "ahk", "linux" }, recommended = "z", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
 		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", id = "alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "ctrl_backspace", family = "feature",
@@ -843,217 +843,217 @@ M.features = {
 		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "gestures.modes.swipe_2_left", id = "swipe_2_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_left", id = "swipe_2_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_right", id = "swipe_2_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_right", id = "swipe_2_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_up", id = "swipe_2_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_up", id = "swipe_2_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_down", id = "swipe_2_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_down", id = "swipe_2_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_left_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_2_right_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_left", id = "swipe_3_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_left", id = "swipe_3_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_right", id = "swipe_3_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_right", id = "swipe_3_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_down", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_up", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_up", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right_down", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right_up", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right_up", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_left", id = "swipe_4_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_left", id = "swipe_4_left", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_right", id = "swipe_4_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_right", id = "swipe_4_right", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_up", id = "swipe_4_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_up", id = "swipe_4_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_down", id = "swipe_4_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_down", id = "swipe_4_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_left_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_4_right_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_left", id = "swipe_5_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_left", id = "swipe_5_left", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_right", id = "swipe_5_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_right", id = "swipe_5_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_up", id = "swipe_5_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_5_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_up", id = "swipe_5_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_5_up", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_down", id = "swipe_5_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_5_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_down", id = "swipe_5_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_5_down", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left_down", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left_up", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_left_up", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right_down", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right_up", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_5_right_up", platforms = { "hs", "linux" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_left", id = "swipe_2_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_left", id = "swipe_2_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_right", id = "swipe_2_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_right", id = "swipe_2_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_up", id = "swipe_2_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_up", id = "swipe_2_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_down", id = "swipe_2_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_down", id = "swipe_2_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_left_down", id = "swipe_2_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_left_up", id = "swipe_2_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_left_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_right_down", id = "swipe_2_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_2_right_up", id = "swipe_2_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_2_right_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_left", id = "swipe_3_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_left", id = "swipe_3_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_right", id = "swipe_3_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_right", id = "swipe_3_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_up", id = "swipe_3_up", section = "gestures.sensitivities", default = 25, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_up", platforms = { "hs" }, recommended = 25, family = "setting",
+		path = "gestures.sensitivities.swipe_3_up", id = "swipe_3_up", section = "gestures.sensitivities", default = 25, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_up", platforms = { "hs", "linux" }, recommended = 25, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_down", id = "swipe_3_down", section = "gestures.sensitivities", default = 25, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_down", platforms = { "hs" }, recommended = 25, family = "setting",
+		path = "gestures.sensitivities.swipe_3_down", id = "swipe_3_down", section = "gestures.sensitivities", default = 25, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_down", platforms = { "hs", "linux" }, recommended = 25, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_left_up", id = "swipe_3_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_right_down", id = "swipe_3_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_right_up", id = "swipe_3_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_left", id = "swipe_4_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_left", id = "swipe_4_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_right", id = "swipe_4_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_right", id = "swipe_4_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_up", id = "swipe_4_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_up", id = "swipe_4_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_down", id = "swipe_4_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_down", id = "swipe_4_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_left_down", id = "swipe_4_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_left_up", id = "swipe_4_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_left_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_right_down", id = "swipe_4_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_right_up", id = "swipe_4_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_4_right_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_left", id = "swipe_5_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_left", id = "swipe_5_left", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_right", id = "swipe_5_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_right", id = "swipe_5_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_up", id = "swipe_5_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_up", id = "swipe_5_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_down", id = "swipe_5_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_down", id = "swipe_5_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_left_down", id = "swipe_5_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_left_up", id = "swipe_5_left_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_left_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_down", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_right_down", id = "swipe_5_right_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_down", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_up", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_up", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.modes.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs", "linux" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, family = "setting",
+		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "layout.ergopti_base", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.ergopti_base", id = "ergopti_base", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_base", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
 		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", family = "feature", enum_values = { "native", "digits", "symbols" },
@@ -1065,28 +1065,28 @@ M.features = {
 		path = "layout.number_row_reorder_edges", id = "number_row_reorder_edges", section = "layout", default = false, type = "boolean", description_key = "menu.layout.number_row_edges", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "feature",
 	},
 	{
-		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.ergopti_alt_gr", id = "ergopti_alt_gr", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_alt_gr", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
-		path = "layout.ergopti_variant", section = "layout", reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys", platforms = { "ahk" },
+		path = "layout.ergopti_variant", id = "ergopti_variant", section = "layout", default = "none", type = "enum", description_key = "menu.layout.ergopti_plus", platforms = { "ahk", "hs", "linux" }, recommended = "ergopti_plus", family = "feature", enum_values = { "none", "ergopti", "ergopti_plus" },
 	},
 	{
-		path = "layout.emulate_number_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_number_row", id = "emulate_number_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_number_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.emulate_top_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_top_row", id = "emulate_top_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_top_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.emulate_home_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_home_row", id = "emulate_home_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_home_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.emulate_bottom_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_bottom_row", id = "emulate_bottom_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_bottom_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "layout.ctrl_magic_save", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
-		path = "layout.emulated_layout", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",
 	},
 	{
 		path = "category_enabled.hotstrings", section = "category_enabled", platforms = { "ahk" },

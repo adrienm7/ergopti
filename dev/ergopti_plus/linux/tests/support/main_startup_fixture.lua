@@ -145,7 +145,8 @@ function M.run(options)
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
 	env.TapHold = { is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
-	env.keystats = { hold_accounting_token = noop, pump_flush = noop, get_categories = function() return {} end,
+	env.keystats = { hold_accounting_token = noop, pump_flush = noop, bind_pointer_position = noop,
+		get_categories = function() return {} end,
 		get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end }
 	env.capture_owned_scancodes = {}
 	env.script_actions = { is_paused = function() return false end }
@@ -192,6 +193,17 @@ function M.run(options)
 				observed.driver_control = control_options
 				return { handle = function() return false end, stop = function() return true end }
 			end }
+		elseif name == "infra.updater_boot_ready" then
+			-- The update watcher that started this daemon is told once it is ready.
+			return { report = function(reason)
+				observed.boot_ready_reason = reason; record("updater.boot_ready"); return false
+			end }
+		elseif name == "adapters.wpm_surface" then
+			-- The floating WPM widget pumps its own window, tray or not.
+			return { pump = function() record("wpm.pump"); return 0 end }
+		elseif name == "infra.typed_input_withheld" then
+			-- The session's withheld-input summary is logged as the daemon exits.
+			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end }
 		elseif name == "infra.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }
@@ -201,6 +213,9 @@ function M.run(options)
 				observed.field_run = field_options
 				return { stop = function() return true end }
 			end }
+		elseif name == "infra.personal_shortcuts" then
+			-- The user's personal source runs once, at the end of the services.
+			return { load = function() record("personal_shortcuts"); return true end }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then

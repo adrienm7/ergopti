@@ -42,8 +42,8 @@
 ;   IMMNotificationClient, GetSystemPowerStatus polling). They are
 ;   listed in KEYSTATS_SPEC §3 but their UI consumers tolerate empty
 ;   tables, so we ship without them and revisit when needed.
-; - space_change is macOS-only (Mission Control); intentionally not
-;   ported.
+; - space_change comes from keystats_virtual_desktop.ahk, polled on the
+;   window-topology tick.
 ; - system_load (periodic CPU/RAM snapshots) is also deferred.
 ; ==============================================================================
 
@@ -441,7 +441,7 @@ KL_Watchers_IdleTick(Now := unset) {
 				SessionGeneration: KLWatch.session_generation,
 				IdleGeneration: KLWatch.idle_generation}
 		} finally Critical(ObservationCritical)
-		if IdleOwner.LastTick = 0
+		if LastTick == 0 && !KLWatch.is_session_active
 				return
 		now := IsSet(Now) ? Now : A_TickCount
 		gap := TickElapsed64(LastTick, now)

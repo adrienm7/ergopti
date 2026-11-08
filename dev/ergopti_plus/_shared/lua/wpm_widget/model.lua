@@ -15,7 +15,8 @@
 --- 2. Pure. Every function takes the time and the stats it needs, so the whole
 ---    behaviour — colour holds, idle hiding, the curve — is testable without a
 ---    screen, on both drivers, against the same file.
---- 3. The macOS behaviour is the reference: the drivers used to differ on the
+--- 3. Windows owns pointer hiding and held-source precedence. Rendering also
+---    shares one canon: the drivers used to differ on the
 ---    strip's darkening (one of them kept 60 % of each channel where the others
 ---    kept 40 %), on the graph's corners and history, and on whether the unit
 ---    was translated. Each of those is now one line here.
@@ -62,7 +63,7 @@ local REQUIRED = {
 
 -- Strings that are names, not colours: the Storage keys of the saved position.
 local REQUIRED_NAMES = {
-	position = { storage_x = true, storage_y = true },
+	position = { storage_x = true, storage_y = true, storage_pair = true },
 }
 
 --- Checks a decoded canon.
@@ -143,17 +144,27 @@ function M.darken_hex(hex, factor)
 	return string.format("#%02x%02x%02x", channels[1], channels[2], channels[3])
 end
 
---- Which source colours the readouts now: the last source, for `hold_s` after it.
---- @param stats table|nil { source, source_variant, source_time (s) }
+--- Resolves held sources in Windows order: AI, hotstring, autocorrection.
+--- Neutral producers never displace an earlier coloured hold.
+--- @param stats table|nil { source_holds = { { source, variant, time } } }
 --- @param hold_s number
 --- @param now_s number
+--- @param canon table Validated shared constants.
 --- @return string The source, or "none".
-function M.active_source(stats, hold_s, now_s)
-	if type(stats) ~= "table" then return "none" end
-	local source = stats.source_variant or stats.source or "none"
-	if source == "none" then return "none" end
-	if (now_s - (tonumber(stats.source_time) or 0)) > hold_s then return "none" end
-	return source
+function M.active_source(stats, hold_s, now_s, canon)
+	local selected, priority, selected_at = "none", 0, -math.huge
+	for _, hold in ipairs(type(stats) == "table" and stats.source_holds or {}) do
+		local source = hold.source == "llm" and "llm" or hold.variant
+		local age = now_s - hold.time
+		if age >= 0 and age < hold_s and not canon.neutral_sources[source] then
+			local rank = source == "llm" and 3 or (source == "autocorrection" and 1 or 2)
+			if rank > priority or (rank == priority and (hold.time > selected_at
+				or (hold.time == selected_at and source < selected))) then
+				selected, priority, selected_at = source, rank, hold.time
+			end
+		end
+	end
+	return selected
 end
 
 --- The colour a source paints with.
@@ -191,7 +202,7 @@ end
 --- @param opts table { now_s, hold_s, use_colors, resolve }
 --- @return string hex, string source
 local function current_colour(canon, stats, opts)
-	local source = M.active_source(stats, opts.hold_s, opts.now_s)
+	local source = M.active_source(stats, opts.hold_s, opts.now_s, canon)
 	if not opts.use_colors or source == "none" then return canon.colors.bg_manual, source end
 	return M.source_hex(canon, source, opts.resolve), source
 end
@@ -292,7 +303,7 @@ end
 --- @param opts table { now_s, hold_s, use_colors, resolve, unit }
 --- @return table { label, background|nil, background_alpha, text, font_size, source }
 function M.menubar_frame(canon, stats, opts)
-	local source = M.active_source(stats, opts.hold_s, opts.now_s)
+	local source = M.active_source(stats, opts.hold_s, opts.now_s, canon)
 	local coloured = opts.use_colors and source ~= "none"
 	return {
 		label = M.readout_label(stats and stats.wpm, opts.unit),
@@ -325,20 +336,16 @@ function M.menubar_visible(stats, source, tooltip_visible)
 	return (tonumber(stats and stats.wpm) or 0) > 0 or tooltip_visible == true or source ~= "none"
 end
 
---- Whether the floating widget shows, and the new "last active" time.
----
---- It shows while text is appearing or a preview is up, and for
---- timings [ui] wpm_widget_idle_hide_ms after — unless the mouse moved since
---- the last keystroke, which means the user went back to pointing.
---- @param ctx table { wpm, source, tooltip_visible, now_s, last_active_s, last_mouse_s, idle_hide_s }
---- @return boolean show, number last_active_s
+--- Whether the floating widget shows after real keyboard activity.
+--- A preview is the only exception to pointer and keyboard-idle hiding.
+--- @param ctx table { tooltip_visible, now_s, last_input_s, last_mouse_s, idle_hide_s }
+--- @return boolean
 function M.widget_visible(ctx)
-	local last_active = ctx.last_active_s or 0
-	if (ctx.wpm or 0) > 0 or (ctx.source or "none") ~= "none" then last_active = ctx.now_s end
-	local keyboard_idle = last_active > 0 and (ctx.now_s - last_active) >= ctx.idle_hide_s
-	local mouse_active = (ctx.last_mouse_s or 0) > last_active
-	local recently_active = last_active > 0 and not keyboard_idle and not mouse_active
-	return ((ctx.wpm or 0) > 0 or ctx.tooltip_visible == true or recently_active), last_active
+	if ctx.tooltip_visible == true then return true end
+	local input = ctx.last_input_s
+	if type(input) ~= "number" or input > ctx.now_s then return false end
+	return (ctx.now_s - input) < ctx.idle_hide_s
+		and (ctx.last_mouse_s == nil or ctx.last_mouse_s <= input)
 end
 
 --- The pill's default top-left corner: the screen's bottom-right, inset.

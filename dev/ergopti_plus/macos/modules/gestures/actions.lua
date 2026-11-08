@@ -25,6 +25,7 @@ local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
 local Clipboard     = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
@@ -60,6 +61,7 @@ local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 local _state = nil
 local _dispatch_parent = GESTURE_ACTION_PARENT
+local _binding_changes = {}
 local _action_scope_lifecycles = {}
 local _lookup_operations = {}
 
@@ -553,11 +555,11 @@ end
 -- registry below stays a pure name -> behaviour mapping. Re-export its public
 -- surface on M so existing callers (and the registry) keep their call sites.
 M.force_cleanup           = Click.force_cleanup
-M.toggle_right_click      = function()
-	return Click.toggle_right_click(current_action_parent())
+M.toggle_right_click      = function(binding)
+	return Click.toggle_right_click(current_action_parent(), binding)
 end
-M.toggle_left_click       = function()
-	return Click.toggle_left_click(current_action_parent())
+M.toggle_left_click       = function(binding)
+	return Click.toggle_left_click(current_action_parent(), binding)
 end
 M.is_right_click_held     = Click.is_right_click_held
 
@@ -963,17 +965,57 @@ local function arm_sticky(modifiers)
 	return Sticky.toggle(modifiers, secs, current_action_parent())
 end
 
-sg("layer_on", function()
+-- Newest layer write; an older settlement must not undo a newer intent.
+local _layer_request = 0
+
+--- Writes the navigation-layer variable and, once that exact write settles,
+--- moves the wheel bindings with it. Karabiner taps the F20/F19 sentinels only
+--- around its own generated actions, so this direct write would otherwise
+--- leave the wheel scrolling after layer_on, or consuming after layer_off.
+--- @param active boolean True to enter the layer, false to leave it.
+local function set_nav_layer(active)
 	local ke = ke_variables()
-	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_ON) end
-end)
-sg("layer_off", function()
-	local ke = ke_variables()
-	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_OFF) end
-end)
+	if not ke then return end
+	_layer_request = _layer_request + 1
+	local request = _layer_request
+	local function finish(ok, reason)
+		if ok ~= true or reason ~= "written" then
+			Logger.debug(LOG, "Navigation layer write did not settle: %s.", tostring(reason))
+			return
+		end
+		if request ~= _layer_request then
+			Logger.debug(LOG, "Navigation layer write was superseded.")
+			return
+		end
+		local sentinels_ok, Sentinels = pcall(require, "modules.keymap.control_sentinels")
+		if not sentinels_ok or type(Sentinels) ~= "table"
+			or type(Sentinels.publish_nav_layer) ~= "function" then
+			Logger.error(LOG, "Navigation layer wheel cannot follow the layer: %s.", tostring(Sentinels))
+			return
+		end
+		Sentinels.publish_nav_layer(active)
+	end
+	ke.set(KE_LAYER_VARIABLE, active and KE_LAYER_ON or KE_LAYER_OFF, finish)
+end
+
+sg("layer_on", function() set_nav_layer(true) end)
+sg("layer_off", function() set_nav_layer(false) end)
 sg("capsword", function()
 	local ke = ke_variables()
 	if not ke then return end
+	-- The action toggles, as on Windows and Linux (decision of 2026-11-06): a
+	-- second invocation ends the running CapsWord through the watcher's clear.
+	if ke.capsword_known_active() then
+		local watchers_ok, watchers = pcall(require, "platform.remap.watchers")
+		if not watchers_ok or type(watchers) ~= "table" or type(watchers.deactivate_capsword_by_action) ~= "function" then
+			Logger.error(LOG, "CapsWord action cannot switch CapsWord off: %s.", tostring(watchers))
+			return
+		end
+		if not watchers.deactivate_capsword_by_action() then
+			Logger.error(LOG, "CapsWord action could not switch CapsWord off: no running CapsWord watcher.")
+		end
+		return
+	end
 	local function finish_activation(ok, reason, revision)
 		if ok ~= true or reason ~= "written" then
 			Logger.debug(LOG, "CapsWord gesture activation did not settle: %s.", tostring(reason))
@@ -1597,6 +1639,7 @@ end)
 -- it: a local declared below one binds a nil global instead, and the failure
 -- surfaces only inside a timer callback where the file logger never sees it.
 local _search_capture_in_flight = false
+ClipboardBorrowers.register("search", function() return _search_capture_in_flight == true end)
 local _search_parent = nil
 local _search_saved_clipboard = nil
 local _search_result_receipt = nil
@@ -1966,13 +2009,24 @@ sg("search_web", function(binding)
 	-- the FIRST had just copied — the selection, not the user's clipboard — and
 	-- then dutifully "restored" it, so the real clipboard was gone for good. The
 	-- same stale-snapshot class the text-transform path was hardened against.
-	local ok_snapshot, snapshot_or_error = pcall(hs.pasteboard.readAllData)
-	if not ok_snapshot or type(snapshot_or_error) ~= "table" then
-		Logger.error(LOG, "search_web clipboard snapshot failed: %s.", tostring(snapshot_or_error))
-		return
+	-- Another family's temporary payload is not the user's clipboard
+	local holder = ClipboardBorrowers.foreign_holder("search")
+	if holder then
+		Logger.info(LOG, "search_web ignored while %s borrows the clipboard.", holder)
+		return false
+	end
+	local ok_snapshot, snapshot, captured, snapshot_count = pcall(Clipboard.save)
+	if not ok_snapshot or captured ~= true then
+		Logger.error(LOG, "search_web clipboard snapshot failed.")
+		return false
 	end
 	if not aux_admission_open(parent) then return false end
-	_search_saved_clipboard = snapshot_or_error
+	if Clipboard._change_count() ~= snapshot_count then
+		Logger.error(LOG, "search_web clipboard changed before capture.")
+		return false
+	end
+	if not aux_admission_open(parent) then return false end
+	_search_saved_clipboard = snapshot or {}
 	_search_result_receipt = nil
 	_search_capture_in_flight = true
 	_search_parent = parent
@@ -3047,6 +3101,27 @@ local function dispatch_single(name, binding, s, parent, control_plane, acted_fr
 	return callback_ok == true and admission_committed == true
 end
 
+--- Reserves one gesture slot across a durable assignment change.
+--- @return table|nil receipt
+function M.begin_click_binding_change(binding, previous)
+	if type(binding) ~= "string" or _binding_changes[binding] then return nil end
+	local receipt = { binding = binding, click = Click.capture_binding(GESTURE_ACTION_PARENT, binding, previous) }
+	_binding_changes[binding] = receipt
+	return receipt
+end
+
+--- Opens the slot after publication and retires only its captured click.
+--- @return boolean settled
+function M.finish_click_binding_change(receipt, committed)
+	if type(receipt) ~= "table" or _binding_changes[receipt.binding] ~= receipt then return false end
+	if committed and receipt.click and Click.retire_binding(receipt.click) ~= true then
+		_binding_changes[receipt.binding] = nil
+		return false
+	end
+	_binding_changes[receipt.binding] = nil
+	return true
+end
+
 --- Dispatches a registered single-shot action. An action the catalogue
 --- declares `confirm = true` only asks here; it runs from the answer, and only
 --- while its parent is still admitted.
@@ -3056,6 +3131,7 @@ end
 --- confirmation asked for); false when the action is unknown here, so the
 --- caller can try its own fallback instead of assuming the action ran.
 function M.execute_single(name, binding)
+	if type(binding) == "string" and _binding_changes[binding] then return false end
 	local parent = parent_for_binding(binding)
 	local control_plane = is_script_control_plane_action(name, binding)
 	if not control_plane and not aux_admission_open(parent) then return false end

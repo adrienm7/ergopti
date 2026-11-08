@@ -1,63 +1,152 @@
 {
 	"description": "Golden vectors for the token usage and estimated cost of a remote-provider answer, the figures the dashboard's AI tab reads from events_llm. Replayed by the shared Lua module (_shared/lua/llm/remote_response_classifier.lua, macOS and Linux) and on Windows by test_llm_shared_vectors.ahk.",
-	"rule": "Each format reads only its own top-level usage map: openai and backboard usage.{prompt_tokens,completion_tokens,total_tokens}, perplexity_agent usage.{input_tokens,output_tokens,total_tokens}, anthropic usage.{input_tokens,output_tokens} with the total their sum, gemini usageMetadata.{promptTokenCount,candidatesTokenCount,totalTokenCount}. A negative, non-numeric or missing count is 0; a zero total beside a nonzero prompt count is the sum. A price row is kept when in and out are finite nonnegative numbers (US dollars per million tokens); cost = (prompt * in + completion * out) / 1000000, 0 for an unpriced model.",
+	"rule": "Each format reads only its own top-level usage map: openai and backboard usage.{prompt_tokens,completion_tokens,total_tokens}, perplexity_agent usage.{input_tokens,output_tokens,total_tokens}, anthropic usage.{input_tokens,output_tokens} with the total their sum, gemini usageMetadata.{promptTokenCount,candidatesTokenCount,totalTokenCount}. A negative, non-numeric or missing count is 0; a zero or missing total is the sum of the admitted prompt and completion counts. A price row is kept when in and out are finite nonnegative numbers (US dollars per million tokens); cost = (prompt * in + completion * out) / 1000000, 0 for an unpriced model.",
 	"usage_vectors": [
 		{
 			"id": "openai_top_level_only",
 			"format": "openai",
 			"body": "{\"metadata\":{\"usage\":{\"prompt_tokens\":900,\"completion_tokens\":800,\"total_tokens\":1700}},\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":12,\"total_tokens\":23}}",
-			"expected": { "prompt_tokens": 11, "completion_tokens": 12, "total_tokens": 23 }
+			"expected": {
+				"prompt_tokens": 11,
+				"completion_tokens": 12,
+				"total_tokens": 23
+			}
 		},
 		{
 			"id": "anthropic_top_level_only",
 			"format": "anthropic",
 			"body": "{\"metadata\":{\"usage\":{\"input_tokens\":900,\"output_tokens\":800}},\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"usage\":{\"input_tokens\":21,\"output_tokens\":22}}",
-			"expected": { "prompt_tokens": 21, "completion_tokens": 22, "total_tokens": 43 }
+			"expected": {
+				"prompt_tokens": 21,
+				"completion_tokens": 22,
+				"total_tokens": 43
+			}
 		},
 		{
 			"id": "gemini_top_level_only",
 			"format": "gemini",
 			"body": "{\"metadata\":{\"usageMetadata\":{\"promptTokenCount\":900,\"candidatesTokenCount\":800,\"totalTokenCount\":1700}},\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]}}],\"usageMetadata\":{\"promptTokenCount\":31,\"candidatesTokenCount\":32,\"totalTokenCount\":63}}",
-			"expected": { "prompt_tokens": 31, "completion_tokens": 32, "total_tokens": 63 }
+			"expected": {
+				"prompt_tokens": 31,
+				"completion_tokens": 32,
+				"total_tokens": 63
+			}
 		},
 		{
 			"id": "perplexity_agent_top_level_only",
 			"format": "perplexity_agent",
 			"body": "{\"metadata\":{\"usage\":{\"input_tokens\":900,\"output_tokens\":800}},\"output\":[],\"usage\":{\"input_tokens\":51,\"output_tokens\":52,\"total_tokens\":103,\"cost\":{\"total_cost\":0.1}}}",
-			"expected": { "prompt_tokens": 51, "completion_tokens": 52, "total_tokens": 103 }
+			"expected": {
+				"prompt_tokens": 51,
+				"completion_tokens": 52,
+				"total_tokens": 103
+			}
 		},
 		{
 			"id": "openai_missing_total_is_sum",
 			"format": "openai",
 			"body": "{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":2}}",
-			"expected": { "prompt_tokens": 40, "completion_tokens": 2, "total_tokens": 42 }
+			"expected": {
+				"prompt_tokens": 40,
+				"completion_tokens": 2,
+				"total_tokens": 42
+			}
 		},
 		{
 			"id": "negative_and_non_numeric_are_zero",
 			"format": "openai",
 			"body": "{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"usage\":{\"prompt_tokens\":-1,\"completion_tokens\":\"2\",\"total_tokens\":-3}}",
-			"expected": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0 }
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 0,
+				"total_tokens": 0
+			}
 		},
 		{
 			"id": "null_usage_is_zero",
 			"format": "openai",
 			"body": "{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"usage\":null}",
-			"expected": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0 }
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 0,
+				"total_tokens": 0
+			}
 		},
 		{
 			"id": "not_json_is_zero",
 			"format": "openai",
 			"body": "upstream timeout",
-			"expected": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0 }
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 0,
+				"total_tokens": 0
+			}
+		},
+		{
+			"id": "openai_output_only_missing_total",
+			"format": "openai",
+			"body": "{\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":10}}",
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 10,
+				"total_tokens": 10
+			}
+		},
+		{
+			"id": "gemini_output_only_missing_total",
+			"format": "gemini",
+			"body": "{\"usageMetadata\":{\"promptTokenCount\":0,\"candidatesTokenCount\":10}}",
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 10,
+				"total_tokens": 10
+			}
+		},
+		{
+			"id": "backboard_output_only_missing_total",
+			"format": "backboard",
+			"body": "{\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":10}}",
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 10,
+				"total_tokens": 10
+			}
+		},
+		{
+			"id": "perplexity_agent_output_only_missing_total",
+			"format": "perplexity_agent",
+			"body": "{\"usage\":{\"input_tokens\":0,\"output_tokens\":10}}",
+			"expected": {
+				"prompt_tokens": 0,
+				"completion_tokens": 10,
+				"total_tokens": 10
+			}
 		}
 	],
 	"model_prices": {
-		"priced-integer": { "in": 1, "out": 2 },
-		"priced-float": { "in": 0.25, "out": 1.25 },
-		"free": { "in": 0, "out": 0 },
-		"string-price": { "in": "1", "out": 2 },
-		"negative-price": { "in": -1, "out": 2 },
-		"missing-out": { "in": 1 },
+		"priced-integer": {
+			"in": 1,
+			"out": 2
+		},
+		"priced-float": {
+			"in": 0.25,
+			"out": 1.25
+		},
+		"free": {
+			"in": 0,
+			"out": 0
+		},
+		"string-price": {
+			"in": "1",
+			"out": 2
+		},
+		"negative-price": {
+			"in": -1,
+			"out": 2
+		},
+		"missing-out": {
+			"in": 1
+		},
 		"not-a-row": 3
 	},
 	"admitted_prices": ["free", "priced-float", "priced-integer"],

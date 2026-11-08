@@ -648,6 +648,49 @@ _CMJ_BootReadStretch() {
 }
 Test("config journal: the boot read stretch shares one comparison and never admits a write on it", _CMJ_BootReadStretch)
 
+; boot-operation-budget-2026-11-03: the boot's consumers read config.toml through
+; ConfigTomlBootSnapshot fourteen times, over the startup smoke's ceiling of
+; nine. The open stretch serves them the one snapshot it admitted, and its
+; release proves that snapshot once, refusing one mutated while it was served.
+_CMJ_BootSnapshotStretch() {
+	global ConfigurationFile, ConfigMigrateBootReadProof, _ConfigTomlSnapshotReads
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Source := _CMJ_CurrentSource(), Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ConfigMigrateBootReadsOpen()
+		Cache := ParseConfigTomlFile(Path)
+		Before := _ConfigTomlSnapshotReads
+		Served := ConfigTomlBootSnapshot(Cache)
+		AssertTrue(IsObject(Served), "the bootstrap cache has its actual snapshot owner")
+		loop 6
+			AssertTrue(ConfigTomlBootSnapshot(Cache) == Served, "every boot consumer shares the admitted snapshot")
+		AssertEqual(1, _ConfigTomlSnapshotReads - Before, "seven boot consumers pay one snapshot read")
+		AssertTrue(ConfigMigrateBootReadsClose(Path))
+		Before := _ConfigTomlSnapshotReads
+		AssertTrue(ConfigTomlBootReadsRelease(Path), "an unchanged served snapshot releases cleanly")
+		AssertEqual(1, _ConfigTomlSnapshotReads - Before, "the release proves the served snapshot once")
+		AssertTrue(ConfigTomlBootReadsRelease(Path), "a second release has nothing left to prove")
+		Before := _ConfigTomlSnapshotReads
+		ConfigTomlBootSnapshot(Cache), ConfigTomlBootSnapshot(Cache)
+		AssertEqual(2, _ConfigTomlSnapshotReads - Before, "after the stretch every read proves its image again")
+		ConfigMigrateBootReadsOpen()
+		Served := ConfigTomlBootSnapshot(Cache)
+		Served.Cache["tampered"] := Map()
+		AssertTrue(ConfigMigrateBootReadsClose(Path))
+		AssertFalse(ConfigTomlBootReadsRelease(Path), "a snapshot mutated while it was served is refused")
+	} finally {
+		ConfigMigrateBootReadProof.open := false
+		ConfigMigrateBootReadProof.registry := 0, ConfigMigrateBootReadProof.shadow := 0
+		try ConfigTomlBootReadsRelease(Path)
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: the boot read stretch serves one admitted snapshot and proves it at release", _CMJ_BootSnapshotStretch)
+
 _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
@@ -656,7 +699,24 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	Source := '[_meta]`nschema_version = ' . Registry["oldest"] . '`n[hotstrings]`ntrigger_char = "@"`n'
 	NativeWrite := FSWriteDurable, PreviousSink := _LOGGER_TEST_SINK
 	PreviousLevel := LOGGER_MIN_LEVEL
-	Seen := { stage: 0, completed: 0, stage_paths: [], stage_content: "", source_unchanged: false }
+	Seen := { stage: 0, completed: 0, stage_paths: [], stage_content: "", source_unchanged: false,
+		held_creations: 0, stage_handle: -1 }
+	HeldOwner := FSWriteReplaceOwned, HadOwnHeld := HeldOwner.HasOwnProp("Call"), InstalledHeld := false
+	if HadOwnHeld
+		SavedHeld := HeldOwner.GetOwnPropDesc("Call")
+	ObserveHeld(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := When == "stage" && (Target is String) && StrCompare(Target, Path, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			Handle := StageFn.Call(Folder, Name, Attributes)
+			Seen.held_creations += 1
+			Seen.stage_handle := Handle
+			return Handle
+		}
+		return Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+	}
 	Observe(Line) {
 		if When == "stage" && InStr(Line, "[INFO] [ConfigMigrate] Verified durable migration stage '")
 				&& InStr(Line, "' for '" . Path . "' before native publication.") {
@@ -665,7 +725,11 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 			; original registry before the actual final native move can run.
 			loop Files Path . "." . A_ScriptHwnd . "-migration-*.stage", "F" {
 				Seen.stage_paths.Push(A_LoopFileFullPath)
-				Seen.stage_content := FSReadUtf8Exact(A_LoopFileFullPath)
+				; The retained writer still owns WRITE|DELETE. A pathname
+				; reader that shares only READ correctly refuses that owner.
+				; Observe the exact real factory handle instead of reopening it.
+				_FSRewind(Seen.stage_handle)
+				Seen.stage_content := _FSReadUtf8ExactHandle(Seen.stage_handle, 0, false)
 			}
 			Seen.source_unchanged := FSUtf8ExactMatches(Path, Source)
 			Step["reason"] := Reason . " withdrawn after actual durable stage"
@@ -692,7 +756,16 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 				_LoggerRefreshFastFlags()
 				LoggerSetTestSink(Observe)
 		}
+		if When == "stage" {
+			HeldOwner.DefineProp("Call", {Call: ObserveHeld})
+			InstalledHeld := true
+		}
 		Result := ConfigMigrateBoot(Path)
+		if When == "stage" {
+			_TestPrint("# migration-registry-held-stage stage=" . Seen.stage . " held_creations=" . Seen.held_creations
+				. " content_is_string=" . (Seen.stage_content is String) . " source_unchanged=" . Seen.source_unchanged)
+			AssertEqual(1, Seen.held_creations, "the actual retained stage factory must supply the observed handle")
+		}
 		AssertEqual("failed", Result["status"], "lost original registry handoff is an actual failure, never a public success map")
 		AssertEqual(1, Result["read_only"]), AssertFalse(ConfigSchemaCanPrepareWrite(Path))
 		if When == "prepared" {
@@ -721,6 +794,12 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 		Step["reason"] := Reason
 		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "repair does not resurrect this session's refused initial boot")
 	} finally {
+		if InstalledHeld {
+			if HadOwnHeld
+				HeldOwner.DefineProp("Call", SavedHeld)
+			else
+				HeldOwner.DeleteProp("Call")
+		}
 		try {
 			; Close this real observer cohort before restoring the exact previous sink.
 			try _LoggerFlushRepeats(true)

@@ -42,8 +42,8 @@ class _TN64_Ops extends _TakeNoteFakeOps {
 		return Captured
 	}
 
-	static FindWindow(FileName) {
-		Result := _TakeNoteFakeOps.FindWindow(FileName)
+	static FindWindow(FileName, Admits := 0) {
+		Result := _TakeNoteFakeOps.FindWindow(FileName, Admits)
 		if (_TN64_Ops.Arm and _TN64_Ops.Cut == "reschedule") {
 			_TN64_Ops.Arm := false
 			_TN64_Ops.BoundaryHits += 1

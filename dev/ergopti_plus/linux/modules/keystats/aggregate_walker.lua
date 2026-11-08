@@ -50,11 +50,7 @@ local MIN5_STEP_MINUTES = 5
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local handle = io.open(path, "r")
-	if not handle then return nil end
-	local content = handle:read("*a")
-	handle:close()
-	return content
+	return require("adapters.file_system").read(path)
 end
 
 --- Validates the physical family against its actual provider registry.
@@ -84,7 +80,31 @@ local function finger_lookup(family)
 	if not path then return nil end
 	local ok_json, Json = pcall(require, "json")
 	if not ok_json then return nil end
-	return FingerMap.load(family, read_file, Json.decode, path)
+	-- The shared finger catalogue names physical keys in QWERTY; its AZERTY
+	-- labels describe an Apple keyboard, whose punctuation differs from Linux.
+	-- Resolve each Linux evdev level back to that same physical QWERTY key.
+	local reference = FingerMap.load("qwerty", read_file, Json.decode, path)
+	local layouts = require("modules.hotstrings.input_reader").get_layouts()
+	local qwerty = type(layouts) == "table" and layouts.qwerty or nil
+	local target = type(layouts) == "table" and layouts[family] or nil
+	if type(reference) ~= "table" or type(qwerty) ~= "table" or type(qwerty.unshifted) ~= "table"
+		or type(target) ~= "table" then return nil end
+	local result, ambiguous = {}, {}
+	for _, level in ipairs({ "unshifted", "shifted" }) do
+		local keys = target[level]
+		if type(keys) == "table" then
+			for code, char in pairs(keys) do
+				local physical = reference[qwerty.unshifted[code]]
+				if type(char) == "string" and physical and not ambiguous[char] then
+					local previous = result[char]
+					if previous and (previous.finger ~= physical.finger or previous.hand ~= physical.hand) then
+						result[char], ambiguous[char] = nil, true
+					else result[char] = physical end
+				end
+			end
+		end
+	end
+	return result
 end
 
 local WALK_TIMINGS = {
@@ -149,6 +169,10 @@ end
 --- @param batch table|nil An existing batch to add to; a fresh one when absent.
 --- @param clock table Captured physical_layout and optional reported layout,
 ---        times, wall_times or wall_offset_ms. Missing time ports skip histograms.
+---        A replayed row of another device carries `slot` (the hour of its
+---        timestamp, as macOS bins a replayed row) and `foreign = true`: its
+---        physical keyboard is not one of this host's, so a family this host
+---        does not register walks without a finger port instead of refusing.
 --- @param ctx table|nil The application's walk context (see M.settle), carried
 ---        from the previous flush and updated in place. Without it, everything
 ---        still open is credited when the stream ends.
@@ -158,7 +182,15 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	if type(events) ~= "table" then return batch end
 	assert(type(clock) == "table", "Metrics walk requires captured input context")
 	assert(clock.layout == nil or type(clock.layout) == "string", "Invalid captured metrics layout label")
-	local typing_walk = captured_walk(clock.physical_layout)
+	local typing_walk
+	if clock.foreign == true then
+		local known = require("modules.hotstrings.input_reader").get_layouts()
+		local family = clock.physical_layout
+		typing_walk = (type(family) == "string" and type(known) == "table" and known[family])
+			and captured_walk(family) or Walk
+	else
+		typing_walk = captured_walk(clock.physical_layout)
+	end
 	-- Nothing continues across midnight: what the context still holds belongs
 	-- to the day it was typed on.
 	if ctx and ctx.date and ctx.date ~= date_str then M.settle(ctx, nil, batch, true) end
@@ -170,6 +202,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 
 	--- The hour and five-minute slot of one keystroke, from its stamp.
 	local function slot_of(index)
+		if type(clock.slot) == "table" then return clock.slot end
 		local captured = wall_times and tonumber(wall_times[index])
 		local monotonic = times and tonumber(times[index])
 		if not captured and not monotonic then return nil end
@@ -244,10 +277,9 @@ end
 --- Splits a batch's n-gram tables into per-table, per-app-day maps the writer
 --- takes.
 ---
---- The batch keys rows by "date\1app\1token" because the shared accumulator has
---- to hold several applications at once; the writer takes one application at a
---- time. Undoing that here rather than in the writer keeps the writer's shape
---- the same as its five siblings.
+--- The shared accumulator keeps the original tuple in item.identity when an
+--- app contains the legacy key separator. Other rows retain the established
+--- "date\1app\1token" key. The writer takes one application at a time.
 --- @param batch table
 --- @return table Array of { table_name, date, app, ngrams }.
 function M.batches_for_writer(batch)
@@ -257,7 +289,12 @@ function M.batches_for_writer(batch)
 	for table_name, rows in pairs(batch.ngram) do
 		local grouped = {}
 		for key, item in pairs(rows) do
-			local date_str, app, token = key:match("^([^\1]*)\1([^\1]*)\1(.*)$")
+			local date_str, app, token
+			if item.identity then
+				date_str, app, token = item.identity.date, item.identity.app, item.identity.token
+			else
+				date_str, app, token = key:match("^([^\1]*)\1([^\1]*)\1(.*)$")
+			end
 			if date_str and token ~= "" then
 				local bucket = grouped[date_str .. "\1" .. app]
 				if not bucket then

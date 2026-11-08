@@ -9,6 +9,8 @@
 ;   - wpm_config.ahk   — shared TOML constant loading, config persistence,
 ;                        position save/reset helpers
 ;   - wpm_widget.ahk   — compact + graph GUI builders and drag handling
+;   - wpm_tray_readout.ahk — the live number in a notification-area icon,
+;                        the macOS menu bar / Linux tray readout's counterpart
 ;
 ; FEATURES & RATIONALE:
 ; 1. Rolling window: WPM is calculated over a configurable trailing window
@@ -38,3 +40,4 @@
 #Include wpm_gdiplus_ownership.ahk
 #Include wpm_widget.ahk
 #Include wpm_config.ahk
+#Include wpm_tray_readout.ahk

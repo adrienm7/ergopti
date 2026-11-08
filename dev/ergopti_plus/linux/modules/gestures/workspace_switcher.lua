@@ -30,7 +30,7 @@
 ---    the rule the macOS and Windows drivers use, pinned by a shared corpus.
 --- 2. A query that fails is reported, never read as "workspace 0": the action
 ---    then presses the desktop's own shortcut, which is the plain step. A
----    switch refused after a good read walks to the target with that shortcut.
+---    switch with an inconclusive result never launches a second producer.
 --- 3. Every tool call is bounded by `timeout`: the daemon waits for it while
 ---    it holds the keyboard, so a hung display server must cost a second, not
 ---    the keyboard.
@@ -48,6 +48,9 @@ local LOG = "modules.gestures.workspace_switcher"
 
 -- Seconds each tool call may take (see FEATURES 3).
 local TOOL_TIMEOUT_S = 1
+-- KWin's count is external input; even thousands of desktops already exceed
+-- practical interactive use, and must not allocate unbounded memory here.
+local MAX_KWIN_WORKSPACES = 4096
 
 -- The combination the desktops bind to the previous and the next workspace,
 -- pressed when no interface can switch. Under Wayland it is the only way
@@ -129,7 +132,7 @@ function M.parse_kwin(current_text, count_text)
 	if not current or not count then
 		error("KWin answered '" .. tostring(current_text) .. "' / '" .. tostring(count_text) .. "'", 0)
 	end
-	if count < 1 or current < 1 or current > count then
+	if count < 1 or count > MAX_KWIN_WORKSPACES or current < 1 or current > count then
 		error("KWin's current desktop " .. current .. " is outside its " .. count .. " desktop(s)", 0)
 	end
 	local ids = {}
@@ -293,7 +296,7 @@ end
 --- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
 --- @param wrap boolean True to go on to the other end from an edge.
 --- @param press_combo function Presses one xdotool-style combination.
---- @return string outcome "switched", "stayed" or "pressed".
+--- @return string outcome "switched", "stayed", "pressed" or "unconfirmed".
 function M.switch(direction, wrap, press_combo)
 	if M.COMBO[direction] == nil then
 		error("workspace_switcher: unknown direction '" .. tostring(direction) .. "'", 2)
@@ -320,16 +323,10 @@ function M.switch(direction, wrap, press_combo)
 					backend.name, state.index + 1, target + 1, #state.ids)
 				return "switched"
 			end
-			-- The position is known, so walk to the target as the macOS and
-			-- Windows drivers do: a wrap from an edge is several steps the
-			-- other way, and one press in the requested direction would run
-			-- into the edge.
-			local steps = target - state.index
-			local combo = M.COMBO[steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS]
-			Logger.warn(LOG, "%s refused to switch to workspace %d — pressing %s %d time(s) instead.",
-				backend.name, target + 1, combo, math.abs(steps))
-			for _ = 1, math.abs(steps) do press_combo(combo) end
-			return "pressed"
+			-- A timed-out or failed command may already have reached the compositor.
+			-- A second producer could then move a second time from the new workspace.
+			Logger.warn(LOG, "%s did not confirm the workspace switch; no second command was sent.", backend.name)
+			return "unconfirmed"
 		else
 			Logger.warn(LOG, "%s could not list the workspaces (%s) — pressing %s instead.",
 				backend.name, tostring(result), M.COMBO[direction])

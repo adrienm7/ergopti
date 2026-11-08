@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../../../support/filesystem_write_lock.ahk
 
 
 
@@ -258,3 +259,121 @@ Test("Diagnostics collection preserves malformed progress refusal after sharing 
 Test("Diagnostics collection keeps its deadline behind exclusive progress (groups247-collection)", _TestHC_CollectionExclusiveProgress.Bind("deadline"))
 
 #Include test_healthcheck_collection_publish_owner.ahk
+
+
+; A lock that shares delete must not itself cause the stage rename to fail.
+_TestHC_LockedStageRenameControl(Root) {
+	Lock := _FSWL_Lock()
+	Stage := Root . "\rename-stage", Target := Root . "\rename-target"
+	try {
+		File := Lock.Open(Stage, "w", "UTF-8-RAW")
+		File.Close()
+		Moved := false
+		try {
+			FileMove(Stage, Target, true)
+			Moved := true
+		}
+		AssertTrue(Lock.Acquired, "the native byte-range lock was acquired")
+		AssertTrue(Moved, "the lock shares DELETE and permits rename")
+		AssertTrue(FileExist(Target) != "", "the rename really occurred while locked")
+	} finally Lock.Release()
+}
+
+
+; Create the real stage, then retain the same file object with no write-data right.
+; WriteFile on that exact object must fail with ERROR_ACCESS_DENIED; DELETE and
+; write-attributes remain available for production's owned-handle cleanup.
+_TestHC_CollectionReadOnlyStage(State, Folder, Name, Attributes) {
+	Original := _FSCreateHeldStage(Folder, Name, Attributes)
+	Duplicate := 0
+	try {
+		State["name"] := Name
+		Before := FSHandleSnapshot(Original)
+		CurrentProcess := DllCall("kernel32\GetCurrentProcess", "Ptr")
+		Rights := 0x110181 ; SYNCHRONIZE | DELETE | FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES | FILE_READ_DATA
+		if !DllCall("kernel32\DuplicateHandle", "Ptr", CurrentProcess, "Ptr", Original,
+				"Ptr", CurrentProcess, "Ptr*", &Duplicate, "UInt", Rights, "Int", false, "UInt", 0, "Int")
+			throw OSError(A_LastError, "duplicate read-only stage")
+		After := FSHandleSnapshot(Duplicate)
+		State["same"] := Before.Get("ok", false) && After.Get("ok", false)
+			&& Before["volume"] == After["volume"] && Before["index_high"] == After["index_high"]
+			&& Before["index_low"] == After["index_low"]
+		if !State["same"]
+			throw Error("the duplicate did not retain the original stage identity")
+		if !DllCall("kernel32\CloseHandle", "Ptr", Original, "Int")
+			throw OSError(A_LastError, "close original stage")
+		Original := -1
+		Result := Duplicate, Duplicate := 0
+		return Result
+	} finally {
+		if Duplicate {
+			_FSDiscardHeldStage(Duplicate)
+			DllCall("kernel32\CloseHandle", "Ptr", Duplicate, "Int")
+		}
+		if Original != -1 {
+			_FSDiscardHeldStage(Original)
+			DllCall("kernel32\CloseHandle", "Ptr", Original, "Int")
+		}
+	}
+}
+
+; Exercise the genuine OS writer with the exact stage object lacking write-data access.
+_TestHC_GuidedWriteRejectsBufferedFlush() {
+	Root := _FSWL_Path()
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("The proof could not acquire its exclusive scratch directory")
+	try {
+		_TestHC_LockedStageRenameControl(Root)
+		D := DiagnosticCollectionWindows()
+		D.Directory := Root
+		Refused := false, Result := false, Failure := ""
+		Stage := Map("same", false, "name", "")
+		try Result := D.SkipGuided(_TestHC_CollectionReadOnlyStage.Bind(Stage))
+		catch as Err {
+			Refused := true
+			Failure := Err.Message
+		}
+		Published := Root . "\physical.json"
+		PublishedBytes := FileExist(Published) ? FileGetSize(Published) : -1
+		FileAppend("OBS collection-guided same=" . Stage["same"] . " Refused=" . Refused
+			. " Result=" . Result . " publishedBytes=" . PublishedBytes . " error=" . Failure . "`n", "*")
+		AssertEqual("physical.json.tmp", Stage["name"], "the actual guided stage was opened")
+		AssertTrue(Stage["same"], "the read-only duplicate is the exact created stage")
+		AssertTrue(Refused || !Result, "a refused native write must not acknowledge guided completion")
+		AssertContains(Failure, "owned text stage write (Win32 5)", "the real WriteFile boundary refused the stage with access denied")
+		AssertFalse(FileExist(Published), "a failed write cannot publish a control receipt")
+		AssertFalse(FileExist(Root . "\physical.json.tmp"), "owned incomplete stage is retired by handle")
+	} finally {
+		if Created && DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Diagnostics collection: guided receipt requires an OS write (collection-guided-native-write)",
+	_TestHC_GuidedWriteRejectsBufferedFlush)
+
+; A foreign sibling is not a scratch file the collection may overwrite or delete.
+_TestHC_GuidedForeignStage() {
+	Root := _FSWL_Path()
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("The proof could not acquire its exclusive scratch directory")
+	try {
+		Target := Root . "\physical.json", Stage := Target . ".tmp"
+		AssertTrue(FSWriteCreateDurable(Target, "previous"))
+		AssertTrue(FSWriteCreateDurable(Stage, "foreign"))
+		D := DiagnosticCollectionWindows(), D.Directory := Root
+		Refused := false
+		try D.SkipGuided()
+		catch
+			Refused := true
+		AssertTrue(Refused, "the preexisting stage refuses publication")
+		AssertEqual("previous", FSReadUtf8Exact(Target), "the previous receipt remains unchanged")
+		AssertEqual("foreign", FSReadUtf8Exact(Stage), "the foreign stage remains unchanged")
+	} finally {
+		if Created && DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Diagnostics collection: a foreign control stage is never adopted (collection-guided-native-write)",
+	_TestHC_GuidedForeignStage)

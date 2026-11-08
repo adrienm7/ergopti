@@ -11,7 +11,8 @@
 --- the AutoHotkey port is windows/modules/llm/parser.ahk, and both are pinned to
 --- the _shared/tests/corpus/llm/process_prediction_vectors.json golden corpus.
 ---
---- This module is PURE: it contains zero Hammerspoon API references. The only
+--- This module is platform-neutral and reads its fixed shared resource policy
+--- once. It contains zero Hammerspoon API references. The only
 --- OS-specific inputs — the min/max word limits — are resolved by the caller and
 --- threaded in through the `opts` table of process_prediction (the macOS shim
 --- reads them from its settings store; a Linux driver would read its own config).
@@ -30,6 +31,9 @@ local M = {}
 local utils  = require("text_utils")
 local Logger = require("logger.shim")
 local LOG    = "llm.parser"
+-- Maximum combined token-comparison scans and dynamic-programming cells per
+-- prediction. Beyond this, refuse the prediction rather than freeze input.
+local MAX_ALIGNMENT_WORK = 65536
 local native_utf8 = rawget(_G, "utf8")
 local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
 	and native_utf8.offset and native_utf8.codes and native_utf8.char)
@@ -134,7 +138,9 @@ local function clean_model_output(text)
 	
 	text = utils.unescape_text(text)
 	text = text:gsub("%*%*", ""):gsub("`", ""):gsub("\"", "")
-	text = text:gsub("<[^>]->", "")
+	-- Strip HTML tags, not angle-bracket comparisons such as "1 < 2 > 0".
+	text = text:gsub("</?[%a][%w:_%-]*%s*/?>", "")
+	text = text:gsub("</?[%a][%w:_%-]*%s+[^<>]->", "")
 	
 	text = text:gsub("^Voici la suite%s*:?%s*", "")
 	text = text:gsub("^Je propose%s*:?%s*", "")
@@ -393,55 +399,82 @@ end
 --- @param s string The string to tokenize.
 --- @return table Array of tokens.
 local function tokenize(s)
-	local tokens = {}
-	local current = ""
-	local current_type = 0 -- 1=word, 2=space, 3=punctuation
-
+	local tokens, current, current_type = {}, {}, 0
 	local chars = get_chars(s)
 	if not chars then return nil end
+	local function flush()
+		if #current > 0 then tokens[#tokens + 1] = table.concat(current); current = {} end
+	end
 	for _, c in ipairs(chars) do
-		local t = 0
-		if is_spacing_character(c) then
-			t = 2
-		elseif is_word_character(c) then
-			t = 1
-		else
-			t = 3
-		end
-
+		local t = is_spacing_character(c) and 2 or (is_word_character(c) and 1 or 3)
 		if t == 3 then
-			if current ~= "" then table.insert(tokens, current) end
-			table.insert(tokens, c)
-			current = ""
+			flush()
+			tokens[#tokens + 1] = c
 			current_type = 0
-		elseif t == current_type then
-			current = current .. c
 		else
-			if current ~= "" then table.insert(tokens, current) end
-			current = c
+			if t ~= current_type then flush() end
+			current[#current + 1] = c
 			current_type = t
 		end
 	end
-	if current ~= "" then table.insert(tokens, current) end
+	flush()
 	return tokens
 end
 
 --- Calculates the cost of substituting two semantic tokens.
+-- The shared resource policy bounds work before tokenization or any DP allocation.
+-- Byte counts are conservative for both the Lua codepoints and AHK UTF-16 port.
+local diff_limits
+local function diff_within_limits(original, corrected)
+	if not diff_limits then
+		local source = debug.getinfo(1, "S").source
+		assert(source:sub(1, 1) == "@", "parser resource policy requires its shipped source location")
+		local directory = assert(require("native_path").dirname(source:sub(2)), "parser source directory is unavailable")
+		local file = assert(io.open(directory .. "/../../modules/llm/parser_limits.json", "rb"))
+		local text = file:read("*a")
+		file:close()
+		local limits = assert(require("json").decode(text), "invalid shared parser resource policy")
+		assert(type(limits) == "table", "shared parser resource policy must be an object")
+		for _, name in ipairs({ "max_operand_bytes", "max_grid_cells" }) do
+			local value = limits[name]
+			assert(type(value) == "number" and value >= 1 and value < math.huge and value == math.floor(value), "invalid shared parser limit: " .. name)
+		end
+		diff_limits = limits
+	end
+	return #original <= diff_limits.max_operand_bytes and #corrected <= diff_limits.max_operand_bytes
+		and (#original + 1) * (#corrected + 1) <= diff_limits.max_grid_cells
+end
+
 --- Implements a strict similarity threshold to avoid scrambling unrelated words.
 --- @param t1 string The original token.
 --- @param t2 string The target token.
 --- @return number The substitution cost.
-local function token_sub_cost(t1, t2)
+local function token_sub_cost(t1, t2, budget, c1, c2)
 	if t1 == t2 then return 0 end
-	
+	-- Comparing and trimming long tokens also consumes work even if the
+	-- dynamic-programming middle is empty.
+	local scan = #c1 + #c2
+	if scan > budget.remaining then return nil end
+	budget.remaining = budget.remaining - scan
+
 	local type1 = (is_spacing_only(t1) and 2) or (t1:match("[%w’']") and 1) or 3
 	local type2 = (is_spacing_only(t2) and 2) or (t2:match("[%w’']") and 1) or 3
 	
 	if type1 ~= type2 then return 1000 end
 	
-	local c1 = get_chars(t1)
-	local c2 = get_chars(t2)
-	
+	local max_len = math.max(#c1, #c2)
+	local prefix = 0
+	while prefix < #c1 and prefix < #c2 and c1[prefix + 1] == c2[prefix + 1] do prefix = prefix + 1 end
+	local suffix = 0
+	while suffix < #c1 - prefix and suffix < #c2 - prefix
+		and c1[#c1 - suffix] == c2[#c2 - suffix] do suffix = suffix + 1 end
+	local trimmed1, trimmed2 = {}, {}
+	for i = prefix + 1, #c1 - suffix do trimmed1[#trimmed1 + 1] = c1[i] end
+	for i = prefix + 1, #c2 - suffix do trimmed2[#trimmed2 + 1] = c2[i] end
+	c1, c2 = trimmed1, trimmed2
+	local cells = #c1 * #c2
+	if cells > budget.remaining then return nil end
+	budget.remaining = budget.remaining - cells
 	local matrix = {}
 	for i = 0, #c1 do matrix[i] = {[0] = i} end
 	for j = 0, #c2 do matrix[0][j] = j end
@@ -454,8 +487,6 @@ local function token_sub_cost(t1, t2)
 	end
 	
 	local dist = matrix[#c1][#c2]
-	local max_len = math.max(#c1, #c2)
-	
 	local threshold = math.max(1, math.floor(max_len * 0.4))
 	
 	if dist > threshold then return 1000 end
@@ -498,26 +529,34 @@ end
 --- @param orig string The original text.
 --- @param corr string The corrected text.
 --- @return table Raw diff operations.
-local function token_diff_ops(orig, corr)
+local function token_diff_ops(orig, corr, budget)
 	local tokens1 = tokenize(orig)
 	local tokens2 = tokenize(corr)
 	if not tokens1 or not tokens2 then return nil end
 	local len1, len2 = #tokens1, #tokens2
+	local cells = len1 * len2
+	if cells > budget.remaining then return nil end
+	budget.remaining = budget.remaining - cells
 
+	local chars1, chars2 = {}, {}
+	for i, token in ipairs(tokens1) do chars1[i] = get_chars(token) end
+	for i, token in ipairs(tokens2) do chars2[i] = get_chars(token) end
 	local d = {}
 	for i = 0, len1 do d[i] = {[0] = 0} end
 	
 	local sum2 = 0
 	for j = 1, len2 do
-		sum2 = sum2 + #get_chars(tokens2[j])
+		sum2 = sum2 + #chars2[j]
 		d[0][j] = sum2
 	end
 
 	for i = 1, len1 do
 		for j = 1, len2 do
-			local cost_del = d[i-1][j] + #get_chars(tokens1[i])
-			local cost_ins = d[i][j-1] + #get_chars(tokens2[j])
-			local cost_sub = d[i-1][j-1] + token_sub_cost(tokens1[i], tokens2[j])
+			local cost_del = d[i-1][j] + #chars1[i]
+			local cost_ins = d[i][j-1] + #chars2[j]
+			local sub_cost = token_sub_cost(tokens1[i], tokens2[j], budget, chars1[i], chars2[j])
+			if sub_cost == nil then return nil end
+			local cost_sub = d[i-1][j-1] + sub_cost
 			d[i][j] = math.min(cost_del, cost_ins, cost_sub)
 		end
 	end
@@ -536,9 +575,11 @@ local function token_diff_ops(orig, corr)
 				table.insert(ops, 1, {type="equal", t1=tokens1[i], t2=tokens2[j]})
 				i, j = i - 1, j - 1
 			else
-				local cost_del = d[i-1][j] + #get_chars(tokens1[i])
-				local cost_ins = d[i][j-1] + #get_chars(tokens2[j])
-				local cost_sub = d[i-1][j-1] + token_sub_cost(tokens1[i], tokens2[j])
+				local cost_del = d[i-1][j] + #chars1[i]
+				local cost_ins = d[i][j-1] + #chars2[j]
+				local sub_cost = token_sub_cost(tokens1[i], tokens2[j], budget, chars1[i], chars2[j])
+				if sub_cost == nil then return nil end
+				local cost_sub = d[i-1][j-1] + sub_cost
 
 				local min_cost = math.min(cost_del, cost_ins, cost_sub)
 
@@ -616,6 +657,9 @@ function M.process_prediction(full_text, tail_text, block, opts)
 	local is_advanced = is_rewrite or block:find("TAIL_CORRECTED") or block:find("NEXT_WORDS")
 	
 	if is_advanced then
+		-- Dynamic-programming alignment runs on the event loop. A single provider
+		-- response must not spend unbounded work there, even with a long word.
+		local budget = { remaining = MAX_ALIGNMENT_WORK }
 		local tc, nw
 		if is_rewrite then
 			tc = block:match("REWRITE:%s*(.-)[\r\n]+") or block:match("REWRITE:%s*(.-)$") or ""
@@ -628,6 +672,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		tc = utils.trim((tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", "")))
 		nw = utils.trim((nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", "")))
 		
+		if not diff_within_limits("", tc) or not diff_within_limits("", nw) then
+			Logger.warn(LOG, "Prediction refused: model text exceeds the shared parser resource limits.")
+			return nil
+		end
 		tc = apply_french_typography(tc)
 		nw = apply_french_typography(nw)
 		nw = strip_prediction_padding(nw)
@@ -641,6 +689,11 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			tc = utils.trim(((tail_text or ""):gsub("^\"", ""):gsub("\"$", "")))
 		end
 		if tc == "" and nw == "" then return nil end
+
+		if not diff_within_limits(full_text, tc) or not diff_within_limits("", nw) then
+			Logger.warn(LOG, "Prediction refused: correction exceeds the shared diff resource limits.")
+			return nil
+		end
 
 		local normalized_full = (full_text or "")
 		local tc_norm = tc
@@ -672,12 +725,26 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		-- guard only protects continuations
 		local orig_last = last_word(normalized_full):lower()
 		local tc_last   = last_word(tc_norm):lower()
-		if not is_rewrite and orig_last ~= "" and tc_last ~= "" then
+		if not is_rewrite and orig_last ~= "" and tc_last ~= "" and orig_last ~= tc_last then
 			local max_len = math.max(#orig_last, #tc_last)
-			local dist    = char_lev(orig_last, tc_last)
+			local prefix = 0
+			while prefix < #orig_last and prefix < #tc_last
+				and orig_last:byte(prefix + 1) == tc_last:byte(prefix + 1) do prefix = prefix + 1 end
+			local suffix = 0
+			while suffix < #orig_last - prefix and suffix < #tc_last - prefix
+				and orig_last:byte(#orig_last - suffix) == tc_last:byte(#tc_last - suffix) do suffix = suffix + 1 end
+			local orig_mid = orig_last:sub(prefix + 1, #orig_last - suffix)
+			local corrected_mid = tc_last:sub(prefix + 1, #tc_last - suffix)
+			local cells = #orig_mid * #corrected_mid
+			if cells > budget.remaining then
+				Logger.warn(LOG, "Prediction refused: correction exceeds alignment work budget.")
+				return nil
+			end
+			budget.remaining = budget.remaining - cells
+			local dist = char_lev(orig_mid, corrected_mid)
 			-- Fully disjoint last words (ratio == 1.0) → stale snapshot
 			if max_len > 0 and dist >= max_len then
-				Logger.warn(LOG, "Stale buffer: last word of tc ('%s') is fully disjoint from buffer tail ('%s') — discarding.", tc_last, orig_last)
+				Logger.warn(LOG, "Stale buffer: corrected tail is fully disjoint from the buffer tail — discarding.")
 				return nil
 			end
 		end
@@ -790,9 +857,13 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		end
 		
 		-- 1. Diff strictly against TAIL_CORRECTED to avoid misaligning new words
-		local ops = token_diff_ops(orig_context, tc_norm)
+		if not diff_within_limits(orig_context, tc_norm) then
+			Logger.warn(LOG, "Prediction refused: normalized correction exceeds the shared diff resource limits.")
+			return nil
+		end
+		local ops = token_diff_ops(orig_context, tc_norm, budget)
 		if not ops then
-			Logger.error(LOG, "Prediction parser refused invalid UTF-8 during token alignment.")
+			Logger.error(LOG, "Prediction parser refused invalid UTF-8 or excessive work during token alignment.")
 			return nil
 		end
 
@@ -1063,6 +1134,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
 		nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
+		if not diff_within_limits("", nw) or not diff_within_limits("", full_text) then
+			Logger.warn(LOG, "Prediction refused: raw text exceeds the shared parser resource limits.")
+			return nil
+		end
 		nw = strip_bullet_prefix(nw)
 		nw = strip_prediction_padding(nw)
 		nw = apply_french_typography(nw)

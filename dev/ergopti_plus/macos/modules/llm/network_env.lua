@@ -262,8 +262,8 @@ end
 --- Exports static settings for local serving and native-aware commands.
 --- A client that reads only HTTPS_PROXY (the Ollama daemon) names the origin it
 --- downloads from in options.pac_probe_url: under an automatic (PAC, WPAD)
---- configuration the launcher then resolves that origin and the first route
---- becomes HTTPS_PROXY (see resolve_system_route_for_probe in network-retry.sh).
+--- configuration the launcher resolves that origin and the first reachable
+--- route becomes HTTPS_PROXY (see resolve_system_route_for_probe in network-retry.sh).
 --- @param tag string Child log prefix.
 --- @param options table|nil { pac_probe_url = string }.
 --- @return string|nil prelude

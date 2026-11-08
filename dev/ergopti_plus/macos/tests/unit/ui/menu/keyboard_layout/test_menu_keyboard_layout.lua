@@ -37,11 +37,24 @@ helpers.describe("menu_keyboard_layout._version_gt", function()
 	end)
 end)
 
+local function register_real_entries(path)
+	local uv = require("luv")
+	local directory = assert(uv.fs_scandir(path))
+	local names = {}
+	while true do
+		local name = uv.fs_scandir_next(directory)
+		if not name then break end
+		names[#names + 1] = name
+	end
+	require("tests.stubs.hs").fs.__set_entries(path, names)
+end
+
 helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 	helpers.it("returns the highest version present in the bundles directory", function()
 		-- Use the checked-in fixture directory so the test is self-contained and
 		-- does not depend on a real macOS build artefact being present on disk.
 		local bundles_dir = helpers.fixtures_dir() .. "bundles/"
+		register_real_entries(bundles_dir)
 		local latest = kbd.pick_latest_bundle(bundles_dir)
 		helpers.assert_true(type(latest) == "string" and latest:match("^Ergopti_v[%d%.]+%.bundle$") ~= nil,
 			"expected a bundle name, got " .. tostring(latest))
@@ -59,6 +72,7 @@ helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 		local driver_root = helpers.driver_root()
 		-- BUNDLES_RELDIR is ../../ergopti/macos/bundles/
 		local bundles_dir = driver_root .. "../../ergopti/macos/bundles/"
+		register_real_entries(bundles_dir)
 		local latest = kbd.pick_latest_bundle(bundles_dir)
 		helpers.assert_true(type(latest) == "string" and latest:match("^Ergopti_v[%d%.]+%.bundle$") ~= nil,
 			"Expected to find a bundle in the real repository path: " .. bundles_dir)

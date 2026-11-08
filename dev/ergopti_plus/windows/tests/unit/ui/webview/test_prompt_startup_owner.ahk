@@ -51,6 +51,26 @@ _PRST_ChildSource() {
 		}
 	}
 	AssertEqual(4, Owners.Count, "The public profile, editor, serializer and default dialog owners must be distinct")
+	; The opening receipt covers the full persisted LLM projection. Keep the
+	; authored state initializer and genuine normalizers, not a three-field menu.
+	for Spec in [["_LLM_Menu_SyncToFeatures", _DriverDir], ["LLM_Option_TryNormalize", _DriverDir],
+		["ChordParse", _DriverDir], ["_LLM_RequestPlanRequireDelay", _DriverDir],
+		["LLM_DisplayStreamingCapable", _SharedDir]] {
+		Owner := _DriverProductionFileForSymbol(Spec[1], Spec[2])
+		AssertTrue(Owner != "", "The projection component requires its genuine owner: " . Spec[1])
+		if !Owners.Has(Owner) {
+			Owners[Owner] := true
+			Code .= "#Include " . Owner . "`n"
+		}
+	}
+	for Symbol in ["LLM_BackendCapabilities", "LLM_EffectiveStreaming"]
+		Code .= _DriverFuncBody(Symbol) . "`n"
+	StateOwner := _DriverProductionFileForSymbol("LLM_Menu_ApplySharedDefaults")
+	StateSource := FileRead(StateOwner, "UTF-8")
+	AssertTrue(RegExMatch(StateSource, "ms)^global _LLM_Menu := Map\(.*?^\)", &StateDefinition) > 0,
+		"The component must retain the complete unmodified authored menu initializer")
+	Code .= StateDefinition[0] . "`n"
+	Code .= "global Features := ManifestBuildFeaturesMap()`n"
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\prompt_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))
@@ -61,13 +81,13 @@ _PRST_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier prompt editor child must retire first")
 	Directory := A_Temp . "\ergopti_prompt_startup_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory), "The exact child root must be exclusively acquired before cleanup authority exists")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory . "\64bit"), "The private browser marker directory must be exclusively acquired")
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
@@ -142,3 +162,15 @@ for _PRST_Mode in ["current", "close-create", "reopen-create"]
 		_PRST_Case.Bind(_PRST_Mode))
 
 #Include test_prompt_navigation_custody.ahk
+
+for _PRST_SubscriptionMode in ["subscription-current", "subscription-close"]
+	Test("Prompt editor add-event retirement: " . _PRST_SubscriptionMode . " owns the real HWND (prompt-native-subscription-retirement-owner)",
+		_PRST_Case.Bind(_PRST_SubscriptionMode))
+
+for _PRST_SdkMode in ["subscription-throw-current", "subscription-throw-retired"]
+	Test("Prompt editor SDK refusal: " . _PRST_SdkMode . " preserves its original disposition (prompt-subscription-sdk-failure-owner)",
+		_PRST_Case.Bind(_PRST_SdkMode))
+
+for _PRST_RetryMode in ["retry-current", "retry-reentry"]
+	Test("Prompt initial retirement: " . _PRST_RetryMode . " preserves intervening native cancellation (prompt-native-initial-retirement-reentry)",
+		_PRST_Case.Bind(_PRST_RetryMode))

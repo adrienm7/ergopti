@@ -409,6 +409,11 @@ local function scenarios(repo)
 		-- runtime's admission, with no error, dialog or reverted setting.
 		{ name = "the recommended preset imported without Ergopti's own runtime installed boots and saves",
 			setup = neutral_defaults, steps = { "restore_recommended" }, marker = BOOTED_MARKER },
+		-- macOS keeps a three-finger tap it runs itself: the slot is held and
+		-- greyed, and the boot shows no dialog, since only macOS would react.
+		{ name = "a native three-finger conflict is held without a boot dialog (gesture-conflict-boot)",
+			setup = neutral_defaults, steps = { "restore_recommended", "gesture_conflict" }, marker = BOOTED_MARKER,
+			machine = "gesture_conflict", held_gesture_conflict = true },
 		-- world.MACHINES: the machine each boot runs on, and the lease facts it ends with.
 		{ name = "an Ergopti layout boots while the lease worker answers late, on one lease worker",
 			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
@@ -703,11 +708,17 @@ function M.run(check, options)
 			local marker = action ~= "restore_recommended" and scenario.marker or nil
 			for context_index, ctx in ipairs(contexts) do
 				local output = outputs[context_index]
+				local held_conflict = scenario.held_gesture_conflict and action == "gesture_conflict"
 				for _, problem in ipairs(judge(output, action, marker)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
 				end
 				for _, problem in ipairs(judge_facts(output, scenario.facts)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+				end
+				if held_conflict then
+					for _, problem in ipairs(judge_facts(output, { system_tap_3_state = "taken" })) do
+						ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+					end
 				end
 				-- hardening-h: the boot starts no Python at all; the helper starts one,
 				-- which the ROSETTA judgement above then covers.

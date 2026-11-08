@@ -11,6 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local previous_destination = package.loaded["modules.keymap.utils"]
+local Destination = require("tests.support.text_destination_receipt")
 
 
 local function clone(value)
@@ -22,8 +24,9 @@ end
 
 
 local function fresh_fixture()
+	Destination.install()
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text",
+		"modules.shortcuts.actions.text", "adapters.clipboard",
 		"adapters.synthetic_input",
 		"adapters.event_provenance",
 		"adapters.timer_scheduler",
@@ -147,6 +150,7 @@ local function fresh_fixture()
 
 	hs_stub.pasteboard = {
 		changeCount = function() return fixture.change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			fixture.snapshot_calls = fixture.snapshot_calls + 1
 			return clone(fixture.clipboard)
@@ -726,3 +730,5 @@ helpers.describe("text composite owner: parent isolation", function()
 		end)
 	end
 end)
+
+package.loaded["modules.keymap.utils"] = previous_destination

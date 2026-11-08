@@ -397,6 +397,10 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 			Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", Fault . ",git"),
 				Spawn, _CRWT_WaitUntil, A_ScriptDir . "\support\crash_cim_boundary.ps1")
 			Diagnostic := _CRWT_CimDiagnostic(Observation, Result, Fault, Scope.Tasks.Count - BeforeTasks)
+			AssertEqual(A_Is64bitOS ? "64 bits" : "32 bits", Result["report"]["os_arch"],
+				"OS architecture must ignore the worker process environment")
+			AssertEqual(Snapshot["ahk_bitness"], Result["report"]["ahk_bitness"],
+				"process bitness remains a separate snapshot field")
 			AssertEqual("primary", Result["owner"]["phase"],
 				"a fallback cannot prove that independent enrichment continued; " . Diagnostic)
 			AssertEqual(BeforeTasks + 1, Scope.Tasks.Count, "each case must run one primary worker")
@@ -410,7 +414,7 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 				"the artifact must name the independently failed enrichment: " . Fault
 				. "; observed enrichment errors: " . Errors)
 			Healthy := Fault = "os"
-				? Map("cpu_name", "CIM_SENTINEL_CPU", "cpu_cores", "16")
+				? Map("cpu_name", "CIM_SENTINEL_CPU", "cpu_cores", "20")
 				: Map("os_build", "99001", "ram_total_gb", "32", "ram_free_gb", "12")
 			for Key, Expected in Healthy
 				AssertEqual(Expected, Result["report"][Key],
@@ -821,3 +825,86 @@ _CRWT_ControlTextThroughNativeWorker() {
 }
 Test("crash report JSON: native worker preserves control text (crash-json-control-native)",
 	_CRWT_ControlTextThroughNativeWorker)
+
+_CRWT_ProcessorSockets() {
+	Cpu := _CrashReport_ProcessorInfo([
+		{Name: " first socket ", NumberOfLogicalProcessors: 8},
+		{Name: "second socket", NumberOfLogicalProcessors: 12}
+	])
+	AssertEqual("first socket", Cpu["name"], "the first model name remains the diagnostic label")
+	AssertEqual(20, Cpu["cores"], "heterogeneous socket counts are summed rather than taking or multiplying the first")
+	Single := _CrashReport_ProcessorInfo([{Name: "single", NumberOfLogicalProcessors: 6}])
+	AssertEqual(6, Single["cores"])
+	for Processors in [[], [{Name: "invalid", NumberOfLogicalProcessors: 0}],
+		[{Name: "valid", NumberOfLogicalProcessors: 8}, {Name: "invalid", NumberOfLogicalProcessors: -1}]] {
+		Rejected := false
+		try _CrashReport_ProcessorInfo(Processors)
+		catch ValueError
+			Rejected := true
+		AssertTrue(Rejected, "an incomplete CPU observation must not become a partial machine count")
+	}
+}
+Test("crash report: logical processors include every physical socket", _CRWT_ProcessorSockets)
+
+
+; Observe the actual completion decoder's thread setting; the child does not
+; get a replacement encoder or a simulated native receipt.
+_CRWT_ReceiptDone(State, ExitCode, Stdout, Stderr) {
+	State["read_encoding"] := A_FileEncoding
+	_CRWT_RecordDone(State, ExitCode, Stdout, Stderr)
+}
+
+_CRWT_UnicodeArtifactReceipt(UnicodePath, Fallback) {
+	global _ConfigDir, _CRWT_FallbackSpawnState, _CRWT_TIMEOUT_MS
+	SavedConfigDir := _ConfigDir
+	SavedSpawnState := _CRWT_FallbackSpawnState
+	Scope := _CRWF_Fixture("receipt-codepage")
+	Failure := 0
+	try {
+		_ConfigDir := Scope.Directory . "\"
+		Reports := Scope.Directory . "\" . (UnicodePath ? "reports-é-報告" : "reports-ascii") . "\"
+		; Loop Files reports a long path, while A_Temp may use an 8.3 account
+		; alias. Normalize the input directory before the worker ever receives it;
+		; the actual receipt below must still survive unchanged, code unit for unit.
+		DirCreate(Reports)
+		OriginalReports := Reports
+		Reports := FSResolveDirectoryPath(Reports) . "\"
+		Snapshot := _CrashReport_CheapSnapshot(Error("receipt encoding control"))
+		Snapshot["_transport_reports_dir"] := Reports
+		State := Map("called", false, "exit_code", -1, "stdout", "", "stderr", "", "read_encoding", "")
+		_CRWT_FallbackSpawnState := Map("calls", 0)
+		Spawn := Fallback ? _CRWT_FallbackSpawn : _CrashReportWorkerSpawnOwned
+		Owner := Scope.Start(_CrashReport_ToWorkerJson(Snapshot), _CRWT_ReceiptDone.Bind(State),
+			Spawn, , Map("faults", "os,cpu,git"))
+		AssertTrue(Owner is Map)
+		AssertTrue(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS))
+		AssertEqual(0, State["exit_code"], "the real selected writer must finish successfully")
+		AssertEqual(Fallback ? "fallback" : "primary", Owner["phase"])
+		Actual := _CRWT_FirstJson(Reports)
+		AssertTrue(Actual != "", "an independently enumerated native report must exist before checking its receipt")
+		Report := JsonParse(FileRead(Actual, "UTF-8"))
+		AssertEqual("receipt encoding control", Report["error_msg"])
+		AssertTrue(RegExMatch(State["stdout"], "m)^OK:(.+)$", &Match))
+		Received := Trim(Match[1])
+		_TestPrint("# CRASH_NATIVE_RECEIPT " . KL_JsonEncode(Map("unicode_path", UnicodePath,
+			"fallback", Fallback, "read_encoding", State["read_encoding"], "exact_path", Received == Actual,
+			"reports_path_canonicalized", OriginalReports != Reports,
+			"reports_length_delta", StrLen(Reports) - StrLen(OriginalReports),
+			"physical_artifact", Actual != "", "received_exists", FileExist(Received) != "")))
+		_CRWT_AssertCodeUnits(Actual, Received, "the real worker's acknowledged artifact path")
+		AssertTrue(FileExist(Received), "the acknowledged report path must select the physical report")
+	} catch Error as Caught {
+		Failure := Caught
+		throw Caught
+	} finally {
+		_ConfigDir := SavedConfigDir
+		_CRWT_FallbackSpawnState := SavedSpawnState
+		Scope.Finish(Failure)
+	}
+}
+Test("crash worker: ASCII artifact receipt control (crash-native-path-receipt)",
+	_CRWT_UnicodeArtifactReceipt.Bind(false, false))
+Test("crash worker: primary Unicode artifact receipt is exact (crash-native-path-receipt)",
+	_CRWT_UnicodeArtifactReceipt.Bind(true, false))
+Test("crash worker: fallback Unicode artifact receipt is exact (crash-native-path-receipt)",
+	_CRWT_UnicodeArtifactReceipt.Bind(true, true))

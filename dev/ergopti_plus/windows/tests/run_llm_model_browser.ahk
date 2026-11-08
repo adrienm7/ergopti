@@ -19,6 +19,8 @@ SetWorkingDir(A_ScriptDir)
 #Include ../infra/webview_script.ahk
 ; Browser messages and JavaScript payloads share the actual native JSON owner.
 #Include ../infra/json.ahk
+#Include ../adapters/timer_scheduler.ahk
+#Include ../adapters/window_manager.ahk
 
 ; --- Globals the browser module reads ---
 global _LLM_Menu   := Map("model", "Qwen3.5-2B")
@@ -307,7 +309,7 @@ _MBW_BridgeRoutesRealMessages(Message, Expected) {
 	global _TestIndex, _MBW_SelectedModels, _LLM_MBW_SessionEpoch
 	SavedIndex := _TestIndex, SavedSelections := _MBW_SelectedModels
 	SavedEpoch := _LLM_MBW_SessionEpoch
-	PreviousCritical := Critical("Off")
+	PreviousCritical := Critical("On")
 	Fence := {Done: false}
 	MarkFence := (*) => Fence.Done := true
 	try {
@@ -316,6 +318,8 @@ _MBW_BridgeRoutesRealMessages(Message, Expected) {
 		_LLM_MBW_SessionEpoch += 1
 		_LLM_MBW_OnWebMessage(_LLM_MBW_SessionEpoch, 0, _MBW_MessageArgs(Message))
 		AssertEqual(0, _MBW_SelectedModels.Length, "the actual COM callback must defer model application")
+		; Admit timers only after checking that the COM callback did no inline work.
+		Critical("Off")
 		SetTimer(MarkFence, -50)
 		Started := A_TickCount
 		while !Fence.Done && A_TickCount - Started < 2000

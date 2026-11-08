@@ -19,6 +19,12 @@ global _TOML_DocumentParses := 0
 ; slow path, so the boot record publishes it per parse and the startup smoke
 ; bounds it: a native run that stops matching shows up here, not in a wall clock.
 global _TOML_DocumentSlowSteps := 0
+; Document parses per caller<parent since the last interval publication. The
+; boot's ceiling counts parses, and only the owners tell a new boot reader from an
+; old one. A private bounded map: the shared counter registry is capped, and a
+; name per caller pair filled it and refused unrelated counters.
+global _TOML_DocumentParseOwners := Map()
+global TOML_DOCUMENT_PARSE_OWNER_LIMIT := 32
 
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
@@ -300,6 +306,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 		throw TypeError("TOML document source must be a String")
 	_TOML_DocumentParses += 1
 	PerfCount("toml.document_parse")
+	_TOML_DocumentParseOwnerCount(Error("", -2).What . "<" . Error("", -3).What)
 	PerfCount("toml.document_chars", StrLen(Source))
 	SlowStepsBefore := _TOML_DocumentSlowSteps
 	try return _TOML_ParseDocumentRecords(Source, &Records, &Physical)
@@ -707,10 +714,13 @@ TOML_EndsWithLineBreak(Text) {
 ; their existing flat writer. Only explicit updates and replacement prefixes own
 ; source values, so future namespaces and table-array generations stay physical.
 _TOML_ConfigPath(Section, Key := unset) {
+	if Section is String
+		SourceTextRequireUnicodeScalars(StrPtr(Section), 0, StrLen(Section))
 	Parts := Section == "" ? [] : TOML_ParseKeyPath(Section, true)
 	if IsSet(Key) {
 		if !(Key is String)
 			throw TypeError("Configuration update keys must be strings")
+		SourceTextRequireUnicodeScalars(StrPtr(Key), 0, StrLen(Key))
 		Parts.Push(Key)
 	}
 	return Parts
@@ -1677,4 +1687,28 @@ _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Can
 			_TOML_WithoutNamespaces(NewProjection, InlineRoots))
 		throw ValueError("The inline candidate differs outside its admitted partitions")
 	return Map("content", InlineContent, "preserve_source", false)
+}
+
+
+/**
+ * Counts one document parse for its owner, within the private owner bound.
+ * @param {String} Owner - "caller<parent" as Error().What reports them.
+ */
+_TOML_DocumentParseOwnerCount(Owner) {
+	global _TOML_DocumentParseOwners, TOML_DOCUMENT_PARSE_OWNER_LIMIT
+	if _TOML_DocumentParseOwners.Has(Owner)
+		_TOML_DocumentParseOwners[Owner] += 1
+	else if _TOML_DocumentParseOwners.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+		_TOML_DocumentParseOwners[Owner] := 1
+}
+
+/**
+ * Returns and clears the document parse owners counted since the last call.
+ * @returns {Map} Owner to parse count.
+ */
+TOML_DocumentParseOwnersTake() {
+	global _TOML_DocumentParseOwners
+	Owners := _TOML_DocumentParseOwners
+	_TOML_DocumentParseOwners := Map()
+	return Owners
 }

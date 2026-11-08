@@ -173,6 +173,20 @@ _PIMV_InvalidPoliciesFailClosed() {
 Test("personal-info mask: every malformed shared policy fails closed",
 	_PIMV_InvalidPoliciesFailClosed)
 
+_PIMV_MissingPolicyFieldsFailClosed() {
+	Full := Map("mask_char", "•", "reveal_head", 0, "reveal_tail", 0,
+		"min_length_to_reveal", 12, "preserve_separators", true)
+	for Missing in ["mask_char", "reveal_head", "reveal_tail", "min_length_to_reveal", "preserve_separators"] {
+		Policy := Full.Clone()
+		Policy.Delete(Missing)
+		AssertEqual(Missing, PersonalInfoMaskPolicyInvalidField(Policy), "report the missing policy field")
+		AssertEqual("••••••", PersonalInfoMaskValue("SECRET", Policy), "a missing field must mask every character")
+	}
+}
+Test("personal-info mask: missing policy fields fail closed (personal-mask-missing-policy)",
+	_PIMV_MissingPolicyFieldsFailClosed)
+
+
 
 ; What is TYPED is never what the bubble shows. The mask is a display function
 ; and has no route to the injection path; this pins the other direction — that a
@@ -190,3 +204,44 @@ _PIMV_MaskingDoesNotMutateTheValue() {
 }
 Test("personal-info mask: masking a value leaves the value it will type untouched (preview-masking-cross-driver)",
 	_PIMV_MaskingDoesNotMutateTheValue)
+
+
+_PIMV_MalformedFieldStaysMasked() {
+	Policy := Map("mask_char", "•", "reveal_head", 0, "reveal_tail", 0,
+		"min_length_to_reveal", 12, "preserve_separators", true)
+	for Keys in [Map(), Map("masked", ""), Map("masked", "0"), Map("masked", 0), Map("masked", TOML_Bool(true))] {
+		Declaration := { Policy: Policy, Fields: Map("secret", _PIMaskFieldIsMasked(Keys)) }
+		AssertEqual("••••••", PersonalInfoMaskFieldWith("SECRET", "secret", Declaration),
+			"a malformed or true flag must not reveal a value")
+	}
+	Declaration := { Policy: Policy, Fields: Map("public", _PIMaskFieldIsMasked(Map("masked", TOML_Bool(false)))) }
+	AssertEqual("PUBLIC", PersonalInfoMaskFieldWith("PUBLIC", "public", Declaration),
+		"an explicitly false flag keeps a public field visible")
+}
+Test("personal-info mask: malformed field flags remain private (personal-mask-field-type)",
+	_PIMV_MalformedFieldStaysMasked)
+
+
+_PIMV_TypedDeclarationRejectsNumericFlag() {
+	global _SharedDir
+	SavedDir := _SharedDir
+	Root := A_Temp . "\ergopti_mask_types_" . A_TickCount . "_" . Random(1000, 9999)
+	DirCreate(Root . "\modules\personal_info")
+	Path := Root . "\modules\personal_info\fields.toml"
+	try {
+		FileAppend('[policy]`nmask_char = "•"`nreveal_head = 0`nreveal_tail = 0`n'
+			. 'min_length_to_reveal = 12`npreserve_separators = true`n'
+			. '[fields.secret]`nmasked = 0`n[fields.public]`nmasked = false`n', Path, "UTF-8")
+		_SharedDir := Root
+		Declaration := _PIMaskLoadDeclaration()
+		AssertEqual("••••••", PersonalInfoMaskFieldWith("SECRET", "secret", Declaration),
+			"numeric zero must not masquerade as a TOML false")
+		AssertEqual("PUBLIC", PersonalInfoMaskFieldWith("PUBLIC", "public", Declaration),
+			"a TOML false continues to identify a public field")
+	} finally {
+		_SharedDir := SavedDir
+		DirDelete(Root, true)
+	}
+}
+Test("personal-info mask: typed declaration rejects numeric flags (personal-mask-typed-flag)",
+	_PIMV_TypedDeclarationRejectsNumericFlag)

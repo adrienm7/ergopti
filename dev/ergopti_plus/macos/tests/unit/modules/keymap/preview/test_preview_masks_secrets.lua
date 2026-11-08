@@ -255,6 +255,7 @@ local function capture_rows(register, buf)
 		-- Everything the bridge pulls in is loaded FIRST, then the bridge: it captures
 		-- its dependencies as upvalues at require time.
 		local State = helpers.load_with_stubs("modules.keymap.state")
+		local scheduler_hs = hs
 
 		-- Dropped so it is re-required under the fresh stub the bridge load installs;
 		-- see trap 2 above. Registry and Expander are stateful singletons too: leaving
@@ -283,6 +284,8 @@ local function capture_rows(register, buf)
 		register(Registry)
 		Registry.sort_mappings()
 
+		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+
 		helpers.assert_eq(Bridge.init(state,
 			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
 		helpers.assert_eq(Expander.init(state, Registry, Bridge), true)
@@ -293,6 +296,7 @@ local function capture_rows(register, buf)
 		-- re-raised afterward so the row assertions cannot become vacuous.
 		local render_ok, render_err = xpcall(function()
 			Bridge.update_preview(buf)
+			scheduler_hs.timer.__fire_all()
 			hs.timer.__fire_all()
 		end, debug.traceback)
 		tooltip.show_stacked = real_show_stacked
@@ -417,7 +421,9 @@ helpers.describe("preview masking: display only", function()
 
 		RE.inject_data({
 			phone_number           = "0612345678",
-			phone_number_clean     = "+33612345678",
+			-- Distinct from the international raw-phone output, so the replacement
+			-- below identifies the spaced variant alone.
+			phone_number_clean     = "06 12 34 56 78",
 			social_security_number = "1 85 05 78 006 084 36",
 			iban                   = "FR76 3000 6000 0112 3456 7890 189",
 		}, "★")
@@ -443,7 +449,7 @@ helpers.describe("preview masking: display only", function()
 		local seen = {}
 		for _, call in ipairs(added) do
 			seen[call.opts.field] = (seen[call.opts.field] or 0) + 1
-			if call.replacement == "+33612345678" then
+			if call.replacement == "06 12 34 56 78" then
 				helpers.assert_eq(call.opts.field, "phone_number_clean",
 					"the spaced phone variant is its own declared field")
 			end

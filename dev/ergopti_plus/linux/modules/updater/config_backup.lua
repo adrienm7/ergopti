@@ -6,7 +6,8 @@
 --- Binds the shared configuration backup owner (_shared/lua/updater/
 --- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder, the settings
 --- store beside it (storage.json, which holds the folder override and the tray
---- choices), and file ports over the shared atomic writer. The Versions window
+--- choices), the remote API entries (api_keys.json, secret-service references
+--- only, as Windows backs up api_entries.json), and file ports over the shared atomic writer. The Versions window
 --- backs the configuration up through it before installing a release, and
 --- restores a backup through it.
 ---
@@ -23,6 +24,7 @@
 local M = {}
 
 local Logger      = require("logger.shim")
+local TokenStore  = require("modules.llm.api_token_store")
 local Paths       = require("infra.paths")
 local ConfigPaths = require("infra.config_paths")
 local Json        = require("json")
@@ -95,6 +97,13 @@ end
 local function file_ports()
 	return {
 		list = list,
+		directory_identity = NativeDirectory.directory_identity,
+		directory_status = function(path)
+			local kind, detail, code = NativeDirectory.target_kind(path)
+			if kind == "directory" then return "present" end
+			if kind == nil and code == "ENOENT" then return "absent" end
+			return "error", detail or "not a folder"
+		end,
 		read = function(path)
 			local content, status, detail = Writer.read_classified(path)
 			if status == "ok" then return content end
@@ -103,6 +112,10 @@ local function file_ports()
 		end,
 		make_dir = function(path)
 			if Shell.run("mkdir -p -- " .. Shell.quote(path)) then return true end
+			return nil, "mkdir failed"
+		end,
+		make_dir_exclusive = function(path)
+			if Shell.run("mkdir -- " .. Shell.quote(path)) then return true end
 			return nil, "mkdir failed"
 		end,
 		create = function(path, content)
@@ -119,7 +132,8 @@ end
 --- Wall-clock time of a backup, in UTC.
 --- @return table { stamp, iso }
 local function clock()
-	return { stamp = os.date("!%Y%m%d-%H%M%S"), iso = os.date("!%Y-%m-%dT%H:%M:%SZ") }
+	local now = os.time()
+	return { stamp = os.date("!%Y%m%d-%H%M%S", now), iso = os.date("!%Y-%m-%dT%H:%M:%SZ", now) }
 end
 
 
@@ -150,6 +164,26 @@ end
 --- @return table|nil roots
 --- @return string|nil reason
 --- @return string|nil log_text
+--- How many rows of an API entries file hold a key in plaintext rather than
+--- a secret-service reference. An absent file holds none; a file that is not
+--- the entries JSON counts as one, so it is never copied blindly.
+--- @param path string
+--- @return integer|nil count
+--- @return string|nil error
+function M._plaintext_api_keys(path)
+	local text, status, detail = Writer.read_classified(path)
+	if status == "absent" then return 0 end
+	if status ~= "ok" or type(text) ~= "string" then return nil, tostring(detail or status) end
+	local decoded_ok, root = pcall(Json.decode_lossless, text)
+	if not decoded_ok or type(root) ~= "table" or type(root.entries) ~= "table" then return 1 end
+	local count = 0
+	for _, row in ipairs(root.entries) do
+		local token = type(row) == "table" and row.token or nil
+		if type(token) == "string" and token ~= "" and not TokenStore.is_reference(token) then count = count + 1 end
+	end
+	return count
+end
+
 local function default_roots()
 	local roots = { { id = "config", dir = ConfigPaths.get_config_dir() } }
 	local ok_storage, Storage = pcall(require, "adapters.storage")
@@ -158,6 +192,28 @@ local function default_roots()
 			"Configuration backup refused: the settings store path is unknown."
 	end
 	roots[#roots + 1] = { id = "settings_store", file = Storage.path() }
+	-- The remote API entries: Windows keeps them in api_entries.json inside
+	-- the configuration folder, so its backups hold them; here they live
+	-- beside storage.json. The file names each key by its secret-service
+	-- reference, so it is copied only while no row holds a key an earlier
+	-- build wrote in plaintext (a backup may sit in a synced folder).
+	local ok_entries, Entries = pcall(require, "modules.llm.api_entries")
+	if not (ok_entries and type(Entries) == "table" and type(Entries.path) == "function") then
+		return nil, "API entries store unavailable",
+			"Configuration backup refused: the API entries path is unknown."
+	end
+	local entries_path = Entries.path()
+	local plaintext, scan_err = M._plaintext_api_keys(entries_path)
+	if plaintext == nil then
+		return nil, "API entries unreadable",
+			"Configuration backup refused: '" .. entries_path .. "' could not be read: " .. tostring(scan_err) .. "."
+	end
+	if plaintext == 0 then
+		roots[#roots + 1] = { id = "api_entries", file = entries_path }
+	else
+		Logger.warn(LOG, "The backup leaves '%s' out: %d API key(s) there are still plaintext.",
+			entries_path, plaintext)
+	end
 	return roots
 end
 
@@ -166,8 +222,10 @@ local _binding = Binding.new({
 	log = LOG,
 	defaults = read_defaults,
 	json = { encode = Json.encode, decode = function(text)
-		local ok, value = pcall(Json.decode, text)
+		local ok, value = pcall(Json.decode_lossless, text)
 		if not ok then return nil, tostring(value) end
+		-- Legacy empty manifests can use {}, but an explicit null is no file list.
+		if type(value) == "table" and Json.is_null(value.files) then return nil, "null file list" end
 		return value
 	end },
 	file_ports = file_ports,
@@ -183,5 +241,6 @@ local _binding = Binding.new({
 function M.owner() return _binding.owner() end
 
 M._list = list
+M._default_roots = default_roots
 
 return M

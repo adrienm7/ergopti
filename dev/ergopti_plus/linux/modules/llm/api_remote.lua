@@ -229,9 +229,10 @@ end
 local function catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared("modules/llm/api_providers.json")
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	local closed = fh and fh:close()
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
+	local closed = status == "ok"
 	local cloud_published
 	_catalogue, cloud_published = M.parse_catalogue(text)
 	local order, servers, local_published, _, request_fields, local_dialect = LocalCatalogue.load(_catalogue.providers)
@@ -367,11 +368,11 @@ end
 --- Percent-encodes every byte outside the unreserved set.
 local percent_encode = TextUtils.percent_encode
 
---- Replaces credential-bearing query values before a URL is logged.
+--- Keeps user-configured endpoint addresses and credentials out of logs.
 --- @param url string
 --- @return string
-function M.redact_url(url)
-	return (tostring(url):gsub("([?&][Kk][Ee][Yy]=)[^&#]*", "%1<redacted>"))
+function M.redact_url(_url)
+	return "<endpoint redacted>"
 end
 
 --- The model an entry sends: its own, else the provider's default.
@@ -417,14 +418,17 @@ local function refresh_access(provider, entry, on_done)
 	local slot = access_slot(entry)
 	if type(on_done) == "function" then slot.waiters[#slot.waiters + 1] = on_done end
 	if slot.pending then return end
-	local function settle(ok, reason)
-		slot.pending = false
+	local function notify_waiters(ok, reason)
 		local waiters = slot.waiters
 		slot.waiters = {}
 		for _, waiter in ipairs(waiters) do
-			local called, problem = pcall(waiter, ok, reason)
-			if not called then Logger.error(LOG, "Access token waiter failed: %s", tostring(problem)) end
+			local called = pcall(waiter, ok, reason)
+			if not called then Logger.error(LOG, "Access token waiter failed.") end
 		end
+	end
+	local function settle(ok, reason)
+		slot.pending = false
+		notify_waiters(ok, reason)
 	end
 	slot.pending = true
 	-- A service-account key's assertion is signed one slice per tick
@@ -437,7 +441,14 @@ local function refresh_access(provider, entry, on_done)
 				return settle(false, reason)
 			end
 			Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", provider.id)
-			local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+			local constructing, received, staged_received, staged = true, false, false, nil
+			local function answer(result)
+				if received or slot.uncertain then return end
+				if constructing then
+					if not staged_received then staged_received, staged = true, result end
+					return
+				end
+				received = true
 				result = type(result) == "table" and result or {}
 				local raw = type(result.body) == "string" and result.body ~= "" and result.body or result.error_body
 				local decoded_ok, decoded = pcall(Json.decode, type(raw) == "string" and raw or "")
@@ -452,8 +463,22 @@ local function refresh_access(provider, entry, on_done)
 				slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
 				Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
 				return settle(false, why)
-			end)
+			end
+			local called, dispatched = pcall(HttpClient.post, request.url, request.headers, request.body, answer)
+			constructing = false
+			if not called then
+				-- A constructor may throw after acquiring transport resources. Without
+				-- its owner no retry can prove the previous request is retired.
+				slot.uncertain, slot.failure = true, "the token exchange transport state is unknown"
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: transport state is unknown.", provider.id)
+				notify_waiters(false, slot.failure)
+				return
+			end
+			if staged_received and (dispatched == true or type(staged) ~= "table" or staged.status ~= 200) then
+				return answer(staged)
+			end
 			if not dispatched then
+				received = true
 				slot.failure = "the token exchange could not be sent"
 				slot.retry_at = Monotonic.now_sec() + ACCESS_RETRY_SECONDS
 				Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", provider.id)
@@ -490,6 +515,7 @@ function M.prepare_access(entry, on_ready)
 	if TokenExchange.state(provider.auth, slot.token and slot or nil, now) then
 		return on_ready(true, nil)
 	end
+	if slot.uncertain then return on_ready(false, slot.failure) end
 	if not slot.pending and slot.retry_at and now < slot.retry_at then
 		-- A refused exchange waits its pause: the reason answers at once
 		return on_ready(false, slot.failure)
@@ -507,7 +533,8 @@ function M.prewarm_access(entry)
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
 	if not (provider and provider.auth) or type(entry.token) ~= "string" or entry.token == "" then return false end
 	access_token(provider, entry)
-	return access_slot(entry).pending == true
+	local slot = access_slot(entry)
+	return slot.pending == true and not slot.uncertain
 end
 
 --- Runs send() once an entry's access token is usable: at once for a provider
@@ -671,19 +698,24 @@ local function save_thinking_refused()
 	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
 	local text = Json.encode(_thinking_refused)
 	local temp = path .. ".tmp"
-	-- A temporary file a crash left behind would refuse the exclusive creation
-	if io.open(temp, "r") then os.remove(temp) end
-	local opened, fh, _, _, remove_owned = pcall(require("infra.regular_file_writer").open, temp, "wx")
-	if not opened or not fh or type(text) ~= "string" then
-		if opened and fh then pcall(fh.close, fh); remove_owned() end
+	-- An existing staging entry has no retained owner; exclusive creation
+	-- refuses it without opening or deleting an unrelated file.
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, temp, "wx")
+	if not opened or not fh or type(remove_owned) ~= "function" or type(current_image) ~= "function" or type(text) ~= "string" then
+		if opened and fh then
+			pcall(fh.close, fh)
+			if type(remove_owned) == "function" then pcall(remove_owned) end
+		end
 		return false
 	end
 	local wrote, written = pcall(fh.write, fh, text)
 	local closed, flushed = pcall(fh.close, fh)
-	if not wrote or not written or not closed or flushed ~= true then
+	if not wrote or (written ~= true and written ~= fh) or not closed or flushed ~= true then
 		remove_owned()
 		return false
 	end
+	local checked, current = pcall(current_image, text)
+	if not checked or current ~= true then return false end
 	local called, renamed = pcall(os.rename, temp, path)
 	if not called or renamed ~= true then
 		remove_owned()
@@ -698,9 +730,9 @@ end
 function thinking_families()
 	if _thinking_families then return _thinking_families end
 	local path = Paths.shared("modules/llm/thinking_off.json")
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
 	local families, reason = ThinkingOff.parse_families(type(text) == "string" and Json.decode(text) or nil)
 	if not families then
 		Logger.error(LOG, "thinking_off.json is unreadable (%s) — no request turns thinking off.", tostring(reason))
@@ -820,12 +852,12 @@ function M.build_request(entry, messages, opts)
 	local payload = nil
 	if provider.format == "anthropic" then
 		payload = {
-			model = model, system = system, max_tokens = max_tokens, temperature = temperature,
+			model = model, system = system ~= "" and system or nil, max_tokens = max_tokens, temperature = temperature,
 			messages = { { role = "user", content = user } },
 		}
 	elseif provider.format == "gemini" then
 		payload = {
-			systemInstruction = { parts = { { text = system } } },
+			systemInstruction = system ~= "" and { parts = { { text = system } } } or nil,
 			contents = { { role = "user", parts = { { text = user } } } },
 			generationConfig = { temperature = temperature, maxOutputTokens = max_tokens },
 		}
@@ -965,7 +997,9 @@ local function open_exchange(scope, on_done, admission)
 		scope.active = nil
 		if deliver and type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
-			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
+			if not ok then Logger.error(LOG, "Terminal callback raised — %s",
+				(type(callback_err) == "string" or type(callback_err) == "number") and "details withheld"
+					or ErrorDescription.describe(callback_err)) end
 		end
 	end
 	return epoch, done, admission ~= nil and authorized or nil
@@ -1090,8 +1124,7 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 		if authorized and not authorized() then return end
 		local assistant_id = Formats.backboard_assistant_id(root)
 		if not assistant_id then
-			Logger.warn(LOG, "The Backboard assistant could not be created: no assistant_id (keys: %s).",
-				top_level_keys(root))
+			Logger.warn(LOG, "The Backboard assistant could not be created: no assistant_id.")
 			fail("the Backboard assistant could not be created: no assistant_id in the answer")
 			return
 		end
@@ -1173,7 +1206,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		return false
 	end
 	local function fail(detail, receipt)
-		Logger.warn(LOG, "Remote request failed: %s.", detail)
+		Logger.warn(LOG, "Remote request failed: %s.", require("modules.llm.error_log").describe(detail))
 		if receipt == nil then done("", detail) else done("", detail, receipt) end
 	end
 	local started = Monotonic.now_ms()
@@ -1235,7 +1268,7 @@ local function decide(scope, entry, state, questions, on_done, admission)
 		return false
 	end
 	local function fail(detail, receipt)
-		Logger.warn(LOG, "Decision request failed: %s.", detail)
+		Logger.warn(LOG, "Decision request failed: %s.", require("modules.llm.error_log").describe(detail))
 		if receipt == nil then done(nil, detail) else done(nil, detail, receipt) end
 	end
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
@@ -1266,7 +1299,7 @@ local function decide(scope, entry, state, questions, on_done, admission)
 		backboard_send(scope, epoch, prepared, { system = "", text = state, questions = questions }, fail, function(root)
 			local answers, where = Formats.backboard_decision_answers(root, Json.decode)
 			if not answers then
-				Logger.warn(LOG, "Backboard returned no Jev answers; its top-level keys: %s.", top_level_keys(root))
+				Logger.warn(LOG, "Backboard returned no Jev answers.")
 				done(nil, "Backboard returned no Jev answers")
 				return
 			end
@@ -1379,8 +1412,9 @@ local function list_models_now(entry, finish)
 				finish({ state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" })
 				return
 			end
-			local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
-			local ids = decoded_ok and ApiModelListing.model_ids(format, decoded) or nil
+			local decoded_ok, decoded = pcall(Json.decode_lossless, type(result.body) == "string" and result.body or "")
+			local list = type(decoded) == "table" and decoded[format == "gemini" and "models" or "data"] or nil
+			local ids = decoded_ok and Json.is_array(list) and ApiModelListing.model_ids(format, decoded) or nil
 			if type(ids) ~= "table" then
 				Logger.warn(LOG, "Remote model listing could not be read (provider=%s).", provider_id)
 				finish({ state = "failed", reason = "unreadable" })
@@ -1405,9 +1439,14 @@ end
 --- @return boolean dispatched
 function M.list_models(entry, on_done)
 	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
+	local finished = false
 	local function finish(state)
+		if finished then return end
+		finished = true
 		local ok, err = pcall(on_done, state)
-		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s", ErrorDescription.describe(err)) end
+		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s",
+			(type(err) == "string" or type(err) == "number") and "details withheld"
+				or ErrorDescription.describe(err)) end
 	end
 	-- An access-token provider lists once its token is fetched
 	local waited = with_access(entry, function() return true end, function() return list_models_now(entry, finish) end,
@@ -1449,8 +1488,11 @@ function M.refresh_capabilities(entry)
 						provider_id, tostring(type(result) == "table" and result.status or nil))
 					return finish(nil)
 				end
-				local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
-				local records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil)
+				local decoded_ok, decoded = pcall(Json.decode_lossless, type(result.body) == "string" and result.body or "")
+				local list = type(decoded) == "table" and decoded[ModelCapabilities.LISTINGS[listing]] or nil
+				local records, reason
+				if not Json.is_array(list) then reason = "unreadable"
+				else records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil) end
 				if not records then
 					Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", provider_id, tostring(reason))
 					return finish(nil)

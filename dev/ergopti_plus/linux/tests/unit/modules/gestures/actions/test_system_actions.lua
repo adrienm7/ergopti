@@ -54,6 +54,14 @@ local function launched(commands)
 	return out
 end
 
+--- The command an observed background launch runs, without the wrapper that
+--- records its status and stderr (modules/gestures/background_commands.lua).
+--- @param text string The recorded os.execute command.
+--- @return string|nil
+local function unwrap(text)
+	return text:match("^%( %( (.*) %) </dev/null >/dev/null 2>'")
+end
+
 --- Replaces modules in package.loaded for the duration of body.
 --- @param stubs table name -> module
 --- @param body function
@@ -90,7 +98,12 @@ local function run_with_stubs(script, stubs)
 	local fh = assert(io.open(script_file, "w"))
 	fh:write(script .. "\n")
 	fh:close()
-	os.execute("PATH='" .. dir .. ":/usr/bin:/bin' STUBS='" .. dir .. "' sh '" .. script_file .. "' </dev/null >/dev/null 2>&1")
+	-- install/launch.sh creates the session lock folder the serialized toggles
+	-- flock in; the test provides it rather than depending on the host's home.
+	local session = os.execute("mkdir '" .. dir .. "/ergopti'")
+	helpers.assert_true(session == true or session == 0, "the session lock folder must be created")
+	os.execute("PATH='" .. dir .. ":/usr/bin:/bin' STUBS='" .. dir .. "' XDG_RUNTIME_DIR='" .. dir
+		.. "' sh '" .. script_file .. "' </dev/null >/dev/null 2>&1")
 	local log_fh = io.open(dir .. "/calls.log", "r")
 	local log = log_fh and log_fh:read("*a") or ""
 	if log_fh then log_fh:close() end
@@ -108,18 +121,26 @@ local function backgrounded(Gestures, action, answer)
 		Gestures.execute_action(action, "tap_3")
 		local run = launched(commands)
 		helpers.assert_eq(#run, 1, action .. " must background exactly one command")
-		text = run[1]:gsub(" 2>/dev/null &$", "")
+		text = unwrap(run[1])
+		helpers.assert_not_nil(text, action .. " must run as an observed background command")
 	end, answer)
 	return text
 end
 
+-- The read-modify-write toggles queue on one session lock (toggle-serialized-lds-002).
+local SERIAL = "flock \"${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti/system-toggle.lock\" sh -c "
+
 local EXPECTED = {
-	show_desktop = "{ case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac; }",
+	show_desktop = "{ " .. SERIAL .. "'desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
+		.. " *'\\''mode: ON'\\''*) wmctrl -k off;; *'\\''mode: OFF'\\''*) wmctrl -k on;; *) false;; esac'; }",
 	-- Powered off at once, the release of the triggering keys woke them again.
 	sleep_displays = "{ sleep 1 && xset dpms force off; }",
-	toggle_dark_mode = "{ case \"$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)\" in"
-		.. " *prefer-dark*) gsettings set org.gnome.desktop.interface color-scheme default;;"
-		.. " *) gsettings set org.gnome.desktop.interface color-scheme prefer-dark;; esac; }",
+	toggle_dark_mode = "{ " .. SERIAL .. "'scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)"
+		.. " && case \"$scheme\" in"
+		.. " \"'\\''prefer-dark'\\''\") gsettings set org.gnome.desktop.interface color-scheme default;;"
+		.. " \"'\\''default'\\''\"|\"'\\''prefer-light'\\''\") gsettings set org.gnome.desktop.interface color-scheme prefer-dark;;"
+		.. " *) false;; esac'; }",
+
 	mic_mute_toggle = "{ pactl set-source-mute @DEFAULT_SOURCE@ toggle; }",
 	-- The desktop and the panels belong to the desktop shell: signalling their
 	-- process removed the desktop and the panels for the session.
@@ -141,7 +162,7 @@ helpers.describe("Linux system actions", function()
 		helpers.it(action .. " backgrounds its exact command (system-actions)", function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action(action, "tap_3")
-				helpers.assert_eq(launched(commands)[1], expected .. " 2>/dev/null &")
+				helpers.assert_eq(unwrap(launched(commands)[1]), expected)
 				helpers.assert_eq(#launched(commands), 1)
 			end)
 		end)
@@ -175,11 +196,12 @@ helpers.describe("Linux system actions", function()
 					.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 					.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ]'
 					.. " && " .. DIALOG .. " --question --no-markup --default-cancel "
-				helpers.assert_eq(run[1]:sub(1, #head), head,
-					"the active window is read, then the question comes, with Cancel focused: " .. run[1])
-				local chained = " && { " .. FORCE_QUIT_KILL .. "; }; } 2>/dev/null &"
-				helpers.assert_eq(run[1]:sub(-#chained), chained, "the kill runs only on Continue")
-				helpers.assert_eq(select(2, run[1]:gsub("getactivewindow", "")), 1,
+				local command = unwrap(run[1])
+				helpers.assert_eq(command:sub(1, #head), head,
+					"the active window is read, then the question comes, with Cancel focused: " .. command)
+				local chained = " && { " .. FORCE_QUIT_KILL .. "; }; }"
+				helpers.assert_eq(command:sub(-#chained), chained, "the kill runs only on Continue")
+				helpers.assert_eq(select(2, command:gsub("getactivewindow", "")), 1,
 					"the window is never read again after the question")
 			end)
 		end)
@@ -248,10 +270,11 @@ helpers.describe("Linux system actions", function()
 			local run = launched(commands)
 			helpers.assert_eq(#run, 1)
 			local head = DIALOG .. " --question --no-markup --default-cancel "
-			helpers.assert_true(run[1]:sub(1, #head) == head,
-				"the question comes first, with Cancel focused: " .. run[1])
-			local chained = " && { gio trash --empty; } 2>/dev/null &"
-			helpers.assert_eq(run[1]:sub(-#chained), chained, "the trash is emptied only on Continue")
+			local command = unwrap(run[1])
+			helpers.assert_true(command:sub(1, #head) == head,
+				"the question comes first, with Cancel focused: " .. command)
+			local chained = " && { gio trash --empty; }"
+			helpers.assert_eq(command:sub(-#chained), chained, "the trash is emptied only on Continue")
 		end)
 	end)
 
@@ -285,9 +308,59 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(written[1], "")
 	end)
 
+	helpers.it("never sends Ctrl+C to a terminal for make_executable_selection", function()
+		local Open = require("modules.shortcuts.open_selection")
+		Open._set_deps_for_test({ focused_app = function() return "gnome-terminal-server" end,
+			focused_context = function() return "gnome-terminal-server", "test:terminal" end })
+		local combos = {}
+		local ok, err = pcall(function()
+			with_modules({
+				["adapters.clipboard"] = { read_selection_uri_list = function(emit)
+					emit("ctrl+c"); return false, "", "no_file_selection"
+				end },
+				["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
+				["adapters.event_loop"] = { sleep_ms = function() return true end },
+			}, function() Gestures.execute_action("make_executable_selection", "tap_3") end)
+		end)
+		Open._set_deps_for_test(nil)
+		if not ok then error(err, 0) end
+		helpers.assert_eq(combos, {})
+	end)
+
+	for _, boundary in ipairs({ "before copy", "after copy" }) do
+		helpers.it("refuses make-executable when focus changes " .. boundary, function()
+			local Open = require("modules.shortcuts.open_selection")
+			local app, combos = "nautilus", {}
+			Open._set_deps_for_test({ focused_app = function() return app end,
+				focused_context = function() return app, "test:file-manager-window" end })
+			local ok, err = pcall(function()
+				with_modules({
+					["adapters.clipboard"] = { read_selection_uri_list = function(emit)
+						if boundary == "before copy" then app = "gnome-terminal-server" end
+						local sent = emit("ctrl+c")
+						if boundary == "before copy" then helpers.assert_eq(sent, false) end
+						app = "gnome-terminal-server"
+						return true, "file:///home/ana/run.sh", nil
+					end },
+					["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
+					["adapters.event_loop"] = { sleep_ms = function() return true end },
+				}, function()
+					with_recorded_shell(function(commands)
+						Gestures.execute_action("make_executable_selection", "tap_3")
+						helpers.assert_eq(#launched(commands), 0)
+					end)
+				end)
+			end)
+			Open._set_deps_for_test(nil)
+			if not ok then error(err, 0) end
+			helpers.assert_eq(combos, boundary == "before copy" and {} or { "ctrl+c" })
+		end)
+	end
+
 	helpers.it("make_executable_selection chmods exactly the copied paths (system-actions)", function()
 		local combos = {}
 		with_modules({
+			["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
 			["adapters.clipboard"] = {
 				read_selection_uri_list = function(emit_combo, sleep_ms)
 					helpers.assert_eq(type(emit_combo), "function")
@@ -301,7 +374,7 @@ helpers.describe("Linux system actions", function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action("make_executable_selection", "tap_3")
 				local run = launched(commands)
-				helpers.assert_eq(run[1], "chmod +x '/home/ana/run.sh' '/home/ana/it'\\''s here.sh' 2>/dev/null &")
+				helpers.assert_eq(unwrap(run[1]), "chmod +x '/home/ana/run.sh' '/home/ana/it'\\''s here.sh'")
 			end)
 		end)
 	end)
@@ -313,6 +386,7 @@ helpers.describe("Linux system actions", function()
 			{ true, "", nil },
 		}) do
 			with_modules({
+				["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
 				["adapters.clipboard"] = {
 					read_selection_uri_list = function() return report[1], report[2], report[3] end,
 				},
@@ -327,6 +401,42 @@ helpers.describe("Linux system actions", function()
 			end)
 		end
 	end)
+
+	for _, response in ipairs({ "exit 1", 'printf "unknown"' }) do
+		helpers.it("does not change desktop visibility after an unreadable query (" .. response .. ")", function()
+			local log = run_with_stubs(backgrounded(Gestures, "show_desktop"), {
+				wmctrl = 'if [ "$1" = -m ]; then ' .. response .. '; fi',
+			})
+			helpers.assert_true(not log:find("wmctrl -k", 1, true), "unobserved state must not be changed: " .. log)
+		end)
+	end
+
+	for _, vector in ipairs({ { "ON", "off" }, { "OFF", "on" } }) do
+		helpers.it("toggles observed desktop visibility " .. vector[1], function()
+			local log = run_with_stubs(backgrounded(Gestures, "show_desktop"), {
+				wmctrl = 'if [ "$1" = -m ]; then printf "%s\\n" "showing the desktop mode: ' .. vector[1] .. '"; fi',
+			})
+			helpers.assert_true(log:find("wmctrl -k " .. vector[2], 1, true) ~= nil, log)
+		end)
+	end
+
+	for _, response in ipairs({ "exit 1", 'printf "unexpected"' }) do
+		helpers.it("does not change the colour scheme after an unreadable setting (" .. response .. ")", function()
+			local log = run_with_stubs(backgrounded(Gestures, "toggle_dark_mode"), {
+				gsettings = 'if [ "$1" = get ]; then ' .. response .. '; fi',
+			})
+			helpers.assert_true(not log:find("gsettings set", 1, true), "unobserved state must not be changed: " .. log)
+		end)
+	end
+
+	for _, vector in ipairs({ { "default", "prefer-dark" }, { "prefer-light", "prefer-dark" }, { "prefer-dark", "default" } }) do
+		helpers.it("toggles the observed " .. vector[1] .. " colour scheme", function()
+			local log = run_with_stubs(backgrounded(Gestures, "toggle_dark_mode"), {
+				gsettings = 'if [ "$1" = get ]; then printf "\\047%s\\047\\n" "' .. vector[1] .. '"; fi',
+			})
+			helpers.assert_true(log:find("gsettings set org.gnome.desktop.interface color-scheme " .. vector[2], 1, true) ~= nil, log)
+		end)
+	end
 
 	helpers.it("minimize_all minimizes every listed window but the sticky ones (action-parity-linux-system)", function()
 		local log = run_with_stubs(backgrounded(Gestures, "minimize_all"), {
@@ -365,6 +475,22 @@ helpers.describe("Linux system actions", function()
 			})
 		end)
 
+	for _, fault in ipairs({ "mount query", "partition query", "unmount" }) do
+		helpers.it("does not power off a disk after " .. fault .. " fails", function()
+			local lsblk = table.concat({
+				'case "$*" in',
+				'  "-nrpo NAME,TYPE,RM,HOTPLUG") printf "%s\\n" "/dev/sdb disk 1 1";;',
+				'  "-nrpo MOUNTPOINT /dev/sdb") ' .. (fault == "mount query" and "exit 1" or 'printf "%s\\n" "/media/ana/KEY"') .. ';;',
+				'  "-nrpo NAME,MOUNTPOINT /dev/sdb") ' .. (fault == "partition query" and "exit 1" or 'printf "%s\\n" "/dev/sdb1 /media/ana/KEY"') .. ';;',
+				'esac',
+			}, "\n")
+			local log = run_with_stubs(backgrounded(Gestures, "eject_all_disks"), {
+				lsblk = lsblk, udisksctl = fault == "unmount" and 'exit 1' or ':',
+			})
+			helpers.assert_true(not log:find("udisksctl power%-off"), "unsafe power-off after " .. fault .. ": " .. log)
+		end)
+	end
+
 	helpers.it("open_emoji_picker chains the installed choosers and logs when there is none (action-parity-linux-system)",
 		function()
 			local installed = { ibus = true, smile = true }
@@ -394,7 +520,7 @@ helpers.describe("Linux system actions", function()
 		end
 		local ok, err = pcall(function()
 			helpers.assert_eq(backgrounded(Gestures, "pick_color", answer),
-				"{ xcolor --selection clipboard || gpick --single --output --no-newline | xclip -selection clipboard; }")
+				'{ xcolor --selection clipboard || { colour=$(gpick --single --output --no-newline) && [ -n "$colour" ] && printf "%s" "$colour" | xclip -selection clipboard; }; }')
 			wayland = "wayland-0"
 			helpers.assert_eq(backgrounded(Gestures, "pick_color", answer), "{ hyprpicker --autocopy --format=hex; }")
 		end)
@@ -402,10 +528,170 @@ helpers.describe("Linux system actions", function()
 		if not ok then error(err, 0) end
 	end)
 
+	for _, gpick in ipairs({ "exit 1", "exit 0" }) do
+		helpers.it("keeps the clipboard when the X11 colour picker produces no colour (" .. gpick .. ")", function()
+			local old_getenv = os.getenv
+			os.getenv = function(name) if name == "WAYLAND_DISPLAY" then return "" end; return old_getenv(name) end
+			local ok, err = pcall(function()
+				local command = backgrounded(Gestures, "pick_color", function() return true end)
+				local log, dir = run_with_stubs(command, { xcolor = "exit 1", gpick = gpick,
+					xclip = 'cat > "$STUBS/clipboard"' })
+				helpers.assert_nil(io.open(dir .. "/clipboard", "rb"), "no colour must preserve clipboard: " .. log)
+			end)
+			os.getenv = old_getenv
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("copies a colour produced by the X11 fallback picker", function()
+		local old_getenv = os.getenv
+		os.getenv = function(name) if name == "WAYLAND_DISPLAY" then return "" end; return old_getenv(name) end
+		local ok, err = pcall(function()
+			local command = backgrounded(Gestures, "pick_color", function() return true end)
+			local _, dir = run_with_stubs(command, { xcolor = "exit 1", gpick = 'printf "#aabbcc"',
+				xclip = 'cat > "$STUBS/clipboard"' })
+			local file = assert(io.open(dir .. "/clipboard", "rb"))
+			helpers.assert_eq(file:read("*a"), "#aabbcc")
+			file:close()
+		end)
+		os.getenv = old_getenv
+		if not ok then error(err, 0) end
+	end)
+
+	for _, action in ipairs({ "screenshot_fullscreen_clipboard", "screenshot_region_clipboard" }) do
+		helpers.it("falls back without writing an empty clipboard when grim fails (" .. action .. ")", function()
+			local log, dir = run_with_stubs(backgrounded(Gestures, action), {
+				grim = "exit 1", slurp = 'echo "10,10 50x20"',
+				["wl-copy"] = 'cat > "$STUBS/clipboard"',
+				["gnome-screenshot"] = "exit 0", spectacle = "exit 1", maim = "exit 1",
+			})
+			helpers.assert_nil(io.open(dir .. "/clipboard", "r"), "failed grim cannot replace the clipboard: " .. log)
+			helpers.assert_true(log:find("gnome%-screenshot") ~= nil, "next capture tool must run: " .. log)
+		end)
+	end
+
+	for _, action in ipairs({ "screenshot_fullscreen_clipboard", "screenshot_region_clipboard" }) do
+		helpers.it("copies a successful PNG and cleans its private temporary file (" .. action .. ")", function()
+			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, action)
+			local log, dir = run_with_stubs(command, {
+				grim = 'for last; do :; done; printf PNG > "$last"',
+				slurp = 'echo "10,10 50x20"', ["wl-copy"] = 'cat > "$STUBS/clipboard"',
+				["gnome-screenshot"] = "exit 1", spectacle = "exit 1", maim = "exit 1",
+			})
+			local clip = assert(io.open(dir .. "/clipboard", "rb"))
+			helpers.assert_eq(clip:read("*a"), "PNG")
+			clip:close()
+			helpers.assert_true(not log:find("gnome%-screenshot"), "success stops the cascade")
+			local stream = assert(io.popen("find '" .. dir .. "' -name '*.png' -print"))
+			helpers.assert_eq(stream:read("*a"), "", "the staged PNG is removed")
+			stream:close()
+		end)
+	end
+
+	for _, signal in ipairs({ "HUP", "INT", "TERM" }) do
+		helpers.it("removes the staged screenshot when its shell receives SIG" .. signal, function()
+			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, "screenshot_fullscreen_clipboard")
+			local log, dir = run_with_stubs(command, {
+				grim = 'for last; do :; done; printf PNG > "$last"; kill -' .. signal .. ' "$PPID"; exit 0',
+				["wl-copy"] = 'cat > "$STUBS/clipboard"', ["gnome-screenshot"] = "exit 1",
+				spectacle = "exit 1", maim = "exit 1",
+			})
+			local stream = assert(io.popen("find '" .. dir .. "' -name 'ergopti-screenshot.*' -print"))
+			helpers.assert_eq(stream:read("*a"), "", "the private capture directory must be removed: " .. log)
+			stream:close()
+		end)
+	end
+
+	helpers.it("two saved window captures in the same second retain both images", function()
+		local target = os.tmpname()
+		os.remove(target)
+		local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
+		local old_getenv, old_date = os.getenv, os.date
+		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+		os.date = function() return "2026-11-04_16-00-00" end
+		local ok, err = pcall(function()
+			local cmd = backgrounded(Gestures, "screenshot_window_save")
+			run_with_stubs(cmd .. " & " .. cmd .. " & wait", {
+				["gnome-screenshot"] = 'printf PNG > "$2"',
+			})
+			local pipe = assert(io.popen("find '" .. target .. "' -type f | wc -l"))
+			local count = tonumber(pipe:read("*l"))
+			pipe:close()
+			helpers.assert_eq(count, 2, "both screenshots must remain")
+		end)
+		os.getenv, os.date = old_getenv, old_date
+		os.execute("rm -rf '" .. target .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes an incomplete reserved screenshot after all capture tools fail", function()
+		local target = os.tmpname()
+		os.remove(target)
+		local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
+		local old_getenv = os.getenv
+		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+		local ok, err = pcall(function()
+			local command = backgrounded(Gestures, "screenshot_window_save")
+			run_with_stubs(command, {
+				["gnome-screenshot"] = 'printf partial > "$2"; exit 1',
+				spectacle = "exit 1", maim = "exit 1", xdotool = "exit 1",
+			})
+			local pipe = assert(io.popen("find '" .. target .. "' -mindepth 1 -print"))
+			helpers.assert_eq(pipe:read("*a"), "", "failed capture leaves no reserved artifact")
+			pipe:close()
+		end)
+		os.getenv = old_getenv
+		os.execute("rm -rf '" .. target .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	for _, variant in ipairs({ "empty-success", "partial-failure" }) do
+		helpers.it("saved screenshots continue after " .. variant .. " from the first tool", function()
+			local target = os.tmpname()
+			os.remove(target)
+			local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
+			local old_getenv = os.getenv
+			os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+			local ok, err = pcall(function()
+				local command = backgrounded(Gestures, "screenshot_fullscreen_save")
+				local log = run_with_stubs(command, {
+					grim = variant == "empty-success" and "exit 0" or 'printf partial > "$1"; exit 1',
+					["gnome-screenshot"] = 'printf GOOD > "$2"', spectacle = "exit 1", maim = "exit 1",
+				})
+				helpers.assert_true(log:find("gnome%-screenshot") ~= nil, "fallback must run: " .. log)
+				local pipe = assert(io.popen("cat '" .. target .. "'/*.png 2>/dev/null"))
+				helpers.assert_eq(pipe:read("*a"), "GOOD")
+				pipe:close()
+			end)
+			os.getenv = old_getenv
+			os.execute("rm -rf '" .. target .. "'")
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("does not retain an earlier failed tool's partial screenshot", function()
+		local target = os.tmpname()
+		os.remove(target)
+		local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
+		local old_getenv = os.getenv
+		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+		local ok, err = pcall(function()
+			local command = backgrounded(Gestures, "screenshot_fullscreen_save")
+			run_with_stubs(command, { grim = 'printf partial > "$1"; exit 1',
+				["gnome-screenshot"] = "exit 0", spectacle = "exit 1", maim = "exit 1" })
+			local pipe = assert(io.popen("find '" .. target .. "' -mindepth 1 -print"))
+			helpers.assert_eq(pipe:read("*a"), "", "partial data cannot masquerade as a later success")
+			pipe:close()
+		end)
+		os.getenv = old_getenv
+		os.execute("rm -rf '" .. target .. "'")
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("screen_capture_instant saves the active window like screenshot_window_save (action-parity-linux-system)",
 		function()
 			local instant = backgrounded(Gestures, "screen_capture_instant")
-			helpers.assert_true(instant:find("gnome-screenshot -wf '", 1, true) ~= nil, instant)
+			helpers.assert_true(instant:find('gnome-screenshot -wf "$f"', 1, true) ~= nil, instant)
 			helpers.assert_true(instant:find("/ergopti_win_", 1, true) ~= nil, "a window capture file name: " .. instant)
 		end)
 
@@ -428,6 +714,30 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(leftover, "0", "the temporary capture is removed")
 	end)
 
+	helpers.it("keeps the clipboard when OCR finds no text", function()
+		local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
+			slurp = 'echo "10,10 50x20"',
+			grim = 'for last; do :; done; printf PNG > "$last"',
+			tesseract = 'case "$1" in --list-langs) printf "List:\neng\n";; *) exit 0;; esac',
+			["wl-copy"] = 'cat > "$STUBS/clipboard"',
+		})
+		helpers.assert_nil(io.open(dir .. "/clipboard", "rb"), "empty OCR must not clear the clipboard: " .. log)
+	end)
+
+	for _, signal in ipairs({ "HUP", "INT", "TERM" }) do
+		helpers.it("cleans the private OCR image on SIG" .. signal, function()
+			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, "ocr_screenshot")
+			local log, dir = run_with_stubs(command, {
+				slurp = 'echo "10,10 50x20"',
+				grim = 'for last; do :; done; printf PNG > "$last"; kill -' .. signal .. ' "$PPID"; exit 0',
+				tesseract = 'printf text', ["wl-copy"] = 'cat > "$STUBS/clipboard"',
+			})
+			local pipe = assert(io.popen("find '" .. dir .. "' -name 'ergopti-ocr.*' -print"))
+			helpers.assert_eq(pipe:read("*a"), "", "OCR capture directory must be removed on signal: " .. log)
+			pipe:close()
+		end)
+	end
+
 	helpers.it("ocr_screenshot leaves the clipboard alone when the selection is cancelled (action-parity-linux-system)",
 		function()
 			local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
@@ -438,5 +748,80 @@ helpers.describe("Linux system actions", function()
 			})
 			helpers.assert_nil(io.open(dir .. "/clipboard", "r"), "nothing reached the clipboard: " .. log)
 			helpers.assert_true(not log:find("tesseract", 1, true), "nothing was read: " .. log)
+		end)
+
+	-- Two accepted toggles background two shells. Unserialized, both read the
+	-- old state before either writes, so both write the same new state and one
+	-- toggle is lost. The stubs widen that window with a slow read.
+	local TOGGLES = {
+		toggle_dark_mode = {
+			stub = "gsettings",
+			body = 'if [ "$1" = get ]; then v=$(cat "$STUBS/state"); sleep 0.3; printf "\'%s\'\\n" "$v";'
+				.. ' else printf "%s" "$4" > "$STUBS/state"; fi',
+			initial = "default", once = "prefer-dark",
+		},
+		show_desktop = {
+			stub = "wmctrl",
+			body = 'if [ "$1" = -m ]; then v=$(cat "$STUBS/state"); sleep 0.3; printf "Name: stub\\n'
+				.. 'Window manager\'s \\"showing the desktop\\" mode: %s\\n" "$v";'
+				.. ' else case "$2" in on) printf ON;; off) printf OFF;; esac > "$STUBS/state"; fi',
+			initial = "OFF", once = "ON",
+		},
+	}
+	for action, toggle in pairs(TOGGLES) do
+		helpers.it(action .. ": overlapping toggles both apply (toggle-serialized-lds-002)", function()
+			local command = backgrounded(Gestures, action)
+			local function run(times)
+				local jobs = {}
+				for index = 1, times do jobs[index] = "( " .. command .. " ) &" end
+				local script = 'printf "%s" ' .. toggle.initial .. ' > "$STUBS/state"\n'
+					.. 'export XDG_RUNTIME_DIR="$STUBS"\nmkdir -p "$STUBS/ergopti"\n'
+					.. table.concat(jobs, "\n") .. "\nwait"
+				local log, dir = run_with_stubs(script, { [toggle.stub] = toggle.body })
+				local fh = io.open(dir .. "/state", "r")
+				local state = fh and fh:read("*a")
+				if fh then fh:close() end
+				os.execute("rm -rf '" .. dir .. "'")
+				return state, log
+			end
+			local once = run(1)
+			helpers.assert_eq(once, toggle.once, "one toggle flips the state")
+			local twice, log = run(2)
+			helpers.assert_eq(twice, toggle.initial, "two overlapping toggles flip it back; calls: " .. log)
+		end)
+	end
+
+	-- The shell that backgrounds a command answers at once. Its refusal (no
+	-- fork, no shell, status 126 under either os.execute ABI, or a raise) was
+	-- dropped by an ignored pcall, so the action failed with no line logged.
+	helpers.it("a refused background shell is logged, a started one is not (background-acquisition-lds-001)",
+		function()
+			local errors = {}
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
+			local cached = package.loaded["modules.gestures.manager"]
+			local cached_runner = package.loaded["modules.gestures.background_commands"]
+			package.loaded["modules.gestures.background_commands"] = nil
+			local ok, failure = pcall(function()
+				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "logger.shim", logger)
+				local real = os.execute
+				local function dispatch(answer)
+					errors = {}
+					os.execute = answer
+					local called, raised = pcall(Fresh.execute_action, "mic_mute_toggle", "tap_3")
+					os.execute = real
+					if not called then error(raised, 0) end
+					return #errors
+				end
+				helpers.assert_eq(dispatch(function() return true end), 0, "Lua 5.2+ success logs nothing")
+				helpers.assert_eq(dispatch(function() return 0 end), 0, "LuaJIT success logs nothing")
+				helpers.assert_eq(dispatch(function() return nil, "exit", 126 end), 1, "Lua 5.2+ refusal is logged")
+				helpers.assert_eq(dispatch(function() return 126 * 256 end), 1, "LuaJIT refusal is logged")
+				helpers.assert_eq(dispatch(function() error("fork refused") end), 1, "a raise is logged")
+				helpers.assert_true(not errors[1]:find("pactl", 1, true), "the command is never logged: " .. errors[1])
+			end)
+			package.loaded["modules.gestures.manager"] = cached
+			package.loaded["modules.gestures.background_commands"] = cached_runner
+			if not ok then error(failure, 0) end
 		end)
 end)

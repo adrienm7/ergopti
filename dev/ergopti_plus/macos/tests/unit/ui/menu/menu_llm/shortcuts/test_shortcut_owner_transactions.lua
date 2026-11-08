@@ -21,6 +21,89 @@ local seed_family = Seeds.seed_family
 local seed_inactive_family = Seeds.seed_inactive_family
 
 helpers.describe("HS-033 exact LLM shortcut transactions", function()
+	helpers.it("rejects unknown modifiers instead of changing the shortcut", function()
+		with_trigger_fixture({}, function(fixture)
+			local slot = seed_family(fixture, "profile")
+			local old_handle, old_preference = slot.get_handle(), slot.get_pref()
+			fixture.reset_observations()
+			for _, mods in ipairs({{"bogus"}, {"cmd", "bogus"}, {""}}) do
+				helpers.assert_eq(slot.apply(mods, "b"), false)
+				helpers.assert_eq(fixture.orchestrator.restore_shortcuts({
+					llm_profile_shortcuts = {user_p = {mods = mods, key = "b"}},
+				}), false)
+				helpers.assert_true(slot.get_handle() == old_handle)
+				helpers.assert_true(slot.get_pref() == old_preference)
+			end
+			helpers.assert_eq(fixture.get_save_count(), 0)
+			fixture.fire(old_handle)
+			helpers.assert_eq(fixture.get_prediction_count(), 1)
+		end)
+	end)
+
+	helpers.it("refuses malformed saved shortcuts when arming without removing an owner", function()
+		with_trigger_fixture({}, function(fixture)
+			local slot = seed_family(fixture, "profile")
+			local old_handle = slot.get_handle()
+			fixture.reset_observations()
+			for _, malformed in ipairs({{mods = {"ctrl"}}, false, "invalid"}) do
+				fixture.state.llm_profile_shortcuts = {user_p = malformed}
+				helpers.assert_eq(fixture.orchestrator.arm_shortcuts(), false)
+				helpers.assert_true(slot.get_handle() == old_handle)
+				helpers.assert_true(fixture.state.llm_profile_shortcuts.user_p == malformed)
+			end
+			fixture.state.llm_profile_shortcuts = false
+			helpers.assert_eq(fixture.orchestrator.arm_shortcuts(), false)
+			helpers.assert_true(slot.get_handle() == old_handle)
+			helpers.assert_eq(fixture.get_save_count(), 0)
+			fixture.fire(old_handle)
+			helpers.assert_eq(fixture.get_prediction_count(), 1)
+		end)
+	end)
+
+	helpers.it("rejects a malformed shortcut collection without deleting existing bindings", function()
+		with_trigger_fixture({}, function(fixture)
+			local slot = seed_family(fixture, "profile")
+			local old_handle, old_preference = slot.get_handle(), slot.get_pref()
+			fixture.reset_observations()
+			for _, malformed in ipairs({false, "invalid", 42}) do
+				helpers.assert_eq(fixture.orchestrator.restore_shortcuts({
+					llm_profile_shortcuts = malformed,
+				}), false)
+				helpers.assert_true(slot.get_handle() == old_handle)
+				helpers.assert_true(slot.get_pref() == old_preference)
+			end
+			helpers.assert_eq(fixture.get_save_count(), 0)
+			fixture.fire(old_handle)
+			helpers.assert_eq(fixture.get_prediction_count(), 1)
+		end)
+	end)
+
+	helpers.it("rejects malformed persisted shortcuts without disturbing the owner", function()
+		with_trigger_fixture({}, function(fixture)
+			local slot = seed_family(fixture, "profile")
+			local old_handle, old_preference = slot.get_handle(), slot.get_pref()
+			fixture.reset_observations()
+			for _, shortcut in ipairs({
+				{mods = {true}, key = "b"},
+				{mods = {{ }}, key = "b"},
+				{mods = {[1] = "ctrl", [3] = "alt"}, key = "b"},
+				{mods = {extra = "ctrl"}, key = "b"},
+				{mods = false, key = "b"},
+				{mods = {"ctrl"}},
+			}) do
+				helpers.assert_eq(fixture.orchestrator.restore_shortcuts({
+					llm_profile_shortcuts = {user_p = shortcut},
+				}), false)
+				helpers.assert_true(slot.get_handle() == old_handle)
+				helpers.assert_true(slot.get_pref() == old_preference)
+			end
+			helpers.assert_nil(fixture.orchestrator.bind_hotkey({true}, "b", function() end))
+			helpers.assert_eq(fixture.get_save_count(), 0)
+			fixture.fire(old_handle)
+			helpers.assert_eq(fixture.get_prediction_count(), 1)
+		end)
+	end)
+
 	for _, family in ipairs({"profile"}) do
 		for _, outcome in ipairs({"false", "nil", "throw"}) do
 			helpers.it("HS-033 " .. family .. " fresh bind rejects new " .. outcome, function()

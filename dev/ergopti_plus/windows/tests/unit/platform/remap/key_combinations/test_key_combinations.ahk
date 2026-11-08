@@ -672,7 +672,7 @@ Test("key combinations: the menu lists every ordered pair by hand, with its two 
 _KCT_EveryKeyHasItsPairHotkeys() {
 	Path := A_ScriptDir . "\..\platform\remap\key_combination_keys.ahk"
 	Src := _StripFullLineComments(FileRead(Path, "UTF-8"))
-	Start := InStr(Src, "#HotIf KeyCombinationOwnsHotkey()`n")
+	Start := InStr(Src, "#HotIf IsSet(Features) && KeyCombinationOwnsHotkey()`n")
 	Assert(Start > 0, "the pair hotkeys stand under the criterion that reads the key from the hotkey's name")
 	Finish := InStr(Src, "`n#HotIf`n", , Start + 1)
 	Assert(Finish > Start, "the criterion must be closed")
@@ -1684,3 +1684,31 @@ Test("key combinations: unset tap assignments refuse the parse-time tap accessor
 	_KCT_TapSlotUnsetAtBoot.Bind("taps"))
 Test("key combinations: unset empty sentinel refuses the parse-time tap accessor (pair-tap-slot-boot)",
 	_KCT_TapSlotUnsetAtBoot.Bind("none"))
+
+; A real default-clock producer owns the mark. Only the consumer's existing
+; optional clock argument is moved; no timestamp/map entry is forged. This is
+; a native-domain protocol probe, not a claim of 49-day uptime or held input.
+_KCT_TakenPressNative64(Eras) {
+	global _TH_PressesTakenByCombination
+	PreviousCritical := Critical("On")
+	Saved := _TH_PressesTakenByCombination
+	try {
+		_TH_PressesTakenByCombination := Map()
+		TapHoldMarkPressTakenByCombination("left_alt")
+		Origin := _TH_PressesTakenByCombination["left_alt"]
+		ObservedNow := Origin + Eras * 0x100000000 + 100
+		Actual := _TH_TakePressTakenByCombination("left_alt", 250, ObservedNow)
+		_TestPrint("# combination-native64 eras=" . Eras . " origin=" . Origin
+			. " now=" . ObservedNow . " elapsed=" . (ObservedNow - Origin) . " taken=" . Actual)
+		AssertFalse(_TH_PressesTakenByCombination.Has("left_alt"), "Every old marker must be retired exactly once.")
+		AssertEqual(Eras == 0, Actual,
+			"Only a mark within the genuine 250ms guard may cancel this tap; a full native era must not resurrect it.")
+	} finally {
+		_TH_PressesTakenByCombination := Saved
+		Critical(PreviousCritical)
+	}
+}
+
+for _KCT_Native64Eras in [0, 1, 2]
+	Test("key combination native age: eras=" . _KCT_Native64Eras . " (combination-mark-native64)",
+		_KCT_TakenPressNative64.Bind(_KCT_Native64Eras))

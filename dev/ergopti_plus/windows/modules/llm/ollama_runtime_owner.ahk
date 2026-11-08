@@ -46,7 +46,7 @@ class OllamaRuntimeOwner {
 		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256", "ProxyRelayContractSha256"]
 			if !RegExMatch(Proxy.Get(Name, ""), "^[0-9a-f]{64}$")
 				throw TypeError("Runtime proxy capture requires its digest.", -1, Name)
-		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs", "ProxyListProbeMs"]
 			if !(Proxy.Get(Name, 0) is Integer) || Proxy.Get(Name, 0) <= 0
 				throw TypeError("Runtime proxy capture requires its relay deadlines.", -1, Name)
 		if Proxy.Has("ProxyRelayPath") && (!this._LocalPath(Proxy["ProxyRelayPath"])
@@ -60,6 +60,7 @@ class OllamaRuntimeOwner {
 		this.Options := Options.Clone()
 		this.Record := 0
 		this.Generation := 0
+		this.CallbacksRetired := false
 	}
 
 	/**
@@ -78,6 +79,8 @@ class OllamaRuntimeOwner {
 	}
 
 	_StartNonCritical(Target, Authority, OnReady, OnExit) {
+		if this.CallbacksRetired
+			return false
 		if !OllamaNativeIdentityDrain()
 			return false
 		if !this._ValidTarget(Target) || !(Authority is Map)
@@ -89,7 +92,7 @@ class OllamaRuntimeOwner {
 		PreviousCritical := Critical("On")
 		try {
 			; Starting and retained cancellation records block every successor.
-			if (this.Record is Map) || A_IsSuspended
+			if this.CallbacksRetired || (this.Record is Map) || A_IsSuspended
 				return false
 			Record := Map("generation", ++this.Generation,
 				"target", Target.Clone(), "authority", Authority.Clone(),
@@ -128,7 +131,7 @@ class OllamaRuntimeOwner {
 			for Name in ["VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
 					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256",
 					"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs",
-					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs", "ProxyListProbeMs"]
 				Arguments.Push("-" . Name, String(this.Options["proxy"][Name]))
 			; No relay installed: the launcher reads the empty default.
 			if this.Options["proxy"].Has("ProxyRelayPath")
@@ -177,6 +180,25 @@ class OllamaRuntimeOwner {
 	/** @returns {Boolean} Includes stable ownership and unacknowledged cleanup. */
 	HasOwner() {
 		return this.Record is Map || OllamaNativeIdentityHasDebt()
+	}
+
+	/**
+	 * Permanently closes an idle runtime after native and lease retirement.
+	 * @param Retired Optional receiver retaining callbacks through a caller's RAM claim.
+	 * @returns {Boolean} False while a runtime record or native identity debt remains.
+	 */
+	RetireCallbacks(&Retired := unset) {
+		PreviousCritical := Critical("On")
+		try {
+			if this.HasOwner()
+				return false
+			PreviousRetired := IsSet(Retired) ? Retired : 0
+			Retired := [this.Options["on_retired"], this.Options.Get("on_error", 0)]
+			this.CallbacksRetired := true
+			this.Options["on_retired"] := 0
+			this.Options["on_error"] := 0
+			return true
+		} finally Critical(PreviousCritical)
 	}
 
 	_Current(Record) {

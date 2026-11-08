@@ -97,6 +97,17 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 		end)
 	end)
 
+	helpers.it("rejects a NUL-bearing URL before it reaches a shell command", function()
+		with_subject('[shortcuts]\nchatgpt_url = "https://example.invalid/\\u0000tail"\n', function(subject, controls)
+			helpers.assert_eq(subject.get_url(), subject.DEFAULT_URL)
+			helpers.assert_eq(subject.is_valid("https://example.invalid/" .. string.char(0) .. "tail"), false)
+			helpers.assert_eq(subject.set_url("https://example.invalid/" .. string.char(0) .. "tail"), false)
+			helpers.assert_true(subject.open())
+			helpers.assert_eq(#controls.commands, 1)
+			helpers.assert_eq(controls.commands[1]:find(string.char(0), 1, true), nil)
+		end)
+	end)
+
 	helpers.it("never opens an old-shape URL and lets a new choice replace it (config-outdated-chatgpt)", function()
 		-- A stored value that is not an HTTP(S) URL is outdated configuration:
 		-- it used to make every read raise, so Ctrl+G, the menu and the cleanup

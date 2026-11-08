@@ -139,6 +139,8 @@ _MF_FilterConfigKey(Prop) {
 
 _MF_PublishFlagCandidate(Prop, Target) {
 	MetricsFilters.%Prop% := Target
+	if Prop == "encrypt" && !KL_Roi_CommitEncryptionPolicy(Target)
+		throw Error("ROI text policy did not acknowledge the encryption preference.")
 }
 
 _MF_BuildFilterTogglePlan(Prop) {
@@ -158,6 +160,8 @@ MF_CommitFilterToggle(Prop, WriterFn := 0, NotifyFn := 0) {
 }
 
 _MF_ApplyEncryptionCandidate(Target, ApplyFn := 0) {
+	if Target && !KL_Roi_EncryptionReady()
+		return false
 	if HasMethod(ApplyFn, "Call") {
 		Applied := ApplyFn.Call(Target)
 		return (Applied is Integer) && Applied == 1
@@ -176,6 +180,13 @@ _MF_EncryptionCandidateAvailable(AvailableFn := 0) {
 _MF_BuildEncryptionTogglePlan(Outcome, ApplyFn := 0, AvailableFn := 0) {
 	OldValue := !!MetricsFilters.encrypt
 	Target := !OldValue
+	Outcome["roi_owner"] := KL_Roi_BeginEncryptionRequest(Target)
+	if !IsObject(Outcome["roi_owner"])
+		throw Error("An encryption preference transition already owns ROI admission.")
+	if Target && !KL_Roi_EncryptionReady() {
+		Outcome["pending_write"] := true
+		return { noop: true }
+	}
 	if Target && !_MF_EncryptionCandidateAvailable(AvailableFn) {
 		try LoggerError("Keystats", "At-rest encryption requested but no key can be derived - staying off.")
 		return { noop: true }
@@ -191,15 +202,15 @@ _MF_BuildEncryptionTogglePlan(Outcome, ApplyFn := 0, AvailableFn := 0) {
 	}
 }
 
-_MF_NotifyEncryptionUnavailable(NotifyFn := 0) {
+_MF_NotifyEncryptionUnavailable(NotifyFn := 0, PendingWrite := false) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _MF_NotifyEncryptionUnavailable(NotifyFn)
+		try return _MF_NotifyEncryptionUnavailable(NotifyFn, PendingWrite)
 		finally Critical(InheritedCritical)
 	}
 	try {
-		Message := t("dialog.metrics.encryption_unavailable")
+		Message := t(PendingWrite ? "dialog.metrics.encryption_pending_write" : "dialog.metrics.encryption_unavailable")
 		Options := Map("title", t("dialog.metrics.encrypt_confirm_title"),
 			"level", "error")
 		Presented := HasMethod(NotifyFn, "Call")
@@ -220,17 +231,22 @@ _MF_NotifyEncryptionUnavailable(NotifyFn := 0) {
 MF_CommitEncryptionToggle(WriterFn := 0, NotifyFn := 0, ApplyFn := 0,
 		AvailableFn := 0) {
 	Outcome := Map("accepted", false)
-	Committed := MF_SaveBuiltToIni("the at-rest encryption preference",
-		_MF_BuildEncryptionTogglePlan.Bind(Outcome, ApplyFn, AvailableFn),
-		WriterFn, NotifyFn)
-	if !Committed
-		return false
-	if Outcome.Get("accepted", false)
-		return true
-	return _MF_NotifyEncryptionUnavailable(NotifyFn)
+	try {
+		Committed := MF_SaveBuiltToIni("the at-rest encryption preference",
+			_MF_BuildEncryptionTogglePlan.Bind(Outcome, ApplyFn, AvailableFn),
+			WriterFn, NotifyFn)
+		if !Committed
+			return false
+		if Outcome.Get("accepted", false)
+			return true
+		return _MF_NotifyEncryptionUnavailable(NotifyFn, Outcome.Get("pending_write", false))
+	} finally {
+		if IsObject(Outcome.Get("roi_owner", 0))
+			KL_Roi_EndEncryptionRequest(Outcome["roi_owner"])
+	}
 }
 
-_MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
+_MF_BuildDisabledAppsPlan(Selected, Receipt := 0, DurableOutcome := 0) {
 	if IsObject(Receipt)
 			&& !AppPicker_ClaimReceipt(Receipt, MF_DisabledList())
 		return false
@@ -243,11 +259,14 @@ _MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
 		Candidate[Key] := true
 		Persisted.Push(Key)
 	}
-	return {
+	Plan := {
 		updates: [{ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS,
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}
+	if DurableOutcome is Map
+		Plan.durable_outcome := DurableOutcome
+	return Plan
 }
 
 _MF_PublishDisabledAppsCandidate(Candidate) {
@@ -256,8 +275,12 @@ _MF_PublishDisabledAppsCandidate(Candidate) {
 }
 
 MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
-	return MF_SaveBuiltToIni("the disabled metrics applications",
-		_MF_BuildDisabledAppsPlan.Bind(Selected, Receipt), WriterFn, NotifyFn)
+	Outcome := Receipt is Map && Receipt.Get("durable_mode", false) ? AppPicker_BeginDurableSave(Receipt) : 0
+	Committed := MF_SaveBuiltToIni("the disabled metrics applications",
+		_MF_BuildDisabledAppsPlan.Bind(Selected, Receipt, Outcome), WriterFn, NotifyFn)
+	if Outcome is Map
+		Outcome["applied"] := (Committed is Integer) && Committed == 1
+	return Committed
 }
 
 
@@ -671,6 +694,9 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 		return false
 	if MetricsFocusCache.event_mode
 		return true
+	; Retire failed cleanup before creating another callback generation.
+	if MetricsFocusCache.hooks.Length && !_MF_StopFocusWinEvents()
+		return false
 	Callback := 0
 	try Callback := CallbackCreate(_MF_FocusWinEvent, "F", 7)
 	catch as Err {
@@ -685,9 +711,10 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 			try LoggerError("MetricsFilters", "SetWinEventHook raised for event 0x{1:X}: {2}.", Event, Err.Message)
 		if !Hook {
 			try LoggerError("MetricsFilters", "Focus event 0x{1:X} could not be hooked; polling instead.", Event)
-			for Done in Hooks
-				try WIRemoveEventHook(Done)
-			try CallbackFree(Callback)
+			if !_MF_ReleaseFocusHooks(Hooks, Callback, , , &Remaining) {
+				MetricsFocusCache.hooks := Remaining
+				MetricsFocusCache.event_callback := Callback
+			}
 			return false
 		}
 		Hooks.Push(Hook)
@@ -705,7 +732,7 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 
 ; Removes the hooks. A hook that refuses to unhook keeps its callback allocated: freeing
 ; a callback the system can still invoke would crash the driver.
-_MF_StopFocusWinEvents() {
+_MF_StopFocusWinEvents(RemoveFn := 0, FreeFn := 0) {
 	PreviousCritical := Critical("On")
 	try {
 		Hooks := MetricsFocusCache.hooks
@@ -717,16 +744,35 @@ _MF_StopFocusWinEvents() {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	Removed := _MF_ReleaseFocusHooks(Hooks, Callback, RemoveFn, FreeFn, &Remaining)
+	if !Removed {
+		MetricsFocusCache.hooks := Remaining
+		MetricsFocusCache.event_callback := Callback
+	}
+	return Removed
+}
+
+; Partial installation and normal teardown obey the same callback ownership rule.
+_MF_ReleaseFocusHooks(Hooks, Callback, RemoveFn := 0, FreeFn := 0, &Remaining := unset) {
+	Remaining := []
 	AllRemoved := true
 	for Hook in Hooks {
 		Removed := false
-		try Removed := WIRemoveEventHook(Hook)
+		try Removed := IsObject(RemoveFn) ? RemoveFn.Call(Hook) : WIRemoveEventHook(Hook)
 		catch as Err
 			try LoggerWarn("MetricsFilters", "Focus event hook teardown failed: {1}.", Err.Message)
+		if !Removed
+			Remaining.Push(Hook)
 		AllRemoved := AllRemoved && Removed
 	}
-	if Callback && AllRemoved
-		try CallbackFree(Callback)
+	if !AllRemoved
+		try LoggerWarn("MetricsFilters", "A focus event hook remains active; retaining its callback.")
+	if Callback && AllRemoved {
+		if IsObject(FreeFn)
+			FreeFn.Call(Callback)
+		else
+			CallbackFree(Callback)
+	}
 	return AllRemoved
 }
 

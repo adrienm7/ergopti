@@ -128,10 +128,18 @@ _A0720B4_DelimiterWriteFailureIsSurfaced() {
 		"one publisher must project both delimiter caches together")
 	Writer := _DriverFuncBody("_SaveOverrides")
 	Assert(Writer != "", "_SaveOverrides must exist")
-	AuthorizePos := InStr(Writer, "AuthorizeFn.Call()")
-	ReplacePos := InStr(Writer, "FSAtomicMoveReplace(")
-	PublishCallPos := InStr(Writer, "PublishFn.Call()")
-	Assert(AuthorizePos > 0 and ReplacePos > AuthorizePos
+	; The owned native route re-authorizes inside its replacement gate; the
+	; legacy staged route re-authorizes before its own atomic move.
+	NativeGatePos := InStr(Writer, "FinalAdmission := _HotstringsOverrideCommitSourceCurrent.Bind(")
+	NativeAuthorizerPos := InStr(Writer, "AuthorizeFn, HasAuthorizer", true, Max(1, NativeGatePos))
+	NativeReplacePos := InStr(Writer, "Published := FSWriteReplaceOwned(")
+	NativeAdmissionPos := InStr(Writer, "NativeAdmission,", true, Max(1, NativeReplacePos))
+	AuthorizePos := InStr(Writer, "AuthorizeFn.Call()", true, Max(1, NativeAdmissionPos))
+	ReplacePos := InStr(Writer, "FSConfigAtomicMoveReplace(", true, Max(1, AuthorizePos))
+	PublishCallPos := InStr(Writer, "PublishFn.Call()", true, Max(1, ReplacePos))
+	Assert(NativeGatePos > 0 and NativeAuthorizerPos > NativeGatePos
+		and NativeReplacePos > NativeAuthorizerPos and NativeAdmissionPos > NativeReplacePos
+		and AuthorizePos > NativeAdmissionPos and ReplacePos > AuthorizePos
 		and PublishCallPos > ReplacePos,
 		"the complete stage must be re-authorized, atomically replaced, and projected live in that order")
 }

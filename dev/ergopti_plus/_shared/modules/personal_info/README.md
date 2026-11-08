@@ -91,12 +91,42 @@ every driver's suite.
 
 ---
 
-## Windows is not wired to this yet
+## Windows applies the mask through its AutoHotkey twin
 
-The fields this file classifies are not in the Windows preview index at all:
-`@iban★`, `@cb★` and `@ss★` are registered by direct `CreateHotstring` calls in
-AutoHotkey code, while the index is built exclusively from the TOML categories
-listed in `_PREFIX_WATCHER_CATEGORIES`. There is nothing on screen there for a
-mask to attach to, so making the requirement _observable_ on Windows is its own
-piece of work and is tracked separately. This file is written for three drivers
-because the answer must not differ between them once the third arrives.
+Windows is wired to this declaration. `windows/infra/personal_info_mask.ahk`
+reads the policy (which fields are secrets, how much of one stays visible) from
+`fields.toml` at runtime and masks the frozen field/value snapshot of an
+engine decision for the preview bubble (`PersonalInfoMaskForPreview`,
+`windows/infra/personal_info_preview.ahk`) and for persisted metrics. The
+direct-registered tags (`@iban★`, `@cb★`, `@ss★`) carry their field names in
+`PreviewFields`, so the same mask reaches them. The algorithm is pinned by
+`preview_vectors.toml`, replayed by every driver's suite.
+
+A missing localization key that exists only in metadata is audited separately
+from the working, translated tray caption; it does not affect the mask.
+
+---
+
+## Alias alphabets differ per system
+
+The `[letters]` table maps one alias key to an `[info]` field. What a key may
+be, and so what a combo such as `@np` can name, is not yet the same everywhere:
+
+| Driver  | Accepted alias key                                                                                                     | Owner                                                          |
+| ------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| macOS   | one cased Unicode scalar, with exact spelling and no normalisation; other keys are refused at load                     | `parse_toml_section` in `dynamic_hotstrings/personal_info.lua` |
+| Linux   | exactly one valid UTF-8 code point (a precomposed `é` is accepted, a decomposed spelling is refused, no normalisation) | `strict_codepoint_length` in `dynamic_hotstrings/manager.lua`  |
+| Windows | one cased letter, ASCII or accented (`@tél` ships), tested by distinct upper and lower forms                           | `_PIPreviewIsTagChar` in `infra/personal_info_preview.ahk`     |
+
+The three agree on the shipped thirteen aliases and accept accented and non-Latin
+cased aliases. The Lua combo resolvers reject conflicting case twins rather than
+guess which field to type, and never normalize decomposed spellings. macOS preserves
+non-ASCII keys as quoted TOML keys, collects and deletes whole scalars, and uses the
+same resolved fields for its preview and its expansion. Linux also accepts uncased
+single-codepoint aliases in its registered single-field rules. Windows registers eager combos up to the
+configured pattern length at boot (the macOS and Linux engines resolve a combo
+when it is typed); its cost at the highest accepted setting is a measurement
+for a physical Windows machine, not a claim made here.
+
+The first-boot file is written from `lua/personal_info/defaults.lua` on macOS and
+Linux, so the editor opens on the same placeholder fields on both.

@@ -16,11 +16,15 @@ local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local dir = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/system-bind-recovery-XXXXXX"))
 local database = dir .. "/metrics.sqlite"
+-- A private ledger folder: the baseline below is written for the device this
+-- host registers in SQLite, and a ledger identity an earlier suite left in the
+-- shared <config>/metrics would bind the collector to that other device.
+local metrics_dir = dir .. "/metrics"
 assert(uv.fs_mkdir(database, 448))
 local ok, failure = xpcall(function()
 	Preferences.with(function()
 		Fixture.with(function(k)
-			k.init({ sqlite_path = database, log_dir = dir })
+			k.init({ sqlite_path = database, log_dir = dir, metrics_dir = metrics_dir })
 			local writer = require("modules.keystats.sqlite_writer")
 			assert(not writer.is_available(), "an actual directory must refuse database admission")
 			local system = require("modules.keystats.system_metrics")
@@ -38,7 +42,7 @@ local ok, failure = xpcall(function()
 			local baseline = 4000
 			assert(writer.upsert_system_day(device, { date = current.date, awake_ms = baseline }))
 			writer.close_db()
-			k.init({ sqlite_path = database, log_dir = dir })
+			k.init({ sqlite_path = database, log_dir = dir, metrics_dir = metrics_dir })
 			assert(writer.is_available() and writer.get_db_path() == database)
 			local after = system.snapshot().values
 			for date, day in pairs(before) do
@@ -55,9 +59,14 @@ local ok, failure = xpcall(function()
 		end)
 	end)
 end, debug.traceback)
-for name in uv.fs_scandir_next, assert(uv.fs_scandir(dir)) do
-	local path = dir .. "/" .. name
-	if uv.fs_lstat(path).type == "directory" then assert(uv.fs_rmdir(path)) else assert(uv.fs_unlink(path)) end
+--- Removes a folder this fixture created, the ledger's nested folders included.
+--- @param path string
+local function remove_tree(path)
+	for name in uv.fs_scandir_next, assert(uv.fs_scandir(path)) do
+		local child = path .. "/" .. name
+		if uv.fs_lstat(child).type == "directory" then remove_tree(child) else assert(uv.fs_unlink(child)) end
+	end
+	assert(uv.fs_rmdir(path))
 end
-assert(uv.fs_rmdir(dir))
+remove_tree(dir)
 assert(ok, failure)

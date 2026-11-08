@@ -207,7 +207,12 @@ function M.extract(block, tag)
 	if type(block) ~= "string" or type(tag) ~= "string" or tag == "" then return nil end
 	local at = block:upper():find(tag:upper(), 1, true)
 	if not at then return nil end
-	local text = block:sub(at + #tag):gsub("%*%*", "")
+	local text = block:sub(at + #tag)
+	-- Remove a bold label's closing marker, never operators or formatting in
+	-- the screen transcription or the answer itself.
+	if at > 2 and block:sub(at - 2, at - 1) == "**" and text:sub(1, 2) == "**" then
+		text = text:sub(3)
+	end
 	text = TextUtils.trim(text)
 	if text == "" then return nil end
 	return text

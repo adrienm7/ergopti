@@ -554,15 +554,26 @@ function M.load_file(name, path)
 	end)
 end
 
+--- A source list must be dense so ipairs cannot silently skip bindings.
+local function dense_list(values)
+	if type(values) ~= "table" then return false end
+	local length, count = #values, 0
+	for index in pairs(values) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then return false end
+		count = count + 1
+	end
+	return count == length
+end
+
 --- Whether a section-source list has the shape load_toml takes.
 --- @param section_sources any
 --- @return boolean
 local function valid_section_sources(section_sources)
 	if section_sources == nil then return true end
-	if type(section_sources) ~= "table" then return false end
+	if not dense_list(section_sources) then return false end
 	for _, source in ipairs(section_sources) do
 		if type(source) ~= "table" or type(source.path) ~= "string" or source.path == ""
-			or type(source.sections) ~= "table" or #source.sections == 0 then
+			or not dense_list(source.sections) or #source.sections == 0 then
 			return false
 		end
 		for _, section in ipairs(source.sections) do
@@ -1074,6 +1085,19 @@ function M.list_groups()
 	if not _state then return {} end
 	local out = {}
 	for name, g in pairs(_state.groups) do out[name] = g.enabled end
+	return out
+end
+
+--- The enabled groups a TOML file declares, sorted by name: the categories
+--- whose metadata a preview reads (hotstrings_config.prewarm_meta).
+--- @return table Array of group names.
+function M.list_toml_groups()
+	if not _state then return {} end
+	local out = {}
+	for name, g in pairs(_state.groups) do
+		if g.kind == "toml" and g.enabled then out[#out + 1] = name end
+	end
+	table.sort(out)
 	return out
 end
 

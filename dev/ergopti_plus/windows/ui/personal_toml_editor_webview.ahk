@@ -388,10 +388,17 @@ _HsEdWeb_Eval(Js) {
 ; input (a keyed sections Map + an order Array), so we forward it directly after
 ; attaching the meta description.
 _HsEdWeb_ShowSaveFailure() {
-	Message := _HsEdWeb_JsStr(t("editor.hotstrings.err_write"))
-	_HsEdWeb_Eval('(function(){const e=document.getElementById("save-toast");'
-		. 'if(e){e.textContent="' . Message
-		. '";e.classList.add("show");}})();')
+	_HsEdWeb_Eval(_HsEdWeb_SaveFailureJs(t("editor.hotstrings.err_write")))
+}
+
+; Builds the script replacing the page's optimistic "Saved" toast with Message.
+; _HsEdWeb_JsStr already returns a complete quoted literal, so it is spliced in
+; bare: wrapping it in a second pair of quotes yields a SyntaxError and leaves
+; the false "Saved" toast on screen (audit WVB-001).
+_HsEdWeb_SaveFailureJs(Message) {
+	return '(function(){const e=document.getElementById("save-toast");'
+		. 'if(e){e.textContent=' . _HsEdWeb_JsStr(Message)
+		. ';e.classList.add("show");}})();'
 }
 
 _HsEdWeb_ReportSaveFailure() {

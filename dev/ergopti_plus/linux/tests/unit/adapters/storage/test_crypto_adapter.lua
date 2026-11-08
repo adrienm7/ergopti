@@ -23,6 +23,19 @@ local function fresh_crypto(provider)
 end
 
 helpers.describe("crypto adapter", function()
+	helpers.it("linux-crypto-cli-invalid: refuses malformed successful digest output", function()
+		local subject = fresh_crypto({ available = false })
+		local native = require("infra.openssl_command")
+		local previous = native.exec
+		local ok, failure = pcall(function()
+			for _, output in ipairs({ "SHA2-256(stdin)= abc\n", "SHA2-256(stdin)= " .. string.rep("a", 65) .. "\n" }) do
+				native.exec = function() return output end
+				helpers.assert_eq(subject.sha256("abc"), "", "malformed output cannot become a SHA-256 receipt")
+			end
+		end)
+		native.exec = previous
+		if not ok then error(failure, 0) end
+	end)
 	for _, data in ipairs({ "abc", "a\0b" }) do
 		local kind = data:find("\0", 1, true) and "binary" or "text"
 		for _, status in ipairs({ 1, 7, 23, 143, 137, false }) do

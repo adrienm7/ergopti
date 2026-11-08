@@ -3,9 +3,10 @@
 ; ==============================================================================
 ; MODULE: Keyboard Layout Switch (Windows)
 ; DESCRIPTION:
-; Lists the keyboard layouts installed for the user and makes one active, for
-; the automatic layout switch on a pause, a resume and a quit
-; (_shared/modules/features/pause_switch_policy.ahk decides which).
+; Lists the keyboard layouts installed for the user, reports the active one
+; and makes one active, for the automatic layout switch on a start, a pause, a
+; resume and a quit (_shared/modules/features/pause_switch_policy.ahk decides
+; which) and for Layout > « Input sources ».
 ;
 ; FEATURES & RATIONALE:
 ; 1. A layout is stored by its KLID, the registry name of the layout
@@ -114,6 +115,45 @@ KLS_Choices(ListFn := 0, LookupFn := 0, LabelFn := 0) {
 }
 
 /**
+ * The KLID of the layout the foreground window types with.
+ * @param {Func} ResolveFn Optional port returning the active HKL, 0 when none
+ *   (KS_ResolveKeyboardLayout's contract).
+ * @param {Func} LookupFn Optional custom layout id port (see KLS_LayoutId).
+ * @returns {String} The KLID, "" when no layout could be resolved.
+ */
+KLS_ActiveId(ResolveFn := 0, LookupFn := 0) {
+	if !HasMethod(ResolveFn, "Call")
+		ResolveFn := KS_ResolveKeyboardLayout
+	Hkl := ResolveFn.Call()
+	if !(Hkl is Integer) || Hkl == 0 {
+		try LoggerWarn("KeyboardLayoutSwitch", "The active keyboard layout could not be resolved.")
+		return ""
+	}
+	return KLS_LayoutId(Hkl, LookupFn)
+}
+
+; The URI of Settings > Time & language > Language & region, where Windows adds
+; and removes keyboard layouts.
+global KLS_SETTINGS_URI := "ms-settings:regionlanguage"
+
+/**
+ * Opens the Windows keyboard layout settings.
+ * @param {Func} RunFn Optional port: RunFn(Target) opens it and throws on refusal.
+ * @returns {Boolean} true once opened, false when Windows refused it.
+ */
+KLS_OpenSettings(RunFn := 0) {
+	global KLS_SETTINGS_URI
+	if !HasMethod(RunFn, "Call")
+		RunFn := Run
+	try RunFn.Call(KLS_SETTINGS_URI)
+	catch as Err {
+		try LoggerError("KeyboardLayoutSwitch", "The keyboard settings could not be opened: {1}.", Err.Message)
+		return false
+	}
+	return true
+}
+
+/**
  * Makes one installed layout active in the foreground window.
  * @param {String} Klid Target layout id.
  * @param {Func} ListFn Optional installed-layout port (see KLS_Choices).
@@ -140,6 +180,21 @@ KLS_Select(Klid, ListFn := 0, PostFn := 0, LookupFn := 0) {
 	}
 	try LoggerError("KeyboardLayoutSwitch", "Layout {1} is not installed for this user.", Klid)
 	return false
+}
+
+/**
+ * Loads an installed layout into the session's layout list: a layout that has
+ * just been installed is not in it until then.
+ * @param {String} Klid Layout id.
+ * @returns {Integer} The layout handle; throws when Windows refuses it.
+ */
+KLS_Load(Klid) {
+	if !(Klid is String) || Klid == ""
+		throw ValueError("a layout id is required")
+	Hkl := DllCall("LoadKeyboardLayoutW", "Str", Klid, "UInt", 0, "Ptr")
+	if !Hkl
+		throw OSError(A_LastError, -1, "LoadKeyboardLayoutW refused " . Klid)
+	return Hkl
 }
 
 ; Posts the language change to the foreground window, as the user's own layout

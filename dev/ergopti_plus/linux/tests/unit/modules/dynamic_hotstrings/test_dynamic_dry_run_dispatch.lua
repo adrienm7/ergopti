@@ -42,7 +42,12 @@ end
 --- Runs one actual Main route and restores all acquired fixture ownership.
 --- @param kind string Dynamic route under test.
 --- @param dry_run boolean Main command-line posture.
-local function exercise(kind, dry_run)
+--- @param options table|nil `preview` (fake preview owner), `delay` (seconds the
+---   category cascade resolves), `pause_ms` (gap before the magic key) and
+---   `observe(report)` (receives the offers, suggestions, delay reads, document) and
+---   `disable_section` (a family switched off before typing).
+local function exercise(kind, dry_run, options)
+	options = options or {}
 	local previous = {}
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	for name in pairs(previous) do
@@ -82,6 +87,7 @@ local function exercise(kind, dry_run)
 			assert(dynamic.init({ trigger_char = "★", personal_info_path = info_path }))
 			assert(dynamic.set_enabled(true))
 			require("tests.support.dynamic_hotstrings_fixture").prefer_families(dynamic)
+			if options.disable_section then assert(dynamic.set_rule_enabled(options.disable_section, false)) end
 			local repeat_key = require("modules.hotstrings.repeat_key")
 			assert(repeat_key.set_enabled(false))
 			local glyphs = { [30] = "@", [25] = "p", [49] = "n", [20] = "t", [32] = "d", [22] = "u",
@@ -145,7 +151,9 @@ local function exercise(kind, dry_run)
 				assert(dynamic.set_user_code_time_activation(0.5))
 				assert(dynamic.set_user_code_enabled(true))
 				h.assert_eq(user.count(), 1, "the original source loader admits the actual private callback")
+				local suggestions, delay_reads, clock = 0, {}, 0
 				local metrics = setmetatable({ on_keydown = function() end,
+					record_suggestion = function() suggestions = suggestions + 1 end,
 					record_hotstring = function() commits = commits + 1 end }, { __index = policy })
 				local environment = setmetatable({ secure_focus_guard = guard, script_actions = scripts,
 					-- Bare keys: the shared expansion delay reads the held modifiers per key.
@@ -155,8 +163,19 @@ local function exercise(kind, dry_run)
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
 					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,
 					dyn_hotstrings = dynamic, injector = injector, Logger = require("logger.shim"), user_hotstring_native = native,
-					keyboard_hook = session.hook,
+					keyboard_hook = session.hook, tooltip_preview = options.preview,
 				}, { __index = _G })
+				if options.delay ~= nil then
+					environment.ExpansionDelay = require("modules.hotstrings.expansion_delay")
+					environment.hotstrings_config = { resolve = function(group, section)
+						delay_reads[#delay_reads + 1] = { group = group, section = section }
+						return { delay = options.delay }
+					end }
+				end
+				if options.pause_ms ~= nil then
+					-- The daemon stamps each key from its monotonic clock, not the event.
+					environment.Monotonic = { now_ms = function() return clock end, resolution_ms = function() return 0 end }
+				end
 				local main = assert(io.open(root .. "/ergopti_hotstrings.lua", "rb"))
 				local source = main:read("*a"); assert(main:close())
 				local first = assert(source:find("\tlocal function handle_char(", 1, true))
@@ -188,6 +207,7 @@ local function exercise(kind, dry_run)
 				local position = 0
 				for char in routes[kind].trigger:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 					position = position + 1
+					clock = clock + (char == "★" and options.pause_ms or 10)
 					local code = assert(inverse[char]).keycode
 					session.edge("a", code, 1, 1000 + position * 10)
 					session.edge("a", code, 0, 1001 + position * 10)
@@ -195,6 +215,12 @@ local function exercise(kind, dry_run)
 				drain()
 				debug.sethook()
 				resume_jit()
+				if options.observe then
+					options.observe({ suggestions = suggestions, delay_reads = delay_reads,
+						document = document, commits = commits })
+					assert(user.stop()); drain()
+					return
+				end
 				h.assert_eq(calls.manager, dry_run and 0 or #routes[kind].trigger:gsub("[\128-\191]", ""), "Main gates before dynamic dispatch")
 				if dry_run then
 					h.assert_eq(calls, { manager = 0, inject = 0, fields = 0, user = 0, source = 0 }, "no output or programmable source I/O is dispatched")
@@ -244,6 +270,132 @@ h.describe("dynamic dry-run Main dispatch", function()
 			h.it("dynamic dry-run " .. kind .. " posture " .. tostring(dry_run), function() exercise(kind, dry_run) end)
 		end
 	end
+end)
+
+--- A preview owner that answers `show` with the given verdicts and records offers.
+--- @param verdicts table Booleans returned by successive `show` calls; the last repeats.
+--- @return table preview
+--- @return table offers One `{ rows = {...}, shown = boolean }` per `show` call.
+local function recording_preview(verdicts)
+	local offers = {}
+	local preview = {
+		is_visible = function() return false end, is_showing = function() return false end,
+		hide = function() end,
+		show = function(candidates)
+			local rows = {}
+			for index, candidate in ipairs(candidates) do rows[index] = candidate end
+			local shown = verdicts[math.min(#offers + 1, #verdicts)]
+			offers[#offers + 1] = { rows = rows, shown = shown }
+			return shown
+		end,
+	}
+	return preview, offers
+end
+
+-- invisible-offer-metrics (LIN-002): the bubble refused by a toggle, a category or
+-- a missing renderer was still counted as a suggestion the user saw.
+h.describe("Main counts only the offers the preview drew (invisible-offer-metrics)", function()
+	h.it("invisible-offer-metrics refused previews count no suggestion", function()
+		local preview, offers = recording_preview({ false })
+		exercise("fields", false, { preview = preview, observe = function(report)
+			h.assert_true(#offers > 0, "the actual Main handler offers the @-combo row")
+			h.assert_eq(report.suggestions, 0, "an offer the renderer refused was never seen")
+		end })
+	end)
+
+	h.it("invisible-offer-metrics drawn previews still count", function()
+		local preview, offers = recording_preview({ true })
+		exercise("fields", false, { preview = preview, observe = function(report)
+			h.assert_true(#offers > 0, "the positive control draws the @-combo row")
+			h.assert_eq(report.suggestions, #offers, "each distinct drawn row counts once")
+		end })
+	end)
+end)
+
+--- The rows offered for one exact trigger across every drawn preview.
+--- @param offers table Records from recording_preview.
+--- @param trigger string Exact row trigger.
+--- @return table rows
+local function rows_for(offers, trigger)
+	local found = {}
+	for _, offer in ipairs(offers) do
+		for _, row in ipairs(offer.rows) do
+			if row.trigger == trigger then found[#found + 1] = row end
+		end
+	end
+	return found
+end
+
+-- single-field-preview (LIN-001): "@p" and "td" expanded on the magic key and
+-- previewed nothing, because the registered dynamic rules reached no candidate
+-- source of the daemon's preview.
+h.describe("Main previews registered single-field expansions (single-field-preview)", function()
+	h.it("single-field-preview personal alias offers its masked field row", function()
+		local preview, offers = recording_preview({ true })
+		exercise("personal", false, { preview = preview, observe = function(report)
+			local rows = rows_for(offers, "@p★")
+			h.assert_eq(#rows, 1, "one row for @p before the magic key")
+			h.assert_eq(rows[1].field, "first_name", "the field names the classification that masks it")
+			h.assert_eq(rows[1].group, "personal")
+			h.assert_eq(rows[1].section, "personal_info")
+			h.assert_eq(rows[1].replacement, "ok")
+			h.assert_true(rows[1].fires == true)
+			h.assert_eq(report.document, "ok", "the previewed expansion still fires")
+		end })
+	end)
+
+	h.it("single-field-preview date offers its row", function()
+		local preview, offers = recording_preview({ true })
+		exercise("date", false, { preview = preview, observe = function()
+			local rows = rows_for(offers, "td★")
+			h.assert_eq(#rows, 1, "one row for td before the magic key")
+			h.assert_eq(rows[1].section, "date")
+			h.assert_eq(rows[1].replacement, os.date("%Y_%m_%d"))
+			h.assert_nil(rows[1].field, "a date is not a personal field and is never masked")
+		end })
+	end)
+
+	h.it("single-field-preview disabled family offers nothing", function()
+		local preview, offers = recording_preview({ true })
+		exercise("date", false, { preview = preview, disable_section = "date", observe = function(report)
+			h.assert_eq(#rows_for(offers, "td★"), 0, "a switched-off family is not offered")
+			h.assert_eq(report.document, "td★", "and does not fire")
+		end })
+	end)
+end)
+
+-- dynamic-expansion-delay (LIN-003): the built-in dates, @-tags and @-combos
+-- ignored the category's expansion delay that the prefix mappings and the
+-- programmable source honour, so "td", a pause and the magic key still expanded.
+local DELAY_SECTIONS = { personal = "personal_info", date = "date", fields = "personal_info" }
+
+h.describe("Main applies the expansion delay to built-in dynamic output (dynamic-expansion-delay)", function()
+	for _, kind in ipairs({ "personal", "date", "fields" }) do
+		h.it("dynamic-expansion-delay " .. kind .. " expires after its delay", function()
+			exercise(kind, false, { delay = 0.5, pause_ms = 1000, observe = function(report)
+				h.assert_eq(report.document, routes[kind].trigger, "a late magic key types itself only")
+				h.assert_eq(report.commits, 0, "and records no expansion")
+				local read = false
+				for _, entry in ipairs(report.delay_reads) do
+					if entry.group == "dynamichotstrings" and entry.section == DELAY_SECTIONS[kind] then read = true end
+				end
+				h.assert_true(read, "the delay is the family's own cascade, as for the prefix mappings")
+			end })
+		end)
+
+		h.it("dynamic-expansion-delay " .. kind .. " fires within its delay", function()
+			exercise(kind, false, { delay = 0.5, pause_ms = 500, observe = function(report)
+				h.assert_eq(report.document, routes[kind].output, "the exact deadline still expands")
+				h.assert_eq(report.commits, 1)
+			end })
+		end)
+	end
+
+	h.it("dynamic-expansion-delay zero means always", function()
+		exercise("date", false, { delay = 0, pause_ms = 2500, observe = function(report)
+			h.assert_eq(report.document, routes.date.output, "a zero delay never expires")
+		end })
+	end)
 end)
 
 return true

@@ -38,6 +38,15 @@ helpers.describe("streaming requires an acknowledged complete payload", function
 				end)
 			end
 		end
+		helpers.it(backend .. " refuses an allocation with unknown identity before writing", function()
+			with_stream(backend, function(h)
+				h.missing_identity = true
+				helpers.assert_true(h.request())
+				helpers.assert_eq(h.failures, 1)
+				helpers.assert_eq(h.writes, 0)
+				helpers.assert_eq(h.spawns, 0)
+			end)
+		end)
 		helpers.it(backend .. " preserves a replacement at the failed payload path", function()
 			with_stream(backend, function(h)
 				h.phase, h.refusal, h.replace = "close", "nil", true

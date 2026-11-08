@@ -241,16 +241,26 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 	/// Fixed system tools only. No runtime publication/service/driver command is admitted by this purpose.
 	private static func stagingProgram(source: String, stage: URL, requirement: String, digest: String, route: String) -> String {
 		stagedHelperProgram(source: source, stage: stage, requirement: requirement, digest: digest) { executable in
-			"/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin ERGOPTI_VHD_REPORT_ROUTE=\(quote(route)) \(quote(executable)) --virtual-hid-daemon-report-worker"
+			"task_step=helper; /usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin ERGOPTI_VHD_REPORT_ROUTE=\(quote(route)) \(quote(executable)) --virtual-hid-daemon-report-worker"
 		}
 	}
+	/// The stderr line the staged program writes when a step fails: `ergopti-step=<step> status=<n>`. An
+	/// administrator shell that only answered "status 1" left two field runs without the failing step
+	/// (field reports 2026-11-05 and 2026-11-06), so every step names itself before it runs.
+	static let failedStepMarker = "ergopti-step="
 	/// Copies the helper root-owned into a fresh UUID stage, proves its requirement and digest, then runs the
 	/// one command the purpose names on that exact staged executable (the report worker or the first install).
+	/// The copy drops extended attributes and resource forks: `codesign --strict` refuses Finder information and
+	/// similar detritus, which security agents and Finder attach to downloaded bundles on managed Macs, while
+	/// the signature seals none of them.
 	static func stagedHelperProgram(source: String, stage: URL, requirement: String, digest: String, then command: (String) -> String) -> String {
 		let parent = "/Library/Application Support/ErgoptiPlus", directory = stage.deletingLastPathComponent().path
 		let executable = stage.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer").path
 		let program = """
 		set -eu
+		task_step=start
+		task_report() { task_exit=$?; [ "$task_exit" = 0 ] || printf '\(failedStepMarker)%s status=%s\\n' "$task_step" "$task_exit" >&2; }
+		trap task_report EXIT
 		assert_directory() {
 		  [ ! -L "$1" ] && [ -d "$1" ] && [ "$(/usr/bin/stat -f '%u' "$1")" = 0 ] || exit 77
 		  task_mode=$(/usr/bin/stat -f '%Lp' "$1")
@@ -259,18 +269,22 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		  task_listing=$(/bin/ls -lde "$1"); task_permissions=${task_listing%% *}
 		  case "$task_permissions" in ??????????|??????????@) ;; *) exit 77 ;; esac
 		}
-		assert_directory '/'; assert_directory '/Library'; assert_directory '/Library/Application Support'
+		task_step=system_folders; assert_directory '/'; assert_directory '/Library'; assert_directory '/Library/Application Support'
+		task_step=parent_folder
 		if [ ! -e \(quote(parent)) ] && [ ! -L \(quote(parent)) ]; then /bin/mkdir -m 0755 \(quote(parent)); fi
 		assert_directory \(quote(parent))
-		/bin/mkdir -m 0700 \(quote(directory))
-		/usr/bin/ditto --noqtn --noacl \(quote(source)) \(quote(stage.path))
+		task_step=stage_folder; /bin/mkdir -m 0700 \(quote(directory))
+		task_step=stage_copy; /usr/bin/ditto --noqtn --noacl --noextattr --norsrc \(quote(source)) \(quote(stage.path))
+		task_step=stage_members
 		task_bad=$(/usr/bin/find \(quote(directory)) -type l -print -quit); [ -z "$task_bad" ] || exit 77
 		task_bad=$(/usr/bin/find \(quote(directory)) ! \\( -type f -o -type d \\) -print -quit); [ -z "$task_bad" ] || exit 77
 		task_bad=$(/usr/bin/find \(quote(directory)) -type f -links +1 -print -quit); [ -z "$task_bad" ] || exit 77
 		task_bad=$(/usr/bin/find \(quote(directory)) \\( -perm -4000 -o -perm -2000 \\) -print -quit); [ -z "$task_bad" ] || exit 77
-		/usr/sbin/chown -R root:wheel \(quote(directory)); /bin/chmod -RN \(quote(directory)); /bin/chmod -R go-w \(quote(directory))
+		task_step=stage_owner; /usr/sbin/chown -R root:wheel \(quote(directory)); /bin/chmod -RN \(quote(directory)); /bin/chmod -R go-w \(quote(directory))
 		assert_directory \(quote(directory))
+		task_step=stage_signature
 		/usr/bin/codesign --verify --strict --all-architectures --deep --test-requirement \(quote(requirement)) \(quote(stage.path))
+		task_step=stage_digest
 		task_digest=$(/usr/bin/shasum -a 256 \(quote(executable))); task_digest=${task_digest%% *}; [ "$task_digest" = \(quote(digest)) ] || exit 77
 		\(command(executable))
 		"""

@@ -7,15 +7,82 @@
 		{ "id": "patch_lt", "a": "2.5.0", "b": "2.5.1", "expect": -1 },
 		{ "id": "minor_gt", "a": "2.6.0", "b": "2.5.9", "expect": 1 },
 		{ "id": "major_gt", "a": "3.0.0", "b": "2.99.99", "expect": 1 },
+		{
+			"id": "large_major_precision",
+			"a": "9007199254740993.0.0",
+			"b": "9007199254740992.0.0",
+			"expect": 1
+		},
+		{
+			"id": "large_minor_precision",
+			"a": "1.9007199254740993.0",
+			"b": "1.9007199254740992.0",
+			"expect": 1
+		},
+		{
+			"id": "large_patch_precision",
+			"a": "1.0.9007199254740993",
+			"b": "1.0.9007199254740992",
+			"expect": 1
+		},
+		{
+			"id": "huge_core_length",
+			"a": "1000000000000000000000.0.0",
+			"b": "999999999999999999999.0.0",
+			"expect": 1
+		},
 		{ "id": "prerelease_increment", "a": "2.5.0-dev.4", "b": "2.5.0-dev.3", "expect": 1 },
 		{ "id": "prerelease_numeric_order", "a": "2.5.0-dev.10", "b": "2.5.0-dev.4", "expect": 1 },
+		{
+			"id": "numeric_prerelease_before_text",
+			"a": "2.5.0-dev.2",
+			"b": "2.5.0-dev.1alpha",
+			"expect": -1
+		},
+		{
+			"id": "text_prerelease_after_numeric",
+			"a": "2.5.0-dev.1alpha",
+			"b": "2.5.0-dev.2",
+			"expect": 1
+		},
+		{
+			"id": "large_prerelease_precision",
+			"a": "2.5.0-dev.9007199254740993",
+			"b": "2.5.0-dev.9007199254740992",
+			"expect": 1
+		},
+		{
+			"id": "huge_prerelease_length",
+			"a": "2.5.0-dev.999999999999999999999",
+			"b": "2.5.0-dev.1000000000000000000000",
+			"expect": -1
+		},
 		{ "id": "stable_over_prerelease", "a": "2.5.0", "b": "2.5.0-dev.4", "expect": 1 },
 		{ "id": "prerelease_under_stable", "a": "2.5.0-dev.4", "b": "2.5.0", "expect": -1 },
 		{ "id": "shorter_prerelease_is_less", "a": "2.5.0-dev", "b": "2.5.0-dev.4", "expect": -1 },
+		{ "id": "nonsemver_missing_prerelease_separator", "a": "2.5.1oops", "b": "2.5.0", "expect": 0 },
+		{ "id": "nonsemver_empty_prerelease", "a": "2.5.1-", "b": "2.5.0", "expect": 0 },
+		{ "id": "nonsemver_empty_prerelease_middle", "a": "2.5.1-a..b", "b": "2.5.0", "expect": 0 },
+		{ "id": "nonsemver_empty_prerelease_start", "a": "2.5.1-.a", "b": "2.5.0", "expect": 0 },
+		{ "id": "nonsemver_empty_prerelease_end", "a": "2.5.1-a.", "b": "2.5.0", "expect": 0 },
 		{ "id": "nonsemver_numeric_trap", "a": "10", "b": "9", "expect": 0 },
 		{ "id": "nonsemver_pair", "a": "foo", "b": "bar", "expect": 0 },
 		{ "id": "nonsemver_identical", "a": "rolling", "b": "rolling", "expect": 0 },
 		{ "id": "semver_vs_nonsemver", "a": "2.5.0", "b": "garbage", "expect": 0 },
-		{ "id": "nonsemver_vs_semver", "a": "garbage", "b": "2.5.0", "expect": 0 }
+		{ "id": "nonsemver_vs_semver", "a": "garbage", "b": "2.5.0", "expect": 0 },
+		{ "id": "missing_prerelease_separator", "a": "1.2.3", "b": "1.2.3foo", "expect": 0 },
+		{ "id": "empty_prerelease", "a": "1.2.3", "b": "1.2.3-", "expect": 0 },
+		{
+			"id": "numeric_before_hyphenated_identifier",
+			"a": "1.2.3-9",
+			"b": "1.2.3--alpha",
+			"expect": -1
+		},
+		{
+			"id": "hyphenated_identifier_after_numeric",
+			"a": "1.2.3--alpha",
+			"b": "1.2.3-9",
+			"expect": 1
+		}
 	]
 }

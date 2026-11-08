@@ -582,3 +582,53 @@ _THMI_AllPickerKeysShareTheImmediateOwner() {
 }
 Test("tap-hold modifier: shared owner accepts every picker identity (tap-hold-modifier-immediate)",
 	_THMI_AllPickerKeysShareTheImmediateOwner)
+
+
+_THAC_DispatchRevokedDuringLog(Revoke) {
+	global TapHold, _TH_TapHoldTrackState, _TH_PressesTakenByCombination
+	global _LOGGER_TEST_SINK, _LOGGER_DEBUG_ENABLED, _LOGGER_MIN_SEVERITY
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
+	_TSUH_Begin(Map(), Map())
+	Track := _THAC_ResetState()
+	Saved := {Config: TapHold, Pairs: _TH_PressesTakenByCombination, Paused: A_IsSuspended,
+		Sink: _LOGGER_TEST_SINK, Debug: _LOGGER_DEBUG_ENABLED, Severity: _LOGGER_MIN_SEVERITY,
+		Dedup: _LOGGER_DEDUP_KEY, DedupLevel: _LOGGER_DEDUP_LEVEL, DedupCount: _LOGGER_DEDUP_COUNT,
+		LastTime: _LastErrTime, Repeat: _LOGGER_REPEAT_ENABLED}
+	Seen := 0, Sent := [], Successor := Map("down", true, "cancel_reason", "successor")
+	Observe(Line) {
+		if !InStr(Line, "[TapHoldTrack] No tap cancel needed")
+			return
+		Seen += 1
+		if !Revoke
+			return
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		_TH_TapHoldTrackState["caps_lock"] := Successor
+	}
+	try {
+		Suspend(false)
+		TapHold := Map("keys", Map("caps_lock", Map("tap_action", "caps_lock", "time_activation_seconds", 0.2)), "layers", Map())
+		_TH_PressesTakenByCombination := Map()
+		_LOGGER_DEBUG_ENABLED := true, _LOGGER_MIN_SEVERITY := 10
+		_LOGGER_DEDUP_KEY := "", _LOGGER_REPEAT_ENABLED := false
+		LoggerSetTestSink(Observe)
+		Result := TapHoldDispatchTap("caps_lock", () => Sent.Push("tap"))
+		AssertEqual(1, Seen, "The real cancellation logger must deliver the controlled interruption")
+		AssertEqual(Revoke ? 0 : 1, Sent.Length, "A revoked dispatcher must stop before the actual tap callback")
+		AssertEqual(!Revoke, Result)
+		if Revoke
+			AssertTrue(_TH_TapHoldTrackState.Has("caps_lock") && _TH_TapHoldTrackState["caps_lock"] == Successor,
+				"The retired dispatch finalizer must preserve the resumed tracked press")
+	} finally {
+		_LOGGER_TEST_SINK := Saved.Sink, _LOGGER_DEBUG_ENABLED := Saved.Debug, _LOGGER_MIN_SEVERITY := Saved.Severity
+		_LOGGER_DEDUP_KEY := Saved.Dedup, _LOGGER_DEDUP_LEVEL := Saved.DedupLevel, _LOGGER_DEDUP_COUNT := Saved.DedupCount
+		_LastErrTime := Saved.LastTime, _LOGGER_REPEAT_ENABLED := Saved.Repeat
+		TapHold := Saved.Config, _TH_PressesTakenByCombination := Saved.Pairs
+		_THAC_RestoreState(Track)
+		Suspend(Saved.Paused)
+		_TSUH_End()
+	}
+}
+Test("tap-hold: actual dispatch logger cannot emit or forget a resumed press (synthetic-owner-dispatch)", _THAC_DispatchRevokedDuringLog.Bind(true))
+Test("tap-hold: actual dispatch logger keeps an admitted tap working (synthetic-owner-dispatch)", _THAC_DispatchRevokedDuringLog.Bind(false))

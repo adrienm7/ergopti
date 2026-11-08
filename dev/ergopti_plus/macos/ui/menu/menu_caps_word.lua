@@ -20,7 +20,7 @@ local CapsWordPolicy  = require("caps_word.auto_off")
 local Manifest        = require("infra.manifest_reader")
 
 --- Builds the group's rows.
---- @param ctx table Menu context (state, save_prefs, updateMenu, state_getters, applyTriggerChar).
+--- @param ctx table Menu context (state, save_prefs, updateMenu, state_getters).
 --- @return table|nil rows Rendered rows for the group.
 function M.build(ctx)
 	local state = ctx.state
@@ -60,7 +60,9 @@ function M.build(ctx)
 					for _, separator in ipairs(boundary) do rows[#rows + 1] = separator end
 				else
 					rows[#rows + 1] = {
-						label = ctx.applyTriggerChar(i18n.get(row.label_key)),
+						-- The star delimiter is the literal built-in ★ on every OS, as the
+						-- policy reads it: the caption never takes a renamed magic key (CWS-002).
+						label = i18n.get(row.label_key),
 						checked = checked[row.key] or nil,
 						action = function()
 							local list = CapsWordPolicy.with_terminator(

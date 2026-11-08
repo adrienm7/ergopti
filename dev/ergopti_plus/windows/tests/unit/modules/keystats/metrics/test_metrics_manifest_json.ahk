@@ -301,8 +301,9 @@ _MMJ_TitleProjection(Mode) {
 		Actual := _MMJ_Compare(Db, 0)
 		AssertEqual(3, Actual["2026-01-01"]["fixture.exe"]["win_titles"][Title]["c"])
 		AssertTrue(Actual["2026-01-01"]["fixture.exe"]["win_titles"].Has(""), "an empty title is a real key")
-		AssertTrue(Actual["2026-01-01"]["_system"].Has("win_titles"), "a title-only pseudo-app keeps its ordinary cell shape")
-		AssertFalse(Actual["2026-01-02"]["_system"].Has("win_titles"), "system counters retain their overwrite priority")
+		AssertTrue(Actual["2026-01-01"]["~_system"].Has("win_titles"), "a title-only application keeps its exact identity")
+		AssertFalse(Actual["2026-01-02"]["_system"].Has("win_titles"), "system counters remain separate")
+		AssertTrue(Actual["2026-01-02"]["~_system"].Has("win_titles"), "the same-named application remains present")
 		Raw := KLR_BuildManifestJson(Db)
 		AssertFalse(InStr(Raw, Chr(0x2028)), "line separators remain escaped for script consumers")
 		AssertFalse(InStr(Raw, Chr(0x2029)), "paragraph separators remain escaped for script consumers")
@@ -335,3 +336,39 @@ _MMJ_NulTitleKey() {
 	}
 }
 Test("manifest JSON: a NUL window title stays a distinct key (windows-reader-nul-json-keys)", _MMJ_NulTitleKey)
+
+; Optional integration: already registered test_metrics_manifest_json.ahk.
+; Qualifies the actual production full/partial JSON paths, without putting NUL
+; tokens into an AHK Map or claiming that the old Map API preserves them.
+_MMJ_ProductionNulRange() {
+	global Features
+	SavedFeatures := Features, SavedApp := KLHook.prev_app
+	Db := _WJFM_OpenMemory()
+	try {
+		Features := Map("layout", Map("ergopti_base", false))
+		KLHook.prev_app := ""
+		AssertTrue(KLR_LoadSchema(Db))
+		Today := FormatTime(A_Now, "yyyy-MM-dd"), Yesterday := KLR_PrevDay(Today)
+		for Day in [Yesterday, Today] {
+			AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day(device_id,date,app) VALUES "
+				. "('nul'," . SQLite_Q(Day) . ",'nul.exe');"))
+			for Spec in [["a", 10], ["a" . Chr(0) . "b", 1]]
+				AssertTrue(SQLite_Exec(Db, "INSERT INTO ngram_chars(device_id,date,app,token,c) VALUES "
+					. "('nul'," . SQLite_Q(Day) . ",'nul.exe'," . SQLite_Q(Spec[1]) . "," . Spec[2] . ");"))
+		}
+		Blob := KLPF_BuildTyping(Db, "full", true, Today, true)
+		AssertTrue(Blob.Has("__klpf_prefetch_json"), "the production full path must retain SQL-built range JSON")
+		AssertFalse(Blob.Has("_prefetch_data"), "no legacy token Map may intercept the full range")
+		Raw := KLPF_SerializeBlob(Blob)
+		AssertEqual("61|10,610062|1", _KLRNul_Keys(Db, Raw, '$._prefetch_data.historical.c'))
+		AssertEqual("61|10,610062|1", _KLRNul_Keys(Db, Raw, '$._prefetch_data.today."nul.exe".c'))
+		Partial := KLPF_BuildPartialJson("typing", Db, Map("oldest", Yesterday, "newest", Today))
+		AssertEqual("61|10,610062|1", _KLRNul_Keys(Db, Partial, '$._prefetch_data.historical.c'))
+		AssertEqual("61|10,610062|1", _KLRNul_Keys(Db, Partial, '$._prefetch_data.today."nul.exe".c'))
+	} finally {
+		Features := SavedFeatures, KLHook.prev_app := SavedApp
+		SQLite_Close(Db)
+	}
+}
+Test("metrics JSON: production full and partial publications preserve NUL tokens (metrics-production-nul-range)",
+	_MMJ_ProductionNulRange)

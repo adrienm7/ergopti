@@ -15,6 +15,7 @@
 local M = {}
 
 local gestures_mod  = require("modules.gestures")
+local Sensitivity = require("gestures.sensitivity")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
@@ -133,13 +134,29 @@ function M.build(ctx)
 			return false
 		end
 
-		local apply_ok, apply_result = xpcall(setter, debug.traceback, slot, value)
-		if not apply_ok or apply_result ~= true then
-			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
-			if not rollback_ok or rollback_result ~= true then
+		local click_change
+		if setter_name == "set_action" and previous ~= value then
+			if type(gestures.begin_click_binding_change) ~= "function"
+				or type(gestures.finish_click_binding_change) ~= "function" then return false end
+			click_change = gestures.begin_click_binding_change(slot, previous)
+			if not click_change then return false end
+		end
+		local function restore_previous()
+			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous, click_change ~= nil)
+			-- A setter can throw after changing its state (for example while logging).
+			-- Release the binding only after observing restoration, before logging.
+			local observed, current = xpcall(getter, debug.traceback, slot)
+			if click_change and observed and current == previous then
+				gestures.finish_click_binding_change(click_change, false)
+			end
+			if not rollback_ok or rollback_result ~= true or not observed or current ~= previous then
 				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
 					tostring(label), tostring(slot), tostring(rollback_result))
 			end
+		end
+		local apply_ok, apply_result = xpcall(setter, debug.traceback, slot, value, click_change ~= nil)
+		if not apply_ok or apply_result ~= true then
+			restore_previous()
 			Logger.error(LOG, "Gesture %s mutation did not commit for '%s': %s.",
 				tostring(label), tostring(slot), tostring(apply_result))
 			return false
@@ -147,16 +164,15 @@ function M.build(ctx)
 
 		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
 		if not save_ok or save_result ~= true then
-			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
-			if not rollback_ok or rollback_result ~= true then
-				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
-					tostring(label), tostring(slot), tostring(rollback_result))
-			end
+			restore_previous()
 			Logger.error(LOG, "Gesture %s preference publication did not commit for '%s': %s.",
 				tostring(label), tostring(slot), tostring(save_result))
 			return false
 		end
 
+		if click_change and gestures.finish_click_binding_change(click_change, true) ~= true then
+			Logger.error(LOG, "Gesture click cleanup remains pending for %s.", slot)
+		end
 		ctx.updateMenu()
 		return true
 	end
@@ -270,20 +286,41 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
-					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
+				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+					local click_change
+					local called, committed = xpcall(shortcut_utils.prompt_action_parameter, debug.traceback,
+						gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
 						read = function() return gestures.get_action(slot) end,
-						apply = function() return gestures.set_action(slot, a) == true end,
-						restore = function(previous) return gestures.set_action(slot, previous) == true end,
+						apply = function()
+							local previous = gestures.get_action(slot)
+							if previous ~= a then
+								click_change = gestures.begin_click_binding_change(slot, previous)
+								if not click_change then return false end
+							end
+							return gestures.set_action(slot, a, click_change ~= nil) == true
+						end,
+						restore = function(previous) return gestures.set_action(slot, previous, click_change ~= nil) == true end,
+						recovery_settled = function()
+							if not click_change then return true end
+							if gestures.finish_click_binding_change(click_change, false) ~= true then return false end
+							click_change = nil
+							return true
+						end,
 					}, ctx.commit_program_parameter)
-					if committed then
+					if click_change and called and committed == true then
+						if gestures.finish_click_binding_change(click_change, true) ~= true then
+							Logger.error(LOG, "Gesture click cleanup remains pending for %s.", slot)
+						end
+						click_change = nil
+					end
+					if not called then Logger.error(LOG, "Gesture parameter transaction raised: %s.", tostring(committed)) end
+					if called and committed then
 						local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
 						ctx.updateMenu()
 						show_conflict(conflict)
 					end
 				end, "menu_gestures.action_parameter")
-				return
 			end
 			local conflict = apply_action()
 			if conflict == false then return false end
@@ -347,7 +384,7 @@ function M.build(ctx)
 			sensSubmenu = ManifestMenu.template_rows("gesture_sensitivity_head")
 			if not sensSubmenu then return nil end
 		end
-		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0 }
+		local sensitivities = Sensitivity.options()
 		for _, s in ipairs(sensitivities) do
 			local label = string.format("%.1f", s)
 			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end
@@ -368,9 +405,11 @@ function M.build(ctx)
 
 		local slot_commands = {
 			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
+				-- A refused schedule is reported; an accepted one only opens the
+				-- picker later, so it is not a publication receipt.
+				if DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names, current) end,
-					"menu_gestures.action_chooser")
+					"menu_gestures.action_chooser") ~= true then return false end
 			end,
 		}
 		local slot_getters = {
@@ -417,7 +456,39 @@ function M.build(ctx)
 		return ctx.apply_gesture_scope(mode) == true
 	end
 	local function cmd_scope_clear() return apply_scope("clear") end
-	local function cmd_scope_restore() return apply_scope("recommended") end
+
+	--- The slots the recommended defaults just assigned that macOS still
+	--- takes: the restore never touches the macOS settings, so such a slot
+	--- stays greyed and never fires until the user turns the macOS gesture off.
+	--- @return boolean claimed
+	local function recommended_slot_claimed()
+		if type(gestures.system_slot_state) ~= "function" then return false end
+		for slot in pairs(gestures.RECOMMENDED_GESTURES or {}) do
+			local action = gestures.get_action(slot)
+			if action ~= nil and action ~= "none" and gestures.system_slot_state(slot) ~= "free" then
+				return true
+			end
+		end
+		return false
+	end
+
+	--- Restores the recommended assignments, then shows the Trackpad settings
+	--- dialog when macOS still takes one of them (field report 2026-11-05: the
+	--- restore said nothing, and the restored slot stayed greyed).
+	--- @return boolean committed
+	local function cmd_scope_restore()
+		if apply_scope("recommended") ~= true then return false end
+		if not recommended_slot_claimed() then return true end
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+			local settings = i18n.get("menu.gestures.open_settings")
+			local clicked = dialog.block_alert(i18n.get("menu.gestures.notify_title"),
+				i18n.get("menu.gestures.recommended_reason_macos"), settings, i18n.get("button.ok"), "informational")
+			if clicked == settings and gestures.open_system_gestures() ~= true then
+				Logger.error(LOG, "Trackpad settings could not open after the recommended restore.")
+			end
+		end, "menu_gestures.recommended_claimed")
+		return true
+	end
 
 	--- Shows the recommended-defaults rule and the macOS reason behind the
 	--- menu's « Infos… » row: several sentences do not fit a menu row.

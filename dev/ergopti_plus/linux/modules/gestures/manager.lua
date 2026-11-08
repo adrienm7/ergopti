@@ -63,6 +63,7 @@ local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
+local BackgroundCommands = require("modules.gestures.background_commands")
 local TableUtil = require("table_util")
 local TextUtils = require("text_utils")
 local ConfigKeys = require("config_keys")
@@ -197,6 +198,8 @@ local _now_sec = Monotonic.now_sec
 -- may acquire them on a desktop without a touchpad too.
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
+local _parameter_configuration_owner = nil
+local _gesture_click_fence = nil
 local _click_holds = require("modules.gestures.click_hold").new(function() return not _is_paused() end)
 
 -- =========================================
@@ -223,6 +226,19 @@ end
 --- All single / axis gesture slots (the shared [slots] section).
 M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)
 M.AXIS_SLOTS = copy_list(Catalogue.slots.axis)
+
+-- The horizontal axis slot each finger count falls back to. An axis slot is
+-- the binding of BOTH horizontal directions of one count: a straight left or
+-- right swipe whose own direction slot is unbound runs it (decided 2026-11-06,
+-- docs/memory/maintainer-decisions.md). Derived from the shared slot list so a
+-- renamed or added axis slot cannot leave a stale literal here; a name this
+-- rule does not understand is refused at load rather than never firing.
+local AXIS_SLOT_FOR_FINGERS = {}
+for _, slot in ipairs(M.AXIS_SLOTS) do
+	local fingers = slot:match("^swipe_(%d)_horiz$")
+	assert(fingers, "unsupported axis gesture slot in the shared catalogue: " .. tostring(slot))
+	AXIS_SLOT_FOR_FINGERS[tonumber(fingers)] = slot
+end
 
 -- Exclude picker headings and modifier groups from the declared action rows.
 M.LINUX_DECLARED_ACTIONS = {}
@@ -293,6 +309,26 @@ for _, slot in ipairs(M.AXIS_SLOTS) do
 	M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 end
 
+--- Incremental mode per swipe slot and its step in millimetres, from the
+--- shared manifest, as on macOS; config.toml `[gestures.modes]` and
+--- `[gestures.sensitivities]` override them. An incremental slot acts while
+--- the fingers move (modules/gestures/incremental_tracker.lua).
+M.MODE_SINGLE, M.MODE_INCREMENTAL = "x1", "incremental"
+local MODES_SECTION = ConfigKeys.KEY.GESTURES_MODES
+local SENSITIVITIES_SECTION = ConfigKeys.KEY.GESTURES_SENSITIVITIES
+M.DEFAULT_MODES, M.DEFAULT_SENSITIVITIES = {}, {}
+-- The manifest declares a mode and a step for every swipe direction; taps and
+-- the axis slots have none.
+for _, slot in ipairs(M.SINGLE_SLOTS) do
+	if not slot:match("^swipe_") then goto continue end
+	M.DEFAULT_MODES[slot] = Manifest.default_for(MODES_SECTION .. "." .. slot)
+	M.DEFAULT_SENSITIVITIES[slot] = Manifest.default_for(SENSITIVITIES_SECTION .. "." .. slot)
+	::continue::
+end
+local _modes, _sensitivities = {}, {}
+-- The live tracker of the touch in progress; nil while the pad has no scale.
+local _incremental = nil
+
 -- =========================================
 -- =========================================
 -- ======= 2/ Action Registry ==============
@@ -319,13 +355,15 @@ local function load_modifier_chords()
 		Logger.error(LOG, "Could not resolve the shared modifier chords JSON path.")
 		return nil
 	end
-	local fh = io.open(path, "r")
-	if not fh then
+	if type(TomlWriter) ~= "table" or type(TomlWriter.read_classified) ~= "function" then
+		Logger.warn(LOG, "Shared modifier chords JSON cannot be read: classified reader unavailable.")
+		return nil
+	end
+	local raw, status = TomlWriter.read_classified(path)
+	if status ~= "ok" then
 		Logger.warn(LOG, "Shared modifier chords JSON unreadable at '%s'.", path)
 		return nil
 	end
-	local raw = fh:read("*a")
-	fh:close()
 	local ok_json, json = pcall(require, "json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.warn(LOG, "JSON decoder unavailable — modifier chord actions skipped.")
@@ -369,10 +407,21 @@ end
 
 register_modifier_chords(load_modifier_chords())
 
---- Runs a shell command in the background, discarding its output.
+--- Launches an application for the user (xdg-open, gtk-launch, a settings
+--- app) in the background, discarding its output. The shell that forks it
+--- answers at once, and its refusal is logged, never dropped; the command
+--- itself is not logged, as it can carry a selected path or URL. The child is
+--- the application, which outlives the action, so it has no completion to
+--- report: one-shot commands go through BackgroundCommands instead.
 --- @param cmd string A fully composed command.
+--- @return boolean started
 local function run_background(cmd)
-	pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
+	local called, result, _, code = pcall(os.execute, cmd .. " 2>/dev/null &")
+	-- LuaJIT returns the status number; Lua 5.2+ returns true, or nil and the code.
+	if called and (result == true or result == 0) then return true end
+	Logger.error(LOG, "The shell refused to start a background action command (%s).",
+		tostring(called and (code or result) or result))
+	return false
 end
 
 local function shell_quote(value)
@@ -384,10 +433,8 @@ local function url_encode_query(value)
 end
 
 local function primary_selection()
-	local pipe = io.popen("xclip -o -selection primary 2>/dev/null", "r")
-	if not pipe then return "" end
-	local value = pipe:read("*a") or ""
-	pipe:close()
+	local called, ok, value = pcall(function() return require("adapters.clipboard").read_primary() end)
+	if not called or ok ~= true or type(value) ~= "string" then return "" end
 	return (value:gsub("%s+$", ""))
 end
 
@@ -459,7 +506,9 @@ local OPEN_PATH = {
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
-	["open_personal_shortcuts"] = function(Paths) return Paths.config("personal_shortcuts.toml") end,
+	-- The programmable personal source, created from its template when absent,
+	-- as Windows and macOS create theirs before opening it.
+	["open_personal_shortcuts"] = function() return require("infra.personal_shortcuts").path_for_editing() end,
 }
 
 --- The three log actions, by ui/log_openers function: shared with the tray, so
@@ -481,19 +530,43 @@ local OPEN_LOG = {
 ---
 --- `%s` is replaced with the destination path for the SAVE variants; the
 --- clipboard variants take no path.
+-- A pipeline reports the clipboard writer's status even if the capture tool
+-- failed. Stage the PNG privately so a failed or empty capture cannot erase the
+-- clipboard or stop the fallback cascade.
+local function screenshot_to_clipboard(capture, writer)
+	return '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-screenshot.XXXXXXXX") || exit 1; '
+		.. [=[f="$d/capture.png"; trap 'rm -f "$f"; rmdir "$d"' 0; ]=]
+		.. [=[trap 'exit 1' HUP INT TERM; ]=] .. capture .. ' "$f" && [ -s "$f" ] && '
+		.. writer .. ' < "$f" )'
+end
+
+-- Each candidate gets an empty reserved destination: a later command's
+-- successful exit cannot turn an earlier command's partial output into a PNG.
+local function screenshot_to_file(capture)
+	return "{ : > %s && " .. capture .. " %s && [ -s %s ]; }"
+end
+
 local SCREENSHOT_COMMANDS = {
 	["screenshot_fullscreen_clipboard"] =
-		"grim - | wl-copy || gnome-screenshot -c || spectacle -bnc || maim | xclip -selection clipboard -t image/png",
+		screenshot_to_clipboard("grim", "wl-copy --type image/png")
+		.. " || gnome-screenshot -c || spectacle -bnc || "
+		.. screenshot_to_clipboard("maim", "xclip -selection clipboard -t image/png"),
 	["screenshot_fullscreen_save"] =
-		"grim %s || gnome-screenshot -f %s || spectacle -bno %s || maim %s",
+		screenshot_to_file("grim") .. " || " .. screenshot_to_file("gnome-screenshot -f")
+		.. " || " .. screenshot_to_file("spectacle -bno") .. " || " .. screenshot_to_file("maim"),
 	["screenshot_region_clipboard"] =
-		"grim -g \"$(slurp)\" - | wl-copy || gnome-screenshot -ac || spectacle -bnrc || maim -s | xclip -selection clipboard -t image/png",
+		screenshot_to_clipboard('grim -g "$(slurp)"', "wl-copy --type image/png")
+		.. " || gnome-screenshot -ac || spectacle -bnrc || "
+		.. screenshot_to_clipboard("maim -s", "xclip -selection clipboard -t image/png"),
 	["screenshot_region_save"] =
-		"grim -g \"$(slurp)\" %s || gnome-screenshot -af %s || spectacle -bnro %s || maim -s %s",
+		screenshot_to_file('grim -g "$(slurp)"') .. " || " .. screenshot_to_file("gnome-screenshot -af")
+		.. " || " .. screenshot_to_file("spectacle -bnro") .. " || " .. screenshot_to_file("maim -s"),
 	["screenshot_window_clipboard"] =
-		"gnome-screenshot -wc || spectacle -bnac || maim -i \"$(xdotool getactivewindow)\" | xclip -selection clipboard -t image/png",
+		"gnome-screenshot -wc || spectacle -bnac || "
+		.. screenshot_to_clipboard('maim -i "$(xdotool getactivewindow)"', "xclip -selection clipboard -t image/png"),
 	["screenshot_window_save"] =
-		"gnome-screenshot -wf %s || spectacle -bnao %s || maim -i \"$(xdotool getactivewindow)\" %s",
+		screenshot_to_file("gnome-screenshot -wf") .. " || " .. screenshot_to_file("spectacle -bnao")
+		.. " || " .. screenshot_to_file('maim -i "$(xdotool getactivewindow)"'),
 }
 -- The frontmost window saved at once, with no selection: what macOS and
 -- Windows name screen_capture_instant is this driver's window capture.
@@ -504,20 +577,21 @@ SCREENSHOT_COMMANDS["screen_capture_instant"] = SCREENSHOT_COMMANDS["screenshot_
 --- installed (its own "osd" script detector is not a language), and the text
 --- left on the clipboard, Wayland first as for the captures. The capture is
 --- removed whatever happens; a cancelled selection leaves the clipboard alone.
-local OCR_COMMAND = "{ f=$(mktemp --suffix=.png) || exit 1; { "
+local OCR_COMMAND = '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ocr.XXXXXXXX") || exit 1; '
+	.. [=[f="$d/capture.png"; trap 'rm -f "$f"; rmdir "$d"' 0; trap 'exit 1' HUP INT TERM; { ]=]
 	.. SCREENSHOT_COMMANDS["screenshot_region_save"]:gsub("%%s", '"$f"')
 	.. "; } && [ -s \"$f\" ]"
 	.. " && langs=$(tesseract --list-langs 2>/dev/null | tail -n +2 | grep -vx osd | tr '\\n' '+')"
 	.. " && text=$(tesseract \"$f\" - ${langs:+-l \"${langs%+}\"} 2>/dev/null)"
+	.. " && [ -n \"$text\" ]"
 	.. " && { printf '%s' \"$text\" | wl-copy 2>/dev/null || printf '%s' \"$text\" | xclip -selection clipboard; };"
-	.. " rm -f \"$f\"; }"
+	.. " )"
 
 --- Where a saved screenshot lands, and under what name.
 ---
 --- $XDG_PICTURES_DIR when the user's desktop declares one, the conventional
---- ~/Pictures otherwise. The stamp is second-resolution so two captures in the
---- same minute do not overwrite each other — the failure would be silent, and
---- the file the user wanted is the one that disappeared.
+--- ~/Pictures otherwise. This is a prefix; the shell reserves a unique name
+--- before the capture tool can write it.
 --- @param kind string Short tag: "full", "reg" or "win".
 --- @return string An absolute path.
 local function screenshot_path(kind)
@@ -526,7 +600,7 @@ local function screenshot_path(kind)
 		local ok, Paths = pcall(require, "infra.config_paths")
 		dir = (ok and Paths.home() or ".") .. "/Pictures"
 	end
-	return string.format("%s/ergopti_%s_%s.png", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
+	return string.format("%s/ergopti_%s_%s", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
 end
 
 --- The tag each save action stamps into its filename.
@@ -595,8 +669,14 @@ local BUILTIN_HANDLERS = {
 		Logger.error(LOG, "open_system_settings: none of %s is installed — nothing opened.",
 			table.concat(SETTINGS_APPLICATIONS, ", "))
 	end,
-	["left_click_toggle"] = function() return _click_holds.toggle("1") end,
-	["right_click_toggle"] = function() return _click_holds.toggle("3") end,
+	["left_click_toggle"] = function(binding)
+		if (_parameter_configuration_owner or _gesture_click_fence) and M.DEFAULT_GESTURES[binding] ~= nil then return false end
+		return _click_holds.toggle("1", binding)
+	end,
+	["right_click_toggle"] = function(binding)
+		if (_parameter_configuration_owner or _gesture_click_fence) and M.DEFAULT_GESTURES[binding] ~= nil then return false end
+		return _click_holds.toggle("3", binding)
+	end,
 	["open_chatgpt"] = function()
 		return require("modules.shortcuts.chatgpt").open()
 	end,
@@ -647,6 +727,13 @@ local BUILTIN_HANDLERS = {
 local _action_handlers = {}
 
 
+-- The observer told about every key combination the catalogue emitted AND the
+-- virtual keyboard acknowledged, whoever asked for it (a gesture, a keyboard
+-- shortcut, a tap-hold). The emitted keys never reach the hook, so this is the
+-- only place their logical effect (an arrow word and AI-context reset, a
+-- word-capitalisation delimiter) can be published, once, after the output is certain.
+local _effect_observer = nil
+
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
 
@@ -670,20 +757,21 @@ local function _execute_action(action_name, go_next, binding)
 	local function _press_combo(combo)
 		if not emitter_authority_current() then
 			Logger.error(LOG, "The gesture emitter is unavailable; '%s' was refused.", combo)
-			return
+			return false
 		end
 		local press, certify = _emitter_press, _emitter_certify
 		local emitted, result = press(combo)
-		if emitted == true then return end
+		if emitted == true then return true end
 		Logger.debug(LOG, "Checking pre-acquisition fallback admission for '%s' (X11 only).", combo)
 		if emitted ~= false or type(certify) ~= "function"
 			or not emitter_authority_current()
 			or certify(result, combo) ~= true
 			or not emitter_authority_current() then
 			Logger.warn(LOG, "Gesture '%s' refused another output producer after native refusal or unknown custody.", combo)
-			return
+			return false
 		end
 		_run("xdotool key " .. combo)
+		return true
 	end
 
 	--- Raises one of the driver's own windows, or reveals one of its files.
@@ -731,11 +819,15 @@ local function _execute_action(action_name, go_next, binding)
 		-- xdg-open on a file that does not exist fails silently, so say so here
 		-- instead: a personal_*.toml the user has never created is the common case
 		-- and "nothing happened" is not a usable answer.
-		local probe = io.open(target, "r")
-		if probe then
-			probe:close()
-		elseif not target:match("/$") then
+		local kind, detail, code = require("infra.native_directory").target_kind(target)
+		if kind == nil and code == "ENOENT" and not target:match("/$") then
 			Logger.warn(LOG, "'%s' points at '%s', which does not exist yet.", name, target)
+		elseif kind == nil and code ~= "ENOENT" then
+			Logger.error(LOG, "Cannot inspect '%s': %s.", name, tostring(detail or code))
+			return true
+		elseif kind == "other" then
+			Logger.error(LOG, "Cannot open '%s': the target is not a regular file or directory.", name)
+			return true
 		end
 		run_background("xdg-open " .. shell_quote(target))
 		return true
@@ -754,7 +846,12 @@ local function _execute_action(action_name, go_next, binding)
 	-- which did nothing under Wayland; they take the uinput path below as well.
 	local emit_combo = MODIFIER_ACTION_COMMANDS[action_name] or _EMIT_ROWS[action_name]
 	if emit_combo then
-		_press_combo(emit_combo)
+		if _press_combo(emit_combo) == true and _effect_observer then
+			local observed, detail = pcall(_effect_observer, action_name, emit_combo, binding)
+			if not observed then
+				Logger.error(LOG, "The action effect observer raised for '%s': %s.", action_name, tostring(detail))
+			end
+		end
 		return
 	end
 
@@ -791,18 +888,25 @@ local function _execute_action(action_name, go_next, binding)
 	if shot then
 		local kind = SCREENSHOT_KIND[action_name]
 		if kind then
-			-- Quoted once and substituted everywhere: the same path goes to each
-			-- candidate in the cascade, and a path with a space in it must survive
-			-- all four of them.
-			shot = shot:gsub("%%s", (shell_quote(screenshot_path(kind)):gsub("%%", "%%%%")))
+			-- mktemp -d provides a fresh name without GNU's --suffix option. The
+			-- noclobber reservation also refuses an existing PNG from an older run.
+			local template = shell_quote(screenshot_path(kind) .. ".XXXXXXXX")
+			shot = shot:gsub("%%s", '"$f"')
+			shot = '( d=$(mktemp -d ' .. template .. ') || exit 1; f="$d.png"; '
+				.. '( set -C; : > "$f" ) || { rmdir "$d"; exit 1; }; rmdir "$d"; '
+				.. [=[trap 'rm -f "$f"' 0; trap 'exit 1' HUP INT TERM; { ]=] .. shot
+				.. '; } && [ -s "$f" ] && trap - 0 )'
 		end
-		run_background(shot)
+		-- One-shot commands report their own failure (LDS-001); the
+		-- application launches above keep run_background, whose child is the
+		-- application itself.
+		BackgroundCommands.run(shot, action_name)
 		return
 	end
 
 	local direct = DIRECT_COMMANDS[action_name]
 	if direct then
-		run_background(direct)
+		BackgroundCommands.run(direct, action_name)
 		return
 	end
 
@@ -810,13 +914,14 @@ local function _execute_action(action_name, go_next, binding)
 		local meta = Catalogue.actions[action_name]
 		local command = SystemActions.command_for(action_name, M.get_action_label(action_name),
 			meta ~= nil and meta.confirm == true)
-		if command then run_background(command) end
+		if command then BackgroundCommands.run(command, action_name) end
 		return
 	end
 	local system_handler = SystemActions.HANDLERS[action_name]
 	if system_handler then
 		local ok, err = pcall(system_handler, {
-			run_background = run_background,
+			-- Handler commands can name the user's files: their stderr stays out of the log.
+			run_background = function(command) return BackgroundCommands.run(command, action_name, true) end,
 			clipboard = require("adapters.clipboard"),
 			emit_combo = require("modules.gestures.combo_emitter").press,
 			sleep_ms = require("adapters.event_loop").sleep_ms,
@@ -1089,7 +1194,6 @@ local _reading       = false -- the touchpad's evdev node is open and being drai
 local _reader_stop_error = nil -- an unacknowledged close must fence reacquisition
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
-local _parameter_configuration_owner = nil
 local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
 require("infra.scope_registry").register("gesture_scope", function()
@@ -1113,10 +1217,11 @@ end
 --- Keeps captured preferences exclusively owned until compensation completes.
 --- @return boolean admitted
 local function admit_mutation(owner)
+	if _gesture_click_fence ~= nil and _gesture_click_fence ~= owner then return false end
 	local bindings = package.loaded["infra.program_binding_transaction"]
 	if type(bindings) == "table" and bindings.pending() and not bindings.owns(owner) then return false end
 	if _parameter_configuration_owner ~= nil then return false end
-	if _scope_owner and _scope_owner.pending() then
+	if _scope_owner and _scope_owner ~= owner and _scope_owner.pending() then
 		Logger.error(LOG, "Gesture configuration remains owned by a pending scope transaction.")
 		return false
 	end
@@ -1131,6 +1236,16 @@ local copy_state = TableUtil.shallow_copy
 -- Initialize actions with defaults.
 for k, v in pairs(M.DEFAULT_GESTURES) do
 	_actions[k] = v
+end
+
+-- Retire only clicks acquired by gesture bindings that no longer name them.
+local function retire_changed_click_bindings(previous, candidate)
+	for slot, old in pairs(previous) do
+		if candidate[slot] ~= old then
+			if old == "left_click_toggle" then _click_holds.retire_binding("1", slot)
+			elseif old == "right_click_toggle" then _click_holds.retire_binding("3", slot) end
+		end
+	end
 end
 
 -- =========================================
@@ -1174,11 +1289,14 @@ function M.disable()
 	return true
 end
 
+local preserve_scope_clicks = {}
+local stop_reading_preserving_clicks
+
 --- Persists and applies the master gesture state as one transaction.
 --- @param enabled boolean
 --- @return boolean True when the requested state was committed.
 function M.set_enabled(enabled)
-	if not admit_mutation() then return false end
+	if _gesture_click_fence ~= nil or not admit_mutation() then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "Gesture state must be a boolean — nothing changed.")
 		return false
@@ -1188,26 +1306,67 @@ function M.set_enabled(enabled)
 	if not snapshot then return false end
 	local candidate = M.capture_scope_state()
 	candidate.enabled, candidate.reading = enabled, enabled
-	local applied = M.apply_scope_state(candidate)
-	if applied == true and M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = enabled } }) then
-		return true
-	end
-	-- The native boundary can fail after releasing ownership. Keep the exact
-	-- inverse admitted until it succeeds; a later setter must not supersede it.
-	local debt = snapshot
-	local owner = {}
+	-- Install the recovery owner before reader, process or persistence callbacks.
+	local debt, uncertain, source, candidate_bytes = snapshot, false, nil, nil
+	local owner, retire_clicks = {}, nil
 	function owner.pending() return debt ~= nil end
 	function owner.retry_restore()
 		if debt == nil then return true end
-		if M.apply_scope_state(debt) ~= true then return false end
+		if uncertain then
+			if not source or type(candidate_bytes) ~= "string" then return false end
+			local called, bytes, status = pcall(TomlWriter.read_classified, _config_path)
+			if not called then return false end
+			if status == "ok" and bytes == candidate_bytes then
+				debt = nil
+				if retire_clicks then pcall(retire_clicks) end
+				if _gesture_click_fence == owner then _gesture_click_fence = nil end
+				return true, "committed"
+			end
+			if status ~= source.status or (status == "ok" and bytes ~= source.content) then return false end
+			uncertain = false
+		end
+		local called, restored = pcall(M.apply_scope_state, debt, preserve_scope_clicks)
+		if not called or restored ~= true then return false end
 		debt = nil
+		if _gesture_click_fence == owner then _gesture_click_fence = nil end
 		return true
 	end
-	-- A refused switch commits nothing, so a composed scope has nothing to undo.
 	function owner.revert() return false, "no committed gesture scope to revert" end
 	function owner.release() end
 	_scope_owner = owner
-	if owner.retry_restore() then
+	_gesture_click_fence = owner
+	retire_clicks = not enabled and _click_holds.capture_retirement() or nil
+	local updates = { { section = CONFIG_SECTION, key = "enabled", value = enabled } }
+	if _persist then
+		local prepared, accepted, _, bytes, original = pcall(TomlWriter.prepare_batch, _config_path, updates)
+		if not prepared or accepted ~= true then
+			debt = nil
+			if _gesture_click_fence == owner then _gesture_click_fence = nil end
+			return false
+		end
+		candidate_bytes, source = bytes, original
+	end
+	local called, applied = pcall(M.apply_scope_state, candidate, preserve_scope_clicks)
+	if called and applied == true then
+		local saved, accepted, detail = pcall(M._persist_updates,
+			updates, nil, owner, source)
+		if saved and accepted == true then
+			debt = nil
+			if retire_clicks then
+				local ok = pcall(retire_clicks)
+				if not ok then pcall(Logger.error, LOG, "Could not advance captured gesture click cleanup; its owner retains the debt.") end
+			end
+			if _gesture_click_fence == owner then _gesture_click_fence = nil end
+			return true
+		end
+		-- An exception may follow publication; do not guess which bytes won.
+		if not saved or detail == "publication_unknown" then uncertain = true end
+	end
+	local recovered, resolution = owner.retry_restore()
+	if recovered and resolution == "committed" then
+		Logger.warn(LOG, "Gesture state publication was confirmed after an uncertain response.")
+		return true
+	elseif recovered then
 		Logger.error(LOG, "Gesture state was refused — the previous runtime was restored.")
 	else
 		Logger.error(LOG, "Gesture state was refused — runtime rollback remains pending.")
@@ -1250,7 +1409,8 @@ function M.set_action(slot, action_name)
 			tostring(action_name), tostring(slot))
 		return false
 	end
-	local staged = copy_state(_actions)
+	local previous = _actions
+	local staged = copy_state(previous)
 	staged[slot] = action_name
 	if not M._persist_updates({ { section = CONFIG_SECTION, key = slot, value = action_name } }) then
 		Logger.error(LOG, "Gesture assignment was not persisted — nothing changed.")
@@ -1258,6 +1418,7 @@ function M.set_action(slot, action_name)
 	end
 	_actions = staged
 	_program_revision = _program_revision + 1
+	retire_changed_click_bindings(previous, staged)
 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
 	return true
 end
@@ -1511,22 +1672,38 @@ end
 function M.set_program_paused(paused)
 	-- The hidden run_command children follow the same pause as user programs
 	local commands_settled = UserActions.set_paused(paused)
+	local inhibitor = package.loaded["modules.keep_awake"]
+	if paused == true and inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
 	return _program_owner.set_paused(paused) and commands_settled
 end
 
 function M.stop_programs()
 	local commands_settled = UserActions.stop()
+	local inhibitor = package.loaded["modules.keep_awake"]
+	if inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return commands_settled end
 	return _program_owner.stop() and commands_settled
 end
 
 function M.when_programs_settled(callback)
-	if _program_owner == nil then
-		if type(callback) ~= "function" then return false end
-		pcall(callback); return true
+	if type(callback) ~= "function" then return false end
+	local inhibitor = package.loaded["modules.keep_awake"]
+	local commands_done, programs_done, inhibitor_done, delivered = false, _program_owner == nil, inhibitor == nil, false
+	local function notify()
+		if commands_done and programs_done and inhibitor_done and not delivered then
+			delivered = true
+			local ok = pcall(callback)
+			if not ok then Logger.error(LOG, "Program settlement listener failed.") end
+		end
 	end
-	return _program_owner.when_settled(callback)
+	if UserActions.when_settled(function() commands_done = true; notify() end) ~= true then return false end
+	if inhibitor and inhibitor.when_settled(function() inhibitor_done = true; notify() end) ~= true then return false end
+	if _program_owner ~= nil then
+		if _program_owner.when_settled(function() programs_done = true; notify() end) ~= true then return false end
+	end
+	notify()
+	return true
 end
 
 --- Captures canonical action ownership and the current physical input generation.
@@ -1760,6 +1937,37 @@ function M.get_all_actions()
 	return t
 end
 
+--- Retains each physical obligation by identity across a provisional scope.
+--- @return function|nil finalize Called with the final commit verdict.
+function M.capture_scope_click_retirement()
+	if _gesture_click_fence ~= nil or _parameter_configuration_owner ~= nil then return nil end
+	local fence = {}
+	_gesture_click_fence = fence
+	local captured = {}
+	for slot, action in pairs(_actions) do
+		local button = action == "left_click_toggle" and "1" or action == "right_click_toggle" and "3" or nil
+		if button then captured[#captured + 1] = { slot = slot, action = action,
+			retire = _click_holds.capture_binding_retirement(button, slot) } end
+	end
+	return function(committed)
+		if _gesture_click_fence ~= fence then return end
+		for _, entry in ipairs(captured) do
+			if committed and (not _enabled or _actions[entry.slot] ~= entry.action) then
+				local ok = pcall(entry.retire)
+				if not ok then pcall(Logger.error, LOG, "Could not advance captured gesture click cleanup; its owner retains the debt.") end
+			end
+		end
+		if _gesture_click_fence == fence then _gesture_click_fence = nil end
+	end
+end
+
+--- Applies a snapshot while its scope retains the captured click obligations.
+--- @param candidate table Detached scope runtime snapshot.
+--- @return boolean acknowledged
+function M.apply_scope_state_provisional(candidate)
+	return M.apply_scope_state(candidate, preserve_scope_clicks)
+end
+
 --- Captures detached preferences and the acknowledged touchpad reader state.
 --- @return table|nil snapshot Nil when the current master has no live reader.
 function M.capture_scope_state()
@@ -1774,7 +1982,7 @@ end
 --- A failed native transition belongs to the caller's retained compensation.
 --- @param candidate table Detached scope runtime snapshot.
 --- @return boolean acknowledged
-function M.apply_scope_state(candidate)
+function M.apply_scope_state(candidate, preserve_clicks)
 	if _parameter_configuration_owner ~= nil then return false end
 	if type(candidate) ~= "table" or type(candidate.enabled) ~= "boolean"
 		or type(candidate.reading) ~= "boolean" or (candidate.enabled and not candidate.reading)
@@ -1797,7 +2005,10 @@ function M.apply_scope_state(candidate)
 	_scope_native = true
 	local called, acknowledged = pcall(function()
 		if candidate.reading then return M.start_reading() == true and M.is_reading() end
-		return M.stop_reading() == true and not M.is_reading()
+		local stopped
+		if preserve_clicks == preserve_scope_clicks then stopped = stop_reading_preserving_clicks()
+		else stopped = M.stop_reading() end
+		return stopped == true and not M.is_reading()
 	end)
 	_scope_native = false
 	if not called or acknowledged ~= true then return false end
@@ -1811,7 +2022,7 @@ end
 --- @param mode string `recommended` or `clear`.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply_scope(mode)
+function M.apply_scope(mode, deferred)
 	if _parameter_configuration_owner ~= nil then return false end
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
 	if not retire_window_operation() then return false, "native window retirement remains pending" end
@@ -1820,14 +2031,17 @@ function M.apply_scope(mode)
 	if _scope_owner and _scope_owner.pending() then
 		if not _scope_owner.retry_restore() then return false, "gesture runtime rollback remains pending" end
 	end
+	if _gesture_click_fence ~= nil then return false, "gesture scope remains owned" end
 	_scope_sequence = _scope_sequence + 1
 	local backup = _config_path .. ".gestures-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _scope_sequence .. ".bak"
-	_scope_owner = require("infra.gesture_scope").new({
+	local owner = require("infra.gesture_scope").new({
 		path = _config_path,
 		backup_path = backup,
 		gestures = M,
 	})
-	local committed, detail = _scope_owner.apply(mode)
+	_scope_owner = owner
+	local committed, detail = owner.apply(mode)
+	if committed and deferred ~= true then owner.release() end
 	if not committed then Logger.error(LOG, "Gesture scope '%s' was refused: %s.", mode, tostring(detail)) end
 	return committed, detail, backup
 end
@@ -1845,7 +2059,7 @@ end
 --- @return table participant See config_scope_composition.
 function M.scope_participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply_scope(mode) end,
+		apply = function(mode) return M.apply_scope(mode, true) end,
 		owner = function() return _scope_owner end,
 	})
 end
@@ -1853,7 +2067,8 @@ end
 --- Resets all gesture actions to defaults.
 --- @return boolean True only after every default is durable when persistence is enabled.
 function M.reset_defaults()
-	local staged = copy_state(_actions)
+	local previous = _actions
+	local staged = copy_state(previous)
 	local updates = {}
 	for k, v in pairs(M.RECOMMENDED_GESTURES) do
 		staged[k] = v
@@ -1865,6 +2080,7 @@ function M.reset_defaults()
 	end
 	_actions = staged
 	_program_revision = _program_revision + 1
+	retire_changed_click_bindings(previous, staged)
 	Logger.info(LOG, "Gestures reset to defaults.")
 	return true
 end
@@ -1873,7 +2089,8 @@ end
 --- master enable flag.
 --- @return boolean True only after every empty binding is durable when persistence is enabled.
 function M.disable_all_actions()
-	local staged = copy_state(_actions)
+	local previous = _actions
+	local staged = copy_state(previous)
 	local updates = {}
 	for slot in pairs(M.DEFAULT_GESTURES) do
 		staged[slot] = "none"
@@ -1885,6 +2102,7 @@ function M.disable_all_actions()
 	end
 	_actions = staged
 	_program_revision = _program_revision + 1
+	retire_changed_click_bindings(previous, staged)
 	Logger.info(LOG, "Every gesture binding was set to none.")
 	return true
 end
@@ -1922,6 +2140,23 @@ local function _slot_for_gesture(fingers, direction, tap)
 	return string.format("swipe_%d_%s", math.min(fingers, 5), direction)
 end
 
+--- The key combination the catalogue emits for an action, when it is a single one.
+--- @param action_name string An action id.
+--- @return string|nil combo X keysym names joined by "+", or nil.
+function M.emit_combo_for(action_name)
+	return MODIFIER_ACTION_COMMANDS[action_name] or _EMIT_ROWS[action_name]
+end
+
+--- Installs the one observer of acknowledged catalogue key emissions. The
+--- daemon owns it; a restarted session replaces its predecessor's.
+--- @param observer function|nil fn(action_name, combo, binding), or nil to remove.
+function M.set_effect_observer(observer)
+	if observer ~= nil and type(observer) ~= "function" then
+		error("the action effect observer must be a function or nil", 2)
+	end
+	_effect_observer = observer
+end
+
 --- Runs one action by name, whatever asked for it.
 ---
 --- Exposed because the gesture manager owns the action catalogue, the labels and
@@ -1932,11 +2167,88 @@ end
 --- @param binding string|nil What asked for it, for the logs and the parameters.
 --- @return boolean True when a name was given at all.
 function M.execute_action(action_name, binding)
+	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and M.DEFAULT_GESTURES[binding] ~= nil
+		and (action_name == "left_click_toggle" or action_name == "right_click_toggle") then return false end
 	if type(action_name) ~= "string" or action_name == "" or action_name == "none" then
 		return false
 	end
 	_execute_action(action_name, nil, binding)
 	return true
+end
+
+--- The mode of a swipe slot: "x1" fires once per swipe, "incremental" once per
+--- step of travel while the fingers move.
+--- @param slot string
+--- @return string|nil mode nil for a slot with no mode (a tap).
+function M.get_mode(slot)
+	return _modes[slot] or M.DEFAULT_MODES[slot]
+end
+
+--- The step of an incremental slot, in millimetres of travel.
+--- @param slot string
+--- @return number|nil step
+function M.get_sensitivity(slot)
+	return _sensitivities[slot] or M.DEFAULT_SENSITIVITIES[slot]
+end
+
+--- The live tracker for a touchpad of a given scale, or nil without one.
+--- @param units_x number|nil Device units per millimetre along x.
+--- @param units_y number|nil Device units per millimetre along y.
+--- @return table|nil tracker
+local function new_incremental(units_x, units_y)
+	if not (units_x and units_y) then return nil end
+	return require("modules.gestures.incremental_tracker").new({
+		units_x = units_x, units_y = units_y,
+		mode_of = M.get_mode, step_of = M.get_sensitivity,
+		-- Each step runs the slot exactly as a completed swipe would, through
+		-- the same pause, click-fence and axis-slot rules.
+		fire = function(_, fingers, direction, count)
+			local fired = 0
+			for _ = 1, count do
+				if not M.dispatch_gesture({ fingers = fingers, direction = direction, tap = false }) then break end
+				fired = fired + 1
+			end
+			return fired
+		end,
+	})
+end
+
+--- Persists one mode or step and applies it.
+--- @return boolean committed
+local function set_slot_setting(store, section, slot, value)
+	if not admit_mutation() then return false end
+	if not M._persist_updates({ { section = section, key = slot, value = value } }) then
+		Logger.error(LOG, "Gesture %s for %s was not persisted — nothing changed.", section, slot)
+		return false
+	end
+	store[slot] = value
+	Logger.info(LOG, "Gesture %s.%s → %s.", section, slot, tostring(value))
+	return true
+end
+
+--- Sets a swipe slot's mode.
+--- @param slot string
+--- @param mode string "x1" or "incremental".
+--- @return boolean committed
+function M.set_mode(slot, mode)
+	if M.DEFAULT_MODES[slot] == nil or (mode ~= M.MODE_SINGLE and mode ~= M.MODE_INCREMENTAL) then
+		Logger.warn(LOG, "Refusing gesture mode '%s' for '%s'.", tostring(mode), tostring(slot))
+		return false
+	end
+	return set_slot_setting(_modes, MODES_SECTION, slot, mode)
+end
+
+--- Sets an incremental slot's step.
+--- @param slot string
+--- @param value number Millimetres, within the shared range.
+--- @return boolean committed
+function M.set_sensitivity(slot, value)
+	local step = require("gestures.sensitivity").coerce(value)
+	if M.DEFAULT_SENSITIVITIES[slot] == nil or step == nil then
+		Logger.warn(LOG, "Refusing gesture step '%s' for '%s'.", tostring(value), tostring(slot))
+		return false
+	end
+	return set_slot_setting(_sensitivities, SENSITIVITIES_SECTION, slot, step)
 end
 
 --- Runs the action bound to a gesture the decoder has already classified.
@@ -1960,6 +2272,22 @@ function M.dispatch_gesture(gesture)
 	end
 
 	local action = _actions[slot]
+	-- A straight horizontal swipe whose direction slot is unbound runs the axis
+	-- slot of its finger count. The direction slot wins when both are bound, so
+	-- an explicit left/right choice is never overridden. Diagonals and taps have
+	-- no axis slot. The decoder already applied the shared direction thresholds;
+	-- an incremental slot reaches here once per step of travel
+	-- (modules/gestures/incremental_tracker.lua), each step through this rule.
+	if (not action or action == "none") and not gesture.tap
+		and (gesture.direction == "left" or gesture.direction == "right") then
+		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(gesture.fingers, 5)]
+		local axis_action = axis_slot and _actions[axis_slot]
+		if axis_action and axis_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
+			slot, action = axis_slot, axis_action
+		end
+	end
+	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is
 		-- the normal state until the user chooses — saying so at INFO would make
@@ -1982,6 +2310,7 @@ function M.dispatch_gesture(gesture)
 	end
 
 	Logger.info(LOG, "GESTURE FIRE: slot=%s action=%s", slot, action)
+	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	_execute_action(action, nil, slot)
 	return true
 end
@@ -2055,6 +2384,14 @@ function M.start_reading()
 	_decoder = Decoder.new()
 	_touchpad = touchpad
 	_reading = true
+	local units_x, units_y = Finder.read_resolution(touchpad.path)
+	_incremental = new_incremental(units_x, units_y)
+	if _incremental then
+		Logger.info(LOG, "%s: %d x %d units per mm; incremental swipes count millimetres.", touchpad.path, units_x, units_y)
+	else
+		-- No scale, no millimetres: an incremental slot cannot measure its step.
+		Logger.warn(LOG, "%s reports no resolution: incremental swipes fire once, like x1 ones.", touchpad.path)
+	end
 	Logger.success(LOG, "Reading %s (%s), up to %d finger(s)%s.",
 		touchpad.path, touchpad.name, touchpad.max_fingers,
 		touchpad.semi_mt and ", semi-MT" or "")
@@ -2077,6 +2414,19 @@ function M.pump()
 
 	local drained, status = Reader.drain(function(event)
 		local gesture = _decoder:feed(event)
+		if _incremental then
+			-- A swipe that already stepped while the fingers moved is done.
+			if gesture then
+				if not _incremental:finish() then M.dispatch_gesture(gesture) end
+				return
+			end
+			if event.type == 0 and event.code == 0 then -- EV_SYN / SYN_REPORT
+				local live = _decoder:live()
+				-- A touch that ended without a completed swipe ends the tracking too.
+				if live then _incremental:update(live) elseif not _decoder:touching() then _incremental:finish() end
+			end
+			return
+		end
 		if gesture then M.dispatch_gesture(gesture) end
 	end, Reader.TOUCHPAD)
 	if status == "fatal" or status == "closed" then
@@ -2095,9 +2445,9 @@ end
 
 --- Stops reading the touchpad.
 --- @return boolean True only when the reader acknowledges closure.
-function M.stop_reading()
+local function stop_reading(preserve_clicks)
 	if not _scope_native and not admit_mutation() then return false end
-	local clicks_retired = M.release_clicks()
+	local clicks_retired = preserve_clicks == true or M.release_clicks()
 	if _reading then
 		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 		local called, acknowledged, detail = false, nil, "reader close is unavailable"
@@ -2116,10 +2466,14 @@ function M.stop_reading()
 	_reading = false
 	_reader_stop_error = nil
 	_decoder = nil
+	_incremental = nil
 	_touchpad = nil
 	Logger.info(LOG, "Touchpad reader stopped.")
 	return clicks_retired
 end
+
+stop_reading_preserving_clicks = function() return stop_reading(true) end
+function M.stop_reading() return stop_reading(false) end
 
 --- The touchpad being read, or nil.
 --- @return table|nil
@@ -2135,9 +2489,12 @@ end
 --- opens that seam and nothing else: the pump, the decoder and the dispatch are
 --- all the real ones, and only the device underneath is faked.
 --- @param decoder table An mt_decoder instance.
-function M._test_begin_reading(decoder)
+--- @param units_x number|nil Device units per millimetre along x, for incremental slots.
+--- @param units_y number|nil Device units per millimetre along y.
+function M._test_begin_reading(decoder, units_x, units_y)
 	_decoder = decoder
 	_reading = true
+	_incremental = new_incremental(units_x, units_y)
 end
 
 --- Returns true if the touch reader is active.
@@ -2150,10 +2507,10 @@ end
 -- =========================================
 -- =========================================
 
-function M._persist_updates(updates, private)
+function M._persist_updates(updates, private, owner, expected_source)
 	-- Configuration cannot supersede a still-owned native window activation.
 	if not retire_window_operation() then return false end
-	if not admit_mutation() then return false end
+	if not admit_mutation(owner) then return false end
 	if not _persist then return true end
 	if type(updates) ~= "table" or #updates == 0 then
 		Logger.error(LOG, "Could not persist gesture configuration: update batch is empty or invalid.")
@@ -2168,7 +2525,7 @@ function M._persist_updates(updates, private)
 		return false
 	end
 
-	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates)
+	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates, nil, expected_source)
 	if not call_ok or committed ~= true then
 		if private == true then
 			Logger.error(LOG, "Could not persist private user program configuration.")
@@ -2176,7 +2533,7 @@ function M._persist_updates(updates, private)
 			Logger.error(LOG, "Could not persist gesture configuration: %s",
 			tostring(call_ok and err or committed))
 		end
-		return false
+		return false, not call_ok and "publication_unknown" or nil
 	end
 	return true
 end
@@ -2213,6 +2570,9 @@ local function walk_user_config(config, visit)
 			-- being skipped in silence. `enabled` is the master switch.
 			if slot == "enabled" and section_name == CONFIG_SECTION then
 				-- Read by the enabled visitor below.
+			elseif (slot == "modes" or slot == "sensitivities") and section_name == CONFIG_SECTION
+				and type(action) == "table" then
+				-- [gestures.modes] and [gestures.sensitivities], read by load_slot_settings.
 			elseif not M.DEFAULT_GESTURES[slot] then
 				ConfigOutdated.report(entry_path(section_name, slot), "no gesture slot of this build has this name", Logger)
 			elseif type(action) ~= "string" then
@@ -2305,12 +2665,40 @@ function M.mark_config_reads(config, mark)
 	})
 end
 
+--- Reads [gestures.modes] and [gestures.sensitivities]; an invalid entry is
+--- outdated configuration, reported and left out.
+--- @param config table Decoded config.toml.
+local function load_slot_settings(config)
+	local section = type(config.gestures) == "table" and config.gestures or {}
+	local Sensitivity = require("gestures.sensitivity")
+	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
+		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
+			_modes[slot] = mode
+		else
+			ConfigOutdated.report({ "gestures", "modes", tostring(slot) }, "not a swipe slot mode (x1 or incremental)", Logger)
+		end
+	end
+	for slot, value in pairs(type(section.sensitivities) == "table" and section.sensitivities or {}) do
+		local step = Sensitivity.coerce(value)
+		if M.DEFAULT_SENSITIVITIES[slot] ~= nil and step ~= nil then
+			_sensitivities[slot] = step
+		else
+			ConfigOutdated.report({ "gestures", "sensitivities", tostring(slot) }, "not a swipe slot step in range", Logger)
+		end
+	end
+end
+
 local function load_user_config(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
+	if type(TomlWriter) ~= "table" or type(TomlWriter.read_classified) ~= "function" then
+		Logger.error(LOG, "Gesture configuration cannot be read: classified file reader unavailable.")
+		return nil
+	end
+	local content, status, detail = TomlWriter.read_classified(path)
+	if status ~= "ok" then
+		if status ~= "absent" then Logger.error(LOG, "Gesture configuration is unreadable: %s.", tostring(detail or status)) end
+		return nil
+	end
 	local ok, config = pcall(TomlCodec.decode, content)
 	if not ok or type(config) ~= "table" then return nil end
 
@@ -2332,6 +2720,7 @@ local function load_user_config(path)
 		end,
 		enabled = function(value) configured = value end,
 	})
+	load_slot_settings(config)
 	local legacy = type(config.linux) == "table" and config.linux or nil
 	if legacy and type(legacy.gestures) == "table" and next(legacy.gestures) ~= nil then
 		Logger.info(LOG,
@@ -2420,6 +2809,38 @@ end
 function M.parameter_configuration_actions_snapshot(owner)
 	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return nil end
 	return M.get_all_actions()
+end
+
+-- A parameter transaction may apply and roll back several candidate maps.
+-- Its opaque receipt delays irreversible click retirement until publication and
+-- lease release have both succeeded.
+local _click_configuration_receipts = setmetatable({}, { __mode = "k" })
+function M.capture_click_configuration(owner, slot)
+	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner or type(slot) ~= "string" then return nil end
+	local old = _actions[slot]
+	local button = old == "left_click_toggle" and "1" or old == "right_click_toggle" and "3" or nil
+	local receipt = {}
+	_click_configuration_receipts[receipt] = {
+		owner = owner, slot = slot, old = old,
+		retire = button and _click_holds.capture_binding_retirement(button, slot) or function() end,
+	}
+	return receipt
+end
+function M.seal_click_configuration(owner, receipt)
+	local record = _click_configuration_receipts[receipt]
+	if not record or record.owner ~= owner or _parameter_configuration_owner ~= owner or record.sealed then return false end
+	record.changed = _actions[record.slot] ~= record.old
+	record.sealed = true
+	return true
+end
+function M.commit_click_configuration(owner, receipt)
+	local record = _click_configuration_receipts[receipt]
+	if not record or record.owner ~= owner or not record.sealed then return end
+	_click_configuration_receipts[receipt] = nil
+	if record.changed then
+		local ok = pcall(record.retire)
+		if not ok then pcall(Logger.error, LOG, "Could not advance captured gesture click cleanup; its owner retains the debt.") end
+	end
 end
 
 --- Applies only assignments without changing input-reader ownership or files.

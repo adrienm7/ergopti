@@ -220,8 +220,13 @@ end
 
 --- Checks if a path is a directory.
 --- @param path string
+--- @param nofollow boolean|nil Refuse a symbolic link to a directory.
 --- @return boolean
-local function _is_dir(path)
+local function _is_dir(path, nofollow)
+	if nofollow and luv and type(luv.fs_lstat) == "function" then
+		local ok, stat = pcall(luv.fs_lstat, path)
+		return ok and type(stat) == "table" and stat.type == "directory"
+	end
 	if posix and posix.stat then
 		local ok, st = pcall(posix.stat, path)
 		if ok and st and st.type then
@@ -231,7 +236,9 @@ local function _is_dir(path)
 		end
 	end
 	-- Fallback.
-	local fh = io.popen("test -d " .. TextUtils.shell_quote(path) .. " && echo 1 || echo 0", "r")
+	local quoted = TextUtils.shell_quote(path)
+	local link_guard = nofollow and (" && test ! -L " .. quoted) or ""
+	local fh = io.popen("test -d " .. quoted .. link_guard .. " && echo 1 || echo 0", "r")
 	if fh then
 		local out = fh:read("*l")
 		fh:close()
@@ -412,15 +419,19 @@ local function _arm_luv_watcher(path, accept_fn)
 				return
 			end
 			-- fname is the basename of the changed file (nil for file watchers).
-			-- events is a table like {"change"} or {"rename"}.
+			-- luv supplies keyed flags; some backends supply an array of names.
 			if type(fname) == "string" and fname ~= "" then
 				-- Directory watcher: filter by filename.
 				if accept_fn(fname) then
 					_schedule_reload(string.format("inotify: %s/%s", NativePath.basename(path), fname), { path .. "/" .. fname })
 				end
-			elseif events and #events > 0 then
+			elseif type(events) == "table" and (events.change or events.rename or #events > 0) then
 				-- File watcher: fire on any event.
-				_schedule_reload(string.format("inotify: %s (%s)", NativePath.basename(path), table.concat(events, ",")), { path })
+				local names = {}
+				if events.change then names[#names + 1] = "change" end
+				if events.rename then names[#names + 1] = "rename" end
+				if #names == 0 then names = events end
+				_schedule_reload(string.format("inotify: %s (%s)", NativePath.basename(path), table.concat(names, ",")), { path })
 			end
 		end)
 	end)
@@ -562,9 +573,9 @@ _personal_metadata = function(path)
 	-- manager's layout) names the file it points to, so it is judged by what it
 	-- resolves to. Directory roots keep the no-follow policy below.
 	if _personal_file and path == _personal_root and luv and type(luv.fs_stat) == "function" then
-		local called, attributes = pcall(luv.fs_stat, path)
+		local called, attributes, _, code = pcall(luv.fs_stat, path)
 		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
-			return nil, "selected TOML file metadata is unavailable: " .. path
+			return nil, "selected TOML file metadata is unavailable: " .. path, called and code or nil
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type }
 	end
@@ -579,14 +590,19 @@ _personal_metadata = function(path)
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type or attributes.mode }
 	end
-	if luv and type(luv.fs_stat) == "function" then
-		local called, attributes = pcall(luv.fs_stat, path)
+	local native_stat
+	if luv then
+		if selected_root then native_stat = luv.fs_stat else native_stat = luv.fs_lstat end
+	end
+	if type(native_stat) == "function" then
+		local called, attributes = pcall(native_stat, path)
 		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
 			return nil, "personal native filesystem metadata is unavailable: " .. path
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type }
 	end
-	local content, detail = _personal_command("LC_ALL=C stat -L -c '%d:%i:%F' -- " .. Shell.quote(path) .. " 2>/dev/null")
+	local follow = selected_root and "-L " or ""
+	local content, detail = _personal_command("LC_ALL=C stat " .. follow .. "-c '%d:%i:%F' -- " .. Shell.quote(path) .. " 2>/dev/null")
 	if not content then return nil, detail end
 	local device, inode, kind = content:match("^(%d+):(%d+):([^\r\n]+)\n$")
 	if not device then return nil, "personal filesystem metadata is malformed: " .. path end
@@ -973,26 +989,37 @@ function M.start(opts)
 	-- ── 9.2) Personal hotstrings (recursive .toml scan) ──
 	if personal_dir ~= "" then
 		local clean_dir = _directory_path(personal_dir)
-		local is_directory = _is_dir(clean_dir)
+		local is_directory = _is_dir(clean_dir, true)
 		-- A selected TOML file is the user's explicit choice (--config FILE.toml):
 		-- a missing one is waited for, a symlink to one is followed, and any other
 		-- object under that name is refused loudly instead of silently unwatched.
 		local selected = not is_directory and _is_toml(clean_dir)
 		local is_file = false
+		local wait_for_directory = false
+		if not is_directory and not selected then
+			local attributes = _personal_metadata(clean_dir)
+			-- A missing or temporarily uninspectable root can appear later.
+			-- A known non-directory never grants directory traversal authority.
+			wait_for_directory = attributes == nil
+		end
 		if selected then
 			_personal_file, _personal_root = true, clean_dir
-			local attributes = _personal_metadata(clean_dir)
+			local attributes, detail, code = _personal_metadata(clean_dir)
 			_personal_file, _personal_root = false, nil
 			if attributes == nil then
 				is_file = true
-				Logger.info(LOG, "Selected TOML file '%s' is absent; waiting for it to appear.", clean_dir)
+				if code == "ENOENT" then
+					Logger.info(LOG, "Selected TOML file '%s' is absent; waiting for it to appear.", clean_dir)
+				else
+					Logger.warn(LOG, "Selected TOML file metadata is unavailable: %s; retrying.", tostring(detail))
+				end
 			elseif _personal_regular_file(attributes) then
 				is_file = true
 			else
 				Logger.warn(LOG, "Selected TOML path '%s' is not a regular file; it is not watched.", clean_dir)
 			end
 		end
-		if is_directory or is_file then
+		if is_directory or is_file or wait_for_directory then
 			_personal_epoch = _personal_epoch + 1
 			_personal_root, _personal_dirty = clean_dir, true
 			_personal_file = is_file == true

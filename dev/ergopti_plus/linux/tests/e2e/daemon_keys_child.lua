@@ -137,6 +137,9 @@ package.preload["adapters.keyboard_layout"] = function()
 end
 
 local scripted_writer, injected_refusal = nil, false
+local callbacks = {}
+local queued_during_output = false
+local ai_characters = {}
 package.preload["adapters.uinput_writer"] = function()
 	-- Actual Writer transactions over controlled byte ports, never native input.
 	scripted_writer = require("tests.fakes").uinput_writer({
@@ -151,6 +154,12 @@ package.preload["adapters.uinput_writer"] = function()
 				elseif char_of[code] then
 					if selection.focused then screen = {}; selection.focused = false end
 					screen[#screen + 1] = char_of[code]
+					if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" and not queued_during_output
+						and table.concat(screen) == "parce que" then
+						queued_during_output = true
+						screen[#screen + 1] = "x"
+						callbacks.onChar("x", 30)
+					end
 				end
 			end
 			return true
@@ -159,10 +168,17 @@ package.preload["adapters.uinput_writer"] = function()
 	return scripted_writer
 end
 
-local callbacks = {}
 local hook = require("adapters.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
+	if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then
+		local prediction = require("modules.llm.prediction_engine")
+		local original = prediction.on_char
+		prediction.on_char = function(ch, ...)
+			ai_characters[#ai_characters + 1] = ch
+			return original(ch, ...)
+		end
+	end
 	if CONFIG:match("[/\\]daemon_keys%.toml$") then
 		local config = require("modules.hotstrings.hotstrings_config")
 		assert(config.set_all_sections("daemon_keys", true), "the scripted catalogue must be explicitly selected")
@@ -267,6 +283,9 @@ if not MENU_ROWS_FILE then
 			end,
 			focused_identity = function() return "owned-e2e-window" end,
 			focused_text_identity = function() return "owned-e2e-text-field" end,
+			-- Main binds the metrics' pointer and desktop sources at boot; this
+			-- scripted window grants neither, as on Wayland.
+			metrics_sources = function() return {} end,
 		}
 	end
 end
@@ -686,4 +705,5 @@ end
 -- A screen receipt is useful only after Main and native owners exit cleanly.
 assert(type(final_screen) == "string", "the scripted screen was never observed")
 print(final_screen)
+if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then print("QUEUE_AI " .. table.concat(ai_characters)) end
 print("E2E_CLEAN_EXIT")

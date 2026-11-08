@@ -39,6 +39,8 @@ M.NAV_LAYER_EXITED = "nav_layer_exited"
 M.ONE_SHOT_SHIFT = "one_shot_shift"
 M.CAPSWORD_ACTIVATED = "capsword_activated"
 M.CAPSWORD_DEACTIVATED = "capsword_deactivated"
+--- A tap-hold key's own command follows (hotstrings.tap_hold_resets_word).
+M.TAP_HOLD_COMMAND = "tap_hold_command"
 
 -- Reserved keycode → published signal. Karabiner prepends F20 to every action
 -- that activates the navigation layer and appends F19 to every one that turns
@@ -91,6 +93,18 @@ local function publish(signal)
 		local ok, err = pcall(callback, signal)
 		if not ok then report_listener_failure(name, err) end
 	end
+end
+
+
+--- Publishes a navigation-layer transition that no sentinel key carried.
+--- A Lua catalogue action (layer_on/layer_off on a gesture or an action slot)
+--- writes the Karabiner layer variable directly, so no F20/F19 reaches the
+--- keymap tap; its settled write must still move the wheel bindings with it.
+--- @param active boolean True when the layer was entered, false when left.
+function M.publish_nav_layer(active)
+	assert(type(active) == "boolean",
+		"keymap.control_sentinels.publish_nav_layer: active must be a boolean")
+	publish(active and M.NAV_LAYER_ENTERED or M.NAV_LAYER_EXITED)
 end
 
 

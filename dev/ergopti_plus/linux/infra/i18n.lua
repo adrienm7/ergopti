@@ -25,6 +25,7 @@ local Logger     = require("logger.shim")
 -- The shared section-header decoration, the same one macOS and AutoHotkey draw.
 local Labels     = require("menu.labels")
 local NativeDirectory = require("infra.native_directory")
+local RegularFileReader = require("infra.regular_file_reader")
 local LOG        = "i18n"
 
 local _locale    = "fr"   -- active locale code
@@ -59,16 +60,6 @@ local function _load_persisted_locale()
 	return "fr"
 end
 
---- Persists the current locale so it survives restarts.
---- @param code string Locale code.
---- @return boolean True only after durable storage confirms the write.
-local function _save_locale(code)
-	local s = _get_storage()
-	if not s or type(s.set) ~= "function" then return false end
-	return s.set("locale", code) == true
-end
-
-
 -- =========================================
 -- =========================================
 -- ======= 2/ Locale Discovery =============
@@ -85,10 +76,11 @@ local function _load_order(data_dir)
 	if not ok_j or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil
 	end
-	local f = io.open(data_dir .. "/locale_order.json", "r")
+	local f = RegularFileReader.open_source(data_dir .. "/locale_order.json")
 	if not f then return nil end
-	local raw = f:read("*a")
-	f:close()
+	local read, raw = pcall(f.read, f, "*a")
+	local closed, accepted = pcall(f.close, f)
+	if not read or type(raw) ~= "string" or not closed or accepted ~= true then return nil end
 	local ok, doc = pcall(json_mod.decode, raw)
 	if not ok or type(doc) ~= "table" or type(doc.order) ~= "table" then return nil end
 	local rank = {}
@@ -216,7 +208,7 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True only after storage confirms the explicit selection.
 function M.persist_locale(code)
-	if not _scope.admit_change() then return false end
+	if not require("infra.script_scope").retry_locale() or not _scope.admit_change() then return false end
 	if type(code) ~= "string" or code == "" then return false end
 
 	-- Verify the locale is available.
@@ -229,14 +221,11 @@ function M.persist_locale(code)
 		return false
 	end
 
-	-- config.toml's [script] locale wins at start: rewrite it first.
-	if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOCALE, code)
-		or not _save_locale(code) then
-		Logger.error(LOG, "Locale '%s' was not persisted — nothing changed.", code)
+	-- The alias, runtime and an existing config row commit under one owner.
+	if not require("infra.script_scope").edit_locale(code) then
+		Logger.error(LOG, "Locale '%s' was not committed.", code)
 		return false
 	end
-	_locale = code
-	locale_mod.set_locale(code)
 	Logger.info(LOG, "Locale set to '%s' (persisted).", code)
 	return true
 end
@@ -246,7 +235,7 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True when the active locale needs no change or was persisted.
 function M.set_locale(code)
-	if not _scope.admit_change() then return false end
+	if not require("infra.script_scope").retry_locale() or not _scope.admit_change() then return false end
 	if code == _locale then return true end
 	return M.persist_locale(code)
 end

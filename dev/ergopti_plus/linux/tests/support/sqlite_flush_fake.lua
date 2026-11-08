@@ -6,6 +6,11 @@ local M = {}
 local unpack_values = table.unpack or unpack
 
 function M.attach(writer)
+	-- ROI is admitted through start_flush, not a standalone insertion API.
+	-- Keep its logical transaction receipts in the test-only namespace.
+	local test = rawget(writer, "test")
+	if test == nil then test = {}; writer.test = test end
+	test.roi_events = test.roi_events or {}
 	-- Logical flush ports own no native file descriptors. Do not let a broad
 	-- unknown-method metatable fabricate private cleanup debt, and preserve an
 	-- explicitly supplied debt port when a test models that refusal itself.
@@ -18,9 +23,12 @@ function M.attach(writer)
 		local raw_methods = { typing = "insert_typing_events", hotstrings = "insert_hotstring_events",
 			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events",
 			llm = "insert_llm_events", windows = "insert_window_switch_events",
-			sessions = "insert_session_events", system = "insert_system_events" }
+			sessions = "insert_session_events", system = "insert_system_events", network = "insert_network_events" }
 		for family, method in pairs(raw_methods) do
 			if #(payload.raw[family] or {}) > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
+		end
+		for _, row in ipairs(payload.raw.roi or {}) do
+			test.roi_events[#test.roi_events + 1] = { device_id = device, row = row }
 		end
 		if #(payload.raw.media or {}) > 0
 			and writer.insert_media_events(device, payload.raw.media, payload.media_threshold_ms) == false then

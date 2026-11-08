@@ -34,6 +34,7 @@ local function load_fixture(reset_result)
 		current_action_epoch = function() return current_token end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
+		hotstring_time = function() return 0 end,
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback, timer = {} }
 				scheduled[#scheduled + 1] = handle
@@ -129,6 +130,7 @@ local function load_fixture(reset_result)
 	package.loaded["modules.keymap.llm_bridge"] = nil
 	local Bridge = require("modules.keymap.llm_bridge")
 	Bridge.init({
+		llm_context_text = "", llm_context_mark = "", llm_buffer = "",
 		buffer = "",
 		mappings = {},
 		preview_providers = {

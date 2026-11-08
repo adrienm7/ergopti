@@ -40,18 +40,17 @@ function parseToNodes(text) {
 	if (!text) return [document.createTextNode('')];
 
 	var nodes = [];
-	var normalized = text.replace(/\n/g, '{Enter}');
-	var re = /\{([^}]+)\}/gi;
+	var re = /\n|\{([^}\n]+)\}/gi;
 	var last = 0;
 	var match;
 
-	while ((match = re.exec(normalized)) !== null) {
+	while ((match = re.exec(text)) !== null) {
 		if (match.index > last) {
-			nodes.push(document.createTextNode(normalized.slice(last, match.index)));
+			nodes.push(document.createTextNode(text.slice(last, match.index)));
 		}
 
-		var tokenName = match[1].toLowerCase();
-		if (tokenName === 'enter') {
+		var tokenName = match[1] && match[1].toLowerCase();
+		if (match[0] === '\n') {
 			nodes.push(document.createElement('br'));
 		} else if (
 			tokenName === 'context' ||
@@ -60,15 +59,15 @@ function parseToNodes(text) {
 			tokenName === 'max_words' || // config-key-literal-ok: prompt template token, not a configuration key
 			tokenName === 'language'
 		) {
-			nodes.push(makeChip(tokenName));
+			nodes.push(makeChip(match[1]));
 		} else {
 			nodes.push(document.createTextNode(match[0]));
 		}
 		last = re.lastIndex;
 	}
 
-	if (last < normalized.length) {
-		nodes.push(document.createTextNode(normalized.slice(last)));
+	if (last < text.length) {
+		nodes.push(document.createTextNode(text.slice(last)));
 	}
 
 	return nodes;
@@ -81,16 +80,6 @@ function parseToNodes(text) {
  */
 function serializeEditor(element) {
 	var nodes = Array.from(element.childNodes);
-
-	// Strip trailing breaks that aren't chips
-	while (nodes.length > 0) {
-		var last = nodes[nodes.length - 1];
-		if (last.nodeType === 1 && last.tagName === 'BR' && !last.classList.contains('token-chip')) {
-			nodes.pop();
-		} else {
-			break;
-		}
-	}
 
 	var serializedString = '';
 	nodes.forEach(function (node) {
@@ -221,8 +210,7 @@ function tryConvertToken(editorElement) {
 	replaceRange.setEnd(node, offset);
 	replaceRange.deleteContents();
 
-	var tokenName = match[1].toLowerCase();
-	var chip = makeChip(tokenName);
+	var chip = makeChip(match[1]);
 	var anchorRange = selection.getRangeAt(0);
 	anchorRange.insertNode(chip);
 
@@ -365,16 +353,27 @@ function checkAc() {
 // ================================
 // ================================
 
+// Selection and input events may omit isComposing while an IME owns the DOM.
+let imeComposing = false;
+document.addEventListener('compositionstart', () => {
+	imeComposing = true;
+});
+document.addEventListener('compositionend', () => {
+	imeComposing = false;
+});
+
 var editorElement = document.getElementById('e-out');
 
 // Trigger dynamic token evaluation on text input
-editorElement.addEventListener('input', function () {
+editorElement.addEventListener('input', function (e) {
+	if (imeComposing || e.isComposing) return;
 	tryConvertToken(editorElement);
 	checkAc();
 	checkPlaceholder();
 });
 
 editorElement.addEventListener('keyup', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (
 		acItems.length > 0 &&
 		['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(e.key) >=
@@ -390,6 +389,7 @@ editorElement.addEventListener('keyup', function (e) {
 editorElement.addEventListener('blur', hideAc);
 
 editorElement.addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	// Handling Autocomplete navigation
 	if (acItems.length > 0) {
 		if (e.key === 'Tab') {
@@ -507,6 +507,7 @@ editorElement.addEventListener('paste', function (e) {
 
 // Cursor Ejector: Prevents the caret from getting stuck inside non-editable chips
 document.addEventListener('selectionchange', function () {
+	if (imeComposing) return;
 	var selection = window.getSelection();
 	if (!selection || !selection.rangeCount || !selection.isCollapsed) return;
 
@@ -536,6 +537,7 @@ document.addEventListener('click', function (e) {
 // ==============================
 
 var activePromptContext = Object.freeze({ edit_id: '', epoch: 0 });
+var promptInitialized = false;
 
 /**
  * Reads an immutable host context while preserving legacy macOS payloads.
@@ -560,9 +562,10 @@ function readPromptContext(data) {
  */
 function init(data) {
 	var nextContext = readPromptContext(data);
+	if (promptInitialized && nextContext.epoch === activePromptContext.epoch) return;
 	if (
 		(activePromptContext.epoch > 0 && nextContext.epoch === 0) ||
-		(nextContext.epoch > 0 && nextContext.epoch < activePromptContext.epoch)
+		(nextContext.epoch > 0 && nextContext.epoch <= activePromptContext.epoch)
 	) {
 		return;
 	}
@@ -580,6 +583,7 @@ function init(data) {
 	});
 
 	checkPlaceholder();
+	promptInitialized = true;
 
 	setTimeout(function () {
 		document.getElementById('p-name').focus();
@@ -605,9 +609,9 @@ function doCancel() {
 function doSave() {
 	var promptName = document.getElementById('p-name').value.trim();
 	var promptMode = document.getElementById('p-mode').value;
-	var promptContent = serializeEditor(editorElement).trim();
+	var promptContent = serializeEditor(editorElement);
 
-	if (!promptName || !promptContent) {
+	if (!promptName || !promptContent.trim()) {
 		return alert(window._i18n_strings['prompt_editor.required_fields']);
 	}
 
@@ -623,6 +627,7 @@ function doSave() {
 
 // Global hotkey for cancellation
 document.addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') doCancel();
 });
 

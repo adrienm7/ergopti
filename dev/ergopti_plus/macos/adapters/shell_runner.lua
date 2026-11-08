@@ -34,6 +34,7 @@ local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
 local RuntimeLog = require("diagnostics.runtime_log")
 local TableUtil = require("table_util")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.shell_runner"
 
@@ -44,7 +45,9 @@ local LOG = "adapters.shell_runner"
 local function now_ms()
 	local timer = hs and hs.timer
 	if timer and type(timer.absoluteTime) == "function" then
-		return timer.absoluteTime() / 1e6
+		local ok, sample = pcall(timer.absoluteTime)
+		if ok and type(sample) == "number" and sample == sample
+			and sample >= 0 and sample < math.huge then return sample / 1e6 end
 	end
 	return os.time() * 1000
 end
@@ -121,7 +124,7 @@ function M.exec(cmd)
 	end
 	local ok, result = run_sync(cmd)
 	if not ok then
-		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), tostring(result))
+		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), ErrorDescription.describe(result))
 		return ""
 	end
 	return type(result) == "string" and result or ""
@@ -188,6 +191,17 @@ end
 local function settle_private_output()
 	local receipt = _private_stdin_cleanup
 	if receipt == nil then return true end
+	if receipt.file ~= nil then
+		local closed, result = pcall(function() return receipt.file:close() end)
+		if not closed or result ~= true then
+			if receipt.reported ~= true then
+				receipt.reported = true
+				Logger.error(LOG, "exec_private_stdin() private output close refused; the handle is retained for retry.")
+			end
+			return false
+		end
+		receipt.file = nil
+	end
 	local call_ok, removed = pcall(receipt.native.remove, receipt.path)
 	local absent = false
 	if not call_ok or removed ~= true then
@@ -232,9 +246,9 @@ local function run_private_stdin(cmd, input)
 	local read_ok, output = pcall(function()
 		local handle = native.open(out_path, "rb")
 		if not handle then return nil end
-		local data = handle:read("a")
-		handle:close()
-		return data
+		-- Record ownership before reading, which may raise or return an error.
+		_private_stdin_cleanup.file = handle
+		return handle:read("a")
 	end)
 	if not written_ok or not written then return nil, "standard input was not fully delivered" end
 	if not closed_ok or exit_type ~= "exit" or rc ~= 0 or status ~= true then
@@ -350,7 +364,7 @@ local function refused_handle(private)
 		if type(observer) ~= "function" then return false end
 		local ok, err = xpcall(observer, debug.traceback)
 		if not ok then
-			Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+			Logger.error(LOG, "spawn.onSettled() observer raised: %s", ErrorDescription.describe(err))
 		end
 		return true
 	end
@@ -418,7 +432,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		for _, observer in ipairs(observers) do
 			local ok, err = xpcall(observer, debug.traceback)
 			if not ok then
-				Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+				Logger.error(LOG, "spawn.onSettled() observer raised: %s", ErrorDescription.describe(err))
 			end
 		end
 		return true
@@ -466,7 +480,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			-- Keep both the native task and its GC pin: this handle is the only exact
 			-- capability that can retry termination without process discovery.
 			Logger.error(LOG, "spawn.terminate(): native task stop failed; retained for retry — %s",
-				tostring(stop_result))
+				ErrorDescription.describe(stop_result))
 			return false, "refused"
 		end
 		_input_closed = true
@@ -564,7 +578,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			end
 		end
 		if not ok then
-			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
+			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", ErrorDescription.describe(started))
 		else
 			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
 		end
@@ -589,7 +603,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local ok, result = pcall(function() return _task:setInput(data) end)
 		if not ok or result == false or result == nil then
 			Logger.error(LOG, "spawn.set_input(): task input failed for %s — %s",
-				tostring(executable), tostring(result))
+				tostring(executable), ErrorDescription.describe(result))
 			return false
 		end
 		return true
@@ -606,7 +620,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local ok, result = pcall(function() return _task:closeInput() end)
 		if not ok or result == false or result == nil then
 			Logger.error(LOG, "spawn.close_input(): closing task input failed for %s — %s",
-				tostring(executable), tostring(result))
+				tostring(executable), ErrorDescription.describe(result))
 			return false
 		end
 		_input_closed = true
@@ -623,9 +637,9 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	--- @param label string Identifies which callback threw, for the log line.
 	--- @param err any The error value captured by xpcall.
 	local function report_callback_throw(label, err)
-		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
+		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), ErrorDescription.describe(err))
 		if private ~= true and type(_G.ergopti_report_crash) == "function" then
-			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
+			local report_ctx = "shell_runner." .. label .. ": " .. ErrorDescription.describe(err)
 			DeferredWork.after(0,
 				function() pcall(_G.ergopti_report_crash, report_ctx) end,
 				"shell_runner.crash_report")
@@ -820,7 +834,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		if handle.isSettled() then
 			local ok, err = xpcall(observer, debug.traceback)
 			if not ok then
-				Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+				Logger.error(LOG, "spawn.onSettled() observer raised: %s", ErrorDescription.describe(err))
 			end
 			return true
 		end
@@ -868,7 +882,7 @@ local function invoke_guarded(label, fn, ...)
 	local args = table.pack(...)
 	local ok, err = xpcall(function() return fn(table.unpack(args, 1, args.n)) end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s callback threw: %s", tostring(label), tostring(err))
+		Logger.error(LOG, "%s callback threw: %s", tostring(label), ErrorDescription.describe(err))
 	end
 end
 

@@ -215,6 +215,21 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_eq(trail(e:release_all()), "", "nothing left to release")
 	end)
 
+	-- A physical tap arms the deadline only, no input arm: the wrapped letter's
+	-- auto-repeat must stay the engine's own row, or the broker refuses it as a
+	-- repeat nobody pressed and retires the channel (OSL-002).
+	helpers.it("keeps the wrapped letter's repeat as the engine's own row (one-shot-repeat-holder)", function()
+		local e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		local down = e:process(KEY_A, DOWN, 300)
+		helpers.assert_eq(trail(down), "42↓ 30↓", "A is shifted")
+		local repeated = e:process(KEY_A, REPEAT, 600)
+		helpers.assert_eq(trail(repeated), "30⟳", "the repeat is delivered once")
+		helpers.assert_eq(e:output_holder(repeated[1]), "hold", "the repeat carries the engine's output holder")
+		helpers.assert_eq(trail((e:process(KEY_A, UP, 700))), "30↑ 42↑", "the release lifts the key and its Shift")
+	end)
+
 	helpers.it("types a key pressed within RCtrl's threshold unshifted (rctrl-one-shot-hold-past-threshold)", function()
 		local e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
 		e:process(RCTRL, DOWN, 0)

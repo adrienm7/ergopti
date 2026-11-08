@@ -8,6 +8,7 @@
 --- The initial expansion ACK is scripted; Undo output and refusal are real Lua.
 --- ==============================================================================
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local Fixture = require("tests.support.text_owner_fixture")
 
 --- Extracts the actual two callbacks without reproducing their Undo protocol.
@@ -57,7 +58,10 @@ local function with_undo(options, body)
 		local commands, clipboard = {}, "SAVED"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec_checked = function() transition("clipboard-read"); return true, clipboard end,
+			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
+				transition("clipboard-read"); return true, clipboard
+			end,
 			with_exact_stdin = function(_, text)
 				local command = "undo-clipboard-" .. tostring(#commands + 1)
 				commands[#commands + 1] = { command = command, text = text }; return command
@@ -116,7 +120,8 @@ local function with_undo(options, body)
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
 				keyboard_hook = { held_modifiers = function() return {} end },
 				keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
-					unsuppress = function() end, on_keydown = function() end, record_hotstring = function() end,
+					unsuppress = function() end, on_keydown = function() end, record_roi_text = function() end,
+					discard_roi = function() end, record_roi_key = function() end, record_hotstring = function() end,
 					-- The physical Backspace that requests the Undo is a manual correction.
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
 				engine = { reset = function() end, apply_expansion = function() end, on_char = function()

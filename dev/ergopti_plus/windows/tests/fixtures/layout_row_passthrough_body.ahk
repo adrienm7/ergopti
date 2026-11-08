@@ -25,7 +25,8 @@ _LRPS_HotIf(Args*) {
 
 _LRPS_Register(Name, Callback, Options) {
 	global _LRPS_Bindings, _LRPS_Current
-	_LRPS_Bindings[Name] := Map("callback", Callback, "criterion", _LRPS_Current, "options", Options)
+	_LRPS_Require(SubStr(Name, 1, 1) == "~", "every native-row variant must admit its original host event")
+	_LRPS_Bindings[StrReplace(Name, "~")] := Map("name", Name, "callback", Callback, "criterion", _LRPS_Current, "options", Options)
 }
 
 ; AHK permits overriding a built-in function in this isolated child only.
@@ -51,23 +52,17 @@ _LRPS_Run() {
 	for Prefix in ["", "*", "+", "^", "!"] {
 		Name := Prefix . "SC010"
 		Binding := _LRPS_Bindings[Name]
-		_LRPS_Require((Binding["criterion"]).Call(Name), "the disabled row must admit " . Name)
+		_LRPS_Require((Binding["criterion"]).Call(Binding["name"]), "the disabled row must admit " . Name)
 		SendLevel(CallerLevel)
 		_LRPS_Emits := []
 		Failure := ""
-		try (Binding["callback"]).Call(Name)
+		try (Binding["callback"]).Call(Binding["name"])
 		catch as Err
 			Failure := Err.Message
-		_LRPS_Require(Failure == (_LRPS_Throw ? "fixture sender refused" : ""), "sender refusal must propagate exactly")
-		_LRPS_Require(A_SendLevel == CallerLevel, "the caller's send level must survive success and refusal")
-		_LRPS_Require(_LRPS_Emits.Length == 1, "one admitted press must reach the sender exactly once")
-		Emission := _LRPS_Emits[1]
-		_LRPS_Require(Emission["keys"] == "{Blind}{SC010}", "physical identity and held modifiers must survive the native route")
-		; AHK2.0.26 HotInputLevelAllowsFiring admits only SendLevel > InputLevel.
-		; Both I2 and I3 must ignore this already-forwarded physical key.
-		InputLevel := Integer(SubStr(Binding["options"], 2))
-		_LRPS_Require(Emission["level"] <= InputLevel, "forwarded output must not reactivate " . Name)
-		_LRPS_Require(Emission["level"] >= ObserverMinimum, "forwarded output must still reach the real input observers")
+		_LRPS_Require(Failure == "", "a native pass-through must never call even the refusing sender trap")
+		_LRPS_Require(A_SendLevel == CallerLevel, "the pass-through callback must preserve its caller's send level")
+		_LRPS_Require(_LRPS_Emits.Length == 0, "the original tilde event must not be duplicated by synthetic output")
+		_LRPS_Require(Binding["options"] == (Prefix == "!" ? "I3" : "I2"), "the same five identities must retain their exact input levels")
 	}
 }
 

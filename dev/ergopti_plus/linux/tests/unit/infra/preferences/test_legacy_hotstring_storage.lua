@@ -253,4 +253,35 @@ helpers.describe("legacy hotstring storage import: word delimiters", function()
 			helpers.assert_eq(next(adapter.values), nil)
 		end)
 	end)
+
+	helpers.it("never resurrects a later neutral choice after a failed legacy removal (LCF-001)", function()
+		with_config(nil, function(Import, path, Preferences)
+			local adapter = storage({ ["hotstrings.preview_ai_enabled"] = AI_PREVIEW_CHOICE })
+			adapter.refuse_delete = true
+			helpers.assert_eq(Import.import({ path = path, storage = adapter }), false,
+				"a failed removal is reported")
+			helpers.assert_eq(Preferences.get("hotstrings.preview_ai_enabled"), AI_PREVIEW_CHOICE)
+			-- The user then picks the neutral value, stored as absence.
+			helpers.assert_true(Preferences.set("hotstrings.preview_ai_enabled", not AI_PREVIEW_CHOICE))
+			helpers.assert_nil(Codec.decode(read(path)).hotstrings.preview_ai_enabled)
+			-- The next start removes the keys and keeps the later choice.
+			adapter.refuse_delete = false
+			helpers.assert_true(Import.import({ path = path, storage = adapter }))
+			helpers.assert_nil(Codec.decode(read(path)).hotstrings.preview_ai_enabled,
+				"the legacy value must not be written over the later choice")
+			helpers.assert_eq(Preferences.get("hotstrings.preview_ai_enabled"), not AI_PREVIEW_CHOICE)
+			helpers.assert_eq(next(adapter.values), nil, "the retried removal succeeds")
+		end)
+	end)
+
+	helpers.it("marks the committed import in the same write as its leaves", function()
+		with_config('[other]\nvalue = 1\n', function(Import, path)
+			local adapter = storage({ ["hotstrings.trigger_char"] = "§" })
+			helpers.assert_true(Import.import({ path = path, storage = adapter }))
+			local document = Codec.decode(read(path))
+			helpers.assert_eq(document._meta.linux_legacy_storage_imported, true)
+			helpers.assert_eq(document.hotstrings.trigger_char, "§")
+			helpers.assert_eq(document.other.value, 1)
+		end)
+	end)
 end)

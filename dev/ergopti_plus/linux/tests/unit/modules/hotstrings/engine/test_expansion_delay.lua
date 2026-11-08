@@ -53,6 +53,21 @@ end
 -- =========================================================
 
 helpers.describe("expansion delay: what the settings window writes is what resolves", function()
+	helpers.it("refuses malformed CSS color overrides (hotstring-css-color)", function()
+		local logger = require("logger.shim")
+		local old_error, messages = logger.error, {}
+		logger.error = function(_, message) messages[#messages + 1] = message end
+		local ok, err = xpcall(function()
+			for _, color in ipairs({ "#12345", "#1234567" }) do
+				helpers.assert_eq(Config.set_override("rolls", nil, "color", color), false)
+				helpers.assert_eq(Config.set_personal_metadata("personal", nil, "color", color), false)
+			end
+			helpers.assert_eq(#messages, 4)
+			for _, message in ipairs(messages) do helpers.assert_contains(message, "3, 4, 6 or 8") end
+		end, debug.traceback)
+		logger.error = old_error
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("a category override wins over the global default", function()
 		Config._set_overrides_for_test({})
@@ -247,6 +262,48 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 			helpers.assert_eq(config.resolve("rolls", nil).delay, 0)
 			helpers.assert_eq(config.set_base_delay(2.5), true)
 			helpers.assert_eq(config.resolve("rolls", nil).delay, 0, "0 is not an offset of the base")
+		end)
+	end)
+
+	helpers.it("publishes real unlimited file and section overrides to the settings page", function()
+		with_config({}, function(config)
+			config._set_categories_for_test({ rolls = { sections_order = { "fast" } } })
+			helpers.assert_true(config.set_override("rolls", nil, "delay", 0))
+			helpers.assert_true(config.set_override("rolls", "fast", "delay", 0))
+			local previous = package.loaded["ui.webview_manager"]
+			local script
+			package.loaded["ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
+			local ok, err = xpcall(function()
+				require("ui.hotstrings_config_window.bridge").on_message("ready", { config = config })
+				local payload = require("json").decode(assert(script:match("setData%((.*)%)$")))
+				helpers.assert_eq(payload.categories[1].delay_ms, 0)
+				helpers.assert_eq(payload.categories[1].sections[1].delay_ms, 0)
+				helpers.assert_eq(payload.categories[1].delay_overridden, true)
+				helpers.assert_eq(payload.categories[1].sections[1].delay_overridden, true)
+			end, debug.traceback)
+			package.loaded["ui.webview_manager"] = previous
+			if not ok then error(err) end
+		end)
+	end)
+
+	helpers.it("publishes a persisted zero global delay and no declared category delay", function()
+		with_config({}, function(config)
+			config._set_categories_for_test({ rolls = { sections_order = { "fast" } } })
+			helpers.assert_true(config.set_base_delay(0))
+			helpers.assert_eq(config.get_base_delay(), 0)
+			local previous = package.loaded["ui.webview_manager"]
+			local script
+			package.loaded["ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
+			local ok, err = xpcall(function()
+				require("ui.hotstrings_config_window.bridge").on_message("ready", { config = config })
+				local payload = require("json").decode(assert(script:match("setData%((.*)%)$")))
+				helpers.assert_eq(payload.global_default_delay_ms, 0)
+				helpers.assert_eq(payload.categories[1].delay_ms, 0)
+				helpers.assert_nil(payload.categories[1].delay_default_ms)
+				helpers.assert_nil(payload.categories[1].sections[1].delay_default_ms)
+			end, debug.traceback)
+			package.loaded["ui.webview_manager"] = previous
+			if not ok then error(err) end
 		end)
 	end)
 

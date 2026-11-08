@@ -9,6 +9,18 @@ helpers.describe("linux/infra/locale.lua", function()
 		helpers.assert_true(type(mod) == "table", "should return a table")
 	end)
 
+	helpers.it("locale refuses a missing JSON decoder before reading data", function()
+		local saved_json, saved_preload = package.loaded.json, package.preload.json
+		local saved_locale, saved_core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		package.loaded.json, package.loaded["infra.locale"] = nil, nil
+		package.preload.json = function() error("controlled missing decoder") end
+		local ok, detail = pcall(require, "infra.locale")
+		package.loaded.json, package.preload.json = saved_json, saved_preload
+		package.loaded["infra.locale"], package.loaded["locale.core"] = saved_locale, saved_core
+		helpers.assert_eq(ok, false, "a missing JSON decoder must not become an executable data fallback")
+		helpers.assert_true(tostring(detail):find("JSON decoder", 1, true) ~= nil)
+	end)
+
 	helpers.it("locale.get returns a non-empty string for a known key", function()
 		local locale = require("infra.locale")
 		-- The default locale is 'fr', so "menu.global.quit" should exist
@@ -40,6 +52,22 @@ helpers.describe("linux/infra/locale.lua", function()
 	end)
 end)
 
+helpers.describe("Linux keycode JSON admission", function()
+	helpers.it("input reader refuses a missing JSON decoder before loading keycodes", function()
+		local saved_json, saved_preload = package.loaded.json, package.preload.json
+		local saved_reader, saved_evdev = package.loaded["modules.hotstrings.input_reader"], package.loaded["keycodes.evdev"]
+		local calls = 0
+		package.loaded.json, package.loaded["modules.hotstrings.input_reader"] = nil, nil
+		package.preload.json = function() error("controlled missing decoder") end
+		package.loaded["keycodes.evdev"] = { load = function() calls = calls + 1; return {} end }
+		local ok = pcall(require, "modules.hotstrings.input_reader")
+		package.loaded.json, package.preload.json = saved_json, saved_preload
+		package.loaded["modules.hotstrings.input_reader"], package.loaded["keycodes.evdev"] = saved_reader, saved_evdev
+		helpers.assert_eq(ok, false, "missing JSON must refuse keycode admission")
+		helpers.assert_eq(calls, 0, "no keycode data is read with an executable fallback")
+	end)
+end)
+
 helpers.describe("linux/infra/i18n.lua", function()
 	helpers.it("module loads without error", function()
 		local ok, mod = pcall(require, "infra.i18n")
@@ -58,6 +86,32 @@ helpers.describe("linux/infra/i18n.lua", function()
 		local i18n = require("infra.i18n")
 		local s = i18n.get("this.key.does.not.exist")
 		helpers.assert_eq(s, "this.key.does.not.exist", "falls back to key name")
+	end)
+
+	-- A key written twice decodes under the default decoder, the last value
+	-- winning, and refuses under the lossless one every owner reading a whole
+	-- catalogue uses: one duplicated inventory key in all 21 files once failed
+	-- every such reader on Linux.
+	helpers.it("every locale catalogue decodes losslessly, with no key written twice", function()
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local directory = Paths.shared("data/locales")
+		local listing = assert(io.popen("ls " .. require("text_utils").shell_quote(directory)))
+		local names = {}
+		for name in listing:lines() do
+			if name:match("^%a%a%.json$") then names[#names + 1] = name end
+		end
+		listing:close()
+		helpers.assert_true(#names > 1, "the catalogues must be listed")
+		local seen_english = false
+		for _, name in ipairs(names) do
+			seen_english = seen_english or name == "en.json"
+			local file = assert(io.open(directory .. "/" .. name, "rb"))
+			local text = file:read("*a")
+			file:close()
+			helpers.assert_type(Json.decode_lossless(text), "table", name .. " must decode losslessly")
+		end
+		helpers.assert_true(seen_english, "the canonical English catalogue must be among them")
 	end)
 
 	helpers.it("i18n.get_locale returns default 'fr'", function()
