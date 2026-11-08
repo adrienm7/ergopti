@@ -44,7 +44,7 @@
 		}
 	],
 	"source_sha256": {
-		"static/ergopti_plus/windows/_generated/update_channels.ahk": "67d2977b59553b5a58cc9386dc1a3304e56a3706dc57d7c07a221e7075680a4b",
+		"static/ergopti_plus/windows/_generated/update_channels.ahk": "34f8079401c7377c7242e5fd4a40332a1a10b078d7c9f2a893e7814709abe733",
 		"static/ergopti_plus/windows/_generated/update_schedule.ahk": "d13e790c22ce73d57a6dd7b6ace50d73f3f2b74ca43593a0f9177d0c89decaf7",
 		"static/ergopti_plus/windows/infra/config_io.ahk": "0da5bcc8c9a42658a093b2ad182787b79cef18a87d87fd0233b7ac3d2e2962fc",
 		"static/ergopti_plus/windows/infra/config_migrate.ahk": "6123574c18829321c817b9bfe0419edd0490edea914e74d44371f0208d2b8f78",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "b582c2cfbfbdb0858123473de93f63965bba9025",
+	"source_pin_base": "5427b56b499da51fe3e07ef75948f506dde30dbb",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
