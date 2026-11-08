@@ -23,7 +23,7 @@ one cask per update channel of
 ```bash
 brew tap adrienm7/ergopti
 brew install --cask ergoptiplus        # main (stable) channel
-brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prerelease
+brew install --cask ergoptiplus@dev   # dev channel: every X.Y.Z-dev.N prerelease
 ```
 
 - **Channel.** The cask installs that channel's newest build, and a build

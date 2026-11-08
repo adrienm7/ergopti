@@ -575,9 +575,9 @@ check('dev: a new commit publishes under the next dev tag', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(result.outputs, {
 		release: 'true',
-		tag: 'v0.0.0-dev.3',
-		version: '0.0.0-dev.3',
-		title: 'Ergopti v0.0.0-dev.3',
+		tag: 'v0.0.1-dev.3',
+		version: '0.0.1-dev.3',
+		title: 'Ergopti v0.0.1-dev.3',
 		prerelease: 'true',
 		channel: 'dev'
 	});
@@ -607,7 +607,7 @@ check('dev: after a force push, a commit that an older tag contains is not publi
 		/::notice::This commit is already part of v0\.0\.0-dev\.2, /
 	);
 	git(forced, 'checkout', '--quiet', '--detach', b1);
-	releases(plan(forced, commit(forced, 'chore: b2'), 'refs/heads/dev'), 'v0.0.0-dev.4');
+	releases(plan(forced, commit(forced, 'chore: b2'), 'refs/heads/dev'), 'v0.0.1-dev.4');
 });
 
 check('dev: a failing git tag fails plan instead of reading as "never released"', () => {
@@ -633,7 +633,34 @@ check('dev: a failing git tag fails plan instead of reading as "never released"'
 
 check('dev: the first dev release is planned without any tag', () => {
 	const fresh = repository('fresh', 'dev');
-	releases(plan(fresh, commit(fresh, 'chore: first'), 'refs/heads/dev'), 'v0.0.0-dev.1');
+	releases(plan(fresh, commit(fresh, 'chore: first'), 'refs/heads/dev'), 'v0.0.1-dev.1');
+});
+
+check('dev: a dev tag is a prerelease of the patch after the last stable tag', () => {
+	const next = repository('next-patch', 'dev');
+	const s1 = commit(next, 'feat(macos)!: a breaking change');
+	git(next, 'tag', 'v1.0.9', s1);
+	git(next, 'tag', 'v0.0.0-dev.169', commit(next, 'feat: a feature'));
+	// The legacy series' counter continues under the new core, whatever the
+	// subjects: the breaking and feat commits leave it at the next patch.
+	const first = plan(next, commit(next, 'fix: one'), 'refs/heads/dev');
+	assert.deepEqual(first.outputs, {
+		release: 'true',
+		tag: 'v1.0.10-dev.170',
+		version: '1.0.10-dev.170',
+		title: 'Ergopti v1.0.10-dev.170',
+		prerelease: 'true',
+		channel: 'dev'
+	});
+	git(next, 'tag', 'v1.0.10-dev.170', 'HEAD');
+	// The newest dev tag is the highest counter, not the highest core or the
+	// latest text order: v0.0.0-dev.99 sorts after v1.0.10-dev.170 as text.
+	git(next, 'tag', 'v0.0.0-dev.99', s1);
+	releases(plan(next, commit(next, 'fix: two'), 'refs/heads/dev'), 'v1.0.10-dev.171');
+	git(next, 'tag', 'v1.0.10-dev.171', 'HEAD');
+	// A new stable tag moves the core and never restarts the counter.
+	git(next, 'tag', 'v1.0.10', 'HEAD');
+	releases(plan(next, commit(next, 'fix: three'), 'refs/heads/dev'), 'v1.0.11-dev.172');
 });
 
 const main = repository('main', 'main');
@@ -864,15 +891,15 @@ check('dev: a Release-As, even a malformed one, is ignored with a notice', () =>
 		commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'),
 		'refs/heads/dev'
 	);
-	releases(result, 'v0.0.0-dev.1');
+	releases(result, 'v0.0.1-dev.1');
 	assert.equal(result.outputs.prerelease, 'true');
 	assert.match(
 		result.stdout,
-		/::notice::Release-As '1\.2\.4' in commit [0-9a-f]{12} applies to main only: dev keeps v0\.0\.0-dev\.1\./
+		/::notice::Release-As '1\.2\.4' in commit [0-9a-f]{12} applies to main only: dev keeps v0\.0\.1-dev\.1\./
 	);
-	git(work, 'tag', 'v0.0.0-dev.1', 'HEAD');
+	git(work, 'tag', 'v0.0.1-dev.1', 'HEAD');
 	const malformed = plan(work, commit(work, 'fix: x\n\nRelease-As: v9'), 'refs/heads/dev');
-	releases(malformed, 'v0.0.0-dev.2');
+	releases(malformed, 'v0.0.1-dev.2');
 	assert.match(
 		malformed.stdout,
 		/::notice::Release-As 'v9' in commit [0-9a-f]{12} applies to main only/
@@ -892,7 +919,7 @@ check('a tag outside the series, even one the glob matches, does not count as pu
 	git(hotfix, 'tag', 'v0.0.0-dev.1', h1);
 	const h2 = commit(hotfix, 'chore: two');
 	git(hotfix, 'tag', 'v0.0.0-dev.1-hotfix', h2);
-	releases(plan(hotfix, h2, 'refs/heads/dev'), 'v0.0.0-dev.2');
+	releases(plan(hotfix, h2, 'refs/heads/dev'), 'v0.0.1-dev.2');
 });
 
 // ===============================================
@@ -1484,6 +1511,22 @@ check('a newer release of the channel: a free older tag is not created', () => {
 		/::error::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.19/
 	);
 	assert.deepEqual(result.ghCalls, []);
+	assert.deepEqual(result.outputs, {});
+});
+
+// The dev series spans two cores since 2026-11-08: a tag under the release
+// core published after a legacy v0.0.0-dev.N one is the newer release.
+check('a newer dev release under the release core supersedes a legacy dev tag', () => {
+	const cores = repository('series-cores', 'dev');
+	const legacy = commit(cores, 'chore: the bridge commit');
+	pushTag('v0.0.0-dev.169', legacy, { repo: cores });
+	pushTag('v1.0.10-dev.170', commit(cores, 'chore: a newer commit'), { repo: cores });
+	const result = preflight('v0.0.0-dev.169', { cwd: cores, sha: legacy, ghMode: 'missing' });
+	assert.equal(result.status, 1);
+	assert.match(
+		result.stdout,
+		/::error::v1\.0\.10-dev\.170 was published after this run planned v0\.0\.0-dev\.169/
+	);
 	assert.deepEqual(result.outputs, {});
 });
 

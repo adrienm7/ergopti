@@ -571,7 +571,10 @@ function reportFolder(paths) {
 			);
 			// A company proxy shares one address, whose anonymous REST API quota runs out
 			assert.doesNotMatch(installer, /HOST_GITHUB_API/, 'the installer must not need the REST API');
-			assert.match(installer, /git ls-remote --tags --refs "\$REMOTE\.git" 'v0\.0\.0-dev\.\*'/);
+			assert.match(installer, /git ls-remote --tags --refs "\$REMOTE\.git" 'v\*-dev\.\*'/);
+			// The dev counter runs across the v0.0.0 and release cores, so the newest
+			// tag is the highest counter, never the highest core or the text order.
+			assert.match(installer, /awk -F'-dev\[\.\]' '\{ print \$2, \$0 \}' \| sort -n \| tail -n 1/);
 			assert.match(installer, /"\$REMOTE\/releases\/download\/\$tag\/\$ARCHIVE"/);
 			// A second copy (a local build) would take the Accessibility grant and the boot would reset it
 			const open = installer.indexOf('open --env');

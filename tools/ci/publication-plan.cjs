@@ -107,7 +107,7 @@ function validate(record) {
 		assert.match(
 			p.tag,
 			c.ref === 'refs/heads/dev'
-				? /^v0\.0\.0-dev\.[1-9]\d*$/
+				? /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-dev\.[1-9]\d*$/
 				: /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/
 		);
 		assert.equal(p.prerelease, c.ref === 'refs/heads/dev' ? 'true' : 'false');

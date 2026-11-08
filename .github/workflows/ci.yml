@@ -241,13 +241,26 @@ jobs:
               prerelease="false"
               title="Ergopti ${tag}"
           else
-              # dev branch — v0.0.0-dev.N series
-              series_glob='v0.0.0-dev.*'
-              series_re='^v0\.0\.0-dev\.[0-9]+$'
-              # Filtered like the stable series: a tag such as v0.0.0-dev.4-hotfix
-              # matches the glob, and its number is not an integer.
-              last_dev=$(git tag --list "$series_glob" --sort=-v:refname \
-                  | grep -E "$series_re" | head -1 || true)
+              # dev branch: vX.Y.Z-dev.N, a prerelease of X.Y.Z, the patch after
+              # the last stable tag, so a dev build names the release it leads
+              # to and semver orders it after that stable tag and before the
+              # next one. N is one counter across the whole series, so a new
+              # stable tag never restarts it and every dev tag stays unique.
+              # The v0.0.0-dev.N tags published before 2026-11-08 are the same
+              # series: their counter continues here, and v0.0.0-dev.169, the
+              # last of them, is the bridge that teaches installed builds the
+              # new core (docs/memory/maintainer-decisions.md).
+              last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+              IFS='.' read -r maj min pat <<< "${last_stable:-v0.0.0}"
+              maj="${maj#v}"
+              series_glob='v*-dev.*'
+              series_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.[1-9][0-9]*$'
+              # Filtered like the stable series: a tag such as v1.0.10-dev.4-hotfix
+              # matches the glob, and its number is not an integer. The newest
+              # tag is the one with the highest counter, whatever its core.
+              last_dev=$(git tag --list "$series_glob" | grep -E "$series_re" \
+                  | awk -F'-dev[.]' '{ print $2, $0 }' | sort -n | tail -n 1 | cut -d' ' -f2 || true)
               if [ -z "$last_dev" ]; then
                   next_n=1
                   request_range="HEAD"
@@ -256,7 +269,7 @@ jobs:
                   next_n=$((last_n + 1))
                   request_range="${last_dev}..HEAD"
               fi
-              tag="v0.0.0-dev.${next_n}"
+              tag="v${maj}.${min}.$((pat + 1))-dev.${next_n}"
               prerelease="true"
 
               # The sidebar of the repository home truncates long titles, and the

@@ -441,8 +441,12 @@ Each lane has one entry stage and one exit stage, so the run graph draws one
 line per lane; Release also reads the plan from the root.
 
 **Channels:** a push to `main` publishes a stable release (`vX.Y.Z`); a push to
-`dev` publishes a pre-release, `v0.0.0-dev.N`, one past the last dev tag. If the
-tag already exists, or a tag of its branch already contains the commit (an older
+`dev` publishes a pre-release, `vX.Y.Z-dev.N`: `X.Y.Z` is the patch after the
+last stable tag (`v1.0.10-dev.170` after `v1.0.9`), and `N` is one past the
+highest dev counter, which a stable release never restarts. The pre-releases
+before 8 November 2026 are named `v0.0.0-dev.N`; `v0.0.0-dev.169`, the last of
+them, is the bridge that teaches installed builds the new names, so it is never
+deleted. If the tag already exists, or a tag of its branch already contains the commit (an older
 commit, a re-run of one that was published, or one a force push left behind),
 the run is a plain CI run and publishes nothing. When Release fails part-way,
 _Re-run failed jobs_ on that run resumes it: it reuses a tag or a published
