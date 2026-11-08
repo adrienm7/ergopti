@@ -15,9 +15,7 @@
 #   bash tools/dev/run-macos-dev-app.sh --open-only open the developer app built before
 #
 # Rebuild after a change to the Swift launcher, a native helper or LuaSocket;
-# a Lua or _shared edit needs no rebuild. The build is signed with the stable
-# certificate of ~/ErgoptiPlus-signing (ERGOPTI_SIGNING_DIR) when it is there,
-# asking for its password unless MACOS_SIGNING_CERTIFICATE_PASSWORD is set.
+# a Lua or _shared edit needs no rebuild.
 # ==============================================================================
 
 set -euo pipefail
@@ -94,30 +92,6 @@ for bootstrap in "$HOME/.hammerspoon/init.lua" "${XDG_CONFIG_HOME:-$HOME/.config
 		log "WARNING: $bootstrap is a retired Ergopti+ dev bootstrap; delete it (and restore your backup) so a stock Hammerspoon stops showing the refusal."
 	fi
 done
-
-# Ergopti's own Karabiner runtime installs only under an app signed with the
-# stable certificate the release builds use (its leaf is pinned in
-# vendor/remap-runtime/manifest.json); an ad hoc app is refused. The identity
-# tools/build/create_macos_signing_identity.sh wrote on this Mac signs the
-# developer app the same way, so the dev branch is field-tested as it is,
-# never through a published release.
-SIGNING_DIR="${ERGOPTI_SIGNING_DIR:-$HOME/ErgoptiPlus-signing}"
-SIGNING_P12_BASE64="$SIGNING_DIR/ErgoptiPlus-signing.p12.base64"
-if [ "$open_only" = false ] && [ -z "${MACOS_SIGNING_CERTIFICATE_BASE64:-}" ] && [ -f "$SIGNING_P12_BASE64" ]; then
-	MACOS_SIGNING_CERTIFICATE_BASE64="$(cat "$SIGNING_P12_BASE64")" || fail "Cannot read $SIGNING_P12_BASE64."
-	if [ -z "${MACOS_SIGNING_CERTIFICATE_PASSWORD:-}" ]; then
-		# Typed, never stored: the password stays in this process and the build's.
-		{ printf '[macos-dev-app] Password of %s (from your password manager): ' "$SIGNING_DIR/ErgoptiPlus-signing.p12" > /dev/tty; } 2>/dev/null \
-			|| fail "$SIGNING_P12_BASE64 needs its password: set MACOS_SIGNING_CERTIFICATE_PASSWORD or run this from a terminal."
-		IFS= read -rs MACOS_SIGNING_CERTIFICATE_PASSWORD < /dev/tty || fail "No password was typed."
-		printf '\n' > /dev/tty
-		[ -n "$MACOS_SIGNING_CERTIFICATE_PASSWORD" ] || fail "An empty password cannot open $SIGNING_DIR/ErgoptiPlus-signing.p12."
-	fi
-	export MACOS_SIGNING_CERTIFICATE_BASE64 MACOS_SIGNING_CERTIFICATE_PASSWORD
-	log "Signing the developer app with the stable certificate of $SIGNING_DIR."
-elif [ "$open_only" = false ] && [ -z "${MACOS_SIGNING_CERTIFICATE_BASE64:-}" ]; then
-	log "WARNING: no $SIGNING_P12_BASE64: the developer app is signed ad hoc, so Ergopti's own Karabiner runtime refuses to install under it (set ERGOPTI_SIGNING_DIR when the identity is elsewhere)."
-fi
 
 if [ "$open_only" = false ]; then
 	# The host slice alone: a two-slice launcher needs Xcode, and a developer app

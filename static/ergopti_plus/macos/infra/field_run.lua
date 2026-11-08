@@ -153,6 +153,11 @@ function M.validate(spec)
 		if step.disabled ~= nil and (type(step.disabled) ~= "string" or not step.disabled:match("^[a-z][a-z0-9_]*$")) then
 			error("field run: step " .. step.id .. " has a disabled reason that is not a code", 2)
 		end
+		-- Ergopti's own Karabiner runtime installs only under the CI certificate:
+		-- the collector requests these steps only of the installed signed app.
+		if step.signed_app ~= nil and step.signed_app ~= true then
+			error("field run: step " .. step.id .. " has a signed_app mark that is not true", 2)
+		end
 		if step.kind == "field_check" and type(step.check) ~= "string" then
 			error("field run: field check step " .. step.id .. " names no check", 2)
 		end

@@ -1972,7 +1972,9 @@ packaged runtime never loads it. Runtime installs go through
 entries directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
 declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
 refuse a check with no step. A step that needs a person is declared with
-`person`/`reason` and reported, never driven with synthetic input.
+`person`/`reason` and reported, never driven with synthetic input. A step that
+needs the owned runtime installed is marked `signed_app`: the collector leaves
+it out on the ad hoc developer app and runs it only with `--installed`.
 
 ### project-karabiner-strict-signature-finder-detritus
 
@@ -2110,9 +2112,8 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   `install_driver_failed`); `driver_active` waits up to 840 s for pqrs' driver,
   opening Login Items & Extensions once, and fails `not_approved`. The next
   step, `owned_install_reload`, reloads so the owner admits the runtime. An
-  installed signed app runs the field run only when opened with
-  `ERGOPTI_FIELD_RUN_ROOT`; the collector drives the developer app (signed with
-  the stable certificate, so the install is admitted); the automatic install offer
+  installed signed app runs the field run only when the collector opened it
+  with `ERGOPTI_FIELD_RUN_ROOT` (`--installed`); the automatic install offer
   and the approval watch stay off while a field run drives.
 - `field_owned_start` and `field_owned_pause`: the pause's resume follows the
   run and reloads, so the next run's `field_owned_start` proves close on
