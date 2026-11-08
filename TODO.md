@@ -27,6 +27,13 @@ the field-run step or the hand action that proves it and the commits it confirms
       passed on fb2059e00e; the exe changes since are the dev channel core (5427b56b49) and the LLM dispatcher
       serialization (0aae34e00c). 36805b170a keeps the exit code, the launch streams and the startup logs in
       `windows-compiled-upgrade-evidence/failure-diagnostics`: read them on the next failure.
+- [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
+      Mac too):** rules stay fail-closed. The misleading « lease auto-recovery exhausted » error is gone (the
+      recovery stops while the runtime waits for admission), and the installer helper refusal now names its cause
+      (`helper_signature_invalid`, `helper_signature`, `helper_code_hashes`). The helper of
+      `remap-runtime-v16.3.0-ergopti.3` and the dev.166 launcher carry the same leaf (759d8aae…), so the leaf is not
+      the cause. Next: the `remap.runtime_owner` lines (« unavailable: <reason> ») and `launcher.log` « owned runtime
+      install: refused (…) » of a build with these fixes.
 - [ ] **[RELEASE] Dev naming handoff:** everything is on `dev`. `v0.0.0-dev.169` is the bridge (ci.yml keeps the
       legacy core up to counter 169), then `v1.0.10-dev.170`; the next merge to `main` carries
       `Release-As: 1.0.10`. Delete the orphan draft `v0.0.0-dev.167` by hand (this session cannot delete releases).
