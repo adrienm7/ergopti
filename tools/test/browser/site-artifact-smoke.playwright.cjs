@@ -148,12 +148,18 @@ async function exerciseNavigation(page, origin, basePath) {
 	const link = page.locator('header a[href="utilisation"]').first();
 	await link.waitFor({ state: 'visible' });
 	assert.equal(new URL(await link.getAttribute('href'), page.url()).href, target);
-	const timeOrigin = await page.evaluate(() => performance.timeOrigin);
+	// A marker on the window proves the document survived: Chromium derives
+	// performance.timeOrigin from the wall clock on each read, so a clock
+	// adjustment moved it by 1 ms on a hosted runner without any reload.
+	const documentMarker = await page.evaluate(() => {
+		window.__ergoptiSmokeDocument = crypto.randomUUID();
+		return window.__ergoptiSmokeDocument;
+	});
 	await Promise.all([page.waitForURL(target), link.click()]);
 	assert.equal(page.url(), target, 'Client navigation stays in its declared target');
 	assert.equal(
-		await page.evaluate(() => performance.timeOrigin),
-		timeOrigin,
+		await page.evaluate(() => window.__ergoptiSmokeDocument),
+		documentMarker,
 		'Navigation must retain the hydrated document'
 	);
 	await exerciseEmulationReadiness(page);
