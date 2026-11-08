@@ -144,32 +144,54 @@ BundledAppsNative_Reveal(Path) {
 }
 
 /**
- * Writes a shortcut.
+ * Writes a shortcut through the built-in FileCreateShortcut: the shell COM
+ * object route counts against the exe's antivirus script-host ceiling
+ * (tools/ci/windows-exe-av-surface.json).
  * @param {String} Path The .lnk to write.
- * @param {Map} Fields target, arguments, working_directory, icon, description.
+ * @param {Map} Fields target, arguments, working_directory, icon (an
+ *     IconLocation "file,index"), description.
  */
 BundledAppsNative_WriteShortcut(Path, Fields) {
-	Shell := ComObject("WScript.Shell")
-	Link := Shell.CreateShortcut(Path)
-	Link.TargetPath := Fields["target"]
-	Link.Arguments := Fields.Get("arguments", "")
-	if Fields.Get("working_directory", "") != ""
-		Link.WorkingDirectory := Fields["working_directory"]
+	IconFile := "", IconNumber := ""
 	if Fields.Get("icon", "") != ""
-		Link.IconLocation := Fields["icon"]
-	if Fields.Get("description", "") != ""
-		Link.Description := Fields["description"]
-	Link.Save()
+		_BundledAppsNative_SplitIconLocation(Fields["icon"], &IconFile, &IconNumber)
+	FileCreateShortcut(Fields["target"], Path, Fields.Get("working_directory", ""), Fields.Get("arguments", ""),
+		Fields.Get("description", ""), IconFile, , IconNumber)
 }
 
 /**
- * Reads a shortcut's target, arguments and icon.
+ * Reads a shortcut's target, arguments and icon through the built-in
+ * FileGetShortcut.
  * @param {String} Path
- * @returns {Map}
+ * @returns {Map} target, arguments and icon as an IconLocation "file,index"
+ *     ("" when the shortcut names no icon file).
  */
 BundledAppsNative_ReadShortcut(Path) {
-	Link := ComObject("WScript.Shell").CreateShortcut(Path)
-	return Map("target", Link.TargetPath, "arguments", Link.Arguments, "icon", Link.IconLocation)
+	FileGetShortcut(Path, &Target, , &Arguments, , &IconFile, &IconNumber)
+	Icon := ""
+	if IconFile != ""
+		Icon := IconFile . "," . _BundledAppsNative_IconIndex(IconNumber)
+	return Map("target", Target, "arguments", Arguments, "icon", Icon)
+}
+
+; Splits an IconLocation "file,index" into FileCreateShortcut's icon file and
+; icon number: a zero-based index becomes the one-based number, a negative
+; resource ID stays negative (both conventions mean a resource ID there).
+_BundledAppsNative_SplitIconLocation(Location, &IconFile, &IconNumber) {
+	if !RegExMatch(Location, "^(.*),(-?\d+)$", &Parts)
+		throw ValueError("The shortcut icon must be an IconLocation ""file,index"": " . Location, -1)
+	IconFile := Parts[1]
+	Index := Integer(Parts[2])
+	IconNumber := Index >= 0 ? Index + 1 : Index
+}
+
+; The zero-based IconLocation index of FileGetShortcut's icon number, which is
+; blank for the first icon, one-based otherwise and negative for a resource ID.
+_BundledAppsNative_IconIndex(IconNumber) {
+	if IconNumber == ""
+		return 0
+	Number := Integer(IconNumber)
+	return Number > 0 ? Number - 1 : Number
 }
 
 /**

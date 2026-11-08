@@ -170,6 +170,25 @@ _BAT_QuotesArguments() {
 }
 Test("(bundled-apps-quoting) quotes each argument as CommandLineToArgvW reads it back", _BAT_QuotesArguments)
 
+_BAT_ShortcutRoundTrip() {
+	Dir := _BAT_WorkDir()
+	try {
+		Target := A_WinDir . "\System32\notepad.exe"
+		Icons := A_WinDir . "\System32\shell32.dll"
+		for Icon in [Icons . ",0", Icons . ",3", ""] {
+			Link := Dir . "\clone_" . A_Index . ".lnk"
+			BundledAppsNative_WriteShortcut(Link, Map("target", Target, "arguments", '--profile "a b"',
+				"working_directory", Dir, "icon", Icon, "description", "Ergopti clone"))
+			Read := BundledAppsNative_ReadShortcut(Link)
+			AssertEqual(Target, Read["target"])
+			AssertEqual('--profile "a b"', Read["arguments"])
+			AssertEqual(Icon, Read["icon"], "the IconLocation index survives the native shortcut round trip")
+		}
+		AssertThrows(() => BundledAppsNative_WriteShortcut(Dir . "\bad.lnk", Map("target", Target, "icon", Icons)))
+	} finally DirDelete(Dir, true)
+}
+Test("(bundled-apps-shortcut) writes and reads a shortcut's target, arguments and icon index", _BAT_ShortcutRoundTrip)
+
 _BAT_Request(Program, Extra := 0) {
 	global _SharedDir
 	Request := Map("program", Program, "arguments", [], "name", "Work Browser", "open_item", "",
