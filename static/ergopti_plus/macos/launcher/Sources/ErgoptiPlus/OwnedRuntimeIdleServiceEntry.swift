@@ -2,14 +2,6 @@
 // One confirmed administrator transaction installs the owned files, the idle Core service and the VirtualHIDDevice daemon job.
 import Foundation
 
-/// The step a first install reached or stopped at, on the helper's standard error: the closed stdout result
-/// says only that a service step did not finish, so the hosted acceptance and a field log need the step.
-enum OwnedRuntimeInstallTrail {
-	static func note(_ step: String) {
-		try? FileHandle.standardError.write(contentsOf: Data(("OWNED_RUNTIME_INSTALL_TRAIL|" + step + "\n").utf8))
-	}
-}
-
 /// The result never certifies Console, physical capture, DriverKit approval or full Runtime retirement.
 enum OwnedRuntimeIdleServiceEntry {
 	enum Result: String {
