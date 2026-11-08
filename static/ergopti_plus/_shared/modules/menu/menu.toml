@@ -2153,7 +2153,7 @@ reason_key = "platform_reason.layout_install_is_the_macos_bundle"
 # Windows installs Ergopti as a system layout from the unsigned stand-alone
 # package every release publishes (Ergopti_windows_layout.zip, maintainer
 # decision of 2026-11-06). The exe carries neither that elevated installer nor
-# its DLL (provisional coordinator decision of 2026-11-07): this row says
+# its DLL (maintainer decision of 2026-11-08): this row says
 # whether the layout is installed and opens the package's download
 # (modules/keymap/system_layout_install.ahk). Once installed it is one of the
 # user's layouts, listed and switched by « Input sources » and the pause switch

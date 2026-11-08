@@ -14,7 +14,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The driver never runs the elevated installer and ships neither it nor the
-;    DLL (provisional coordinator decision of 2026-11-07, maintainer
+;    DLL (maintainer decision of 2026-11-08, maintainer
 ;    decisions): an exe that carries a UAC launch and an inline P/Invoke stage
 ;    is what proxies and antivirus engines block (tools/ci/windows-exe-av-
 ;    surface.json). The installer stays in the release asset.

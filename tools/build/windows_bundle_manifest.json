@@ -149,7 +149,7 @@
 		{
 			"name": "system-layout-installer",
 			"globs": ["static/ergopti_plus/windows/vendor/keyboard_layout/**"],
-			"why": "The elevated keyboard layout installer, its user step and the keyboard DLL builds CI writes next to them ship only in the Ergopti_windows_layout.zip release asset (provisional coordinator decision of 2026-11-07): a UAC launch and an inline P/Invoke stage inside the exe are what antivirus engines flag (tools/ci/windows-exe-av-surface.json), and the tray row only opens that asset's download."
+			"why": "The elevated keyboard layout installer, its user step and the keyboard DLL builds CI writes next to them ship only in the Ergopti_windows_layout.zip release asset (maintainer decision of 2026-11-08): a UAC launch and an inline P/Invoke stage inside the exe are what antivirus engines flag (tools/ci/windows-exe-av-surface.json), and the tray row only opens that asset's download."
 		},
 		{
 			"name": "runtime-caches",
