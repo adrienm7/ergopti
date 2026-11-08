@@ -21,6 +21,7 @@
 	"steps": [
 		{
 			"id": "field_owned_install",
+			"signed_app": true,
 			"kind": "field_check",
 			"check": "owned_install",
 			"deadline_seconds": 900,
@@ -28,6 +29,7 @@
 		},
 		{
 			"id": "owned_install_reload",
+			"signed_app": true,
 			"kind": "reload",
 			"deadline_seconds": 180,
 			"proves": "The driver reloads after the install, so the owner admits the installed runtime before the owned checks run."
@@ -48,6 +50,7 @@
 		},
 		{
 			"id": "field_owned_start",
+			"signed_app": true,
 			"kind": "field_check",
 			"check": "owned_start",
 			"deadline_seconds": 720,
