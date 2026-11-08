@@ -192,10 +192,11 @@ jobs:
           set -euo pipefail
           emit() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
 
-          # Only a push to main or dev publishes. A pull request or a manual
-          # dispatch takes the CI profile: every lane still runs its tests and
-          # builds its package, and release is skipped. dev is the channel the
-          # CI packages have always been stamped with.
+          # Only a push to main or dev publishes, and a push to dev only when a
+          # commit requests it (Dev-Prerelease, below). A pull request or a
+          # manual dispatch takes the CI profile: every lane still runs its
+          # tests and builds its package, and release is skipped. dev is the
+          # channel the CI packages have always been stamped with.
           if [ "$GITHUB_EVENT_NAME" != "push" ] ||
              { [ "$GITHUB_REF" != "refs/heads/main" ] && [ "$GITHUB_REF" != "refs/heads/dev" ]; }; then
               echo "Not a push to main or dev: CI profile, no release."
@@ -271,7 +272,7 @@ jobs:
               fi
               # Installed builds before the bridge match only v0.0.0-dev.N, so
               # counters up to it keep that core: a bridge run that fails is
-              # published by the next push under the same legacy name, never
+              # published by the next request under the same legacy name, never
               # skipped by a release those builds cannot see.
               bridge_n=169
               if [ "$next_n" -le "$bridge_n" ]; then
@@ -372,6 +373,40 @@ jobs:
               echo "::notice::Release-As $request in commit ${request_commit:0:12} replaces the computed $tag ($bump bump)."
               tag="$requested_tag"
               title="Ergopti ${tag}"
+          fi
+
+          # A push to dev runs every lane but publishes a prerelease only on
+          # request: a line of its own in a commit message since the last dev
+          # tag,
+          #
+          #     Dev-Prerelease: yes
+          #
+          # (git commit --trailer 'Dev-Prerelease: yes' writes it; with
+          # --allow-empty it requests one for what dev already holds). Every
+          # commit since the last dev tag counts, so a requested run that fails
+          # or is cancelled is published by the next push, and once the tag
+          # exists the range starts after it. Any other value fails the plan
+          # rather than guessing. main ignores it: every main push releases.
+          dev_request=""
+          while IFS= read -r line; do
+              line="${line%$'\r'}"
+              if [[ "$line" =~ ^[Dd][Ee][Vv]-[Pp][Rr][Ee][Rr][Ee][Ll][Ee][Aa][Ss][Ee]:[[:space:]]*(.*)$ ]]; then
+                  value="${BASH_REMATCH[1]}"
+                  value="${value%"${value##*[![:space:]]}"}"
+                  if [ "$value" != "yes" ]; then
+                      echo "::error::Dev-Prerelease '$value' is not 'yes'; write 'Dev-Prerelease: yes' or remove the line."
+                      exit 1
+                  fi
+                  dev_request="yes"
+              fi
+          done <<< "$messages"
+          if [ "$branch" = "main" ] && [ -n "$dev_request" ]; then
+              echo "::notice::Dev-Prerelease applies to dev only: main publishes $tag as every push does."
+          elif [ "$branch" = "dev" ] && [ -z "$dev_request" ]; then
+              echo "::notice::No 'Dev-Prerelease: yes' line in a commit since ${last_dev:-the first commit}: CI profile, no prerelease. Request one with: git commit --allow-empty -m 'chore(release): request a dev prerelease' --trailer 'Dev-Prerelease: yes'"
+              emit release false
+              emit channel dev
+              exit 0
           fi
 
           # Skip if the tag already exists (duplicate push guard). The listing is

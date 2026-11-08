@@ -752,6 +752,21 @@ build. The `v0.0.0-dev.N` tags before 2026-11-08 are the same series; the dev
 channel of `_shared/modules/updater/channels.json` matches any core since
 `v0.0.0-dev.169`, the bridge release that installed builds, which only know the
 old rule, still pick up; `ci.yml` keeps the `0.0.0` core for every counter up to 169, so a failed bridge run is
-published by the next push under the same legacy name. Action: never delete `v0.0.0-dev.169`; compute the dev
+published by the next request under the same legacy name. Action: never delete `v0.0.0-dev.169`; compute the dev
 tag in `ci.yml` (pinned by `test-ci-release-reruns.cjs`), and read the series
 with the general `-dev.N` pattern everywhere a dev tag is listed.
+
+## A push to dev publishes a prerelease only on request (2026-11-08)
+
+Every push to `dev` runs every lane, but `ci.yml` publishes a dev prerelease
+only when a commit since the last dev tag carries a line of its own
+`Dev-Prerelease: yes` (`git commit --allow-empty -m 'chore(release): request a
+dev prerelease' --trailer 'Dev-Prerelease: yes'`); the maintainer did not want
+one release per commit. The publication path stays push-only (the persisted
+plan, the qualification policies and the changelog all bind to `push`), so the
+request is a trailer, not a `workflow_dispatch` input. Any other value fails
+the plan; `main` ignores the line. The request carries until a dev tag exists,
+so a red or cancelled requested run is published by the next push. Action: ask
+for a prerelease before a field report that installs one
+(`collect-macos-field-report.sh --installed`); keep the opt-in pinned by
+`test-ci-release-reruns.cjs`.
