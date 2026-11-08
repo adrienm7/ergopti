@@ -766,21 +766,18 @@ one release per commit. The publication path stays push-only (the persisted
 plan, the qualification policies and the changelog all bind to `push`), so the
 request is a trailer, not a `workflow_dispatch` input. Any other value fails
 the plan; `main` ignores the line. The request carries until a dev tag exists,
-so a red or cancelled requested run is published by the next push. Action:
-keep the opt-in pinned by `test-ci-release-reruns.cjs`; a field report never
-needs a prerelease (next entry).
+so a red or cancelled requested run is published by the next push. Action: ask
+for a prerelease before the complete field report, which installs one
+(`collect-macos-field-report.sh --installed`); keep the opt-in pinned by
+`test-ci-release-reruns.cjs`.
 
-## A field report tests the dev branch, never a release (2026-11-08)
+## The field report tests the branch; --installed adds Karabiner (2026-11-08)
 
-The macOS field report runs on the developer app of the clone, so it tests the
-branch as it is. The owned Karabiner runtime admits only an app signed with the
-stable certificate (`capture.requirement` of
-`vendor/remap-runtime/manifest.json`), so `run-macos-dev-app.sh` signs the
-developer app with the maintainer's copy of it (`~/ErgoptiPlus-signing`, or
-`ERGOPTI_SIGNING_DIR`; the `.p12` password is typed or read from
-`MACOS_SIGNING_CERTIFICATE_PASSWORD`), and `collect-macos-field-report.sh`
-rebuilds an app without that designated requirement and stops when the build
-still lacks it. `--installed`, which installed the newest dev prerelease, is
-refused by name; it replaced this on 2026-11-04 and is itself replaced.
-Action: do not route a field report through a published build again;
-`install-macos-dev-prerelease.sh` stays only to install a prerelease by hand.
+By default `collect-macos-field-report.sh` runs on the developer app of the
+clone, so any tester checks the branch with no release and no certificate. The
+owned Karabiner runtime installs only under the stable CI certificate (its root
+daemon serves raw keystrokes only to that signed app), so the steps
+`field_run.json` marks `signed_app` are left out of that run. `--installed`
+runs every step, those included, on the newest signed dev prerelease. Action:
+keep the root daemon's signature check; mark any new step that needs the owned
+runtime installed `signed_app`, never weaken the check for test runs.

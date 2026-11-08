@@ -32,13 +32,19 @@
 # missing; base.txt in the report names the base and the commit):
 #   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
 #   bash tools/dev/collect-macos-field-report.sh --no-push  same, without the push
+#   bash tools/dev/collect-macos-field-report.sh --installed  the complete run,
+#     Karabiner included, on the signed dev prerelease instead of the developer
+#     app: installs or updates it from GitHub, verified
+#     (tools/dev/install-macos-dev-prerelease.sh), reopens it with this clone as
+#     its field-run root, and runs every step in it, the owned runtime's first
+#     install included (field_owned_install: the macOS administrator prompt and
+#     the driver approval are the only human steps, and the terminal says so)
 #
-# The field run always tests the branch itself, never a published release.
-# The owned Karabiner runtime installs only under the stable certificate the
-# release builds are signed with, so the developer app is built signed with
-# the maintainer's copy of it (~/ErgoptiPlus-signing, or ERGOPTI_SIGNING_DIR;
-# tools/dev/run-macos-dev-app.sh asks for its password): an app without that
-# signature is rebuilt, and a build that still lacks it stops the run.
+# By default the field run tests the branch itself: the developer app of this
+# clone, which any tester builds, with no release and no certificate. The
+# owned Karabiner runtime installs only under the stable certificate the CI
+# signs with, so the steps field_run.json marks signed_app are left out there
+# and run only with --installed (docs/tooling/next-release-handoff.md, WP9).
 #
 # Each step records its exit status in steps.txt; a failed step never hides
 # the others, and the summary names it. Ctrl-C or a TERM never loses the
@@ -99,11 +105,12 @@ fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
 
 push=true
+installed=false
 for argument in "$@"; do
 	case "${argument}" in
 		--no-push) push=false ;;
-		--installed) fail "--installed is retired: the field run tests this branch's developer app, signed with the stable certificate; run without it." ;;
-		*) fail "Expected no argument or --no-push." ;;
+		--installed) installed=true ;;
+		*) fail "Expected no argument, --no-push or --installed." ;;
 	esac
 done
 
@@ -329,7 +336,7 @@ step launch_agents sh -c 'ls "${HOME}/Library/LaunchAgents" /Library/LaunchAgent
 step disk sh -c 'df -h / "${TMPDIR:-/tmp}" | sed "s#${HOME}#~#g"'
 # Ergopti's own Karabiner runtime (ADR 011) without the app: both launchd jobs,
 # the installed files, the DriverKit approval, the verified download and the
-# signing authority of the developer app (the install needs a certificate).
+# signing authority of the installed app (the install needs a certificate).
 step owned_runtime sh -c '
 	for label in "$1" "$2"; do launchctl print "system/$label" >/dev/null 2>&1; echo "$label: launchctl print exit=$?"; done
 	for path in "/Library/Application Support/ErgoptiPlus/Runtime" "/Library/LaunchDaemons/$1.plist" "/Library/LaunchDaemons/$2.plist"; do
@@ -337,7 +344,7 @@ step owned_runtime sh -c '
 	done
 	systemextensionsctl list 2>&1 | grep -i "Karabiner-DriverKit-VirtualHIDDevice" || echo "no pqrs driver extension listed"
 	ls "${HOME}/Library/Application Support/Ergopti/RemapRuntime"/*/receipt 2>/dev/null | sed "s#${HOME}#~#" || echo "no verified runtime download"
-	codesign -dv --verbose=2 "$3" 2>&1 | grep -E "^(Authority|TeamIdentifier|Signature)=" || echo "no developer app at $3"
+	codesign -dv --verbose=2 "/Applications/$3" 2>&1 | grep -E "^(Authority|TeamIdentifier|Signature)=" || echo "no installed $3"
 	# The Console is the launcher'"'"'s child (never disclaimed), so macOS files its
 	# Input Monitoring under the app: its parent must be the launcher.
 	console="$(pgrep -f "ErgoptiPlus-Remap-Console.app/Contents/MacOS/" | head -1)"
@@ -347,7 +354,7 @@ step owned_runtime sh -c '
 	else
 		echo "console parent: no owned Console running"
 	fi
-' sh "${ERGOPTI_SERVICE_LABEL_MACOS_CORE}" "${ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID}" "${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}"
+' sh "${ERGOPTI_SERVICE_LABEL_MACOS_CORE}" "${ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID}" "${ERGOPTI_APP_BUNDLE}"
 
 # ===========================================
 # ======= 3/ Field run in the app ===========
@@ -467,37 +474,34 @@ run_field_run() {
 	# the running app is stale: the runner stops it (and any installed
 	# ErgoptiPlus or kept-alive guardian) and rebuilds, even when it answers. A
 	# Lua-only change needs no rebuild: the developer app reloads it.
-	local app_path="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}"
-	local app_binary="${app_path}/Contents/MacOS/${ERGOPTI_APP_NAME}"
-	local stale="" pinned
-	# The designated requirement the owned runtime admits: the stable certificate's leaf.
-	pinned="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["capture"]["requirement"])' \
-		"${REPO_ROOT}/static/ergopti_plus/macos/vendor/remap-runtime/manifest.json")" \
-		|| { log "Cannot read the pinned signing requirement of the owned runtime manifest."; return 1; }
-	stable_signed() { codesign -d -r- "${app_path}" 2>&1 | grep -qxF "designated => ${pinned}"; }
-	if [ ! -x "${app_binary}" ]; then
+	local app_binary="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}/Contents/MacOS/${ERGOPTI_APP_NAME}"
+	local stale=""
+	if [ "${installed}" = true ]; then
+		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
+		bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh" \
+			|| { log "The signed dev prerelease could not be installed and opened (reason above)."; return 1; }
+		log "Three steps may need you: if System Settings opens Accessibility, switch on the entry Ergopti's dialog"
+		log "names (never add one with +); type your password if macOS asks for it (Ergopti installs its own"
+		log "Karabiner runtime); and if System Settings opens Login Items & Extensions, switch on the Karabiner driver."
+		log "Nothing else needs a click; the run waits for all three."
+	elif [ ! -x "${app_binary}" ]; then
 		stale="no developer app is built"
-	elif ! stable_signed; then
-		stale="the developer app is not signed with the stable certificate"
 	else
 		stale="$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" "${REPO_ROOT}/tools/build" \
 			-type f -newer "${app_binary}" -print -quit 2>/dev/null)"
 	fi
 	# A readiness left by an app the runner is about to stop would send the
 	# request to that app: only the readiness of the app opened here counts.
-	if [ -n "${stale}" ] || ! ready_pid >/dev/null; then
+	if [ "${installed}" = true ]; then
+		: # Opened above with its field-run root; its readiness is the one to wait for.
+	elif [ -n "${stale}" ] || ! ready_pid >/dev/null; then
 		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
 	fi
-	if [ -n "${stale}" ]; then
-		log "Building and opening the developer app (${stale#"${REPO_ROOT}/"}; a few minutes)..."
+	if [ "${installed}" = true ]; then
+		:
+	elif [ -n "${stale}" ]; then
+		log "Building and opening the developer app (${stale#"${REPO_ROOT}/"} is newer than the build; a few minutes)..."
 		bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" || { log "The developer app could not be built."; return 1; }
-		if ! stable_signed; then
-			log "The developer app is not signed with the stable certificate, so Ergopti's own Karabiner runtime would refuse"
-			log "to install: put ErgoptiPlus-signing.p12.base64 in ~/ErgoptiPlus-signing (or set ERGOPTI_SIGNING_DIR), then run again."
-			return 1
-		fi
-		log "Two steps may need you: type your password if macOS asks for it (Ergopti installs its own Karabiner"
-		log "runtime), and if System Settings opens Login Items & Extensions, switch on the Karabiner driver."
 	elif ! ready_pid >/dev/null; then
 		log "Opening the developer app..."
 		bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" --open-only \
@@ -550,17 +554,27 @@ run_field_attempt() {
 	while ! pid="$(ready_pid)"; do
 		now="$(date +%s)"
 		if [ $((now - started_at)) -ge "${FIELD_RUN_READY_SECONDS}" ]; then
-			log "No ready developer app after ${FIELD_RUN_READY_SECONDS} s. If another ${ERGOPTI_APP_NAME} is running, quit it and run this again."
+			log "No ready developer app after ${FIELD_RUN_READY_SECONDS} s. If an installed ${ERGOPTI_APP_NAME} is running, quit it and run this again."
 			return 1
 		fi
 		sleep "${FIELD_RUN_POLL_SECONDS}"
 	done
-	log "Developer app ready (pid ${pid}); requesting every step within ${deadline_seconds} s."
+	# The developer app is signed ad hoc: the owned runtime refuses to install
+	# under it, so the steps that need the signed app are left to --installed.
+	local steps_json='["all"]'
+	if [ "${installed}" != true ]; then
+		steps_json="$(python3 -c 'import json, sys
+steps = json.load(open(sys.argv[1]))["steps"]
+print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_ROOT}/${FIELD_RUN_SPEC}")" \
+			|| { log "Cannot read the steps of ${FIELD_RUN_SPEC}."; return 1; }
+		log "Developer app of this branch: the Karabiner runtime install steps are left out; --installed runs them on the signed dev prerelease."
+	fi
+	log "Developer app ready (pid ${pid}); requesting the field run within ${deadline_seconds} s."
 	log "The run is working now: do not reload or quit Ergopti; each step prints its verdict here."
 
 	rm -f "${run_folder}/${refused_name}"
-	printf '{"schema":1,"request_id":"%s","steps":["all"],"deadline_seconds":%s}\n' \
-		"${request_id}" "${deadline_seconds}" > "${run_folder}/.${request_name}.tmp" \
+	printf '{"schema":1,"request_id":"%s","steps":%s,"deadline_seconds":%s}\n' \
+		"${request_id}" "${steps_json}" "${deadline_seconds}" > "${run_folder}/.${request_name}.tmp" \
 		|| { log "Cannot write the field run request."; return 1; }
 	mv -f "${run_folder}/.${request_name}.tmp" "${run_folder}/${request_name}" \
 		|| { log "Cannot publish the field run request."; return 1; }
@@ -616,10 +630,10 @@ run_field_attempt() {
 
 run_field_run 2>&1 | tee "${out}/field_run.txt"
 field_run_status=${PIPESTATUS[0]}
-# After the run, on the developer app it drove: the managed Ollama guardian
-# refuses a launcher whose strict signature fails
+# After the run, on the app it installed: the managed Ollama guardian refuses a
+# launcher whose strict signature fails
 # (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
-step app_signature sh -c 'app="$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"; codesign -d -r- "$app" 2>&1 | grep "^designated"' sh "${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}"
+step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
 # What no command can do on its own, said once instead of faked.
 cat > "${out}/not_automated.txt" <<'NOTE'
 typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;

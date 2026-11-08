@@ -378,6 +378,20 @@ helpers.describe("field run: declaration and requests", function()
 		end)
 	end)
 
+	-- The collector leaves these steps out on the ad hoc developer app, where
+	-- the owned runtime refuses to install; only true marks them.
+	helpers.it("admits a signed_app mark only as true", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local spec = spec_of(FieldRun)
+			helpers.assert_eq(spec.step_by_id.field_owned_install.signed_app, true)
+			helpers.assert_nil(spec.step_by_id.field_lease.signed_app)
+			local marked = Json.decode(SPEC_TEXT)
+			marked.steps[1].signed_app = "yes"
+			helpers.assert_true(not pcall(FieldRun.validate, marked))
+		end)
+	end)
+
 	helpers.it("writes the refusal of an unknown step and runs nothing", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
