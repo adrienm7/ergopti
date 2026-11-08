@@ -33,7 +33,7 @@ UpdateChannelRegistryData() {
 				"menu_label_key", "updater.channel.dev_menu",
 				"aliases", [],
 				"github_prerelease", true,
-				"tag_core", "0.0.0",
+				"tag_core", "semver",
 				"tag_prerelease", Map("label", "dev", "counter", true),
 				"sparkle_feed", "appcast-dev.xml")
 		])
