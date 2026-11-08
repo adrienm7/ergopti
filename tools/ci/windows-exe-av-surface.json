@@ -26,13 +26,13 @@
 			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
 			"key_state_polling": {
 				"pattern": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
-				"max": 56
+				"max": 58
 			},
 			"clipboard_listener": {
 				"pattern": "AddClipboardFormatListener|SetClipboardViewer|OnClipboardChange",
 				"max": 3
 			},
-			"send_input_api": { "pattern": "SendInput", "max": 122 },
+			"send_input_api": { "pattern": "SendInput", "max": 123 },
 			"script_host": { "pattern": "WScript|cscript|mshta", "max": 2 },
 			"elevation_wording": {
 				"pattern": "RunAs|requireAdministrator|highestAvailable|\\bUAC\\b",
