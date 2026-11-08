@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The release build stamps it. The version used to be a "3.0.0" literal that
----    no build rewrote, while releases are published as 0.0.0-dev.N and N.N.N:
+---    no build rewrote, while releases are published as X.Y.Z-dev.N and X.Y.Z:
 ---    every installed driver showed a version that never existed, and the
 ---    updater compared releases against it. tools/build/write_build_stamp.sh now
 ---    writes `version=` next to `commit=` in the shared tree's build stamp,

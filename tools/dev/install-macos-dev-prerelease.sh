@@ -47,9 +47,12 @@ as_admin=
 work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-dev-prerelease.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 
-# The newest dev prerelease tag (v0.0.0-dev.N), and its two macOS assets.
-tags="$(git ls-remote --tags --refs "$REMOTE.git" 'v0.0.0-dev.*')" || fail "GitHub's tags could not be read."
-tag="$(printf '%s\n' "$tags" | sed -n 's|.*refs/tags/\(v0\.0\.0-dev\.[0-9][0-9]*\)$|\1|p' | sort -t. -k4,4n | tail -n 1)"
+# The newest dev prerelease tag (vX.Y.Z-dev.N, and v0.0.0-dev.N before
+# 2026-11-08), and its two macOS assets. The counter runs across both cores,
+# so the newest tag is the one with the highest N.
+tags="$(git ls-remote --tags --refs "$REMOTE.git" 'v*-dev.*')" || fail "GitHub's tags could not be read."
+tag="$(printf '%s\n' "$tags" | sed -n 's|.*refs/tags/\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*-dev\.[0-9][0-9]*\)$|\1|p' \
+	| awk -F'-dev[.]' '{ print $2, $0 }' | sort -n | tail -n 1 | cut -d' ' -f2)"
 [ -n "$tag" ] || fail "no dev prerelease is published."
 publication_url="$REMOTE/releases/download/$tag/macos-publication.json"
 archive_url="$REMOTE/releases/download/$tag/$ARCHIVE"

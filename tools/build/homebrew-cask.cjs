@@ -137,7 +137,7 @@ function tokenForChannel(id) {
 
 /**
  * Renders the cask of one release.
- * @param {string} tag Release tag, e.g. "v0.0.0-dev.142".
+ * @param {string} tag Release tag, e.g. "v1.0.10-dev.170".
  * @param {string} sha256 Lowercase hex checksum of the selected release archive.
  * @return {{token: string, file: string, text: string}}
  */

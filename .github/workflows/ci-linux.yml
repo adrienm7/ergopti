@@ -4513,7 +4513,7 @@ jobs:
       # healthcheck and the updater report the published release. The package
       # METADATA still takes its version from package.json, so the .deb "Version:"
       # and the .rpm "Version:" can lag the release tag: on dev the version is
-      # 0.0.0-dev.N, and rpm rejects a hyphen in Version:, so the same value that a
+      # X.Y.Z-dev.N, and rpm rejects a hyphen in Version:, so the same value that a
       # .deb accepts would abort rpmbuild. Every published package is therefore
       # renamed below to a name that carries no version at all, so no asset can be
       # misnamed and the website's exact-name lookup keeps working.

@@ -366,7 +366,10 @@ function workflowTagFamilies() {
 	const stable = /tag="v\$\{maj\}\.\$\{min\}\.\$\{pat\}"\s*\n\s*prerelease="(true|false)"/.exec(
 		text
 	);
-	const dev = /tag="v0\.0\.0-dev\.\$\{next_n\}"\s*\n\s*prerelease="(true|false)"/.exec(text);
+	const dev =
+		/tag="v\$\{maj\}\.\$\{min\}\.\$\(\(pat \+ 1\)\)-dev\.\$\{next_n\}"\s*\n\s*prerelease="(true|false)"/.exec(
+			text
+		);
 	const families = [];
 	if (stable)
 		families.push({
@@ -377,7 +380,8 @@ function workflowTagFamilies() {
 	if (dev)
 		families.push({
 			name: 'dev branch',
-			samples: ['v0.0.0-dev.1', 'v0.0.0-dev.134'],
+			// v0.0.0-dev.N is the series before 2026-11-08, which installed builds still run.
+			samples: ['v0.0.1-dev.1', 'v1.0.10-dev.170', 'v0.0.0-dev.169'],
 			prerelease: dev[1] === 'true'
 		});
 	return families;

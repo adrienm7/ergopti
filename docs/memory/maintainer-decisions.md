@@ -739,3 +739,18 @@ installed and opens that asset of the running release; the driver never starts
 an elevated process for it. Action: install or update the layout through the
 release asset; do not move the scripts back into the bundle or raise a ceiling
 to do so.
+
+## Dev prereleases are named after the next patch (2026-11-08)
+
+A dev prerelease is `vX.Y.Z-dev.N`: `X.Y.Z` is the patch after the last stable
+tag, whatever the subjects since it, and `N` is one counter across the whole
+series, never restarted by a stable release. The patch, not the bump `main`
+would compute, because semver must order every dev tag after the previous one:
+a predicted major or minor core could not come back down when `main` releases a
+lower version (`Release-As`), and the updaters would keep offering the older
+build. The `v0.0.0-dev.N` tags before 2026-11-08 are the same series; the dev
+channel of `_shared/modules/updater/channels.json` matches any core since
+`v0.0.0-dev.169`, the bridge release that installed builds, which only know the
+old rule, still pick up. Action: never delete `v0.0.0-dev.169`; compute the dev
+tag in `ci.yml` (pinned by `test-ci-release-reruns.cjs`), and read the series
+with the general `-dev.N` pattern everywhere a dev tag is listed.

@@ -293,7 +293,7 @@ jobs:
           # every macOS user back to it. Only the notes of an already published
           # $TAG may still be finished, without its feed.
           case "$CHANNEL" in
-              dev) series='refs/tags/v0.0.0-dev.*'; series_re='^v0\.0\.0-dev\.[0-9]+$' ;;
+              dev) series='refs/tags/v*-dev.*'; series_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.[1-9][0-9]*$' ;;
               main) series='refs/tags/v*'; series_re='^v[0-9]+\.[0-9]+\.[0-9]+$' ;;
               *) echo "::error::plan's channel is '$CHANNEL', expected dev or main."; exit 1 ;;
           esac
