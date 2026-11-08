@@ -63,9 +63,12 @@ function Write-Outcome {
 	[IO.File]::WriteAllText($ResultPath, $json, [Text.UTF8Encoding]::new($false))
 }
 
+# The replacement is an IntPtr so the null that MOVEFILE_DELAY_UNTIL_REBOOT
+# needs reaches Windows: PowerShell binds $null to a string parameter as "",
+# and MoveFileEx then fails with ERROR_PATH_NOT_FOUND (3).
 Add-Type -Namespace ErgoptiLayout -Name Native -MemberDefinition @'
 [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-public static extern bool MoveFileEx(string existing, string replacement, int flags);
+public static extern bool MoveFileEx(string existing, IntPtr replacement, int flags);
 '@
 
 <#
@@ -79,8 +82,9 @@ function Move-Aside {
 	$aside = "$Path.$([Guid]::NewGuid().ToString('N')).old"
 	Move-Item -LiteralPath $Path -Destination $aside
 	# MOVEFILE_DELAY_UNTIL_REBOOT with no replacement deletes it at restart.
-	if (-not [ErgoptiLayout.Native]::MoveFileEx($aside, $null, 4)) {
-		throw "The previous $Path was moved to $aside but its deletion at restart could not be scheduled (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))."
+	if (-not [ErgoptiLayout.Native]::MoveFileEx($aside, [IntPtr]::Zero, 4)) {
+		$win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+		throw "The previous $Path was moved to $aside but its deletion at restart could not be scheduled (Win32 error $win32Error)."
 	}
 }
 
