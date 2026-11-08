@@ -18,7 +18,7 @@
 			"menu_label_key": "updater.channel.dev_menu",
 			"aliases": [],
 			"github_prerelease": true,
-			"tag": { "core": "0.0.0", "prerelease": { "label": "dev", "counter": true } },
+			"tag": { "core": "semver", "prerelease": { "label": "dev", "counter": true } },
 			"sparkle_feed": "appcast-dev.xml"
 		}
 	]

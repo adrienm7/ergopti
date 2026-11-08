@@ -37,7 +37,7 @@
 				"aliases": [],
 				"github_prerelease": true,
 				"tag": {
-					"core": "0.0.0",
+					"core": "semver",
 					"prerelease": {
 						"label": "dev",
 						"counter": true
