@@ -253,6 +253,10 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 	/// The copy drops extended attributes and resource forks: `codesign --strict` refuses Finder information and
 	/// similar detritus, which security agents and Finder attach to downloaded bundles on managed Macs, while
 	/// the signature seals none of them.
+	/// The `codesign --test-requirement` argument for a requirement text. codesign reads an argument without a
+	/// leading `=` as the path of a requirement file: the bare text failed every install with « No such file or
+	/// directory | invalid requirement specification » at stage_signature (field report 2026-11-08, issue #106).
+	static func testRequirementArgument(_ requirement: String) -> String { "=" + requirement }
 	static func stagedHelperProgram(source: String, stage: URL, requirement: String, digest: String, then command: (String) -> String) -> String {
 		let parent = "/Library/Application Support/ErgoptiPlus", directory = stage.deletingLastPathComponent().path
 		let executable = stage.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer").path
@@ -283,7 +287,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		task_step=stage_owner; /usr/sbin/chown -R root:wheel \(quote(directory)); /bin/chmod -RN \(quote(directory)); /bin/chmod -R go-w \(quote(directory))
 		assert_directory \(quote(directory))
 		task_step=stage_signature
-		/usr/bin/codesign --verify --strict --all-architectures --deep --test-requirement \(quote(requirement)) \(quote(stage.path))
+		/usr/bin/codesign --verify --strict --all-architectures --deep --test-requirement \(quote(testRequirementArgument(requirement))) \(quote(stage.path))
 		task_step=stage_digest
 		task_digest=$(/usr/bin/shasum -a 256 \(quote(executable))); task_digest=${task_digest%% *}; [ "$task_digest" = \(quote(digest)) ] || exit 77
 		\(command(executable))

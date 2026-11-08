@@ -37,6 +37,29 @@ final class OwnedRuntimeInstallHelperHashesTests: XCTestCase {
 			+ String(repeating: "aa", count: 20) + "\" or cdhash H\"" + String(repeating: "bb", count: 20) + "\")")
 	}
 
+	private func codesignTestRequirement(_ argument: String) throws -> Int32 {
+		let process = Process()
+		process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+		process.arguments = ["--verify", "--test-requirement", argument, "/usr/bin/true"]
+		process.standardOutput = FileHandle.nullDevice
+		process.standardError = FileHandle.nullDevice
+		try process.run()
+		process.waitUntilExit()
+		return process.terminationStatus
+	}
+
+	func testTheStagedRequirementReachesCodesignAsText() throws {
+		// Issue #106: the bare text was read as a requirement file path and every install failed at stage_signature
+		let requirement = "anchor apple"
+		XCTAssertEqual(try codesignTestRequirement(
+			OwnedVirtualHIDDaemonReportMainOperation.testRequirementArgument(requirement)), 0)
+		XCTAssertNotEqual(try codesignTestRequirement(requirement), 0, "a bare requirement is a missing file to codesign")
+		let program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: "/s", stage: URL(fileURLWithPath: "/t/Helper.app"),
+			requirement: requirement, digest: "d") { _ in "true" }
+		// The program is quoted again for sh -c, so its inner quote reads '"'"'
+		XCTAssertTrue(program.contains("--test-requirement '\"'\"'=anchor apple'\"'\"'"), program)
+	}
+
 	func testAbsentDuplicatedOversizedOrMalformedHashesAreRefused() {
 		let hash = Data(repeating: 3, count: 32)
 		XCTAssertNil(OwnedRuntimeInstallMainOperation.codeDirectoryHashes([:]))
