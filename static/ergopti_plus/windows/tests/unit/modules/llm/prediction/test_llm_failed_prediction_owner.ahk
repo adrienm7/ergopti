@@ -1003,6 +1003,14 @@ _LDP_Native(Mode, Calls, Lines) {
                 AssertFalse(IsObject(_LLM_Engine_Plan().Pending))
                 ArmToken := 0
             } else {
+                ; A unit missing from the rolling context while the Edit and the
+                ; I1 callback hold the whole canary was seen once on a hosted
+                ; runner: record which native character it was and the bridge
+                ; state around it before the verdict.
+                if _LLM_Bridge_Buffer != Canary
+                    _TestPrint("# LLM_DEBOUNCE_BUFFER_GAP " . KL_JsonEncode(Map("mode", Mode,
+                        "buffer", _LLM_Bridge_Buffer, "engine", _LLM_Engine["last_buffer"],
+                        "now", _LDP_PrivacyTraceState(), "trace", State.PrivacyTrace)))
                 AssertEqual(Canary, _LLM_Bridge_Buffer)
                 AssertEqual(Canary, _LLM_Engine["last_buffer"])
                 AssertTrue(_LDP_ArmedSince(0, BeforeRequestId, BeforeCounter),
