@@ -152,11 +152,15 @@ BundledAppsNative_Reveal(Path) {
  *     IconLocation "file,index"), description.
  */
 BundledAppsNative_WriteShortcut(Path, Fields) {
-	IconFile := "", IconNumber := ""
-	if Fields.Get("icon", "") != ""
-		_BundledAppsNative_SplitIconLocation(Fields["icon"], &IconFile, &IconNumber)
-	FileCreateShortcut(Fields["target"], Path, Fields.Get("working_directory", ""), Fields.Get("arguments", ""),
-		Fields.Get("description", ""), IconFile, , IconNumber)
+	WorkingDirectory := Fields.Get("working_directory", "")
+	Arguments := Fields.Get("arguments", ""), Description := Fields.Get("description", "")
+	if Fields.Get("icon", "") == "" {
+		; FileCreateShortcut takes no icon number without an icon file.
+		FileCreateShortcut(Fields["target"], Path, WorkingDirectory, Arguments, Description)
+		return
+	}
+	_BundledAppsNative_SplitIconLocation(Fields["icon"], &IconFile, &IconNumber)
+	FileCreateShortcut(Fields["target"], Path, WorkingDirectory, Arguments, Description, IconFile, , IconNumber)
 }
 
 /**
