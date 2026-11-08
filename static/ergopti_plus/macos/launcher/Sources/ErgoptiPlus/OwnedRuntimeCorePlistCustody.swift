@@ -42,36 +42,36 @@ final class OwnedRuntimeCorePlistCustody {
 		var priorLedger = stat(); errno = 0
 		let ledgerAbsent = fstatat(ledgerDirectory, job.ledgerName, &priorLedger, AT_SYMLINK_NOFOLLOW) == -1
 		if ledgerAbsent {
-			guard errno == ENOENT else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard errno == ENOENT else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			var priorPlist = stat(); errno = 0
 			guard fstatat(plistDirectory, job.name, &priorPlist, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
-				throw OwnedRuntimeInstallFailure.destination
+				throw OwnedRuntimeInstallFailure.traced(.destination)
 			}
 		}
 		ledger = openat(ledgerDirectory, job.ledgerName, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
 		let created = ledger >= 0
 		if !created {
-			guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			ledger = openat(ledgerDirectory, job.ledgerName, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
 		}
-		guard ledger >= 0, flock(ledger, LOCK_EX | LOCK_NB) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		var identity = stat(); guard fstat(ledger, &identity) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard ledger >= 0, flock(ledger, LOCK_EX | LOCK_NB) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
+		var identity = stat(); guard fstat(ledger, &identity) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		self.ledger = ledger; ledgerIdentity = identity
 		completed = true // All stored properties are initialized; subsequent ledger/file debt belongs to deinit.
 		if created {
 			try writeLedger(job.pending)
-			guard fsync(ledgerDirectory) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard fsync(ledgerDirectory) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		} else {
 			try protection(ledger, identity, mode: 0o600)
-			guard identity.st_size > 0, identity.st_size <= 256 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard identity.st_size > 0, identity.st_size <= 256 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			ledgerBytes = try read(ledger, count: Int(identity.st_size))
 			if ledgerBytes != job.pending {
-				guard let parsed = Self.parse(ledgerBytes, bytes: bytes, tag: job.tag) else { throw OwnedRuntimeInstallFailure.cleanupPending }
+				guard let parsed = Self.parse(ledgerBytes, bytes: bytes, tag: job.tag) else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 				openedFile = openat(plistDirectory, job.name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
 				file = openedFile
-				guard file >= 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+				guard file >= 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 				var value = stat(); guard fstat(file, &value) == 0, UInt64(bitPattern: Int64(value.st_dev)) == parsed.0, UInt64(value.st_ino) == parsed.1 else {
-					throw OwnedRuntimeInstallFailure.cleanupPending
+					throw OwnedRuntimeInstallFailure.traced(.cleanupPending)
 				}
 				fileIdentity = value
 			}
@@ -96,45 +96,45 @@ final class OwnedRuntimeCorePlistCustody {
 	}
 	private func protection(_ fd: Int32, _ value: stat, mode: mode_t) throws {
 		guard value.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), value.st_mode & 0o7777 == mode,
-			value.st_nlink == 1, !protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
+			value.st_nlink == 1, !protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 		errno = 0
 		if let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) {
 			defer { acl_free(UnsafeMutableRawPointer(acl)) }
 			var entry: acl_entry_t?; errno = 0
 			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
-				throw OwnedRuntimeInstallFailure.protection
+				throw OwnedRuntimeInstallFailure.traced(.protection)
 			}
-		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.traced(.protection) } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 	}
 	private func read(_ fd: Int32, count: Int) throws -> Data {
 		var data = Data(count: count)
-		guard data.withUnsafeMutableBytes({ pread(fd, $0.baseAddress, $0.count, 0) }) == count else { throw OwnedRuntimeInstallFailure.source }
+		guard data.withUnsafeMutableBytes({ pread(fd, $0.baseAddress, $0.count, 0) }) == count else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		return data
 	}
 	private func writeLedger(_ data: Data) throws {
 		try verifyLedger()
 		guard ftruncate(ledger, 0) == 0, data.withUnsafeBytes({ pwrite(ledger, $0.baseAddress, $0.count, 0) }) == data.count,
-			fsync(ledger) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			fsync(ledger) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		ledgerBytes = data
 		try verifyLedger()
 	}
 	private func verifyLedger() throws {
-		guard !closed, !removed else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !closed, !removed else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try admission(); try ledgerParent.verifyAnchor(); try plistParent.verifyAnchor()
 		var held = stat(), named = stat()
 		guard fstat(ledger, &held) == 0, fstatat(ledgerDirectory, job.ledgerName, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == ledgerIdentity.st_dev, held.st_ino == ledgerIdentity.st_ino,
 			named.st_dev == held.st_dev, named.st_ino == held.st_ino, held.st_size == ledgerBytes.count,
-			try read(ledger, count: ledgerBytes.count) == ledgerBytes else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			try read(ledger, count: ledgerBytes.count) == ledgerBytes else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try protection(ledger, held, mode: 0o600)
 	}
 	private func verifyFile() throws {
 		try verifyLedger()
-		guard let identity = fileIdentity, file >= 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard let identity = fileIdentity, file >= 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		var held = stat(), named = stat()
 		guard fstat(file, &held) == 0, fstatat(plistDirectory, job.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == identity.st_dev, held.st_ino == identity.st_ino, named.st_dev == held.st_dev, named.st_ino == held.st_ino,
-			held.st_size == bytes.count, try read(file, count: bytes.count) == bytes else { throw OwnedRuntimeInstallFailure.mutated }
+			held.st_size == bytes.count, try read(file, count: bytes.count) == bytes else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		try protection(file, held, mode: 0o644)
 	}
 	func prepare() throws {
@@ -142,15 +142,15 @@ final class OwnedRuntimeCorePlistCustody {
 		if fileIdentity != nil { try verifyFile(); return }
 		var existing = stat(); errno = 0
 		guard fstatat(plistDirectory, job.name, &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
-			throw OwnedRuntimeInstallFailure.destination
+			throw OwnedRuntimeInstallFailure.traced(.destination)
 		}
 		file = openat(plistDirectory, job.name, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
-		guard file >= 0 else { throw OwnedRuntimeInstallFailure.copy }
-		var value = stat(); guard fstat(file, &value) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }; fileIdentity = value
+		guard file >= 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }
+		var value = stat(); guard fstat(file, &value) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }; fileIdentity = value
 		// Durable inode admission precedes the first plist byte. A crash before this record conservatively keeps unknown debt.
 		try writeLedger(Data((job.tag + "|1|owned|" + String(UInt64(bitPattern: Int64(value.st_dev))) + "|" + String(UInt64(value.st_ino)) + "|" + Self.digest(bytes) + "\n").utf8))
 		guard bytes.withUnsafeBytes({ pwrite(file, $0.baseAddress, $0.count, 0) }) == bytes.count,
-			fchmod(file, 0o644) == 0, fsync(file) == 0, fsync(plistDirectory) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			fchmod(file, 0o644) == 0, fsync(file) == 0, fsync(plistDirectory) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try verifyFile()
 	}
 	func current() -> Bool { do { try verifyFile(); return true } catch { return false } }
@@ -197,7 +197,7 @@ final class OwnedRuntimeCorePlistCustody {
 	static func createProduction(owner: OwnedRuntimeCoreProvisionOwner) throws -> OwnedRuntimeCorePlistCustody {
 		try OwnedRuntimeCorePlistCustody(plistParentURL: URL(fileURLWithPath: "/Library/LaunchDaemons"),
 			ledgerParentURL: URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus"), bytes: try owner.fixedPlistBytes(), protected: true, admission: { [weak owner] in
-				guard let owner else { throw OwnedRuntimeInstallFailure.principal }; try owner.verifyForPlistCustody()
+				guard let owner else { throw OwnedRuntimeInstallFailure.traced(.principal) }; try owner.verifyForPlistCustody()
 			})
 	}
 	/// The VirtualHIDDevice daemon job, admitted by the same Core provision custody that started the Core.
@@ -205,13 +205,13 @@ final class OwnedRuntimeCorePlistCustody {
 		try owner.verifyForPlistCustody()
 		return try OwnedRuntimeCorePlistCustody(job: .virtualHID, plistParentURL: URL(fileURLWithPath: "/Library/LaunchDaemons"),
 			ledgerParentURL: URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus"), bytes: bytes, protected: true, admission: { [weak owner] in
-				guard let owner else { throw OwnedRuntimeInstallFailure.principal }; try owner.verifyForPlistCustody()
+				guard let owner else { throw OwnedRuntimeInstallFailure.traced(.principal) }; try owner.verifyForPlistCustody()
 			})
 	}
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 	/// Actual temporary descriptor/flock cleanup only; retained journal bytes never become authority.
 	static func fixtureRejectedInitializerRetirement(parent: URL, rejectAt: Int) throws -> Bool? {
-		guard (0...2).contains(rejectAt), Thread.current.threadDictionary[initializerObservationKey] == nil else { throw OwnedRuntimeInstallFailure.source }
+		guard (0...2).contains(rejectAt), Thread.current.threadDictionary[initializerObservationKey] == nil else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let observation = InitializerRetirementObservation()
 		Thread.current.threadDictionary[initializerObservationKey] = observation
 		defer { Thread.current.threadDictionary.removeObject(forKey: initializerObservationKey) }
@@ -219,13 +219,13 @@ final class OwnedRuntimeCorePlistCustody {
 		do {
 			let unexpected = try OwnedRuntimeCorePlistCustody(plistParentURL: parent, ledgerParentURL: parent, bytes: Data("fixture-plist".utf8), protected: false, admission: {
 				admissions += 1
-				if admissions == rejectAt { throw OwnedRuntimeInstallFailure.principal }
+				if admissions == rejectAt { throw OwnedRuntimeInstallFailure.traced(.principal) }
 			})
-			_ = unexpected.closeOwnedDescriptors(); throw OwnedRuntimeInstallFailure.destination
+			_ = unexpected.closeOwnedDescriptors(); throw OwnedRuntimeInstallFailure.traced(.destination)
 		} catch OwnedRuntimeInstallFailure.principal {
-			guard admissions == rejectAt else { throw OwnedRuntimeInstallFailure.source }; return observation.result
+			guard admissions == rejectAt else { throw OwnedRuntimeInstallFailure.traced(.source) }; return observation.result
 		} catch OwnedRuntimeInstallFailure.cleanupPending {
-			guard rejectAt == 0 else { throw OwnedRuntimeInstallFailure.source }; return observation.result
+			guard rejectAt == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }; return observation.result
 		}
 	}
 	static func fixtureRollback(parent: URL, bytes: Data, restart: Bool, afterPin: (() throws -> Void)?) throws -> Bool {

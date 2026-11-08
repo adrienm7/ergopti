@@ -8,14 +8,21 @@ import Foundation
 enum OwnedRuntimeInstallFailure: Error, Equatable {
 	case principal, source, protection, mutated, destination, copy, signature, cleanupPending
 
-	/// A `.source` refusal that names its check on the install trail first: some twenty checks share the case,
-	/// and a field install failed with a bare `publish-failed-source` that told none of them apart (field
-	/// report 2026-11-08). The check names a path relative to the tree or a syscall errno, never file bytes.
-	/// - Parameter check: Short check name, then any relative path or errno it saw.
-	/// - Returns: `.source`, so callers keep comparing the case as before.
-	static func refusedSource(_ check: String) -> OwnedRuntimeInstallFailure {
-		OwnedRuntimeInstallTrail.note("source-" + check)
-		return .source
+	/// Every refusal of the installer helper names its case, its check and its source line on the install trail
+	/// before it is thrown: a field install failed with a bare `publish-failed-source` that some twenty checks
+	/// share (field report 2026-11-08), and the artifact pins the commit those lines belong to.
+	/// - Parameters:
+	///   - failure: The case callers keep comparing.
+	///   - check: Optional detail: a path relative to the tree, a file kind or an errno, never file bytes.
+	/// - Returns: `failure` itself.
+	static func traced(_ failure: OwnedRuntimeInstallFailure, _ check: String? = nil,
+		file: StaticString = #fileID, line: UInt = #line) -> OwnedRuntimeInstallFailure {
+		OwnedRuntimeInstallTrail.refusal(failure, check, file: file, line: line)
+		return failure
+	}
+	/// A `.source` refusal with the detail that tells its checks apart.
+	static func refusedSource(_ check: String, file: StaticString = #fileID, line: UInt = #line) -> OwnedRuntimeInstallFailure {
+		traced(.source, check, file: file, line: line)
 	}
 }
 
@@ -25,6 +32,21 @@ enum OwnedRuntimeInstallFailure: Error, Equatable {
 enum OwnedRuntimeInstallTrail {
 	static func note(_ step: String) {
 		try? FileHandle.standardError.write(contentsOf: Data(("OWNED_RUNTIME_INSTALL_TRAIL|" + step + "\n").utf8))
+	}
+	/// Only the installer helper writes refusals: the resident launcher shares these owners and probes them
+	/// on purpose (a runtime not installed yet refuses on every poll), which must not flood its log.
+	private static let isInstallerHelper = Bundle.main.bundleIdentifier == Identifiers.SigningIds.runtimeInstaller
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	/// Lets a test process observe the refusals the helper would write.
+	static var recordsRefusalsForTests = false
+	private static var writesRefusals: Bool { isInstallerHelper || recordsRefusalsForTests }
+	#else
+	private static var writesRefusals: Bool { isInstallerHelper }
+	#endif
+	static func refusal(_ failure: OwnedRuntimeInstallFailure, _ check: String?, file: StaticString, line: UInt) {
+		guard writesRefusals else { return }
+		let source = String(describing: file).split(separator: "/").last.map(String.init) ?? String(describing: file)
+		note("refused-" + String(describing: failure) + (check.map { "-" + $0 } ?? "") + "@" + source + ":" + String(line))
 	}
 }
 
@@ -48,59 +70,59 @@ final class OwnedRuntimeInstallScratch {
 		defer { if !completed { Darwin.close(parentDescriptor); for node in nodes { Darwin.close(node.descriptor) } } }
 		let name = destination.lastPathComponent
 		guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0"),
-			mkdirat(parentDescriptor, name, 0o755) == 0 else { throw OwnedRuntimeInstallFailure.destination }
+			mkdirat(parentDescriptor, name, 0o755) == 0 else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 		try retain(parent: parentDescriptor, name: name, relative: "", directory: true)
 		completed = true
 	}
 	deinit { for node in nodes { Darwin.close(node.descriptor) }; Darwin.close(parentDescriptor) }
 	private func retain(parent: Int32, name: String, relative: String, directory: Bool, opened: Int32? = nil) throws {
 		let descriptor = opened ?? openat(parent, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (directory ? O_DIRECTORY : 0))
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		var held = stat(), named = stat()
-		guard fstat(descriptor, &held) == 0 else { Darwin.close(descriptor); throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard fstat(descriptor, &held) == 0 else { Darwin.close(descriptor); throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		nodes.append(Node(descriptor: descriptor, parent: parent, name: name, relative: relative, identity: held, directory: directory))
 		guard fstatat(parent, name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == named.st_dev, held.st_ino == named.st_ino,
 			held.st_mode & mode_t(S_IFMT) == mode_t(directory ? S_IFDIR : S_IFREG),
-			directory || held.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			directory || held.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try afterCreation?(relative, descriptor)
 		if directory { directories[relative] = descriptor }
 	}
 	private func location(_ relative: String) throws -> (Int32, String) {
 		let parts = relative.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
 		guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\0") }),
-			let parent = directories[parts.dropLast().joined(separator: "/")] else { throw OwnedRuntimeInstallFailure.copy }
+			let parent = directories[parts.dropLast().joined(separator: "/")] else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 		return (parent, parts.last!)
 	}
 	func directory(_ relative: String) throws {
 		let (parent, name) = try location(relative)
-		guard mkdirat(parent, name, 0o755) == 0 else { throw OwnedRuntimeInstallFailure.copy }
+		guard mkdirat(parent, name, 0o755) == 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 		try retain(parent: parent, name: name, relative: relative, directory: true)
 	}
 	func file(_ relative: String, data: Data, executable: mode_t) throws {
 		let (parent, name) = try location(relative)
 		let descriptor = openat(parent, name, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.copy }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 		try retain(parent: parent, name: name, relative: relative, directory: false, opened: descriptor)
 		var offset = 0
 		try data.withUnsafeBytes { buffer in
 			while offset < buffer.count {
 				let count = Darwin.write(descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset)
-				guard count > 0 else { throw OwnedRuntimeInstallFailure.copy }; offset += count
+				guard count > 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }; offset += count
 			}
 		}
-		guard fchmod(descriptor, 0o644 | executable) == 0, fsync(descriptor) == 0 else { throw OwnedRuntimeInstallFailure.copy }
+		guard fchmod(descriptor, 0o644 | executable) == 0, fsync(descriptor) == 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 	}
 	/// Native publication uses the same retained parent and exact still-named created root.
 	func publishRuntime() throws {
-		guard !published, let root = nodes.first else { throw OwnedRuntimeInstallFailure.destination }
+		guard !published, let root = nodes.first else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 		try parentTree.verifyAnchor()
 		var held = stat(), named = stat()
 		guard fstat(root.descriptor, &held) == 0, fstatat(parentDescriptor, root.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == root.identity.st_dev, held.st_ino == root.identity.st_ino,
-			named.st_dev == held.st_dev, named.st_ino == held.st_ino else { throw OwnedRuntimeInstallFailure.mutated }
+			named.st_dev == held.st_dev, named.st_ino == held.st_ino else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		guard renameatx_np(parentDescriptor, root.name, parentDescriptor, "Runtime", UInt32(RENAME_EXCL)) == 0 else {
-			throw OwnedRuntimeInstallFailure.destination
+			throw OwnedRuntimeInstallFailure.traced(.destination)
 		}
 		published = true
 	}
@@ -163,20 +185,20 @@ final class OwnedRuntimeInstallTree {
 	}
 	private func protection(_ descriptor: Int32, _ value: stat) throws {
 		guard value.st_mode & 0o022 == 0, value.st_mode & 0o6000 == 0,
-			!protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
+			!protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 		try aclProtection(descriptor)
 	}
 	private func aclProtection(_ descriptor: Int32) throws {
 		errno = 0
 		guard let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else {
 			if errno == ENOENT { return } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
-			throw OwnedRuntimeInstallFailure.protection
+			throw OwnedRuntimeInstallFailure.traced(.protection)
 		}
 		defer { acl_free(UnsafeMutableRawPointer(acl)) }
-		guard acl_valid(acl) == 0 else { throw OwnedRuntimeInstallFailure.protection }
+		guard acl_valid(acl) == 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 		var entry: acl_entry_t?; errno = 0
 		let result = acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry), observedError = errno
-		guard result == -1, observedError == EINVAL else { throw OwnedRuntimeInstallFailure.protection }
+		guard result == -1, observedError == EINVAL else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 	}
 	private func pinRoot() throws {
 		guard root.isFileURL, root.path.hasPrefix("/"), !root.path.contains("\0"), !root.path.contains("//") else {
@@ -198,7 +220,7 @@ final class OwnedRuntimeInstallTree {
 			let descriptor = openat(parent, part, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
 			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("ancestor-open-errno-" + String(errno) + "-" + part) }
 			ancestors.append(descriptor)
-			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.mutated }
+			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			if protected { try protection(descriptor, observed) }
 			ancestorNames.append((parent: parent, name: part, observed: observed))
 			parent = descriptor
@@ -249,7 +271,7 @@ final class OwnedRuntimeInstallTree {
 			// Retain before any throwing validation; rejected entries still close their exact FD.
 			entries.append(Entry(relative: relative, descriptor: descriptor, parent: parent.descriptor, name: name,
 				observed: named, directory: directory, digest: nil))
-			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.mutated }
+			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			try protection(descriptor, observed)
 			var digest: Data?
 			if !directory {
@@ -264,18 +286,18 @@ final class OwnedRuntimeInstallTree {
 		}
 	}
 	func verifyAnchor() throws {
-		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.refusedSource("anchor-no-root") }
 		var held = stat(), named = stat()
 		guard fstat(root.descriptor, &held) == 0, fstatat(root.parent, root.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == root.observed.st_dev, held.st_ino == root.observed.st_ino,
 			named.st_dev == held.st_dev, named.st_ino == held.st_ino,
 			held.st_mode == root.observed.st_mode, held.st_uid == root.observed.st_uid,
-			held.st_gid == root.observed.st_gid else { throw OwnedRuntimeInstallFailure.mutated }
+			held.st_gid == root.observed.st_gid else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		try protection(root.descriptor, held)
 		for descriptor in ancestors {
 			var current = stat()
-			guard fstat(descriptor, &current) == 0 else { throw OwnedRuntimeInstallFailure.mutated }
+			guard fstat(descriptor, &current) == 0 else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			if protected { try protection(descriptor, current) }
 			else { try aclProtection(descriptor) }
 		}
@@ -284,36 +306,36 @@ final class OwnedRuntimeInstallTree {
 			guard fstatat(ancestor.parent, ancestor.name, &current, AT_SYMLINK_NOFOLLOW) == 0,
 				current.st_dev == ancestor.observed.st_dev, current.st_ino == ancestor.observed.st_ino,
 				current.st_mode == ancestor.observed.st_mode, current.st_uid == ancestor.observed.st_uid,
-				current.st_gid == ancestor.observed.st_gid else { throw OwnedRuntimeInstallFailure.mutated }
+				current.st_gid == ancestor.observed.st_gid else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		}
 	}
 	func verify() throws {
-		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		for ancestor in ancestorNames {
 			var named = stat()
 			guard fstatat(ancestor.parent, ancestor.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 				named.st_dev == ancestor.observed.st_dev, named.st_ino == ancestor.observed.st_ino,
 				named.st_mode == ancestor.observed.st_mode, named.st_uid == ancestor.observed.st_uid,
-				named.st_gid == ancestor.observed.st_gid else { throw OwnedRuntimeInstallFailure.mutated }
+				named.st_gid == ancestor.observed.st_gid else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		}
 		for descriptor in ancestors {
-			var current = stat(); guard fstat(descriptor, &current) == 0 else { throw OwnedRuntimeInstallFailure.mutated }
+			var current = stat(); guard fstat(descriptor, &current) == 0 else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			if protected { try protection(descriptor, current) }
 		}
 		for entry in entries {
 			var current = stat(), named = stat()
 			guard fstat(entry.descriptor, &current) == 0, fstatat(entry.parent, entry.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
-				same(entry.observed, current), same(entry.observed, named) else { throw OwnedRuntimeInstallFailure.mutated }
+				same(entry.observed, current), same(entry.observed, named) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			try protection(entry.descriptor, current)
 			if let digest = entry.digest {
-				guard Data(SHA256.hash(data: try bytes(entry.descriptor, size: current.st_size))) == digest else { throw OwnedRuntimeInstallFailure.mutated }
+				guard Data(SHA256.hash(data: try bytes(entry.descriptor, size: current.st_size))) == digest else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			}
 		}
 	}
 	func synchronize() throws {
 		try verify()
 		for entry in entries.reversed() where entry.directory {
-			guard fsync(entry.descriptor) == 0 else { throw OwnedRuntimeInstallFailure.copy }
+			guard fsync(entry.descriptor) == 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 		}
 	}
 	func matchesBytes(of other: OwnedRuntimeInstallTree) throws -> Bool {
@@ -324,7 +346,7 @@ final class OwnedRuntimeInstallTree {
 		}
 	}
 	func duplicateRootDescriptor() throws -> Int32 {
-		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-no-root") }
 		let descriptor = fcntl(root.descriptor, F_DUPFD_CLOEXEC, STDERR_FILENO + 1)
 		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-errno-" + String(errno)) }
@@ -346,7 +368,7 @@ final class OwnedRuntimeInstallTree {
 		}
 		try verify()
 		let copied = try OwnedRuntimeInstallTree(root: destination, protected: protected)
-		guard try matchesBytes(of: copied) else { throw OwnedRuntimeInstallFailure.copy }
+		guard try matchesBytes(of: copied) else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 		try copied.synchronize()
 	}
 
@@ -368,7 +390,7 @@ enum OwnedRuntimeInstallWorker {
 		var scratch: OwnedRuntimeInstallScratch?
 		do { try source.copy(into: destination, custody: { scratch = $0 }, afterCreatedFile: afterCreatedFile) }
 		catch {
-			if let scratch, !scratch.retire() { throw OwnedRuntimeInstallFailure.cleanupPending }
+			if let scratch, !scratch.retire() { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			throw error
 		}
 	}

@@ -1,5 +1,5 @@
 // Tests/ErgoptiPlusTests/OwnedRuntimeInstallSourceTrailTests.swift
-// A `.source` install refusal names its check on the trail; the 2026-11-08 field install said only publish-failed-source.
+// Every install refusal names its case, check and line on the trail; the 2026-11-08 field install said only publish-failed-source.
 import Darwin
 import Foundation
 import XCTest
@@ -28,7 +28,7 @@ final class OwnedRuntimeInstallSourceTrailTests: XCTestCase {
 		return String(decoding: output, as: UTF8.self)
 	}
 
-	func testSourceRefusalNamesTheCheckAndTheRelativePath() throws {
+	func testSourceRefusalNamesTheCheckThePathAndTheLine() throws {
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 		// /var is a symlink on macOS and the tree refuses any symlinked ancestor.
 		let base = URL(fileURLWithPath: NSTemporaryDirectory()).resolvingSymlinksInPath()
@@ -39,15 +39,26 @@ final class OwnedRuntimeInstallSourceTrailTests: XCTestCase {
 		defer { try? FileManager.default.removeItem(at: base) }
 		try Data("payload".utf8).write(to: source.appendingPathComponent("a"))
 		try FileManager.default.createSymbolicLink(atPath: source.appendingPathComponent("link").path, withDestinationPath: "a")
+		OwnedRuntimeInstallTrail.recordsRefusalsForTests = true
+		defer { OwnedRuntimeInstallTrail.recordsRefusalsForTests = false }
 		var thrown: Error?
 		let trail = try capturedStandardError {
 			do { try OwnedRuntimeInstallWorker.fixtureCopy(source: source, destination: base.appendingPathComponent("copy")) }
 			catch { thrown = error }
 		}
 		XCTAssertEqual(thrown as? OwnedRuntimeInstallFailure, .source, "the case callers compare stays .source")
-		XCTAssertTrue(trail.contains("OWNED_RUNTIME_INSTALL_TRAIL|source-entry-kind-120000-links-1-link\n"), trail)
+		XCTAssertTrue(trail.contains("OWNED_RUNTIME_INSTALL_TRAIL|refused-source-entry-kind-120000-links-1-link@OwnedRuntimeInstallWorker.swift:"), trail)
+		XCTAssertEqual(trail.components(separatedBy: "OWNED_RUNTIME_INSTALL_TRAIL|").count - 1, 1, "one refusal, one trail line: " + trail)
 		#else
 		throw XCTSkip("The install worker fixtures exist only in debug test builds.")
 		#endif
+	}
+}
+
+extension OwnedRuntimeInstallSourceTrailTests {
+	/// The resident launcher shares these owners and probes them on purpose: it never writes their refusals.
+	func testOutsideTheHelperARefusalWritesNoTrail() throws {
+		let trail = try capturedStandardError { _ = OwnedRuntimeInstallFailure.traced(.destination, "probe") }
+		XCTAssertEqual(trail, "")
 	}
 }

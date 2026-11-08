@@ -96,12 +96,12 @@ final class OwnedRuntimePublisherIdentity {
 		do {
 			let tree = try OwnedRuntimeInstallTree(root: bundle, protected: protected, includeChildren: false)
 			let descriptor = open(executable.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			var admitted = false; defer { if !admitted { Darwin.close(descriptor); _ = tree.releaseOwnedDescriptors() } }
 			var identity = stat()
 			guard fstat(descriptor, &identity) == 0, identity.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
 				identity.st_nlink == 1, identity.st_size > 0, identity.st_size <= 268_435_456,
-				!protected || (identity.st_uid == 0 && identity.st_mode & 0o6022 == 0) else { throw OwnedRuntimeInstallFailure.protection }
+				!protected || (identity.st_uid == 0 && identity.st_mode & 0o6022 == 0) else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 			let owner = OwnedRuntimePublisherIdentity(principal: principal, role: role, tree: tree, executable: executable,
 				descriptor: descriptor, identity: identity, bundle: bundle, leaf: leaf)
 			admitted = true
@@ -193,7 +193,7 @@ final class OwnedRuntimeInstalledPublisher {
 	static func fixtureObserveOriginalTree(root: URL, code: SecStaticCode, afterObservation: (() throws -> Void)? = nil) throws -> Bool {
 		let tree = try OwnedRuntimeInstallTree(root: root, protected: false)
 		defer { _ = tree.releaseOwnedDescriptors() }
-		guard let leaf = OwnedRuntimePublisherSignature.leaf(code, role: .launcher) else { throw OwnedRuntimeInstallFailure.signature }
+		guard let leaf = OwnedRuntimePublisherSignature.leaf(code, role: .launcher) else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		return try observeOriginalTree(tree, code: code, role: .launcher, expected: leaf, afterObservation: afterObservation)
 	}
 	#endif
