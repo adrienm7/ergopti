@@ -284,9 +284,13 @@ for _, in_callback in ipairs({ false, true }) do
 	check("actual ShellRunner child survives its new deadline " .. location, function()
 		local results, start = {}, nil
 		local function arm()
-			uv.sleep(160); start = uv.hrtime()
+			-- The blocking work outlasts the deadline, so a deadline taken from
+			-- the stale loop clock has already passed; the 400 ms deadline
+			-- leaves a loaded runner room for a 40 ms child (one took 102 ms
+			-- against the former 100 ms deadline).
+			uv.sleep(600); start = uv.hrtime()
 			local token = assert(Shell.run_async("/bin/sh", { "-c", "sleep .04; printf done; printf warning >&2" },
-				{ timeout_ms = 100 }, function(result) results[#results + 1] = result end))
+				{ timeout_ms = 400 }, function(result) results[#results + 1] = result end))
 			tokens[#tokens + 1] = token
 			remember_processes()
 		end
