@@ -22,6 +22,14 @@ the field-run step or the hand action that proves it and the commits it confirms
       the 11th callback entering at 10 units and completing last: a later callback overtook it. A real Windows
       bug on the dispatcher path, which left Critical before its append and dropped the overtaken character,
       and a test-side race in the probe's own callback; both now serialize from admission (0aae34e00c).
+- [ ] **[TEST] Windows compiled upgrade (Install and launch):** run 42480459552 (39b55d78ff) failed at the
+      `upgrade` step: the current exe, booted on the profile v1.0.0 installed, did not exit successfully. It last
+      passed on fb2059e00e; the exe changes since are the dev channel core (5427b56b49) and the LLM dispatcher
+      serialization (0aae34e00c). 36805b170a keeps the exit code, the launch streams and the startup logs in
+      `windows-compiled-upgrade-evidence/failure-diagnostics`: read them on the next failure.
+- [ ] **[RELEASE] Dev naming handoff:** everything is on `dev`. `v0.0.0-dev.169` is the bridge (ci.yml keeps the
+      legacy core up to counter 169), then `v1.0.10-dev.170`; the next merge to `main` carries
+      `Release-As: 1.0.10`. Delete the orphan draft `v0.0.0-dev.167` by hand (this session cannot delete releases).
 - [x] **[TEST] LLM debounce privacy probes:** the trace showed a real Windows bug: a late key-down of the last
       typed letter cancelled the debounce its character had just armed (66afcf12e3). Fixed by 679e279d19.
 
