@@ -128,6 +128,37 @@ helpers.describe("field run: the owned runtime's first install with no click of 
 	end)
 end)
 
+helpers.describe("field run: the install check waits for the owner to settle (owned-install-settle)", function()
+	-- Field report 2026-11-09: "starting" during the artifact fetch read as installed, so no install ran.
+	helpers.it("decides only after the owner left starting, then installs the missing runtime", function()
+		local ports, mac_world = mac({ state = "starting", reason = nil })
+		local world = with_install(ports, { active = { true } })
+		local looks = 0
+		ports.after = function(_, callback)
+			looks = looks + 1
+			if looks == 3 then mac_world.state = "unavailable" end
+			callback()
+		end
+		ports.owned_activation.owner_reason = function()
+			return mac_world.state == "unavailable" and "runtime_not_installed" or nil
+		end
+		local steps, result = run("owned_install", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.install_needed.value, "yes:runtime_not_installed")
+		helpers.assert_eq(world.installs, 1)
+	end)
+
+	helpers.it("fails by name when the owner never settles, and installs nothing", function()
+		local ports = mac({ state = "starting" })
+		local world = with_install(ports, {})
+		local steps, result = run("owned_install", ports)
+		helpers.assert_eq(result.passed, false)
+		helpers.assert_eq(steps.install_needed.value, "owner_unsettled:starting")
+		helpers.assert_eq(steps.installed.value, "owner_unsettled")
+		helpers.assert_eq(world.installs, 0)
+	end)
+end)
+
 helpers.describe("field run: Ergopti runs, so its runtime closes the user's Karabiner", function()
 	helpers.it("passes a verified, ready runtime holding the user's Karabiner closed", function()
 		local steps, result = run("owned_start", (mac({ marker = true, others = 0 })))
