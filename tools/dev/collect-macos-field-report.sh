@@ -484,6 +484,10 @@ run_field_run() {
 	local stale=""
 	if [ "${installed}" = true ]; then
 		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
+		# An earlier install that stopped before its services blocks the next one
+		# (field report 2026-11-09): its leftovers go first, finished installs stay.
+		bash "${REPO_ROOT}/tools/dev/reset-macos-owned-runtime.sh" \
+			|| { log "The leftovers of an unfinished owned runtime install could not be removed (reason above)."; return 1; }
 		bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh" \
 			|| { log "The signed dev prerelease could not be installed and opened (reason above)."; return 1; }
 		log "Three steps may need you: if System Settings opens Accessibility, switch on the entry Ergopti's dialog"
