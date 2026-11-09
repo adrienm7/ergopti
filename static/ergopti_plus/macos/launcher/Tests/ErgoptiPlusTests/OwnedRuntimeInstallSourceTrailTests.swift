@@ -65,3 +65,33 @@ extension OwnedRuntimeInstallSourceTrailTests {
 		XCTAssertEqual(trail, "")
 	}
 }
+
+extension OwnedRuntimeInstallSourceTrailTests {
+	/// The helper runs under the private umask 077; the folders it publishes must still be readable by the user.
+	func testPublishedFoldersAreReadableUnderThePrivateUmask() throws {
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		guard let resolved = realpath(NSTemporaryDirectory(), nil) else { throw CaptureFailure(errno: errno) }
+		let temporary = String(cString: resolved); free(resolved)
+		let base = URL(fileURLWithPath: temporary, isDirectory: true)
+			.appendingPathComponent("ergopti-published-mode-" + UUID().uuidString, isDirectory: true)
+		let source = base.appendingPathComponent("source", isDirectory: true)
+		try FileManager.default.createDirectory(at: source.appendingPathComponent("bin"), withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o755])
+		try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: source.path)
+		defer { try? FileManager.default.removeItem(at: base) }
+		try Data("cli".utf8).write(to: source.appendingPathComponent("bin/cli"))
+		let copy = base.appendingPathComponent("copy")
+		// Field report 2026-11-09: under the helper's umask the published Runtime came out drwx------.
+		let previous = umask(kPrivateProcessUmask)
+		defer { _ = umask(previous) }
+		try OwnedRuntimeInstallWorker.fixtureCopy(source: source, destination: copy)
+		for folder in [copy, copy.appendingPathComponent("bin")] {
+			var observed = stat()
+			XCTAssertEqual(lstat(folder.path, &observed), 0, folder.path)
+			XCTAssertEqual(observed.st_mode & 0o777, OwnedRuntimeInstallScratch.publishedDirectoryMode, folder.path)
+		}
+		#else
+		throw XCTSkip("The install worker fixtures exist only in debug test builds.")
+		#endif
+	}
+}

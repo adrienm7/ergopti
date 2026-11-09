@@ -33,8 +33,9 @@ import tarfile
 # last number whenever the signed products or the artifact shape change (.2:
 # the artifact became the signed installer helper instead of Runtime/; .3: its
 # first install also starts the Core service and loads the VirtualHIDDevice job;
-# .4: the helper names each source refusal on its install trail).
-RUNTIME_VERSION = "16.3.0-ergopti.4"
+# .4: the helper names each source refusal on its install trail; .5: its
+# published folders are 0755 whatever its private umask).
+RUNTIME_VERSION = "16.3.0-ergopti.5"
 FILE_PREFIX = "ErgoptiPlus-Remap-Runtime-"
 FILE_SUFFIX = ".tar.gz"
 RELEASE_TAG_PREFIX = "remap-runtime-v"
