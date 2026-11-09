@@ -62,6 +62,11 @@ final class OwnedRuntimeInstallScratch {
 	private var directories: [String: Int32] = [:]
 	private var published = false
 	private let afterCreation: ((String, Int32) throws -> Void)?
+	/// The mode of every directory a scratch creates. The installer helper runs under the private umask 077
+	/// (InstallerMain.swift), and mkdirat applies it: the published Runtime folders came out 0700, so the
+	/// user's launcher could not read the runtime it had just installed and called it not installed (field
+	/// report 2026-11-09). Set explicitly, the mode no longer depends on the creating process's umask.
+	static let publishedDirectoryMode: mode_t = 0o755
 	init(destination: URL, protected: Bool, afterCreation: ((String, Int32) throws -> Void)? = nil) throws {
 		self.afterCreation = afterCreation
 		parentTree = try OwnedRuntimeInstallTree(root: destination.deletingLastPathComponent(), protected: protected, includeChildren: false)
@@ -78,6 +83,10 @@ final class OwnedRuntimeInstallScratch {
 	private func retain(parent: Int32, name: String, relative: String, directory: Bool, opened: Int32? = nil) throws {
 		let descriptor = opened ?? openat(parent, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (directory ? O_DIRECTORY : 0))
 		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
+		if directory && fchmod(descriptor, Self.publishedDirectoryMode) != 0 {
+			let failure = OwnedRuntimeInstallFailure.traced(.copy, "directory-mode-errno-" + String(errno) + "-" + relative)
+			Darwin.close(descriptor); throw failure
+		}
 		var held = stat(), named = stat()
 		guard fstat(descriptor, &held) == 0 else { Darwin.close(descriptor); throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		nodes.append(Node(descriptor: descriptor, parent: parent, name: name, relative: relative, identity: held, directory: directory))
