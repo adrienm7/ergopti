@@ -161,6 +161,19 @@ M.INSTALL_WAIT_SEC = 840
 --- Seconds between two looks at the driver while macOS waits for the approval.
 M.DRIVER_POLL_SEC = 5
 
+--- Seconds the install check waits for the owner to leave a transient state.
+--- The owner reads "starting" while it downloads and verifies the artifact,
+--- which took 14 s for a new pin behind the maintainer's proxy. With the
+--- driver wait it stays within the step's 900 s deadline (field_run.json).
+M.OWNER_SETTLE_SEC = 60
+
+--- Seconds between two looks at the owner while it settles.
+M.OWNER_POLL_SEC = 1
+
+--- Owner states that say nothing yet about the installed runtime: the check
+--- decides only once the owner has left them.
+M.TRANSIENT_OWNER_STATES = { uninitialized = true, idle = true, starting = true, stopping = true }
+
 --- The first install with no click of Ergopti's: when the owner reports a
 --- missing runtime, the install runs directly (the macOS administrator prompt
 --- is the one human step), then the driver approval pane opens and the check
@@ -194,22 +207,41 @@ function M.install(ports, report, finish)
 		end
 		look()
 	end
-	local reason = port.owner_reason()
-	if port.install_reasons()[reason] ~= true then
-		report.step("install_needed", "info", "no:" .. tostring(port.owner_state()) .. ":" .. tostring(reason))
-		report.step("installed", "skip", "not_needed")
-		return driver()
+	local function decide()
+		local reason = port.owner_reason()
+		if port.install_reasons()[reason] ~= true then
+			report.step("install_needed", "info", "no:" .. tostring(port.owner_state()) .. ":" .. tostring(reason))
+			report.step("installed", "skip", "not_needed")
+			return driver()
+		end
+		report.step("install_needed", "info", "yes:" .. tostring(reason))
+		port.install(function(ok, why)
+			if ok ~= true then
+				report.step("installed", "fail", tostring(why))
+				report.step("driver_active", "skip", "not_installed")
+				return finish()
+			end
+			report.step("installed", "pass", "installed")
+			driver()
+		end)
 	end
-	report.step("install_needed", "info", "yes:" .. tostring(reason))
-	port.install(function(ok, why)
-		if ok ~= true then
-			report.step("installed", "fail", tostring(why))
-			report.step("driver_active", "skip", "not_installed")
+	-- Field report 2026-11-09: the check read "starting" while the owner was
+	-- still fetching a new artifact, took it for an installed runtime and
+	-- skipped the install that the owner reported missing 11 s later.
+	local settled_wait = 0
+	local function settle()
+		local state = port.owner_state()
+		if M.TRANSIENT_OWNER_STATES[state] ~= true then return decide() end
+		if settled_wait >= M.OWNER_SETTLE_SEC then
+			report.step("install_needed", "fail", "owner_unsettled:" .. tostring(state))
+			report.step("installed", "skip", "owner_unsettled")
+			report.step("driver_active", "skip", "owner_unsettled")
 			return finish()
 		end
-		report.step("installed", "pass", "installed")
-		driver()
-	end)
+		settled_wait = settled_wait + M.OWNER_POLL_SEC
+		ports.after(M.OWNER_POLL_SEC, settle)
+	end
+	settle()
 end
 
 return M
