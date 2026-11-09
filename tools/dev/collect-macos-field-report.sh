@@ -355,6 +355,12 @@ step owned_runtime sh -c '
 		echo "console parent: no owned Console running"
 	fi
 ' sh "${ERGOPTI_SERVICE_LABEL_MACOS_CORE}" "${ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID}" "${ERGOPTI_APP_BUNDLE}"
+# Every file a first install left in the owned runtime's parent folder (the
+# stage, the journal, a partial Runtime), with owners, modes and ACLs: a failed
+# install of 2026-11-08 left a Runtime folder that blocked the next one, and
+# only a person typing ls could see it. It is listed again after the run.
+OWNED_RUNTIME_FILES='p="/Library/Application Support/ErgoptiPlus"; if [ -e "$p" ]; then ls -laeR "$p" 2>&1 | head -n 400; else echo "absent: $p"; fi'
+step owned_runtime_files sh -c "${OWNED_RUNTIME_FILES}"
 
 # ===========================================
 # ======= 3/ Field run in the app ===========
@@ -634,6 +640,7 @@ field_run_status=${PIPESTATUS[0]}
 # launcher whose strict signature fails
 # (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
 step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
+step owned_runtime_files_after sh -c "${OWNED_RUNTIME_FILES}"
 # What no command can do on its own, said once instead of faked.
 cat > "${out}/not_automated.txt" <<'NOTE'
 typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;
