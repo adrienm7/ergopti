@@ -28,8 +28,8 @@ the field-run step or the hand action that proves it and the commits it confirms
       serialization (0aae34e00c). 36805b170a keeps the exit code, the launch streams and the startup logs in
       `windows-compiled-upgrade-evidence/failure-diagnostics`: read them on the next failure.
       Read on run 42619305563 attempt 1 (4c809ea0fb, 2026-11-09; attempt 2 passed): the upgraded exe reached
-      « Driver fully initialised — ready », logged `[HttpClient] Curl child termination was refused; retaining
-    the exact request for retry` 0.5 s later, then exited non-zero with empty stdout and stderr. Lead: a curl
+      « Driver fully initialised — ready », logged « [HttpClient] Curl child termination was refused »
+      0.5 s later, then exited non-zero with empty stdout and stderr. Lead: a curl
       child still running when the smoke quits makes the exit fail; check how the quit path settles an in-flight
       HttpClient request and why its termination is refused.
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
