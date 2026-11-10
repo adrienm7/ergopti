@@ -40,6 +40,8 @@ local EVENT_TYPES = {
 	"llm_generation_failed", "sys_autocorrect",
 	"session_start", "session_end", "idle_start", "idle_end",
 	"clipboard_copy", "clipboard_paste", "paste_burst",
+	"window_move", "window_resize", "window_state_change", "monitor_focus_change",
+	"screen_recording_start", "screen_recording_end",
 }
 
 -- Timestamp shape the builders slice for the denormalised `date` column.

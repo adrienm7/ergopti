@@ -1,0 +1,117 @@
+--- tests/unit/modules/keystats/storage/test_window_topology_rows.lua
+
+--- ==============================================================================
+--- MODULE: macOS Window Topology And Capture Presence Rows
+--- DESCRIPTION:
+--- Windows records the focused window's moves, resizes, state and monitor
+--- changes in events_window_topo and the presence of a capture program in
+--- events_av; macOS recorded neither, and build_inserts discarded any such
+--- entry as an unknown type. These tests drive the real watcher over scripted
+--- ports and the real writer, so the join from the reading to the row is
+--- proven, not each half alone.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+--- Starts a fresh watcher over scripted ports.
+--- @return table watcher, table entries, table control
+local function scripted()
+	local Watcher = helpers.load_with_stubs("modules.keystats.topology_watcher")
+	local Timings = require("infra.timings")
+	local entries, now, observation, ids, private = {}, 0, nil, {}, false
+	helpers.assert_true(Watcher.start({
+		append = function(entry) entries[#entries + 1] = entry end,
+		app = function() return "Code" end,
+		private = function() return private end,
+		ports = {
+			focused = function() return observation end,
+			running_bundle_ids = function() return ids end,
+			now_ms = function() return now end,
+		},
+	}))
+	local topo_ms = Timings.ms("keystats", "topo_tick_ms")
+	local scan_ms = Timings.ms("keystats", "av_state_slow_tick_ms")
+	local control = {}
+	function control.window(window, x, y, w, h, state, monitor)
+		observation = { window = window, x = x, y = y, w = w, h = h, state = state or "normal", monitor = monitor }
+		Watcher.tick()
+		now = now + topo_ms
+	end
+	function control.ids(list) ids = list end
+	function control.scan() now = now + scan_ms; Watcher.tick() end
+	function control.private(value) private = value end
+	return Watcher, entries, control
+end
+
+helpers.describe("macOS window topology: the watcher", function()
+	helpers.it("macos-topology-move: a settled move is one window_move entry for the focused app", function()
+		local Watcher, entries, control = scripted()
+		control.window(3, 10, 10, 800, 600)
+		control.window(3, 200, 10, 800, 600)
+		control.window(3, 210, 12, 800, 600)
+		helpers.assert_eq(entries, { { type = "window_move", app = "Code", from_x = 10, from_y = 10, to_x = 210, to_y = 12 } })
+		Watcher.stop()
+	end)
+
+	helpers.it("macos-topology-monitor: a screen change by UUID is a monitor_focus_change", function()
+		local Watcher, entries, control = scripted()
+		local a, b = { id = "UUID-A", width = 1512 }, { id = "UUID-B", width = 2560 }
+		control.window(3, 10, 10, 800, 600, "normal", a)
+		control.window(3, 10, 10, 800, 600, "normal", b)
+		control.window(3, 10, 10, 800, 600, "normal", b)
+		helpers.assert_eq(entries, { { type = "monitor_focus_change", app = "Code", from_monitor = "UUID-A", to_monitor = "UUID-B" } })
+		Watcher.stop()
+	end)
+
+	helpers.it("macos-topology-private: a private window records nothing and is no baseline", function()
+		local Watcher, entries, control = scripted()
+		control.private(true)
+		control.window(3, 10, 10, 800, 600)
+		control.window(3, 400, 10, 800, 600)
+		control.window(3, 400, 10, 800, 600)
+		helpers.assert_eq(#entries, 0)
+		Watcher.stop()
+	end)
+
+	helpers.it("macos-capture-presence: bundle ids open and close the interval, stop closes it too", function()
+		local Watcher, entries, control = scripted()
+		control.ids({ "com.apple.Safari", "us.zoom.xos" })
+		control.scan()
+		control.ids(nil)
+		control.scan()
+		helpers.assert_eq(#entries, 1, "an unreadable application list is no end")
+		control.ids({ "com.apple.Safari" })
+		control.scan()
+		control.ids({ "com.obsproject.obs-studio" })
+		control.scan()
+		Watcher.stop()
+		helpers.assert_eq(entries, {
+			{ type = "screen_recording_start", app = "Code", exe = "us.zoom.xos" },
+			{ type = "screen_recording_end", app = "Code", exe = "us.zoom.xos" },
+			{ type = "screen_recording_start", app = "Code", exe = "com.obsproject.obs-studio" },
+			{ type = "screen_recording_end", app = "Code", exe = "com.obsproject.obs-studio" },
+		})
+		helpers.assert_eq(Watcher.is_running(), false)
+	end)
+end)
+
+helpers.describe("macOS window topology: the writer", function()
+	helpers.it("macos-topology-rows: each kind is an INSERT into its Windows table with its metadata", function()
+		local Writer = helpers.load_with_stubs("modules.keystats.sqlite_writer")
+		Writer.init({
+			paths = { db = "/tmp/ergopti_test.db" },
+			device_obj = { id = "test-device" },
+			device_id = "00000000-0000-4000-8000-000000000001",
+		})
+		local topo = Writer.build_inserts({ type = "window_resize", timestamp = "2026-11-10 10:00:00.000",
+			app = "Code", old_w = 800, old_h = 600, new_w = 1000, new_h = 700 })
+		helpers.assert_eq(#topo, 1)
+		helpers.assert_true(topo[1]:find("INSERT OR IGNORE INTO events_window_topo", 1, true) == 1, topo[1])
+		helpers.assert_true(topo[1]:find("'window_resize', 'Code'", 1, true) ~= nil, topo[1])
+		helpers.assert_true(topo[1]:find('"new_w":1000', 1, true) ~= nil, topo[1])
+		local av = Writer.build_inserts({ type = "screen_recording_start", timestamp = "2026-11-10 10:00:00.000",
+			app = "Code", exe = "us.zoom.xos" })
+		helpers.assert_true(av[1]:find("INSERT OR IGNORE INTO events_av", 1, true) == 1, av[1])
+		helpers.assert_true(av[1]:find('{"exe":"us.zoom.xos"}', 1, true) ~= nil, av[1])
+	end)
+end)
