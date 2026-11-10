@@ -3606,6 +3606,40 @@ jobs:
               exit 1
           fi
         timeout-minutes: 3
+      # Enabling the AI beside a system Ollama starts Ergopti's own on its port, and a
+      # PAC GIO cannot download warns, then the pull goes direct (Ollama stand-in).
+      - name: Qualify the owned Ollama start and PAC-unreachable pull
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/run_owned_ollama_container.py
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+      # The AI menu's detection names the local servers that run, each on the port
+      # its command line, settings file or listening socket gives (stand-ins).
+      - name: Qualify the local server detection
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/run_local_servers_container.py
+          else
+              exit 1
+          fi
+        timeout-minutes: 3
       # Independent NIST vectors use retained, already unlinked descriptors.
       - name: Qualify native retained FD SHA-256
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}

@@ -533,9 +533,10 @@ const PROGRAMS = {
 	),
 	// The driver reads /proc instead; the hardware lanes probe procps first.
 	ps: optionalTool('procps process listing of the hardware lanes', HOST),
+	// The Ubuntu runner image ships iproute2 for the host proof (run_local_servers_container.py).
 	ss: why(
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
-		TEST,
+		['test', 'host'],
 		{
 			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? nodejs curl ;;' },
 			probed: true
