@@ -16,7 +16,10 @@
 ---    shrinking distance keeps the actions fired.
 --- 3. Reversal from the last fire: coming back half a first step rebases the
 ---    swipe there, so the opposite direction starts fresh, as on macOS.
---- 4. Pure: travel in, fire requests out, through the caller's fire function.
+--- 4. The mode and step are those of the slot that answers: an axis slot
+---    (swipe_N_horiz) standing in for an unbound left or right slot keeps its
+---    own mode, as macOS reads the mode of resolveSwipeSlot's answer.
+--- 5. Pure: travel in, fire requests out, through the caller's fire function.
 --- ==============================================================================
 
 local M = {}
@@ -33,13 +36,14 @@ M.REVERSE_FLOOR_MM = 1.0
 
 --- Creates a tracker.
 --- @param opts table { units_x, units_y (device units per mm), mode_of(slot), step_of(slot),
----   fire(slot, fingers, direction, count) -> fired count }
+---   slot_of(slot, fingers, direction) -> the slot whose mode and step apply (an axis slot
+---   answering for an unbound direction one), fire(slot, fingers, direction, count) -> fired count }
 --- @return table tracker
 function M.new(opts)
 	assert(type(opts) == "table", "incremental tracker needs its options")
 	assert(type(opts.units_x) == "number" and opts.units_x > 0 and type(opts.units_y) == "number" and opts.units_y > 0,
 		"incremental tracker needs the touchpad resolution in units per millimetre")
-	for _, name in ipairs({ "mode_of", "step_of", "fire" }) do
+	for _, name in ipairs({ "mode_of", "step_of", "slot_of", "fire" }) do
 		assert(type(opts[name]) == "function", "incremental tracker needs " .. name)
 	end
 	local tracker = {}
@@ -54,15 +58,19 @@ function M.new(opts)
 		if type(progress) ~= "table" then return end
 		local x, y = progress.dx / opts.units_x, progress.dy / opts.units_y
 		if not state or state.fingers ~= progress.fingers then
-			state = { fingers = progress.fingers, ox = x, oy = y, committed = 0, fired = state and state.fired or false }
+			-- The decoder's travel already starts where this finger count
+			-- started: the frames it took to hold the count are swipe too, and
+			-- a brisk swipe moves from its first frame.
+			state = { fingers = progress.fingers, ox = 0, oy = 0, committed = 0, fired = state and state.fired or false }
 		end
 		if state.dead then return end
 		local rx, ry = x - state.ox, y - state.oy
 		local direction = Direction.classify(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
 		if not direction then return end
 		local slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
-		if opts.mode_of(slot) ~= "incremental" then return end
-		local step = opts.step_of(slot)
+		local answering = opts.slot_of(slot, progress.fingers, direction)
+		if opts.mode_of(answering) ~= "incremental" then return end
+		local step = opts.step_of(answering)
 
 		local horizontal = direction == "left" or direction == "right"
 		local vertical = direction == "up" or direction == "down"

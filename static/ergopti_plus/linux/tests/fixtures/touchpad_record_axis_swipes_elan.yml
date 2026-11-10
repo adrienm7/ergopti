@@ -1,0 +1,818 @@
+version: 1
+ndevices: 1
+libinput:
+  version: '1.25.0'
+  git: 'unknown'
+system:
+  os: 'ubuntu:24.04'
+  kernel: '6.8.0-47-generic'
+  dmi: 'dmi:bvnLENOVO:bvrN32ET86W:svnLENOVO'
+# ergopti-expect: fingers=3 direction=left tap=false
+# ergopti-expect: fingers=3 direction=right tap=false
+devices:
+  - node: /dev/input/event7
+    evdev:
+      # Name: ELAN0670:00 04F3:3150 Touchpad
+      # ID: bus 0x18 vendor 0x4f3 product 0x3150 version 0x100
+      # Supported Events:
+      # Event type 0 (EV_SYN)
+      # Event type 1 (EV_KEY)
+      #   Event code 272 (BTN_LEFT)
+      #   Event code 325 (BTN_TOOL_FINGER)
+      #   Event code 328 (BTN_TOOL_QUINTTAP)
+      #   Event code 330 (BTN_TOUCH)
+      #   Event code 333 (BTN_TOOL_DOUBLETAP)
+      #   Event code 334 (BTN_TOOL_TRIPLETAP)
+      #   Event code 335 (BTN_TOOL_QUADTAP)
+      # Event type 3 (EV_ABS)
+      #   Event code 0 (ABS_X)
+      #       Value      0
+      #       Min         0
+      #       Max      3000
+      #       Fuzz       0
+      #       Flat       0
+      #       Resolution  30
+      #   Event code 1 (ABS_Y)
+      #       Value      0
+      #       Min         0
+      #       Max      2000
+      #       Fuzz       0
+      #       Flat       0
+      #       Resolution  30
+      #   Event code 47 (ABS_MT_SLOT)
+      #       Value      0
+      #       Min         0
+      #       Max         4
+      #       Fuzz       0
+      #       Flat       0
+      #       Resolution   0
+      #   Event code 53 (ABS_MT_POSITION_X)
+      #       Value      0
+      #       Min         0
+      #       Max      3000
+      #       Fuzz       0
+      #       Flat       0
+      #       Resolution  30
+      #   Event code 54 (ABS_MT_POSITION_Y)
+      #       Value      0
+      #       Min         0
+      #       Max      2000
+      #       Fuzz       0
+      #       Flat       0
+      #       Resolution  30
+      #   Event code 57 (ABS_MT_TRACKING_ID)
+      #       Value      0
+      #       Min         0
+      #       Max     65535
+      #       Fuzz       0
+      #       Flat       0
+      #       Resolution   0
+      # Event type 4 (EV_MSC)
+      #   Event code 5 (MSC_TIMESTAMP)
+      # Properties:
+      #   Property 0
+      #   Property 2
+      #   Property 4
+      name: 'ELAN0670:00 04F3:3150 Touchpad'
+      id: [24, 1267, 12624, 256]
+      codes:
+        0: [0, 1, 2, 3, 4] # EV_SYN
+        1: [272, 325, 328, 330, 333, 334, 335] # EV_KEY
+        3: [0, 1, 47, 53, 54, 57] # EV_ABS
+        4: [5] # EV_MSC
+      absinfo:
+        0: [0, 3000, 0, 0, 30]
+        1: [0, 2000, 0, 0, 30]
+        47: [0, 4, 0, 0, 0]
+        53: [0, 3000, 0, 0, 30]
+        54: [0, 2000, 0, 0, 30]
+        57: [0, 65535, 0, 0, 0]
+      properties: [0, 2, 4]
+    hid: []
+    udev:
+      properties:
+        - ID_INPUT=1
+        - ID_INPUT_TOUCHPAD=1
+    quirks:
+    events:
+      # A three-finger swipe left, 25 mm
+      - evdev:
+          - [0, 0, 3, 57, 300] # EV_ABS / ABS_MT_TRACKING_ID     300
+          - [0, 0, 3, 53, 1200] # EV_ABS / ABS_MT_POSITION_X      1200
+          - [0, 0, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 0, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 0, 3, 57, 301] # EV_ABS / ABS_MT_TRACKING_ID     301
+          - [0, 0, 3, 53, 1500] # EV_ABS / ABS_MT_POSITION_X      1500
+          - [0, 0, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 0, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 0, 3, 57, 302] # EV_ABS / ABS_MT_TRACKING_ID     302
+          - [0, 0, 3, 53, 1800] # EV_ABS / ABS_MT_POSITION_X      1800
+          - [0, 0, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 0, 1, 330, 1] # EV_KEY / BTN_TOUCH              1
+          - [0, 0, 1, 334, 1] # EV_KEY / BTN_TOOL_TRIPLETAP     1
+          - [0, 0, 3, 0, 1200] # EV_ABS / ABS_X                  1200
+          - [0, 0, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [0, 0, 4, 5, 0] # EV_MSC / MSC_TIMESTAMP          0
+          - [0, 0, 0, 0, 0] # ------------ SYN_REPORT (0) ----------
+      - evdev:
+          - [0, 7000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 7000, 3, 53, 1170] # EV_ABS / ABS_MT_POSITION_X      1170
+          - [0, 7000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 7000, 3, 53, 1470] # EV_ABS / ABS_MT_POSITION_X      1470
+          - [0, 7000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 7000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 7000, 3, 53, 1770] # EV_ABS / ABS_MT_POSITION_X      1770
+          - [0, 7000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 7000, 3, 0, 1170] # EV_ABS / ABS_X                  1170
+          - [0, 7000, 4, 5, 7000] # EV_MSC / MSC_TIMESTAMP          7000
+          - [0, 7000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 14000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 14000, 3, 53, 1140] # EV_ABS / ABS_MT_POSITION_X      1140
+          - [0, 14000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 14000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 14000, 3, 53, 1440] # EV_ABS / ABS_MT_POSITION_X      1440
+          - [0, 14000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 14000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 14000, 3, 53, 1740] # EV_ABS / ABS_MT_POSITION_X      1740
+          - [0, 14000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 14000, 3, 0, 1140] # EV_ABS / ABS_X                  1140
+          - [0, 14000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [0, 14000, 4, 5, 14000] # EV_MSC / MSC_TIMESTAMP          14000
+          - [0, 14000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 21000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 21000, 3, 53, 1110] # EV_ABS / ABS_MT_POSITION_X      1110
+          - [0, 21000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 21000, 3, 53, 1410] # EV_ABS / ABS_MT_POSITION_X      1410
+          - [0, 21000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 21000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 21000, 3, 53, 1710] # EV_ABS / ABS_MT_POSITION_X      1710
+          - [0, 21000, 3, 0, 1110] # EV_ABS / ABS_X                  1110
+          - [0, 21000, 4, 5, 21000] # EV_MSC / MSC_TIMESTAMP          21000
+          - [0, 21000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 28000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 28000, 3, 53, 1080] # EV_ABS / ABS_MT_POSITION_X      1080
+          - [0, 28000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 28000, 3, 53, 1380] # EV_ABS / ABS_MT_POSITION_X      1380
+          - [0, 28000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 28000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 28000, 3, 53, 1680] # EV_ABS / ABS_MT_POSITION_X      1680
+          - [0, 28000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 28000, 3, 0, 1080] # EV_ABS / ABS_X                  1080
+          - [0, 28000, 4, 5, 28000] # EV_MSC / MSC_TIMESTAMP          28000
+          - [0, 28000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 35000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 35000, 3, 53, 1050] # EV_ABS / ABS_MT_POSITION_X      1050
+          - [0, 35000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 35000, 3, 53, 1350] # EV_ABS / ABS_MT_POSITION_X      1350
+          - [0, 35000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 35000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 35000, 3, 53, 1650] # EV_ABS / ABS_MT_POSITION_X      1650
+          - [0, 35000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 35000, 3, 0, 1050] # EV_ABS / ABS_X                  1050
+          - [0, 35000, 4, 5, 35000] # EV_MSC / MSC_TIMESTAMP          35000
+          - [0, 35000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 42000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 42000, 3, 53, 1020] # EV_ABS / ABS_MT_POSITION_X      1020
+          - [0, 42000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 42000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 42000, 3, 53, 1320] # EV_ABS / ABS_MT_POSITION_X      1320
+          - [0, 42000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 42000, 3, 53, 1620] # EV_ABS / ABS_MT_POSITION_X      1620
+          - [0, 42000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 42000, 3, 0, 1020] # EV_ABS / ABS_X                  1020
+          - [0, 42000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [0, 42000, 4, 5, 42000] # EV_MSC / MSC_TIMESTAMP          42000
+          - [0, 42000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 49000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 49000, 3, 53, 990] # EV_ABS / ABS_MT_POSITION_X      990
+          - [0, 49000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 49000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 49000, 3, 53, 1290] # EV_ABS / ABS_MT_POSITION_X      1290
+          - [0, 49000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 49000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 49000, 3, 53, 1590] # EV_ABS / ABS_MT_POSITION_X      1590
+          - [0, 49000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 49000, 3, 0, 990] # EV_ABS / ABS_X                  990
+          - [0, 49000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [0, 49000, 4, 5, 49000] # EV_MSC / MSC_TIMESTAMP          49000
+          - [0, 49000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 56000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 56000, 3, 53, 960] # EV_ABS / ABS_MT_POSITION_X      960
+          - [0, 56000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 56000, 3, 53, 1260] # EV_ABS / ABS_MT_POSITION_X      1260
+          - [0, 56000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 56000, 3, 53, 1560] # EV_ABS / ABS_MT_POSITION_X      1560
+          - [0, 56000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 56000, 3, 0, 960] # EV_ABS / ABS_X                  960
+          - [0, 56000, 4, 5, 56000] # EV_MSC / MSC_TIMESTAMP          56000
+          - [0, 56000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 63000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 63000, 3, 53, 930] # EV_ABS / ABS_MT_POSITION_X      930
+          - [0, 63000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 63000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 63000, 3, 53, 1230] # EV_ABS / ABS_MT_POSITION_X      1230
+          - [0, 63000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 63000, 3, 53, 1530] # EV_ABS / ABS_MT_POSITION_X      1530
+          - [0, 63000, 3, 0, 930] # EV_ABS / ABS_X                  930
+          - [0, 63000, 3, 1, 899] # EV_ABS / ABS_Y                  899
+          - [0, 63000, 4, 5, 63000] # EV_MSC / MSC_TIMESTAMP          63000
+          - [0, 63000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 70000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 70000, 3, 53, 900] # EV_ABS / ABS_MT_POSITION_X      900
+          - [0, 70000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 70000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 70000, 3, 53, 1200] # EV_ABS / ABS_MT_POSITION_X      1200
+          - [0, 70000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 70000, 3, 53, 1500] # EV_ABS / ABS_MT_POSITION_X      1500
+          - [0, 70000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 70000, 3, 0, 900] # EV_ABS / ABS_X                  900
+          - [0, 70000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [0, 70000, 4, 5, 70000] # EV_MSC / MSC_TIMESTAMP          70000
+          - [0, 70000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 77000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 77000, 3, 53, 870] # EV_ABS / ABS_MT_POSITION_X      870
+          - [0, 77000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 77000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 77000, 3, 53, 1170] # EV_ABS / ABS_MT_POSITION_X      1170
+          - [0, 77000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 77000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 77000, 3, 53, 1470] # EV_ABS / ABS_MT_POSITION_X      1470
+          - [0, 77000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 77000, 3, 0, 870] # EV_ABS / ABS_X                  870
+          - [0, 77000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [0, 77000, 4, 5, 77000] # EV_MSC / MSC_TIMESTAMP          77000
+          - [0, 77000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 84000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 84000, 3, 53, 840] # EV_ABS / ABS_MT_POSITION_X      840
+          - [0, 84000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 84000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 84000, 3, 53, 1140] # EV_ABS / ABS_MT_POSITION_X      1140
+          - [0, 84000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 84000, 3, 53, 1440] # EV_ABS / ABS_MT_POSITION_X      1440
+          - [0, 84000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 84000, 3, 0, 840] # EV_ABS / ABS_X                  840
+          - [0, 84000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [0, 84000, 4, 5, 84000] # EV_MSC / MSC_TIMESTAMP          84000
+          - [0, 84000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 91000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 91000, 3, 53, 810] # EV_ABS / ABS_MT_POSITION_X      810
+          - [0, 91000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 91000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 91000, 3, 53, 1110] # EV_ABS / ABS_MT_POSITION_X      1110
+          - [0, 91000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 91000, 3, 53, 1410] # EV_ABS / ABS_MT_POSITION_X      1410
+          - [0, 91000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 91000, 3, 0, 810] # EV_ABS / ABS_X                  810
+          - [0, 91000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [0, 91000, 4, 5, 91000] # EV_MSC / MSC_TIMESTAMP          91000
+          - [0, 91000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 98000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 98000, 3, 53, 780] # EV_ABS / ABS_MT_POSITION_X      780
+          - [0, 98000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 98000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 98000, 3, 53, 1080] # EV_ABS / ABS_MT_POSITION_X      1080
+          - [0, 98000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 98000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 98000, 3, 53, 1380] # EV_ABS / ABS_MT_POSITION_X      1380
+          - [0, 98000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 98000, 3, 0, 780] # EV_ABS / ABS_X                  780
+          - [0, 98000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [0, 98000, 4, 5, 98000] # EV_MSC / MSC_TIMESTAMP          98000
+          - [0, 98000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 105000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 105000, 3, 53, 750] # EV_ABS / ABS_MT_POSITION_X      750
+          - [0, 105000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 105000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 105000, 3, 53, 1050] # EV_ABS / ABS_MT_POSITION_X      1050
+          - [0, 105000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 105000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 105000, 3, 53, 1350] # EV_ABS / ABS_MT_POSITION_X      1350
+          - [0, 105000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 105000, 3, 0, 750] # EV_ABS / ABS_X                  750
+          - [0, 105000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [0, 105000, 4, 5, 105000] # EV_MSC / MSC_TIMESTAMP          105000
+          - [0, 105000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 112000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 112000, 3, 53, 720] # EV_ABS / ABS_MT_POSITION_X      720
+          - [0, 112000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 112000, 3, 53, 1020] # EV_ABS / ABS_MT_POSITION_X      1020
+          - [0, 112000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 112000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 112000, 3, 53, 1320] # EV_ABS / ABS_MT_POSITION_X      1320
+          - [0, 112000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 112000, 3, 0, 720] # EV_ABS / ABS_X                  720
+          - [0, 112000, 4, 5, 112000] # EV_MSC / MSC_TIMESTAMP          112000
+          - [0, 112000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 119000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 119000, 3, 53, 690] # EV_ABS / ABS_MT_POSITION_X      690
+          - [0, 119000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 119000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 119000, 3, 53, 990] # EV_ABS / ABS_MT_POSITION_X      990
+          - [0, 119000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 119000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 119000, 3, 53, 1290] # EV_ABS / ABS_MT_POSITION_X      1290
+          - [0, 119000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 119000, 3, 0, 690] # EV_ABS / ABS_X                  690
+          - [0, 119000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [0, 119000, 4, 5, 119000] # EV_MSC / MSC_TIMESTAMP          119000
+          - [0, 119000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 126000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 126000, 3, 53, 660] # EV_ABS / ABS_MT_POSITION_X      660
+          - [0, 126000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 126000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 126000, 3, 53, 960] # EV_ABS / ABS_MT_POSITION_X      960
+          - [0, 126000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 126000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 126000, 3, 53, 1260] # EV_ABS / ABS_MT_POSITION_X      1260
+          - [0, 126000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 126000, 3, 0, 660] # EV_ABS / ABS_X                  660
+          - [0, 126000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [0, 126000, 4, 5, 126000] # EV_MSC / MSC_TIMESTAMP          126000
+          - [0, 126000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 133000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 133000, 3, 53, 630] # EV_ABS / ABS_MT_POSITION_X      630
+          - [0, 133000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 133000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 133000, 3, 53, 930] # EV_ABS / ABS_MT_POSITION_X      930
+          - [0, 133000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 133000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 133000, 3, 53, 1230] # EV_ABS / ABS_MT_POSITION_X      1230
+          - [0, 133000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 133000, 3, 0, 630] # EV_ABS / ABS_X                  630
+          - [0, 133000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [0, 133000, 4, 5, 133000] # EV_MSC / MSC_TIMESTAMP          133000
+          - [0, 133000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 140000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 140000, 3, 53, 600] # EV_ABS / ABS_MT_POSITION_X      600
+          - [0, 140000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 140000, 3, 53, 900] # EV_ABS / ABS_MT_POSITION_X      900
+          - [0, 140000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 140000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 140000, 3, 53, 1200] # EV_ABS / ABS_MT_POSITION_X      1200
+          - [0, 140000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 140000, 3, 0, 600] # EV_ABS / ABS_X                  600
+          - [0, 140000, 4, 5, 140000] # EV_MSC / MSC_TIMESTAMP          140000
+          - [0, 140000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 147000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 147000, 3, 53, 570] # EV_ABS / ABS_MT_POSITION_X      570
+          - [0, 147000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 147000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 147000, 3, 53, 870] # EV_ABS / ABS_MT_POSITION_X      870
+          - [0, 147000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 147000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 147000, 3, 53, 1170] # EV_ABS / ABS_MT_POSITION_X      1170
+          - [0, 147000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 147000, 3, 0, 570] # EV_ABS / ABS_X                  570
+          - [0, 147000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [0, 147000, 4, 5, 147000] # EV_MSC / MSC_TIMESTAMP          147000
+          - [0, 147000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 154000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 154000, 3, 53, 540] # EV_ABS / ABS_MT_POSITION_X      540
+          - [0, 154000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 154000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 154000, 3, 53, 840] # EV_ABS / ABS_MT_POSITION_X      840
+          - [0, 154000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 154000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 154000, 3, 53, 1140] # EV_ABS / ABS_MT_POSITION_X      1140
+          - [0, 154000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 154000, 3, 0, 540] # EV_ABS / ABS_X                  540
+          - [0, 154000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [0, 154000, 4, 5, 154000] # EV_MSC / MSC_TIMESTAMP          154000
+          - [0, 154000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 161000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 161000, 3, 53, 510] # EV_ABS / ABS_MT_POSITION_X      510
+          - [0, 161000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 161000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 161000, 3, 53, 810] # EV_ABS / ABS_MT_POSITION_X      810
+          - [0, 161000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [0, 161000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 161000, 3, 53, 1110] # EV_ABS / ABS_MT_POSITION_X      1110
+          - [0, 161000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 161000, 3, 0, 510] # EV_ABS / ABS_X                  510
+          - [0, 161000, 3, 1, 899] # EV_ABS / ABS_Y                  899
+          - [0, 161000, 4, 5, 161000] # EV_MSC / MSC_TIMESTAMP          161000
+          - [0, 161000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 168000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 168000, 3, 53, 480] # EV_ABS / ABS_MT_POSITION_X      480
+          - [0, 168000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 168000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 168000, 3, 53, 780] # EV_ABS / ABS_MT_POSITION_X      780
+          - [0, 168000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 168000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 168000, 3, 53, 1080] # EV_ABS / ABS_MT_POSITION_X      1080
+          - [0, 168000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 168000, 3, 0, 480] # EV_ABS / ABS_X                  480
+          - [0, 168000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [0, 168000, 4, 5, 168000] # EV_MSC / MSC_TIMESTAMP          168000
+          - [0, 168000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 175000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 175000, 3, 53, 450] # EV_ABS / ABS_MT_POSITION_X      450
+          - [0, 175000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 175000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 175000, 3, 53, 750] # EV_ABS / ABS_MT_POSITION_X      750
+          - [0, 175000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 175000, 3, 53, 1050] # EV_ABS / ABS_MT_POSITION_X      1050
+          - [0, 175000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [0, 175000, 3, 0, 450] # EV_ABS / ABS_X                  450
+          - [0, 175000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [0, 175000, 4, 5, 175000] # EV_MSC / MSC_TIMESTAMP          175000
+          - [0, 175000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [0, 182000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 182000, 3, 57, -1] # EV_ABS / ABS_MT_TRACKING_ID     -1
+          - [0, 182000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 182000, 3, 57, -1] # EV_ABS / ABS_MT_TRACKING_ID     -1
+          - [0, 182000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 182000, 3, 57, -1] # EV_ABS / ABS_MT_TRACKING_ID     -1
+          - [0, 182000, 1, 334, 0] # EV_KEY / BTN_TOOL_TRIPLETAP     0
+          - [0, 182000, 1, 330, 0] # EV_KEY / BTN_TOUCH              0
+          - [0, 182000, 4, 5, 182000] # EV_MSC / MSC_TIMESTAMP          182000
+          - [0, 182000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      # A three-finger swipe right, 25 mm
+      - evdev:
+          - [0, 989000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 989000, 3, 57, 303] # EV_ABS / ABS_MT_TRACKING_ID     303
+          - [0, 989000, 3, 53, 1200] # EV_ABS / ABS_MT_POSITION_X      1200
+          - [0, 989000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 989000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 989000, 3, 57, 304] # EV_ABS / ABS_MT_TRACKING_ID     304
+          - [0, 989000, 3, 53, 1500] # EV_ABS / ABS_MT_POSITION_X      1500
+          - [0, 989000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 989000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 989000, 3, 57, 305] # EV_ABS / ABS_MT_TRACKING_ID     305
+          - [0, 989000, 3, 53, 1800] # EV_ABS / ABS_MT_POSITION_X      1800
+          - [0, 989000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [0, 989000, 1, 330, 1] # EV_KEY / BTN_TOUCH              1
+          - [0, 989000, 1, 334, 1] # EV_KEY / BTN_TOOL_TRIPLETAP     1
+          - [0, 989000, 3, 0, 1200] # EV_ABS / ABS_X                  1200
+          - [0, 989000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [0, 989000, 4, 5, 989000] # EV_MSC / MSC_TIMESTAMP          989000
+          - [0, 989000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +807ms
+      - evdev:
+          - [0, 996000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [0, 996000, 3, 53, 1230] # EV_ABS / ABS_MT_POSITION_X      1230
+          - [0, 996000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [0, 996000, 3, 53, 1530] # EV_ABS / ABS_MT_POSITION_X      1530
+          - [0, 996000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [0, 996000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [0, 996000, 3, 53, 1830] # EV_ABS / ABS_MT_POSITION_X      1830
+          - [0, 996000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [0, 996000, 3, 0, 1230] # EV_ABS / ABS_X                  1230
+          - [0, 996000, 4, 5, 996000] # EV_MSC / MSC_TIMESTAMP          996000
+          - [0, 996000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 3000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 3000, 3, 53, 1260] # EV_ABS / ABS_MT_POSITION_X      1260
+          - [1, 3000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 3000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 3000, 3, 53, 1560] # EV_ABS / ABS_MT_POSITION_X      1560
+          - [1, 3000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 3000, 3, 53, 1860] # EV_ABS / ABS_MT_POSITION_X      1860
+          - [1, 3000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 3000, 3, 0, 1260] # EV_ABS / ABS_X                  1260
+          - [1, 3000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [1, 3000, 4, 5, 1003000] # EV_MSC / MSC_TIMESTAMP          1003000
+          - [1, 3000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 10000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 10000, 3, 53, 1290] # EV_ABS / ABS_MT_POSITION_X      1290
+          - [1, 10000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 10000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 10000, 3, 53, 1590] # EV_ABS / ABS_MT_POSITION_X      1590
+          - [1, 10000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 10000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 10000, 3, 53, 1890] # EV_ABS / ABS_MT_POSITION_X      1890
+          - [1, 10000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 10000, 3, 0, 1290] # EV_ABS / ABS_X                  1290
+          - [1, 10000, 3, 1, 899] # EV_ABS / ABS_Y                  899
+          - [1, 10000, 4, 5, 1010000] # EV_MSC / MSC_TIMESTAMP          1010000
+          - [1, 10000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 17000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 17000, 3, 53, 1320] # EV_ABS / ABS_MT_POSITION_X      1320
+          - [1, 17000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 17000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 17000, 3, 53, 1620] # EV_ABS / ABS_MT_POSITION_X      1620
+          - [1, 17000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 17000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 17000, 3, 53, 1920] # EV_ABS / ABS_MT_POSITION_X      1920
+          - [1, 17000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 17000, 3, 0, 1320] # EV_ABS / ABS_X                  1320
+          - [1, 17000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [1, 17000, 4, 5, 1017000] # EV_MSC / MSC_TIMESTAMP          1017000
+          - [1, 17000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 24000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 24000, 3, 53, 1350] # EV_ABS / ABS_MT_POSITION_X      1350
+          - [1, 24000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 24000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 24000, 3, 53, 1650] # EV_ABS / ABS_MT_POSITION_X      1650
+          - [1, 24000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 24000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 24000, 3, 53, 1950] # EV_ABS / ABS_MT_POSITION_X      1950
+          - [1, 24000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 24000, 3, 0, 1350] # EV_ABS / ABS_X                  1350
+          - [1, 24000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [1, 24000, 4, 5, 1024000] # EV_MSC / MSC_TIMESTAMP          1024000
+          - [1, 24000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 31000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 31000, 3, 53, 1380] # EV_ABS / ABS_MT_POSITION_X      1380
+          - [1, 31000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 31000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 31000, 3, 53, 1680] # EV_ABS / ABS_MT_POSITION_X      1680
+          - [1, 31000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 31000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 31000, 3, 53, 1980] # EV_ABS / ABS_MT_POSITION_X      1980
+          - [1, 31000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 31000, 3, 0, 1380] # EV_ABS / ABS_X                  1380
+          - [1, 31000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [1, 31000, 4, 5, 1031000] # EV_MSC / MSC_TIMESTAMP          1031000
+          - [1, 31000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 38000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 38000, 3, 53, 1410] # EV_ABS / ABS_MT_POSITION_X      1410
+          - [1, 38000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 38000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 38000, 3, 53, 1710] # EV_ABS / ABS_MT_POSITION_X      1710
+          - [1, 38000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 38000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 38000, 3, 53, 2010] # EV_ABS / ABS_MT_POSITION_X      2010
+          - [1, 38000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 38000, 3, 0, 1410] # EV_ABS / ABS_X                  1410
+          - [1, 38000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [1, 38000, 4, 5, 1038000] # EV_MSC / MSC_TIMESTAMP          1038000
+          - [1, 38000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 45000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 45000, 3, 53, 1440] # EV_ABS / ABS_MT_POSITION_X      1440
+          - [1, 45000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 45000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 45000, 3, 53, 1740] # EV_ABS / ABS_MT_POSITION_X      1740
+          - [1, 45000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 45000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 45000, 3, 53, 2040] # EV_ABS / ABS_MT_POSITION_X      2040
+          - [1, 45000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 45000, 3, 0, 1440] # EV_ABS / ABS_X                  1440
+          - [1, 45000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [1, 45000, 4, 5, 1045000] # EV_MSC / MSC_TIMESTAMP          1045000
+          - [1, 45000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 52000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 52000, 3, 53, 1470] # EV_ABS / ABS_MT_POSITION_X      1470
+          - [1, 52000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 52000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 52000, 3, 53, 1770] # EV_ABS / ABS_MT_POSITION_X      1770
+          - [1, 52000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 52000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 52000, 3, 53, 2070] # EV_ABS / ABS_MT_POSITION_X      2070
+          - [1, 52000, 3, 0, 1470] # EV_ABS / ABS_X                  1470
+          - [1, 52000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [1, 52000, 4, 5, 1052000] # EV_MSC / MSC_TIMESTAMP          1052000
+          - [1, 52000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 59000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 59000, 3, 53, 1500] # EV_ABS / ABS_MT_POSITION_X      1500
+          - [1, 59000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 59000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 59000, 3, 53, 1800] # EV_ABS / ABS_MT_POSITION_X      1800
+          - [1, 59000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 59000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 59000, 3, 53, 2100] # EV_ABS / ABS_MT_POSITION_X      2100
+          - [1, 59000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 59000, 3, 0, 1500] # EV_ABS / ABS_X                  1500
+          - [1, 59000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [1, 59000, 4, 5, 1059000] # EV_MSC / MSC_TIMESTAMP          1059000
+          - [1, 59000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 66000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 66000, 3, 53, 1530] # EV_ABS / ABS_MT_POSITION_X      1530
+          - [1, 66000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 66000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 66000, 3, 53, 1830] # EV_ABS / ABS_MT_POSITION_X      1830
+          - [1, 66000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 66000, 3, 53, 2130] # EV_ABS / ABS_MT_POSITION_X      2130
+          - [1, 66000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 66000, 3, 0, 1530] # EV_ABS / ABS_X                  1530
+          - [1, 66000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [1, 66000, 4, 5, 1066000] # EV_MSC / MSC_TIMESTAMP          1066000
+          - [1, 66000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 73000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 73000, 3, 53, 1560] # EV_ABS / ABS_MT_POSITION_X      1560
+          - [1, 73000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 73000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 73000, 3, 53, 1860] # EV_ABS / ABS_MT_POSITION_X      1860
+          - [1, 73000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 73000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 73000, 3, 53, 2160] # EV_ABS / ABS_MT_POSITION_X      2160
+          - [1, 73000, 3, 0, 1560] # EV_ABS / ABS_X                  1560
+          - [1, 73000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [1, 73000, 4, 5, 1073000] # EV_MSC / MSC_TIMESTAMP          1073000
+          - [1, 73000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 80000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 80000, 3, 53, 1590] # EV_ABS / ABS_MT_POSITION_X      1590
+          - [1, 80000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 80000, 3, 53, 1890] # EV_ABS / ABS_MT_POSITION_X      1890
+          - [1, 80000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 80000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 80000, 3, 53, 2190] # EV_ABS / ABS_MT_POSITION_X      2190
+          - [1, 80000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 80000, 3, 0, 1590] # EV_ABS / ABS_X                  1590
+          - [1, 80000, 4, 5, 1080000] # EV_MSC / MSC_TIMESTAMP          1080000
+          - [1, 80000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 87000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 87000, 3, 53, 1620] # EV_ABS / ABS_MT_POSITION_X      1620
+          - [1, 87000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 87000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 87000, 3, 53, 1920] # EV_ABS / ABS_MT_POSITION_X      1920
+          - [1, 87000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 87000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 87000, 3, 53, 2220] # EV_ABS / ABS_MT_POSITION_X      2220
+          - [1, 87000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 87000, 3, 0, 1620] # EV_ABS / ABS_X                  1620
+          - [1, 87000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [1, 87000, 4, 5, 1087000] # EV_MSC / MSC_TIMESTAMP          1087000
+          - [1, 87000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 94000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 94000, 3, 53, 1650] # EV_ABS / ABS_MT_POSITION_X      1650
+          - [1, 94000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 94000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 94000, 3, 53, 1950] # EV_ABS / ABS_MT_POSITION_X      1950
+          - [1, 94000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 94000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 94000, 3, 53, 2250] # EV_ABS / ABS_MT_POSITION_X      2250
+          - [1, 94000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 94000, 3, 0, 1650] # EV_ABS / ABS_X                  1650
+          - [1, 94000, 3, 1, 899] # EV_ABS / ABS_Y                  899
+          - [1, 94000, 4, 5, 1094000] # EV_MSC / MSC_TIMESTAMP          1094000
+          - [1, 94000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 101000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 101000, 3, 53, 1680] # EV_ABS / ABS_MT_POSITION_X      1680
+          - [1, 101000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 101000, 3, 53, 1980] # EV_ABS / ABS_MT_POSITION_X      1980
+          - [1, 101000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 101000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 101000, 3, 53, 2280] # EV_ABS / ABS_MT_POSITION_X      2280
+          - [1, 101000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 101000, 3, 0, 1680] # EV_ABS / ABS_X                  1680
+          - [1, 101000, 4, 5, 1101000] # EV_MSC / MSC_TIMESTAMP          1101000
+          - [1, 101000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 108000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 108000, 3, 53, 1710] # EV_ABS / ABS_MT_POSITION_X      1710
+          - [1, 108000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 108000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 108000, 3, 53, 2010] # EV_ABS / ABS_MT_POSITION_X      2010
+          - [1, 108000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 108000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 108000, 3, 53, 2310] # EV_ABS / ABS_MT_POSITION_X      2310
+          - [1, 108000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 108000, 3, 0, 1710] # EV_ABS / ABS_X                  1710
+          - [1, 108000, 3, 1, 901] # EV_ABS / ABS_Y                  901
+          - [1, 108000, 4, 5, 1108000] # EV_MSC / MSC_TIMESTAMP          1108000
+          - [1, 108000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 115000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 115000, 3, 53, 1740] # EV_ABS / ABS_MT_POSITION_X      1740
+          - [1, 115000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 115000, 3, 53, 2040] # EV_ABS / ABS_MT_POSITION_X      2040
+          - [1, 115000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 115000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 115000, 3, 53, 2340] # EV_ABS / ABS_MT_POSITION_X      2340
+          - [1, 115000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 115000, 3, 0, 1740] # EV_ABS / ABS_X                  1740
+          - [1, 115000, 4, 5, 1115000] # EV_MSC / MSC_TIMESTAMP          1115000
+          - [1, 115000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 122000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 122000, 3, 53, 1770] # EV_ABS / ABS_MT_POSITION_X      1770
+          - [1, 122000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 122000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 122000, 3, 53, 2070] # EV_ABS / ABS_MT_POSITION_X      2070
+          - [1, 122000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 122000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 122000, 3, 53, 2370] # EV_ABS / ABS_MT_POSITION_X      2370
+          - [1, 122000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 122000, 3, 0, 1770] # EV_ABS / ABS_X                  1770
+          - [1, 122000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [1, 122000, 4, 5, 1122000] # EV_MSC / MSC_TIMESTAMP          1122000
+          - [1, 122000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 129000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 129000, 3, 53, 1800] # EV_ABS / ABS_MT_POSITION_X      1800
+          - [1, 129000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 129000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 129000, 3, 53, 2100] # EV_ABS / ABS_MT_POSITION_X      2100
+          - [1, 129000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 129000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 129000, 3, 53, 2400] # EV_ABS / ABS_MT_POSITION_X      2400
+          - [1, 129000, 3, 0, 1800] # EV_ABS / ABS_X                  1800
+          - [1, 129000, 3, 1, 902] # EV_ABS / ABS_Y                  902
+          - [1, 129000, 4, 5, 1129000] # EV_MSC / MSC_TIMESTAMP          1129000
+          - [1, 129000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 136000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 136000, 3, 53, 1830] # EV_ABS / ABS_MT_POSITION_X      1830
+          - [1, 136000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 136000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 136000, 3, 53, 2130] # EV_ABS / ABS_MT_POSITION_X      2130
+          - [1, 136000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 136000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 136000, 3, 53, 2430] # EV_ABS / ABS_MT_POSITION_X      2430
+          - [1, 136000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 136000, 3, 0, 1830] # EV_ABS / ABS_X                  1830
+          - [1, 136000, 3, 1, 900] # EV_ABS / ABS_Y                  900
+          - [1, 136000, 4, 5, 1136000] # EV_MSC / MSC_TIMESTAMP          1136000
+          - [1, 136000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 143000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 143000, 3, 53, 1860] # EV_ABS / ABS_MT_POSITION_X      1860
+          - [1, 143000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 143000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 143000, 3, 53, 2160] # EV_ABS / ABS_MT_POSITION_X      2160
+          - [1, 143000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 143000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 143000, 3, 53, 2460] # EV_ABS / ABS_MT_POSITION_X      2460
+          - [1, 143000, 3, 0, 1860] # EV_ABS / ABS_X                  1860
+          - [1, 143000, 3, 1, 899] # EV_ABS / ABS_Y                  899
+          - [1, 143000, 4, 5, 1143000] # EV_MSC / MSC_TIMESTAMP          1143000
+          - [1, 143000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 150000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 150000, 3, 53, 1890] # EV_ABS / ABS_MT_POSITION_X      1890
+          - [1, 150000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 150000, 3, 53, 2190] # EV_ABS / ABS_MT_POSITION_X      2190
+          - [1, 150000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 150000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 150000, 3, 53, 2490] # EV_ABS / ABS_MT_POSITION_X      2490
+          - [1, 150000, 3, 0, 1890] # EV_ABS / ABS_X                  1890
+          - [1, 150000, 4, 5, 1150000] # EV_MSC / MSC_TIMESTAMP          1150000
+          - [1, 150000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 157000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 157000, 3, 53, 1920] # EV_ABS / ABS_MT_POSITION_X      1920
+          - [1, 157000, 3, 54, 898] # EV_ABS / ABS_MT_POSITION_Y      898
+          - [1, 157000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 157000, 3, 53, 2220] # EV_ABS / ABS_MT_POSITION_X      2220
+          - [1, 157000, 3, 54, 901] # EV_ABS / ABS_MT_POSITION_Y      901
+          - [1, 157000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 157000, 3, 53, 2520] # EV_ABS / ABS_MT_POSITION_X      2520
+          - [1, 157000, 3, 54, 902] # EV_ABS / ABS_MT_POSITION_Y      902
+          - [1, 157000, 3, 0, 1920] # EV_ABS / ABS_X                  1920
+          - [1, 157000, 3, 1, 898] # EV_ABS / ABS_Y                  898
+          - [1, 157000, 4, 5, 1157000] # EV_MSC / MSC_TIMESTAMP          1157000
+          - [1, 157000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 164000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 164000, 3, 53, 1950] # EV_ABS / ABS_MT_POSITION_X      1950
+          - [1, 164000, 3, 54, 899] # EV_ABS / ABS_MT_POSITION_Y      899
+          - [1, 164000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 164000, 3, 53, 2250] # EV_ABS / ABS_MT_POSITION_X      2250
+          - [1, 164000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 164000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 164000, 3, 53, 2550] # EV_ABS / ABS_MT_POSITION_X      2550
+          - [1, 164000, 3, 54, 900] # EV_ABS / ABS_MT_POSITION_Y      900
+          - [1, 164000, 3, 0, 1950] # EV_ABS / ABS_X                  1950
+          - [1, 164000, 3, 1, 899] # EV_ABS / ABS_Y                  899
+          - [1, 164000, 4, 5, 1164000] # EV_MSC / MSC_TIMESTAMP          1164000
+          - [1, 164000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
+      - evdev:
+          - [1, 171000, 3, 47, 0] # EV_ABS / ABS_MT_SLOT            0
+          - [1, 171000, 3, 57, -1] # EV_ABS / ABS_MT_TRACKING_ID     -1
+          - [1, 171000, 3, 47, 1] # EV_ABS / ABS_MT_SLOT            1
+          - [1, 171000, 3, 57, -1] # EV_ABS / ABS_MT_TRACKING_ID     -1
+          - [1, 171000, 3, 47, 2] # EV_ABS / ABS_MT_SLOT            2
+          - [1, 171000, 3, 57, -1] # EV_ABS / ABS_MT_TRACKING_ID     -1
+          - [1, 171000, 1, 334, 0] # EV_KEY / BTN_TOOL_TRIPLETAP     0
+          - [1, 171000, 1, 330, 0] # EV_KEY / BTN_TOUCH              0
+          - [1, 171000, 4, 5, 1171000] # EV_MSC / MSC_TIMESTAMP          1171000
+          - [1, 171000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +7ms
