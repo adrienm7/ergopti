@@ -109,7 +109,7 @@ function M.reload()
 	end
 	local ok, built = pcall(function()
 		local model = Emulation.load(source.text, _deps.keycodes(), source.convention, { composer = source.composer })
-		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry()))
+		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry(), require("json").is_null))
 		Emulation.configure(session, { base = settings.base, alt_gr = settings.alt_gr, layout = settings.layout,
 			number_row = settings.number_row, edges = settings.edges })
 		return session
