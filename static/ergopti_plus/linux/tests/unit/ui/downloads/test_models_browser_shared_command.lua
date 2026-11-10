@@ -32,9 +32,11 @@ local function with_browser(callback)
 		package.loaded["ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
-		package.loaded["infra.paths"] = { shared = function(relative)
-			return driver .. "/../_shared/" .. relative
-		end }
+		-- The Delete question's dialog command reads the driver root from here.
+		package.loaded["infra.paths"] = {
+			shared = function(relative) return driver .. "/../_shared/" .. relative end,
+			driver_root = function() return driver end,
+		}
 		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
 		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
 		local header_raw = header_file:read("*a")
