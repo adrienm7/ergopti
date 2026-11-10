@@ -200,7 +200,11 @@ local function language_callback_fixture(body)
 		local production_source = debug.getinfo(producer, "S").source
 		helpers.assert_true(rawequal(producer, require("ui.menu.menu_language").build),
 			"the actual loaded MenuBuilder must bind the language module's producer")
-		helpers.assert_true(production_source:find("/ui/menu/menu_language.lua", 1, true) ~= nil)
+		-- The defining file is the one require resolves for the module name, so
+		-- the module can move without this assertion naming its path.
+		local module_file = assert(package.searchpath("ui.menu.menu_language", package.path)):gsub("^%./", "")
+		helpers.assert_true(production_source:sub(-#module_file) == module_file,
+			"the producer must be defined in " .. module_file .. ", got " .. production_source)
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())

@@ -36,7 +36,7 @@ helpers.describe("network-policy-source", function()
 			helpers.it("(network-policy-source) " .. policy.module .. " admits " .. kind .. " explicitly", function()
 				local base = os.tmpname(); os.remove(base)
 				local driver = base .. "/driver"
-				copy(helpers.driver_root() .. "/infra/paths.lua", driver .. "/infra/paths.lua")
+				copy(assert(package.searchpath("infra.paths", package.path)), driver .. "/infra/paths.lua")
 				copy(Paths.shared("data/locales/en.json"), driver .. "/_shared/data/locales/en.json")
 				for _, declaration in ipairs(policies) do
 					copy(Paths.shared(declaration.path), driver .. "/_shared/" .. declaration.path)

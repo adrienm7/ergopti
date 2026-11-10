@@ -72,8 +72,21 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // and api_ollama pair, the sqlite_command callers, the CapsWord pointer map,
 // the native dialog title inventory and the webview app names list modules
 // by name instead of by path.
-const BASELINE = 8;
-const READ_BASELINE = 18;
+// 8 → 7 files and 18 → 13 reads: the locale, network policy, shared loader
+// and keyboard source fixture copies take their source from the module name,
+// and the menu language producer is checked against the file require resolves.
+//
+// What is left is legitimate, and each holds a path because the path is the
+// behaviour under test: the paths, locale, policy and shared loader layout
+// tests stage a copy at a named layout (/usr/lib/ergopti/infra/paths.lua,
+// ./infra/locale.lua) because the module derives its roots from its own
+// location; the keyboard source fixture asserts the hardware harnesses never
+// load the production writer by that path; the startup soak runs the actual
+// e2e child fragment, which loads the event loop by that path; the healthcheck
+// asserts the opener worker's argv, which is that path. Converting them would
+// pin a different string, not remove the pin.
+const BASELINE = 7;
+const READ_BASELINE = 13;
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];

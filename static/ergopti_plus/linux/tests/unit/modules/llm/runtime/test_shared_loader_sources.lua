@@ -54,7 +54,7 @@ local function observe(family, target, mode)
 			driver .. "/_shared/" .. require("native_path").dirname(TIMINGS_SOURCE) }) do
 			assert(uv.fs_mkdir(dir, 448))
 		end
-		write(driver .. "/infra/paths.lua", read(root .. "/infra/paths.lua"))
+		write(driver .. "/infra/paths.lua", assert(helpers.read_module_source("infra.paths")))
 		write(driver .. "/_shared/data/locales/en.json", read(root .. "/../_shared/data/locales/en.json"))
 		-- The environment loader's shared timings owner reads this installed resource.
 		write(driver .. "/_shared/" .. TIMINGS_SOURCE, read(root .. "/../_shared/" .. TIMINGS_SOURCE))

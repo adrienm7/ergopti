@@ -22,9 +22,7 @@ local helpers = require("tests.helpers")
 --- @param chunk_path string
 --- @return table The locale module.
 local function load_as(chunk_path)
-	local fh = assert(io.open(helpers.driver_root() .. "/infra/locale.lua", "r"))
-	local source = fh:read("*a")
-	fh:close()
+	local source = assert(helpers.read_module_source("infra.locale"))
 	package.loaded["locale.core"] = nil
 	local chunk = assert((loadstring or load)(source, "@" .. chunk_path))
 	return chunk()
