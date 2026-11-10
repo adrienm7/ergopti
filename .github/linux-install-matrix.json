@@ -21,7 +21,7 @@
 		"distro": "arch",
 		"container": "archlinux:latest",
 		"image": "archlinux:latest",
-		"prep": "pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers"
+		"prep": "pacman -Syu --noconfirm --needed bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers"
 	},
 	"Alpine: installed archive": {
 		"id": "archive-install-alpine",
