@@ -165,17 +165,17 @@ vm.runInContext(appsSource, appsContext);
 // A system KPI this host cannot measure reads « — » and its reason; a count
 // from any device (an imported ledger) still shows, and a measured zero stays 0.
 appsContext.window._i18n_strings = {
-	'platform_reason.desktop_changes_need_x11': 'X11 only',
+	'platform_reason.desktop_changes_need_workspace_interface': 'X11 only',
 	'ui_apps.kpi_space_switches': 'switches'
 };
 const unmeasuredReading = (count, reason) =>
 	JSON.stringify(appsContext.systemKpiReading(count, reason, 'ui_apps.kpi_space_switches'));
 assert.strictEqual(
-	unmeasuredReading(0, 'platform_reason.desktop_changes_need_x11'),
+	unmeasuredReading(0, 'platform_reason.desktop_changes_need_workspace_interface'),
 	JSON.stringify({ value: '—', detail: 'X11 only' })
 );
 assert.strictEqual(
-	unmeasuredReading(3, 'platform_reason.desktop_changes_need_x11'),
+	unmeasuredReading(3, 'platform_reason.desktop_changes_need_workspace_interface'),
 	JSON.stringify({ value: '3', detail: 'switches' })
 );
 assert.strictEqual(unmeasuredReading(0, undefined), JSON.stringify({ value: '0', detail: '—' }));

@@ -164,6 +164,8 @@ function M.run(options)
 	env.emit_diagnostic_snapshot = function(boot_ms, _, _, prepared)
 		if prepared then prepared({ boot_ms = boot_ms }) end
 	end
+	-- The real clock: the metrics' desktop source is handed it at startup.
+	env.Monotonic = require("infra.monotonic")
 	env.RuntimeGuard = { call = function(_, callback) callback(); return true end, optional_require = function() return nil end }
 	env.webview_manager = { set_daemon_state = function(state) observed.daemon_state = state end,
 		show = function()
@@ -216,6 +218,10 @@ function M.run(options)
 		elseif name == "infra.personal_shortcuts" then
 			-- The user's personal source runs once, at the end of the services.
 			return { load = function() record("personal_shortcuts"); return true end }
+		elseif name == "modules.gestures.workspace_switcher" then
+			-- No X11 desktop in the fixture: the Wayland workspace reader is asked,
+			-- and this session has none (its own cases: test_workspace_switcher).
+			return { current_workspace_source = function() record("workspace.source"); return nil, "unsupported" end }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then

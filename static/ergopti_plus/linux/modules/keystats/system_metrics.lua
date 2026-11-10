@@ -30,8 +30,9 @@
 --- system_load_poll_ms as a `system_load` event with the Windows fields
 --- (cpu_pct, ram_used_pct, ram_total_mb, ram_free_mb) and the macOS user share.
 --- `space_switches` counts changes of the EWMH current desktop the X server
---- publishes, observed on the daemon's focus tick; Wayland exposes no current
---- desktop to a client, so there the KPI is unavailable with its reason
+--- publishes, or of the current workspace sway, Hyprland or KWin report under
+--- Wayland, observed on the daemon's focus tick; a Wayland desktop with no such
+--- interface (GNOME) leaves the KPI unavailable with its reason
 --- (space_change_availability) rather than a zero that looks measured.
 --- `night_wake_count` counts the suspensions that end earlier than
 --- [keystats] night_wake_end_ms after local midnight, the rule macOS and
@@ -103,9 +104,9 @@ local _proc = { stat = PROC_STAT_PATH, meminfo = MEMINFO_PATH }
 -- How often CPU and memory are sampled, the interval macOS and Windows use.
 local SYSTEM_LOAD_POLL_MS = require("infra.timings").ms("keystats", "system_load_poll_ms")
 
--- The current-desktop source (read() -> integer|nil), or nil with the i18n
+-- The current-desktop source (read() -> number|string|nil), or nil with the i18n
 -- key of why virtual-desktop changes are not measured.
-local _desktop = { read = nil, reason = "platform_reason.desktop_changes_need_x11" }
+local _desktop = { read = nil, reason = "platform_reason.desktop_changes_need_workspace_interface" }
 
 
 
@@ -537,11 +538,12 @@ function M.sample()
 end
 
 --- Binds the current-desktop reader, or none with the reason.
---- @param read function|nil Returns the current desktop index, or nil.
+--- @param read function|nil Returns the current desktop's identity (the X11
+---   desktop index, a Wayland workspace id or name), or nil.
 --- @param reason string|nil i18n key of why changes are not measured.
 function M.bind_desktop_source(read, reason)
 	assert(read == nil or type(read) == "function", "a desktop source is a function")
-	_desktop = { read = read, reason = read == nil and (reason or "platform_reason.desktop_changes_need_x11") or nil }
+	_desktop = { read = read, reason = read == nil and (reason or "platform_reason.desktop_changes_need_workspace_interface") or nil }
 	_last.desktop = nil
 end
 
@@ -557,7 +559,8 @@ end
 function M.observe_desktop()
 	if not _desktop.read then return nil end
 	local called, desktop = pcall(_desktop.read)
-	if not called or type(desktop) ~= "number" then
+	local kind = type(desktop)
+	if not called or (kind ~= "number" and (kind ~= "string" or desktop == "")) then
 		-- An unanswered read breaks the chain: no change is counted across it.
 		_last.desktop = nil
 		return nil
@@ -616,7 +619,7 @@ function M._reset()
 	_wireless_path = WIRELESS_PATH
 	_audio_source = nil
 	_proc = { stat = PROC_STAT_PATH, meminfo = MEMINFO_PATH }
-	_desktop = { read = nil, reason = "platform_reason.desktop_changes_need_x11" }
+	_desktop = { read = nil, reason = "platform_reason.desktop_changes_need_workspace_interface" }
 end
 
 --- Test seam: reads CPU and memory from fixture files instead of /proc.

@@ -622,7 +622,7 @@
 			"persisted-lifecycle-ending",
 			"persisted-script-paused",
 			"persistence",
-			"platform_reason.desktop_changes_need_x11",
+			"platform_reason.desktop_changes_need_workspace_interface",
 			"policy_off",
 			"prediction_refused",
 			"press_not_admitted",

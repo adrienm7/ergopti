@@ -47,12 +47,12 @@ end
 helpers.describe("metrics menu: what this session cannot measure", function()
 	helpers.it("linux-metrics-availability: names each unmeasured metric with its reason", function()
 		local rows = metrics_rows({ measured = false, reason = "platform_reason.pointer_distance_needs_cursor_position" },
-			function(System) System.bind_desktop_source(nil, "platform_reason.desktop_changes_need_x11") end)
+			function(System) System.bind_desktop_source(nil, "platform_reason.desktop_changes_need_workspace_interface") end)
 		local i18n = require("infra.i18n")
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.pointer_distance"), { string.format(i18n.get("menu.metrics.not_measured"),
 			i18n.get("menu.metrics.pointer_distance"), i18n.get("platform_reason.pointer_distance_needs_cursor_position")) })
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.space_changes"), { string.format(i18n.get("menu.metrics.not_measured"),
-			i18n.get("menu.metrics.space_changes"), i18n.get("platform_reason.desktop_changes_need_x11")) })
+			i18n.get("menu.metrics.space_changes"), i18n.get("platform_reason.desktop_changes_need_workspace_interface")) })
 	end)
 
 	helpers.it("linux-metrics-availability: lists nothing when both are measured", function()

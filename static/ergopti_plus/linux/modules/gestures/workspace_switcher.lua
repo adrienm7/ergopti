@@ -34,6 +34,11 @@
 --- 3. Every tool call is bounded by `timeout`: the daemon waits for it while
 ---    it holds the keyboard, so a hung display server must cost a second, not
 ---    the keyboard.
+--- 4. The metrics read the current workspace through the same interfaces
+---    (current_workspace_source) on Wayland, where no EWMH desktop exists. The
+---    daemon tick asks four times a second; a fork per tick would double the
+---    cost of the focus poll, so one answer is reused for
+---    WORKSPACE_READ_INTERVAL_MS and a round trip shorter than that is missed.
 --- ==============================================================================
 
 local M = {}
@@ -51,6 +56,9 @@ local TOOL_TIMEOUT_S = 1
 -- KWin's count is external input; even thousands of desktops already exceed
 -- practical interactive use, and must not allocate unbounded memory here.
 local MAX_KWIN_WORKSPACES = 4096
+-- Milliseconds one current-workspace answer is reused by the metrics source
+-- (see FEATURES 4): one fork a second instead of four.
+local WORKSPACE_READ_INTERVAL_MS = 1000
 
 -- The combination the desktops bind to the previous and the next workspace,
 -- pressed when no interface can switch. Under Wayland it is the only way
@@ -281,6 +289,67 @@ function M.detect()
 		return nil, "tool:qdbus"
 	end
 	return nil, "unsupported"
+end
+
+
+
+
+--- The current workspace's identity for a change counter: sway's focused
+--- workspace name, Hyprland's active workspace id, KWin's desktop number.
+--- One query each, the smallest the compositor answers.
+local CURRENT_WORKSPACE = {
+	sway = function()
+		for _, workspace in ipairs(decode(query("swaymsg -t get_workspaces -r"), "swaymsg -t get_workspaces")) do
+			if workspace.focused == true then
+				if type(workspace.name) ~= "string" or workspace.name == "" then
+					error("sway reports a focused workspace without a name", 0)
+				end
+				return workspace.name
+			end
+		end
+		error("sway reports no focused workspace", 0)
+	end,
+	hyprland = function()
+		local active = decode(query("hyprctl -j activeworkspace"), "hyprctl activeworkspace")
+		if type(active.id) ~= "number" then error("Hyprland reports no active workspace", 0) end
+		return active.id
+	end,
+	kwin = function(backend)
+		local text = query(backend.binary .. " org.kde.KWin /KWin org.kde.KWin.currentDesktop")
+		local current = tonumber(tostring(text):match("^%s*(%d+)%s*$"))
+		if not current then error("KWin answered '" .. tostring(text) .. "'", 0) end
+		return current
+	end,
+}
+
+--- The metrics' current-workspace reader on a Wayland session (FEATURES 4).
+--- X11 is not served here: the EWMH desktop is read in-process by x11_focus.
+--- @param now_ms function Monotonic milliseconds, the reuse clock.
+--- @return function|nil read Returns the workspace identity (number or
+---   string), or nil when the compositor did not answer.
+--- @return string|nil reason detect()'s reason, or "x11" on an X11 session.
+function M.current_workspace_source(now_ms)
+	assert(type(now_ms) == "function", "workspace_switcher: the reader needs a millisecond clock")
+	if DisplayServer.kind() == DisplayServer.X11 then return nil, "x11" end
+	local backend, reason = M.detect()
+	if not backend then return nil, reason end
+	local key = backend == BACKENDS.sway and "sway" or backend == BACKENDS.hyprland and "hyprland" or "kwin"
+	local read_current = CURRENT_WORKSPACE[key]
+	local read_at, answer = nil, nil
+	return function()
+		local now = now_ms()
+		if read_at ~= nil and now - read_at < WORKSPACE_READ_INTERVAL_MS then return answer end
+		read_at = now
+		local ok, value = pcall(read_current, backend)
+		if not ok then
+			-- Reported at debug: it can repeat once a second, and the metrics
+			-- treat the gap as no answer, never as a change.
+			Logger.debug(LOG, "%s did not report its current workspace (%s).", backend.name, tostring(value))
+			value = nil
+		end
+		answer = value
+		return answer
+	end, nil
 end
 
 
