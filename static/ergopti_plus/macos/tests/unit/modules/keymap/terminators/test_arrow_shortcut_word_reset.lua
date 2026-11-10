@@ -149,9 +149,12 @@ local function with_keymap(body)
 	local now = 100
 	hs_stub.timer.secondsSinceEpoch = function() return now end
 
-	local tap = nil
+	local tap, flags_tap = nil, nil
 	for _, candidate in ipairs(hs_stub.eventtap.__taps) do
 		if #candidate.types == 1 and candidate.types[1] == hs_stub.eventtap.event.types.keyDown then tap = candidate end
+		if #candidate.types == 1 and candidate.types[1] == hs_stub.eventtap.event.types.flagsChanged then
+			flags_tap = candidate
+		end
 	end
 	local properties = hs_stub.eventtap.event.properties
 
@@ -168,8 +171,25 @@ local function with_keymap(body)
 		})
 	end
 
+	--- Delivers one modifier edge to the real flagsChanged tap.
+	--- @param flags table Modifier flags after the edge.
+	--- @param keycode number|nil Modifier key code (left Command by default).
+	local function modifier_edge(flags, keycode)
+		now = now + 0.01
+		return flags_tap.fn({
+			getProperty = function(_self, property)
+				if property == properties.eventSourceUserData then return 0 end
+				return KARABINER_PID
+			end,
+			getFlags = function() return flags end,
+			getKeyCode = function() return keycode or 55 end,
+			rawFlags = function() return 0 end,
+		})
+	end
+
 	local ok, err = xpcall(function()
 		helpers.assert_not_nil(tap, "the real keymap must install one key-down eventtap")
+		helpers.assert_not_nil(flags_tap, "the real keymap must install one flagsChanged eventtap")
 		helpers.assert_not_nil(state, "the keymap must build its state through the state module")
 		helpers.assert_eq(Keymap.load_toml("word_reset", "/virtual/word_reset.toml"), true,
 			"the TOML-shaped entries register through the real loader")
@@ -186,6 +206,7 @@ local function with_keymap(body)
 		body({
 			keymap = Keymap, state = state, effects = effects,
 			press = press,
+			modifier_edge = modifier_edge,
 			pause = function(seconds) now = now + seconds end,
 			settle = function() drain_immediate_timers(hs_stub) end,
 		})
@@ -606,6 +627,10 @@ local KEYCODE_F20 = 90
 local KEYCODE_F19 = 80
 local TAP_HOLD_TAG = { cmd = true, ctrl = true, alt = true, shift = true }
 local CMD_V = { cmd = true, ctrl = false, alt = false, shift = false }
+-- The untagged context-menu key Karabiner sends before a tap-hold key's Ctrl,
+-- Cmd or Option hold, with the flags the hand holds at that moment.
+local KEYCODE_CONTEXT_MENU = 110
+local CMD_CTRL_V = { cmd = true, ctrl = true, alt = false, shift = false }
 
 local TAP_HOLD_EVENTS = {
 	{ name = "a tap-hold's own Cmd+V", fn = function(f)
@@ -616,6 +641,20 @@ local TAP_HOLD_EVENTS = {
 		f.press("", NO_FLAGS, KEYCODE_F20, KARABINER_PID)
 		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
 		f.press("", NO_FLAGS, KEYCODE_F19, KARABINER_PID)
+	end },
+	{ name = "Cmd+V under a tap-hold key's Cmd hold", fn = function(f)
+		f.press("", NO_FLAGS, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+		f.modifier_edge(CMD_V)
+		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+		f.modifier_edge(NO_FLAGS)
+	end },
+	{ name = "Cmd+Ctrl+V under a tap-hold Ctrl hold over the hand's Cmd", fn = function(f)
+		f.modifier_edge(CMD_V)
+		f.press("", CMD_V, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+		f.modifier_edge(CMD_CTRL_V, 59)
+		f.press("v", CMD_CTRL_V, KEYCODE_V, KARABINER_PID)
+		f.modifier_edge(CMD_V, 59)
+		f.modifier_edge(NO_FLAGS)
 	end },
 }
 
@@ -658,6 +697,36 @@ helpers.describe("hotstrings.tap_hold_resets_word (macos-tap-hold-word-reset)", 
 	helpers.it("the marker never reaches the application", function()
 		with_keymap(function(f)
 			helpers.assert_eq(f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID), true)
+			helpers.assert_eq(f.press("", NO_FLAGS, KEYCODE_CONTEXT_MENU, KARABINER_PID), true,
+				"nor does the hold marker (macos-tap-hold-modifier-word-reset)")
+		end)
+	end)
+
+	-- The hold has no release marker: its modifiers going up end it, so the
+	-- hand's own chords follow the shortcut option again.
+	helpers.it("the user's own Cmd+V after a tap-hold Cmd hold follows the shortcut option", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+			helpers.assert_eq(a_event_then(f, function()
+				f.press("", NO_FLAGS, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+				f.modifier_edge(CMD_V)
+				f.modifier_edge(NO_FLAGS)
+				f.modifier_edge(CMD_V)
+				f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+				f.modifier_edge(NO_FLAGS)
+			end), "", "the released hold no longer owns Cmd")
+		end)
+	end)
+
+	helpers.it("the hand's own Cmd+V under a tap-hold hold that added nothing follows the shortcut option", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+			helpers.assert_eq(a_event_then(f, function()
+				f.modifier_edge(CMD_V)
+				f.press("", CMD_V, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+				f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+				f.modifier_edge(NO_FLAGS)
+			end), "", "Cmd was the hand's before the marker")
 		end)
 	end)
 end)

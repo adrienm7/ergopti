@@ -41,13 +41,17 @@ M.CAPSWORD_ACTIVATED = "capsword_activated"
 M.CAPSWORD_DEACTIVATED = "capsword_deactivated"
 --- A tap-hold key's own command follows (hotstrings.tap_hold_resets_word).
 M.TAP_HOLD_COMMAND = "tap_hold_command"
+--- A tap-hold key's Ctrl, Cmd or Option hold follows (context-menu sentinel).
+M.TAP_HOLD_MODIFIER = "tap_hold_modifier"
 
 -- Reserved keycode → published signal. Karabiner prepends F20 to every action
--- that activates the navigation layer and appends F19 to every one that turns
--- it off (platform/remap/generator.lua).
+-- that activates the navigation layer, appends F19 to every one that turns it
+-- off, and leads every tap-hold hold pressing Ctrl, Cmd or Option with the
+-- untagged context-menu key (platform/remap/generator.lua).
 local SIGNAL_BY_KEYCODE = {
-	[Keycodes.F20_LAYER_NAV_ENTERED] = M.NAV_LAYER_ENTERED,
-	[Keycodes.F19_LAYER_NAV_EXITED]  = M.NAV_LAYER_EXITED,
+	[Keycodes.F20_LAYER_NAV_ENTERED]          = M.NAV_LAYER_ENTERED,
+	[Keycodes.F19_LAYER_NAV_EXITED]           = M.NAV_LAYER_EXITED,
+	[Keycodes.CONTEXT_MENU_TAP_HOLD_MODIFIER] = M.TAP_HOLD_MODIFIER,
 }
 
 -- name → callback(signal). Keyed slots, so a module reload replaces its own
@@ -60,7 +64,8 @@ local _listener_failure_logged = {}
 --- Listeners run inside the eventtap callback that claimed the sentinel. They
 --- must do bounded in-memory work and defer anything else off the callback.
 --- @param name string Stable listener identity.
---- @param callback function|nil Receives the signal name; nil unregisters.
+--- @param callback function|nil Receives the signal name and the sentinel's
+---   modifier flags (nil for a published layer move); nil unregisters.
 function M.set_listener(name, callback)
 	assert(type(name) == "string" and name ~= "",
 		"keymap.control_sentinels.set_listener: name must be a non-empty string")
@@ -88,9 +93,10 @@ end
 
 --- Delivers one signal to every registered listener.
 --- @param signal string Published signal name.
-local function publish(signal)
+--- @param flags table|nil The sentinel key-down's modifier flags, when a key carried it.
+local function publish(signal, flags)
 	for name, callback in pairs(_listeners) do
-		local ok, err = pcall(callback, signal)
+		local ok, err = pcall(callback, signal, flags)
 		if not ok then report_listener_failure(name, err) end
 	end
 end
@@ -129,7 +135,7 @@ function M.claim_key(keycode, is_down, flags)
 	-- F20 carries the exact control tags; F19 remains the navigation exit even
 	-- while the user's hand still holds tagged modifiers.
 	if signal == M.NAV_LAYER_ENTERED then signal = ControlSignals.decode(flags) or signal end
-	if is_down then publish(signal) end
+	if is_down then publish(signal, flags) end
 	return true
 end
 

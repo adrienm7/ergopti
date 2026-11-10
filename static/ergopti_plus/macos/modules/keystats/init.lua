@@ -132,6 +132,7 @@ local F_KEY_CODES = {
 local SILENT_KEYCODES = {
 	[80] = true,   -- F19: reserved synthetic channel
 	[90] = true,   -- F20: synthetic "typing complete" signal (KE bridge)
+	[110] = true,  -- Context menu: Karabiner's tap-hold modifier-hold marker
 }
 
 -- Keycodes for navigation keys (arrows + Delete, Home, End, PageUp, PageDown).
