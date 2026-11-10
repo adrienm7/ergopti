@@ -313,7 +313,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `open_system_settings` | ⚙ System settings | yes | yes | yes |
 | `pick_color` | 🎨 HEX colour under cursor | yes | yes | yes |
 | `open_emoji_picker` | 😀 Emoji picker | yes | yes | yes |
-| `take_note` | 📝 Take a note | yes | no, R20 | yes (tool:xdg-open, tool:xdg-mime) |
+| `take_note` | 📝 Take a note | yes | no, R20 | yes (tool:gtk-launch, tool:xdg-mime) |
 | `activity_simulation` | 🖱 Simulate activity (anti-sleep) | yes | yes | yes (tool:systemd-inhibit) |
 | `display_mirror_toggle` | 🖥 Mirror displays (on/off) | yes | yes | no, R21 |
 | `search_web` | 🔍 Web search [configurable] | yes | yes | yes (tool:xclip, tool:xdg-open) |
