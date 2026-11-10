@@ -191,6 +191,38 @@ helpers.describe("system_proxy: exact native process ownership", function()
 		helpers.assert_true(not adapter.is_owned("private-owner"))
 	end)
 
+	-- (pac-download-direct) The helper names an undownloadable PAC only beside
+	-- its DIRECT answer; the caller's check bound travels on stdin.
+	helpers.it("(pac-download-direct) forwards the PAC check bound and admits its stage beside DIRECT only", function()
+		for _, case in ipairs({
+			{ proxies = { "direct://" }, admitted = true },
+			{ proxies = { "http://proxy.invalid:8123", "direct://" }, admitted = false },
+		}) do
+			local adapter, state = fresh()
+			local results = {}
+			assert(adapter.lookup_owned("https://destination.invalid/", { owner = "private-owner", timeout_ms = 317,
+				pac_check_timeout_ms = 250 }, function(receipt) results[#results + 1] = receipt end))
+			helpers.assert_eq(Json.decode(state.input).pac_check_timeout_ms, 250)
+			local receipt = selection()
+			receipt.proxies, receipt.pac_unavailable = case.proxies, "native_pac_download"
+			state.input_finished()
+			state.output(receipt)
+			state.completed()
+			state.ack_closes()
+			if case.admitted then
+				helpers.assert_eq(results[1].pac_unavailable, "native_pac_download")
+			else
+				helpers.assert_eq(results[1].ok, false)
+				helpers.assert_eq(results[1].error, "proxy-receipt-invalid")
+			end
+		end
+		local adapter = fresh()
+		local operation, err = adapter.lookup_owned("https://destination.invalid/", { owner = "private-owner",
+			timeout_ms = 317, pac_check_timeout_ms = 0 }, function() end)
+		helpers.assert_nil(operation)
+		helpers.assert_eq(err, "proxy-options-invalid")
+	end)
+
 	helpers.it("cancellation suppresses completion and reserves the owner through physical exit", function()
 		local adapter, state = fresh()
 		local operation, results = dispatch(adapter)

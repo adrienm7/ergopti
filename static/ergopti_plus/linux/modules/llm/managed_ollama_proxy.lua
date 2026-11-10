@@ -27,7 +27,9 @@
 --- 4. An unusable desktop configuration (GIO could not resolve the origin, or
 ---    ran out of time: a PAC it could not fetch or evaluate) sends that origin
 ---    direct, at the closed stages of proxy_policy.json "pac_unavailable_fallback",
----    with one WARNING naming the stage, as macOS does. A relay the user exported
+---    with one WARNING naming the stage, as macOS does. GIO answers DIRECT for a
+---    PAC it could not download; the lookup child then reports that stage
+---    (native_pac_download) beside its DIRECT answer, and the same WARNING names it. A relay the user exported
 ---    never reaches the lookup, and a relay the PAC names is kept as named.
 ---    Any other failure or a refused plan refuses the start with a classified
 ---    reason instead of launching a daemon that would fail its first pull.
@@ -65,9 +67,10 @@ M.BYPASS_VARIABLES = { "NO_PROXY", "no_proxy" }
 --- Every variable the stage may set; the composition admits only these.
 M.VARIABLES = { M.VARIABLE, M.BYPASS_VARIABLES[1], M.BYPASS_VARIABLES[2] }
 
---- The closed lookup stage each GIO lookup failure stands for. GIO names no
---- finer step: a PAC it cannot download or evaluate fails the lookup itself.
---- Failures of Ergopti's own helper process are not listed and keep refusing.
+--- The closed lookup stage each GIO lookup failure stands for. A PAC GIO could
+--- not download is no failure: it answers DIRECT, and the receipt's
+--- pac_unavailable names that stage. Failures of Ergopti's own helper process
+--- are not listed and keep refusing.
 M.LOOKUP_STAGES = {
 	["proxy-lookup-failed"] = "native_proxy_lookup",
 	["proxy-lookup-timeout"] = "native_proxy_budget",
@@ -325,6 +328,12 @@ function M.new(deps)
 					stage, index, #origins)
 				fallback = fallback or stage
 				choices = { { mode = "direct" } }
+			elseif receipt.pac_unavailable ~= nil and policy.falls_back_direct(receipt.pac_unavailable) then
+				-- GIO answered DIRECT for a PAC it could not download: the same
+				-- direct route, named as the unusable PAC it is.
+				Logger.warn(LOG, "Managed Ollama proxy lookup unusable at %s: origin %d of %d goes direct.",
+					receipt.pac_unavailable, index, #origins)
+				fallback = fallback or receipt.pac_unavailable
 			end
 			choose(index, choices, 1)
 		end
@@ -397,6 +406,7 @@ function M.new(deps)
 			local child, dispatch_error = lookup(origins[index], {
 				owner = owner, timeout_ms = math.ceil(math.min(deps.timeout_ms, remaining)),
 				environment_exclusions = route.environment_exclusions,
+				pac_check_timeout_ms = deps.probe_timeout_ms and math.ceil(math.min(deps.probe_timeout_ms, remaining)) or nil,
 			}, function(receipt) receive(index, receipt) end)
 			if not child then
 				Logger.error(LOG, "Managed Ollama proxy lookup not started: %s", tostring(dispatch_error))

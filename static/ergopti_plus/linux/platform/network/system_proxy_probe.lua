@@ -15,6 +15,8 @@ end
 --- and its retirement; the grabbed-keyboard process never calls GIO directly.
 --- GIO/libproxy acknowledges selection, not successful PAC retrieval or
 --- evaluation: a native DIRECT selection preserves that explicit limitation.
+--- A caller that passes pac_check_timeout_ms learns when that DIRECT answer
+--- stands for a GNOME-configured PAC the helper itself could not download.
 --- ==============================================================================
 
 local shared_root = arg[1]
@@ -254,6 +256,35 @@ local function curl_capabilities()
 	}
 end
 
+--- Downloads the configured PAC once with the owned curl, without a proxy, as
+--- libproxy does, to tell a PAC it could not fetch from one that said DIRECT.
+--- The address goes through curl's stdin config, never argv. The outer helper
+--- deadline owns this process; the native loop retains it until exit.
+--- @param url string The PAC address of the desktop settings.
+--- @param timeout_ms number Bound of the download.
+--- @return boolean downloaded
+local function pac_downloadable(url, timeout_ms)
+	local loaded, uv = pcall(require, "luv")
+	if not loaded then return false end
+	local stdin = uv.new_pipe(false)
+	if not stdin then return false end
+	local code
+	local process = uv.spawn(require("infra.owned_programs").resolve("curl"), {
+		args = { "--disable", "--silent", "--fail", "--noproxy", "*", "--output", "/dev/null",
+			"--max-time", string.format("%.3f", timeout_ms / 1000), "--config", "-" },
+		stdio = { stdin, nil, nil },
+	}, function(exit_code, signal)
+		code = signal == 0 and exit_code or -1
+	end)
+	if not process then uv.close(stdin); uv.run(); return false end
+	local quoted = url:gsub("\\", "\\\\"):gsub('"', '\\"')
+	uv.write(stdin, 'url = "' .. quoted .. '"\n', function() uv.close(stdin) end)
+	uv.run()
+	uv.close(process)
+	uv.run()
+	return code == 0
+end
+
 -- Bounded stdin keeps the destination and any signed query out of argv, logs
 -- and temporary files. The HTTP owner admits schemes before this native seam.
 local bytes = io.stdin:read(65537)
@@ -264,6 +295,17 @@ if not decoded or type(request) ~= "table" or type(request.url) ~= "string"
 	os.exit(0)
 end
 local succeeded, receipt = pcall(lookup, request.url, request.environment_exclusions)
+-- GProxyResolverGnome answers DIRECT, with no error, for a PAC libproxy could
+-- not download (glib-networking 2.80, libproxy 0.5): a caller that asked is
+-- told, so it can log the unusable PAC as macOS and Windows do. Other backends
+-- name no PAC address this helper can read and are left as they answered.
+local pac_check_ms = request.pac_check_timeout_ms
+if succeeded and receipt.ok and type(pac_check_ms) == "number" and pac_check_ms >= 1 and pac_check_ms <= 60000
+	and receipt.backend == "GProxyResolverGnome" and #receipt.proxies == 1 and receipt.proxies[1] == "direct://" then
+	local native = native_backend()
+	local read, pac_url = pcall(function() return native and NativeRuntime.configured_pac_url(native) end)
+	if read and pac_url and not pac_downloadable(pac_url, pac_check_ms) then receipt.pac_unavailable = "native_pac_download" end
+end
 if succeeded and request.probe_curl == true then
 	local probed, capabilities = pcall(curl_capabilities)
 	receipt.curl_capabilities = probed and capabilities or { proxy_used = false }
