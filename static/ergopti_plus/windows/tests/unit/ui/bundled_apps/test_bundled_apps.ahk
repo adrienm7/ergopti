@@ -180,7 +180,9 @@ _BAT_ShortcutRoundTrip() {
 			BundledAppsNative_WriteShortcut(Link, Map("target", Target, "arguments", '--profile "a b"',
 				"working_directory", Dir, "icon", Icon, "description", "Ergopti clone"))
 			Read := BundledAppsNative_ReadShortcut(Link)
-			AssertEqual(Target, Read["target"])
+			; The shell stores the target in the folder's on-disk case (C:\Windows)
+			; while A_WinDir can read C:\WINDOWS: one path, compared as Windows does.
+			AssertEqual(StrLower(Target), StrLower(Read["target"]))
 			AssertEqual('--profile "a b"', Read["arguments"])
 			AssertEqual(Icon, Read["icon"], "the IconLocation index survives the native shortcut round trip")
 		}
