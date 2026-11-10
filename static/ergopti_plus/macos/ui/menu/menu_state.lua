@@ -568,10 +568,20 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			local _shortcuts_ref = core_mods.shortcuts_mod
 			_keystats_start_pending = true
 			local scheduling, fired = true, false
+			-- The hardware UUID the first start needs is read by an ioreg child
+			-- during the delay; run on the main thread it held the run loop
+			-- 151 ms at boot+1 s (field report 2026-11-03). A failed or late read
+			-- resumes the start, which then reads it synchronously.
+			local function prepare(resume)
+				if type(kl.prepare_start) ~= "function" then return true end
+				local prepared, ready = try("metrics", "keystats.prepare_start", kl.prepare_start, resume)
+				return not prepared or ready == true
+			end
 			local function activate()
 				if keystats_generation ~= _keystats_start_generation then return end
 				if scheduling then fired = true; return end
 				if type(kl.start) ~= "function" then return end
+				if not prepare(activate) then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
 				local start_ok, started = try("metrics", "keystats.start", kl.start, _shortcuts_ref)
 				if start_ok and started ~= true then
@@ -594,6 +604,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				_keystats_start_ms = (hs.timer.secondsSinceEpoch() - _t_kl) * 1000
 				Logger.info(LOG, "Keystats engine start (deferred): %.1f ms.", _keystats_start_ms)
 			end
+			prepare(nil)
 			local scheduled = DeferredWork.after(KEYSTATS_START_DELAY_SEC, activate, "menu_state.keystats_start")
 			scheduling = false
 			if scheduled ~= true then

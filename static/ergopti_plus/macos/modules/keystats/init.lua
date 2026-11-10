@@ -35,6 +35,7 @@ local TeardownTransaction = require("infra.teardown_transaction")
 local InputSourceBroker = require("adapters.input_source_broker")
 
 local LogManager     = require("modules.keystats.log_manager")
+local HostSignature  = require("modules.keystats.host_signature")
 local ContextTracker = require("modules.keystats.context_tracker")
 local KcBridge       = require("modules.keystats.kc_bridge")
 local AccountingMode = require("modules.keystats.physical_accounting_mode")
@@ -2287,6 +2288,16 @@ local function physical_lifecycle_snapshot(initial)
 	local paused = _is_paused()
 	if generation ~= _runtime_generation then return {} end
 	return { enabled = CoreState.is_enabled, paused = paused, runtime_generation = generation }
+end
+
+--- Reads the hardware UUID off the main thread before the first start needs it.
+--- The log manager's first M.init() otherwise runs a synchronous ioreg pipeline
+--- (151 ms on the Mac at boot+1 s). Pending callers are resumed by on_ready.
+--- @param on_ready function|nil Zero-argument callback run once the read settles.
+--- @return boolean ready True when start may run now; on_ready is then not retained.
+function M.prepare_start(on_ready)
+	if _state then return true end
+	return HostSignature.prefetch(on_ready)
 end
 
 --- Starts the keystats engine and all background daemons.

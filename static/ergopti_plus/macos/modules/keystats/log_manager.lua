@@ -63,6 +63,7 @@ local Rotation     = require("modules.keystats.rotation")
 local IngestTrace  = require("modules.keystats.ingest_trace")
 local Export       = require("modules.keystats.export")
 local LedgerReplay = require("modules.keystats.ledger_replay")
+local HostSignature = require("modules.keystats.host_signature")
 local Metrics      = require("keystats.metrics")
 
 
@@ -263,8 +264,15 @@ local function _uuid_v4()
 		b[9], b[10], b[11], b[12], b[13], b[14], b[15], b[16])
 end
 
---- Returns the macOS hardware UUID (KEYSTATS_SPEC §16.1).
+--- Returns the macOS hardware UUID (KEYSTATS_SPEC §16.1). The deferred boot
+--- start prefetches it off the main thread (modules/keystats/host_signature.lua):
+--- this synchronous pipeline held the run loop 151 ms at boot+1 s. It still
+--- runs when nothing prefetched the value, e.g. a later Metrics toggle.
 local function _host_signature()
+	local prefetched = HostSignature.value()
+	if prefetched then return prefetched end
+	Logger.debug(LOG, "Hardware UUID not prefetched (%s); reading it synchronously.",
+		HostSignature.status())
 	local cmd = "ioreg -d2 -c IOPlatformExpertDevice "
 		.. "| grep IOPlatformUUID | awk -F\\\" '{print $4}'"
 	local ok, out = pcall(hs.execute, cmd)
