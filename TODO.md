@@ -1078,9 +1078,17 @@ between workers) green alone. All live checks pass, typed by the harness.
   longer lists the owned endpoint without its binary (no ERROR); n-gram history merges paced (458 ms slice); the
   dashboard no longer resends an unchanged history each live update (250 ms holds, +73 MB heap per minute). Already on
   dev: blob Range redirect (e6942d05c2), diagnostics phase A (e76a5443f8), post-wake AX hold (1f2884f13c), owned
-  Ollama Go test enrolment (627bfad0af). Next: Karabiner regeneration is synchronous (merge 170 ms, layout actions
-  230 ms cold: event_taps `runloop_late_ms` 294); keystats start runs `ioreg -d2` (151 ms) on the main thread at
-  boot+1 s. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed.
+  Ollama Go test enrolment (627bfad0af). Done since: the hardware UUID keystats start needs is read by an ioreg child
+  during the start delay (`modules/keystats/host_signature.lua`), no longer by `ioreg -d2` on the main thread (151 ms
+  at boot+1 s); a later Metrics toggle still reads it synchronously when no prefetch ran. Karabiner regeneration stays
+  synchronous (merge 170 ms, layout actions 230 ms cold: event_taps `runloop_late_ms` 294), no safe non-blocking
+  design: the work is in-process Lua plus native calls (`hs.keycodes.map`, `hs.json`, the file write), which no child
+  can do, and slicing it across run-loop turns would let layout, pause and lease events land between a build and the
+  layout serial, lease token and epoch it was validated against. Measured on Linux Lua 5.4 under the stub harness
+  (shipped recommended preset, 6 rounds): layout actions 1.1-1.8 ms, build 27-40 ms, merge 9-30 ms, encode 11-44 ms
+  (258617 bytes); so the field 230 ms in `karabiner.layout_actions` is native, not the Lua loop. Next: split that
+  phase on the Mac (`Layout.keyboard_form()` registry snapshot vs the 548 `hs.keycodes.map` lookups) before touching
+  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed.
 - **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. Check the maintainer's machines against `docs/tooling/one-folder-name-handoff.md`; remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31).
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November, all on `dev`:
