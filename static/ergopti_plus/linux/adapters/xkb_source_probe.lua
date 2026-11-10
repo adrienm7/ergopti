@@ -528,8 +528,9 @@ function M.property_invalidation_view()
 	return result
 end
 
---- Orders complete alias declarations without changing any alias name or target.
---- The codec preserves declaration order, which differs between X11 and xkbcomp.
+--- Orders complete alias declarations without changing any alias name or target,
+--- and blanks the group names. The codec preserves declaration order, which
+--- differs between X11 and xkbcomp.
 local function ordered_aliases(text)
 	local result, sections = text:gsub("(xkb_keycodes[^\n]*{\n)(.-)(\n};)", function(header, body, footer)
 		body = body .. "\n"
@@ -545,7 +546,12 @@ local function ordered_aliases(text)
 		end)
 		return header .. body .. footer:sub(2)
 	end)
-	return sections == 1 and result or nil
+	if sections ~= 1 then return nil end
+	-- A group name types nothing, and xkbcomp prints a name byte at or above
+	-- 0x80 as a sign-extended octal escape that libxkbcommon reads back as other
+	-- bytes: a layout named « bépo » or « Français — Ergopti » never matched its
+	-- printed copy, and every key press it was asked to type was refused.
+	return (result:gsub('(\n[ \t]*name%[[Gg]roup%d+%][ \t]*=[ \t]*)"[^\n]*";', '%1"";'))
 end
 
 --- Projects native serialization through the capture owner's exact parser codec.
