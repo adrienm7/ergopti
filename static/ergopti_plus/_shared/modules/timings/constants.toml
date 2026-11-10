@@ -580,7 +580,7 @@ mouse_park_idle_ms = 3000
 roi_halflife_check_ms = 3600000
 
 # Paste burst detection window (clipboard activity grouping).
-# AHK: keystats_clipboard.ahk PASTE_BURST_WINDOW_MS.
+# AHK: keystats_clipboard.ahk PASTE_BURST_WINDOW_MS. Lua: keystats/clipboard_events.lua.
 paste_burst_window_ms = 10000
 
 # Category auto-save debounce after a classification change.
