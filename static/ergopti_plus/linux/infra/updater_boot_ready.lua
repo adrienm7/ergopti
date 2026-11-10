@@ -18,6 +18,11 @@
 ---    which is logged at info level.
 --- 3. Only a token of the watcher's shape is written, so an inherited
 ---    variable cannot make the daemon create a file anywhere else.
+--- 4. A Quit is no failed start: the watcher's wait is this daemon's startup,
+---    so a user who quits it before the report (or during the probation) would
+---    otherwise see the update rolled back and the previous daemon started. The
+---    Quit writes `quit` to the token instead; the watcher then keeps the update
+---    and starts nothing.
 --- ==============================================================================
 
 local M = {}
@@ -31,11 +36,15 @@ M.ENVIRONMENT = "ERGOPTI_UPDATER_BOOT_READY"
 -- The watcher's token: <tmp>/ergopti-boot-ready.<random>/ready (restarter.lua).
 local TOKEN_PATTERN = "^/.+/ergopti%-boot%-ready%.[%w]+/ready$"
 
-local _reported = false
+-- The watcher's token content for a Quit (modules/updater/restarter.lua).
+M.QUIT_REPORT = "quit"
 
---- Writes the pid to the token through a temporary file.
+local _reported = false
+local _withdrawn = false
+
+--- Writes one report to the token through a temporary file.
 --- @param path string Admitted token path.
---- @param pid string Daemon pid.
+--- @param pid string Daemon pid or the Quit report.
 --- @param io_open function io.open or a test double.
 --- @param rename function os.rename or a test double.
 --- @return boolean written
@@ -58,17 +67,29 @@ local function publish(path, pid, io_open, rename)
 	return true
 end
 
+--- The watcher's token named by the environment, when it has the watcher's shape.
+--- @param getenv function os.getenv or a test double.
+--- @return string|nil path
+--- @return boolean|nil foreign True when a token is set but outside the watcher's folder.
+local function admitted_token(getenv)
+	local path = getenv(M.ENVIRONMENT)
+	if type(path) ~= "string" or path == "" then return nil end
+	if not path:match(TOKEN_PATTERN) or path:find("/../", 1, true) or path:find("/./", 1, true) then
+		return nil, true
+	end
+	return path
+end
+
 --- Reports this daemon as ready to the watcher that started it, at most once.
 --- @param reason string What made the daemon ready, for the log.
 --- @param deps table|nil { getenv, pid, io_open, rename } test doubles.
 --- @return boolean reported True when the token was written by this call.
 function M.report(reason, deps)
 	if _reported then return false end
-	local getenv = deps and deps.getenv or os.getenv
-	local path = getenv(M.ENVIRONMENT)
-	if type(path) ~= "string" or path == "" then return false end
+	local path, foreign = admitted_token(deps and deps.getenv or os.getenv)
+	if not path and not foreign then return false end
 	_reported = true
-	if not path:match(TOKEN_PATTERN) or path:find("/../", 1, true) or path:find("/./", 1, true) then
+	if not path then
 		Logger.warn(LOG, "Ignoring a boot-ready token outside the update watcher's folder.")
 		return false
 	end
@@ -87,9 +108,33 @@ function M.report(reason, deps)
 	return true
 end
 
---- Forgets the one report (tests only).
+--- Tells the update watcher that the user quit this daemon, at most once: it
+--- keeps the update and starts nothing (header, point 4).
+--- @param reason string What quit the daemon, for the log.
+--- @param deps table|nil { getenv, io_open, rename } test doubles.
+--- @return boolean reported True when the token was written by this call.
+function M.report_quit(reason, deps)
+	if _withdrawn then return false end
+	local path, foreign = admitted_token(deps and deps.getenv or os.getenv)
+	if not path then
+		if foreign then Logger.warn(LOG, "Ignoring a boot-ready token outside the update watcher's folder.") end
+		return false
+	end
+	_withdrawn = true
+	local written, detail = publish(path, M.QUIT_REPORT, deps and deps.io_open or io.open,
+		deps and deps.rename or os.rename)
+	if not written then
+		Logger.info(LOG, "No update watcher is waiting for this daemon (%s).", tostring(detail))
+		return false
+	end
+	Logger.success(LOG, "The update watcher was told that %s quit the updated daemon.", tostring(reason))
+	return true
+end
+
+--- Forgets the reports (tests only).
 function M.reset_for_tests()
 	_reported = false
+	_withdrawn = false
 end
 
 return M

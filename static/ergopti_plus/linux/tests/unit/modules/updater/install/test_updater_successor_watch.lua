@@ -129,6 +129,31 @@ helpers.describe("updated daemon start watch (linux-update-successor-ready)", fu
 		end
 	end)
 
+	helpers.it("(update-quit-kept) keeps the update and starts nothing when the new daemon is quit before it reports", function()
+		local s = scenario({})
+		helpers.assert_true(watch("relay", s, { launcher(s, "quit") }), "a Quit is no failed start")
+		helpers.assert_eq(read(s.root .. "/marker"), "new", "the update stays installed")
+		helpers.assert_eq(runs(s), 1, "the previous daemon is not started")
+		helpers.assert_contains(read(s.log) or "", "quit before it reported ready")
+		cleanup(s)
+	end)
+
+	helpers.it("(update-quit-kept) keeps the update when the new daemon is quit during its probation", function()
+		local s = scenario({})
+		local path = s.dir .. "/launcher"
+		write(path, table.concat({ "#!/bin/sh", "echo run >> " .. quote(s.runs), "[ -n \"$ERGOPTI_UPDATER_BOOT_READY\" ] || exit 0",
+			'echo $$ > "$ERGOPTI_UPDATER_BOOT_READY.tmp"; mv "$ERGOPTI_UPDATER_BOOT_READY.tmp" "$ERGOPTI_UPDATER_BOOT_READY"',
+			"sleep 0.2",
+			'echo quit > "$ERGOPTI_UPDATER_BOOT_READY.tmp"; mv "$ERGOPTI_UPDATER_BOOT_READY.tmp" "$ERGOPTI_UPDATER_BOOT_READY"',
+			"" }, "\n"))
+		assert(os.execute("chmod +x " .. quote(path)))
+		helpers.assert_true(watch("relay", s, { path }), "a Quit is no failed start")
+		helpers.assert_eq(read(s.root .. "/marker"), "new", "the update stays installed")
+		helpers.assert_eq(runs(s), 1, "the previous daemon is not started")
+		helpers.assert_contains(read(s.log) or "", "quit during its probation")
+		cleanup(s)
+	end)
+
 	helpers.it("(update-successor-watch) only starts an installation that predates the boot reporter", function()
 		local s = scenario({ reporter = false })
 		watch("relay", s, { launcher(s, nil) })
