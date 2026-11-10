@@ -25,6 +25,13 @@ unit (the service's cgroup would kill it), the token goes through
 back. A tree without the reporter file is only started; the rollback start is
 not watched. Moves are `mv -T -n` plus an existence check, not renameat2.
 
+The watcher's wait is the updated daemon's boot, so a user's Quit lands in
+that daemon, not the old one (a relay restart has already requested the old
+one's shutdown; under the unit systemd TERMs it at once). Every user Quit
+(`infra/quit_request.lua`, both degraded trays) first writes `quit` to the
+token (`report_quit`), and the watcher then keeps the update and starts
+nothing. Action: a new Quit path calls `report_quit`.
+
 A `systemctl --user --no-block restart|stop` of the daemon's own unit runs
 inside that unit's cgroup, so systemd's TERM of the cgroup can kill the shell
 and client before they report: the call then read as refused although the job

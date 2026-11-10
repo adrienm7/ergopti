@@ -21,6 +21,10 @@
 ---    of a daemon that keeps running.
 --- 4. Facts From Ports: every fact is read from an owner injected here, and a
 ---    missing owner fails at construction instead of reading as "not busy".
+--- 5. No Rollback For A Quit: a daemon that an update watcher started has not
+---    reported ready yet during the watcher's wait; an admitted Quit tells the
+---    watcher first, so it keeps the update instead of restoring and starting
+---    the previous daemon (infra/updater_boot_ready.lua).
 --- ==============================================================================
 
 local QuitAdmission = require("quit_admission")
@@ -38,6 +42,7 @@ local LOG = "infra.quit_request"
 ---   writer_active       function Whether a scope write, rollback or the global composition is pending.
 ---   publication_pending function Whether a hotstring publication is pending.
 ---   apply_pause_layout  function Applies the pause layout; its failure never blocks the quit.
+---   report_update_quit  function Tells a waiting update watcher that the user quit; its failure never blocks the quit.
 ---   schedule            function (seconds, callback) -> boolean, arms a one-shot timer.
 ---   now                 function Monotonic seconds.
 ---   timeout             number   Seconds a deferred Quit may wait (the user-quit deadline).
@@ -49,7 +54,7 @@ function M.new(ports)
 	assert(type(ports.shutdown) == "table" and type(ports.shutdown.is_requested) == "function"
 		and type(ports.shutdown.request) == "function", "the quit request needs the shutdown owner")
 	for _, name in ipairs({ "reload_in_flight", "abandon_reload", "writer_active", "publication_pending",
-		"apply_pause_layout", "schedule", "now", "notify_refused" }) do
+		"apply_pause_layout", "report_update_quit", "schedule", "now", "notify_refused" }) do
 		assert(type(ports[name]) == "function", "the quit request needs the " .. name .. " port")
 	end
 	assert(type(ports.timeout) == "number" and type(ports.poll) == "number", "the quit request needs its bounds")
@@ -62,6 +67,8 @@ function M.new(ports)
 			local called, err = pcall(ports.abandon_reload)
 			if not called then Logger.error(LOG, "Reload cancellation raised: %s.", tostring(err)) end
 		end
+		local reported, report_err = pcall(ports.report_update_quit)
+		if not reported then Logger.error(LOG, "Update watcher Quit report raised: %s.", tostring(report_err)) end
 		if not ports.shutdown.is_requested() then
 			local called, err = pcall(ports.apply_pause_layout)
 			if not called then Logger.error(LOG, "Quit layout switch raised: %s.", tostring(err)) end

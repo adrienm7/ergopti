@@ -199,6 +199,8 @@ function M.run(options)
 			-- The update watcher that started this daemon is told once it is ready.
 			return { report = function(reason)
 				observed.boot_ready_reason = reason; record("updater.boot_ready"); return false
+			end, report_quit = function(reason)
+				observed.boot_quit_reason = reason; record("updater.boot_quit"); return false
 			end }
 		elseif name == "adapters.wpm_surface" then
 			-- The floating WPM widget pumps its own window, tray or not.

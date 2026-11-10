@@ -20,6 +20,9 @@
 --- it, moves the installation to <root>.failed-<pid>, puts <root>.old back and
 --- starts the previous daemon. Under the unit the watcher is a transient
 --- systemd-run unit, since the service's cgroup would kill it on restart.
+--- The watcher's wait is the new daemon's startup, so a Quit lands in that
+--- daemon: it writes `quit` to the token (infra/updater_boot_ready.lua) and the
+--- watcher keeps the update and starts nothing.
 --- ==============================================================================
 
 local M = {}
@@ -134,8 +137,10 @@ M.WATCH_SCRIPT = table.concat({
 	'	sleep 0.1',
 	'done',
 	'successor=',
+	'kept() { note "The updated daemon was quit $1: the update stays installed and no daemon is started."; finish; exit 0; }',
 	'if [ -z "$failure" ]; then',
 	'	successor=$(cat "$token")',
+	'	[ "$successor" = quit ] && kept "before it reported ready"',
 	'	case "$successor" in ""|*[!0-9]*) successor=; failure="an invalid boot report" ;; esac',
 	'fi',
 	'if [ -z "$failure" ]; then',
@@ -143,6 +148,7 @@ M.WATCH_SCRIPT = table.concat({
 	'	kill -0 "$successor" 2>/dev/null || failure="it quit during the probation"',
 	'fi',
 	'if [ -z "$failure" ]; then note "The updated daemon reported a healthy start."; finish; exit 0; fi',
+	'[ "$(cat "$token" 2>/dev/null)" = quit ] && kept "during its probation"',
 	'if [ "$mode" = systemd ]; then',
 	'	systemctl --user stop "$unit"',
 	'else',

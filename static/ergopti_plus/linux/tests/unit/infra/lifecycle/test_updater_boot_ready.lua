@@ -54,6 +54,21 @@ helpers.describe("updater boot ready (linux-update-successor-ready)", function()
 		end)
 	end)
 
+	helpers.it("(update-quit-kept) a Quit writes the quit report once, even after the ready report", function()
+		with_reporter(function(Ready, dir, deps, env)
+			helpers.assert_eq(Ready.report("daemon ready", deps()), true)
+			helpers.assert_eq(Ready.report_quit("the tray Quit", deps()), true, "a Quit in the probation still counts")
+			helpers.assert_eq(read(dir .. "/ready"), Ready.QUIT_REPORT .. "\n")
+			helpers.assert_nil(read(dir .. "/ready.tmp"), "no temporary file is left behind")
+			helpers.assert_eq(Ready.report_quit("the tray Quit", deps()), false, "one Quit report per daemon")
+			Ready.reset_for_tests()
+			env.ERGOPTI_UPDATER_BOOT_READY = "/tmp/elsewhere/ready"
+			helpers.assert_eq(Ready.report_quit("the tray Quit", deps()), false, "a foreign token is never written")
+			env.ERGOPTI_UPDATER_BOOT_READY = nil
+			helpers.assert_eq(Ready.report_quit("the tray Quit", deps()), false, "no watcher, no report")
+		end)
+	end)
+
 	helpers.it("(update-successor-watch) publishes through a rename", function()
 		with_reporter(function(Ready, dir, deps)
 			local renames = 0
