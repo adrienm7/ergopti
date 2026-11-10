@@ -1035,8 +1035,17 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Wayland desktop changes: on sway, Hyprland and KDE Plasma 6 Wayland, switch workspaces a few times (each at least 1 s apart); Metrics shows the desktop-change count rising by one per switch, and GNOME Wayland still shows « — » with its reason.
 - [ ] Secret service: add a key with the keyring locked, the unlock prompt takes the keyboard under the grab; restart
       and check the plaintext `api_keys.json` migration (e93a4f7368, 939c0f60).
-- [ ] Owned Ollama: with `ollama serve` on 11434, enabling the AI starts Ergopti's on 11435 (32fa07be7f).
-- [ ] PAC unreachable: an Ollama pull logs the WARNING then the direct success (50b424b997, afc7fa23db).
+- [x] Owned Ollama: with `ollama serve` on 11434, enabling the AI starts Ergopti's on 11435 (32fa07be7f). Container
+      proof 2026-11-10 (`static/ergopti_plus/linux/tests/hardware/run_owned_ollama_container.py`, CI `network-ai`): an Ollama stand-in speaking its HTTP
+      API on 11434 and an `ollama` on PATH are never contacted or run; the menu's enable starts the managed binary
+      with `OLLAMA_HOST=127.0.0.1:11435`, which answers `/api/version`, and switching the AI off ends it. The proof
+      found an absent `config.toml` refused the start (`runtime_writer_unacknowledged_restored`): fixed in
+      `runtime_source.lua` (`runtime-absent-config`). The pinned release itself cannot be downloaded in the cloud.
+- [x] PAC unreachable: an Ollama pull logs the WARNING then the direct success (50b424b997, afc7fa23db). Container
+      proof 2026-11-10 (same runner, real glib-pacrunner on a private bus): GIO answered `direct://` with no error for
+      a PAC it could not download, so the WARNING never appeared on Linux; the lookup child now downloads the GNOME
+      PAC itself and the stage logs « lookup unusable at native_pac_download », then the pull succeeds direct
+      (`pac-download-direct`). A PAC that says DIRECT warns nothing; a dead relay as the last entry fails the pull.
 - [ ] Item 50 cascade and the composed layout typed on a physical keyboard.
 - [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
@@ -1055,10 +1064,17 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Tap-hold copy check on Wayland: on KDE or sway with wl-clipboard, a tap-hold copy in an editor sends no retry
       and no warning, and a copy with nothing selected warns once; on GNOME the log says the watch ended and the
       copy goes unchecked. On X11 with xclip removed, the same copy is checked through libX11.
-- [ ] Some `local_servers.json` servers installed: the detection names them.
+- [x] Some `local_servers.json` servers installed: the detection names them. Container proof 2026-11-10
+      (`static/ergopti_plus/linux/tests/hardware/run_local_servers_container.py`, CI `network-ai`): stand-ins under the servers' own names and flags;
+      the sweep names llama.cpp and vLLM (port from the command line), Lemonade (`~/.config/lemonade/config.json`)
+      and KoboldCpp (its listening socket through ss), each up with its model, every other server « not running ».
 - [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
       press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
+      Not emulable in the cloud (2026-11-10): the container kernel has no uinput module and no /dev/input
+      (`mknod c 10 223` opens with ENODEV), so no pointer, wheel or touchpad device can reach the hook's evdev
+      reader, and no compositor runs the spinner or the focused-window poll; the event routing is covered by
+      `test_prediction_control_retirement.lua` (« Main cancels AI on pointer activity »).
 - [ ] Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
       types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row changes
       the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
@@ -1149,6 +1165,13 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### All drivers
 
+- [ ] **Linux PAC lists through GIO (found 2026-11-10).** On GNOME, GIO keeps only the first entry of a PAC answer
+      (`PROXY a; DIRECT` reaches the driver as `a`), so the managed Ollama stage's browser-style walk cannot fall
+      back to DIRECT when that relay is down (docs/memory `project-linux-gio-hides-pac-failures`). Decide whether to
+      evaluate the PAC another way or document it.
+- [ ] **Linux managed Ollama under umask 0002 (found 2026-11-10).** The install resolver refuses a group-writable
+      ancestor (`install_ancestor_writable_by_others`), and a user-private-group umask 0002 makes `~/.local/share`
+      group-writable when an application creates it so: decide whether a private group's write bit is acceptable.
 - [x] **Test parity (audit item 14), Linux and macOS.** Closed on 10 November (39b12ae7): the tar feeder tests
       already load `infra.archive_tar_feeder` by module; five more Linux copies resolve their file from the module name
       (ratchet 7 files, 13 reads); every remaining Linux and macOS pin is documented as legitimate in its ratchet header
