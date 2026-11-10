@@ -19,6 +19,10 @@
 ---    keys that fired it woke them straight back up.
 --- 5. force_quit_frontmost killed unasked (decision of 2026-09-29), and a kill
 ---    confirmed in a dialog must target the window active before the question.
+--- 7. open_terminal_here and new_text_file_here had no Linux handler: they act
+---    only in the folder adapters/file_manager_folder.lua proved, start the
+---    terminal detached in it, create the file exclusively under the first free
+---    name, reveal it in the same Nautilus process, and say why otherwise.
 --- 6. minimize_all, eject_all_disks, open_emoji_picker, pick_color,
 ---    screen_capture_instant and ocr_screenshot were declared for Windows and
 ---    macOS only. Their Linux commands run here in a real shell against stub
@@ -306,6 +310,97 @@ helpers.describe("Linux system actions", function()
 		end)
 		helpers.assert_eq(#written, 1)
 		helpers.assert_eq(written[1], "")
+	end)
+
+	--- Runs body with a scripted folder owner and a recording notifier.
+	local function with_folder(answer, body)
+		local notices = {}
+		local folder_port = {
+			available = function() return true end,
+			read_active_folder = function() return answer() end,
+			reveal_command = function(folder, path) return "reveal " .. folder.bus .. " " .. path end,
+		}
+		with_modules({
+			["adapters.file_manager_folder"] = folder_port,
+			["adapters.application_notifier"] = { send = function(message) notices[#notices + 1] = message; return true end },
+		}, function() body(notices) end)
+	end
+
+	helpers.it("open_terminal_here starts the session terminal detached in the proven folder (system-actions)", function()
+		with_folder(function() return { path = "/home/ana/My dir", bus = ":1.9" } end, function(notices)
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("open_terminal_here", "tap_3")
+				local run = launched(commands)
+				helpers.assert_eq(#run, 1)
+				helpers.assert_true(run[1]:match("^cd %-%- '/home/ana/My dir' && setsid '[%w%-]+' </dev/null >/dev/null 2>&1 &$")
+					~= nil, run[1])
+			end)
+			helpers.assert_eq(notices, {})
+		end)
+	end)
+
+	helpers.it("file-manager folder refusals say why and run nothing (system-actions)", function()
+		local i18n = require("infra.i18n")
+		local SystemActions = require("modules.gestures.system_actions")
+		for reason, key in pairs(SystemActions.FOLDER_REFUSALS) do
+			for _, action in ipairs({ "open_terminal_here", "new_text_file_here" }) do
+				with_folder(function() return nil, reason, "Thunar" end, function(notices)
+					with_recorded_shell(function(commands)
+						Gestures.execute_action(action, "tap_3")
+						helpers.assert_eq(#launched(commands), 0, action .. " " .. reason)
+					end)
+					local expected = i18n.get(key):gsub("{1}", "Thunar")
+					helpers.assert_eq(notices, { expected }, action .. " " .. reason)
+				end)
+			end
+		end
+		helpers.assert_eq(SystemActions.FOLDER_REFUSALS.unsupported_file_manager, "system_actions.file_manager_unsupported")
+	end)
+
+	helpers.it("new_text_file_here creates the first free name exclusively and reveals it (system-actions)", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		local made = os.execute("mkdir '" .. dir .. "'")
+		helpers.assert_true(made == true or made == 0)
+		local base = require("infra.i18n").get("system_actions.new_text_file_name")
+		local taken = assert(io.open(dir .. "/" .. base .. ".txt", "w"))
+		taken:write("kept")
+		taken:close()
+		with_folder(function() return { path = dir, bus = ":1.9" } end, function(notices)
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("new_text_file_here", "tap_3")
+				local run = launched(commands)
+				helpers.assert_eq(#run, 1)
+				helpers.assert_eq(unwrap(run[1]), "reveal :1.9 " .. dir .. "/" .. base .. " 2.txt")
+			end)
+			helpers.assert_eq(notices, {})
+		end)
+		local kept = assert(io.open(dir .. "/" .. base .. ".txt", "r"))
+		helpers.assert_eq(kept:read("*a"), "kept", "an existing file is never overwritten")
+		kept:close()
+		local created = io.open(dir .. "/" .. base .. " 2.txt", "r")
+		helpers.assert_not_nil(created, "the second name is created")
+		helpers.assert_eq(created:read("*a"), "")
+		created:close()
+		os.execute("rm -rf '" .. dir .. "'")
+	end)
+
+	helpers.it("create_new_text_file stops on a refusal other than an existing name (system-actions)", function()
+		local SystemActions = require("modules.gestures.system_actions")
+		local tried = {}
+		local path = SystemActions.create_new_text_file("/srv/x", function(candidate)
+			tried[#tried + 1] = candidate
+			if #tried == 1 then return false, 17 end
+			return false, 13
+		end)
+		helpers.assert_nil(path)
+		helpers.assert_eq(#tried, 2)
+		local count = 0
+		helpers.assert_nil(SystemActions.create_new_text_file("/srv/x/", function()
+			count = count + 1
+			return false, "EEXIST"
+		end))
+		helpers.assert_eq(count, SystemActions.NEW_FILE_NAME_ATTEMPTS)
 	end)
 
 	helpers.it("never sends Ctrl+C to a terminal for make_executable_selection", function()

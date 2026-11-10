@@ -155,7 +155,13 @@ const AX_FIELDS = new Set([
 const REQUIREMENT_TOKENS = {
 	ahk: [/^ai:on$/],
 	hs: [/^ai:on$/],
-	linux: [/^tool:[A-Za-z0-9._+-]+$/, /^session:x11$/, /^session:workspaces$/, /^ai:on$/]
+	linux: [
+		/^tool:[A-Za-z0-9._+-]+$/,
+		/^session:x11$/,
+		/^session:workspaces$/,
+		/^file_manager:folder$/,
+		/^ai:on$/
+	]
 };
 
 /**

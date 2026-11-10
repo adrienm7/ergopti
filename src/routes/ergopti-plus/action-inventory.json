@@ -1016,26 +1016,14 @@
 	{
 		"path": "sg_actions.open_terminal_here",
 		"labels": { "fr": "⌨ Ouvrir un terminal ici", "en": "⌨ Open a terminal here" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This action requires a file-manager-specific integration to identify the active folder.",
-				"fr": "Cette action nécessite une intégration propre au gestionnaire de fichiers pour identifier le dossier actif.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.new_text_file_here",
 		"labels": { "fr": "📄 Nouveau fichier texte ici", "en": "📄 New text file here" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This action requires a file-manager-specific integration to identify the active folder.",
-				"fr": "Cette action nécessite une intégration propre au gestionnaire de fichiers pour identifier le dossier actif.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.open_metrics_typing",

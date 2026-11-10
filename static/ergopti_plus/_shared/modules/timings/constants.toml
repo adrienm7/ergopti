@@ -299,6 +299,12 @@ startup_phase_timeout_ms = 30000
 # HS: gestures/actions_aux_owner.lua SHELL_DEADLINE_SEC.
 aux_shell_timeout_ms = 10000
 
+# Free names new_text_file_here tries in a folder ("New text file.txt", then
+# "New text file 2.txt"…) before it gives up on a folder that holds them all.
+# LX: modules/gestures/system_actions.lua. HS: modules/gestures/system_actions.lua
+# and AHK: modules/gestures/system_actions.ahk keep a copy of the same count.
+new_text_file_name_attempts = 100
+
 # Longest a hidden run_command child may run before it is stopped and its
 # failure notified (a terminal window is the user's own and is not bounded).
 # HS: gestures/user_actions.lua. LX: modules/gestures/user_actions.lua.
