@@ -5,6 +5,17 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Linux PAC lists and the managed-Ollama data folder (2026-11-10)
+
+- Linux evaluates the PAC itself: GIO (GNOME) keeps only the first entry of
+  a PAC answer, so `PROXY a; DIRECT` never fell back when relay `a` was down.
+  The driver runs the PAC it already downloads and walks the whole ordered
+  list with the shared route timeout, as Windows and macOS do.
+- The managed-Ollama installer accepts a group-writable parent folder only
+  when the group is the user's own private group (same name and gid as the
+  user, no other member), the Ubuntu umask 0002 layout; another shared group
+  or a world-writable folder is still refused.
+
 ## Tap-hold settings, minimum tap, tap-to-click and Linux proof (2026-11-10)
 
 - One home for the tap-hold settings on every OS: a shared `tap_hold.toml`
