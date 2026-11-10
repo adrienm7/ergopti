@@ -31,6 +31,14 @@ local LOG = "modules.updater.restarter"
 
 M.UNIT = "ergopti-hotstrings.service"
 
+-- A restart or stop of the unit this process runs in makes systemd TERM every
+-- process of its cgroup, the shell and the systemctl client still reporting
+-- the queued job included. Killed there, the call reads as a refusal although
+-- the job runs: the restart then disarmed its update watcher and logged a
+-- refusal (seen under a real user manager, tests/desktop). Ignoring TERM, which
+-- the client inherits, lets it report; it exits right after, as before.
+M.OWN_UNIT_JOB_PREFIX = "trap '' TERM; "
+
 local function read_file(path)
 	local fh = io.open(path, "r")
 	if not fh then return nil end
@@ -279,7 +287,7 @@ function M.cancel(how, opts)
 			if watch_token then os.remove(watch_token); os.remove((watch_token:gsub("/ready$", ""))) end
 			watch_unit, watch_token = nil, nil
 		end
-		if run("systemctl --user --no-block stop " .. M.UNIT) then
+		if run(M.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop " .. M.UNIT) then
 			Logger.info(LOG, "The pending restart was replaced by a stop.")
 			return true
 		end
@@ -367,7 +375,7 @@ function M.restart(opts)
 			end
 			-- --no-block: systemd restarts the unit after this call returns, by
 			-- stopping this process the way a logout does.
-			if run("systemctl --user --no-block restart " .. M.UNIT) then
+			if run(M.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. M.UNIT) then
 				Logger.info(LOG, "Restart on the update requested from systemd.")
 				return "systemd"
 			end

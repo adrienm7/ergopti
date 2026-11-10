@@ -161,12 +161,34 @@ helpers.describe("updated daemon start watch (linux-update-successor-ready)", fu
 		helpers.assert_contains(ran[1], "systemctl --user set-environment 'ERGOPTI_UPDATER_BOOT_READY=")
 		helpers.assert_contains(ran[2], "systemd-run --user --collect --quiet --unit='ergopti-update-watch-")
 		helpers.assert_contains(ran[2], "update-watch systemd '/opt/ergopti/lib'")
-		helpers.assert_eq(ran[3], "systemctl --user --no-block restart " .. Restarter.UNIT)
+		helpers.assert_eq(ran[3], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. Restarter.UNIT)
 		-- A Quit replaces the restart: the watcher is stopped first, so it restores nothing.
 		local cancelled = {}
 		helpers.assert_eq(Restarter.cancel("systemd", { run = function(cmd) cancelled[#cancelled + 1] = cmd; return true end }), true)
 		helpers.assert_contains(cancelled[1], "systemctl --user stop 'ergopti-update-watch-")
-		helpers.assert_eq(cancelled[#cancelled], "systemctl --user --no-block stop " .. Restarter.UNIT)
+		helpers.assert_eq(cancelled[#cancelled], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop " .. Restarter.UNIT)
+	end)
+
+	helpers.it("(update-successor-watch) keeps the watcher when systemd TERMs the restart's own client", function()
+		-- systemd stops this unit by TERMing its whole cgroup, the systemctl
+		-- client that queued the restart included; the stand-in does just that.
+		local s = scenario({})
+		assert(os.execute("mkdir -p " .. quote(s.dir .. "/bin")))
+		write(s.dir .. "/bin/systemctl", "#!/bin/sh\necho \"$*\" >> " .. quote(s.dir .. "/calls")
+			.. "\ncase \"$*\" in *--no-block*) kill -TERM $$ ;; esac\nexit 0\n")
+		assert(os.execute("chmod +x " .. quote(s.dir .. "/bin/systemctl")))
+		local function run(cmd)
+			if cmd:find("systemd-run", 1, true) then return true end
+			local ok = os.execute("PATH=" .. quote(s.dir .. "/bin") .. ":\"$PATH\"; export PATH; " .. cmd)
+			return ok == true or ok == 0
+		end
+		local how = Restarter.restart({ wrapper = "/opt/ergopti/bin/ergopti", args = {}, cgroup = UNIT_CGROUP,
+			successor = { root = s.root, log = s.log }, run = run })
+		helpers.assert_eq(how, "systemd", "a TERMed client still queued the restart")
+		helpers.assert_true(not (read(s.dir .. "/calls") or ""):find("unset-environment", 1, true),
+			"the watcher must stay armed")
+		helpers.assert_eq(Restarter.cancel("systemd", { run = run }), true, "a TERMed stop client still queued the stop")
+		cleanup(s)
 	end)
 
 	helpers.it("(update-successor-watch) stops the watcher of a restart systemd refused", function()

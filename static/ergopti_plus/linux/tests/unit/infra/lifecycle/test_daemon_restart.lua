@@ -44,7 +44,7 @@ helpers.describe("daemon restart", function()
 		local opts, record = fixture(UNIT_CGROUP, nil)
 		helpers.assert_eq(DaemonRestart.restart(opts), "systemd")
 		helpers.assert_eq(DaemonRestart.cancel({ restarter = Restarter, run = opts.run }), true)
-		helpers.assert_eq(record.commands[2], "systemctl --user --no-block stop " .. Restarter.UNIT)
+		helpers.assert_eq(record.commands[2], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop " .. Restarter.UNIT)
 		helpers.assert_eq(DaemonRestart.cancel({ restarter = Restarter, run = opts.run }), false,
 			"the restart is no longer pending")
 	end)
@@ -62,7 +62,7 @@ helpers.describe("daemon restart", function()
 	helpers.it("asks systemd to restart the user unit without resolving an installation", function()
 		local opts, record = fixture(UNIT_CGROUP, nil)
 		helpers.assert_eq(DaemonRestart.restart(opts), "systemd")
-		helpers.assert_eq(record.commands, { "systemctl --user --no-block restart " .. Restarter.UNIT })
+		helpers.assert_eq(record.commands, { Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. Restarter.UNIT })
 		helpers.assert_eq(record.resolved, 0, "the unit restarts itself; no launcher is needed")
 	end)
 
@@ -96,7 +96,7 @@ helpers.describe("daemon restart", function()
 			local opts, record = fixture(cgroup, nil)
 			helpers.assert_eq(DaemonRestart.restart(opts), "systemd")
 			helpers.assert_eq(record.resolved, 0)
-			helpers.assert_eq(record.commands, { "systemctl --user --no-block restart " .. Restarter.UNIT })
+			helpers.assert_eq(record.commands, { Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. Restarter.UNIT })
 		end
 	end)
 
@@ -189,7 +189,7 @@ helpers.describe("restart pause handoff", function()
 					seen = f.read()
 					helpers.assert_type(seen, "string", "pause must survive the old process before dispatch")
 					if cgroup == UNIT_CGROUP then
-						helpers.assert_eq(command, "systemctl --user --no-block restart " .. Restarter.UNIT)
+						helpers.assert_eq(command, Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. Restarter.UNIT)
 					end
 					return true
 				end, cgroup)
