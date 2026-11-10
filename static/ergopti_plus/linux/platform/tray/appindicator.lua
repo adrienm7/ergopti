@@ -45,6 +45,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Perf = require("infra.perf_counters")
 
 local LOG = "platform.tray.appindicator"
 
@@ -180,6 +181,7 @@ local function bind()
 		void         gtk_menu_shell_append(GtkWidget *shell, GtkWidget *child);
 		void         gtk_widget_set_sensitive(GtkWidget *widget, gboolean sensitive);
 		void         gtk_widget_show_all(GtkWidget *widget);
+		void         gtk_widget_show(GtkWidget *widget);
 		gboolean     gtk_init_check(int *argc, char ***argv);
 		gboolean     gtk_events_pending(void);
 		gboolean     gtk_main_iteration_do(gboolean blocking);
@@ -287,36 +289,244 @@ local function dispatcher(lib)
 	return _dispatcher.gcallback
 end
 
---- Connects a Lua function to "activate" through the shared dispatcher.
+--- Registers a Lua function under a fresh action id and connects `signal` of
+--- `widget` to the shared dispatcher with that id.
 --- @param lib table
 --- @param widget userdata
+--- @param signal string "activate" or "map".
 --- @param fn function
---- @param owned table
---- @param checked boolean|nil
-local function on_activate(lib, widget, fn, owned, checked)
-	local signal_id
-	local action = fn
-	if checked ~= nil then
-		action = function()
-			-- GTK toggles before activate handlers run. Only the owning rebuild
-			-- may publish a changed setting; rejected writes must keep its check.
-			-- set_active emits activate too, so block this exact handler while
-			-- restoring, before fn can rebuild and destroy the old widget.
-			lib.gobject.g_signal_handler_block(widget, signal_id)
-			local restored, err = pcall(lib.gtk.gtk_check_menu_item_set_active, widget, checked and 1 or 0)
-			lib.gobject.g_signal_handler_unblock(widget, signal_id)
-			if not restored then error(err, 0) end
-			return fn()
-		end
-	end
+--- @param owned table Receives the id.
+--- @return integer action_id
+--- @return integer signal_id
+local function connect(lib, widget, signal, fn, owned)
 	_next_action = _next_action + 1
-	_actions[_next_action] = action
-	owned[#owned + 1] = _next_action
-	signal_id = lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
-		lib.ffi.cast("gpointer", _next_action), nil, 0)
+	local action_id = _next_action
+	_actions[action_id] = fn
+	owned[#owned + 1] = action_id
+	local signal_id = lib.gobject.g_signal_connect_data(widget, signal, dispatcher(lib),
+		lib.ffi.cast("gpointer", action_id), nil, 0)
+	return action_id, signal_id
 end
 
---- Builds a GtkMenu from the neutral tree the renderer emits.
+--- The widget kind a row needs; a row only changes in place within its kind.
+--- @param item table
+--- @return string "separator", "check" or "plain".
+local function row_kind(item)
+	if item.separator or item.title == "-" then return "separator" end
+	if item.checked ~= nil then return "check" end
+	return "plain"
+end
+
+--- @param item table
+--- @return boolean
+local function has_submenu(item)
+	return type(item.menu) == "table" and #item.menu > 0
+end
+
+--- The action a row may run: none for a parent, a disabled row or an inert one.
+--- @param row table
+--- @param item table
+--- @param disabled boolean
+--- @return function|nil
+local function row_action(row, item, disabled)
+	if row.has_sub or disabled or type(item.fn) ~= "function" then return nil end
+	return item.fn
+end
+
+--- Sets a check row's mark without running its action: set_active emits
+--- activate, so the row's own handler is blocked meanwhile.
+--- @param lib table
+--- @param row table
+--- @param checked boolean
+local function set_check(lib, row, checked)
+	-- A check row with a submenu opens it on activate: blocked too, or a
+	-- changed check would build a submenu nobody opened.
+	local signal = row.signal or (row.sub and row.sub.parent_signal)
+	if signal then lib.gobject.g_signal_handler_block(row.widget, signal) end
+	local restored, err = pcall(lib.gtk.gtk_check_menu_item_set_active, row.widget, checked and 1 or 0)
+	if signal then lib.gobject.g_signal_handler_unblock(row.widget, signal) end
+	if not restored then error(err, 0) end
+end
+
+--- Connects a row's activate handler, once, the first time it has an action.
+--- The handler reads the row's current action and check, so an in-place update
+--- never needs a new callback.
+--- @param lib table
+--- @param row table
+--- @param owned table
+local function arm_row(lib, row, owned)
+	if row.action_id or not row.fn then return end
+	row.action_id, row.signal = connect(lib, row.widget, "activate", function()
+		if row.kind == "check" then
+			-- GTK toggles before activate handlers run. Only the owning rebuild
+			-- may publish a changed setting; rejected writes must keep its check.
+			set_check(lib, row, row.checked)
+		end
+		local fn = row.fn
+		if fn then return fn() end
+	end, owned)
+end
+
+local fill_node
+
+--- Retires every action of a node and of its filled descendants: a click on a
+--- destroyed or rebuilt row must run nothing, least of all its successor.
+--- @param node table
+local function retire_node(node)
+	for _, id in ipairs(node.fill_ids or {}) do _actions[id] = nil end
+	for _, row in ipairs(node.rows or {}) do
+		if row.action_id then _actions[row.action_id] = nil end
+		if row.sub then retire_node(row.sub) end
+	end
+end
+
+--- A submenu node, empty until it is opened. A hidden placeholder keeps the
+--- parent a submenu row for dbusmenu (an empty GtkMenu is published as a plain
+--- item, and AboutToShow on it is ignored). libdbusmenu-gtk turns a client's
+--- AboutToShow into the parent's "activate", and a native GtkMenu popup (the
+--- XEmbed fallback) maps the submenu: either fills it, once. Not "show": the
+--- indicator shows every submenu when the menu is set, opened or not.
+--- @param lib table
+--- @param parent userdata The parent row's widget.
+--- @param items table
+--- @param disabled boolean
+--- @param owned table
+--- @return table node
+local function lazy_node(lib, parent, items, disabled, owned)
+	local menu = lib.gtk.gtk_menu_new()
+	local node = { menu = menu, items = items, disabled = disabled, filled = false, rows = {}, fill_ids = {} }
+	node.placeholder = lib.gtk.gtk_menu_item_new_with_label("")
+	lib.gtk.gtk_menu_shell_append(menu, node.placeholder)
+	local function fill() fill_node(lib, node, owned) end
+	node.fill_ids[1], node.parent_signal = connect(lib, parent, "activate", fill, owned)
+	node.fill_ids[2] = connect(lib, menu, "map", fill, owned)
+	lib.gtk.gtk_menu_item_set_submenu(parent, menu)
+	return node
+end
+
+--- Creates the widget of one row and appends it.
+--- @param lib table
+--- @param node table
+--- @param item table
+--- @param owned table
+--- @return table row
+local function add_row(lib, node, item, owned)
+	local disabled = node.disabled or item.disabled == true
+	local row = { kind = row_kind(item), has_sub = has_submenu(item) }
+	if row.kind == "separator" then
+		row.widget = lib.gtk.gtk_separator_menu_item_new()
+	else
+		row.title = tostring(item.title or "")
+		if row.kind == "check" then
+			row.widget = lib.gtk.gtk_check_menu_item_new_with_label(row.title)
+			row.checked = item.checked == true
+			lib.gtk.gtk_check_menu_item_set_active(row.widget, row.checked and 1 or 0)
+		else
+			row.widget = lib.gtk.gtk_menu_item_new_with_label(row.title)
+		end
+	end
+	if row.has_sub then
+		row.sub = lazy_node(lib, row.widget, item.menu, disabled, owned)
+	else
+		-- dbusmenu Event can activate an insensitive GTK item directly.
+		-- Unavailable rows therefore never receive an action capability.
+		row.fn = row_action(row, item, disabled)
+		arm_row(lib, row, owned)
+	end
+	row.sensitive = not disabled
+	if disabled then lib.gtk.gtk_widget_set_sensitive(row.widget, 0) end
+	lib.gtk.gtk_menu_shell_append(node.menu, row.widget)
+	lib.gtk.gtk_widget_show(row.widget)
+	return row
+end
+
+--- Builds the rows of a node that has none yet. Never show_all: it recurses
+--- into every submenu and shows rows nobody opened.
+--- @param lib table
+--- @param node table
+--- @param owned table
+fill_node = function(lib, node, owned)
+	if node.filled then return end
+	node.filled = true
+	if node.placeholder ~= nil then
+		lib.gtk.gtk_widget_destroy(node.placeholder)
+		node.placeholder = nil
+	end
+	for _, id in ipairs(node.fill_ids) do _actions[id] = nil end
+	node.rows = {}
+	for _, item in ipairs(node.items or {}) do
+		node.rows[#node.rows + 1] = add_row(lib, node, item, owned)
+	end
+	Perf.count("tray.rows", #node.rows)
+end
+
+--- Whether a node's rows can take `items` in place: the same kinds, the same
+--- submenu parents and the same titles. A changed title rebuilds the node,
+--- so a click aimed at one row can never land on the row that took its place.
+--- @param node table
+--- @param items table
+--- @return boolean
+local function same_shape(node, items)
+	if #node.rows ~= #items then return false end
+	for index, item in ipairs(items) do
+		local row = node.rows[index]
+		if row.kind ~= row_kind(item) or row.has_sub ~= has_submenu(item) then return false end
+		if row.kind ~= "separator" and row.title ~= tostring(item.title or "") then return false end
+	end
+	return true
+end
+
+local patch_node
+
+--- Updates one row in place: its check, its sensitivity and its action.
+--- @param lib table
+--- @param node table
+--- @param row table
+--- @param item table
+--- @param owned table
+local function patch_row(lib, node, row, item, owned)
+	local disabled = node.disabled or item.disabled == true
+	if row.kind == "check" and row.checked ~= (item.checked == true) then
+		row.checked = item.checked == true
+		set_check(lib, row, row.checked)
+	end
+	if row.sensitive ~= not disabled then
+		row.sensitive = not disabled
+		lib.gtk.gtk_widget_set_sensitive(row.widget, disabled and 0 or 1)
+	end
+	if row.has_sub then
+		patch_node(lib, row.sub, item.menu, disabled, owned)
+	else
+		row.fn = row_action(row, item, disabled)
+		arm_row(lib, row, owned)
+	end
+end
+
+--- Brings a node to `items`: in place when the shape is unchanged, otherwise
+--- by destroying its rows and building them again. A node never opened only
+--- keeps the new rows for when it is.
+--- @param lib table
+--- @param node table
+--- @param items table
+--- @param disabled boolean
+--- @param owned table
+patch_node = function(lib, node, items, disabled, owned)
+	items = items or {}
+	local reshaped = node.disabled ~= disabled
+	node.items, node.disabled = items, disabled
+	if not node.filled then return end
+	if not reshaped and same_shape(node, items) then
+		for index, item in ipairs(items) do patch_row(lib, node, node.rows[index], item, owned) end
+		return
+	end
+	retire_node(node)
+	for _, row in ipairs(node.rows) do lib.gtk.gtk_widget_destroy(row.widget) end
+	node.filled = false
+	fill_node(lib, node, owned)
+end
+
+--- Builds a top-level menu node from the neutral tree the renderer emits: its
+--- own rows now, every submenu when it is opened.
 ---
 --- The tree shape is the shared one: { title, fn, menu, checked, disabled }.
 --- Nothing here knows what a hotstring is, which is what lets the whole menu be
@@ -324,40 +534,13 @@ end
 --- @param lib table
 --- @param items table
 --- @param owned table Receives the action ids the menu registers.
---- @param inherited_disabled boolean|nil An unavailable ancestor revokes descendant actions.
---- @return userdata GtkMenu
-local function build_menu(lib, items, owned, inherited_disabled)
-	local menu = lib.gtk.gtk_menu_new()
-
-	for _, item in ipairs(items or {}) do
-		local disabled = inherited_disabled or item.disabled
-		local widget
-		if item.separator or item.title == "-" then
-			widget = lib.gtk.gtk_separator_menu_item_new()
-		elseif item.checked ~= nil then
-			widget = lib.gtk.gtk_check_menu_item_new_with_label(tostring(item.title or ""))
-			lib.gtk.gtk_check_menu_item_set_active(widget, item.checked and 1 or 0)
-		else
-			widget = lib.gtk.gtk_menu_item_new_with_label(tostring(item.title or ""))
-		end
-
-		if type(item.menu) == "table" and #item.menu > 0 then
-			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu, owned, disabled))
-		elseif not disabled and type(item.fn) == "function" then
-			-- dbusmenu Event can activate an insensitive GTK item directly.
-			-- Unavailable rows therefore never receive an action capability.
-			on_activate(lib, widget, item.fn, owned, item.checked)
-		end
-
-		if disabled then
-			lib.gtk.gtk_widget_set_sensitive(widget, 0)
-		end
-
-		lib.gtk.gtk_menu_shell_append(menu, widget)
-	end
-
-	lib.gtk.gtk_widget_show_all(menu)
-	return menu
+--- @return table node { menu = GtkMenu, ... }
+local function build_menu(lib, items, owned)
+	local node = { menu = lib.gtk.gtk_menu_new(), items = items or {}, disabled = false, filled = false,
+		rows = {}, fill_ids = {} }
+	fill_node(lib, node, owned)
+	lib.gtk.gtk_widget_show(node.menu)
+	return node
 end
 
 
@@ -394,25 +577,22 @@ function M.create(id, icon_name, title)
 	-- An indicator with no menu is not shown by most panels, so an empty one is
 	-- set immediately rather than waiting for the first setMenu().
 	_menu = build_menu(lib, {}, _menu_actions)
-	lib.indicator.app_indicator_set_menu(_indicator, _menu)
+	lib.indicator.app_indicator_set_menu(_indicator, _menu.menu)
 
 	Logger.success(LOG, "Tray icon created (id=%s).", tostring(id))
 	return true
 end
 
---- Replaces the menu.
+--- Replaces the menu's rows. The indicator keeps one GtkMenu: rows whose
+--- shape is unchanged are updated in place (a toggle changes one check), a
+--- changed node is rebuilt, and a submenu never opened is only re-pointed at
+--- its new rows.
 --- @param items table Neutral menu tree.
 --- @return boolean
 function M.set_menu(items)
 	local lib = bind()
 	if not lib or not _indicator then return false end
-
-	-- The replaced menu's actions go with it; its ids are never reissued, so a
-	-- late click on an old row finds nothing to run.
-	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
-	_menu_actions = {}
-	_menu = build_menu(lib, items, _menu_actions)
-	lib.indicator.app_indicator_set_menu(_indicator, _menu)
+	patch_node(lib, _menu, items, false, _menu_actions)
 	return true
 end
 
@@ -547,7 +727,7 @@ function M.new_item(id, icon_name, items)
 	local handle = { ptr = ptr, owned = {}, active = false }
 	-- Most panels do not show an item without a menu.
 	handle.menu = build_menu(lib, items or {}, handle.owned)
-	lib.indicator.app_indicator_set_menu(ptr, handle.menu)
+	lib.indicator.app_indicator_set_menu(ptr, handle.menu.menu)
 	lib.indicator.app_indicator_set_status(ptr, STATUS_PASSIVE)
 	return handle
 end

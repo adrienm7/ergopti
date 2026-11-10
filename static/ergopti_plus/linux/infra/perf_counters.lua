@@ -58,7 +58,7 @@ local COUNTER_NAMES = {
 	"output.uinput_writes", "output.uinput_events", "shell.spawns",
 	"hotstring.matches", "hotstring.expansions",
 	"keystats.ingests", "keystats.flushes",
-	"tray.builds", "tray.opens",
+	"tray.builds", "tray.opens", "tray.rows",
 }
 
 -- Every span (a duration with its count, total and maximum), by name.
