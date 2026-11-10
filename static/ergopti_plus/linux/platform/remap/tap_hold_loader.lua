@@ -16,8 +16,10 @@
 ---     accepts the same spellings), and a modifier or layer no driver knows
 ---     is an outdated entry warned once and a hold dropped: the key keeps its
 ---     tap, as the Windows loader refuses an unknown hold where it reads it;
----   - a user key the Linux engine cannot remap, or a field no key has, is
----     warned once, naming tap_hold.toml, and left out; the rest applies;
+---   - a user key no driver has, or a field no key has, is warned once,
+---     naming tap_hold.toml, and left out; a catalogue key only another driver
+---     has (the file is shared, _shared/tap_hold/SCHEMA.md) is left out
+---     silently; the rest applies;
 ---   - only [tap_hold] inherit_defaults = true lays the user file over the
 ---     shipped keys; otherwise it starts from no keys at all (an empty file is
 ---     the keyboard's own behaviour), and enabled = false switches the feature
@@ -327,8 +329,14 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 		end
 	end
 	local user_fields = {}
+	-- The shared file also holds the keys of the other drivers (_shared/tap_hold/SCHEMA.md):
+	-- a catalogue key Linux lacks (Fn, the Mac Option and Command keys) is theirs.
+	local catalogued = {}
+	for _, entry in ipairs(defaults.tap_hold.catalog.keys) do catalogued[entry.id] = true end
 	for key_id, override in pairs(overrides) do
-		if not remappable[key_id] then
+		if catalogued[key_id] and not remappable[key_id] then
+			-- Left as it is for the driver that has the key.
+		elseif not remappable[key_id] then
 			Outdated.report_in_file(user_file, { "tap_hold", "keys", tostring(key_id) },
 				"the Linux engine has no such tap-hold key")
 		elseif Shapes.is_table(override, shapes) then
@@ -342,6 +350,10 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 				if KEY_FIELDS[field] then
 					merged[field] = value
 					user_fields[key_id][field] = true
+				elseif field == "hold_action" then
+					-- The shared file's macOS-only hold (_shared/tap_hold/SCHEMA.md).
+					Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id, field },
+						"a macOS hold action; the key keeps its tap and holds nothing here")
 				else
 					Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id, tostring(field) },
 						"no tap-hold key has this field")

@@ -60,6 +60,10 @@ local MAX_THRESHOLD_SECONDS = 10
 -- only ever written when the user sets it: no key ships one.
 local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", ConfigKeys.LEAF.TIME_ACTIVATION_SECONDS }
 
+-- The macOS-only hold of the shared file (_shared/tap_hold/SCHEMA.md): a hold
+-- chosen here replaces it, so every driver holds what the user just chose.
+local FOREIGN_HOLD_FIELD = "hold_action"
+
 -- The [tap_hold] field of the lone modifier tap window (the loader's).
 local LONE_TAP_FIELD = require("platform.remap.tap_hold_loader").LONE_TAP_FIELD
 
@@ -420,6 +424,7 @@ local function clear_owned_keys(tap_hold, preset, shapes)
 		local entry = tap_hold.keys[key_id]
 		if Shapes.is_table(entry, shapes) then
 			for _, field in ipairs(OWNED_KEY_FIELDS) do entry[field] = nil end
+			entry[FOREIGN_HOLD_FIELD] = nil
 			if next(entry) == nil then tap_hold.keys[key_id] = nil end
 		end
 	end
@@ -507,6 +512,7 @@ function M.set_hold(key_id, kind, id)
 	local in_force, saved = save_and_reload(key_id .. " hold = " .. kind .. ":" .. canonical, function(document, shapes)
 		local entry = key_entry(document, key_id, shapes)
 		entry.hold_modifier, entry.hold_layer, entry.enabled = nil, nil, nil
+		entry[FOREIGN_HOLD_FIELD] = nil
 		if kind == "layer" then
 			entry.hold_layer = canonical
 		elseif kind == "modifier" then
@@ -538,6 +544,7 @@ function M.set_native(key_id)
 	return commit(key_id .. " native", function(document, shapes)
 		local entry = key_entry(document, key_id, shapes)
 		entry.tap_action, entry.hold_modifier, entry.hold_layer, entry.enabled = "", "", nil, nil
+		entry[FOREIGN_HOLD_FIELD] = nil
 	end)
 end
 
