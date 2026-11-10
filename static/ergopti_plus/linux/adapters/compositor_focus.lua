@@ -33,8 +33,6 @@ local LOG = "adapters.compositor_focus"
 local OWNER = "compositor-focus"
 -- One worker line is a bounded record; anything longer is not one.
 local MAX_LINE_BYTES = 8192
--- Bounded diagnostics retained from the worker's stderr.
-local MAX_OUTPUT_BYTES = 65536
 
 
 
@@ -167,7 +165,7 @@ function M.new(options)
 		local commanded, executable, arguments, cwd = pcall(command)
 		if not commanded then fail("worker command unavailable: " .. tostring(executable)); return false end
 		local spawned, child = pcall(start_process, executable, arguments, {
-			owner = OWNER, capture_tail = true, max_output_bytes = MAX_OUTPUT_BYTES, cwd = cwd,
+			owner = OWNER, capture_tail = true, max_output_bytes = require("llm.process_limits").defaults().max_output_bytes, cwd = cwd,
 			on_output = on_output,
 		}, function(result)
 			if status == "stopped" then return end
