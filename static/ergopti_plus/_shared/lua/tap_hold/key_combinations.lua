@@ -30,6 +30,10 @@ function M.new(options)
 	end
 	local taps, holds = options.taps or {}, options.holds or {}
 	local source_thresholds = assert(options.thresholds, "native key thresholds required")
+	-- The shared tap minimum bounds a pair's release-judged tap as it bounds every
+	-- tap that waits for its release (maintainer decision of 2026-11-10).
+	local tap_min_ms = options.tap_min_ms
+	assert(finite(tap_min_ms) and tap_min_ms >= 0, "tap minimum (tap_hold.tap_min_duration_ms) required")
 	local thresholds = {}
 	for _, second in ipairs(order) do
 		assert(finite(source_thresholds[second]) and source_thresholds[second] >= 0)
@@ -87,7 +91,7 @@ function M.new(options)
 			taken[token] = nil
 			if state.pair.hold ~= M.NONE then
 				effects[#effects + 1] = effect("release_hold", state)
-				if not state.cancelled and event.at_ms >= state.at_ms
+				if not state.cancelled and event.at_ms - state.at_ms >= tap_min_ms
 					and event.at_ms - state.at_ms <= thresholds[state.key] and state.pair.tap ~= M.NONE then
 					effects[#effects + 1] = effect("tap", state)
 				end
