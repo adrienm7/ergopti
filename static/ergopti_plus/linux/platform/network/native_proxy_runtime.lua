@@ -29,6 +29,10 @@ function M.load()
 		void *g_settings_schema_source_get_default(void);
 		void *g_settings_schema_source_lookup(void *source, const char *schema_id, int recursive);
 		void g_settings_schema_unref(void *schema);
+		void *g_settings_new(const char *schema_id);
+		char *g_settings_get_string(void *settings, const char *key);
+		void g_free(void *memory);
+		void g_object_unref(void *object);
 	]])
 	if not declared then return nil end
 	local ok, gio, gobject, glib, null_pointer = pcall(function()
@@ -85,6 +89,29 @@ function M.proxy_schema_available(native)
 	if M.is_null(native, schema) then return false end
 	native.gio.g_settings_schema_unref(schema)
 	return true
+end
+
+--- Reads the PAC address of the GNOME proxy settings GProxyResolverGnome reads.
+--- The resolver answers DIRECT for a PAC it could not download, so only this
+--- address lets the lookup child tell that apart from a PAC that said DIRECT.
+--- @param native table Loaded native ABI.
+--- @return string|nil url The PAC address while the mode is "auto", else nil.
+function M.configured_pac_url(native)
+	if not M.proxy_schema_available(native) then return nil end
+	local catalogue = require("_generated.native_runtime")
+	local settings = native.gio.g_settings_new(catalogue.network_runtime.proxy_schema)
+	if M.is_null(native, settings) then return nil end
+	local function read(key)
+		local value = native.gio.g_settings_get_string(settings, key)
+		if M.is_null(native, value) then return nil end
+		local text = native.ffi.string(value)
+		native.glib.g_free(value)
+		return text
+	end
+	local mode, url = read("mode"), read("autoconfig-url")
+	native.gobject.g_object_unref(settings)
+	if mode ~= "auto" or type(url) ~= "string" or url == "" or url:find("[%z\r\n]") then return nil end
+	return url
 end
 
 --- Reports required ABI/backend availability without calling proxy lookup.

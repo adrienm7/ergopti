@@ -190,6 +190,12 @@ local function complete(request)
 			count = count + 1
 		end
 		if count ~= #receipt.proxies then finish(request, { ok = false, error = "proxy-receipt-invalid" }); return end
+		-- The one closed stage the helper reports, and only beside its DIRECT answer.
+		if receipt.pac_unavailable ~= nil and (receipt.pac_unavailable ~= "native_pac_download"
+			or #receipt.proxies ~= 1 or receipt.proxies[1] ~= "direct://") then
+			finish(request, { ok = false, error = "proxy-receipt-invalid" })
+			return
+		end
 	elseif type(receipt.error) ~= "string" or not receipt.error:match("^proxy%-%l[%l%-]+$") then
 		finish(request, { ok = false, error = "proxy-receipt-invalid" })
 		return
@@ -206,9 +212,11 @@ end
 
 --- Resolves one destination through the native desktop proxy configuration.
 --- Callers preserve the returned ordered proxies, including explicit DIRECT.
---- They must not interpret lookup success as PAC download/evaluation success.
+--- They must not interpret lookup success as PAC download/evaluation success:
+--- with pac_check_timeout_ms, a DIRECT answer whose configured PAC could not be
+--- downloaded carries pac_unavailable = "native_pac_download" (GNOME settings).
 --- @param url string Private destination URL.
---- @param options table { owner, timeout_ms }
+--- @param options table { owner, timeout_ms, pac_check_timeout_ms? }
 --- @param callback function Receives the native selection after retirement.
 --- @return table|nil operation
 --- @return string|nil error Dispatch refusal.
@@ -217,11 +225,15 @@ function M.lookup_owned(url, options, callback)
 	if type(options) ~= "table" or type(options.owner) ~= "string" or options.owner == ""
 		or type(options.timeout_ms) ~= "number" or options.timeout_ms <= 0
 		or options.timeout_ms % 1 ~= 0 or type(callback) ~= "function"
-		or (options.on_native_terminal ~= nil and type(options.on_native_terminal) ~= "function") then return nil, "proxy-options-invalid" end
+		or (options.on_native_terminal ~= nil and type(options.on_native_terminal) ~= "function")
+		or (options.pac_check_timeout_ms ~= nil and (type(options.pac_check_timeout_ms) ~= "number"
+			or options.pac_check_timeout_ms < 1 or options.pac_check_timeout_ms > 60000
+			or options.pac_check_timeout_ms % 1 ~= 0)) then return nil, "proxy-options-invalid" end
 	if _owned[options.owner] then return nil, "proxy-owner-busy" end
 	if not luv then return nil, "proxy-async-unavailable" end
 	local encoded, input = pcall(Json.encode, {
 		url = url, probe_curl = options.probe_curl == true, environment_exclusions = options.environment_exclusions,
+		pac_check_timeout_ms = options.pac_check_timeout_ms,
 	})
 	if not encoded or #input > MAX_PACKET_BYTES then return nil, "proxy-request-invalid" end
 	local shared_root = Paths.shared_root()

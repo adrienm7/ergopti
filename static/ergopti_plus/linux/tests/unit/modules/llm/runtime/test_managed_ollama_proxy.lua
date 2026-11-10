@@ -231,6 +231,41 @@ it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemo
 	end
 end)
 
+-- (pac-download-direct) GIO answers DIRECT, with no error, for a PAC it could
+-- not download; the lookup child names that stage beside the DIRECT answer.
+-- The WARNING was never logged on Linux before (container proof 2026-11-10).
+it("(pac-download-direct) a DIRECT answer for an undownloadable PAC warns and records the stage", function()
+	local warnings = {}
+	local Logger = require("logger.shim")
+	local original = Logger.warn
+	Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+	local ok, result = pcall(function()
+		local w = world({ receipt = { ok = true, proxies = { "direct://" }, pac_unavailable = "native_pac_download" } })
+		local answer = w:run()
+		eq(w.lookup_options.pac_check_timeout_ms, 1000)
+		return answer
+	end)
+	Logger.warn = original
+	assert(ok, result)
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(result.direct_fallback, "native_pac_download")
+	eq(#warnings, #ORIGINS)
+	assert(warnings[1]:find("unusable at native_pac_download", 1, true), warnings[1])
+end)
+
+it("(pac-download-direct) a PAC that answered DIRECT itself warns nothing", function()
+	local warnings = {}
+	local Logger = require("logger.shim")
+	local original = Logger.warn
+	Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+	local ok, result = pcall(function() return world({ receipt = { ok = true, proxies = { "direct://" } } }):run() end)
+	Logger.warn = original
+	assert(ok, result)
+	eq(result.direct_fallback, nil)
+	eq(#warnings, 0)
+end)
+
 it("(pac-unavailable-fallback) each fallback stage is one the shared policy lists", function()
 	local active = policy()
 	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
