@@ -58,6 +58,37 @@ variables" at load): new hook state goes into an existing table such as
 ceiling: a new top-level local it reads breaks the load, so `require` inside
 the closure instead.
 
+A pointer's custody in a source transaction is its descriptor's open
+lifetime (the Reader's `same_open`), never its input generation: the layer's
+`ungrab` and a `SYN_DROPPED` renumber the slot, and judging the mouse by the
+generation once stopped the hook at the next device watchdog tick after the
+first wheel or button binding (`_source_recovery.member_custody`).
+
+### project-linux-container-proofs-model-the-kernel-at-libc
+
+A container kernel has no uinput: `tests/hardware/run_container_proofs.sh`
+runs the unchanged daemon with `virtual_kernel_preload.c` in `LD_PRELOAD`,
+FIFOs as `/dev/input/eventN` and a bind-mounted `/proc/bus/input/devices` in a
+private mount namespace. The model sits at libc because the hook's managed
+capture admits only the Reader's production FFI backend: a Lua `_set_backend`
+fake is refused ("original Reader authority is unavailable"), and swapping a
+Reader export breaks the hook's cold-construction pin. The shim must also catch
+libuv's `syscall(SYS_close)` and `syscall(SYS_statx)`, and drop `LD_PRELOAD`
+for the daemon's children. The AT-SPI client binds to the first bus it meets,
+so a multi-session proof reads AT-SPI in a child process. Locally, `python3`
+may lack gi: run with `PYTHON=python3.12`.
+
+### project-linux-x11-slave-switch-revokes-the-layout
+
+Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the
+core keyboard changes (XTEST, the daemon's virtual keyboard after a physical
+one). `adapters/xkb_source_probe.lua` bumps its source generation on every such
+notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group
+change, so after one switch `KeyboardLayout.is_ready()` stays false and every
+replacement takes the clipboard route. Xvfb fed by uinput never shows it (it
+reads no evdev); the container proofs show it with XTest and warm the XTEST
+slave before the daemon starts.
+
 ### project-linux-touchpad-gestures-share-the-touches-with-the-desktop
 
 The gesture reader decodes the touchpad evdev node without a grab, so the desktop
