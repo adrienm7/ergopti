@@ -5,6 +5,28 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Tap-hold settings, minimum tap, tap-to-click and Linux proof (2026-11-10)
+
+- One home for the tap-hold settings on every OS: a shared `tap_hold.toml`
+  holds the keys, the global and sticky delays, the lone-tap window and the
+  modifier combinations (`mod_combos`); `config.toml` keeps the
+  `[[features.*]]` rows; the macOS-only Karabiner integration is its own
+  section of that file. Each driver migrates its old files once
+  (macOS `config_karabiner.toml`, Linux `config.toml` `mod_combos`, Windows
+  `config.toml` tap-hold keys), and a cross-driver test writes the file on one
+  driver and reads it on the other two.
+- The minimum tap duration applies to every tap that waits for its release,
+  the Linux rule, on the three drivers; Windows stops limiting it to LShift,
+  LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
+- Linux counts tap-to-click: features follow the most complete, most precise
+  OS unless that is overkill. The daemon already decodes the touchpad without
+  a grab; it counts the touches libinput would turn into a click, under the
+  desktop's own tap setting.
+- A Linux check the cloud cannot run on real hardware closes on a container
+  proof: a headless session (Xvfb/X11, sway, KWin or GNOME headless), a Docker
+  distro, a uinput fake or a `libinput record` replay. macOS checks close on
+  the GitHub Actions macOS lane or the next field report.
+
 ## Layout emulation on the three OS (2026-11-06)
 
 Every feature about the user's keyboard layout is the same on Windows, macOS
