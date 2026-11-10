@@ -1145,6 +1145,18 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Qualify the owned Ollama start and PAC-unreachable pull",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Qualify the local server detection",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Qualify native retained FD SHA-256",
 			"protocol": 9
 		},
