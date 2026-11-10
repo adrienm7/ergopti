@@ -2813,7 +2813,7 @@ jobs:
       # Retained original role: launch
       - uses: actions/checkout@v4
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -2824,7 +2824,7 @@ jobs:
 
       - name: Fetch the older release whose files seed the user state
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -2836,7 +2836,7 @@ jobs:
 
       - name: Download the package built by this run
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -2851,7 +2851,7 @@ jobs:
 
       - name: Download the independent CI archive source
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -2870,7 +2870,7 @@ jobs:
       # cannot be proved fresh stops the lot (macos_launch_reset.py).
       - name: Record the fresh runner state before the first launch
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -2891,7 +2891,7 @@ jobs:
       # does not hide the others; the step fails if any of them failed.
       - name: Install, launch and judge every scenario of the lot
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -2998,7 +2998,7 @@ jobs:
 
       - name: Retain source-bound AppleEvent launch qualification receipt
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
@@ -3016,7 +3016,7 @@ jobs:
 
       - name: Retain launch evidence
         env:
-          SEED_TAG: 'v0.0.0-dev.24'
+          SEED_TAG: 'ci-seed/macos-personal-files-v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
