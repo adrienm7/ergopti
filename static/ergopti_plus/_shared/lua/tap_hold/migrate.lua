@@ -21,6 +21,8 @@
 ---    for the caller to refuse, never rewritten.
 --- 4. Pure and idempotent: replaying a step on its own output changes nothing,
 ---    so a crash between two writers never leaves a half-migrated file.
+--- 5. Also validates `[legacy_imports]`, the old files each driver carries over
+---    once into the shared tap_hold.toml; the driver performs that import.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +34,11 @@ M.META_SECTION = "_meta"
 M.VERSION_KEY = "schema_version"
 
 local OPS = { drop_retired_values = true, delete = true }
+
+-- The driver columns a legacy import may name, and the closed set of
+-- translations (_shared/tap_hold/migrations.toml section 2).
+local KNOWN_PLATFORMS = { ahk = true, hs = true, linux = true }
+local TRANSLATIONS = { karabiner = true }
 
 
 
@@ -105,7 +112,36 @@ function M.parse_registry(decoded)
 	if expected ~= meta.current_version then
 		error("tap-hold migration registry: the steps stop at version " .. expected, 0)
 	end
-	return { current = meta.current_version, unstamped = meta.unstamped_version, steps = steps }
+	return { current = meta.current_version, unstamped = meta.unstamped_version, steps = steps,
+		legacy_imports = M.parse_legacy_imports(decoded.legacy_imports) }
+end
+
+--- Validates `[legacy_imports]`: per driver column, the old file carried over
+--- once into the shared tap_hold.toml.
+--- @param declared table|nil Decoded `[legacy_imports]`.
+--- @return table imports Driver column -> `{ source, translate, retired_suffix }`.
+function M.parse_legacy_imports(declared)
+	if declared == nil then return {} end
+	if type(declared) ~= "table" then error("tap-hold migration registry: [legacy_imports] is not a table", 0) end
+	local imports = {}
+	for platform, entry in pairs(declared) do
+		local where = "tap-hold migration registry: [legacy_imports." .. tostring(platform) .. "]"
+		if not KNOWN_PLATFORMS[platform] then error(where .. " names no driver column", 0) end
+		if type(entry) ~= "table" or type(entry.source) ~= "string" or not entry.source:match("^[%w_%-]+%.toml$") then
+			error(where .. " needs a source file name beside tap_hold.toml", 0)
+		end
+		if not TRANSLATIONS[entry.translate] then error(where .. " names no known translation", 0) end
+		if type(entry.retired_suffix) ~= "string" or not entry.retired_suffix:match("^%.[%w_%-]+$") then
+			error(where .. " needs a retired_suffix such as \".migrated\"", 0)
+		end
+		for field in pairs(entry) do
+			if field ~= "source" and field ~= "translate" and field ~= "retired_suffix" then
+				error(where .. " has an unknown field '" .. tostring(field) .. "'", 0)
+			end
+		end
+		imports[platform] = { source = entry.source, translate = entry.translate, retired_suffix = entry.retired_suffix }
+	end
+	return imports
 end
 
 --- Reads and validates the registry file.
