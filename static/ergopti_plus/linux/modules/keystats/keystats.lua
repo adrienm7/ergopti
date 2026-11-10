@@ -1498,26 +1498,47 @@ function M.pointer_distance_availability()
 	return _pointer.availability()
 end
 
+--- Binds what counting the touchpad's tap-to-click needs (pointer_metrics).
+--- @param describe function|nil (source) -> { path, name, units_x, units_y } | nil, reason
+--- @param read_setting function|nil (device) -> tap_to_click_setting answer
+--- @param clock function|nil Monotonic milliseconds.
+function M.bind_touchpads(describe, read_setting, clock)
+	_pointer.bind_touchpads(describe, read_setting, clock)
+end
+
+--- Re-reads the tap-to-click setting of the touchpads in use, from the tick.
+function M.refresh_tap_settings()
+	_pointer.refresh_tap_settings()
+end
+
+--- Whether the touchpad taps are counted with the clicks, for the menu.
+--- @return table { measured, reason? }
+function M.tap_click_availability()
+	return _pointer.tap_click_availability()
+end
+
 --- Records one report of an observed pointer for the mouse columns of
 --- events_typing. The clicks, wheel turns and distance accumulate under the
 --- focused application and are written with its next typing row, as macOS
 --- carries them to the next flushed run. Gated like every recording entry
 --- point, and never for an application whose input stays out of the metrics.
---- @param kind string "press", "motion", "frame", "dropped" or "reset" (pointer_metrics).
+--- @param kind string "press", "motion", "frame", "dropped", "reset" or "contact" (pointer_metrics).
 --- @param code integer|nil evdev code.
 --- @param value integer|nil evdev value.
 --- @param source any|nil Pointer device identity.
-function M.record_pointer(kind, code, value, source)
+--- @param at_us number|nil Kernel time of a frame, in microseconds.
+function M.record_pointer(kind, code, value, source, at_us)
 	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
 		_pointer.discard_frames()
 		_pointer.forget_position()
-		-- Keep device lifecycle and queue-loss state in sync while collection is off.
-		if kind == "reset" or kind == "dropped" or kind == "frame" then
-			_pointer.observe(kind, code, value, source)
+		-- Keep device lifecycle, queue-loss and touch state in sync while
+		-- collection is off; what they would add is not recorded.
+		if kind == "reset" or kind == "dropped" or kind == "frame" or kind == "contact" then
+			_pointer.observe(kind, code, value, source, at_us)
 		end
 		return
 	end
-	local delta = _pointer.observe(kind, code, value, source)
+	local delta = _pointer.observe(kind, code, value, source, at_us)
 	if not delta then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)

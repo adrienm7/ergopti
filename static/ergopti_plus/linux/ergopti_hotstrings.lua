@@ -2418,10 +2418,13 @@ local function main()
 	-- The metrics count clicks, wheel turns and distance from the same stream.
 	-- The manager names the event's pointer kind: main() is at LuaJIT's
 	-- 60-upvalue limit.
-	local function on_pointer_event(kind_of_event, code, value, source)
+	local function on_pointer_event(kind_of_event, code, value, source, at_us)
+		-- A touch report only feeds the tap-to-click count; its coordinate
+		-- change also arrives as absolute_motion.
+		if kind_of_event == "contact" then keystats.record_pointer(kind_of_event, code, value, source); return end
 		if wpm_widget then wpm_widget.observe_pointer(kind_of_event, value, Monotonic.now_ms() / 1000) end
 		-- An absolute coordinate is no distance in the relative units the metrics count.
-		if kind_of_event ~= "absolute_motion" then keystats.record_pointer(kind_of_event, code, value, source) end
+		if kind_of_event ~= "absolute_motion" then keystats.record_pointer(kind_of_event, code, value, source, at_us) end
 		if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end
 		-- Motion, a wheel turn or a touchpad coordinate is user activity: a
 		-- pending prediction stops (a zero-distance report is none). Presses
@@ -3272,6 +3275,9 @@ local function main()
 			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
 				.. "(no X11 window geometry; Wayland exposes none to a client).")
 		end
+		-- A touchpad tap-to-click never reaches evdev as a button: the metrics
+		-- count the touches libinput turns into one, under the desktop's setting.
+		require("modules.keystats.tap_click_sources").bind(keystats, Monotonic.now_ms)
 	end
 
 	if process_lifecycle then
@@ -3378,6 +3384,8 @@ local function main()
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
 		RuntimeGuard.call("keystats migration pump", keystats.pump_migration)
+		-- Off the input path: the tap-to-click setting of a pad in use, when due.
+		RuntimeGuard.call("tap-to-click setting refresh", keystats.refresh_tap_settings)
 		-- The per-device ledger follows the committed store one bounded slice
 		-- at a time, so the other drivers can import this device's metrics.
 		RuntimeGuard.call("keystats ledger pump", keystats.pump_ledger)

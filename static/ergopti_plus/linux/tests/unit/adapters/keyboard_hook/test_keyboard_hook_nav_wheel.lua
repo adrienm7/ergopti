@@ -142,8 +142,8 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 				return true
 			end,
 			onClick = not omit_click and function(code) if on_click then on_click(kh, code) end end or nil,
-			onPointerEvent = observer and function(kind, code, value, slot)
-				return observer(kind, code, value, slot, kh, start_options, grabs)
+			onPointerEvent = observer and function(kind, code, value, slot, at_us)
+				return observer(kind, code, value, slot, kh, start_options, grabs, at_us)
 			end or nil,
 		}
 		kh.start(start_options)
@@ -375,6 +375,28 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		end)
 		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "frame", 0, 0, source },
 			{ "reset", nil, nil, source } })
+	end)
+
+	helpers.it("(tap-click) forwards every touch report and stamps each frame with its kernel time", function()
+		local reports = {}
+		local _, _, _, running, source = drive("touchpad", {}, {
+			{ 3, 0x39, 41, 3000000 }, { 3, 0x35, 500, 3000000 }, { EV_KEY, 0x14a, 1, 3000000 },
+			{ EV_KEY, 0x145, 1, 3000000 }, { EV_SYN, 0, 0, 3000000 },
+			{ 3, 0x39, -1, 3090000 }, { EV_KEY, 0x145, 0, 3090000 }, { EV_KEY, 0x14a, 0, 3090000 },
+			{ EV_SYN, 0, 0, 3090000 },
+		}, nil, function(kind, code, value, slot, _, _, _, at_us)
+			if kind ~= "absolute_motion" then reports[#reports + 1] = { kind, code, value, slot, at_us } end
+		end)
+		helpers.assert_true(running)
+		helpers.assert_eq(reports, {
+			{ "contact", 0x39, 41, source }, { "contact", 0x35, 500, source },
+			{ "contact", 0x14a, 1, source }, { "press", 0x14a, 1, source },
+			{ "contact", 0x145, 1, source }, { "press", 0x145, 1, source },
+			{ "frame", 0, 0, source, 3000000 },
+			{ "contact", 0x39, -1, source }, { "contact", 0x145, 0, source }, { "contact", 0x14a, 0, source },
+			{ "frame", 0, 0, source, 3090000 },
+			{ "reset", nil, nil, source },
+		}, "a lift is a contact edge too, and only a frame carries the stamp the tap is timed by")
 	end)
 
 	helpers.it("reports pointer queue loss to its observer", function()
