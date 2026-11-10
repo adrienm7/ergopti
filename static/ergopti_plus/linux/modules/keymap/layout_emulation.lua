@@ -35,6 +35,7 @@
 local Emulation = require("layouts.keylayout_emulation")
 local Settings = require("layouts.emulation_settings")
 local Logger = require("logger.shim")
+local EvdevCodes = require("infra.evdev_codes")
 
 local M = {}
 
@@ -45,6 +46,12 @@ local _deps = nil
 local _session = nil
 local _evdev_to_code = nil
 local _status = { active = false, id = nil, error = nil }
+
+-- The modifiers a shortcut chord keeps from the hand, as the hook names them.
+local CHORD_MODIFIERS = {
+	{ name = "ctrl", code = EvdevCodes.KEY_LEFTCTRL }, { name = "shift", code = EvdevCodes.KEY_LEFTSHIFT },
+	{ name = "alt", code = EvdevCodes.KEY_LEFTALT }, { name = "meta", code = EvdevCodes.KEY_LEFTMETA },
+}
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
 	"dispatch_char", "emit_shortcut", "caps_locked", "magic_evdev", "is_active" }
@@ -61,7 +68,7 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 
 --- Takes the collaborators. Called once, before the hook starts.
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
----   type_text, dispatch_char, emit_shortcut, caps_locked, magic_evdev, is_active }
+---   type_text, dispatch_char, emit_shortcut(char, code, mods), caps_locked, magic_evdev, is_active }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -186,7 +193,7 @@ function M.on_key(detail)
 		mods.altgr == true, mods.ctrl == true, mods.alt == true, mods.meta == true, detail.char)
 	if decision == Emulation.PASS then return false end
 	if decision == Emulation.SHORTCUT then
-		if _deps.emit_shortcut(text, detail.code) == true then return true end
+		if _deps.emit_shortcut(text, detail.code, mods) == true then return true end
 		Logger.error(LOG, "The emulated shortcut key could not be pressed — the chord keeps its own key.")
 		return false
 	end
@@ -226,13 +233,13 @@ local function shared_json(rel, lossless)
 	return _json_cache[rel]
 end
 
---- Initializes the module with the daemon's collaborators and loads the layout.
+--- The daemon's collaborators for M.init, built from its ports.
 --- @param ports table { injector, is_paused, dispatch_char, magic_evdev, dry_run }
---- @return boolean ok M.reload's answer.
-function M.start(ports)
+--- @return table deps
+function M.production_deps(ports)
 	local Registry = require("modules.keymap.layout_registry")
 	local Injector = ports.injector
-	M.init({
+	return {
 		read_config = function()
 			local bytes, status, detail = require("toml_codec.writer").read_classified(
 				require("infra.config_paths").config("config.toml"))
@@ -261,19 +268,33 @@ function M.start(ports)
 			return type(pasted) == "table" and pasted.ok == true
 		end,
 		dispatch_char = ports.dispatch_char,
-		emit_shortcut = function(char, code)
+		emit_shortcut = function(char, code, mods)
 			if ports.dry_run then return false end
 			local keycode, level_mods = require("adapters.keyboard_layout").shortcut_keycode(char, code)
-			for _, mod in ipairs(level_mods) do if not Injector.emit_key(mod, 1) then return false end end
-			local pressed = Injector.emit_key(keycode, 1)
-			local released = pressed and Injector.emit_key(keycode, 0)
-			for index = #level_mods, 1, -1 do Injector.emit_key(level_mods[index], 0) end
-			return pressed == true and released == true
+			-- Through the broker, which owns every write on the virtual keyboard:
+			-- a bare write beside it moves the writer's epoch under the broker,
+			-- which then refuses all later output, the grab's pass-through
+			-- included. The modifiers the hand holds are named so the chord keeps
+			-- them instead of suspending them as foreign.
+			local chord = {}
+			for _, held in ipairs(CHORD_MODIFIERS) do
+				if type(mods) == "table" and mods[held.name] == true then chord[#chord + 1] = held.code end
+			end
+			for _, mod in ipairs(level_mods) do chord[#chord + 1] = mod end
+			local pressed = require("modules.gestures.combo_emitter").press_codes(chord, { keycode }, "emulated shortcut")
+			return pressed == true
 		end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
 		magic_evdev = ports.magic_evdev,
 		is_active = function() return not ports.is_paused() end,
-	})
+	}
+end
+
+--- Initializes the module with the daemon's collaborators and loads the layout.
+--- @param ports table { injector, is_paused, dispatch_char, magic_evdev, dry_run }
+--- @return boolean ok M.reload's answer.
+function M.start(ports)
+	M.init(M.production_deps(ports))
 	return M.reload()
 end
 
