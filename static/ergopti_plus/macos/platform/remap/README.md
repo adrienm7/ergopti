@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This module generates ErgoptiPlus complex modifications and merges them into the user's existing `karabiner.json`. It also persists the ErgoptiPlus remapping preferences stored in `config_karabiner.toml`.
+This module generates ErgoptiPlus complex modifications and merges them into the user's existing `karabiner.json`. It also persists the ErgoptiPlus remapping preferences stored in the shared `tap_hold.toml` (`_shared/tap_hold/SCHEMA.md`; an old `config_karabiner.toml` is carried over once).
 
 Its tap-holds and chords are configured under the same "Tap-Holds" menu
 Windows uses.
@@ -40,7 +40,7 @@ reuses for its own file.
   the physical capture. The signed launcher's installed-source role owns the
   Console (ADR 011, decision 8), so the owner spawns no process and is ready
   only when the capture admits its first stream. It is reached unless
-  `config_karabiner.toml` holds `[karabiner] runtime = "shared"`
+  `tap_hold.toml` holds `[karabiner] runtime = "shared"`
   (`Config.RUNTIME_DEFAULT` is `owned`). `ke_paths.lua` selects the command line tool of
   the runtime once, `Generator.deploy_owned_config` writes the complete file
   under `~/Library/Application Support/ErgoptiPlus/karabiner/`, and
@@ -82,7 +82,7 @@ reuses for its own file.
 
 ## « Ergopti uses Karabiner »
 
-`[karabiner] integration_enabled` in `config_karabiner.toml` is the switch
+`[karabiner] integration_enabled` in `tap_hold.toml` is the switch
 (default on, `Config.INTEGRATION_ENABLED_DEFAULT`); a value that is not a
 boolean refuses the whole file like a corrupt one. The older `[karabiner]
 enabled` is never read: builds before 2026-09-22 wrote `enabled = false` on
@@ -163,15 +163,15 @@ diagnosis. Stock Karabiner does not participate in an ErgoptiPlus lock or
 compare-and-swap protocol, so ErgoptiPlus makes no claim that it can preserve a
 personal edit made concurrently between its read and rename.
 
-`config_karabiner.toml` is the single runtime truth for ErgoptiPlus remapping preferences after first launch. Defaults are recomputed only when the user explicitly resets them.
+`tap_hold.toml` is the single runtime truth for ErgoptiPlus remapping preferences after first launch. Defaults are recomputed only when the user explicitly resets them.
 
 ## Ports used
 
-| Port          | Usage                                                                              |
-| ------------- | ---------------------------------------------------------------------------------- |
-| `FileSystem`  | Read/write `config_karabiner.toml`, inspect and atomically deploy `karabiner.json` |
-| `Storage`     | Persist ErgoptiPlus preferences between sessions                                   |
-| `ShellRunner` | Retain the signed native lease worker and its detached exact-revocation fallback   |
+| Port          | Usage                                                                            |
+| ------------- | -------------------------------------------------------------------------------- |
+| `FileSystem`  | Read/write `tap_hold.toml`, inspect and atomically deploy `karabiner.json`       |
+| `Storage`     | Persist ErgoptiPlus preferences between sessions                                 |
+| `ShellRunner` | Retain the signed native lease worker and its detached exact-revocation fallback |
 
 ## Canonical data
 

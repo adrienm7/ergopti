@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param original string Independent TOML fixture.
 --- @param body function Assertions receiving actual owners and recorded ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -28,6 +28,8 @@ local function with_file(original, body)
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
+		local Text = require("tests.support.tap_hold_file_text")
+		original = Text.file(original)
 		write(original)
 		local files = require("adapters.file_system")
 		local native_read, native_write = files.read_with_status, files.write_if_unchanged
@@ -44,7 +46,7 @@ local function with_file(original, body)
 		end
 		local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
-			decode = require("infra.toml.codec").decode, native_read = native_read })
+			decode = Text.model, file = Text.file, original = original, native_read = native_read })
 		files.read_with_status, files.write_if_unchanged = native_read, native_write
 		os.remove(path); os.remove(path .. ".tmp")
 		if not ok then error(err, 0) end
@@ -70,8 +72,8 @@ helpers.describe("Known scalar remap binding preservation", function()
 				helpers.assert_eq(status, "ok")
 				helpers.assert_eq(state.tap_hold_config.escape, { tap = "none", hold = "none" })
 				helpers.assert_eq(#f.warnings, 2)
-				helpers.assert_contains(table.concat(f.warnings, "\n"), "'tap_holds.config.escape' in '" .. f.path .. "'")
-				helpers.assert_eq(f.read(), fixture(vector), "loading preserves exact source bytes")
+				helpers.assert_contains(table.concat(f.warnings, "\n"), "'tap_hold.keys.escape' in '" .. f.path .. "'")
+				helpers.assert_eq(f.read(), f.original, "loading preserves exact source bytes")
 				state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 				helpers.assert_true(f.config.save_user_config(state, f.path), "neutral carried scalar cannot refuse unrelated edits")
 				local stored = f.decode(f.read())
@@ -97,11 +99,11 @@ helpers.describe("Known scalar remap binding preservation", function()
 				state.tap_hold_config.escape = fields
 				helpers.assert_eq(f.config.save_user_config(state, f.path), false)
 				helpers.assert_eq(f.controls.writes, 0)
-				helpers.assert_eq(f.read(), fixture(VECTORS[1]), "refusal preserves exact bytes")
+				helpers.assert_eq(f.read(), f.original, "refusal preserves exact bytes")
 				helpers.assert_eq(#f.errors, 1)
 				helpers.assert_contains(f.errors[1], "tap_holds.config.escape")
 				helpers.assert_contains(f.errors[1], f.path)
-				f.write('[tap_holds.config.escape]\ntap = "none"\nhold = "none"\n')
+				f.write(f.file('[tap_holds.config.escape]\ntap = "none"\nhold = "none"\n'))
 				f.controls.expected = f.read()
 				helpers.assert_true(f.config.save_user_config(state, f.path), "explicit file repair allows retry")
 				helpers.assert_eq(f.controls.writes, 1)
@@ -130,7 +132,7 @@ helpers.describe("Known scalar remap binding preservation", function()
 			state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 			helpers.assert_eq(f.config.save_user_config(state, f.path), false, "legacy conversion retains its existing repair owner")
 			helpers.assert_eq(f.controls.writes, 0)
-			helpers.assert_eq(f.read(), original)
+			helpers.assert_eq(f.read(), f.original)
 		end)
 	end)
 end)
@@ -150,9 +152,9 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 				helpers.assert_eq(status, "ok")
 				helpers.assert_eq(state.mod_combos_config.esc_tab, { tap = "none", hold = "none", combo = "none" })
 				helpers.assert_eq(state.enabled, false, "explicit integration consent is unchanged")
-				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(#f.warnings, 2)
-				helpers.assert_contains(table.concat(f.warnings, "\n"), "'mod_combos.config.esc_tab' in '" .. f.path .. "'")
+				helpers.assert_contains(table.concat(f.warnings, "\n"), "'mod_combos.config.escape_then_tab' in '" .. f.path .. "'")
 				state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 				helpers.assert_eq(f.config.save_user_config(state, f.path), true, "obsolete combination cannot refuse unrelated edits")
 				helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
@@ -175,11 +177,11 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 					state.mod_combos_config.esc_tab[field] = "copy"
 					helpers.assert_eq(f.config.save_user_config(state, f.path), false)
 					helpers.assert_eq(f.controls.writes, 0)
-					helpers.assert_eq(f.read(), original)
+					helpers.assert_eq(f.read(), f.original)
 					helpers.assert_eq(#f.errors, 1)
 					helpers.assert_contains(f.errors[1], "mod_combos.config.esc_tab")
 					helpers.assert_contains(f.errors[1], f.path)
-					f.write('[karabiner]\nintegration_enabled = false\n[mod_combos.config.esc_tab]\ntap = "none"\nhold = "none"\ncombo = "none"\n')
+					f.write(f.file('[karabiner]\nintegration_enabled = false\n[mod_combos.config.esc_tab]\ntap = "none"\nhold = "none"\ncombo = "none"\n'))
 					f.controls.expected = f.read()
 					helpers.assert_eq(f.config.save_user_config(state, f.path), true, "explicit source repair admits the candidate")
 					helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
@@ -192,6 +194,7 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 		with_file(source_for(vectors[1]), function(f)
 			local state = f.load()
 			local latest = source_for(vectors[3]):gsub('keep = "independent"', 'keep = "later"')
+			latest = f.file(latest)
 			f.write(latest); f.controls.expected = latest
 			state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 			helpers.assert_eq(f.config.save_user_config(state, f.path), true)
@@ -218,14 +221,15 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 			helpers.assert_eq(f.config.save_user_config(state, f.path, true), true)
 			-- The sticky timeout is the one shared one-shot timeout, 2000 ms, and the
 			-- global is the timing registry's fallback, 200 ms (PAR-15). The lone
-			-- modifier tap window is written like them, at its manifest default.
+			-- modifier tap window is written like them, at its manifest default. The
+			-- shared tap_hold.toml spells a neutral binding by its absence.
 			helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
 				tap_holds = { enabled = false, timeout_ms = 200, sticky_timeout_ms = 2000,
-					lone_modifier_tap_max_ms = 1000,
-					config = { escape = { tap = "none", hold = "none" }, tab = { tap = "none", hold = "none" } } },
-				mod_combos = { simultaneous_threshold_ms = 100, symmetric = false,
-					config = { esc_tab = { tap = "none", hold = "none", combo = "none" } } } },
-				"explicit reset writes its full neutral intent while dropping source neighbors")
+					lone_modifier_tap_max_ms = 1000 },
+				mod_combos = { simultaneous_threshold_ms = 100, symmetric = false },
+				-- The file is shared: a section no macOS setting owns may be another driver's.
+				future = { keep = "independent" } },
+				"explicit reset writes its full neutral intent and drops the combination no driver has")
 		end)
 	end)
 

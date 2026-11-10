@@ -558,7 +558,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		reset_journal = reset_journal,
 		reset_paths = {
 			MenuPaths.get("ConfigTomlPath"),
-			MenuPaths.get("KarabinerConfigPath"),
+			MenuPaths.get("TapHoldConfigPath"),
 		},
 		gestures = gestures,
 		gesture_slots = global_gesture_slots,
@@ -1547,7 +1547,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				layout = { rows = layout_scope_rows, live = require("modules.keymap.number_row_live") },
 				backup_path = function(scope)
 					scope_generation = scope_generation + 1
-					return MenuPaths.get("KarabinerConfigPath") .. ".global-" .. scope .. "-"
+					return MenuPaths.get("TapHoldConfigPath") .. ".global-" .. scope .. "-"
 						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 				end,
 				defer = function(continuation)
@@ -1916,7 +1916,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- edit and armed a reload.
 		{
 			MenuPaths.get("ConfigTomlPath"),
-			MenuPaths.get("KarabinerConfigPath"),
+			MenuPaths.get("TapHoldConfigPath"),
 		}
 	)
 

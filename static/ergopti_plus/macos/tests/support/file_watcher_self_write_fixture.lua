@@ -16,7 +16,7 @@ local OWNERS = {
 
 M.CONFIG_ROOT = "/fake/config/"
 M.CONFIG_TOML = M.CONFIG_ROOT .. "hammerspoon/config.toml"
-M.KARABINER_TOML = M.CONFIG_ROOT .. "hammerspoon/config_karabiner.toml"
+M.KARABINER_TOML = M.CONFIG_ROOT .. "hammerspoon/tap_hold.toml"
 M.HOTSTRING_TOML = M.CONFIG_ROOT .. "francais.toml"
 
 --- Runs a real file-watcher controller over deterministic external boundaries.

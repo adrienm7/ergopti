@@ -96,7 +96,7 @@ helpers.describe("factory-reset journal survives process death", function()
 		local fs = memory_file_system()
 		local source = "/config/config.toml"
 		local backup = source .. ".ergopti-reset-backup-100-1"
-		local untouched_source = "/config/config_karabiner.toml"
+		local untouched_source = "/config/tap_hold.toml"
 		local untouched_backup = untouched_source .. ".ergopti-reset-backup-100-2"
 		local absent_source = "/config/optional.toml"
 		local absent_backup = absent_source .. ".ergopti-reset-backup-100-3"

@@ -4423,7 +4423,7 @@ description_key = "menu.category_enabled.tap_holds"
 # The « Combinaisons de touches » switch under Shortcuts: the only gate of the
 # key combinations, which the Shortcuts master no longer reaches (decision of
 # 2026-09-29), each pair keeping its own slots. macOS keeps the same switch as
-# [mod_combos] enabled in config_karabiner.toml, beside the rules it gates. Its
+# [mod_combos] enabled in tap_hold.toml, beside the rules it gates. Its
 # neutral value is on: the gate can only narrow what each pair already binds,
 # so it activates nothing alone. An absent key must leave the pairs live, and
 # the sparse writer deletes a value equal to the default, so a default of off
@@ -4750,7 +4750,7 @@ order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", 
 title_key = "menu.tapholds.title"
 question_key = "menu.tapholds.enable"
 description_key = "onboarding.page.tap_holds.description"
-# macOS keeps the switch in config_karabiner.toml and Linux in tap_hold.toml,
+# macOS and Linux keep the switch in tap_hold.toml,
 # where a config.toml answer would never be read: there, importing a checked
 # key switches the Tap-Holds on in that file, and a No or an empty list writes
 # nothing. The question starts from that switch, which the host reports.

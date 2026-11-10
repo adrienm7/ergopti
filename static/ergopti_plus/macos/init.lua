@@ -2371,12 +2371,12 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
 	-- and the pathwatcher is recursive, so these two would otherwise register as
 	-- external edits: every save_prefs — every menu toggle — reloaded the whole
-	-- driver, and every layout change regenerated config_karabiner.toml and did
+	-- driver, and every layout change regenerated tap_hold.toml and did
 	-- it again. Resolved from menu_paths so the watcher and the writers cannot
 	-- disagree about where these files are.
 	self_written_files      = {
 		config_paths.get("ConfigTomlPath"),
-		config_paths.get("KarabinerConfigPath"),
+		config_paths.get("TapHoldConfigPath"),
 	},
 	-- Runtime store, not source: the TOML snapshot cache writes .lua files, so
 	-- wherever a watched tree contains it every cache refresh would trigger a

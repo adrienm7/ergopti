@@ -169,7 +169,7 @@ local function run_tap_hold_row(id)
 			asked[#asked + 1] = message
 			return no
 		end }
-		package.loaded["infra.config_paths"] = { get = function() return "/remap/config_karabiner.toml" end }
+		package.loaded["infra.config_paths"] = { get = function() return "/remap/tap_hold.toml" end }
 		package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(menu_key, _, _, _, context)
 			if menu_key == "tap_holds_menu" then commands = context.commands end
 			return {}
@@ -189,7 +189,7 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 		helpers.assert_eq(#requests, 1)
 		helpers.assert_eq(requests[1].scope, "tap_holds")
 		helpers.assert_eq(requests[1].mode, "recommended")
-		helpers.assert_true(requests[1].backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+		helpers.assert_true(requests[1].backup_path:find("^/remap/tap_hold%.toml%.tap_holds%-") ~= nil,
 			"the remap file is backed up first: " .. tostring(requests[1].backup_path))
 		helpers.assert_eq(refreshes, 1, "the menu refreshes once the terminal commits")
 	end)
@@ -201,7 +201,7 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 		helpers.assert_eq(#requests, 1)
 		helpers.assert_eq(requests[1].scope, "tap_holds")
 		helpers.assert_eq(requests[1].mode, "clear")
-		helpers.assert_true(requests[1].backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+		helpers.assert_true(requests[1].backup_path:find("^/remap/tap_hold%.toml%.tap_holds%-") ~= nil,
 			"the remap file is backed up first: " .. tostring(requests[1].backup_path))
 		helpers.assert_eq(refreshes, 1)
 	end)

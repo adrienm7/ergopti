@@ -35,7 +35,7 @@ local PATH_KEYS = {
 	"HotstringsDirPath",
 	"PersonalHotstringsDir",
 	"ConfigTomlPath",
-	"KarabinerConfigPath",
+	"TapHoldConfigPath",
 	"PersonalShortcutsLuaPath",
 }
 

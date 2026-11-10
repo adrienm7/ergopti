@@ -150,7 +150,7 @@ end
 -- The configuration files the storage step parses, by config_paths key.
 local CONFIG_FILES = {
 	{ name = "config_toml", key = "ConfigTomlPath" },
-	{ name = "karabiner_toml", key = "KarabinerConfigPath" },
+	{ name = "tap_hold_toml", key = "TapHoldConfigPath" },
 	{ name = "personal_toml", key = "PersonalTomlPath" },
 	{ name = "personal_info_toml", key = "PersonalInfoTomlPath" },
 }

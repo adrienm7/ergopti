@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param original string Independent TOML fixture.
 --- @param body function Assertions receiving actual owners and recorded ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -28,6 +28,8 @@ local function with_file(original, body)
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
+		local Text = require("tests.support.tap_hold_file_text")
+		original = Text.file(original)
 		write(original)
 		local files = require("adapters.file_system")
 		local native_read, native_write = files.read_with_status, files.write_if_unchanged
@@ -44,7 +46,7 @@ local function with_file(original, body)
 		end
 		local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
-			decode = require("infra.toml.codec").decode, native_read = native_read })
+			decode = Text.model, file = Text.file, original = original, native_read = native_read })
 		files.read_with_status, files.write_if_unchanged = native_read, native_write
 		os.remove(path); os.remove(path .. ".tmp")
 		if not ok then error(err, 0) end
@@ -52,12 +54,13 @@ local function with_file(original, body)
 end
 
 local VECTORS = {
-	{ name = "tap_holds", source = "tap_holds = ", section = "tap_holds", mode = "root" },
-	{ name = "tap_holds.config", source = "[tap_holds]\nconfig = ", section = "tap_holds", mode = "config" },
-	{ name = "tap_holds.config.escape", source = "[tap_holds.config]\nescape = ", section = "tap_holds", mode = "binding", id = "escape" },
-	{ name = "mod_combos", source = "mod_combos = ", section = "mod_combos", mode = "root" },
-	{ name = "mod_combos.config", source = "[mod_combos]\nconfig = ", section = "mod_combos", mode = "config" },
-	{ name = "mod_combos.config.esc_tab", source = "[mod_combos.config]\nesc_tab = ", section = "mod_combos", mode = "binding", id = "esc_tab" },
+	-- `file` is where the shared tap_hold.toml keeps the model's table.
+	{ name = "tap_holds", file = "tap_hold", source = "tap_holds = ", section = "tap_holds", mode = "root" },
+	{ name = "tap_holds.config", file = "tap_hold.keys", source = "[tap_holds]\nconfig = ", section = "tap_holds", mode = "config" },
+	{ name = "tap_holds.config.escape", file = "tap_hold.keys.escape", source = "[tap_holds.config]\nescape = ", section = "tap_holds", mode = "binding", id = "escape" },
+	{ name = "mod_combos", file = "mod_combos", source = "mod_combos = ", section = "mod_combos", mode = "root" },
+	{ name = "mod_combos.config", file = "mod_combos.config", source = "[mod_combos]\nconfig = ", section = "mod_combos", mode = "config" },
+	{ name = "mod_combos.config.esc_tab", file = "mod_combos.config.escape_then_tab", source = "[mod_combos.config]\nesc_tab = ", section = "mod_combos", mode = "binding", id = "esc_tab" },
 }
 local ARRAYS = { { source = "[]", value = {} }, { source = '[["opaque"], []]', value = { { "opaque" }, {} } },
 	{ source = '[{ future = [[], ["keep"]] }]', value = { { future = { {}, { "keep" } } } } } }
@@ -85,13 +88,13 @@ helpers.describe("Array remap dictionaries", function()
 					helpers.assert_eq(state.tap_hold_config.escape, { tap = "none", hold = "none" })
 					helpers.assert_eq(state.mod_combos_config.esc_tab, { tap = "none", hold = "none", combo = "none" })
 					helpers.assert_eq(#f.warnings, 1)
-					helpers.assert_contains(f.warnings[1], "'" .. vector.name .. "' in '" .. f.path .. "'")
-					helpers.assert_eq(f.read(), original, "read-only admission retains exact bytes")
+					helpers.assert_contains(f.warnings[1], "'" .. vector.file .. "' in '" .. f.path .. "'")
+					helpers.assert_eq(f.read(), f.original, "read-only admission retains exact bytes")
 					state.enabled = false
 					helpers.assert_true(f.config.save_user_config(state, f.path))
 					local codec = require("infra.toml.codec")
 					local stored, shapes = codec.decode_with_shapes(f.read())
-					local preserved = obsolete(stored, vector)
+					local preserved = obsolete(require("tests.support.tap_hold_file_text").model_of(stored, shapes), vector)
 					helpers.assert_eq(preserved, array.value)
 					helpers.assert_true(shapes.arrays[preserved], "source remains an array, including empty arrays")
 					helpers.assert_eq(stored.future, { keep = { {}, { "literal-neighbor" } } })
@@ -110,10 +113,10 @@ helpers.describe("Array remap dictionaries", function()
 				local state = f.load()
 				change_collision(state, vector)
 				helpers.assert_eq(f.config.save_user_config(state, f.path), false)
-				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(f.controls.writes, 0)
 				helpers.assert_contains(f.errors[1], vector.name)
-				f.write('[future]\nkeep = "repaired"\n')
+				f.write(f.file('[future]\nkeep = "repaired"\n'))
 				f.controls.expected = f.read()
 				helpers.assert_true(f.config.save_user_config(state, f.path))
 				helpers.assert_eq(f.decode(f.read()).future, { keep = "repaired" })
@@ -129,7 +132,7 @@ helpers.describe("Array remap dictionaries", function()
 				else state.simultaneous_threshold_ms = state.simultaneous_threshold_ms + 1 end
 				helpers.assert_eq(f.config.save_user_config(state, f.path), false)
 				helpers.assert_eq(f.controls.writes, 0)
-				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_contains(f.errors[1], vector.name)
 			end)
 		end)
@@ -142,7 +145,8 @@ helpers.describe("Array remap dictionaries", function()
 				if vector.section == "tap_holds" then state.tap_hold_timeout_ms = 1234
 				else state.simultaneous_threshold_ms = 1234 end
 				helpers.assert_true(f.config.save_user_config(state, f.path))
-				local stored, shapes = require("infra.toml.codec").decode_with_shapes(f.read())
+				local decoded, shapes = require("infra.toml.codec").decode_with_shapes(f.read())
+				local stored = require("tests.support.tap_hold_file_text").model_of(decoded, shapes)
 				helpers.assert_eq(obsolete(stored, vector), {})
 				helpers.assert_true(shapes.arrays[obsolete(stored, vector)])
 				helpers.assert_eq(stored[vector.section][vector.section == "tap_holds" and "timeout_ms"
@@ -157,7 +161,7 @@ helpers.describe("Array remap dictionaries", function()
 				local state, status = f.load()
 				helpers.assert_nil(state)
 				helpers.assert_eq(status, "error")
-				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.read(), f.original)
 				local candidate = f.config.build_default_state({}, {})
 				helpers.assert_eq(f.config.save_user_config(candidate, f.path), false)
 				helpers.assert_eq(f.controls.writes, 0)
@@ -174,7 +178,8 @@ helpers.describe("Array remap dictionaries", function()
 			helpers.assert_eq(state.mod_combos_config.esc_tab.hold, "ctrl")
 			state.enabled = false
 			helpers.assert_true(f.config.save_user_config(state, f.path))
-			local stored, shapes = require("infra.toml.codec").decode_with_shapes(f.read())
+			local decoded, shapes = require("infra.toml.codec").decode_with_shapes(f.read())
+			local stored = require("tests.support.tap_hold_file_text").model_of(decoded, shapes)
 			helpers.assert_eq(stored.tap_holds.config.escape, { tap = "copy", future = { {}, { "retained" } } })
 			helpers.assert_eq(stored.mod_combos.config.esc_tab, { hold = "ctrl", future = { { choices = {} } } })
 			helpers.assert_true(shapes.arrays[stored.tap_holds.config.escape.future[1]])

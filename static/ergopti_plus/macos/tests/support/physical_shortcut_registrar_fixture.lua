@@ -11,9 +11,9 @@ local function with_compiled_navigation(body, controls, files)
 	local lfs = require("lfs")
 	local directory = helpers.temp_dir() .. "/physical-scope-nav-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
 	assert(lfs.mkdir(directory))
-	local path = directory .. "/config_karabiner.toml"
+	local path = directory .. "/tap_hold.toml"
 	local stream = assert(io.open(path, "wb"))
-	assert(stream:write('[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = false\n'))
+	assert(stream:write('[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = false\n'))
 	assert(stream:close())
 	controls.navigation_source_path = path
 	local saved, original_hs = {}, _G.hs
@@ -24,7 +24,7 @@ local function with_compiled_navigation(body, controls, files)
 			return require("tests.support.remap_transaction_fixture")(function(fixture)
 				local remap, observations = fixture.load_enabled_remap({ real_user_config_path = path, initially_enabled = false })
 				local paths = package.loaded["infra.config_paths"]
-				paths.get = function(key) if key == "KarabinerConfigPath" then return path end; return "config" end
+				paths.get = function(key) if key == "TapHoldConfigPath" then return path end; return "config" end
 				paths.get_config_dir = function() return directory end
 				local terminal, reason
 				local accepted = remap.regenerate(function(ok, detail) terminal, reason = ok, detail end)

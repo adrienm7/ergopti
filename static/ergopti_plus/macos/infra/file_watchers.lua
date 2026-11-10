@@ -182,7 +182,7 @@ function M.start(ctx)
 	-- so the recursive pathwatcher covers hammerspoon/config.toml too. Every
 	-- save_prefs, meaning every single menu toggle, then looked exactly like a
 	-- user editing a hotstring file and reloaded the whole driver half a second
-	-- later. config_karabiner.toml is worse still: the driver regenerates it
+	-- later. tap_hold.toml is worse still: the driver regenerates it
 	-- whenever the layout changes.
 	--
 	-- Matched by resolved PATH rather than by filename, and resolved by the

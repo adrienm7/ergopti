@@ -46,7 +46,7 @@ helpers.describe("empty configuration boot projection", function()
 	helpers.it("does not seed missing remap children or an absent master in an existing file", function()
 		helpers.with_fresh_modules({ "platform.remap.config", "adapters.file_system" }, function()
 			package.loaded["adapters.file_system"] = {
-				read_with_status = function() return "[tap_holds.config]\n[mod_combos.config]\n", "ok" end,
+				read_with_status = function() return "[tap_hold.keys]\n[mod_combos.config]\n", "ok" end,
 			}
 			local config = helpers.load_with_stubs("platform.remap.config")
 			local state, status = config.load_user_config({ { id = "left_shift" } },

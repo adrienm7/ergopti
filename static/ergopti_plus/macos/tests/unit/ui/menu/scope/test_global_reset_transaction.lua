@@ -69,7 +69,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 		with_menu_fixture({ failures = { reload = fail("false") } }, function(observations)
 			local nested_result = nil
 			observations.hooks[
-				"file-restore:/virtual/config_karabiner.toml:after"
+				"file-restore:/virtual/tap_hold.toml:after"
 			] = function()
 				nested_result = observations.actions.factory_reset()
 			end
@@ -79,7 +79,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 				"rollback owns its inverse until the mutating boundary returns")
 			assert_fully_restored(observations)
 			helpers.assert_eq(
-				observations.calls["file-restore:/virtual/config_karabiner.toml"],
+				observations.calls["file-restore:/virtual/tap_hold.toml"],
 				1,
 				"the same inverse must not recurse while it is on-stack"
 			)
@@ -91,7 +91,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			"setting:llm_api_entries",
 			"setting:llm_api_entry_id",
 			"file-move:/virtual/config.toml",
-			"file-move:/virtual/config_karabiner.toml",
+			"file-move:/virtual/tap_hold.toml",
 		}) do
 			local modes = boundary:sub(1, #"setting:") == "setting:"
 				and { "false", "nil", "throw", "false-after", "throw-after" }
@@ -156,10 +156,10 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 	helpers.it("retains compensation debt and lets one retry commit exactly once", function()
 		with_menu_fixture({ failures = {
 			reload = fail("false"),
-			["file-restore:/virtual/config_karabiner.toml"] = fail("false"),
+			["file-restore:/virtual/tap_hold.toml"] = fail("false"),
 		} }, function(observations)
 			helpers.assert_eq(observations.actions.factory_reset(), false)
-			helpers.assert_nil(observations.files["/virtual/config_karabiner.toml"],
+			helpers.assert_nil(observations.files["/virtual/tap_hold.toml"],
 				"the refused inverse remains owned as cleanup debt")
 			helpers.assert_eq(observations.actions.factory_reset(), true,
 				"the retry must finish debt before starting one new candidate")

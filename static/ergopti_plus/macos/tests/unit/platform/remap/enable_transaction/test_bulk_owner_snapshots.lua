@@ -151,12 +151,12 @@ helpers.describe("configured navigation reservations share actual remap settings
 		sequence = sequence + 1
 		local directory = helpers.temp_dir() .. "/mac-remap-nav-" .. tostring(os.time()) .. "-" .. tostring(sequence)
 		assert(lfs.mkdir(directory))
-		local config = directory .. "/config_karabiner.toml"
+		local config = directory .. "/tap_hold.toml"
 		local layer = directory .. "/layers.toml"
 		local function write(path, text)
 			local stream = assert(io.open(path, "wb")); assert(stream:write(text)); assert(stream:close())
 		end
-		local settings_text = settings or '[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = true\n[tap_holds.config.left_shift]\ntap = "none"\nhold = "layer"\n'
+		local settings_text = settings or '[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = true\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n'
 		local layer_text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "none"\n'
 		write(config, settings_text); write(layer, layer_text)
 		local called, detail = xpcall(function()
@@ -208,9 +208,9 @@ helpers.describe("configured navigation reservations share actual remap settings
 	end)
 
 	for _, settings in ipairs({
-		'[karabiner]\nintegration_enabled = false\n[tap_holds.config.left_shift]\nhold = "layer"\n',
-		'[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = false\n[tap_holds.config.left_shift]\nhold = "layer"\n',
-		'[karabiner]\nintegration_enabled = true\n[tap_holds.config.left_shift]\nhold = "none"\n',
+		'[karabiner]\nintegration_enabled = false\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n',
+		'[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = false\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n',
+		'[karabiner]\nintegration_enabled = true\n[tap_hold.keys.left_shift]\nhold_modifier = ""\n',
 	}) do
 		helpers.it("nav-configured remap leaves unreachable Navigation inputs unreserved: " .. settings, function()
 			with_navigation_case(function(remap, calls)
@@ -259,7 +259,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 			helpers.assert_type(capture, "table")
 			helpers.assert_eq(capture.codes, { 38 })
 			helpers.assert_eq(capture.current(), true)
-		end, '[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = true\n[tap_holds.config.left_shift]\ntap = "layer_on"\nhold = "none"\n')
+		end, '[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = true\n[tap_hold.keys.left_shift]\ntap_action = "layer_on"\n')
 	end)
 
 	helpers.it("nav-configured remap cannot activate a layer action absent from its actual catalogue", function()
@@ -317,7 +317,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 	helpers.it("nav-configured remap refuses settings removed after compilation even when saved bytes agree", function()
 		with_navigation_case(function(remap, _, write, _, text)
 			helpers.assert_eq(remap.set_hold_action("left_shift", "none"), true)
-			write(text:gsub('hold = "layer"', 'hold = "none"'))
+			write((text:gsub('hold_layer = "nav"', 'hold_modifier = ""')))
 			helpers.assert_nil(remap.capture_configured_navigation_inventory(), "newly saved settings do not own the old compiled rules")
 		end)
 	end)
@@ -423,7 +423,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 				armed = true
 				io.open = function(path, mode)
 					local handle, detail = original_open(path, mode)
-					if armed and handle and mode == "r" and path:match("/config_karabiner%.toml$") then
+					if armed and handle and mode == "r" and path:match("/tap_hold%.toml$") then
 						reads = reads + 1
 						if phase == "prepare" and reads ~= 4 then return handle, detail end
 						return { read = function(_, ...) return handle:read(...) end,
@@ -462,7 +462,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 			helpers.assert_type(inventory, "table", "the original write receipt owns the new enabled bytes")
 			helpers.assert_eq(inventory.codes, { 38 })
 			helpers.assert_eq(inventory.current(), true)
-		end, '[karabiner]\nintegration_enabled = false\n[tap_holds]\nenabled = true\n[tap_holds.config.left_shift]\nhold = "layer"\n', nil, true)
+		end, '[karabiner]\nintegration_enabled = false\n[tap_hold]\nenabled = true\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n', nil, true)
 	end)
 
 	for _, phase in ipairs({ "before_ready", "before_resumed" }) do
@@ -481,7 +481,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 				helpers.assert_eq(accepted, true)
 				helpers.assert_eq(terminal, true, "original native enable admission is unchanged: " .. tostring(reason))
 				helpers.assert_nil(remap.capture_configured_navigation_inventory(), "a later read cannot replace the original compile/write source custody")
-			end, '[karabiner]\nintegration_enabled = false\n[tap_holds]\nenabled = true\n[tap_holds.config.left_shift]\nhold = "layer"\n', nil, true)
+			end, '[karabiner]\nintegration_enabled = false\n[tap_hold]\nenabled = true\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n', nil, true)
 		end)
 	end
 

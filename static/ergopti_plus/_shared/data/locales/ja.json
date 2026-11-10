@@ -4116,7 +4116,7 @@
 	"platform_reason.accented_shortcuts_need_a_layout_file_on_macos": "macOS では使えません：macOS のレイアウトファイルは独自の Command と Control のレイヤーを持つため、Cmd+é はすでにそのファイルが割り当てたショートカットとして働きます。Windows と Linux では、アクセント付き文字を直接入力するキーでの Ctrl・Alt・Super の組み合わせを、その文字の通常のショートカットに割り当て直すので、Ctrl+é は Ctrl+C として働きます。",
 	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "Windows では利用できません：Windows の設定でショートカットを割り当てられるのは、3 本指・4 本指のタップと 4 方向のまっすぐなスワイプだけで、タッチデータは Ergopti に渡されません。そのため、2 本指・5 本指のスロット、斜め方向、水平スワイプのスロットはありません。",
 	"platform_reason.category_master_is_a_gate_on_windows": "Windows ではこの名前ではありません：Windows はこのマスタースイッチを category_enabled のカテゴリゲートとして持ちます。macOS と Linux はカテゴリ自身のセクションに enabled として持ちます。",
-	"platform_reason.key_combinations_are_karabiner_settings_on_macos": "macOS ではこの名前ではありません：macOS ではキーの組み合わせを Karabiner-Elements が実行するため、macOS はそれらとそのスイッチを Karabiner の設定に、config_karabiner.toml の mod_combos として保存します。",
+	"platform_reason.key_combinations_are_karabiner_settings_on_macos": "macOS ではこの名前ではありません：macOS ではキーの組み合わせを Karabiner-Elements が実行するため、macOS はそれらとそのスイッチを Karabiner の設定に、tap_hold.toml の mod_combos として保存します。",
 	"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS ではこの名前ではありません：macOS はこのオプションを Ctrl と Cmd のショートカットの一つとして扱い、それらと一緒に shortcuts.keys.wrap_text_if_selected として保存します。",
 	"platform_reason.action_application_switching_is_macos": "macOS のみ：macOS はそれぞれがウインドウをまとめるアプリ間で切り替えます。Windows と Linux は Alt+Tab でウインドウ間を切り替えます：同等の操作を使ってください。",
 	"platform_reason.action_continuous_swipe_is_macos": "macOS のみ：連続スワイプは指が動いている間それを追いかけますが、これを読み取れるのは macOS ドライバーだけです。Windows はタッチパッド設定から完了したジェスチャーを受け取り、Linux はスワイプが終わってから動作します：同等の 1 段階の操作を使ってください。",

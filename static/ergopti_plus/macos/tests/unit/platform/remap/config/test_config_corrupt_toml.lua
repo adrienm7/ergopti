@@ -1,9 +1,9 @@
 --- tests/unit/platform/remap/config/test_config_corrupt_toml.lua
 
 --- ==============================================================================
---- MODULE: config_karabiner.toml Corruption Guard
+--- MODULE: tap_hold.toml Corruption Guard
 --- DESCRIPTION:
---- Guards that a corrupt (unparseable) config_karabiner.toml is surfaced loudly
+--- Guards that a corrupt (unparseable) tap_hold.toml is surfaced loudly
 --- via Logger.error rather than silently reset to defaults and overwritten.
 --- Before the fix, _load_toml_file returned nil for both "file absent" and
 --- "present but corrupt", and load_user_config treated both identically — logging
@@ -91,7 +91,7 @@ helpers.describe("Config._load_toml_file — corrupt TOML detection (karabiner-s
 		reset_captured()
 		local original_open = io.open
 		io.open = function() return nil, "PRIVATE-READ-FAILURE", 13 end
-		local call_ok, data, err = pcall(Config._load_toml_file, "/controlled/config_karabiner.toml")
+		local call_ok, data, err = pcall(Config._load_toml_file, "/controlled/tap_hold.toml")
 		io.open = original_open
 
 		helpers.assert_true(call_ok, "a permission or transient-lock failure must not escape")

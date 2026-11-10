@@ -150,14 +150,14 @@ helpers.describe("Config.build_default_state", function()
 	end)
 end)
 
---- Loads config_karabiner.toml from one decoded document.
+--- Loads tap_hold.toml from one decoded document.
 --- @param document table Decoded TOML document.
 --- @return table|nil state
 --- @return string status
 local function load_document(document)
 	local original_load = Config._load_toml_file
 	Config._load_toml_file = function() return document end
-	local ok, state, status = pcall(Config.load_user_config, {}, {}, "/tmp/config_karabiner.toml")
+	local ok, state, status = pcall(Config.load_user_config, {}, {}, "/tmp/tap_hold.toml")
 	Config._load_toml_file = original_load
 	helpers.assert_true(ok, "load_user_config must not raise: " .. tostring(state))
 	return state, status
@@ -188,7 +188,7 @@ local function encoded_document(state, merge_existing)
 		encoded = value
 		error("stop before the disk write")
 	end
-	pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", merge_existing ~= true)
+	pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", merge_existing ~= true)
 	codec.encode = original_encode
 	codec.decode_with_shapes, codec.encode_with_shapes = original_decode_shapes, original_encode_shapes
 	return encoded
@@ -244,7 +244,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 			helpers.assert_true(type(encoded.karabiner) == "table", "the switch lives in [karabiner]")
 			helpers.assert_eq(encoded.karabiner.integration_enabled, value)
 			helpers.assert_nil(encoded.karabiner.enabled, "the legacy key is never written")
-			helpers.assert_true(type(encoded.tap_holds) == "table", "the tap-hold settings are still persisted")
+			helpers.assert_true(type(encoded.tap_hold) == "table", "the tap-hold settings are still persisted")
 		end
 	end)
 
@@ -266,6 +266,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 					"a retired key remains until explicit cleanup")
 				helpers.assert_eq(encoded, {
 					karabiner = { enabled = false, integration_enabled = switch }, personal = { kept = true },
+					_meta = { schema_version = 1 },
 				}, "the complete independently specified source model survives the ordinary save")
 				helpers.assert_eq(encoded.personal and encoded.personal.kept, true)
 			end
@@ -296,9 +297,9 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 		local state = Config.build_default_state({}, {})
 		helpers.assert_eq(state.tap_holds_enabled, false, "a fresh install leaves Tap-Holds off")
 		state.tap_holds_enabled = true
-		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", merge_existing ~= true)
+		pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", merge_existing ~= true)
 		codec.encode = original_encode
-		helpers.assert_eq(encoded.tap_holds.enabled, true)
+		helpers.assert_eq(encoded.tap_hold.enabled, true)
 
 		local original_load = Config._load_toml_file
 		for _, case in ipairs({ { stored = false, expected = false }, { stored = true, expected = true }, { expected = false } }) do
@@ -308,7 +309,7 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 					mod_combos = { config = {} },
 				}
 			end
-			local loaded = Config.load_user_config({ { id = "escape" } }, {}, "/tmp/config_karabiner.toml")
+			local loaded = Config.load_user_config({ { id = "escape" } }, {}, "/tmp/tap_hold.toml")
 			helpers.assert_eq(loaded.tap_holds_enabled, case.expected)
 			helpers.assert_eq(loaded.tap_hold_config.escape.hold, "ctrl",
 				"the assignments load unchanged whatever the switch")
@@ -331,10 +332,10 @@ helpers.describe("Config: the key-combinations switch", function()
 		end
 		local state = Config.build_default_state({}, {})
 		helpers.assert_nil(state.mod_combos_enabled, "a fresh install leaves the switch absent")
-		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
+		pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", true)
 		helpers.assert_nil(encoded.mod_combos.enabled, "an inherited switch is not written")
 		state.mod_combos_enabled = false
-		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
+		pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", true)
 		codec.encode = original_encode
 		helpers.assert_eq(encoded.mod_combos.enabled, false)
 
@@ -346,7 +347,7 @@ helpers.describe("Config: the key-combinations switch", function()
 					mod_combos = { enabled = case.stored, config = {} },
 				}
 			end
-			local loaded = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
+			local loaded = Config.load_user_config({}, {}, "/tmp/tap_hold.toml")
 			helpers.assert_eq(loaded.mod_combos_enabled, case.stored)
 		end
 		Config._load_toml_file = original_load

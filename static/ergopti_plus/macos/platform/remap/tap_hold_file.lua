@@ -1,0 +1,312 @@
+--- platform/remap/tap_hold_file.lua
+
+--- ==============================================================================
+--- MODULE: Shared Tap-Hold File (macOS)
+--- DESCRIPTION:
+--- Binds the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md) to the Karabiner
+--- model platform/remap/config.lua merges: a read decodes the file, migrates
+--- it in memory (_shared/tap_hold/migrations.toml) and translates it with
+--- _shared/lua/tap_hold/shared_file.lua; a save writes back only the leaves the
+--- model changed, stamped with the current version. It also carries an old
+--- config_karabiner.toml over once (import_legacy).
+---
+--- FEATURES & RATIONALE:
+--- 1. One home on every OS: macOS reads and writes the file Linux and Windows
+---    read, under the catalogue's key ids, so a configuration carried between
+---    machines works as it did (Cmd versus Ctrl aside).
+--- 2. Shipped data is read once and validated: a context that cannot place a
+---    key or a combination raises at the first read, never guesses.
+--- 3. A file saved by a newer build, or with an unusable version stamp, is read
+---    as it is and never written, as on Linux.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("infra.logger")
+local Paths = require("infra.paths")
+local TomlCodec = require("infra.toml.codec")
+local JsonCodec = require("adapters.json_codec")
+local SharedFile = require("tap_hold.shared_file")
+local Migrate = require("tap_hold.migrate")
+local KeyCatalog = require("tap_hold.key_catalog")
+local Outdated = require("config_outdated")
+
+local LOG = "karabiner"
+
+-- The macOS column of the key catalogue, and of the legacy imports.
+local PLATFORM = "hs"
+
+local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
+
+local _context, _registry, _retired = nil, nil, nil
+
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 1/ Shipped data =======
+-- ===============================
+-- ===============================
+
+--- Reads a whole shipped file, raising when it is missing.
+--- @param path string
+--- @return string
+local function read_shipped(path)
+	local fh, err = io.open(path, "rb")
+	if not fh then error("cannot read shipped tap-hold data '" .. tostring(path) .. "': " .. tostring(err), 0) end
+	local text = fh:read("*a")
+	fh:close()
+	return text
+end
+
+--- Decodes a shipped TOML file, raising when it does not parse.
+--- @param path string
+--- @return table
+local function shipped_toml(path)
+	local decoded = TomlCodec.decode(read_shipped(path))
+	if type(decoded) ~= "table" then error("shipped tap-hold data does not parse: " .. tostring(path), 0) end
+	return decoded
+end
+
+--- Decodes a shipped JSON file, raising when it does not parse.
+--- @param path string
+--- @return table
+local function shipped_json(path)
+	local decoded = JsonCodec.decode(read_shipped(path))
+	if type(decoded) ~= "table" then error("shipped tap-hold data does not parse: " .. tostring(path), 0) end
+	return decoded
+end
+
+--- The translation context, built once from the shipped data.
+--- @return table See shared_file.hs_context.
+function M.context()
+	if _context == nil then
+		local defaults = shipped_toml(Paths.shared("tap_hold/defaults.toml"))
+		local picker = defaults.tap_hold and defaults.tap_hold.hold_picker or {}
+		local aliases = {}
+		for _, field in ipairs({ "modifier_aliases", "left_modifier_aliases" }) do
+			for alias, name in pairs(type(picker[field]) == "table" and picker[field] or {}) do aliases[alias] = name end
+		end
+		_retired = KeyCatalog.retired_delays(defaults)
+		local catalogue_ids = {}
+		for _, entry in ipairs(defaults.tap_hold.catalog.keys) do catalogue_ids[#catalogue_ids + 1] = entry.id end
+		_context = SharedFile.hs_context(SharedFile.parse_spec(shipped_toml(Paths.shared("tap_hold/shared_file.toml"))), {
+			catalogue = KeyCatalog.for_platform(defaults, PLATFORM),
+			catalogue_ids = catalogue_ids,
+			tap_hold_keys = shipped_json(_DATA_DIR .. "tap_hold_keys.json"),
+			mod_combos = shipped_json(_DATA_DIR .. "mod_combos.json"),
+			actions = shipped_json(_DATA_DIR .. "actions.json"),
+			aliases = aliases,
+		})
+	end
+	return _context
+end
+
+--- The per-key delays earlier builds shipped, under the catalogue ids.
+--- @return table See key_catalog.retired_delays.
+function M.retired_delays()
+	M.context()
+	return _retired
+end
+
+--- The validated migration registry, read once.
+--- @return table See migrate.parse_registry.
+function M.registry()
+	if _registry == nil then _registry = Migrate.load_registry(Paths.shared("tap_hold/migrations.toml")) end
+	return _registry
+end
+
+--- The shared pair id of a macOS key combination.
+--- @param combo_id string
+--- @return string
+function M.pair_of_combo(combo_id)
+	local pair = M.context().pair_of_combo[combo_id]
+	if not pair then error("macOS key combination '" .. tostring(combo_id) .. "' has no pair id", 0) end
+	return pair
+end
+
+--- The file path of a Karabiner model path (see shared_file.file_segments).
+--- @param segments table
+--- @return table
+function M.file_segments(segments)
+	return SharedFile.file_segments(segments, M.context())
+end
+
+--- The macOS key combination of a shared pair id, nil when macOS has none.
+--- @param pair string
+--- @return string|nil
+function M.combo_of_pair(pair)
+	return M.context().combo_of_pair[pair]
+end
+
+
+
+
+
+-- ================================
+-- ================================
+-- ======= 2/ Read and save =======
+-- ================================
+-- ================================
+
+--- The array test of one decoded document.
+local function table_test(shapes)
+	return function(value) return type(value) == "table" and not (shapes and shapes.arrays[value]) end
+end
+
+--- A model copy for the save's comparison: the tables are copied, arrays and
+--- the sections the model does not own stay the same references.
+local function snapshot(model, is_table)
+	local function copy(value)
+		if not is_table(value) then return value end
+		local out = {}
+		for key, child in pairs(value) do out[key] = copy(child) end
+		return out
+	end
+	local out = {}
+	for key, value in pairs(model) do out[key] = value end
+	out.tap_holds, out.mod_combos = copy(model.tap_holds), copy(model.mod_combos)
+	return out
+end
+
+--- Translates a decoded tap_hold.toml for the Karabiner model.
+--- @param document table Decoded shared file, migrated in place.
+--- @param shapes table|nil Its shape receipt.
+--- @param path string The file, named by warnings.
+--- @return table file `{ document, shapes, model, model_shapes, before, writable, detail }`.
+function M.read(document, shapes, path)
+	local is_table = table_test(shapes)
+	local outcome, detail = Migrate.apply(document, M.registry(), M.retired_delays(), is_table)
+	local writable = outcome == "migrated" or outcome == "current"
+	if outcome == "newer" then
+		Logger.warn(LOG, "'%s' was saved by a newer build (schema v%s); it is read as it is and never written.",
+			path, tostring(detail))
+	elseif outcome == "invalid" then
+		Outdated.report_in_file(path, { Migrate.META_SECTION, Migrate.VERSION_KEY },
+			tostring(detail) .. "; the file is read as it is and never written", Logger)
+	end
+	local model, notes = SharedFile.to_karabiner(document, M.context(), is_table)
+	for _, note in ipairs(notes) do
+		local segments = {}
+		for segment in note.path:gmatch("[^%.]+") do segments[#segments + 1] = segment end
+		Outdated.report_in_file(path, segments, note.detail, Logger)
+	end
+	local model_shapes = shapes and { arrays = shapes.arrays, numbers = {}, strings = {}, document = model } or nil
+	return { document = document, shapes = shapes, model = model, model_shapes = model_shapes,
+		before = snapshot(model, is_table), writable = writable, detail = outcome }
+end
+
+--- Stamps a document with the current version.
+local function stamp(document)
+	if type(document[Migrate.META_SECTION]) ~= "table" then document[Migrate.META_SECTION] = {} end
+	document[Migrate.META_SECTION][Migrate.VERSION_KEY] = M.registry().current
+end
+
+--- The text a save publishes.
+--- @param file table|nil What M.read() returned for the source, nil when the
+---   save starts from no file (absent, explicit reset or backed-up repair).
+--- @param model table The model the save produced.
+--- @return string text
+function M.encode(file, model)
+	if file == nil then
+		local document = SharedFile.from_karabiner(model, M.context(), table_test(nil))
+		stamp(document)
+		return TomlCodec.encode(document)
+	end
+	if not file.writable then
+		error("the tap-hold file was saved by a newer build or carries an unusable version (" .. tostring(file.detail) .. ")", 0)
+	end
+	SharedFile.apply_karabiner(file.document, file.before, model, M.context(), table_test(file.shapes))
+	stamp(file.document)
+	if file.shapes then return TomlCodec.encode_with_shapes(file.document, file.shapes) end
+	return TomlCodec.encode(file.document)
+end
+
+--- The text an explicit reset publishes over a file that parses: every leaf
+--- macOS owns is the model's, every other driver's setting stays, with the
+--- spelling of the reset's own read of the source.
+--- @param document table Decoded source, edited in place.
+--- @param shapes table The receipt of that same read.
+--- @param model table The model the reset produced.
+--- @return string text
+function M.encode_reset(document, shapes, model)
+	local is_table = table_test(shapes)
+	local outcome, detail = Migrate.apply(document, M.registry(), M.retired_delays(), is_table)
+	if outcome == "newer" or outcome == "invalid" then
+		error("the tap-hold file was saved by a newer build or carries an unusable version (" .. tostring(detail) .. ")", 0)
+	end
+	SharedFile.drop_karabiner_owned(document, M.context(), is_table)
+	SharedFile.apply_karabiner(document, {}, model, M.context(), is_table)
+	stamp(document)
+	return TomlCodec.encode_with_shapes(document, shapes)
+end
+
+
+
+
+
+-- ===========================
+-- ===========================
+-- ======= 3/ Old file =======
+-- ===========================
+-- ===========================
+
+--- Carries an old config_karabiner.toml over into tap_hold.toml, once: only
+--- while tap_hold.toml does not exist. The old file is renamed with the
+--- registry's suffix after the new one is published, never deleted.
+--- @param target string The tap_hold.toml path.
+--- @param file_system table The FileSystem port (read_with_status, write_if_unchanged).
+--- @return boolean ok False when the old file exists but cannot be carried over.
+--- @return string outcome "imported", "none", "kept" (both files exist) or the refusal.
+function M.import_legacy(target, file_system)
+	local spec = M.registry().legacy_imports[PLATFORM]
+	assert(spec and spec.translate == "karabiner", "the macOS legacy import is not declared")
+	local legacy = (require("native_path").directory_prefix(target) or "") .. spec.source
+	local raw, status = file_system.read_with_status(legacy)
+	if status == "absent" then return true, "none" end
+	if status ~= "ok" then
+		Logger.error(LOG, "Cannot read the old '%s' — it is not carried over.", legacy)
+		return false, "unreadable"
+	end
+	local _, target_status = file_system.read_with_status(target)
+	if target_status ~= "absent" then
+		Logger.warn(LOG, "Both '%s' and the old '%s' exist: the old one is left as it is and not read.", target, legacy)
+		return true, "kept"
+	end
+	local ok, model, shapes = pcall(TomlCodec.decode_with_shapes, raw)
+	if not ok or type(model) ~= "table" then
+		Logger.error(LOG, "Cannot parse the old '%s' as TOML — it is not carried over; repair or remove it.", legacy)
+		return false, "unparseable"
+	end
+	local built, document = pcall(SharedFile.from_karabiner, model, M.context(), table_test(shapes))
+	if not built then
+		Logger.error(LOG, "The old '%s' cannot be carried over: %s.", legacy, tostring(document))
+		return false, "untranslatable"
+	end
+	stamp(document)
+	-- The old file's receipts are keyed by table, so the sections carried by
+	-- reference keep their arrays and their spelling.
+	local text = TomlCodec.encode_with_shapes(document, { arrays = shapes.arrays, numbers = shapes.numbers,
+		strings = shapes.strings, document = document })
+	local written = file_system.write_if_unchanged(target, text, { status = "absent" })
+	if written ~= true then
+		Logger.error(LOG, "Cannot publish '%s' from the old '%s' — nothing was carried over.", target, legacy)
+		return false, "unpublished"
+	end
+	local renamed, rename_err = os.rename(legacy, legacy .. spec.retired_suffix)
+	if not renamed then
+		Logger.error(LOG, "'%s' was carried over into '%s' but could not be renamed (%s); it is no longer read.",
+			legacy, target, tostring(rename_err))
+	end
+	Logger.info(LOG, "Carried the old '%s' over into '%s'.", legacy, target)
+	return true, "imported"
+end
+
+--- Test seam: forgets the cached shipped data.
+function M._reset_for_test()
+	_context, _registry, _retired = nil, nil, nil
+end
+
+return M

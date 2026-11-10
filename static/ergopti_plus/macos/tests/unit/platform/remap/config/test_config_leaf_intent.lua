@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Remap Configuration Explicit Leaf Intent
 --- DESCRIPTION:
---- An obsolete leaf of config_karabiner.toml (a timing spelled as text, a
+--- An obsolete leaf of tap_hold.toml (a timing spelled as text, a
 --- switch that is not a Boolean, a binding that is not a table) survives every
 --- ordinary full-state save, and a non-neutral candidate value at that leaf is
 --- refused, because a carried value never proves that the user repaired it.
@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim",
+local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "logger.shim",
 	"toml_codec", "infra.toml.codec" }
 
 --- Runs body against one real source file; publication is captured in place.
@@ -36,6 +36,8 @@ local function with_file(original, body)
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
+		local Text = require("tests.support.tap_hold_file_text")
+		original = Text.file(original)
 		write(original)
 		local files = require("adapters.file_system")
 		local native_write = files.write_if_unchanged
@@ -53,7 +55,7 @@ local function with_file(original, body)
 			return config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, path)
 		end
 		local ok, err = pcall(body, { config = config, path = path, warnings = warnings, errors = errors,
-			controls = controls, load = load, read = read, decode = require("infra.toml.codec").decode })
+			controls = controls, load = load, read = read, decode = Text.model, file = Text.file, original = original })
 		files.write_if_unchanged = native_write
 		os.remove(path); os.remove(path .. ".tmp")
 		if not ok then error(err, 0) end
@@ -105,7 +107,7 @@ helpers.describe("Remap explicit leaf intent (remap-leaf-intent)", function()
 					or "mod_combos.simultaneous_threshold_ms"
 				helpers.assert_eq(f.config.save_user_config(state, f.path, nil, nil, { leaves = { [other] = true } }),
 					false)
-				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(f.controls.writes, 0)
 			end)
 		end)
