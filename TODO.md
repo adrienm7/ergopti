@@ -1009,7 +1009,11 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       (relay); `…update-watch.log` beside the settings reads « reported a healthy start ». With a new tree whose
       `bin/` launcher exits at once, the tree moves to `<root>.failed-<pid>` within 60 s, `<root>.old` is back and the
       previous daemon runs; a Quit during the wait leaves the update installed and nothing restarted.
-- [ ] Layout emulation (2026-11-06): with an AZERTY (fr) XKB layout, choose Keyboard layout > Layout to emulate >
+- [x] Layout emulation (2026-11-06): with an AZERTY (fr) XKB layout, choose Keyboard layout > Layout to emulate >
+      Done (container proof, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): `tests/hardware/run_layout_typing_live.sh` types the 30 hand-read
+      `keylayout_vectors.json` vectors of Ergopti, Ergopti➕ and Ergo-L over AZERTY into mousepad (GTK) and kwrite (Qt),
+      read back through AT-SPI, with Ctrl+c and Ctrl+z on the Command level, a row switched off and the AZERTY-dead `^`
+      key; fixes a1a8cf98, f7541d24, 0601d1a8.
 - [ ] Bundled apps (`wave3/app-cloner-encryptor`): Applications > Encryptor opens a file chooser and writes
 - [ ] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
       uinput without Tab, and nothing is typed into a password field.
@@ -1027,6 +1031,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       physical capture: HARDWARE.md section 13 still welcomes one) through the binary evdev reader,
       `start_reading`, the decoder and the dispatch.
 - [ ] Layout switching (branch `layout/system-switch-parity`, 2026-11-06): on GNOME Wayland, KDE Plasma 6 Wayland,
+      Container proof 2026-11-10 (`tests/hardware/run_input_sources_live.sh`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): KDE Plasma 6.6.4
+      Wayland and X11, openbox X11 and sway pass (`getLayoutsList` answers `a(sss)` on both Plasma sessions); GNOME
+      Shell 46 fails, the switch changes nothing on a running shell (Linux remaining work). Left: GNOME only.
       KDE Plasma X11 and another X11 desktop with two layouts, Layout > « Input sources » lists them (GNOME and KDE
       tick the active one, X11 ticks none) and picking one switches the desktop. On KDE, the keyboard daemon's
       `org.kde.KeyboardLayouts.getLayoutsList` (through `gdbus call`) answers the `a(sss)` shape the adapter parses
@@ -1055,7 +1062,12 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       PAC itself and the stage logs « lookup unusable at native_pac_download », then the pull succeeds direct
       (`pac-download-direct`). A PAC that says DIRECT warns nothing; a dead relay as the last entry fails the pull.
 - [ ] Item 50 cascade and the composed layout typed on a physical keyboard.
+      Not attempted in the 2026-11-10 container pass; the emulation proof above can type the composer's
+      `composed.keylayout` once it is the emulated layout.
 - [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
+      Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
+      46 `apply-wayland` ends `not_loaded` and rolls back (the shell lists no user-tree id, mutter still compiles it);
+      on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted.
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
 - [ ] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running".
@@ -1067,7 +1079,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
       output reaches the focused window under the grab; only that evidence may turn
       `keyboard_shortcuts.physical_delivery_available` true.
-- [ ] Accented shortcuts: on AZERTY with « é → C » on, Ctrl+é copies in a GTK and a Qt editor, AltGr+é still types
+- [x] Accented shortcuts: on AZERTY with « é → C » on, Ctrl+é copies in a GTK and a Qt editor, AltGr+é still types
+      Done (container proof, `tests/hardware/run_layout_typing_live.sh`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Ctrl+é copies in mousepad
+      and kwrite, AltGr+é types AZERTY's level 3, Ctrl+2 with digits first stays Ctrl+KEY_2 on the wire.
       what the layout gives, and Ctrl+2 (é) stays Ctrl+2 while the number row types digits first.
 - [ ] Tap-hold copy check on Wayland: on KDE or sway with wl-clipboard, a tap-hold copy in an editor sends no retry
       and no warning, and a copy with nothing selected warns once; on GNOME the log says the watch ended and the
@@ -1084,6 +1098,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       reader, and no compositor runs the spinner or the focused-window poll; the event routing is covered by
       `test_prediction_control_retirement.lua` (« Main cancels AI on pointer activity »).
 - [ ] Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
+      Container proof 2026-11-10 ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Qt (kwrite) types ₢ at once; GTK 3 (mousepad, no IBus) types the
+      borrowed trigger « ⅕ » (Linux remaining work); the installed X11 Bépo needed 03a47899. The other parts of this
+      line were not attempted.
       types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row changes
       the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
       output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
@@ -1198,6 +1215,21 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
+
+### Linux (container proofs of 2026-11-10)
+
+- [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
+      `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
+      writes no `mru-sources`. Writing `sources` as `[target]`, `[target, other]`, then the user's list switches a
+      running shell, but only once the shell processed each write: wait on the session keymap (XWayland group) between
+      writes. The same holds for `apply-wayland`, and the shell lists no id it does not know from the system rules.
+      [Proof and mechanism](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
+- [ ] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method compiles nothing from the
+      include block (an included file that itself includes `%L`), so Bépo's monnaie then cédille types « ⅕ » in
+      mousepad while Qt types ₢. Write the rules where GTK 3 reads them, or state the IBus requirement.
+- [ ] **KDE layout id across session types.** `getLayoutsList`'s middle field is Plasma's display label (`''` on
+      Wayland, the short name on X11), read as a variant: the same layout is `us` on Wayland and `us(us)` on X11, so a
+      stored pause layout does not match on the other session type.
 
 ## CI acceptance
 
