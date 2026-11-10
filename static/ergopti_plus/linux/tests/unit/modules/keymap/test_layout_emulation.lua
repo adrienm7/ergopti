@@ -131,6 +131,16 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_eq(record.typed, { "^" }, "Ergo-L's AltGr symbol")
 	end)
 
+	helpers.it("leaves a row switched off to the system layout (emulation-row-switch-null-registry)", function()
+		-- The registry is decoded losslessly, as in production: its JSON nulls
+		-- must still read as character keys for the rows to exist at all.
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti_plus", emulate_top_row = false })
+		helpers.assert_true(M.reload(), "Ergopti+ loads with the top row off")
+		helpers.assert_true(not press(M, KEY_Q), "the top row types the system layout")
+		helpers.assert_true(press(M, KEY_D), "the home row is still emulated")
+		helpers.assert_eq(#record.typed, 1, "only the home-row key typed")
+	end)
+
 	helpers.it("turns itself off with an error on a layout it cannot read", function()
 		local M = fixture({ emulated_layout = "missing", ergopti_base = true })
 		helpers.assert_true(not M.reload(), "the reload refuses")

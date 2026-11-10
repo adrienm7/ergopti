@@ -378,7 +378,7 @@ end
 
 --- The row of every physical key of the four emulated rows.
 --- @param registry table Decoded _shared/data/keycodes/physical_keys.json.
---- @param is_null function|nil The JSON decoder's null test.
+--- @param is_null function The JSON decoder's null test (required, see layout_rows_policy.keys).
 --- @return table KeyboardEvent.code -> row id.
 function M.row_map(registry, is_null)
 	local rows = {}

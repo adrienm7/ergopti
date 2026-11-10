@@ -144,6 +144,19 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_nil(paused.unicode, "a paused driver types the system layout")
 	end)
 
+	helpers.it("leaves a row switched off to the system layout (emulation-row-switch-null-registry)", function()
+		-- The registry is decoded losslessly, as in production: its JSON nulls
+		-- must still read as character keys for the rows to exist at all.
+		local M = fixture({ ergopti_base = true, ergopti_variant = "ergopti_plus", emulate_top_row = false })
+		helpers.assert_true(M.reload(), "Ergopti+ loads with the top row off")
+		local top = event()
+		helpers.assert_true(not M.key_down(top, KC_Q), "the top-row key is not deleted")
+		helpers.assert_nil(top.unicode, "the top row types the system layout")
+		local home = event()
+		M.key_down(home, KC_D)
+		helpers.assert_true(home.unicode ~= nil, "the home row is still emulated")
+	end)
+
 	helpers.it("turns itself off with an error on a layout it cannot read", function()
 		local M = fixture({ emulated_layout = "missing", ergopti_base = true })
 		helpers.assert_true(not M.reload(), "the reload refuses")
