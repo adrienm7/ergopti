@@ -160,21 +160,25 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     key comes up (lalt.ahk 4.1): `tap_at_down`. Its hotkey has no *
 --     wildcard, so under a held modifier LAlt stays Alt (`native_under_
 --     modifier`), and it does nothing at all while RCtrl, CapsLock, LShift or
---     LCtrl is physically down (`skip_while_down`).
+--     LCtrl is physically down (`skip_while_down`);
+--   - the alt_tab_monitor taps and RCtrl's Tab tap wait for their release with
+--     the key's own threshold (KS_WaitReleased(.., TapHoldDuration) in
+--     tab.ahk 8.1, lalt.ahk 4.3, rctrl.ahk 7.2), never the lone tap window
+--     the other held modifiers get (`strict_tap`).
 local NO_HOLD_BY_KEY = {
 	left_shift = { own = true }, left_ctrl = { own = true }, right_shift = { own = true },
 	alt_gr = { own = true },
 }
 local NO_HOLD_BY_TAP = {
-	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT } } },
+	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT }, strict_tap = true } },
 	left_alt = {
-		alt_tab_monitor = { mods = { KEY_LEFTALT } },
+		alt_tab_monitor = { mods = { KEY_LEFTALT }, strict_tap = true },
 		one_shot_shift = {
 			mods = { KEY_LEFTSHIFT }, tap_at_down = true, native_under_modifier = true,
 			skip_while_down = { EvdevCodes.KEY_RIGHTCTRL, EvdevCodes.KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL },
 		},
 	},
-	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT }, hold_past_threshold = true } },
+	right_ctrl = { tab = { own = true, strict_tap = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT }, hold_past_threshold = true } },
 }
 -- The keys that must be up when a key goes down for its tap to fire, by key.
 -- LCtrl taps only with CapsLock and LAlt up (lshift_lctrl.ahk 3.1, in its
@@ -362,7 +366,7 @@ function M.new(opts)
 			-- Every typing key is left out, as on macOS and Windows, whatever its tap.
 			entry.lone_modifier = #entry.mods > 0 and not entry.layer and not roll_keys[key_id]
 				and not entry.hold_past_threshold and not entry.tap_at_down and not entry.instant
-				and tap ~= "one_shot_shift"
+				and not (rule and rule.strict_tap) and tap ~= "one_shot_shift"
 		end
 		::continue::
 	end
