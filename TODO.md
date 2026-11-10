@@ -106,6 +106,7 @@ records the focused campaigns already completed, broader reviews, exact limits
 and the next module candidates. The audit is paused at the maintainer's request.
 
 - [ ] **[CODE] Parity audit continuation:** on resumption, reconcile current source areas with the linked coverage register, then deepen tap-holds/chords/layers as one bounded module across Windows/macOS/Linux/shared before moving to another. Keep native receiving and implementation of existing finding IDs separate; do not restart completed focused campaigns without source drift or a new hypothesis.
+      Progress (10 November 2026, [tap-hold campaign](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): census reconciled (375 areas, 12 new and 206 changed since the last pinned census, still to review outside tap-holds). Fixed on Linux/shared: LAlt's Tab tap with no hold is tap-only (THL-001), the Alt-Tab and RCtrl Tab taps keep their strict threshold (THL-002), a pair starts from the earliest held first key (THL-003), chord defaults pinned across drivers (THS-001). Decisions pending: THD-1 to THD-4 (pair tap and the layer, pair tap timing with the minimum tap, layer-hold pair activity, macOS thumb Backspace under modifiers). Left: the report's Linux and macOS remaining rows; native receiving unqualified. Next module after this one: hotstring cascade.
 
 ## Dead-key composition parity follow-up
 
