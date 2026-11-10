@@ -64,7 +64,14 @@ function context(value) {
 }
 
 function sameFile(left, right) {
-	return ['dev', 'ino', 'size', 'mtimeNs', 'ctimeNs'].every((key) => left[key] === right[key]);
+	// On Windows 11 Node's path stat (lstat) answers dev 0: its by-name fast path
+	// carries no volume serial, which the handle stat (fstat) does. Zero there is
+	// "unknown", not another volume (no regular file lives on device 0 elsewhere);
+	// the file index, size and both times still have to match exactly.
+	const unknownVolume = left.dev === 0n || right.dev === 0n;
+	return ['dev', 'ino', 'size', 'mtimeNs', 'ctimeNs'].every(
+		(key) => (key === 'dev' && unknownVolume) || left[key] === right[key]
+	);
 }
 
 /** Hash an opened regular file and refuse replacement, short read or growth during capture. */
