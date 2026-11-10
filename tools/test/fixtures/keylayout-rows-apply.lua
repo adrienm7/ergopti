@@ -9,8 +9,9 @@
 --- Linux converter's own application of the options. Usage:
 ---   lua keylayout-rows-apply.lua <_shared dir> <file.keylayout> <mac_keycodes.json>
 ---       <convention> <order> <edges> <out.keylayout> <report.json> [<new name>]
---- Also prints the keyboard id of each further argument after the eighth one's
---- name, one per line, when ERGOPTI_KEYBOARD_IDS is set to a "|"-separated list.
+--- Also prints the keyboard id of each name read from stdin, one per line, when
+--- ERGOPTI_KEYBOARD_IDS is "1": stdin carries the exact UTF-8 bytes, which a
+--- Windows environment value does not (the C runtime hands Lua the ANSI page).
 --- Exit status 2 and the reason on stderr when the layout is refused.
 --- ==============================================================================
 
@@ -36,8 +37,8 @@ local function refuse(reason)
 	os.exit(2)
 end
 
-if os.getenv("ERGOPTI_KEYBOARD_IDS") then
-	for name in os.getenv("ERGOPTI_KEYBOARD_IDS"):gmatch("[^|]+") do io.write(Rows.keyboard_id(name), "\n") end
+if os.getenv("ERGOPTI_KEYBOARD_IDS") == "1" then
+	for name in io.read("*a"):gmatch("[^\n]+") do io.write(Rows.keyboard_id(name), "\n") end
 	os.exit(0)
 end
 
