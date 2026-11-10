@@ -833,6 +833,7 @@ return {
 	"tests.unit.modules.gestures.engine.test_touchpad_finder",
 	"tests.unit.modules.gestures.engine.test_gesture_slot_report",
 	"tests.unit.modules.gestures.engine.test_touchpad_record",
+	"tests.unit.modules.gestures.engine.test_touchpad_container_proofs",
 	"tests.unit.platform.remap.test_typing_rollover_catalog",
 	"tests.unit.platform.remap.test_tap_copy_check",
 	"tests.unit.platform.remap.test_tap_copy_linux",
