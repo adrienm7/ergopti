@@ -466,6 +466,20 @@ text. On POSIX a backslash is filename data, the working directory comes from
 native `getcwd` rather than `$PWD`, and the at-rest key falls back to
 `/var/lib/dbus/machine-id`.
 
+### project-linux-gio-hides-pac-failures
+
+GProxyResolverGnome (glib-networking 2.80, libproxy 0.5.4) answers
+`direct://` with no error for a PAC it could not download, and keeps only the
+first entry of a PAC answer (`PROXY a; DIRECT` reaches the driver as `a`
+alone, while libproxy's own `PX_FORCE_CONFIG` path returns both). So a lookup
+error never stands for an unreachable PAC on GNOME: a caller that must tell
+the two apart passes `pac_check_timeout_ms` to `adapters/system_proxy.lua`,
+and the lookup child downloads the GSettings `autoconfig-url` itself and
+reports `pac_unavailable = "native_pac_download"` beside the DIRECT answer.
+A PAC fallback walk cannot reach an entry GIO dropped. Container proofs of
+the managed runtime run as a normal user under `umask 022`: the resolver
+refuses group-writable ancestors and root-owned trees.
+
 ### project-linux-ci-runner-prerequisites
 
 Linux fixtures depend on runner details: Dunst 1.9 history has no urgency field;
