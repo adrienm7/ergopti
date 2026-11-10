@@ -660,7 +660,7 @@
 		},
 		{
 			"id": "linux-compositor-focus-install",
-			"ordinal": 607,
+			"ordinal": 608,
 			"name": "Linux installs, enables once and removes the GNOME Shell extension and KWin script that report the focused window",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-compositor-focus-install.cjs"],
