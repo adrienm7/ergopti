@@ -25,6 +25,16 @@ unit (the service's cgroup would kill it), the token goes through
 back. A tree without the reporter file is only started; the rollback start is
 not watched. Moves are `mv -T -n` plus an existence check, not renameat2.
 
+A `systemctl --user --no-block restart|stop` of the daemon's own unit runs
+inside that unit's cgroup, so systemd's TERM of the cgroup can kill the shell
+and client before they report: the call then read as refused although the job
+ran, which disarmed the update watcher (seen about one run in five under a real
+user manager). Those calls carry `OWN_UNIT_JOB_PREFIX` (`trap '' TERM;`).
+Action: any new command that stops or restarts the daemon's own unit takes the
+prefix. `tests/desktop/run_update_restart_watcher.sh` runs a real
+`systemd --user` in a container by mounting a tmpfs on `/run/systemd` and
+creating `system/` there (sd_booted) in a private mount namespace.
+
 ### project-linux-device-descriptors-are-close-on-exec
 
 `EVIOCGRAB` and a uinput device belong to the open file, not to the daemon: the

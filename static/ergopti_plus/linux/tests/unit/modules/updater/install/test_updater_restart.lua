@@ -31,7 +31,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local ran = {}
 		local cancelled = Restarter.cancel("systemd", { run = function(cmd) ran[#ran + 1] = cmd; return true end })
 		helpers.assert_eq(cancelled, true)
-		helpers.assert_eq(ran, { "systemctl --user --no-block stop ergopti-hotstrings.service" })
+		helpers.assert_eq(ran, { Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop ergopti-hotstrings.service" })
 		local refused, detail = Restarter.cancel("systemd", { run = function() return false end })
 		helpers.assert_eq(refused, false)
 		helpers.assert_contains(detail, "systemctl")
@@ -228,7 +228,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray" },
 			cgroup = UNIT_CGROUP, run = function(cmd) ran[#ran + 1] = cmd; return true end })
 		helpers.assert_eq(how, "systemd")
-		helpers.assert_eq(ran[1], "systemctl --user --no-block restart ergopti-hotstrings.service")
+		helpers.assert_eq(ran[1], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart ergopti-hotstrings.service")
 	end)
 
 	helpers.it("otherwise relaunches the installed launcher once this process has exited", function()
