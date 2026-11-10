@@ -1109,13 +1109,16 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### All drivers
 
-- **Test parity (audit item 14).** Done on 1 November for the `init.lua` gates (boot scenarios), the dedup test,
-  the `managed_http` group and most Linux source invariants (`helpers.read_driver_unit`). Left: whole-tree class scans
-  (legitimate meta tests) and the sliced-source compile tests (archive_output tar feeder).
+- [x] **Test parity (audit item 14), Linux and macOS.** Closed on 10 November (39b12ae7): the tar feeder tests
+      already load `infra.archive_tar_feeder` by module; five more Linux copies resolve their file from the module name
+      (ratchet 7 files, 13 reads); every remaining Linux and macOS pin is documented as legitimate in its ratchet header
+      (layout staging, harness absence check, e2e soak fragment, opener argv, macOS `init.lua` class scans).
 - **Provider flags inferred, not read.** Checked against the docs on 1 November (90344262aa): Featherless and
-  Qianfan confirmed; left: SambaNova toggle unverified (its docs answer 403 to automated reads), Chutes Qwen field
-  inferred; watch Perplexity Sonar chat completions (ended
-  2026-09-27), `dashscope-intl`, Moonshot K2 retiring by December.
+  Qianfan confirmed. Rechecked on 10 November (7ae1147b): the Perplexity, `dashscope-intl` and Moonshot K2 watches
+  are closed and guarded by `test-llm-provider-retirements.cjs`. Left, both only provable with a live key (the docs
+  hosts are unreachable from cloud sessions and show no off example): SambaNova's `enable_thinking: false` (off is
+  its default, docs show only `true`) and the Chutes Qwen `enable_thinking` field; a refusal is dropped and
+  remembered either way.
 - **Tooling found on the way (4 November).** The source seal now reads Git blobs without creating a temporary checkout. On the Windows PC these fail on a clean `dev` for
   environment reasons, so only CI proves them: `test-site-github-release` and the site deploy admission controls
   ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
