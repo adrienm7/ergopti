@@ -105,15 +105,21 @@ local function insert_rows(db, first_id, date)
 		params.device_id, params.id, params.ts, params.date = DEVICE, first_id + index - 1, TS, date
 		script[#script + 1] = Queries.render(entry[1], "cli_json", params)
 	end
+	-- events_clipboard is rendered by the shared clipboard module, outside the catalogue.
+	local clipboard_id = first_id + #rows
+	script[#script + 1] = require("keystats.clipboard_events").insert_sql({ device_id = DEVICE, id = clipboard_id,
+		ts = TS, date = date, kind = "clipboard_paste", app = "kate",
+		meta_json = require("json").encode({ copy_lag_ms = 12, source_app = tricky }) })
 	assert(sqlite(db, table.concat(script, "\n")))
 	-- INSERT OR IGNORE drops a row a CHECK refuses: prove every family landed.
 	local count = assert(sqlite(db, "SELECT (SELECT count(*) FROM events_typing)"
 		.. "+(SELECT count(*) FROM events_app_switch)+(SELECT count(*) FROM events_window_switch)"
 		.. "+(SELECT count(*) FROM events_shortcut)+(SELECT count(*) FROM events_system)"
 		.. "+(SELECT count(*) FROM events_hotstring)+(SELECT count(*) FROM events_session)"
-		.. "+(SELECT count(*) FROM events_llm)+(SELECT count(*) FROM events_roi);"))
-	assert(tonumber(count) == first_id + #rows - 1, "a fixture row was refused by the schema")
-	return first_id + #rows - 1
+		.. "+(SELECT count(*) FROM events_llm)+(SELECT count(*) FROM events_roi)"
+		.. "+(SELECT count(*) FROM events_clipboard);"))
+	assert(tonumber(count) == clipboard_id, "a fixture row was refused by the schema")
+	return clipboard_id
 end
 
 local DUMP = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'events_%' ORDER BY name;"
