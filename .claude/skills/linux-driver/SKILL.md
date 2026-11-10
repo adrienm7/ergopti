@@ -119,9 +119,9 @@ runner cannot answer.
   are tables in the engine, each citing its `.ahk` block. The minimum tap
   duration applies to every tap that waits for its release; Windows checks
   it only for LShift, LCtrl, RShift, CapsLock holding the layer and LAlt
-  holding it with a tap other than Backspace. That difference is known and
-  not yet decided: do not copy either side to the other without the
-  maintainer.
+  holding it with a tap other than Backspace. Decided 2026-11-10: the Linux
+  rule holds on every OS (Windows follows; the ordered-pair policy applies
+  the same minimum to a pair's release-judged tap).
 - **`tap_hold_loader.lua`** lays the user's `tap_hold.toml` over
   `_shared/tap_hold/defaults.toml` key by key and field by field, but only
   when the file says `inherit_defaults = true`; otherwise it starts from no
