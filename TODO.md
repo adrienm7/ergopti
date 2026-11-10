@@ -1009,14 +1009,25 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       previous daemon runs; a Quit during the wait leaves the update installed and nothing restarted.
 - [ ] Layout emulation (2026-11-06): with an AZERTY (fr) XKB layout, choose Keyboard layout > Layout to emulate >
 - [ ] Bundled apps (`wave3/app-cloner-encryptor`): Applications > Encryptor opens a file chooser and writes
-- [ ] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
-      uinput without Tab, and nothing is typed into a password field.
-- [ ] Navigation layer mouse buttons and repeat counts: with `MouseMiddle = "escape"` and the recommended number row,
+- [x] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
+      uinput without Tab, and nothing is typed into a password field. Container proof (2026-11-10):
+      `tests/hardware/run_ai_inline_container.py` (11 assertions, receipt `docs/audits/linux/2026-11-10-container-proofs`) types the inline prediction into
+      mousepad on Xvfb, read back over AT-SPI, with no Tab, and a GTK password field gets no request and no text. The
+      X11 session warms its XTEST keyboard first: a slave switch revokes the layout receipt (item under "Remaining
+      code work").
+- [x] Navigation layer mouse buttons and repeat counts: with `MouseMiddle = "escape"` and the recommended number row,
       a real mouse's middle click under the layer types Escape and never clicks, and `3` then `arrow_up` moves up
-      three lines.
+      three lines. Container proof (2026-11-10): `tests/hardware/run_nav_pointer_container.py` (21 assertions,
+      receipt `docs/audits/linux/2026-11-10-container-proofs`) in mousepad on Xvfb; a leaked click would paste a PRIMARY marker. It found and fixed a stopped
+      daemon: the next device watchdog tick after the layer gave the mouse back refused the source cohort.
 - [ ] Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
       grab, injection and hotplug (30); real kernel capture (93: ordered pairs need Xorg or a compositor on real
-      evdev nodes).
+      evdev nodes). Container pass (2026-11-10): not closable in the cloud container, whose kernel has no uinput or
+      evdev (`mknod /dev/uinput` opens with `ENODEV`) and no systemd PID 1, so a real-node grab, the polkit agent,
+      the user-manager autostart and real kernel capture cannot run there; the grab and injection on a real kernel
+      already run on CI (`run_grab_race.lua`, `run_daemon_live.sh`). The X11 and Wayland halves of the grabbed input
+      path now run on the kernel model (`tests/hardware/run_container_proofs.sh`). Left for a runner with uinput:
+      sway or Xorg reading the daemon's real virtual keyboard (93); wizard (7) and the magic key (30) not attempted.
 - [ ] Gestures: a three-finger pad and one `libinput record` from a real touchpad (d627f511fc, 1870e62e1a,
       `linux/HARDWARE.md` section 13); a two-finger scroll with a thumb resting reports two fingers, a brisk
       three-finger tap still reports `tap_3`.
@@ -1029,7 +1040,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Incremental swipes: on a real touchpad, a three-finger horizontal swipe steps about one action per 3.5 mm (one tab per 25 mm vertically), a reversal steps back, and the log names the pad's resolution; a pad that reports none logs it and fires once.
 - [ ] Gesture axis slots (312bb581): on a real touchpad, with only `swipe_3_horiz` bound, a three-finger swipe
       left and right each run it once; binding `swipe_3_left` too makes the left swipe run that one instead.
-- [ ] Navigation layer wheel bindings with a real mouse (ea4b3fa600).
+- [x] Navigation layer wheel bindings with a real mouse (ea4b3fa600). Container proof (2026-11-10): the wheel phase
+      of `tests/hardware/run_nav_pointer_container.py`: a notch under the layer is the volume key and never scrolls,
+      outside it the mouse is not grabbed (receipt `docs/audits/linux/2026-11-10-container-proofs`).
 - [ ] Wayland desktop changes: on sway, Hyprland and KDE Plasma 6 Wayland, switch workspaces a few times (each at least 1 s apart); Metrics shows the desktop-change count rising by one per switch, and GNOME Wayland still shows « — » with its reason.
 - [ ] Secret service: add a key with the keyring locked, the unlock prompt takes the keyboard under the grab; restart
       and check the plaintext `api_keys.json` migration (e93a4f7368, 939c0f60).
@@ -1047,12 +1060,16 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
       suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
       output reaches the focused window under the grab; only that evidence may turn
-      `keyboard_shortcuts.physical_delivery_available` true.
+      `keyboard_shortcuts.physical_delivery_available` true. Not done in the 2026-11-10 container pass: the kernel
+      model (`tests/hardware/run_container_proofs.sh`) can host this proof, but it first needs a delivery path to
+      qualify behind the getter.
 - [ ] Accented shortcuts: on AZERTY with « é → C » on, Ctrl+é copies in a GTK and a Qt editor, AltGr+é still types
       what the layout gives, and Ctrl+2 (é) stays Ctrl+2 while the number row types digits first.
-- [ ] Tap-hold copy check on Wayland: on KDE or sway with wl-clipboard, a tap-hold copy in an editor sends no retry
+- [x] Tap-hold copy check on Wayland: on KDE or sway with wl-clipboard, a tap-hold copy in an editor sends no retry
       and no warning, and a copy with nothing selected warns once; on GNOME the log says the watch ended and the
-      copy goes unchecked. On X11 with xclip removed, the same copy is checked through libX11.
+      copy goes unchecked. On X11 with xclip removed, the same copy is checked through libX11. Container proof
+      (2026-11-10): `tests/hardware/run_tap_copy_container.py` (23 assertions, receipt `docs/audits/linux/2026-11-10-container-proofs`) on sway headless with
+      mousepad, mutter 46 headless (GNOME's compositor) and Xvfb with xclip hidden.
 - [ ] Some `local_servers.json` servers installed: the detection names them.
 - [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
@@ -1150,6 +1167,14 @@ between workers) green alone. All live checks pass, typed by the harness.
   ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
   `test-linux-field-report-contract` (setup error), `test-menu-manifest` in a worktree (a `node_modules` junction
   copy fails with `EPERM`). Make each one pass locally or skip with a stated reason.
+- [ ] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
+      Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the core keyboard changes (the daemon's
+      virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
+      notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group change, so after one switch
+      `KeyboardLayout.is_ready()` stays false and every replacement takes the clipboard route. Reproduce: drop the XTEST
+      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Decide whether a same-group
+      notify whose canonical keymap is unchanged may renew the inverse (the custody tests pin different-group renewal
+      only); Wayland and macOS have no slave switch.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
