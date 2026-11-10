@@ -779,8 +779,11 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)')
 		helpers.assert_contains(hook, '_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil')
 		-- The frame a report closes is for the metrics; it is neither a press nor a motion.
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot, ev.timestamp_us)')
 		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end')
+		-- Nor is a touch report, which only feeds the tap-to-click count.
+		helpers.assert_contains(source("ergopti_hotstrings.lua"),
+			'if kind_of_event == "contact" then keystats.record_pointer(kind_of_event, code, value, source); return end')
 	end)
 
 	helpers.it("caps word auto-off, the manager maps a native press and motion to their declared kinds", function()

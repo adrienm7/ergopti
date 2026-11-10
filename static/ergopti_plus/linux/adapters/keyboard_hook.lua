@@ -290,7 +290,9 @@ local _on_click = nil
 -- ("motion", axis) for every EV_REL report (a movement or a wheel turn), if
 -- the caller asked for it: CapsWord ends on the pointer kinds it names.
 -- Also called with ("absolute_motion", axis) when a touchpad or tablet reports a
--- coordinate that changed from the previous one of its contact.
+-- coordinate that changed from the previous one of its contact, with
+-- ("contact", code, value) for every EV_ABS report and every BTN_DIGI key edge
+-- of a touch, and with ("frame", code, value, slot, timestamp_us) per SYN_REPORT.
 local _on_pointer_event = nil
 -- Previous coordinates of the absolute pointers, per reader slot.
 local _absolute_motion = require("infra.absolute_motion").new()
@@ -2842,14 +2844,26 @@ local function _dispatch_pointer(ev, slot)
 		if ev.type == InputEvent.EV_REL then
 			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)
 		elseif ev.type == InputEvent.EV_ABS then
+			-- Every touch report, so the metrics can tell a tap-to-click from
+			-- the touch libinput turns into it (pointer_metrics, tap_detector).
+			_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
+			if not _running or _capture_session ~= session then return end
 			if slot ~= nil and _absolute_motion.observe(slot, ev.code, ev.value) then
 				_call_callback("pointer event callback", _on_pointer_event, "absolute_motion", ev.code, ev.value, slot)
 			end
-		elseif pointer_key and ev.value == InputEvent.VALUE_DOWN then
-			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
+		elseif pointer_key then
+			if not InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+				-- A finger landing or lifting (BTN_TOUCH, BTN_TOOL_*), both edges.
+				_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
+				if not _running or _capture_session ~= session then return end
+			end
+			if ev.value == InputEvent.VALUE_DOWN then
+				_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
+			end
 		elseif ev.type == InputEvent.EV_SYN then
 			if ev.code == InputEvent.SYN_REPORT then
-				_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)
+				-- The kernel's stamp times a touchpad tap, as libinput times it.
+				_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot, ev.timestamp_us)
 			elseif ev.code == SYN_DROPPED then
 				_call_callback("pointer event callback", _on_pointer_event, "dropped", ev.code, ev.value, slot)
 			end

@@ -225,6 +225,10 @@ function M.run(options)
 			-- No X11 desktop in the fixture: the Wayland workspace reader is asked,
 			-- and this session has none (its own cases: test_workspace_switcher).
 			return { current_workspace_source = function() record("workspace.source"); return nil, "unsupported" end }
+		elseif name == "modules.keystats.tap_click_sources" then
+			-- The touchpad tap count binds its sources into keystats (its own
+			-- cases: test_keystats_pointer_metrics, test_tap_to_click_setting).
+			return { bind = noop }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then

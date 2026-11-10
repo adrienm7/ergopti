@@ -30,10 +30,10 @@ local function tick() cursor.now = cursor.now + 100; return cursor.now end
 
 --- Wraps an observer so its relative reports move the scripted cursor first.
 local function following(observe)
-	return function(kind, code, value, source)
+	return function(kind, code, value, source, at_us)
 		if kind == "motion" and code == InputEvent.REL_X then cursor.x = cursor.x + value end
 		if kind == "motion" and code == InputEvent.REL_Y then cursor.y = cursor.y + value end
-		return observe(kind, code, value, source)
+		return observe(kind, code, value, source, at_us)
 	end
 end
 
@@ -420,5 +420,171 @@ helpers.describe("pointer metrics: the writer stores the mouse columns", functio
 		writer.close_db()
 		os.execute("rm -rf '" .. dir .. "'")
 		if not ok then error(failure, 0) end
+	end)
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= Touchpad tap-to-click ===================================
+-- =================================================================
+-- =================================================================
+
+local Record = helpers.load_module("tests.support.touchpad_record")
+
+local PAD = "pointer:/dev/input/event7"
+
+--- The recorded trace of tests/fixtures/tap_click_record_synaptics.yml.
+local function tap_trace()
+	local file = assert(io.open(helpers.driver_root() .. "/tests/fixtures/tap_click_record_synaptics.yml", "rb"))
+	local trace = assert(Record.decode(file:read("*a")))
+	file:close()
+	return trace
+end
+
+--- Replays evdev events as the keyboard hook reports them to its observer:
+--- a contact per EV_ABS report and per BTN_DIGI edge, a press per key down,
+--- a frame with the kernel stamp per SYN_REPORT. EV_MSC is not forwarded.
+--- @param observe function (kind, code, value, source, at_us) -> delta|nil
+--- @param events table
+--- @param source string
+--- @return integer clicks The clicks the deltas add up to.
+local function replay_as_hook(observe, events, source)
+	local clicks = 0
+	local function add(delta) if delta then clicks = clicks + delta.clicks end end
+	for _, event in ipairs(events) do
+		if event.type == InputEvent.EV_ABS then
+			add(observe("contact", event.code, event.value, source))
+		elseif event.type == InputEvent.EV_KEY then
+			if not InputEvent.is_pointer_button(event.code) then add(observe("contact", event.code, event.value, source)) end
+			if event.value == 1 then add(observe("press", event.code, event.value, source)) end
+		elseif event.type == InputEvent.EV_SYN and event.code == InputEvent.SYN_REPORT then
+			add(observe("frame", event.code, event.value, source, event.timestamp_us))
+		end
+	end
+	return clicks
+end
+
+--- A tracker whose touchpad answers a scripted setting.
+--- @param setting table|function The setting answer, or a function returning it.
+--- @return table tracker, table calls { describe, read }
+local function pad_tracker(setting)
+	local tracker, calls, now = PointerMetrics.new(), { describe = 0, read = 0 }, { ms = 0 }
+	tracker.bind_touchpads(function(source)
+		calls.describe = calls.describe + 1
+		helpers.assert_eq(source, PAD, "only the touch source is described")
+		return { path = "/dev/input/event7", name = "SYNA8004:00 06CB:CD8B Touchpad", units_x = 12, units_y = 12 }
+	end, function(device)
+		calls.read = calls.read + 1
+		helpers.assert_eq(device.path, "/dev/input/event7")
+		return type(setting) == "function" and setting() or setting
+	end, function() return now.ms end)
+	return tracker, calls, now
+end
+
+local LRM_ON = { known = true, enabled = true, map = "lrm", source = "fixture" }
+
+helpers.describe("pointer metrics: touchpad tap-to-click", function()
+	helpers.it("(tap-click) counts the recorded left and right taps and the button press as clicks", function()
+		local tracker = pad_tracker(LRM_ON)
+		-- Taps of 1, 2, 3, 1, 1, 1 fingers: the middle (three-finger) one is no
+		-- click, as a middle press is none; the clickpad press of H is one.
+		helpers.assert_eq(replay_as_hook(tracker.observe, tap_trace().events, PAD), 6)
+		helpers.assert_eq(tracker.tap_click_availability(), { measured = true })
+	end)
+
+	helpers.it("(tap-click) counts the two-finger tap as no click under the lmr map", function()
+		local lmr = pad_tracker({ known = true, enabled = true, map = "lmr", source = "fixture" })
+		-- lmr: 1 left, 2 middle, 3 right, then four left taps and the press.
+		helpers.assert_eq(replay_as_hook(lmr.observe, tap_trace().events, PAD), 6)
+		local events = {}
+		for _, event in ipairs(tap_trace().events) do
+			-- Section B alone: the two-finger tap, 0.7 s to 1.6 s into the trace.
+			if event.timestamp_us >= 1700000 and event.timestamp_us < 2600000 then events[#events + 1] = event end
+		end
+		helpers.assert_eq(replay_as_hook(pad_tracker(LRM_ON).observe, events, PAD), 1, "a right click under lrm")
+		helpers.assert_eq(replay_as_hook(pad_tracker({ known = true, enabled = true, map = "lmr", source = "fixture" }).observe,
+			events, PAD), 0, "a middle click under lmr")
+	end)
+
+	helpers.it("(tap-click) counts no tap while the desktop has tap-to-click off", function()
+		local tracker = pad_tracker({ known = true, enabled = false, map = "lrm", source = "fixture" })
+		helpers.assert_eq(replay_as_hook(tracker.observe, tap_trace().events, PAD), 1, "the button press only")
+		helpers.assert_eq(tracker.tap_click_availability(), { measured = true })
+	end)
+
+	helpers.it("(tap-click) an unreadable setting counts no tap and says why", function()
+		local tracker = pad_tracker({ known = false, reason = "platform_reason.tap_to_click_setting_unreadable",
+			detail = "fixture" })
+		helpers.assert_eq(replay_as_hook(tracker.observe, tap_trace().events, PAD), 1)
+		helpers.assert_eq(tracker.tap_click_availability(),
+			{ measured = false, reason = "platform_reason.tap_to_click_setting_unreadable" })
+	end)
+
+	helpers.it("(tap-click) reads the setting at the first tap, then only from the tick while the pad is in use", function()
+		local tracker, calls, now = pad_tracker(LRM_ON)
+		tracker.refresh_tap_settings()
+		helpers.assert_eq(calls.read, 0, "an untouched pad is never read")
+		replay_as_hook(tracker.observe, tap_trace().events, PAD)
+		helpers.assert_eq(calls.describe, 1, "the pad is described once")
+		helpers.assert_eq(calls.read, 1, "the input path reads once, at the first tap")
+		now.ms = PointerMetrics.TAP_SETTING_READ_INTERVAL_MS - 1
+		tracker.refresh_tap_settings()
+		helpers.assert_eq(calls.read, 1, "a fresh answer is reused")
+		now.ms = PointerMetrics.TAP_SETTING_READ_INTERVAL_MS
+		tracker.refresh_tap_settings()
+		helpers.assert_eq(calls.read, 2, "a due answer is read again by the tick")
+		now.ms = PointerMetrics.TAP_SETTING_IDLE_MS + 1
+		tracker.refresh_tap_settings()
+		helpers.assert_eq(calls.read, 2, "a pad at rest costs no fork")
+	end)
+
+	helpers.it("(tap-click) a setting turned off between two taps stops the count", function()
+		local answer = LRM_ON
+		local tracker, _, now = pad_tracker(function() return answer end)
+		local trace = tap_trace().events
+		local first, rest = {}, {}
+		for _, event in ipairs(trace) do
+			if event.timestamp_us < 1700000 then first[#first + 1] = event else rest[#rest + 1] = event end
+		end
+		helpers.assert_eq(replay_as_hook(tracker.observe, first, PAD), 1, "tap A")
+		answer = { known = true, enabled = false, map = "lrm", source = "fixture" }
+		now.ms = PointerMetrics.TAP_SETTING_READ_INTERVAL_MS
+		tracker.refresh_tap_settings()
+		helpers.assert_eq(replay_as_hook(tracker.observe, rest, PAD), 1, "only the button press after the change")
+	end)
+
+	helpers.it("(tap-click) a mouse never becomes a pad, and a departed pad is forgotten", function()
+		local tracker, calls = pad_tracker(LRM_ON)
+		tracker.observe("press", EvdevCodes.BTN_LEFT, 1, "pointer:/dev/input/event3")
+		tracker.observe("frame", InputEvent.SYN_REPORT, 0, "pointer:/dev/input/event3", 1000)
+		helpers.assert_eq(calls.describe, 0, "button presses and frames describe nothing")
+		replay_as_hook(tracker.observe, tap_trace().events, PAD)
+		tracker.observe("reset", nil, nil, PAD)
+		replay_as_hook(tracker.observe, tap_trace().events, PAD)
+		helpers.assert_eq(calls.describe, 2, "a reconnected pad is described afresh")
+	end)
+
+	helpers.it("(tap-click) a pad whose frames carry no kernel time counts no tap", function()
+		local tracker = pad_tracker(LRM_ON)
+		local unstamped = {}
+		for _, event in ipairs(tap_trace().events) do
+			unstamped[#unstamped + 1] = { type = event.type, code = event.code, value = event.value }
+		end
+		helpers.assert_eq(replay_as_hook(tracker.observe, unstamped, PAD), 1, "the button press only")
+	end)
+
+	helpers.it("(tap-click) carries the counted taps to the focused application's row", function()
+		local rows = recorded(function(keystats)
+			keystats.bind_touchpads(function()
+				return { path = "/dev/input/event7", name = "pad", units_x = 12, units_y = 12 }
+			end, function() return LRM_ON end, function() return 0 end)
+			keystats.on_app_focus("org.gnome.TextEditor", 1000)
+			replay_as_hook(keystats.record_pointer, tap_trace().events, PAD)
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_clicks, 6)
 	end)
 end)
