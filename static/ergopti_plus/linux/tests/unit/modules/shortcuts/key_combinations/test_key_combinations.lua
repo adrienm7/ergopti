@@ -1525,7 +1525,7 @@ helpers.describe("same-device third slot through original production consumers (
 		with_chord({},function(s)
 			local Engine=require("platform.remap.tap_hold_engine")
 			local Pair=require("platform.remap.key_combination_engine")
-			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},enabled=true,revision=0,
+			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},tap_min_ms=0,enabled=true,revision=0,
 				chords={tab_then_caps_lock="copy"},chord_settings={simultaneous_threshold_ms=100,combo_symmetric=true},
 				capture=function()return function()return true end end,capture_action=function()return function()return true end end,
 				capture_chord=function()return function()return true end end}
