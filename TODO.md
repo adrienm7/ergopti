@@ -1082,6 +1082,18 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **Older findings.** The seven "Remaining findings" of
   [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
   first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
+- **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad titles a window « Notes.txt – Bloc-notes » with
+  an en dash; the matcher read only « - » and never found the window (fixed, `takenote-title-separator`). Left: by
+  default it opens a second file as a tab of the open window, so a same-named note of another folder shares one
+  window with the first, and the module, which binds one window to one path, waits for a window that never comes
+  (`takenote-native-document-owner` mode different-folder fails on the PC, passes on the Server runner's classic
+  Notepad). Tell the two tabs apart (UI Automation tab items) or select the right tab before typing.
+- **Whole AHK suite on the PC (2026-11-10, `fix/windows-pc-2026-11-10`).** 20,286 run, 16 red: 2 token-exchange
+  budgets and 1 shortcut path case (fixed), 2 TakeNote (above). The other 11 need what the CI runner installs
+  and this PC does not have: the Kana layout (`one-shot-native-kana-*`, 2), a top row that types letters, while
+  the PC's first layout is the custom `d001040c` (`layout-row-native-flags`, `layout-row-external-native-flags`,
+  `layout-row-pending-dead-key`, 7), and file symlinks, which need Developer Mode (`unblock-selected-file-reparse`,
+  2). Skip each with its reason when the prerequisite is absent instead of failing.
 
 ### macOS
 
