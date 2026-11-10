@@ -1,0 +1,16 @@
+# Receipt: keep awake against a real logind (2026-11-10)
+# Proof: tests/desktop/run_keep_awake_logind.sh, as root on Ubuntu 24.04 (kernel 6.18.44), base ac832229e2.
+# logind: the distribution's systemd-logind 255 on a private system bus, read through `systemd-inhibit --list`.
+# X11: Xvfb :81 with openbox. Wayland: headless sway 1.9 (WLR_BACKENDS=headless).
+logind: s ""
+session: XDG_SESSION_TYPE=x11 DISPLAY=:81 WAYLAND_DISPLAY=nil
+PASS toggle-off: acquired=true released=true settled=true
+PASS pause: acquired=true released=true settled=true
+PASS quit: acquired=true released=true settled=true
+PASS daemon-sigkill: acquired=true released=true
+session: XDG_SESSION_TYPE=wayland DISPLAY=nil WAYLAND_DISPLAY=wayland-1
+PASS toggle-off: acquired=true released=true settled=true
+PASS pause: acquired=true released=true settled=true
+PASS quit: acquired=true released=true settled=true
+PASS daemon-sigkill: acquired=true released=true
+rc=0
