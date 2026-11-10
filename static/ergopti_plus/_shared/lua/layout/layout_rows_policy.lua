@@ -19,17 +19,20 @@ M.IDS = { "number_row", "top_row", "home_row", "bottom_row" }
 --- the alphanumeric keys that type a character (no layout-independent Send
 --- name) on ISO rows 1 to 4, left to right.
 --- @param registry table Decoded _shared/data/keycodes/physical_keys.json.
---- @param is_null function|nil Tells a decoded JSON null apart (the decoder's own sentinel).
+--- @param is_null function Tells a decoded JSON null apart (the decoder's own sentinel). Required:
+---   a lossless decode keeps `ahk_send: null` as a sentinel, and read as a Send name it removes
+---   every key from its row, so every row switch would be ignored.
 --- @return table Row id -> array of KeyboardEvent.code, left to right.
 function M.keys(registry, is_null)
 	if type(registry) ~= "table" or type(registry.keys) ~= "table" then
 		error("The layout rows need the physical-key registry.")
 	end
+	if type(is_null) ~= "function" then error("The layout rows need the JSON null predicate of the registry's decoder.") end
 	local columns = {}
 	for _, row in ipairs(M.IDS) do columns[row] = {} end
 	for code, key in pairs(registry.keys) do
 		local send = type(key) == "table" and key.ahk_send or nil
-		local character = send == nil or (type(is_null) == "function" and is_null(send)) or send == ""
+		local character = send == nil or is_null(send) or send == ""
 		local iso = type(key) == "table" and type(key.geometry) == "table" and key.geometry.iso or nil
 		if character and key.kind == "key" and key.group == "alphanumeric" and type(iso) == "table"
 			and type(iso.row) == "number" and iso.row >= 1 and iso.row <= #M.IDS then
