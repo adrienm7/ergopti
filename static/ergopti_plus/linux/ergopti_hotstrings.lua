@@ -543,6 +543,17 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			-- Started at boot on GNOME and KDE Wayland only; a no-op elsewhere.
+			name = "compositor focus source",
+			wait_for_ack = true,
+			stop = function()
+				if window_info and type(window_info.stop_compositor_focus) == "function" then
+					return window_info.stop_compositor_focus() == true
+				end
+				return true
+			end,
+		},
+		{
 			-- Started by the tap-hold manager on Wayland only; absent elsewhere.
 			name = "Wayland clipboard watch",
 			stop = function()
@@ -3217,6 +3228,9 @@ local function main()
 	-- The focus poll runs four times a second: on X11 it asks the server inside
 	-- this process (libxcb) instead of forking xdotool twice per poll.
 	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
+	-- On GNOME and KDE Wayland the Shell extension and KWin script push focus
+	-- changes to a resident worker; the poll then reads them from memory.
+	if window_info and type(window_info.start_compositor_focus) == "function" then window_info.start_compositor_focus() end
 	-- Pointer distance and virtual-desktop changes are read from the X server:
 	-- the cursor's screen position (the pixels Windows and macOS store) and the
 	-- EWMH current desktop. Wayland grants no cursor position to a client; its

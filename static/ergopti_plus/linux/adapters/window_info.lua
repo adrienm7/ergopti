@@ -18,11 +18,13 @@
 ---     river and the other wlroots ones) answers through `lswt -j`, whose
 ---     listing marks the activated toplevel.
 ---   - GNOME removed Shell.Eval in 41 and admits its Introspect interface to
----     allow-listed senders only, so only a Shell extension could ask.
----   - KDE answers only a KWin script, which must call back a D-Bus name the
----     daemon would own; COSMIC's own toplevel protocol needs a native Wayland
----     client, and ext-foreign-toplevel-list carries no activation state;
----     Weston exposes nothing. Those stay unknown.
+---     allow-listed senders only, and KDE answers only a loaded KWin script:
+---     the Ergopti Shell extension and KWin script (linux/desktop_focus/) push
+---     every focus change to a session-bus name the daemon owns
+---     (adapters/compositor_focus), read here from memory, without a fork.
+---   - COSMIC's own toplevel protocol needs a native Wayland client, and
+---     ext-foreign-toplevel-list carries no activation state; Weston exposes
+---     nothing. Those stay unknown.
 --- That is a deliberate security posture, not an oversight to work around, and
 --- it is why per-application rules cannot be promised under Wayland. The failure
 --- is honest: an empty appId, logged once, rather than a wrong one.
@@ -69,6 +71,10 @@ local _reported_no_window_list = false
 
 -- The /proc process-name reader getAll() uses; a test seam replaces it.
 local _read_proc_comm = nil
+
+-- The GNOME Shell or KWin focus source, when this session started one
+-- (start_compositor_focus); it then owns the Wayland answer.
+local _compositor_focus = nil
 
 
 
@@ -386,6 +392,22 @@ local function focused_wlr_toplevel()
 	return info, native_identity("wlr-toplevel", focused.identifier, nil), nil
 end
 
+--- Reads the focus GNOME Shell or KWin last pushed to the daemon.
+--- @return table|nil info, string|nil identity, number|nil pid
+local function focused_compositor()
+	local window = _compositor_focus.snapshot()
+	if not window then return nil end
+	local info = empty_info()
+	info.windowTitle = window.title
+	-- The WM class is the desktop's own application identity, as app_id is
+	-- under sway; a window without one is named by its process, read in this
+	-- process (the poll runs four times a second).
+	info.appId = window.class
+	if info.appId == "" and window.pid then info.appId = _read_proc_comm(window.pid) end
+	local server = _compositor_focus.family() == "gnome" and "gnome" or "kwin"
+	return info, native_identity(server, window.id, window.pid), window.pid
+end
+
 -- Each query probes its own client binary first and answers nil without it.
 local WAYLAND_QUERIES = {
 	sway         = focused_sway,
@@ -397,6 +419,10 @@ local WAYLAND_QUERIES = {
 --- Tries every Wayland backend this session might speak.
 --- @return table|nil
 local function focused_wayland()
+	-- A started desktop source is the answer for this session, unknown
+	-- included: falling through would fork the other clients on every poll
+	-- for compositors that are not running. It logs its own unavailability.
+	if _compositor_focus and _compositor_focus.is_active() then return focused_compositor() end
 	for _, name in ipairs(WAYLAND_BACKENDS) do
 		local info, identity, pid = WAYLAND_QUERIES[name]()
 		if info then return info, identity, pid end
@@ -405,9 +431,9 @@ local function focused_wayland()
 	if not _reported_unsupported then
 		_reported_unsupported = true
 		-- Said once, and said plainly: this is a property of the compositor, not a
-		-- bug to file. GNOME removed Shell.Eval in 41 and KDE exposes no
-		-- equivalent, so there is nothing to fall back to and per-application
-		-- rules cannot work here.
+		-- bug to file. COSMIC and Weston offer a client no focus query, so
+		-- there is nothing to fall back to and per-application rules cannot
+		-- work here.
 		Logger.warn(LOG,
 			"No focused-window query on this compositor (%s) — per-application rules "
 				.. "are inactive for this session.",
@@ -452,6 +478,31 @@ function M.use_native_x11()
 		Logger.warn(LOG, "libxcb focus queries unavailable (%s) — X11 focus keeps using xdotool.", tostring(reason))
 	end
 	return bound
+end
+
+--- Starts the GNOME Shell or KWin focus source for this daemon, once. Only a
+--- Wayland GNOME or KDE session has one; elsewhere nothing starts.
+--- @param options table|nil Extra compositor_focus.new options (test seams).
+--- @return boolean started
+function M.start_compositor_focus(options)
+	assert(_compositor_focus == nil, "compositor focus source already started")
+	if not DisplayServer.is_wayland() then return false end
+	local CompositorFocus = require("adapters.compositor_focus")
+	local family = CompositorFocus.desktop_family(DisplayServer.desktop())
+	if not family then return false end
+	local settings = { family = family }
+	for key, value in pairs(options or {}) do settings[key] = value end
+	_compositor_focus = CompositorFocus.new(settings)
+	return _compositor_focus.start()
+end
+
+--- Stops the focus source started by start_compositor_focus().
+--- @return boolean settled
+function M.stop_compositor_focus()
+	if not _compositor_focus then return true end
+	local settled = _compositor_focus.stop()
+	if settled then _compositor_focus = nil end
+	return settled
 end
 
 --- The X server readings the metrics take beside the focus: the cursor
@@ -565,7 +616,8 @@ function M.focused_identity()
 		return nil
 	end
 	if identity == nil and DisplayServer.is_wayland() then
-		-- GNOME and KDE expose no compositor window ID. Their accessible control
+		-- No compositor window ID here (COSMIC, or GNOME and KDE before their
+		-- Ergopti integration reports). The accessible control
 		-- still has an exact native destination; labels never substitute for it.
 		local captured, destination = pcall(function()
 			return require("adapters.user_hotstring_destination").capture_current()
@@ -599,6 +651,7 @@ function M._reset_state()
 	_reported_unsupported = false
 	_reported_no_window_list = false
 	_read_proc_comm = read_proc_comm
+	_compositor_focus = nil
 	_x11_cache.id = nil
 	_x11_cache.title = nil
 	_x11_cache.appId = ""
