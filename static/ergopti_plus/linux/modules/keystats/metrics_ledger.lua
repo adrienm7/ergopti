@@ -67,6 +67,7 @@ M.ROWS_PER_STEP = 500
 M.RAW_STATEMENTS = {
 	"events.typing", "events.app_switch", "events.window_switch", "events.shortcut",
 	"events.system", "events.hotstring", "events.session", "events.llm", "events.network", "events.roi",
+	"events.window_topo", "events.av",
 }
 
 --- Raw tables both Lua drivers render outside the catalogue, with their columns

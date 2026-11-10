@@ -173,8 +173,11 @@ local _pending_shortcut_events = {}
 -- LLM prediction events (generation, suggested, dismissed, accepted), buffered like their
 -- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
 local _pending_llm_events = {}
--- Connectivity transitions (network_metrics), the Windows events_network rows.
-local _pending_network_events = {}
+-- The generic (kind, app, meta) raw families, one buffer each: connectivity
+-- transitions (network_metrics, events_network), window geometry, state and
+-- monitor changes (topology_metrics, events_window_topo) and capture-program
+-- presence (events_av). One table: the main chunk is at LuaJIT's 200-local limit.
+local _raw_pending = { network = {}, window_topo = {}, av = {} }
 -- Clipboard copy, paste and paste-burst rows (keystats.clipboard_events), the
 -- Windows events_clipboard rows, and the one tracker their burst ring lives in.
 local _clipboard = { pending = {}, tracker = nil }
@@ -1578,7 +1581,7 @@ function M.record_network_event(kind, fields)
 	local clock = observe_calendar()
 	local meta = {}
 	for _, name in ipairs(allowed) do meta[name] = fields[name] end
-	_pending_network_events[#_pending_network_events + 1] = {
+	_raw_pending.network[#_raw_pending.network + 1] = {
 		ts = clock.ts, date = clock.date, kind = kind,
 		app = dashboard_app_name(M.last_app() or "unknown"), meta = meta,
 	}
@@ -1611,6 +1614,26 @@ function M.record_clipboard_chord(app_id, action, now_ms, excluded)
 			ts = clock.ts, date = clock.date, kind = row.kind, app = app, meta = row.meta,
 		}
 	end
+end
+
+--- Records one window-topology or capture-presence transition (topology_metrics).
+--- The row carries the focused application, as Windows' Keystats.session_app.
+--- @param kind string One of window_topology.KINDS or capture_presence.KINDS.
+--- @param fields table|nil Metadata; only the kind's own keys are kept.
+function M.record_topology_event(kind, fields)
+	if not may_record() then return end
+	-- The raw family of each kind: events_window_topo or events_av.
+	local family, allowed = "window_topo", require("keystats.window_topology").KINDS[kind]
+	if not allowed then family, allowed = "av", require("keystats.capture_presence").KINDS[kind] end
+	assert(allowed, "not a window-topology or capture-presence kind: " .. tostring(kind))
+	local app = M.last_app() or "unknown"
+	if M.is_unrecorded_app(app) then return end
+	fields = type(fields) == "table" and fields or {}
+	local clock = observe_calendar()
+	local meta = {}
+	for _, name in ipairs(allowed) do meta[name] = fields[name] end
+	local buffer = _raw_pending[family]
+	buffer[#buffer + 1] = { ts = clock.ts, date = clock.date, kind = kind, app = dashboard_app_name(app), meta = meta }
 end
 
 --- Records successful automated output that is not a static hotstring (LLM,
@@ -2731,7 +2754,7 @@ local function capture_flush(close_session)
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, media = {}, network = {}, clipboard = {}, roi = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {}, network = {}, clipboard = {}, window_topo = {}, av = {}, roi = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2741,13 +2764,13 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		network = _pending_network_events, clipboard = _clipboard.pending, roi = Roi.pending,
+		network = _raw_pending.network, clipboard = _clipboard.pending, roi = Roi.pending,
+		window_topo = _raw_pending.window_topo, av = _raw_pending.av,
 		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
-	local _pending_network_events = buffers.network
 	local _pending_clipboard_events = buffers.clipboard
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
@@ -2869,14 +2892,12 @@ local function capture_flush(close_session)
 		_pending_shortcut_events = {}
 	end
 	payload.raw.roi = buffers.roi
-	if #_pending_network_events > 0 then
-		payload.raw.network = _pending_network_events
-		_pending_network_events = {}
-	end
+	payload.raw.network = buffers.network
 	if #_pending_clipboard_events > 0 then
 		payload.raw.clipboard = _pending_clipboard_events
 		_pending_clipboard_events = {}
 	end
+	payload.raw.window_topo, payload.raw.av = buffers.window_topo, buffers.av
 	if #_pending_llm_events > 0 then
 		payload.raw.llm = _pending_llm_events
 		_pending_llm_events = {}
@@ -3218,7 +3239,9 @@ local function restore_flush_buffers(buffers)
 	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
-	_pending_network_events = prepend(buffers.network, _pending_network_events)
+	_raw_pending.network = prepend(buffers.network, _raw_pending.network)
+	_raw_pending.window_topo = prepend(buffers.window_topo, _raw_pending.window_topo)
+	_raw_pending.av = prepend(buffers.av, _raw_pending.av)
 	_clipboard.pending = prepend(buffers.clipboard, _clipboard.pending)
 	-- A reentrant activation can retire text while this source is detached.
 	-- Nil acquisition owns no append: purge before clearing the reservation or
@@ -3259,6 +3282,7 @@ local function dispatch_flush(close_session)
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
 		and #payload.raw.network == 0 and #payload.raw.clipboard == 0 and #payload.raw.roi == 0
+		and #payload.raw.window_topo == 0 and #payload.raw.av == 0
 		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
@@ -3272,7 +3296,7 @@ local function dispatch_flush(close_session)
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
-	_pending_network_events = {}
+	_raw_pending.network, _raw_pending.window_topo, _raw_pending.av = {}, {}, {}
 	_clipboard.pending = {}
 	Roi.pending = {}
 	_pending_window_switch_events = {}
@@ -3485,8 +3509,9 @@ end
 --- Whether fresh capture still needs a durable reset boundary.
 has_reset_input = function()
 	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
-		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_raw_pending.network > 0
 		or #_clipboard.pending > 0 or #Roi.pending > 0
+		or #_raw_pending.window_topo > 0 or #_raw_pending.av > 0
 		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
 		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
 end
@@ -3749,7 +3774,7 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
-		+ #_pending_network_events + #_clipboard.pending + #Roi.pending
+		+ #_raw_pending.network + #_clipboard.pending + #Roi.pending + #_raw_pending.window_topo + #_raw_pending.av
 		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, stream in pairs(_pending_typing_events) do
 		for _, pending in ipairs(stream.runs) do count = count + #pending.events end

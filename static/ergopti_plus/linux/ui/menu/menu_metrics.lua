@@ -73,6 +73,10 @@ local function _availability_rows(k)
 	if ok and type(SystemMetrics.space_change_availability) == "function" then
 		add("menu.metrics.space_changes", SystemMetrics.space_change_availability())
 	end
+	local loaded, TopologyMetrics = pcall(require, "modules.keystats.topology_metrics")
+	if loaded and type(TopologyMetrics.window_topology_availability) == "function" then
+		add("menu.metrics.window_topology", TopologyMetrics.window_topology_availability())
+	end
 	return rows
 end
 
