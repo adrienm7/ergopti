@@ -10,6 +10,22 @@
 adapters and runtime orchestration while consuming shared schemas, constants,
 and generated data. Bypassing the shared source creates silent drift.
 
+### project-the-tap-hold-file-is-one-layout-translated-at-the-boundary
+
+`tap_hold.toml` has one layout on every OS (`_shared/tap_hold/SCHEMA.md`):
+catalogue key ids, `<first>_then_<second>` pairs, seconds, `+`-joined
+modifiers. macOS keeps merging its old Karabiner model in
+`platform/remap/config.lua` and translates only at the file boundary
+(`platform/remap/tap_hold_file.lua`, `_shared/lua/tap_hold/shared_file.lua`):
+a save compares the model it started from with the one it ends with and
+writes only the leaves that differ, so another driver's keys, fields and
+spellings survive. Every writer stamps `[_meta] schema_version`: an unstamped
+file is version 0 and the v0_to_v1 step drops delays equal to the retired
+ones, so a macOS file without the stamp would lose a user's 350 ms on Linux.
+Change the layout in SCHEMA.md, `shared_file.toml` and the corpus
+`_shared/tests/corpus/tap_hold_shared_file/` together; each suite pins its own
+writer's corpus file byte for byte and reads the other's.
+
 ### project-registry-flows-and-healthcheck-bridges-stay-per-driver
 
 The layout registry store, the shortcuts catalogue, the healthcheck report runner
@@ -646,7 +662,7 @@ shared list, and on Windows the block of `tap_hold_roll_keys.ahk`;
 
 The modifier combinations are the Shortcuts group `key_combinations_group`
 with a switch of their own, the only one they follow on every OS. macOS
-persists it as `[mod_combos] enabled` in `config_karabiner.toml`, read only by
+persists it as `[mod_combos] enabled` in the shared `tap_hold.toml`, read only by
 `Generator.key_combinations_enabled`; Windows as `KeyCombinations`, read by
 the pair hotkeys themselves (`KeyCombinationsAreOn`), which no master gate
 rewrites. Absent is on on both, because the sparse writer drops a value equal

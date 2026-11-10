@@ -1016,7 +1016,7 @@ signed installer helper.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 
-`[karabiner] integration_enabled` in `config_karabiner.toml` is read before
+`[karabiner] integration_enabled` in `tap_hold.toml` is read before
 any token, lease worker, or guardian registration, at boot and on toggle. Never
 read the older `[karabiner] enabled`: builds before 2026-09-22 wrote `false`
 there on first launch without asking. The launcher never registers the guardian
@@ -2054,7 +2054,7 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   `immutable=1` so the ingest never meets a lock; an issue counts only when a
   second scan sees it, and damage names the issue line count only; a running
   cache rebuild is held for the scans (`keystats_writes=rebuild_held`). The parsed
-  files are `config.toml`, `config_karabiner.toml`, personal hotstrings and
+  files are `config.toml`, `tap_hold.toml`, personal hotstrings and
   personal info, with the driver's TOML reader. The logs probe file is removed
   at once. `keystats_cache_place` is `caches`, `legacy_left` or
   `outside_caches` (cache under `~/Library/Caches/Ergopti/metrics`, no
