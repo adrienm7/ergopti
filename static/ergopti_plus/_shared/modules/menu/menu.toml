@@ -1421,7 +1421,7 @@ id = "extensions_shortcuts"
 
 # The « Combinaisons de touches » group under Shortcuts. Its first row is its
 # own switch, the only one the combinations follow on every OS: macOS
-# persists it as [mod_combos] enabled in config_karabiner.toml, Windows as
+# persists it as [mod_combos] enabled in tap_hold.toml, Windows as
 # [category_enabled] key_combinations; absent, it is on.
 # Complete per-key menus reuse the head and expose the existing native timing owner.
 [[menu.tap_hold_karabiner_off_rows]]

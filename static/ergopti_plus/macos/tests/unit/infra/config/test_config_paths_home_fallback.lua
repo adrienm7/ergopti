@@ -29,7 +29,7 @@ local PATH_SUFFIXES = {
 	HotstringsDirPath        = "",
 	PersonalHotstringsDir    = "hotstrings/",
 	ConfigTomlPath           = "hammerspoon/config.toml",
-	KarabinerConfigPath      = "hammerspoon/config_karabiner.toml",
+	TapHoldConfigPath      = "hammerspoon/tap_hold.toml",
 	PersonalShortcutsLuaPath = "hammerspoon/personal_shortcuts.lua",
 }
 

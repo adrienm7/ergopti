@@ -39,7 +39,7 @@ local MODULE_NAMES = {
 }
 
 -- Where the doubled path resolver puts the remap settings.
-M.KARABINER_CONFIG_PATH = "/virtual/hammerspoon/config_karabiner.toml"
+M.KARABINER_CONFIG_PATH = "/virtual/hammerspoon/tap_hold.toml"
 -- The configuration folder it resolves, which holds layers.toml.
 M.CONFIG_DIR = "/virtual/"
 
@@ -247,7 +247,7 @@ function M.with_finish(opts, scenario)
 	}
 	package.loaded["infra.config_paths"] = {
 		get = function(key)
-			assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+			assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 			return M.KARABINER_CONFIG_PATH
 		end,
 		get_config_dir = function()

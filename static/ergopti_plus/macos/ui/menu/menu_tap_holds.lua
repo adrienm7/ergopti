@@ -283,7 +283,7 @@ local _scope_generation = 0
 local function run_scope(karabiner, mode, update_menu, scope)
 	scope = scope or ConfigKeys.KEY.TAP_HOLDS
 	_scope_generation = _scope_generation + 1
-	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. "." .. scope .. "-"
+	local backup_path = require("infra.config_paths").get("TapHoldConfigPath") .. "." .. scope .. "-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
 	return run_bulk_menu_command(
 		karabiner,

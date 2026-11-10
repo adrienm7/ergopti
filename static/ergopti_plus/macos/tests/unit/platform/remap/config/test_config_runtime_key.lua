@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Hidden Karabiner Runtime Key
 --- DESCRIPTION:
---- Pins `[karabiner] runtime` of config_karabiner.toml (ADR 011): absent means
+--- Pins `[karabiner] runtime` of tap_hold.toml (ADR 011): absent means
 --- Ergopti's own runtime, `shared` keeps the official application by hand,
 --- anything else refuses the file, and an ordinary save keeps the key the user
 --- wrote by hand and writes none for the default.
@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- @param source string TOML source.
 --- @param body function Receives { config, path, load, read, errors }.
 local function with_file(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim",
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "logger.shim",
 		"toml_codec", "infra.toml.codec" }, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
@@ -58,7 +58,7 @@ helpers.describe("Karabiner runtime key", function()
 	end)
 
 	helpers.it("defaults to owned when there is no karabiner table at all", function()
-		with_file("[tap_holds]\nenabled = true\n", function(f)
+		with_file("[tap_hold]\nenabled = true\n", function(f)
 			local state = f.load()
 			helpers.assert_eq(state.runtime, "owned")
 		end)
@@ -74,7 +74,7 @@ helpers.describe("Karabiner runtime key", function()
 	end)
 
 	helpers.it("writes no runtime key for the default on an ordinary save", function()
-		with_file("[tap_holds]\nenabled = true\n", function(f)
+		with_file("[tap_hold]\nenabled = true\n", function(f)
 			local state = f.load()
 			helpers.assert_true(f.config.save_user_config(state, f.path))
 			helpers.assert_eq(f.read():find("runtime", 1, true), nil)
@@ -112,7 +112,7 @@ helpers.describe("hidden [karabiner] close_other_instances key", function()
 		with_file('[karabiner]\nruntime = "owned"\n', function(f)
 			helpers.assert_eq(f.load().close_other_instances, true)
 		end)
-		with_file("[tap_holds]\nenabled = true\n", function(f)
+		with_file("[tap_hold]\nenabled = true\n", function(f)
 			helpers.assert_eq(f.load().close_other_instances, true)
 		end)
 	end)

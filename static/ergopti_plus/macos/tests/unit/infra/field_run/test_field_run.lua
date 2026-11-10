@@ -926,13 +926,13 @@ helpers.describe("field run: configuration guard", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world()
-			state.restore_outcome = { restored = { "KarabinerConfigPath" }, failed = {}, reload = false }
+			state.restore_outcome = { restored = { "TapHoldConfigPath" }, failed = {}, reload = false }
 			started(FieldRun, state)
 			state.request({ schema = 1, request_id = "r41", steps = Json.array({ "field_lease" }) })
 			state.advance(0)
 			helpers.assert_eq(#state.reloads, 0)
 			helpers.assert_eq(table.concat(state.json(result_path("r41", 2, "config_guard")).codes, ","),
-				"restored_KarabinerConfigPath")
+				"restored_TapHoldConfigPath")
 		end)
 	end)
 
@@ -1109,20 +1109,20 @@ helpers.describe("field run ports: configuration guard", function()
 			local snapshot = ports.config_snapshot()
 			helpers.assert_eq(ports.config_restore(snapshot).restored[1], nil, "an untouched configuration restores nothing")
 			files["/cfg/config.toml"] = "a = 2\n"
-			files["/cfg/KarabinerConfigPath"] = "new"
+			files["/cfg/TapHoldConfigPath"] = "new"
 			settings.llm_backend = "mlx"
 			settings.added = 1
 			local outcome = ports.config_restore(snapshot)
 			helpers.assert_eq(files["/cfg/config.toml"], "a = 1\n")
-			helpers.assert_nil(files["/cfg/KarabinerConfigPath"], "a file the run created is removed")
+			helpers.assert_nil(files["/cfg/TapHoldConfigPath"], "a file the run created is removed")
 			helpers.assert_eq(settings.llm_backend, "ollama")
 			helpers.assert_nil(settings.added, "a preference the run added is removed")
 			helpers.assert_eq(settings.keep, true)
 			helpers.assert_eq(table.concat(outcome.restored, ","),
-				"ConfigTomlPath,KarabinerConfigPath,setting_added,setting_llm_backend")
+				"ConfigTomlPath,TapHoldConfigPath,setting_added,setting_llm_backend")
 			helpers.assert_eq(#outcome.failed, 0)
 			helpers.assert_true(outcome.reload, "config.toml put back under the live preferences needs a reload")
-			files["/cfg/KarabinerConfigPath"] = "regenerated"
+			files["/cfg/TapHoldConfigPath"] = "regenerated"
 			helpers.assert_eq(ports.config_restore(snapshot).reload, false,
 				"a file the driver does not read back into its preferences needs none")
 		end)

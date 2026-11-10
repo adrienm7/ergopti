@@ -180,7 +180,7 @@ helpers.describe("onboarding empty configuration folder", function()
 				local admitted = mode == "success" or mode == "absent"
 				helpers.assert_eq(#evaluations, admitted and 1 or 0)
 				helpers.assert_eq(#errors, admitted and 0 or 1)
-				helpers.assert_eq(remap_paths, admitted and { "/virtual/config_karabiner.toml" } or {})
+				helpers.assert_eq(remap_paths, admitted and { "/virtual/tap_hold.toml" } or {})
 				if admitted then
 					helpers.assert_eq(state.payload.request, 7)
 					helpers.assert_eq(state.payload.values, mode == "success" and { ["hotstrings.enabled"] = true } or {})

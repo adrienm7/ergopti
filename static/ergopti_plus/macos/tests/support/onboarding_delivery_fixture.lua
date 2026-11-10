@@ -22,8 +22,8 @@ local function with_delivery(callback, native_timers)
 			get_config_dir = function() return "/virtual/current/" end,
 			metrics_dir = function(dir) return "<metrics of " .. dir .. ">" end,
 			get = function(key)
-				assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-				return "/virtual/current/hammerspoon/config_karabiner.toml"
+				assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+				return "/virtual/current/hammerspoon/tap_hold.toml"
 			end,
 		}
 		-- The remap owner reports the tap-hold keys beside each config.toml read:
