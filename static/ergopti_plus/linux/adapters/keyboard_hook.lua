@@ -3457,6 +3457,25 @@ local function _all_pointers_open(paths)
 	return true
 end
 
+--- Whether a source member's original custody still holds.
+--- A keyboard's custody is its current input generation. A pointer carries no
+--- input right: its custody is the original descriptor's open lifetime, which
+--- the navigation layer's grab release and a SYN_DROPPED renumber without
+--- replacing (the Reader's same_open). Judged by the generation, a mouse the
+--- layer had given back read as a lost source, and the next watchdog tick
+--- refused the whole cohort and stopped the hook.
+--- @param lease table Original source owner.
+--- @param observer function|nil Its private observer.
+--- @param pointer boolean Whether the member is a pointer.
+--- @return boolean|nil input Native input currency (keyboards only).
+--- @return boolean custody
+function _source_recovery.member_custody(lease, observer, pointer)
+	local input, cleanup, same_open = _input_reader_ports.source_owner_current(lease, observer,
+		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	if pointer then return input, same_open == true end
+	return input, cleanup == true
+end
+
 --- Retains only source leases issued by the construction-captured Reader.
 --- @param tx table Original source transaction.
 --- @param path string Intended device path.
@@ -3475,8 +3494,7 @@ local function _capture_source_member(tx, path, slot_for, keyboard)
 		tx.close_owners[slot], tx.close_observers[slot] = lease, observer
 	end
 	if not exports_current then tx.native_complete = false; return not tx.managed end
-	local input, cleanup = _input_reader_ports.source_owner_current(lease, observer,
-		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	local input, cleanup = _source_recovery.member_custody(lease, observer, slot_for == pointer_slot)
 	if cleanup ~= true or not _input_exports_current() then
 		tx.native_complete = false
 		return not tx.managed
@@ -3513,8 +3531,7 @@ local function _begin_source_transaction()
 			if tx.authority and lease then
 				tx.cleanup[#tx.cleanup + 1] = lease
 				tx.close_owners[slot], tx.close_observers[slot] = lease, observer
-				local input, cleanup = _input_reader_ports.source_owner_current(lease, observer,
-					_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+				local input, cleanup = _source_recovery.member_custody(lease, observer, not keyboard)
 				if cleanup == true then
 					local staged, staged_observers = keyboard and tx.sources or tx.pointers,
 						keyboard and tx.source_observers or tx.pointer_observers
@@ -3606,8 +3623,7 @@ local function _source_existing_current(tx, slot)
 	if not tx.authority then return not tx.managed end
 	local lease, observer = tx.close_owners[slot], tx.close_observers[slot]
 	if not lease then tx.native_complete = false; return not tx.managed end
-	local _, cleanup = _input_reader_ports.source_owner_current(lease, observer,
-		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	local _, cleanup = _source_recovery.member_custody(lease, observer, slot:sub(1, #pointer_slot("")) == pointer_slot(""))
 	if cleanup ~= true then
 		tx.native_complete = false
 		-- Explicit unmanaged raw input keeps compatibility after an authority-port
@@ -3622,11 +3638,10 @@ end
 --- @return boolean current
 local function _source_original_cohort_current(tx)
 	if not _source_transaction_current(tx) then return false end
-	for _, pair in ipairs({ { tx.original_sources, tx.original_source_observers },
-		{ tx.original_pointers, tx.original_pointer_observers } }) do
+	for _, pair in ipairs({ { tx.original_sources, tx.original_source_observers, false },
+		{ tx.original_pointers, tx.original_pointer_observers, true } }) do
 		for slot, lease in pairs(pair[1]) do
-			local _, cleanup = _input_reader_ports.source_owner_current(lease, pair[2][slot],
-				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+			local _, cleanup = _source_recovery.member_custody(lease, pair[2][slot], pair[3])
 			if cleanup ~= true then return false end
 		end
 	end
@@ -3641,8 +3656,7 @@ local function _source_cohort_current(tx)
 	if not tx.native_complete then return not tx.managed end
 	for _, pair in ipairs({ { tx.sources, tx.source_observers, true }, { tx.pointers, tx.pointer_observers, false } }) do
 		for slot, lease in pairs(pair[1]) do
-			local input, cleanup = _input_reader_ports.source_owner_current(lease, pair[2][slot],
-				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+			local input, cleanup = _source_recovery.member_custody(lease, pair[2][slot], not pair[3])
 			if cleanup ~= true or pair[3] and _intercept and input ~= true then return false end
 		end
 	end
