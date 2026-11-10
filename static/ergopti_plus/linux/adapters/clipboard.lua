@@ -112,6 +112,15 @@ local function backend()
 				-- Every MIME type the owner offers, one per line: a borrower
 				-- checks it before replacing formats it could not put back.
 				list_types = string.format("timeout %d wl-paste --list-types 2>/dev/null", IO_TIMEOUT_S),
+				-- wl-paste exits 1 on an empty clipboard and on a failed read
+				-- alike; only its message tells them apart.
+				owned = function()
+					local empty = Shell.exec_checked(string.format(
+						"{ timeout %d wl-paste --list-types 2>&1 >/dev/null; } | grep -qx 'Nothing is copied'",
+						IO_TIMEOUT_S))
+					if empty then return false end
+					return nil
+				end,
 				-- One advertised type's exact bytes, for a multi-format snapshot.
 				read_target = function(target)
 					return string.format("timeout %d wl-paste --no-newline --type %s 2>/dev/null", IO_TIMEOUT_S,
@@ -133,6 +142,8 @@ local function backend()
 				-- The ICCCM TARGETS answer: every target the owner can convert to.
 				list_types = string.format(
 					"timeout %d xclip -selection clipboard -t TARGETS -o 2>/dev/null", IO_TIMEOUT_S),
+				-- xclip exits 1 on an ownerless clipboard and on a failed read alike.
+				owned = function() return (require("adapters.x11_selection_stamp").owned()) end,
 				read_target = function(target)
 					return string.format("timeout %d xclip -selection clipboard -t %s -o 2>/dev/null", IO_TIMEOUT_S,
 						Shell.quote(target))
@@ -283,7 +294,13 @@ end
 --- @return string|nil reason
 local function read_restorable_snapshot(selected_backend)
 	local ok, contents, reason = read_backend_checked(selected_backend)
-	if not ok then return false, nil, reason end
+	if not ok then
+		-- A clipboard nobody owns (nothing copied yet this session, or its owner
+		-- quit) makes xclip and wl-paste fail as a broken read does. It is an
+		-- empty clipboard, restored as one; any other failure still refuses.
+		if selected_backend.owned and selected_backend.owned() == false then return true, { text = "" }, nil end
+		return false, nil, reason
+	end
 	local listed, lost = formats_lost_by_text_restore(selected_backend)
 	if not listed then
 		-- xsel cannot ask for TARGETS: nothing proves the text is all there is.

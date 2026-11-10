@@ -18,7 +18,8 @@
 --- 2. Bounded wait: the owner's answer is awaited for at most the caller's
 ---    timeout, polling without blocking, then the read is "unreadable".
 --- 3. No owner, no stamp: a clipboard nobody owns answers 0, which a later
----    copy moves, as an owner's renewed timestamp does.
+---    copy moves, as an owner's renewed timestamp does. M.owned answers the
+---    owner question alone, for the clipboard borrower.
 --- ==============================================================================
 
 local M = {}
@@ -106,6 +107,22 @@ local function await_stamp(native, display, window, property, timeout_s)
 		waited = waited + POLL_STEP_S
 	end
 	return nil
+end
+
+--- Whether any client owns the CLIPBOARD selection. xclip cannot tell an
+--- ownerless clipboard from a failed read (both exit 1), and an ownerless
+--- clipboard is simply empty.
+--- @return boolean|nil owned
+--- @return string|nil reason "unsupported" without libX11 or a display.
+function M.owned()
+	local native, reason = bind()
+	if not native then return nil, reason end
+	local x11 = native.x11
+	local display = x11.XOpenDisplay(nil)
+	if display == nil then return nil, "unsupported" end
+	local owner = x11.XGetSelectionOwner(display, x11.XInternAtom(display, "CLIPBOARD", 0))
+	x11.XCloseDisplay(display)
+	return owner ~= NONE
 end
 
 --- The CLIPBOARD owner's TIMESTAMP.
