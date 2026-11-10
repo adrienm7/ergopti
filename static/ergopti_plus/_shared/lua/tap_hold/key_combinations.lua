@@ -47,6 +47,10 @@ function M.new(options)
 	end
 	local owner = {}
 	local down, taken, retirement = {}, {}, nil
+	-- Press order: with several first keys held, the one pressed earliest is
+	-- the pair's first key whatever the catalogue order, as on Windows
+	-- (KeyCombinationHeldFirstKey reads the native press ledger).
+	local press_sequence = 0
 	local revision = assert(options.revision, "configuration lease revision required")
 	local generation = assert(options.generation, "physical source generation required")
 	local enabled = options.enabled == true
@@ -92,15 +96,20 @@ function M.new(options)
 		end
 		if down[token] then return { consumed = state ~= nil, effects = effects } end
 		activity(token)
-		local chosen
+		local chosen, chosen_sequence
 		if enabled then
 			for _, pair in ipairs(pairs_by_second[event.key]) do
 				-- Conservative first slice: an ordered pair belongs to one exact
 				-- physical keyboard. Cross-device combinations are not admitted.
-				if down[event.source .. "\0" .. pair.first] and not (event.blocked_first or {})[pair.first] then chosen = pair; break end
+				local first_down = down[event.source .. "\0" .. pair.first]
+				if first_down and not (event.blocked_first or {})[pair.first]
+					and (chosen_sequence == nil or first_down.sequence < chosen_sequence) then
+					chosen, chosen_sequence = pair, first_down.sequence
+				end
 			end
 		end
-		down[token] = { key = event.key, source = event.source, at_ms = event.at_ms }
+		press_sequence = press_sequence + 1
+		down[token] = { key = event.key, source = event.source, at_ms = event.at_ms, sequence = press_sequence }
 		if not chosen then return { consumed = false, effects = effects } end
 		state = { pair = chosen, key = event.key, source = event.source, at_ms = event.at_ms, cancelled = false }
 		taken[token] = state
@@ -123,7 +132,7 @@ function M.new(options)
 	end
 	function owner.ack_retirement(token, settled)
 		if not retirement or retirement.token ~= token or settled ~= true then return false end
-		down, taken, enabled, retirement = {}, {}, false, nil
+		down, taken, enabled, retirement, press_sequence = {}, {}, false, nil, 0
 		return true
 	end
 	return owner
