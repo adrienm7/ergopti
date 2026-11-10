@@ -244,7 +244,8 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		helpers.assert_eq(ctx.state.sections_order_overrides.alpha, { "one", "two" })
 		helpers.assert_eq(saves, 2); helpers.assert_eq(refreshes, 2)
 		helpers.assert_eq(rebuilt_order().menu[4].fn(), true)
-		helpers.assert_nil(ctx.state.sections_order_overrides.alpha)
+		helpers.assert_eq(ctx.state.sections_order_overrides.alpha, {},
+			"a reset empties the order so the save removes it from config.toml")
 		helpers.assert_eq(saves, 3); helpers.assert_eq(refreshes, 3)
 	end)
 

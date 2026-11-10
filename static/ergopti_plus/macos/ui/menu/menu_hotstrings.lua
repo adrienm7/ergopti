@@ -556,7 +556,12 @@ function M.build_groups(ctx, only, counts)
 			local order_rows = SectionOrder.menu(ManifestMenu.template_rows, order, order_labels, function(candidate)
 				if ctx.state.sections_order_overrides ~= saved_orders then return false end
 				local next_orders = TableUtil.shallow_copy(saved_orders or {})
-				next_orders[name] = candidate
+				-- A reset is an empty order, not an absent one: Preferences.save
+				-- keeps every stored order its state does not name (another
+				-- build's categories), and deletes a stored order only when the
+				-- state empties it. An absent key left the old order in
+				-- config.toml, so it came back at the next start.
+				next_orders[name] = candidate or {}
 				ctx.state.sections_order_overrides = next_orders
 				local called, committed = pcall(ctx.save_prefs)
 				if not called or committed ~= true then
