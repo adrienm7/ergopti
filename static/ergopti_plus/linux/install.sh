@@ -1468,6 +1468,15 @@ AUTOSTART
 fi
 
 
+# GNOME and KDE tell a Wayland client nothing about the focused window; the
+# Ergopti Shell extension and KWin script, installed and enabled here for the
+# running desktop, report it to the daemon. launch.sh refreshes them at every
+# start, which is how package installs get them too.
+echo ""
+_section install.section_focus
+bash "${LIB_DIR}/linux/install/compositor_focus.sh" install "${LIB_DIR}/linux" || true
+
+
 # =======================================
 # =======================================
 # ======= 7/ Post-Install Summary =======
