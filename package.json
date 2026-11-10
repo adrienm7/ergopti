@@ -464,6 +464,7 @@
 		"test:opensuse-first-install-tooling": "node ./tools/test/test-opensuse-first-install-tooling.cjs",
 		"test:linux-package-setup": "node ./tools/test/test-linux-package-setup.cjs",
 		"test:linux-start-at-login": "node ./tools/test/test-linux-start-at-login.cjs",
+		"test:linux-compositor-focus-install": "node ./tools/test/test-linux-compositor-focus-install.cjs",
 		"test:linux-uninstall-sandbox": "node ./tools/test/test-linux-uninstall-sandbox.cjs",
 		"test:windows-uninstall": "node ./tools/test/test-windows-uninstall.cjs",
 		"test:linux-tracked-copy": "node ./tools/test/test-linux-tracked-copy.cjs",

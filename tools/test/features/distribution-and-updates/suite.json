@@ -657,6 +657,15 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-report-redact.cjs"],
 			"repro": "npm run test:field-report-redact"
+		},
+		{
+			"id": "linux-compositor-focus-install",
+			"ordinal": 607,
+			"name": "Linux installs, enables once and removes the GNOME Shell extension and KWin script that report the focused window",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-compositor-focus-install.cjs"],
+			"repro": "npm run test:linux-compositor-focus-install",
+			"platforms": ["linux"]
 		}
 	]
 }
