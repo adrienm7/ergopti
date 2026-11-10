@@ -540,6 +540,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-literal-token.cjs"],
 			"repro": "node tools/test/test-prompt-editor-literal-token.cjs"
+		},
+		{
+			"id": "js-llm-provider-retirements",
+			"ordinal": 607,
+			"name": "remote providers keep no retired endpoint or model as a default",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-provider-retirements.cjs"],
+			"repro": "node tools/test/test-llm-provider-retirements.cjs"
 		}
 	]
 }
