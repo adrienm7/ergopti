@@ -32,6 +32,7 @@ OS, `lua/tap_hold`, the keymap areas it reads).
 | THL-001 | LAlt with `tap_action = "tab"` and no hold: press, repeats, J under it               | Generic tap-only block 4.9: Tab at key-down and each repeat (block 4.2 needs a hold layer) | Held the navigation layer; J gave Ctrl+Left   | `lalt-tab-no-hold-is-tap-only`              |
 | THL-002 | LAlt or Tab set to `alt_tab_monitor`, RCtrl set to `tab`, no hold, lone 600 ms press | Strict `KS_WaitReleased(.., TapHoldDuration)`: no tap                                      | Lone tap window (1000 ms): switcher / Tab     | `strict-tap-no-lone-window` (AltGr control) |
 | THL-003 | Pairs `left_shift_then_space` and `caps_lock_then_space`; LShift, CapsLock, Space    | `KeyCombinationHeldFirstKey`: the earliest pressed first key, LShift                       | Catalogue order: CapsLock                     | `pair-first-key-press-order`                |
+| THL-004 | Pair with a hold, second key released after 20 ms                                    | Minimum tap checked (`constants.ahk` `TapHoldOwnImmediateModifier`)                        | The pair's tap ran                            | `pair-tap-minimum`                          |
 | THS-001 | Chord delay and symmetry defaults                                                    | Manifest `mod_combos` (100, false)                                                         | macOS reads `[hs_timeouts]`, an unpinned copy | `chord-defaults-single-source`              |
 
 ## Decisions pending (behaviour left unchanged)
@@ -41,11 +42,11 @@ OS, `lua/tap_hold`, the keymap areas it reads).
   again; Linux lifts the first key's layer around the action and restores it;
   macOS (`lcmd_caps` and the other combination rules) leaves `layer_active`
   set. Three behaviours, no recorded contract.
-- **THD-2, timing of a pair's own tap.** Windows times a pair whose hold is a
-  modifier through `TapHoldOwnImmediateModifier` (lone tap window and the
-  minimum tap); the shared policy uses the strict threshold and no minimum.
-  This touches the minimum tap duration difference, which the maintainer has
-  not decided.
+- **THD-2, timing of a pair's own tap (minimum decided 2026-11-10).** The
+  minimum tap now bounds a pair's release-judged tap on Linux (THL-004,
+  regression `pair-tap-minimum`), as it does on Windows. Still open: Windows
+  also gives such a pair the lone tap window, the shared policy the strict
+  threshold.
 - **THD-3, activity under a pair whose hold is the layer.** Windows
   `TapHoldOwnImmediateLayer` does not cancel the tap when a layer key was struck
   under it (probably a Windows defect); the shared policy cancels it.
@@ -56,6 +57,16 @@ OS, `lua/tap_hold`, the keymap areas it reads).
   pending PAR-17 preset decision (`defaults.toml` header).
 
 ## Remaining work
+
+- **macOS, minimum tap (decided 2026-11-10, not implemented):** every tap that
+  waits for its release must respect `tap_hold.tap_min_duration_ms`. The
+  generated rules use `to_if_alone`, which has a maximum
+  (`basic.to_if_alone_timeout_milliseconds`) and no minimum, and Karabiner
+  does not re-process its own output, so a delayed-action variable cannot
+  gate the tap; it needs a new mechanism qualified on a Mac
+  (`_shared/lua/tap_hold/lone_tap.lua` point 3 records the limit).
+- **Windows (maintainer's change):** extend the minimum tap beyond LShift,
+  LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
 
 - **Linux:** RCtrl as the one-shot Shift held while LAlt (tap Tab, no hold) is
   struck: Windows `SC11D & SC038` types Shift+Tab, Linux a plain Tab. With a
