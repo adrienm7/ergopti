@@ -199,6 +199,24 @@ end
 ---   have are omitted.
 function M.retired_delays_for_platform(defaults, platform)
 	local catalog = M.for_platform(defaults, platform)
+	local declared = M.retired_delays(defaults)
+	local result = {}
+	for _, entry in ipairs(catalog) do
+		if declared[entry.key] ~= nil then result[entry.id] = declared[entry.key] end
+	end
+	return result
+end
+
+--- The per-key delays the shared defaults used to ship, under the catalogue
+--- ids: the ids of the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md).
+--- @param defaults table Decoded shared tap-hold defaults.
+--- @return table retired Catalogue key id -> seconds.
+function M.retired_delays(defaults)
+	if type(defaults) ~= "table" or type(defaults.tap_hold) ~= "table" or type(defaults.tap_hold.catalog) ~= "table"
+		or type(defaults.tap_hold.catalog.keys) ~= "table" then
+		error("the shared tap-hold defaults declare no [tap_hold.catalog] keys", 0)
+	end
+	validate(defaults.tap_hold.catalog.keys)
 	local declared = defaults.tap_hold.retired_delays
 	if type(declared) ~= "table" then error("the shared tap-hold defaults declare no [tap_hold.retired_delays]", 0) end
 	local known = {}
@@ -211,9 +229,7 @@ function M.retired_delays_for_platform(defaults, platform)
 		end
 	end
 	local result = {}
-	for _, entry in ipairs(catalog) do
-		if declared[entry.key] ~= nil then result[entry.id] = declared[entry.key] end
-	end
+	for id, seconds in pairs(declared) do result[id] = seconds end
 	return result
 end
 

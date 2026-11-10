@@ -45,6 +45,11 @@
 # owner (TOML_BuildConfigDocumentCandidate), which also edits a dotted or inline
 # spelling where it is.
 # The corpus _shared/tests/corpus/tap_hold_migrations/ pins the semantics.
+#
+# Section 2 is not a version step: it names the files a driver kept its
+# tap-hold settings in before the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md)
+# and how each is carried over, once. The Windows reader of this registry reads
+# [registry] and [steps] only.
 
 [registry]
 current_version = 1
@@ -68,3 +73,26 @@ ops = [
 	{ op = "drop_retired_values", section = "tap_hold.keys", key = "time_activation_seconds", retired = "tap_hold.retired_delays", unless = { section = "tap_hold", key = "explicit_delays", value = true } },
 	{ op = "delete", section = "tap_hold", key = "explicit_delays" },
 ]
+
+
+
+
+
+# =======================================
+# =======================================
+# ======= 2. Old files, read once =======
+# =======================================
+# =======================================
+
+# [legacy_imports.<driver column>]: the old file beside the driver's
+# tap_hold.toml, the closed translation that turns it into the shared layout,
+# and the suffix the old file is renamed with once its content is published in
+# tap_hold.toml (kept, never deleted: it is the user's backup). A driver imports
+# only while its tap_hold.toml does not exist yet, so the import runs once; with
+# both files present the shared one wins and the old one is left alone.
+#   translate = "karabiner": macOS config_karabiner.toml, through
+#   _shared/lua/tap_hold/shared_file.lua (from_karabiner).
+[legacy_imports.hs]
+source = "config_karabiner.toml"
+translate = "karabiner"
+retired_suffix = ".migrated"
