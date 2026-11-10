@@ -949,6 +949,7 @@ M.checks = {
 	idle_cost = Session.idle_cost,
 	fifo_safety = Session.fifo_safety,
 	slow_lines = Session.slow_lines,
+	log_signals = require("infra.field_check_log_signals").log_signals,
 	pac_fallback = PacFallback.pac_fallback,
 	apple_shortcuts = require("infra.field_check_apple_shortcuts").apple_shortcuts,
 	tap_hold_thresholds = require("infra.field_check_tap_hold_thresholds").tap_hold_thresholds,
