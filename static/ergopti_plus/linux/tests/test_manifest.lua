@@ -429,6 +429,7 @@ return {
 	"tests.unit.modules.hotstrings.injector.test_injector_output_observer",
 	"tests.unit.modules.hotstrings.injector.test_injection_diagnostic_output_owner",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key",
+	"tests.unit.platform.remap.tap_hold.test_key_combination_first_key_order",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_loader",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_obsolete_shapes",
