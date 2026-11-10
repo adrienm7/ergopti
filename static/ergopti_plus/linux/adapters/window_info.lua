@@ -506,12 +506,14 @@ function M.stop_compositor_focus()
 end
 
 --- The X server readings the metrics take beside the focus: the cursor
---- position (pointer distance in screen pixels) and the EWMH current desktop.
---- Only a native X11 session answers them; under Wayland a client reads neither.
---- @return table sources { pointer = function|nil, desktop = function|nil }
+--- position (pointer distance in screen pixels), the EWMH current desktop and
+--- the focused window's geometry, state and monitor (window topology).
+--- Only a native X11 session answers them; under Wayland a client reads none.
+--- @return table sources { pointer = function|nil, desktop = function|nil, topology = function|nil }
 function M.metrics_sources()
 	if not DisplayServer.is_x11() or not X11Focus.has_transport() then return {} end
-	return { pointer = X11Focus.pointer_position, desktop = X11Focus.current_desktop }
+	return { pointer = X11Focus.pointer_position, desktop = X11Focus.current_desktop,
+		topology = X11Focus.active_topology }
 end
 
 --- Returns the identity of the currently focused window.
