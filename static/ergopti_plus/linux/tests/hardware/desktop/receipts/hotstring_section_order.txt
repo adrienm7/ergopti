@@ -1,0 +1,31 @@
+# static/ergopti_plus/linux/tests/hardware/desktop/receipts/hotstring_section_order.txt
+#
+# Container proof receipt (maintainer decision 2026-11-10: a container proof
+# closes a Linux check).
+# Command: bash static/ergopti_plus/linux/tests/hardware/desktop/run_hotstring_section_order.sh
+# Run: 2026-11-10, base origin/dev 1d5fe5941e, Ubuntu 24.04.5 LTS container.
+# Packages: xvfb 2:21.1.12-1ubuntu1.9; openbox 3.6.1-12build5; luajit 2.1.0+git20231223.c525bcb+dfsg-1ubuntu0.1; lua-lgi 0.9.2-3build2; libayatana-appindicator3-1 0.5.93-1build3; python3-gi 3.48.2-1
+# Exit status: 0
+# Scope: the real catalogue, menu builder, rebuild owner and libayatana tray,
+# clicked over D-Bus by tray_panel.py; "restart" is a new tray process on the
+# same config.toml. The daemon process itself refuses to start without an evdev
+# keyboard (this container has no /dev/input and no uinput module).
+
+=== hotstring section order through the tray (display :71) ===
+  PASS the panel switches the hotstrings on and opens the Autocorrection submenu
+  catalogue order: names|abbreviations|technical_terms
+  PASS the submenu lists the catalogue's own order
+  PASS Ordre des sections > abbreviations > Monter is clicked
+  PASS the rebuilt menu moves abbreviations above names at once (abbreviations|names|technical_terms)
+  PASS config.toml keeps hotstrings.order_overrides.autocorrection = abbreviations|names|technical_terms
+  PASS a restarted tray process opens the moved section's own rows
+  PASS after the restart the first section's Monter is greyed and Descendre is offered (false|true)
+  PASS the restarted tray draws the saved order (abbreviations|names|technical_terms)
+  PASS Ordre des sections > Revenir au défaut is clicked
+  PASS the reset removes the override and redraws the catalogue order (none; names|abbreviations|technical_terms)
+  PASS a second move is saved before the stale-menu case
+  PASS the menu built before the external edit is clicked
+  PASS config.toml still holds the external edit, byte for byte
+  PASS the stale move was not written (abbreviations|names|technical_terms)
+  PASS the tray log names the refusal
+=== every check held ===
