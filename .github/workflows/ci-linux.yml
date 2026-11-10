@@ -3200,6 +3200,26 @@ jobs:
           fi
         timeout-minutes: 4
 
+      # GNOME Shell and KWin report the focused window to a session-bus name the
+      # daemon's worker owns; this runs that worker on a real dbus-daemon, the
+      # test standing in for the Shell (admission, refusals, single owner).
+      - name: The compositor focus worker admits only the desktop on a real session bus
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          timeout 60 dbus-run-session -- luajit tests/hardware/run_compositor_focus_bus.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 2
+
       - name: Install prerequisites for The owned dialog host shows its captions and answers on a real display
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |

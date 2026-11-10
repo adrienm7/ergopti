@@ -1025,6 +1025,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "The compositor focus worker admits only the desktop on a real session bus",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for The owned dialog host shows its captions and answers on a real display",
 			"protocol": 9
 		},
