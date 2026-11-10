@@ -649,6 +649,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-build-scripts-bash32.cjs"],
 			"repro": "npm run test:macos-build-scripts-bash32"
+		},
+		{
+			"id": "js-field-report-redact",
+			"ordinal": 606,
+			"name": "a field report names neither the user nor the machine: every collector redacts its folder before the commit and the pre-commit hook refuses an added line naming this machine",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-report-redact.cjs"],
+			"repro": "npm run test:field-report-redact"
 		}
 	]
 }

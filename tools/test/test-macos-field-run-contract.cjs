@@ -43,6 +43,7 @@ const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
 // The logs are scrubbed of typed text before they reach the pushed branch.
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
+const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The app's own crash reports are summarized without paths or user data.
 const IPS_SUMMARY = 'tools/dev/field-ips-summary.py';
@@ -125,6 +126,7 @@ function fixture(name, { onDev = false } = {}) {
 		PRIVACY_PANES,
 		FIELD_GIT,
 		LOG_SCRUB,
+		REPORT_REDACT,
 		COLLISIONS,
 		IPS_SUMMARY,
 		BUNDLED_SAMPLE,

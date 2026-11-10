@@ -30,6 +30,9 @@
 #    it holds are gitignored.
 # 6. The analysis is tools/dev/field-log-analyse.py, the one analyser of the
 #    three collectors: it reads only the scrubbed copies in the report folder.
+# 7. The branch is public: before the commit, every file of the report folder
+#    loses the home folder, the login (with its directory domain), the host
+#    name, the full name and any e-mail address, or the commit is refused.
 #
 # Sourced only; defines functions and runs nothing. Bash 3.2 compatible: the
 # macOS collector runs under the system bash.
@@ -121,10 +124,16 @@ field_report_analyse() {
 	return 0
 }
 
-# Commits the report folder alone, then pushes unless push=false.
+# Commits the report folder alone, then pushes unless push=false. The folder
+# is redacted first (tools/dev/field-report-redact.py): the step outputs are
+# raw command output, and `ls -la` or `lsof` name the account that owns a file,
+# a company directory login with its domain included. Nothing is committed
+# when the redaction cannot prove the folder clean.
 # $1: commit subject.
 field_report_commit() {
 	local subject="$1"
+	python3 "${REPO_ROOT}/tools/dev/field-report-redact.py" "${out}" \
+		|| fail "${out} still names this machine or its user; nothing was committed."
 	log "Collected into ${out}:"
 	ls -1 "${out}" | sed 's/^/  /'
 	git add -f -- "${out}" || fail "git add of ${out} failed."

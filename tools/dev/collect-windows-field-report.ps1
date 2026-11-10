@@ -15,7 +15,9 @@
 # gitignored, so they are added with `git add -f`; the logger already masks
 # secrets, the home folder, e-mail addresses and personal names, and the branch is
 # public, so only copies scrubbed of typed text by tools/dev/field-log-scrub.py
-# leave the PC and the digests read those copies. The personal hotstrings file
+# leave the PC and the digests read those copies. The whole folder then goes
+# through tools/dev/field-report-redact.py before the commit, which is refused
+# when a trace of the user or the PC remains. The personal hotstrings file
 # never travels: tools/dev/hotstring-collisions.py reports which of its triggers
 # share a bundled one. The facts have the profile folder and the user name
 # replaced, and the proxy facts say only whether a proxy or a PAC file is set,
@@ -560,6 +562,13 @@ function Complete-Report {
 	if ($script:Interrupted) { $Subject = "$Subject (interrupted)" }
 	Log "Collected into ${OutRelative}:"
 	Get-ChildItem -LiteralPath $script:Out | ForEach-Object { [Console]::Out.WriteLine("  $($_.Name)") }
+	# The branch is public and Hide-User only knows the profile folder and the
+	# account name: the shared redaction also removes the domain, the host name,
+	# the full name and any e-mail address, and refuses a folder it cannot clean.
+	if (-not $script:Python) { Fail "No Python interpreter runs on this PC: $OutRelative cannot be redacted, nothing was committed." }
+	$ErrorActionPreference = 'Continue'
+	& $script:Python (Join-Path $DevTools 'field-report-redact.py') $script:Out
+	if ($LASTEXITCODE -ne 0) { Fail "$OutRelative still names this PC or its user; nothing was committed." }
 	if (-not (Invoke-Git add '-f' $OutRelative)) { Fail "git add of $OutRelative failed." }
 	if (-not (Invoke-Git commit '-q' '-m' $Subject $OutRelative)) { Fail 'git commit failed.' }
 	if ($NoPush) {

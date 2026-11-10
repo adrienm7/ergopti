@@ -43,6 +43,7 @@ const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
 const IDENTIFIERS_JSON = 'static/ergopti_plus/_shared/data/identifiers.json';
 const APP_DIRS = 'static/ergopti_plus/_shared/lua/app_dirs.lua';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
+const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 const SHELL_CHECKS = 'tools/dev/linux-field-shell-checks.sh';
 const FIELD_RUN = 'tools/dev/linux-field-run.sh';
@@ -137,6 +138,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		FIELD_GIT,
 		IDENTIFIERS,
 		LOG_SCRUB,
+		REPORT_REDACT,
 		COLLISIONS,
 		BUNDLED_SAMPLE,
 		SHELL_CHECKS,

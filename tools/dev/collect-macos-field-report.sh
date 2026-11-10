@@ -11,7 +11,9 @@
 # docs/field-reports/, then commits and pushes the branch. The logs are
 # gitignored, so they are added with `git add -f`; the logger already masks
 # secrets, the home folder, e-mail addresses and personal names, and the
-# summary lists every file it adds.
+# summary lists every file it adds. The step outputs are raw command output, so
+# the whole folder goes through tools/dev/field-report-redact.py before the
+# commit, which is refused when a trace of the user or the Mac remains.
 #
 # The field run: the collector opens the developer app of this clone when it
 # is not running (tools/dev/run-macos-dev-app.sh, which builds it first when

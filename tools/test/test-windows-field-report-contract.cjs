@@ -39,6 +39,7 @@ const SCRIPT = 'tools/dev/collect-windows-field-report.ps1';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.json';
 const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
+const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
@@ -363,6 +364,7 @@ function fixture(name, start = 'dev') {
 		IDENTIFIERS,
 		APP_DIRS,
 		LOG_SCRUB,
+		REPORT_REDACT,
 		COLLISIONS,
 		BUNDLED_SAMPLE,
 		ANALYSER,

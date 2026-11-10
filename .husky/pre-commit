@@ -44,6 +44,15 @@ if [ -n "$STAGED_LUA_TESTS" ]; then
     fi
 fi
 
+# Identity — refuse any added line that holds this machine's home folder,
+# directory login with its domain, domain or host name, whatever the file:
+# field report evidence once published a company login this way. The values
+# are read from the machine at commit time; the repository holds none.
+# The first Python that runs: python3 is a Store stub on a Windows without it.
+IDENTITY_PYTHON=python3
+python3 -c '' 2>/dev/null || IDENTITY_PYTHON=python
+"$IDENTITY_PYTHON" tools/dev/field-report-redact.py --staged || exit 1
+
 # Formatting — Prettier and Ruff rewrite the staged files they own and
 # re-stage them, so every commit carries formatted bytes; CI's check then
 # never finds a diff. A staged file with unstaged changes is refused.

@@ -182,6 +182,7 @@
 		"test:macos-field-run-contract": "node ./tools/test/test-macos-field-run-contract.cjs",
 		"test:linux-field-report-contract": "node ./tools/test/test-linux-field-report-contract.cjs",
 		"test:field-log-scrub": "node ./tools/test/test-field-log-scrub.cjs",
+		"test:field-report-redact": "node ./tools/test/test-field-report-redact.cjs",
 		"test:field-log-analyse": "node ./tools/test/test-field-log-analyse.cjs",
 		"test:field-run-protocol": "node ./tools/test/test-field-run-protocol.cjs",
 		"test:feature-requirements": "node ./tools/test/test-feature-requirements.cjs",

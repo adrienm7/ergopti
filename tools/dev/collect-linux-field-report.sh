@@ -16,6 +16,8 @@
 # logger already masks secrets, the home folder, e-mail addresses and personal
 # names, and the branch is public, so only copies scrubbed of typed text by
 # tools/dev/field-log-scrub.py leave the machine and the digests read those copies.
+# The whole folder then goes through tools/dev/field-report-redact.py before the
+# commit, which is refused when a trace of the user or the machine remains.
 # The personal hotstrings file never travels: tools/dev/hotstring-collisions.py
 # reports which of its triggers share a bundled one. The facts below have the home
 # folder and the user name replaced.
