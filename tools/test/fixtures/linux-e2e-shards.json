@@ -131,6 +131,8 @@
 			"Qualify the Go proxy sign-in relay",
 			"Install prerequisites for Qualify the installed managed Ollama route plan",
 			"Qualify the installed managed Ollama route plan",
+			"Qualify the owned Ollama start and PAC-unreachable pull",
+			"Qualify the local server detection",
 			"Qualify native retained FD SHA-256",
 			"Install prerequisites for Prepare authenticated managed HTTP validation tools",
 			"Prepare authenticated managed HTTP validation tools",
@@ -373,6 +375,12 @@
 			"Install prerequisites for Qualify native managed network runtime"
 		],
 		"Qualify the installed managed Ollama route plan": [
+			"Install prerequisites for Qualify the installed managed Ollama route plan"
+		],
+		"Qualify the owned Ollama start and PAC-unreachable pull": [
+			"Install prerequisites for Qualify the installed managed Ollama route plan"
+		],
+		"Qualify the local server detection": [
 			"Install prerequisites for Qualify the installed managed Ollama route plan"
 		],
 		"Qualify native runtime prerequisites": [
