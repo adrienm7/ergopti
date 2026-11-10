@@ -826,6 +826,27 @@ if (
 		errors.push('Linux symmetry may not borrow another platform default');
 }
 
+// macOS reads the chord delay and symmetry from defaults.toml [hs_timeouts]
+// (macos/platform/remap/defaults.lua), Windows and Linux from the manifest's
+// mod_combos records: two copies of one default, pinned here so they cannot
+// drift (chord-defaults-single-source).
+{
+	const hsTimeouts = TOML.parse(read(DEFAULTS)).hs_timeouts || {};
+	const record = (id) =>
+		manifest.feature_records.find((item) => item.section_path === 'mod_combos' && item.id === id);
+	for (const [macKey, manifestId] of [
+		['simultaneous_threshold_ms', 'simultaneous_threshold_ms'],
+		['combo_symmetric', 'symmetric']
+	]) {
+		const declared = record(manifestId);
+		if (!declared || hsTimeouts[macKey] === undefined || hsTimeouts[macKey] !== declared.default)
+			errors.push(
+				`chord default ${macKey}: defaults.toml [hs_timeouts] has ${hsTimeouts[macKey]}, ` +
+					`manifest mod_combos.${manifestId} has ${declared && declared.default}`
+			);
+	}
+}
+
 // ==========================
 // ==========================
 // ======= 5/ Verdict =======
