@@ -40,6 +40,7 @@ local KcBridge       = require("modules.keystats.kc_bridge")
 local AccountingMode = require("modules.keystats.physical_accounting_mode")
 local Timestamp      = require("modules.keystats.timestamp")
 local PrivacyContext = require("modules.keystats.privacy_context")
+local ClipboardTelemetry = require("modules.keystats.clipboard_telemetry")
 -- The WPM formula lives once, in the shared metrics module. This file used to
 -- divide by a literal 5 in two places while _shared/lua/keystats/metrics.lua
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
@@ -703,6 +704,15 @@ local function build_shortcut_key(event_obj, flags, keycode)
 	return table.concat(parts, "+")
 end
 
+--- Clears the copy provenance when a refused key-down is a copy chord: its app
+--- must not reach a later recorded paste (modules/keystats/clipboard_telemetry).
+--- @param event_obj table The raw hs.eventtap event object.
+--- @param evt_type number The event type.
+local function refuse_clipboard_chord(event_obj, evt_type)
+	if evt_type ~= hs.eventtap.event.types.keyDown then return end
+	ClipboardTelemetry.refuse(event_obj:getCharacters(true), event_obj:getFlags() or {})
+end
+
 --- Returns the foreground application name already maintained by ContextTracker.
 --- Native application queries can cross process boundaries and therefore cannot
 --- run in the eventtap callback.
@@ -853,6 +863,7 @@ local function handle_key(event_obj)
 		and _script_control.is_paused()
 		then
 			discard_roi_word()
+			refuse_clipboard_chord(event_obj, evt_type)
 			-- Observed physical releases retire their old hold even while telemetry
 			-- is paused. A new paused press has no usable timestamp: retain only
 			-- its crossing-release marker until that exact key releases.
@@ -878,6 +889,7 @@ local function handle_key(event_obj)
 		-- expansions this branch would have refused.
 		if not M.context_allows_logging() then
 			discard_roi_word()
+			refuse_clipboard_chord(event_obj, evt_type)
 			-- Retain observed per-key release state, never an excluded duration.
 			if evt_type == hs.eventtap.event.types.flagsChanged then
 				local keycode = event_obj:getKeyCode()
@@ -992,6 +1004,10 @@ local function handle_key(event_obj)
 				build_shortcut_key(event_obj, flags, keycode),
 				current_cached_app_name()
 			)
+			local clipboard_action = ClipboardTelemetry.action(event_obj:getCharacters(true), flags)
+			if clipboard_action then
+				ClipboardTelemetry.record(clipboard_action, current_cached_app_name(), now, LogManager.log_clipboard_event)
+			end
 			return
 		end
 
@@ -2228,6 +2244,13 @@ local function teardown_runtime(opts)
 				if type(observer.stop) ~= "function" then return false end
 				if observer:stop() == false then return false end
 				if CoreState.ax_observer == observer then CoreState.ax_observer = nil end
+				return true
+			end,
+		},
+		{
+			name = "clipboard-telemetry",
+			run = function()
+				ClipboardTelemetry.reset()
 				return true
 			end,
 		},

@@ -987,6 +987,24 @@ function M.log_shortcut(shortcut_key, app_name)
 	})
 end
 
+--- Queues one events_clipboard row (modules/keystats/clipboard_telemetry);
+--- only the kind's own metadata keys are kept, never clipboard content.
+--- @param kind string One of keystats.clipboard_events KINDS.
+--- @param app_name string Foreground application name.
+--- @param meta table The kind's metadata.
+--- @return boolean|nil accepted
+function M.log_clipboard_event(kind, app_name, meta)
+	if not _require_state("log_clipboard_event") then return end
+	local fields = require("keystats.clipboard_events").KINDS[kind]
+	assert(fields and type(meta) == "table", "not an events_clipboard row: " .. tostring(kind))
+	local entry = {
+		type = kind,
+		app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown",
+	}
+	for _, name in ipairs(fields) do entry[name] = meta[name] end
+	return M.append_log(entry)
+end
+
 function M.log_modifier_press(keycode, app_name)
 	if not _require_state("log_modifier_press") then return end
 	M.append_log({ type = "system_event", action = "modifier_press", keycode = keycode, app = app_name })
@@ -1933,6 +1951,7 @@ local function _persist_recovery_state(db, cursor)
 		.. " UNION ALL SELECT id FROM events_hotstring WHERE device_id=" .. _sq(_device_id)
 		.. " UNION ALL SELECT id FROM events_llm WHERE device_id=" .. _sq(_device_id)
 		.. " UNION ALL SELECT id FROM events_session WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_clipboard WHERE device_id=" .. _sq(_device_id)
 		.. ")") do
 		max_id = tonumber(row.max_id) or 0
 	end
