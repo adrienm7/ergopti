@@ -12,8 +12,15 @@
 #   broken   the new tree's bin/ launcher exits at once: the tree moves to
 #            <root>.failed-<pid>, <root>.old is back and the previous daemon
 #            runs (the elapsed time is printed);
-#   quit     the restart is cancelled by a Quit: the update stays installed
-#            and nothing is restarted.
+#   quit     the user quits the UPDATED daemon during the watcher's wait,
+#            before its ready report, through the real infra/quit_request.lua
+#            handler: the update stays installed and no daemon is started.
+#
+# Why the Quit is in the updated daemon: once the old daemon asks for the
+# restart, a relay restart has already requested its shutdown (a later Quit
+# there is refused, an exit owns the process) and under the unit systemd TERMs
+# it as soon as the job runs. The watcher's 60 s wait is the new daemon's boot,
+# whose tray is up before its ready report: that is where a user can quit.
 #
 # systemd --user refuses to start unless /run/systemd/system exists (sd_booted).
 # This container did not boot systemd, so the script re-executes itself in a
@@ -40,7 +47,7 @@ mkdir -p /run/systemd/system
 
 S="$(mktemp -d)"
 export HOME="${S}/home" XDG_RUNTIME_DIR="${S}/runtime" TMPDIR="${S}/tmp"
-# The daemon's configuration folder exists in any install: a relay Quit writes its marker there.
+# The daemon's configuration folder exists in any install: the relay's cancellation marker lives there.
 mkdir -p "${HOME}/.config/ergopti" "${HOME}/.config/systemd/user" "${XDG_RUNTIME_DIR}" "${TMPDIR}" "${S}/opt"
 chmod 700 "${XDG_RUNTIME_DIR}"
 ROOT="${S}/opt/ergopti"
@@ -56,7 +63,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# A tree: kind "daemon" runs a generation, kind "broken" exits at once.
+# A tree: kind "daemon" runs a generation, "quit" one quit before ready, "broken" exits at once.
 make_tree() {
 	local dir="$1" name="$2" kind="$3"
 	mkdir -p "${dir}/bin" "${dir}/linux/infra"
@@ -70,7 +77,7 @@ make_tree() {
 			cd '${DRIVER}' || exit 1
 			LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 			export LUA_PATH
-			exec luajit tests/desktop/update_watch_daemon.lua '${name}' '${ROOT}' '${RUNS}' '${LOG}'
+			exec luajit tests/desktop/update_watch_daemon.lua '${name}' '${ROOT}' '${RUNS}' '${LOG}' '${kind}'
 		LAUNCHER
 	fi
 	chmod +x "${dir}/bin/ergopti"
@@ -147,6 +154,9 @@ scenario() {
 		kill -USR1 "${old_pid}"
 		check "the restarter took the ${mode} route" "wait_for 10 'grep -qx \"restart ${mode}\" \"${RUNS}\"'"
 		check "the new tree moved to <root>.failed-<pid>" "wait_for 75 'ls -d \"${ROOT}\".failed-* >/dev/null 2>&1'"
+		local failed
+		failed="$(basename "$(ls -d "${ROOT}".failed-* 2>/dev/null | head -n 1)")"
+		check "its name ends in the watcher's pid (${failed})" "[[ '${failed}' =~ \\.failed-[0-9]+\$ ]]"
 		echo "  info rollback after $((SECONDS - started)) s"
 		# The watcher waits 600 ticks of `sleep 0.1` (60 s plus each tick's fork), then stops
 		# the daemon (up to 5 s in relay mode) and moves the trees: allow 4 s past the wait.
@@ -156,13 +166,16 @@ scenario() {
 		check "the watch log names the failure" "grep -q 'did not start (no boot report): the previous installation is back' \"${LOG}\""
 		;;
 	quit)
-		install_new daemon
-		kill -USR2 "${old_pid}"
+		install_new quit
+		local started=${SECONDS}
+		kill -USR1 "${old_pid}"
 		check "the restarter took the ${mode} route" "wait_for 10 'grep -qx \"restart ${mode}\" \"${RUNS}\"'"
-		check "the Quit cancelled the restart" "wait_for 10 'grep -qx \"cancel true nil\" \"${RUNS}\"'"
-		check "the previous daemon exited" "wait_for 10 '! kill -0 ${old_pid} 2>/dev/null'"
+		check "the updated daemon started under the watcher" "wait_for 20 '[ -n \"\$(pid_of new)\" ]'"
+		check "its tray Quit was admitted by infra/quit_request.lua" "wait_for 10 'grep -qx \"quit true\" \"${RUNS}\" && grep -qx \"shutdown tray quit\" \"${RUNS}\"'"
+		check "the watch log reads « quit before it reported ready »" "wait_for 20 'grep -q \"quit before it reported ready: the update stays installed\" \"${LOG}\"'"
+		echo "  info watcher settled $((SECONDS - started)) s after the restart"
 		sleep 3
-		check "nothing was restarted" "[ -z \"\$(pid_of new)\" ] && [ \"\$(count_of old)\" = 1 ] && ! pgrep -f update_watch_daemon.lua >/dev/null"
+		check "no daemon was started again" "[ \"\$(count_of old)\" = 1 ] && [ \"\$(count_of new)\" = 1 ] && ! pgrep -f update_watch_daemon.lua >/dev/null"
 		check "no update watcher is left" "! pgrep -f 'update-watch' >/dev/null"
 		check "the update stays installed" "[ \"\$(cat \"${ROOT}/tree\")\" = new ] && ! ls -d \"${ROOT}\".failed-* >/dev/null 2>&1"
 		if [ "${mode}" = systemd ]; then
