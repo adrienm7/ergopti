@@ -175,6 +175,9 @@ local _pending_shortcut_events = {}
 local _pending_llm_events = {}
 -- Connectivity transitions (network_metrics), the Windows events_network rows.
 local _pending_network_events = {}
+-- Clipboard copy, paste and paste-burst rows (keystats.clipboard_events), the
+-- Windows events_clipboard rows, and the one tracker their burst ring lives in.
+local _clipboard = { pending = {}, tracker = nil }
 local _pending_app_switch_events = {}
 -- Window title changes, written to events_window_switch as Windows and macOS do:
 -- the dashboard's per-application context shifts read them.
@@ -1581,6 +1584,35 @@ function M.record_network_event(kind, fields)
 	}
 end
 
+--- Records one physical copy or paste chord forwarded to the focused
+--- application (keystats.clipboard_events), with the burst it completes. A copy
+--- refused by a filter clears the copy provenance a later paste would carry.
+--- @param app_id string Focused application identifier.
+--- @param action string "copy" or "paste" (ClipboardEvents.classify_chord).
+--- @param now_ms number Monotonic milliseconds.
+--- @param excluded boolean|nil The daemon's own gate (script pause, privacy
+---   admission, secure field) refused the chord's context.
+function M.record_clipboard_chord(app_id, action, now_ms, excluded)
+	assert(action == "copy" or action == "paste", "not a clipboard chord: " .. tostring(action))
+	assert(type(now_ms) == "number", "a clipboard chord needs its time")
+	local ClipboardEvents = require("keystats.clipboard_events")
+	_clipboard.tracker = _clipboard.tracker
+		or ClipboardEvents.new({ window_ms = Timings.ms("keystats", "paste_burst_window_ms") })
+	if excluded == true or not may_record() or type(app_id) ~= "string" or app_id == ""
+		or M.is_unrecorded_app(app_id) then
+		if action == "copy" then _clipboard.tracker.invalidate() end
+		return
+	end
+	local app = dashboard_app_name(app_id)
+	local rows = action == "copy" and _clipboard.tracker.copy(now_ms, app) or _clipboard.tracker.paste(now_ms, app)
+	local clock = observe_calendar()
+	for _, row in ipairs(rows) do
+		_clipboard.pending[#_clipboard.pending + 1] = {
+			ts = clock.ts, date = clock.date, kind = row.kind, app = app, meta = row.meta,
+		}
+	end
+end
+
 --- Records successful automated output that is not a static hotstring (LLM,
 --- clipboard expansion, etc.) in the same portable event format. It is called
 --- only after the producer confirms success, so cancelled streamed output never
@@ -2627,8 +2659,11 @@ local copy_flush_value = TableUtil.deep_copy
 
 -- The numeric cursor fields an open-walk record keeps, in their fixed order.
 -- No typed text: the open word and sequence are not persisted.
-local OPEN_SESSION_FIELDS = { "char_count", "total_ms" }
-local OPEN_BURST_FIELDS = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" }
+-- One table, not two locals: this chunk is at LuaJIT's 200-local limit.
+local OPEN_WALK_FIELDS = {
+	session = { "char_count", "total_ms" },
+	burst = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" },
+}
 
 --- Encodes the sessions and bursts the walk contexts hold open, canonically, so
 --- an unchanged state encodes to the same text and causes no write.
@@ -2649,8 +2684,8 @@ local function encode_open_walk(contexts)
 		local session, burst = ctx.current_session, ctx.current_burst
 		if type(ctx.date) == "string" and type(ctx.app) == "string" and (session or burst) then
 			records[#records + 1] = { date = ctx.date, app = ctx.app, text = "{\"date\":" .. Json.encode(ctx.date)
-				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(session, OPEN_SESSION_FIELDS)
-				.. ",\"burst\":" .. cursor(burst, OPEN_BURST_FIELDS) .. "}" }
+				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(session, OPEN_WALK_FIELDS.session)
+				.. ",\"burst\":" .. cursor(burst, OPEN_WALK_FIELDS.burst) .. "}" }
 		end
 	end
 	table.sort(records, function(a, b) return a.date < b.date or (a.date == b.date and a.app < b.app) end)
@@ -2681,8 +2716,8 @@ decode_open_walk = function(encoded)
 	for index, record in ipairs(records) do
 		if type(record) ~= "table" or type(record.date) ~= "string"
 			or not record.date:match("^%d%d%d%d%-%d%d%-%d%d$") or type(record.app) ~= "string" then return nil end
-		local session_ok, session = cursor(record.session, OPEN_SESSION_FIELDS)
-		local burst_ok, burst = cursor(record.burst, OPEN_BURST_FIELDS)
+		local session_ok, session = cursor(record.session, OPEN_WALK_FIELDS.session)
+		local burst_ok, burst = cursor(record.burst, OPEN_WALK_FIELDS.burst)
 		if not session_ok or not burst_ok then return nil end
 		contexts[index] = { date = record.date, app = record.app, current_session = session, current_burst = burst }
 	end
@@ -2696,7 +2731,7 @@ local function capture_flush(close_session)
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, media = {}, network = {}, roi = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {}, network = {}, clipboard = {}, roi = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2706,13 +2741,14 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		network = _pending_network_events, roi = Roi.pending,
+		network = _pending_network_events, clipboard = _clipboard.pending, roi = Roi.pending,
 		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
 	local _pending_network_events = buffers.network
+	local _pending_clipboard_events = buffers.clipboard
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
@@ -2836,6 +2872,10 @@ local function capture_flush(close_session)
 	if #_pending_network_events > 0 then
 		payload.raw.network = _pending_network_events
 		_pending_network_events = {}
+	end
+	if #_pending_clipboard_events > 0 then
+		payload.raw.clipboard = _pending_clipboard_events
+		_pending_clipboard_events = {}
 	end
 	if #_pending_llm_events > 0 then
 		payload.raw.llm = _pending_llm_events
@@ -3179,6 +3219,7 @@ local function restore_flush_buffers(buffers)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
 	_pending_network_events = prepend(buffers.network, _pending_network_events)
+	_clipboard.pending = prepend(buffers.clipboard, _clipboard.pending)
 	-- A reentrant activation can retire text while this source is detached.
 	-- Nil acquisition owns no append: purge before clearing the reservation or
 	-- a subsequent known-OFF observation would resurrect the revoked source.
@@ -3217,7 +3258,7 @@ local function dispatch_flush(close_session)
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
-		and #payload.raw.network == 0 and #payload.raw.roi == 0
+		and #payload.raw.network == 0 and #payload.raw.clipboard == 0 and #payload.raw.roi == 0
 		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
@@ -3232,6 +3273,7 @@ local function dispatch_flush(close_session)
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
 	_pending_network_events = {}
+	_clipboard.pending = {}
 	Roi.pending = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
@@ -3443,7 +3485,8 @@ end
 --- Whether fresh capture still needs a durable reset boundary.
 has_reset_input = function()
 	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
-		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0 or #Roi.pending > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0
+		or #_clipboard.pending > 0 or #Roi.pending > 0
 		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
 		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
 end
@@ -3706,7 +3749,7 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
-		+ #_pending_network_events + #Roi.pending
+		+ #_pending_network_events + #_clipboard.pending + #Roi.pending
 		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, stream in pairs(_pending_typing_events) do
 		for _, pending in ipairs(stream.runs) do count = count + #pending.events end

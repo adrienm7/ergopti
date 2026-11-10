@@ -2205,6 +2205,31 @@ local function main()
 		Logger.debug(LOG, "Control key '%s' — buffer %s.", key_name, effect)
 	end
 	local on_control = input_capture_gate.guard(handle_control)
+	-- Copy and paste chords the application receives, for events_clipboard
+	-- (keystats.clipboard_events). The driver's own injected chords come from
+	-- its virtual device, which the hook never reads, so only the user's count.
+	local function observe_clipboard_chord(key_name, detail)
+		local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+		local key = key_name
+		if key_name == "shortcut" then key = keyboard_shortcuts.collision_identity(detail.key) end
+		-- Required here, not at the top: main() is at LuaJIT's 60-upvalue limit.
+		local action = require("keystats.clipboard_events").classify_chord(key, {
+			primary = mods.ctrl == true, shift = mods.shift == true, alt = mods.alt == true,
+			other = mods.meta == true or mods.altgr == true,
+		})
+		if not action then return end
+		local excluded = script_actions.is_paused()
+			or (physical_privacy_admission ~= nil and not physical_privacy_admission.allowed)
+			or secure_focus_guard.blocks_text() == true or input_capture_gate.blocks_text() == true
+		keystats.record_clipboard_chord(_cached_app_id or "Unknown", action, math.floor(Monotonic.now_ms()), excluded)
+	end
+	do
+		local guarded_control = on_control
+		on_control = function(key_name, detail)
+			observe_clipboard_chord(key_name, detail)
+			return guarded_control(key_name, detail)
+		end
+	end
 
 	-- 8.7b) A pointer click moves the caret.
 	--

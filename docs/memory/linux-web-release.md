@@ -52,7 +52,11 @@ ioctl; changes to this handoff must account for reports on both sides.
 `adapters/keyboard_hook.lua`'s main chunk is
 at LuaJIT's 200-local ceiling ("main function has more than 200 local
 variables" at load): new hook state goes into an existing table such as
-`LayerPointer`, never into new top-level locals.
+`LayerPointer`, never into new top-level locals. The same holds for
+`modules/keystats/keystats.lua` (raw-event buffers join a table such as
+`_clipboard`), and `ergopti_hotstrings.lua`'s `main` is at the 60-upvalue
+ceiling: a new top-level local it reads breaks the load, so `require` inside
+the closure instead.
 
 ### project-linux-touchpad-gestures-share-the-touches-with-the-desktop
 
