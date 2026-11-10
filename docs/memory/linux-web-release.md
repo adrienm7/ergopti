@@ -281,6 +281,35 @@ delimiter rows. A switched-off feature notice is error-level by design
 flags it unless the step names the notice it causes. A refused write through a
 read-only folder needs a non-root user: report it as SKIP under root.
 
+### project-linux-tray-submenus-fill-on-activate-not-show
+
+`platform/tray/appindicator.lua` builds a submenu's rows only when it is
+opened. libdbusmenu-gtk 0.4 turns a client's `AboutToShow` on a parent row
+into that GtkMenuItem's `activate`, and rows added in the handler are in the
+next `GetLayout`. The submenu GtkMenu's `show` is useless as a trigger: the
+indicator shows every submenu when the menu is set; a native popup (XEmbed
+fallback) maps it instead. An empty GtkMenu is published as a plain row and
+`AboutToShow` on it is ignored, so an unopened submenu holds one hidden
+placeholder. `gtk_widget_show_all` recurses into submenus: never call it on a
+menu. `gtk_check_menu_item_set_active` emits `activate`, so a changed check on
+a parent row must block that row's open handler. Action: prove tray changes
+with `tests/hardware/sni_host.py` (`--expect-lazy`, `--toggle-label`), which
+opens submenus as a panel does.
+
+### project-linux-file-manager-folder-needs-the-window-own-bus
+
+The folder of a file manager window is read only where the window publishes
+its own owner: Nautilus's GtkApplicationWindow sets `_GTK_UNIQUE_BUS_NAME`
+and `_GTK_WINDOW_OBJECT_PATH`, and its FileManager1 `OpenWindowsWithLocations`
+is keyed by that path. Query the unique name, not `org.freedesktop.FileManager1`
+(Thunar or Dolphin may own it). The list holds every tab in tab order and the
+active tab is not published (the `go-to-tab` action state stays 0), so tabs on
+different folders are ambiguous. Thunar's D-Bus methods only take
+caller-supplied folders and Dolphin's MainWindow only says whether a URL is open
+in some tab. Action: keep `adapters/file_manager_folder.lua` refusing every
+other owner, and prove a new file manager with
+`tests/hardware/run_file_manager_folder.sh`.
+
 ## Linux native boundaries
 
 ### project-linux-absence-needs-enoent
