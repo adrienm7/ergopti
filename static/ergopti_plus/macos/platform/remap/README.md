@@ -50,9 +50,9 @@ reuses for its own file.
   own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
   the capture port (`adapters/runtime_capture_port.lua` over
   `adapters/installed_physical_source.lua`). The artifact comes from
-  `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.5`, the
+  `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.6`, the
   hosted `runtime-artifact` job's digest, published under the prerelease
-  `remap-runtime-v16.3.0-ergopti.5` and written by the `apply` command of
+  `remap-runtime-v16.3.0-ergopti.6` and written by the `apply` command of
   `tools/build/remap_runtime_publish.py`; `runtime_artifact_fetch.lua`
   downloads and verifies it into
   `~/Library/Application Support/Ergopti/RemapRuntime/` on the first
