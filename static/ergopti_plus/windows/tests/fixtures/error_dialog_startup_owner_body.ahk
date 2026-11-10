@@ -378,8 +378,23 @@ _EDOS_Main() {
 		Warm := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
 		_EDOS_Phase("after shared environment warm await")
 		_EDOS_Require(Warm == _EDOS.Environment, "Only the genuine shared helper may publish the passive environment.")
+		; An ERROR emitted while an interrupted background flush still owns the
+		; queue reaches the errors file only when that flush resumes, so the
+		; report could snapshot before the file existed and read the ring. The
+		; source error is emitted once no flush is in flight, under Critical so
+		; no timer tick can start one between the check and the emission.
+		Started := A_TickCount
+		loop {
+			Critical("On")
+			if LoggerFlushSettled()
+				break
+			Critical("Off")
+			_EDOS_Require(TickElapsed64(Started) < 3000, "The logger must settle before the source error.")
+			Sleep(10)
+		}
 		_EDOS_Phase("before LoggerError A")
-		LoggerError("EDStartupA", "Controlled source error A")
+		try LoggerError("EDStartupA", "Controlled source error A")
+		finally Critical("Off")
 		_EDOS_Phase("after LoggerError A")
 		Started := A_TickCount
 		; Main cannot resume from the presenter's interrupt until its Open stack
