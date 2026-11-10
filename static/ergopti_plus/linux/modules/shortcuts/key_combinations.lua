@@ -13,6 +13,7 @@ local Features = require("infra.manifest_reader")
 local ModuleSource = require("module_source_identity")
 local ModuleDirectory = require("module_source_directory")
 local ConfigKeys = require("config_keys")
+local Timings = require("infra.timings")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
@@ -252,6 +253,7 @@ function M.new(options)
 	end
 	function owner.engine_options(thresholds)
 		local configured = { keys = clone(key_ids), taps = clone(state.taps), holds = clone(state.holds), thresholds = clone(thresholds),
+			tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 			chords = state.chord_enabled and clone(state.chords) or nil, chord_settings = state.chord_settings and clone(state.chord_settings) or nil, capture_chord = owner.capture_chord,
 			enabled = state.enabled and lease == nil and options.is_paused() == false, revision = generation, capture = owner.capture_runtime, capture_action = owner.capture_action }
 		-- Only this actual config-reading owner issues pending settings. A copied
