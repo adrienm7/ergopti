@@ -295,6 +295,58 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		helpers.assert_eq(sent(home[1]), "home nav_repeat_count=1", "but its send spends the count")
 	end)
 
+	helpers.it("(layer-repeat-count-macos) replays 3 then arrow_up as three moves, then one, then none kept", function()
+		-- The Mac check « Navigation layer repeat count » (TODO, To confirm on the
+		-- Mac) replayed with Karabiner's matching: the first manipulator of the key
+		-- whose variable conditions hold fires, and its set_variable events apply in
+		-- order. Entering the layer resets the count to 1 (generator test
+		-- « entering the layer resets the count only when the layer binds one »),
+		-- which is what makes a release after `3` forget the count.
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit3" = "repeat_count:3"\n"KeyI" = "arrow_up"\n'), ctx.registry, "ansi")
+		local arrows = on_key(rule, "i")
+		local plain = arrows[#arrows]
+		helpers.assert_nil(required(plain, "nav_repeat_count"), "the last arrow manipulator is the plain send")
+		local entered = {}
+		for _, condition in ipairs(plain.conditions) do
+			if condition.type == "variable_if" then entered[condition.name] = condition.value end
+		end
+		local vars
+		local function enter_layer()
+			vars = {}
+			for name, value in pairs(entered) do vars[name] = value end
+			vars.nav_repeat_count = 1
+		end
+		local function matches(manipulator)
+			for _, condition in ipairs(manipulator.conditions or {}) do
+				local value = vars[condition.name] or 0
+				if condition.type == "variable_if" and value ~= condition.value then return false end
+				if condition.type == "variable_unless" and value == condition.value then return false end
+			end
+			return true
+		end
+		local function press(key_code)
+			for _, manipulator in ipairs(on_key(rule, key_code)) do
+				if matches(manipulator) then
+					local keys = {}
+					for _, event in ipairs(manipulator.to) do
+						if event.key_code then keys[#keys + 1] = event.key_code end
+						if event.set_variable then vars[event.set_variable.name] = event.set_variable.value end
+					end
+					return table.concat(keys, " ")
+				end
+			end
+			return nil
+		end
+		enter_layer()
+		helpers.assert_eq(press("3"), "", "the count key types nothing")
+		helpers.assert_eq(press("i"), "up_arrow up_arrow up_arrow", "3 then arrow_up moves up three lines")
+		helpers.assert_eq(press("i"), "up_arrow", "the next arrow_up moves one line")
+		helpers.assert_eq(press("3"), "")
+		enter_layer()
+		helpers.assert_eq(press("i"), "up_arrow", "a count typed before the layer was released is forgotten")
+	end)
+
 	helpers.it("(layer-repeat-count-macos) a layer without a count generates exactly what it did before", function()
 		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
 			.. '"KeyK" = "arrow_left"\n'), ctx.registry, "ansi")

@@ -64,4 +64,29 @@ helpers.describe("keystats WPM activity", function()
 		helpers.assert_eq(#fixture.keystats.get_live_stats().source_holds, 0, "restart cannot revive old colour")
 		helpers.assert_true(fixture.keystats.stop())
 	end)
+	helpers.it("(wpm-source-parity) the user's metrics pause retires held sources", function()
+		-- The Mac check « WPM … pause/restart removes old holds » (TODO, To confirm
+		-- on the Mac): the metrics pause of the menu, not only a session reset or a
+		-- stop, must leave no source colour to paint once collection resumes.
+		local fixture = fixtures.load_keystats()
+		fixture.hs.caffeinate = { watcher = { new = function()
+			return { start = function(self) return self end, stop = function(self) return self end }
+		end } }
+		fixture.start()
+		local now = 10000
+		fixture.hs.timer.absoluteTime = function() return now * 1000000 end
+		package.loaded["modules.keystats.log_manager"].append_log = function() return true end
+		-- The fixture's context tracker carries no foreground interval to close.
+		local tracker = package.loaded["modules.keystats.context_tracker"]
+		tracker.suspend_collection_context = function() end
+		tracker.resume_collection_context = function() end
+		helpers.assert_true(fixture.keystats.notify_synthetic("AI", "llm", 0, "stream"))
+		helpers.assert_true(fixture.keystats.notify_synthetic("correct", "hotstring", 0, "autocorrection"))
+		helpers.assert_true(#fixture.keystats.get_live_stats().source_holds > 0, "two sources are held before the pause")
+		fixture.keystats.suspend_collection()
+		helpers.assert_eq(#fixture.keystats.get_live_stats().source_holds, 0, "the pause retires held sources")
+		fixture.keystats.resume_collection()
+		helpers.assert_eq(#fixture.keystats.get_live_stats().source_holds, 0, "resuming cannot revive old colour")
+		helpers.assert_true(fixture.keystats.stop())
+	end)
 end)
