@@ -857,6 +857,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 	writer_active = function() return require("infra.scope_registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
+	report_update_quit = function() require("infra.updater_boot_ready").report_quit("the tray Quit") end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
 	end,
@@ -2931,7 +2932,13 @@ local function main()
 				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))
 			end
 			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
-				function() shutdown.request("degraded tray quit") end)
+				function()
+					-- A failed watcher report never keeps the daemon from quitting.
+					if not pcall(require("infra.updater_boot_ready").report_quit, "the degraded tray Quit") then
+						Logger.error(LOG, "The update watcher could not be told of the Quit.")
+					end
+					shutdown.request("degraded tray quit")
+				end)
 		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but the tray adapter could not load.")

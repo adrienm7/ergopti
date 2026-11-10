@@ -20,7 +20,7 @@ require("test.quit_admission_contract")(helpers)
 --- @param state table Mutable facts: requested, reload, writer, publication, abandon_fails.
 --- @return function on_quit, table calls
 local function build(state)
-	local calls = { layout = 0, requests = {}, abandons = 0, timers = {}, notices = {}, clock = 0 }
+	local calls = { layout = 0, requests = {}, abandons = 0, timers = {}, notices = {}, clock = 0, order = {} }
 	local on_quit = QuitRequest.new({
 		shutdown = {
 			is_requested = function() return state.requested == true end,
@@ -28,6 +28,7 @@ local function build(state)
 				if state.requested then return false end
 				state.requested = true
 				calls.requests[#calls.requests + 1] = reason
+				calls.order[#calls.order + 1] = "shutdown"
 				return true
 			end,
 		},
@@ -41,6 +42,10 @@ local function build(state)
 		end,
 		writer_active = function() return state.writer == true end,
 		publication_pending = function() return state.publication == true end,
+		report_update_quit = function()
+			calls.order[#calls.order + 1] = "update watcher"
+			if state.report_throws then error("controlled watcher report failure") end
+		end,
 		apply_pause_layout = function() calls.layout = calls.layout + 1; if state.layout_throws then error("controlled layout failure") end end,
 		schedule = function(_, callback) calls.timers[#calls.timers + 1] = callback; return true end,
 		now = function() return calls.clock end,
@@ -51,7 +56,7 @@ local function build(state)
 end
 
 helpers.describe("Linux tray Quit follows the shared admission (quit-admission)", function()
-	for _, fault in ipairs({ "layout_throws", "abandon_throws" }) do
+	for _, fault in ipairs({ "layout_throws", "abandon_throws", "report_throws" }) do
 		helpers.it("linux-quit-port-exception: quit proceeds after " .. fault, function()
 			local state = { reload = fault == "abandon_throws" }
 			state[fault] = true
@@ -68,6 +73,17 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 		helpers.assert_eq(calls.layout, 1)
 		helpers.assert_eq(calls.requests, { "tray quit" })
 		helpers.assert_eq(calls.abandons, 0)
+	end)
+
+	helpers.it("(update-quit-kept) tells a waiting update watcher before the shutdown, never on a refusal", function()
+		-- The watcher's wait is this daemon's startup: without the report it
+		-- restored the previous installation and started the previous daemon.
+		local on_quit, calls = build({})
+		helpers.assert_eq(on_quit(), true)
+		helpers.assert_eq(calls.order, { "update watcher", "shutdown" })
+		local refused, refused_calls = build({ requested = true })
+		helpers.assert_eq(refused(), false)
+		helpers.assert_eq(refused_calls.order, {}, "a refused Quit leaves the watcher alone")
 	end)
 
 	helpers.it("refuses a second click once an exit owns the process, without any effect", function()
