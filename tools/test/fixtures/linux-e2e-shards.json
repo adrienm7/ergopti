@@ -35,6 +35,8 @@
 			"Qualify actual cursor-display window switching",
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
 			"Detect and read the keymap on a real X11 and a real Wayland",
+			"Install prerequisites for The container proofs",
+			"The container proofs",
 			"Install prerequisites for Load the number-row options into a real X server",
 			"Load the number-row options into a real X server",
 			"Restart the daemon through the local reload control",
@@ -348,6 +350,7 @@
 		"Detect and read the keymap on a real X11 and a real Wayland": [
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland"
 		],
+		"The container proofs": ["Install prerequisites for The container proofs"],
 		"Load the number-row options into a real X server": [
 			"Install prerequisites for Load the number-row options into a real X server"
 		],
