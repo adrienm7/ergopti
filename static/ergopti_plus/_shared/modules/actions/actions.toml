@@ -1258,7 +1258,7 @@ emit_ahk = "#."
 [sg_actions.take_note]
 platform = "ahk,linux"
 reason_hs = "platform_reason.action_take_note_uses_notepad"
-requires_linux = ["tool:xdg-open", "tool:xdg-mime"]
+requires_linux = ["tool:gtk-launch", "tool:xdg-mime"]
 
 [sg_actions.activity_simulation]
 # Windows and macOS simulate activity until physical input. Linux holds the

@@ -495,7 +495,7 @@ return {
 		["tab_next"] = { family = "sg", label_key = "sg_actions.tab_next", platforms = { "hs", "linux" } },
 		["tab_prev"] = { family = "sg", label_key = "sg_actions.tab_prev", platforms = { "hs", "linux" } },
 		["tabs"] = { family = "ax", label_key = "ax_actions.tabs", platforms = { "hs" } },
-		["take_note"] = { family = "sg", label_key = "sg_actions.take_note", platforms = { "linux" }, requires = { linux = { "tool:xdg-open", "tool:xdg-mime" } } },
+		["take_note"] = { family = "sg", label_key = "sg_actions.take_note", platforms = { "linux" }, requires = { linux = { "tool:gtk-launch", "tool:xdg-mime" } } },
 		["teleport_mouse"] = { family = "sg", label_key = "sg_actions.teleport_mouse", platforms = { "hs", "linux" }, requires = { linux = { "session:x11", "tool:xdotool", "tool:xrandr" } } },
 		["titlecase_selection"] = { family = "sg", label_key = "sg_actions.titlecase_selection", platforms = { "hs", "linux" } },
 		["toggle_capslock"] = { family = "sg", label_key = "sg_actions.toggle_capslock", platforms = { "hs", "linux" } },
