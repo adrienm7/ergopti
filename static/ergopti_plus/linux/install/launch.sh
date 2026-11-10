@@ -151,6 +151,10 @@ if "$DAEMON_LAUNCH"; then
 	fi
 	# LuaJIT restricts inheritance before loading modules that launch children.
 	export ERGOPTI_SESSION_LOCK_FD=9
+	# Every install kind starts here, so the GNOME Shell extension and KWin
+	# script are installed (first run) or refreshed (update) for this user.
+	# Never fatal: without them per-application rules are only inactive.
+	bash "$DRIVER_ROOT/install/compositor_focus.sh" install "$DRIVER_ROOT" 9>&- || true
 fi
 
 # A package's private runtime (network-runtime-env.sh, sourced by its wrapper)

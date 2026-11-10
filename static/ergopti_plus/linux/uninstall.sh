@@ -514,6 +514,10 @@ fi
 if "$stopped_unit"; then
 	systemctl --user disable ergopti-hotstrings.service
 fi
+# The desktop focus integration lives in the XDG data folder, outside the
+# manifest; its helper removes only the folders it wrote. Run it while the
+# helper is still installed.
+bash "$LIBRARY/linux/install/compositor_focus.sh" remove || true
 UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
 rm -- "$MANIFEST"
