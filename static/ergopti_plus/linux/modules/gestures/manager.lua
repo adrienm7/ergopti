@@ -1291,6 +1291,8 @@ end
 
 local preserve_scope_clicks = {}
 local stop_reading_preserving_clicks
+-- Defined with the dispatch below; declared here for the incremental tracker.
+local answering_slot
 
 --- Persists and applies the master gesture state as one transaction.
 --- @param enabled boolean
@@ -2200,6 +2202,11 @@ local function new_incremental(units_x, units_y)
 	return require("modules.gestures.incremental_tracker").new({
 		units_x = units_x, units_y = units_y,
 		mode_of = M.get_mode, step_of = M.get_sensitivity,
+		-- The mode and step are the answering slot's: an axis slot standing in
+		-- for an unbound direction slot keeps its own x1 or incremental.
+		slot_of = function(slot, fingers, direction)
+			return (answering_slot(slot, fingers, direction, false))
+		end,
 		-- Each step runs the slot exactly as a completed swipe would, through
 		-- the same pause, click-fence and axis-slot rules.
 		fire = function(_, fingers, direction, count)
@@ -2251,6 +2258,31 @@ function M.set_sensitivity(slot, value)
 	return set_slot_setting(_sensitivities, SENSITIVITIES_SECTION, slot, step)
 end
 
+--- The slot that answers a gesture, and its action.
+---
+--- A straight horizontal swipe whose direction slot is unbound runs the axis
+--- slot of its finger count. The direction slot wins when both are bound, so
+--- an explicit left/right choice is never overridden. Diagonals and taps have
+--- no axis slot. The decoder already applied the shared direction thresholds;
+--- an incremental slot reaches here once per step of travel
+--- (modules/gestures/incremental_tracker.lua), each step through this rule,
+--- and the tracker takes its mode and step from the same answer, as macOS
+--- takes them from resolveSwipeSlot's.
+--- @param slot string The gesture's own slot.
+--- @return string slot, string|nil action
+answering_slot = function(slot, fingers, direction, tap)
+	local action = _actions[slot]
+	if (not action or action == "none") and not tap and (direction == "left" or direction == "right") then
+		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(fingers, 5)]
+		local axis_action = axis_slot and _actions[axis_slot]
+		if axis_action and axis_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
+			return axis_slot, axis_action
+		end
+	end
+	return slot, action
+end
+
 --- Runs the action bound to a gesture the decoder has already classified.
 ---
 --- Separate from process_frame, which does its own classification from a list of
@@ -2271,22 +2303,8 @@ function M.dispatch_gesture(gesture)
 		return false
 	end
 
-	local action = _actions[slot]
-	-- A straight horizontal swipe whose direction slot is unbound runs the axis
-	-- slot of its finger count. The direction slot wins when both are bound, so
-	-- an explicit left/right choice is never overridden. Diagonals and taps have
-	-- no axis slot. The decoder already applied the shared direction thresholds;
-	-- an incremental slot reaches here once per step of travel
-	-- (modules/gestures/incremental_tracker.lua), each step through this rule.
-	if (not action or action == "none") and not gesture.tap
-		and (gesture.direction == "left" or gesture.direction == "right") then
-		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(gesture.fingers, 5)]
-		local axis_action = axis_slot and _actions[axis_slot]
-		if axis_action and axis_action ~= "none" then
-			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
-			slot, action = axis_slot, axis_action
-		end
-	end
+	local action
+	slot, action = answering_slot(slot, gesture.fingers, gesture.direction, gesture.tap)
 	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is

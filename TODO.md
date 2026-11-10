@@ -1017,18 +1017,26 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
       grab, injection and hotplug (30); real kernel capture (93: ordered pairs need Xorg or a compositor on real
       evdev nodes).
-- [ ] Gestures: a three-finger pad and one `libinput record` from a real touchpad (d627f511fc, 1870e62e1a,
+- [x] Gestures: a three-finger pad and one `libinput record` from a real touchpad (d627f511fc, 1870e62e1a,
       `linux/HARDWARE.md` section 13); a two-finger scroll with a thumb resting reports two fingers, a brisk
-      three-finger tap still reports `tap_3`.
+      three-finger tap still reports `tap_3`. Container proof (2026-11-10): `container-proof-gestures` in
+      `linux/tests/unit/modules/gestures/engine/test_touchpad_container_proofs.lua` replays
+      `tests/fixtures/touchpad_record_three_finger_alps.yml` (a trace written in `libinput record` format, not a
+      physical capture: HARDWARE.md section 13 still welcomes one) through the binary evdev reader,
+      `start_reading`, the decoder and the dispatch.
 - [ ] Layout switching (branch `layout/system-switch-parity`, 2026-11-06): on GNOME Wayland, KDE Plasma 6 Wayland,
       KDE Plasma X11 and another X11 desktop with two layouts, Layout > « Input sources » lists them (GNOME and KDE
       tick the active one, X11 ticks none) and picking one switches the desktop. On KDE, the keyboard daemon's
       `org.kde.KeyboardLayouts.getLayoutsList` (through `gdbus call`) answers the `a(sss)` shape the adapter parses
       (Plasma 5.21+). With the pause switch on, the daemon start selects the resume layout and a start after a paused
       reload keeps the pause layout; on Sway the rows show the unsupported-desktop reason.
-- [ ] Incremental swipes: on a real touchpad, a three-finger horizontal swipe steps about one action per 3.5 mm (one tab per 25 mm vertically), a reversal steps back, and the log names the pad's resolution; a pad that reports none logs it and fires once.
-- [ ] Gesture axis slots (312bb581): on a real touchpad, with only `swipe_3_horiz` bound, a three-finger swipe
+- [x] Incremental swipes: on a real touchpad, a three-finger horizontal swipe steps about one action per 3.5 mm (one tab per 25 mm vertically), a reversal steps back, and the log names the pad's resolution; a pad that reports none logs it and fires once. Container proof (2026-11-10): `container-proof-incremental` (`test_touchpad_container_proofs.lua`, trace `touchpad_record_incremental_elan.yml`); it found the tracker measuring from its first live frame (a brisk 21 mm swipe stepped 5 times, not 6), fixed in `incremental_tracker.lua`.
+- [x] Gesture axis slots (312bb581): on a real touchpad, with only `swipe_3_horiz` bound, a three-finger swipe
       left and right each run it once; binding `swipe_3_left` too makes the left swipe run that one instead.
+      Container proof (2026-11-10): `container-proof-axis-slots` (`test_touchpad_container_proofs.lua`, trace
+      `touchpad_record_axis_swipes_elan.yml`); it found the incremental tracker taking the unbound
+      `swipe_3_left`'s default incremental mode, so the axis slot ran about once per 3.5 mm; it now takes the
+      answering slot's mode, as macOS does.
 - [ ] Navigation layer wheel bindings with a real mouse (ea4b3fa600).
 - [ ] Wayland desktop changes: on sway, Hyprland and KDE Plasma 6 Wayland, switch workspaces a few times (each at least 1 s apart); Metrics shows the desktop-change count rising by one per switch, and GNOME Wayland still shows « — » with its reason.
 - [ ] Secret service: add a key with the keyring locked, the unlock prompt takes the keyboard under the grab; restart

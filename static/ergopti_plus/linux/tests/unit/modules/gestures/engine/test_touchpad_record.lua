@@ -126,6 +126,9 @@ helpers.describe("touchpad record: reading libinput record", function()
 		helpers.assert_eq(trace.events[5].timestamp_us - trace.events[4].timestamp_us, 7160,
 			"the interval between frames is the recorded one")
 		helpers.assert_true(trace.events[1].timestamp_us > 0, "a 0 stamp would be read as unstamped")
+		local formatted = assert(Record.decode((LIBINPUT_LAYOUT:gsub('name: "SYNA8004:00 06CB:CD8B Touchpad"',
+			"name: 'SYNA8004:00 06CB:CD8B Touchpad'"))))
+		helpers.assert_eq(formatted.name, "SYNA8004:00 06CB:CD8B Touchpad", "a trace the formatter requoted keeps its name")
 	end)
 
 	helpers.it("refuses a record of several devices, an empty one and a malformed row", function()
