@@ -473,8 +473,15 @@ const PROGRAMS = {
 		'action picker window switching, the menu row is disabled with a reason when absent'
 	),
 	xprop: optionalTool(
-		'action picker window switching, the menu row is disabled with a reason when absent'
+		'action picker window switching and the file manager folder, the menu row is disabled with a reason when absent',
+		DRIVER_HOST
 	),
+	// The real file managers and terminal of the file manager folder proof
+	// (tests/hardware/run_file_manager_folder.sh), which exits 2 without them.
+	nautilus: optionalTool('the file manager whose folder the proof reads', HOST),
+	thunar: optionalTool('a file manager the proof must refuse by name', HOST),
+	dolphin: optionalTool('a file manager the proof must refuse by name', HOST),
+	xterm: optionalTool('the terminal open_terminal_here starts in the proof', HOST),
 	xwininfo: optionalTool(
 		'action picker window switching, the menu row is disabled with a reason when absent'
 	),

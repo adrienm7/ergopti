@@ -12,9 +12,11 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 [ "$(id -u)" != 0 ] || { echo "run as an ordinary user: Nautilus refuses root" >&2; exit 2; }
-for tool in Xvfb openbox dbus-launch xdotool xprop gdbus nautilus thunar dolphin xterm luajit; do
-	command -v "$tool" >/dev/null 2>&1 || { echo "missing tool: $tool" >&2; exit 2; }
-done
+need() {
+	command -v "$1" >/dev/null 2>&1 || { echo "missing tool: $1" >&2; exit 2; }
+}
+need Xvfb; need openbox; need dbus-launch; need xdotool; need xprop; need gdbus
+need nautilus; need thunar; need dolphin; need xterm; need luajit
 
 WORK=$(mktemp -d)
 export HOME="$WORK/home" XDG_RUNTIME_DIR="$WORK/run" XDG_CONFIG_HOME="$WORK/home/.config"
@@ -23,11 +25,25 @@ export DISPLAY=":$((80 + $$ % 100))" XDG_SESSION_TYPE=x11 TERMINAL=xterm LANG=C.
 unset WAYLAND_DISPLAY
 Xvfb "$DISPLAY" -screen 0 1280x800x24 >/dev/null 2>&1 &
 XVFB=$!
+# The processes of this fixture: every one inherits HOME="$WORK/home", the
+# file managers' D-Bus-activated helpers included. Read from /proc, not pgrep.
+own_pids() {
+	for dir in /proc/[0-9]*; do
+		[ "${dir#/proc/}" != $$ ] || continue
+		grep -qz "^HOME=$WORK/home\$" "$dir/environ" 2>/dev/null && printf '%s\n' "${dir#/proc/}"
+	done
+}
+# The newest fixture process whose command name is $1.
+own_named() {
+	found=""
+	for pid in $(own_pids); do
+		[ "$(cat "/proc/$pid/comm" 2>/dev/null)" = "$1" ] && found=$pid
+	done
+	printf '%s' "$found"
+}
 cleanup() {
-	pkill -P $$ >/dev/null 2>&1 || true
 	[ -n "${DBUS_SESSION_BUS_PID:-}" ] && kill "$DBUS_SESSION_BUS_PID" >/dev/null 2>&1 || true
-	pkill -u "$(id -u)" -f "$WORK" >/dev/null 2>&1 || true
-	pkill -u "$(id -u)" -x xterm >/dev/null 2>&1 || true
+	for pid in $(own_pids); do kill "$pid" >/dev/null 2>&1 || true; done
 	kill "$XVFB" >/dev/null 2>&1 || true
 	rm -rf "$WORK"
 }
@@ -54,7 +70,11 @@ nautilus_action() {
 		--method org.gtk.Actions.Activate "$1" "$2" '{}' >/dev/null
 	sleep 0.5
 }
-activate() { xdotool search --sync --onlyvisible --class "$1" | head -n 1 | xargs xdotool windowactivate --sync; sleep 0.5; }
+activate() {
+	window=$(xdotool search --sync --onlyvisible --class "$1" | head -n 1)
+	xdotool windowactivate --sync "$window"
+	sleep 0.5
+}
 
 # Thunar first, so it owns org.freedesktop.FileManager1: the read must still
 # ask the active Nautilus window's own process.
@@ -73,7 +93,7 @@ expect "a navigation is read at once (quote, accent, space)" "folder	$B" read
 
 expect "open_terminal_here starts the terminal" "terminal	started" terminal
 sleep 2
-term=$(pgrep -n -u "$(id -u)" -x xterm || true)
+term=$(own_named xterm)
 if [ -n "$term" ] && [ "$(readlink "/proc/$term/cwd")" = "$B" ]; then echo "ok   the terminal runs in the folder"
 else echo "FAIL the terminal is not in the folder (pid ${term:-none})"; FAILED=1; fi
 [ -n "$term" ] && kill "$term"
