@@ -4,6 +4,13 @@
 /** Exact source-acquisition cohort; no full-package or runtime activation claim. */
 const fs = require('node:fs');
 const { cleanTranscript, evaluate: fullEvaluate } = require('./swift_xctest_evidence.cjs');
+// Self-contained (fixtures copy this reader alone): Node's path stat on Windows
+// 11 leaves st_dev at 0 while the handle stat names the volume, so there the
+// named identity rests on the file index; elsewhere devices compare exactly.
+// Same rule as tools/ci/windows-updater-original-source.cjs sameNamedDevice.
+function sameNamedDevice(named, acquired, platform = process.platform) {
+	return named.dev === acquired.dev || (platform === 'win32' && Number(named.dev) === 0);
+}
 const METHODS = Object.freeze({
 	ManagedPACSourceTests: Object.freeze([
 		'testStrictUTF8AndBOMAdmission',
@@ -207,7 +214,7 @@ function readBoundedRegular(file, maximum) {
 		if (
 			!before.isFile() ||
 			before.size > maximum ||
-			before.dev !== named.dev ||
+			!sameNamedDevice(named, before) ||
 			before.ino !== named.ino
 		)
 			throw new Error('Native PAC source capture refused.');
@@ -224,7 +231,7 @@ function readBoundedRegular(file, maximum) {
 			length !== before.size ||
 			after.size !== before.size ||
 			after.mtimeMs !== before.mtimeMs ||
-			after.dev !== finalName.dev ||
+			!sameNamedDevice(finalName, after) ||
 			after.ino !== finalName.ino
 		)
 			throw new Error('Native PAC source capture changed.');

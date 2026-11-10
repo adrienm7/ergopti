@@ -7,6 +7,13 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { cleanTranscript } = require('./swift_xctest_evidence.cjs');
+// Self-contained (fixtures copy this reader alone): Node's path stat on Windows
+// 11 leaves st_dev at 0 while the handle stat names the volume, so there the
+// named identity rests on the file index; elsewhere devices compare exactly.
+// Same rule as tools/ci/windows-updater-original-source.cjs sameNamedDevice.
+function sameNamedDevice(named, acquired, platform = process.platform) {
+	return named.dev === acquired.dev || (platform === 'win32' && Number(named.dev) === 0);
+}
 const item36 = require('./item36_xctest_evidence.cjs');
 
 const METHOD = 'testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata';
@@ -110,7 +117,7 @@ function readBoundedRegular(file, maximum) {
 		if (
 			!before.isFile() ||
 			before.size > maximum ||
-			before.dev !== named.dev ||
+			!sameNamedDevice(named, before) ||
 			before.ino !== named.ino
 		)
 			throw new Error('Unadmitted SDK observation capture.');
@@ -121,7 +128,7 @@ function readBoundedRegular(file, maximum) {
 			bytes.length !== before.size ||
 			after.size !== before.size ||
 			after.mtimeMs !== before.mtimeMs ||
-			after.dev !== final.dev ||
+			!sameNamedDevice(final, after) ||
 			after.ino !== final.ino
 		)
 			throw new Error('SDK observation capture changed.');

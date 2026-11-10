@@ -7,6 +7,13 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { cleanTranscript } = require('./swift_xctest_evidence.cjs');
+// Self-contained (fixtures copy this reader alone): Node's path stat on Windows
+// 11 leaves st_dev at 0 while the handle stat names the volume, so there the
+// named identity rests on the file index; elsewhere devices compare exactly.
+// Same rule as tools/ci/windows-updater-original-source.cjs sameNamedDevice.
+function sameNamedDevice(named, acquired, platform = process.platform) {
+	return named.dev === acquired.dev || (platform === 'win32' && Number(named.dev) === 0);
+}
 const { parseClosedJson } = require('../ci/dev-release-qualification.cjs');
 const { readBoundedRegular } = require('./native_pac_source_evidence.cjs');
 const SUITE = 'KarabinerLeaseWorkerTests';
@@ -148,7 +155,7 @@ function inputHash(file) {
 		if (
 			!before.isFile() ||
 			before.size > 1048576 ||
-			before.dev !== named.dev ||
+			!sameNamedDevice(named, before) ||
 			before.ino !== named.ino
 		)
 			throw new Error('Lease silence compiler input refused.');
@@ -165,7 +172,7 @@ function inputHash(file) {
 			length !== before.size ||
 			after.size !== before.size ||
 			after.mtimeMs !== before.mtimeMs ||
-			after.dev !== final.dev ||
+			!sameNamedDevice(final, after) ||
 			after.ino !== final.ino
 		)
 			throw new Error('Lease silence compiler input changed.');
