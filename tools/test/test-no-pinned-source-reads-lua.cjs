@@ -30,6 +30,14 @@
  * auto-fixer. It has to be shared: while each carried its own regex they
  * disagreed by a factor of five, and "the fixer covers most of the lot" was a
  * claim about two different populations.
+ *
+ * WHAT IS LEFT IS LEGITIMATE:
+ * Every remaining pin is a whole-tree class scan under tests/meta/ naming
+ * init.lua, the entry point Hammerspoon loads by that fixed name: the file
+ * cannot move, so the pin cannot break on a refactor, and each scan starts
+ * from it to reach the whole tree (compile, closure-before-local, fs.dir
+ * iterator, lazy require targets, synchronous TOML formatter, keystroke
+ * delay, settings namespace, port adapter purity).
  * ==============================================================================
  */
 

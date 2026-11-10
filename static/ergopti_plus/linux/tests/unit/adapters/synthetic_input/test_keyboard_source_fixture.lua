@@ -18,7 +18,8 @@ local helpers, recorder = Fixture.helpers, Fixture.recorder
 local Finder = require("modules.hotstrings.device_finder")
 local KeyboardSource = require("tests.hardware.keyboard_source_writer")
 
-local WRITER_PATH = helpers.driver_root() .. "/adapters/uinput_writer.lua"
+-- Resolved as require resolves it, so the writer can move without this test pinning its path.
+local WRITER_PATH = assert(package.searchpath("adapters.uinput_writer", package.path))
 local HARNESSES = { "run_modifier_custody.lua", "run_input_owner_real.lua", "run_simultaneous_configuration_real.lua",
 	"run_hook_text_custody.lua", "run_daemon_live.lua" }
 
