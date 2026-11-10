@@ -26,6 +26,9 @@ local Logger = require("infra.logger")
 
 local LOG = "adapters.window_info"
 
+-- A window this close to its screen's usable frame on every edge fills it.
+local TOPOLOGY_FILL_TOLERANCE_PX = 4
+
 
 
 
@@ -161,6 +164,61 @@ function M.focused_identity()
 		return nil
 	end
 	return result
+end
+
+--- Whether a frame covers another within the tolerance on every edge.
+--- @param frame table { x, y, w, h }
+--- @param screen table { x, y, w, h }
+--- @return boolean
+local function fills(frame, screen)
+	local tolerance = TOPOLOGY_FILL_TOLERANCE_PX
+	return math.abs(frame.x - screen.x) <= tolerance and math.abs(frame.y - screen.y) <= tolerance
+		and math.abs(frame.w - screen.w) <= tolerance and math.abs(frame.h - screen.h) <= tolerance
+end
+
+--- The focused window's topology for the keystats window-topology rows, in the
+--- Windows vocabulary: minimized, maximized (fullscreen, or filling the screen's
+--- usable frame: macOS has only a zoom that fills it) or normal, and the screen
+--- UUID as the monitor identity, which survives reordering. Never raises.
+--- @return table|nil observation { window, x, y, w, h, state, monitor = { id, width }|nil }
+function M.focused_topology()
+	local ok, observation = pcall(function()
+		local win = hs.window.focusedWindow()
+		if not win then return nil end
+		local id, frame = win:id(), win:frame()
+		if id == nil or not frame or not frame.w or frame.w <= 0 or frame.h <= 0 then return nil end
+		local screen = win:screen()
+		local screen_frame = screen and screen:frame() or nil
+		local state = "normal"
+		if win:isMinimized() then
+			state = "minimized"
+		elseif win:isFullScreen() or (screen_frame and fills(frame, screen_frame)) then
+			state = "maximized"
+		end
+		local monitor = nil
+		local uuid = screen and screen:getUUID() or nil
+		if type(uuid) == "string" and uuid ~= "" and screen_frame then monitor = { id = uuid, width = screen_frame.w } end
+		return { window = id, x = math.floor(frame.x), y = math.floor(frame.y), w = math.floor(frame.w),
+			h = math.floor(frame.h), state = state, monitor = monitor }
+	end)
+	if not ok then return nil end
+	return observation
+end
+
+--- The bundle identifiers of the running applications (capture presence). The
+--- NSWorkspace list never enumerates windows. Never raises.
+--- @return table|nil ids nil when the list cannot be read.
+function M.running_bundle_ids()
+	local ok, ids = pcall(function()
+		local out = {}
+		for _, app in ipairs(hs.application.runningApplications() or {}) do
+			local read, id = pcall(function() return app:bundleID() end)
+			if read and type(id) == "string" and id ~= "" then out[#out + 1] = id end
+		end
+		return out
+	end)
+	if not ok then return nil end
+	return ids
 end
 
 --- Returns an array of WindowInfo tables for all currently visible windows.

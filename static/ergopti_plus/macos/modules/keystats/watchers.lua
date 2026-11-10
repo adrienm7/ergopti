@@ -59,6 +59,10 @@ local _is_paused = nil
 -- Log manager reference; the engine drains all sensor events through it.
 local LogManager = require("modules.keystats.log_manager")
 
+-- Window topology and capture presence ride the hardware lifecycle and the
+-- maintenance tick: it starts and stops with the hardware watchers.
+local TopologyWatcher = require("modules.keystats.topology_watcher")
+
 -- Hardware watcher handles owned exclusively by this module
 local _wifi_watcher         = nil
 local _battery_watcher      = nil
@@ -335,6 +339,11 @@ function M.perform_maintenance()
 		end
 	end
 	poll_mouse_distance()
+	-- Paced by the watcher itself; only a live, admitted hardware generation records.
+	if hardware_callback_allowed(_hardware_generation) then
+		local ticked, reason = xpcall(TopologyWatcher.tick, debug.traceback)
+		if not ticked then Logger.error(LOG, "Window topology tick failed: %s.", tostring(reason)) end
+	end
 end
 
 --- Contains a native hardware callback and routes failures to the file logger.
@@ -845,6 +854,14 @@ function M.init_hardware_watchers()
 	end
 
 	_hardware_watchers_enabled = true
+	if not TopologyWatcher.is_running() then
+		TopologyWatcher.start({
+			-- Late-bound: the log manager owns its own initialisation.
+			append = function(entry) return LogManager.append_log(entry) end,
+			app = function() return _state.session_app_name end,
+			private = function() return _state.is_private_window == true end,
+		})
+	end
 	Logger.debug(LOG, "Hardware watcher transaction committed.")
 	return true
 end
@@ -863,6 +880,8 @@ function M.stop_hardware_watchers()
 	_state.passive_started_at, _state.passive_kind = nil, nil
 	-- Pointer movement while stopped must not be charged to the next run.
 	_state.last_mouse_pos = nil
+	-- An open capture interval ends with the collector, as on Windows.
+	TopologyWatcher.stop()
 	local timers_stopped = cancel_context_refresh_timers()
 	local watchers_stopped = cleanup_hardware_resources()
 	local settled = timers_stopped and watchers_stopped
