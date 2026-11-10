@@ -1,0 +1,7 @@
+=== user-tree layout on KDE Wayland (W1 to W3) ===
+  ok   Ergopti is installed in the user tree (ok)
+  FAIL W1/W2: the compositor loads the user-tree id and the session holds it (live_apply_failed not loaded: not_loaded live_code=not_loaded)
+  FAIL W1: the session's keymap carries the ERGOPTI_SEVEN_LEVEL type
+  FAIL W3: a second build under the other slot loads with no restart (live_apply_failed not loaded: not_loaded live_code=not_loaded)
+  FAIL W3: the number row the session types changed between the builds
+=== 5 check(s), 4 failure(s) ===
