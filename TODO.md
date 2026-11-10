@@ -724,11 +724,11 @@ three-OS CI is green on the final source. See the handoff above for the current 
 
 ## To confirm on the Mac
 
-- [ ] Hotstring section order: move a section up/down, reopen and restart to prove persistence, reset the order, and refuse a stale menu after config changes.
-- [ ] WPM: a pointer move after the last physical keystroke hides the widget unless a preview or drag is active; overlapping source holds show AI before hotstrings before autocorrection, and pause/restart removes old holds.
+- [ ] Hotstring section order: closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382): `test_section_order_round_trip` chains the menu, `Preferences.save` and `Preferences.load` (move, restart, stale menu after a reload refused, reset), with `test_section_order` and `test_hotstring_bulk_checkboxes`. The round trip found the reset kept the old order in `config.toml` (fixed: a reset commits an empty order).
+- [ ] WPM: closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382): `test_wpm_widget_mouse_throttle` (pointer hides, preview and drag keep it), `test_wpm_activity` (AI before hotstrings before autocorrection with overlapping holds; reset, stop/start and the new metrics-pause case leave no hold).
 
-- [ ] PAC route lists: use a real PAC with a dead relay followed by DIRECT or a live relay; preserve ordered selection, the shared timeout and refusal after expiry. Native XCTest milestone: `ManagedProxyRouteWorkerTests` compiled and passed all 23 cases on macOS 26 in [CI run 42374265115](https://github.com/adrienm7/ergopti/actions/runs/42374265115/job/128410747338), source `07dda15c1`, including the native TCP listener probe. The injected route-list cases do not close application receiving with a real PAC.
-- [ ] Personal aliases: configure cased Unicode aliases, type and erase a combo one scalar at a time, and confirm preview and expansion agree in native applications.
+- [ ] PAC route lists with a real PAC (dead relay then DIRECT or a live relay): field report: `field_network` (`route_lookup`) and `field_pac_fallback` on a network with a PAC. Native XCTest milestone: `ManagedProxyRouteWorkerTests` compiled and passed all 23 cases on macOS 26 in [CI run 42374265115](https://github.com/adrienm7/ergopti/actions/runs/42374265115/job/128410747338), source `07dda15c1`, including the native TCP listener probe; the injected route-list cases do not close application receiving with a real PAC.
+- [ ] Personal aliases: closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382): `test_personal_info_combo_matches_buffer` types a cased Unicode combo, erases it one scalar at a time and checks at every length that the preview names exactly what the expansion types, then that erasing past the last scalar ends it; delivery into a native app is the field report's `hotstring_roundtrip`.
 
 - [ ] **MRT-004 « Réparer le service »:** decided 2026-11-06, not built: a new authenticated helper role that adopts an existing exact Core/VirtualHIDDevice plist and settles the first-start `core.json` fence; needs a Swift build and native macOS qualification, then i18n in the 21 locales.
 
@@ -746,35 +746,19 @@ Field run, no person needed (read the next report):
       `menu_item.shortcuts` / `menu_keyboard_layout.sources` phases, `diagnostics` phase A under 5 ms, `idle_cost`
       below 8 %, and `granite4:350m-h` pulled with no `digest_mismatch`. A remaining one is a code entry with its
       report lines.
-- [ ] Release swap boot-ready: install a chosen release from the Versions window; `swap.log` ends with « reported a
-      healthy start ». Then a chosen build that cannot boot (rename its `init.lua` in the staged app before the quit)
-      is moved to `ErgoptiPlus.app.failed-<pid>` within 60 s and the previous app opens (exit 9).
-- [ ] Two copies and one Accessibility switch: with a local `build/macos` copy registered beside the `/Applications`
-      prerelease, an untrusted boot logs the other copy, does not run `tccutil reset`, and the dialog names
-      `…/build/macos/ErgoptiPlus.app`; once that copy is trashed and the switch turned on, the boot resumes.
-- [ ] Owned runtime install through the launcher: after the next runtime rebuild, Tap-Holds > install the owned
-      runtime (the `--request-owned-runtime-install` role, its administrator prompt answered) installs and reports
-      `files-published-services-observed-staging-retired`, and the helper's report path admits its one SHA-256 code
-      directory (no `helper_signature` or report refusal in the launcher log).
-- [ ] Managed Ollama 0.40.6: rebuild the managed runtime (`tools/build/build-macos-managed-ollama.py`, Go and macOS
-      cells), then `field_ai_local` pulls a model behind a PAC-only or explicit proxy with no direct route, and the
-      native receiver passes with its registry at 8.8.8.8.
-- [ ] Physical shortcut delivery: the same proof as on Linux (source suppressed once, no other owner acts, output reaches the focused app) under Karabiner and the keymap tap, before `keyboard_shortcuts.physical_delivery_available` may turn true; meanwhile the « Raccourcis physiques » row is greyed with « Pas encore disponible ».
+- [ ] Release swap boot-ready: closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382): `test_release_installer` « the replacement script under /bin/sh » keeps a chosen app whose boot reports ready (« reported a healthy start »), and moves one that never reports to `ErgoptiPlus.app.failed-<pid>`, reopens the previous one and exits 9.
+- [ ] Two copies and one Accessibility switch: field report: `field_login_items` (each copy and whose it is) and `field_permissions` (`accessibility`, bundle identity), run once with a `build/macos` copy registered beside the `/Applications` prerelease: no `tccutil reset`, the dialog names `…/build/macos/ErgoptiPlus.app`, the boot resumes once that copy is trashed and the switch on.
+- [ ] Owned runtime install through the launcher (after the next runtime rebuild): field report: `field_owned_install` then `owned_install_reload` (`files-published-services-observed-staging-retired`, no `helper_signature` or report refusal); the administrator prompt is its one human step.
+- [ ] Managed Ollama 0.40.6 (rebuild with `tools/build/build-macos-managed-ollama.py` first): field report: `field_ai_local` behind a PAC-only or explicit proxy with no direct route, and `field_network_hosts` (the registry).
+- [ ] Physical shortcut delivery: the greyed « Raccourcis physiques » row with « Pas encore disponible » is closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382) (`test_physical_shortcuts_row_unqualified`, `test_physical_delivery_unqualified`). The delivery itself (source suppressed once, no other owner acts, output reaches the focused app under Karabiner and the keymap tap) is code work, not a confirmation: `keyboard_shortcuts.physical_delivery_available` stays false until it is built and qualified.
 - [ ] Tap-hold word reset: with « Un tap ou un hold sur une touche tap-hold commence un nouveau mot » on and « Un raccourci clavier commence un nouveau mot » off, a tap-hold copy (Cmd+C tap) between two words makes the next word-start hotstring fire, the user's own Cmd+C does not, and no F20 reaches TextEdit or a Finder rename; switching the option off keeps the word. Karabiner-Elements must deliver the tagged F20 before the chord. Then with Caps Lock (or another tap-hold key) held as Ctrl or Cmd: a shortcut struck under it follows the same option, the user's own Cmd+C afterwards follows « Un raccourci clavier commence un nouveau mot », Ctrl held by hand before the key still reaches the tap (Ctrl+Enter), and no context-menu key reaches TextEdit or a Finder rename (Karabiner-Elements must deliver the untagged `application` key before the hold's modifier).
-- [ ] AI inline auto-type: switch on « Inline auto-type » in the trigger menu; a finished prediction is typed into a
-      text editor without Tab, a correction that rewrites typed words stays in the bubble.
-- [ ] Backup of the API entries: add a remote API entry, install a release from the Versions window, delete the entry,
-      then restore the pre-install backup: the entry comes back after the reload and its key still works from the
-      Keychain.
-- [ ] Onboarding number-row order: with an Ergopti layout of ours selected, the wizard offers the order; Finish with «
-      symbols » types symbols on the number row after the reload. With a system layout it is greyed with its reason.
-- [ ] Navigation layer repeat count: bind `Digit3 = "repeat_count:3"`; under the layer, `3` then `arrow_up` moves up
-      three lines, the next `arrow_up` one, and releasing the layer after `3` forgets the count.
-- [ ] Owned Ollama starts and pulls: `field_ai_local` ready daemon and a done pull (6170813ea9, 6335790e5a,
-      894585a213, b71b4a67db, 4545f672d1, 721074f21d).
-- [ ] Test models: one complete Ollama and MLX test-model download on a connection that does not count (e8ff7479e1).
-- [ ] Timed reload: `driver_reload` passes and `reload.request_to_boot` is under 4000 ms (b12a654d79, 02c58f8a94,
-      c366dd1c5b, c0ba1d98bb, 8121349ee7, e6426e2ec5).
+- [ ] AI inline auto-type: the engine (typed without Tab, a correction with deletions stays in the bubble) is `test_prediction_inline_autotype`; the typing into a real editor with a model is field report: `prediction_tooltip` with « Inline auto-type » on.
+- [ ] Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`), but « its key still works » cannot hold today: deleting the entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), and the backup keeps only the `keychain:<account>` reference. Waits on « Maintainer decisions pending ».
+- [ ] Onboarding number-row order: the offer, the greyed reason with a system layout and the live apply before the reload are `test_onboarding_number_row` and `test_number_row_live`; the symbols typed after the reload are field report: `field_layout_rows` (a layout build read back) plus one person typing the row.
+- [ ] Navigation layer repeat count: closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382): `test_nav_layer_rule` replays `Digit3 = "repeat_count:3"` then `arrow_up` with Karabiner's matching (three up arrows, then one, nothing after re-entry) and `test_generator_layers` proves the count reset on layer entry.
+- [ ] Owned Ollama starts and pulls: field report: `field_ai_local` (ready daemon) and `ollama_model` (a done pull) (6170813ea9, 6335790e5a, 894585a213, b71b4a67db, 4545f672d1, 721074f21d).
+- [ ] Test models: field report: `ollama_model` and `mlx_model` (one complete download each) on a connection that does not count (e8ff7479e1).
+- [ ] Timed reload: field report: `driver_reload` passes with its `reload_ms` under 4000 ms (b12a654d79, 02c58f8a94, c366dd1c5b, c0ba1d98bb, 8121349ee7, e6426e2ec5).
 - [ ] Remap guardian: `field_login_items` `developer_adhoc_reregistered` on a Mac that holds an earlier build's
       Background Items record, no `ErgoptiPlus` codesigning kill in `field_app_health`, `guardian_state` ready with
       `guardian_wait` under 10 s, and the same on an Intel Mac (2be257c9f5). Hosted CI proves the ad hoc installed-app
@@ -786,36 +770,21 @@ Field run, no person needed (read the next report):
       (`slow_ingest_*`, `worst_hold_site`), healthcheck and ignored-window probe (`slow_diagnostics_collector`,
       `slow_ignored_window_*`), one-off holds (`worst_hold_site`), `keystats_start_ms` under 100 ms. Each names the
       stage to bound next.
-- [ ] L24 key events: re-read `key_event_health` totals once the holds are gone (82c220c089); key-ups lost without a
-      hold point at the Karabiner virtual HID path.
-- [ ] L32 memory: read `memory_footprint_mb`, `memory_region_1..5` and `lua_heap_mb` in `field_app_health`
-      (cce99afbc7, 58961fd2b2, f7faaa0558).
-- [ ] L42 off the company network: `03_field_network` passes with `pac_download info:unreachable_direct`,
-      `pac_script skip:not_fetched`, `route_lookup pass:selected:direct` (5d93e78e90, 1dfaec8298, ec15345d22,
-      8fedb505dd).
-- [ ] L43: `04_field_toolchain` `karabiner_signature` reads `info strict_only:finder_detritus` (cc172a504d,
-      58fd867081).
-- [ ] 116: `field_toolchain` third-party report (timer, Shortcuts, Homebrew, Karabiner signature, Gatekeeper).
-- [ ] Composer (L52): `06_field_composer` passes after a single re-read.
-- [ ] Keystats cache: `field_storage` `keystats_cache_place` is `caches`.
-- [ ] Karabiner lease 117/140: `lease_failure_kinds` and `memory_free_percent` (25411ee080, 380ad99aa8); a low free
-      percentage next to PONG/READY kinds confirms starvation.
-- [ ] Lease deploy write: `deploy_write_verdict` is `keep`; `shrink` means code to write (make the 743 KB file
-      smaller).
-- [ ] Owned Karabiner runtime: `field_owned_runtime`, then on an owned boot `field_owned_start` and
-      `field_owned_pause`; the next run's `field_owned_start` proves close-on-resume.
-- [ ] Layout rows: `field_layout_rows` answers M4 to M6 (91725b18f7, fc5d3a11df, aaf3518af7); on `select_refused` or
-      `requires_logout` the live path needs the design note's in-bundle route.
-- [ ] Apple Shortcuts (106) and the new actions (`run_command`, `open_path`, `run_apple_shortcut`, on dev, not
-      field-verified): `field_apple_shortcuts` `field_test_run`. First create a no-op shortcut named
-      `Ergopti Field Test` in Shortcuts.
-- [ ] PAC unusable on a network whose PAC is unreachable: `field_pac_fallback` `direct_worked` for an Ollama pull and
-      the MLX install.
-- [ ] Ollama behind a real PAC: `field_ollama_blob_host` and Debug > Test network.
-- [ ] Log-only checks of the 2026-10-30 report, each failing by name in `field_slow_lines`: no
-      `log_shortcuts_still_unregistered` after a rebind retry (else rebinding needs the `hs.keycodes.map`
-      notification); no `log_keystats_database_locked` (8084562373); no `log_lease_bound_failures` nor
-      `log_layout_change_before_baseline` (item 38).
+- [ ] L24 key events: field report: `field_lease` (`key_event_health` totals) once the holds are gone (82c220c089); key-ups lost without a hold point at the Karabiner virtual HID path.
+- [ ] L32 memory: field report: `field_app_health` (`memory_footprint_mb`, `memory_region_1..5`, `lua_heap_mb`) (cce99afbc7, 58961fd2b2, f7faaa0558).
+- [ ] L42 off the company network: field report: `field_network` with `pac_download info:unreachable_direct`, `pac_script skip:not_fetched`, `route_lookup pass:selected:direct` (5d93e78e90, 1dfaec8298, ec15345d22, 8fedb505dd).
+- [ ] L43: field report: `field_toolchain` `karabiner_signature` reads `info strict_only:finder_detritus` (cc172a504d, 58fd867081).
+- [ ] 116: field report: `field_toolchain` (timer, Shortcuts, Homebrew, Karabiner signature, Gatekeeper).
+- [ ] Composer (L52): field report: `field_composer` passes after a single re-read.
+- [ ] Keystats cache: field report: `field_storage` `keystats_cache_place` is `caches`.
+- [ ] Karabiner lease 117/140: field report: `field_lease` `lease_failure_kinds` and `memory_free_percent` (25411ee080, 380ad99aa8); a low free percentage next to PONG/READY kinds confirms starvation.
+- [ ] Lease deploy write: field report: `field_lease` `deploy_write_verdict` is `keep`; `shrink` means code to write (make the 743 KB file smaller).
+- [ ] Owned Karabiner runtime: field report: `field_owned_runtime`, then on an owned boot `field_owned_start` and `field_owned_pause`; the next run's `field_owned_start` proves close-on-resume.
+- [ ] Layout rows: field report: `field_layout_rows` answers M4 to M6 (91725b18f7, fc5d3a11df, aaf3518af7); a failed `rows_build` or `rows_replace` means the live path needs the design note's in-bundle route.
+- [ ] Apple Shortcuts (106) and the actions `run_command`, `open_path`, `run_apple_shortcut`: field report: `field_apple_shortcuts` `field_test_run` (create once a no-op shortcut named `Ergopti Field Test` in Shortcuts).
+- [ ] PAC unusable on a network whose PAC is unreachable: field report: `field_pac_fallback` `direct_worked` for an Ollama pull and the MLX install.
+- [ ] Ollama behind a real PAC: field report: `field_ollama_blob_host` and `field_network` (the Debug > Test network chain).
+- [ ] Log-only checks of the 2026-10-30 report: field report: `field_slow_lines` `log_shortcuts_still_unregistered` after a rebind retry (else rebinding needs the `hs.keycodes.map` notification), `log_keystats_database_locked` (8084562373), `log_lease_bound_failures` and `log_layout_change_before_baseline` (item 38).
 
 Hands needed:
 
@@ -825,32 +794,17 @@ Hands needed:
       off types French; a hotstring fires on emulated text. Check that a key the French layout makes dead (`^`)
       types its emulated character, that the cleared Option flag does not break an Option chord in Terminal, and
       note the password-field limit (Secure Event Input: the system layout types).
-- [ ] Hotstrings (asa): `asa` + Space fast twenty times, also holding `a`: always `ASA`, with
-      `Synthetic text moved off a held key` in the day log; ordinary hotstrings in Edge, VS Code and a terminal.
-- [ ] oMLX on port 8181 is found in API mode with no `ps` deadlock (`field_local_servers` names it).
-- [ ] Gestures: one « Infos… » row that opens the dialog; `tap_3` recommends left click.
-- [ ] L46 with no explicit `[gestures.sensitivities]` swipe_3 value (6d3aa65273; `field_gesture_frames`): minutes of
-      two-finger scrolls switch no tab; deliberate vertical three-finger swipes (slow, flick, staggered, after a
-      scroll, finger resting, ten half a second apart) each switch exactly one tab, past 29 units two; a miss logs
-      `Three-finger candidate rejected by <gate>`; no `has no capture timestamp` ERROR after a reload.
-- [ ] Ctrl+Caps Lock: type it during a session before the field run; `field_capslock_chord` `never_delivered` drops
-      the slot's macOS recommendation with a reason (ea02cf7000).
-- [ ] Dropped letters: a day of typing in Safari, TextEdit, Terminal, VS Code and an Electron app, then the field
-      report (`swallowed_keys`); Debug > Report a bug right when a letter disappears.
-- [ ] Production profile: the same working day feeds `field_boot_cost`, `field_idle_cost` and `field_slow_lines`;
-      also three cold starts and one after a login (`Boot complete in`, `Boot CPU`).
-- [ ] Event taps refused, personal hotstring reload rolled back, MLX POST routes 404 after a repair, screenshot
-      without an image: read the named step or `accessibility_trusted` on the next occurrence.
-- [ ] Native ownership contracts with Xcode.app: the launcher XCTest suite, the FSEvents start refusal
-      (`macos/infra/file_watchers.lua`), POSIX filesystem capability and ServiceManagement boundaries (hosted CI, run
-      41257389239: Launcher XCTest on macOS 26, Native XCTest on macOS 15 Intel, Build and all five Install-and-launch
-      rows green for the owned-runtimes Swift and the guardian fixes; a local `swift test` run on full Xcode.app
-      remains).
-- [ ] Schema v15 and v20 (PAR-41): an old `config.toml` with parameterised slots keeps every action under its role
-      id; a v19 file with `ctrl_g = true` opens the ChatGPT URL on Ctrl+G and loses `ctrl_g`, `false` leaves the
-      slot empty; old `[llm.profiles] user_profiles` still show (PAR-40).
-- [ ] Ten window-toggle actions bound to shortcuts: open, raise when covered, close when frontmost, restore when
-      minimised; `open_model_browser` right after a reload and with the AI off logs no `window_toggle` ERROR.
+- [ ] Hotstrings (asa): the carrier types the whole `ASA` while the trigger's `a` is held (`test_text_carrier_avoids_held_key`); on the Mac: field report: `field_log_signals` `log_held_key_moves` after a person types `asa` + Space fast twenty times, also holding `a`, and `hotstring_roundtrip`; ordinary hotstrings in Edge, VS Code and a terminal stay hands.
+- [ ] oMLX on port 8181: field report: `field_local_servers` names it in API mode (`server_<id>` `up:...`), with no `ps` deadlock.
+- [ ] Gestures: one « Infos… » row that opens the dialog, `tap_3` recommending left click: closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382) (`test_menu_gestures_handlers_match_manifest` en and fr, `test_default_gestures_are_manifest`).
+- [ ] L46 with no explicit `[gestures.sensitivities]` swipe_3 value (6d3aa65273): field report: `field_gesture_frames`, and `field_log_signals` `log_capture_stamp_errors` (no `has no capture timestamp` ERROR after a reload) and `log_three_finger_rejections` (`<n>:<gate>`). The swipes themselves (minutes of two-finger scrolls switch no tab; deliberate vertical three-finger swipes — slow, flick, staggered, after a scroll, finger resting, ten half a second apart — each switch exactly one tab, past 29 units two) stay hands.
+- [ ] Ctrl+Caps Lock: field report: `field_capslock_chord` (`never_delivered` drops the slot's macOS recommendation with a reason, ea02cf7000), after a person types it once during the session.
+- [ ] Dropped letters: field report: `field_lease` `swallowed_keys` and `key_accounting` after a day of typing in Safari, TextEdit, Terminal, VS Code and an Electron app; Debug > Report a bug right when a letter disappears.
+- [ ] Production profile: field report: `field_boot_cost`, `field_idle_cost` and `field_slow_lines` after a working day, plus three cold starts and one after a login (`Boot complete in`, `Boot CPU`).
+- [ ] Event taps refused, personal hotstring reload rolled back, MLX POST routes 404 after a repair, screenshot without an image: field report: `field_event_taps`, `field_permissions` (`accessibility`) and `field_log_signals` `log_start_rollbacks` on the next occurrence.
+- [ ] Native ownership contracts with Xcode.app: closes on the macOS lane (run 41257389239, and the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382)): Launcher XCTest on macOS 26, Native XCTest on macOS 15 Intel, Build and all five Install-and-launch rows for the owned-runtimes Swift and the guardian fixes; the FSEvents start refusal and POSIX filesystem capability run in the Lua unit lots. A local `swift test` on full Xcode.app adds nothing the hosted cells do not run.
+- [ ] Schema v15 and v20 (PAR-41): closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382): `test_keyboard_slot_migration`, `test_config_migrate` (`shipped_keyboard_slot_parameters_on_macos`, `shipped_hs_ctrl_g_*`, `shipped_user_profiles_*`), `test_migrated_config_keeps_bindings` (`ctrl_g = true` binds Ctrl+G once, `false` leaves `none`), `test_apps_layer_actions` (`open_chatgpt` opens the configured URL) and `test_preferences_user_profiles_storage` (PAR-40).
+- [ ] Ten window-toggle actions bound to shortcuts: open, raise when covered and close when focused are `test_window_toggle` (all ten pages); on the Mac: field report: `field_log_signals` `log_window_toggle_errors` after `open_model_browser` right after a reload and with the AI off, and a person checks restore when minimised.
 - [ ] Menus: Clear and Restore per category and global; Shortcuts group restore and clear; tap delay row and « Use
       global delay (…) »; tap and hold pickers; « Combinaisons de touches »; row order unchanged (PAR-76 R18);
       « Retirer les anciennes règles » on an upgrade (43); Login Items show one Ergopti (24).
@@ -876,17 +830,9 @@ Hands needed:
 - [ ] VirtualHIDDevice offer (3ebab93a17): on a Mac whose active driver is older than 8.5.0, Tap-holds > update row,
       admin prompt, installer, forceActivate; the report names the new version and the remap reloads; cancelling the
       prompt reports `cancelled` and changes nothing.
-- [ ] Run the field report once: its `scpt_recompile` step rebuilds `Encryptor.app/.../main.scpt` from its updated
-      `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
-- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): on a real Mac, during the spinner and over
-      a shown prediction, a pointer move, a trackpad scroll, a pinch or swipe gesture, Cmd+Tab, a click in
-      another app and F5 each cancel and hide; Tab, Shift+Tab, the arrows and the validation digits still act on
-      it; a resting hand keeps it. Check that mouseMoved now in the keymap mouse tap adds no visible pointer lag
-      (Debug log `User activity (mouseMoved)` appears once per cancellation, not per event).
-- [ ] Branch `wave3/input-policies` (2026-11-06): a second CapsWord gesture or shortcut switches CapsWord off and
-      unlocks CapsLock; the CapsWord delimiter menu shows « ★ » after the magic key is renamed. Native one-shot Shift:
-      modifier-map, dead-key and IME handling of the captured key; CapsWord key/control payload receiving
-      (moved from the one-shot and CapsWord parity follow-ups).
+- [ ] Run the field report once: field report: `scpt_recompile` rebuilds `Encryptor.app/.../main.scpt` from its updated `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
+- [ ] Predictions stop on activity: the cancellations (pointer, scroll, gestures, a key the tooltip did not consume) and Tab, Shift+Tab, arrows and digits acting on it are `test_mouse_tap_pointer_activity`, `test_prediction_cancelled_by_user_activity` and `test_llm_tooltip_chords_consumed`; on the Mac: field report: `field_log_signals` `log_prediction_activity_cancels` (one `User activity (mouseMoved)` per cancellation, at DEBUG). A person still checks Cmd+Tab, a click in another app, F5 and that mouseMoved in the keymap mouse tap adds no visible pointer lag.
+- [ ] Branch `wave3/input-policies` (2026-11-06): CapsWord closes on the macOS lane [run 42917273382](https://github.com/adrienm7/ergopti/actions/runs/42917273382) (`test_watchers_capsword_auto_off` « a second CapsWord action ends it at once and unlocks CapsLock », `test_karabiner_actions_reachable`, `test_menu_caps_word` « ★ » after the rename). Native one-shot Shift (modifier-map, dead-key and IME handling of the captured key) and CapsWord key/control payload receiving stay hands (moved from the one-shot and CapsWord parity follow-ups).
 
 ## To confirm on the Windows PC
 
@@ -1360,3 +1306,8 @@ Each closes on a named green hosted or native run, recorded here.
       `_shared/data/db/purge_schema.sql`; writers `request_metrics_maintenance` (Linux keystats, macOS `log_manager`) and
       `KL_RunMetricsMaintenance` (Windows); the Windows path is checked by source contracts only and still wants a live
       Windows run.
+- [ ] An API entry restored from a pre-install backup comes back without its key (found 2026-11-10 closing « Backup
+      of the API entries »): deleting an entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids`
+      → `retry_pending_api_token_deletes`) and the backup holds only the `keychain:<account>` reference. Choose:
+      keep a deleted entry's Keychain item while a retained backup still references it (the restore then works), or
+      keep deleting it and have the restored entry ask for its key again (the Mac line then reads so).
