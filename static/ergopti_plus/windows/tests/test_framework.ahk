@@ -1280,22 +1280,33 @@ _TestClockMs() {
 ; flight keeps its native process and poll timer alive, and its completion
 ; runs inside whichever later test next yields: a rebuild launched from there
 ; reached a proof that forbids every launch, in a whole-group CI run only.
-; @returns {Integer} The owner counter before the test, or -1 without the module.
+; The mark is the set of owners current before the test, not the owner counter:
+; twenty isolation helpers rewind that counter to 0, and an owner the test then
+; opened carried a token below the old counter, so a leak passed in suite order
+; and failed only under --reverse.
+; @returns {Map|Integer} Owner object pointer -> owner (held, so no address is
+;   reused during the test), or 0 without the module.
 _TestLlmAuxMark() {
-	global _LLM_AuxOwnerCounter
-	return IsSet(_LLM_AuxOwnerCounter) ? _LLM_AuxOwnerCounter : -1
+	global _LLM_AuxOwners
+	if !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+		return 0
+	Mark := Map()
+	for Kind, Owner in _LLM_AuxOwners
+		if IsObject(Owner)
+			Mark[ObjPtr(Owner)] := Owner
+	return Mark
 }
 
-; @param {Integer} Mark The counter _TestLlmAuxMark returned before the test.
+; @param {Map|Integer} Mark What _TestLlmAuxMark returned before the test.
 ; @returns {String} The kinds of the owners the test opened and left current,
 ;   comma-separated; "" when it retired every one.
 _TestLlmAuxLeaked(Mark) {
 	global _LLM_AuxOwners
-	if Mark < 0 || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+	if !(Mark is Map) || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
 		return ""
 	Kinds := ""
 	for Kind, Owner in _LLM_AuxOwners {
-		if Owner is Map && Owner.Get("token", 0) > Mark
+		if Owner is Map && !Mark.Has(ObjPtr(Owner))
 			Kinds .= (Kinds == "" ? "" : ", ") . Kind
 	}
 	return Kinds
