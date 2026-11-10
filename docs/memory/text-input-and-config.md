@@ -500,7 +500,7 @@ full saves keep boot-outdated entries on disk for the cleanup. Judge
 choice. Real failures stay fail-closed: an unreadable or malformed file, a
 native refusal, and a scope's own post-write candidate still refuse.
 Other files (layers.toml, tap_hold.toml, installed.json, storage.json,
-api_keys.json, hotstrings_overrides.toml, config_karabiner.toml) follow the
+api_keys.json, hotstrings_overrides.toml) follow the
 same rule through `config_outdated.report_in_file`: one WARNING naming the
 file and the entry to fix by hand, since only config.toml has a cleanup, and
 never recorded by a cleanup scan. The entry is ignored and the rest of the
