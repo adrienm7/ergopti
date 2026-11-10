@@ -160,7 +160,7 @@
 			"base_url": "https://api.perplexity.ai/v1",
 			"default_model": "perplexity/sonar",
 			"format": "perplexity_agent",
-			"_source": "https://docs.perplexity.ai/docs/agent-api/quickstart, https://docs.perplexity.ai/api-reference/agent-post, https://docs.perplexity.ai/docs/agent-api/models, https://docs.perplexity.ai/api-reference/models-get, https://docs.perplexity.ai/docs/agent-api/migrate-from-sonar/how-to (read 2026-11-01; POST /v1/agent, GET /v1/models lists the ids and declares no authentication; input_image takes a URL of at most 2048 characters, so no screenshot; a reasoning control exists but its per-model behaviour is undocumented, so no dialect). Never called live: no key was available."
+			"_source": "https://docs.perplexity.ai/docs/agent-api/quickstart, https://docs.perplexity.ai/api-reference/agent-post, https://docs.perplexity.ai/docs/agent-api/models, https://docs.perplexity.ai/api-reference/models-get, https://docs.perplexity.ai/docs/agent-api/migrate-from-sonar/how-to (read 2026-11-01; POST /v1/agent, GET /v1/models lists the ids and declares no authentication; input_image takes a URL of at most 2048 characters, so no screenshot; a reasoning control exists but its per-model behaviour is undocumented, so no dialect). Sonar chat completions support ended on 2026-09-27 (migrate-from-sonar/overview, checked 2026-11-10); this provider was already on the Agent API, so nothing moves. Never called live: no key was available."
 		},
 		"moonshot": {
 			"label": "Moonshot AI (Kimi)",
@@ -168,7 +168,7 @@
 			"default_model": "kimi-k3",
 			"format": "openai",
 			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
-			"_source": "https://platform.kimi.ai/docs/api/chat, https://platform.kimi.ai/docs/models (the K3 series always thinks, reasoning_effort low/high/max; thinking.type disabled only on the retiring kimi-k2.6, so no toggle)"
+			"_source": "https://platform.kimi.ai/docs/api/chat, https://platform.kimi.ai/docs/models (the K3 series always thinks, reasoning_effort low/high/max; thinking.type disabled only on the retiring kimi-k2.6, so no toggle; checked 2026-11-10: the K2 series is closed to new accounts since 2026-10-31 and retires by the end of December 2026, named replacement kimi-k3.1-pro, so the default stays on the K3 series)"
 		},
 		"dashscope": {
 			"label": "Alibaba Qwen (DashScope)",
@@ -184,7 +184,7 @@
 				"toggle": { "enable_thinking": false },
 				"effort": { "reasoning_effort": "$level" }
 			},
-			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking, https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope (Singapore shared domain), https://www.alibabacloud.com/help/en/model-studio/base-url (read 2026-11-01: the shared DashScope domain is legacy but available, migrating to a workspace-dedicated domain {WorkspaceId}.{region}.maas.aliyuncs.com is recommended, such a domain takes only a key of its workspace)"
+			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking, https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope (Singapore shared domain), https://www.alibabacloud.com/help/en/model-studio/base-url (read 2026-11-01: the shared DashScope domain is legacy but available, migrating to a workspace-dedicated domain {WorkspaceId}.{region}.maas.aliyuncs.com is recommended, such a domain takes only a key of its workspace; checked 2026-11-10: the shared domain is in maintenance mode from 2026-09-30, no new features and no shutdown date announced, so it stays the default and optional_address covers the dedicated domain)"
 		},
 		"zai": {
 			"label": "Z.ai (GLM)",
