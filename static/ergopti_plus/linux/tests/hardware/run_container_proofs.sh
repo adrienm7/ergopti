@@ -24,7 +24,7 @@ done
 "${PYTHON}" -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("Atspi", "2.0")' 2>/dev/null \
 	|| { echo "ENVIRONMENT: ${PYTHON} has no Gtk 3 / Atspi bindings" >&2; exit 2; }
 status=0
-for proof in run_nav_pointer_container.py; do
+for proof in run_nav_pointer_container.py run_tap_copy_container.py run_ai_inline_container.py; do
 	echo "=== ${proof} ==="
 	unshare --mount --propagation private "${PYTHON}" "${proof}"
 	result=$?
