@@ -34,6 +34,7 @@ local TextUtils = require("text_utils")
 local OpenTarget = require("open_target")
 local FileSelection = require("file_selection")
 local Logger = require("logger.shim")
+local FileManagerFolder = require("adapters.file_manager_folder")
 
 local LOG = "shortcuts.open_selection"
 
@@ -43,16 +44,6 @@ local REPORT_KEYS = {
 	file_name = "open_target.bare_file_name",
 	windows_only = "open_target.windows_only",
 	failed = "open_target.open_failed",
-}
-
--- The focused application identities (X11 process names, Wayland app ids)
--- of the file managers whose Ctrl+C publishes the selected files. A
--- reverse-DNS id also matches by its last component (org.gnome.Nautilus).
-local FILE_MANAGERS = {
-	["nautilus"] = true, ["nemo"] = true, ["caja"] = true, ["thunar"] = true,
-	["dolphin"] = true, ["konqueror"] = true, ["pcmanfm"] = true, ["pcmanfm-qt"] = true,
-	["spacefm"] = true, ["krusader"] = true, ["doublecmd"] = true, ["peony"] = true,
-	["io.elementary.files"] = true, ["pantheon-files"] = true,
 }
 
 local DEFAULT_DEPS = {
@@ -150,9 +141,7 @@ end
 --- @param app any
 --- @return boolean
 local function is_file_manager(app)
-	if type(app) ~= "string" or app == "" then return false end
-	local id = app:lower()
-	return FILE_MANAGERS[id] == true or FILE_MANAGERS[id:match("([^.]+)$")] == true
+	return FileManagerFolder.file_manager_name(app) ~= nil
 end
 
 local function capture_manager(app, identity)

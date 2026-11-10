@@ -1069,7 +1069,8 @@ function M.get_executable_action_names()
 end
 
 --- Whether one requirement token from the catalogue holds on this machine.
---- @param token string "tool:<binary>", "session:x11", "session:workspaces" or "ai:on".
+--- @param token string "tool:<binary>", "session:x11", "session:workspaces",
+---   "file_manager:folder" or "ai:on".
 --- @return boolean|nil True/false when proven, nil when it cannot be told —
 ---   a probe that could not read the machine must never take a binding away.
 --- @return string|nil hint Localized reason when the requirement is absent.
@@ -1102,6 +1103,13 @@ local function requirement_holds(token)
 		end
 		if reason == "unsupported" then return false, i18n.get("dialog.action_picker.requires_workspaces") end
 		return nil, nil
+	end
+	if token == "file_manager:folder" then
+		-- A file manager that publishes its windows' folders (Nautilus): with
+		-- only Thunar, Dolphin or another one installed, the row stays greyed
+		-- with the reason (adapters/file_manager_folder.lua).
+		if require("adapters.file_manager_folder").supported_installed() then return true, nil end
+		return false, i18n.get("platform_reason.action_file_manager_folder_is_unreadable_on_linux")
 	end
 	if token == "ai:on" then
 		-- The AI menu's switch: nothing of the AI runs while it is off, so the
