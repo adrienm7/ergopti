@@ -490,7 +490,12 @@ _LAO_ApiValidationPublishesWhileDisabled() {
 			"a deleted entry must still reject an obsolete validation result")
 		AssertEqual(1, Notices.Length,
 			"only the current disabled-state completion may notify")
-	} finally _LLM_Menu := SavedMenu
+	} finally {
+		; The rejected completions leave the last validation owner current: the
+		; real menu would have retired it with the obsolete request.
+		LLM_AuxRetirePrefix("api_validation:prod")
+		_LLM_Menu := SavedMenu
+	}
 }
 Test("[ahk-020] API validation reports while LLM is disabled "
 	. "(api-validation-disabled-feedback)",
