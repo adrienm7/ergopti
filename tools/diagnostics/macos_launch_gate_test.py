@@ -1299,7 +1299,7 @@ class ProfileTests(unittest.TestCase):
         for arguments in (
             ("--print-matrix", "nightly"),
             ("--print-matrix", "ci", "/Applications/ErgoptiPlus.app"),
-            ("--print-matrix", "release", "--seed-tag", "v0.0.0-dev.24"),
+            ("--print-matrix", "release", "--seed-tag", "ci-seed/macos-personal-files-v0.0.0-dev.24"),
         ):
             result = print_matrix(*arguments)
             self.assertEqual(result.returncode, 2, arguments)
