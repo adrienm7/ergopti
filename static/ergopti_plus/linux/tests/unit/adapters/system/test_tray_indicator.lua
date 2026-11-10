@@ -59,9 +59,18 @@ local function fake_binding()
 			log.appends[#log.appends + 1] = { shell = shell, child = child }
 			shell.children = shell.children or {}
 			shell.children[#shell.children + 1] = child
+			child.parent = shell
 		end,
 		gtk_widget_set_sensitive = function(w, sensitive) w.sensitive = sensitive end,
 		gtk_widget_show_all = function() log.calls[#log.calls + 1] = "show_all" end,
+		gtk_widget_show = function(w) w.shown = true end,
+		gtk_widget_destroy = function(w)
+			w.destroyed = true
+			local siblings = w.parent and w.parent.children or {}
+			for index, child in ipairs(siblings) do
+				if child == w then table.remove(siblings, index) break end
+			end
+		end,
 		gtk_init_check = function() return 1 end,
 		gtk_events_pending = function()
 			log.pending_polls = (log.pending_polls or 0) + 1
@@ -95,10 +104,19 @@ local function fake_binding()
 			-- Fired the way GTK fires "activate": (the item, the user data).
 			entry.id = #log.signals + 1
 			entry.fire = function()
-				if instance.kind == "check" then instance.active = instance.active == 1 and 0 or 1 end
+				if signal == "activate" and instance.kind == "check" then
+					instance.active = instance.active == 1 and 0 or 1
+				end
 				if not entry.blocked then return handler(instance, data) end
 			end
-			instance.activate = entry.fire
+			if signal == "activate" then
+				-- A parent row's activate opens its submenu; GTK runs every
+				-- handler of the signal, so the fake chains them too.
+				local previous = instance.activate
+				instance.activate = previous and function() previous(); entry.fire() end or entry.fire
+			else
+				instance[signal] = entry.fire
+			end
 			log.signals[#log.signals + 1] = entry
 			return entry.id
 		end,
@@ -148,9 +166,31 @@ end
 --- @return table|nil
 local function widget_named(log, label)
 	for _, w in ipairs(log.widgets) do
-		if w.label == label then return w end
+		if w.label == label and not w.destroyed then return w end
 	end
 	return nil
+end
+
+--- Opens a submenu row as a panel does: libdbusmenu-gtk turns AboutToShow
+--- into the parent row's "activate".
+--- @param log table
+--- @param label string
+local function open(log, label)
+	local row = assert(widget_named(log, label), "no row " .. label)
+	assert(row.activate, label .. " has no open handler")
+	row.activate()
+end
+
+--- The live rows of a menu, the hidden placeholder of an unopened submenu
+--- left out.
+--- @param menu table
+--- @return table
+local function rows_of(menu)
+	local rows = {}
+	for _, child in ipairs(menu.children or {}) do
+		if child.shown then rows[#rows + 1] = child end
+	end
+	return rows
 end
 
 
@@ -253,7 +293,9 @@ helpers.describe("tray indicator: the widget tree", function()
 		helpers.assert_eq(#log.submenus, 1, "exactly one submenu was attached")
 		local pair = log.submenus[1]
 		helpers.assert_eq(pair.item.label, "Hotstrings", "to the row that declared it")
-		helpers.assert_eq(#pair.submenu.children, 2, "carrying both of its rows")
+		helpers.assert_eq(#rows_of(pair.submenu), 0, "its rows are built when it is opened")
+		open(log, "Hotstrings")
+		helpers.assert_eq(#rows_of(pair.submenu), 2, "carrying both of its rows")
 		ind._set_binding_for_test(nil)
 	end)
 
@@ -263,6 +305,8 @@ helpers.describe("tray indicator: the widget tree", function()
 		ind.set_menu({
 			{ title = "A", menu = { { title = "B", menu = { { title = "C" } } } } },
 		})
+		open(log, "A")
+		open(log, "B")
 		helpers.assert_eq(#log.submenus, 2,
 			"categories contain sections; a builder that only handled one level "
 				.. "would drop every section row")
@@ -305,9 +349,20 @@ helpers.describe("tray indicator: the widget tree", function()
 			{ title = "Inert" },
 			{ title = "Parent", menu = { { title = "Child", fn = function() end } } },
 		})
-		helpers.assert_eq(#log.signals, 2,
-			"one per actionable row; a parent row opens its submenu and must not "
-				.. "also fire an action")
+		local function signals_on(label, signal)
+			local count = 0
+			for _, entry in ipairs(log.signals) do
+				if entry.widget.label == label and entry.signal == signal then count = count + 1 end
+			end
+			return count
+		end
+		helpers.assert_eq(signals_on("Acts", "activate"), 1, "one per actionable row")
+		helpers.assert_eq(signals_on("Inert", "activate"), 0, "none for a row with nothing to run")
+		helpers.assert_eq(signals_on("Parent", "activate"), 1,
+			"a parent row's only handler opens its submenu: it must not also fire an action")
+		open(log, "Parent")
+		helpers.assert_eq(signals_on("Child", "activate"), 1, "the child is armed once its submenu is opened")
+		helpers.assert_eq(#log.signals, 4, "Acts, the parent's open, its submenu's map, and Child")
 		ind._set_binding_for_test(nil)
 	end)
 
@@ -530,6 +585,130 @@ helpers.describe("tray indicator: destroy", function()
 		ind._set_binding_for_test(nil)
 	end)
 
+end)
+
+helpers.describe("tray indicator: lazy submenus and in-place rows", function()
+	--- A tree shaped like the real one: a few top rows, large submenus.
+	local function big_tree(checked, counter)
+		local rows = { { title = "Toggle", checked = checked, fn = function() counter.toggled = counter.toggled + 1 end } }
+		for section = 1, 3 do
+			local children = {}
+			for slot = 1, 100 do
+				children[slot] = { title = "Slot " .. section .. "." .. slot, fn = function() counter.slot = counter.slot + 1 end }
+			end
+			rows[#rows + 1] = { title = "Section " .. section, menu = children }
+		end
+		return rows
+	end
+
+	helpers.it("(tray-lazy) builds only the top rows until a submenu is opened", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local counter = { toggled = 0, slot = 0 }
+		local before = #log.widgets
+		ind.set_menu(big_tree(false, counter))
+		local built = #log.widgets - before
+		helpers.assert_true(built <= 10, "304 rows must not build 304 widgets before any open: built " .. built)
+		open(log, "Section 2")
+		helpers.assert_eq(#rows_of(log.submenus[2].submenu), 100, "the opened submenu has all its rows")
+		helpers.assert_nil(widget_named(log, "Slot 1.1"), "an unopened sibling stays unbuilt")
+		widget_named(log, "Slot 2.7").activate()
+		helpers.assert_eq(counter.slot, 1, "a lazily built row runs its own action")
+		local after_open = #log.widgets
+		open(log, "Section 2")
+		helpers.assert_eq(#log.widgets, after_open, "opening again builds nothing")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-lazy) a toggle updates its row in place, with no new widget", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local old = { toggled = 0, slot = 0 }
+		ind.set_menu(big_tree(false, old))
+		open(log, "Section 1")
+		local toggle_row = widget_named(log, "Toggle")
+		local slot = widget_named(log, "Slot 1.3")
+		local widgets = #log.widgets
+		local new = { toggled = 0, slot = 0 }
+		ind.set_menu(big_tree(true, new))
+		helpers.assert_eq(#log.widgets, widgets, "a same-shaped tree builds no widget")
+		helpers.assert_true(widget_named(log, "Toggle") == toggle_row, "the toggled row is the same widget")
+		helpers.assert_eq(toggle_row.active, 1, "showing the new check")
+		helpers.assert_eq(old.toggled + new.toggled, 0, "publishing the check runs no action")
+		slot.activate()
+		toggle_row.activate()
+		helpers.assert_eq(old.slot + old.toggled, 0, "a row runs the current tree's action, never the replaced one's")
+		helpers.assert_eq(new.slot, 1)
+		helpers.assert_eq(new.toggled, 1)
+		helpers.assert_eq(toggle_row.active, 1, "the click left the published check to the owner")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-lazy) a changed title rebuilds only its own submenu", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local counter = { toggled = 0, slot = 0 }
+		local tree = big_tree(false, counter)
+		ind.set_menu(tree)
+		open(log, "Section 1")
+		open(log, "Section 3")
+		local renamed_slot = widget_named(log, "Slot 1.5")
+		local kept = widget_named(log, "Slot 3.5")
+		local top = widget_named(log, "Section 1")
+		tree = big_tree(false, counter)
+		tree[2].menu[5].title = "Renamed slot"
+		ind.set_menu(tree)
+		helpers.assert_true(renamed_slot.destroyed, "the changed submenu was rebuilt")
+		helpers.assert_eq(widget_named(log, "Renamed slot").shown, true)
+		helpers.assert_true(not kept.destroyed, "an unchanged submenu keeps its widgets")
+		helpers.assert_true(widget_named(log, "Section 1") == top, "the parent row itself stays")
+		renamed_slot.activate()
+		helpers.assert_eq(counter.slot, 0, "a destroyed row runs nothing")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-lazy) disabling a row in place revokes its action and enabling grants it", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local runs = 0
+		local function row(disabled) return { { title = "Row", disabled = disabled, fn = function() runs = runs + 1 end } } end
+		ind.set_menu(row(false))
+		local widget = widget_named(log, "Row")
+		ind.set_menu(row(true))
+		helpers.assert_true(widget_named(log, "Row") == widget, "updated in place")
+		helpers.assert_eq(widget.sensitive, 0)
+		widget.activate()
+		helpers.assert_eq(runs, 0, "dbusmenu can activate an insensitive item: it must find no action")
+		ind.set_menu(row(false))
+		helpers.assert_eq(widget.sensitive, 1)
+		widget.activate()
+		helpers.assert_eq(runs, 1)
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-lazy) a changed check on a submenu row does not build that submenu", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local function tree(checked) return { { title = "Category", checked = checked, menu = { { title = "Inside" } } } } end
+		ind.set_menu(tree(false))
+		ind.set_menu(tree(true))
+		helpers.assert_eq(widget_named(log, "Category").active, 1)
+		helpers.assert_nil(widget_named(log, "Inside"), "GTK's set_active emits activate, which opens the submenu")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-lazy) a disabled parent's rows are built disabled when opened", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local runs = 0
+		ind.set_menu({ { title = "Off", disabled = true, menu = { { title = "Child", fn = function() runs = runs + 1 end } } } })
+		open(log, "Off")
+		local child = widget_named(log, "Child")
+		helpers.assert_eq(child.sensitive, 0)
+		if child.activate then child.activate() end
+		helpers.assert_eq(runs, 0)
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
 end)
 
 helpers.describe("tray-disabled-admission: protocol activation", function()
