@@ -3181,6 +3181,7 @@ jobs:
               --expect-label "Ergopti+ tray probe" --expect-icon-file \
               --expect-submenu "Parent probe" --expect-submenu "Child probe" \
               --expect-submenu "Checked probe" --click-label "Click probe" \
+              --expect-lazy "Child probe" --toggle-label "Toggle probe" \
               --rebuild-label "Rebuild probe" --expect-rebuilt-label "Rebuilt marker" > "$RUNNER_TEMP/sni.json" &
             host=$!
             for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
