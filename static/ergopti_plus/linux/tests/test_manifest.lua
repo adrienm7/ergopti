@@ -255,6 +255,8 @@ return {
 	"tests.unit.adapters.synthetic_input.test_keyboard_source_fixture",
 	"tests.unit.adapters.synthetic_input.test_uinput_writer_constructor_retirement_refusal",
 	"tests.unit.adapters.atspi.test_window_info_focus",
+	"tests.unit.adapters.compositor_focus.test_compositor_focus",
+	"tests.unit.adapters.compositor_focus.test_compositor_focus_assets",
 	"tests.unit.adapters.system.test_wpm_surface_lifecycle",
 	"tests.unit.adapters.layout.test_xkb_capture_exact_evdev_event",
 	"tests.unit.adapters.layout.test_xkb_capture_direct_sources_retain",
