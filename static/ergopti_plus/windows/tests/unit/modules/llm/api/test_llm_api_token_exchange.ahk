@@ -982,7 +982,10 @@ _LTEWB_Body(Backend, Late, Posts, Lines) {
     try {
         Success := (Text, Usage := "") => Heard.Push(Map("ok", true))
         Failure := (Info := "") => Heard.Push(Map("ok", false, "info", Info))
-        Budget := 96
+        ; Only the late case needs a budget that expires: the immediate control
+        ; proves a reply inside the budget, and at 96 ms a loaded machine's
+        ; reply could arrive after its own deadline and read as a timeout.
+        Budget := Late ? 96 : 10000
         if Backend == "generate"
             Id := LLM_RemoteGenerate_Async(_LTE_Entry(), "Fixture system.", "Fixture user.", 0.1,
                 Success, Failure, "", 8, "token_wait_budget", Budget)
