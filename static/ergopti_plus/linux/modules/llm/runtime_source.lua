@@ -10,8 +10,11 @@
 local M={}
 local KEY=require("config_keys").KEY
 local TableUtil=require("table_util")
+-- Two reads of one source, compared as the writer compares them: an absent
+-- file has no bytes (the writer's preimage carries "", a preference read nil).
 local function same_source(a,b)
-	return type(a)=='table' and type(b)=='table' and a.status==b.status and a.content==b.content
+	return type(a)=='table' and type(b)=='table' and a.status==b.status
+		and (a.status~='ok' or a.content==b.content)
 end
 local copy=TableUtil.shallow_copy
 function M.new(deps)

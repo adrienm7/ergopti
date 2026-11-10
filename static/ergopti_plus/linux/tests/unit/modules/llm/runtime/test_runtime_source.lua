@@ -52,14 +52,20 @@ local function world()
 			if owner.on_publication_read then owner.on_publication_read(owner.batch_frame)end
 		end
 		if owner.on_read then owner.on_read(owner.reads)end
+		if owner.bytes==nil then return nil,'absent' end
 		return owner.bytes,'ok'
 	end
+	-- An absent source has no bytes to compare, as for the real file adapter.
+	local function unchanged(source)
+		if owner.bytes==nil then return source.status=='absent' end
+		return source.status=='ok' and source.content==owner.bytes
+	end
 	function memory.write_if_unchanged(_,content,source)
-		if owner.write_refused or source.status~='ok' or source.content~=owner.bytes then return false,'source changed'end
+		if owner.write_refused or not unchanged(source) then return false,'source changed'end
 		owner.bytes=content;owner.writes=owner.writes+1;return true
 	end
 	function memory.write_if_unchanged_admitted(path,content,source,on_error,admission)
-		if source.status~='ok' or source.content~=owner.bytes then return false,'source changed'end
+		if not unchanged(source) then return false,'source changed'end
 		local called,allowed=pcall(admission)
 		if not called or allowed~=true then return false,'final admission refused'end
 		return memory.write_if_unchanged(path,content,source)
@@ -133,6 +139,15 @@ test('actual profile/preference/shared writer ACK produces exact private app pro
 	local v=world();v:capture();local before=v.preferences.generation();eq(v:publish(),true)
 	eq(v.writes,1);eq(v.accept_count,1);eq(v.preferences.generation(),before+2);eq(v.state.enabled,true)
 	eq(v.source.app_current(v.application,v.runtime,v.handle.origin),true)
+end)
+-- (runtime-absent-config) config_migrate leaves an absent config.toml absent,
+-- and the writer's preimage of it carries "" where the preference read carries
+-- nil: starting Ergopti's Ollama was refused (runtime_writer_unacknowledged_restored)
+-- until an absent source compared by status alone (container proof 2026-11-10).
+test('(runtime-absent-config) an absent config.toml publishes the enable it creates',function()
+	local v=world();v.bytes=nil;v:capture();eq(v:publish(),true)
+	eq(v.writes,1);eq(v.accept_count,1);eq(v.state.enabled,true)
+	eq(v.bytes:find('enabled = true',1,true)~=nil,true)
 end)
 test('exact preview preserves independent unrelated bytes',function()
 	local v=world();v.bytes=v.bytes..'# independent preserved comment\n';v:capture();eq(v:publish(),true)
