@@ -27,10 +27,14 @@ _TakeNoteTitleMatchesFile(Title, FileName) {
 	Title := Trim(Title)
 	if SubStr(Title, 1, 1) == "*"
 		Title := LTrim(SubStr(Title, 2))
-	; Notepad appends its localized product label after the last " - ". Taking
-	; the last separator rejects prefixes, backup extensions, and filenames that
-	; merely begin with the requested fixed Notes*.txt basename.
-	SeparatorPos := InStr(Title, " - ", , -1)
+	; Notepad appends its localized product label after the last separator: a
+	; hyphen in the classic Notepad, an en dash in the Windows 11 Store Notepad
+	; (« Notes.txt – Bloc-notes »). Taking the last one rejects prefixes, backup
+	; extensions, and filenames that merely begin with the requested fixed
+	; Notes*.txt basename.
+	SeparatorPos := 0
+	for Separator in [" - ", " " . Chr(0x2013) . " ", " " . Chr(0x2014) . " "]
+		SeparatorPos := Max(SeparatorPos, InStr(Title, Separator, , -1))
 	DocumentTitle := SeparatorPos > 0 ? SubStr(Title, 1, SeparatorPos - 1) : Title
 	return StrLower(DocumentTitle) == StrLower(FileName)
 }
