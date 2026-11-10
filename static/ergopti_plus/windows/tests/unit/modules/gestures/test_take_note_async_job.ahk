@@ -448,3 +448,20 @@ _TNAJ_TimeoutNamesWhatItWaitedFor() {
 }
 Test("take note async: the deadline warning says what it waited for (takenote-timeout-cause)",
 	_TNAJ_TimeoutNamesWhatItWaitedFor)
+
+; The Windows 11 Store Notepad separates the product label with an en dash
+; (« Notes.txt – Bloc-notes »): a hyphen-only matcher never found its window.
+_TNAJ_TitleSeparatorsOfEveryNotepad() {
+	EnDash := Chr(0x2013), EmDash := Chr(0x2014)
+	AssertTrue(_TakeNoteTitleMatchesFile("Notes.txt - Notepad", "Notes.txt"), "classic Notepad hyphen")
+	AssertTrue(_TakeNoteTitleMatchesFile("Notes.txt " . EnDash . " Bloc-notes", "Notes.txt"),
+		"Windows 11 Notepad en dash, French label with its own hyphen")
+	AssertTrue(_TakeNoteTitleMatchesFile("*Notes.txt " . EnDash . " Notepad", "Notes.txt"), "unsaved marker")
+	AssertTrue(_TakeNoteTitleMatchesFile("Notes.txt " . EmDash . " Notepad", "Notes.txt"), "em dash")
+	AssertFalse(_TakeNoteTitleMatchesFile("Notes.txt " . EnDash . " old.txt " . EnDash . " Notepad", "Notes.txt"),
+		"the last separator names the product, so a longer document title stays foreign")
+	AssertFalse(_TakeNoteTitleMatchesFile("Notes.txt.bak " . EnDash . " Bloc-notes", "Notes.txt"), "backup")
+	AssertFalse(_TakeNoteTitleMatchesFile("Notes.txt " . EnDash . " Bloc-notes", "Other.txt"), "other file")
+}
+Test("take note async: the title matcher reads every Notepad separator (takenote-title-separator)",
+	_TNAJ_TitleSeparatorsOfEveryNotepad)
