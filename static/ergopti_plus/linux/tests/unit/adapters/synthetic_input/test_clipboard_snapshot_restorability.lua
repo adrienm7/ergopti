@@ -5,7 +5,7 @@ local REPLACEMENT = "EP79_PRIVATE_REPLACEMENT_CANARY"
 local SELECTED = "EP79_PRIVATE_SELECTED_CANARY"
 local URI = "file:///owned/EP79_PRIVATE_URI_CANARY\n"
 
-local function with_snapshot(saved, body, targets, owner)
+local function with_snapshot(saved, body, targets, owner, unowned)
 	local loaded, globals = {}, {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local old_cpath, old_ffi_preload = package.cpath, package.preload.ffi
@@ -56,6 +56,14 @@ local function with_snapshot(saved, body, targets, owner)
 				return true
 			end,
 		}
+		-- Real xclip exits 1 when nobody owns the clipboard; the libX11 owner
+		-- probe tells that empty clipboard from a failed read.
+		s.owner_probes = 0
+		package.loaded["adapters.x11_selection_stamp"] = { owned = function()
+			s.owner_probes = s.owner_probes + 1
+			if unowned == nil then error("the owner probe runs only after a failed read", 0) end
+			return unowned.owned
+		end }
 		package.loaded["adapters.keyboard_layout"] = {
 			shortcut_keycode = function(char, fallback)
 				s.layout_calls = s.layout_calls + 1
@@ -82,6 +90,7 @@ local function with_snapshot(saved, body, targets, owner)
 			end
 			if command == clipboard or command == primary or command == uri then
 				s.reads[#s.reads + 1] = command
+				if unowned ~= nil and #s.writes == 0 then return { ok = false, output = "" } end
 				return { ok = true, output = s.value }
 			end
 			-- Decode the real generated command independently; no writer/guard mock.
@@ -185,6 +194,24 @@ helpers.describe("clipboard snapshot restorability", function()
 					elseif owner == "read_selection" then helpers.assert_eq(text, SELECTED)
 					elseif owner == "read_selection_uri_list" then helpers.assert_eq(text, URI) end
 				end)
+			end)
+		end
+		helpers.it("snapshot preflight: " .. owner .. " borrows a clipboard nobody owns as empty (clipboard-unowned-empty)", function()
+			with_snapshot("", function(_, s)
+				local accepted = s.invoke(owner)
+				helpers.assert_eq(accepted, true, "an ownerless clipboard is an empty one, not a failed read")
+				helpers.assert_eq(s.owner_probes, 1)
+				helpers.assert_eq(s.writes[#s.writes], "", "the empty clipboard is restored")
+			end, nil, nil, { owned = false })
+		end)
+		for _, probe in ipairs({ { name = "owned", owned = true }, { name = "unknown", owned = nil } }) do
+			helpers.it("snapshot preflight: " .. owner .. " refuses a failed read of an " .. probe.name
+				.. " clipboard (clipboard-unowned-empty)", function()
+				with_snapshot("EP79_PRIVATE_UNREAD", function(_, s)
+					local accepted = s.invoke(owner)
+					helpers.assert_eq(accepted, false)
+					helpers.assert_eq(#s.writes, 0, "a clipboard that could not be read is never borrowed")
+				end, nil, nil, { owned = probe.owned })
 			end)
 		end
 		-- LCP-001: the text writer offers one type, so a clipboard that also holds
