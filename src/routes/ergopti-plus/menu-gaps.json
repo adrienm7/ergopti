@@ -577,12 +577,12 @@
 		"platforms": { "windows": false, "macos": false, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Linux only: under Wayland an application gets neither the cursor position nor the current desktop, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.",
-				"fr": "Linux uniquement : sous Wayland, une application ne reçoit ni la position du curseur ni le bureau courant ; cette liste nomme donc les métriques que cette session ne peut pas mesurer, chacune avec sa raison. Windows et macOS mesurent les deux dans toutes les sessions et n’ont rien à lister."
+				"en": "Linux only: under Wayland an application gets no cursor position, and the current desktop only from sway, Hyprland or KDE Plasma, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.",
+				"fr": "Linux uniquement : sous Wayland, une application ne reçoit pas la position du curseur, et le bureau courant seulement de sway, Hyprland ou KDE Plasma ; cette liste nomme donc les métriques que cette session ne peut pas mesurer, chacune avec sa raison. Windows et macOS mesurent les deux dans toutes les sessions et n’ont rien à lister."
 			},
 			"macos": {
-				"en": "Linux only: under Wayland an application gets neither the cursor position nor the current desktop, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.",
-				"fr": "Linux uniquement : sous Wayland, une application ne reçoit ni la position du curseur ni le bureau courant ; cette liste nomme donc les métriques que cette session ne peut pas mesurer, chacune avec sa raison. Windows et macOS mesurent les deux dans toutes les sessions et n’ont rien à lister."
+				"en": "Linux only: under Wayland an application gets no cursor position, and the current desktop only from sway, Hyprland or KDE Plasma, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.",
+				"fr": "Linux uniquement : sous Wayland, une application ne reçoit pas la position du curseur, et le bureau courant seulement de sway, Hyprland ou KDE Plasma ; cette liste nomme donc les métriques que cette session ne peut pas mesurer, chacune avec sa raison. Windows et macOS mesurent les deux dans toutes les sessions et n’ont rien à lister."
 			}
 		}
 	},
