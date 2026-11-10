@@ -72,6 +72,8 @@ M.COMBO = {
 -- ship qdbus6 (Arch, KDE neon) or qdbus-qt6 (Fedora), Qt 5 ones qdbus or
 -- qdbus-qt5. The first one on the PATH is used.
 local QDBUS_BINARIES = { "qdbus6", "qdbus-qt6", "qdbus", "qdbus-qt5" }
+-- Shared with the tap-to-click setting reader, which asks KWin too.
+M.QDBUS_BINARIES = QDBUS_BINARIES
 
 
 

@@ -67,6 +67,23 @@ reader start names each bound two-finger slot), and no code here can stop the
 desktop's own gesture without taking the grab. Under Wayland no external process
 can move, focus or close a window, so no Linux tool can add those actions there.
 
+### project-linux-tap-to-click-is-re-derived-from-the-touch
+
+libinput synthesises a tap-to-click above evdev, so the kernel never reports
+its button; Windows and macOS count it because their hooks see the button.
+The keyboard hook forwards every touch report of a pointer source as a
+`contact` and stamps each `frame` with the kernel time; `pointer_metrics`
+runs `modules/gestures/tap_detector.lua` (libinput's 180 ms timer from the
+last landing, 1.3 mm, at most three fingers, no landing after a lift, no
+button press) and counts a left or right tap as a click only while
+`adapters/tap_to_click_setting.lua` reads the desktop's setting as on. That
+reader answers unknown, never off, when the desktop does not say; the Metrics
+menu then names « Touchpad taps » as not measured. Palm, thumb and
+disable-while-typing rejection are not reproduced: a change that needs them
+must bring the keyboard stream and the hwdb quirks to the detector. The
+setting is read off the input path (the tick, every 5 s while the pad is in
+use) except once at a pad's first tap.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve
