@@ -160,6 +160,11 @@ function M.new(defaults, delays_default)
 		tap_hold_resets_word       = false,
 		tap_hold_command_pending   = false,
 		nav_layer_active           = false,
+		-- The Cmd, Ctrl and Option flags the hand held when Karabiner's untagged
+		-- context-menu marker announced a tap-hold key's Ctrl, Cmd or Option
+		-- hold; nil while no such hold is down. A shortcut carrying a flag
+		-- beyond these is the hold's.
+		tap_hold_modifier_hand     = nil,
 		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
 		WORD_TIMEOUT_SEC           = 0,
 		-- How many expansions a chain of hotstrings may hold

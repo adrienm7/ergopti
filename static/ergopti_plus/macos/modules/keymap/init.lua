@@ -626,15 +626,64 @@ function M.set_tap_hold_resets_word(enabled)
 	return true
 end
 
+-- The modifiers that make shortcuts; Shift only types.
+local SHORTCUT_FLAGS = { "cmd", "ctrl", "alt" }
+
+--- The Cmd, Ctrl and Option flags of one event.
+--- @param flags table|nil Quartz modifier flags.
+--- @return table held Flag name → true.
+local function shortcut_flags_of(flags)
+	local held = {}
+	for _, flag in ipairs(SHORTCUT_FLAGS) do
+		if type(flags) == "table" and flags[flag] == true then held[flag] = true end
+	end
+	return held
+end
+
+--- Whether a tap-hold key's Ctrl, Cmd or Option hold is still down under these
+--- flags: one of them is beyond what the hand held at its marker. Once none is,
+--- the hold was released and the record is dropped, so the hand's own chords
+--- follow shortcut_resets_word again.
+--- @param flags table|nil Quartz modifier flags.
+--- @return boolean
+local function tap_hold_modifier_down(flags)
+	local hand = CoreState.tap_hold_modifier_hand
+	if hand == nil then return false end
+	for flag in pairs(shortcut_flags_of(flags)) do
+		if not hand[flag] then return true end
+	end
+	CoreState.tap_hold_modifier_hand = nil
+	return false
+end
+
+--- Follows a modifier edge for the tap-hold modifier record: the release of the
+--- hold's modifiers is the hold's end (Karabiner sends no marker for it).
+--- Runs inside the flagsChanged eventtap: in-memory work only.
+--- @param flags table|nil Quartz modifier flags after the edge.
+function M.observe_modifier_edge(flags)
+	tap_hold_modifier_down(flags)
+end
+
 --- Applies one Karabiner marker to the word state. A tap-hold command applies
 --- its option at once (its keys may be no shortcut at all) and lends it to the
 --- shortcut that carries it; the navigation layer lends it to every shortcut
---- struck while it is on. A Ctrl, Cmd or Option hold carries no marker (it
---- would lift the hand's modifiers), so its shortcuts follow shortcut_resets_word.
+--- struck while it is on. A Ctrl, Cmd or Option hold is led by the untagged
+--- context-menu key, whose flags are the hand's own modifiers: every shortcut
+--- carrying another one of them is the hold's until its modifiers go up.
 --- Runs inside the eventtap that claimed the marker: in-memory work only.
 --- @param signal string A control sentinel signal.
-function M.observe_tap_hold_signal(signal)
-	if signal == ControlSentinels.TAP_HOLD_COMMAND then
+--- @param flags table|nil The marker's modifier flags.
+function M.observe_tap_hold_signal(signal, flags)
+	if signal == ControlSentinels.TAP_HOLD_MODIFIER then
+		-- A second hold under the first: the hand holds at most what both saw.
+		local hand, previous = shortcut_flags_of(flags), CoreState.tap_hold_modifier_hand
+		if previous ~= nil then
+			for flag in pairs(hand) do
+				if not previous[flag] then hand[flag] = nil end
+			end
+		end
+		CoreState.tap_hold_modifier_hand = hand
+	elseif signal == ControlSentinels.TAP_HOLD_COMMAND then
 		if CoreState.tap_hold_resets_word == true then
 			CoreState.buffer = ""
 			CoreState.start_is_word_boundary = true
@@ -1902,10 +1951,12 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Cmd+A outside a terminal and Cmd+L in a browser select the whole text of
 	-- the field: once a Backspace or a character replaces it the field is empty,
 	-- and a further Backspace deletes nothing (start_is_line_start).
-	-- A chord a tap-hold sent, or struck while the navigation layer is on,
-	-- follows hotstrings.tap_hold_resets_word instead, as on Windows and
-	-- Linux; Karabiner's markers say which (observe_tap_hold_signal).
+	-- A chord a tap-hold sent, struck under a tap-hold key's Ctrl, Cmd or
+	-- Option hold, or struck while the navigation layer is on, follows
+	-- hotstrings.tap_hold_resets_word instead, as on Windows and Linux;
+	-- Karabiner's markers say which (observe_tap_hold_signal).
 	local from_tap_hold = CoreState.tap_hold_command_pending == true or CoreState.nav_layer_active == true
+		or tap_hold_modifier_down(flags)
 	CoreState.tap_hold_command_pending = false
 	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
 		local resets = CoreState.shortcut_resets_word == true
@@ -2442,11 +2493,14 @@ shift_tap = eventtap.new(
 			_shift_right_down = false
 			_shift_last_side = nil
 			update_shift_side()
+			-- An unread edge may be the hold's release: its shortcuts are no longer known.
+			CoreState.tap_hold_modifier_hand = nil
 			return false, fence_events
 		end
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
+			M.observe_modifier_edge(f)
 			-- Its own pcall: a watch failure must never pass for a shift-side one.
 			if _tap_copy and CoreState.processing_paused ~= true and SyntheticInput.admission_open() then
 				local _, stamp = EventClock.lateness_ms(e)

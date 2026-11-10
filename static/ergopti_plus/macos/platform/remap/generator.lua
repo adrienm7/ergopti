@@ -201,6 +201,10 @@ local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED
 -- Hammerspoon knows when the layer is no longer held: it runs the layer's
 -- wheel bindings, which Karabiner cannot take, only in between.
 local LAYER_EXIT_SENTINEL_NAME = Keycodes.to_name(Keycodes.F19_LAYER_NAV_EXITED)
+-- The untagged key led by every hold that presses Ctrl, Cmd or Option for a
+-- tap-hold key (tap_hold_modifier_marker). Read from the platform-neutral
+-- registry: hs.keycodes.map names no keycode 110, so to_name() cannot.
+local TAP_HOLD_MODIFIER_SENTINEL_NAME = require("keycodes").CONTEXT_MENU_KARABINER_NAME
 
 -- The tap-hold keys the navigation layer swallows while another key holds it,
 -- by key id, with the tap that makes them so (their hold being the layer):
@@ -1068,6 +1072,60 @@ local function marked_tap(events, marked)
 	return copy
 end
 
+--- One untagged key telling the driver that a tap-hold key's hold is about to
+--- press Ctrl, Cmd or Option, so a shortcut struck under it follows
+--- hotstrings.tap_hold_resets_word, as on Windows and Linux. Untagged, unlike
+--- tap_hold_marker: a tagged event would make the rule claim the modifiers the
+--- hand already holds, which the hold keeps (decision vector
+--- hold_key_tap_keeps_a_modifier_held_before_it). The hold's release needs no
+--- marker of its own: the driver sees its modifiers go up.
+--- @return table event Fresh Karabiner event.
+local function tap_hold_modifier_marker()
+	return { key_code = TAP_HOLD_MODIFIER_SENTINEL_NAME, ["repeat"] = false }
+end
+
+--- Whether a Karabiner modifier name is Ctrl, Cmd or Option, the modifiers
+--- that make shortcuts (Shift only types).
+--- @param name any Karabiner key code or modifier name.
+--- @return boolean
+local function is_shortcut_modifier(name)
+	return type(name) == "string" and (name:find("command", 1, true) or name:find("control", 1, true)
+		or name:find("option", 1, true)) ~= nil
+end
+
+--- Whether a hold presses Ctrl, Cmd or Option of its own: a key held as its own
+--- native modifier (left Control held as left Control) is the keyboard's
+--- modifier, as on Windows (TapHoldOwnsShortcut).
+--- @param key_code string Physical key.
+--- @param events table Karabiner hold events.
+--- @return boolean
+local function is_shortcut_hold(key_code, events)
+	if #events == 1 and type(events[1]) == "table" and events[1].key_code == key_code
+		and events[1].modifiers == nil then return false end
+	for _, event in ipairs(events) do
+		if type(event) == "table" then
+			if FLAG_KEY_CODES[event.key_code] and is_shortcut_modifier(event.key_code) then return true end
+			for _, modifier in ipairs(type(event.modifiers) == "table" and event.modifiers or {}) do
+				if is_shortcut_modifier(modifier) then return true end
+			end
+		end
+	end
+	return false
+end
+
+--- A copy of a hold's events led by the modifier marker when it presses Ctrl,
+--- Cmd or Option of its own.
+--- @param key_code string Physical key.
+--- @param events table Karabiner hold events.
+--- @param marked boolean Whether markers are emitted at all.
+--- @return table events
+local function marked_hold(key_code, events, marked)
+	if not marked or not is_shortcut_hold(key_code, events) then return events end
+	local copy = { tap_hold_modifier_marker() }
+	for _, event in ipairs(events) do copy[#copy + 1] = deep_copy(event) end
+	return copy
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -1152,11 +1210,11 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 		manipulator.to_if_alone = native_tap
 		manipulator.to_delayed_action = { to_if_canceled = native_tap }
 		manipulator.to_if_held_down = { set_var_event(rollover_hold_var, 1) }
-		for _, ev in ipairs(hold_to) do
+		for _, ev in ipairs(marked_hold(key_code, hold_to, marked)) do
 			manipulator.to_if_held_down[#manipulator.to_if_held_down + 1] = deep_copy(ev)
 		end
 	else
-		for _, ev in ipairs(hold_to) do to_events[#to_events + 1] = ev end
+		for _, ev in ipairs(marked_hold(key_code, hold_to, marked)) do to_events[#to_events + 1] = ev end
 		local effective_tap_to = (#tap_to > 0) and tap_to or { { key_code = key_code } }
 		-- to_if_alone only when tap output differs from hold output
 		if not same_output(effective_tap_to, hold_to) then

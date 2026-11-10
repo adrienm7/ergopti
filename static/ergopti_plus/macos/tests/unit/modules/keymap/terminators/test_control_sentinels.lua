@@ -24,6 +24,9 @@ local TooltipSupport = require("tests.support.tooltip_watcher_fixture")
 local KEYCODE_A = 0
 local KEYCODE_F19 = 80
 local KEYCODE_F20 = 90
+-- The untagged context-menu key Karabiner sends before a tap-hold key's Ctrl,
+-- Cmd or Option hold (macos-tap-hold-modifier-word-reset).
+local KEYCODE_CONTEXT_MENU = 110
 
 
 --- Loads a fresh owner whose deferred diagnostics are captured.
@@ -91,6 +94,24 @@ helpers.describe("control sentinels: one owner claims the Karabiner F20", functi
 		helpers.assert_eq(signals, { Sentinels.NAV_LAYER_EXITED, Sentinels.NAV_LAYER_EXITED })
 	end)
 
+	helpers.it("(macos-tap-hold-modifier-word-reset) claims both context-menu phases and hands over the hand's flags", function()
+		local Sentinels = load_owner()
+		local signals = {}
+		Sentinels.set_listener("test.observer", function(signal, flags)
+			signals[#signals + 1] = { signal = signal, flags = flags }
+		end)
+		local hand = { cmd = true }
+		helpers.assert_true(Sentinels.is_sentinel(KEYCODE_CONTEXT_MENU), "the context-menu key is a control sentinel")
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_CONTEXT_MENU, true, hand), "its key-down must be deleted")
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_CONTEXT_MENU, false), "its key-up must be deleted")
+		-- Untagged: whatever the hand holds, it stays the hold's marker.
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_CONTEXT_MENU, true, { ctrl = true, alt = true }))
+		helpers.assert_eq(#signals, 2, "only key-down edges publish")
+		helpers.assert_eq(signals[1].signal, Sentinels.TAP_HOLD_MODIFIER)
+		helpers.assert_true(signals[1].flags == hand, "the listener reads the marker's own flags")
+		helpers.assert_eq(signals[2].signal, Sentinels.TAP_HOLD_MODIFIER)
+	end)
+
 	helpers.it("(sentinel-never-reaches-app) isolates a failing listener and reports it off the tap", function()
 		local Sentinels, deferred, logs = load_owner()
 		local healthy = 0
@@ -137,6 +158,11 @@ helpers.describe("control sentinels: tooltip watchers defer to the owner", funct
 			TooltipSupport.drain_deferred_actions(context.timers)
 			helpers.assert_true(context.tooltip.is_visible(),
 				"leaving the navigation layer must not dismiss the tooltip (layer-wheel-slots)")
+			helpers.assert_eq(key_watcher.fn(TooltipSupport.hardware_key_event(KEYCODE_CONTEXT_MENU)), false,
+				"the tooltip watcher must leave the hold marker to its owner")
+			TooltipSupport.drain_deferred_actions(context.timers)
+			helpers.assert_true(context.tooltip.is_visible(),
+				"a tap-hold key's modifier hold must not dismiss the tooltip (macos-tap-hold-modifier-word-reset)")
 
 			helpers.assert_true(require("modules.keymap.control_sentinels").claim_key(KEYCODE_F20, true))
 			TooltipSupport.drain_deferred_actions(context.timers)
@@ -163,6 +189,11 @@ helpers.describe("control sentinels: tooltip watchers defer to the owner", funct
 			TooltipSupport.drain_deferred_actions(context.timers)
 			helpers.assert_true(context.renderer.visible,
 				"the exit sentinel is not a dismissing keystroke (layer-wheel-slots)")
+			helpers.assert_eq(key_watcher.fn(TooltipSupport.hardware_key_event(KEYCODE_CONTEXT_MENU)), false,
+				"the hotstring watcher must leave the hold marker to its owner")
+			TooltipSupport.drain_deferred_actions(context.timers)
+			helpers.assert_true(context.renderer.visible,
+				"the hold marker is not a dismissing keystroke (macos-tap-hold-modifier-word-reset)")
 		end)
 	end)
 end)

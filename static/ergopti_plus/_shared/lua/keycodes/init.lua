@@ -90,6 +90,22 @@ M.F19_LAYER_NAV_EXITED = 80
 --- then publish the signal in-process (the LLM tooltip renews its deadline).
 M.F20_LAYER_NAV_ENTERED = 90
 
+--- Context-menu key (keycode 110, HID keyboard usage 0x65, Karabiner
+--- "application") — Karabiner-emitted, untagged, right before a tap-hold
+--- key's Ctrl, Cmd or Option hold, so the macOS word reset tells a shortcut
+--- struck under that hold from the keyboard's own (hotstrings.
+--- tap_hold_resets_word). It is untagged because a tagged event makes
+--- Karabiner claim the modifiers the hand already holds, which the hold must
+--- keep; F13 to F20 are all taken, and F21 to F24 reach no application (the
+--- macOS HID table maps them to no keycode). An Apple keyboard has no such
+--- key and macOS gives it no action; the keymap eventtaps delete both phases
+--- through modules/keymap/control_sentinels.lua.
+M.CONTEXT_MENU_TAP_HOLD_MODIFIER = 110
+
+--- Karabiner key_code name of CONTEXT_MENU_TAP_HOLD_MODIFIER. hs.keycodes.map
+--- names no keycode 110, so the generator cannot derive it through to_name().
+M.CONTEXT_MENU_KARABINER_NAME = "application"
+
 --- The constant naming the sentinel Karabiner emits for each script chord slot
 --- (_shared/modules/actions/script_chords.json): written by the rules of
 --- platform/remap/script_chord_rules.lua and read by

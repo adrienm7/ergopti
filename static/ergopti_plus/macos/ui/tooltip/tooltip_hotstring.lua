@@ -369,6 +369,8 @@ local function start_watchers()
 			Keycodes.LAYER_SYN_1,
 			Keycodes.LAYER_SYN_2,
 			Keycodes.LAYER_SYN_3,
+			-- Last: a registry stub without it ends the list here, not mid-way.
+			Keycodes.CONTEXT_MENU_TAP_HOLD_MODIFIER,
 		}
 		
 		for _, ignored_code in ipairs(ignored_keycodes) do

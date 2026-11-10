@@ -146,6 +146,9 @@ helpers.with_fresh_modules({
 		QUARTZ_OF_KEY_CODE[letter.key_code] = letter.quartz
 	end
 	local sentinel = "key_90"
+	-- The untagged marker that leads a Ctrl, Cmd or Option hold: the keymap
+	-- deletes it, so no application receives it, whatever the hand holds.
+	local hold_marker = require("keycodes").CONTEXT_MENU_KARABINER_NAME
 
 	--- Builds the rules of one vector: every key and combination off, then its bindings.
 	--- @param vector table
@@ -203,7 +206,8 @@ helpers.with_fresh_modules({
 					if ControlSignals.decode(quartz) == "one_shot_shift" then
 						adapter.arm(Defaults.sticky_timeout_ms / 1000)
 					end
-				elseif key_code ~= nil and emission.phase ~= "lock" and not KarabinerModel.MODIFIER_KEY_CODES[key_code] then
+				elseif key_code ~= nil and key_code ~= hold_marker and emission.phase ~= "lock"
+					and not KarabinerModel.MODIFIER_KEY_CODES[key_code] then
 					local held, raw = {}, 0
 					for flag in pairs(emission.flags) do
 						local role = MODIFIER_OF_FLAG[flag]

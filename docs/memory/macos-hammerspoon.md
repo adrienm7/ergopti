@@ -794,6 +794,18 @@ until the key is released and which then takes the place of the first key's
 held modifiers after a chord. Watchers that ignore F20 by keycode (the tooltip
 dismiss lists) must ignore F19 too.
 
+A sentinel that must keep the hand's modifiers cannot be tagged: the tag is
+read by exact flags, so a hand-held Ctrl spoils it, and claiming the hand's
+modifiers to keep it exact breaks the decision vector
+`hold_key_tap_keeps_a_modifier_held_before_it`. F21 to F24 are no escape: the
+macOS HID table (IOHIDFamily `Cosmo_USB2ADB.c`) maps them to DEADKEY, so no
+event reaches Quartz. The tap-hold modifier-hold marker is therefore the
+untagged context-menu key (`application`, keycode 110), which no Apple keyboard
+has and macOS gives no action; its end is the hold's modifiers going up in the
+flagsChanged tap, not a second key. Add any new keycode sentinel to the same
+four sibling lists (tooltip dismiss lists, LLM activity-neutral keys, keystats
+silent keys) as the claim table.
+
 ### project-hs-layer-wheel-is-a-derived-owner
 
 Karabiner takes no wheel input, so the navigation layer's wheel bindings
