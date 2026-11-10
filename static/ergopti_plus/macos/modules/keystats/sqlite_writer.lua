@@ -665,6 +665,24 @@ function _builders.roi(e, id)
 	})
 end
 
+--- Persists clipboard copy, paste and burst rows in the Windows metadata shape,
+--- through the statement keystats.clipboard_events shares with Linux.
+--- @param e table Admitted clipboard event.
+--- @param id number Allocated event identity.
+--- @return string
+function _builders.clipboard(e, id)
+	local meta = {}
+	for key, value in pairs(e) do
+		if key ~= "type" and key ~= "timestamp" and key ~= "app" then meta[key] = value end
+	end
+	return require("keystats.clipboard_events").insert_sql({
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		kind = e.type, app = tostring(e.app or "Unknown"),
+		meta_json = _required_event_json(meta, "clipboard event"),
+	})
+end
+
 function _builders.hotstring(e, id, kind)
 	return Queries.render("events.hotstring", "native", {
 		device_id = tostring(_device_id), id = id,
@@ -735,6 +753,8 @@ function M.build_inserts(entry)
 		return { _builders.system(entry, _alloc_event_id()) }
 	elseif t == "roi_snapshot" or t == "new_trigger_candidate" or t == "trigger_halflife" then
 		return { _builders.roi(entry, _alloc_event_id()) }
+	elseif t == "clipboard_copy" or t == "clipboard_paste" or t == "paste_burst" then
+		return { _builders.clipboard(entry, _alloc_event_id()) }
 	elseif t == "hotstring" then
 		return { _builders.hotstring(entry, _alloc_event_id(), "fired") }
 	elseif t == "hotstring_suggested" then

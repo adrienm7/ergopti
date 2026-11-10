@@ -39,6 +39,7 @@ local EVENT_TYPES = {
 	"llm_generation", "llm_suggested", "llm_dismissed", "llm_accepted",
 	"llm_generation_failed", "sys_autocorrect",
 	"session_start", "session_end", "idle_start", "idle_end",
+	"clipboard_copy", "clipboard_paste", "paste_burst",
 }
 
 -- Timestamp shape the builders slice for the denormalised `date` column.

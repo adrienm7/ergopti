@@ -7,6 +7,9 @@
 --- real SyntheticInput tag must never reach shortcut persistence, even after a
 --- different eventtap consumer claims the same tag first. An otherwise identical
 --- untagged Cmd+V remains a genuine user shortcut and proves the sink is live.
+--- The same callback feeds events_clipboard: physical Cmd+C and Cmd+V become
+--- clipboard_copy, clipboard_paste and paste_burst rows, a tagged paste or a
+--- paused one does not, and a paused copy lends no provenance to a later paste.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -19,6 +22,8 @@ local KEYCODE_V = 9
 local function load_fixture()
 	local captured_handle = nil
 	local shortcuts = {}
+	local clipboard = {}
+	local paused = { value = false }
 	local context_state = nil
 	local log_manager = {
 		init = function() return true end,
@@ -27,6 +32,10 @@ local function load_fixture()
 		flush_buffer = function() end,
 		stop = function() return true end,
 		log_shortcut = function(value) shortcuts[#shortcuts + 1] = value end,
+		log_clipboard_event = function(kind, app, meta)
+			clipboard[#clipboard + 1] = { kind = kind, app = app, meta = meta }
+			return true
+		end,
 	}
 	package.loaded["modules.keystats.log_manager"] = log_manager
 	package.loaded["modules.keystats.context_tracker"] = {
@@ -111,7 +120,7 @@ local function load_fixture()
 	})
 	local live_hs = require("hs")
 	local prior_timer_count = #live_hs.timer.__timers
-	helpers.assert_eq(keystats.start({ is_paused = function() return false end }), true,
+	helpers.assert_eq(keystats.start({ is_paused = function() return paused.value end }), true,
 		"the provenance fixture must start before it drives the real callback")
 	local settled = 0
 	for index = prior_timer_count + 1, #live_hs.timer.__timers do
@@ -129,6 +138,8 @@ local function load_fixture()
 		context_state = context_state,
 		handle = captured_handle,
 		shortcuts = shortcuts,
+		clipboard = clipboard,
+		paused = paused,
 		synthetic = require("adapters.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 		hs = require("hs"),
@@ -136,6 +147,7 @@ local function load_fixture()
 			for _, name in ipairs({
 				"modules.keystats.init",
 				"modules.keystats.log_manager",
+				"modules.keystats.clipboard_telemetry",
 				"modules.keystats.context_tracker",
 				"modules.keystats.kc_bridge",
 				"modules.keystats.watchers",
@@ -185,6 +197,17 @@ local function physical_paste_event(fixture)
 end
 
 
+--- Creates an untagged physical Cmd+C.
+--- @param fixture table
+--- @return table event
+local function physical_copy_event(fixture)
+	local event = physical_paste_event(fixture)
+	event.getKeyCode = function() return 8 end
+	event.getCharacters = function() return "c" end
+	return event
+end
+
+
 --- Creates a real tagged replacement Cmd+V keyDown.
 --- @param fixture table
 --- @return table event
@@ -223,6 +246,41 @@ helpers.describe("keystats: tagged paste is never persisted as a shortcut", func
 		local keystats_claim = fixture.provenance.classify(event, "keystats")
 		helpers.assert_true(keystats_claim and keystats_claim.duplicate,
 			"the real keystats callback must have claimed its independent slot")
+		fixture.cleanup()
+	end)
+end)
+
+helpers.describe("keystats: physical copy and paste chords feed events_clipboard", function()
+	helpers.it("macos-clipboard-rows: Cmd+C, five Cmd+V and their burst are clipboard rows", function()
+		local fixture = load_fixture()
+		fixture.handle(physical_copy_event(fixture))
+		for _ = 1, 5 do fixture.handle(physical_paste_event(fixture)) end
+		local kinds = {}
+		for _, row in ipairs(fixture.clipboard) do kinds[#kinds + 1] = row.kind end
+		helpers.assert_eq(kinds, { "clipboard_copy", "clipboard_paste", "clipboard_paste", "clipboard_paste",
+			"clipboard_paste", "clipboard_paste", "paste_burst" })
+		helpers.assert_eq(fixture.clipboard[1].meta, { content_type = "unknown" })
+		helpers.assert_eq(fixture.clipboard[2].meta.source_app, fixture.clipboard[1].app,
+			"a paste names the application of the copy it follows")
+		helpers.assert_true(fixture.clipboard[2].meta.copy_lag_ms >= 0)
+		helpers.assert_eq(fixture.clipboard[7].meta.count, 5)
+		fixture.cleanup()
+	end)
+
+	helpers.it("macos-clipboard-provenance: a tagged paste is no row, a paused copy clears the provenance", function()
+		local fixture = load_fixture()
+		fixture.handle(owned_paste_event(fixture))
+		helpers.assert_eq(#fixture.clipboard, 0, "the driver's own Cmd+V is not the user's paste")
+		fixture.handle(physical_copy_event(fixture))
+		fixture.paused.value = true
+		fixture.handle(physical_copy_event(fixture))
+		fixture.handle(physical_paste_event(fixture))
+		helpers.assert_eq(#fixture.clipboard, 1, "a paused copy or paste is no row")
+		fixture.paused.value = false
+		fixture.handle(physical_paste_event(fixture))
+		helpers.assert_eq(fixture.clipboard[2].kind, "clipboard_paste")
+		helpers.assert_eq(fixture.clipboard[2].meta, { copy_lag_ms = -1, source_app = "" },
+			"the paused copy cleared the provenance of the recorded one")
 		fixture.cleanup()
 	end)
 end)
