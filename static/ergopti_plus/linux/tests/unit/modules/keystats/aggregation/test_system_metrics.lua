@@ -604,7 +604,7 @@ helpers.describe("system metrics: network changes", function()
 			local day = metrics.current()
 			helpers.assert_eq(day.space_switches, 0, "no desktop source: nothing is counted")
 			helpers.assert_eq(metrics.space_change_availability(),
-				{ measured = false, reason = "platform_reason.desktop_changes_need_x11" })
+				{ measured = false, reason = "platform_reason.desktop_changes_need_workspace_interface" })
 			helpers.assert_eq(day.night_wake_count, 0)
 		end)
 	end)
@@ -624,10 +624,17 @@ helpers.describe("system metrics: network changes", function()
 			helpers.assert_eq(metrics.observe_desktop(), false, "no change is counted across an unanswered read")
 			desktop = 0
 			helpers.assert_eq(metrics.observe_desktop(), true)
-			helpers.assert_eq(metrics.current().space_switches, 2)
+			-- sway names its workspaces: a name is an identity like an index.
+			desktop = "1:web"
+			helpers.assert_eq(metrics.observe_desktop(), true, "a Wayland workspace name counts too")
+			desktop = "1:web"
+			helpers.assert_eq(metrics.observe_desktop(), false)
+			desktop = ""
+			helpers.assert_nil(metrics.observe_desktop(), "an empty name is no answer")
+			helpers.assert_eq(metrics.current().space_switches, 3)
 			local actions = {}
 			for _, event in ipairs(metrics.take_events()) do actions[#actions + 1] = event.action end
-			helpers.assert_eq(actions, { "space_change", "space_change" })
+			helpers.assert_eq(actions, { "space_change", "space_change", "space_change" })
 			helpers.assert_eq(metrics.space_change_availability().measured, true)
 		end)
 	end)

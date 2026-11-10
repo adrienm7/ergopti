@@ -17,6 +17,9 @@
 ---    fell back to a keystroke that stops at the edge whatever was asked. KDE
 ---    Plasma, sway and Hyprland are now driven through their own interfaces,
 ---    and a desktop with none (GNOME) says so instead of pretending to wrap.
+--- 3. space_switches was never measured under Wayland: only the X11 EWMH
+---    desktop fed it. current_workspace_source reads the same sway, Hyprland
+---    and KWin interfaces, once a second at most, and keeps GNOME unmeasured.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -317,6 +320,67 @@ helpers.describe("workspace switcher: Wayland compositors", function()
 			helpers.assert_contains(tostring(err), "boolean wrap")
 			helpers.assert_eq(commands, {})
 			helpers.assert_eq(pressed, {})
+		end)
+	end)
+
+	helpers.it("linux-space-change: reads sway's focused workspace name once a second at most", function()
+		local focused = "1:web"
+		local answers = {}
+		local function listing()
+			return '[{"num":1,"name":"1:web","focused":' .. tostring(focused == "1:web")
+				.. ',"output":"eDP-1"},{"num":2,"name":"2","focused":' .. tostring(focused == "2")
+				.. ',"output":"eDP-1"}]'
+		end
+		answers["get_workspaces"] = listing()
+		in_session({ kind = "wayland", desktop = "sway", tools = { swaymsg = true }, answers = answers },
+			function(Switcher, commands)
+				local now = 0
+				local read, reason = Switcher.current_workspace_source(function() return now end)
+				helpers.assert_nil(reason)
+				helpers.assert_eq(read(), "1:web")
+				focused = "2"; answers["get_workspaces"] = listing()
+				now = 999
+				helpers.assert_eq(read(), "1:web", "an answer is reused within the interval")
+				helpers.assert_eq(#commands, 1, "no second fork within the interval")
+				now = 1000
+				helpers.assert_eq(read(), "2")
+				answers["get_workspaces"] = false
+				now = 2000
+				helpers.assert_nil(read(), "a failed query is no answer, never a workspace")
+			end)
+	end)
+
+	helpers.it("linux-space-change: reads Hyprland's active id and KWin's desktop number", function()
+		in_session({
+			kind = "wayland", desktop = "", env = { HYPRLAND_INSTANCE_SIGNATURE = "abc" },
+			tools = { hyprctl = true },
+			answers = { ["activeworkspace"] = '{"id":4,"name":"4","monitor":"DP-1"}' },
+		}, function(Switcher, commands)
+			local read = Switcher.current_workspace_source(function() return 0 end)
+			helpers.assert_eq(read(), 4)
+			helpers.assert_eq(commands, { "timeout 1 hyprctl -j activeworkspace 2>/dev/null" },
+				"one query, not the workspace listing")
+		end)
+		in_session({
+			kind = "wayland", desktop = "KDE", tools = { qdbus6 = true },
+			answers = { ["currentDesktop"] = "3\n" },
+		}, function(Switcher)
+			helpers.assert_eq(Switcher.current_workspace_source(function() return 0 end)(), 3)
+		end)
+	end)
+
+	helpers.it("linux-space-change: names why GNOME Wayland and X11 get no workspace reader", function()
+		in_session({ kind = "wayland", desktop = "ubuntu:gnome", tools = {} }, function(Switcher, commands)
+			local read, reason = Switcher.current_workspace_source(function() return 0 end)
+			helpers.assert_nil(read)
+			helpers.assert_eq(reason, "unsupported")
+			helpers.assert_eq(commands, {})
+		end)
+		in_session(x11(WMCTRL_THREE), function(Switcher, commands)
+			local read, reason = Switcher.current_workspace_source(function() return 0 end)
+			helpers.assert_nil(read, "X11 is read in-process by x11_focus, never by a wmctrl fork per tick")
+			helpers.assert_eq(reason, "x11")
+			helpers.assert_eq(commands, {})
 		end)
 	end)
 end)

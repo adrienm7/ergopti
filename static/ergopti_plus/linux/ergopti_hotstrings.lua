@@ -3194,20 +3194,30 @@ local function main()
 	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
 	-- Pointer distance and virtual-desktop changes are read from the X server:
 	-- the cursor's screen position (the pixels Windows and macOS store) and the
-	-- EWMH current desktop. Wayland grants neither to a client; the metrics then
-	-- say so instead of storing another unit or a zero that looks measured.
+	-- EWMH current desktop. Wayland grants no cursor position to a client; its
+	-- current workspace comes from sway, Hyprland or KWin when one runs. What
+	-- no source answers is said instead of a zero that looks measured.
 	do
 		local sources = window_info and window_info.metrics_sources() or {}
 		keystats.bind_pointer_position(sources.pointer, sources.pointer and Monotonic.now_ms or nil,
 			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
-		if system_metrics then
-			system_metrics.bind_desktop_source(sources.desktop,
-				not sources.desktop and "platform_reason.desktop_changes_need_x11" or nil)
+		local desktop, desktop_reason = sources.desktop, nil
+		if not desktop then
+			desktop, desktop_reason = require("modules.gestures.workspace_switcher")
+				.current_workspace_source(Monotonic.now_ms)
 		end
+		if system_metrics then
+			system_metrics.bind_desktop_source(desktop,
+				not desktop and "platform_reason.desktop_changes_need_workspace_interface" or nil)
+		end
+		-- The diagnostics trail of the menu's « not measured » rows.
 		if not sources.pointer then
-			-- The diagnostics trail of the menu's « not measured » rows.
-			Logger.warn(LOG, "Metrics: pointer distance and desktop changes are not measured in this session "
-				.. "(no X11 cursor position or current desktop; Wayland exposes neither to a client).")
+			Logger.warn(LOG, "Metrics: pointer distance is not measured in this session "
+				.. "(no X11 cursor position; Wayland exposes none to a client).")
+		end
+		if not desktop then
+			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
+				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
 		end
 	end
 
