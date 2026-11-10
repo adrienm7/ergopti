@@ -132,6 +132,9 @@ def identity():
             domain, _, local = login.partition("\\")
             logins.add(local)
             domains.add(domain)
+    # Each label of a directory domain names the organisation on its own
+    # (`login.corp` → `corp`), wherever it appears without the login.
+    domains |= {label for domain in domains for label in domain.split(".")}
     hosts = {os.environ.get("COMPUTERNAME", ""), socket.gethostname(), socket.getfqdn()}
     if platform.system() == "Darwin":
         for key in ("ComputerName", "LocalHostName", "HostName"):
@@ -155,6 +158,18 @@ def identity():
         "administrator",
         "runner",
         "guest",
+        # Directory and DNS labels that name no organisation.
+        "login",
+        "corp",
+        "ad",
+        "lan",
+        "intra",
+        "intranet",
+        "domain",
+        "com",
+        "net",
+        "org",
+        "fr",
     }
 
     def keep(values):

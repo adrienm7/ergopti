@@ -110,6 +110,17 @@ check('the original leak: a directory login with its domain in `ls -la` and `lso
 	assert(run.files['listeners.txt'].includes('TCP 127.0.0.1:7265 (LISTEN)'), 'the fact stays');
 });
 
+check('the organisation named by the directory domain leaves on its own too', () => {
+	const run = runRedact({
+		'f.txt': 'expanded Corp-Canary for the CORP-CANARY team, kept corp-canarying\n'
+	});
+	assert.equal(run.status, 0, run.stderr);
+	assert.equal(
+		run.files['f.txt'],
+		'expanded <domain> for the <domain> team, kept corp-canarying\n'
+	);
+});
+
 check('a company login is removed even when the machine does not report it', () => {
 	const run = runRedact({ 'a.txt': 'owner other.person@unknown-corp.example\n' });
 	assert.equal(run.status, 0, run.stderr);
@@ -192,6 +203,10 @@ check('the pre-commit gate refuses an added line naming this machine', () => {
 		const refused = gate();
 		assert.equal(refused.status, 1);
 		assert.match(refused.stderr, /leak\.txt/);
+		git('reset', '-q');
+		fs.writeFileSync(path.join(repo, 'org.txt'), 'a note about Corp-Canary\n');
+		git('add', 'org.txt');
+		assert.equal(gate().status, 1, 'the organisation name alone is refused');
 	} finally {
 		fs.rmSync(repo, { recursive: true, force: true });
 	}
