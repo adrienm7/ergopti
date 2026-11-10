@@ -70,6 +70,19 @@ _publish_tree() {
 	done < <(find "$source" -type f -print0)
 }
 
+# Whether every file of a source tree is in the target with the same bytes,
+# which is what _publish_tree writes. Compared with sha256sum (coreutils):
+# diff is absent from minimal Arch, Fedora and openSUSE images.
+_same_tree() {
+	local source="$1" target="$2" file relative
+	[ -d "$target" ] && [ ! -L "$target" ] || return 1
+	while IFS= read -r -d '' file; do
+		relative="${file#"$source"/}"
+		[ -f "$target/$relative" ] || return 1
+		[ "$(sha256sum < "$file")" = "$(sha256sum < "$target/$relative")" ] || return 1
+	done < <(find "$source" -type f -print0)
+}
+
 # Prints the first of the given commands found on PATH.
 _first_command() {
 	local name
@@ -99,7 +112,7 @@ _install_gnome() {
 	local source="$1/desktop_focus/gnome" first=false enabled label="GNOME Shell"
 	[ -d "$GNOME_TARGET" ] || first=true
 	# Every daemon start runs this: an unchanged copy says nothing.
-	if ! "$first" && diff -rq -- "$source" "$GNOME_TARGET" >/dev/null 2>&1; then return 0; fi
+	if ! "$first" && _same_tree "$source" "$GNOME_TARGET"; then return 0; fi
 	if ! _publish_tree "$source" "$GNOME_TARGET"; then
 		ergopti_msg_with "  ⚠  " install.focus_integration_failed "$label" >&2
 		return 0
@@ -168,7 +181,7 @@ _remove_gnome() {
 _install_kwin() {
 	local source="$1/desktop_focus/kwin" first=false writer label="KWin"
 	[ -d "$KWIN_TARGET" ] || first=true
-	if ! "$first" && diff -rq -- "$source" "$KWIN_TARGET" >/dev/null 2>&1; then return 0; fi
+	if ! "$first" && _same_tree "$source" "$KWIN_TARGET"; then return 0; fi
 	if ! _publish_tree "$source" "$KWIN_TARGET"; then
 		ergopti_msg_with "  ⚠  " install.focus_integration_failed "$label" >&2
 		return 0
