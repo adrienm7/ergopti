@@ -1592,7 +1592,7 @@ const INSTALL_PREPARATIONS = {
 	'archive-install-fedora':
 		'dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers',
 	'archive-install-arch':
-		'pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers',
+		'pacman -Syu --noconfirm --needed bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers',
 	'archive-install-alpine':
 		'apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers',
 	'archive-install-opensuse':
