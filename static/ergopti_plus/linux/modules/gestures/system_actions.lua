@@ -7,8 +7,10 @@
 --- show the desktop, minimize every window, sleep the displays, toggle dark
 --- mode and the microphone, quit or kill the active window's process, empty
 --- the trash, eject the removable disks, clear the notifications and the
---- clipboard, open an emoji chooser, pick a screen colour, and make the file
---- manager's selection executable. modules/gestures/manager.lua dispatches them.
+--- clipboard, open an emoji chooser, pick a screen colour, make the file
+--- manager's selection executable, and open a terminal or create a text file
+--- in the active file manager folder. modules/gestures/manager.lua dispatches
+--- them.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data first: COMMANDS maps each fixed action to its exact shell command,
@@ -27,6 +29,12 @@
 ---    read before the question too, and the signal goes only to a window that
 ---    still belongs to it: a window closed meanwhile leaves no XID to resolve,
 ---    and its freed process id may already be another program's.
+--- 4. open_terminal_here and new_text_file_here act only in a folder whose
+---    owner adapters/file_manager_folder.lua proved: the active Nautilus
+---    window showing one local folder. Every other case is refused with a
+---    notice that names why, never guessed from a title or a working
+---    directory. The new file is created exclusively (O_EXCL) under the first
+---    free name, then selected in that same Nautilus process's window.
 --- ==============================================================================
 
 local M = {}
@@ -37,6 +45,7 @@ local i18n = require("infra.i18n")
 local ShellRunner = require("adapters.shell_runner")
 local NativeDialog = require("ui.native_dialog")
 local FileSelection = require("file_selection")
+local Timings = require("infra.timings")
 
 local LOG = "modules.gestures.system_actions"
 
@@ -243,13 +252,81 @@ end
 
 --- Shows a short notice for an action that had nothing to act on.
 --- @param key string Locale key.
-local function notify(key)
+--- @param value string|nil Replaces {1} in the message.
+local function notify(key, value)
 	local ok, Notifier = pcall(require, "adapters.application_notifier")
 	if not ok or type(Notifier.send) ~= "function" then
 		Logger.warn(LOG, "No notifier to show '%s'.", key)
 		return
 	end
-	Notifier.send(i18n.get(key), { level = "info" })
+	local message = i18n.get(key)
+	if value ~= nil then message = message:gsub("{1}", function() return value end) end
+	Notifier.send(message, { level = "info" })
+end
+
+--- How many free names new_text_file_here tries before it gives up.
+M.NEW_FILE_NAME_ATTEMPTS = Timings.count("gestures", "new_text_file_name_attempts")
+
+--- The extension of the file new_text_file_here creates.
+M.NEW_FILE_EXTENSION = ".txt"
+
+--- The notice of each reason adapters/file_manager_folder.lua refuses a folder.
+M.FOLDER_REFUSALS = {
+	no_window = "system_actions.no_folder",
+	not_file_manager = "system_actions.no_folder",
+	no_folder = "system_actions.no_folder",
+	unsupported_file_manager = "system_actions.file_manager_unsupported",
+	ambiguous_tabs = "system_actions.folder_tabs_ambiguous",
+	not_local = "system_actions.folder_not_local",
+	not_directory = "system_actions.folder_not_local",
+	focus_changed = "system_actions.folder_changed",
+	query_failed = "system_actions.folder_unreadable",
+}
+
+--- Runs `on_folder` with the active file manager's proven folder, or tells
+--- the user why there is none.
+--- @param action string The action id, for the log.
+--- @param on_folder function Receives the folder and the adapter.
+local function with_file_manager_folder(action, on_folder)
+	local Folder = require("adapters.file_manager_folder")
+	local available, missing = Folder.available()
+	if not available then
+		Logger.warn(LOG, "%s: the file manager folder cannot be read in this session (%s).", action, tostring(missing))
+		notify("platform_reason.action_file_manager_folder_is_unreadable_on_linux")
+		return
+	end
+	local folder, reason, name = Folder.read_active_folder()
+	if not folder then
+		local key = M.FOLDER_REFUSALS[reason]
+		if not key then error("system_actions: no notice for the folder refusal '" .. tostring(reason) .. "'") end
+		Logger.info(LOG, "%s refused: %s%s.", action, tostring(reason), name and (" (" .. name .. ")") or "")
+		notify(key, name)
+		return
+	end
+	on_folder(folder, Folder)
+end
+
+--- Creates an empty text file with a free name in a folder, exclusively: a
+--- name another program creates meanwhile is skipped, never overwritten.
+--- @param folder string Absolute folder path.
+--- @param write_new function|nil path, content -> written, reason (tests).
+--- @return string|nil path The created file, nil when none could be created.
+function M.create_new_text_file(folder, write_new)
+	write_new = write_new or require("adapters.file_system").write_new
+	local base = i18n.get("system_actions.new_text_file_name")
+	local prefix = folder:sub(-1) == "/" and folder or (folder .. "/")
+	for attempt = 1, M.NEW_FILE_NAME_ATTEMPTS do
+		local name = attempt == 1 and base or (base .. " " .. attempt)
+		local path = prefix .. name .. M.NEW_FILE_EXTENSION
+		local created, reason = write_new(path, "")
+		if created then return path end
+		if reason ~= 17 and reason ~= "EEXIST" then
+			Logger.error(LOG, "A new text file could not be created in the folder (%s).", tostring(reason))
+			return nil
+		end
+	end
+	Logger.error(LOG, "The folder already holds %d new text files: none created.", M.NEW_FILE_NAME_ATTEMPTS)
+	return nil
 end
 
 --- Actions that need more than one fixed command, by action id. Each
@@ -345,6 +422,37 @@ M.HANDLERS = {
 		for index, path in ipairs(paths) do words[index] = quote(path) end
 		Logger.info(LOG, "Making %d selected item(s) executable.", #paths)
 		deps.run_background("chmod +x " .. table.concat(words, " "))
+	end,
+	-- The session's terminal, started detached in the folder: it outlives the
+	-- action, so it is not a one-shot background command.
+	open_terminal_here = function()
+		with_file_manager_folder("open_terminal_here", function(folder)
+			local UserActions = require("modules.gestures.user_actions")
+			local terminal = UserActions.resolve_terminal(ShellRunner.has_command, os.getenv("TERMINAL"))
+			if not terminal then
+				Logger.error(LOG, "open_terminal_here: no known terminal is installed.")
+				notify("user_actions.terminal_unavailable")
+				return
+			end
+			local command = "cd -- " .. quote(folder.path) .. " && " .. UserActions.detached_command({ terminal.binary })
+			if ShellRunner.run(command) then
+				Logger.info(LOG, "Opened %s in the file manager folder.", terminal.binary)
+			else
+				Logger.error(LOG, "open_terminal_here: %s could not start in the folder.", terminal.binary)
+				notify("user_actions.terminal_unavailable")
+			end
+		end)
+	end,
+	new_text_file_here = function(deps)
+		with_file_manager_folder("new_text_file_here", function(folder, Folder)
+			local path = M.create_new_text_file(folder.path)
+			if not path then
+				notify("system_actions.new_text_file_failed")
+				return
+			end
+			Logger.info(LOG, "Created a text file in the file manager folder.")
+			deps.run_background(Folder.reveal_command(folder, path))
+		end)
 	end,
 }
 

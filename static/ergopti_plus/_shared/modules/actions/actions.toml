@@ -64,7 +64,9 @@
 #             hint, instead of offering a binding that would do nothing. Linux
 #             understands "tool:<binary>" (on PATH), "session:x11" and
 #             "session:workspaces" (a session whose workspaces another process
-#             can read and pick: X11, KDE Plasma, sway or Hyprland). Every
+#             can read and pick: X11, KDE Plasma, sway or Hyprland) and
+#             "file_manager:folder" (a file manager that publishes the folder
+#             of its active window is installed: Nautilus). Every
 #             driver understands "ai:on" (the AI menu's switch is on: the
 #             picker greys the row with the AI-off notice while it is off, and
 #             the action refuses itself then). The other
@@ -1081,15 +1083,16 @@ platform = "hs,linux"
 reason_ahk = "platform_reason.action_executable_permission_is_unix"
 
 [sg_actions.open_terminal_here]
-# The folder of the active Finder or Explorer window. Linux still needs a
-# file-manager-specific active-window/folder owner. Nautilus publishes all open
-# tab locations asynchronously; that list is not an active-folder receipt.
-platform = "hs,ahk"
-reason_linux = "platform_reason.action_file_manager_folder_is_unreadable_on_linux"
+# The folder of the active Finder or Explorer window, or on Linux of the
+# active Nautilus window (linux/adapters/file_manager_folder.lua: the window's
+# own GTK object path keys Nautilus's FileManager1 OpenWindowsWithLocations).
+# Thunar and Dolphin publish no active folder: refused with their name.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xprop", "tool:gdbus", "file_manager:folder"]
 
 [sg_actions.new_text_file_here]
-platform = "hs,ahk"
-reason_linux = "platform_reason.action_file_manager_folder_is_unreadable_on_linux"
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xprop", "tool:gdbus", "file_manager:folder"]
 
 # --- UI / Fenêtres de l'app ---
 # Every row of this group TOGGLES one Ergopti web-view window, so a single

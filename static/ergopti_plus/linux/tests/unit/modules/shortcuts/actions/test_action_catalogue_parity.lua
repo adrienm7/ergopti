@@ -282,6 +282,33 @@ helpers.describe("action picker items (Linux)", function()
 		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true)
 	end)
 
+	helpers.it("greys the folder actions with the reason when no file manager publishes its folder", function()
+		local Display = require("infra.display_server")
+		local Shell = require("adapters.shell_runner")
+		local M = recording_manager()
+		local function rows(nautilus)
+			Display._set_for_test(Display.X11, "xfce")
+			Shell._set_runner(function(command) return nautilus or not command:find("nautilus", 1, true) end)
+			local ok, items = pcall(M.get_picker_items)
+			Shell._reset_runner()
+			Display._set_for_test(nil, nil)
+			helpers.assert_true(ok, tostring(items))
+			local by_id = {}
+			for _, item in ipairs(items) do if item.type == "action" then by_id[item.id] = item end end
+			return by_id
+		end
+		local reason = require("infra.i18n").get("platform_reason.action_file_manager_folder_is_unreadable_on_linux")
+		local without = rows(false)
+		for _, id in ipairs({ "open_terminal_here", "new_text_file_here" }) do
+			helpers.assert_eq(without[id].disabled, true, id .. ": Thunar or Dolphin alone cannot tell their folder")
+			helpers.assert_eq(without[id].hint, reason, id)
+		end
+		local with = rows(true)
+		for _, id in ipairs({ "open_terminal_here", "new_text_file_here" }) do
+			helpers.assert_eq(with[id].disabled, nil, id .. ": offered with Nautilus installed")
+		end
+	end)
+
 	helpers.it("greys the agent's manual actions with the AI notice while the AI is off (ai-off-picker)", function()
 		local engine = "modules.llm.prediction_engine"
 		local previous, switch = package.loaded[engine], { enabled = false }
