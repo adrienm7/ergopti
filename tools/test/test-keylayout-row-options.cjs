@@ -228,9 +228,12 @@ try {
 	);
 
 	const names = ['Ergopti+', 'Ergopti+ 2', 'Rows azerty_digits', 'Bépo 7', 'Ergo‑L 12', 'Rows 3'];
+	// stdin, not the environment: Windows hands Lua an environment value in the
+	// ANSI code page, so « é » and « ‑ » would reach keyboard_id as other bytes.
 	const ids = spawnSync(LUA, [APPLY, shared()], {
 		encoding: 'utf8',
-		env: { ...process.env, ERGOPTI_KEYBOARD_IDS: names.join('|') }
+		input: names.join('\n') + '\n',
+		env: { ...process.env, ERGOPTI_KEYBOARD_IDS: '1' }
 	});
 	const luaIds = ids.stdout.trim().split('\n').map(Number);
 	const composerId = (name) => {
