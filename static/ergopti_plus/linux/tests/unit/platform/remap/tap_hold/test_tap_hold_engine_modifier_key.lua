@@ -317,6 +317,35 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		end
 	end)
 
+	-- tab.ahk 8.1, lalt.ahk 4.3 and rctrl.ahk 7.2 wait for the release with
+	-- KS_WaitReleased(.., TapHoldDuration): no lone tap window, which Linux
+	-- granted them; AltGr's own tap goes through TapHoldOwnImmediateModifier
+	-- and keeps it (strict-tap-no-lone-window).
+	helpers.it("keeps the strict threshold for the Alt-Tab and RCtrl Tab taps (strict-tap-no-lone-window)", function()
+		local nav = require("tests.support.nav_layer_fixture").recommended()
+		local function lone(keys)
+			return Engine.new({ keys = keys, tap_min_ms = 50, lone_tap_max_ms = 1000, one_shot_timeout_ms = 2000,
+				nav_layer = nav, key_text = function() return nil end, plan_text = function() return nil end,
+				one_shot_result = function() return nil end })
+		end
+		local strict = {
+			{ "left_alt", "alt_tab_monitor" }, { "tab", "alt_tab_monitor" }, { "right_ctrl", "tab" },
+		}
+		for _, case in ipairs(strict) do
+			local key_id, tap_action = case[1], case[2]
+			local code = Engine.KEY_CODES[key_id]
+			local e = lone({ [key_id] = { tap_action = tap_action, time_activation_seconds = 0.2 } })
+			e:process(code, DOWN, 0)
+			local out, tap = e:process(code, UP, 600)
+			helpers.assert_nil(tap, key_id .. "/" .. tap_action .. ": no tap past its threshold")
+			helpers.assert_eq(trail(out):find("15↓", 1, true), nil, key_id .. "/" .. tap_action .. ": no Tab typed")
+		end
+		local e = lone({ alt_gr = { tap_action = "tab", time_activation_seconds = 0.2 } })
+		e:process(Engine.KEY_CODES.alt_gr, DOWN, 0)
+		local out = e:process(Engine.KEY_CODES.alt_gr, UP, 600)
+		helpers.assert_eq(trail(out):find("15↓ 15↑", 1, true) ~= nil, true, "AltGr's lone tap keeps the window")
+	end)
+
 	-- lalt.ahk 4.2 needs a hold layer: a Tab tap with no hold is the generic
 	-- tap-only block 4.9 (`*SC038:: _LAltDispatch()`), a Tab at key-down and at
 	-- each repeat, no layer under it (lalt-tab-no-hold-is-tap-only).
