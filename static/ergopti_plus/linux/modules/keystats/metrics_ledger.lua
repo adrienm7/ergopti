@@ -40,6 +40,7 @@ local M = {}
 
 local Json = require("json")
 local Queries = require("keystats.queries")
+local ClipboardEvents = require("keystats.clipboard_events")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 
 local LOG = "keystats.metrics_ledger"
@@ -66,6 +67,12 @@ M.ROWS_PER_STEP = 500
 M.RAW_STATEMENTS = {
 	"events.typing", "events.app_switch", "events.window_switch", "events.shortcut",
 	"events.system", "events.hotstring", "events.session", "events.llm", "events.network", "events.roi",
+}
+
+--- Raw tables both Lua drivers render outside the catalogue, with their columns
+--- in schema order (keystats.clipboard_events says why it is not catalogued).
+M.RAW_TABLES = {
+	{ table = "events_clipboard", columns = ClipboardEvents.COLUMNS },
 }
 
 --- Meta keys holding the export state, committed together.
@@ -152,16 +159,19 @@ function M.export_query(device_id, cursor, limit)
 	assert(type(cursor) == "number" and cursor >= 0 and cursor % 1 == 0, "invalid ledger cursor")
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "invalid ledger limit")
 	local device = "'" .. SqliteCommand.escape_literal(device_id) .. "'"
+	local raw = {}
+	for _, name in ipairs(M.RAW_STATEMENTS) do raw[#raw + 1] = { table = table_of(name), columns = Queries.params(name) } end
+	for _, entry in ipairs(M.RAW_TABLES) do raw[#raw + 1] = entry end
 	local parts = {}
-	for _, name in ipairs(M.RAW_STATEMENTS) do
-		local columns = Queries.params(name)
+	for _, entry in ipairs(raw) do
+		local columns = entry.columns
 		assert(columns[1] == "device_id" and columns[2] == "id", "a ledger statement starts with device_id, id")
 		local values = {}
 		for index, column in ipairs(columns) do values[index] = literal_expression(column) end
 		parts[#parts + 1] = string.format(
 			"SELECT id, date, 'INSERT OR IGNORE INTO %s (%s) VALUES (' || %s || ');' AS stmt FROM %s WHERE device_id=%s AND id>%.0f",
-			table_of(name), table.concat(columns, ", "), table.concat(values, " || ', ' || "),
-			table_of(name), device, cursor)
+			entry.table, table.concat(columns, ", "), table.concat(values, " || ', ' || "),
+			entry.table, device, cursor)
 	end
 	return "SELECT id || ' ' || hex(coalesce(date,'')) || ' ' || hex(stmt) FROM ("
 		.. table.concat(parts, " UNION ALL ") .. string.format(") ORDER BY id LIMIT %d;", limit)
