@@ -58,8 +58,10 @@
  *
  * SCOPES. A launch is judged where its file runs: "driver" (a user's machine:
  * driver, installer, launcher), "test" (the distribution containers, which hold
- * only the CI image preparation) or "host" (tests/hardware and the other files that
- * only the Ubuntu runners execute). An entry lists the scopes it is valid for, and
+ * only the CI image preparation) or "host" (tests/hardware, the container
+ * desktop proofs of tests/desktop and the other files that only the Ubuntu
+ * runners or a prepared container execute). An entry lists the scopes it is
+ * valid for, and
  * a machine-checked proof must back each of them: a file proof this gate reads
  * (an install by CI, a declared dependency, the container entry point of every
  * image), bound to the scopes it covers, or a probe of the program in every file
@@ -509,7 +511,10 @@ const PROGRAMS = {
 	'lxqt-config': optionalTool(
 		'opens the system settings, the first of several applications that is present'
 	),
-	qdbus: optionalTool('KDE workspace switching, the first present of several binaries'),
+	qdbus: optionalTool(
+		'KDE workspace switching, the first present of several binaries',
+		DRIVER_HOST
+	),
 	'qdbus-qt5': optionalTool('KDE workspace switching, the first present of several binaries'),
 	'qdbus-qt6': optionalTool('KDE workspace switching, the first present of several binaries'),
 	qdbus6: optionalTool('KDE workspace switching, the first present of several binaries'),
@@ -519,7 +524,7 @@ const PROGRAMS = {
 	),
 	swaymsg: optionalTool('Sway window identity', DRIVER_HOST),
 	niri: optionalTool('Niri window identity'),
-	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)'),
+	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)', DRIVER_HOST),
 	'update-desktop-database': optionalTool('desktop menu cache refresh after an App Cloner clone'),
 	'xdg-mime': why(
 		`queries the daily note's text editor; supplied by xdg-utils, installed with xdg-open by install.sh and declared by ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
@@ -629,6 +634,12 @@ const PROGRAMS = {
 			proof: { file: CI_LINUX, token: 'sudo unshare --mount' }
 		}
 	),
+	// The headless desktop proofs (tests/desktop) run in a prepared container,
+	// never on CI: each probes these with command -v and exits 2 without them.
+	labwc: packageManager('Wayland compositor of the container desktop proofs', HOST),
+	foot: packageManager('Wayland terminal window of the container desktop proofs', HOST),
+	kwin_wayland: packageManager('KWin compositor of the container desktop proofs', HOST),
+	'gnome-shell': packageManager('GNOME Shell compositor of the container desktop proofs', HOST),
 	pulseaudio: inUbuntuJob('pulseaudio', 'sound server'),
 	lua: inUbuntuJob('lua5\\.4', 'Lua interpreter'),
 	'lua5.4': inUbuntuJob('lua5\\.4', 'Lua interpreter'),
@@ -2084,6 +2095,7 @@ const EXCLUDED_DIRS = ['/vendor/', '/_generated/', '/native/'];
 function scopeOf(rel) {
 	if (
 		rel.startsWith(`${LINUX_DIR}/tests/hardware/`) ||
+		rel.startsWith(`${LINUX_DIR}/tests/desktop/`) ||
 		rel === `${LINUX_DIR}/tests/distro/run_in_docker.sh` ||
 		HOST_FILES.has(rel)
 	)
