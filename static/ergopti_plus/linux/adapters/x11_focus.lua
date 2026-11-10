@@ -33,13 +33,19 @@ local Monotonic = require("infra.monotonic")
 local LOG = "adapters.x11_focus"
 
 -- Predefined core atoms (X11 protocol appendix B), so no intern round trip.
-local ATOM_STRING, ATOM_WINDOW, ATOM_CARDINAL, ATOM_WM_NAME = 31, 33, 6, 39
+local ATOM_ATOM, ATOM_STRING, ATOM_WINDOW, ATOM_CARDINAL, ATOM_WM_NAME = 4, 31, 33, 6, 39
+
+-- Most _NET_WM_STATE atoms one window's state reads.
+local MAX_STATE_ATOMS = 32
 
 -- Longest title read, in 32-bit units (16 KiB). A longer title is truncated.
 local MAX_TITLE_LONGS = 4096
 
 -- Most managed windows one listing reads (the property is read in 32-bit units).
 M.MAX_CLIENTS = 1024
+
+-- Most monitors one RandR listing reads.
+M.MAX_MONITORS = 16
 
 -- Minimum milliseconds between two connection attempts after a failure.
 M.RECONNECT_MS = 2000
@@ -50,6 +56,8 @@ M.RECONNECT_MS = 2000
 --   property(window, property_atom, type_atom, max_longs) -> { type, format, bytes }|nil
 --   root() -> window id
 --   pointer() -> root_x, root_y|nil (the cursor on the root window's screen)
+--   geometry(window) -> x, y, width, height|nil (root coordinates of the window's origin)
+--   monitors() -> array of { x, y, width, height }|nil (RandR 1.5; nil without the extension)
 --   healthy() -> boolean
 --   disconnect()
 local _transport = nil
@@ -254,6 +262,70 @@ function M.pointer_position()
 	return x, y
 end
 
+--- The EWMH state of a window in the Windows vocabulary: _NET_WM_STATE_HIDDEN
+--- is minimized; both maximized axes, or fullscreen, is maximized.
+--- @param window integer
+--- @return string state "normal", "maximized" or "minimized".
+local function window_state(window)
+	local property = atom("_NET_WM_STATE")
+	if not property then return "normal" end
+	local reply = _transport.property(window, property, ATOM_ATOM, MAX_STATE_ATOMS)
+	if not reply or reply.format ~= 32 then return "normal" end
+	local present = {}
+	for offset = 1, #reply.bytes - 3, 4 do
+		local value = u32(reply.bytes:sub(offset, offset + 3))
+		if value then present[value] = true end
+	end
+	local function has(name)
+		local value = atom(name)
+		return value ~= nil and present[value] == true
+	end
+	if has("_NET_WM_STATE_HIDDEN") then return "minimized" end
+	if has("_NET_WM_STATE_FULLSCREEN")
+		or (has("_NET_WM_STATE_MAXIMIZED_VERT") and has("_NET_WM_STATE_MAXIMIZED_HORZ")) then
+		return "maximized"
+	end
+	return "normal"
+end
+
+--- The RandR monitor holding a point, identified by its bounds (the Windows
+--- fallback identity: the bounds do not move when outputs are enumerated anew).
+--- @param x number
+--- @param y number
+--- @return table|nil monitor { id, width }
+local function monitor_at(x, y)
+	if type(_transport.monitors) ~= "function" then return nil end
+	local monitors = _transport.monitors()
+	if type(monitors) ~= "table" then return nil end
+	for _, m in ipairs(monitors) do
+		if x >= m.x and x < m.x + m.width and y >= m.y and y < m.y + m.height then
+			return { id = string.format("%d,%d,%d,%d", m.x, m.y, m.x + m.width, m.y + m.height), width = m.width }
+		end
+	end
+	return nil
+end
+
+--- The focused window's topology: its root-relative geometry, its EWMH state
+--- and the monitor holding its centre. One in-process round trip per reading.
+--- @return table|nil observation { window, x, y, w, h, state, monitor }; nil with a reason when unanswerable.
+--- @return string|nil reason
+function M.active_topology()
+	if not _transport then return nil, "no X transport" end
+	if type(_transport.geometry) ~= "function" then return nil, "this transport cannot read window geometry" end
+	local connected, reason = ensure_connected()
+	if not connected then return nil, reason end
+	local window = active_window()
+	if not window then return nil, "no active window" end
+	local x, y, w, h = _transport.geometry(window)
+	if type(x) ~= "number" or type(h) ~= "number" or w <= 0 or h <= 0 then
+		return nil, "the active window has no geometry"
+	end
+	return {
+		window = window, x = x, y = y, w = w, h = h, state = window_state(window),
+		monitor = monitor_at(x + math.floor(w / 2), y + math.floor(h / 2)),
+	}
+end
+
 --- Lists the managed top-level windows from the root window's _NET_CLIENT_LIST,
 --- as wmctrl -lp does, but in this process and without forking.
 --- @return table|nil windows Array of { id, title, pid }; nil with a reason on transport trouble.
@@ -284,6 +356,59 @@ end
 -- =========================================
 -- =========================================
 
+--- Binds libxcb-randr for the monitor list, or raises when it is unavailable.
+--- @param ffi table The LuaJIT FFI.
+--- @return table randr { negotiate(connection) -> boolean, monitors(connection, root) -> table|nil }
+local function build_randr(ffi)
+	local defined, define_error = pcall(ffi.cdef, [[
+		typedef struct { uint8_t response_type, pad0; uint16_t sequence; uint32_t length, major_version, minor_version; uint8_t pad1[16]; } ergopti_xcb_randr_query_version_reply_t;
+		ergopti_xcb_cookie_t xcb_randr_query_version(ergopti_xcb_connection_t *connection, uint32_t major_version, uint32_t minor_version);
+		ergopti_xcb_randr_query_version_reply_t *xcb_randr_query_version_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
+		typedef struct { uint8_t response_type, pad0; uint16_t sequence; uint32_t length, timestamp, nMonitors, nOutputs; uint8_t pad1[12]; } ergopti_xcb_randr_get_monitors_reply_t;
+		typedef struct { uint32_t name; uint8_t primary, automatic; uint16_t nOutput; int16_t x, y; uint16_t width, height; uint32_t width_in_millimeters, height_in_millimeters; } ergopti_xcb_randr_monitor_info_t;
+		typedef struct { ergopti_xcb_randr_monitor_info_t *data; int rem; int index; } ergopti_xcb_randr_monitor_info_iterator_t;
+		ergopti_xcb_cookie_t xcb_randr_get_monitors(ergopti_xcb_connection_t *connection, uint32_t window, uint8_t get_active);
+		ergopti_xcb_randr_get_monitors_reply_t *xcb_randr_get_monitors_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
+		ergopti_xcb_randr_monitor_info_iterator_t xcb_randr_get_monitors_monitors_iterator(const ergopti_xcb_randr_get_monitors_reply_t *reply);
+		void xcb_randr_monitor_info_next(ergopti_xcb_randr_monitor_info_iterator_t *iterator);
+	]])
+	if not defined and not tostring(define_error):find("redefin", 1, true) then error(define_error) end
+	local loaded, library = pcall(ffi.load, "xcb-randr")
+	if not loaded then library = ffi.load("libxcb-randr.so.0") end
+	local randr = {}
+
+	--- RandR answers GetMonitors only to a client that announced version 1.5.
+	function randr.negotiate(connection)
+		local error_slot = ffi.new("void*[1]")
+		local reply = library.xcb_randr_query_version_reply(connection,
+			library.xcb_randr_query_version(connection, 1, 5), error_slot)
+		if error_slot[0] ~= nil then ffi.C.free(error_slot[0]) end
+		if reply == nil then return false end
+		local major, minor = tonumber(reply.major_version), tonumber(reply.minor_version)
+		ffi.C.free(reply)
+		return major > 1 or (major == 1 and minor >= 5)
+	end
+
+	function randr.monitors(connection, root)
+		local error_slot = ffi.new("void*[1]")
+		local reply = library.xcb_randr_get_monitors_reply(connection,
+			library.xcb_randr_get_monitors(connection, root, 1), error_slot)
+		if error_slot[0] ~= nil then ffi.C.free(error_slot[0]) end
+		if reply == nil then return nil end
+		local out = {}
+		local iterator = library.xcb_randr_get_monitors_monitors_iterator(reply)
+		while iterator.rem > 0 and #out < M.MAX_MONITORS do
+			local m = iterator.data
+			out[#out + 1] = { x = tonumber(m.x), y = tonumber(m.y), width = tonumber(m.width), height = tonumber(m.height) }
+			library.xcb_randr_monitor_info_next(iterator)
+		end
+		ffi.C.free(reply)
+		return out
+	end
+
+	return randr
+end
+
 --- Builds the libxcb transport, or nil with a reason when libxcb is unavailable.
 --- @return table|nil transport
 --- @return string|nil reason
@@ -313,6 +438,12 @@ local function build_xcb_transport()
 		typedef struct { uint8_t response_type, same_screen; uint16_t sequence; uint32_t length, root, child; int16_t root_x, root_y, win_x, win_y; uint16_t mask; uint8_t pad0[2]; } ergopti_xcb_query_pointer_reply_t;
 		ergopti_xcb_cookie_t xcb_query_pointer(ergopti_xcb_connection_t *connection, uint32_t window);
 		ergopti_xcb_query_pointer_reply_t *xcb_query_pointer_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
+		typedef struct { uint8_t response_type, depth; uint16_t sequence; uint32_t length, root; int16_t x, y; uint16_t width, height, border_width; uint8_t pad0[2]; } ergopti_xcb_get_geometry_reply_t;
+		ergopti_xcb_cookie_t xcb_get_geometry(ergopti_xcb_connection_t *connection, uint32_t drawable);
+		ergopti_xcb_get_geometry_reply_t *xcb_get_geometry_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
+		typedef struct { uint8_t response_type, same_screen; uint16_t sequence; uint32_t length, child; int16_t dst_x, dst_y; } ergopti_xcb_translate_coordinates_reply_t;
+		ergopti_xcb_cookie_t xcb_translate_coordinates(ergopti_xcb_connection_t *connection, uint32_t src_window, uint32_t dst_window, int16_t src_x, int16_t src_y);
+		ergopti_xcb_translate_coordinates_reply_t *xcb_translate_coordinates_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
 		void free(void *pointer);
 	]])
 	if not defined and not tostring(define_error):find("redefin", 1, true) then
@@ -326,6 +457,12 @@ local function build_xcb_transport()
 
 	local connection, root = nil, 0
 	local transport = {}
+	-- RandR is a separate library; a runtime without it still answers geometry.
+	local randr_bound, randr_library = pcall(build_randr, ffi)
+	if not randr_bound then
+		Logger.info(LOG, "libxcb-randr unavailable (%s): window topology records no monitor changes.", tostring(randr_library))
+	end
+	local randr = nil
 
 	function transport.connect()
 		local screen = ffi.new("int[1]")
@@ -344,6 +481,11 @@ local function build_xcb_transport()
 			return false, "the X server reported no screen"
 		end
 		connection, root = opened, iterator.data.root
+		randr = nil
+		if randr_bound then
+			local negotiated, supported = pcall(randr_library.negotiate, connection)
+			if negotiated and supported then randr = randr_library end
+		end
 		return true
 	end
 
@@ -378,6 +520,27 @@ local function build_xcb_transport()
 		ffi.C.free(reply)
 		if not same then return nil end
 		return x, y
+	end
+
+	function transport.geometry(window)
+		local error_slot = ffi.new("void*[1]")
+		local reply = library.xcb_get_geometry_reply(connection, library.xcb_get_geometry(connection, window), error_slot)
+		if error_slot[0] ~= nil then ffi.C.free(error_slot[0]) end
+		if reply == nil then return nil end
+		local w, h = tonumber(reply.width), tonumber(reply.height)
+		ffi.C.free(reply)
+		local moved = library.xcb_translate_coordinates_reply(connection,
+			library.xcb_translate_coordinates(connection, window, root, 0, 0), error_slot)
+		if error_slot[0] ~= nil then ffi.C.free(error_slot[0]) end
+		if moved == nil then return nil end
+		local x, y = tonumber(moved.dst_x), tonumber(moved.dst_y)
+		ffi.C.free(moved)
+		return x, y, w, h
+	end
+
+	function transport.monitors()
+		if randr == nil then return nil end
+		return randr.monitors(connection, root)
 	end
 
 	function transport.property(window, property, type_atom, max_longs)

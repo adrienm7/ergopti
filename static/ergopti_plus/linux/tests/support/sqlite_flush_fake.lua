@@ -24,7 +24,8 @@ function M.attach(writer)
 			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events",
 			llm = "insert_llm_events", windows = "insert_window_switch_events",
 			sessions = "insert_session_events", system = "insert_system_events", network = "insert_network_events",
-			clipboard = "insert_clipboard_events" }
+			clipboard = "insert_clipboard_events",
+			window_topo = "insert_window_topo_events", av = "insert_av_events" }
 		for family, method in pairs(raw_methods) do
 			if #(payload.raw[family] or {}) > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
 		end

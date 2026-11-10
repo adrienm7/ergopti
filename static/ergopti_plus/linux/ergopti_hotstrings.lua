@@ -515,6 +515,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			-- Before the final flush, so an open capture interval ends in it, as on Windows.
+			name = "capture presence interval",
+			stop = function()
+				require("modules.keystats.topology_metrics").daemon_stop()
+				return true
+			end,
+		},
+		{
 			name = "metrics SQLite flush",
 			wait_for_ack = true,
 			stop = function() return keystats.stop() == true end,
@@ -3244,6 +3252,12 @@ local function main()
 			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
 				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
 		end
+		require("modules.keystats.topology_metrics").bind_topology_source(sources.topology,
+			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
+		if not sources.topology then
+			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
+				.. "(no X11 window geometry; Wayland exposes none to a client).")
+		end
 	end
 
 	if process_lifecycle then
@@ -3386,6 +3400,11 @@ local function main()
 		-- decides which probe is due; reachability answers later through libuv.
 		RuntimeGuard.call("network metrics sampler", function()
 			require("modules.keystats.network_metrics").daemon_tick(keystats.record_network_event)
+		end)
+		-- Window moves, resizes and monitor changes (X11, in process) and the
+		-- capture-program presence (procfs); the module paces both readings.
+		RuntimeGuard.call("topology metrics sampler", function()
+			require("modules.keystats.topology_metrics").daemon_tick(keystats.record_topology_event)
 		end)
 
 		-- The WPM readouts' clock: the floating widget and the tray readout each

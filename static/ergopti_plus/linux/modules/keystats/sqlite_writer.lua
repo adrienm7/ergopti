@@ -1105,6 +1105,31 @@ _raw_sql.clipboard = function(device_id, events, first_id)
 	return table.concat(statements, "\n")
 end
 
+--- Renders one family of the Windows generic (kind, app, meta_json) rows.
+--- @param statement string Catalogue statement.
+--- @param kinds table The family's kinds and their metadata keys.
+--- @return function renderer (device_id, events, first_id) -> sql
+local function _kind_meta_rows(statement, kinds)
+	return function(device_id, events, first_id)
+		local statements = {}
+		for i, ev in ipairs(events) do
+			assert(kinds[ev.kind] ~= nil and type(ev.meta) == "table", "Invalid " .. statement .. " event")
+			statements[i] = Queries.render(statement, "cli_json", {
+				device_id = device_id, id = first_id + i - 1,
+				ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
+				meta_json = Json.encode(ev.meta),
+			})
+		end
+		return table.concat(statements, "\n")
+	end
+end
+
+--- Window geometry, state and monitor changes as the Windows events_window_topo rows.
+_raw_sql.window_topo = _kind_meta_rows("events.window_topo", require("keystats.window_topology").KINDS)
+
+--- Capture-program presence as the Windows events_av rows.
+_raw_sql.av = _kind_meta_rows("events.av", require("keystats.capture_presence").KINDS)
+
 --- Renders the portable trigger ROI payload without dropping its typed metadata.
 --- @param events table Array of { ts, date, kind, app, meta }.
 _raw_sql.roi = function(device_id, events, first_id)
@@ -1174,6 +1199,26 @@ function M.insert_clipboard_events(device_id, events)
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
 	local sql = _compose_raw("clipboard", device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
+--- Commits one canonical raw window-topology batch and returns its native receipt.
+function M.insert_window_topo_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _compose_raw("window_topo", device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
+--- Commits one canonical raw capture-presence batch and returns its native receipt.
+function M.insert_av_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _compose_raw("av", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -1880,6 +1925,8 @@ function M.start_flush(device_id, payload)
 	payload.raw.media = payload.raw.media or {}
 	payload.raw.network = payload.raw.network or {}
 	payload.raw.clipboard = payload.raw.clipboard or {}
+	payload.raw.window_topo = payload.raw.window_topo or {}
+	payload.raw.av = payload.raw.av or {}
 	payload.raw.roi = payload.raw.roi or {}
 	array(payload.raw.roi)
 	-- New ROI text cannot enter an owned persistence operation under encryption.
@@ -1896,7 +1943,7 @@ function M.start_flush(device_id, payload)
 	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
 	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media",
-		"network", "clipboard", "roi" }
+		"network", "clipboard", "window_topo", "av", "roi" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]
