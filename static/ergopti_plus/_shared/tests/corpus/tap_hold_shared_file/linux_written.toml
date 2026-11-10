@@ -1,0 +1,28 @@
+# tap_hold.toml — written by the Ergopti+ tray menu.
+#
+# Only the keys you changed are listed. Every other key keeps its value from
+# the shared defaults, which the driver lays under this file key by key.
+
+[_meta]
+schema_version = 1
+
+[tap_hold]
+enabled = true
+lone_modifier_tap_max_ms = 0
+sticky_timeout_ms = 1500
+time_activation_seconds = 0.25
+
+[tap_hold.keys.caps_lock]
+hold_modifier = "ctrl"
+tap_action = "backspace"
+
+[tap_hold.keys.left_shift]
+hold_modifier = "shift"
+tap_action = "copy"
+time_activation_seconds = 0.3
+
+[tap_hold.keys.tab]
+hold_layer = "nav"
+
+[tap_hold.keys.win]
+hold_modifier = "ctrl+alt"
