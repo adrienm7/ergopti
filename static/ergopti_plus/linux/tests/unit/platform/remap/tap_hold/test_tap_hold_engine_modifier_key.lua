@@ -302,8 +302,6 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 			-- tab.ahk 8.1, lalt.ahk 4.3: Alt for the switcher, the monitor on a tap.
 			{ "tab", "alt_tab_monitor", "56↓", masked_alt_up, "alt_tab_monitor" },
 			{ "left_alt", "alt_tab_monitor", "56↓", masked_alt_up, "alt_tab_monitor" },
-			-- lalt.ahk 4.2: the navigation layer, Tab on a tap.
-			{ "left_alt", "tab", "", "15↓ 15↑", nil },
 			-- rctrl.ahk 7.2: RCtrl itself, Tab on a tap.
 			{ "right_ctrl", "tab", "97↓", "97↑ 15↓ 15↑", nil },
 			-- rctrl.ahk 7.1: Backspace at key-down.
@@ -317,10 +315,19 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 			local out, tap = e:process(code, UP, 100)
 			helpers.assert_eq({ trail(out), tap }, { case[4], case[5] }, key_id .. "/" .. tap_action .. " on a quick release")
 		end
-		-- The layer is held: LAlt+J is Ctrl+Left.
+	end)
+
+	-- lalt.ahk 4.2 needs a hold layer: a Tab tap with no hold is the generic
+	-- tap-only block 4.9 (`*SC038:: _LAltDispatch()`), a Tab at key-down and at
+	-- each repeat, no layer under it (lalt-tab-no-hold-is-tap-only).
+	helpers.it("types LAlt's Tab with no hold at key-down and holds no layer (lalt-tab-no-hold-is-tap-only)", function()
 		local e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 } })
-		e:process(ALT, DOWN, 0)
-		helpers.assert_eq(trail((e:process(KEY_J, DOWN, 50))), "29↓ 105↓", "LAlt with a Tab tap holds the layer")
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "15↓ 15↑", "the Tab goes out at key-down")
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 500))), "15↓ 15↑", "and again at each repeat")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 550), "J under LAlt is J: no navigation layer is held")
+		e:process(KEY_J, UP, 560)
+		local out, tap = e:process(ALT, UP, 600)
+		helpers.assert_eq({ trail(out), tap }, { "", nil }, "the release types nothing more")
 	end)
 
 	-- lshift_lctrl.ahk 3.1: LCtrl taps only when CapsLock and LAlt were up at

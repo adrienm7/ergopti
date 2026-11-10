@@ -149,8 +149,9 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     itself, and a lone Right Alt, a plain Alt on some layouts, is masked
 --     before its release (mask_lone_release);
 --   - an alt_tab_monitor tap holds Alt for the switcher (tab.ahk 8.1,
---     lalt.ahk 4.3), and LAlt's Tab holds the navigation layer (lalt.ahk
---     4.2), from key-down as every hold is;
+--     lalt.ahk 4.3), from key-down as every hold is; LAlt's Tab with no hold
+--     layer is no such rule: lalt.ahk 4.2 needs a hold layer, so it is the
+--     generic tap-only block 4.9, a Tab at key-down and at each repeat;
 --   - RCtrl's one-shot Shift holds Shift for a long press only once its
 --     threshold has passed, as rctrl.ahk 7.3 presses it when its KeyWait
 --     times out: a key typed sooner is typed unshifted (`hold_past_threshold`,
@@ -168,7 +169,6 @@ local NO_HOLD_BY_TAP = {
 	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT } } },
 	left_alt = {
 		alt_tab_monitor = { mods = { KEY_LEFTALT } },
-		tab = { layer = "nav" },
 		one_shot_shift = {
 			mods = { KEY_LEFTSHIFT }, tap_at_down = true, native_under_modifier = true,
 			skip_while_down = { EvdevCodes.KEY_RIGHTCTRL, EvdevCodes.KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL },
