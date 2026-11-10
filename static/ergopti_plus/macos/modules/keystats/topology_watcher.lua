@@ -64,6 +64,7 @@ function M.start(opts)
 	end
 	assert(type(opts) == "table" and type(opts.append) == "function" and type(opts.app) == "function"
 		and type(opts.private) == "function", "the topology watcher needs a recorder, an app and a privacy predicate")
+	Logger.start(LOG, "Starting window topology and capture-application presence…")
 	local ports = opts.ports or default_ports()
 	local function emit(kind, fields)
 		local entry = { type = kind, app = opts.app() or "Unknown" }
@@ -77,7 +78,7 @@ function M.start(opts)
 		topo_ms = Timings.ms("keystats", "topo_tick_ms"), scan_ms = Timings.ms("keystats", "av_state_slow_tick_ms"),
 		next_topo = 0, next_scan = 0,
 	}
-	Logger.info(LOG, "Window topology and capture-application presence are recorded.")
+	Logger.success(LOG, "Window topology and capture-application presence are recorded.")
 	return true
 end
 
@@ -87,7 +88,7 @@ function M.stop()
 	local ok, reason = pcall(_session.tracker.close, "")
 	if not ok then Logger.error(LOG, "The open capture interval was not closed: %s.", tostring(reason)) end
 	_session = nil
-	Logger.info(LOG, "Window topology and capture-application presence are no longer recorded.")
+	Logger.debug(LOG, "Window topology and capture-application presence are no longer recorded.")
 end
 
 --- Whether a session is running.
