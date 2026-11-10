@@ -35,6 +35,13 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const { escapeRegExp } = require('../lib/text-escape.cjs');
 const AppDirs = require('./lib/app-dirs.cjs');
 
+// Before any module-level probe: the analyser description below spawns python3,
+// which on Windows is the Store alias and would throw before this skip.
+if (process.platform === 'win32') {
+	console.log('[SKIP] The Linux field report collector is a Linux shell tool; not run on Windows.');
+	process.exit(0);
+}
+
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-linux-field-report.sh';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
@@ -56,11 +63,6 @@ const ANALYSER_SOURCES = JSON.parse(
 	}).stdout
 ).sources;
 const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
-
-if (process.platform === 'win32') {
-	console.log('[SKIP] The Linux field report collector is a Linux shell tool; not run on Windows.');
-	process.exit(0);
-}
 
 const names = JSON.parse(fs.readFileSync(path.join(ROOT, IDENTIFIERS_JSON), 'utf8')).field_report;
 const collector = fs.readFileSync(path.join(ROOT, SCRIPT), 'utf8');
