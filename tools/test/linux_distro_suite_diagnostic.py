@@ -159,7 +159,9 @@ def main(arguments):
                 + "; inspect the raw artifact",
             )
             return 2
-        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+        # newline="\n": text mode would write CRLF on Windows, which the step
+        # output contract (and its test on the PC) reads as part of each value.
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8", newline="\n") as output:
             output.write("passed=" + str(totals[1]) + "\ninterpreter=" + interpreters[0] + "\n")
     return 0
 

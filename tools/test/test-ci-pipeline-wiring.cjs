@@ -6805,7 +6805,7 @@ const DISTRO_DIAGNOSTIC_PATH = path.join(__dirname, 'linux_distro_suite_diagnost
 const DISTRO_DIAGNOSTIC = fs.readFileSync(DISTRO_DIAGNOSTIC_PATH, 'utf8');
 // The reviewed diagnostic bytes. Its behavior is executed below against
 // handwritten logs; any edit must be reviewed against those controls.
-const DISTRO_DIAGNOSTIC_SHA256 = '5c028ced76cccfdb5785c667f2609b6523c71f3bc100e95235687a5bd14b01c5';
+const DISTRO_DIAGNOSTIC_SHA256 = '5c4e19319333c99646443578a8f413193766eaf1f2958dbf08229099727e59b3';
 // The runner's whole executable body: the authored map is the only source of
 // the image and preparation, the suite is checked before any container, the
 // checkout is mounted read-only, and the helper receives that mount and suite.
