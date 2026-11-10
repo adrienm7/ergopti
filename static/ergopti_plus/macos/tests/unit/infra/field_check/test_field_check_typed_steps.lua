@@ -72,7 +72,7 @@ helpers.describe("hotstring round-trip probe", function()
 		local world = { candidates = CANDIDATES, typed = typed_as(" ASA ", 61.7) }
 		local steps, result = run("hotstring_roundtrip", world)
 		helpers.assert_true(result.passed)
-		helpers.assert_eq(table.concat(world.keys, ","), "space,a,x,a,space")
+		helpers.assert_eq(table.concat(world.keys, ","), "space,a,s,a,space")
 		helpers.assert_eq(world.options.until_text, " ASA ", "the field is awaited for exactly the expansion")
 		helpers.assert_eq(steps.hotstring_expanded.value, "exact")
 		helpers.assert_eq(steps.terminator_to_text_ms.value, "61")

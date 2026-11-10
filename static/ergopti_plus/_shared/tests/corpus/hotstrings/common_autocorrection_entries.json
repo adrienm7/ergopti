@@ -2,7 +2,7 @@
 	"schema_version": 1,
 	"captured_from": "static/ergopti_plus/_shared/modules/hotstrings/autocorrection.toml",
 	"captured_commit": "e9c00eb6252be77ffd2cd6ddb662c6f9564e85d8",
-	"source_sha256": "6aa39e0cf0b216e8a5ae47d84ef15dd00019dbbe35a8f77c7c9d332f7b6394f8",
+	"source_sha256": "166201004786d8ab0b95629c86dab65a7d31776c18c0f6664f88b99d6f411684",
 	"category": "autocorrection",
 	"legacy_section": "caps",
 	"source": "common",
