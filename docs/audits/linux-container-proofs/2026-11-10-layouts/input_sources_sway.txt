@@ -1,0 +1,4 @@
+=== Layout > « Input sources » on unsupported ===
+  ok   the session has no input source backend
+  ok   the menu shows the unsupported-desktop reason row: Indisponible sur ce bureau (GNOME, KDE ou X11 uniquement)
+=== 2 check(s), 0 failure(s) ===

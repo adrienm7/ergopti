@@ -1,0 +1,17 @@
+=== Layout > « Input sources » on kde ===
+  ok   the session's backend is kde (kde)
+  ok   the layout listing settles
+  ok   the session's 2 layouts are listed: us, fr
+  ok   the menu has one row per layout: English (US) | French
+  ok   kde ticks exactly one row
+  ok   the ticked row is the layout the desktop types with (q / q)
+  ok   the row of fr can be chosen
+  ok   choosing fr switches the desktop to it (<AD01> types a, fr types a)
+  ok   the row of us can be chosen
+  ok   choosing us switches the desktop to it (<AD01> types q, us types q)
+  ok   the row of us can be chosen
+  ok   choosing us switches the desktop to it (<AD01> types q, us types q)
+  ok   a running start selects the resume layout fr (desktop reads a)
+  ok   a start after a paused reload keeps the pause layout us (desktop reads q)
+  ok   resuming selects fr (<AD01> types a)
+=== 15 check(s), 0 failure(s) ===

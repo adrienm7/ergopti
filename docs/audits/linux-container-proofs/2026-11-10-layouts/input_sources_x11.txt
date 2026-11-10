@@ -1,0 +1,16 @@
+=== Layout > « Input sources » on x11 ===
+  ok   the session's backend is x11 (x11)
+  ok   the layout listing settles
+  ok   the session's 2 layouts are listed: us, fr
+  ok   the menu has one row per layout: us | fr
+  ok   X11 ticks no row (the active group is not read)
+  ok   the row of fr can be chosen
+  ok   choosing fr switches the desktop to it (<AD01> types a, fr types a)
+  ok   the row of us can be chosen
+  ok   choosing us switches the desktop to it (<AD01> types q, us types q)
+  ok   the row of us can be chosen
+  ok   choosing us switches the desktop to it (<AD01> types q, us types q)
+  ok   a running start selects the resume layout fr (desktop reads a)
+  ok   a start after a paused reload keeps the pause layout us (desktop reads q)
+  ok   resuming selects fr (<AD01> types a)
+=== 14 check(s), 0 failure(s) ===
