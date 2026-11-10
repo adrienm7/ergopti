@@ -33,6 +33,8 @@ local sqlite3 = require("hs.sqlite3")
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local Queries = require("keystats.queries")
+local WindowTopology = require("keystats.window_topology")
+local CapturePresence = require("keystats.capture_presence")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keystats.text_cipher")
@@ -683,6 +685,25 @@ function _builders.clipboard(e, id)
 	})
 end
 
+--- Persists a window-topology or capture-presence entry as the Windows
+--- generic (kind, app, meta_json) row of its table.
+--- @param statement string "events.window_topo" or "events.av".
+--- @param e table Admitted entry.
+--- @param id number Allocated event identity.
+--- @return string
+function _builders.kind_meta(statement, e, id)
+	local meta = {}
+	for key, value in pairs(e) do
+		if key ~= "type" and key ~= "timestamp" and key ~= "app" then meta[key] = value end
+	end
+	return Queries.render(statement, "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		kind = e.type, app = tostring(e.app or "Unknown"),
+		meta_json = _required_event_json(meta, statement .. " event"),
+	})
+end
+
 function _builders.hotstring(e, id, kind)
 	return Queries.render("events.hotstring", "native", {
 		device_id = tostring(_device_id), id = id,
@@ -755,6 +776,10 @@ function M.build_inserts(entry)
 		return { _builders.roi(entry, _alloc_event_id()) }
 	elseif t == "clipboard_copy" or t == "clipboard_paste" or t == "paste_burst" then
 		return { _builders.clipboard(entry, _alloc_event_id()) }
+	elseif WindowTopology.KINDS[t] then
+		return { _builders.kind_meta("events.window_topo", entry, _alloc_event_id()) }
+	elseif CapturePresence.KINDS[t] then
+		return { _builders.kind_meta("events.av", entry, _alloc_event_id()) }
 	elseif t == "hotstring" then
 		return { _builders.hotstring(entry, _alloc_event_id(), "fired") }
 	elseif t == "hotstring_suggested" then
