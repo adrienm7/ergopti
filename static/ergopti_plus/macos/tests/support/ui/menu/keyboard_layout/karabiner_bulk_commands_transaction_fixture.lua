@@ -87,8 +87,8 @@ package.loaded["infra.dialog_util"] = {
 }
 package.loaded["infra.config_paths"] = {
 	get = function(key)
-		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-		return "/remap/config_karabiner.toml"
+		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/tap_hold.toml"
 	end,
 }
 

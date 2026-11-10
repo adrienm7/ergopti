@@ -44,7 +44,7 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 				local sent = observations.arguments[case.method]
 				helpers.assert_eq(sent.scope, case.request.scope)
 				helpers.assert_eq(sent.mode, case.request.mode)
-				helpers.assert_true(sent.backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+				helpers.assert_true(sent.backup_path:find("^/remap/tap_hold%.toml%.tap_holds%-") ~= nil,
 					"the backup sits beside the remap file: " .. tostring(sent.backup_path))
 			end
 			helpers.assert_eq(count_logs(observations, "success"), 0,

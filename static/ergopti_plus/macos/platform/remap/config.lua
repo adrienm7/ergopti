@@ -5,7 +5,9 @@
 --- DESCRIPTION:
 --- Handles all data loading and user configuration persistence for the
 --- Karabiner bridge: JSON data files (actions, keys, combos), default state
---- construction, and reading/writing config_karabiner.toml.
+--- construction, and reading/writing the shared tap_hold.toml through
+--- platform/remap/tap_hold_file.lua, which translates it to and from the
+--- Karabiner model this module merges (the layout config_karabiner.toml had).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Driver-Local Data Files: platform/remap/data/ hosts actions.json,
@@ -18,7 +20,7 @@
 ---    and preserves every field it does not own; load_user_config() reads an
 ---    absent table, key, slot or timing as its neutral value and upgrades the
 ---    legacy bare-string combo shape.
---- 4. Corruption Safety: an unparseable config_karabiner.toml is never silently
+--- 4. Corruption Safety: an unparseable tap_hold.toml is never silently
 ---    replaced. The read path falls back to defaults without touching the file
 ---    and the write path refuses to publish over it, so the user keeps a file
 ---    they can still repair by hand. Only an explicit reset overrides that.
@@ -39,10 +41,19 @@ local JsonCodec  = require("adapters.json_codec")
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
-local Outdated = require("config_outdated")
+local OutdatedEntries = require("config_outdated")
 local KePaths = require("platform.remap.ke_paths")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
+local TapHoldFile = require("platform.remap.tap_hold_file")
+
+-- Outdated entries are named where the user finds them: the merge below works
+-- on the Karabiner model, the file holds the shared layout.
+local Outdated = {
+	report_in_file = function(path, segments, detail, logger)
+		return OutdatedEntries.report_in_file(path, TapHoldFile.file_segments(segments), detail, logger)
+	end,
+}
 
 local LOG = "karabiner"
 
@@ -120,7 +131,7 @@ local function combinations_symmetric(section, path)
 end
 
 --- « Ergopti uses Karabiner »: `[karabiner] integration_enabled` in
---- config_karabiner.toml. On by default; off means no lease worker, no guardian
+--- tap_hold.toml. On by default; off means no lease worker, no guardian
 --- registration and no ErgoptiPlus rule left in karabiner.json. Karabiner
 --- itself is never touched.
 M.INTEGRATION_ENABLED_DEFAULT = true
@@ -201,7 +212,8 @@ function M._load_toml_file(path)
 		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
 		return nil, "parse_error"
 	end
-	return data, nil, { path = path, status = "ok", content = raw }, shapes
+	local file = TapHoldFile.read(data, shapes, path)
+	return file.model, nil, { path = path, status = "ok", content = raw }, file.model_shapes
 end
 
 local function load_json_file(path)
@@ -642,12 +654,12 @@ end
 -- ==========================================
 -- ==========================================
 
---- Loads config_karabiner.toml.
+--- Loads tap_hold.toml as the Karabiner model.
 --- If the file is absent (first launch), builds and returns the default state.
 --- A sparse file is completed with neutral values; legacy combos are upgraded.
 --- @param tap_hold_keys table List from load_tap_hold_keys.
 --- @param mod_combos table List from load_mod_combos.
---- @param user_config_path string Absolute path to config_karabiner.toml.
+--- @param user_config_path string Absolute path to tap_hold.toml.
 --- @return table|nil state Full state, or nil when the persisted source is unsafe.
 --- @return string status One of "ok", "absent", or "error".
 --- @return table|nil source Optional exact same-read path/status/raw admission receipt.
@@ -857,13 +869,13 @@ function M.explicit_leaves(intent)
 	return leaves
 end
 
---- Persists the non-neutral state sparsely to config_karabiner.toml.
+--- Persists the non-neutral state sparsely to tap_hold.toml.
 --- Refuses to publish over a file that exists but cannot be decoded as TOML:
 --- load_user_config() already falls back to defaults without touching such a
 --- file, so the overwrite performed by the very next setter is where the user's
 --- still-recoverable tap/hold and combo configuration was actually destroyed.
 --- @param state table The current module state table.
---- @param user_config_path string Absolute path to config_karabiner.toml.
+--- @param user_config_path string Absolute path to tap_hold.toml.
 --- @param overwrite_corrupt boolean|nil True only for the explicit reset-to-defaults
 ---        action — the one case where clobbering an unparseable file is the intent.
 --- @param expected_source table|nil `{ status, content }` a scope transaction read
@@ -882,6 +894,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 	assert(intent == nil or not overwrite_corrupt, "a reset already owns every remap leaf")
 	local document = {}
 	local document_shapes
+	-- The shared file the save started from, nil when it starts from none; a
+	-- reset's parsed source, whose other drivers' settings it keeps.
+	local shared_file, reset_base
 	local source, source_status
 	if not overwrite_corrupt then
 		-- Re-reading before every save is cheap (a few KB, only on user action)
@@ -911,6 +926,14 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				Logger.warn(LOG, "Rewriting the unparseable user config at '%s'; its exact bytes are in the scope backup.",
 					user_config_path)
 				decoded, shapes = {}, nil
+			else
+				shared_file = TapHoldFile.read(decoded, shapes, user_config_path)
+				if not shared_file.writable then
+					Logger.error(LOG, "Refusing to overwrite '%s': it was saved by a newer build or its version is unusable — settings NOT saved.",
+						user_config_path)
+					return false
+				end
+				decoded, shapes = shared_file.model, shared_file.model_shapes
 			end
 			document, document_shapes = decoded, shapes
 		elseif source_status ~= "absent" then
@@ -925,6 +948,12 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		if source_status ~= "ok" and source_status ~= "absent" then
 			Logger.error(LOG, "Refusing to repair unreadable user config at '%s'.", user_config_path)
 			return false
+		end
+		-- The file is shared: a reset replaces what macOS owns and keeps the
+		-- other drivers' settings of a file that still parses.
+		if source_status == "ok" then
+			local decoded_ok, decoded, shapes = pcall(TomlCodec.decode_with_shapes, source)
+			if decoded_ok and type(decoded) == "table" then reset_base = { document = decoded, shapes = shapes } end
 		end
 	end
 
@@ -1087,9 +1116,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			if next(mod_combos) == nil then document.mod_combos = nil end
 		end
 		-- Only an ordinary valid-source read owns the parsed identities. Explicit
-		-- resets, absent files and backed corrupt repair keep their default encoder.
-		if document_shapes then return TomlCodec.encode_with_shapes(document, document_shapes) end
-		return TomlCodec.encode(document)
+		-- resets, absent files and backed corrupt repair start a new shared file.
+		if reset_base then return TapHoldFile.encode_reset(reset_base.document, reset_base.shapes, document) end
+		return TapHoldFile.encode(shared_file, document)
 	end)
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "User config candidate for '%s' refused: %s.", user_config_path,
@@ -1122,10 +1151,16 @@ function M.prepare_copy_taps_to_chords(entries, actions, path)
 	assert(status == "absent" or (status == "ok" and type(source) == "string"), "fresh chord source could not be read")
 	local expected = { status = status, content = source }
 	local known = {}; for _, action in ipairs(actions) do known[action.id] = true end
+	-- The shared file names a combination by its pair id.
+	local pairs_of = {}
+	for index, entry in ipairs(entries) do pairs_of[index] = { id = TapHoldFile.pair_of_combo(entry.id) } end
 	local plan = require("tap_hold.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
-		entries = entries, is_action = function(action) return known[action] == true end,
+		entries = pairs_of, is_action = function(action) return known[action] == true end,
 		settings = { simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT, combo_symmetric = COMBO_SYMMETRIC_DEFAULT },
 	})
+	local by_combo = {}
+	for pair, slots in pairs(plan.mod_combos_config) do by_combo[TapHoldFile.combo_of_pair(pair)] = slots end
+	plan.mod_combos_config = by_combo
 	local prepared, detail, content, witnessed = require("toml_codec.writer").prepare_batch(path, plan.rows, FileSystem, expected)
 	assert(prepared == true and type(content) == "string" and type(witnessed) == "table", detail or "chord source preparation refused")
 	plan.path, plan.expected_source, plan.candidate = path, expected, content

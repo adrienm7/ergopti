@@ -162,7 +162,9 @@ return function(run, dependencies)
 					return { { id = "none" } }
 				end,
 				load_tap_hold_keys = function() return { { id = "left_shift" } } end,
-				load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
+				-- A real combination when the caller writes the shared tap_hold.toml,
+				-- which names a combination by its pair id.
+				load_mod_combos = function() return { { id = options.mod_combo_id or "left_shift+right_shift" } } end,
 				compute_non_canonical_combos = function() return {} end,
 				load_user_config = function(tap_hold_keys, mod_combos)
 					if type(options.real_user_config_path) == "string" then

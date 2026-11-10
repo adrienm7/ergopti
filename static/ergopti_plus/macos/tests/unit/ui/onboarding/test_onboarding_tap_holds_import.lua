@@ -4,7 +4,7 @@
 --- MODULE: Regression — the wizard's Tap-Holds answer imports the checked keys
 --- DESCRIPTION:
 --- The first-run wizard's Tap-Holds page asked nothing on macOS: the switch
---- lives in config_karabiner.toml, where a config.toml answer is never read,
+--- lives in tap_hold.toml, where a config.toml answer is never read,
 --- so the page showed a note and a Yes imported no key.
 ---
 --- ROOT CAUSE ENCODED:

@@ -4116,7 +4116,7 @@
 	"platform_reason.accented_shortcuts_need_a_layout_file_on_macos": "macOS에서는 사용할 수 없음: macOS 자판 파일에는 자체 Command 및 Control 계층이 있으므로 Cmd+é는 이미 그 파일이 지정한 단축키로 동작합니다. Windows와 Linux에서는 악센트 문자를 바로 입력하는 키의 Ctrl, Alt, Super 조합을 해당 문자의 일반 단축키로 다시 매핑하므로 Ctrl+é가 Ctrl+C처럼 동작합니다.",
 	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "Windows에서는 사용할 수 없음: Windows 설정에서는 세 손가락·네 손가락 탭과 네 방향 직선 스와이프에만 단축키를 지정할 수 있고, 터치 데이터는 Ergopti에 전달되지 않습니다. 따라서 두 손가락·다섯 손가락 슬롯, 대각선, 수평 스와이프 슬롯이 없습니다.",
 	"platform_reason.category_master_is_a_gate_on_windows": "Windows에서는 이 이름이 아님: Windows는 이 마스터 스위치를 category_enabled의 카테고리 게이트로 둡니다. macOS와 Linux는 카테고리 자체 섹션에 enabled로 둡니다.",
-	"platform_reason.key_combinations_are_karabiner_settings_on_macos": "macOS에서는 이 이름이 아님: macOS에서는 Karabiner-Elements가 키 조합을 실행하므로, macOS는 키 조합과 그 스위치를 Karabiner 설정의 config_karabiner.toml 안 mod_combos로 저장합니다.",
+	"platform_reason.key_combinations_are_karabiner_settings_on_macos": "macOS에서는 이 이름이 아님: macOS에서는 Karabiner-Elements가 키 조합을 실행하므로, macOS는 키 조합과 그 스위치를 Karabiner 설정의 tap_hold.toml 안 mod_combos로 저장합니다.",
 	"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS에서는 이 이름이 아님: macOS는 이 옵션을 Ctrl 및 Cmd 단축키 사이에 두고 그것들과 함께 shortcuts.keys.wrap_text_if_selected로 저장합니다.",
 	"platform_reason.action_application_switching_is_macos": "macOS 전용: macOS는 각자 창을 묶은 앱 사이를 전환합니다. Windows와 Linux는 Alt+Tab으로 창 사이를 전환합니다: 대응하는 동작을 사용하세요.",
 	"platform_reason.action_continuous_swipe_is_macos": "macOS 전용: 연속 스와이프는 손가락이 움직이는 동안 따라가며, 이를 읽는 것은 macOS 드라이버뿐입니다. Windows는 터치패드 설정에서 완료된 제스처를 받고 Linux는 스와이프가 끝난 뒤 동작합니다: 대응하는 한 단계 동작을 사용하세요.",

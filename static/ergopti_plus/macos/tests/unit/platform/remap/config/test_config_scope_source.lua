@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Remap Configuration Under A Scope Transaction
 --- DESCRIPTION:
---- A scope backs up config_karabiner.toml, then saves: the save must refuse a
+--- A scope backs up tap_hold.toml, then saves: the save must refuse a
 --- file that changed after that backup, or the backup would not hold the bytes
 --- it replaced. The recommended state it saves sparsely must also load back as
 --- exactly the recommended state, since absence is the neutral value.
@@ -18,7 +18,7 @@ local COMBOS = { { id = "esc_tab" } }
 --- @param source string|nil Initial bytes, nil for absent.
 --- @param body function Receives the config module and the disk table.
 local function with_disk(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.toml.codec", "toml_codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.toml.codec", "toml_codec" }, function()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local files = require("adapters.file_system")
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged

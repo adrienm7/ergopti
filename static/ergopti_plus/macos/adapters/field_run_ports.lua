@@ -46,7 +46,7 @@ local LOG = "adapters.field_run_ports"
 
 -- The personal files the configuration guard protects, by config_paths key.
 local GUARDED_FILES = {
-	"ConfigTomlPath", "KarabinerConfigPath", "MlxActiveModelPath", "PersonalTomlPath", "PersonalInfoTomlPath",
+	"ConfigTomlPath", "TapHoldConfigPath", "MlxActiveModelPath", "PersonalTomlPath", "PersonalInfoTomlPath",
 }
 
 -- The guarded files the running driver holds in memory once loaded: putting
