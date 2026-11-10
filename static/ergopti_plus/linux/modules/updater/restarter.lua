@@ -202,6 +202,17 @@ function M.watch_command(mode, successor, tail)
 	return table.concat(argv, " ")
 end
 
+--- The watcher command line as systemd-run hands it to the manager.
+--- systemd expands `$NAME`, `${NAME}` and `$$` in a unit's command line, so
+--- the script's `$$` arrived as a lone `$`: every rollback under the unit moved
+--- the tree to `<root>.failed-$`, and the next one found that name taken and
+--- could not move aside. Doubling every `$` hands the script over intact.
+--- @param successor table { root, token, log }.
+--- @return string
+function M.systemd_watch_command(successor)
+	return (M.watch_command("systemd", successor, { M.UNIT }):gsub("%$", "$$"))
+end
+
 --- The launcher and its arguments as one list.
 --- @param wrapper string The installed launcher.
 --- @param args table|nil Its arguments.
@@ -369,7 +380,7 @@ function M.restart(opts)
 				else
 					local unit = "ergopti-update-watch-" .. successor.token:match("ergopti%-boot%-ready%.(%w+)/ready$") .. ".service"
 					if not run("systemd-run --user --collect --quiet --unit=" .. ShellRunner.quote(unit) .. " "
-						.. M.watch_command("systemd", successor, { M.UNIT })) then
+						.. M.systemd_watch_command(successor)) then
 						Logger.warn(LOG, "The update watcher unit could not start; the updated daemon starts unwatched.")
 						run("systemctl --user unset-environment ERGOPTI_UPDATER_BOOT_READY")
 						unwatched()

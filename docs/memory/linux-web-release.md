@@ -30,7 +30,10 @@ that daemon, not the old one (a relay restart has already requested the old
 one's shutdown; under the unit systemd TERMs it at once). Every user Quit
 (`infra/quit_request.lua`, both degraded trays) first writes `quit` to the
 token (`report_quit`), and the watcher then keeps the update and starts
-nothing. Action: a new Quit path calls `report_quit`.
+nothing. Action: a new Quit path calls `report_quit`. systemd expands `$$`
+(and `${NAME}`) in a unit's command line, so the transient watcher's command
+goes through `systemd_watch_command`, which doubles every `$`. Action: any
+new `systemd-run` command escapes `$` the same way.
 
 A `systemctl --user --no-block restart|stop` of the daemon's own unit runs
 inside that unit's cgroup, so systemd's TERM of the cgroup can kill the shell

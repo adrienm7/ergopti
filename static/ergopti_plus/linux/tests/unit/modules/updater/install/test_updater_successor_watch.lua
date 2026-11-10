@@ -176,6 +176,26 @@ helpers.describe("updated daemon start watch (linux-update-successor-ready)", fu
 		cleanup(s)
 	end)
 
+	helpers.it("(update-failed-name) hands systemd-run the watcher with every $ escaped", function()
+		-- systemd turns `$$` into `$` in a unit's command line: unescaped, the
+		-- script's `$root.failed-$$` named every rollback `<root>.failed-$`.
+		local ran = {}
+		local how = Restarter.restart({ wrapper = "/opt/ergopti/bin/ergopti", args = {}, cgroup = UNIT_CGROUP,
+			successor = { root = "/opt/ergo$pti/lib", log = "/tmp/watch.log" },
+			run = function(cmd) ran[#ran + 1] = cmd; return true end })
+		helpers.assert_eq(how, "systemd")
+		Restarter.cancel("systemd", { run = function() return true end })
+		local prefix = "systemd-run --user --collect --quiet --unit='"
+		helpers.assert_eq(ran[2]:sub(1, #prefix), prefix)
+		local handed = ran[2]:match("^systemd%-run [^']+'[^']+' (.*)$")
+		helpers.assert_true(handed ~= nil, ran[2])
+		local token = ran[1]:match("ERGOPTI_UPDATER_BOOT_READY=(.-)'$")
+		local expected = Restarter.watch_command("systemd",
+			{ root = "/opt/ergo$pti/lib", token = token, log = "/tmp/watch.log" }, { Restarter.UNIT })
+		helpers.assert_eq(handed:gsub("%$%$", "$"), expected, "systemd's unescaping must yield the script")
+		helpers.assert_true(handed:find("failed-$$$$", 1, true) ~= nil, "the script's own $$ reaches the shell")
+	end)
+
 	helpers.it("(update-successor-watch) arms the watcher outside the unit and hands the token through the manager", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/opt/ergopti/bin/ergopti", args = {}, cgroup = UNIT_CGROUP,
