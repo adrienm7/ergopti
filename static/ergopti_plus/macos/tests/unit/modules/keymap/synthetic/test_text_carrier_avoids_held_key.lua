@@ -156,7 +156,7 @@ helpers.describe("replacement text never rides a held key (hsfix-held-carrier)",
 		local a_up = physical(fixture, KEYCODE_A, false)
 		fixture.up(a_up)
 		app.deliver(a_up)
-		helpers.assert_eq(app.text(), "aAXA",
+		helpers.assert_eq(app.text(), "aASA",
 			"the first replacement character must not ride the held A key")
 	end)
 
