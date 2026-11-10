@@ -2156,13 +2156,13 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
 baseline` line (item 38).
 - `field_log_signals` runs after `field_slow_lines`, one `awk` pass over
   today's log that prints counts and enumerated names only.
-  `log_capture_stamp_errors` (gestures `has no capture timestamp` ERROR, L46),
-  `log_window_toggle_errors` (any `[window_toggle]` ERROR) and
+  `log_capture_stamp_errors` (the gestures « has no capture timestamp »
+  ERROR, L46), `log_window_toggle_errors` (any `window_toggle` ERROR) and
   `log_start_rollbacks` (a dynamic or personal hotstring start or publication
-  rolled back) fail on any line. `log_three_finger_rejections`
-  (`<n>:<most frequent gate>`), `log_held_key_moves` (`Synthetic text moved off
-  a held key`) and `log_prediction_activity_cancels` (`<n>:<most frequent
-  activity>`) are information; the last two kinds are DEBUG lines, so a 0 at a
+  rolled back) fail on any line. `log_three_finger_rejections` (count and most
+  frequent gate), `log_held_key_moves` (« Synthetic text moved off a held
+  key ») and `log_prediction_activity_cancels` (count and most frequent
+  activity) are information; the last two kinds are DEBUG lines, so a 0 at a
   higher log level says nothing.
 - `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
   first so a regressed guard cannot freeze the app, checks `followed_mode`
