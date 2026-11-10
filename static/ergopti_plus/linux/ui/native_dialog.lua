@@ -31,12 +31,11 @@ M.EXIT_UNAVAILABLE = 69
 
 local DEFAULT_DEPS = {
 	exepath = function() return require("luv").exepath() end,
-	-- The host is this module's sibling, so the driver root is read from this
-	-- file's own path rather than from a configured location.
-	driver_root = function()
-		local source = debug.getinfo(1, "S").source:gsub("^@", "")
-		return source:match("^(/.*)/ui/native_dialog%.lua$")
-	end,
+	-- The path owner's root, absolute even under a relative package.path
+	-- (`luajit ergopti_hotstrings.lua` from the driver folder, or a child the
+	-- tray starts with that path): this file's own source path is then
+	-- "./ui/native_dialog.lua", and every dialog refused to open.
+	driver_root = function() return require("infra.paths").driver_root() end,
 	quote = function(value) return require("text_utils").shell_quote(value) end,
 }
 
