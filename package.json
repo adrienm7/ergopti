@@ -185,6 +185,7 @@
 		"test:field-report-redact": "node ./tools/test/test-field-report-redact.cjs",
 		"test:field-log-analyse": "node ./tools/test/test-field-log-analyse.cjs",
 		"test:field-todo-summary": "node ./tools/test/test-field-todo-summary.cjs",
+		"test:field-guided": "node ./tools/test/test-field-guided.cjs",
 		"test:field-run-protocol": "node ./tools/test/test-field-run-protocol.cjs",
 		"test:feature-requirements": "node ./tools/test/test-feature-requirements.cjs",
 		"test:windows-field-report-contract": "node ./tools/test/test-windows-field-report-contract.cjs",

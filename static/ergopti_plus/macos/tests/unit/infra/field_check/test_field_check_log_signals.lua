@@ -40,8 +40,9 @@ local function run(code, output)
 	return steps_of(report)
 end
 
+local COUNTS = "switch_cancel 0\ntoggle_open 0\ntoggle_raise 0\nexpansion 0\nboot 0\n"
 local QUIET = "capture_stamp 0\nwindow_toggle 0\nstart_rollback 0\nrotation_warning 0\ndigest_mismatch 0\n"
-	.. "rejections 0 none\nheld_key 0\ncancels 0 none\n"
+	.. "rejections 0 none\nheld_key 0\ncancels 0 none\n" .. COUNTS
 
 
 
@@ -62,7 +63,8 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 
 	helpers.it("fails each error signal by name and keeps activity as information", function()
 		local steps = run(0, "capture_stamp 2\nwindow_toggle 1\nstart_rollback 0\nrotation_warning 1\n"
-			.. "digest_mismatch 0\nrejections 7 tilt\nheld_key 3\ncancels 4 mouseMoved\n")
+			.. "digest_mismatch 0\nrejections 7 tilt\nheld_key 3\ncancels 4 mouseMoved\n"
+			.. "switch_cancel 2\ntoggle_open 1\ntoggle_raise 3\nexpansion 9\nboot 4\n")
 		helpers.assert_eq(steps.log_capture_stamp_errors.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_capture_stamp_errors.value, "2")
 		helpers.assert_eq(steps.log_window_toggle_errors.state, Report.STATE_FAIL)
@@ -73,6 +75,11 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 		helpers.assert_eq(steps.log_three_finger_rejections.value, "7:tilt")
 		helpers.assert_eq(steps.log_held_key_moves.value, "3")
 		helpers.assert_eq(steps.log_prediction_activity_cancels.value, "4:mouseMoved")
+		for id, value in pairs({ log_prediction_switch_cancels = "2", log_window_toggle_opens = "1",
+			log_window_toggle_raises = "3", log_hotstring_expansions = "9", log_boot_completions = "4" }) do
+			helpers.assert_eq(steps[id].state, Report.STATE_INFO, id)
+			helpers.assert_eq(steps[id].value, value, id)
+		end
 	end)
 
 	helpers.it("fails on a missing log, a timeout or a summary without its totals", function()
@@ -125,6 +132,15 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 			"2026-11-10 10:00:16:001 [WARNING] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed its digest "
 				.. "check; Ollama removed the layer, so it is pulled once more.",
 			"2026-11-10 10:00:17:001 [INFO] [menu_llm.ollama] The Ollama pull of granite4:350m-h finished.",
+			"2026-11-10 10:00:18:001 [DEBUG] [keymap.llm_bridge] User activity (application or window switch) — "
+				.. "pending prediction cancelled.",
+			"2026-11-10 10:00:19:001 [DEBUG] [window_toggle] Toggle 'model_browser': closed, opening.",
+			"2026-11-10 10:00:20:001 [DEBUG] [window_toggle] Toggle 'model_browser': open but not focused, "
+				.. "bringing to front.",
+			"2026-11-10 10:00:21:001 [DEBUG] [window_toggle] Toggle 'model_browser': focused, closing.",
+			"2026-11-10 10:00:22:001 [DEBUG] [keymap.expander] Auto-expand: private mapping fired (content withheld).",
+			"2026-11-10 10:00:23:001 [DEBUG] [keymap.expander] Terminator-expand: 'asa' → 'ASA'.",
+			"2026-11-10 10:00:24:001 [SUCCESS] [boot_profiler] Boot complete in 2140 ms.",
 		}, "\n") .. "\n")
 		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
 		local output = pipe:read("*a")
@@ -139,6 +155,12 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 		helpers.assert_eq(summary.digest_mismatch, 1, "only the failed digest check counts")
 		helpers.assert_eq(summary.rejections, { count = 3, top = "tilt" })
 		helpers.assert_eq(summary.held_key, 1)
-		helpers.assert_eq(summary.cancels, { count = 3, top = "mouseMoved" })
+		helpers.assert_eq(summary.cancels, { count = 3, top = "mouseMoved" },
+			"a window switch, whose reason holds spaces, is counted apart")
+		helpers.assert_eq(summary.switch_cancel, 1)
+		helpers.assert_eq(summary.toggle_open, 1)
+		helpers.assert_eq(summary.toggle_raise, 1, "a focused toggle closes and is neither")
+		helpers.assert_eq(summary.expansion, 2)
+		helpers.assert_eq(summary.boot, 1)
 	end)
 end)

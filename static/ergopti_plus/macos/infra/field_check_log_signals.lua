@@ -9,7 +9,9 @@
 --- hotstring reload rolled back, a keystats day rotation that stalled, a model
 --- blob whose digest did not match, the three-finger candidates a gate rejected,
 --- the synthetic text moved off a held key (`asa` typed fast) and the pending
---- predictions a user activity cancelled. A person reading the report then
+--- predictions a user activity cancelled (a window switch counted apart), the
+--- window toggles that opened or raised a page, the hotstring expansions and
+--- the completed boots of the day. A person reading the report then
 --- knows which of those happened today without opening the log.
 ---
 --- FEATURES & RATIONALE:
@@ -58,6 +60,23 @@ M.ERROR_SIGNALS = {
 	{ step = "log_digest_mismatches", name = "digest_mismatch" },
 }
 
+--- The activity counts, each information the guided steps watch rise
+--- (infra/field_run_guided.lua) and the TODO summary bounds.
+--- @type table { { step, name } } in report order
+M.COUNT_SIGNALS = {
+	-- modules/keymap/llm_bridge.lua: a prediction a window or application switch
+	-- cancelled; its reason holds spaces, which the generic count refuses.
+	{ step = "log_prediction_switch_cancels", name = "switch_cancel" },
+	-- ui/window_toggle.lua: a toggle that opened its page, or raised a covered or
+	-- minimised one.
+	{ step = "log_window_toggle_opens", name = "toggle_open" },
+	{ step = "log_window_toggle_raises", name = "toggle_raise" },
+	-- modules/keymap/expander.lua: an auto or terminator expansion (DEBUG).
+	{ step = "log_hotstring_expansions", name = "expansion" },
+	-- infra/boot_profiler.lua: one completed boot.
+	{ step = "log_boot_completions", name = "boot" },
+}
+
 -- POSIX awk only: macOS ships the BWK awk.
 M.LOG_SIGNALS_AWK = [=[
 function top(names,   name, best, best_n) {
@@ -70,6 +89,11 @@ function top(names,   name, best, best_n) {
 /\[ERROR\] \[[^]]*\] .*(start rolled back after|publication transaction rolled back)/ { start_rollback++ }
 /\[WARNING\] \[[^]]*\] (Midnight rotation stalled|day_rollover: today\.log not fully drained)/ { rotation_warning++ }
 /\[(ERROR|WARNING)\] \[[^]]*\] .*(failed its digest check|digest_mismatch)/ { digest_mismatch++ }
+/User activity \(application or window switch\) — pending prediction cancelled/ { switch_cancel++ }
+/Toggle '[^']*': closed, opening\./ { toggle_open++ }
+/Toggle '[^']*': open but not focused, bringing to front\./ { toggle_raise++ }
+/\] (Auto|Terminator)-expand: / { expansion++ }
+/\] Boot complete in [0-9]+ ms\./ { boot++ }
 match($0, /Three-finger candidate rejected by [A-Za-z_][A-Za-z0-9_]*/) {
 	rejections++; gate[substr($0, RSTART + 35, RLENGTH - 35)]++
 }
@@ -80,6 +104,8 @@ match($0, /User activity \([A-Za-z_][A-Za-z0-9_]*\)/) {
 END {
 	printf "capture_stamp %d\nwindow_toggle %d\nstart_rollback %d\n", capture_stamp, window_toggle, start_rollback
 	printf "rotation_warning %d\ndigest_mismatch %d\n", rotation_warning, digest_mismatch
+	printf "switch_cancel %d\ntoggle_open %d\ntoggle_raise %d\n", switch_cancel, toggle_open, toggle_raise
+	printf "expansion %d\nboot %d\n", expansion, boot
 	printf "rejections %d %s\nheld_key %d\ncancels %d %s\n", rejections, top(gate), held_key, cancels, top(reason)
 }
 ]=]
@@ -96,8 +122,10 @@ function M.parse_summary(text)
 		local named, named_count, top = line:match("^([%a_]+) (%d+) ([%w_]+)$")
 		if named then summary[named] = { count = tonumber(named_count), top = top } end
 	end
-	for _, signal in ipairs(M.ERROR_SIGNALS) do
-		if type(summary[signal.name]) ~= "number" then return nil end
+	for _, list in ipairs({ M.ERROR_SIGNALS, M.COUNT_SIGNALS }) do
+		for _, signal in ipairs(list) do
+			if type(summary[signal.name]) ~= "number" then return nil end
+		end
 	end
 	if type(summary.held_key) ~= "number" or type(summary.rejections) ~= "table"
 		or type(summary.cancels) ~= "table" then
@@ -142,6 +170,7 @@ function M.log_signals(ports, report, finish)
 			summary.rejections.count .. ":" .. summary.rejections.top)
 		report.step("log_held_key_moves", INFO, summary.held_key)
 		report.step("log_prediction_activity_cancels", INFO, summary.cancels.count .. ":" .. summary.cancels.top)
+		for _, signal in ipairs(M.COUNT_SIGNALS) do report.step(signal.step, INFO, summary[signal.name]) end
 		finish()
 	end)
 end

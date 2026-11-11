@@ -30,6 +30,12 @@
 # summary line: the collector's own checks (tools/dev/linux-field-shell-checks.sh),
 # the field run and the tray checks clicked today.
 #
+# The guided and probe steps: tools/dev/field-guided.py, after the field run,
+# reads the session (uinput, evdev, autostart, polkit, the focus reporter) and
+# prompts the gestures of TODO « To confirm on Linux » in this terminal; the
+# report ends with todo_summary.md, one verdict per TODO point
+# (static/ergopti_plus/linux/data/field_todo_coverage.json).
+#
 # The field run: tools/dev/linux-field-run.sh asks the running daemon to run its
 # Debug field checks with no window (linux/infra/field_run.lua, the macOS field
 # run's protocol), copies one result per step into field_run/ and prints their
@@ -174,7 +180,8 @@ report_field_checks() {
 
 # Prints the logs folder the driver resolves and the log file names of
 # _shared/lua/app_dirs.lua, one per line: folder, unified prefix, errors prefix,
-# extension, bootstrap log, crash reports folder, personal hotstrings file.
+# extension, bootstrap log, crash reports folder, personal hotstrings file and
+# the Metrics database the guided steps count rows in.
 driver_log_layout() {
 	LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;" \
 		luajit -e '
@@ -182,7 +189,8 @@ driver_log_layout() {
 			print(require("infra.config_paths").get_logs_dir())
 			print(files.unified_prefix); print(files.errors_prefix); print(files.extension)
 			print(files.bootstrap_log); print(dirs.crash_reports_dir)
-			print(require("infra.config_paths").config("personal_hotstrings.toml"))'
+			print(require("infra.config_paths").config("personal_hotstrings.toml"))
+			print(require("infra.config_paths").metrics_path())'
 }
 
 # Copies one log into the report without the user's typed text.
@@ -270,6 +278,14 @@ finalize() {
 		printf '%-28s unavailable\n' "journal_warnings" >> "${steps}"
 	fi
 	[ -z "${journal_dir}" ] || rm -rf "${journal_dir}"
+	# One verdict per TODO « To confirm on Linux » point, from the field run,
+	# the guided and probe steps and steps.txt; printed so the terminal ends on
+	# what to tick.
+	step todo_summary python3 "${REPO_ROOT}/tools/dev/field-todo-summary.py" --os linux --report "${out}"
+	if [ -f "${out}/todo_summary.txt" ]; then
+		log "TODO « To confirm on Linux », one verdict per point (todo_summary.md):"
+		sed 's/^/[field-report]   /' "${out}/todo_summary.txt"
+	fi
 	# Last: it also reads the check verdicts the steps above wrote.
 	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
 
@@ -325,6 +341,19 @@ printf '%-28s exit=%s\n' "field_python" "${PIPESTATUS[0]}" >> "${steps}"
 log "Field run: asking the daemon to run its field checks…"
 field_linux_run "${REPO_ROOT}" "${out}" 2>&1 | tee "${out}/field_run.txt" | sed 's/^/[field-report] /'
 printf '%-28s exit=%s\n' "field_run" "${PIPESTATUS[0]}" >> "${steps}"
+# The collector's own steps (static/ergopti_plus/linux/data/field_guided_steps.json):
+# probes read the session once (uinput, evdev, autostart, polkit, the focus
+# reporter), guided steps print a gesture and count what it left in today's
+# day log or the Metrics database, attested steps take y, n or s. Only counts
+# and closed codes reach field_guided/; the raw log is read here, never copied.
+guided_sources=()
+if layout="$(driver_log_layout 2>/dev/null)"; then
+	{ read -r g_log_dir; read -r g_main; read -r _; read -r g_ext; read -r _; read -r _; read -r _; read -r g_metrics; } <<< "${layout}"
+	guided_sources=(--log "${g_log_dir}/${g_main}$(date +%Y-%m-%d)${g_ext}" --metrics "${g_metrics}")
+fi
+python3 "${REPO_ROOT}/tools/dev/field-guided.py" --steps "${DRIVER_ROOT}/data/field_guided_steps.json" \
+	--out "${out}" ${guided_sources[@]+"${guided_sources[@]}"} 2>&1 | tee "${out}/field_guided.txt"
+printf '%-28s exit=%s\n' "field_guided" "${PIPESTATUS[0]}" >> "${steps}"
 
 # ===========================================
 # ======= 3/ Logs, commit and push ==========
