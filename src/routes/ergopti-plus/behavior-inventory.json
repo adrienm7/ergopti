@@ -343,7 +343,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.key_down(e, key_code)",
-					"sha256": "85c525f297d98db42ca451ae661889628bfc7bc62586d04e6cd4bd5ba4b0614a"
+					"sha256": "bd1e2ab31623275ebd2a9c87464cec9089291d92cec1f0cfccd736a4d07dba02"
 				},
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
@@ -355,7 +355,7 @@
 				{
 					"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.on_key(detail)",
-					"sha256": "25bc2970b24dfc9ac70c35249ff9bcfe05f1da9f946cd4e5ef2e527c450d735f"
+					"sha256": "2f14ad09c6a321186d64eea5f41321a32a63a233d2b70af41489e33097dbb49a"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
