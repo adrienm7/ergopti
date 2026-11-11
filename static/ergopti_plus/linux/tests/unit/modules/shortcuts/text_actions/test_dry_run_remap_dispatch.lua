@@ -35,10 +35,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
 			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
 	end
-	-- config.toml and tap_hold.toml share their folder, as infra/config_paths.lua places them.
-	local folder = os.tmpname(); os.remove(folder)
-	assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
-	local config_path, tap_path = folder .. "/config.toml", folder .. "/tap_hold.toml"
+	local config_path, tap_path = os.tmpname(), os.tmpname()
 	local injector, manager
 	local ok, detail = pcall(function()
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
@@ -54,12 +51,10 @@ local function with_remap(route, dry, action, hold, body, revoke)
 			.. '[gesture_parameters]\ntap_hold__tab__send_text = "ok"\ncombination__caps_lock_then_tab__send_text = "ok"\ncombination__tab_then_caps_lock__send_text = "ok"\n'
 		if route == "ordered" then config = config .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "' .. action .. '"\n'
 			.. (hold and '[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "ctrl"\n' or "")
-		end
+		elseif route == "buffered" then config = config .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
+			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. action .. '"\n' end
 		file = assert(io.open(config_path, "wb")); assert(file:write(config)); assert(file:close())
 		local tap = '[tap_hold]\nenabled = ' .. tostring(route == "single") .. '\ninherit_defaults = false\n'
-		-- The buffered third slot lives in tap_hold.toml, beside the tap-hold keys.
-		if route == "buffered" then tap = tap .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
-			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. action .. '"\n' end
 		if route == "single" then tap = tap .. '[tap_hold.keys.tab]\ntap_action = "' .. action .. '"\n'
 			.. 'hold_modifier = "' .. (hold and "ctrl" or "") .. '"\n' .. (hold and "" or 'hold_layer = ""\n') .. 'time_activation_seconds = 0.2\n' end
 		file = assert(io.open(tap_path, "wb")); assert(file:write(tap)); assert(file:close())
@@ -125,8 +120,8 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				if route ~= "single" then session.edge("a", 58, 1, 1000) end
 				world.first_rows = #session.rows
 				if revoke then
-					local changed = tap:gsub('combo = "' .. action .. '"', 'combo = "none"')
-					local changed_file = assert(io.open(tap_path, "wb"))
+					local changed = config:gsub('combo = "' .. action .. '"', 'combo = "none"')
+					local changed_file = assert(io.open(config_path, "wb"))
 					assert(changed_file:write(changed)); assert(changed_file:close())
 				end
 				session.edge("a", 15, 1, 1010)
@@ -153,7 +148,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 	end)
 	if manager then pcall(manager._reset_for_test) end
 	if injector then injector._set_uinput(nil); injector._set_nanosleep_for_test(nil) end
-	os.remove(config_path); os.remove(tap_path); os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
+	os.remove(config_path); os.remove(tap_path)
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(saved) do package.loaded[name] = value end
 	if not ok then error(detail, 0) end

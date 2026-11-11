@@ -74,13 +74,9 @@ warn once and hold nothing on a key that holds them, and keep its tap.
 | `config.<pair>.combo`        | string  | The action of the combination. Absent or `"none"`: none.      |
 | `config.<pair>.tap`, `.hold` | string  | macOS only: the action of the pair's tap and hold slots.      |
 
-macOS and Linux read and write this section here. On Linux,
-`modules/shortcuts/key_combinations.lua` reads it, and the Shortcuts and key
-combinations scopes publish it through the tap-hold writer
-(`prepare_combo_rows`) as the second backed-up file of their transaction;
-`config.toml` keeps the pair taps and holds and the
-`[category_enabled] key_combinations` switch. A `[mod_combos]` left in
-`config.toml` is never read.
+macOS writes this section here; Linux reads and writes it in `config.toml`
+(`modules/shortcuts/key_combinations.lua`), beside the pair taps and holds and
+the `[category_enabled] key_combinations` switch.
 
 ### `[karabiner]` (macOS only)
 
@@ -104,11 +100,6 @@ Each driver carries its old files over once, as `migrations.toml`
 - macOS `hammerspoon/config_karabiner.toml`: translated by
   `shared_file.from_karabiner`, published as `tap_hold.toml`, then renamed
   `config_karabiner.toml.migrated`. Only while `tap_hold.toml` does not exist.
-- Linux `config.toml` `[mod_combos]`: moved as it is into `tap_hold.toml` at
-  boot (`tap_hold_writer.import_config_combos`, translation `config_section`),
-  then deleted from `config.toml` line by line. Both files are backed up first
-  and `tap_hold.toml` is published first; when it already holds a different
-  `[mod_combos]`, it wins and `config.toml` is left as it is.
 - Windows `config.toml` tap-hold keys: the Windows driver's own migration.
 
 ## Cross-driver corpus

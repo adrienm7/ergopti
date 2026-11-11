@@ -98,29 +98,6 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 		end)
 	end
 
-	for _, name in ipairs({ "linux_written", "macos_written" }) do
-		helpers.it("the Linux key combinations read " .. name .. ".toml as expected.toml says (tap-hold-shared-file)", function()
-			local want = expected.reads[name].linux.mod_combos
-			local catalog = Loader.load(DEFAULTS, nil).catalog
-			local owner = require("modules.shortcuts.key_combinations").new({ keys = catalog,
-				hold_picker = Loader.load(DEFAULTS, nil).hold_picker,
-				files = require("adapters.file_system"), route = function() return "/nonexistent-ergopti-corpus/config.toml" end,
-				chord_route = function() return CORPUS .. name .. ".toml" end,
-				is_paused = function() return false end, changed = function() return true end,
-				actions = { is_assignable = function(action) return action == "copy" end } })
-			local token = {}
-			helpers.assert_true(owner.acquire_configuration(token))
-			local snapshot = owner.configuration_snapshot(token)
-			helpers.assert_true(owner.release_configuration(token))
-			helpers.assert_eq(snapshot.chord_enabled, want.enabled)
-			helpers.assert_eq(snapshot.chord_settings, { simultaneous_threshold_ms = want.simultaneous_threshold_ms,
-				combo_symmetric = want.symmetric })
-			local chords = {}
-			for pair, action in pairs(snapshot.chords) do if action ~= "none" then chords[pair] = action end end
-			helpers.assert_eq(chords, want.chords)
-		end)
-	end
-
 	helpers.it("another driver's key is left alone, a macOS hold is named once (tap-hold-shared-file)", function()
 		local Logger = require("logger.shim")
 		local real_warn, warnings = Logger.warn, {}
