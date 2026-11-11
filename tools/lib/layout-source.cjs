@@ -5,7 +5,7 @@
  * MODULE: Ergopti Layout Source Loader
  * DESCRIPTION:
  * Loads the browser's source model and compiler with the existing composer
- * reader and TOML codec, and binds the physical key tables the compiler reads.
+ * reader and the page's vendored TOML codec, and binds the physical key tables the compiler reads.
  * The CLI and tests use the same contract a shared editor can load.
  * ==============================================================================
  */
@@ -15,8 +15,22 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const codec = require('smol-toml');
 const { shared } = require('./paths.cjs');
+// The page's own vendored codec (smol-toml's CommonJS build, byte for byte):
+// one TOML reader for the editor and the tools, and none from node_modules, so
+// a CI job without `npm ci` (the Linux E2E rows) can build an install payload.
+const codec = vendoredCodec();
+
+/** The vendored codec, run as the page runs it: a classic script writing `exports`. */
+function vendoredCodec() {
+	const filename = shared('ui', 'vendor', 'smol-toml.js');
+	// In this realm, so the arrays and tables it parses are this realm's own.
+	const loaded = {};
+	vm.compileFunction(fs.readFileSync(filename, 'utf8'), ['exports'], { filename })(loaded);
+	if (typeof loaded.parse !== 'function' || typeof loaded.stringify !== 'function')
+		throw new Error(`${filename} does not define the TOML codec`);
+	return loaded;
+}
 
 /** The key tables a page passes the compiler, read from their owners. */
 function keyTables() {
