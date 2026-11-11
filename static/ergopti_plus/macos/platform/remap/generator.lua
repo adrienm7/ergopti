@@ -576,10 +576,16 @@ local function apply_managed_timing_parameters(
 							manipulator_index
 						)
 					end
-					if manipulator.to_if_held_down and manipulator.to_delayed_action then
-						local threshold = manipulator.parameters["basic.to_if_alone_timeout_milliseconds"]
+					local threshold = manipulator.parameters["basic.to_if_alone_timeout_milliseconds"]
+					if manipulator.to_if_held_down and manipulator.to_delayed_action
+						and manipulator.to_delayed_action.to_if_canceled then
+						-- A rollover key: its hold and its cancelled native tap share the threshold.
 						manipulator.parameters["basic.to_if_held_down_threshold_milliseconds"] = threshold
 						manipulator.parameters["basic.to_delayed_action_delay_milliseconds"] = threshold
+					elseif manipulator.to_if_held_down then
+						-- A hold past the threshold (HOLD_PAST_THRESHOLD_TAPS); its delayed
+						-- action, if any, is the tap minimum's own timer.
+						manipulator.parameters["basic.to_if_held_down_threshold_milliseconds"] = threshold
 					end
 				end
 				if has_simultaneous then
@@ -1010,6 +1016,13 @@ local function native_tap_only_hold(key_code, tap_action, hold_action)
 	return hold_action
 end
 
+-- The keys whose tap with no hold waits for a quick release and holds Shift
+-- for a long press, by key id, with that tap: the Windows RCtrl (macOS's
+-- right_option) tapping the one-shot Shift (rctrl.ahk 7.3), as Linux does
+-- (hold_past_threshold). Sent at key_down like other keys with no hold, a long
+-- press armed the one-shot and nothing held Shift.
+local HOLD_PAST_THRESHOLD_TAPS = { right_option = "sticky_shift" }
+
 -- The tap timeout of each key in the last build (M.last_tap_timeouts).
 local _last_tap_timeouts = nil
 
@@ -1248,7 +1261,13 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	local marked = typing_priority ~= false
 	local key_down_action = hold_action
 	local rollover_hold_var
-	if #hold_to == 0 then
+	if #hold_to == 0 and typing_priority ~= false and HOLD_PAST_THRESHOLD_TAPS[key_def.id] == tap_action.id then
+		-- rctrl.ahk 7.3: the one-shot waits for a quick release, and a long press
+		-- holds Shift from the threshold on (apply_managed_timing_parameters
+		-- times it with the key's tap threshold).
+		manipulator.to_if_alone = marked_tap(tap_to, marked)
+		manipulator.to_if_held_down = { { key_code = "left_shift" } }
+	elseif #hold_to == 0 then
 		key_down_action = tap_action
 		for _, ev in ipairs(marked_tap(tap_to, marked)) do to_events[#to_events + 1] = ev end
 	elseif typing_priority ~= false and Defaults.rollover_keys[key_def.id] and
