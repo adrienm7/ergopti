@@ -5,6 +5,43 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Metrics rows store UTC and their recorded offset (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (KMD-1): every raw `events_*` row
+stores `ts` in UTC and `utc_offset_min`, the local UTC offset in force when it
+was recorded (nullable column, last in each table, `schema.sql` and every
+`events.*` catalogue statement); `date` stays the local day. Hour-of-day,
+night wakes and a day read from `ts` use ts + offset, the local time the user
+lived (`_shared/lua/keystats/local_time.lua`). Rows recorded before the column
+have NULL: a Linux row then held UTC and is read with the reading device's
+current offset, which the rebuild logs; a macOS or Windows row held local time.
+Display follows the viewer's zone: no dashboard shows a raw instant today, so
+a future one converts `ts` from UTC.
+
+- Writers: Linux `sqlite_writer` stores the offset of each row's UTC instant
+  (`_render_event`); macOS `sqlite_writer` converts today.log's local stamp
+  with `local_time.from_local` (the system's choice in a fall-back hour). The
+  purge tombstone's `metadata.utc` carries milliseconds and the Linux tombstone
+  stamps `ts` in UTC.
+- Migration: `_shared/lua/keystats/utc_offset_column.lua` adds the column to an
+  older store and drops the purge triggers written before it, run on open
+  before `purge_schema.sql` (Linux `_ensure_utc_offset_column`, macOS
+  `_initialize_db`). `purge_schema.sql` compares a row with an offset (or an
+  older Linux row) in UTC and an older macOS or Windows row with the
+  tombstone's local time.
+- Readers: Linux `ledger_rebuild.walk_device`, macOS
+  `_publish_rebuilt_partitions` (log_manager).
+- Windows (maintainer): add the same column on open of an existing cache and
+  drop the 16 purge triggers before `KLR_LoadPurgeSchema`
+  (`keystats_reader_db.ahk`); until then an existing Windows cache refuses
+  every raw INSERT, which now names the column. Pass `ts` in UTC and
+  `utc_offset_min` in every `KeystatsQuery("events.*")` of `keystats_sql.ahk`
+  and the network, topology, capture, ROI and clipboard writers; the
+  tombstone of `keystats_maintenance.ahk` gives `utc` milliseconds and its own
+  offset; `keystats_walker_events.ahk` reads ts + offset (an older Linux row
+  with the current offset) for `KLW_IsNightWake`, the hour slot and the days
+  of `KLW_WalkAppSwitch`, `KLW_WalkWindowSwitch` and `KLW_WalkSystemEvent`.
+
 ## A pair swipe decides from 3.0 mm on macOS and Linux (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (GSD-3): a two-finger swipe, an

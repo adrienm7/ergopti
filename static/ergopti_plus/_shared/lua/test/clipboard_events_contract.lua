@@ -102,9 +102,12 @@ function M.register(helpers)
 			end
 			helpers.assert_eq(ClipboardEvents.COLUMNS, columns)
 			local sql = ClipboardEvents.insert_sql({ device_id = "d", id = 7, ts = "2026-11-10 10:00:00.000",
-				date = "2026-11-10", kind = "paste_burst", app = "l'app", meta_json = "{}" })
-			helpers.assert_eq(sql, "INSERT OR IGNORE INTO events_clipboard (device_id, id, ts, date, kind, app, meta_json)"
-				.. " VALUES ('d', 7, '2026-11-10 10:00:00.000', '2026-11-10', 'paste_burst', 'l''app', '{}');")
+				date = "2026-11-10", kind = "paste_burst", app = "l'app", meta_json = "{}", utc_offset_min = 60 })
+			helpers.assert_eq(sql, "INSERT OR IGNORE INTO events_clipboard (device_id, id, ts, date, kind, app, meta_json, "
+				.. "utc_offset_min) VALUES ('d', 7, '2026-11-10 10:00:00.000', '2026-11-10', 'paste_burst', 'l''app', '{}', 60);")
+			helpers.assert_true(ClipboardEvents.insert_sql({ device_id = "d", id = 8, ts = "2026-11-10 10:00:00.000",
+				date = "2026-11-10", kind = "paste_burst", app = "a", meta_json = "{}" }):match(", NULL%);$") ~= nil,
+				"a row without an offset stores NULL (KMD-1)")
 			helpers.assert_true(not pcall(ClipboardEvents.insert_sql, { kind = "clipboard_cut", id = 1 }),
 				"an unknown kind is refused")
 		end)

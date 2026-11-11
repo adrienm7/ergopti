@@ -460,62 +460,62 @@ AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id = {{s dev
 
 -- name: events.app_switch
 -- doc: A change of the foreground application.
-INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s? prev_app}}, {{s? next_app}}, {{i duration_ms}});
+INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s? prev_app}}, {{s? next_app}}, {{i duration_ms}}, {{i? utc_offset_min}});
 
 -- name: events.window_switch
 -- doc: A change of the focused window title inside an application.
-INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s? prev_title}}, {{s? next_title}}, {{i duration_ms}});
+INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s? prev_title}}, {{s? next_title}}, {{i duration_ms}}, {{i? utc_offset_min}});
 
 -- name: events.shortcut
 -- doc: A shortcut or action that typed no text.
-INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s key}});
+INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s key}}, {{i? utc_offset_min}});
 
 -- name: events.system
 -- doc: A transition of the machine: sleep, lock, network, power.
-INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s action}}, {{s? metadata_json}});
+INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s action}}, {{s? metadata_json}}, {{i? utc_offset_min}});
 
 -- name: events.network
 -- doc: A connectivity transition: Internet reachability or a VPN adapter (Windows keystats_network.ahk kinds).
-INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}}, {{i? utc_offset_min}});
 
 -- name: events.window_topo
 -- doc: A change of the focused window's geometry, state or monitor (Windows keystats_window_topology.ahk kinds).
-INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}}, {{i? utc_offset_min}});
 
 -- name: events.av
 -- doc: A screen-capture or conferencing process starting or stopping (Windows keystats_av_state.ahk kinds).
-INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}}, {{i? utc_offset_min}});
 
 -- name: events.roi
 -- doc: A cumulative savings snapshot, a manual-word candidate or a stale trigger warning.
-INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}}, {{i? utc_offset_min}});
 
 -- name: events.hotstring
 -- doc: A hotstring that fired, was suggested, dismissed or nearly typed.
-INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, {{s trigger}}, {{s replacement}}, {{s? h_type}}, {{i? net_saved_chars}});
+INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, {{s trigger}}, {{s replacement}}, {{s? h_type}}, {{i? net_saved_chars}}, {{i? utc_offset_min}});
 
 -- name: events.session
 -- doc: The start or end of a typing session or an idle period.
-INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{i? duration_ms}});
+INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{i? duration_ms}}, {{i? utc_offset_min}});
 
 -- name: events.typing
 -- doc: A flushed run of typed text. text and events_json arrive already encrypted
 -- doc: when the at-rest setting is on; the renderer only quotes them.
-INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s? app_category}}, {{s? title}}, {{s? url}}, {{s? field_role}}, {{s? layout}}, {{s? document_path}}, {{i is_fullscreen}}, {{i in_meeting}}, {{i mouse_clicks}}, {{i mouse_scrolls}}, {{i mouse_distance_px}}, {{i? pause_before_ms}}, {{i? battery_level}}, {{r? audio_volume}}, {{r? wpm}}, {{s text}}, {{s? rich_text}}, {{s events_json}});
+INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s? app_category}}, {{s? title}}, {{s? url}}, {{s? field_role}}, {{s? layout}}, {{s? document_path}}, {{i is_fullscreen}}, {{i in_meeting}}, {{i mouse_clicks}}, {{i mouse_scrolls}}, {{i mouse_distance_px}}, {{i? pause_before_ms}}, {{i? battery_level}}, {{r? audio_volume}}, {{r? wpm}}, {{s text}}, {{s? rich_text}}, {{s events_json}}, {{i? utc_offset_min}});
 
 -- name: events.llm
 -- doc: A prediction generated, shown, dismissed or accepted. An absent number is
 -- doc: NULL, so the dashboard tells no token count from a count of zero.
-INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd)
-VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, {{s? context}}, {{s? predictions_json}}, {{s? prediction}}, {{s? all_predictions_json}}, {{i? chosen_index}}, {{i? deletes}}, {{s? deleted_text}}, {{i? net_saved_chars}}, {{i? count}}, {{i? prompt_tokens}}, {{i? completion_tokens}}, {{i? total_tokens}}, {{r? est_cost_usd}});
+INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd, utc_offset_min)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, {{s? context}}, {{s? predictions_json}}, {{s? prediction}}, {{s? all_predictions_json}}, {{i? chosen_index}}, {{i? deletes}}, {{s? deleted_text}}, {{i? net_saved_chars}}, {{i? count}}, {{i? prompt_tokens}}, {{i? completion_tokens}}, {{i? total_tokens}}, {{r? est_cost_usd}}, {{i? utc_offset_min}});

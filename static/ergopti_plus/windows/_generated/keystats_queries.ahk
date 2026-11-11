@@ -551,7 +551,7 @@ KeystatsQuery(Name, Params := Map()) {
 			["literal", ")`;"]
 		],
 		"events.app_switch", [
-			["literal", "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -565,10 +565,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "next_app", "s?"],
 			["literal", ", "],
 			["slot", "duration_ms", "i"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.window_switch", [
-			["literal", "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -584,10 +586,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "next_title", "s?"],
 			["literal", ", "],
 			["slot", "duration_ms", "i"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.shortcut", [
-			["literal", "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -599,10 +603,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "app", "s"],
 			["literal", ", "],
 			["slot", "key", "s"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.system", [
-			["literal", "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -614,10 +620,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "action", "s"],
 			["literal", ", "],
 			["slot", "metadata_json", "s?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.network", [
-			["literal", "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -631,10 +639,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "app", "s"],
 			["literal", ", "],
 			["slot", "meta_json", "s?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.window_topo", [
-			["literal", "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -648,10 +658,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "app", "s"],
 			["literal", ", "],
 			["slot", "meta_json", "s?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.av", [
-			["literal", "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -665,10 +677,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "app", "s"],
 			["literal", ", "],
 			["slot", "meta_json", "s?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.roi", [
-			["literal", "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -682,10 +696,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "app", "s"],
 			["literal", ", "],
 			["slot", "meta_json", "s?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.hotstring", [
-			["literal", "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -705,10 +721,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "h_type", "s?"],
 			["literal", ", "],
 			["slot", "net_saved_chars", "i?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.session", [
-			["literal", "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -720,10 +738,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "kind", "s"],
 			["literal", ", "],
 			["slot", "duration_ms", "i?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.typing", [
-			["literal", "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -769,10 +789,12 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "rich_text", "s?"],
 			["literal", ", "],
 			["slot", "events_json", "s"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		],
 		"events.llm", [
-			["literal", "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ("],
+			["literal", "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd, utc_offset_min) VALUES ("],
 			["slot", "device_id", "s"],
 			["literal", ", "],
 			["slot", "id", "i"],
@@ -810,6 +832,8 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "total_tokens", "i?"],
 			["literal", ", "],
 			["slot", "est_cost_usd", "r?"],
+			["literal", ", "],
+			["slot", "utc_offset_min", "i?"],
 			["literal", ")`;"]
 		]
 	)
