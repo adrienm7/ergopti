@@ -130,6 +130,16 @@ function M.classify_api(status, body, err)
 	return true, nil
 end
 
+--- Whether an API body opens a JSON array: what tells a release list, even a
+--- malformed or cut one (« parse failed »), from a proxy or captive-portal page
+--- served in its place (« no connection », then the feed: UPD-1, decided by the
+--- maintainer on 2026-11-11). Read by the Linux and macOS update checks.
+--- @param body any
+--- @return boolean opens
+function M.opens_release_array(body)
+	return type(body) == "string" and body:gsub("^\239\187\191", "", 1):match("^%s*%[") ~= nil
+end
+
 --- Accepts a feed response only when it is an Atom document.
 --- @param status any
 --- @param body any

@@ -446,8 +446,9 @@ function M.new(opts)
 			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
 			return request_copy.body
 		end
-		if type(result) == "table" and result.ok == true and type(result.body) == "string"
-			and result.body:match("^%s*%[") then
+		-- An answer that does not open a JSON array (a proxy or captive portal
+		-- answering with HTTP 200) is no list, by the rule Linux shares (UPD-1).
+		if type(result) == "table" and result.ok == true and ReleaseSources.opens_release_array(result.body) then
 			local decoded, decode_error = JsonCodec.decode(result.body)
 			if decode_error or type(decoded) ~= "table" then
 				return nil, "parse_failed", "a malformed release list: " .. tostring(decode_error)

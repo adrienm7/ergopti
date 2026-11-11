@@ -6,6 +6,21 @@ Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
 ## One configuration layout on every OS for tap-holds (2026-11-11)
+## An answer that is not the release list is no connection (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (UPD-1): a GitHub API answer with
+HTTP 200 whose body does not open a JSON array (a proxy or captive-portal
+page) is « no connection » on every driver, so the update check reads the
+public Atom feed, as macOS did; a body that opens one but is malformed or cut
+stays « parse failed » with no feed (the Linux hardware array vectors pin
+that). The one rule is `updater.release_sources.opens_release_array` (BOM
+stripped, then `[`), read by Linux `manager.lua` `accept_page` and macOS
+`auto_check.lua` `read_response`, which now also admits a BOM.
+A Linux 304 the check cannot answer from its cached page (none, or an ETag
+association that does not match) is « no connection » with the feed too, and
+the cached page is dropped so the next request is unconditional; macOS and
+Windows already fell back there. Windows counterpart (maintainer): TODO
+« Windows (the PC agent's) ». Regressions `upd1-captive-portal`.
 ## Linux stages are named per process and reaped at start (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (CFD-1): the Linux TOML writer

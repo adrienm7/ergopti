@@ -908,6 +908,35 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
 	end)
 
+	-- UPD-1 (decided by the maintainer on 2026-11-11): the three drivers read a
+	-- 200 that does not open a JSON array as no connection through one shared
+	-- rule (updater.release_sources.opens_release_array), then the feed.
+	helpers.it("a captive-portal page from the API is no list: the feed answers (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = "<html>Please sign in to the hotel Wi-Fi</html>", headers = {} },
+			{ ok = true, status = 200, body = FEED, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 2, "the API, then the feed")
+		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
+		helpers.assert_eq(answers[1].state, "available")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+	end)
+
+	helpers.it("a cut array stays a list that could not be read, with no feed (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = '[{"tag_name":"v1.0.0"}', headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a release list cut short is no connection problem")
+		helpers.assert_eq(answers[1].reason_key, "updater.parse_failed")
+	end)
+
+	helpers.it("a page opening after a byte-order mark is still read as a list (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = "\239\187\191[]", headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a BOM before the array is the list, not a portal page")
+	end)
+
 	helpers.it("a manual check reads no feed for a list the API answered unusable", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = '[{"name":"no tag"}]', headers = {} } } })

@@ -94,3 +94,47 @@ helpers.describe("public updater release JSON admission", function()
 		end)
 	end
 end)
+
+-- UPD-1 (decided by the maintainer on 2026-11-11): an answer that is not the
+-- release list (a proxy or captive-portal page served with HTTP 200, a 304 the
+-- check cannot answer from a cached page) is « no connection » and the public
+-- feed is read, as on macOS; a malformed JSON array stays a parse failure.
+helpers.describe("updater: an answer that is not the release list (upd1-captive-portal)", function()
+	local function check(answer)
+		local M = helpers.load_module("modules.updater.manager")
+		local feeds, result = 0, nil
+		local ok, problem = pcall(function()
+			M.current_version = function() return "1.0.0" end
+			M.release_api_url = function() return "https://example.invalid/releases?per_page=100" end
+			M._fetch_feed = function(callback) feeds = feeds + 1; callback(nil, "feed unavailable in this fixture"); return true end
+			M._http_client = require("tests.support.release_http_fixture").attach({ get = function(_, _, _, callback)
+				callback(answer)
+				return true
+			end })
+			helpers.assert_true(M.check_for_updates("main", function(_, _, _, checked) result = checked end))
+		end)
+		package.loaded["modules.updater.manager"] = nil
+		if not ok then error(problem, 0) end
+		return result, feeds
+	end
+
+	helpers.it("reads a captive-portal page as no connection and tries the feed (upd1-captive-portal)", function()
+		local result, feeds = check({ ok = true, status = 200, error_body = "", headers = {},
+			body = "<!DOCTYPE html><html><body>Please sign in to the hotel Wi-Fi</body></html>" })
+		helpers.assert_eq(result.state, "error")
+		helpers.assert_eq(result.reason_key, "updater.no_connection")
+		helpers.assert_eq(feeds, 1, "the public feed is the fallback of an answer that is not the list")
+	end)
+
+	helpers.it("keeps a malformed JSON array a parse failure, with no feed (upd1-captive-portal)", function()
+		local result, feeds = check({ ok = true, status = 200, error_body = "", headers = {}, body = "[{\"tag_name\":}]" })
+		helpers.assert_eq(result.reason_key, "updater.parse_failed")
+		helpers.assert_eq(feeds, 0)
+	end)
+
+	helpers.it("reads a 304 with no cached page as no connection and tries the feed (upd1-captive-portal)", function()
+		local result, feeds = check({ ok = false, status = 304, error_body = "", headers = {}, body = "" })
+		helpers.assert_eq(result.reason_key, "updater.no_connection")
+		helpers.assert_eq(feeds, 1)
+	end)
+end)

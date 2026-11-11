@@ -736,18 +736,22 @@ local function _fetch_releases(channel, callback)
 					finish(nil, status, "incomplete conditional response", "no_connection")
 					return
 				end
+				-- A 304 this check cannot answer from its cached page (none, or one
+				-- the response does not belong to) is no list, as on macOS and
+				-- Windows: the public feed still tells whether a release is newer
+				-- (UPD-1, decided by the maintainer on 2026-11-11). The cached
+				-- page goes, so the next check asks without a validator.
 				local cached, association = _list_cache[key], result.etag_receipt
 				if type(cached) ~= "table" or type(association) ~= "table"
 					or association.format ~= "curl-etag-final-v1" or association.conditional_sent ~= true
-					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator then
-					finish(nil, status, "conditional response endpoint association refused", "unexpected"); return
-				end
-				body = cached.body
-				if not body then
-					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
-					finish(nil, status, "not modified, and no release page is cached", "unexpected")
+					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator
+					or not cached.body then
+					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a usable cached release page.", channel, page)
+					_list_cache[key] = nil
+					finish(nil, status, "not modified, and no usable release page is cached", "no_connection")
 					return
 				end
+				body = cached.body
 				Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s page %d; reusing the cached page.", channel, page)
 			elseif not result or result.ok ~= true then
 				local limit = result and type(result.rate_limit) == "table" and result.rate_limit or {}
@@ -762,9 +766,19 @@ local function _fetch_releases(channel, callback)
 			else
 				all_unchanged = false
 			end
+			-- A 200 that does not even open a JSON array is a proxy or captive
+			-- portal answering in GitHub's place, not a release list: no
+			-- connection, so the public feed is read, as on macOS (UPD-1, the
+			-- shared release_sources.opens_release_array); a malformed or cut
+			-- array stays a parse failure.
+			if not ReleaseSources.opens_release_array(body) then
+				Logger.warn(LOG, "GitHub releases for channel %s page %d: HTTP %d without a JSON release array.",
+					channel, page, status)
+				finish(nil, status, "HTTP 200 without a JSON release array", "no_connection")
+				return
+			end
 			local valid, decoded = pcall(Json.decode_lossless, body)
-			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
-				or type(decoded) ~= "table" then
+			if not valid or type(decoded) ~= "table" then
 				finish(nil, status, "invalid release page JSON", "parse_failed")
 				return
 			end
