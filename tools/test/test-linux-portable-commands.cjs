@@ -650,7 +650,6 @@ const PROGRAMS = {
 		HOST
 	),
 	'systemd-run': packageManager('starts the update watcher of the container desktop proofs', HOST),
-	unshare: packageManager('private mount namespace of the container desktop proofs', HOST),
 	setsid: packageManager('detaches the relay of the container desktop proofs', HOST),
 	pgrep: packageManager('finds the daemons of the container desktop proofs', HOST),
 	awk: packageManager('reads the process table in the container desktop proofs', HOST),
