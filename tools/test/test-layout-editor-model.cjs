@@ -281,6 +281,29 @@ test('the exact conversion keeps the behaviour and compiles back to the same cha
 	refuses(() => IO.convertImport(IO.create('a', 'A')), 'source_not_imported');
 });
 
+test('the repository tool writes the payload « Install and use » sends', () => {
+	const os = require('node:os');
+	const { spawnSync } = require('node:child_process');
+	const file = path.join(ROOT, 'static', 'layouts', 'sources', 'ergopti.toml');
+	const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'install-payload-')), 'payload.json');
+	try {
+		const run = spawnSync(
+			process.execPath,
+			[path.join(ROOT, 'tools', 'layout-source.cjs'), 'install-payload', file, 'linux', out],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(run.status, 0, run.stderr);
+		const page = plain(IO.installPayload(IO.parse(fs.readFileSync(file, 'utf8')).doc, 'linux'));
+		assert.deepEqual(
+			JSON.parse(fs.readFileSync(out, 'utf8')),
+			page,
+			'the tool and the page send the same'
+		);
+	} finally {
+		fs.rmSync(path.dirname(out), { recursive: true, force: true });
+	}
+});
+
 test('a preserved import installs and exports its own XML, only in its own variant', () => {
 	const xml = registry('ergopti');
 	const doc = IO.importKeylayout(xml, 'ergopti', 'iso');
