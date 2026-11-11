@@ -418,6 +418,73 @@ return function(helpers)
 			helpers.assert_eq(owner.revert(), false, "one commit reverts once")
 		end)
 
+		-- A companion file (Linux tap_hold.toml for [mod_combos]) joins every plan
+		-- and edit of its owner, inside the same backup and inverse boundary.
+		local function with_companion(controls_files)
+			local options, files, writes, runtime, controls, original = fixture()
+			options.validate_update = function() return true end
+			options.companions = { side = { path = "side", backup_path = "side_backup", prefixes = { "llm" },
+				prepare = function(rows, adapter)
+					local prepared, why, candidate, source = require("toml_codec.writer").prepare_batch("side", rows, adapter)
+					controls_files.rows = rows
+					return prepared, why, candidate, source
+				end } }
+			local seen
+			local apply = options.apply
+			options.apply = function(decoded, updates, source, candidate, rendered)
+				seen = rendered.side
+				return apply(decoded, updates, source, candidate, rendered)
+			end
+			return options, files, writes, runtime, controls, original, function() return seen end
+		end
+
+		helpers.it("routes companion rows to their own file, backed up and reverted with the scope", function()
+			local probe = {}
+			local options, files, writes, _, _, original, seen = with_companion(probe)
+			files.side = "[llm]\nenabled = true\n[keep]\nx = 1\n"
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_true(owner.apply_updates("gestures", {
+				{ section = "gestures", key = "swipe_3_down", value = "paste" },
+				{ section = "llm", key = "enabled", value = "off" },
+			}))
+			helpers.assert_eq(#probe.rows, 1, "only the companion's rows reach it")
+			helpers.assert_eq(Codec.decode(files.config).llm.enabled, true, "config keeps its own copy")
+			helpers.assert_eq(Codec.decode(files.side).llm.enabled, "off")
+			helpers.assert_eq(files.side_backup, "[llm]\nenabled = true\n[keep]\nx = 1\n")
+			helpers.assert_eq(seen().published, true)
+			helpers.assert_eq(Codec.decode(seen().candidate).keep.x, 1)
+			local published = #writes
+			helpers.assert_true(owner.revert())
+			helpers.assert_eq(files.config, original); helpers.assert_eq(files.side, files.side_backup)
+			helpers.assert_true(#writes > published)
+		end)
+
+		helpers.it("reads an unchanged companion for the runtime and never publishes it", function()
+			local probe = {}
+			local options, files, writes, _, _, _, seen = with_companion(probe)
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_true(owner.apply_updates("gestures", { { section = "gestures", key = "swipe_3_down", value = "paste" } }))
+			helpers.assert_eq(seen().published, false); helpers.assert_eq(seen().source, { status = "absent" })
+			helpers.assert_eq(files.side, nil, "no companion file is created"); helpers.assert_eq(files.side_backup, nil)
+			for _, path in ipairs(writes) do helpers.assert_true(path ~= "side", "the companion is never written") end
+		end)
+
+		helpers.it("refuses a companion whose file changes before publication", function()
+			local probe = {}
+			local options, files, _, _, controls = with_companion(probe)
+			files.side = "[llm]\nenabled = true\n"
+			controls.external_edit = nil
+			local apply = options.apply
+			options.apply = function(...)
+				files.side = "[llm]\nenabled = false\n"
+				return apply(...)
+			end
+			local owner = require("config_scope_transaction").new(options)
+			local committed = owner.apply_updates("gestures", { { section = "llm", key = "enabled", value = "off" } })
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(files.side, "[llm]\nenabled = false\n", "the other writer's bytes are kept")
+		end)
+
 		helpers.it("puts the exact configuration bytes back after a committed single-file scope", function()
 			local options, files, _, runtime, _, original = fixture()
 			local owner = require("config_scope_transaction").new(options)
