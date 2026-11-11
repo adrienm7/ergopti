@@ -1,0 +1,142 @@
+# Ergopti layout source fixture of the driver emulation
+# (docs/design/layout-source-format.md, « Emulation of what no .keylayout holds »).
+# Every record here is left out of the compiled .keylayout and performed by the
+# emulation table instead: a held and a locked custom modifier with their
+# layers, key-chord mappings, shortcuts, the three kinds of tap-hold and the
+# remaps of system keys. A few records even the emulation cannot perform are
+# listed in its not_emulated report: a dead key and an action in an emulated
+# layer, a sided-modifier layer, a modifier-key remap and an unseen key.
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "emulation_fixture"
+name = "Emulation Fixture"
+
+[physical]
+base = "iso"
+
+[[modifiers]]
+id = "roya"
+mode = "held"
+keys = ["IntlBackslash"]
+
+[[modifiers]]
+id = "kana"
+mode = "locked"
+keys = ["Insert", "ScrollLock"]
+
+[[modifiers]]
+id = "nav"
+mode = "held"
+keys = ["F13"]
+
+[[layers]]
+id = "base"
+required = []
+optional = []
+
+[layers.keys]
+KeyA = { text = "a" }
+KeyB = { text = "b" }
+KeyS = { text = "s" }
+KeyE = { dead_key = "acute" }
+KeyX = { key = "Escape" }
+
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = []
+
+[layers.keys]
+KeyA = { text = "A" }
+KeyB = { text = "B" }
+
+[[layers]]
+id = "roya"
+required = ["roya"]
+optional = ["shift"]
+
+[layers.keys]
+KeyA = { text = "α" }
+KeyB = { text = "βeta" }
+KeyD = { key = "KeyC", modifiers = ["control"] }
+KeyE = { dead_key = "acute" }
+
+[[layers]]
+id = "kana"
+required = ["kana"]
+optional = ["caps_lock"]
+
+[layers.keys]
+KeyA = { text = "あ" }
+KeyS = { key = "ArrowLeft" }
+KeyX = { disabled = true }
+KeyJ = { action = "arrow_left" }
+
+[[layers]]
+id = "nav"
+required = ["nav"]
+optional = ["shift", "control"]
+
+[layers.keys]
+KeyJ = { key = "ArrowLeft" }
+KeyL = { key = "ArrowRight" }
+
+[[layers]]
+id = "right_kana"
+required = ["shift_right", "kana"]
+optional = []
+
+[layers.keys]
+KeyA = { text = "ア" }
+
+[[dead_keys]]
+id = "acute"
+terminator = "´"
+
+[[dead_keys.rules]]
+input = "a"
+text = "á"
+
+[remap]
+Home = "End"
+Pause = "Escape"
+PageDown = ""
+CapsLock = "Escape"
+
+[[shortcuts]]
+key = "KeyA"
+modifiers = ["control"]
+send_key = "KeyB"
+send_modifiers = ["control"]
+
+[[shortcuts]]
+key = "KeyQ"
+modifiers = ["alt"]
+send_key = "Escape"
+send_modifiers = []
+
+[[tap_holds]]
+key = "Space"
+tap = { text = " " }
+hold_layer = "nav"
+threshold_ms = 180
+
+[[tap_holds]]
+key = "Tab"
+tap = { key = "Tab" }
+hold_modifier = "shift"
+threshold_ms = 200
+
+[[tap_holds]]
+key = "Enter"
+tap = { key = "Enter" }
+hold_modifier = "roya"
+threshold_ms = 150
+
+[[tap_holds]]
+key = "Backslash"
+tap = { dead_key = "acute" }
+hold_modifier = "control"
+threshold_ms = 150

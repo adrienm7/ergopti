@@ -482,8 +482,161 @@ var LayoutSourceCompiler = (function () {
 		return { text: lines.join('\n') + '\n', convention: 'iso', names, omitted };
 	}
 
+	// ===========================
+	// ======= 5/ Emulation ======
+	// ===========================
+
+	const EMULATION_FORMAT = 'ergopti-layout-emulation';
+	const EMULATION_VERSION = 1;
+	// The built-in modifiers a driver reports, by family; a sided id other than
+	// alt_right (AltGr, macOS Option) is not reported by the Linux hook or the
+	// macOS tap flags, so a layer needing one cannot be selected by the engine.
+	const REPORTED = new Set(['shift', 'control', 'alt', 'alt_right', 'meta', 'caps_lock']);
+
+	/** A mapping the engine can perform, or the reason it cannot. */
+	function emulatedMapping(mapping, sendable) {
+		if (own(mapping, 'text')) return { text: mapping.text };
+		if (own(mapping, 'key')) {
+			if (!sendable(mapping.key)) return 'physical_key_not_emulated';
+			return { key: mapping.key, modifiers: (mapping.modifiers || []).slice() };
+		}
+		if (own(mapping, 'disabled')) return { disabled: true };
+		return own(mapping, 'dead_key') ? 'dead_key_not_emulated' : 'action_not_emulated';
+	}
+
+	/**
+	 * The records a platform's compiled .keylayout leaves out, as the table the
+	 * ErgoptiPlus drivers and the web emulation perform on top of it: custom
+	 * modifiers and their layers, key-chord mappings, shortcuts sending another
+	 * key, tap-holds and the remaps of system keys. What even the emulation
+	 * cannot perform is listed in not_emulated with its path and reason.
+	 * @param {object} source - A validated structured source.
+	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
+	 * @param {{platform?: 'macos'|'linux'|'windows'}} [options]
+	 * @returns {object} The emulation table (JSON-serializable).
+	 */
+	function compileEmulation(source, tables, options = {}) {
+		LayoutSource.validate(source);
+		const platform = options.platform || 'macos';
+		if (!PLATFORMS.includes(platform)) fail('source_platform', String(platform));
+		if (source.imported_keylayout) fail('source_imported_preserved', 'imported_keylayout');
+		const table = keyTable(tables, 'iso');
+		const custom = new Set((source.modifiers || []).map((modifier) => modifier.id));
+		const notEmulated = [];
+		const skip = (path, reason) => notEmulated.push({ path, reason });
+		// A key a driver can press for the user: one of the registry's own keys.
+		const sendable = (name) =>
+			own(tables.physicalKeys.keys, name) && tables.physicalKeys.keys[name].kind === 'key';
+		// A physical key the drivers see as a key press of its own (not a modifier flag).
+		const pressable = (name, path) => {
+			if (MODIFIER_KEYS.has(name)) skip(path, 'modifier_key_not_emulated');
+			else if (!sendable(name)) skip(path, 'physical_key_not_emulated');
+			else return true;
+			return false;
+		};
+		const reported = (ids) => ids.every((id) => custom.has(id) || REPORTED.has(id));
+
+		// Every custom modifier is listed, keyless when none of its keys can be seen:
+		// a tap-hold can still hold it, and the engine refuses an undeclared id.
+		const modifiers = (source.modifiers || []).map((modifier) => ({
+			id: modifier.id,
+			mode: modifier.mode,
+			keys: modifier.keys.filter((key, index) =>
+				pressable(key, `modifiers.${modifier.id}.keys[${index}]`)
+			)
+		}));
+
+		const layers = (source.layers || []).map((layer) => {
+			const selectors = [layer, ...(layer.alternatives || [])].map((selector) => ({
+				required: selector.required.slice(),
+				optional: selector.optional.slice()
+			}));
+			const native = selectors.every(
+				(selector) => selectorKeys(selector, platformTokens(platform)) !== null
+			);
+			const ids = selectors.flatMap((selector) => [...selector.required, ...selector.optional]);
+			const entry = { id: layer.id, selectors, native, keys: {} };
+			if (!native && !reported(ids)) {
+				skip(`layers.${layer.id}`, 'sided_modifier_not_emulated');
+				entry.selectable = false;
+				return entry;
+			}
+			for (const [name, mapping] of Object.entries(
+				layerKeys(source, layer, platform, 'iso', table)
+			)) {
+				const path = `layers.${layer.id}.keys.${name}`;
+				// The compiled .keylayout already types a native layer's text, dead keys and
+				// disabled keys; the emulation adds what it leaves out.
+				if (native && !own(mapping, 'key') && !own(mapping, 'action')) continue;
+				if (!pressable(name, path)) continue;
+				const emulated = emulatedMapping(mapping, sendable);
+				if (typeof emulated === 'string') skip(path, emulated);
+				else entry.keys[name] = emulated;
+			}
+			return entry;
+		});
+
+		const shortcuts = [];
+		for (const [index, shortcut] of (source.shortcuts || []).entries()) {
+			const path = `shortcuts[${index}]`;
+			if (!pressable(shortcut.key, path)) continue;
+			if (!sendable(shortcut.send_key)) skip(`${path}.send_key`, 'physical_key_not_emulated');
+			else if (!reported([...shortcut.modifiers, ...shortcut.send_modifiers]))
+				skip(path, 'sided_modifier_not_emulated');
+			else
+				shortcuts.push({
+					key: shortcut.key,
+					modifiers: shortcut.modifiers.slice(),
+					send_key: shortcut.send_key,
+					send_modifiers: shortcut.send_modifiers.slice()
+				});
+		}
+
+		const tapHolds = [];
+		for (const [index, entry] of (source.tap_holds || []).entries()) {
+			const path = `tap_holds[${index}]`;
+			if (!pressable(entry.key, path)) continue;
+			const tap = emulatedMapping(entry.tap, sendable);
+			if (typeof tap === 'string') {
+				skip(`${path}.tap`, tap);
+				continue;
+			}
+			const hold = own(entry, 'hold_layer')
+				? { hold_layer: entry.hold_layer }
+				: { hold_modifier: entry.hold_modifier };
+			if (own(hold, 'hold_modifier') && !reported([hold.hold_modifier])) {
+				skip(`${path}.hold_modifier`, 'sided_modifier_not_emulated');
+				continue;
+			}
+			tapHolds.push({ key: entry.key, tap, ...hold, threshold_ms: entry.threshold_ms });
+		}
+
+		const remaps = [];
+		for (const [from, to] of Object.entries(source.remap || {})) {
+			if (nativeRemap(table, from, to)) continue;
+			const path = `remap.${from}`;
+			if (!pressable(from, path)) continue;
+			if (to !== '' && MODIFIER_KEYS.has(to)) skip(path, 'modifier_target_not_emulated');
+			else if (to !== '' && !sendable(to)) skip(path, 'physical_key_not_emulated');
+			else remaps.push({ key: from, to });
+		}
+
+		return {
+			format: EMULATION_FORMAT,
+			version: EMULATION_VERSION,
+			layout: source.layout.id,
+			platform,
+			modifiers,
+			layers,
+			shortcuts,
+			tap_holds: tapHolds,
+			remaps,
+			not_emulated: notEmulated
+		};
+	}
+
 	// ========================
-	// ======= 5/ Import ======
+	// ======= 6/ Import ======
 	// ========================
 
 	/** Parse one modifierMap keys attribute into source modifier ids. */
@@ -709,7 +862,7 @@ var LayoutSourceCompiler = (function () {
 	}
 
 	// ==============================
-	// ======= 6/ macOS export ======
+	// ======= 7/ macOS export ======
 	// ==============================
 
 	/**
@@ -918,6 +1071,7 @@ var LayoutSourceCompiler = (function () {
 		keyTable,
 		ansiPairs,
 		compileKeylayout,
+		compileEmulation,
 		importStructured,
 		exportMacos,
 		targetKeylayout
