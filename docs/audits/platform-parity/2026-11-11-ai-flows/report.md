@@ -36,8 +36,18 @@ only the request it fails carries the status.
   failed, two on Windows and Linux. Decided by the maintainer on 2026-11-11:
   the quick retry spends an attempt; macOS now sends two
   (`test_sequential_retry_request_fence.lua`).
-- **AID-2, a token exchange answering 400 (`invalid_grant`).** Windows marks it
-  `key_refused` but its classifier ignores the flag: retried on all three.
+- **AID-2, a token exchange answering 400 (`invalid_grant`).** Windows marked
+  it `key_refused` but its classifier ignored the flag: retried on all three.
+  Decided by the maintainer on 2026-11-11: never retried, failing at once with
+  the service's message. Shared: `failure_class` reads the exchange's 400
+  refusal as a refused key and `api_token_exchange.read` carries the service's
+  message (both corpora updated). Linux fails the chat with
+  « HTTP 400: the token exchange answered HTTP 400: <message> »; macOS already
+  failed an unresolved entry as `no_credential` (never retried) and now logs
+  the message. **Windows counterpart (maintainer):** `LLM_TokenExchange_Read`
+  appends the same message, `api_common.ahk` takes the phrase « the token
+  exchange answered http 400 »; `test_llm_shared_vectors.ahk` and
+  `test_llm_api_token_exchange.ahk` replay the new vectors.
 - **AID-3, a settings change while a request is in flight.** Windows retires
   the request by its semantic signature (temperature, count, word bounds,
   profile, auto-type); Linux and macOS only on a model or backend change. The
