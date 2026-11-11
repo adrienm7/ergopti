@@ -647,11 +647,11 @@ assert.strictEqual(portable.signal, null, 'portable controls completed');
 assert.strictEqual(portable.status, 0, 'actual portable controls: ' + portable.stderr);
 assert.match(
 	portable.stderr,
-	/Ran 15 tests[\s\S]*\nOK(?:\r?\n|$)/,
-	'all 15 actual portable cases executed'
+	/Ran 16 tests[\s\S]*\nOK(?:\r?\n|$)/,
+	'all 16 actual portable cases executed'
 );
 console.log(
-	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals5; ABI29/cookies3 native UNRUN'
+	'PASS additive LuaJIT XI2 enrollment: portable16/source refusals22/placement refusals5; ABI29/cookies3 native UNRUN'
 );
 
 // The ordered suites converge before packaging; no event admits a package after a failed E2E.
