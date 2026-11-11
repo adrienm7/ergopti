@@ -1112,6 +1112,8 @@ function M.predict(context, output_context, override, automatic)
 		-- would truncate it and erase text it could not retype.
 		local sent_tokens = require("llm.request_plan.token_budget").for_call(
 			rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call)
+		-- A retry is not streamed, as on Windows (DispatchVariant) and macOS.
+		local retrying = retry_call ~= nil
 		if retry_call then
 			sent_tokens, sent_temperature = retry_call.tokens, retry_call.temperature
 			retry_call = nil
@@ -1127,7 +1129,7 @@ function M.predict(context, output_context, override, automatic)
 		end
 		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
-			stream = DisplaySettings.get("streaming") == true,
+			stream = DisplaySettings.get("streaming") == true and not retrying,
 			temperature = sent_temperature,
 			max_tokens = sent_tokens,
 			-- Decided from the prompt, as macOS does: one continuation, unless the
@@ -1161,6 +1163,9 @@ function M.predict(context, output_context, override, automatic)
 				end
 				if err ~= "cancelled" and not refused_key and attempts_remain() then
 					arm_retry()
+					-- The failed call's streamed partial is no candidate: withdrawn
+					-- before the retry, it can no longer be accepted meanwhile.
+					if streamed ~= "" then publish() end
 					dispatch()
 					return
 				end
@@ -1176,7 +1181,10 @@ function M.predict(context, output_context, override, automatic)
 			end
 			-- An empty or unusable answer is retried with more room; a duplicate
 			-- only spends its attempt, since its call was not too short.
-			if #parsed == 0 then arm_retry() end
+			if #parsed == 0 then
+				arm_retry()
+				if streamed ~= "" then publish() end
+			end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if attempts_remain() or (is_batch and request_index < batching.calls) then
 				-- Shown now: the next variant may wait for the backend's interval.
