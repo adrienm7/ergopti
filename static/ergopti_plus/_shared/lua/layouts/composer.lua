@@ -306,6 +306,20 @@ function M.read_composed(settings, config_dir, max_file_bytes, ports)
 	return { text = text, convention = checked.convention }, nil
 end
 
+--- read_composed over a driver's resolved registry collaborators, for the two
+--- registries' composer_copy.
+--- @param settings table|nil From M.settings (nil when the defaults are unreadable).
+--- @param config_dir string
+--- @param resolved table { settings = { max_file_bytes }, exists(path), read(path) }
+--- @param decode_toml function
+--- @return table|nil composed
+--- @return string|nil error
+function M.registry_copy(settings, config_dir, resolved, decode_toml)
+	if settings == nil then return nil, "the composer settings are unreadable" end
+	return M.read_composed(settings, config_dir, resolved.settings.max_file_bytes,
+		{ exists = resolved.exists, read = resolved.read, decode_toml = decode_toml })
+end
+
 --- The installed record's entry of a composition.
 --- @param settings table
 --- @param checked table From M.check.
