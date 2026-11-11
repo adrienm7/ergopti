@@ -57,9 +57,9 @@ helpers.describe("user prompt profiles are stored at the key every OS reads (par
 		end)
 	end)
 
-	-- The array an older build stored at [llm.profiles] user_profiles reaches the
-	-- envelope through the boot migration (step v16_to_v17, corpus
-	-- shipped_user_profiles_*), so this reader has nothing to import.
+	-- The array an older build stored at [llm.profiles] user_profiles reached the
+	-- envelope through the boot migration (step v16_to_v17, squashed since: a file
+	-- that old is now refused), so this reader has nothing to import.
 	helpers.it("imports nothing from the older array: the boot migration owns it", function()
 		local source = "[llm]\nenabled = true\n[llm.profiles]\n"
 			.. "user_profiles = [{ id = \"user_first\", label = \"First Profile\", system_single = \"first\" }]\n"

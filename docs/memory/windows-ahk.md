@@ -1198,9 +1198,10 @@ the Hotstrings master left every family on) and the dynamic gate in
 `ApplyMasterGatesToFeatures`. They now walk on into a member when the next path
 segment is a nested Map. Action: a new group switch beside nested features
 needs the same rule in any reader that stops at `enabled`. Windows has no
-`category_enabled.dynamichotstrings`: the retired spelling is renamed by the
-v12 to v13 config step, which also writes the master on for a configuration
-without one so live families stay live (its neutral default is off).
+`category_enabled.dynamichotstrings`: the retired spelling was renamed by the
+v12 to v13 config step (squashed since; 1.0.9 runs it), which also wrote the
+master on for a configuration without one so live families stayed live (its
+neutral default is off).
 
 ### project-windows-at-rest-store-is-data-sql
 

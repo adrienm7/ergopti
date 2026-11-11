@@ -8,7 +8,7 @@
 		},
 		{
 			"type": "---",
-			"platforms": ["hs"],
+			"platforms": ["ahk", "hs"],
 			"unavailable": "hide"
 		},
 		{
@@ -16,7 +16,7 @@
 			"id": "gesture_mode_options",
 			"i18n": "menu.gestures.mode_current",
 			"caption_getter": "gesture_mode_current_label",
-			"platforms": ["hs"],
+			"platforms": ["ahk", "hs"],
 			"unavailable": "hide"
 		},
 		{
@@ -25,12 +25,17 @@
 			"i18n": "menu.gestures.sensitivity_current",
 			"caption_getter": "gesture_sensitivity_current_label",
 			"disabled_when": ["gesture_mode_incremental_ready"],
-			"platforms": ["hs"],
+			"platforms": ["ahk", "hs"],
 			"unavailable": "hide"
 		}
 	],
 	"platform_rows": {
-		"ahk": [],
+		"ahk": [
+			"gesture_slot_change_action",
+			"separator",
+			"gesture_mode_options",
+			"gesture_sensitivity_options"
+		],
 		"hs": [
 			"gesture_slot_change_action",
 			"separator",

@@ -98,7 +98,11 @@ Test("gestures: absent click holds acknowledge idempotent release (gesture-click
 _GCHT_LifecycleRequiresNativeReleaseReceipts() {
 	SuspendBody := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
-	DispatchBody := _DriverFuncBody("GestureDispatch")
+	; GestureDispatch hands the shortcut to the action runner the incremental
+	; steps share; the release receipts live there.
+	AssertTrue(InStr(_DriverFuncBody("GestureDispatch"), "GestureRunSlotAction(slot)") > 0,
+		"the shortcut route must run through the shared action runner")
+	DispatchBody := _DriverFuncBody("GestureRunSlotAction")
 	Assert(InStr(SuspendBody,
 		'() => GestureReleaseLeftClick(), true') > 0
 		and InStr(SuspendBody,
