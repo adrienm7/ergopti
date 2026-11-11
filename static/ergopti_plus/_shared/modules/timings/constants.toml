@@ -952,6 +952,13 @@ ollama_deps_poll_ms = 3000
 # grace main.swift gives a leftover embedded runtime (LauncherTimings).
 user_quit_deadline_ms = 12000
 
+# Margin past user_quit_deadline_ms a launcher waits for the running instance's
+# controlled exit before it gives up: the macOS launcher answering a quit from
+# outside (Sparkle relaunch, logout, osascript; MLC-002), and a second launch
+# restarting the running instance on macOS and Linux (MLC-003). Swift: main.swift
+# (LauncherTimings); Linux: install/launch.sh (_generated/launch_timings.sh).
+quit_handshake_margin_ms = 2000
+
 # Deadline for a controlled reload (menu, source watcher, field run). An
 # in-process reload takes about 1 s. Past this bound, a reload whose stages never
 # settled reloads natively instead of staying up with the Karabiner remaps
@@ -1386,12 +1393,6 @@ instance_lock_retry_ms = 100
 # controlled exit, so a runtime still inside its quit fence is never killed
 # (MLC-004). Swift: main.swift waitForStaleRuntimes.
 stale_runtime_poll_ms = 100
-
-# Margin past [ui] user_quit_deadline_ms the launcher waits for its runtime's
-# controlled exit after a quit from outside (Sparkle relaunch, logout,
-# osascript) before it answers the quit anyway (MLC-002). Swift: main.swift
-# applicationShouldTerminate.
-quit_handshake_margin_ms = 2000
 
 # Poll of the remap lease guardian while it arms, and of its singleton lock.
 # Swift: RemapLeaseGuardian.swift.
