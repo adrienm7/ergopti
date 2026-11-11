@@ -233,6 +233,31 @@ helpers.describe("Linux foreign metrics ledger import", function()
 		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM meta WHERE key LIKE 'linux_ledger_import_pending:%';"), "0")
 	end)
 
+	-- Windows records its Wi-Fi changes as events_network network_change rows
+	-- and counts the connectivity and SSID transitions among them
+	-- (keystats_reader_db.ahk "wifi-day"); the Linux rebuild read only
+	-- events_system wifi_change, so an imported Windows device showed none
+	-- (KML-002, linux-import-wifi-changes).
+	it("linux-import-wifi-changes: a foreign device's network_change transitions are its Wi-Fi changes", function()
+		local f = fixture()
+		local function change(id, meta)
+			return "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ('"
+				.. FOREIGN .. "', " .. id .. ", '2026-11-05 09:0" .. id .. ":00.000', '2026-11-05', 'network_change', 'Code', '"
+				.. meta .. "');"
+		end
+		write(f.ledger, HEADER .. batch(typing(1, EVENTS),
+			change(2, '{"connection_state":"connected"}'),
+			change(3, '{"connection_state":"disconnected","prev_connection_state":"connected"}'),
+			change(4, '{"connection_state":"connected","prev_connection_state":"disconnected"}'),
+			change(5, '{"connection_state":"connected","prev_connection_state":"connected","ssid_hash":"b","prev_ssid_hash":"a"}'),
+			change(6, '{"connection_state":"connected","prev_connection_state":"connected","ssid_hash":"b","prev_ssid_hash":"b"}'),
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('"
+				.. FOREIGN .. "', 7, '2026-11-05 10:00:00.000', '2026-11-05', 'wifi_change', '{}');"))
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT wifi_changes FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "4",
+			"a disconnect, a reconnect, an SSID change and the legacy row; no baseline, no signal-only row")
+	end)
+
 	it("linux-import-incremental: only appended complete batches are applied, a torn tail waits", function()
 		local f = fixture()
 		write(f.ledger, HEADER .. batch(typing(1, EVENTS)))
