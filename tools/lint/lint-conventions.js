@@ -820,9 +820,13 @@ const tomlDirs = [
 // ADR-003 and is read back by the same writer, so it is not a style choice this
 // linter can act on — the exclusion carries over from the per-driver tests it
 // replaces rather than being invented here.
+// An Ergopti layout source keys its mappings by W3C KeyboardEvent.code (KeyA,
+// IntlBackslash), the physical-key identity of physical_keys.json, so its corpus
+// is a data format with PascalCase keys by definition (docs/design/layout-source-format.md).
 const tomlAll = tomlDirs
 	.flatMap((d) => walkFiles(d, ['.toml']))
-	.filter((f) => !/[/\\]paths\.toml$/.test(f));
+	.filter((f) => !/[/\\]paths\.toml$/.test(f))
+	.filter((f) => !/[/\\]tests[/\\]corpus[/\\]layouts[/\\]source[/\\][^/\\]+\.toml$/.test(f));
 
 // Guard against the exact regression above: a stale path makes walkFiles() return
 // [] and the whole TOML check pass vacuously. The shared tree always has TOMLs, so

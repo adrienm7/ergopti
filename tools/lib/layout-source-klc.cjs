@@ -58,7 +58,8 @@ function quoted(value, field) {
 
 /** Create native character files without installing or reserving a Windows KLID. */
 function exportKlc(document) {
-	const imported = loadLayoutSource().conversionSource(document);
+	// The preserved import, or the compiled .keylayout of a structured source.
+	const imported = loadLayoutSource().targetKeylayout(document, 'windows');
 	const metadata = document.exports?.windows;
 	if (!metadata || !metadata.locale || !metadata.layout_id || !metadata.dll_name)
 		refuse('exports.windows requires locale, layout_id and dll_name');
@@ -208,6 +209,7 @@ function exportKlc(document) {
 		artifact: 'klc',
 		reason: 'msklc_character_columns',
 		blockers: [],
+		omitted: imported.omitted,
 		name: metadata.dll_name,
 		locale,
 		language_lcid: metadata.layout_id.toLowerCase(),
