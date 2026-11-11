@@ -697,6 +697,35 @@ for (const [needle, replacement] of [
 	assert.throws(() => validateWorkflow(opponent, entry));
 	passed++;
 }
+// A refused public phase names where it stood, from the case names alone.
+{
+	const { publicProgress } = require('./run-linux-managed-http-native.cjs');
+	const os = require('node:os');
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-public-progress-'));
+	const sink = path.join(directory, 'public30.stderr');
+	try {
+		fs.writeFileSync(
+			sink,
+			'test_actual_gnome_proxy_reaches_public_get_owned (__main__.NativePublicControls.test_actual_gnome_proxy_reaches_public_get_owned) ... ok\n' +
+				'test_actual_loopback_fast_path_bypasses_pac (__main__.NativePublicControls.test_actual_loopback_fast_path_bypasses_pac) ... FAIL\n' +
+				'test_actual_pac_dead_relay_then_direct_reaches_origin (__main__.NativePublicControls.test_actual_pac_dead_relay_then_direct_reaches_origin) ... ',
+			{ mode: 0o600 }
+		);
+		const line = publicProgress(sink);
+		assert.match(line, /^public cases finished 2\/\d+ /);
+		assert.match(line, /test_actual_loopback_fast_path_bypasses_pac=not-ok/);
+		assert.match(line, /; running: test_actual_pac_dead_relay_then_direct_reaches_origin$/);
+		assert.doesNotMatch(line, /__main__/);
+		assert.equal(
+			publicProgress(path.join(directory, 'absent')),
+			'public case progress unavailable'
+		);
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+	passed++;
+}
+
 console.log(
 	'[OK] Managed HTTP native CI registration: ' +
 		passed +
