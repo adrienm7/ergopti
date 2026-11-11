@@ -461,7 +461,10 @@ end
 
 	helpers.it("hands a manual check's answer to the daemon when no window can show it", function()
 		local fake = fake_updater("idle")
-		fake.check_for_updates = function(_, callback) callback(false, nil, nil); return true end
+		fake.check_for_updates = function(_, callback)
+			callback(false, nil, nil, { state = "up_to_date", channel = "dev", current = "0.0.0-dev.133", others = {} })
+			return true
+		end
 		local told = nil
 		local saved = package.loaded["ui.update_check.bridge"]
 		package.loaded["ui.update_check.bridge"] = { open = function() return false end }
@@ -471,7 +474,7 @@ end
 		end
 		package.loaded["ui.update_check.bridge"] = saved
 		helpers.assert_true(told ~= nil, "the daemon is told, and redraws the menu")
-		helpers.assert_eq(told[1], false)
+		helpers.assert_eq(told[1].state, "up_to_date", "with the check's structured answer (UPL-002)")
 	end)
 
 	helpers.it("installs a downloaded update and hands the result on for the restart", function()

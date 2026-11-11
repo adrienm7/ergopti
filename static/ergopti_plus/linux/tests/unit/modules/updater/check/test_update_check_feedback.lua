@@ -154,7 +154,7 @@ helpers.describe("menu: the check row opens the update-check window (Linux)", fu
 			get_cached_release = function() return nil end,
 			check_for_updates = function(_, callback)
 				recorded.checks = recorded.checks + 1
-				callback(false, nil, nil)
+				callback(false, nil, nil, { state = "up_to_date", channel = "dev", current = "0.0.0-dev.133", others = {} })
 				return true
 			end,
 		}
@@ -163,7 +163,7 @@ helpers.describe("menu: the check row opens the update-check window (Linux)", fu
 			on_menu_changed = function() end,
 			on_update_finished = function() end,
 			on_open_today_log = function() return true end,
-			on_update_checked = function() recorded.notified = true end,
+			on_update_checked = function(result) recorded.notified = result end,
 		}
 		-- An installed build's rows: the checkout the suite runs from greys them.
 		local Installation = require("infra.installation")
@@ -199,6 +199,74 @@ helpers.describe("menu: the check row opens the update-check window (Linux)", fu
 	helpers.it("notifies the answer only when the window cannot open", function()
 		local recorded = check_row(false)
 		helpers.assert_eq(recorded.checks, 1, "the check still runs")
-		helpers.assert_true(recorded.notified == true, "the answer is notified instead")
+		helpers.assert_eq(type(recorded.notified), "table", "the answer is notified instead")
+		helpers.assert_eq(recorded.notified.state, "up_to_date", "with the check's own structured answer")
+	end)
+end)
+
+-- The fallback notification read only (available, release, err): a release
+-- without the Linux bundle or a channel with no release said « up to date »,
+-- a parse failure said « no connection », and a failed check with a release
+-- already known said « new version ». Windows words each outcome
+-- (Updater_ShowAvailableUpdateCallback); the notice now follows the result
+-- the window shows (UPL-002, check-notice-wording).
+helpers.describe("updater: the fallback notification words the check's answer (check-notice-wording)", function()
+	local Notice = helpers.load_module("modules.updater.check_notice")
+	local CheckResult = require("updater.check_result")
+	--- A locale double that shows each key with its substitutions.
+	local function get(key)
+		return key .. "[{1}|{channel}|{tag}|{current}]"
+	end
+	local function label(id) return "label:" .. id end
+
+	helpers.it("names a release without the Linux bundle, not an up-to-date build (check-notice-wording)", function()
+		local list = "[" .. release("v0.0.0-dev.150", "2026-09-02T00:00:00Z", false) .. "]"
+		local told = check(list, "dev", "0.0.0-dev.140")
+		helpers.assert_eq(told[1], false, "nothing to install")
+		helpers.assert_eq(Notice.body(told[4], get, label),
+			"update_check.error_no_asset[{1}|label:dev|v0.0.0-dev.150|0.0.0-dev.140]")
+	end)
+
+	helpers.it("says the channel has no release yet (check-notice-wording)", function()
+		local list = "[" .. release("v0.0.0-dev.140", "2026-08-01T00:00:00Z", true) .. "]"
+		helpers.assert_eq(Notice.body(check(list, "main", "0.0.0-dev.140")[4], get, label),
+			"updater.no_release_on_channel[{1}|label:main|{tag}|{current}]")
+	end)
+
+	helpers.it("names a parse failure, not a lost connection (check-notice-wording)", function()
+		local told = check(nil, "dev", "0.0.0-dev.140", "the list could not be read", "parse_failed")
+		helpers.assert_eq(Notice.body(told[4], get, label),
+			"updater.parse_failed[{1}|label:dev|{tag}|0.0.0-dev.140]")
+	end)
+
+	helpers.it("reports a failed check as failed, a release being known or not (check-notice-wording)", function()
+		local failed = CheckResult.failure({ channel = "dev", current = "0.0.0-dev.140" }, "no_connection", "offline")
+		helpers.assert_eq(Notice.body(failed, get, label),
+			"updater.no_connection[{1}|label:dev|{tag}|0.0.0-dev.140]")
+	end)
+
+	helpers.it("announces an available release and an up-to-date build (check-notice-wording)", function()
+		local list = "[" .. release("v0.0.0-dev.150", "2026-09-02T00:00:00Z", true) .. "]"
+		helpers.assert_eq(Notice.body(check(list, "dev", "0.0.0-dev.140")[4], get, label),
+			"updater.tray_new_version_body[v0.0.0-dev.150|{channel}|{tag}|{current}]")
+		helpers.assert_eq(Notice.body(check(list, "dev", "0.0.0-dev.150")[4], get, label),
+			"updater.up_to_date[0.0.0-dev.150|{channel}|{tag}|{current}]")
+	end)
+
+	-- A background check read from the public feed names a release it cannot
+	-- install; Windows says so in the balloon (_Updater_AnnounceCheckOnlyRelease),
+	-- Linux sent the plain sentence (UPL-003, check-only-notice).
+	helpers.it("says a feed-only release cannot be installed yet (check-only-notice)", function()
+		helpers.assert_eq(Notice.release_body({ tag = "v1.4.0", check_only = true }, get),
+			"updater.tray_new_version_body[v1.4.0|{channel}|{tag}|{current}] update_check.check_only[{1}|{channel}|{tag}|{current}]")
+		helpers.assert_eq(Notice.release_body({ tag = "v1.4.0" }, get),
+			"updater.tray_new_version_body[v1.4.0|{channel}|{tag}|{current}]", "an installable release, the plain sentence")
+		helpers.assert_eq(Notice.release_body({ tag = "v2.1%-rc1" }, get),
+			"updater.tray_new_version_body[v2.1%-rc1|{channel}|{tag}|{current}]", "a % in the tag is text")
+	end)
+
+	helpers.it("refuses an answer it cannot read (check-notice-wording)", function()
+		helpers.assert_throws(function() Notice.body(nil, get, label) end)
+		helpers.assert_throws(function() Notice.body({ state = "checking" }, get, label) end)
 	end)
 end)
