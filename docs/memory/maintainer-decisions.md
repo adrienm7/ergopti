@@ -137,6 +137,21 @@ Linux (`Inference.max_attempts`). One prediction at multiplier 2 sends at most
 two requests, never four. The retry keeps its extra tokens and warmer
 temperature; it is simply counted.
 
+## Linux installed trees load a precompiled bytecode package (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, following
+`docs/design/linux-bytecode-package.md`: the installer and the updater compile
+an installed tree with the target's own luajit into `<root>/.bytecode/` (a
+bundle and a manifest naming `jit.version`, the architecture, the GC64 flag,
+the physical root and each chunk's source SHA-256). Bytecode is trusted only
+in an installed tree, launched through its physical path, and only when the
+whole manifest matches the running luajit; a checkout never reads it. On any
+mismatch the daemon loads every module from source and logs one warning, and
+the next updater run recompiles; no boot mixes the two. The tree is derived:
+excluded from the ownership receipt, admitted by name
+(`OWNERSHIP_DERIVED_TREE`) and removed whole by uninstall. Do not ship
+bytecode built on a CI runner.
+
 ## X11 same-group XKB notify renews the layout receipt (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: after an XKB new-keyboard notify that

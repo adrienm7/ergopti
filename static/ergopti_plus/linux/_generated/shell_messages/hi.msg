@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT नेटवर्किंग मॉड्य
 build_luv.recipe_required=नेटिव luv बिल्ड को उसकी स्रोत रेसिपी चाहिए।
 install.already_installed={1} — पहले से इंस्टॉल है
 install.archive_digest_unavailable=बनाए रखे गए डिस्क्रिप्टर वाले अपडेट के लिए वास्तविक OpenSSL3 रनटाइम आवश्यक है; क्षमता अनुपलब्ध रहती है।
+install.bytecode_skipped=पूर्व-संकलित मॉड्यूल नहीं बनाए जा सके — Ergopti स्रोत कोड से, थोड़ा धीमे शुरू होता है।
 install.capability_verified={1} — क्षमता सत्यापित
 install.command_still_missing={1} इंस्टॉल हो गया, लेकिन '{2}' अभी भी नहीं मिला।
 install.daemon_manual=डेमॉन को मैन्युअल रूप से शुरू करने के लिए:

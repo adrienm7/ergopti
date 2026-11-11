@@ -1417,9 +1417,10 @@ coordinator on 2026-11-11, to review by the maintainer.
       summary, the last counter interval at exit, paired `[Span]` DEBUG lines for `tray.fill`, `layout.switch`,
       `config.reload`, `hotstring.expand` (macOS mirrors `hotstring.expand`), `input.latency` (kernel stamp to
       forwarded write). `run_perf_budget_container.py` joins the container proofs.
-- [ ] Startup compile: 126 of about 180 ms before the boot clock is LuaJIT compiling 6.5 MB of source; a bytecode
-      searcher measured 170-240 → 110-130 ms. Proposal with the staleness contract to decide:
-      `docs/design/linux-bytecode-package.md` (maintainer decision).
+- [x] Startup compile: installed trees load a bytecode package compiled by the installer and the updater with the
+      target's luajit (maintainer decision 2026-11-11, `docs/design/linux-bytecode-package.md`): spawn to ready
+      488 → 355 ms, load phase 200 → 90 ms in an installed tree (`run_bytecode_installed_tree.py`, container
+      proofs). A mismatched or partial package loads from source with one warning; a checkout never reads one.
 - [x] Keystats boot stage (round 2): the ledger reads its four meta keys in one sqlite3 query, and its exporter and
       the text migration resume start on the loop's first idle tick (warm init 52-57 → 36-42 ms). Left: open_db's
       own spawns (mkdir, schema checks), device registration and the open-walk read, about 30 ms of sqlite3
