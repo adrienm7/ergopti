@@ -1208,11 +1208,15 @@ Test("number row: symbols retain real dead-action composition without a new emit
 ; These calls exercise the real criterion before its live sources are published.
 _NRP_AssertBootMode(Expected, Caption, Hkl := unset) {
 	Observed := ""
-	Failure := ""
+	; The caught state is the verdict: an Error with an empty message is still an
+	; escape, and a message sentinel alone accepted it.
+	Escaped := false, Failure := ""
 	try Observed := IsSet(Hkl) ? NumberRowEffectiveMode(Hkl, false) : NumberRowEffectiveMode()
-	catch as Err
-		Failure := Err.Message
-	AssertEqual("", Failure, Caption . " must not escape an early-boot unset read")
+	catch as Err {
+		Escaped := true
+		Failure := Type(Err) . ": " . Err.Message
+	}
+	AssertFalse(Escaped, Caption . " must not escape an early-boot unset read: " . Failure)
 	AssertEqual(Expected, Observed, Caption . " must retain truthful native admission")
 }
 
