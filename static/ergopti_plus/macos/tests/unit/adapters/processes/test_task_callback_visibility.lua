@@ -21,8 +21,26 @@ local function capturing_logger(errors)
 	return logger
 end
 
+--- Runs one case with package.loaded put back as it found it: a module a case
+--- loads under its stubs (the keystats watchers now start a network watcher
+--- and its timer scheduler) must not serve the next case's owner.
+--- @param body function The case.
+--- @return function The isolated case.
+local function isolated(body)
+	return function()
+		local saved = {}
+		for name, module in pairs(package.loaded) do saved[name] = module end
+		local ok, failure = pcall(body)
+		for name in pairs(package.loaded) do
+			if saved[name] == nil then package.loaded[name] = nil end
+		end
+		for name, module in pairs(saved) do package.loaded[name] = module end
+		if not ok then error(failure, 0) end
+	end
+end
+
 helpers.describe("direct task callbacks: exceptions reach the file-logger boundary", function()
-	helpers.it("logs a keystats system-load sink exception", function()
+	helpers.it("logs a keystats system-load sink exception", isolated(function()
 		local errors = {}
 		local completion
 		package.loaded["infra.logger"] = capturing_logger(errors)
@@ -51,9 +69,9 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 		helpers.assert_eq(1, #errors, "the contained callback error must reach Logger.pcall")
 		helpers.assert_true(errors[1]:find("system event sink exploded", 1, true) ~= nil,
 			"the logged error must preserve the thrown cause")
-	end)
+	end))
 
-	helpers.it("logs an active-layout on_done exception", function()
+	helpers.it("logs an active-layout on_done exception", isolated(function()
 		local errors = {}
 		local completion
 		package.loaded["infra.logger"] = capturing_logger(errors)
@@ -72,5 +90,5 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 		helpers.assert_eq(1, #errors, "the contained listener error must reach Logger.pcall")
 		helpers.assert_true(errors[1]:find("layout refresh listener exploded", 1, true) ~= nil,
 			"the logged error must preserve the thrown cause")
-	end)
+	end))
 end)
