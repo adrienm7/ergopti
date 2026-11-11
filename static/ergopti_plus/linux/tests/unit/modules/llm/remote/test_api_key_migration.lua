@@ -179,7 +179,10 @@ helpers.describe("api_key_migration: a locked keyring never delays input readine
 			working_tool()
 			probe("(<true>,)")
 			helpers.assert_eq(migration.start(), true)
-			-- The probe child settles on its own time under a loaded suite.
+			-- start() arms the first attempt in "waiting"; see it run, then let the
+			-- probe child settle on its own time under a loaded suite.
+			run_loop(2000, function() return migration.status() == "running" end)
+			helpers.assert_eq(migration.status(), "running", "the first attempt started")
 			run_loop(8000, function() return migration.status() == "waiting" or read(DIR .. "/argv") ~= nil end)
 			helpers.assert_eq(read(DIR .. "/argv"), nil, "nothing is stored while the keyring is locked")
 			helpers.assert_eq(migration.status(), "waiting")
