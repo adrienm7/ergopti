@@ -612,6 +612,10 @@ helpers.describe("physical preflight joins the original Magic Key replacement", 
 			local source = removing and MAGIC_COLLISION_SOURCE:gsub('magic_editor = "none"\n', 'magic_editor = "none"\nphysical_none_KeyJ = "copy"\n', 1) or MAGIC_COLLISION_SOURCE
 			with_magic_publication_scope(source, function(scope, owners, controls, path, Source)
 				-- Both legitimate native-intent writes must publish while actual readiness is false.
+				-- The production getter answers true since 2026-11-11 (LIN-004): this
+				-- case keeps the unqualified answer the safety refusal still handles.
+				helpers.assert_eq(owners.keyboard.physical_delivery_available(), true, "the production getter")
+				owners.keyboard.physical_delivery_available = function() return false end
 				helpers.assert_eq(scope.physical_delivery_available(), false)
 				local observations = 0
 				Source.capture_collision_inventory = function() observations = observations + 1; error("native intent must not acquire an output collision frame") end

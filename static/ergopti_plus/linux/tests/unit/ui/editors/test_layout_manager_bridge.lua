@@ -67,6 +67,37 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_true(Bridge.on_message({ action = "shell", id = "ergol" }, daemon_state).handled == false,
 			"an action outside the allowlist is refused")
 	end)
+
+	helpers.it("applies the layout editor's navigation layer through the layer editor's save (layout-editor-nav-apply)", function()
+		local Bridge, state, daemon_state = bridge()
+		local applied = {}
+		daemon_state.layer_editor_bridge = {
+			apply_text = function(text, given_state)
+				applied[#applied + 1] = { text = text, state = given_state }
+				return { saved = true, applied = true, errors = {} }
+			end,
+		}
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_contains(state.pushes[1].js, '"nav_apply":true')
+		helpers.assert_true(Bridge.on_message({ action = "nav_save", text = "[layers]\n" }, daemon_state).handled)
+		helpers.assert_eq(applied[1].text, "[layers]\n")
+		helpers.assert_true(applied[1].state == daemon_state, "the daemon state reaches the save")
+		local last = state.pushes[#state.pushes].js
+		helpers.assert_contains(last, "window.navResult(")
+		helpers.assert_contains(last, '"saved":true')
+		helpers.assert_contains(last, '"applied":true')
+		helpers.assert_true(Bridge.on_message({ action = "nav_save" }, daemon_state).handled == false,
+			"a save without its text is refused")
+		helpers.assert_eq(#applied, 1)
+	end)
+
+	helpers.it("offers no navigation layer save without the layer editor (layout-editor-nav-apply)", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layer_editor_bridge = { }
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_contains(state.pushes[1].js, '"nav_apply":false')
+		helpers.assert_true(Bridge.on_message({ action = "nav_save", text = "x" }, daemon_state).handled == false)
+	end)
 end)
 
 --- Captures actual provider data while forwarding its status and rendering to the real binding.

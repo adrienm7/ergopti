@@ -42,6 +42,14 @@ report as it is.
   `source_pick` in `initData`: the editor's « Open » posts `source_pick`, the host opens an `NSOpenPanel` limited
   to `.toml` and `.keylayout` (`infra/dialog_util.lua`), bounds the file with `SourceStore.read_picked` and answers
   `window.sourcePicked({filename, text} | {} | {code, detail})`. Linux keeps WebKitGTK's own file chooser.
+  « Apply the navigation layer » (shown when the source has the `nav` layer and `initData` carries
+  `nav_apply: true`) posts `{action: "nav_save", text}` with the `layers.toml` text `LayoutSourceIO.navLayerFile`
+  builds; the shared bridge hands it to the host's `apply_nav`, which runs the navigation layer editor's own save
+  (macOS `ui/layer_editor` `apply_text`: every OS's validation, the exact-byte publish against the `layers.toml` it
+  reads now, the Karabiner regeneration and the wheel bindings; Linux `ui/layer_editor/bridge.lua` `apply_text`: the
+  same save and the remap manager reload) and answers `window.navResult({saved, applied, errors})`. The navigation
+  layer editor window keeps working: Windows still needs it. Decided by the coordinator on 2026-11-11, to review by
+  the maintainer.
 - **ErgoptiPlus, Windows (maintainer).** Until then the shared page shows the composer there.
   `windows/ui/layout_manager/init.ahk` needs `source_open`, `source_save` (and `source_pick` only if WebView2's own
   file chooser is not enough) in
@@ -50,7 +58,8 @@ report as it is.
   `max_file_bytes`, written in `layout_sources\` of the driver's configuration folder, the last source name in
   `last_file`, results pushed as `sourceData` / `sourceResult` through the WebView2 `ExecuteScript` path the page
   already uses; `windows/ui/layout_manager/composer.ahk` needs to accept `composer_save` with `source` for « Install
-  and use ». Then drop `windowsPending` in `tools/test/test-layout-manager-page.cjs`, and retire the composer
+  and use », and `nav_save` routed to the AHK navigation layer editor's save with `nav_apply: true` in `initData`
+  for « Apply the navigation layer ». Then drop `windowsPending` in `tools/test/test-layout-manager-page.cjs`, and retire the composer
   section (`layout_composer/composer_page.js` and its markup) once no host shows it.
 
 ## Limits stated to the user

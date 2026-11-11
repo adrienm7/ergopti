@@ -244,6 +244,44 @@ end
 
 
 
+--- Validates and publishes a layers.toml text, then applies it: the one save
+--- path of the navigation layer editor window and of the layout editor's
+--- « Apply the navigation layer » (ui/layout_manager/bridge.lua).
+--- @param state table Daemon state.
+--- @param opts table { text, ctx, config_dir, file_adapter, current } where
+---   current() says whether the saved folder is still the configuration folder.
+--- @return table result LayerEditor.save's, with `applied`, or `stale` when the
+---   folder changed after the save.
+local function save_text(state, opts)
+	local result = LayerEditor.save({
+		text = opts.text, ctx = opts.ctx, config_dir = opts.config_dir, toml_decode = TomlCodec.decode,
+		file_adapter = opts.file_adapter,
+	})
+	if not result.saved then
+		for _, err in ipairs(result.errors) do
+			Logger.warn(LOG, "Refused: %s (%s.%s.%s) — %s.", tostring(err.code), tostring(err.layer or ""),
+				tostring(err.section or ""), tostring(err.key or ""), tostring(err.detail))
+		end
+		Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
+		return result
+	end
+	if not opts.current() then
+		result.applied, result.stale = false, true
+		return result
+	end
+	result.applied = apply(state)
+	if result.applied then
+		Logger.success(LOG, "Navigation layer saved to '%s' and applied.", result.path)
+	else
+		Logger.error(LOG, "Navigation layer saved to '%s' but not applied.", result.path)
+	end
+	return result
+end
+
+
+
+
+
 -- ===================================
 -- ===================================
 -- ======= 2/ Message handlers =======
@@ -313,28 +351,18 @@ function M.on_message(payload, state, context)
 		if owner.saving then return { saved = false, busy = true } end
 		owner.saving = true
 		local function save_and_apply()
-			local result = LayerEditor.save({
-				text = payload.text, ctx = owner.ctx, config_dir = owner.config_dir, toml_decode = TomlCodec.decode,
+			local result = save_text(state, {
+				text = payload.text, ctx = owner.ctx, config_dir = owner.config_dir,
 				file_adapter = opening_files(owner, state, context),
+				current = function() return committed_folder_current(owner, state) end,
 			})
 			if not result.saved then
-				for _, err in ipairs(result.errors) do
-					Logger.warn(LOG, "Refused: %s (%s.%s.%s) — %s.", tostring(err.code), tostring(err.layer or ""),
-						tostring(err.section or ""), tostring(err.key or ""), tostring(err.detail))
-				end
-				Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
 				if opening_page_current(owner, state, context) then
 					call_page(state, "saveResult", { saved = false, errors = result.errors })
 				end
 				return result
 			end
-			if not committed_folder_current(owner, state) then result.applied = false; return result end
-			result.applied = apply(state)
-			if result.applied then
-				Logger.success(LOG, "Navigation layer saved to '%s' and applied.", result.path)
-			else
-				Logger.error(LOG, "Navigation layer saved to '%s' but not applied.", result.path)
-			end
+			if result.stale then result.stale = nil; return result end
 			if opening_page_current(owner, state, context) then
 				call_page(state, "saveResult", { saved = true, applied = result.applied, errors = {} })
 			end
@@ -365,6 +393,34 @@ function M.on_message(payload, state, context)
 	end
 	Logger.warn(LOG, "Ignored the unknown layer editor action '%s'.", tostring(payload.action))
 	return nil
+end
+
+--- Saves and applies a layers.toml the layout editor built from a source's
+--- navigation layer, through the window's own save path. The destination is
+--- the user's layers.toml as read now: it is replaced only while it still holds
+--- those bytes (LayerEditor.save's exact-byte precondition).
+--- @param text any The layers.toml text.
+--- @param state table Daemon state.
+--- @return table result { saved, applied, errors }
+function M.apply_text(text, state)
+	state = type(state) == "table" and state or {}
+	Logger.start(LOG, "Applying the navigation layer from the layout editor…")
+	local ok, shared_root, config_dir = pcall(folders, state)
+	local ok_ctx, ctx = false, shared_root
+	if ok then ok_ctx, ctx = pcall(load_context, shared_root) end
+	if not ok or not ok_ctx then
+		local detail = "the layer data could not be read: " .. tostring(ctx)
+		Logger.error(LOG, "The navigation layer was not applied: %s.", detail)
+		return { saved = false, applied = false, errors = { { code = LayerEditor.WRITE_FAILED, detail = detail } } }
+	end
+	local result = save_text(state, {
+		text = text, ctx = ctx, config_dir = config_dir, file_adapter = nil,
+		current = function()
+			local still, _, dir = pcall(folders, state)
+			return still and dir == config_dir
+		end,
+	})
+	return { saved = result.saved == true, applied = result.applied == true, errors = result.errors or {} }
 end
 
 return M

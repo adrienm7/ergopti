@@ -385,6 +385,15 @@ if [ $UI_FILE_COUNT -eq 0 ]; then
 	MISSING=$((MISSING + 1))
 fi
 
+# The list above names files; the bound hotstring files of the shipped layout
+# extensions come from their manifests (the same check as the macOS build), so a
+# binding added there is required here without another list to update.
+if ! python3 "${SCRIPT_DIR}/check_layout_extension_payload.py" \
+	"${REPO_ROOT}/static/layouts/registry" "${BUILD_DIR}/linux/static/layouts/registry"; then
+	echo "  MISSING: a bound layout extension hotstring file"
+	MISSING=$((MISSING + 1))
+fi
+
 if [ $MISSING -gt 0 ]; then
 	echo ""
 	echo "ERROR: ${MISSING} required file(s) missing from build."
