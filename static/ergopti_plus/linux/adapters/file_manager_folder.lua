@@ -38,6 +38,7 @@ local M = {}
 
 local FileSelection = require("file_selection")
 local Logger = require("logger.shim")
+local TextUtils = require("text_utils")
 
 local LOG = "adapters.file_manager_folder"
 
@@ -231,14 +232,15 @@ function M.single_folder(uris)
 	return paths[1], nil
 end
 
---- Encodes an absolute local path as a file URI (RFC 3986 path characters kept,
---- except the apostrophe, so the URI never needs escaping in GVariant text).
+--- Encodes an absolute local path as a file URI: each segment keeps only the
+--- RFC 3986 unreserved characters, so the URI never needs escaping in GVariant
+--- text (an apostrophe is encoded with the rest).
 --- @param path string
 --- @return string
 function M.file_uri(path)
-	return "file://" .. path:gsub("[^%w%-%._~/!$&()*+,;=:@]", function(char)
-		return string.format("%%%02X", char:byte())
-	end)
+	local segments = {}
+	for segment in (path .. "/"):gmatch("([^/]*)/") do segments[#segments + 1] = TextUtils.percent_encode(segment) end
+	return "file://" .. table.concat(segments, "/")
 end
 
 
