@@ -1353,6 +1353,12 @@ instance_lock_retry_ms = 100
 # (MLC-004). Swift: main.swift waitForStaleRuntimes.
 stale_runtime_poll_ms = 100
 
+# Margin past [ui] user_quit_deadline_ms the launcher waits for its runtime's
+# controlled exit after a quit from outside (Sparkle relaunch, logout,
+# osascript) before it answers the quit anyway (MLC-002). Swift: main.swift
+# applicationShouldTerminate.
+quit_handshake_margin_ms = 2000
+
 # Poll of the remap lease guardian while it arms, and of its singleton lock.
 # Swift: RemapLeaseGuardian.swift.
 guardian_arm_poll_ms = 10
