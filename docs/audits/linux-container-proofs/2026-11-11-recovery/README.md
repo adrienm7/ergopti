@@ -79,6 +79,17 @@ whose GObject bindings match), and now in the desktop-webview CI shard:
 | `tests/hardware/run_llm_selection_focus.py`  | `llm_selection_focus.txt` | 31 AI text-destination cases on real GTK/AT-SPI with XTest output: correct controls receive the text; changed fields, changed windows and passwords refuse. |
 | `tests/hardware/run_secure_focus_watch.py`   | `secure_focus_watch.txt`  | The resident privacy owner on owned GTK fields: ordinary, password and role-changing fields, source freshness and native cleanup.                           |
 
+## API keys in a real locked and unlocked keyring (a6fa8892, ac91f06d)
+
+`tests/hardware/run_keyring_receipts.sh`: a private session bus, Xvfb with
+openbox, gnome-keyring 46 with a fresh login keyring and its real unlock
+prompter (gcr-prompter), answered or dismissed with xdotool. The production
+`modules/llm/api_token_store.lua` runs the real secret-tool.
+`keyring_receipts.txt`: 15/15. `keyring_receipts_before_fix.txt`: the module
+before a6fa8892 fails two checks: a dismissed unlock prompt read as an absent
+key, and a clear on the locked keyring (which removes nothing and raises no
+prompt) read as done, so a removed entry's key stayed in the keyring unlogged.
+
 ## Limits
 
 - The install is driven by a tar-backed archive factory, not the authenticated

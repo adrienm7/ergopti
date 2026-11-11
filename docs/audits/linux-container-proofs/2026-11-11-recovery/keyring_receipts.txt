@@ -1,0 +1,17 @@
+=== API keys in a real secret service ===
+  ok   an unlocked keyring stores the key: secret-service:live#5b815cb6b09eecd41b3ecc3ee8dd57ba
+  ok   secret-tool search lists the stored item
+  ok   the key reads back byte for byte: nil
+  ok   a key of exactly 8192 bytes reads back whole
+  ok   a longer key is refused, with no reference: API key exceeds secret-tool input capacity
+  ok   the login collection is locked
+  ok   locked, the prompt answered: the key is returned: nil
+  ok   the login collection is locked again
+  ok   locked, the prompt dismissed: no key is returned
+  ok   the dismissal is a failure, not an absent key: the keyring is locked, or its unlock prompt was dismissed
+  ok   a clear on the locked keyring is refused, not reported done: the keyring is locked, or its unlock prompt was dismissed; the key stays in the secret service
+  ok   and the item is still in the keyring
+  ok   unlocked again through the prompt
+  ok   the key is cleared on the unlocked keyring
+  ok   a cleared key reads absent: absent
+15 checks, 0 failures
