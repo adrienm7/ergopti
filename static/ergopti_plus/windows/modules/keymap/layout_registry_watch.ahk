@@ -45,9 +45,8 @@ global LAYOUT_REGISTRY_WATCH_KEY_NOTIFY := 0x0010
 ; REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET: a subkey added or
 ; removed, a value added, removed or rewritten.
 global LAYOUT_REGISTRY_WATCH_FILTER := 0x0005
-; WaitForSingleObject results.
-global LAYOUT_REGISTRY_WATCH_WAIT_SIGNALED := 0x0000
-global LAYOUT_REGISTRY_WATCH_WAIT_TIMEOUT := 0x0102
+; WaitForSingleObject results: PLC_WAIT_OBJECT_0 / PLC_WAIT_TIMEOUT
+; (adapters/process_lifecycle.ahk).
 ; The running watch, 0 when none: "capture", "port", "keys" (each "name",
 ; "handle", "event"), "tick" (the bound poll) and "captures" (count).
 global _LayoutRegistryWatch := 0
@@ -263,11 +262,11 @@ _LayoutRegistryWatchArm(Handle, Event) {
 
 ; Whether Event is signaled; a true answer resets the auto-reset event.
 _LayoutRegistryWatchSignaled(Event) {
-	global LAYOUT_REGISTRY_WATCH_WAIT_SIGNALED, LAYOUT_REGISTRY_WATCH_WAIT_TIMEOUT
+	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
 	Result := DllCall("WaitForSingleObject", "Ptr", Event, "UInt", 0, "UInt")
-	if (Result == LAYOUT_REGISTRY_WATCH_WAIT_SIGNALED)
+	if (Result == PLC_WAIT_OBJECT_0)
 		return true
-	if (Result == LAYOUT_REGISTRY_WATCH_WAIT_TIMEOUT)
+	if (Result == PLC_WAIT_TIMEOUT)
 		return false
 	throw OSError(A_LastError, -1, "WaitForSingleObject")
 }
