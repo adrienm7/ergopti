@@ -97,6 +97,9 @@ if os.getenv("ERGOPTI_LIVE_GNOME_UNSAFE") then
 		.. " --method org.gnome.Shell.Eval 'const m = Main.panel.statusArea.keyboard._inputSourceManager;"
 		.. " JSON.stringify({current: m.currentSource && m.currentSource.id,"
 		.. " sources: Object.values(m.inputSources).map(s => s.id)})'"))
+	print("diagnostic: XWayland " .. tostring(os.getenv("DISPLAY")) .. " auth " .. tostring(os.getenv("XAUTHORITY"))
+		.. " symbols " .. (keymap():match('xkb_symbols%s+"([^"]*)"') or "unreadable")
+		.. " AE01 " .. ((keymap():match("key <AE01>%s*(%b{})") or ""):gsub("%s+", " ")))
 	print("diagnostic: user tree " .. capture("ls -R \"$HOME/.config/xkb\" 2>&1 | tr '\\n' ' '"))
 end
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))

@@ -760,6 +760,9 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 			helpers.assert_eq(state.runs[2].args[2], "apply-wayland")
 			helpers.assert_eq(arg_value(state.runs[2].args, "--layout-id"), "ergol")
 			helpers.assert_eq(arg_value(state.runs[2].args, "--source-dir"), LOCAL_DIR .. "ergol")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--gnome-settle-ms"),
+				tostring(require("infra.timings").ms("ui", "gnome_input_source_settle_ms")),
+				"the installer waits the shared settle time between GNOME writes (gnome-runtime-switch)")
 			helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "EuroSign")
 			helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
 		end

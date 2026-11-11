@@ -1155,7 +1155,8 @@ function M.apply_rows(id, rows, on_done, deps)
 		end
 		if path == "wayland" then
 			local args = { "apply-wayland", "--layout-id", base, "--display-name", entry.name,
-				"--source-dir", deps.local_dir .. base }
+				"--source-dir", deps.local_dir .. base, "--gnome-settle-ms",
+				tostring(require("infra.timings").ms("ui", "gnome_input_source_settle_ms")) }
 			for _, language in ipairs(type(entry.languages) == "table" and entry.languages or {}) do
 				args[#args + 1] = "--language"
 				args[#args + 1] = language
