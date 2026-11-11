@@ -9,10 +9,6 @@ local helpers = require("tests.helpers")
 local Codec = require("toml_codec")
 local Scope = require("infra.shortcuts_scope")
 local path, backup = "/controlled/config.toml", "/controlled/combination.bak"
--- `[mod_combos]` lives in the shared tap_hold.toml beside config.toml.
-local chord_path = "/controlled/tap_hold.toml"
--- Resolved before any case stubs the tap-hold loader the writer reads its fields from.
-local prepare_chord_rows = require("platform.remap.tap_hold_writer").prepare_combo_rows
 local pair, binding = "caps_lock_then_tab", "combination__caps_lock_then_tab"
 local parameter = binding .. "__open_url"
 local source = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "open_url"\nfuture_then_tab = "future"\n'
@@ -47,15 +43,6 @@ local function with_owner(body, managed, prepare)
 				if target == path then state.publications = state.publications + 1 end
 				return true
 			end,
-			-- The inverse of a publication that created tap_hold.toml removes it.
-			remove_if_unchanged = function(target, expected)
-				local current = state.bytes[target]
-				if current == nil or expected.status ~= "ok" or current ~= expected.content then
-					return false, "Controlled removal conflict"
-				end
-				state.bytes[target] = nil
-				return true
-			end,
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
@@ -65,7 +52,7 @@ local function with_owner(body, managed, prepare)
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
 			package.loaded["adapters.file_system"]=files
-			package.loaded["infra.config_paths"]={config=function(name) return name=="tap_hold.toml" and "/controlled/tap_hold.toml" or path end}
+			package.loaded["infra.config_paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.refuse_native then return false end
 				if state.native then
@@ -108,8 +95,7 @@ local function with_owner(body, managed, prepare)
 			}
 		end
 		if prepare then prepare(state) end
-		state.scope = Scope.new({path=path,backup_path=backup,chord_path=chord_path,prepare_chord_rows=prepare_chord_rows,
-			files=files,combinations=state.pairs,parameters=gestures,
+		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
 			manager=ordinary({enabled=true,wrap=false,caps_word_active=false}),
 			keyboard=ordinary({assignments={},explicit_assignments={}}), taps=ordinary({}), chords=ordinary({}), url=ordinary({}),
 			is_paused=function() return state.paused end})
@@ -421,17 +407,15 @@ end)
 
 -- These additive controls use actual declared Linux data, pair source leases,
 -- parameter owners and conditional publication. Device/file edges are controlled.
--- config.toml keeps the pair slots and the category switch; tap_hold.toml
--- holds every `[mod_combos]` leaf, known and foreign.
-local public_source = source .. '[category_enabled]\nkey_combinations=false\n'
-local public_chords = '[_meta]\nschema_version=1\n[mod_combos]\nenabled=false\nsimultaneous_threshold_ms=75\nsymmetric=true\n'
+local public_source = source .. '[mod_combos]\nenabled=false\nsimultaneous_threshold_ms=75\nsymmetric=true\n'
  .. '[mod_combos.config.caps_lock_then_tab]\ncombo="copy"\nfuture=17\n'
  .. '[mod_combos.config.future_then_tab]\ncombo="foreign_action"\n'
+ .. '[category_enabled]\nkey_combinations=false\n'
 local function seed_public_global(s)
  local token={}
  helpers.assert_true(s.pairs.acquire_configuration(token))
- s.bytes[path],s.bytes[chord_path]=public_source,public_chords
- helpers.assert_true(s.pairs.apply_configuration(token,s.pairs.configuration_candidate(Codec.decode(public_source),true,Codec.decode(public_chords))))
+ s.bytes[path]=public_source
+ helpers.assert_true(s.pairs.apply_configuration(token,s.pairs.configuration_candidate(Codec.decode(public_source),true)))
  helpers.assert_true(s.pairs.release_configuration(token))
 end
 helpers.describe("global scope includes only original known simultaneous leaves",function()
@@ -440,16 +424,15 @@ helpers.describe("global scope includes only original known simultaneous leaves"
    with_owner(function(s)
     helpers.assert_eq(s.pairs.get_chord(pair),"copy")
     helpers.assert_true(s.scope.apply(mode))
-    local doc,combos=Codec.decode(s.bytes[path]),Codec.decode(s.bytes[chord_path]).mod_combos
-    helpers.assert_eq(doc.mod_combos,nil,"config.toml never gets a [mod_combos]")
-    helpers.assert_eq(combos.config[pair].combo,nil)
-    helpers.assert_eq(combos.config[pair].future,17)
-    helpers.assert_eq(combos.config.future_then_tab.combo,"foreign_action")
-    helpers.assert_eq(combos.enabled,false)
+    local doc=Codec.decode(s.bytes[path])
+    helpers.assert_eq(doc.mod_combos.config[pair].combo,nil)
+    helpers.assert_eq(doc.mod_combos.config[pair].future,17)
+    helpers.assert_eq(doc.mod_combos.config.future_then_tab.combo,"foreign_action")
+    helpers.assert_eq(doc.mod_combos.enabled,false)
     if mode=="clear" then helpers.assert_eq(doc.category_enabled.key_combinations,false)
     else helpers.assert_eq(doc.category_enabled.key_combinations,nil) end
-    helpers.assert_eq(combos.simultaneous_threshold_ms,nil)
-    helpers.assert_eq(combos.symmetric,nil)
+    helpers.assert_eq(doc.mod_combos.simultaneous_threshold_ms,nil)
+    helpers.assert_eq(doc.mod_combos.symmetric,nil)
     helpers.assert_eq(doc.shortcuts.key_combination_taps.future_then_tab,"future")
     helpers.assert_eq(doc.gesture_parameters[parameter],nil)
     helpers.assert_eq(doc.unrelated.keep,42)
@@ -457,7 +440,6 @@ helpers.describe("global scope includes only original known simultaneous leaves"
     helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
     helpers.assert_eq(s.scope.pending(),false)
     helpers.assert_true(s.scope.revert());helpers.assert_eq(s.bytes[path],public_source)
-    helpers.assert_eq(s.bytes[chord_path],public_chords)
     helpers.assert_eq(s.pairs.get_chord(pair),"copy")
     helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=75,combo_symmetric=true})
    end,false,seed_public_global)
@@ -468,7 +450,6 @@ helpers.describe("global scope includes only original known simultaneous leaves"
    local foreign={};helpers.assert_true(s.gestures.acquire_parameter_configuration(foreign))
    helpers.assert_eq(s.scope.apply("clear"),false)
    helpers.assert_eq(s.publications,0);helpers.assert_eq(s.bytes[path],public_source)
-   helpers.assert_eq(s.bytes[chord_path],public_chords)
    helpers.assert_eq(s.pairs.get_chord(pair),"copy");helpers.assert_eq(s.scope.pending(),false)
    helpers.assert_eq(s.pairs.configuration_pending(),false)
    helpers.assert_eq(s.gestures.acquire_parameter_configuration({}),false)
@@ -479,13 +460,13 @@ helpers.describe("global scope includes only original known simultaneous leaves"
  end)
  helpers.it("refuses stale third-source ownership before backup and restores no foreign bytes",function()
   with_owner(function(s)
-   local foreign=public_chords:gsub('combo="copy"','combo="open_url"',1)
-   s.bytes[chord_path]=foreign
+   local foreign=public_source:gsub('combo="copy"','combo="open_url"',1)
+   s.bytes[path]=foreign
    helpers.assert_eq(s.scope.apply("clear"),false)
    helpers.assert_eq(s.publications,0);helpers.assert_eq(s.bytes[backup],nil)
-   helpers.assert_eq(s.bytes[chord_path],foreign);helpers.assert_eq(s.bytes[path],public_source)
-   s.bytes[chord_path]=public_chords;helpers.assert_true(s.scope.retry_restore())
-   helpers.assert_eq(s.bytes[chord_path],public_chords);helpers.assert_eq(s.pairs.get_chord(pair),"copy")
+   helpers.assert_eq(s.bytes[path],foreign)
+   s.bytes[path]=public_source;helpers.assert_true(s.scope.retry_restore())
+   helpers.assert_eq(s.bytes[path],public_source);helpers.assert_eq(s.pairs.get_chord(pair),"copy")
   end,false,seed_public_global)
  end)
 end)

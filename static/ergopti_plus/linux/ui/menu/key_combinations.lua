@@ -2,9 +2,6 @@
 
 --- Renders shared ordered slots through the actual native picker and publisher.
 --- Same-device chord choices retain the original source and publication owner.
---- Their `mod_combos.*` rows reach the shared tap_hold.toml: the scope routes
---- them to its tap-hold writer companion, and the source receipt every command
---- captures covers config.toml and tap_hold.toml.
 local SaveFailure = require("config_save_failure")
 local Shared = require("tap_hold.key_combinations")
 local HoldOptions = require("tap_hold.hold_options")
