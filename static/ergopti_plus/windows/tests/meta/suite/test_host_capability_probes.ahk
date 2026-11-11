@@ -28,11 +28,18 @@ _HCP_GateOutcome(Receipt, HostedCi?) {
 }
 
 _HCP_GateDecidesBothWays() {
-	Absent := Map("state", "absent", "name", "example", "why", "the probe saw it missing")
+	Absent := Map("state", "absent", "hosted_ci", "required", "name", "example", "why", "the probe saw it missing")
 	AssertEqual("not executed: host capability example is absent: the probe saw it missing",
 		_HCP_GateOutcome(Absent, false), "a developer machine reports an absent capability as not executed")
 	AssertEqual("failed: hosted CI must provide host capability example, which is absent: the probe saw it missing",
 		_HCP_GateOutcome(Absent, true), "hosted CI fails a case whose capability is absent instead of skipping it")
+	; A capability a runner is designed to lack (the unattended CurrentUser root
+	; admission) declares no hosted_ci rule and stays not executed there too.
+	Designed := Map("state", "absent", "name", "example", "why", "the probe saw it missing")
+	AssertEqual("not executed: host capability example is absent: the probe saw it missing",
+		_HCP_GateOutcome(Designed, true), "hosted CI keeps a designed absence not executed")
+	Unknown := Map("state", "absent", "hosted_ci", "optional", "name", "example", "why", "unused")
+	AssertContains(_HCP_GateOutcome(Unknown, false), "failed: A host capability receipt hosted_ci must be")
 	for State in ["present", "unknown"] {
 		Receipt := Map("state", State, "name", "example", "why", "unused")
 		AssertEqual("ran", _HCP_GateOutcome(Receipt, false), State . " runs the case on a developer machine")
@@ -47,7 +54,7 @@ Test("host capability gate: absent skips locally, fails on hosted CI, present an
 _HCP_GateReadsHostedCiFromEnvironment() {
 	AssertEqual(StrCompare(EnvGet("GITHUB_ACTIONS"), "true", true) == 0, TestHostIsHostedCi(),
 		"the default gate decision follows GITHUB_ACTIONS")
-	Absent := Map("state", "absent", "name", "example", "why", "the probe saw it missing")
+	Absent := Map("state", "absent", "hosted_ci", "required", "name", "example", "why", "the probe saw it missing")
 	Expected := TestHostIsHostedCi() ? "failed: " : "not executed: "
 	AssertContains(_HCP_GateOutcome(Absent), Expected, "the omitted seam uses the real environment")
 }

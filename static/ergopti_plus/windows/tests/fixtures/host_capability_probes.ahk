@@ -28,7 +28,7 @@ global TEST_ERROR_PRIVILEGE_NOT_HELD := 1314
 TestFileSymlinkReceipt(Created, LastError) {
 	global TEST_ERROR_PRIVILEGE_NOT_HELD
 	State := Created != 0 ? "present" : LastError == TEST_ERROR_PRIVILEGE_NOT_HELD ? "absent" : "unknown"
-	return Map("state", State, "name", "file symlink creation",
+	return Map("state", State, "hosted_ci", "required", "name", "file symlink creation",
 		"why", "CreateSymbolicLinkW refused with Win32 error " . LastError
 			. " (ERROR_PRIVILEGE_NOT_HELD); enable Developer Mode or run elevated to execute it here")
 }
@@ -39,7 +39,7 @@ TestFileSymlinkReceipt(Created, LastError) {
 ; @return {Map}
 TestTopRowLetterReceipt(Vk) {
 	State := Vk >= 0x41 && Vk <= 0x5A ? "present" : Vk != 0 ? "absent" : "unknown"
-	return Map("state", State, "name", "a letter on the first top-row key",
+	return Map("state", State, "hosted_ci", "required", "name", "a letter on the first top-row key",
 		"why", Format("the active keyboard layout maps SC010 to VK 0x{:02X}, not a letter;", Vk)
 			. " switch to a layout such as US QWERTY or French AZERTY to execute it here")
 }
@@ -49,7 +49,7 @@ TestTopRowLetterReceipt(Vk) {
 ; @return {Map}
 TestSc012NotOReceipt(KeyText) {
 	State := KeyText.Count != 1 ? "unknown" : KeyText.Text == "o" ? "absent" : "present"
-	return Map("state", State, "name", "an OS character other than o on SC012",
+	return Map("state", State, "hosted_ci", "required", "name", "an OS character other than o on SC012",
 		"why", "the foreground keyboard layout already types o on SC012, like the Ergopti+ top row,"
 			. " so the OS character cannot be told from the selected one; switch to US QWERTY or French AZERTY to execute it here")
 }
@@ -62,7 +62,7 @@ TestSc012NotOReceipt(KeyText) {
 ; @return {Map}
 TestNonKanaLayoutReceipt(Probe) {
 	State := !Probe["valid"] ? "unknown" : Probe["kana"] ? "absent" : "present"
-	return Map("state", State, "name", "a non-Kana active keyboard layout",
+	return Map("state", State, "hosted_ci", "required", "name", "a non-Kana active keyboard layout",
 		"why", Format("the active keyboard layout 0x{:X} is itself a Kana-family layout (SC138 is VK 0x{:02X}, no VK_RMENU);",
 			Probe["hkl"] & 0xFFFFFFFF, Probe["altgr_vk"])
 			. " switch to a layout such as US QWERTY or French AZERTY to execute it here")
