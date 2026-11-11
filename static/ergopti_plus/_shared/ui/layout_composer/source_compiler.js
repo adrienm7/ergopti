@@ -79,7 +79,14 @@ var LayoutSourceCompiler = (function () {
 		'CapsLock',
 		'Fn'
 	]);
-	const PLATFORMS = ['macos', 'linux', 'windows'];
+	// What each compilation target can carry. macOS reads the keylayout itself, with
+	// every sided token and an unused cell for a disabled key; Linux and Windows reach
+	// it through the XKB and KLC converters, which have neither.
+	const TARGETS = {
+		macos: { tokens: TOKENS, disabledCharacterCell: true },
+		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false },
+		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false }
+	};
 	const VARIANTS = ['iso', 'ansi'];
 	const MACOS_FORMATS = ['bundle', 'iso', 'ansi'];
 	const DEFAULT_VERSION = '1.0';
@@ -216,7 +223,7 @@ var LayoutSourceCompiler = (function () {
 
 	/** The modifierMap tokens a platform's compilation may use. */
 	function platformTokens(platform) {
-		return platform === 'macos' ? TOKENS : CONVERTER_TOKENS;
+		return TARGETS[platform].tokens;
 	}
 
 	/** One modifier combination as a modifierMap keys attribute, or null when the target has no token. */
@@ -303,7 +310,7 @@ var LayoutSourceCompiler = (function () {
 		const variant = options.variant || 'iso';
 		const platform = options.platform || 'macos';
 		if (!VARIANTS.includes(variant)) fail('source_variant', String(variant));
-		if (!PLATFORMS.includes(platform)) fail('source_platform', String(platform));
+		if (!Object.hasOwn(TARGETS, platform)) fail('source_platform', String(platform));
 		if (source.imported_keylayout) fail('source_imported_preserved', 'imported_keylayout');
 		const table = keyTable(tables, 'iso');
 		const defaults = systemDefaults();
@@ -367,7 +374,8 @@ var LayoutSourceCompiler = (function () {
 				else if (own(mapping, 'disabled')) {
 					// The converters refuse a control output on a character key: there the key
 					// becomes an empty cell, which XKB and KLC report and may let inherit.
-					if (platform === 'macos' || !table.character.has(name)) rows.set(mac, ['output', UNUSED]);
+					if (TARGETS[platform].disabledCharacterCell || !table.character.has(name))
+						rows.set(mac, ['output', UNUSED]);
 					else omitted.push({ path, reason: 'disabled_key_is_empty_cell' });
 				} else
 					omitted.push({
