@@ -1,0 +1,15 @@
+$ luajit tests/hardware/run_webkit_gc_signal.lua --unreserved
+Overriding existing handler for signal 10. Set JSC_SIGNAL_FOR_GC if you want WebKit to use a different signal
+exit=139
+
+$ luajit tests/hardware/run_webkit_gc_signal.lua 
+ERROR: invalid option: JSC_SIGNAL_FOR_GC=12
+ERROR: invalid option: JSC_SIGNAL_FOR_GC=12
+ERROR: invalid option: JSC_SIGNAL_FOR_GC=12
+  ok   the WebView loaded a page that runs JavaScript
+  ..   JSC_SIGNAL_FOR_GC=12
+  ok   WebKit's collector took the reserved signal 12 instead of the reload signal
+  ok   the daemon's reload callback received every SIGUSR1: 3
+PASS the reload signal survives an in-process WebView
+exit=0
+
