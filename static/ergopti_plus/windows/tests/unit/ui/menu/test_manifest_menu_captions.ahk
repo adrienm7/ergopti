@@ -317,6 +317,46 @@ _MTF_RefusedRows(Key, Legacy, Root, Corpus, Language) {
 	}
 }
 
+; The shared corpus images the Magic trigger row of each driver per language,
+; key and customisation; Windows draws one editor row and never a reset row.
+_MTF_CorpusImages() {
+	global _SharedDir, ScriptInformation, _I18nCache, _I18nCacheLoaded
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\magic_trigger_frame.json", "UTF-8"))
+	AssertEqual("hotstrings_magic_trigger_frame", Corpus["section"], "the corpus names the frame the provider reads")
+	AssertEqual(4, Corpus["cases"].Length, "every language, key and customisation case is replayed")
+	HadInformation := IsSet(ScriptInformation), Prior := HadInformation ? ScriptInformation : false
+	HadCache := IsSet(_I18nCache), PreviousCache := HadCache ? _I18nCache : false
+	HadLoaded := IsSet(_I18nCacheLoaded), PreviousLoaded := HadLoaded ? _I18nCacheLoaded : false
+	try {
+		for Case in Corpus["cases"] {
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Case["language"] . ".json", "UTF-8"))
+			_I18nCacheLoaded := true
+			ScriptInformation := HadInformation ? Prior.Clone() : Map()
+			ScriptInformation["MagicKey"] := Case["value"]
+			Rows := _HS_MagicKeyRows()
+			Name := Case["language"] . " " . Case["value"]
+			AssertTrue(Rows is Array, Name . ": the actual Windows Magic provider returns row data")
+			AssertEqual(Case["windows"].Length, Rows.Length, Name . ": Windows draws the corpus rows only")
+			for Index, Expected in Case["windows"]
+				AssertEqual(Expected, Rows[Index]["label"], Name . ": row " . Index . " caption")
+		}
+	} finally {
+		if HadInformation
+			ScriptInformation := Prior
+		else
+			ScriptInformation := unset
+		if HadCache
+			_I18nCache := PreviousCache
+		else
+			_I18nCache := unset
+		if HadLoaded
+			_I18nCacheLoaded := PreviousLoaded
+		else
+			_I18nCacheLoaded := unset
+	}
+}
+Test("shared Magic trigger rows match the corpus images for Windows (magic-trigger-frame)", _MTF_CorpusImages)
+
 ; Ordered original-format values and OS/user record captions share one literal contract.
 _LVC_WithFixture(Body) {
 	global _SharedDir, _I18nCache, _I18nCacheLoaded
