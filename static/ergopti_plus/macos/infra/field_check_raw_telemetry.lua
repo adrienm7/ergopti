@@ -23,13 +23,15 @@
 
 local Report = require("field_check_report")
 local Probes = require("infra.field_check_probes")
+local TableUtil = require("table_util")
 
 local M = {}
 
 local PASS, FAIL, INFO, SKIP = Report.STATE_PASS, Report.STATE_FAIL, Report.STATE_INFO, Report.STATE_SKIP
 
 local SQLITE = "/usr/bin/sqlite3"
-local SQLITE_TIMEOUT = 20
+-- One grouped count over three indexed tables: far below the storage scan.
+local QUERY_SECONDS = 20
 
 --- The tables read, each with its report prefix and its shared kind list.
 --- @type table { { table, prefix, kinds } } in report order
@@ -48,14 +50,6 @@ function M.query()
 			entry.prefix, entry.table)
 	end
 	return table.concat(parts, " UNION ALL ") .. ";"
-end
-
---- The declared kinds of one table, sorted, so the report order is stable.
-local function sorted_kinds(kinds)
-	local names = {}
-	for name in pairs(kinds) do names[#names + 1] = name end
-	table.sort(names)
-	return names
 end
 
 --- Reads the sqlite3 answer.
@@ -82,7 +76,7 @@ function M.raw_telemetry(ports, report, finish)
 		report.step("telemetry_db", SKIP, database.path == nil and "metrics_not_started" or "absent")
 		return finish()
 	end
-	ports.exec(SQLITE, { "-readonly", Probes.immutable_uri(database.path), M.query() }, SQLITE_TIMEOUT,
+	ports.exec(SQLITE, { "-readonly", Probes.immutable_uri(database.path), M.query() }, QUERY_SECONDS,
 		function(code, output)
 			if code ~= 0 then
 				report.step("telemetry_db", FAIL, code == nil and "timeout" or ("sqlite_exit_" .. tostring(code)))
@@ -91,7 +85,7 @@ function M.raw_telemetry(ports, report, finish)
 			report.step("telemetry_db", PASS, "read")
 			local counts = M.parse_counts(output)
 			for _, entry in ipairs(M.TABLES) do
-				for _, kind in ipairs(sorted_kinds(entry.kinds)) do
+				for _, kind in ipairs(TableUtil.sorted_keys(entry.kinds)) do
 					report.step(entry.prefix .. "_" .. kind, INFO, counts[entry.prefix .. ":" .. kind] or 0)
 				end
 			end
