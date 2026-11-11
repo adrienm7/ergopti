@@ -46,6 +46,17 @@ var LayoutEditorPage = (function () {
 		{ id: 'math', from: 0x2200, to: 0x22ff }
 	];
 	const STICKER_LAYERS = ['base', 'shift', 'altgr', 'shift_altgr'];
+	// Physical modifier keys and the sided modifier ids the format names them by.
+	const SIDED_MODIFIERS = {
+		ShiftLeft: 'shift_left',
+		ShiftRight: 'shift_right',
+		AltLeft: 'alt_left',
+		AltRight: 'alt_right',
+		ControlLeft: 'control_left',
+		ControlRight: 'control_right',
+		MetaLeft: 'meta_left',
+		MetaRight: 'meta_right'
+	};
 	const TAP_HOLD_THRESHOLD_STEP = 10;
 
 	// ============================
@@ -165,7 +176,9 @@ var LayoutEditorPage = (function () {
 	 * @param {HTMLElement} root - The element the editor fills.
 	 * @param {{saveFile: function(string, string, string): Promise<void>,
 	 *   initial?: string|null, onClose?: function}} host - saveFile(filename,
-	 *   text, mime) stores a file; initial is a source text to open.
+	 *   text, mime) stores a file; initial is a source text to open; install({source,
+	 *   keylayout}) and platform ('macos'|'linux') when the host installs layouts;
+	 *   savedStatus names the message shown after a save; onClose leaves the editor.
 	 * @returns {{open: function(string, string): void, current: function(): object}}
 	 */
 	function mount(root, host) {
@@ -187,6 +200,10 @@ var LayoutEditorPage = (function () {
 			// A pending question: { text, onYes }. In-page, because a webview
 			// host may not show window.confirm (WKWebView needs a UI delegate).
 			confirm: null,
+			// Whether the exact import refused the file, so the approximate one is offered.
+			approximate: false,
+			// Physical modifier keys held in the preview, as sided modifier ids.
+			heldSides: new Set(),
 			lost: null,
 			dirty: false
 		};
@@ -216,6 +233,7 @@ var LayoutEditorPage = (function () {
 			state.lost = lost || null;
 			state.dirty = false;
 			state.deadKey = null;
+			state.approximate = false;
 		}
 
 		// ============================
@@ -286,14 +304,28 @@ var LayoutEditorPage = (function () {
 			render();
 		}
 
+		function adoptConverted(converted) {
+			state.history.push(converted.doc);
+			state.lost = converted.lost;
+			state.approximate = false;
+			state.layer = 'base';
+			state.dirty = true;
+			notify('ok', tl('status.converted'));
+		}
+
 		function convertImport() {
 			try {
-				const projected = LayoutSourceIO.projectImport(doc());
-				state.history.push(projected.doc);
-				state.lost = projected.lost;
-				state.layer = 'base';
-				state.dirty = true;
-				notify('ok', tl('status.converted'));
+				adoptConverted(LayoutSourceIO.convertImport(doc()));
+			} catch (error) {
+				// The exact importer refused: offer the approximate conversion, never silently.
+				state.approximate = true;
+				notify('error', problemText(error));
+			}
+		}
+
+		function approximateImport() {
+			try {
+				adoptConverted(LayoutSourceIO.approximateImport(doc()));
 			} catch (error) {
 				notify('error', problemText(error));
 			}
@@ -457,7 +489,15 @@ var LayoutEditorPage = (function () {
 							id: 'le-convert',
 							text: tl('btn.convert'),
 							onclick: () => ask(tl('convert_confirm'), convertImport)
-						})
+						}),
+						state.approximate
+							? el('button', {
+									type: 'button',
+									id: 'le-convert-approximate',
+									text: tl('btn.convert_approximate'),
+									onclick: () => ask(tl('convert_approximate_confirm'), approximateImport)
+								})
+							: null
 					])
 				);
 			if (state.lost)
@@ -1211,11 +1251,15 @@ var LayoutEditorPage = (function () {
 		// ============================
 
 		function heldModifiers(event) {
-			const held = [];
-			if (event.shiftKey) held.push('shift');
-			if (event.altKey) held.push('alt');
-			if (event.ctrlKey) held.push('control');
-			if (event.metaKey) held.push('meta');
+			const held = [...state.heldSides];
+			// A modifier held before the field had focus has no known side.
+			for (const [flag, id] of [
+				['shiftKey', 'shift'],
+				['altKey', 'alt'],
+				['ctrlKey', 'control'],
+				['metaKey', 'meta']
+			])
+				if (event[flag] && !held.some((h) => h.startsWith(id + '_'))) held.push(id);
 			for (const id of state.heldCustom) held.push(id);
 			for (const id of state.locked) held.push(id);
 			return held;
@@ -1248,23 +1292,15 @@ var LayoutEditorPage = (function () {
 						} else state.heldCustom.add(modifier.id);
 						return;
 					}
-					if (
-						[
-							'ShiftLeft',
-							'ShiftRight',
-							'AltLeft',
-							'AltRight',
-							'ControlLeft',
-							'ControlRight',
-							'MetaLeft',
-							'MetaRight'
-						].includes(event.code)
-					)
+					if (Object.prototype.hasOwnProperty.call(SIDED_MODIFIERS, event.code)) {
+						state.heldSides.add(SIDED_MODIFIERS[event.code]);
 						return;
+					}
 					state.presses.push({ code: event.code, held: heldModifiers(event) });
 					renderPreviewOnly();
 				},
 				onkeyup: (event) => {
+					state.heldSides.delete(SIDED_MODIFIERS[event.code]);
 					const modifier = customModifier(event.code);
 					if (modifier && modifier.mode === 'held') state.heldCustom.delete(modifier.id);
 				}
@@ -1298,6 +1334,44 @@ var LayoutEditorPage = (function () {
 		// ======= 12/ Export =========
 		// ============================
 
+		/** A report reason: its own text, else the refusal it names. */
+		function reasonText(code) {
+			const strings = window._i18n_strings || {};
+			return typeof strings[`${PREFIX}reason.${code}`] === 'string'
+				? tl(`reason.${code}`)
+				: problemText({ code });
+		}
+
+		/** Installs the source through the ErgoptiPlus composer host and switches to it. */
+		function installButton(report) {
+			const row = report.find((entry) => entry.target === `driver_${host.platform}`);
+			return el('button', {
+				type: 'button',
+				id: 'le-install',
+				class: 'primary',
+				text: tl('btn.install'),
+				disabled: !row || row.status === 'unavailable',
+				onclick: () =>
+					ask(tl('install_confirm'), () => {
+						let payload;
+						try {
+							payload = LayoutSourceIO.installPayload(doc(), host.platform);
+						} catch (error) {
+							notify('error', problemText(error));
+							return;
+						}
+						Promise.resolve(host.install(payload)).then(
+							(result) =>
+								notify(
+									'ok',
+									tl(result && result.pending ? 'status.installed_pending' : 'status.installed')
+								),
+							(error) => notify('error', problemText(error))
+						);
+					})
+			});
+		}
+
 		function exportPanel() {
 			let report = [];
 			try {
@@ -1309,13 +1383,26 @@ var LayoutEditorPage = (function () {
 					el('p', { class: 'le-message error', text: problemText(error) })
 				);
 			}
-			const rows = report.map((row) =>
-				el('tr', { 'data-target': row.target }, [
+			const rows = report.map((row) => {
+				const omitted = row.omitted || [];
+				return el('tr', { 'data-target': row.target }, [
 					el('td', { text: tl(`target.${row.target}`) }),
 					el('td', { class: `le-status ${row.status}`, text: tl(`status_kind.${row.status}`) }),
-					el('td', { text: tl(`reason.${row.reason}`) })
-				])
-			);
+					el('td', {}, [
+						row.reason ? reasonText(row.reason) : '',
+						omitted.length
+							? el('details', {}, [
+									el('summary', { text: tl('export.omitted', { count: omitted.length }) }),
+									el(
+										'ul',
+										{},
+										omitted.map((entry) => el('li', { text: `${entry.path}: ${entry.reason}` }))
+									)
+								])
+							: null
+					])
+				]);
+			});
 			const buttons = [
 				el('button', {
 					type: 'button',
@@ -1324,26 +1411,24 @@ var LayoutEditorPage = (function () {
 					onclick: saveSource
 				})
 			];
-			const macos = report.find((row) => row.target === 'macos');
-			if (macos && macos.status === 'native')
-				buttons.push(
-					el('button', {
-						type: 'button',
-						id: 'le-export-keylayout',
-						text: tl('export.keylayout'),
-						onclick: () => {
-							try {
-								save(
-									`${doc().layout.id}.keylayout`,
-									LayoutSourceIO.exportKeylayout(doc()),
-									'application/xml'
-								);
-							} catch (error) {
-								notify('error', problemText(error));
-							}
-						}
-					})
-				);
+			for (const variant of ['iso', 'ansi']) {
+				let file = null;
+				try {
+					file = LayoutSourceIO.keylayoutFile(doc(), variant);
+				} catch (error) {
+					// This variant is not producible here; the report row says why.
+				}
+				if (file)
+					buttons.push(
+						el('button', {
+							type: 'button',
+							id: `le-export-keylayout-${variant}`,
+							text: tl(`export.keylayout_${variant}`),
+							onclick: () => save(file.filename, file.text, 'application/xml')
+						})
+					);
+			}
+			if (host.install) buttons.push(installButton(report));
 			if ((doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
 				buttons.push(
 					el('button', {
@@ -1367,11 +1452,19 @@ var LayoutEditorPage = (function () {
 					select(
 						['bundle', 'iso', 'ansi'].map((f) => [f, tl(`export.macos.${f}`)]),
 						macFormat,
-						(value) => apply((d) => LayoutEditorModel.setExport(d, 'macos', { format: value })),
+						(value) =>
+							apply((d) =>
+								LayoutEditorModel.setExport(
+									d,
+									'macos',
+									Object.assign({}, (d.exports || {}).macos, { format: value })
+								)
+							),
 						{ id: 'le-macos-format' }
 					)
 				]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
+				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
 				el('p', { class: 'le-note', text: tl('export.tooling_note') }),
 				el('code', {
 					class: 'le-cli',

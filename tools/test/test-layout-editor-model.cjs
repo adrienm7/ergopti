@@ -27,6 +27,8 @@ const PAGE_SCRIPTS = [
 	'layer_editor/layer_model.js',
 	'layout_composer/composer_model.js',
 	'layout_composer/source_model.js',
+	'layout_composer/source_compiler.js',
+	'layout_editor/_generated/key_tables.js',
 	'layout_editor/toml_prelude.js',
 	'vendor/smol-toml.js',
 	'layout_editor/source_io.js',
@@ -45,7 +47,10 @@ function loadEditor() {
 		// A top-level const is not a property of the context; the page reads these as globals.
 		const source = fs
 			.readFileSync(path.join(UI, file), 'utf8')
-			.replace(/^const (LAYOUT_COMPOSER_DATA|LAYER_EDITOR_DATA) =/m, 'var $1 =');
+			.replace(
+				/^const (LAYOUT_COMPOSER_DATA|LAYER_EDITOR_DATA|LAYOUT_SOURCE_TABLES) =/m,
+				'var $1 ='
+			);
 		vm.runInContext(source, context, { filename: file });
 	}
 	return vm.runInContext(
@@ -211,35 +216,100 @@ test('an imported .keylayout exports byte for byte until it is edited', () => {
 	}
 });
 
-test('converting an import keeps every level the composer reads and says what it drops', () => {
-	const xml = registry('ergopti');
-	const doc = IO.importKeylayout(xml, 'ergopti', 'iso');
-	const projected = IO.projectImport(doc);
-	assert.deepEqual(plain(projected.lost), ['keylayout_original_xml', 'keylayout_sided_modifiers']);
-	const source = LayoutComposer.parseSource('ergopti', xml, 'iso', COMPOSER);
-	const levels = { base: [], shift: ['shift'], altgr: ['alt'], shift_altgr: ['shift', 'alt'] };
-	for (const [layer, held] of Object.entries(levels))
+/** The four character levels the composer reader sees, as held modifiers. */
+const LEVELS = {
+	base: [],
+	shift: ['shift_left'],
+	altgr: ['alt_left'],
+	shift_altgr: ['shift_left', 'alt_left']
+};
+
+/** Every printable cell of the four levels types the same text in the converted source. */
+function assertTypesLike(xml, doc, label) {
+	const source = LayoutComposer.parseSource('x', xml, 'iso', COMPOSER);
+	let checked = 0;
+	for (const [layer, held] of Object.entries(LEVELS))
 		for (const [code, cells] of Object.entries(source.cells)) {
 			const cell = cells[layer];
 			if (!cell || cell.text === undefined) continue;
 			assert.equal(
-				M.simulate(projected.doc, [{ code, held }], null).text,
+				M.simulate(doc, [{ code, held }], null).text,
 				cell.text,
-				`${layer} ${code}`
+				`${label} ${layer} ${code}`
 			);
+			checked++;
 		}
+	assert.ok(checked > 150, `${label}: only ${checked} cells compared`);
+}
+
+test('the exact conversion keeps the behaviour and compiles back to the same characters', () => {
+	for (const id of ['ergopti', 'ergopti_plus']) {
+		const xml = registry(id);
+		const converted = IO.convertImport(IO.importKeylayout(xml, id, 'iso'));
+		assert.deepEqual(plain(converted.lost), ['keylayout_original_xml']);
+		assertTypesLike(xml, converted.doc, id);
+		const compiled = IO.keylayoutFile(converted.doc, 'iso');
+		assert.match(compiled.filename, /\.keylayout$/);
+		const before = LayoutComposer.parseSource('a', xml, 'iso', COMPOSER).cells;
+		const after = LayoutComposer.parseSource('b', compiled.text, 'iso', COMPOSER).cells;
+		for (const layer of Object.keys(LEVELS))
+			for (const code of Object.keys(before))
+				assert.equal(
+					(after[code][layer] || {}).text,
+					(before[code][layer] || {}).text,
+					`${id} compiled ${layer} ${code}`
+				);
+		assert.ok(IO.keylayoutFile(converted.doc, 'ansi').text.length > 0, 'the ANSI variant compiles');
+		const report = IO.capabilities(converted.doc);
+		assert.ok(['native', 'partial'].includes(report.find((row) => row.target === 'macos').status));
+		for (const target of ['driver_macos', 'driver_linux'])
+			assert.ok(
+				['emulated', 'partial'].includes(report.find((row) => row.target === target).status),
+				target
+			);
+		const payload = IO.installPayload(converted.doc, 'linux');
+		assert.equal(IO.parse(payload.source).ok, true);
+		assert.match(payload.keylayout, /<keyboard /);
+	}
+	refuses(() => IO.convertImport(IO.create('a', 'A')), 'source_not_imported');
+});
+
+test('a preserved import installs and exports its own XML, only in its own variant', () => {
+	const xml = registry('ergopti');
+	const doc = IO.importKeylayout(xml, 'ergopti', 'iso');
+	assert.equal(IO.installPayload(doc, 'macos').keylayout, xml);
+	assert.equal(IO.keylayoutFile(doc, 'iso').text, xml);
+	refuses(() => IO.keylayoutFile(doc, 'ansi'), 'source_export_unavailable');
+});
+
+test('the approximate conversion keeps the composer levels and says what it drops', () => {
+	const xml = registry('ergopti');
+	const projected = IO.approximateImport(IO.importKeylayout(xml, 'ergopti', 'iso'));
+	assert.deepEqual(plain(projected.lost), ['keylayout_original_xml', 'keylayout_sided_modifiers']);
+	assertTypesLike(xml, projected.doc, 'approximate');
 	assert.ok(projected.doc.dead_keys.length > 0, 'dead keys are kept');
 	for (const dead of projected.doc.dead_keys) assert.ok(dead.rules.length > 0, dead.id);
-	assert.equal(
-		IO.capabilities(projected.doc).find((row) => row.target === 'macos').status,
-		'unavailable'
-	);
 	assert.ok(
-		IO.projectImport(IO.importKeylayout(registry('ergopti_ansi'), 'x', 'ansi')).lost.includes(
+		IO.approximateImport(IO.importKeylayout(registry('ergopti_ansi'), 'x', 'ansi')).lost.includes(
 			'keylayout_ansi_projected_iso'
 		)
 	);
-	refuses(() => IO.projectImport(IO.create('a', 'A')), 'source_not_imported');
+	refuses(() => IO.approximateImport(IO.create('a', 'A')), 'source_not_imported');
+});
+
+test('sided modifiers and alternative selectors reach their layer', () => {
+	let doc = IO.create('a', 'A');
+	doc = M.addLayer(doc, 'shift', ['shift'], []);
+	doc = M.addLayer(doc, 'left_alt', ['alt_left'], []);
+	assert.equal(M.layerFor(doc, ['shift_right']), 'shift');
+	assert.equal(M.layerFor(doc, ['alt_left']), 'left_alt');
+	assert.equal(M.layerFor(doc, ['alt_right']), null);
+	const next = plain(doc);
+	next.layers.find((layer) => layer.id === 'left_alt').alternatives = [
+		{ required: ['meta'], optional: [] }
+	];
+	assert.equal(IO.check(next).ok, true);
+	assert.equal(M.layerFor(next, ['meta_left']), 'left_alt');
 });
 
 /** What layers.toml gives each key on one OS, `primary` resolved. */
