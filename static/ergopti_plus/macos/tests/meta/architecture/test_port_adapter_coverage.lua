@@ -315,6 +315,9 @@ helpers.describe("meta: _shared/ code purity", function()
 	for _, file_path in ipairs(shared_files) do
 		-- Skip spec files — they may reference pattern names in documentation strings
 		if file_path:match("%.spec%.js$") then goto continue end
+		-- Generated tables are a tool's data output, not shared logic; their
+		-- embedded _comment text names files such as codegen-*-hs.cjs.
+		if file_path:find("/_generated/", 1, true) then goto continue end
 		scanned = scanned + 1
 
 		local body = SourceFile.read(file_path)
