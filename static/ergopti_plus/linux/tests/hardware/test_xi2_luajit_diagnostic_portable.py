@@ -1,6 +1,7 @@
 """Source/receiver tests only; import never runs a compiler, LuaJIT or native server."""
 
 import copy
+import hashlib
 import importlib.util
 from pathlib import Path
 import unittest
@@ -100,6 +101,17 @@ class PortableControls(unittest.TestCase):
         )
         self.assertEqual(text.count("original.family_run("), 2)
         self.assertIn("module.digest(module.FAMILY) == FAMILY_SHA", text)
+
+    def test_candidate_pin_names_the_committed_source_probe(self):
+        # The native step refuses a candidate whose digest differs from the pin
+        # with only "FAIL ... CONTROLLED runtime" (run 42929436137 after
+        # 7a53f387 changed the probe): name the stale pin here instead.
+        probe = HERE.parents[1] / "adapters/xkb_source_probe.lua"
+        self.assertEqual(
+            hashlib.sha256(probe.read_bytes()).hexdigest(),
+            diagnostic.CANDIDATE_SHA,
+            "adapters/xkb_source_probe.lua changed: review it and move CANDIDATE_SHA",
+        )
 
     def test_real_emission_original_candidate_and_retirement(self):
         text = (HERE / "xi2_luajit_receiver.lua").read_text()
