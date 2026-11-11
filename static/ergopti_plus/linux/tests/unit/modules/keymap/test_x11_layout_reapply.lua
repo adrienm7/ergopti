@@ -25,7 +25,7 @@ local function fakes(options)
 	local deps = {
 		settle_ms = 750, window_ms = 60000, read_timeout_ms = 5000,
 		now_ms = function() return state.now end,
-		command = function() return "luajit", { "adapters/x11_keymap_watch_worker.lua", "libX11.so.6", "1" } end,
+		command = function() return "luajit", { "fake-keymap-watch-worker", "libX11.so.6", "1" } end,
 		display = function() return ":5" end,
 		start_process = function(program, args, opts, on_done)
 			state.spawned[#state.spawned + 1] = { program = program, args = args, owner = opts.owner }

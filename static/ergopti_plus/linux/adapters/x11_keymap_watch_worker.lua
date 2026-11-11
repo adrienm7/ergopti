@@ -96,7 +96,7 @@ function M.run(soname, parent_pid, emit)
 end
 
 if type(arg) == "table" and type(arg[0]) == "string"
-	and arg[0]:gsub("\\", "/"):match("([^/]+)$") == "x11_keymap_watch_worker.lua" then
+	and arg[0]:match("/x11_keymap_watch_worker%.lua$") then
 	local function emit(line)
 		local written = io.stdout:write(line, "\n")
 		return written ~= nil and io.stdout:flush() ~= nil

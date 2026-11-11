@@ -31,7 +31,7 @@ local LOG = "modules.keymap.x11_layout_reapply"
 local OWNER = "x11-layout-reapply-watch"
 local READ_OWNER = "x11-layout-reapply-read"
 local MAX_REAPPLIES = 3
-local MAX_LINE_BYTES = 64
+local MAX_WORKER_LINE_BYTES = 64
 -- A server keymap as xkbcomp prints it is about 120 KB (evdev keycodes, every
 -- type and compat entry): far above the default child output bound.
 M.MAX_KEYMAP_BYTES = 1048576
@@ -212,7 +212,7 @@ function M.new(deps)
 			consume(line)
 			if status == "stopped" then return end
 		end
-		if #pending > MAX_LINE_BYTES then stop("worker line exceeds its bound") end
+		if #pending > MAX_WORKER_LINE_BYTES then stop("worker line exceeds its bound") end
 	end
 
 	--- Keeps `id` loaded from now on; starts the watch on the first call.
