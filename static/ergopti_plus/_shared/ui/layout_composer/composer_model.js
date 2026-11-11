@@ -289,8 +289,8 @@ var LayoutComposer = (function () {
 	/**
 	 * Reads the text of a .keylayout into the maps the readers walk.
 	 * @param {string} text - The file content.
-	 * @returns {object} Name, mapSet, defaultIndex, selects, keyMapSets, bases,
-	 *   actions and terminators.
+	 * @returns {object} Name, layouts, mapSet, defaultIndex, selects, keyMapSets,
+	 *   bases, actions and terminators.
 	 * @throws {ComposerError} When a part every reader needs is missing.
 	 */
 	function parseModel(text) {
@@ -403,6 +403,9 @@ var LayoutComposer = (function () {
 			}
 		}
 		model.layoutCount = layouts.length;
+		// Every hardware layout as declared (first, last, mapSet, modifiers), for the
+		// structured import of a file with several (Bépo's ISO and ANSI maps).
+		model.layouts = layouts.map((layout) => Object.assign({}, layout));
 		const first = layouts.find((candidate) => candidate.first === '0');
 		if (!first) throw new ComposerError('keylayout_no_layout');
 		model.mapSet = first.mapSet || '';

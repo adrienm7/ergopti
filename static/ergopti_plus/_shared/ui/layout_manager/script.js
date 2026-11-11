@@ -34,7 +34,8 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'composer_save',
 	'composer_remove',
 	'source_open',
-	'source_save'
+	'source_save',
+	'source_pick'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -439,7 +440,12 @@ window.initData = function (data) {
 		applyDomStrings();
 	}
 	// Only a host that stores the editor's files offers it (macOS and Linux).
-	document.getElementById('btn-editor').hidden = data.source_editor !== true;
+	// There the editor replaces the composer, which fills layers from the same
+	// sources; Windows keeps the composer until its host accepts a source.
+	const editor = data.source_editor === true;
+	document.getElementById('btn-editor').hidden = !editor;
+	document.getElementById('btn-compose').hidden = editor;
+	_hostPicks = data.source_pick === true;
 	window.updateState(data.state);
 };
 
@@ -454,6 +460,10 @@ window.initData = function (data) {
 let _editor = null;
 let _pendingSave = null;
 let _pendingInstall = null;
+let _pendingSources = null;
+let _pendingPick = null;
+// Whether the host opens files in a native panel (macOS), from initData.
+let _hostPicks = false;
 
 /** Shows the editor or the layout list. */
 function showEditor(visible) {
@@ -493,8 +503,33 @@ function hostInstall(payload) {
 	});
 }
 
-/** Routes the composer host's answer to an editor install, else to the composer section. */
+/**
+ * The registry layouts a layer can be filled from: the composer host's own
+ * sources ({id, name, convention, text}), asked with composer_open.
+ */
+function hostSources() {
+	return new Promise(function (resolve, reject) {
+		if (_pendingSources) {
+			reject({ code: 'save_busy', path: 'composer_open' });
+			return;
+		}
+		_pendingSources = resolve;
+		send('composer_open');
+	});
+}
+
+/** Routes the composer host's answers to the editor when it asked, else to the composer section. */
 function routeComposerResults() {
+	const composerData = window.composerData;
+	window.composerData = function (data) {
+		const pending = _pendingSources;
+		if (!pending) {
+			if (typeof composerData === 'function') composerData(data);
+			return;
+		}
+		_pendingSources = null;
+		pending(data && Array.isArray(data.sources) ? data.sources : []);
+	};
 	const composerResult = window.composerResult;
 	window.composerResult = function (result) {
 		const pending = _pendingInstall;
@@ -508,6 +543,32 @@ function routeComposerResults() {
 		else pending.reject({ code: result.code || 'host_save_failed', path: result.detail || '' });
 	};
 }
+
+/** Opens a file in the host's native panel; settles on sourcePicked. */
+function hostPick() {
+	return new Promise(function (resolve, reject) {
+		if (_pendingPick) {
+			reject({ code: 'save_busy', path: 'source_pick' });
+			return;
+		}
+		_pendingPick = { resolve: resolve, reject: reject };
+		send('source_pick');
+	});
+}
+
+/**
+ * Called by the host with the picked file: { filename, text }, {} when the
+ * user cancelled, or { code, detail } when the host refused the file.
+ * @param {Object} data
+ */
+window.sourcePicked = function (data) {
+	const pending = _pendingPick;
+	_pendingPick = null;
+	if (!pending) return;
+	if (data && typeof data.code === 'string')
+		pending.reject({ code: data.code, path: data.detail || '' });
+	else pending.resolve(data && typeof data.text === 'string' ? data : null);
+};
 
 /**
  * Called by the host with the last saved source: { text, filename, folder }.
@@ -524,6 +585,8 @@ window.sourceData = function (data) {
 	_editor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
 		saveFile: hostSave,
 		install: hostInstall,
+		loadSources: hostSources,
+		pickFile: _hostPicks ? hostPick : null,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,

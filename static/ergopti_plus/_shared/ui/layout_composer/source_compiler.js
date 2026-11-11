@@ -38,6 +38,9 @@ var LayoutSourceCompiler = (function () {
 	const NEUTRAL = 'none';
 	const UNUSED = '\u0010';
 	const MAX_CODE = 127;
+	// A macOS code no key table names (Ergo-L types at code 66, a legacy keypad
+	// position): the source names it MacCode<n>, which only the macOS target owns.
+	const MAC_CODE = /^MacCode(\d{1,3})$/;
 
 	// Built-in modifier -> TN2056 modifierMap token. A plain token is the left key.
 	const TOKENS = {
@@ -81,15 +84,27 @@ var LayoutSourceCompiler = (function () {
 	]);
 	// What each compilation target can carry. macOS reads the keylayout itself, with
 	// every sided token and an unused cell for a disabled key; Linux and Windows reach
-	// it through the XKB and KLC converters, which have neither.
+	// it through the XKB and KLC converters, which have neither and place no key at
+	// an unnamed macOS key code.
 	const TARGETS = {
-		macos: { tokens: TOKENS, disabledCharacterCell: true },
-		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false },
-		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false }
+		macos: { tokens: TOKENS, disabledCharacterCell: true, unnamedMacCodes: true },
+		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false },
+		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false }
 	};
 	const VARIANTS = ['iso', 'ansi'];
 	const MACOS_FORMATS = ['bundle', 'iso', 'ansi'];
 	const DEFAULT_VERSION = '1.0';
+	// The PNG-carrying icon element of each square size macOS reads from an .icns.
+	const ICNS_TYPES = new Map([
+		[16, 'icp4'],
+		[32, 'icp5'],
+		[64, 'icp6'],
+		[128, 'ic07'],
+		[256, 'ic08'],
+		[512, 'ic09'],
+		[1024, 'ic10']
+	]);
+	const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 	const INPUT_SOURCE_PREFIX = 'com.apple.keyboardlayout.';
 
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -132,7 +147,16 @@ var LayoutSourceCompiler = (function () {
 		);
 		for (const [name, key] of unregistered)
 			if (!byName.has(name) && !byMac.has(key.hs)) add(name, key.hs);
-		return { byName, byMac, character };
+		return { byName, byMac, character, code: (name) => macCode(byName, byMac, name) };
+	}
+
+	/** The macOS code of a physical name: its table entry, or the MacCode<n> it spells. */
+	function macCode(byName, byMac, name) {
+		if (byName.has(name)) return byName.get(name);
+		const match = MAC_CODE.exec(name);
+		if (!match) return undefined;
+		const mac = Number(match[1]);
+		return mac <= MAX_CODE && !byMac.has(mac) && String(mac) === match[1] ? mac : undefined;
 	}
 
 	/** macOS code -> the standard control output of a key that types no character. */
@@ -258,7 +282,8 @@ var LayoutSourceCompiler = (function () {
 			else if (original[to] !== undefined) keys[from] = original[to];
 			else delete keys[from];
 		}
-		if (variant === 'ansi') keys = swapped(keys, ansiPairs(source));
+		if (variant === 'ansi')
+			keys = Object.assign(swapped(keys, ansiPairs(source)), layer.ansi_keys || {});
 		return keys;
 	}
 
@@ -356,9 +381,13 @@ var LayoutSourceCompiler = (function () {
 			const rows = new Map();
 			for (const [name, mapping] of Object.entries(keys)) {
 				const path = `layers.${layer.id}.keys.${name}`;
-				const mac = table.byName.get(name);
+				const mac = table.code(name);
 				if (mac === undefined || MODIFIER_KEYS.has(name)) {
 					omitted.push({ path, reason: 'physical_key_not_in_keylayout' });
+					continue;
+				}
+				if (!TARGETS[platform].unnamedMacCodes && !table.byName.has(name)) {
+					omitted.push({ path, reason: `mac_only_key_code_not_in_${platform}` });
 					continue;
 				}
 				if (own(mapping, 'text')) {
@@ -453,8 +482,161 @@ var LayoutSourceCompiler = (function () {
 		return { text: lines.join('\n') + '\n', convention: 'iso', names, omitted };
 	}
 
+	// ===========================
+	// ======= 5/ Emulation ======
+	// ===========================
+
+	const EMULATION_FORMAT = 'ergopti-layout-emulation';
+	const EMULATION_VERSION = 1;
+	// The built-in modifiers a driver reports, by family; a sided id other than
+	// alt_right (AltGr, macOS Option) is not reported by the Linux hook or the
+	// macOS tap flags, so a layer needing one cannot be selected by the engine.
+	const REPORTED = new Set(['shift', 'control', 'alt', 'alt_right', 'meta', 'caps_lock']);
+
+	/** A mapping the engine can perform, or the reason it cannot. */
+	function emulatedMapping(mapping, sendable) {
+		if (own(mapping, 'text')) return { text: mapping.text };
+		if (own(mapping, 'key')) {
+			if (!sendable(mapping.key)) return 'physical_key_not_emulated';
+			return { key: mapping.key, modifiers: (mapping.modifiers || []).slice() };
+		}
+		if (own(mapping, 'disabled')) return { disabled: true };
+		return own(mapping, 'dead_key') ? 'dead_key_not_emulated' : 'action_not_emulated';
+	}
+
+	/**
+	 * The records a platform's compiled .keylayout leaves out, as the table the
+	 * ErgoptiPlus drivers and the web emulation perform on top of it: custom
+	 * modifiers and their layers, key-chord mappings, shortcuts sending another
+	 * key, tap-holds and the remaps of system keys. What even the emulation
+	 * cannot perform is listed in not_emulated with its path and reason.
+	 * @param {object} source - A validated structured source.
+	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
+	 * @param {{platform?: 'macos'|'linux'|'windows'}} [options]
+	 * @returns {object} The emulation table (JSON-serializable).
+	 */
+	function compileEmulation(source, tables, options = {}) {
+		LayoutSource.validate(source);
+		const platform = options.platform || 'macos';
+		if (!Object.hasOwn(TARGETS, platform)) fail('source_platform', String(platform));
+		if (source.imported_keylayout) fail('source_imported_preserved', 'imported_keylayout');
+		const table = keyTable(tables, 'iso');
+		const custom = new Set((source.modifiers || []).map((modifier) => modifier.id));
+		const notEmulated = [];
+		const skip = (path, reason) => notEmulated.push({ path, reason });
+		// A key a driver can press for the user: one of the registry's own keys.
+		const sendable = (name) =>
+			own(tables.physicalKeys.keys, name) && tables.physicalKeys.keys[name].kind === 'key';
+		// A physical key the drivers see as a key press of its own (not a modifier flag).
+		const pressable = (name, path) => {
+			if (MODIFIER_KEYS.has(name)) skip(path, 'modifier_key_not_emulated');
+			else if (!sendable(name)) skip(path, 'physical_key_not_emulated');
+			else return true;
+			return false;
+		};
+		const reported = (ids) => ids.every((id) => custom.has(id) || REPORTED.has(id));
+
+		// Every custom modifier is listed, keyless when none of its keys can be seen:
+		// a tap-hold can still hold it, and the engine refuses an undeclared id.
+		const modifiers = (source.modifiers || []).map((modifier) => ({
+			id: modifier.id,
+			mode: modifier.mode,
+			keys: modifier.keys.filter((key, index) =>
+				pressable(key, `modifiers.${modifier.id}.keys[${index}]`)
+			)
+		}));
+
+		const layers = (source.layers || []).map((layer) => {
+			const selectors = [layer, ...(layer.alternatives || [])].map((selector) => ({
+				required: selector.required.slice(),
+				optional: selector.optional.slice()
+			}));
+			const native = selectors.every(
+				(selector) => selectorKeys(selector, platformTokens(platform)) !== null
+			);
+			const ids = selectors.flatMap((selector) => [...selector.required, ...selector.optional]);
+			const entry = { id: layer.id, selectors, native, keys: {} };
+			if (!native && !reported(ids)) {
+				skip(`layers.${layer.id}`, 'sided_modifier_not_emulated');
+				entry.selectable = false;
+				return entry;
+			}
+			for (const [name, mapping] of Object.entries(
+				layerKeys(source, layer, platform, 'iso', table)
+			)) {
+				const path = `layers.${layer.id}.keys.${name}`;
+				// The compiled .keylayout already types a native layer's text, dead keys and
+				// disabled keys; the emulation adds what it leaves out.
+				if (native && !own(mapping, 'key') && !own(mapping, 'action')) continue;
+				if (!pressable(name, path)) continue;
+				const emulated = emulatedMapping(mapping, sendable);
+				if (typeof emulated === 'string') skip(path, emulated);
+				else entry.keys[name] = emulated;
+			}
+			return entry;
+		});
+
+		const shortcuts = [];
+		for (const [index, shortcut] of (source.shortcuts || []).entries()) {
+			const path = `shortcuts[${index}]`;
+			if (!pressable(shortcut.key, path)) continue;
+			if (!sendable(shortcut.send_key)) skip(`${path}.send_key`, 'physical_key_not_emulated');
+			else if (!reported([...shortcut.modifiers, ...shortcut.send_modifiers]))
+				skip(path, 'sided_modifier_not_emulated');
+			else
+				shortcuts.push({
+					key: shortcut.key,
+					modifiers: shortcut.modifiers.slice(),
+					send_key: shortcut.send_key,
+					send_modifiers: shortcut.send_modifiers.slice()
+				});
+		}
+
+		const tapHolds = [];
+		for (const [index, entry] of (source.tap_holds || []).entries()) {
+			const path = `tap_holds[${index}]`;
+			if (!pressable(entry.key, path)) continue;
+			const tap = emulatedMapping(entry.tap, sendable);
+			if (typeof tap === 'string') {
+				skip(`${path}.tap`, tap);
+				continue;
+			}
+			const hold = own(entry, 'hold_layer')
+				? { hold_layer: entry.hold_layer }
+				: { hold_modifier: entry.hold_modifier };
+			if (own(hold, 'hold_modifier') && !reported([hold.hold_modifier])) {
+				skip(`${path}.hold_modifier`, 'sided_modifier_not_emulated');
+				continue;
+			}
+			tapHolds.push({ key: entry.key, tap, ...hold, threshold_ms: entry.threshold_ms });
+		}
+
+		const remaps = [];
+		for (const [from, to] of Object.entries(source.remap || {})) {
+			if (nativeRemap(table, from, to)) continue;
+			const path = `remap.${from}`;
+			if (!pressable(from, path)) continue;
+			if (to !== '' && MODIFIER_KEYS.has(to)) skip(path, 'modifier_target_not_emulated');
+			else if (to !== '' && !sendable(to)) skip(path, 'physical_key_not_emulated');
+			else remaps.push({ key: from, to });
+		}
+
+		return {
+			format: EMULATION_FORMAT,
+			version: EMULATION_VERSION,
+			layout: source.layout.id,
+			platform,
+			modifiers,
+			layers,
+			shortcuts,
+			tap_holds: tapHolds,
+			remaps,
+			not_emulated: notEmulated
+		};
+	}
+
 	// ========================
-	// ======= 5/ Import ======
+	// ======= 6/ Import ======
 	// ========================
 
 	/** Parse one modifierMap keys attribute into source modifier ids. */
@@ -480,6 +662,28 @@ var LayoutSourceCompiler = (function () {
 	}
 
 	/**
+	 * The keyMapSet of the ANSI hardware, for a file declaring several hardware
+	 * layouts: null for a single one. Accepted only as Bépo has them, every layout
+	 * on one modifierMap, keyboard type 0 on the ISO map the import reads and every
+	 * other type on one ANSI map; the source then holds the ANSI variant itself.
+	 */
+	function ansiMapSet(model, convention) {
+		if (model.layoutCount === 1) return null;
+		const sets = new Set(model.layouts.map((layout) => layout.mapSet));
+		const first = model.layouts.find((layout) => layout.first === '0');
+		const others = model.layouts.filter((layout) => layout.mapSet !== first.mapSet);
+		if (
+			convention !== 'iso' ||
+			sets.size !== 2 ||
+			model.layouts.some((layout) => layout.modifiers !== first.modifiers) ||
+			model.layouts.some((layout) => layout.mapSet === first.mapSet && layout !== first) ||
+			first.last !== '0'
+		)
+			fail('source_import_hardware_layouts', 'layouts');
+		return others[0].mapSet;
+	}
+
+	/**
 	 * Import a .keylayout into structured records that compile back to the same
 	 * behaviour. Refuses what the records cannot hold instead of approximating it.
 	 * @param {string} text - The .keylayout content.
@@ -496,7 +700,7 @@ var LayoutSourceCompiler = (function () {
 		} catch (error) {
 			fail('source_keylayout', error.code || error.message);
 		}
-		if (model.layoutCount !== 1) fail('source_import_hardware_layouts', 'layouts');
+		const ansiSet = ansiMapSet(model, convention);
 		if (model.defaultIndex !== 0) fail('source_import_default_index', 'modifier_map.default_index');
 		const table = keyTable(tables, convention);
 		const defaults = systemDefaults();
@@ -532,6 +736,33 @@ var LayoutSourceCompiler = (function () {
 			} else if (whens.size > 1) composing.add(action);
 		}
 
+		/** One keyMap entry as a named mapping, or null for a key left implicit. */
+		const keyMapping = (entry, mac, at) => {
+			let name = table.byMac.get(mac);
+			if (entry.kind === 'output') {
+				if (name === undefined && LayoutComposer.isPrintable(entry.value)) name = `MacCode${mac}`;
+				if (name === undefined || MODIFIER_KEYS.has(name)) {
+					if (LayoutComposer.isPrintable(entry.value)) fail('source_import_unnamed_key', at);
+					return null;
+				}
+				if (!table.character.has(name) && defaults.get(mac) === entry.value) return null;
+				if (entry.value === UNUSED) return { name, mapping: { disabled: true } };
+				const mapping = { text: entry.value };
+				if (composing.has(entry.value)) mapping.compose = false;
+				return { name, mapping };
+			}
+			const whens = model.actions.get(entry.value);
+			if (!whens) fail('source_import_undefined_action', at);
+			const neutral = whens.get(NEUTRAL);
+			if (name === undefined && neutral.next === '' && LayoutComposer.isPrintable(neutral.output))
+				name = `MacCode${mac}`;
+			if (name === undefined || MODIFIER_KEYS.has(name)) fail('source_import_unnamed_key', at);
+			if (neutral.next !== '') return { name, mapping: { dead_key: stateIds.get(neutral.next) } };
+			const mapping = { text: neutral.output };
+			if (entry.value !== neutral.output) mapping.compose_as = entry.value;
+			return { name, mapping };
+		};
+
 		const layers = [];
 		const takenLayers = new Set();
 		model.selects.forEach((select, position) => {
@@ -543,33 +774,28 @@ var LayoutSourceCompiler = (function () {
 			layer.keys = {};
 			for (let mac = 0; mac <= MAX_CODE; mac++) {
 				const entry = LayoutComposer.keyEntry(model, select.index, mac);
-				if (!entry) continue;
-				const name = table.byMac.get(mac);
-				const at = `keyMap[${select.index}].key[${mac}]`;
-				let mapping;
-				if (entry.kind === 'output') {
-					if (name === undefined || MODIFIER_KEYS.has(name)) {
-						if (LayoutComposer.isPrintable(entry.value)) fail('source_import_unnamed_key', at);
-						continue;
-					}
-					if (!table.character.has(name) && defaults.get(mac) === entry.value) continue;
-					if (entry.value === UNUSED) mapping = { disabled: true };
-					else {
-						mapping = { text: entry.value };
-						if (composing.has(entry.value)) mapping.compose = false;
-					}
-				} else {
-					const whens = model.actions.get(entry.value);
-					if (!whens) fail('source_import_undefined_action', at);
-					const neutral = whens.get(NEUTRAL);
-					if (name === undefined || MODIFIER_KEYS.has(name)) fail('source_import_unnamed_key', at);
-					if (neutral.next !== '') mapping = { dead_key: stateIds.get(neutral.next) };
-					else {
-						mapping = { text: neutral.output };
-						if (entry.value !== neutral.output) mapping.compose_as = entry.value;
-					}
+				const imported = entry && keyMapping(entry, mac, `keyMap[${select.index}].key[${mac}]`);
+				if (imported) layer.keys[imported.name] = imported.mapping;
+			}
+			if (ansiSet !== null) {
+				// The ANSI map is read in the same numbering, so it differs from the
+				// derived ANSI variant exactly where the rule moves too little.
+				const ansiModel = Object.assign({}, model, { mapSet: ansiSet });
+				const derived = swapped(layer.keys, ansiPairs({ physical: {} }));
+				const ansiKeys = {};
+				for (let mac = 0; mac <= MAX_CODE; mac++) {
+					const at = `ANSI keyMap[${select.index}].key[${mac}]`;
+					const entry = LayoutComposer.keyEntry(ansiModel, select.index, mac);
+					const imported = entry && keyMapping(entry, mac, at);
+					const name = imported ? imported.name : table.byMac.get(mac);
+					if (name === undefined) continue;
+					const expected = imported ? imported.mapping : undefined;
+					if (JSON.stringify(expected) === JSON.stringify(derived[name])) continue;
+					// An ANSI key that types nothing where the derivation types something has no record.
+					if (expected === undefined) fail('source_import_hardware_layouts', at);
+					ansiKeys[name] = expected;
 				}
-				layer.keys[name] = mapping;
+				if (Object.keys(ansiKeys).length) layer.ansi_keys = ansiKeys;
 			}
 			layers.push(layer);
 		});
@@ -585,7 +811,14 @@ var LayoutSourceCompiler = (function () {
 			deadKeys.push(record);
 		}
 		const byState = new Map(deadKeys.map((record) => [record.state || record.id, record]));
+		const referenced = new Set();
+		for (const maps of model.keyMapSets.values())
+			for (const keys of maps.values())
+				for (const entry of keys.values()) if (entry.kind === 'action') referenced.add(entry.value);
 		for (const [action, whens] of model.actions) {
+			// No key reaches an action with an empty id (Bépo declares one), and no rule
+			// can answer to empty text: it has no behaviour to keep.
+			if (action === '' && !referenced.has(action)) continue;
 			const neutral = whens.get(NEUTRAL);
 			for (const [state, when] of whens) {
 				if (state === NEUTRAL) continue;
@@ -629,8 +862,42 @@ var LayoutSourceCompiler = (function () {
 	}
 
 	// ==============================
-	// ======= 6/ macOS export ======
+	// ======= 7/ macOS export ======
 	// ==============================
+
+	/**
+	 * Wrap one square PNG into an .icns holding it as its size's element. The
+	 * image itself is the user's; only its header is read.
+	 * @param {Uint8Array} png
+	 * @param {string} path - Source path named in a refusal.
+	 * @returns {Uint8Array}
+	 */
+	function icns(png, path) {
+		// Checked by shape: a page or a Node vm passes bytes from another realm.
+		if (!ArrayBuffer.isView(png) || png.BYTES_PER_ELEMENT !== 1 || png.length < 24)
+			fail('source_icon_png', path);
+		const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+		const header = String.fromCharCode(...png.subarray(12, 16));
+		if (PNG_SIGNATURE.some((byte, index) => png[index] !== byte) || header !== 'IHDR')
+			fail('source_icon_png', path);
+		const width = view.getUint32(16);
+		const type = ICNS_TYPES.get(width);
+		if (type === undefined || view.getUint32(20) !== width) fail('source_icon_size', path);
+		const out = new Uint8Array(16 + png.length);
+		const outView = new DataView(out.buffer);
+		out.set(
+			[...'icns'].map((c) => c.charCodeAt(0)),
+			0
+		);
+		outView.setUint32(4, out.length);
+		out.set(
+			[...type].map((c) => c.charCodeAt(0)),
+			8
+		);
+		outView.setUint32(12, 8 + png.length);
+		out.set(png, 16);
+		return out;
+	}
 
 	const plistEscape = (text) =>
 		text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -639,33 +906,57 @@ var LayoutSourceCompiler = (function () {
 	/**
 	 * The macOS artifacts: a bundle holding ISO and ANSI (the default), or one
 	 * .keylayout. InfoPlist.strings entries are UTF-16LE with a byte-order mark,
-	 * as the shipped Ergopti bundles carry them.
-	 * @returns {{files: {path: string, text: string, encoding: 'utf8'|'utf16le'}[], report: object}}
+	 * as the shipped Ergopti bundles carry them. `exports.macos.icon` (and
+	 * `ansi_icon` for the ANSI variant, else the same) names a PNG whose bytes the
+	 * caller passes in `icons`, keyed by that name; each variant gets its .icns.
+	 * @param {object} [icons] - PNG file name -> Uint8Array.
+	 * @returns {{files: {path: string, text?: string, bytes?: Uint8Array,
+	 *   encoding: 'utf8'|'utf16le'|'binary'}[], report: object}}
 	 */
-	function exportMacos(source, tables, format) {
+	function exportMacos(source, tables, format, icons = {}) {
 		LayoutSource.validate(source);
+		const declared = (source.exports && source.exports.macos) || {};
+		const iconOf = (variant) => {
+			const field = variant === 'ansi' && own(declared, 'ansi_icon') ? 'ansi_icon' : 'icon';
+			if (!own(declared, field)) return null;
+			const png = own(icons, declared[field]) ? icons[declared[field]] : undefined;
+			if (png === undefined) fail('source_icon_missing', `exports.macos.${field}`);
+			return icns(png, `exports.macos.${field}`);
+		};
 		const chosen = format || ((source.exports && source.exports.macos) || {}).format || 'bundle';
 		if (!MACOS_FORMATS.includes(chosen)) fail('source_invalid', 'exports.macos.format');
 		const variants = chosen === 'bundle' ? VARIANTS : [chosen];
 		const compiled = variants.map((variant) => ({
 			variant,
+			icon: iconOf(variant),
 			...compileKeylayout(source, tables, { variant })
 		}));
 		const files = [];
 		if (chosen !== 'bundle') {
+			// A loose .keylayout takes the .icns of the same name beside it.
 			const [only] = compiled;
 			files.push({ path: `${only.names.internal}.keylayout`, text: only.text, encoding: 'utf8' });
+			if (only.icon)
+				files.push({ path: `${only.names.internal}.icns`, bytes: only.icon, encoding: 'binary' });
 		} else {
 			const macos = (source.exports && source.exports.macos) || {};
 			const version = macos.version || DEFAULT_VERSION;
 			const language = (source.layout.languages || [])[0];
 			const root = `${compiled[0].names.internal}.bundle/Contents`;
-			const entries = compiled.map(({ names }) =>
+			const entries = compiled.map(({ names, icon }) =>
 				[
 					`\t<key>KLInfo_${plistEscape(names.internal)}</key>`,
 					'\t<dict>',
 					'\t\t<key>TICapsLockLanguageSwitchCapable</key>',
 					'\t\t<true/>',
+					...(icon
+						? [
+								'\t\t<key>TISIconIsTemplate</key>',
+								'\t\t<false/>',
+								'\t\t<key>ICNS</key>',
+								`\t\t<string>${plistEscape(names.internal)}.icns</string>`
+							]
+						: []),
 					'\t\t<key>TISInputSourceID</key>',
 					`\t\t<string>${plistEscape(names.inputSource)}</string>`,
 					...(language
@@ -714,12 +1005,19 @@ var LayoutSourceCompiler = (function () {
 				text: versionPlist.join('\n') + '\n',
 				encoding: 'utf8'
 			});
-			for (const { names, text } of compiled)
+			for (const { names, text, icon } of compiled) {
 				files.push({
 					path: `${root}/Resources/${names.internal}.keylayout`,
 					text,
 					encoding: 'utf8'
 				});
+				if (icon)
+					files.push({
+						path: `${root}/Resources/${names.internal}.icns`,
+						bytes: icon,
+						encoding: 'binary'
+					});
+			}
 			// The strings key is the internal name; macOS refuses a bundle keyed otherwise.
 			const strings = compiled
 				.map(
@@ -746,7 +1044,9 @@ var LayoutSourceCompiler = (function () {
 				variants: compiled.map(({ variant, names }) => ({ variant, ...names })),
 				omitted: compiled[0].omitted,
 				limitations: [
-					'Icons are not generated; macOS shows its generic layout icon.',
+					...(compiled.some(({ icon }) => icon === null)
+						? ['A variant without exports.macos.icon shows the generic layout icon.']
+						: []),
 					'Native loading by macOS is not certified by this export; install and select it to check.'
 				]
 			}
@@ -771,6 +1071,7 @@ var LayoutSourceCompiler = (function () {
 		keyTable,
 		ansiPairs,
 		compileKeylayout,
+		compileEmulation,
 		importStructured,
 		exportMacos,
 		targetKeylayout

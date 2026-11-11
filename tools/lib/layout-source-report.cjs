@@ -16,15 +16,37 @@ const { loadLayoutSource } = require('./layout-source.cjs');
 const { exportXkb } = require('./layout-source-xkb.cjs');
 const { exportKlc } = require('./layout-source-klc.cjs');
 
-/** Run target admission before claiming an artifact can be produced. */
-function targetReport(document) {
+// The .keylayout omissions the emulation table takes over; what it cannot
+// perform comes back in its own not_emulated list.
+const EMULATED_REASONS = new Set([
+	'custom_modifier_not_in_keylayout',
+	'modifier_not_in_keylayout',
+	'shortcut_output_not_in_keylayout',
+	'tap_hold_not_in_keylayout',
+	'system_or_modifier_key_remap',
+	'key_chord_not_in_keylayout',
+	'action_not_in_keylayout'
+]);
+
+/**
+ * Run target admission before claiming an artifact can be produced.
+ * @param {object} document - A validated source.
+ * @param {object} [icons] - PNG file name -> bytes for the macOS bundle icons.
+ */
+function targetReport(document, icons) {
 	const source = loadLayoutSource();
 	const reports = source.capabilities(document);
 	// A structured source compiles through the shared generator; a preserved import
 	// keeps the pure model's verdict on its original .keylayout.
 	const macos = document.imported_keylayout
 		? []
-		: [{ target: 'macos', artifact: 'bundle', compile: (doc) => source.exportMacos(doc) }];
+		: [
+				{
+					target: 'macos',
+					artifact: 'bundle',
+					compile: (doc) => source.exportMacos(doc, undefined, icons)
+				}
+			];
 	for (const { target, artifact, compile } of [
 		...macos,
 		{ target: 'linux', artifact: 'xkb', compile: exportXkb },
@@ -46,18 +68,28 @@ function targetReport(document) {
 	}
 	// The macOS and Linux drivers take a source through the layout composer host
 	// (_shared/lua/layouts/composer.lua): its compiled .keylayout is installed and
-	// emulated, so a driver carries what that file carries and omits the rest.
-	for (const target of ['driver_macos', 'driver_linux']) {
+	// emulated, and its emulation table performs what that file leaves out; a
+	// driver omits what neither carries.
+	for (const [target, platform] of [
+		['driver_macos', 'macos'],
+		['driver_linux', 'linux']
+	]) {
 		const index = reports.findIndex((entry) => entry.target === target);
 		try {
 			const compiled = source.targetKeylayout(document, 'macos');
+			const emulated = document.imported_keylayout
+				? { not_emulated: [] }
+				: source.compileEmulation(document, { platform });
+			const omitted = compiled.omitted
+				.filter((entry) => !EMULATED_REASONS.has(entry.reason))
+				.concat(emulated.not_emulated);
 			reports[index] = {
 				target,
-				status: compiled.omitted.length ? 'partial' : 'emulated',
+				status: omitted.length ? 'partial' : 'emulated',
 				artifact: 'emulation',
-				reason: 'compiled_keylayout_installed_by_composer_host',
+				reason: 'compiled_keylayout_and_emulation_table_by_composer_host',
 				blockers: [],
-				omitted: compiled.omitted
+				omitted
 			};
 		} catch (error) {
 			reports[index] = {

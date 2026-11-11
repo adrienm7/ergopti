@@ -78,6 +78,8 @@ var LayoutSource = (function () {
 		'input_source_id',
 		'version'
 	];
+	const MACOS_ICONS = ['icon', 'ansi_icon'];
+	const ICON_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.png$/;
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 	const table = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
@@ -333,7 +335,7 @@ var LayoutSource = (function () {
 				(entry, at) => {
 					record(
 						entry,
-						['id', 'required', 'optional', 'alternatives', 'keys', 'platform_keys'],
+						['id', 'required', 'optional', 'alternatives', 'keys', 'platform_keys', 'ansi_keys'],
 						['id', 'required', 'optional', 'keys'],
 						at
 					);
@@ -350,6 +352,15 @@ var LayoutSource = (function () {
 					for (const [key, value] of Object.entries(entry.keys)) {
 						keyCode(key, `${at}.keys.${key}`);
 						mapping(value, `${at}.keys.${key}`, deadKeys, modifiers);
+					}
+					// The ANSI variant's own mappings where the derivation rule is not enough
+					// (Bépo's ANSI hardware map), applied after it, on every platform.
+					if (own(entry, 'ansi_keys')) {
+						requireValue(table(entry.ansi_keys), `${at}.ansi_keys`);
+						for (const [key, value] of Object.entries(entry.ansi_keys)) {
+							keyCode(key, `${at}.ansi_keys.${key}`);
+							mapping(value, `${at}.ansi_keys.${key}`, deadKeys, modifiers);
+						}
 					}
 					if (own(entry, 'platform_keys')) {
 						record(entry.platform_keys, ['windows', 'macos', 'linux'], [], `${at}.platform_keys`);
@@ -493,7 +504,7 @@ var LayoutSource = (function () {
 				const macos = source.exports.macos;
 				record(
 					macos,
-					['format', ...MACOS_EXPORT_STRINGS, 'keyboard_id', 'ansi_keyboard_id'],
+					['format', ...MACOS_EXPORT_STRINGS, 'keyboard_id', 'ansi_keyboard_id', ...MACOS_ICONS],
 					['format'],
 					'exports.macos'
 				);
@@ -507,6 +518,13 @@ var LayoutSource = (function () {
 				for (const field of ['internal_name', 'ansi_internal_name'])
 					if (own(macos, field))
 						requireValue(FILE_NAME.test(macos[field]), `exports.macos.${field}`);
+				// A PNG beside the source file, wrapped into each variant's .icns by the exporter.
+				for (const field of MACOS_ICONS)
+					if (own(macos, field))
+						requireValue(
+							typeof macos[field] === 'string' && ICON_FILE.test(macos[field]),
+							`exports.macos.${field}`
+						);
 				for (const field of ['keyboard_id', 'ansi_keyboard_id'])
 					if (own(macos, field))
 						requireValue(Number.isSafeInteger(macos[field]), `exports.macos.${field}`);

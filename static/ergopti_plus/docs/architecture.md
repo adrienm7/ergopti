@@ -90,6 +90,7 @@ graph TD
         LINUX_window_switch["WindowSwitch.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_x11_focus["X11Focus.lua"]
+        LINUX_x11_keymap_watch_worker["X11KeymapWatchWorker.lua"]
         LINUX_x11_selection_stamp["X11SelectionStamp.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]
         LINUX_xkb_source_probe["XkbSourceProbe.lua"]

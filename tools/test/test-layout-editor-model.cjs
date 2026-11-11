@@ -26,9 +26,11 @@ const PAGE_SCRIPTS = [
 	'layout_composer/_generated/composer_data.js',
 	'layer_editor/layer_model.js',
 	'layout_composer/composer_model.js',
+	'layout_composer/reference_layouts.js',
 	'layout_composer/source_model.js',
 	'layout_composer/source_compiler.js',
 	'layout_editor/_generated/key_tables.js',
+	'layout_editor/zip_writer.js',
 	'layout_editor/toml_prelude.js',
 	'vendor/smol-toml.js',
 	'layout_editor/source_io.js',
@@ -42,7 +44,8 @@ function loadEditor() {
 		.map((m) => path.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1])))
 		.filter((file) => PAGE_SCRIPTS.includes(file));
 	assert.deepEqual(loaded, PAGE_SCRIPTS, 'index.html loads the model scripts in this order');
-	const context = vm.createContext({});
+	// The globals a page has that the scripts use.
+	const context = vm.createContext({ TextEncoder });
 	for (const file of PAGE_SCRIPTS) {
 		// A top-level const is not a property of the context; the page reads these as globals.
 		const source = fs
@@ -54,12 +57,12 @@ function loadEditor() {
 		vm.runInContext(source, context, { filename: file });
 	}
 	return vm.runInContext(
-		'({ IO: LayoutSourceIO, M: LayoutEditorModel, LayerModel, LayoutComposer, DATA: LAYER_EDITOR_DATA, COMPOSER: LAYOUT_COMPOSER_DATA })',
+		'({ IO: LayoutSourceIO, M: LayoutEditorModel, Zip: LayoutZipWriter, LayerModel, LayoutComposer, DATA: LAYER_EDITOR_DATA, COMPOSER: LAYOUT_COMPOSER_DATA })',
 		context
 	);
 }
 
-const { IO, M, LayerModel, LayoutComposer, DATA, COMPOSER } = loadEditor();
+const { IO, M, Zip, LayerModel, LayoutComposer, DATA, COMPOSER } = loadEditor();
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const registry = (id) =>
 	fs.readFileSync(path.join(ROOT, 'static', 'layouts', 'registry', id, `${id}.keylayout`), 'utf8');
@@ -377,6 +380,131 @@ test('navigation layer refusals name their cause', () => {
 test('identifiers derived from file names are valid format identifiers', () => {
 	assert.equal(IO.identifierFrom('Ergopti v2.2 (ISO)', 'layout'), 'ergopti_v2_2_iso');
 	assert.equal(IO.identifierFrom('2024 Été', 'layout'), 'layout_2024_ete');
+});
+
+test('drag and drop swaps two keys, and a copy leaves the source', () => {
+	let doc = IO.create('a', 'A');
+	doc = M.setMapping(doc, 'base', 'KeyA', { text: 'a' }, null);
+	doc = M.setMapping(doc, 'base', 'KeyB', { text: 'b' }, null);
+	const swapped = M.transferMapping(doc, 'base', 'KeyA', 'KeyB', null, false);
+	assert.equal(swapped.layers[0].keys.KeyA.text, 'b');
+	assert.equal(swapped.layers[0].keys.KeyB.text, 'a');
+	const copied = M.transferMapping(doc, 'base', 'KeyA', 'KeyC', null, true);
+	assert.equal(copied.layers[0].keys.KeyC.text, 'a');
+	assert.equal(copied.layers[0].keys.KeyA.text, 'a');
+	const moved = M.transferMapping(doc, 'base', 'KeyA', 'KeyD', null, false);
+	assert.equal(moved.layers[0].keys.KeyA, undefined, 'a swap with an empty key empties the source');
+	assert.equal(M.transferMapping(doc, 'base', 'KeyA', 'KeyA', null, false), doc);
+});
+
+test('Windows flags and NLS functions are edited and refused like any record', () => {
+	let doc = IO.create('a', 'A');
+	doc = M.setWindowsFlags(doc, ['kllf_altgr']);
+	doc = M.setNls(doc, {
+		key: 'KeyQ',
+		modifiers: ['shift'],
+		function: 'kana_toggle',
+		parameter_key: 'KeyW'
+	});
+	doc = M.setNls(doc, { key: 'KeyQ', modifiers: ['shift'], function: 'kana_lock' });
+	assert.deepEqual(plain(doc.windows), {
+		flags: ['kllf_altgr'],
+		nls: [{ key: 'KeyQ', modifiers: ['shift'], function: 'kana_lock' }]
+	});
+	refuses(() => M.setWindowsFlags(doc, ['Bad Flag']), 'source_invalid');
+	doc = M.removeNls(M.setWindowsFlags(doc, []), 'KeyQ', ['shift']);
+	assert.equal(doc.windows, undefined);
+});
+
+test('the ZIP writer produces an archive any unzip reads back, byte for byte', () => {
+	const { execFileSync } = require('node:child_process');
+	const os = require('node:os');
+	const files = [
+		{ path: 'b.bundle/Contents/Info.plist', text: '<plist/>\n', encoding: 'utf8' },
+		{
+			path: 'b.bundle/Contents/Resources/fr.lproj/InfoPlist.strings',
+			text: '\ufeff"x" = "Été";\n',
+			encoding: 'utf16le'
+		}
+	];
+	const bytes = Zip.pack(files);
+	assert.equal(
+		Zip.crc32(new TextEncoder().encode('123456789')),
+		0xcbf43926,
+		'the CRC-32 check value'
+	);
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'layout-editor-zip-'));
+	try {
+		const archive = path.join(dir, 'a.zip');
+		fs.writeFileSync(archive, bytes);
+		const listing = execFileSync(
+			'python3',
+			[
+				'-I',
+				'-c',
+				'import sys,zipfile,json; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps({n: z.read(n).hex() for n in z.namelist()}))',
+				archive
+			],
+			{ encoding: 'utf8' }
+		);
+		const read = JSON.parse(listing);
+		assert.deepEqual(
+			Object.keys(read),
+			files.map((file) => file.path)
+		);
+		assert.equal(Buffer.from(read[files[0].path], 'hex').toString('utf8'), files[0].text);
+		assert.equal(Buffer.from(read[files[1].path], 'hex').toString('utf16le'), files[1].text);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+	assert.throws(() => Zip.pack([{ path: '../x', text: '', encoding: 'utf8' }]), /unsafe path/);
+	assert.deepEqual(Zip.pack(files), bytes, 'the same files give the same bytes');
+});
+
+test('a structured source downloads its macOS bundle as one archive', () => {
+	const converted = IO.convertImport(IO.importKeylayout(registry('ergopti'), 'ergopti', 'iso')).doc;
+	const archive = IO.macosBundleArchive(converted);
+	assert.match(archive.filename, /\.bundle\.zip$/);
+	assert.ok(archive.bytes.length > 1000);
+	refuses(
+		() => IO.macosBundleArchive(IO.importKeylayout(registry('ergopti'), 'e', 'iso')),
+		'source_export_unavailable'
+	);
+});
+
+test('a layer fills from a reference or a registry layout, dead keys included', () => {
+	const sources = IO.fillSources([
+		{ id: 'ergopti', name: 'Ergopti', convention: 'iso', text: registry('ergopti') },
+		{ id: 'broken', name: 'Broken', convention: 'iso', text: '<keyboard' }
+	]);
+	assert.deepEqual(
+		plain(sources.map((entry) => entry.id)),
+		['qwerty', 'azerty', 'ergopti'],
+		'references first, an unreadable layout left out'
+	);
+	const azerty = sources.find((entry) => entry.id === 'azerty');
+	let doc = M.setMapping(IO.create('a', 'A'), 'base', 'Digit9', { text: 'stale' }, null);
+	doc = IO.fillLayer(doc, azerty, 'base', 'base');
+	const press = (...codes) => codes.map((code) => ({ code, held: [] }));
+	assert.equal(M.simulate(doc, press('KeyQ', 'KeyW'), null).text, 'az');
+	assert.equal(
+		M.simulate(doc, press('BracketLeft', 'KeyE'), null).text,
+		'ê',
+		'the circumflex dead key came along'
+	);
+	doc = M.addLayer(doc, 'shift', ['shift'], []);
+	const again = IO.fillLayer(IO.fillLayer(doc, azerty, 'shift', 'shift'), azerty, 'shift', 'shift');
+	assert.equal(
+		again.dead_keys.length,
+		IO.fillLayer(doc, azerty, 'shift', 'shift').dead_keys.length,
+		'filling twice replaces, never duplicates, its dead keys'
+	);
+	const ergopti = IO.fillLayer(IO.create('b', 'B'), sources[2], 'base', 'base');
+	const reference = LayoutComposer.parseSource('e', registry('ergopti'), 'iso', COMPOSER).cells;
+	for (const [code, cells] of Object.entries(reference))
+		if (cells.base && cells.base.text !== undefined)
+			assert.equal(M.simulate(ergopti, press(code), null).text, cells.base.text, code);
+	refuses(() => IO.fillLayer(doc, azerty, 'base', 'missing'), 'layer_unknown');
 });
 
 let failed = 0;

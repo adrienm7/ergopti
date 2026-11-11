@@ -1,0 +1,734 @@
+{
+	"macos": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "emulation_fixture",
+		"platform": "macos",
+		"modifiers": [
+			{
+				"id": "roya",
+				"mode": "held",
+				"keys": [
+					"IntlBackslash"
+				]
+			},
+			{
+				"id": "kana",
+				"mode": "locked",
+				"keys": [
+					"Insert"
+				]
+			},
+			{
+				"id": "nav",
+				"mode": "held",
+				"keys": []
+			}
+		],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"KeyX": {
+						"key": "Escape",
+						"modifiers": []
+					}
+				}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "roya",
+				"selectors": [
+					{
+						"required": [
+							"roya"
+						],
+						"optional": [
+							"shift"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "α"
+					},
+					"KeyB": {
+						"text": "βeta"
+					},
+					"KeyD": {
+						"key": "KeyC",
+						"modifiers": [
+							"control"
+						]
+					}
+				}
+			},
+			{
+				"id": "kana",
+				"selectors": [
+					{
+						"required": [
+							"kana"
+						],
+						"optional": [
+							"caps_lock"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "あ"
+					},
+					"KeyS": {
+						"key": "ArrowLeft",
+						"modifiers": []
+					},
+					"KeyX": {
+						"disabled": true
+					}
+				}
+			},
+			{
+				"id": "nav",
+				"selectors": [
+					{
+						"required": [
+							"nav"
+						],
+						"optional": [
+							"shift",
+							"control"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyJ": {
+						"key": "ArrowLeft",
+						"modifiers": []
+					},
+					"KeyL": {
+						"key": "ArrowRight",
+						"modifiers": []
+					}
+				}
+			},
+			{
+				"id": "right_kana",
+				"selectors": [
+					{
+						"required": [
+							"shift_right",
+							"kana"
+						],
+						"optional": []
+					}
+				],
+				"native": false,
+				"keys": {},
+				"selectable": false
+			}
+		],
+		"shortcuts": [
+			{
+				"key": "KeyA",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyB",
+				"send_modifiers": [
+					"control"
+				]
+			},
+			{
+				"key": "KeyQ",
+				"modifiers": [
+					"alt"
+				],
+				"send_key": "Escape",
+				"send_modifiers": []
+			}
+		],
+		"tap_holds": [
+			{
+				"key": "Space",
+				"tap": {
+					"text": " "
+				},
+				"hold_layer": "nav",
+				"threshold_ms": 180
+			},
+			{
+				"key": "Tab",
+				"tap": {
+					"key": "Tab",
+					"modifiers": []
+				},
+				"hold_modifier": "shift",
+				"threshold_ms": 200
+			},
+			{
+				"key": "Enter",
+				"tap": {
+					"key": "Enter",
+					"modifiers": []
+				},
+				"hold_modifier": "roya",
+				"threshold_ms": 150
+			}
+		],
+		"remaps": [
+			{
+				"key": "Home",
+				"to": "End"
+			},
+			{
+				"key": "PageDown",
+				"to": ""
+			}
+		],
+		"not_emulated": [
+			{
+				"path": "modifiers.kana.keys[1]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "modifiers.nav.keys[0]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "layers.roya.keys.KeyE",
+				"reason": "dead_key_not_emulated"
+			},
+			{
+				"path": "layers.kana.keys.KeyJ",
+				"reason": "action_not_emulated"
+			},
+			{
+				"path": "layers.right_kana",
+				"reason": "sided_modifier_not_emulated"
+			},
+			{
+				"path": "tap_holds[3].tap",
+				"reason": "dead_key_not_emulated"
+			},
+			{
+				"path": "remap.Pause",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "remap.CapsLock",
+				"reason": "modifier_key_not_emulated"
+			}
+		]
+	},
+	"linux": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "emulation_fixture",
+		"platform": "linux",
+		"modifiers": [
+			{
+				"id": "roya",
+				"mode": "held",
+				"keys": [
+					"IntlBackslash"
+				]
+			},
+			{
+				"id": "kana",
+				"mode": "locked",
+				"keys": [
+					"Insert"
+				]
+			},
+			{
+				"id": "nav",
+				"mode": "held",
+				"keys": []
+			}
+		],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"KeyX": {
+						"key": "Escape",
+						"modifiers": []
+					}
+				}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "roya",
+				"selectors": [
+					{
+						"required": [
+							"roya"
+						],
+						"optional": [
+							"shift"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "α"
+					},
+					"KeyB": {
+						"text": "βeta"
+					},
+					"KeyD": {
+						"key": "KeyC",
+						"modifiers": [
+							"control"
+						]
+					}
+				}
+			},
+			{
+				"id": "kana",
+				"selectors": [
+					{
+						"required": [
+							"kana"
+						],
+						"optional": [
+							"caps_lock"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "あ"
+					},
+					"KeyS": {
+						"key": "ArrowLeft",
+						"modifiers": []
+					},
+					"KeyX": {
+						"disabled": true
+					}
+				}
+			},
+			{
+				"id": "nav",
+				"selectors": [
+					{
+						"required": [
+							"nav"
+						],
+						"optional": [
+							"shift",
+							"control"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyJ": {
+						"key": "ArrowLeft",
+						"modifiers": []
+					},
+					"KeyL": {
+						"key": "ArrowRight",
+						"modifiers": []
+					}
+				}
+			},
+			{
+				"id": "right_kana",
+				"selectors": [
+					{
+						"required": [
+							"shift_right",
+							"kana"
+						],
+						"optional": []
+					}
+				],
+				"native": false,
+				"keys": {},
+				"selectable": false
+			}
+		],
+		"shortcuts": [
+			{
+				"key": "KeyA",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyB",
+				"send_modifiers": [
+					"control"
+				]
+			},
+			{
+				"key": "KeyQ",
+				"modifiers": [
+					"alt"
+				],
+				"send_key": "Escape",
+				"send_modifiers": []
+			}
+		],
+		"tap_holds": [
+			{
+				"key": "Space",
+				"tap": {
+					"text": " "
+				},
+				"hold_layer": "nav",
+				"threshold_ms": 180
+			},
+			{
+				"key": "Tab",
+				"tap": {
+					"key": "Tab",
+					"modifiers": []
+				},
+				"hold_modifier": "shift",
+				"threshold_ms": 200
+			},
+			{
+				"key": "Enter",
+				"tap": {
+					"key": "Enter",
+					"modifiers": []
+				},
+				"hold_modifier": "roya",
+				"threshold_ms": 150
+			}
+		],
+		"remaps": [
+			{
+				"key": "Home",
+				"to": "End"
+			},
+			{
+				"key": "PageDown",
+				"to": ""
+			}
+		],
+		"not_emulated": [
+			{
+				"path": "modifiers.kana.keys[1]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "modifiers.nav.keys[0]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "layers.roya.keys.KeyE",
+				"reason": "dead_key_not_emulated"
+			},
+			{
+				"path": "layers.kana.keys.KeyJ",
+				"reason": "action_not_emulated"
+			},
+			{
+				"path": "layers.right_kana",
+				"reason": "sided_modifier_not_emulated"
+			},
+			{
+				"path": "tap_holds[3].tap",
+				"reason": "dead_key_not_emulated"
+			},
+			{
+				"path": "remap.Pause",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "remap.CapsLock",
+				"reason": "modifier_key_not_emulated"
+			}
+		]
+	},
+	"windows": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "emulation_fixture",
+		"platform": "windows",
+		"modifiers": [
+			{
+				"id": "roya",
+				"mode": "held",
+				"keys": [
+					"IntlBackslash"
+				]
+			},
+			{
+				"id": "kana",
+				"mode": "locked",
+				"keys": [
+					"Insert"
+				]
+			},
+			{
+				"id": "nav",
+				"mode": "held",
+				"keys": []
+			}
+		],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"KeyX": {
+						"key": "Escape",
+						"modifiers": []
+					}
+				}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "roya",
+				"selectors": [
+					{
+						"required": [
+							"roya"
+						],
+						"optional": [
+							"shift"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "α"
+					},
+					"KeyB": {
+						"text": "βeta"
+					},
+					"KeyD": {
+						"key": "KeyC",
+						"modifiers": [
+							"control"
+						]
+					}
+				}
+			},
+			{
+				"id": "kana",
+				"selectors": [
+					{
+						"required": [
+							"kana"
+						],
+						"optional": [
+							"caps_lock"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "あ"
+					},
+					"KeyS": {
+						"key": "ArrowLeft",
+						"modifiers": []
+					},
+					"KeyX": {
+						"disabled": true
+					}
+				}
+			},
+			{
+				"id": "nav",
+				"selectors": [
+					{
+						"required": [
+							"nav"
+						],
+						"optional": [
+							"shift",
+							"control"
+						]
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyJ": {
+						"key": "ArrowLeft",
+						"modifiers": []
+					},
+					"KeyL": {
+						"key": "ArrowRight",
+						"modifiers": []
+					}
+				}
+			},
+			{
+				"id": "right_kana",
+				"selectors": [
+					{
+						"required": [
+							"shift_right",
+							"kana"
+						],
+						"optional": []
+					}
+				],
+				"native": false,
+				"keys": {},
+				"selectable": false
+			}
+		],
+		"shortcuts": [
+			{
+				"key": "KeyA",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyB",
+				"send_modifiers": [
+					"control"
+				]
+			},
+			{
+				"key": "KeyQ",
+				"modifiers": [
+					"alt"
+				],
+				"send_key": "Escape",
+				"send_modifiers": []
+			}
+		],
+		"tap_holds": [
+			{
+				"key": "Space",
+				"tap": {
+					"text": " "
+				},
+				"hold_layer": "nav",
+				"threshold_ms": 180
+			},
+			{
+				"key": "Tab",
+				"tap": {
+					"key": "Tab",
+					"modifiers": []
+				},
+				"hold_modifier": "shift",
+				"threshold_ms": 200
+			},
+			{
+				"key": "Enter",
+				"tap": {
+					"key": "Enter",
+					"modifiers": []
+				},
+				"hold_modifier": "roya",
+				"threshold_ms": 150
+			}
+		],
+		"remaps": [
+			{
+				"key": "Home",
+				"to": "End"
+			},
+			{
+				"key": "PageDown",
+				"to": ""
+			}
+		],
+		"not_emulated": [
+			{
+				"path": "modifiers.kana.keys[1]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "modifiers.nav.keys[0]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "layers.roya.keys.KeyE",
+				"reason": "dead_key_not_emulated"
+			},
+			{
+				"path": "layers.kana.keys.KeyJ",
+				"reason": "action_not_emulated"
+			},
+			{
+				"path": "layers.right_kana",
+				"reason": "sided_modifier_not_emulated"
+			},
+			{
+				"path": "tap_holds[3].tap",
+				"reason": "dead_key_not_emulated"
+			},
+			{
+				"path": "remap.Pause",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "remap.CapsLock",
+				"reason": "modifier_key_not_emulated"
+			}
+		]
+	}
+}

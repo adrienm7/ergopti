@@ -1374,6 +1374,19 @@ function M.composer_settings()
 	return Composer.settings(layout_defaults)
 end
 
+--- The emulation table stored with the composed layout's source, for the layout
+--- emulation; nil when the composed layout has none.
+--- @param deps table|nil
+--- @return table|nil table_
+--- @return string|nil error
+function M.composer_emulation(deps)
+	local settings, settings_err = M.composer_settings()
+	if not settings then return nil, settings_err end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.read_emulation(settings, resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved)
+end
+
 --- The text of an installed layout's copy, for the Debug check of the composer.
 --- @param id string Layout id.
 --- @param deps table|nil

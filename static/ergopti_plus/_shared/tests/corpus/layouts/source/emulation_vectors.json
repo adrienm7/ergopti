@@ -1,0 +1,805 @@
+{
+	"_comment": "Typing vectors of the layout source emulation (docs/design/layout-source-format.md). Each case replays steps on a fresh session of emulation.json, the table the source compiler writes for emulation_source.toml, per platform: press (KeyboardEvent.code, the built-in modifiers held and Caps Lock, the time in ms), release, tick or reset, each with the actions expected in order and whether the key itself is consumed. The web emulation (source_emulation.js) and the Lua engine of macOS and Linux (layouts/source_emulation.lua) replay them.",
+	"source": "emulation_source.toml",
+	"table": "emulation.json",
+	"platforms": ["macos", "linux"],
+	"cases": [
+		{
+			"name": "a native layer key is left to the keylayout",
+			"steps": [
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a key chord in a native layer is emulated",
+			"steps": [
+				{
+					"press": "KeyX",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "Escape",
+							"modifiers": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "a held custom modifier selects its layer while down",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "α"
+						}
+					]
+				},
+				{
+					"press": "KeyB",
+					"held": ["shift"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "βeta"
+						}
+					]
+				},
+				{
+					"press": "KeyD",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyC",
+							"modifiers": ["control"]
+						}
+					]
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyZ",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "IntlBackslash",
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a repeat of a held modifier key keeps it held",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "α"
+						}
+					]
+				},
+				{
+					"release": "IntlBackslash",
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"release": "KeyA",
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a locked custom modifier toggles on each press",
+			"steps": [
+				{
+					"press": "Insert",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Insert",
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "あ"
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": ["caps_lock"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "あ"
+						}
+					]
+				},
+				{
+					"press": "KeyS",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "ArrowLeft",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"press": "KeyX",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyJ",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Insert",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Insert",
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a held modifier no layer allows selects no layer",
+			"steps": [
+				{
+					"press": "Insert",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Insert",
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": ["shift"],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a shortcut sends another key, Caps Lock ignored",
+			"steps": [
+				{
+					"press": "KeyA",
+					"held": ["control"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyB",
+							"modifiers": ["control"]
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": ["control", "caps_lock"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyB",
+							"modifiers": ["control"]
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": ["control", "shift"],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "KeyQ",
+					"held": ["alt"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "Escape",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"press": "KeyQ",
+					"held": ["alt_right"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "Escape",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"press": "KeyQ",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a system key remap keeps the held modifiers, an empty one disables",
+			"steps": [
+				{
+					"press": "Home",
+					"held": ["shift", "caps_lock"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "End",
+							"modifiers": ["shift"]
+						}
+					]
+				},
+				{
+					"press": "PageDown",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "CapsLock",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "Pause",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a tap-hold released before its threshold types its tap",
+			"steps": [
+				{
+					"press": "Space",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Space",
+					"at": 100,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": " "
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "a key under a tap-hold before its threshold types the tap first",
+			"steps": [
+				{
+					"press": "Space",
+					"held": [],
+					"at": 1000,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyJ",
+					"held": [],
+					"at": 1100,
+					"consumed": false,
+					"actions": [
+						{
+							"type": "text",
+							"text": " "
+						}
+					]
+				},
+				{
+					"release": "Space",
+					"at": 1150,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyJ",
+					"held": [],
+					"at": 1200,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a key under a tap-hold after its threshold types on the held layer",
+			"steps": [
+				{
+					"press": "Space",
+					"held": [],
+					"at": 2000,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyJ",
+					"held": [],
+					"at": 2200,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "ArrowLeft",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"press": "KeyL",
+					"held": [],
+					"at": 2250,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "ArrowRight",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 2260,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Space",
+					"at": 2300,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyJ",
+					"held": [],
+					"at": 2400,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the threshold passing starts the hold",
+			"steps": [
+				{
+					"press": "Space",
+					"held": [],
+					"at": 3000,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"tick": 3100,
+					"actions": []
+				},
+				{
+					"tick": 3200,
+					"actions": []
+				},
+				{
+					"press": "KeyJ",
+					"held": [],
+					"at": 3210,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "ArrowLeft",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"release": "Space",
+					"at": 3300,
+					"consumed": true,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a tap-hold released after its threshold types nothing",
+			"steps": [
+				{
+					"press": "Space",
+					"held": [],
+					"at": 4000,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Space",
+					"at": 4500,
+					"consumed": true,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a built-in hold modifier is pressed and released for the user",
+			"steps": [
+				{
+					"press": "Tab",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"tick": 250,
+					"actions": [
+						{
+							"type": "modifier",
+							"id": "shift",
+							"down": true
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": ["shift"],
+					"at": 260,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"release": "Tab",
+					"at": 300,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "modifier",
+							"id": "shift",
+							"down": false
+						}
+					]
+				},
+				{
+					"press": "Tab",
+					"held": [],
+					"at": 1000,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Tab",
+					"at": 1100,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "Tab",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"press": "Tab",
+					"held": [],
+					"at": 2000,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyB",
+					"held": [],
+					"at": 2300,
+					"consumed": false,
+					"actions": [
+						{
+							"type": "modifier",
+							"id": "shift",
+							"down": true
+						}
+					]
+				},
+				{
+					"release": "Tab",
+					"at": 2400,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "modifier",
+							"id": "shift",
+							"down": false
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "a custom hold modifier selects its layer",
+			"steps": [
+				{
+					"press": "Enter",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 200,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "α"
+						}
+					]
+				},
+				{
+					"release": "Enter",
+					"at": 250,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 300,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a second tap-hold settles the first",
+			"steps": [
+				{
+					"press": "Space",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Tab",
+					"held": [],
+					"at": 50,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": " "
+						}
+					]
+				},
+				{
+					"release": "Tab",
+					"at": 100,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "Tab",
+							"modifiers": []
+						}
+					]
+				},
+				{
+					"release": "Space",
+					"at": 120,
+					"consumed": true,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a reset releases a held built-in modifier",
+			"steps": [
+				{
+					"press": "Tab",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"tick": 300,
+					"actions": [
+						{
+							"type": "modifier",
+							"id": "shift",
+							"down": true
+						}
+					]
+				},
+				{
+					"reset": true,
+					"actions": [
+						{
+							"type": "modifier",
+							"id": "shift",
+							"down": false
+						}
+					]
+				},
+				{
+					"release": "Tab",
+					"at": 400,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 500,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "records the emulation cannot perform are left alone",
+			"steps": [
+				{
+					"press": "Backslash",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "ScrollLock",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "F13",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		}
+	]
+}

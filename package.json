@@ -713,7 +713,8 @@
 		"test:layout-source": "node ./tools/test/test-layout-source.cjs",
 		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
 		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",
-		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs"
+		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs",
+		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs"
 	},
 	"type": "module",
 	"imports": {

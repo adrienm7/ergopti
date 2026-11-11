@@ -34,24 +34,32 @@ function keyTables() {
 /** Load the pure source model in the same classic-script order as a page. */
 function loadLayoutSource() {
 	const context = vm.createContext({});
-	for (const file of ['composer_model.js', 'source_model.js', 'source_compiler.js']) {
+	for (const file of [
+		'composer_model.js',
+		'source_model.js',
+		'source_compiler.js',
+		'source_emulation.js'
+	]) {
 		const filename = path.join(shared('ui', 'layout_composer'), file);
 		vm.runInContext(fs.readFileSync(filename, 'utf8'), context, { filename });
 	}
 	const model = vm.runInContext('LayoutSource', context);
 	const compiler = vm.runInContext('LayoutSourceCompiler', context);
 	const composer = vm.runInContext('LayoutComposer', context);
+	const emulation = vm.runInContext('LayoutSourceEmulation', context);
 	const tables = keyTables();
 	return {
 		...model,
 		composer,
+		emulation,
 		tables,
 		read: (text) => model.read(text, codec),
 		write: (source) => model.write(source, codec),
 		importStructured: (text, id, convention) =>
 			compiler.importStructured(text, id, convention, tables),
 		compileKeylayout: (source, options) => compiler.compileKeylayout(source, tables, options),
-		exportMacos: (source, format) => compiler.exportMacos(source, tables, format),
+		exportMacos: (source, format, icons) => compiler.exportMacos(source, tables, format, icons),
+		compileEmulation: (source, options) => compiler.compileEmulation(source, tables, options),
 		targetKeylayout: (source, platform) => compiler.targetKeylayout(source, tables, platform)
 	};
 }

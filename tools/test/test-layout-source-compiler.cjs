@@ -48,8 +48,8 @@ let checks = 0;
  * @returns {string[]} The differences, empty when equivalent.
  */
 function differences(left, right) {
-	const a = Composer.parseModel(left);
-	const b = Composer.parseModel(right);
+	const a = typeof left === 'string' ? Composer.parseModel(left) : left;
+	const b = typeof right === 'string' ? Composer.parseModel(right) : right;
 	const tokens = (keys) => keys.map((k) => k.split(/\s+/).filter(Boolean).sort().join(' '));
 	const found = [];
 	if (a.selects.length !== b.selects.length) return ['keyMapSelect count'];
@@ -123,16 +123,78 @@ for (const id of ['ergopti', 'ergopti_ansi', 'ergopti_plus', 'ergopti_plus_ansi'
 	checks++;
 }
 
-// The importer refuses what its records cannot hold, with stable codes.
-assert.throws(
-	() => Source.importStructured(registryXml('bepo'), 'bepo', 'iso'),
-	/source_import_hardware_layouts/
-);
-assert.throws(
-	() => Source.importStructured(registryXml('ergol'), 'ergol', 'ansi'),
-	/source_import_unnamed_key/
-);
-checks++;
+// Several hardware layouts (Bépo): the ISO map becomes the layers, the ANSI map the
+// ANSI variant, its differences from the derivation rule kept in each layer's ansi_keys.
+{
+	const xml = registryXml('bepo');
+	const original = Composer.parseModel(xml);
+	const reloaded = Source.read(Source.write(Source.importStructured(xml, 'bepo', 'iso')));
+	assert(
+		reloaded.layers.some((layer) => layer.ansi_keys),
+		'bepo: the ANSI map differs from the rule'
+	);
+	assert.deepEqual(differences(xml, Source.compileKeylayout(reloaded).text), [], 'bepo: ISO');
+	const ansiMap = Object.assign({}, original, { mapSet: 'ANSI' });
+	const ansi = Source.compileKeylayout(reloaded, { variant: 'ansi' });
+	assert.deepEqual(differences(ansiMap, ansi.text), [], 'bepo: ANSI map');
+	// Without its ansi_keys the ANSI variant follows the rule, which Bépo does not.
+	const ruleOnly = clone(reloaded);
+	for (const layer of ruleOnly.layers) delete layer.ansi_keys;
+	assert(
+		differences(ansiMap, Source.compileKeylayout(ruleOnly, { variant: 'ansi' }).text).length > 0,
+		'bepo: ansi_keys carry the difference'
+	);
+	// A layout set the records cannot hold is still refused with a stable code.
+	assert.throws(
+		() => Source.importStructured(xml, 'bepo', 'ansi'),
+		/source_import_hardware_layouts/
+	);
+	assert.throws(
+		() =>
+			Source.importStructured(
+				xml.replace(
+					'mapSet="ANSI" modifiers="commonModifiers"/>',
+					'mapSet="ISO" modifiers="commonModifiers"/>'
+				),
+				'bepo',
+				'iso'
+			),
+		/source_import_hardware_layouts/
+	);
+	checks++;
+}
+
+// A printable key at a code no key table names (Ergo-L's 66) is MacCode<n>: kept on
+// macOS, listed as omitted by the converter targets, which have no such key.
+{
+	const xml = registryXml('ergol');
+	const reloaded = Source.read(Source.write(Source.importStructured(xml, 'ergol', 'ansi')));
+	assert.deepEqual(clone(reloaded.layers[1].keys.MacCode66), { text: '*' }, 'ergol: code 66 named');
+	// An ANSI-numbered file is the ANSI variant of the physical source it imports to.
+	assert.deepEqual(
+		differences(xml, Source.compileKeylayout(reloaded, { variant: 'ansi' }).text),
+		[],
+		'ergol: behaviour'
+	);
+	const linux = Source.compileKeylayout(reloaded, { platform: 'linux' });
+	assert(
+		linux.omitted.some(
+			(entry) =>
+				entry.path.endsWith('.keys.MacCode66') && entry.reason === 'mac_only_key_code_not_in_linux'
+		),
+		'ergol: Linux lists code 66'
+	);
+	// A MacCode name for a code a table names, or out of range, is no key.
+	for (const name of ['MacCode0', 'MacCode128', 'MacCode066']) {
+		const source = clone(reloaded);
+		source.layers[0].keys = { [name]: { text: 'x' } };
+		assert(
+			Source.compileKeylayout(source).omitted.some((entry) => entry.path.endsWith(`.keys.${name}`)),
+			`${name} is not a key`
+		);
+	}
+	checks++;
+}
 
 // ISO edits, ANSI derived: the fixed rule reproduces the registry ANSI files.
 for (const [iso, ansi] of PAIRS) {
@@ -322,6 +384,100 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 	checks++;
 }
 
+// Icons: each variant's PNG becomes its .icns, declared in Info.plist; a single
+// .keylayout takes the .icns of its name beside it. Bad or missing PNGs refuse.
+{
+	const zlib = require('node:zlib');
+	const png = (width, height) => {
+		const chunk = (type, data) => {
+			const head = Buffer.alloc(8);
+			head.writeUInt32BE(data.length, 0);
+			head.write(type, 4, 'latin1');
+			return Buffer.concat([head, data, Buffer.alloc(4)]);
+		};
+		const ihdr = Buffer.alloc(13);
+		ihdr.writeUInt32BE(width, 0);
+		ihdr.writeUInt32BE(height, 4);
+		ihdr.set([8, 6, 0, 0, 0], 8);
+		const pixels = zlib.deflateSync(Buffer.alloc(height * (1 + width * 4)));
+		return new Uint8Array(
+			Buffer.concat([
+				Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+				chunk('IHDR', ihdr),
+				chunk('IDAT', pixels),
+				chunk('IEND', Buffer.alloc(0))
+			])
+		);
+	};
+	const iconic = clone(fixture);
+	iconic.exports.macos.icon = 'layout.png';
+	iconic.exports.macos.ansi_icon = 'layout_ansi.png';
+	const iso = png(32, 32);
+	const ansiPng = png(16, 16);
+	const { files, report } = Source.exportMacos(iconic, undefined, {
+		'layout.png': iso,
+		'layout_ansi.png': ansiPng
+	});
+	const root = 'source_fixture.bundle/Contents';
+	const byPath = new Map(files.map((file) => [file.path, file]));
+	for (const [name, image, type] of [
+		['source_fixture', iso, 'icp5'],
+		['source_fixture_ansi', ansiPng, 'icp4']
+	]) {
+		const icon = Buffer.from(byPath.get(`${root}/Resources/${name}.icns`).bytes);
+		assert.equal(icon.toString('latin1', 0, 4), 'icns', `${name}: magic`);
+		assert.equal(icon.readUInt32BE(4), icon.length, `${name}: length`);
+		assert.equal(icon.toString('latin1', 8, 12), type, `${name}: element type`);
+		assert.equal(icon.readUInt32BE(12), 8 + image.length, `${name}: element length`);
+		assert(icon.subarray(16).equals(Buffer.from(image)), `${name}: PNG kept`);
+		assert(
+			byPath
+				.get(`${root}/Info.plist`)
+				.text.includes(
+					`<key>KLInfo_${name}</key>\n\t<dict>\n\t\t<key>TICapsLockLanguageSwitchCapable</key>\n\t\t<true/>\n\t\t<key>TISIconIsTemplate</key>\n\t\t<false/>\n\t\t<key>ICNS</key>\n\t\t<string>${name}.icns</string>`
+				),
+			`${name}: Info.plist names the icon`
+		);
+	}
+	assert(!report.limitations.some((line) => /generic layout icon/.test(line)), 'no generic icon');
+	const single = Source.exportMacos(iconic, 'iso', {
+		'layout.png': iso,
+		'layout_ansi.png': ansiPng
+	});
+	assert.deepEqual(clone(single.files.map((file) => file.path)), [
+		'source_fixture.keylayout',
+		'source_fixture.icns'
+	]);
+	// The ANSI variant falls back to the ISO icon when it names none of its own.
+	delete iconic.exports.macos.ansi_icon;
+	const shared = Source.exportMacos(iconic, 'ansi', { 'layout.png': iso });
+	assert.equal(Buffer.from(shared.files[1].bytes).toString('latin1', 8, 12), 'icp5');
+	assert.throws(() => Source.exportMacos(iconic), /source_icon_missing: exports.macos.icon/);
+	assert.throws(
+		() => Source.exportMacos(iconic, undefined, { 'layout.png': png(32, 16) }),
+		/source_icon_size/
+	);
+	assert.throws(
+		() => Source.exportMacos(iconic, undefined, { 'layout.png': png(48, 48) }),
+		/source_icon_size/
+	);
+	assert.throws(
+		() => Source.exportMacos(iconic, undefined, { 'layout.png': new Uint8Array(40) }),
+		/source_icon_png/
+	);
+	for (const bad of ['../x.png', 'x.jpg', '.x.png', 'a/b.png'])
+		assert.throws(() => {
+			const invalid = clone(fixture);
+			invalid.exports.macos.icon = bad;
+			Source.exportMacos(invalid);
+		}, /source_invalid: exports.macos.icon/);
+	// Without an icon the export says the generic icon is shown.
+	assert(
+		Source.exportMacos(fixture).report.limitations.some((line) => /generic layout icon/.test(line))
+	);
+	checks++;
+}
+
 // Linux and Windows read the same compilation, with their own folds and omissions.
 {
 	const linux = exportXkb(fixture);
@@ -414,7 +570,9 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 			[
 				['macos', 'partial'],
 				['linux', 'partial'],
-				['windows', 'unavailable']
+				['windows', 'unavailable'],
+				['emulation', 'partial'],
+				['web', 'partial']
 			]
 		);
 		assert(
