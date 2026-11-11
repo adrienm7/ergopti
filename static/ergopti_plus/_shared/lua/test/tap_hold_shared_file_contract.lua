@@ -73,9 +73,11 @@ function M.register(helpers, opts)
 			helpers.assert_eq(SharedFile.canonical_modifier(spec, ""), nil)
 		end)
 
-		helpers.it("the macOS legacy import is declared, the only one so far", function()
-			helpers.assert_eq(registry.legacy_imports, { hs = { source = "config_karabiner.toml", translate = "karabiner",
-				retired_suffix = ".migrated" } })
+		helpers.it("the legacy imports are declared: macOS config_karabiner.toml, Linux config.toml [mod_combos]", function()
+			helpers.assert_eq(registry.legacy_imports, {
+				hs = { source = "config_karabiner.toml", translate = "karabiner", retired_suffix = ".migrated" },
+				linux = { source = "config.toml", translate = "config_section", section = "mod_combos" },
+			})
 		end)
 
 		for _, name in ipairs(M.FILES) do

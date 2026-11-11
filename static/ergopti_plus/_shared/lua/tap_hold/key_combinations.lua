@@ -195,6 +195,8 @@ end
 -- Plan from an exact freshly read document, never from a boot-time slot cache.
 -- Only known pairs' chord leaves change. Future records/parameters stay outside
 -- the operation; all known participants are validated before any row is returned.
+-- Linux passes `tap_source`, its config.toml: the taps live there and the
+-- chords in the shared tap_hold.toml (`source`).
 function M.plan_chord_copy(source, options)
 	assert(type(source) == "string" and type(options) == "table" and type(options.entries) == "table",
 		"exact source and declared copy catalogue required")
@@ -211,8 +213,23 @@ function M.plan_chord_copy(source, options)
 	end
 	local combos = namespace(document, ConfigKeys.KEY.MOD_COMBOS)
 	local stored = namespace(combos, "config")
+	assert(options.tap_source == nil or type(options.tap_source) == "string" and options.tap_section == M.TAP_SECTION,
+		"a separate tap source requires the Linux tap section")
+	local tap_document = document
+	if options.tap_source ~= nil then
+		local tap_shapes
+		tap_document, tap_shapes = Codec.decode_with_shapes(options.tap_source)
+		local chord_shapes = shapes
+		namespace = function(parent, key)
+			local value = parent[key]
+			if value == nil then return {} end
+			assert(type(value) == "table" and not chord_shapes.arrays[value] and not tap_shapes.arrays[value],
+				"chord source has an occupied namespace")
+			return value
+		end
+	end
 	local linux_taps = options.tap_section == M.TAP_SECTION
-		and namespace(namespace(document, "shortcuts"), "key_combination_taps") or nil
+		and namespace(namespace(tap_document, "shortcuts"), "key_combination_taps") or nil
 	local declared = M.chord_settings(options.settings)
 	local delay = combos.simultaneous_threshold_ms
 	if delay == nil then delay = declared.simultaneous_threshold_ms end
