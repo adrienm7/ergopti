@@ -5,6 +5,28 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Linux application identity is the WM class or app_id (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ADD-3): Linux names an application
+by its WM class under X11 (the class string of `WM_CLASS`,
+`x11_focus.window_class`, also in `clients()`) and by its app_id or class
+under Wayland, so one exclusion list matches under both session types.
+`/proc/<pid>/comm` is only the fallback (a window without `WM_CLASS`, or the
+xdotool route without the native transport); the kernel cuts it to 15 bytes
+(`TASK_COMM_LEN` 16 with its NUL), so `gnome-terminal-server` reads
+`gnome-terminal-`. Saved lists (`metrics.disabled_apps`,
+`llm.trigger.disabled_apps`, `llm.agent_disabled_apps`) are converted once at
+boot by `infra/app_identity_migration.lua` through
+`_shared/data/linux_app_identities.json` (`aliases` comm to class, `same`
+for names that do not change); an unknown entry is kept and logged at INFO,
+never dropped, and the `migrations.linux_app_identity` marker in
+storage.json is written only after every list is persisted. The conversion
+runs outside the shared config migration registry, whose closed op set the
+Windows interpreter validates at boot and whose identity (the process name)
+does not change (decided by the coordinator on 2026-11-11, to review by the
+maintainer). macOS keeps bundle ids unchanged; Windows keeps process names.
+Regressions `add3-app-identity`.
+
 ## A password manager is a secure field as a whole, from one list (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (ADD-1): every application of
