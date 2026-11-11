@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode पैलेट",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Ergopti लेआउट स्रोत (.toml) या macOS लेआउट (.keylayout) चुनें।",
+	"layout_editor.pick_title": "लेआउट खोलें",
 	"layout_editor.preserved_note": "यह .keylayout ठीक वैसा ही रखा गया है जैसा आयात हुआ था, ताकि इसे बिना बदलाव के निर्यात किया जा सके। इसकी कुंजियाँ संपादित करने के लिए इसे बदलें।",
 	"layout_editor.preview.pending": "डेड कुंजी {id} अगली कुंजी की प्रतीक्षा में।",
 	"layout_editor.preview.placeholder": "अपने कीबोर्ड से यहाँ टाइप करें",

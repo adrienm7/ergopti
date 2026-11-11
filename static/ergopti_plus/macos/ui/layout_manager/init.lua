@@ -136,6 +136,30 @@ local function close_window()
 	return settle_retired_window()
 end
 
+--- Opens a native panel for the layout editor and reads the chosen file
+--- within the store's bounds; WKWebView shows no panel for <input type="file">.
+--- @param on_done function on_done({filename, text} | {} | {code, detail})
+local function pick_source(on_done)
+	local SourceStore = require("layouts.source_store")
+	local DialogUtil = require("infra.dialog_util")
+	local ok_defaults, defaults = pcall(Json.decode, FileSystem.read(Paths.shared("modules/layouts/defaults.json")) or "")
+	local settings, settings_err = SourceStore.settings(ok_defaults and defaults or nil)
+	if not settings then
+		Logger.error(LOG, "The layout editor cannot open files: %s.", tostring(settings_err))
+		on_done({ code = SourceStore.FAILURE_INVALID, detail = settings_err })
+		return
+	end
+	local path = DialogUtil.choose_layout_source(i18n.get("layout_editor.pick_message"),
+		i18n.get("layout_editor.pick_title"))
+	if not path then
+		on_done({})
+		return
+	end
+	local picked = SourceStore.read_picked(settings, path, FileSystem.read)
+	if picked.code then Logger.warn(LOG, "Refused to open %s in the layout editor: %s.", path, picked.detail) end
+	on_done(picked)
+end
+
 --- The controller of one window, bound to that exact window.
 --- @param view any
 --- @return table
@@ -152,6 +176,7 @@ local function controller_for(view)
 			if view == _webview then close_window() end
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		pick_source = pick_source,
 	})
 	local on_message = controller.on_message
 	local ready = false

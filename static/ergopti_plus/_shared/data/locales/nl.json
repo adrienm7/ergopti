@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode-palet",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Kies een Ergopti-indelingsbron (.toml) of een macOS-indeling (.keylayout).",
+	"layout_editor.pick_title": "Een indeling openen",
 	"layout_editor.preserved_note": "Deze .keylayout blijft precies zoals geïmporteerd, zodat hij ongewijzigd kan worden geëxporteerd. Zet hem om om de toetsen te bewerken.",
 	"layout_editor.preview.pending": "Dode toets {id} wacht op de volgende toets.",
 	"layout_editor.preview.placeholder": "Typ hier met je toetsenbord",

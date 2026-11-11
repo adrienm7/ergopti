@@ -116,7 +116,7 @@ async function exerciseManager(browser, origin) {
 		'that host keeps the composer'
 	);
 	await page.evaluate(
-		(state) => window.initData({ strings: {}, state, source_editor: true }),
+		(state) => window.initData({ strings: {}, state, source_editor: true, source_pick: true }),
 		state
 	);
 	assert.equal(
@@ -157,6 +157,12 @@ async function exerciseManager(browser, origin) {
 		false,
 		'the composer section stays closed'
 	);
+
+	// A host with a native panel (macOS) opens files for the page.
+	await page.click('#le-open');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_pick'));
+	await page.evaluate((text) => window.sourcePicked({ filename: 'mine.toml', text }), posted.text);
+	assert.match(await page.textContent('#le-message'), /mine\.toml/);
 
 	// « Install and use » goes through the composer host with the source and its compiled layout.
 	await page.click('#le-install');

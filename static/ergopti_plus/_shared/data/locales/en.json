@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode palette",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Choose an Ergopti layout source (.toml) or a macOS layout (.keylayout).",
+	"layout_editor.pick_title": "Open a layout",
 	"layout_editor.preserved_note": "This .keylayout is kept exactly as imported, so it can be exported unchanged. Convert it to edit its keys.",
 	"layout_editor.preview.pending": "Dead key {id} waiting for the next key.",
 	"layout_editor.preview.placeholder": "Type here with your keyboard",
