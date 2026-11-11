@@ -1592,11 +1592,11 @@ function M.record_llm_event(app_id, kind, fields)
 end
 
 --- Records one connectivity transition (network_metrics) in events_network.
---- @param kind string One of network_metrics.KINDS.
+--- @param kind string One of keystats.network_transitions.KINDS.
 --- @param fields table|nil Metadata; only the kind's own keys are kept.
 function M.record_network_event(kind, fields)
 	if not may_record() then return end
-	local allowed = require("modules.keystats.network_metrics").KINDS[kind]
+	local allowed = require("keystats.network_transitions").KINDS[kind]
 	assert(allowed, "not an events_network kind: " .. tostring(kind))
 	fields = type(fields) == "table" and fields or {}
 	local clock = observe_calendar()
