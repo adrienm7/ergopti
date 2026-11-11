@@ -324,6 +324,7 @@ local function strike(code)
 	local consumed = false
 	if Accented.on_key(detail, {
 		active = function() return _accented_on end,
+		emulating = function() return Emulation.status().active == true end,
 		defer = function(fn) _deferred[#_deferred + 1] = fn; return true end,
 		press = function(combo) return (ComboEmitter.press(combo)) end,
 		number_row_mode = function() return NumberRow.settings().order end,
