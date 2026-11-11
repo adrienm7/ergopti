@@ -116,6 +116,7 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 
 		-- Stub timings to return fixed values
 		package.loaded["infra.timings"] = {
+			count = require("tests.support.registry_count"),
 			sec = function(_, key)
 				if key == "tap_max_ms"              then return 0.5
 				elseif key == "live_rearm_ms"       then return 0.1

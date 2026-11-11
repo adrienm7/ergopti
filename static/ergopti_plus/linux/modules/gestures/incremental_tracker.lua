@@ -27,10 +27,6 @@ local M = {}
 local Direction = require("gestures.direction")
 local Incremental = require("gestures.incremental")
 
--- Travel, in millimetres, before a moving swipe has a direction (the macOS
--- SWIPE_MIN of three fingers and more).
-M.SWIPE_MIN_MM = 1.5
-
 -- Smallest reversal the tracker accepts, in millimetres (macOS LIVE_AXIS_MIN).
 M.REVERSE_FLOOR_MM = 1.0
 
@@ -50,6 +46,15 @@ function M.new(opts)
 	end
 	local tracker = {}
 	local state
+	-- Travel, in millimetres, before a moving swipe has a direction: the shared
+	-- timings registry's [gestures] *_minimum_mm, which macOS reads too, a
+	-- pair's larger (maintainer decision GSD-3). Read once per touchpad.
+	local Timings = require("infra.timings")
+	local minimums = {
+		swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+		pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+		pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm"),
+	}
 
 	local function reset() state = nil end
 	reset()
@@ -70,7 +75,7 @@ function M.new(opts)
 		-- Only a decided axis counts: in the diagonal sector below the diagonal
 		-- minimum the classifier names the dominant straight axis, and the
 		-- name turning diagonal a frame later restarted the count each time.
-		local axis = Direction.decided_axis(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
+		local axis = Direction.decided_axis(rx, ry, Direction.minimums_mm(progress.fingers, minimums))
 		if not axis then return end
 		local direction = Direction.name(axis, rx, ry)
 		local slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)

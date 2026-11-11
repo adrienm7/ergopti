@@ -5,6 +5,24 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A pair swipe decides from 3.0 mm on macOS and Linux (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (GSD-3): a two-finger swipe, an
+incremental one included, decides its direction from 3.0 mm of travel
+(diagonal 5.0 mm) on Linux as on macOS; three fingers or more keep 1.5 mm.
+The one value is the shared timings registry's `[gestures]`
+`swipe_minimum_mm`, `pair_swipe_minimum_mm` and `pair_diagonal_minimum_mm`
+(`_shared/modules/timings/constants.toml`), read with `Timings.count` by macOS
+`geometry.lua` and the Linux `incremental_tracker.lua`; the finger-count rule
+is `gestures.direction.minimums_mm`. `test-gesture-defaults-single-source.cjs`
+fails on a gesture source (any driver, Windows included) that declares a swipe
+minimum locally. « Still user-adjustable » is read as the slot's own step
+(`[gestures.sensitivities]`), which stays the user's: the minimum only gates
+the direction (reading decided by the coordinator on 2026-11-11, to review by
+the maintainer). Windows receives finished swipes, has no live minimum and no
+literal to remove. The Linux decoder's own threshold and pair-scroll travel
+(120 device units) are GSD-2, still pending: not moved.
+
 ## An unbound diagonal falls back to its dominant straight slot (2026-11-11)
 
 Decided by the maintainer on 2026-11-11, reversing the coordinator's default of

@@ -202,6 +202,31 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		helpers.assert_eq(count(up_pressed, up.emit_combo_for("tab_prev")), 1, "a steeper drift falls back to up")
 	end)
 
+	-- GSD-3 (decided by the maintainer on 2026-11-11): a pair decides its
+	-- direction from the shared 3.0 mm minimum, as macOS; three fingers 1.5 mm.
+	helpers.it("incremental: a pair needs the shared pair minimum before it counts (pair-incremental-minimum)", function()
+		local Direction = require("gestures.direction")
+		local Timings = require("infra.timings")
+		helpers.assert_eq(Direction.minimums_mm(2, { swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+			pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+			pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm") }), 3.0,
+			"the shared registry's pair minimum")
+		local function travel(fingers, mm)
+			local fired = 0
+			local tracker = require("modules.gestures.incremental_tracker").new({
+				units_x = UNITS, units_y = UNITS,
+				mode_of = function() return "incremental" end, step_of = function() return 1.0 end,
+				slot_of = function(slot, _, direction) return slot, direction end,
+				fire = function(_, _, _, count) fired = fired + count; return count end,
+			})
+			tracker:update({ fingers = fingers, dx = mm * UNITS, dy = 0 })
+			return fired
+		end
+		helpers.assert_eq(travel(2, 2.5), 0, "2.5 mm is below a pair's minimum")
+		helpers.assert_true(travel(2, 4.0) > 0, "4 mm decides a pair")
+		helpers.assert_true(travel(3, 2.5) > 0, "2.5 mm decides three fingers")
+	end)
+
 	helpers.it("incremental: the sensitivity sets the step, within the shared range", function()
 		local saved = package.loaded[MANAGER]
 		local M = helpers.load_module(MANAGER)
