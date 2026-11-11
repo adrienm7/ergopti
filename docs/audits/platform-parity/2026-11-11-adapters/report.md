@@ -63,14 +63,13 @@ the case did not arise there.
   an owned empty string. Regressions `clipboard-unowned-empty`, updated
   deliberately. Windows: no change (an empty `ClipboardAll` empties the
   clipboard).
-
-## Decisions pending (behaviour left unchanged)
-
-- **ADD-3, the Linux application identity.** X11 reports `/proc/<pid>/comm`,
-  which the kernel cuts to 15 bytes (`window_info.lua`); Wayland reports the
-  `app_id` or window class. An exclusion list built under one session type
-  stops matching under the other. A change needs a migration of saved
-  exclusion lists.
+- **ADD-3, the Linux application identity** (decided by the maintainer on
+  2026-11-11): X11 reports the `WM_CLASS` class (`x11_focus.window_class`),
+  the identity Wayland's app_id and class already gave; `/proc/<pid>/comm`
+  (cut to 15 bytes) is only the fallback. Saved exclusion lists are
+  converted once (`infra/app_identity_migration.lua`, table
+  `_shared/data/linux_app_identities.json`), unknown entries kept and
+  logged. Regressions `add3-app-identity`. macOS and Windows: no change.
 
 ## Windows, report only
 

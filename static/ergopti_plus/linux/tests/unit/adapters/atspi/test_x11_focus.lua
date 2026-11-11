@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local ATOM_STRING, ATOM_WM_NAME = 31, 39
+local ATOM_STRING, ATOM_WM_NAME, ATOM_WM_CLASS = 31, 39, 67
 
 --- A scripted transport over a table of windows.
 --- @param state table { active = id|nil, windows = { [id] = { title, wm_name, pid, wm_name_type } }, ... }
@@ -65,6 +65,8 @@ local function scripted(state)
 				return { type = entry.wm_name_type or ATOM_STRING, format = 8, bytes = entry.wm_name }
 			elseif property == atoms._NET_WM_PID and entry.pid then
 				return { type = 6, format = 32, bytes = le32(entry.pid) }
+			elseif property == ATOM_WM_CLASS and entry.wm_class then
+				return { type = ATOM_STRING, format = 8, bytes = entry.wm_class }
 			end
 			return nil
 		end,
@@ -224,6 +226,48 @@ helpers.describe("window_info: the native X11 route", function()
 		local asked = false
 		for _, command in ipairs(commands) do if command:find("xdotool getactivewindow", 1, true) then asked = true end end
 		helpers.assert_true(asked, "the tools were asked when the server was unreachable")
+		shell._reset_runner()
+	end)
+end)
+
+-- ADD-3 (decided by the maintainer on 2026-11-11): one Linux application
+-- identity under X11 and Wayland. X11 reports the WM_CLASS class, the name
+-- sway's window_properties.class and the desktop compositors report; the
+-- kernel's 15-byte /proc/<pid>/comm is only the fallback.
+helpers.describe("window_info: the X11 identity is the WM class (add3-app-identity)", function()
+	local function under(state, comm)
+		local display = helpers.load_module("infra.display_server")
+		display._set_for_test(display.X11, "x11 identity fixture")
+		package.loaded["infra.display_server"] = display
+		local shell = helpers.load_module("adapters.shell_runner")
+		shell._set_runner(function(command)
+			if command:find("/comm", 1, true) then return comm end
+			return ""
+		end)
+		local focus = helpers.load_module("adapters.x11_focus")
+		focus._set_transport(scripted(state))
+		package.loaded["adapters.x11_focus"] = focus
+		local window = helpers.load_module("adapters.window_info")
+		window._reset_state()
+		window._set_proc_comm_reader_for_test(function() return (comm:gsub("\n$", "")) end)
+		return window, shell
+	end
+
+	helpers.it("names the focused window by its WM_CLASS class, not its cut process name (add3-app-identity)", function()
+		local state = { active = 12, clients = { 12 }, windows = {
+			[12] = { title = "Terminal", pid = 1337, wm_class = "gnome-terminal-server\0Gnome-terminal\0" } } }
+		local window, shell = under(state, "gnome-terminal-\n")
+		local info = window.focused_snapshot()
+		helpers.assert_eq(info.appId, "Gnome-terminal", "the X11 identity must be the class, as on Wayland")
+		helpers.assert_eq(window.getAll()[1].appId, "Gnome-terminal", "the window list names it the same way")
+		shell._reset_runner()
+	end)
+
+	helpers.it("falls back to the process name for a window without WM_CLASS (add3-app-identity)", function()
+		local state = { active = 12, clients = { 12 }, windows = { [12] = { title = "Notes", pid = 1337 } } }
+		local window, shell = under(state, "editor\n")
+		helpers.assert_eq(window.focused_snapshot().appId, "editor")
+		helpers.assert_eq(window.getAll()[1].appId, "editor")
 		shell._reset_runner()
 	end)
 end)

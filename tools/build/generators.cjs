@@ -219,7 +219,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-secure-apps.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/secure_apps_data.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/secure_apps_data.lua',
+			'static/ergopti_plus/_shared/lua/linux_app_identities_data.lua'
+		]
 	},
 	{
 		script: 'codegen/codegen-adapter-errors.cjs',

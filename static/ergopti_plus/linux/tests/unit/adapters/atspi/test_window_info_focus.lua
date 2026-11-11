@@ -303,6 +303,8 @@ helpers.describe("window_info: X11", function()
 		package.loaded["adapters.x11_focus"] = {
 			has_transport = function() return true end,
 			query = function() return "0x100", "Documents", pid end,
+			-- No WM_CLASS: the identity falls back to the process name (ADD-3).
+			window_class = function() return nil end,
 		}
 		local ok, err = pcall(function()
 			local window = under("x11", "xfce", {
