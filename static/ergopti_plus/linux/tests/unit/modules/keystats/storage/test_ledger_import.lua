@@ -258,6 +258,19 @@ helpers.describe("Linux foreign metrics ledger import", function()
 			"a disconnect, a reconnect, an SSID change and the legacy row; no baseline, no signal-only row")
 	end)
 
+	-- A Linux sibling stamps ts in UTC and date in its local time: a passive
+	-- period at 23:30 in New York is ts 04:30 the next day. The rebuild put the
+	-- system row on ts's day, a day later than the sibling counted it (KML-004,
+	-- linux-import-system-date).
+	it("linux-import-system-date: a system row lands on its own date column", function()
+		local f = fixture()
+		write(f.ledger, HEADER .. batch(typing(1, EVENTS),
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('"
+				.. FOREIGN .. "', 2, '2026-11-06 04:30:00', '2026-11-05', 'passive_period', '{\"kind\":\"sleep\",\"duration_ms\":5000}');"))
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT group_concat(date) FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "2026-11-05")
+	end)
+
 	it("linux-import-incremental: only appended complete batches are applied, a torn tail waits", function()
 		local f = fixture()
 		write(f.ledger, HEADER .. batch(typing(1, EVENTS)))
