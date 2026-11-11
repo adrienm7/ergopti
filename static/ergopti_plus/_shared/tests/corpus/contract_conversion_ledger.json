@@ -1196,7 +1196,7 @@
 		},
 		{
 			"contract": "config_scope_transaction_contract.lua",
-			"lua_sites": 30,
+			"lua_sites": 33,
 			"data_driven": [],
 			"stays_in_lua": [
 				{
@@ -1278,6 +1278,18 @@
 				{
 					"case": "reverts runtime and every published file, removing a file it created",
 					"reason": "file_effects"
+				},
+				{
+					"case": "routes companion rows to their own file, backed up and reverted with the scope",
+					"reason": "file_effects"
+				},
+				{
+					"case": "reads an unchanged companion for the runtime and never publishes it",
+					"reason": "file_effects"
+				},
+				{
+					"case": "refuses a companion whose file changes before publication",
+					"reason": "transaction_sequence"
 				},
 				{
 					"case": "puts the exact configuration bytes back after a committed single-file scope",
