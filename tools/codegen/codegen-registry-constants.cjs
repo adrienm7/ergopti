@@ -126,6 +126,13 @@ const probeMs = registry.llm?.[probeKey];
 if (!Number.isSafeInteger(probeMs) || probeMs < 1 || probeMs > MAX_LAUNCHER_MS)
 	fail(`[llm].${probeKey} must be an integer from 1 to ${MAX_LAUNCHER_MS} milliseconds.`);
 
+// A leftover runtime gets the bound of its own controlled exit before it is
+// force-terminated: the launcher reads the Lua quit deadline, not a copy.
+const quitKey = 'user_quit_deadline_ms';
+const quitMs = registry.ui?.[quitKey];
+if (!Number.isSafeInteger(quitMs) || quitMs < 1 || quitMs > MAX_LAUNCHER_MS)
+	fail(`[ui].${quitKey} must be an integer from 1 to ${MAX_LAUNCHER_MS} milliseconds.`);
+
 const swiftRows = Object.entries(launcher)
 	.map(
 		([key, value]) =>
@@ -142,7 +149,7 @@ const swift = `// Sources/ErgoptiPlus/LauncherTimings.generated.swift
 // DESCRIPTION:
 // The [launcher] section of the timing registry: every sleep and poll interval
 // of the launcher, its fixtures and its tests, plus the shared LLM route-probe
-// budget, in the units the sleep APIs take.
+// budget and the Lua quit deadline, in the units the sleep APIs take.
 // ==============================================================================
 
 import Foundation
@@ -164,6 +171,7 @@ struct RegistryDuration: Sendable {
 enum LauncherTimings {
 ${swiftRows}
 	static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "${probeKey}", milliseconds: ${probeMs})
+	static let userQuitDeadline = RegistryDuration(section: "ui", key: "${quitKey}", milliseconds: ${quitMs})
 }
 `;
 
@@ -171,5 +179,5 @@ fs.writeFileSync(OUTPUT_LUA, lua);
 fs.writeFileSync(OUTPUT_SWIFT, swift);
 console.log(`[OK] ${path.relative(ROOT, OUTPUT_LUA)} (${Object.keys(limits).length} limit(s))`);
 console.log(
-	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length + 1} duration(s))`
+	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length + 2} duration(s))`
 );

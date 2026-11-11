@@ -824,7 +824,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 		waitForStaleRuntimes(
 			stale,
-			deadline: Date().addingTimeInterval(kStaleRuntimeTerminateGraceSeconds),
+			deadline: Date().addingTimeInterval(kStaleRuntimeTerminateGrace.seconds),
 			then: proceed
 		)
 	}
@@ -855,7 +855,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			proceed()
 			return
 		}
-		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePollIntervalSeconds) { [weak self] in
+		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePoll.seconds) { [weak self] in
 			self?.waitForStaleRuntimes(stale, deadline: deadline, then: proceed)
 		}
 	}

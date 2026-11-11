@@ -116,6 +116,8 @@ func staleEmbeddedRuntimes(
 /// instance_lock_retry_ms apart (100 ms), tell them apart.
 let kLauncherLockRetryAttempts = 50
 /// Time a leftover embedded runtime gets to run its own teardown after a
-/// normal terminate request before it is force-terminated.
-let kStaleRuntimeTerminateGraceSeconds = 3.0
-let kStaleRuntimePollIntervalSeconds = 0.1
+/// normal terminate request before it is force-terminated: the bound of its own
+/// controlled exit ([ui] user_quit_deadline_ms), so a runtime still inside its
+/// quit fence is never killed. A 3 s literal killed it mid-fence (MLC-004).
+let kStaleRuntimeTerminateGrace = LauncherTimings.userQuitDeadline
+let kStaleRuntimePoll = LauncherTimings.staleRuntimePoll
