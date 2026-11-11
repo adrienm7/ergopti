@@ -415,6 +415,7 @@ helpers.describe("preview masking: display only", function()
 			register_lua_group        = function() end,
 			set_post_load_hook        = function() end,
 			register_interceptor      = function() end,
+			dynamic_rule_within_delay      = function() return true end,
 			register_preview_provider = function() end,
 			registry_transaction      = function(_, mutation) return mutation() == true end,
 		}
@@ -499,6 +500,7 @@ helpers.describe("preview masking: the @-tag provider", function()
 			add                       = function() end,
 			register_preview_provider = function(fn) provider = fn end,
 			register_interceptor      = function(fn) interceptor = fn end,
+			dynamic_rule_within_delay      = function() return true end,
 			inject_dynamic            = function(deletes, text)
 				rec.injects[#rec.injects + 1] = { deletes = deletes, text = text }
 				return true
