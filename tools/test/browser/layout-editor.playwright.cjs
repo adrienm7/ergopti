@@ -254,6 +254,21 @@ async function exerciseManager(browser, origin) {
 		window.composerResult({ action: 'composer_emulate', ok: true, used: true })
 	);
 	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.emulated']);
+
+	// « New » starts blank or from a reference or a catalogue layout of the host.
+	await page.click('#le-new');
+	const starts = await page.$$eval('#le-start [data-start]', (buttons) =>
+		buttons.map((button) => button.dataset.start)
+	);
+	assert.deepEqual(starts, ['blank', 'qwerty', 'azerty', 'ergopti']);
+	await page.click('#le-start [data-start="ergopti"]');
+	if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	assert.equal(await page.inputValue('#le-name'), 'My Ergopti');
+	await page.click('#le-new');
+	await page.click('#le-start [data-start="blank"]');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	assert.equal(await page.inputValue('#le-name'), strings['layout_editor.default_name']);
 	await page.click('#le-close');
 	assert.equal(await page.locator('#layout-view').isVisible(), true);
 	assert.deepEqual(errors, []);
