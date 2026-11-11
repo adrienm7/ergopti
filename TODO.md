@@ -1413,6 +1413,13 @@ coordinator on 2026-11-11, to review by the maintainer.
 - [x] The 20 ms erase-to-text pause applies only to terminals and to applications nobody could name, as Windows and
       macOS pace only terminals: xz → MATCH 34.4 → 14.7 ms; 20 expansions read back intact from a GTK field (X11),
       15 from mousepad under sway. Decided by the coordinator on 2026-11-11, to review by the maintainer.
+- [x] macOS round 3 (Lua-side, off-Mac; report `docs/audits/performance/hammerspoon/2026_11_11/report.md`): the
+      trigger ROI index no longer decodes every character through `compat.utf8` (warm hotstring load 157 → 111 ms,
+      also Linux); the Karabiner action labels probe `i18n.has` so a boot decodes only the active locale (about
+      20 ms on a Mac); a current config builds no migration plan and its strict judgement is memoised (also Linux);
+      the gesture picker builds its name list when it opens. Field confirmation: the report's measurement plan.
+- [ ] macOS boot: `migrations.toml` (74 KB) is parsed and validated at every boot (about 30 ms of Lua 5.4); a
+      generated, hash-checked Lua mirror would remove it (maintainer decision, numbers in the report).
 - [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
       `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
