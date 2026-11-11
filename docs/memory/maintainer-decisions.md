@@ -1047,3 +1047,18 @@ daemon serves raw keystrokes only to that signed app), so the steps
 runs every step, those included, on the newest signed dev prerelease. Action:
 keep the root daemon's signature check; mark any new step that needs the owned
 runtime installed `signed_app`, never weaken the check for test runs.
+
+## A second launch restarts the running app on every OS (2026-11-11)
+
+Opening ErgoptiPlus while it runs restarts it, as Windows' `#SingleInstance
+Force` does (MLC-003). macOS: the second launcher asks the running one to quit,
+which defers that quit until its runtime ran the menu Quit's controlled exit
+(MLC-002), waits for the sole-launcher lock within `[ui]
+user_quit_deadline_ms` plus `quit_handshake_margin_ms`, then takes it and boots
+(`main.swift` `acquireSoleLauncherOwnership`). Linux: `install/launch.sh` sends
+SIGTERM, the daemon's controlled exit, to the instance lock's holders and waits
+for the lock within the same bound (`_generated/launch_timings.sh`); under
+systemd a relaunch from the application menu restarts the unit. Only the login
+autostart (`--session-start`) leaves a running instance alone. Action: keep the
+restart pinned by `testASecondLauncherAsksTheRunningOneToQuitAndTakesOver` and
+`test_second_launch_restarts_the_running_daemon`.
