@@ -31,6 +31,7 @@ local FileSystem   = require("adapters.file_system")
 local HttpClient   = require("adapters.http_client")
 local Crypto       = require("adapters.crypto")
 local Json         = require("json")
+local TomlCodec    = require("toml_codec")
 local Registry     = require("layouts.registry")
 local Catalogue    = require("layouts.catalogue")
 local Extension    = require("layouts.extension")
@@ -1021,6 +1022,8 @@ local function composer_operations(deps)
 		shortcuts = "full",
 		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
 		decode_json = deps.decode_json,
+		-- The page may save an Ergopti layout source in place of a composition.
+		decode_toml = TomlCodec.decode,
 		read = deps.read,
 		exists = deps.exists,
 		delete = deps.delete,

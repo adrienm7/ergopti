@@ -3,20 +3,26 @@
 --- Exercises a driver's composer operations (docs/design/layout-composer.md) with the
 --- shared composer corpus: what the page may save, the record entry, the
 --- stored declaration, the sources sent to the page, the removal, and the
---- messages of the layout manager bridge. The native installation, transport
---- and input-source ports stay controlled by the driver's manager fixture.
+--- messages of the layout manager bridge. An Ergopti layout source saved in
+--- place of a composition (the shared source corpus and its compiled
+--- .keylayout) goes through the same install. The native installation,
+--- transport and input-source ports stay controlled by the driver's manager fixture.
 return function(helpers, Json, ports)
-	local corpus_dir = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/composer/"
-	local function corpus(name)
-		local handle = assert(io.open(corpus_dir .. name, "rb"))
+	local layouts_dir = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/"
+	local function corpus(name, folder)
+		local handle = assert(io.open(layouts_dir .. (folder or "composer") .. "/" .. name, "rb"))
 		local text = handle:read("*a")
 		handle:close()
 		return text
 	end
 	local KEYLAYOUT = corpus("composed.keylayout")
 	local DECLARATION = corpus("composition.json")
+	local SOURCE = corpus("source.toml", "source")
+	local SOURCE_KEYLAYOUT = corpus("source.keylayout", "source")
 	local FAKE_DIGEST = string.rep("ab", 32)
+	local SOURCE_DIGEST = string.rep("cd", 32)
 	local DECLARATION_PATH = ports.config_dir .. "layout_composer/composition.json"
+	local SOURCE_PATH = ports.config_dir .. "layout_composer/layout_source.toml"
 
 	local function replace_once(text, old, new)
 		local first, last = text:find(old, 1, true)
@@ -31,6 +37,7 @@ return function(helpers, Json, ports)
 		local digest = deps.transport.sha256
 		deps.transport.sha256 = function(text, callback)
 			if text == KEYLAYOUT then callback(FAKE_DIGEST, nil) return end
+			if text == SOURCE_KEYLAYOUT then callback(SOURCE_DIGEST, nil) return end
 			return digest(text, callback)
 		end
 		if ports.prepare then ports.prepare(deps, state) end
@@ -151,6 +158,71 @@ return function(helpers, Json, ports)
 		end)
 	end)
 
+	helpers.describe("layout composer (" .. ports.name .. "): an Ergopti layout source", function()
+		helpers.it("refuses a source the compiled layout does not match (layout-source)", function()
+			local registry, deps, state = fresh()
+			local refused = {
+				["not toml"] = { source = "format = ", keylayout = SOURCE_KEYLAYOUT },
+				["another format"] = {
+					source = replace_once(SOURCE, 'format = "ergopti-layout"', 'format = "kalamine"'),
+					keylayout = SOURCE_KEYLAYOUT,
+				},
+				["a future version"] = {
+					source = replace_once(SOURCE, "version = 1", "version = 2"),
+					keylayout = SOURCE_KEYLAYOUT,
+				},
+				["another layout"] = { source = SOURCE, keylayout = KEYLAYOUT },
+				["a renamed internal name"] = {
+					source = replace_once(SOURCE, 'format = "bundle"', 'format = "bundle"\ninternal_name = "other"'),
+					keylayout = SOURCE_KEYLAYOUT,
+				},
+				["an oversized source"] = {
+					source = SOURCE .. string.rep(" ", 262145),
+					keylayout = SOURCE_KEYLAYOUT,
+				},
+				["both forms"] = { source = SOURCE, declaration = DECLARATION, keylayout = SOURCE_KEYLAYOUT },
+			}
+			for label, payload in pairs(refused) do
+				local result = saved(registry, deps, payload)
+				helpers.assert_true(not result.ok, label .. " must be refused")
+				helpers.assert_eq(result.code, "invalid", label)
+			end
+			helpers.assert_nil(state.files[SOURCE_PATH], "nothing is stored")
+			helpers.assert_nil(state.files[ports.local_dir .. "installed.json"], "nothing is recorded")
+		end)
+
+		helpers.it("stores the source, installs its layout and replaces the other form (layout-source)", function()
+			local registry, deps, state = fresh()
+			local result = saved(registry, deps, { source = SOURCE, keylayout = SOURCE_KEYLAYOUT, use = false })
+			helpers.assert_true(result.ok, "the save must succeed: " .. tostring(result.detail))
+			helpers.assert_eq(state.files[SOURCE_PATH], SOURCE, "the source is stored as sent")
+			helpers.assert_eq(state.files[ports.installed_copy], SOURCE_KEYLAYOUT, "its layout is installed unchanged")
+			local entry = Json.decode(state.files[ports.local_dir .. "installed.json"]).layouts.composed
+			helpers.assert_eq(entry.sha256, SOURCE_DIGEST)
+			helpers.assert_eq(entry.name, "Source Fixture")
+			helpers.assert_eq(entry.keyboard_name, "source_fixture")
+			helpers.assert_eq(entry.keycode_convention, "iso")
+			local data
+			registry.composer_open(function(payload) data = payload end, deps)
+			helpers.assert_eq(data.source, SOURCE)
+			helpers.assert_eq(data.declaration, nil)
+
+			helpers.assert_true(saved(registry, deps, { declaration = DECLARATION, keylayout = KEYLAYOUT }).ok)
+			helpers.assert_nil(state.files[SOURCE_PATH], "a composition replaces the source")
+			registry.composer_open(function(payload) data = payload end, deps)
+			helpers.assert_eq(data.source, nil)
+			helpers.assert_eq(data.declaration, DECLARATION)
+			helpers.assert_true(saved(registry, deps, { source = SOURCE, keylayout = SOURCE_KEYLAYOUT }).ok)
+			helpers.assert_nil(state.files[DECLARATION_PATH], "a source replaces the composition")
+
+			local removed
+			registry.composer_remove(function(ok) removed = ok end, deps)
+			helpers.assert_true(removed, "the removal must succeed")
+			helpers.assert_nil(state.files[SOURCE_PATH], "the removal deletes the source")
+			helpers.assert_nil(state.files[ports.installed_copy])
+		end)
+	end)
+
 	helpers.describe("layout composer (" .. ports.name .. "): the manager bridge", function()
 		helpers.it("routes the three composer messages and pushes their results (layout-composer)", function()
 			local ManagerBridge = require("layouts.manager_bridge")
@@ -174,6 +246,10 @@ return function(helpers, Json, ports)
 			helpers.assert_true(controller.on_message({ action = "composer_open" }))
 			helpers.assert_eq(pushed[#pushed].name, "composerData")
 			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = 5 }), "a save needs text")
+			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = DECLARATION,
+				source = SOURCE, keylayout = KEYLAYOUT }), "a save carries one form")
+			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE,
+				keylayout = SOURCE_KEYLAYOUT }), "a source save is routed")
 			helpers.assert_true(controller.on_message({ action = "composer_save", declaration = DECLARATION,
 				keylayout = KEYLAYOUT, use = false }))
 			local result
