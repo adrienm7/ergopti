@@ -2427,6 +2427,17 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 		local ok, keycode = true, observed_keycode
 		if keycode == nil then ok, keycode = pcall(e.getKeyCode, e) end
 		if ok and ControlSentinels.claim_key(keycode, false) then return true, fence_events end
+		-- The layout source emulation's held keys (custom modifiers, tap-holds) end
+		-- here, and a key-down it rewrote to another key releases that key.
+		if ok then
+			local settled, consumed = pcall(LayoutEmulation.key_up, e, keycode)
+			if not settled then
+				LayoutEmulation.reset()
+				SyntheticInput.defer_after_callback("layout emulation release failure", function()
+					Logger.error(LOG, "Layout emulation release failed: %s.", tostring(consumed))
+				end)
+			elseif consumed then return true, fence_events end
+		end
 		if ok and _one_shot_shift then
 			local settled, consumed = pcall(_one_shot_shift.key_up, e, keycode)
 			if not settled then

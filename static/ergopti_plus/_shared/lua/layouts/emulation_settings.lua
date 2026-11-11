@@ -160,8 +160,9 @@ end
 --- the app ships. A layout neither installed nor shipped cannot be emulated.
 --- @param id string Registry id.
 --- @param ports table { installed = id -> installed entry, read_installed = function(id) -> text|nil, err,
----   shipped = function(id) -> { entry, text }|nil, err, composer_id = string|nil }
---- @return table|nil source { id, text, convention, composer }
+---   shipped = function(id) -> { entry, text }|nil, err, composer_id = string|nil,
+---   read_emulation = function() -> decoded emulation table|nil, err (the composed layout's) }
+--- @return table|nil source { id, text, convention, composer, emulation }
 --- @return string|nil err Why it cannot be read.
 function M.source(id, ports)
 	if type(id) ~= "string" or id == "" then error("An emulation source needs a layout id.") end
@@ -170,7 +171,15 @@ function M.source(id, ports)
 	if entry ~= nil then
 		local text, err = ports.read_installed(id)
 		if type(text) ~= "string" then return nil, err or ("the installed copy of " .. id .. " is unreadable") end
-		return { id = id, text = text, convention = entry.keycode_convention, composer = composer }, nil
+		local result = { id = id, text = text, convention = entry.keycode_convention, composer = composer }
+		-- The composed layout of a layout source carries the emulation table of the
+		-- records its .keylayout leaves out (layouts/source_emulation.lua).
+		if composer and type(ports.read_emulation) == "function" then
+			local table_, emulation_err = ports.read_emulation()
+			if emulation_err ~= nil then return nil, emulation_err end
+			result.emulation = table_
+		end
+		return result, nil
 	end
 	local shipped, err = ports.shipped(id)
 	if type(shipped) ~= "table" then return nil, err or ("the layout " .. id .. " is neither installed nor shipped") end

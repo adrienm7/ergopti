@@ -34,18 +34,19 @@ local function event(flags, chars)
 	function e:setUnicodeString(text) self.unicode = text end
 	function e:setKeyCode(code) self.keycode = code end
 	function e:setFlags(value) self.flags = value end
+	function e:getProperty() return self.autorepeat and 1 or 0 end
 	return e
 end
 
 --- A fresh module with recorded collaborators and the given [layout] table.
-local function fixture(layout, form)
+local function fixture(layout, form, source_override)
 	package.loaded["modules.keymap.layout_emulation"] = nil
 	local M = require("modules.keymap.layout_emulation")
-	local record = { paused = false, magic = nil }
+	local record = { paused = false, magic = nil, now = 0, posted = {} }
 	M.init({
 		read_config = function() return { layout = layout } end,
 		default_for = require("infra.manifest_reader").default_for,
-		source = function(id)
+		source = source_override or function(id)
 			for _, entry in ipairs(INDEX.layouts) do
 				if entry.id == id then
 					return { id = id, text = read_all(helpers.shared("../../layouts/registry/" .. entry.file)),
@@ -65,6 +66,20 @@ local function fixture(layout, form)
 		keycode_for_char = function(char) return ({ z = 6, c = 8 })[char] end,
 		magic_code = function() return record.magic end,
 		is_active = function() return not record.paused end,
+		autorepeat = function(e) return e.autorepeat == true end,
+		now_ms = function() return record.now end,
+		post = function(outputs)
+			for _, output in ipairs(outputs) do
+				if output.type == "text" then record.posted[#record.posted + 1] = output.text
+				else
+					local names = {}
+					for name, held in pairs(output.flags) do if held then names[#names + 1] = name end end
+					table.sort(names)
+					record.posted[#record.posted + 1] = output.key_code .. "+" .. table.concat(names, "+")
+				end
+			end
+			return true
+		end,
 	})
 	return M, record
 end
@@ -164,5 +179,117 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		local e = event({}, "q")
 		M.key_down(e, KC_Q)
 		helpers.assert_nil(e.unicode, "the key is the system layout's")
+	end)
+end)
+
+
+-- macOS key codes of the keys the source emulation cases press (ANSI numbering).
+local KC_A, KC_SPACE, KC_TAB, KC_HOME, KC_INTL, KC_INSERT, KC_F1, KC_B, KC_END = 0, 49, 48, 115, 10, 114, 122, 11, 119
+
+--- A module emulating the source fixture's compiled layout with the emulation
+--- fixture's macOS table on top (_shared/tests/corpus/layouts/source/).
+local function source_fixture(table_)
+	local corpus = "tests/corpus/layouts/source/"
+	local emulation = table_ or Json.decode(read_all(helpers.shared(corpus .. "emulation.json"))).macos
+	return fixture({ emulated_layout = "composed", ergopti_base = true }, "ansi", function(id)
+		if id ~= "composed" then return nil, "not composed" end
+		return { id = id, text = read_all(helpers.shared(corpus .. "source.keylayout")), convention = "iso",
+			composer = true, emulation = emulation }
+	end)
+end
+
+helpers.describe("layout emulation (macOS): a layout source's records", function()
+	helpers.it("types a held custom modifier's layer until its key-up (source-emulation)", function()
+		local M = source_fixture()
+		helpers.assert_true(M.reload(), "the composed layout and its table load")
+		helpers.assert_true(M.key_down(event(), KC_INTL), "the modifier key-down is deleted")
+		local repeated = event()
+		repeated.autorepeat = true
+		helpers.assert_true(M.key_down(repeated, KC_INTL), "its repeats are deleted")
+		local e = event({}, "a")
+		helpers.assert_true(not M.key_down(e, KC_A), "a key of its layer rides its own event")
+		helpers.assert_eq(e.unicode, "α")
+		helpers.assert_true(M.key_up(event(), KC_INTL), "the modifier key-up is deleted")
+		local after = event({}, "a")
+		helpers.assert_true(not M.key_down(after, KC_A))
+		helpers.assert_eq(after.unicode, "a", "the keylayout types again")
+	end)
+
+	helpers.it("toggles a locked modifier on its presses (source-emulation)", function()
+		local M = source_fixture()
+		helpers.assert_true(M.reload())
+		helpers.assert_true(M.key_down(event(), KC_INSERT))
+		helpers.assert_true(M.key_up(event(), KC_INSERT))
+		local e = event({}, "a")
+		M.key_down(e, KC_A)
+		helpers.assert_eq(e.unicode, "あ")
+		helpers.assert_true(M.key_down(event(), KC_INSERT), "a second press unlocks it")
+		local after = event({}, "a")
+		M.key_down(after, KC_A)
+		helpers.assert_eq(after.unicode, "a")
+	end)
+
+	helpers.it("rewrites a shortcut and a remap to their key, key-up included (source-emulation)", function()
+		local M = source_fixture()
+		helpers.assert_true(M.reload())
+		local e = event({ ctrl = true }, "a")
+		helpers.assert_true(not M.key_down(e, KC_A))
+		helpers.assert_eq(e.keycode, KC_B, "Ctrl+A becomes Ctrl+B")
+		helpers.assert_eq(e.flags, { ctrl = true })
+		local up = event()
+		helpers.assert_true(not M.key_up(up, KC_A))
+		helpers.assert_eq(up.keycode, KC_B, "its key-up releases B")
+		local home = event({ shift = true })
+		helpers.assert_true(not M.key_down(home, KC_HOME))
+		helpers.assert_eq(home.keycode, KC_END)
+		helpers.assert_eq(home.flags, { shift = true }, "a remap keeps the held modifiers")
+	end)
+
+	helpers.it("types a tap-hold's tap and adds its held modifier to the keys under it (source-emulation)", function()
+		local M, record = source_fixture()
+		helpers.assert_true(M.reload())
+		record.now = 0
+		helpers.assert_true(M.key_down(event(), KC_SPACE))
+		record.now = 100
+		helpers.assert_true(M.key_up(event(), KC_SPACE))
+		helpers.assert_eq(record.posted, { " " }, "released before its threshold: the tap, posted")
+		record.now = 1000
+		helpers.assert_true(M.key_down(event(), KC_TAB))
+		record.now = 1300
+		local e = event({}, "a")
+		helpers.assert_true(not M.key_down(e, KC_A))
+		helpers.assert_eq(e.unicode, "A", "the keylayout types it shifted")
+		local f1 = event({})
+		helpers.assert_true(not M.key_down(f1, KC_F1), "a key the keylayout leaves to the system")
+		helpers.assert_eq(f1.flags, { shift = true }, "goes out with the held Shift")
+		helpers.assert_true(M.key_up(event(), KC_TAB))
+		local after = event({}, "a")
+		M.key_down(after, KC_A)
+		helpers.assert_eq(after.unicode, "a", "the held Shift ends with the key")
+	end)
+
+	helpers.it("posts a settled tap before the press that settled it (source-emulation)", function()
+		local M, record = source_fixture()
+		helpers.assert_true(M.reload())
+		record.now = 0
+		helpers.assert_true(M.key_down(event(), KC_SPACE))
+		record.now = 50
+		helpers.assert_true(M.key_down(event({}, "a"), KC_A), "the press is replayed after the tap")
+		helpers.assert_eq(record.posted, { " ", "a" })
+	end)
+
+	helpers.it("refuses a malformed table and drops held state on reset (source-emulation)", function()
+		local bad = Json.decode(read_all(helpers.shared("tests/corpus/layouts/source/emulation.json"))).macos
+		bad.version = 2
+		local refused = source_fixture(bad)
+		helpers.assert_true(not refused.reload(), "the reload fails")
+		helpers.assert_true(not refused.key_down(event(), KC_INTL), "the key passes")
+		local M = source_fixture()
+		helpers.assert_true(M.reload())
+		helpers.assert_true(M.key_down(event(), KC_INTL))
+		M.reset()
+		local e = event({}, "a")
+		M.key_down(e, KC_A)
+		helpers.assert_eq(e.unicode, "a", "the custom modifier no longer holds")
 	end)
 end)
