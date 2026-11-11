@@ -59,10 +59,13 @@
 			"Ergopti's own Python downloads, verifies and runs",
 			"Install prerequisites for The secure-field probe on a real accessibility bus",
 			"The secure-field probe on a real accessibility bus",
+			"The privacy owner follows real GTK fields on the accessibility bus",
+			"AI text reaches only its own real GTK field",
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"Launch the bounded accessibility helper with Lua interpreter options",
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown",
 			"The whole daemon, live — a trigger typed, a tray shown",
+			"The clipboard owner serves every target from a real X server",
 			"Install WebKit2GTK and lgi",
 			"Install virtual screenshot capture tools",
 			"Keep virtual screenshots inside literal private paths",
@@ -369,6 +372,15 @@
 		],
 		"The secure-field probe on a real accessibility bus": [
 			"Install prerequisites for The secure-field probe on a real accessibility bus"
+		],
+		"The privacy owner follows real GTK fields on the accessibility bus": [
+			"Install prerequisites for The secure-field probe on a real accessibility bus"
+		],
+		"AI text reaches only its own real GTK field": [
+			"Install prerequisites for The secure-field probe on a real accessibility bus"
+		],
+		"The clipboard owner serves every target from a real X server": [
+			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown"
 		],
 		"Update to the newest release and restart": [
 			"Install prerequisites for Update to the newest release and restart"
