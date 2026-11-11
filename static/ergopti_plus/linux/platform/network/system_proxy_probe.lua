@@ -28,9 +28,10 @@ end
 local shared_root = arg[1]
 if type(shared_root) ~= "string" or shared_root == "" then os.exit(2) end
 if literal_driver then
-	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "/lua", ".lua" } })
+	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "/lua", ".lua" },
+		{ shared_root .. "/lua", "/init.lua" } })
 else
-	package.path = shared_root .. "/lua/?.lua;" .. package.path
+	package.path = shared_root .. "/lua/?.lua;" .. shared_root .. "/lua/?/init.lua;" .. package.path
 end
 local Json = require("json")
 
