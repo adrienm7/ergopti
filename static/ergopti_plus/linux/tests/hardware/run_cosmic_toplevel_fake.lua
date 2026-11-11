@@ -133,8 +133,11 @@ for index, text in ipairs(argv_strings) do
 end
 local child = ffi.C.fork()
 if child == 0 then
-	local out = ffi.C.open(output_path, 0x241, 420) -- O_WRONLY | O_CREAT | O_TRUNC
-	local err = ffi.C.open(errors_path, 0x241, 420)
+	-- open's mode is variadic: a plain Lua number reaches it as a double and the
+	-- files are created mode 0000, which only root can read back.
+	local mode = ffi.cast("unsigned int", 420) -- 0644
+	local out = ffi.C.open(output_path, 0x241, mode) -- O_WRONLY | O_CREAT | O_TRUNC
+	local err = ffi.C.open(errors_path, 0x241, mode)
 	ffi.C.dup2(out, 1)
 	ffi.C.dup2(err, 2)
 	ffi.C.execvp("luajit", argv)
