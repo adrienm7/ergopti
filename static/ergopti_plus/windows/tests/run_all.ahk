@@ -316,6 +316,7 @@ global _DefaultLogsDir := _LogsDir
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/modules/keymap/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
+#Include ../modules/keymap/layout_registry_watch.ahk
 #Include ../modules/keymap/pause_layout_switch.ahk
 #Include ../modules/keymap/system_layout_install.ahk
 #Include ../ui/tooltip/init.ahk
@@ -2106,6 +2107,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/keymap/test_layout_rows_policy.ahk
 #Include unit/modules/keymap/test_pause_switch_policy.ahk
 #Include unit/modules/keymap/test_pause_layout_switch.ahk
+#Include unit/modules/keymap/test_layout_registry_watch.ahk
 #Include unit/modules/keymap/test_system_layout_install.ahk
 #Include unit/modules/keymap/test_number_row_native_hkl.ahk
 #Include meta/platform/remap/altgr/test_altgr_kana_taphold_entry.ahk

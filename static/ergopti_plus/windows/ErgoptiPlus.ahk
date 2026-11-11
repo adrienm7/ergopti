@@ -1755,6 +1755,8 @@ global _PENDING_KEYBOARD_HKL := 0
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
+; Sees a keyboard-layout registry change at once and runs the poll's capture.
+#Include modules/keymap/layout_registry_watch.ahk
 ; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
 #Include modules/keymap/pause_layout_switch.ahk
 #Include modules/keymap/system_layout_install.ahk
@@ -1802,3 +1804,5 @@ CheckKeyboardLayoutChange() {
 }
 AltGrFamilyStartFollowing()
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)
+; The poll stays the backstop; the watch captures a registry change at once.
+LayoutRegistryWatch_Start(CheckKeyboardLayoutChange)
