@@ -165,6 +165,39 @@ try {
 	);
 	if (process.platform !== 'win32') {
 		const physicalPython = pythonExecutable();
+		// XNU answers killpg(group, 0) with EPERM while the group's last members
+		// are unreaped zombies (runs 42438031643, 42480689370): the retirement
+		// observer must keep waiting for ESRCH instead of raising, and a refusal
+		// that lasts to the deadline must stay unknown.
+		const zombieGroupRun = spawnSync(
+			physicalPython,
+			[
+				'-c',
+				[
+					'import importlib.util, json, sys, time',
+					'spec = importlib.util.spec_from_file_location("probe", sys.argv[1])',
+					'probe = importlib.util.module_from_spec(spec)',
+					'spec.loader.exec_module(probe)',
+					'def answers(errors):',
+					'    def killpg(group, sig):',
+					'        raise errors.pop(0) if len(errors) > 1 else errors[0]',
+					'    return killpg',
+					'probe.os.killpg = answers([PermissionError(1, "zombie"), PermissionError(1, "zombie"), ProcessLookupError(3, "gone")])',
+					'closed = probe.retire_group(2 ** 22 + 7, time.monotonic() + 2)',
+					'probe.os.killpg = answers([PermissionError(1, "zombie")])',
+					'unknown = probe.retire_group(2 ** 22 + 7, time.monotonic() + 0.1)',
+					'print(json.dumps(dict(closed=closed, unknown=unknown), separators=(",", ":")))'
+				].join('\n'),
+				path.join(ROOT, 'tools/test/lib/app-cloner-log-cleanup-probe.py')
+			],
+			{ encoding: 'utf8', timeout: PHYSICAL_CLI_PROBE_TIMEOUT_MS }
+		);
+		test(
+			'the log-cleanup probe waits through a zombie group EPERM and keeps a lasting one unknown',
+			zombieGroupRun.status === 0 &&
+				zombieGroupRun.stdout.trim() === JSON.stringify({ closed: true, unknown: false }),
+			`${zombieGroupRun.status} ${zombieGroupRun.stdout} ${zombieGroupRun.stderr}`
+		);
 		fixtureCanRetire = false;
 		const physicalRun = spawnSync(
 			physicalPython,
