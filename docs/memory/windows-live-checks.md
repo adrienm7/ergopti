@@ -145,3 +145,18 @@ and every launcher of the elevated device restart asks
 file; the real key is read only to catch a leak. Action: a new machine-scoped
 writer (Startup folder, `HKCU\Software\Ergopti\Storage`, an OS setting) follows
 the same rule before a live check clicks it.
+
+### project-an-isolated-driver-keeps-off-startup-and-storage
+
+The same rule now covers the two other machine-scoped writers: APPDATA is not
+redirected for an isolated driver, so its start-at-login toggle reached the
+user's real `A_Startup` shortcut, and every `ST_*` value (WPM widget position,
+LLM refusal and agent state, updater cadence) went to the real
+`HKCU\Software\Ergopti\Storage`. `infra/start_at_login.ahk` takes its folder
+and approval reader from `_StartAtLoginIsolate` (private `startup_private\`,
+no Windows approval) and `adapters/storage.ahk` swaps every registry port in
+`_ST_Isolate` for `storage_private.txt`, a caller's included. Each logs one
+`Isolated profile:` line. No live check clicks start at login, and the real
+Storage key is not a leak oracle: the user's own driver writes it meanwhile.
+Action: a test that toggles one of them proves the private port before it
+mutates, so a regressed owner fails without touching the machine.
