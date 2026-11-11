@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Pins the emulation of what no .keylayout holds: the table compileEmulation
  * writes for the emulation fixture equals its committed golden file (generated
- * by `layout-source export-emulation`), the web engine replays the shared
+ * by tools/codegen/codegen-layout-source-emulation.cjs), the web engine replays the shared
  * typing vectors the Lua drivers replay too, the engine refuses malformed
  * tables, every record the emulation cannot perform is reported, and
  * export-all publishes the emulation and web targets.
@@ -39,8 +39,25 @@ for (const platform of ['macos', 'linux', 'windows']) {
 	assert.deepEqual(
 		clone(Source.compileEmulation(fixture, { platform })),
 		golden[platform],
-		`${platform}: regenerate with node tools/layout-source.cjs export-emulation ` +
-			'<emulation_source.toml> <new emulation.json>'
+		`${platform}: regenerate with node tools/codegen/codegen-layout-source-emulation.cjs`
+	);
+	checks++;
+}
+
+// The main fixture's tables, which the drivers' composer host tests store, too.
+{
+	const main = Source.read(read(path.join(corpus, 'source.toml')));
+	assert.deepEqual(
+		clone(
+			Object.fromEntries(
+				['macos', 'linux', 'windows'].map((platform) => [
+					platform,
+					Source.compileEmulation(main, { platform })
+				])
+			)
+		),
+		JSON.parse(read(path.join(corpus, 'source_emulation.json'))),
+		'regenerate with node tools/codegen/codegen-layout-source-emulation.cjs'
 	);
 	checks++;
 }

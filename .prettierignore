@@ -27,6 +27,8 @@ src/routes/ergopti-plus/input-inventory.json
 static/ergopti_plus/_shared/core/ports/contracts.json
 static/ergopti_plus/_shared/data/metrics_general_category_aliases.json
 static/ergopti_plus/_shared/tests/corpus/keystats/roi_lowercase_vectors.json
+static/ergopti_plus/_shared/tests/corpus/layouts/source/emulation.json
+static/ergopti_plus/_shared/tests/corpus/layouts/source/source_emulation.json
 static/ergopti_plus/_shared/go/native_http/managed_ollama_bootstrap.json
 static/ergopti_plus/_shared/go/native_http/managed_ollama_environment.json
 static/ergopti_plus/_shared/go/native_http/proxy_policy.json

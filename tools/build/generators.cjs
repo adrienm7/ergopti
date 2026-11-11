@@ -391,6 +391,13 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-layout-source-emulation.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/tests/corpus/layouts/source/emulation.json',
+			'static/ergopti_plus/_shared/tests/corpus/layouts/source/source_emulation.json'
+		]
+	},
+	{
 		script: 'codegen/codegen-keystats-roi-policy.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/keystats/roi_policy.lua']
 	},
