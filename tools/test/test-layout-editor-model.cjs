@@ -139,20 +139,20 @@ test('an invalid edit is refused and leaves the document as it was', () => {
 
 test('modifiers, layers and dead keys still in use cannot be removed', () => {
 	let doc = IO.create('a', 'A');
-	doc = M.setModifier(doc, 'kana', 'locked', ['ScrollLock']);
-	doc = M.addLayer(doc, 'kana', ['kana'], ['shift']);
-	refuses(() => M.removeModifier(doc, 'kana'), 'modifier_in_use');
+	doc = M.setModifier(doc, 'roya', 'locked', ['ScrollLock']);
+	doc = M.addLayer(doc, 'roya', ['roya'], ['shift']);
+	refuses(() => M.removeModifier(doc, 'roya'), 'modifier_in_use');
 	refuses(() => M.removeLayer(doc, 'base'), 'layer_base_required');
 	doc = M.setTapHold(doc, {
 		key: 'CapsLock',
 		tap: { key: 'Escape' },
-		hold_layer: 'kana',
+		hold_layer: 'roya',
 		threshold_ms: 180
 	});
-	refuses(() => M.removeLayer(doc, 'kana'), 'layer_in_use');
+	refuses(() => M.removeLayer(doc, 'roya'), 'layer_in_use');
 	doc = M.removeTapHold(doc, 'CapsLock');
-	doc = M.removeLayer(doc, 'kana');
-	doc = M.removeModifier(doc, 'kana');
+	doc = M.removeLayer(doc, 'roya');
+	doc = M.removeModifier(doc, 'roya');
 	assert.equal(doc.modifiers, undefined);
 	doc = M.setDeadKey(doc, 'circ', 'Circumflex', '^');
 	doc = M.setMapping(doc, 'base', 'BracketLeft', { dead_key: 'circ' }, null);
