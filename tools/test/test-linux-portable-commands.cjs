@@ -477,7 +477,8 @@ const PROGRAMS = {
 	kwin_x11: optionalTool('KWin X11 of the layout switching proof', HOST),
 	kded6: optionalTool('KDE daemon of the layout switching proof', HOST),
 	xrandr: optionalTool(
-		'action picker window switching, the menu row is disabled with a reason when absent'
+		'action picker window switching and the pointer gestures, the menu row is disabled with a reason when absent; the desktop actions proof exits 2 without it',
+		DRIVER_HOST
 	),
 	xprop: optionalTool(
 		'action picker window switching and the file manager folder, the menu row is disabled with a reason when absent',
