@@ -125,7 +125,8 @@ local function with_undo(options, body)
 					-- The physical Backspace that requests the Undo is a manual correction.
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
 				engine = { reset = function() end, apply_expansion = function() end, on_char = function()
-					return { trigger = options.trigger, replacement = "ZZ", backspace_count = 1,
+					return { trigger = options.stored_trigger or options.trigger,
+						typed_trigger = options.trigger, replacement = "ZZ", backspace_count = 1,
 						is_private = options.private == true }
 				end }, Logger = logger, injector = wrapped,
 			}, { __index = _G })
@@ -168,6 +169,15 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 			end)
 		end)
 	end
+	-- A conform rule stores `adn` and fires on `Adn`: Windows (the buffer) and
+	-- macOS (the matched text) type back what the user typed. Main used the
+	-- stored trigger and restored `adn`.
+	helpers.it("restores the trigger with the casing the user typed (undo-typed-casing)", function()
+		with_undo({ trigger = "ok", stored_trigger = "OK" }, function(state)
+			helpers.assert_true(state.result.ok and state.result.cleanup_ok)
+			helpers.assert_eq(state.documents["/field/original"], "ok", "the typed spelling comes back")
+		end)
+	end)
 	helpers.it("keeps the private trigger out of the actual injector trace (undo-owner)", function()
 		with_undo({ trigger = "★PRIVATE_UNDO★", private = true }, function(state)
 			helpers.assert_true(state.result.ok)
