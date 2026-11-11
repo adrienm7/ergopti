@@ -65,7 +65,11 @@ physical key observer releases the held buttons ahead of its privacy gate.
   scaled threshold is stale.
 - **GSD-3, the two-finger incremental minimum.** The Linux tracker uses
   1.5 mm for every finger count; macOS 3.0 (diagonal 5.0) for two fingers
-  (`geometry.lua`). Matters only for a two-finger incremental slot.
+  (`geometry.lua`). Matters only for a two-finger incremental slot. Decided
+  by the maintainer on 2026-11-11: 3.0 mm (diagonal 5.0) on both, from the
+  one shared value, the timings registry's `[gestures]` `*_minimum_mm`, read by
+  both (`pair-incremental-minimum`; a local copy fails
+  `test-gesture-defaults-single-source.cjs`). Windows has no live minimum.
 
 ## Refuted
 

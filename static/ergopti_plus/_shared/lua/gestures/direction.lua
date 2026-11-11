@@ -122,6 +122,24 @@ function M.name(axis, dx, dy)
 	return horizontal .. "_" .. vertical
 end
 
+--- The least travel, in millimetres, of a swipe of a finger count. The values
+--- are the [gestures] *_minimum_mm keys of the shared timings registry, one for
+--- every driver (maintainer decision GSD-3 of 11 November 2026): a pair needs
+--- its own, since two fingers are also the native scroll.
+--- @param fingers integer Finger count, from 2.
+--- @param registry table { swipe_minimum_mm, pair_swipe_minimum_mm, pair_diagonal_minimum_mm }
+---   as the driver read them (Timings.count("gestures", key)).
+--- @return number minimum, number diagonal_minimum
+function M.minimums_mm(fingers, registry)
+	assert(type(fingers) == "number" and fingers >= 2 and fingers % 1 == 0, "a swipe needs two fingers or more")
+	assert(type(registry) == "table", "the swipe minimums are read from the timings registry")
+	for _, key in ipairs({ "swipe_minimum_mm", "pair_swipe_minimum_mm", "pair_diagonal_minimum_mm" }) do
+		assert(type(registry[key]) == "number" and registry[key] > 0, "the timings registry has no " .. key)
+	end
+	if fingers == 2 then return registry.pair_swipe_minimum_mm, registry.pair_diagonal_minimum_mm end
+	return registry.swipe_minimum_mm, registry.swipe_minimum_mm * M.DIAGONAL_MINIMUM_FACTOR
+end
+
 --- The straight direction of a displacement's dominant axis: the slot a
 --- diagonal falls back to when its own slot is unbound (maintainer decision of
 --- 11 November 2026, macOS and Linux). A tie is horizontal, as in M.axis.
