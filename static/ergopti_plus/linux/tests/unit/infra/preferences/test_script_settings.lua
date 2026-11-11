@@ -186,3 +186,48 @@ helpers.describe("script settings mutation", function()
 		helpers.assert_eq(#logger.levels, 0)
 	end)
 end)
+
+-- Each log-level, locale or error-window change wrote storage.edit-*.bak, a
+-- full copy of the store, and config.toml.edit-*.bak when the file held the
+-- row, and nothing removed them: the folder grew with ordinary use. Windows
+-- and macOS keep no copy per edit; a committed and released edit now removes
+-- its own rollback copies (CFL-002, script-edit-backups).
+helpers.describe("script settings edits (script-edit-backups)", function()
+	--- Names of the edit backups in the scratch configuration folder.
+	local function edit_backups(dir)
+		local found = {}
+		local listing = assert(io.popen("ls -1A " .. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null"))
+		for name in listing:lines() do
+			if name:find("%.edit%-.*%.bak$") then found[#found + 1] = name end
+		end
+		listing:close()
+		return found
+	end
+
+	helpers.it("removes its rollback copies once an edit commits (script-edit-backups)", function()
+		local Paths = require("infra.config_paths")
+		local dir = Paths.default_config_dir()
+		helpers.assert_true(dir:find(os.getenv("HOME") or "\0", 1, true) == 1, "the runner's scratch home holds the folder")
+		local Settings = require("infra.script_settings")
+		local before = Settings.current()
+		local config = Paths.config("config.toml")
+		assert(os.execute("mkdir -p " .. require("adapters.shell_runner").quote(dir)))
+		local handle = assert(io.open(config, "w"))
+		handle:write('[script]\nlog_level = "INFO"\n')
+		handle:close()
+		local ok, err = pcall(function()
+			for _, level in ipairs({ "DEBUG", "WARNING", "ERROR" }) do
+				helpers.assert_true(Settings.set(level), "the menu change commits: " .. level)
+			end
+			helpers.assert_eq(Settings.current(), "ERROR")
+			local file = assert(io.open(config, "r"))
+			local text = file:read("*a")
+			file:close()
+			helpers.assert_true(text:find('log_level = "ERROR"', 1, true) ~= nil, "the row the file holds is rewritten")
+			helpers.assert_eq(edit_backups(dir), {}, "no copy of the store or the file is left behind")
+		end)
+		Settings.set(before)
+		os.remove(config)
+		if not ok then error(err, 0) end
+	end)
+end)
