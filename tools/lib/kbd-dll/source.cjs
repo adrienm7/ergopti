@@ -27,10 +27,8 @@
 
 'use strict';
 
-const fs = require('node:fs');
 const C = require('./constants.cjs');
 const Model = require('./model.cjs');
-const { shared } = require('../paths.cjs');
 
 // The modifier ids of a column's bits; AltGr (Ctrl+Alt) is the right Alt key.
 const COLUMN_IDS = [
@@ -56,11 +54,19 @@ const fail = (code, path) => {
 	throw new SourceMappingError(code, path);
 };
 
+/**
+ * The physical-key registry (_shared/data/keycodes/physical_keys.json) read from
+ * the repository; a page passes the table it already holds instead.
+ */
+function repositoryPhysicalKeys() {
+	const fs = require('node:fs');
+	const { shared } = require('../paths.cjs');
+	return JSON.parse(fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8'));
+}
+
 /** Physical key name <-> extended scan code (0x1nn for an E0 key), from the registry. */
-function scanTable() {
-	const keys = JSON.parse(
-		fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
-	).keys;
+function scanTable(physicalKeys) {
+	const keys = (physicalKeys || repositoryPhysicalKeys()).keys;
 	const bySc = new Map();
 	const byCode = new Map();
 	for (const [code, key] of Object.entries(keys)) {
@@ -135,13 +141,14 @@ const deadId = (unit) => `dead_${unit.toString(16).padStart(4, '0')}`;
 /**
  * A Windows layout as an Ergopti layout source.
  * @param {object} model - A checked kbd tables model.
- * @param {{id: string, name?: string}} options
+ * @param {{id: string, name?: string, physicalKeys?: object}} options - physicalKeys: the
+ *   physical-key registry, read from the repository when absent.
  * @returns {object} The source document (validate it with LayoutSource).
  */
 function toSource(model, options) {
 	Model.check(model);
 	const altgr = model.flags.includes('altgr');
-	const { bySc } = scanTable();
+	const { bySc } = scanTable(options.physicalKeys);
 	// Effective scan code -> virtual key, the layout's moves applied.
 	const vkOfSc = new Map();
 	for (let sc = 1; sc < 0x80; sc++) if (defaultVk(sc)) vkOfSc.set(sc, defaultVk(sc));
@@ -261,10 +268,11 @@ function selectorMask(selector, altgr) {
  * `omitted`; a Caps Lock layer is read back as the CAPLOK attribute when it
  * types each key's Shift column, else the source is refused.
  * @param {object} source - A validated structured source with exports.windows.
- * @param {{lcid?: string}} [options]
+ * @param {{physicalKeys?: object}} [options] - physicalKeys: the physical-key registry, read
+ *   from the repository when absent (a page passes its own).
  * @returns {{model: object, omitted: {path: string, reason: string}[]}}
  */
-function fromSource(source) {
+function fromSource(source, options = {}) {
 	const windows = source.exports && source.exports.windows;
 	if (!windows) fail('source_windows_metadata', 'exports.windows');
 	const altgr =
@@ -272,7 +280,7 @@ function fromSource(source) {
 		source.layers.some(
 			(layer) => layer.required.includes('alt_right') || layer.required.includes('alt')
 		);
-	const { byCode } = scanTable();
+	const { byCode } = scanTable(options.physicalKeys);
 	const omitted = [];
 	const columns = [];
 	const columnLayers = [];

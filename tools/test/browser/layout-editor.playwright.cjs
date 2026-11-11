@@ -413,6 +413,17 @@ async function exerciseManager(browser, origin) {
 		// The site says where the Windows DLL and installer come from, and offers no
 		// in-app install or emulation.
 		assert.match(await page.textContent('#le-dll-note'), /node tools\/kbd-dll\.cjs build/);
+		// The four Windows DLLs, written in the page with no compiler.
+		const [dll] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-dll')]);
+		assert.equal(dll.suggestedFilename(), 'kbdergo-dll.zip');
+		const dllZip = fs.readFileSync(await dll.path());
+		assert.deepEqual([...dllZip.subarray(0, 4)], [0x50, 0x4b, 0x03, 0x04], 'a ZIP');
+		for (const arch of ['x86', 'wow64', 'x64', 'arm64'])
+			assert.ok(dllZip.includes(`kbdergo/${arch}/kbdergo.dll`), `${arch} image in the ZIP`);
+		assert.ok(
+			dllZip.includes(Buffer.from('KbdLayerDescriptor')),
+			'the images export KbdLayerDescriptor'
+		);
 		assert.equal(await page.locator('#le-install, #le-emulate').count(), 0);
 		const klcBytes = fs.readFileSync(await klc.path());
 		assert.deepEqual([...klcBytes.subarray(0, 2)], [0xff, 0xfe], 'MSKLC UTF-16LE with a BOM');

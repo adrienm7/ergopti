@@ -92,15 +92,15 @@ folder layout and `tools/kbd-dll.cjs`. Decided by the coordinator on 2026-11-11,
 
 **Message contract** (the page sends these on the WebView2 channel exactly as on `layout_manager_bridge`):
 
-| Action                   | Payload                                      | Host answer                                                                      | Refusal codes                                                                  |
-| ------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `source_open`            | —                                            | `sourceData {text, filename, folder}` (the last saved source, else `text: null`) | —                                                                              |
-| `source_save`            | `{filename, text}`                           | `sourceResult {ok, code, detail, filename}`                                      | `invalid_name`, `too_large`, `write_failed` (`source_store.lua`)               |
-| `source_pick` (optional) | —                                            | `sourcePicked {filename, text} \| {} \| {code, detail}`                          | as `source_save`                                                               |
-| `composer_save`          | `{source, keylayout, emulation?, use: true}` | `composerResult {action, ok, code, detail, used, pending}`                       | `invalid`, `write_failed`, `use_failed`, `install_failed`, `elevation_refused` |
-| `composer_emulate`       | `{source, keylayout, emulation?}`            | `composerResult {action: "composer_emulate", ok, code, detail, used}`            | `invalid`, `write_failed`, `emulate_not_saved`, `emulate_failed`               |
-| `composer_remove`        | —                                            | `composerResult {action, ok, code, detail}`                                      | `write_failed`, `uninstall_failed`                                             |
-| `nav_save`               | `{text}`                                     | `navResult {saved, applied, errors}`                                             | the layer editor's codes                                                       |
+| Action                   | Payload                                                      | Host answer                                                                      | Refusal codes                                                                                                         |
+| ------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `source_open`            | —                                                            | `sourceData {text, filename, folder}` (the last saved source, else `text: null`) | —                                                                                                                     |
+| `source_save`            | `{filename, text}`                                           | `sourceResult {ok, code, detail, filename}`                                      | `invalid_name`, `too_large`, `write_failed` (`source_store.lua`)                                                      |
+| `source_pick` (optional) | —                                                            | `sourcePicked {filename, text} \| {} \| {code, detail}`                          | as `source_save`                                                                                                      |
+| `composer_save`          | `{source, keylayout, emulation?, use: true, dll_name, dlls}` | `composerResult {action, ok, code, detail, used, pending}`                       | `invalid`, `write_failed`, `use_failed`, `install_failed`, `elevation_refused`, `foreign_layout`, `profile_not_added` |
+| `composer_emulate`       | `{source, keylayout, emulation?}`                            | `composerResult {action: "composer_emulate", ok, code, detail, used}`            | `invalid`, `write_failed`, `emulate_not_saved`, `emulate_failed`                                                      |
+| `composer_remove`        | —                                                            | `composerResult {action, ok, code, detail}`                                      | `write_failed`, `uninstall_failed`                                                                                    |
+| `nav_save`               | `{text}`                                                     | `navResult {saved, applied, errors}`                                             | the layer editor's codes                                                                                              |
 
 `initData` then carries `source_editor: true`, `emulate: true` and `nav_apply: true`. The checks are the shared
 composer's (`_shared/lua/layouts/composer.lua` `check_source` and `check_emulation`): the source is TOML of format
@@ -125,38 +125,71 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
    - `composer_emulate` installs nothing: it writes `[layout] emulated_layout = "composed"` and
      `ergopti_base = true` (the leaves `_LayMgrWeb_SelectionOperations` already writes for a registry choice) and
      reloads the emulation.
-   - `composer_save` builds the DLLs and installs them (below), then switches to the layout.
+   - `composer_save` stages the DLL images the page sent and registers them through the elevated helper (below),
+     then switches to the layout.
 4. `windows/modules/keymap/keylayout/keylayout_emulation.ahk`: in `KeylayoutEmulation_Boot`, when the id is the
    composer's and `read_local` fails, read `layout_composer\layout_source.keylayout` (what `read_composed` does on
    macOS and Linux) instead of logging « save it again »; and perform `layout_source_emulation.json` for what the
    `.keylayout` cannot hold (tap-holds, layer holds, multi-character outputs): an AHK port of
    `_shared/lua/layouts/source_emulation.lua`, tested by replaying `_shared/tests/corpus/layouts/source/
 emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
-5. Menu: in `_shared/modules/menu/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
+5. `windows/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
+   `uninstall <dll>`.
+6. Menu: in `_shared/modules/menu/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
    (and the locale key `platform_reason.layout_editor_host_pending_on_windows`); in `windows/ui/menu/menu_init.ahk`
    bind `Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
 
-**Installing from Windows.** The DLLs and the installer come from `tools/kbd-dll.cjs build <source.toml>
-<new-dir>` (`npm run kbd-dll -- build …`), which writes `<arch>/<dll>.dll` for x86, WOW64, x64 and arm64, the NSIS
-`<dll>-setup.exe` and `report.json` after reading every image back. It needs Node, `clang`, `lld-link`, `llvm-rc`
-and `makensis`, which a user's PC does not have, and the Windows bundle ships no Node. So:
+**Installing from Windows.** No Node, no NSIS, no clang on the user's PC. The page writes the four DLL images itself
+(`_generated/kbd_dll_writer.js`, the repository tool's compiler-free writer, proven equal to the clang images in
+[layout-windows-dll.md](layout-windows-dll.md#what-is-proven-and-how)). On a host whose `initData` platform is
+`windows`, `composer_save` adds `dll_name` and `dlls: {x86, wow64, x64, arm64}`, each the image in base64
+(`LayoutSourceIO.installPayload`). The host checks each image before anything is elevated: decoded size at most
+1 MiB, an `MZ` header, and `dll_name` matching `^kbd[a-z0-9_]{1,5}$` (the model's DLL name rule).
 
-- **Now:** the host runs it only when those five are on `PATH` (a developer machine). Otherwise
-  « Install on the system » answers `install_failed` with the reason, and « Emulate without installing » is the
-  way. Then: `RunWait '*RunAs "<dir>\<dll>-setup.exe" /S'` (one UAC prompt; a refused prompt is
-  `elevation_refused`).
-  - The installer copies the DLLs into System32 and SysWOW64, writes the `Keyboard Layouts\<KLID>` key and adds the
-    input profile; see [layout-windows-dll.md](layout-windows-dll.md#installer).
-  - The host switches with `LoadKeyboardLayoutW("<KLID>", KLF_ACTIVATE)` and posts `WM_INPUTLANGCHANGEREQUEST` to
-    the foreground window.
-  - Already installed: a key under `HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts` whose
-    `Layout File` is `<dll>.dll`, or the uninstall entry `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\
-Ergopti_kbd_<dll>` holding the KLID. An upgrade reuses that KLID (the installer does).
-  - `composer_remove` runs the entry's `UninstallString /S` elevated.
-- **Next (recommended):** drop the toolchain. A keyboard DLL is data plus one exported function returning a
-  pointer, so a PE writer in JavaScript (`tools/lib/kbd-dll`, checked against `reader.cjs` and the clang images) can
-  run in the page itself. The host then receives the DLL bytes in `composer_save` and does the registry steps of
-  the NSIS script in an elevated helper, with no Node and no NSIS. This is a follow-up item, not started.
+1. **Staging (unprivileged, `composer.ahk`).** Decode the four images into
+   `%LOCALAPPDATA%\Ergopti\layout_composer\dll\<dll>\<arch>\<dll>.dll`, and write `request.json` there:
+   `{action: "install", dll, text, lcid, company}`. The text, the LCID and the company come from the stored source's
+   `exports.windows`, the same fields `tools/lib/kbd-dll/source.cjs` reads.
+2. **Elevation.** `RunWait('*RunAs "' A_AhkPath '" "' A_ScriptDir '\ui\layout_manager\kbd_register.ahk" "' Staging
+'"')`. This is the one UAC prompt. A refused prompt (`RunWait` throws, or exit code 1223) answers
+   `composerResult {ok: false, code: "elevation_refused"}`.
+3. **`kbd_register.ahk install` (elevated, new file).** The same steps as the NSIS installer of
+   `tools/lib/kbd-dll/installer.cjs`, in this order:
+   - Read `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Ergopti_kbd_<dll>` `KLID`. When present, it is
+     an upgrade: keep that KLID and its `Layout Id`.
+   - Otherwise, take the first free KLID `a0nn<lcid>`, with `nn` from `01` to `ff` and no `Layout File` under
+     `HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\<KLID>`. The `Layout Id` is one above the largest
+     `Layout Id` of every key there, as 4 hexadecimal digits.
+   - Copy the images with `DllCall("Wow64DisableWow64FsRedirection")` around the System32 copy:
+     - ARM64 Windows: `arm64` into `%WINDIR%\System32` and `wow64` into `%WINDIR%\SysWOW64`;
+     - x64 Windows: `x64` into System32 and `wow64` into SysWOW64;
+     - 32-bit Windows: `x86` into System32.
+     - The machine comes from `IsWow64Process2` (native machine `0xAA64`, `0x8664`, or none).
+   - Write `Layout File` = `<dll>.dll` (REG_SZ), `Layout Text` = text (REG_SZ), `Layout Display Name` =
+     `@%SystemRoot%\system32\<dll>.dll,-1000` (REG_EXPAND_SZ) and `Layout Id` (REG_SZ) under the KLID key.
+   - `DllCall("input\InstallLayoutOrTip", "WStr", "<LCID upper>:<KLID>", "UInt", 0)`. A zero return is reported
+     as `profile_not_added`; the layout is installed and can be added in Settings.
+   - Write the uninstall entry: `DisplayName`, `Publisher` (the company), `KLID`, `NoModify` = 1, `NoRepair` = 1,
+     and `UninstallString` = `"<AutoHotkey>" "<...>\kbd_register.ahk" uninstall <dll>`.
+   - Write `result.json` `{ok, code, klid}` next to `request.json`; exit 0 on success, 1 on failure.
+4. **Switching (unprivileged).** Read `result.json`, then call `LoadKeyboardLayoutW("<KLID>", KLF_ACTIVATE)` and post
+   `WM_INPUTLANGCHANGEREQUEST` with that HKL to the foreground window. Answer `composerResult {ok, used: true}`.
+5. **Already installed.** The uninstall entry `Ergopti_kbd_<dll>` holds the KLID. A `Keyboard Layouts` key whose
+   `Layout File` is `<dll>.dll` but no entry is someone else's layout: refuse with `foreign_layout` and never
+   overwrite it, as the Linux host refuses a file it does not own.
+6. **`kbd_register.ahk uninstall <dll>` (elevated, from `composer_remove` or Settings → Apps).** The NSIS uninstall
+   section:
+   - `InstallLayoutOrTip("<LCID>:<KLID>", ILOT_UNINSTALL = 1)`.
+   - The current user's `HKCU\Keyboard Layout\Substitutes` values whose data is the KLID, and every
+     `HKCU\Keyboard Layout\Preload` value naming that substitute or the KLID.
+   - The KLID key.
+   - The DLLs in System32 and SysWOW64. When one is still loaded, `MoveFileEx(path, 0,
+MOVEFILE_DELAY_UNTIL_REBOOT)` removes it at the next start.
+   - The uninstall entry.
+   - `result.json` as above.
+
+`tools/kbd-dll.cjs build … --writer pe` remains the developer's route to the same images plus a signed-or-not
+NSIS installer for distribution ([layout-windows-dll.md](layout-windows-dll.md#signing-maintainer)).
 
 **Tests to add (AHK).**
 
@@ -167,7 +200,11 @@ Ergopti_kbd_<dll>` holding the KLID. An upgrade reuses that KLID (the installer 
 - The emulation's composer-folder fallback.
 - The emulation vectors replayed through `keylayout_emulation.ahk`.
 - The menu row bound and enabled.
-- The « already installed » detection on a fake registry.
+- The « already installed » and « foreign layout » detection on a fake registry, the KLID and Layout Id allocation,
+  and `kbd_register.ahk`'s install and uninstall steps against a fake registry and file system (the helper's
+  `DllCall`s and registry writes injected), each step in the NSIS script's order.
+- The staged images: the base64 of `installPayload(doc, "windows")` decodes to the bytes
+  `test-layout-editor-model.cjs` proves equal to the tool's.
 - A manual check on a PC: install, type, uninstall, as in [layout-windows-dll.md](layout-windows-dll.md).
 
 ## Limits stated to the user
