@@ -166,6 +166,9 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 				helpers.assert_eq(state.stopped, nil, "a healthy destination refusal must not stop the keyboard")
 				helpers.assert_eq(state.clipboard, "SAVED")
 				helpers.assert_eq(state.undo, nil)
+				-- Windows logs a failed restore as an error; Main dropped the receipt.
+				helpers.assert_true(table.concat(state.logs, "\n"):find("Undo: the trigger was not restored", 1, true) ~= nil,
+					"a refused restore must be reported (undo-refusal-reported)")
 			end)
 		end)
 	end
@@ -184,6 +187,11 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 			helpers.assert_eq(table.concat(state.logs, "\n"):find("★PRIVATE_UNDO★", 1, true), nil,
 				"a private trigger must not reach the persistent logger")
 			helpers.assert_true(state.private, "the private classification must survive the Undo commit record")
+			local logs = table.concat(state.logs, "\n")
+			helpers.assert_true(logs:find("Undo: restoring a private trigger (content withheld)", 1, true) ~= nil,
+				"a private restore says only that it happened, as on Windows and macOS (undo-private-log)")
+			helpers.assert_eq(logs:find("Undo: restoring the trigger (", 1, true), nil,
+				"not even the private trigger's length")
 			helpers.assert_eq(state.documents["/field/original"], "★PRIVATE_UNDO★")
 		end)
 	end)

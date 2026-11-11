@@ -2209,13 +2209,24 @@ local function main()
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
-				-- The trigger is typed text: its length is the diagnostic, not its content.
-				Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
-					utf8.len(undo.trigger) or #undo.trigger)
-				injector.inject(remaining - 1, undo.trigger, undo.is_private, nil, undo.destination)
+				-- The trigger is typed text: its length is the diagnostic, not its
+				-- content, and a private one gives not even that (Windows, macOS).
+				if undo.is_private then
+					Logger.info(LOG, "Undo: restoring a private trigger (content withheld).")
+				else
+					Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
+						utf8.len(undo.trigger) or #undo.trigger)
+				end
+				local ok_delivery, delivery = pcall(injector.inject, remaining - 1, undo.trigger,
+					undo.is_private, nil, undo.destination)
 				-- The restored trigger ends the line and is not in the buffer: a
-				-- word-start rule typed next would otherwise fire inside it.
+				-- word-start rule typed next would otherwise fire inside it. A
+				-- refused restore leaves the line unknown, which the same reset says.
 				engine:reset(false)
+				if not (ok_delivery and type(delivery) == "table" and delivery.ok == true) then
+					Logger.error(LOG, "Undo: the trigger was not restored: %s.",
+						tostring(ok_delivery and type(delivery) == "table" and delivery.error or delivery))
+				end
 				return
 			end
 		end
