@@ -3662,8 +3662,11 @@ local function main()
 		end,
 		onPeriodic = on_periodic,
 		periodSec = 0.25,
-		-- Sleep on the input descriptors between ticks instead of spinning a core.
-		idleWait = keyboard_hook.idle_wait,
+		-- Sleep on the input descriptors between ticks instead of spinning a core,
+		-- and on the tray's GLib descriptors, so a panel's request wakes it too.
+		idleWait = function(timeout_ms)
+			return keyboard_hook.idle_wait(timeout_ms, tray_menu and tray_menu.wait_companion() or nil)
+		end,
 	})
 
 	-- 8.14) Clean exit.
