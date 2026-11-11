@@ -390,6 +390,7 @@
 	"layout_editor.error.toml_syntax": "الملف ليس TOML صالحًا.",
 	"layout_editor.export.bundle": "تنزيل حزمة macOS (ZIP)",
 	"layout_editor.export.bundle_note": "فُكّ ضغط حزمة macOS في ~/Library/Keyboard Layouts، ثم أضف التخطيط في إعدادات النظام؛ يثبّته ErgoptiPlus مباشرةً.",
+	"layout_editor.export.windows_dll_note": "Windows: يُنزَّل ملف ‎.klc من هنا؛ أما مكتبة لوحة المفاتيح (DLL) ومثبّتها (‎.exe) فتُبنى من المصدر بأداة المستودع (node tools/kbd-dll.cjs build)، لا داخل صفحة.",
 	"layout_editor.export.keylayout_ansi": "تنزيل ملف .keylayout (ANSI)",
 	"layout_editor.export.keylayout_iso": "تنزيل ملف .keylayout (ISO)",
 	"layout_editor.export.klc": "تنزيل ملف ‎.klc‎ لنظام Windows",

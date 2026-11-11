@@ -2345,6 +2345,7 @@ var LayoutEditorPage = (function () {
 						]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
+				el('p', { class: 'le-note', id: 'le-dll-note', text: tl('export.windows_dll_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
 				el('div', { class: 'le-buttons' }, buttons),
 				host.install

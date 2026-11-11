@@ -390,6 +390,7 @@
 	"layout_editor.error.toml_syntax": "הקובץ אינו TOML תקין.",
 	"layout_editor.export.bundle": "הורדת חבילת macOS (ZIP)",
 	"layout_editor.export.bundle_note": "חלצו את חבילת ה-macOS אל ~/Library/Keyboard Layouts, ולאחר מכן הוסיפו את הפריסה בהגדרות המערכת; ErgoptiPlus מתקין אותה ישירות.",
+	"layout_editor.export.windows_dll_note": "Windows: קובץ ה-.klc יורד מכאן; מנהל המקלדת (DLL) ותוכנית ההתקנה שלו (.exe) נבנים מהמקור בכלי של המאגר (node tools/kbd-dll.cjs build), לא בתוך דף.",
 	"layout_editor.export.keylayout_ansi": "הורדת קובץ ה-.keylayout (ANSI)",
 	"layout_editor.export.keylayout_iso": "הורדת קובץ ה-.keylayout (ISO)",
 	"layout_editor.export.klc": "הורדת קובץ ‎.klc‎ ל-Windows",

@@ -410,6 +410,10 @@ async function exerciseManager(browser, origin) {
 		await page.click('#le-win-klc-apply');
 		const [klc] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-klc')]);
 		assert.equal(klc.suggestedFilename(), 'kbdergo.klc');
+		// The site says where the Windows DLL and installer come from, and offers no
+		// in-app install or emulation.
+		assert.match(await page.textContent('#le-dll-note'), /node tools\/kbd-dll\.cjs build/);
+		assert.equal(await page.locator('#le-install, #le-emulate').count(), 0);
 		const klcBytes = fs.readFileSync(await klc.path());
 		assert.deepEqual([...klcBytes.subarray(0, 2)], [0xff, 0xfe], 'MSKLC UTF-16LE with a BOM');
 		assert.match(klcBytes.toString('utf16le'), /KBD\tkbdergo\t/);
