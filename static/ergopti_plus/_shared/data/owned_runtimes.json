@@ -787,9 +787,9 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`xrandr`, `xprop`, `xwininfo`, `setxkbmap`, `timeout`, `sha256sum`",
-			"programs": ["xrandr", "xprop", "xwininfo", "setxkbmap", "timeout", "sha256sum"],
-			"used_for": "Window and layout queries on X11 (`linux/adapters/window_switch.lua:14`, `linux/platform/window_switch_worker.lua:19,37`, `linux/adapters/input_source_switch.lua:188,258`, `linux/modules/gestures/system_actions.lua:60`)",
+			"tool": "`xrandr`, `xprop`, `xwininfo`, `setxkbmap`, `xinput`, `timeout`, `sha256sum`",
+			"programs": ["xrandr", "xprop", "xwininfo", "setxkbmap", "xinput", "timeout", "sha256sum"],
+			"used_for": "Window, layout and touchpad tap-to-click queries on X11 (`linux/adapters/tap_to_click_setting.lua:222`, `linux/adapters/window_switch.lua:14`, `linux/platform/window_switch_worker.lua:19,37`, `linux/adapters/input_source_switch.lua:188,258`, `linux/modules/gestures/system_actions.lua:60`)",
 			"today": "Host",
 			"current_class": "OPT",
 			"version_needed": "any",
