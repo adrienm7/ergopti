@@ -1225,9 +1225,12 @@ between workers) green alone. All live checks pass, typed by the harness.
       member listed or primary: `infra/user_private_group.lua`, NSS); another shared group, an unknown group and a
       world-writable folder are still refused, and the gid is part of the captured identity. macOS keeps refusing
       (`ManagedBootstrapDownload.swift`): its accounts share `staff`, with no private group by default.
-- [ ] **Linux managed HTTP downloads behind a PAC list.** `infra/managed_http.lua` still takes GIO's answer, which
+- [x] **Linux managed HTTP downloads behind a PAC list.** `infra/managed_http.lua` still takes GIO's answer, which
       drops DIRECT (`PROXY a; DIRECT` fails when `a` is down); pass `pac_check_timeout_ms` so the lookup child
-      evaluates the PAC and the proxy-connect failover can reach DIRECT.
+      evaluates the PAC and the proxy-connect failover can reach DIRECT. Done 2026-11-11: the request's remaining
+      budget, capped by timings `adapters.proxy_pac_download_max_ms`, bounds the PAC download; the failover still
+      needs a curl that reports `proxy_used` (8.7+), as before. Native proof `run_managed_http_native.py`
+      `test_actual_pac_dead_relay_then_direct_reaches_origin` (CI network-ai, the pinned validation curl).
 - [x] **Test parity (audit item 14), Linux and macOS.** Closed on 10 November (39b12ae7): the tar feeder tests
       already load `infra.archive_tar_feeder` by module; five more Linux copies resolve their file from the module name
       (ratchet 7 files, 13 reads); every remaining Linux and macOS pin is documented as legitimate in its ratchet header
