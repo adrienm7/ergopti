@@ -261,7 +261,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						do_next()
 						return
 					end
-					if attempt < 2 then
+					-- The quick retry is an attempt of the budget, as on Windows and Linux:
+					-- outside it one prediction at multiplier 2 sent four requests, not two.
+					if attempt < 2 and attempt_index <= max_attempts then
+						attempt_index = attempt_index + 1
 						-- Same retry policy as api_ollama and api_remote: the step and the
 						-- extra-token budget come from the shared inference manifest rather
 						-- than from literals here, and the ceiling matches theirs. The old
