@@ -665,3 +665,36 @@ _EHX_FilePackRefusalOwnsNativeChildren() {
 }
 Test("hotstring extension frame: real file-pack refusal releases every owned native child and exact dispatch bindings",
 	_EHX_FilePackRefusalOwnsNativeChildren)
+
+_EHX_MarkerRows(Id, *) {
+	return [Map("label", Id)]
+}
+
+; The shared corpus orders the extension content frame and its bulk controls per
+; driver. The real template, given one marker provider per corpus row, must draw
+; the Windows order, and Windows must own none of the bulk controls.
+_EHX_CorpusFrameOrders() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\hotstring_extension_frames.json", "UTF-8"))
+	Providers := Map()
+	for _, Ids in Corpus["content_order"]
+		for Id in Ids
+			if Id != "separator"
+				Providers[Id] := _EHX_MarkerRows.Bind(Id)
+	Rows := MenuRenderer_TemplateRows("hotstring_extension_content_frame", Map(), Map(), Providers)
+	Expected := Corpus["content_order"]["ahk"]
+	AssertTrue(Rows is Array, "the real content template accepts every corpus provider")
+	AssertEqual(Expected.Length, Rows.Length, "Windows draws the corpus content rows only")
+	for Index, Id in Expected
+		AssertEqual(Id, Rows[Index].Get("separator", false) ? "separator" : Rows[Index]["label"],
+			"content row " . Index)
+	Owned := []
+	for Item in _MR_GetMenuDef("hotstring_extension_bulk_controls")
+		if _MR_IsForAhk(Item)
+			Owned.Push(Item["id"])
+	AssertEqual(Corpus["bulk_order"]["ahk"].Length, Owned.Length, "Windows owns the corpus bulk controls only")
+	for Index, Id in Corpus["bulk_order"]["ahk"]
+		AssertEqual(Id, Owned[Index], "bulk control " . Index)
+}
+Test("hotstring extension frame: Windows draws the corpus content order and no bulk control (hotstring-extension-frames)",
+	_EHX_CorpusFrameOrders)
