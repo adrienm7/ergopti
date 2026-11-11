@@ -196,6 +196,8 @@ var LayoutEditorPage = (function () {
 	 *   initial?: string|null, onClose?: function}} host - saveFile(filename,
 	 *   text, mime) stores a file; initial is a source text to open; install({source,
 	 *   keylayout}) and platform ('macos'|'linux') when the host installs layouts;
+	 *   emulate(payload) the same way when its layout emulation can type the source
+	 *   without installing it;
 	 *   savedStatus names the message shown after a save; onClose leaves the editor;
 	 *   exportAssets() resolves what the XKB and KLC downloads run (standalone.js)
 	 *   on a host that can fetch them.
@@ -2101,6 +2103,31 @@ var LayoutEditorPage = (function () {
 			});
 		}
 
+		/** « Emulate without installing »: the driver's emulation types the source over the system layout. */
+		function emulateButton(report) {
+			const row = report.find((entry) => entry.target === `driver_${host.platform}`);
+			return el('button', {
+				type: 'button',
+				id: 'le-emulate',
+				text: tl('btn.emulate'),
+				disabled: !row || row.status === 'unavailable',
+				onclick: () =>
+					ask(tl('emulate_confirm'), () => {
+						let payload;
+						try {
+							payload = LayoutSourceIO.installPayload(doc(), host.platform);
+						} catch (error) {
+							notify('error', problemText(error));
+							return;
+						}
+						Promise.resolve(host.emulate(payload)).then(
+							() => notify('ok', tl('status.emulated')),
+							(error) => notify('error', problemText(error))
+						);
+					})
+			});
+		}
+
 		function exportPanel() {
 			let report = [];
 			try {
@@ -2193,7 +2220,9 @@ var LayoutEditorPage = (function () {
 							}
 						})
 					);
+			// The two ways ErgoptiPlus uses a layout, each said in one line.
 			if (host.install) buttons.push(installButton(report));
+			if (host.emulate) buttons.push(emulateButton(report));
 			// The driver applies the navigation layer through its navigation layer editor's save.
 			if (host.applyNav && (doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
 				buttons.push(
@@ -2258,7 +2287,13 @@ var LayoutEditorPage = (function () {
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
-				el('div', { class: 'le-buttons' }, buttons)
+				el('div', { class: 'le-buttons' }, buttons),
+				host.install
+					? el('p', { class: 'le-note', id: 'le-install-hint', text: tl('install_hint') })
+					: null,
+				host.emulate
+					? el('p', { class: 'le-note', id: 'le-emulate-hint', text: tl('emulate_hint') })
+					: null
 			]);
 		}
 

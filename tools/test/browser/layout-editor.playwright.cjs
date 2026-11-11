@@ -130,7 +130,8 @@ async function exerciseManager(browser, origin) {
 				state,
 				source_editor: true,
 				source_pick: true,
-				nav_apply: true
+				nav_apply: true,
+				emulate: true
 			}),
 		state
 	);
@@ -225,6 +226,34 @@ async function exerciseManager(browser, origin) {
 		window.composerResult({ action: 'composer_save', ok: true, used: true })
 	);
 	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.installed']);
+
+	// « Emulate without installing » stores the source for the driver's emulation alone.
+	assert.equal(await page.textContent('#le-install'), strings['layout_editor.btn.install']);
+	assert.equal(await page.textContent('#le-install-hint'), strings['layout_editor.install_hint']);
+	assert.equal(await page.textContent('#le-emulate-hint'), strings['layout_editor.emulate_hint']);
+	await page.click('#le-emulate');
+	await page.click('#le-confirm-yes');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_emulate'));
+	const emulate = await page.evaluate(() =>
+		window.__posted.find((p) => p.action === 'composer_emulate')
+	);
+	assert.equal(emulate.use, undefined, 'nothing is selected in the system');
+	assert.equal(emulate.source, install.source);
+	assert.equal(emulate.keylayout, install.keylayout);
+	assert.equal(emulate.emulation, install.emulation);
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_emulate', ok: false, code: 'emulate_failed' })
+	);
+	assert.equal(
+		await page.textContent('#le-message'),
+		strings['layout_editor.error.emulate_failed']
+	);
+	await page.click('#le-emulate');
+	await page.click('#le-confirm-yes');
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_emulate', ok: true, used: true })
+	);
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.emulated']);
 	await page.click('#le-close');
 	assert.equal(await page.locator('#layout-view').isVisible(), true);
 	assert.deepEqual(errors, []);

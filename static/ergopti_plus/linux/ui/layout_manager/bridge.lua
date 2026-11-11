@@ -25,6 +25,8 @@ local STRINGS_FILE = "ui/layout_manager/strings.json"
 
 -- Registry work can outlive a page; its UI callbacks retain that exact owner.
 local _controller, _controller_owner, _registry_observer = nil, nil, nil
+-- The menu's « Create or edit a layout… » asked for the editor before the page was ready.
+local _editor_wanted = false
 
 --- A dependency injected by tests, or the production module.
 --- @param state table
@@ -109,7 +111,8 @@ local function controller(state, context)
 		end
 	end
 	-- The composer's and the layout editor's operations take their callback last.
-	for _, method in ipairs({ "composer_open", "composer_save", "composer_remove", "source_open", "source_save" }) do
+	for _, method in ipairs({ "composer_open", "composer_save", "composer_remove", "composer_emulate", "source_open",
+		"source_save" }) do
 		local operation = registry[method]
 		if type(operation) == "function" then
 			owned_registry[method] = function(...)
@@ -127,6 +130,12 @@ local function controller(state, context)
 	local i18n = dependency(state, "i18n", "infra.i18n")
 	local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
 	if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
+	local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")
+	local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
+	if not (preferences and type(preferences.choose) == "function" and emulation
+		and type(emulation.reload_if_started) == "function") then
+		preferences, emulation = nil, nil
+	end
 	local function push(function_name, payload)
 		if not current() then return false end
 		local ok, encoded = pcall(Json.encode, payload)
@@ -168,8 +177,23 @@ local function controller(state, context)
 			local result = layer_editor.apply_text(text, state)
 			if current() then done(result) end
 		end or nil,
+		-- « Emulate without installing »: the composed layout becomes the emulated
+		-- one, as the menu's « Layout to emulate » stores it, and the emulation
+		-- reloads at once (modules/keymap/layout_emulation.lua).
+		emulate = preferences and function(id, done)
+			if not current() then return false end
+			if not preferences.choose(id) then
+				done(false, "emulate_not_saved", "the layout emulation settings were not saved")
+				return
+			end
+			if emulation.reload_if_started() == false then
+				done(false, "emulate_failed", "the layout emulation did not reload the composed layout")
+				return
+			end
+			if current() then done(true) end
+		end or nil,
 	})
-	owner.registry, owner.controller = registry, _controller
+	owner.registry, owner.controller, owner.current = registry, _controller, current
 	owner.publish = function()
 		if not current() then return false end
 		local snapshot = registry.snapshot()
@@ -191,7 +215,24 @@ function M.on_message(payload, state, context)
 		_registry_observer = _controller_owner
 	end
 	local handled = active ~= nil and active.on_message(payload)
+	if handled and _editor_wanted and payload.action == "ready" then
+		_editor_wanted = false
+		active.open_editor()
+	end
 	return { handled = handled }
+end
+
+--- Shows the layout editor in the layout manager window (the menu's « Create or
+--- edit a layout… »): at once when the page is ready, else once it says so.
+--- @return boolean accepted
+function M.open_editor()
+	-- The page already open and current gets it now; a page still loading on ready.
+	local owner = _controller_owner
+	if _controller and owner and type(owner.current) == "function" and owner.current() then
+		return _controller.open_editor()
+	end
+	_editor_wanted = true
+	return true
 end
 
 --- Revokes only callbacks belonging to the exact retired native page.
@@ -205,6 +246,7 @@ end
 --- Test seam: forgets the controller and revokes all retained callbacks.
 function M._reset()
 	_controller, _controller_owner, _registry_observer = nil, nil, nil
+	_editor_wanted = false
 end
 
 return M

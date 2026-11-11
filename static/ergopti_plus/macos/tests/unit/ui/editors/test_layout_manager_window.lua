@@ -75,4 +75,41 @@ helpers.describe("layout manager window (macOS)", function()
 		helpers.assert_eq(#texts, 1)
 		helpers.assert_eq(texts[1], "b")
 	end)
+
+	helpers.it("emulates a source once the menu binds the emulation preferences (layout-editor-emulate)", function()
+		local Host = helpers.load_with_stubs("ui.layout_manager")
+		helpers.assert_true(not pcall(Host.set_emulation_applier, "not a function"), "only a function binds")
+		local saved = package.loaded["modules.keymap.layout_registry"]
+		local stored, emulated = {}, {}
+		package.loaded["modules.keymap.layout_registry"] = {
+			snapshot = function() return { platform = "macos", installed = {} } end,
+			refresh = function() end,
+			composer_emulate = function(payload, on_done)
+				stored[#stored + 1] = payload
+				on_done(true, nil, nil, "composed")
+			end,
+		}
+		local ok, err = pcall(function()
+			local view = { evaluateJavaScript = function() end }
+			local message = { action = "composer_emulate", source = "s", keylayout = "k" }
+			helpers.assert_true(Host._controller_for(view).on_message(message) == false,
+				"without the bound preferences composer_emulate is refused")
+			Host.set_emulation_applier(function(id)
+				emulated[#emulated + 1] = id
+				return true
+			end)
+			helpers.assert_true(Host._controller_for(view).on_message(message) == true)
+		end)
+		Host.set_emulation_applier(nil)
+		package.loaded["modules.keymap.layout_registry"] = saved
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(#stored, 1, "a refused message stores nothing")
+		helpers.assert_eq(emulated, { "composed" })
+	end)
+
+	helpers.it("defers the menu's editor command to the window owner (layout-editor-menu)", function()
+		local Host = helpers.load_with_stubs("ui.layout_manager")
+		helpers.assert_eq(type(Host.editor_menu_command()), "function")
+		helpers.assert_eq(type(Host.open_editor), "function")
+	end)
 end)
