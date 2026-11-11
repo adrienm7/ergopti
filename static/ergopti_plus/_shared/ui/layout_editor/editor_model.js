@@ -308,20 +308,34 @@ var LayoutEditorModel = (function () {
 	// ======= 5/ Preview ==========
 	// =============================
 
+	/** The either-side modifier a sided one belongs to (shift_left -> shift). */
+	const family = (id) => id.replace(/_(left|right)$/, '');
+
+	/** Whether one selector (required, optional) accepts the held modifiers. */
+	function accepts(selector, held) {
+		const allowed = [...selector.required, ...selector.optional];
+		const satisfied = (id) => held.some((h) => h === id || family(h) === id);
+		const permitted = (h) => allowed.some((id) => id === h || id === family(h));
+		return selector.required.every(satisfied) && held.every(permitted);
+	}
+
 	/**
-	 * The layer a set of held modifiers reaches: every required modifier held,
-	 * nothing held outside required and optional; the most specific wins.
+	 * The layer a set of held modifiers reaches: a selector (the layer's own or
+	 * one of its alternatives) whose required modifiers are all held, with
+	 * nothing held outside required and optional; the most specific wins. Held
+	 * modifiers may be sided (shift_left) or either-side (shift).
 	 * @param {string[]} held - Modifier ids.
 	 * @returns {string|null}
 	 */
 	function layerFor(doc, held) {
 		let best = null;
-		for (const layer of doc.layers || []) {
-			const allowed = new Set([...layer.required, ...layer.optional]);
-			if (!layer.required.every((id) => held.includes(id))) continue;
-			if (!held.every((id) => allowed.has(id))) continue;
-			if (!best || layer.required.length > best.required.length) best = layer;
-		}
+		let bestSize = -1;
+		for (const layer of doc.layers || [])
+			for (const selector of [layer, ...(layer.alternatives || [])])
+				if (accepts(selector, held) && selector.required.length > bestSize) {
+					best = layer;
+					bestSize = selector.required.length;
+				}
 		return best ? best.id : null;
 	}
 

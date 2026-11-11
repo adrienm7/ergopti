@@ -130,6 +130,22 @@ async function exerciseManager(browser, origin) {
 		window.sourceResult({ ok: true, detail: '/c/my_layout.toml', filename: 'my_layout.toml' })
 	);
 	assert.match(await page.textContent('#le-message'), /ErgoptiPlus/);
+
+	// « Install and use » goes through the composer host with the source and its compiled layout.
+	await page.click('#le-install');
+	await page.click('#le-confirm-yes');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_save'));
+	const install = await page.evaluate(() =>
+		window.__posted.find((p) => p.action === 'composer_save')
+	);
+	assert.equal(install.use, true);
+	assert.match(install.source, /format = "ergopti-layout"/);
+	assert.match(install.keylayout, /<keyboard /);
+	assert.equal(install.declaration, undefined);
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_save', ok: true, used: true })
+	);
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.installed']);
 	await page.click('#le-close');
 	assert.equal(await page.locator('#layout-view').isVisible(), true);
 	assert.deepEqual(errors, []);
@@ -184,17 +200,21 @@ async function exerciseManager(browser, origin) {
 		await page.selectOption('#le-import-convention', 'iso');
 		await page.setInputFiles('#le-open-file', KEYLAYOUT);
 		await page.waitForSelector('#le-preserved');
-		const exported = await downloaded(page, () => page.click('#le-export-keylayout'));
+		assert.equal(
+			await page.locator('#le-export-keylayout-ansi').count(),
+			0,
+			'an ISO import is not ANSI'
+		);
+		const exported = await downloaded(page, () => page.click('#le-export-keylayout-iso'));
 		assert.equal(exported.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
 		await page.click('#le-convert');
 		await page.click('#le-confirm-yes');
 		await page.waitForSelector('#le-lost');
 		assert.notEqual(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), '');
-		assert.equal(
-			await page.locator('#le-export-keylayout').count(),
-			0,
-			'edits cannot export the original XML'
-		);
+		// The converted source compiles both variants through the shared compiler.
+		const compiled = await downloaded(page, () => page.click('#le-export-keylayout-ansi'));
+		assert.match(compiled.text, /<keyboard /);
+		assert.notEqual(compiled.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
 
 		// The navigation layer imports as a layer and exports as layers.toml again.
 		await page.selectOption('#le-nav-hold', 'CapsLock');
