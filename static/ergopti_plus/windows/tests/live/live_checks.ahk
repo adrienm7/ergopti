@@ -690,6 +690,21 @@ LiveCmdLayoutRow(Args) {
 	return Text
 }
 
+/**
+ * What keys type at the base level on the foreground layout, from the system's
+ * own table: the expectation for a key the driver leaves to the system.
+ * Arguments: the scan codes in hexadecimal. A dead key is reported as "dead".
+ */
+LiveCmdForegroundChars(Args) {
+	Hkl := GetForegroundKeyboardLayout()
+	Text := ""
+	for Code in Args {
+		Char := _LiveLayoutChar(Integer("0x" . Code), false, Hkl, &Dead)
+		Text .= (A_Index > 1 ? " " : "") . (Dead ? "dead" : Char == "" ? "none" : Char)
+	}
+	return "hkl=" . Format("{:X}", Hkl) . " chars=" . Text
+}
+
 /** The delay a hotstring family resolves to. Arguments: the category, the section ("" for none). */
 LiveCmdHotstringDelay(Args) {
 	Resolved := HotstringsResolve(Args[1], Args.Length >= 2 ? Args[2] : "")
@@ -722,6 +737,7 @@ LiveRegister("add_delimiter", LiveCmdAddDelimiter)
 LiveRegister("keyboard_layouts", LiveCmdKeyboardLayouts)
 LiveRegister("edit_layout", LiveCmdEditLayout)
 LiveRegister("layout_row", LiveCmdLayoutRow)
+LiveRegister("foreground_chars", LiveCmdForegroundChars)
 LiveRegister("hold_log_flush", LiveCmdHoldLogFlush)
 LiveRegister("info", LiveCmdInfo)
 LiveRegister("tree", LiveCmdTree)
