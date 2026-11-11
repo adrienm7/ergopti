@@ -84,8 +84,8 @@ local function fixture(options)
 	local folder = dir .. "/metrics/by_device/" .. FOREIGN
 	assert(os.execute("mkdir -p " .. quote(folder)))
 	write(folder .. "/device.json", string.format(
-		'{"device_id":"%s","name":"Mac","os":"darwin","os_version":"26.1","host_signature":"sig","created_at":"2026-11-01 08:00:00.000","schema_version":1}\n',
-		FOREIGN))
+		'{"device_id":"%s","name":"Mac","os":"%s","os_version":"26.1","host_signature":"sig","created_at":"2026-11-01 08:00:00.000","schema_version":1}\n',
+		FOREIGN, options.os or "darwin"))
 	local store = {}
 	function store.query_rows(sql)
 		local output = sqlite(db, sql)
@@ -269,6 +269,46 @@ helpers.describe("Linux foreign metrics ledger import", function()
 				.. FOREIGN .. "', 2, '2026-11-06 04:30:00', '2026-11-05', 'passive_period', '{\"kind\":\"sleep\",\"duration_ms\":5000}');"))
 		drain(f)
 		helpers.assert_eq(scalar(f.db, "SELECT group_concat(date) FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "2026-11-05")
+	end)
+
+	-- KMD-1 (decided by the maintainer on 2026-11-11): a row stores its UTC
+	-- instant and the offset it was recorded at; its hour and a night wake are
+	-- read in that local time. A Linux row without one held UTC and is read
+	-- with this device's current offset; a macOS one held local time.
+	local function offset_typing(id, ts, date, offset)
+		return string.format("INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, "
+			.. "field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, "
+			.. "pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json, utc_offset_min) VALUES ('%s', %d, "
+			.. "'%s', '%s', 'Safari', NULL, 'Docs', '', '', 'macos-azerty', '', 0, 0, 2, 0, 40, 0, 0, 0, 42.5, 'it''s', '', '%s', %s);",
+			FOREIGN, id, ts, date, EVENTS, offset == nil and "NULL" or tostring(offset))
+	end
+	local function hours(f)
+		return scalar(f.db, "SELECT group_concat(hour) FROM (SELECT DISTINCT hour FROM agg_app_day_hourly WHERE device_id='"
+			.. FOREIGN .. "' ORDER BY hour);")
+	end
+
+	it("linux-import-utc-offset: an hour and a night wake are read in the local time the row was recorded in", function()
+		local f = fixture()
+		write(f.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 22:15:00.000", "2026-11-05", 60),
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json, utc_offset_min) VALUES ('"
+				.. FOREIGN .. "', 2, '2026-11-05 03:10:00.000', '2026-11-05', 'wake', '{}', 300);"))
+		drain(f)
+		helpers.assert_eq(hours(f), "23", "22:15 UTC at +01:00 is 23:15 lived")
+		helpers.assert_eq(scalar(f.db, "SELECT night_wake_count FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "0",
+			"03:10 UTC at +05:00 is an 08:10 wake, no night wake")
+	end)
+
+	it("linux-import-utc-offset: an older Linux row is read with this device's offset, an older macOS row as local", function()
+		local LocalTime = require("keystats.local_time")
+		local linux = fixture({ os = "linux" })
+		write(linux.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 09:15:00", "2026-11-05", nil)))
+		drain(linux)
+		local expected = LocalTime.local_ts("2026-11-05 09:15:00", nil, true, LocalTime.offset_at(os.time())):sub(12, 13)
+		helpers.assert_eq(hours(linux), expected, "an older Linux ts is UTC")
+		local mac = fixture()
+		write(mac.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 09:15:00.000", "2026-11-05", nil)))
+		drain(mac)
+		helpers.assert_eq(hours(mac), "09", "an older macOS ts is local time")
 	end)
 
 	it("linux-import-incremental: only appended complete batches are applied, a torn tail waits", function()

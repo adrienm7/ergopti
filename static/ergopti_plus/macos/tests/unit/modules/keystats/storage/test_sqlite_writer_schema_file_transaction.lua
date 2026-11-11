@@ -36,6 +36,8 @@ local function observe(schedule, check)
 					end,
 						nrows = function(_, sql)
 							local row
+							-- The raw tables lacking the UTC offset column (KMD-1): the fixture has none.
+							if sql:find("pragma_table_info", 1, true) then return function() return nil end end
 							if sql:find("sqlite_master", 1, true) and state.meta_exists then row = { name = "meta" } end
 							if sql:find("key='schema_version'", 1, true) and state.schema_applied then row = { value = "1" } end
 							return function() local result = row; row = nil; return result end

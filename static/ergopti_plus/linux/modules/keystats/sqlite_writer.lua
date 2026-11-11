@@ -49,6 +49,7 @@ local AppCategoryStore = require("keystats.app_category_store")
 local RegularFileReader = require("infra.regular_file_reader")
 local ErrorDescription = require("error_description")
 local Queries = require("keystats.queries")
+local LocalTime = require("keystats.local_time")
 local TokenEncoding = require("keystats.token_encoding")
 local PrivateSqlite = nil
 
@@ -267,6 +268,20 @@ local function _reserve_event_ids(count)
 	return first
 end
 
+--- Renders one raw row of this device with its recorded offset: Linux stamps
+--- `ts` in UTC, and the row stores the local UTC offset of that instant here
+--- (maintainer decision KMD-1 of 11 November 2026), what hour-of-day, night
+--- wakes and the other drivers' rebuilds read the lived local time from.
+--- @param name string Catalogue statement (events.*).
+--- @param dialect string Catalogue dialect.
+--- @param params table The row's values, without utc_offset_min.
+--- @return string sql
+local function _render_event(name, dialect, params)
+	assert(params.utc_offset_min == nil, "a Linux row's offset is the one of its UTC instant")
+	params.utc_offset_min = LocalTime.offset_of_utc(params.ts)
+	return Queries.render(name, dialect, params)
+end
+
 --- Reads the canonical schema file from the _shared tree.
 --- @return string|nil Schema SQL, or nil on failure.
 local function _read_schema()
@@ -300,6 +315,30 @@ local function _read_media_resource(relative)
 		return nil
 	end
 	return body
+end
+
+--- Adds utc_offset_min to the raw tables of a store created before it (maintainer
+--- decision KMD-1 of 11 November 2026) and retires the purge triggers written
+--- before it, in one transaction; _ensure_media_schema, next in the same open,
+--- creates the current triggers. A fresh store has the column from schema.sql.
+--- @return boolean True once every raw table has the column.
+local function _ensure_utc_offset_column()
+	local UtcOffsetColumn = require("keystats.utc_offset_column")
+	local output = _query_output(UtcOffsetColumn.missing_query())
+	if output == nil then
+		Logger.error(LOG, "Cannot read which raw metrics tables lack the UTC offset column.")
+		return false
+	end
+	local missing = {}
+	for name in output:gmatch("[^\n]+") do missing[#missing + 1] = name end
+	local statements = UtcOffsetColumn.statements(missing)
+	if #statements == 0 then return true end
+	if not _exec_raw_batch(table.concat(statements, "\n")) then
+		Logger.error(LOG, "The UTC offset column could not be added; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store gained the UTC offset column on %d raw table(s); older rows keep none.", #missing)
+	return true
 end
 
 --- Admits only the committed five-key policy and additive schema before writes.
@@ -681,6 +720,12 @@ function M.open_db(db_path)
 		return false, "store_refused"
 	end
 
+	if not _ensure_utc_offset_column() then
+		_bootstrapped = false
+		_db_path = nil
+		return false, "store_refused"
+	end
+
 	if not _ensure_media_schema() then
 		_media_policy = nil
 		_bootstrapped = false
@@ -868,7 +913,7 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 
 		-- WPM is a fractional rate in a REAL column, not an integer counter. The
 		-- pointer activity is since the application's previous row (pointer_metrics).
-		statements[i] = Queries.render("events.typing", "cli_json", {
+		statements[i] = _render_event("events.typing", "cli_json", {
 			device_id = device_id, id = event_id,
 			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
 			app = ev.app or "unknown", title = ev.title or "", url = "", field_role = "",
@@ -926,7 +971,7 @@ end
 _raw_sql.hotstrings = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.hotstring", "cli_json", {
+		statements[#statements + 1] = _render_event("events.hotstring", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
 			date = _text(ev.date or os.date("%Y-%m-%d")),
@@ -984,7 +1029,7 @@ _raw_sql.llm = function(device_id, events, first_id)
 			Logger.error(LOG, "LLM event batch refused: '%s' is not an events_llm kind.", tostring(kind))
 			return nil
 		end
-		statements[i] = Queries.render("events.llm", "cli_json", {
+		statements[i] = _render_event("events.llm", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
 			app = ev.app or "unknown", kind = kind,
@@ -1026,7 +1071,7 @@ end
 _raw_sql.shortcuts = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.shortcut", "cli_json", {
+		statements[#statements + 1] = _render_event("events.shortcut", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
 			date = _text(ev.date or os.date("%Y-%m-%d")),
@@ -1053,7 +1098,7 @@ end
 _raw_sql.switches = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.app_switch", "cli_json", {
+		statements[#statements + 1] = _render_event("events.app_switch", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
 			date = _text(ev.date or os.date("%Y-%m-%d")),
@@ -1071,7 +1116,7 @@ end
 _raw_sql.windows = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.window_switch", "cli_json", {
+		statements[#statements + 1] = _render_event("events.window_switch", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), app = _text(ev.app),
 			prev_title = _text(ev.prev_title), next_title = _text(ev.next_title),
@@ -1094,7 +1139,7 @@ _raw_sql.sessions = function(device_id, events, first_id)
 			Logger.error(LOG, "Session event batch refused: '%s' is not an events_session kind.", tostring(ev.kind))
 			return nil
 		end
-		statements[#statements + 1] = Queries.render("events.session", "cli_json", {
+		statements[#statements + 1] = _render_event("events.session", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind,
 			duration_ms = type(ev.duration_ms) == "number" and math.floor(ev.duration_ms) or nil,
@@ -1110,7 +1155,7 @@ _raw_sql.system = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(type(ev.action) == "string" and ev.action ~= "", "a system event needs its action")
-		statements[#statements + 1] = Queries.render("events.system", "cli_json", {
+		statements[#statements + 1] = _render_event("events.system", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), action = ev.action,
 			metadata_json = type(ev.metadata) == "table" and Json.encode(ev.metadata) or nil,
@@ -1125,7 +1170,7 @@ _raw_sql.network = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(type(ev.kind) == "string" and ev.kind ~= "", "a network event needs its kind")
-		statements[#statements + 1] = Queries.render("events.network", "cli_json", {
+		statements[#statements + 1] = _render_event("events.network", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
 			meta_json = Json.encode(type(ev.meta) == "table" and ev.meta or {}),
@@ -1142,10 +1187,11 @@ _raw_sql.clipboard = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(ClipboardEvents.KINDS[ev.kind] and type(ev.meta) == "table", "Invalid clipboard event")
+		local ts = _text(ev.ts)
 		statements[#statements + 1] = ClipboardEvents.insert_sql({
 			device_id = device_id, id = first_id + i - 1,
-			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
-			meta_json = Json.encode(ev.meta),
+			ts = ts, date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
+			meta_json = Json.encode(ev.meta), utc_offset_min = LocalTime.offset_of_utc(ts),
 		})
 	end
 	return table.concat(statements, "\n")
@@ -1160,7 +1206,7 @@ local function _kind_meta_rows(statement, kinds)
 		local statements = {}
 		for i, ev in ipairs(events) do
 			assert(kinds[ev.kind] ~= nil and type(ev.meta) == "table", "Invalid " .. statement .. " event")
-			statements[i] = Queries.render(statement, "cli_json", {
+			statements[i] = _render_event(statement, "cli_json", {
 				device_id = device_id, id = first_id + i - 1,
 				ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
 				meta_json = Json.encode(ev.meta),
@@ -1190,7 +1236,7 @@ _raw_sql.roi = function(device_id, events, first_id)
 			end
 			assert(type(event.meta.session_saved) == "number" and type(event.meta.session_fired) == "number", "Incomplete ROI snapshot")
 		end
-		statements[index] = Queries.render("events.roi", "cli_json", {
+		statements[index] = _render_event("events.roi", "cli_json", {
 			device_id = device_id, id = first_id + index - 1,
 			ts = event.ts, date = event.date, kind = event.kind, app = event.app,
 			meta_json = Json.encode(event.meta),
