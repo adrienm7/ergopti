@@ -88,4 +88,17 @@ helpers.describe("layout emulation: shortcut output custody", function()
 				and text:find(KEY_W .. ":1 " .. KEY_W .. ":0", 1, true) ~= nil, "Ctrl and Shift hold the key: " .. text)
 		end)
 	end)
+
+	-- _KLE_OnShortcut sends the logical character. Under a session layout that
+	-- has no key for it (Cyrillic), the chord fell back to the PHYSICAL key:
+	-- Ctrl + the key where Ergopti has c went out on KEY_X, which GTK and Qt
+	-- read as cut. The fallback is the character's US key, as a toolkit
+	-- resolves a shortcut on a non-Latin layout (ILL-003, emulation-shortcut-us-key).
+	helpers.it("falls back to the character's US key when the session layout lacks it (emulation-shortcut-us-key)", function()
+		with_output(function(deps, rows)
+			helpers.assert_true(deps.emit_shortcut("c", KEY_X, { ctrl = true }), "Ctrl+c is pressed")
+			helpers.assert_eq(table.concat(rows, " "),
+				Codes.KEY_LEFTCTRL .. ":1 46:1 46:0 " .. Codes.KEY_LEFTCTRL .. ":0", "on KEY_C, not the physical KEY_X")
+		end)
+	end)
 end)
