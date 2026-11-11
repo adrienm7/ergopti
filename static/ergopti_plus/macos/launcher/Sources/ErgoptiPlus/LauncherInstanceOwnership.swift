@@ -115,6 +115,13 @@ func staleEmbeddedRuntimes(
 /// a moment; a genuine second launcher keeps it. 50 tries, [launcher]
 /// instance_lock_retry_ms apart (100 ms), tell them apart.
 let kLauncherLockRetryAttempts = 50
+/// Tries a second launch spends waiting for the launcher it asked to quit: that
+/// launcher's controlled exit ([ui] user_quit_deadline_ms) plus its margin, then
+/// the update-relaunch window above (MLC-003).
+let kLauncherTakeoverRetryAttempts = kLauncherLockRetryAttempts + Int(
+	(LauncherTimings.userQuitDeadline.seconds + LauncherTimings.quitHandshakeMargin.seconds)
+		/ LauncherTimings.instanceLockRetry.seconds
+)
 /// Time a leftover embedded runtime gets to run its own teardown after a
 /// normal terminate request before it is force-terminated: the bound of its own
 /// controlled exit ([ui] user_quit_deadline_ms), so a runtime still inside its
