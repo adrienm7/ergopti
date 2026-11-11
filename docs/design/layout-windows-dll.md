@@ -24,6 +24,7 @@ unit lots install them).
 | `kbd-dll/klc.cjs`       | `fromKlc`: MSKLC's KLC (UTF-16LE with BOM, or UTF-8) into the model.                                                                                                |
 | `kbd-dll/emit-c.cjs`    | The C tables, the resource script and the module definition of a model.                                                                                             |
 | `kbd-dll/build.cjs`     | clang, llvm-rc and lld-link for the four images.                                                                                                                    |
+| `kbd-dll/pe-writer.cjs` | The same four images with no toolchain: the emitter's rows laid out as its C structures, the resources, exports, relocations and checksum written directly.         |
 | `kbd-dll/reader.cjs`    | An independent PE and KBDTABLES reader: no code or constant shared with the emitter side.                                                                           |
 | `kbd-dll/compare.cjs`   | The golden comparison of a read image with its model.                                                                                                               |
 
@@ -109,6 +110,20 @@ and a non-BMP ligature, and seeded random models, in all four images. For each i
 Negative controls: one changed character in an image is exactly one difference; a wrong machine or a missing export
 is refused. Invalid models (undeclared dead key, reserved or out-of-range unit, too long ligature, duplicate key,
 SGCAPS without its row, chain to nowhere, unknown modifier bit, too many columns) are refused before any build.
+
+The compiler-free writer (`pe-writer.cjs`, `kbd-dll.cjs build … --writer pe`) is proven against the clang image of
+every one of those models, and of the layout sources' DLLs in `test-layout-sources.cjs` (bépo, bépo 1.1rc2's chained
+dead keys, Ergopti's Kana, CAPLOKALTGR, SGCAPS Kana), on all four images:
+
+- the reader's `trace` (every value it reads from the tables, in order, each pointer as the table it names) is equal,
+  so the tables are byte for byte the same wherever each image places them;
+- the logical layout, machine, pointer width, wow64 flag, ordinal and subsystem are equal;
+- every resource leaf (string 1000, the version resource) is byte for byte llvm-rc's;
+- both images carry a correct PE checksum. A changed table byte changes the trace (negative control).
+
+The files themselves differ: lld-link adds a reproducibility debug entry and places sections and tables its own
+way, which the loader does not read. Decided by the coordinator on 2026-11-11, to review by the maintainer: the
+Windows host may build with `--writer pe`, so a user's PC needs no compiler.
 
 KbdEdit parity: this is limited to what is proven above. KbdEdit's own packages (`.kbe` and its installers) are
 encrypted; they were not decrypted, so no structural comparison with them was made.

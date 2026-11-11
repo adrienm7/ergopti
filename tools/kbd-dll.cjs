@@ -10,8 +10,11 @@
  * module-definition sources, the x86, wow64, x64 and arm64 images
  * (<arch>/<dll>.dll), the unsigned NSIS installer (<dll>-setup.exe and its
  * installer.nsi) and report.json, after reading each image back with the
- * independent reader and comparing it with the model. `model <input> <out.json>`
- * writes the model only. See docs/design/layout-windows-dll.md.
+ * independent reader and comparing it with the model. `--writer pe` writes the
+ * images with the compiler-free PE writer (pe-writer.cjs) instead of clang,
+ * lld-link and llvm-rc, for a machine without that toolchain; the installer
+ * still needs makensis. `model <input> <out.json>` writes the model only. See
+ * docs/design/layout-windows-dll.md.
  * ==============================================================================
  */
 
@@ -22,6 +25,7 @@ const path = require('node:path');
 const { fromKlc } = require('./lib/kbd-dll/klc.cjs');
 const Model = require('./lib/kbd-dll/model.cjs');
 const { buildDlls } = require('./lib/kbd-dll/build.cjs');
+const PeWriter = require('./lib/kbd-dll/pe-writer.cjs');
 const { readDll } = require('./lib/kbd-dll/reader.cjs');
 const { compareLayout } = require('./lib/kbd-dll/compare.cjs');
 const KbdSource = require('./lib/kbd-dll/source.cjs');
@@ -55,8 +59,10 @@ function loadModel(file) {
  * difference, so a directory only ever holds verified images.
  * @returns {{model: object, sources: object, dlls: object, report: object}}
  */
-function buildVerified(model) {
-	const { sources, dlls } = buildDlls(model);
+function buildVerified(model, writer = 'clang') {
+	if (writer !== 'clang' && writer !== 'pe') throw new Error(`kbd-dll: unknown writer ${writer}`);
+	const { sources, dlls } =
+		writer === 'pe' ? { sources: null, dlls: PeWriter.writeDlls(model) } : buildDlls(model);
 	const images = {};
 	for (const [arch, bytes] of Object.entries(dlls)) {
 		const read = readDll(bytes);
@@ -82,6 +88,7 @@ function buildVerified(model) {
 		columns: model.columns,
 		keys: model.keys.length,
 		dead_keys: model.dead_keys.length,
+		writer,
 		images,
 		installer: null
 	};
@@ -91,6 +98,9 @@ function buildVerified(model) {
 }
 
 function main(argv) {
+	const writerAt = argv.indexOf('--writer');
+	const writer = writerAt >= 0 ? argv[writerAt + 1] : 'clang';
+	if (writerAt >= 0) argv = argv.slice(0, writerAt).concat(argv.slice(writerAt + 2));
 	const [command, input, output] = argv;
 	if (command === 'model' && input && output) {
 		fs.writeFileSync(output, `${JSON.stringify(loadModel(input), null, '\t')}\n`, { flag: 'wx' });
@@ -98,7 +108,7 @@ function main(argv) {
 	}
 	if (command === 'build' && input && output) {
 		const loaded = loadInput(input);
-		const built = buildVerified(loaded.model);
+		const built = buildVerified(loaded.model, writer);
 		built.report.omitted = loaded.omitted;
 		fs.mkdirSync(output, { recursive: false });
 		const name = built.model.dll_name;
@@ -107,9 +117,11 @@ function main(argv) {
 			fs.writeFileSync(path.join(output, rel), data, { flag: 'wx' });
 		};
 		write('model.json', `${JSON.stringify(built.model, null, '\t')}\n`);
-		write(`src/${name}.c`, built.sources.c);
-		write(`src/${name}.rc`, built.sources.rc);
-		write(`src/${name}.def`, built.sources.def);
+		if (built.sources) {
+			write(`src/${name}.c`, built.sources.c);
+			write(`src/${name}.rc`, built.sources.rc);
+			write(`src/${name}.def`, built.sources.def);
+		}
 		for (const [arch, bytes] of Object.entries(built.dlls)) write(`${arch}/${name}.dll`, bytes);
 		write('installer.nsi', built.installer.script);
 		write(built.installer.file, built.installer.bytes);
@@ -118,7 +130,7 @@ function main(argv) {
 		return;
 	}
 	throw new Error(
-		'Usage: kbd-dll.cjs build <file.klc|source.toml|model.json> <new-directory> | model <file.klc|source.toml> <out.json>'
+		'Usage: kbd-dll.cjs build <file.klc|source.toml|model.json> <new-directory> [--writer clang|pe] | model <file.klc|source.toml> <out.json>'
 	);
 }
 

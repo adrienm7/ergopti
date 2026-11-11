@@ -23,7 +23,8 @@ const { fromKlc } = require('../lib/kbd-dll/klc.cjs');
 const Model = require('../lib/kbd-dll/model.cjs');
 const C = require('../lib/kbd-dll/constants.cjs');
 const { buildDlls, toolchainAvailable } = require('../lib/kbd-dll/build.cjs');
-const { readDll } = require('../lib/kbd-dll/reader.cjs');
+const { readDll, parsePe } = require('../lib/kbd-dll/reader.cjs');
+const PeWriter = require('../lib/kbd-dll/pe-writer.cjs');
 const { compareLayout } = require('../lib/kbd-dll/compare.cjs');
 const { loadLayoutSource } = require('../lib/layout-source.cjs');
 const { exportKlc } = require('../lib/layout-source-klc.cjs');
@@ -38,6 +39,68 @@ assert.ok(
 	'clang, llvm-rc and lld-link are required (tools/ci/ubuntu_apt.py clang lld llvm)'
 );
 
+/** Every resource leaf of an image as hex, keyed type/name/language (read with the reader's PE parser). */
+function resourceLeaves(bytes) {
+	const img = parsePe(bytes);
+	const root = img.dirs[2].rva;
+	const leaves = {};
+	const walk = (at, keyPath) => {
+		const dir = img.offset(root + at, 16);
+		const n = img.b.readUInt16LE(dir + 12) + img.b.readUInt16LE(dir + 14);
+		for (let i = 0; i < n; i++) {
+			const entry = dir + 16 + 8 * i;
+			const id = img.b.readUInt32LE(entry);
+			const next = img.b.readUInt32LE(entry + 4);
+			if (next & 0x80000000) walk(next & 0x7fffffff, keyPath.concat(id));
+			else {
+				const data = img.offset(root + next, 16);
+				const rva = img.b.readUInt32LE(data);
+				const size = img.b.readUInt32LE(data + 4);
+				const start = img.offset(rva, size);
+				leaves[keyPath.concat(id).join('/')] = img.b.toString('hex', start, start + size);
+			}
+		}
+	};
+	walk(0, []);
+	return leaves;
+}
+
+/**
+ * The compiler-free writer (pe-writer.cjs) against the clang image of the same
+ * model: the reader reads the same tables (every value it reads, pointers as the
+ * tables they name), the same layout, the same resources, and the image carries
+ * a valid PE checksum, as the clang one does.
+ */
+function provePeWriter(model, label, clangDlls) {
+	const written = PeWriter.writeDlls(model);
+	assert.deepEqual(Object.keys(written), Object.keys(clangDlls));
+	for (const [arch, bytes] of Object.entries(written)) {
+		const mine = readDll(bytes, { trace: true });
+		const clang = readDll(clangDlls[arch], { trace: true });
+		assert.deepEqual(mine.trace, clang.trace, `${label} ${arch}: the same tables as clang's`);
+		assert.deepEqual(mine.layout, clang.layout, `${label} ${arch}: the same layout as clang's`);
+		assert.deepEqual(
+			[mine.machine, mine.pointer, mine.wow64, mine.ordinal, mine.subsystem],
+			[clang.machine, clang.pointer, clang.wow64, clang.ordinal, clang.subsystem]
+		);
+		assert.deepEqual(
+			resourceLeaves(bytes),
+			resourceLeaves(clangDlls[arch]),
+			`${label} ${arch} resources`
+		);
+		for (const image of [bytes, clangDlls[arch]]) {
+			const at = image.readUInt32LE(0x3c) + 24 + 64;
+			assert.equal(
+				PeWriter.peChecksum(image, at),
+				image.readUInt32LE(at),
+				`${label} ${arch} checksum`
+			);
+		}
+		checks++;
+	}
+	return written;
+}
+
 /** Builds the four images and requires every one to read back as its model. */
 function proveBuild(model, label) {
 	const { dlls } = buildDlls(model);
@@ -49,6 +112,7 @@ function proveBuild(model, label) {
 		reads[arch] = read;
 		checks++;
 	}
+	provePeWriter(model, label, dlls);
 	assert.equal(reads.x86.pointer, 4);
 	assert.equal(reads.wow64.pointer, 8, 'the SysWOW64 image stores 64-bit pointers');
 	assert.equal(reads.wow64.wow64, true);
@@ -221,12 +285,43 @@ for (let round = 0; round < 3; round++) {
 	proveBuild(model, `random ${round}`);
 }
 
-// 7. Reproducible: the same model gives the same bytes.
+// 7. Reproducible: the same model gives the same bytes, with clang and without.
 const again = buildDlls(bepo).dlls;
 for (const arch of Object.keys(again))
 	assert.ok(again[arch].equals(bepoBuilt.dlls[arch]), `${arch} is reproducible`);
+const writtenOnce = PeWriter.writeDlls(bepo);
+const writtenTwice = PeWriter.writeDlls(bepo);
+for (const arch of Object.keys(writtenOnce))
+	assert.ok(writtenOnce[arch].equals(writtenTwice[arch]), `${arch} written reproducibly`);
 checks++;
 
+// 7b. The CLI's verified build without the toolchain: the same checks, writer pe.
+{
+	const { buildVerified } = require('../kbd-dll.cjs');
+	const built = buildVerified(bepo, 'pe');
+	assert.equal(built.report.writer, 'pe');
+	assert.equal(built.sources, null, 'no C, resource script or module definition is needed');
+	for (const arch of Object.keys(writtenOnce))
+		assert.ok(built.dlls[arch].equals(writtenOnce[arch]), `${arch} is the writer's image`);
+	assert.throws(() => buildVerified(bepo, 'msvc'), /unknown writer/);
+	checks++;
+}
+
+// 8. Negative control for the writer proof: one changed table byte changes the trace.
+{
+	const x64 = Buffer.from(writtenOnce.x64);
+	const row = Buffer.from([C.VK.B, 0x01, 0x62, 0, 0x42, 0]);
+	const at = x64.indexOf(row);
+	assert.ok(at > 0, 'the B row is in the written image');
+	x64[at + 2] = 0x63;
+	assert.notDeepEqual(
+		readDll(x64, { trace: true }).trace,
+		readDll(bepoBuilt.dlls.x64, { trace: true }).trace,
+		'a changed character is a different trace'
+	);
+	checks++;
+}
+
 console.log(
-	`[OK] kbd dll: ${checks} checks (bepo.klc and Ergopti KLC golden on x86, wow64, x64, arm64; Kana/Roya; controls; refusals; random models)`
+	`[OK] kbd dll: ${checks} checks (bepo.klc and Ergopti KLC golden on x86, wow64, x64, arm64; the compiler-free writer equal to clang in tables, layout, resources and checksum; Kana/Roya; controls; refusals; random models)`
 );
