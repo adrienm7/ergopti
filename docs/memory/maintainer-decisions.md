@@ -5,6 +5,21 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The config migration registry starts at v20, the schema of 1.0.9 (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: the old steps of
+`_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
+the registry every driver parses at boot and most of the config test time.
+`oldest_version` is v20, what 1.0.9 (the latest public release) and every
+1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
+cleanly on every driver: never written, the session read-only, one ERROR at
+boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
+(it still climbs v12 and v16). There is no silent partial upgrade. Do not bring
+the squashed steps back; the next squash raises the floor only to the schema
+of a public release that climbs every older public schema, and moves the
+bridge and the compiled-upgrade pin with it.
+
 ## The Windows physical shortcut host is built, delivery refused (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: Windows gets the host and the editor

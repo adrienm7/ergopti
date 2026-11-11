@@ -1021,7 +1021,9 @@ Account and tester actions (maintainer, from the PC):
       AltGr press: it unblocks the `left_ctrl` + `alt_gr` pair and the terminal recipe alias.
 - [ ] Sticky keys, `run_command` in a console, `open_path` through both pickers, the vision backend list, and a real
       vLLM on port 8000.
-- [ ] Decide: squash the old steps of `migrations.toml` (recommended, it would cut most remaining config test time).
+- [x] Decide: squash the old steps of `migrations.toml` (recommended, it would cut most remaining config test time).
+      Decided 2026-11-11: `oldest_version` is v20 (1.0.9), only `v20_to_v21` remains, an older file is refused and
+      the notice names 1.0.9 as the bridge (maintainer-decisions.md).
 - [x] Decide whether a registry change seen only at the sweep's next capture is acceptable. Decided 2026-11-11: no.
       `modules/keymap/layout_registry_watch.ahk` arms RegNotifyChangeKeyValue on `HKCU\Keyboard Layout` and the
       installed layouts key, polls its events every 100 ms and runs the layout poll's capture
