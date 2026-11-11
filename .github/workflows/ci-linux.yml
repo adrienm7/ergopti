@@ -3366,6 +3366,43 @@ jobs:
           fi
         timeout-minutes: 5
 
+      # The resident privacy owner (focus watch, secure-field detector, metrics
+      # focus guard) against owned GTK fields on a real accessibility bus:
+      # ordinary, password and role-changing fields, freshness and cleanup.
+      - name: The privacy owner follows real GTK fields on the accessibility bus
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/run_secure_focus_watch.py
+          else
+              exit 1
+          fi
+        timeout-minutes: 15
+
+      # The AI's text destinations on real GTK/AT-SPI with XTest output: correct
+      # fields receive the text, changed fields or windows and passwords refuse.
+      - name: AI text reaches only its own real GTK field
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/run_llm_selection_focus.py
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
       - name: Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
@@ -3456,6 +3493,24 @@ jobs:
               exit 1
           fi
         timeout-minutes: 6
+
+      # The multi-format clipboard owner against a real X server: text, HTML
+      # and a 300 kB binary target (INCR) read back byte for byte through xclip.
+      - name: The clipboard owner serves every target from a real X server
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          (cd static/ergopti_plus/linux && LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" xvfb-run -a luajit tests/hardware/run_clipboard_owner.lua x11)
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
 
       - name: Install prerequisites for Update to the newest release and restart
         if: ${{ !cancelled() && matrix.shard == 'updater' }}

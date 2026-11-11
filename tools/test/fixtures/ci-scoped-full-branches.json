@@ -1073,6 +1073,18 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "The privacy owner follows real GTK fields on the accessibility bus",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "AI text reaches only its own real GTK field",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"protocol": 10
 		},
@@ -1092,6 +1104,12 @@
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
 			"step": "The whole daemon, live — a trigger typed, a tray shown",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "The clipboard owner serves every target from a real X server",
 			"protocol": 9
 		},
 		{
