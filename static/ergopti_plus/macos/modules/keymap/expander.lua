@@ -413,14 +413,14 @@ end
 --- (M.undo_on_backspace). Only a literal replacement is kept: a token or dynamic
 --- output does not say what it typed. The record holds the buffer the expansion
 --- left, so any edit, reset or focus change in between voids it.
---- @param m table The mapping that fired.
+--- @param is_literal boolean Whether the output is plain text (no key directive).
 --- @param trigger string The text the user typed for it, as it was on screen.
 --- @param typed string What the expansion typed, replayed terminator included.
 --- @param is_private boolean The mapping's privacy.
 --- @param eligible boolean False for an ignored window or a composite event.
-local function remember_undo(m, trigger, typed, is_private, eligible)
+local function remember_undo(is_literal, trigger, typed, is_private, eligible)
 	_state.undoable = nil
-	if not eligible or m.plain_repl ~= m.repl or type(trigger) ~= "string" or trigger == ""
+	if not eligible or not is_literal or type(trigger) ~= "string" or trigger == ""
 		or type(typed) ~= "string" or typed == "" or _state.buffer == "" then return end
 	_state.undoable = { trigger = trigger, typed = typed, is_private = is_private == true, buffer_after = _state.buffer }
 end
@@ -1222,7 +1222,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		is_private
 	)
 	if not replaced then return false end
-	remember_undo(m, typed, injection.text, is_private, event_prefix == "" and is_ignored ~= true)
+	remember_undo(m.plain_repl == m.repl, typed, injection.text, is_private,
+		event_prefix == "" and is_ignored ~= true)
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
 	-- IBAN). keystats.log_hotstring writes trigger + replacement verbatim into
@@ -1373,8 +1374,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			replay_spec
 		)
 		if not replacement_ok then return false end
-		remember_undo(m, typed_trigger, to_type .. (replay_tail and chars or ""), is_private,
-			is_ignored ~= true and extra_bs_bytes == 0)
+		-- A stripped no-break space is not typed back, as on Windows and Linux:
+		-- the trigger alone returns, before the replayed colon is erased.
+		remember_undo(m.plain_repl == m.repl, typed_trigger, to_type .. (replay_tail and chars or ""),
+			is_private, is_ignored ~= true)
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keystats
@@ -1478,6 +1481,9 @@ function M.try_repeat_feature(chars, is_ignored)
 		end,
 		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, is_private)
 	if replaced ~= true then return false end
+	-- The repeat is an expansion of the magic key: an immediate Backspace gives
+	-- the magic key back, as on Windows and Linux.
+	remember_undo(true, chars, last_char, is_private, is_ignored ~= true)
 
 	if is_private then
 		Logger.debug(LOG, "Repeat feature: repeated a private character (content withheld).")
