@@ -136,7 +136,9 @@ prediction variant on macOS (`api_ollama`, `api_mlx_fetch`, `api_remote`
 Linux (`Inference.max_attempts`). One prediction at multiplier 2 sends at most
 two requests, never four. The retry keeps its extra tokens and warmer
 temperature; it is simply counted.
+
 ## Linux installed trees load a precompiled bytecode package (2026-11-11)
+
 Decided by the maintainer on 2026-11-11, following
 `docs/design/linux-bytecode-package.md`: the installer and the updater compile
 an installed tree with the target's own luajit into `<root>/.bytecode/` (a
