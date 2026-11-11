@@ -469,8 +469,9 @@ function M.sample()
 		sleep_credited = cumulative_sleep
 		local active = segment.elapsed - segment_sleep
 		day.sleep_ms = day.sleep_ms + segment_sleep
-		local field = _last.locked == true and "locked_ms" or "awake_ms"
-		day[field] = day[field] + active
+		-- awake_ms is keep-awake time (record_awake_session), as on Windows and
+		-- macOS; unlocked uptime is no metric of its own (KMD-3).
+		if _last.locked == true then day.locked_ms = day.locked_ms + active end
 		if _last.muted == true then day.audio_muted_ms = day.audio_muted_ms + active end
 	end
 	_day = current
@@ -575,6 +576,28 @@ function M.observe_desktop()
 	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
 	if _event_admit() == true then
 		_events[#_events + 1] = { action = "space_change", date = clock.date, ts = clock.ts }
+	end
+	return true
+end
+
+--- Records one finished keep-awake session (modules.keep_awake): its time is
+--- the day's awake_ms and a passive_period row of kind "awake", the row the
+--- Windows and macOS rebuilds sum (maintainer decision KMD-3 of 11 November
+--- 2026). A session is credited to the day it ends on, as on macOS.
+--- @param duration_ms number The session's length.
+--- @return boolean|nil recorded nil when the day's source refused.
+function M.record_awake_session(duration_ms)
+	assert(type(duration_ms) == "number" and duration_ms >= 0, "a keep-awake session needs its duration")
+	local clock = Calendar.capture()
+	local day = retained_day(clock.date)
+	if not day then return nil end
+	local duration = math.floor(duration_ms)
+	day.awake_ms = day.awake_ms + duration
+	day.passive_count = day.passive_count + 1
+	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
+	if _event_admit() == true then
+		_events[#_events + 1] = { action = "passive_period", metadata = { kind = "awake", duration_ms = duration },
+			date = clock.date, ts = clock.ts }
 	end
 	return true
 end
