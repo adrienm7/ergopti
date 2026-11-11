@@ -2186,7 +2186,16 @@ baseline` line (item 38).
   « application or window switch » reason, whose spaces the generic count
   refuses), `log_window_toggle_opens` and `log_window_toggle_raises` (the DEBUG
   toggle lines), `log_hotstring_expansions` (auto and terminator expansions)
-  and `log_boot_completions` are counts the guided steps watch rise and the
+  `log_boot_completions`, `log_api_key_absent` (« Keychain holds no key for
+  entry … ») and `log_api_key_reentered` (« API entry key change staged ») are
+  counts, as are the event lines added for the guided steps on 2026-11-11 (one
+  per event): `log_gesture_swipe_dispatches` (« Gesture dispatched:
+  slot=swipe_3… », DEBUG), `log_scope_commits` (« Scope <scope> <mode>
+  committed »), `log_tap_hold_word_resets` (« Tap-hold command marker received
+  (word reset: yes) », logged after the eventtap returns), `log_layout_emulations_on`,
+  `log_number_row_applies` and `log_pages_dark` / `log_pages_light` (« Webview
+  '…' rendered in the <appearance> appearance », DEBUG, from
+  `hs.host.interfaceStyle()` at the first load). The guided steps watch them rise and the
   TODO summary bounds (`min` 4 boots for the production profile).
 - `field_raw_telemetry` runs after `field_ai_local`: one read-only, lock-free
   `sqlite3` query names the `events_window_topo`, `events_av` and
@@ -2312,3 +2321,16 @@ Karabiner runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
 `[karabiner] runtime = "owned"`; checked 2026-10-31). Action: native position
 capture on macOS is item 31's production capture owner; do not plan it as
 separate work.
+
+### project-macos-boot-stages-measure-off-mac
+
+The installed-application boot scenarios (`tests/e2e/boot`) run the real
+`init.lua` headlessly; `tests/bench/bench_boot_stages.lua` reads each
+BootProfile stage's `cpu` figure from them (the world's clock is virtual, so
+wall times read 0 ms). In a container set `USER`: the logger's privacy identity
+refuses an account-less boot ("Privacy initialization refused"). A sampling hook
+through `LUA_INIT_5_4` attributes a stage; the JSON there is pure Lua, so
+`hs.json`-heavy stages look slower than on a Mac. Measured 2026-11-11: module
+compile, the hotstring registry and the config migration dominate the boot's Lua
+CPU. Action: measure the Lua side here before asking for a Mac run, and confirm
+native costs with the report's field plan.

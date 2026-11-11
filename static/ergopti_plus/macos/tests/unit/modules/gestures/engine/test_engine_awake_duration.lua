@@ -74,6 +74,7 @@ local function with_engine_scope(callback)
 			scroll_momentum_guard_ms = 0.2,
 		}
 		package.loaded["infra.timings"] = {
+			count = require("tests.support.registry_count"),
 			sec = function(group, key)
 				assert(group == "gestures" and seconds[key] ~= nil, "unexpected engine timing")
 				return seconds[key]

@@ -163,11 +163,25 @@
 			"proves": "Pointer activity and a key the tooltip does not own cancel a pending prediction, one User activity line each at DEBUG."
 		},
 		{
-			"id": "linux_prediction_hands",
+			"id": "linux_prediction_window_switch",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "prediction_focus_withdrawals",
+					"kind": "log_count",
+					"pattern": "Prediction withdrawn: another native window took the focus"
+				}
+			],
+			"gesture": "With a slow model, type until a prediction is pending, then switch to another window (Alt+Tab or a click); repeat once.",
+			"gesture_seconds": 180,
+			"proves": "Switching window withdraws a pending prediction within the focused-window poll, one line per withdrawal."
+		},
+		{
+			"id": "linux_prediction_keep",
 			"mode": "attest",
-			"gesture": "With a prediction pending, switch window: it hides. With one shown, press a validation digit and a navigation chord: it stays and acts.",
-			"gesture_seconds": 240,
-			"proves": "Switching window hides a pending prediction within the 250 ms poll, and the validation digits and navigation chords keep a shown one."
+			"gesture": "With a prediction shown, press a validation digit and a navigation chord: it stays and acts.",
+			"gesture_seconds": 180,
+			"proves": "The validation digits and the navigation chords keep a shown prediction and act on it."
 		},
 		{
 			"id": "linux_focus_hands",
@@ -210,6 +224,27 @@
 			"gesture": "Change Tap-holds > sticky delay and tap Shift then a letter (the wait follows); change CapsWord in the menu (it applies at once); one-shot Shift and CapsWord on the physical keyboard.",
 			"gesture_seconds": 420,
 			"proves": "The sticky delay row changes the one-shot wait, a CapsWord menu change applies at once, and one-shot Shift and CapsWord behave on a real device."
+		},
+		{
+			"id": "linux_physical_shortcut",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "physical_shortcut_fires",
+					"kind": "log_count",
+					"pattern": "Keyboard shortcut fired: physical_[A-Za-z0-9_]+ → "
+				}
+			],
+			"gesture": "In « Raccourcis physiques », bind a physical slot (a key with no modifier) to an action that types text, save it, then press that key once in an editor (Debug log level).",
+			"gesture_seconds": 240,
+			"proves": "A press of a bound physical slot under the evdev grab fires its action, one Keyboard shortcut fired line per press at DEBUG."
+		},
+		{
+			"id": "linux_physical_shortcut_output",
+			"mode": "attest",
+			"gesture": "Did the press type the action's text once, with no character of the key itself and no hotstring, tap-hold, layer or magic-key effect, and does the editor still show the slot after you reopen it?",
+			"gesture_seconds": 180,
+			"proves": "The physical slot's output reaches the focused window alone and the editor keeps the saved slot."
 		}
 	]
 }

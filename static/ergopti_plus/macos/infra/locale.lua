@@ -46,6 +46,7 @@ Core.init({
 
 -- Re-export the shared surface.
 function M.get(key)                  return Core.get(key) end
+function M.has(key)                  return Core.has(key) end
 function M.set_trigger_provider(fn)  Core.set_trigger_provider(fn) end
 function M.set_locale(code)          Core.set_locale(code) end
 function M.current_locale()          return Core.current_locale() end

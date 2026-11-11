@@ -81,6 +81,9 @@ local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 -- on a delimiter it contains. One owner, set by the daemon.
 local _output_observer = nil
 local _mutation_observer = nil
+-- Answers whether the focused target needs the pause between an erase and the
+-- text (set_erase_pacing); nil until the daemon installs it, which pauses.
+local _erase_pacing = nil
 
 
 -- =========================================
@@ -208,6 +211,21 @@ local function send_backspaces(tx, count)
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN, "backspace down")
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP, "backspace up")
 	end
+end
+
+--- The pause between an erase and the text that replaces it. A terminal or TUI
+--- prompt may judge every Backspace against one stale render before the text
+--- arrives, which is the one case the Windows and macOS drivers pace
+--- ([debounce] terminal_hotstring_key_delay_ms); any other application reads
+--- the virtual keyboard's events in order, so the pause only delayed the text.
+--- Without a pacing port (tests, tools) every erase pauses, as before.
+local function erase_pause()
+	if _erase_pacing then
+		local asked, wanted = pcall(_erase_pacing)
+		if asked and wanted == false then return end
+		if not asked then Logger.error(LOG, "The erase pacing port failed: %s; pausing.", tostring(wanted)) end
+	end
+	sleep_ms(INTER_PHASE_DELAY_MS)
 end
 
 --- Types a string as keystrokes, under the layout the session actually has.
@@ -631,7 +649,8 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	Perf.count("hotstring.expansions")
-	local transaction_started = Perf.clock()
+	local transaction_started = Perf.trace("hotstring.expand")
+	local transaction_events = 0
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
@@ -644,6 +663,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
 			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
 			Perf.count("output.uinput_events")
+			transaction_events = transaction_events + 1
 			local write_started = Perf.clock()
 			local accepted = native_tx.emit(code, value, phase)
 			Perf.span("output.uinput_write", write_started)
@@ -682,7 +702,9 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
-	Perf.span("hotstring.expand", transaction_started)
+	-- The operation and its event count only: never the text.
+	Perf.done("hotstring.expand", transaction_started,
+		string.format("%s, %d event(s)%s", label, transaction_events, result.ok and "" or ", failed"))
 	if not result.ok then result.error = private_failure(result.error, is_private) end
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
 		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
@@ -857,6 +879,21 @@ function M._set_uinput(mod)
 	_uinput = mod
 end
 
+--- Installs the port answering whether the focused target needs the pause
+--- between an erase and its text (true for a terminal); nil restores the
+--- pause for every target.
+--- @param fn function|nil fn() -> boolean.
+--- @return boolean accepted
+function M.set_erase_pacing(fn)
+	if fn ~= nil and type(fn) ~= "function" then
+		Logger.error(LOG, "set_erase_pacing(): a function or nil is required, got %s.", type(fn))
+		return false
+	end
+	_erase_pacing = fn
+	Logger.debug(LOG, "Erase pacing: %s.", fn and "terminals only" or "every target")
+	return true
+end
+
 --- Sets the one observer told of each successful injection's typed text.
 --- A second observer is refused: two owners would each believe they see all
 --- output. Pass nil to clear it (tests, a stopped daemon).
@@ -945,8 +982,8 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
-			-- Brief pause to let the target process the deletions.
-			sleep_ms(INTER_PHASE_DELAY_MS)
+			-- A terminal processes the deletions before the text arrives.
+			erase_pause()
 		end
 
 		require_publication(publication, false)
@@ -1084,7 +1121,7 @@ function M.inject_fields(backspace_count, values, is_private, publication)
 		require_publication(publication, false)
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
-			sleep_ms(INTER_PHASE_DELAY_MS)
+			erase_pause()
 		end
 		require_publication(publication, false)
 
@@ -1146,7 +1183,7 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 	local result = run_transaction("inject_tokens()", function(tx)
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
-			sleep_ms(INTER_PHASE_DELAY_MS)
+			erase_pause()
 		end
 		require_publication(publication, false)
 		local field = 0

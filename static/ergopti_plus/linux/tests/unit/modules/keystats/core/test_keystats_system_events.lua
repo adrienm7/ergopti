@@ -30,6 +30,7 @@ local function with_recorder(transitions, script)
 	local fake_writer = setmetatable({
 		open_db = function() return true end,
 		ensure_token_encoding = function() return true end,
+		ensure_awake_definition = function() return true end,
 		register_device = function() return true end,
 		read_open_walk = function() return nil, true end,
 		upsert_open_walk = function() return true end,
@@ -109,6 +110,41 @@ helpers.describe("keystats system events: the recorder", function()
 		end)
 	end)
 
+	-- KL_AppendLog refuses every entry while the focused app is filtered:
+	-- Linux stored the transition with the excluded app's name, and the device
+	-- ledger exported it (KML-003, linux-network-excluded-app).
+	it("linux-network-excluded-app: no transition is stored under an excluded app", function()
+		with_recorder({}, function(keystats, writer)
+			keystats.set_disabled_apps({ "org.example.excluded" })
+			keystats.on_app_focus("org.example.excluded", 1000)
+			keystats.record_network_event("internet_down")
+			keystats.on_app_focus("org.example.editor", 2000)
+			keystats.record_network_event("internet_up")
+			keystats.flush()
+			helpers.assert_eq(#writer.network_events, 1, "only the transition under a recorded app")
+			helpers.assert_eq(writer.network_events[1].row.kind, "internet_up")
+		end)
+	end)
+
+	-- KMD-2 (decided by the maintainer on 2026-11-11): every row that does not
+	-- come from typing is refused while an excluded app is focused, as on Windows.
+	it("linux-topology-excluded-app: no window or capture row is stored under an excluded app", function()
+		with_recorder({}, function(keystats, writer)
+			keystats.set_disabled_apps({ "org.example.excluded" })
+			keystats.on_app_focus("org.example.excluded", 1000)
+			keystats.record_topology_event("window_move", { from_x = 0, from_y = 0, to_x = 10, to_y = 10 })
+			keystats.record_topology_event("screen_recording_start", { exe = "obs" })
+			keystats.on_app_focus("org.example.editor", 2000)
+			keystats.record_topology_event("window_resize", { old_w = 1, old_h = 1, new_w = 2, new_h = 2 })
+			keystats.record_topology_event("screen_recording_end", { exe = "obs" })
+			keystats.flush()
+			helpers.assert_eq(#writer.window_topo_events, 1, "only the window row under a recorded app")
+			helpers.assert_eq(writer.window_topo_events[1].row.kind, "window_resize")
+			helpers.assert_eq(#writer.av_events, 1, "only the capture row under a recorded app")
+			helpers.assert_eq(writer.av_events[1].row.kind, "screen_recording_end")
+		end)
+	end)
+
 	it("drops the transitions seen while recording is forbidden", function()		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
 			keystats.set_enabled(false)
 			keystats.flush()
@@ -139,6 +175,119 @@ helpers.describe("keystats system events: the writer", function()
 			local rows = assert(writer.query_rows(
 				"SELECT action,ifnull(metadata_json,'NULL') FROM events_system ORDER BY id;"))
 			helpers.assert_eq(rows, { "lock|NULL", 'wake|{"asleep_ms":90000}' })
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+end)
+
+-- KMD-1 (decided by the maintainer on 2026-11-11): a raw row stores its UTC
+-- instant and the local offset it was recorded at; an older store gains the
+-- column on open, and the purge compares each row in its own clock.
+helpers.describe("keystats system events: the UTC offset column", function()
+	local has_sqlite = os.execute("command -v sqlite3 >/dev/null 2>&1")
+	local function with_store(prepare, body)
+		if not (has_sqlite == true or has_sqlite == 0) then return end
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			assert(os.execute("mkdir -p '" .. dir .. "'"))
+			if prepare then prepare(dir .. "/metrics.sqlite") end
+			helpers.assert_true(writer.open_db(dir .. "/metrics.sqlite"))
+			body(writer)
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end
+
+	it("linux-utc-offset: a stored row carries the offset of its UTC instant", function()
+		with_store(nil, function(writer)
+			local LocalTime = require("keystats.local_time")
+			helpers.assert_true(writer.insert_system_events("owned-device", {
+				{ ts = "2026-07-01 12:00:00", date = "2026-07-01", action = "lock" },
+				{ ts = "2026-01-01 12:00:00", date = "2026-01-01", action = "unlock" },
+			}))
+			helpers.assert_eq(writer.query_rows("SELECT utc_offset_min FROM events_system ORDER BY id;"), {
+				tostring(LocalTime.offset_of_utc("2026-07-01 12:00:00")),
+				tostring(LocalTime.offset_of_utc("2026-01-01 12:00:00")) })
+		end)
+	end)
+
+	it("linux-utc-offset: a store created before the column gains it, with the current purge triggers", function()
+		local function older_store(path)
+			local Paths = require("infra.paths")
+			local file = assert(io.open(Paths.shared("data/db/schema.sql"), "r"))
+			local schema = file:read("*a"):gsub("\n\tutc_offset_min INTEGER[^\n]*", "")
+			file:close()
+			local pipe = assert(io.popen("sqlite3 '" .. path .. "' >/dev/null", "w"))
+			-- A trigger of the same name written before the column, which the
+			-- shared purge schema (CREATE TRIGGER IF NOT EXISTS) would keep.
+			pipe:write(schema .. "\nCREATE TRIGGER metrics_purge_guard_typing BEFORE INSERT ON events_typing "
+				.. "WHEN NEW.ts <= '0' BEGIN SELECT RAISE(IGNORE); END;\n")
+			pipe:close()
+		end
+		with_store(older_store, function(writer)
+			local UtcOffsetColumn = require("keystats.utc_offset_column")
+			local rows = writer.query_rows("SELECT count(*) FROM pragma_table_info('events_system') WHERE name='utc_offset_min';")
+			helpers.assert_eq(rows, { "1" })
+			for _, name in ipairs(UtcOffsetColumn.TABLES) do
+				helpers.assert_eq(writer.query_rows("SELECT count(*) FROM pragma_table_info('" .. name
+					.. "') WHERE name='utc_offset_min';"), { "1" }, name)
+			end
+			helpers.assert_eq(writer.query_rows("SELECT instr(sql, 'utc_offset_min') > 0 FROM sqlite_master "
+				.. "WHERE name='metrics_purge_guard_typing';"), { "1" }, "the guard is the current one")
+		end)
+	end)
+
+	it("linux-utc-offset: a purge compares a row with an offset in UTC, an older macOS row in local time", function()
+		with_store(nil, function(writer)
+			helpers.assert_true(writer.query_rows(table.concat({
+				"INSERT INTO devices (device_id, name, os, host_signature, created_at, updated_at) VALUES "
+					.. "('mac', 'Mac', 'darwin', 's', 'x', 'x');",
+				-- A macOS tombstone of before the column: 10:00 local, 09:00 UTC
+				"INSERT INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('mac', 1, "
+					.. "'2026-11-05 10:00:00.000', '2026-11-05', 'metrics_purge', '{\"utc\":\"2026-11-05 09:00:00.000\"}');",
+				"INSERT INTO events_system (device_id, id, ts, date, action, utc_offset_min) VALUES "
+					.. "('mac', 2, '2026-11-05 09:30:00.000', '2026-11-05', 'lock', 60), "
+					.. "('mac', 3, '2026-11-05 08:30:00.000', '2026-11-05', 'lock', 60), "
+					.. "('mac', 4, '2026-11-05 09:30:00.000', '2026-11-05', 'lock', NULL);",
+			}, "\n")) ~= nil)
+			helpers.assert_eq(writer.query_rows("SELECT id FROM events_system WHERE action='lock' ORDER BY id;"), { "2" },
+				"09:30 UTC follows the 09:00 UTC purge; 08:30 UTC and an older 09:30 local precede it")
+		end)
+	end)
+end)
+
+-- KMD-3 (decided by the maintainer on 2026-11-11): the days this device
+-- recorded with sampled uptime are cleared once, with the definition and its
+-- first date recorded, so they are never added to keep-awake time.
+helpers.describe("keystats system events: the awake_ms definition", function()
+	it("linux-awake-definition: clears the sampled days once and marks the definition", function()
+		local has_sqlite = os.execute("command -v sqlite3 >/dev/null 2>&1")
+		if not (has_sqlite == true or has_sqlite == 0) then return end
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			helpers.assert_true(writer.open_db(dir .. "/metrics.sqlite"))
+			helpers.assert_true(writer.query_rows("INSERT INTO agg_system_day (device_id, date, awake_ms, locked_ms) "
+				.. "VALUES ('this-device','2026-11-10',3600000,60000),('other-device','2026-11-10',1200,0);") ~= nil)
+			helpers.assert_true(writer.ensure_awake_definition("this-device", "2026-11-11"))
+			helpers.assert_eq(writer.query_rows("SELECT device_id,awake_ms,locked_ms FROM agg_system_day ORDER BY device_id;"),
+				{ "other-device|1200|0", "this-device|0|60000" }, "only this device's sampled uptime goes")
+			helpers.assert_eq(writer.get_meta(writer.AWAKE_DEFINITION.key), "keep_awake_sessions")
+			helpers.assert_eq(writer.get_meta(writer.AWAKE_DEFINITION.since_key), "2026-11-11")
+			helpers.assert_true(writer.query_rows("UPDATE agg_system_day SET awake_ms = 5000 WHERE device_id='this-device';") ~= nil)
+			helpers.assert_true(writer.ensure_awake_definition("this-device", "2026-11-12"))
+			helpers.assert_eq(writer.query_rows("SELECT awake_ms FROM agg_system_day WHERE device_id='this-device';"), { "5000" },
+				"a store already moved keeps its keep-awake time")
+			helpers.assert_eq(writer.get_meta(writer.AWAKE_DEFINITION.since_key), "2026-11-11")
+			helpers.assert_true(writer.set_meta(writer.AWAKE_DEFINITION.key, "something-else"))
+			helpers.assert_eq(writer.ensure_awake_definition("this-device", "2026-11-12"), false,
+				"an unknown definition is refused, not overwritten")
 		end, debug.traceback)
 		writer.close_db()
 		os.execute("rm -rf '" .. dir .. "'")

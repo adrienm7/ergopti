@@ -881,6 +881,32 @@ end
 ---   told, when the request was refused for one.
 function M.predict(context, output_context, override, automatic)
 	if _runtime_closed or _scope_owner then return false end
+	local RequestSettings = require("llm.request_settings")
+	--- What a prediction is sent with: the backend and, under the API backend,
+	--- the active entry's id, provider, model, endpoint and key; under Ollama
+	--- its server address (a model change already retires through set_model).
+	--- @return table snapshot
+	local function settings_now()
+		local kind = M.get_backend()
+		if kind ~= "api" then
+			local profiles = get_profiles()
+			return RequestSettings.snapshot({ backend = kind, endpoint = profiles and profiles.get_base_url() or nil })
+		end
+		local entries = get_api_entries()
+		local entry = entries and entries.active() or nil
+		if not entry then return RequestSettings.snapshot({ backend = kind }) end
+		return RequestSettings.snapshot({ backend = kind, entry = entry.id, provider = entry.provider,
+			model = entry.model, endpoint = entry.base_url, key = entry.token })
+	end
+	-- A request sent with settings changed since is retired, not waited for
+	-- (maintainer decision AID-3, llm.request_settings).
+	local inflight = _predicting and type(_suggestion_context) == "table" and _suggestion_context.settings or nil
+	local changed = inflight and RequestSettings.change(inflight, settings_now()) or nil
+	if changed then
+		Logger.info(LOG, "Prediction in flight retired: its %s changed.", changed)
+		M.dismiss()
+		if _runtime_closed or _scope_owner then return false end
+	end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
 	if _is_secure_context() then
@@ -912,6 +938,7 @@ function M.predict(context, output_context, override, automatic)
 	local backend, target, model, runtime_response = M.resolve_backend()
 	if not admission_current() then return false end
 	if not backend then return end
+	local settings = settings_now()
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
@@ -986,6 +1013,7 @@ function M.predict(context, output_context, override, automatic)
 		focus = focus,
 		live = override ~= nil and override.live == true,
 		automatic = type(output_context) == "table" and output_context.automatic == true,
+		settings = settings,
 	}
 	_offer_notified = false
 	_predicting = true
@@ -1025,6 +1053,12 @@ function M.predict(context, output_context, override, automatic)
 
 	local function request_current(verify_focus)
 		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+		local changed_field = RequestSettings.change(settings, settings_now())
+		if changed_field then
+			Logger.info(LOG, "Prediction retired: its %s changed while it was in flight.", changed_field)
+			M.dismiss()
+			return false
+		end
 		if verify_focus then
 			local blocked = global_privacy_blocks()
 			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
@@ -1112,6 +1146,8 @@ function M.predict(context, output_context, override, automatic)
 		-- would truncate it and erase text it could not retype.
 		local sent_tokens = require("llm.request_plan.token_budget").for_call(
 			rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call)
+		-- A retry is not streamed, as on Windows (DispatchVariant) and macOS.
+		local retrying = retry_call ~= nil
 		if retry_call then
 			sent_tokens, sent_temperature = retry_call.tokens, retry_call.temperature
 			retry_call = nil
@@ -1127,7 +1163,7 @@ function M.predict(context, output_context, override, automatic)
 		end
 		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
-			stream = DisplaySettings.get("streaming") == true,
+			stream = DisplaySettings.get("streaming") == true and not retrying,
 			temperature = sent_temperature,
 			max_tokens = sent_tokens,
 			-- Decided from the prompt, as macOS does: one continuation, unless the
@@ -1161,6 +1197,9 @@ function M.predict(context, output_context, override, automatic)
 				end
 				if err ~= "cancelled" and not refused_key and attempts_remain() then
 					arm_retry()
+					-- The failed call's streamed partial is no candidate: withdrawn
+					-- before the retry, it can no longer be accepted meanwhile.
+					if streamed ~= "" then publish() end
 					dispatch()
 					return
 				end
@@ -1176,7 +1215,10 @@ function M.predict(context, output_context, override, automatic)
 			end
 			-- An empty or unusable answer is retried with more room; a duplicate
 			-- only spends its attempt, since its call was not too short.
-			if #parsed == 0 then arm_retry() end
+			if #parsed == 0 then
+				arm_retry()
+				if streamed ~= "" then publish() end
+			end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if attempts_remain() or (is_batch and request_index < batching.calls) then
 				-- Shown now: the next variant may wait for the backend's interval.

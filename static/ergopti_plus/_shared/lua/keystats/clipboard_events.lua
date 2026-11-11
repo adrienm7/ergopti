@@ -49,7 +49,7 @@ M.PASTE_BURST_THRESHOLD = 5
 M.CONTENT_UNKNOWN = "unknown"
 
 --- events_clipboard columns, in schema order.
-M.COLUMNS = { "device_id", "id", "ts", "date", "kind", "app", "meta_json" }
+M.COLUMNS = { "device_id", "id", "ts", "date", "kind", "app", "meta_json", "utc_offset_min" }
 
 --- Copy and paste keys under the platform's primary modifier (Ctrl, Cmd).
 local COPY_KEYS = { c = true, x = true }
@@ -158,14 +158,18 @@ local function text(value)
 end
 
 --- Renders one events_clipboard row.
---- @param row table { device_id, id, ts, date, kind, app, meta_json }.
+--- @param row table { device_id, id, ts, date, kind, app, meta_json, utc_offset_min? }; an
+---   absent offset is a row recorded before the column existed (NULL).
 --- @return string sql One INSERT OR IGNORE statement.
 function M.insert_sql(row)
 	assert(type(row) == "table" and M.KINDS[row.kind], "not an events_clipboard kind: " .. tostring(row and row.kind))
 	assert(type(row.id) == "number" and row.id >= 0 and row.id % 1 == 0, "a clipboard row needs an integer id")
+	local offset = row.utc_offset_min
+	assert(offset == nil or (type(offset) == "number" and offset % 1 == 0), "a clipboard row's offset is whole minutes")
 	return "INSERT OR IGNORE INTO events_clipboard (" .. table.concat(M.COLUMNS, ", ") .. ") VALUES ("
 		.. text(row.device_id) .. ", " .. string.format("%d", row.id) .. ", " .. text(row.ts) .. ", "
-		.. text(row.date) .. ", " .. text(row.kind) .. ", " .. text(row.app) .. ", " .. text(row.meta_json) .. ");"
+		.. text(row.date) .. ", " .. text(row.kind) .. ", " .. text(row.app) .. ", " .. text(row.meta_json) .. ", "
+		.. (offset == nil and "NULL" or string.format("%d", offset)) .. ");"
 end
 
 return M

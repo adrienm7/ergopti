@@ -123,6 +123,12 @@ else
 	               SHARED_LUA_DIR .. "/?.lua;" ..
 	               SHARED_LUA_DIR .. "/?/init.lua;" ..
 	               package.path
+	-- An installed tree's modules load from the bytecode its installer compiled
+	-- (compile time was most of the boot's first 200 ms); a checkout never
+	-- reads one. Decided here, before the first application module loads.
+	local BytecodePackage = assert(loadfile(SCRIPT_DIR .. "/infra/bytecode_package.lua"))()
+	package.loaded["infra.bytecode_package"] = BytecodePackage
+	BytecodePackage.install(SCRIPT_DIR)
 end
 
 -- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
@@ -951,6 +957,8 @@ local function main()
 	Logger.start(LOG, "Ergopti hotstrings daemon starting (version %s, pid %s)…",
 		Version.VERSION, DiagnosticSnapshot.pid() or "unknown")
 	BootProfiler.begin()
+	require("infra.bytecode_package").report(function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+		function(fmt, ...) Logger.warn(LOG, fmt, ...) end)
 	-- The options decide half of what follows (grab, tray, device pinning), and a
 	-- user log has no other record of how the unit was launched.
 	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s layout=%s keymap=%s config=%s.",
@@ -1094,7 +1102,8 @@ local function main()
 
 	-- 8.3) Initialise the full keystats.
 	BootProfiler.stage("keystats")
-	local metrics_initialized = keystats.init({})
+	-- Its background tasks (ledger export, text migration) wait for the loop.
+	local metrics_initialized = keystats.init({ defer = event_loop.defer })
 	if metrics_initialized == false and notifier then
 		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
 		if notice_i18n then
@@ -1143,6 +1152,9 @@ local function main()
 	end
 	Logger.info(LOG, "Using device: %s.", device)
 	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
+	-- 8.5 to 8.8 had no stage: the boot summary left their time between two
+	-- stages, unattributed (about 170 ms in a measured X11 session).
+	BootProfiler.stage("callbacks")
 
 	-- Focused app id, cached off the input path by the process_lifecycle
 	-- onFocusChange callback (see 8.12). Declared BEFORE on_char so on_char
@@ -1179,6 +1191,11 @@ local function main()
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
 	local WordReset = require("modules.hotstrings.word_reset")
+	-- The erase-to-text pause only where Windows and macOS pace it: a terminal,
+	-- or an application nobody could name (the focus is unknown).
+	injector.set_erase_pacing(function()
+		return _cached_app_id == nil or WordReset.is_terminal_app(_cached_app_id)
+	end)
 	-- The action catalogue, bound once. It shares a module with the touchpad
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
@@ -2596,8 +2613,10 @@ local function main()
 	end
 	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
-	-- it, so the application never sees a chord Ergopti runs. It comes last: an
-	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- it, so the application never sees a chord Ergopti runs. An offered
+	-- prediction's own digit chord is contextual and outranks a binding; both run
+	-- before the layout emulation, as Windows runs a slot before its layout chord
+	-- and macOS lets the digit accept (ILL-001, ILL-002).
 	-- The press is recorded for the metrics exactly as the control callback
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
@@ -2631,21 +2650,35 @@ local function main()
 		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots.
-		if require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+		-- under the Shortcuts master like the keyboard slots, and only while no
+		-- layout is emulated, as on Windows.
+		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
+			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
-		}) then return true end
+		})
+		if accented then
+			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
+		end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.
 			-- Retire its old PRIMARY window before the deferred action can run.
 			wrap_on_type.end_selection_window()
 			return true
 		end
+		if prediction_engine
+			and type(prediction_engine.handle_shortcut) == "function"
+			and prediction_engine.handle_shortcut(detail) == true then
+			return true
+		end
+		-- A key the tooltip did not own is user activity: a pending prediction
+		-- stops before the typing path arms the next pause.
+		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
+		if consume_bound_chord(detail) then return true end
 		-- The layout emulation, after the actions the user bound on a key.
 		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
@@ -2657,16 +2690,7 @@ local function main()
 			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
 				release_callback = emulated_release }
 		end
-		if wrap_on_type.on_key(detail) then return true end
-		if prediction_engine
-			and type(prediction_engine.handle_shortcut) == "function"
-			and prediction_engine.handle_shortcut(detail) == true then
-			return true
-		end
-		-- A key the tooltip did not own is user activity: a pending prediction
-		-- stops before the typing path arms the next pause.
-		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
-		return consume_bound_chord(detail)
+		return wrap_on_type.on_key(detail) == true
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
 	local hold_token = keystats.hold_accounting_token
@@ -2714,6 +2738,7 @@ local function main()
 	end
 
 
+	BootProfiler.stage_done("callbacks")
 	-- 8.9) Start the tray menu if requested.
 	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
@@ -2775,6 +2800,7 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
+					local switch_started = require("infra.perf_counters").trace("layout.switch")
 					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
 					local function selected_map_current()
 						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
@@ -2786,6 +2812,7 @@ local function main()
 						return selected_map_current() and set_layout(new_layout) == true
 							and selected_map_current() and refresh(selected_keymap) == true
 					end, selected_map_current) then
+						require("infra.perf_counters").done("layout.switch", switch_started, "refused")
 						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
 						return
 					end
@@ -2801,7 +2828,8 @@ local function main()
 					-- So the tick moves to the row the user just chose. Without it the
 					-- menu still marks the old layout and the change reads as ignored.
 					if rebuild_tray_menu then rebuild_tray_menu() end
-					Logger.success(LOG, "Layout '%s' applied.", tostring(new_layout))
+					Logger.success(LOG, "Layout '%s' applied in %.0f ms.", tostring(new_layout),
+						require("infra.perf_counters").done("layout.switch", switch_started))
 				end,
 		keystats     = keystats,
 		llm           = prediction_engine,
@@ -3239,6 +3267,8 @@ local function main()
 	if not opts.dry_run then require("infra.personal_shortcuts").load() end
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
+	-- The snapshot, the watchers and the loop's setup, unattributed before.
+	BootProfiler.stage("watchers")
 
 	-- Discover environment facts while the desktop still owns the keyboard.
 	-- Only cached metadata formatting/logging may follow the ready announcement.
@@ -3504,10 +3534,12 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	CrashReporter.remove_legacy_dumps()
 	if not privacy_owners.startup_checkpoint() then return end
-	-- UI preparation can outlive an XKB change; resolve again before grabbing.
-	if not keyboard_layout.refresh(opts.keymap) then
+	-- UI preparation can outlive an XKB change; resolve again before grabbing,
+	-- unless the desktop source proves the published layout still current.
+	if not keyboard_layout.refresh_unless_current(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	BootProfiler.stage_done("watchers")
 	if not privacy_owners.startup_checkpoint() then return end
 	-- Retain the selected inverse publisher before any source-acquisition callback.
 	local capture_layout = keyboard_layout
@@ -3622,6 +3654,16 @@ local function main()
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
+	-- The first key used to load the shortcut assignments (a config read and a
+	-- TOML decode, about 8 ms in a measured X11 session) inside its own
+	-- dispatch. They load once per process either way; the loop's first idle
+	-- tick takes them now, after the ready announcement.
+	event_loop.defer(function()
+		local loaded, failure = pcall(require("modules.shortcuts.keyboard_shortcuts").get_assignments)
+		if not loaded then
+			Logger.error(LOG, "Shortcut assignments could not be loaded before the first key: %s.", tostring(failure))
+		end
+	end)
 
 	event_loop.run({
 		onIdle = function()
@@ -3665,8 +3707,11 @@ local function main()
 		end,
 		onPeriodic = on_periodic,
 		periodSec = 0.25,
-		-- Sleep on the input descriptors between ticks instead of spinning a core.
-		idleWait = keyboard_hook.idle_wait,
+		-- Sleep on the input descriptors between ticks instead of spinning a core,
+		-- and on the tray's GLib descriptors, so a panel's request wakes it too.
+		idleWait = function(timeout_ms)
+			return keyboard_hook.idle_wait(timeout_ms, tray_menu and tray_menu.wait_companion() or nil)
+		end,
 	})
 
 	-- 8.14) Clean exit.
@@ -3688,6 +3733,8 @@ local function main()
 	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
+	-- The interval since the last summary, which a short session never reached.
+	require("infra.perf_counters").flush_now()
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end

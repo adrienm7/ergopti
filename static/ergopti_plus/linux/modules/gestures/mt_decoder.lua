@@ -314,7 +314,8 @@ function M.new(opts)
 	--- Feeds one decoded event.
 	---
 	--- @param event table { type, code, value } as infra/input_event.lua decodes it.
-	--- @return table|nil A completed gesture { fingers, direction, tap }, or nil.
+	--- @return table|nil A completed gesture { fingers, direction, tap, dominant? }, or nil;
+	---   a diagonal carries its dominant straight direction, its unbound slot's fallback.
 	function decoder:feed(event)
 		if type(event) ~= "table" then return nil end
 		local etype, code, value = event.type, event.code, event.value
@@ -502,7 +503,8 @@ function M.new(opts)
 			-- A swipe is a swipe however long it took: someone dragging slowly
 			-- across the pad means it, and a ceiling here would drop the gesture
 			-- they were halfway through.
-			return { fingers = fingers, direction = direction, tap = false }
+			return { fingers = fingers, direction = direction, tap = false,
+				dominant = direction:find("_", 1, true) and Direction.dominant(dx, dy) or nil }
 		end
 
 		-- No meaningful travel. That is a tap only if it was BRIEF — otherwise it

@@ -730,6 +730,7 @@ function M.sqlite_writer(opts)
 	function fake.has_private_file_debt() return false end
 	function fake.open_db(path) fake.path = path ; if not available then return false, "sqlite_unavailable" end; return true end
 	function fake.ensure_token_encoding() return true end
+	function fake.ensure_awake_definition() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
 	function fake.get_revision() return fake.revision end

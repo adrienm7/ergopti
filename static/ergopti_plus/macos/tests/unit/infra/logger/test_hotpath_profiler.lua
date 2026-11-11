@@ -18,12 +18,17 @@ local helpers = require("tests.helpers")
 local captured = {}
 local function reset_capture() captured = {} end
 local _real_logger = package.loaded["infra.logger"]
+local debug_level_on = false
 local function noop() end
 package.loaded["infra.logger"] = {
 	info    = noop,
 	warn    = function(tag, fmt, ...) captured[#captured + 1] = { tag = tag, fmt = fmt, args = { ... } } end,
-	debug   = noop, trace = noop, done = noop, start = noop, success = noop, error = noop,
-	is_enabled = function() return true end,
+	debug   = noop, start = noop, success = noop, error = noop,
+	trace   = function(tag) captured[#captured + 1] = { tag = tag, kind = "trace" } end,
+	done    = function(tag) captured[#captured + 1] = { tag = tag, kind = "done" } end,
+	-- The logger's public predicate, and no level field: a gate reading the
+	-- private field raised on every logger double (llm-prompt-prediction e2e).
+	is_enabled = function(level) return level ~= 1 or debug_level_on end,
 	LEVELS  = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
 }
 
@@ -157,6 +162,23 @@ helpers.describe("infra.hotpath_profiler nesting attribution", function()
 			helpers.assert_true(type(value) == "number" or Segments.is_declared(value) or value == Segments.NO_PARENT,
 				"a log argument outside the closed vocabulary: " .. tostring(value))
 		end
+	end)
+end)
+
+helpers.describe("infra.hotpath_profiler.trace/done", function()
+	helpers.it("pairs TRACE and DONE lines only while the logger says DEBUG is on", function()
+		reset_capture()
+		hot._reset_for_test()
+		debug_level_on = false
+		NS = 600000 * NS_PER_MS
+		hot.done("hotstring.expand", hot.trace("hotstring.expand"))
+		helpers.assert_eq(#captured, 0, "at INFO a span writes nothing")
+		debug_level_on = true
+		hot.done("hotstring.expand", hot.trace("hotstring.expand"))
+		debug_level_on = false
+		helpers.assert_eq(#captured, 2)
+		helpers.assert_eq(captured[1].kind, "trace")
+		helpers.assert_eq(captured[2].kind, "done")
 	end)
 end)
 
