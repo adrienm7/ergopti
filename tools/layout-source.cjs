@@ -37,12 +37,31 @@ function publish(directory, files) {
 	}
 }
 
-/** The macOS artifacts as a file map; strings files carry their own encoding. */
+/**
+ * The PNG files a source names as its macOS icons, read beside the source file.
+ * The source model admits only plain file names, so none leaves that folder.
+ */
+function readIcons(document, sourceFile) {
+	const macos = (document.exports && document.exports.macos) || {};
+	const icons = {};
+	for (const field of ['icon', 'ansi_icon'])
+		if (typeof macos[field] === 'string')
+			icons[macos[field]] = new Uint8Array(
+				fs.readFileSync(path.join(path.dirname(sourceFile), macos[field]))
+			);
+	return icons;
+}
+
+/** The macOS artifacts as a file map; strings and icon files carry their own encoding. */
 function macosFiles(compiled) {
 	return compiled.files
 		.map((file) => [
 			file.path,
-			file.encoding === 'utf16le' ? Buffer.from(file.text, 'utf16le') : file.text
+			file.encoding === 'binary'
+				? Buffer.from(file.bytes)
+				: file.encoding === 'utf16le'
+					? Buffer.from(file.text, 'utf16le')
+					: file.text
 		])
 		.concat([['export.json', `${JSON.stringify(compiled.report, null, 2)}\n`]]);
 }
@@ -52,11 +71,11 @@ function macosFiles(compiled) {
  * with each export's report, and report.json naming refused targets. A refused
  * target writes no directory; the others still publish.
  */
-function exportAll(source, document, output) {
+function exportAll(source, document, output, icons) {
 	const reports = [];
 	const outputs = [];
 	for (const [target, compile] of [
-		['macos', () => macosFiles(source.exportMacos(document))],
+		['macos', () => macosFiles(source.exportMacos(document, undefined, icons))],
 		['linux', () => [...exportXkb(document).files]],
 		['windows', () => [...exportKlc(document).files]]
 	]) {
@@ -94,14 +113,16 @@ function main(args) {
 	}
 	if (command === 'export-macos' && (values.length === 2 || values.length === 3)) {
 		const [input, output, format] = values;
-		const compiled = source.exportMacos(source.read(readText(input)), format);
+		const document = source.read(readText(input));
+		const compiled = source.exportMacos(document, format, readIcons(document, input));
 		publish(output, macosFiles(compiled));
 		process.stdout.write(`${JSON.stringify(compiled.report, null, 2)}\n`);
 		return;
 	}
 	if (command === 'export-all' && values.length === 2) {
 		const [input, output] = values;
-		const reports = exportAll(source, source.read(readText(input)), output);
+		const document = source.read(readText(input));
+		const reports = exportAll(source, document, output, readIcons(document, input));
 		process.stdout.write(`${JSON.stringify(reports, null, 2)}\n`);
 		return;
 	}
@@ -115,7 +136,7 @@ function main(args) {
 		const document = source.read(readText(values[0]));
 		const report =
 			command === 'report'
-				? targetReport(document)
+				? targetReport(document, readIcons(document, values[0]))
 				: {
 						valid: true,
 						format: document.format,

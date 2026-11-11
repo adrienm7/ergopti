@@ -93,6 +93,17 @@ var LayoutSourceCompiler = (function () {
 	const VARIANTS = ['iso', 'ansi'];
 	const MACOS_FORMATS = ['bundle', 'iso', 'ansi'];
 	const DEFAULT_VERSION = '1.0';
+	// The PNG-carrying icon element of each square size macOS reads from an .icns.
+	const ICNS_TYPES = new Map([
+		[16, 'icp4'],
+		[32, 'icp5'],
+		[64, 'icp6'],
+		[128, 'ic07'],
+		[256, 'ic08'],
+		[512, 'ic09'],
+		[1024, 'ic10']
+	]);
+	const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 	const INPUT_SOURCE_PREFIX = 'com.apple.keyboardlayout.';
 
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -701,6 +712,40 @@ var LayoutSourceCompiler = (function () {
 	// ======= 6/ macOS export ======
 	// ==============================
 
+	/**
+	 * Wrap one square PNG into an .icns holding it as its size's element. The
+	 * image itself is the user's; only its header is read.
+	 * @param {Uint8Array} png
+	 * @param {string} path - Source path named in a refusal.
+	 * @returns {Uint8Array}
+	 */
+	function icns(png, path) {
+		// Checked by shape: a page or a Node vm passes bytes from another realm.
+		if (!ArrayBuffer.isView(png) || png.BYTES_PER_ELEMENT !== 1 || png.length < 24)
+			fail('source_icon_png', path);
+		const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+		const header = String.fromCharCode(...png.subarray(12, 16));
+		if (PNG_SIGNATURE.some((byte, index) => png[index] !== byte) || header !== 'IHDR')
+			fail('source_icon_png', path);
+		const width = view.getUint32(16);
+		const type = ICNS_TYPES.get(width);
+		if (type === undefined || view.getUint32(20) !== width) fail('source_icon_size', path);
+		const out = new Uint8Array(16 + png.length);
+		const outView = new DataView(out.buffer);
+		out.set(
+			[...'icns'].map((c) => c.charCodeAt(0)),
+			0
+		);
+		outView.setUint32(4, out.length);
+		out.set(
+			[...type].map((c) => c.charCodeAt(0)),
+			8
+		);
+		outView.setUint32(12, 8 + png.length);
+		out.set(png, 16);
+		return out;
+	}
+
 	const plistEscape = (text) =>
 		text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 	const stringsEscape = (text) => text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -708,33 +753,57 @@ var LayoutSourceCompiler = (function () {
 	/**
 	 * The macOS artifacts: a bundle holding ISO and ANSI (the default), or one
 	 * .keylayout. InfoPlist.strings entries are UTF-16LE with a byte-order mark,
-	 * as the shipped Ergopti bundles carry them.
-	 * @returns {{files: {path: string, text: string, encoding: 'utf8'|'utf16le'}[], report: object}}
+	 * as the shipped Ergopti bundles carry them. `exports.macos.icon` (and
+	 * `ansi_icon` for the ANSI variant, else the same) names a PNG whose bytes the
+	 * caller passes in `icons`, keyed by that name; each variant gets its .icns.
+	 * @param {object} [icons] - PNG file name -> Uint8Array.
+	 * @returns {{files: {path: string, text?: string, bytes?: Uint8Array,
+	 *   encoding: 'utf8'|'utf16le'|'binary'}[], report: object}}
 	 */
-	function exportMacos(source, tables, format) {
+	function exportMacos(source, tables, format, icons = {}) {
 		LayoutSource.validate(source);
+		const declared = (source.exports && source.exports.macos) || {};
+		const iconOf = (variant) => {
+			const field = variant === 'ansi' && own(declared, 'ansi_icon') ? 'ansi_icon' : 'icon';
+			if (!own(declared, field)) return null;
+			const png = own(icons, declared[field]) ? icons[declared[field]] : undefined;
+			if (png === undefined) fail('source_icon_missing', `exports.macos.${field}`);
+			return icns(png, `exports.macos.${field}`);
+		};
 		const chosen = format || ((source.exports && source.exports.macos) || {}).format || 'bundle';
 		if (!MACOS_FORMATS.includes(chosen)) fail('source_invalid', 'exports.macos.format');
 		const variants = chosen === 'bundle' ? VARIANTS : [chosen];
 		const compiled = variants.map((variant) => ({
 			variant,
+			icon: iconOf(variant),
 			...compileKeylayout(source, tables, { variant })
 		}));
 		const files = [];
 		if (chosen !== 'bundle') {
+			// A loose .keylayout takes the .icns of the same name beside it.
 			const [only] = compiled;
 			files.push({ path: `${only.names.internal}.keylayout`, text: only.text, encoding: 'utf8' });
+			if (only.icon)
+				files.push({ path: `${only.names.internal}.icns`, bytes: only.icon, encoding: 'binary' });
 		} else {
 			const macos = (source.exports && source.exports.macos) || {};
 			const version = macos.version || DEFAULT_VERSION;
 			const language = (source.layout.languages || [])[0];
 			const root = `${compiled[0].names.internal}.bundle/Contents`;
-			const entries = compiled.map(({ names }) =>
+			const entries = compiled.map(({ names, icon }) =>
 				[
 					`\t<key>KLInfo_${plistEscape(names.internal)}</key>`,
 					'\t<dict>',
 					'\t\t<key>TICapsLockLanguageSwitchCapable</key>',
 					'\t\t<true/>',
+					...(icon
+						? [
+								'\t\t<key>TISIconIsTemplate</key>',
+								'\t\t<false/>',
+								'\t\t<key>ICNS</key>',
+								`\t\t<string>${plistEscape(names.internal)}.icns</string>`
+							]
+						: []),
 					'\t\t<key>TISInputSourceID</key>',
 					`\t\t<string>${plistEscape(names.inputSource)}</string>`,
 					...(language
@@ -783,12 +852,19 @@ var LayoutSourceCompiler = (function () {
 				text: versionPlist.join('\n') + '\n',
 				encoding: 'utf8'
 			});
-			for (const { names, text } of compiled)
+			for (const { names, text, icon } of compiled) {
 				files.push({
 					path: `${root}/Resources/${names.internal}.keylayout`,
 					text,
 					encoding: 'utf8'
 				});
+				if (icon)
+					files.push({
+						path: `${root}/Resources/${names.internal}.icns`,
+						bytes: icon,
+						encoding: 'binary'
+					});
+			}
 			// The strings key is the internal name; macOS refuses a bundle keyed otherwise.
 			const strings = compiled
 				.map(
@@ -815,7 +891,9 @@ var LayoutSourceCompiler = (function () {
 				variants: compiled.map(({ variant, names }) => ({ variant, ...names })),
 				omitted: compiled[0].omitted,
 				limitations: [
-					'Icons are not generated; macOS shows its generic layout icon.',
+					...(compiled.some(({ icon }) => icon === null)
+						? ['A variant without exports.macos.icon shows the generic layout icon.']
+						: []),
 					'Native loading by macOS is not certified by this export; install and select it to check.'
 				]
 			}

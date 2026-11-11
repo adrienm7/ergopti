@@ -51,7 +51,7 @@ function loadLayoutSource() {
 		importStructured: (text, id, convention) =>
 			compiler.importStructured(text, id, convention, tables),
 		compileKeylayout: (source, options) => compiler.compileKeylayout(source, tables, options),
-		exportMacos: (source, format) => compiler.exportMacos(source, tables, format),
+		exportMacos: (source, format, icons) => compiler.exportMacos(source, tables, format, icons),
 		targetKeylayout: (source, platform) => compiler.targetKeylayout(source, tables, platform)
 	};
 }

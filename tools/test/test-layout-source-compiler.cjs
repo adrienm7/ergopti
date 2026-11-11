@@ -384,6 +384,100 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 	checks++;
 }
 
+// Icons: each variant's PNG becomes its .icns, declared in Info.plist; a single
+// .keylayout takes the .icns of its name beside it. Bad or missing PNGs refuse.
+{
+	const zlib = require('node:zlib');
+	const png = (width, height) => {
+		const chunk = (type, data) => {
+			const head = Buffer.alloc(8);
+			head.writeUInt32BE(data.length, 0);
+			head.write(type, 4, 'latin1');
+			return Buffer.concat([head, data, Buffer.alloc(4)]);
+		};
+		const ihdr = Buffer.alloc(13);
+		ihdr.writeUInt32BE(width, 0);
+		ihdr.writeUInt32BE(height, 4);
+		ihdr.set([8, 6, 0, 0, 0], 8);
+		const pixels = zlib.deflateSync(Buffer.alloc(height * (1 + width * 4)));
+		return new Uint8Array(
+			Buffer.concat([
+				Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+				chunk('IHDR', ihdr),
+				chunk('IDAT', pixels),
+				chunk('IEND', Buffer.alloc(0))
+			])
+		);
+	};
+	const iconic = clone(fixture);
+	iconic.exports.macos.icon = 'layout.png';
+	iconic.exports.macos.ansi_icon = 'layout_ansi.png';
+	const iso = png(32, 32);
+	const ansiPng = png(16, 16);
+	const { files, report } = Source.exportMacos(iconic, undefined, {
+		'layout.png': iso,
+		'layout_ansi.png': ansiPng
+	});
+	const root = 'source_fixture.bundle/Contents';
+	const byPath = new Map(files.map((file) => [file.path, file]));
+	for (const [name, image, type] of [
+		['source_fixture', iso, 'icp5'],
+		['source_fixture_ansi', ansiPng, 'icp4']
+	]) {
+		const icon = Buffer.from(byPath.get(`${root}/Resources/${name}.icns`).bytes);
+		assert.equal(icon.toString('latin1', 0, 4), 'icns', `${name}: magic`);
+		assert.equal(icon.readUInt32BE(4), icon.length, `${name}: length`);
+		assert.equal(icon.toString('latin1', 8, 12), type, `${name}: element type`);
+		assert.equal(icon.readUInt32BE(12), 8 + image.length, `${name}: element length`);
+		assert(icon.subarray(16).equals(Buffer.from(image)), `${name}: PNG kept`);
+		assert(
+			byPath
+				.get(`${root}/Info.plist`)
+				.text.includes(
+					`<key>KLInfo_${name}</key>\n\t<dict>\n\t\t<key>TICapsLockLanguageSwitchCapable</key>\n\t\t<true/>\n\t\t<key>TISIconIsTemplate</key>\n\t\t<false/>\n\t\t<key>ICNS</key>\n\t\t<string>${name}.icns</string>`
+				),
+			`${name}: Info.plist names the icon`
+		);
+	}
+	assert(!report.limitations.some((line) => /generic layout icon/.test(line)), 'no generic icon');
+	const single = Source.exportMacos(iconic, 'iso', {
+		'layout.png': iso,
+		'layout_ansi.png': ansiPng
+	});
+	assert.deepEqual(clone(single.files.map((file) => file.path)), [
+		'source_fixture.keylayout',
+		'source_fixture.icns'
+	]);
+	// The ANSI variant falls back to the ISO icon when it names none of its own.
+	delete iconic.exports.macos.ansi_icon;
+	const shared = Source.exportMacos(iconic, 'ansi', { 'layout.png': iso });
+	assert.equal(Buffer.from(shared.files[1].bytes).toString('latin1', 8, 12), 'icp5');
+	assert.throws(() => Source.exportMacos(iconic), /source_icon_missing: exports.macos.icon/);
+	assert.throws(
+		() => Source.exportMacos(iconic, undefined, { 'layout.png': png(32, 16) }),
+		/source_icon_size/
+	);
+	assert.throws(
+		() => Source.exportMacos(iconic, undefined, { 'layout.png': png(48, 48) }),
+		/source_icon_size/
+	);
+	assert.throws(
+		() => Source.exportMacos(iconic, undefined, { 'layout.png': new Uint8Array(40) }),
+		/source_icon_png/
+	);
+	for (const bad of ['../x.png', 'x.jpg', '.x.png', 'a/b.png'])
+		assert.throws(() => {
+			const invalid = clone(fixture);
+			invalid.exports.macos.icon = bad;
+			Source.exportMacos(invalid);
+		}, /source_invalid: exports.macos.icon/);
+	// Without an icon the export says the generic icon is shown.
+	assert(
+		Source.exportMacos(fixture).report.limitations.some((line) => /generic layout icon/.test(line))
+	);
+	checks++;
+}
+
 // Linux and Windows read the same compilation, with their own folds and omissions.
 {
 	const linux = exportXkb(fixture);
