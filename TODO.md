@@ -1016,10 +1016,15 @@ Account and tester actions (maintainer, from the PC):
 
 ## To confirm on Linux
 
-- [ ] Raw telemetry (2026-11-11): under X11, move, resize and maximise a window and change monitor:
+Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh` run answers each
+of them in `docs/field-reports/linux-<stamp>/todo_summary.md` (probe steps read the session, guided steps prompt the
+gestures in the terminal): coverage table, verdicts and what no run can test in
+[docs/tooling/linux-field-report-coverage.md](docs/tooling/linux-field-report-coverage.md).
+
+- [ ] <!-- field-point: raw_telemetry --> Raw telemetry (2026-11-11): under X11, move, resize and maximise a window and change monitor:
       `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a WireGuard
       tunnel up then down: `events_network` holds the four Internet and VPN kinds.
-- [ ] Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
+- [ ] <!-- field-point: wayland_focus --> Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
 - [x] Hotstring section order: move/reset sections through the tray, restart, and verify persistence plus refusal of a stale menu after external config changes. Container proof 2026-11-10 (318b803d42): `linux/tests/hardware/desktop/run_hotstring_section_order.sh` (receipt `…/desktop/receipts/hotstring_section_order.txt`, 16/16): the real catalogue, menu builder and libayatana tray clicked over D-Bus moves and resets Autocorrection's sections, a new tray process draws the saved order (first row's « Monter » greyed), and a menu built before an external config.toml edit refuses the write with the « ErgoptiPlus — Erreur » dialog and keeps the edit byte for byte. The daemon process itself needs an evdev keyboard the container lacks.
 - [x] WPM: verify pointer-before-key and key-before-pointer ordering on a real desktop, preview/drag visibility, AI > hotstring > autocorrection holds, and no retained colour after disable/re-enable. Container proof 2026-11-10 (6de85913ce): `linux/tests/hardware/desktop/run_wpm_ordering.sh` (receipt `…/desktop/receipts/wpm_ordering.txt`, 24/24) on Xvfb/openbox with the real collector, SQLite owner, GTK surface, cairo pixels and an xdotool drag; key and pointer events enter at the daemon's callbacks (`keystats.on_keydown`, `wpm_widget.observe_pointer`) since the container has no /dev/input.
 
@@ -1050,7 +1055,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       three lines. Container proof (2026-11-10): `tests/hardware/run_nav_pointer_container.py` (21 assertions,
       receipt `docs/audits/linux/2026-11-10-container-proofs`) in mousepad on Xvfb; a leaked click would paste a PRIMARY marker. It found and fixed a stopped
       daemon: the next device watchdog tick after the layer gave the mouse back refused the source cohort.
-- [ ] Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
+- [ ] <!-- field-point: physical_acceptance --> Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
       grab, injection and hotplug (30); real kernel capture (93: ordered pairs need Xorg or a compositor on real
       evdev nodes). Container pass (2026-11-10): not closable in the cloud container, whose kernel has no uinput or
       evdev (`mknod /dev/uinput` opens with `ENODEV`) and no systemd PID 1, so a real-node grab, the polkit agent,
@@ -1099,7 +1104,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       a PAC it could not download, so the WARNING never appeared on Linux; the lookup child now downloads the GNOME
       PAC itself and the stage logs « lookup unusable at native_pac_download », then the pull succeeds direct
       (`pac-download-direct`). A PAC that says DIRECT warns nothing; a dead relay as the last entry fails the pull.
-- [ ] Item 50 cascade and the composed layout typed on a physical keyboard.
+- [ ] <!-- field-point: item50_cascade --> Item 50 cascade and the composed layout typed on a physical keyboard.
       Not attempted in the 2026-11-10 container pass; the emulation proof above can type the composer's
       `composed.keylayout` once it is the emulated layout. 2026-11-11, the cascade through the daemon's real main()
       (`tests/e2e/run_e2e.lua`, scripted keyboard, uinput into a model field; the container kernel has no evdev or
@@ -1108,7 +1113,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       cases are typed on a uinput keyboard in `run_daemon_live.lua`: CI run 42952845748 (native lane, real
       uinput and grab) received « Facebook » and Space, and « Facebook » then Enter. Left: the
       physical keyboard and the composed layout.
-- [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
+- [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
       Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
       46 `apply-wayland` ends `not_loaded` and rolls back (the shell lists no user-tree id, mutter still compiles it);
       on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted. 2026-11-11: GNOME W1 to W3 hold
@@ -1121,9 +1126,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [x] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running". Container proof (2026-11-10, d5f6f8119c): `linux/tests/hardware/desktop/run_linux_dev_mode.sh`, the real runner, `launch.sh`, daemon and tray (read through `sni_host.py`) on Xvfb with a real `systemd --user`. The keyboard node is a FIFO with `evdev_fifo_shim.c` because this kernel has no evdev or uinput, and the installed unit runs a stand-in. A second `--tray` run prints the held-lock message and exits 0, as `launch.sh` intends (receipt `tests/hardware/desktop/receipts/linux_dev_mode.txt`).
 - [x] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane (PAR-52). Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_window_toggle.sh` on openbox, xfwm4 and GNOME Shell 46 Wayland, 50/50 checks each (receipt `tests/hardware/desktop/receipts/window_toggle.txt`); it found GNOME Wayland leaving a covered page covered (no activation token, so `present()` cannot raise), fixed by mapping the window again before `present()` (5a303edcf3). Release notes: `tests/hardware/desktop/run_release_notes.sh` on X11 and GNOME Wayland, changelog shown without the download table, only the repository link opens (`receipts/release_notes.txt`).
-- [ ] Owned GTK host (split from the window-toggle line): tap delay row and every tray dialog (ca680655d7), group restore and clear, open target, Backspace word start.
+- [ ] <!-- field-point: owned_gtk_host --> Owned GTK host (split from the window-toggle line): tap delay row and every tray dialog (ca680655d7), group restore and clear, open target, Backspace word start.
 - [x] Wayland focus through lswt: on labwc or Wayfire with lswt 2.x, `lswt -j` marks the focused window `activated` and per-application rules follow it; GNOME, KDE and COSMIC log the single "no focused-window query" line. Container proof (2026-11-10, e15b6aac0a, `linux/tests/hardware/desktop/run_wayland_sessions.sh`, receipt `tests/hardware/desktop/receipts/wayland_focus_lswt.txt`): on headless labwc 0.7.1 (`zwlr_foreign_toplevel_manager_v1` v3) with two foot windows, `window_info` reports the activated toplevel and `process_lifecycle.onFocusChange` follows 3 activations; GNOME Shell 46 and KWin 5.27 answer unknown 5 times with one "No focused-window query" line. Substitute: lswt is not packaged by Ubuntu 24.04 and git.sr.ht is refused by the proxy, so `tests/hardware/desktop/foreign_toplevel_probe.c` stands in on the PATH, printing lswt 2.x's JSON from labwc's own protocol events. Not emulable here: the real lswt binary's output; Wayfire will not start without a DRM render node (the container has no `/dev/dri`); COSMIC is not packaged by Ubuntu 24.04.
-- [ ] Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
+- [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
       suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
       output reaches the focused window under the grab; only that evidence may turn
       `keyboard_shortcuts.physical_delivery_available` true. Delivery proven on the kernel model (2026-11-11):
@@ -1148,14 +1153,14 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       (`static/ergopti_plus/linux/tests/hardware/run_local_servers_container.py`, CI `network-ai`): stand-ins under the servers' own names and flags;
       the sweep names llama.cpp and vLLM (port from the command line), Lemonade (`~/.config/lemonade/config.json`)
       and KoboldCpp (its listening socket through ss), each up with its model, every other server « not running ».
-- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
+- [ ] <!-- field-point: predictions_stop --> Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
       press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
       Not emulable in the cloud (2026-11-10): the container kernel has no uinput module and no /dev/input
       (`mknod c 10 223` opens with ENODEV), so no pointer, wheel or touchpad device can reach the hook's evdev
       reader, and no compositor runs the spinner or the focused-window poll; the event routing is covered by
       `test_prediction_control_retirement.lua` (« Main cancels AI on pointer activity »).
-- [ ] Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
+- [ ] <!-- field-point: input_policies --> Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
       Container proof 2026-11-10 ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Qt (kwrite) types ₢ at once; GTK 3 (mousepad, no IBus) types the
       borrowed trigger « ⅕ » (Linux remaining work); the installed X11 Bépo needed 03a47899. The other parts of this
       line were not attempted. 2026-11-11: GTK 3 and Qt both type ₢ at once (`bepo_compose_gtk3.txt`); left: the
