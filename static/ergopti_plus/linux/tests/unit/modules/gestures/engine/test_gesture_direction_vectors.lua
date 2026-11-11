@@ -108,6 +108,7 @@ helpers.describe("gesture direction vectors (Linux)", function()
 		helpers.assert_true(#corpus.boundary_vectors >= 12, "boundary vectors")
 		helpers.assert_eq(rule.minimum, 1)
 		helpers.assert_eq(rule.diagonal_minimum, Direction.DIAGONAL_MINIMUM_FACTOR)
+		helpers.assert_eq(rule.axis_max_degrees, Direction.AXIS_MAX_DEGREES)
 	end)
 
 	for _, vector in ipairs(corpus.boundary_vectors) do

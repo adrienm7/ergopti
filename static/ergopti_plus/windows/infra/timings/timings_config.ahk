@@ -74,6 +74,24 @@ TimingsGet(Section, Key) {
 		return Integer(Val)
 }
 
+; Fetch a required ``[Section] Key`` number that is not a millisecond count
+; (a distance in millimetres, a factor). TimingsGet truncates to an integer,
+; which would turn 1.5 mm into 1.
+; @param Section TOML section name (e.g. "gestures").
+; @param Key Key within that section (e.g. "swipe_minimum_mm").
+; @return Number The value as written.
+TimingsGetNumber(Section, Key) {
+		global _TimingsCache
+		if (Type(_TimingsCache) != "Map") {
+				throw Error(Format("TimingsGetNumber('{1}','{2}') called before TimingsLoadShared() — registry not loaded.", Section, Key))
+		}
+		Val := IniCacheGet(_TimingsCache, Section, Key)
+		if (Val == "_") || !IsNumber(Val) {
+				throw Error(Format("_shared/modules/timings/constants.toml — missing or non-numeric key [{1}] {2}", Section, Key))
+		}
+		return Val + 0
+}
+
 ; Same lookup as TimingsGet but converted to seconds, for the APIs that take a
 ; seconds argument (e.g. an InputHook timeout).
 ; @param Section TOML section name.

@@ -608,6 +608,10 @@ Ergopti_OnSuspendEnter() {
 	; the first tick after resume shows it again.
 	if IsSet(WPMTrayReadout_HideForPause)
 		_LifecycleRunRequiredStep(Transition, "wpm-tray-readout", WPMTrayReadout_HideForPause, true)
+	; Raw touchpad reports reach OnMessage while paused; the reader reads none
+	; then, and the pause drops its touch in progress and its queued steps.
+	if IsSet(RawTouchpadOnPause)
+		_LifecycleRunRequiredStep(Transition, "raw-touchpad", RawTouchpadOnPause, true)
 		; Pausing ends live mode: it is not resumed with the driver, the user
 		; turns it on again ("pause = tout éteint").
 	_LifecycleRunRequiredStep(Transition, "llm-live-mode",
@@ -1589,6 +1593,12 @@ Ergopti_OnShutdown(reason, code) {
 				LoggerError("Lifecycle", "WPM notification-area readout teardown failed.")
 		} catch as Err {
 			try LoggerError("Lifecycle", "WPM notification-area readout teardown failed: {1}.", Err.Message)
+		}
+		try {
+			if !RawTouchpadStop()
+				LoggerError("Lifecycle", "Raw touchpad reader teardown failed.")
+		} catch as Err {
+			try LoggerError("Lifecycle", "Raw touchpad reader teardown failed: {1}.", Err.Message)
 		}
 		try _Updater_AbortStagingOnExit()
 		if (TerminalHandoff is Map) {
