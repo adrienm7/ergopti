@@ -3182,7 +3182,8 @@ function commonProblems(files) {
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
 		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
-		['Test shared layout composer rendering', 'npm run test:browser:layout-composer']
+		['Test shared layout composer rendering', 'npm run test:browser:layout-composer'],
+		['Test shared layout editor page', 'npm run test:browser:layout-editor']
 	])
 		exactStep(browser, name, command);
 	if (browser) {

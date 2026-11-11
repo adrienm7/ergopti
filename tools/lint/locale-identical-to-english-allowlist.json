@@ -1251,6 +1251,104 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "no", "pl", "sv"]
 		},
+		"layout_editor.caps.label": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.kind.action": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"layout_editor.meta.description": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"layout_editor.meta.name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"layout_editor.palette.block.latin1": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "fr", "no", "sv", "tr"]
+		},
+		"layout_editor.physical.ansi": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.physical.iso": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.target.linux": {
+			"reason": "brand-or-feature-name",
+			"locales": ["ar", "hi", "pl", "ru", "tr", "uk"]
+		},
+		"layout_editor.target.windows": {
+			"reason": "brand-or-feature-name",
+			"locales": ["ar", "hi", "pl", "ru", "tr", "uk"]
+		},
 		"layout_manager.btn_homepage": {
 			"reason": "loanword-or-cognate",
 			"locales": ["de", "nl"]
