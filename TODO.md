@@ -1098,9 +1098,15 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
       suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
       output reaches the focused window under the grab; only that evidence may turn
-      `keyboard_shortcuts.physical_delivery_available` true. Not done in the 2026-11-10 container pass: the kernel
-      model (`tests/hardware/run_container_proofs.sh`) can host this proof, but it first needs a delivery path to
-      qualify behind the getter.
+      `keyboard_shortcuts.physical_delivery_available` true. Delivery proven on the kernel model (2026-11-11):
+      `tests/hardware/run_physical_shortcut_container.py` (11 assertions; only its daemon process answers the getter
+      true) shows a bound key suppressed exactly once, also held with autorepeat, its action reaching mousepad, and a
+      single owner against a hotstring (the slot runs, `xz` never expands), a tap-hold key (Tab keeps its tap), the
+      layer (Alt+K keeps ArrowLeft) and the magic key (the slot runs, no ★). The getter stays false, decided by the
+      coordinator on 2026-11-11 overnight, to review by the maintainer: it also opens the editor, whose Linux physical
+      capture is not proven. Left: prove the editor's capture and save (the picker window), then turn the getter true
+      and update its pinned refusals (`test_physical_delivery_unqualified.lua`, `test_picker_refusal.lua`, the menu's
+      `physical_shortcuts.delivery_unqualified` row) and the inventories.
 - [x] Accented shortcuts: on AZERTY with « é → C » on, Ctrl+é copies in a GTK and a Qt editor, AltGr+é still types
       Done (container proof, `tests/hardware/run_layout_typing_live.sh`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Ctrl+é copies in mousepad
       and kwrite, AltGr+é types AZERTY's level 3, Ctrl+2 with digits first stays Ctrl+KEY_2 on the wire.
@@ -1241,9 +1247,15 @@ between workers) green alone. All live checks pass, typed by the harness.
       virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
       notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group change, so after one switch
       `KeyboardLayout.is_ready()` stays false and every replacement takes the clipboard route. Reproduce: drop the XTEST
-      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Decide whether a same-group
-      notify whose canonical keymap is unchanged may renew the inverse (the custody tests pin different-group renewal
-      only); Wayland and macOS have no slave switch.
+      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Kept as is, decided by the
+      coordinator on 2026-11-11 overnight, to review by the maintainer: no proof can re-validate the receipt today. The
+      first proof, `keyboard_hook.refresh_capture`, requires the previous receipt to still be current before it dumps
+      the keymap again, and a typing request may renew only across a group change
+      (`test_keyboard_layout_terminal_plan_observation.lua`, "an equal-group source replacement does not renew an old
+      plan"). A fix needs a new capture re-acquisition owned by the hook, off the input path, that dumps the server
+      keymap and rebuilds capture and inverse together as at startup. The clipboard route then also fails while the
+      clipboard has no owner (a fresh session): `xclip -o` exits 1 as for a read error, and the snapshot refuses to
+      borrow what it cannot restore. Wayland and macOS have no slave switch.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).

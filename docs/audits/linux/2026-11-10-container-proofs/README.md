@@ -38,13 +38,17 @@ proofs — navigation pointer, tap-hold copy, AI inline").
 
 ## Results
 
-| Proof                                                                                    | Assertions | Result |
-| ---------------------------------------------------------------------------------------- | ---------: | ------ |
-| `run_nav_pointer_container.py`: middle button = Escape, `3` + `arrow_up`, wheel = volume |         21 | pass   |
-| `run_tap_copy_container.py`: sway checked, mutter unchecked, X11 without xclip           |         23 | pass   |
-| `run_ai_inline_container.py`: inline prediction into mousepad, none into a password      |         11 | pass   |
+| Proof                                                                                      | Assertions | Result |
+| ------------------------------------------------------------------------------------------ | ---------: | ------ |
+| `run_nav_pointer_container.py`: middle button = Escape, `3` + `arrow_up`, wheel = volume   |         21 | pass   |
+| `run_tap_copy_container.py`: sway checked, mutter unchecked, X11 without xclip             |         23 | pass   |
+| `run_ai_inline_container.py`: inline prediction into mousepad, none into a password        |         11 | pass   |
+| `run_physical_shortcut_container.py` (2026-11-11): LIN-004 delivery, getter forced in-proc |         11 | pass   |
 
-Two consecutive full runs: 55 of 55 assertions, exit 0.
+Two consecutive full runs: 55 of 55 assertions, exit 0. With the physical
+shortcut proof (2026-11-11): 66 of 66, exit 0. That proof alone answers the
+delivery getter true inside its own daemon process; the production getter stays
+false, since it also opens the editor, whose physical capture is not proven.
 
 ## Defect the proofs found and fixed
 
@@ -65,4 +69,8 @@ daemon's layout receipt for good: `adapters/xkb_capture.lua` renews only on a
 group change, so the injector routes every later replacement through the
 clipboard. The X11 sessions above therefore send one XTEST key before the
 daemon starts, so that the core keyboard already follows the device that carries
-the daemon's output. Recorded in `TODO.md` under "Remaining code work".
+the daemon's output. Recorded in `TODO.md` under "Remaining code work". Kept on
+2026-11-11: no existing proof can re-validate the receipt, since
+`keyboard_hook.refresh_capture` requires the previous receipt to be current and
+a typing request renews only across a group change (pinned by the layout
+tests). With no clipboard owner, the clipboard route refuses too.
