@@ -46,6 +46,19 @@ local function child()
  end
  local final_id = case == 'boundary_500' and 500 or 1
  assert(db:exec("INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json) VALUES ('device'," .. final_id .. ",'2026-10-17 23:59:59','2026-10-17','Editor',0,0,0,0,0,'hi','" .. events .. "');") == sqlite.OK)
+ if case == 'wifi' then
+  -- Windows' Wi-Fi poll: a baseline, a disconnect, a reconnect, an SSID change
+  -- and a signal-only row; then one legacy wifi_change system row.
+  local metas = { '{"connection_state":"connected"}',
+   '{"connection_state":"disconnected","prev_connection_state":"connected"}',
+   '{"connection_state":"connected","prev_connection_state":"disconnected"}',
+   '{"connection_state":"connected","prev_connection_state":"connected","ssid_hash":"b","prev_ssid_hash":"a"}',
+   '{"connection_state":"connected","prev_connection_state":"connected","ssid_hash":"b","prev_ssid_hash":"b"}' }
+  for id, meta in ipairs(metas) do
+   assert(db:exec("INSERT INTO events_network(device_id,id,ts,date,kind,app,meta_json) VALUES ('device'," .. id .. ",'2026-10-17 10:0" .. id .. ":00','2026-10-17','network_change','Code','" .. meta .. "');") == sqlite.OK)
+  end
+  assert(db:exec("INSERT INTO events_system(device_id,id,ts,date,action,metadata_json) VALUES ('device',1,'2026-10-17 11:00:00','2026-10-17','wifi_change','{}');") == sqlite.OK)
+ end
  local settlement_entered = false
  local native_settle = aggregator.settle_contexts
  if native_settle then
@@ -77,14 +90,41 @@ local function child()
  local before = rows()
  local second = case == 'retry' and publish(db, { 'device' }) or nil
  local final = rows()
+ local wifi = 0
+ for row in db:nrows("SELECT wifi_changes FROM agg_system_day WHERE device_id='device'") do wifi = wifi + row.wifi_changes end
  assert(db:close() == sqlite.OK)
- print(json.encode({ kind = 'done', first = first, second = second, before = before, final = final }))
+ print(json.encode({ kind = 'done', first = first, second = second, before = before, final = final, wifi = wifi }))
 end
 if arg and arg[0] and arg[0]:match('test_rebuild_day_settlement%.lua$') then child(); return end
 local helpers = require('tests.helpers')
 local quote = require('text_utils').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('durable day settlement during real SQLite rebuild', function()
+ -- Windows records its Wi-Fi changes as events_network network_change rows and
+ -- counts the transitions among them (keystats_reader_db.ahk "wifi-day"); the
+ -- macOS rebuild read only events_system wifi_change, so an imported Windows
+ -- device showed none (KMM-003 of the metrics campaign, macos-rebuild-wifi).
+ helpers.it('counts a network_change transition as a Wi-Fi change (macos-rebuild-wifi)', function()
+  local script = [[
+import importlib.util,os,sys,tempfile
+from pathlib import Path
+root=Path(sys.argv[1]).resolve()
+path=root/'static/ergopti_plus/macos/tests/support/keystats/rebuild_sqlite_bridge.py'
+spec=importlib.util.spec_from_file_location('rebuild_bridge',path)
+bridge=importlib.util.module_from_spec(spec);spec.loader.exec_module(bridge)
+os.environ['ERGOPTI_REBUILD_CASE']='wifi'
+with tempfile.TemporaryDirectory(prefix='ergopti-wifi-') as tmp:
+ result=bridge.run_fixture(sys.argv[2],Path(sys.argv[3]).resolve(),root,tmp)
+ assert result['first'] is True,result
+ assert result['wifi']==4,result
+print('PASS')
+]]
+  local lua = os.getenv('LUA') or arg[-1]
+  local command = 'python3 -c ' .. quote(script) .. ' ' .. quote(helpers.driver_root() .. '../../..') .. ' ' .. quote(lua) .. ' ' .. quote(source) .. ' 2>&1'
+  local pipe = assert(io.popen(command, 'r')); local output = pipe:read('*a'); local ok = pipe:close()
+  helpers.assert_eq(ok, true, output); helpers.assert_eq(output, 'PASS\n')
+ end)
+
  for _, case in ipairs({ 'boundary', 'boundary_500', 'retry' }) do
   helpers.it('credits the previous day exactly once with ' .. case, function()
    local script = [[
