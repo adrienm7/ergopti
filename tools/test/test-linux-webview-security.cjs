@@ -29,9 +29,9 @@ function fail(message) {
 if (
 	MANIFEST.schema_version !== 1 ||
 	!Array.isArray(MANIFEST.assets) ||
-	MANIFEST.assets.length !== 4
+	MANIFEST.assets.length !== 5
 ) {
-	fail('vendor-manifest.json must declare the four reviewed browser bundles');
+	fail('vendor-manifest.json must declare the five reviewed browser bundles');
 }
 
 for (const asset of MANIFEST.assets) {
