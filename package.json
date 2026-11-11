@@ -339,6 +339,7 @@
 		"codegen:touchpad-registry": "node ./tools/codegen/codegen-touchpad-registry.cjs",
 		"codegen:layer-editor-data:js": "node ./tools/codegen/codegen-layer-editor-data-js.cjs",
 		"codegen:layout-composer-data:js": "node ./tools/codegen/codegen-layout-composer-data-js.cjs",
+		"codegen:layout-editor-tables:js": "node ./tools/codegen/codegen-layout-editor-tables-js.cjs",
 		"codegen:layout-composer-corpus": "node ./tools/codegen/codegen-layout-composer-corpus.cjs",
 		"codegen:layout-composer-check": "node ./tools/codegen/codegen-layout-composer-check.cjs",
 		"codegen:onboarding-catalogue": "node ./tools/codegen/codegen-onboarding-catalogue.cjs",
