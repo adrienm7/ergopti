@@ -28,9 +28,21 @@ REPO="$(cd "${DRIVER}/../../.." && pwd -P)"
 SELF="${DRIVER}/tests/desktop/run_linux_dev_mode.sh"
 UNIT=ergopti-hotstrings.service
 PY=python3.12
-for tool in unshare gcc Xvfb dbus-launch openbox luajit systemctl "${PY}"; do
-	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
-done
+need() {
+	command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }
+}
+need unshare
+need gcc
+need Xvfb
+need dbus-launch
+need openbox
+need luajit
+need systemctl
+need "${PY}"
+need pgrep
+need pkill
+need setsid
+need /usr/lib/systemd/systemd
 BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
 	[ -x "${candidate}" ] && BUS_LAUNCHER="${candidate}" && break

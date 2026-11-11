@@ -640,6 +640,20 @@ const PROGRAMS = {
 	foot: packageManager('Wayland terminal window of the container desktop proofs', HOST),
 	kwin_wayland: packageManager('KWin compositor of the container desktop proofs', HOST),
 	'gnome-shell': packageManager('GNOME Shell compositor of the container desktop proofs', HOST),
+	busctl: packageManager("reads logind's inhibitor list in the container desktop proofs", HOST),
+	'systemd-inhibit': packageManager(
+		"lists logind's inhibitors in the container desktop proofs",
+		HOST
+	),
+	'/usr/lib/systemd/systemd': packageManager(
+		'the user manager of the container desktop proofs',
+		HOST
+	),
+	'systemd-run': packageManager('starts the update watcher of the container desktop proofs', HOST),
+	unshare: packageManager('private mount namespace of the container desktop proofs', HOST),
+	setsid: packageManager('detaches the relay of the container desktop proofs', HOST),
+	pgrep: packageManager('finds the daemons of the container desktop proofs', HOST),
+	awk: packageManager('reads the process table in the container desktop proofs', HOST),
 	pulseaudio: inUbuntuJob('pulseaudio', 'sound server'),
 	lua: inUbuntuJob('lua5\\.4', 'Lua interpreter'),
 	'lua5.4': inUbuntuJob('lua5\\.4', 'Lua interpreter'),
