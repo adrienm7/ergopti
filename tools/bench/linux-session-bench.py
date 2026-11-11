@@ -457,9 +457,19 @@ def budget_rows(report):
     ]
 
 
+# Spans the daemon must report in its exit summary: a short session reported
+# nothing before the exit flush, and these two have no unit seam (GTK rows,
+# a forwarded write under the grab).
+REQUIRED_SPANS = (("daemon_spans", "input.latency"), ("daemon_spans_tray", "tray.fill"))
+
+
 def judge_budgets(report):
     """Prints each budget's verdict; returns True when all hold."""
     held = True
+    for section, name in REQUIRED_SPANS:
+        present = name in report.get(section, {})
+        held = held and present
+        print("  %s %s reported at exit (%s)" % ("ok  " if present else "FAIL", name, section))
     for what, value, budget, basis in budget_rows(report):
         ok = value is not None and value <= budget
         held = held and ok
