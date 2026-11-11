@@ -153,10 +153,12 @@ and `makensis`, which a user's PC does not have, and the Windows bundle ships no
     `Layout File` is `<dll>.dll`, or the uninstall entry `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\
 Ergopti_kbd_<dll>` holding the KLID. An upgrade reuses that KLID (the installer does).
   - `composer_remove` runs the entry's `UninstallString /S` elevated.
-- **Next (recommended):** drop the toolchain. A keyboard DLL is data plus one exported function returning a
-  pointer, so a PE writer in JavaScript (`tools/lib/kbd-dll`, checked against `reader.cjs` and the clang images) can
-  run in the page itself. The host then receives the DLL bytes in `composer_save` and does the registry steps of
-  the NSIS script in an elevated helper, with no Node and no NSIS. This is a follow-up item, not started.
+- **Without the toolchain:** `tools/lib/kbd-dll/pe-writer.cjs` (`kbd-dll.cjs build … --writer pe`) writes the four
+  images with no compiler, proven equal to the clang images in tables, layout and resources
+  ([layout-windows-dll.md](layout-windows-dll.md#what-is-proven-and-how)). Left: run it in the page (the module is
+  CommonJS over `model.cjs`, `constants.cjs` and `emit-c.cjs`; a generated browser bundle, as the KLC generator has),
+  so `composer_save` carries the DLL bytes and the host does the NSIS script's registry steps in an elevated helper,
+  with no Node and no NSIS.
 
 **Tests to add (AHK).**
 
