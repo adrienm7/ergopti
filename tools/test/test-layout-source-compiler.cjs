@@ -570,7 +570,9 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 			[
 				['macos', 'partial'],
 				['linux', 'partial'],
-				['windows', 'unavailable']
+				['windows', 'unavailable'],
+				['emulation', 'partial'],
+				['web', 'partial']
 			]
 		);
 		assert(

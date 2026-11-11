@@ -6,8 +6,9 @@
  * DESCRIPTION:
  * Imports .keylayout into the versioned TOML source (preserved or structured),
  * validates source documents, reports per-target support, and runs the one
- * generator: the macOS bundle (ISO + ANSI) or single .keylayout, and the Linux
- * XKB and Windows KLC files through their existing converters. Existing
+ * generator: the macOS bundle (ISO + ANSI) or single .keylayout, the Linux
+ * XKB and Windows KLC files through their existing converters, and the
+ * emulation tables the drivers and the web perform on top of them. Existing
  * destinations are refused so a failed experiment cannot replace a user's
  * source. See docs/design/layout-source-format.md for the current limits.
  * ==============================================================================
@@ -66,10 +67,62 @@ function macosFiles(compiled) {
 		.concat([['export.json', `${JSON.stringify(compiled.report, null, 2)}\n`]]);
 }
 
+/** The emulation table of every platform, as export-emulation writes it. */
+function emulationTables(source, document) {
+	return Object.fromEntries(
+		['macos', 'linux', 'windows'].map((platform) => [
+			platform,
+			source.compileEmulation(document, { platform })
+		])
+	);
+}
+
 /**
- * Every target of one source into a new directory: macos/, linux/ and windows/
- * with each export's report, and report.json naming refused targets. A refused
- * target writes no directory; the others still publish.
+ * The files the ErgoptiPlus drivers and the web emulation perform: one emulation
+ * table per platform, and for the web, which has no installed layout, the macOS
+ * .keylayout its keylayout emulation types with.
+ */
+function emulationFiles(source, document) {
+	const tables = emulationTables(source, document);
+	const files = Object.entries(tables).map(([platform, table]) => [
+		`emulation.${platform}.json`,
+		`${JSON.stringify(table, null, '\t')}\n`
+	]);
+	const report = {
+		target: 'emulation',
+		status: Object.values(tables).some((table) => table.not_emulated.length)
+			? 'partial'
+			: 'emulated',
+		artifact: 'emulation_table',
+		not_emulated: Object.fromEntries(
+			Object.entries(tables).map(([platform, table]) => [platform, table.not_emulated])
+		)
+	};
+	return files.concat([['export.json', `${JSON.stringify(report, null, 2)}\n`]]);
+}
+
+/** The web emulation: the compiled .keylayout and the table it types on top of. */
+function webFiles(source, document) {
+	const compiled = source.compileKeylayout(document);
+	const table = source.compileEmulation(document, { platform: 'macos' });
+	const report = {
+		target: 'web',
+		status: table.not_emulated.length ? 'partial' : 'emulated',
+		artifact: 'web_emulation',
+		keylayout: `${compiled.names.internal}.keylayout`,
+		not_emulated: table.not_emulated
+	};
+	return [
+		[`${compiled.names.internal}.keylayout`, compiled.text],
+		['emulation.json', `${JSON.stringify(table, null, '\t')}\n`],
+		['export.json', `${JSON.stringify(report, null, 2)}\n`]
+	];
+}
+
+/**
+ * Every target of one source into a new directory: macos/, linux/, windows/,
+ * emulation/ and web/ with each export's report, and report.json naming refused
+ * targets. A refused target writes no directory; the others still publish.
  */
 function exportAll(source, document, output, icons) {
 	const reports = [];
@@ -77,7 +130,9 @@ function exportAll(source, document, output, icons) {
 	for (const [target, compile] of [
 		['macos', () => macosFiles(source.exportMacos(document, undefined, icons))],
 		['linux', () => [...exportXkb(document).files]],
-		['windows', () => [...exportKlc(document).files]]
+		['windows', () => [...exportKlc(document).files]],
+		['emulation', () => emulationFiles(source, document)],
+		['web', () => webFiles(source, document)]
 	]) {
 		try {
 			const files = compile();
@@ -126,6 +181,15 @@ function main(args) {
 		process.stdout.write(`${JSON.stringify(reports, null, 2)}\n`);
 		return;
 	}
+	if (command === 'export-emulation' && values.length === 2) {
+		const [input, output] = values;
+		const tables = emulationTables(source, source.read(readText(input)));
+		fs.writeFileSync(output, `${JSON.stringify(tables, null, '\t')}\n`, {
+			encoding: 'utf8',
+			flag: 'wx'
+		});
+		return;
+	}
 	if (command === 'export-keylayout' && values.length === 2) {
 		const [input, output] = values;
 		const xml = source.exportKeylayout(source.read(readText(input)));
@@ -155,7 +219,7 @@ function main(args) {
 		return;
 	}
 	throw new Error(
-		'Usage: layout-source.cjs import <id> <iso|ansi> <input.keylayout> <output.toml> | import-structured <id> <iso|ansi> <input.keylayout> <output.toml> | export-macos <source.toml> <new-output-directory> [bundle|iso|ansi] | export-all <source.toml> <new-output-directory> | validate <source.toml> | report <source.toml> | export-keylayout <source.toml> <output.keylayout> | export-xkb <source.toml> <new-output-directory> | export-klc <source.toml> <new-output-directory>'
+		'Usage: layout-source.cjs import <id> <iso|ansi> <input.keylayout> <output.toml> | import-structured <id> <iso|ansi> <input.keylayout> <output.toml> | export-macos <source.toml> <new-output-directory> [bundle|iso|ansi] | export-all <source.toml> <new-output-directory> | export-emulation <source.toml> <output.json> | validate <source.toml> | report <source.toml> | export-keylayout <source.toml> <output.keylayout> | export-xkb <source.toml> <new-output-directory> | export-klc <source.toml> <new-output-directory>'
 	);
 }
 

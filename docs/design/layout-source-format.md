@@ -355,6 +355,48 @@ another format or an unsupported size (`source_icon_missing`, `source_icon_png`,
 `source_icon_size`). Without an icon macOS shows its generic layout icon and the
 report says so. The image is the user's: the generator draws none.
 
+### Emulation of what no `.keylayout` holds
+
+`compileEmulation(source, tables, {platform})` writes the **emulation table**
+(`format = "ergopti-layout-emulation"`, `version = 1`, JSON) of the records the
+platform's compiled `.keylayout` leaves out: every custom modifier with the keys
+a driver sees (held or locked), every layer in order with its selectors, whether
+the `.keylayout` holds it (`native`) and the mappings the emulation performs
+(all of an emulated layer's `text`, `key` and `disabled` mappings; a native
+layer's `key` chords), the shortcuts, the tap-holds and the remaps of system
+keys. `not_emulated` lists, with a stable reason, what even the emulation
+cannot perform: dead keys and actions in an emulated layer, layers or chords
+needing a sided modifier other than `alt_right` (no driver reports sides), keys
+the physical-key registry does not have (`ScrollLock`, `F13`, `Pause`) and
+modifier keys (`CapsLock`, which the drivers see as a lock or a flag).
+
+One engine performs it: `_shared/lua/layouts/source_emulation.lua` on macOS
+and Linux, its twin `_shared/ui/layout_composer/source_emulation.js` for the
+web. A press goes first to it, then (when it leaves the key alone) to the
+keylayout emulation or the OS. Selection is TN2056's: the first layer whose
+selector matches the held built-in modifiers and the active custom ones; an
+unsided id (`alt`) matches either side, two sides never match; an emulated layer
+types nothing on a key it does not map. A shortcut matches its exact modifiers,
+Caps Lock ignored unless named, and sends its key with its own modifiers; a
+remap sends its target with the held modifiers, an empty target disables the
+key. A tap-hold follows the shared tap-hold catalogue's typing rule (as macOS
+resolves it): a press under the pending key before its threshold types the tap
+first, a press after it or the threshold passing (`tick`) starts the hold of the
+layer or modifier (a built-in one is pressed and released for the user), and a
+release before the threshold types the tap. No keystroke is held back or
+reordered (decided by the coordinator on 2026-11-11 overnight, to review by the
+maintainer: the release-order rule of Windows and Linux would need the drivers
+to delay and replay keys).
+
+`export-emulation <source.toml> <output.json>` writes the three platforms'
+tables; `export-all` adds `emulation/` (one table per platform and its report)
+and `web/` (the macOS `.keylayout` and its table: the web emulation types both,
+having no installed layout). The fixture
+`_shared/tests/corpus/layouts/source/emulation_source.toml`, its golden
+`emulation.json` and the typing vectors `emulation_vectors.json` pin the
+compiler and both engines (`npm run test:layout-source-emulation`, and the Lua
+contract `_shared/lua/test/source_emulation_contract.lua` on both drivers).
+
 ### Drivers: the source through the layout composer host
 
 On macOS and Linux the layout manager page may save an Ergopti source in place

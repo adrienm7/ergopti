@@ -365,6 +365,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-model.cjs"],
 			"repro": "npm run test:layout-editor-model"
+		},
+		{
+			"id": "layout-source-emulation",
+			"ordinal": 611,
+			"name": "layout source emulation table matches its golden file and types the shared vectors",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-source-emulation.cjs"],
+			"repro": "npm run test:layout-source-emulation"
 		}
 	]
 }
