@@ -188,7 +188,7 @@ local TAP_NEEDS_UP = { left_ctrl = { EvdevCodes.KEY_CAPSLOCK, KEY_LEFTALT } }
 -- LAlt tapping Backspace with the layer on hold taps only with CapsLock up at
 -- its release (lalt.ahk 4.5), against a Backspace on a quick LAlt+CapsLock.
 local LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE = { left_alt = { EvdevCodes.KEY_CAPSLOCK } }
-local KEY_BACKSPACE, KEY_DELETE, KEY_RIGHT = 14, 111, 106
+local KEY_BACKSPACE, KEY_DELETE, KEY_RIGHT, KEY_TAB = 14, 111, 106, 15
 
 -- Tap actions that are a single key. They are dispatched through the hook
 -- like the key itself, so an Enter tapped on CapsLock ends a hotstring as a
@@ -344,6 +344,8 @@ function M.new(opts)
 				mods = layer and {} or mods,
 				layer = layer,
 				swallowed_on_layer = swallowed_on_layer,
+				-- The file's own hold modifier, whatever a layer or a rule makes of mods.
+				holds_modifier = type(config.hold_modifier) == "string" and config.hold_modifier ~= "",
 				-- A tap and no hold with no rule: nothing to wait for (see fire_instant).
 				instant = no_hold and not rule,
 				tap_at_down = rule and rule.tap_at_down or false,
@@ -782,7 +784,7 @@ end
 --- Types keystrokes with only their own modifiers, as Windows' TextPressKey
 --- sends them: every modifier down now is lifted around them and pressed back
 --- after, except a Ctrl when every keystroke is a Ctrl chord anyway.
---- @param chords table { { ctrl = boolean, key = code } }, typed in order.
+--- @param chords table { { ctrl = boolean, shift = boolean|nil, key = code } }, typed in order.
 local function type_chords(self, out, chords)
 	local all_ctrl = true
 	for _, chord in ipairs(chords) do all_ctrl = all_ctrl and chord.ctrl end
@@ -798,10 +800,28 @@ local function type_chords(self, out, chords)
 	for _, chord in ipairs(chords) do
 		local press_ctrl = chord.ctrl and not kept_ctrl
 		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = DOWN } end
+		if chord.shift then out[#out + 1] = { code = KEY_LEFTSHIFT, value = DOWN } end
 		tap_key(self, out, chord.key)
+		if chord.shift then out[#out + 1] = { code = KEY_LEFTSHIFT, value = UP } end
 		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = UP } end
 	end
 	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
+end
+
+--- Whether RCtrl, configured to tap the one-shot Shift, is physically down.
+--- @return boolean
+local function rctrl_one_shot_down(self)
+	local rctrl_config = self.by_code[EvdevCodes.KEY_RIGHTCTRL]
+	return self.physical_down[EvdevCodes.KEY_RIGHTCTRL] == true
+		and rctrl_config ~= nil and rctrl_config.tap == "one_shot_shift"
+end
+
+--- What LAlt's Tab tap types under RCtrl tapping the one-shot Shift: Shift+Tab,
+--- as lalt.ahk's `SC11D & SC038` combo sends it.
+--- @return table|nil chords As type_chords takes them; nil for the plain key.
+local function lalt_tab_chords(self)
+	if rctrl_one_shot_down(self) then return { { ctrl = false, shift = true, key = KEY_TAB } } end
+	return nil
 end
 
 --- What LAlt's Backspace tap types instead of a plain Backspace under the keys
@@ -841,16 +861,20 @@ local function rctrl_backspace_chords(self)
 	return nil
 end
 
--- The keys whose Backspace tap Windows types through a logic of its own.
-local BACKSPACE_CHORDS = { left_alt = lalt_backspace_chords, right_ctrl = rctrl_backspace_chords }
+-- The keys whose Backspace or Tab tap Windows types through a logic of its
+-- own, by the key the tap types, then by key id.
+local KEY_TAP_CHORDS = {
+	[KEY_BACKSPACE] = { left_alt = lalt_backspace_chords, right_ctrl = rctrl_backspace_chords },
+	[KEY_TAB] = { left_alt = lalt_tab_chords },
+}
 
 --- Types the key a tap stands for (type_tap), or what the key's Windows
 --- Backspace logic types in its place under the keys held now. That logic's
---- keystrokes all end in a Delete or a Backspace, which spend an armed
+--- keystrokes all end in a Delete, a Backspace or a Tab, which spend an armed
 --- one-shot Shift, as its OneShotShiftFix does.
 --- @return table|nil tap Text for the injector, as type_tap returns it.
 local function type_key_tap(self, out, config, typed, now_ms)
-	local logic = typed == KEY_BACKSPACE and BACKSPACE_CHORDS[config.id]
+	local logic = KEY_TAP_CHORDS[typed] and KEY_TAP_CHORDS[typed][config.id]
 	local chords = logic and logic(self)
 	if not chords then return type_tap(self, out, typed, now_ms) end
 	self.one_shot_until = nil
@@ -1129,6 +1153,15 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
 				self.native_keys[code] = true
 				return pass(self, code, value)
+			end
+			-- LAlt tapping Tab with no hold modifier, struck under RCtrl tapping
+			-- the one-shot Shift, is lalt.ahk's `SC11D & SC038` combo, whatever
+			-- its hold layer: Shift+Tab at key-down and at each repeat.
+			if config.id == "left_alt" and config.tap == "tab" and not config.holds_modifier
+				and rctrl_one_shot_down(self) then
+				cancel_taps(self, nil)
+				self.instant_down[code] = true
+				return fire_instant(self, out, config, now_ms)
 			end
 			local native_under_modifier = NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier
 			if native_under_modifier and modifier_held(self) then
