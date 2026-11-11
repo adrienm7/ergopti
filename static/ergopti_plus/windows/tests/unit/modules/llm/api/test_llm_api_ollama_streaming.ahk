@@ -1021,13 +1021,18 @@ _OllamaStream_HttpHeaderReceipt(Mode, Expected) {
 				AssertTrue(Lock != -1 && Lock != 0, "the header fixture exclusively owns the real sharing refusal")
 			}
 		}
-		Observed := -1, Diagnostic := "", NativeError := 0
+		; The caught state is the verdict: an Error with an empty message is still a
+		; hidden failure, and the empty diagnostic alone read it as an admission.
+		Observed := -1, Refused := false, Diagnostic := "", NativeError := 0
 		try Observed := _LLM_Ollama_ReadStreamHttpStatus({TmpHeaders: Path}, State)
 		catch OSError as Err {
+			Refused := true
 			NativeError := Err.Number
 			Diagnostic := Err.Message
-		} catch as Err
+		} catch as Err {
+			Refused := true
 			Diagnostic := Err.Message
+		}
 		if Expected is String {
 			if Mode == "locked" || Mode == "invalid-path"
 				AssertEqual(Mode == "locked" ? 32 : 3, NativeError, "native header I/O refusal must propagate unchanged")
@@ -1035,7 +1040,7 @@ _OllamaStream_HttpHeaderReceipt(Mode, Expected) {
 				AssertContains(Diagnostic, Expected, "the header refusal must identify its actual protocol boundary")
 			AssertFalse(State.Has("http_status"), "a refused header never caches a successful status")
 		} else {
-			AssertEqual("", Diagnostic, "pending or valid header images have no hidden failure")
+			AssertFalse(Refused, "pending or valid header images have no hidden failure: " . Diagnostic)
 			AssertEqual(Expected, Observed, "only a complete final successful HTTP status is admitted")
 			AssertEqual(Expected != 0, State.Has("http_status"), "only successful final admission is retained")
 		}
