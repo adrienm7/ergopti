@@ -68,7 +68,8 @@ _LMCC_Script(Framework, Receipt) {
 			"_TrayRootRelease", "_TrayRootTryReleaseFailed",
 			"_TrayRootFinishReportableFailure", "_TrayRootFinishOrdinaryFailure",
 			"_TrayRootReportTerminalFailure", "_TrayRootRetireFatal",
-			"_TrayRootFirstPublicationPending", "_TrayRootReportRebuild", "PerfCount", "_PerfCountersOwner"] {
+			"_TrayRootFirstPublicationPending", "_TrayRootReportRebuild", "PerfCount", "_PerfCountersOwner",
+			"MenuDeferOrBuild"] {
 		Body := _DriverFuncBodyOrEmpty(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
@@ -180,9 +181,16 @@ _MI_StageReload() => 0
 _MI_StageQuit() => 0
 _MI_StageDebug() => 0
 _MI_StageMetrics() => TrayMenuStage_AddFeature("metrics", Menu())
-LLM_Menu_BuildSubmenu() {
+; A root build publishes the IA child deferred, built at its first open; this
+; harness opens it at once, so the recording builder sees the published child.
+MenuDeferred_Create(BuildFn, ListId) {
+ Child := Menu()
+ BuildFn.Call(Child)
+ return Child
+}
+LLM_Menu_BuildSubmenu(Target := 0) {
  global _LMCC
- Candidate := Menu()
+ Candidate := (Target is Menu) ? Target : Menu()
  _LMCC["constructed"].Push(Candidate)
  return Candidate
 }
