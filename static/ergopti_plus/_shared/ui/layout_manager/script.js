@@ -453,6 +453,7 @@ window.initData = function (data) {
 // once the host sent the last saved source; files save through the host.
 let _editor = null;
 let _pendingSave = null;
+let _pendingInstall = null;
 
 /** Shows the editor or the layout list. */
 function showEditor(visible) {
@@ -473,6 +474,42 @@ function hostSave(filename, text) {
 }
 
 /**
+ * Installs the editor's source through the composer host (composer_save with
+ * `source`, _shared/lua/layouts/composer.lua) and switches to it; settles on
+ * the composerResult that answers it.
+ */
+function hostInstall(payload) {
+	return new Promise(function (resolve, reject) {
+		if (_pendingInstall || _pendingSave) {
+			reject({ code: 'save_busy', path: 'composer_save' });
+			return;
+		}
+		_pendingInstall = { resolve: resolve, reject: reject };
+		send('composer_save', undefined, {
+			source: payload.source,
+			keylayout: payload.keylayout,
+			use: true
+		});
+	});
+}
+
+/** Routes the composer host's answer to an editor install, else to the composer section. */
+function routeComposerResults() {
+	const composerResult = window.composerResult;
+	window.composerResult = function (result) {
+		const pending = _pendingInstall;
+		if (!pending || !result || result.action !== 'composer_save') {
+			if (typeof composerResult === 'function') composerResult(result);
+			return;
+		}
+		_pendingInstall = null;
+		// macOS may defer turning a new layout on until the next login.
+		if (result.ok === true) pending.resolve({ pending: result.pending === true });
+		else pending.reject({ code: result.code || 'host_save_failed', path: result.detail || '' });
+	};
+}
+
+/**
  * Called by the host with the last saved source: { text, filename, folder }.
  * @param {Object} data
  */
@@ -483,8 +520,11 @@ window.sourceData = function (data) {
 		if (initial !== null) _editor.open(data.filename, initial);
 		return;
 	}
+	routeComposerResults();
 	_editor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
 		saveFile: hostSave,
+		install: hostInstall,
+		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,
 		onClose: function () {

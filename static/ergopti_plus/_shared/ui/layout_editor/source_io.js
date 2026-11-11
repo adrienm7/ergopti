@@ -15,7 +15,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. Imports stay lossless: an imported .keylayout is kept verbatim by the
- *    format owner. Editing it is an explicit conversion (projectImport) that
+ *    format owner. Editing it is an explicit conversion (convertImport) that
  *    reports what the projection cannot hold, never a silent rewrite.
  * 2. The navigation layer is one layer of the source: layers.toml converts in
  *    both directions, per-OS sections becoming platform_keys, so the drivers'
@@ -154,9 +154,83 @@ var LayoutSourceIO = (function () {
 		return LayoutSource.exportKeylayout(doc);
 	}
 
-	/** Per-target support of the format owner's exporters. */
+	/** The compiler's key tables (generated from their owners: _generated/key_tables.js). */
+	function tables() {
+		return LAYOUT_SOURCE_TABLES;
+	}
+
+	/** A target the page cannot produce, with the compiler's refusal. */
+	function refusedRow(target, artifact, error) {
+		const code = error && typeof error.code === 'string' ? error.code : 'compile_refused';
+		const detail =
+			error && typeof error.path === 'string' ? error.path : String(error && error.message);
+		return { target, status: 'unavailable', artifact, reason: code, blockers: [detail] };
+	}
+
+	/**
+	 * Per-target support: the format owner's report, with the compiler's own
+	 * macOS and driver rows for a structured source, as tools/lib/layout-source-report.cjs
+	 * builds them. Linux XKB and Windows KLC run as Node/Lua tooling only.
+	 */
 	function capabilities(doc) {
-		return LayoutSource.capabilities(doc);
+		const report = LayoutSource.capabilities(doc);
+		if (isPreserved(doc)) return report;
+		const set = (row) => {
+			report[report.findIndex((entry) => entry.target === row.target)] = row;
+		};
+		try {
+			set(LayoutSourceCompiler.exportMacos(doc, tables()).report);
+		} catch (error) {
+			set(refusedRow('macos', 'bundle', error));
+		}
+		for (const [target, platform] of [
+			['driver_macos', 'macos'],
+			['driver_linux', 'linux']
+		]) {
+			try {
+				const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
+				set({
+					target,
+					status: compiled.omitted.length ? 'partial' : 'emulated',
+					artifact: 'emulation',
+					reason: 'compiled_keylayout_installed_by_composer_host',
+					blockers: [],
+					omitted: compiled.omitted
+				});
+			} catch (error) {
+				set(refusedRow(target, 'emulation', error));
+			}
+		}
+		return report;
+	}
+
+	/**
+	 * One .keylayout of a macOS variant: the preserved XML when it is that
+	 * variant, else the compilation of the structured source.
+	 * @param {object} doc
+	 * @param {'iso'|'ansi'} variant
+	 * @returns {{filename: string, text: string}}
+	 */
+	function keylayoutFile(doc, variant) {
+		if (isPreserved(doc)) {
+			if (doc.imported_keylayout.convention !== variant)
+				throw new SourceIOError('source_export_unavailable', 'physical.base');
+			return { filename: `${doc.layout.id}.keylayout`, text: exportKeylayout(doc) };
+		}
+		const [file] = LayoutSourceCompiler.exportMacos(doc, tables(), variant).files;
+		return { filename: file.path, text: file.text };
+	}
+
+	/**
+	 * What the ErgoptiPlus composer host installs: the TOML and the .keylayout
+	 * compiled for the host's OS (composer_save with `source`, composer.lua).
+	 * @param {object} doc
+	 * @param {'macos'|'linux'} platform
+	 * @returns {{source: string, keylayout: string}}
+	 */
+	function installPayload(doc, platform) {
+		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
+		return { source: serialize(doc), keylayout: compiled.text };
 	}
 
 	/** An identifier the format accepts, derived from free text. */
@@ -172,14 +246,33 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
-	 * Converts a preserved import into an editable source through the composer
-	 * reader: five character levels, dead keys with chaining and terminators.
-	 * The original XML is dropped from the result, so the caller asks first.
+	 * Converts a preserved import into structured records through the shared
+	 * compiler's importer, which compiles back to the same behaviour and refuses
+	 * what the records cannot hold. Only the original bytes are lost.
+	 * @param {object} doc - A preserved document.
+	 * @returns {{doc: object, lost: string[]}}
+	 */
+	function convertImport(doc) {
+		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
+		const { text, convention } = doc.imported_keylayout;
+		const structured = LayoutSourceCompiler.importStructured(
+			text,
+			doc.layout.id,
+			convention,
+			tables()
+		);
+		return { doc: structured, lost: ['keylayout_original_xml'] };
+	}
+
+	/**
+	 * Converts a preserved import the importer refuses, approximately, through
+	 * the composer reader: five character levels, dead keys with chaining and
+	 * terminators. The page offers it only after that refusal, with this list.
 	 * @param {object} doc - A preserved document.
 	 * @returns {{doc: object, lost: string[]}} The editable source and what the
 	 *   projection cannot hold (stable codes the page translates).
 	 */
-	function projectImport(doc) {
+	function approximateImport(doc) {
 		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
 		const { text, convention } = doc.imported_keylayout;
 		const parsed = LayoutComposer.parseSource(
@@ -366,7 +459,10 @@ var LayoutSourceIO = (function () {
 		exportKeylayout,
 		capabilities,
 		identifierFrom,
-		projectImport,
+		convertImport,
+		approximateImport,
+		keylayoutFile,
+		installPayload,
 		withNavLayer,
 		navLayerFile
 	};
