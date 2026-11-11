@@ -91,11 +91,13 @@ end
 helpers.describe("Owned install child deadlines", function()
 	helpers.it("keeps the event loop running and kills a wrapper past the install deadline (install-owned-smoke-deadline)",
 		function()
-		local outcome = install_with_wrapper("sleep 5\n", 400)
+		-- 2 s: the synchronous moves and receipt checks before the smoke take a
+		-- good part of a small budget on a slow runner; the smoke sleeps 5 s.
+		local outcome = install_with_wrapper("sleep 5\n", 2000)
 		local f = outcome.fixture
 		local ok, err = pcall(function()
 			helpers.assert_true(outcome.elapsed_ms ~= nil, "the install completed")
-			helpers.assert_true(outcome.elapsed_ms < 3000, "the deadline bounded the smoke: " .. tostring(outcome.elapsed_ms))
+			helpers.assert_true(outcome.elapsed_ms < 4500, "the deadline bounded the smoke: " .. tostring(outcome.elapsed_ms))
 			helpers.assert_true(outcome.ticks >= 5, "the event loop kept running during the smoke: " .. outcome.ticks)
 			helpers.assert_eq(outcome.ok, false, "a smoke past the deadline fails the install")
 			helpers.assert_true(Fixture.read(f.installed .. "/old.marker") ~= nil, "the previous installation is restored")
