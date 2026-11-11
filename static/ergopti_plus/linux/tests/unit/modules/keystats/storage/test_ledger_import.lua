@@ -84,8 +84,8 @@ local function fixture(options)
 	local folder = dir .. "/metrics/by_device/" .. FOREIGN
 	assert(os.execute("mkdir -p " .. quote(folder)))
 	write(folder .. "/device.json", string.format(
-		'{"device_id":"%s","name":"Mac","os":"darwin","os_version":"26.1","host_signature":"sig","created_at":"2026-11-01 08:00:00.000","schema_version":1}\n',
-		FOREIGN))
+		'{"device_id":"%s","name":"Mac","os":"%s","os_version":"26.1","host_signature":"sig","created_at":"2026-11-01 08:00:00.000","schema_version":1}\n',
+		FOREIGN, options.os or "darwin"))
 	local store = {}
 	function store.query_rows(sql)
 		local output = sqlite(db, sql)
@@ -164,6 +164,30 @@ helpers.describe("Linux foreign metrics ledger import", function()
 		helpers.assert_eq(Import.last_complete_batch(text:sub(1, -3)), 0)
 	end)
 
+	-- Every driver writes a CR or a NUL in text as a char() concatenation
+	-- (_shared/lua/sqlite/literal.lua, Windows SQLite_Q). The importer read only
+	-- plain literals, refused such a statement and retried the same batch on
+	-- every tick: that device's ledger was stuck for good (KML-001,
+	-- linux-import-control-bytes).
+	it("linux-import-control-bytes: a CR or NUL written as char() passes, as its exact bytes", function()
+		local columns = Import.raw_columns(schema_sql())
+		local Literal = require("sqlite.literal")
+		local row = "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ('d', %d, "
+			.. "'%s', '2026-11-05', 'k', '', NULL);\n"
+		local text = "BEGIN TRANSACTION;\n" .. string.format(row, 1, Literal.escape("l1\r\nl2"))
+			.. string.format(row, 2, Literal.escape("a\0b'c")) .. string.format(row, 3, "x'||char(13)||'") .. "COMMIT;\n"
+		local statements, reason = Import.admit(text, "d", columns)
+		helpers.assert_eq(reason, nil)
+		helpers.assert_eq(#statements, 3)
+		helpers.assert_true(statements[1]:find("CAST(X'6C310D0A6C32' AS TEXT)", 1, true) ~= nil, "CR LF kept")
+		helpers.assert_true(statements[2]:find("CAST(X'6100622763' AS TEXT)", 1, true) ~= nil, "NUL and quote kept")
+		helpers.assert_true(statements[3]:find("CAST(X'780D' AS TEXT)", 1, true) ~= nil, "a trailing CR")
+		for _, hostile in ipairs({ "a'||char(65)||'b", "a'||lower('B')||'", "a'||char(13)", "a'||(SELECT 1)||'" }) do
+			local refused = Import.admit("BEGIN TRANSACTION;\n" .. string.format(row, 4, hostile) .. "COMMIT;\n", "d", columns)
+			helpers.assert_nil(refused, "only char(0) and char(13) between literals: " .. hostile)
+		end
+	end)
+
 	it("linux-import-refusal: subqueries, ATTACH, functions, other devices and unknown tables never pass", function()
 		local columns = Import.raw_columns(schema_sql())
 		local row = "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s);"
@@ -207,6 +231,84 @@ helpers.describe("Linux foreign metrics ledger import", function()
 		helpers.assert_eq(scalar(f.db, "SELECT imported_data_sql_size || ' ' || imported_data_sql_sha256 FROM devices WHERE device_id='"
 			.. FOREIGN .. "';"), size .. " " .. digest)
 		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM meta WHERE key LIKE 'linux_ledger_import_pending:%';"), "0")
+	end)
+
+	-- Windows records its Wi-Fi changes as events_network network_change rows
+	-- and counts the connectivity and SSID transitions among them
+	-- (keystats_reader_db.ahk "wifi-day"); the Linux rebuild read only
+	-- events_system wifi_change, so an imported Windows device showed none
+	-- (KML-002, linux-import-wifi-changes).
+	it("linux-import-wifi-changes: a foreign device's network_change transitions are its Wi-Fi changes", function()
+		local f = fixture()
+		local function change(id, meta)
+			return "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ('"
+				.. FOREIGN .. "', " .. id .. ", '2026-11-05 09:0" .. id .. ":00.000', '2026-11-05', 'network_change', 'Code', '"
+				.. meta .. "');"
+		end
+		write(f.ledger, HEADER .. batch(typing(1, EVENTS),
+			change(2, '{"connection_state":"connected"}'),
+			change(3, '{"connection_state":"disconnected","prev_connection_state":"connected"}'),
+			change(4, '{"connection_state":"connected","prev_connection_state":"disconnected"}'),
+			change(5, '{"connection_state":"connected","prev_connection_state":"connected","ssid_hash":"b","prev_ssid_hash":"a"}'),
+			change(6, '{"connection_state":"connected","prev_connection_state":"connected","ssid_hash":"b","prev_ssid_hash":"b"}'),
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('"
+				.. FOREIGN .. "', 7, '2026-11-05 10:00:00.000', '2026-11-05', 'wifi_change', '{}');"))
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT wifi_changes FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "4",
+			"a disconnect, a reconnect, an SSID change and the legacy row; no baseline, no signal-only row")
+	end)
+
+	-- A Linux sibling stamps ts in UTC and date in its local time: a passive
+	-- period at 23:30 in New York is ts 04:30 the next day. The rebuild put the
+	-- system row on ts's day, a day later than the sibling counted it (KML-004,
+	-- linux-import-system-date).
+	it("linux-import-system-date: a system row lands on its own date column", function()
+		local f = fixture()
+		write(f.ledger, HEADER .. batch(typing(1, EVENTS),
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('"
+				.. FOREIGN .. "', 2, '2026-11-06 04:30:00', '2026-11-05', 'passive_period', '{\"kind\":\"sleep\",\"duration_ms\":5000}');"))
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT group_concat(date) FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "2026-11-05")
+	end)
+
+	-- KMD-1 (decided by the maintainer on 2026-11-11): a row stores its UTC
+	-- instant and the offset it was recorded at; its hour and a night wake are
+	-- read in that local time. A Linux row without one held UTC and is read
+	-- with this device's current offset; a macOS one held local time.
+	local function offset_typing(id, ts, date, offset)
+		return string.format("INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, "
+			.. "field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, "
+			.. "pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json, utc_offset_min) VALUES ('%s', %d, "
+			.. "'%s', '%s', 'Safari', NULL, 'Docs', '', '', 'macos-azerty', '', 0, 0, 2, 0, 40, 0, 0, 0, 42.5, 'it''s', '', '%s', %s);",
+			FOREIGN, id, ts, date, EVENTS, offset == nil and "NULL" or tostring(offset))
+	end
+	local function hours(f)
+		return scalar(f.db, "SELECT group_concat(hour) FROM (SELECT DISTINCT hour FROM agg_app_day_hourly WHERE device_id='"
+			.. FOREIGN .. "' ORDER BY hour);")
+	end
+
+	it("linux-import-utc-offset: an hour and a night wake are read in the local time the row was recorded in", function()
+		local f = fixture()
+		write(f.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 22:15:00.000", "2026-11-05", 60),
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json, utc_offset_min) VALUES ('"
+				.. FOREIGN .. "', 2, '2026-11-05 03:10:00.000', '2026-11-05', 'wake', '{}', 300);"))
+		drain(f)
+		helpers.assert_eq(hours(f), "23", "22:15 UTC at +01:00 is 23:15 lived")
+		helpers.assert_eq(scalar(f.db, "SELECT night_wake_count FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "0",
+			"03:10 UTC at +05:00 is an 08:10 wake, no night wake")
+	end)
+
+	it("linux-import-utc-offset: an older Linux row is read with this device's offset, an older macOS row as local", function()
+		local LocalTime = require("keystats.local_time")
+		local linux = fixture({ os = "linux" })
+		write(linux.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 09:15:00", "2026-11-05", nil)))
+		drain(linux)
+		local expected = LocalTime.local_ts("2026-11-05 09:15:00", nil, true, LocalTime.offset_at(os.time())):sub(12, 13)
+		helpers.assert_eq(hours(linux), expected, "an older Linux ts is UTC")
+		local mac = fixture()
+		write(mac.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 09:15:00.000", "2026-11-05", nil)))
+		drain(mac)
+		helpers.assert_eq(hours(mac), "09", "an older macOS ts is local time")
 	end)
 
 	it("linux-import-incremental: only appended complete batches are applied, a torn tail waits", function()

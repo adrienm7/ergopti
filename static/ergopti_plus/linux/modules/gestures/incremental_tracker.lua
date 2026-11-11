@@ -27,17 +27,15 @@ local M = {}
 local Direction = require("gestures.direction")
 local Incremental = require("gestures.incremental")
 
--- Travel, in millimetres, before a moving swipe has a direction (the macOS
--- SWIPE_MIN of three fingers and more).
-M.SWIPE_MIN_MM = 1.5
-
 -- Smallest reversal the tracker accepts, in millimetres (macOS LIVE_AXIS_MIN).
 M.REVERSE_FLOOR_MM = 1.0
 
 --- Creates a tracker.
 --- @param opts table { units_x, units_y (device units per mm), mode_of(slot), step_of(slot),
----   slot_of(slot, fingers, direction) -> the slot whose mode and step apply (an axis slot
----   answering for an unbound direction one), fire(slot, fingers, direction, count) -> fired count }
+---   slot_of(slot, fingers, direction, dominant) -> the slot whose mode and step apply (an
+---   axis slot answering for an unbound direction one, a straight slot for an unbound
+---   diagonal given its dominant direction) and the direction it answers for,
+---   fire(slot, fingers, direction, count) -> fired count }
 --- @return table tracker
 function M.new(opts)
 	assert(type(opts) == "table", "incremental tracker needs its options")
@@ -48,6 +46,15 @@ function M.new(opts)
 	end
 	local tracker = {}
 	local state
+	-- Travel, in millimetres, before a moving swipe has a direction: the shared
+	-- timings registry's [gestures] *_minimum_mm, which macOS reads too, a
+	-- pair's larger (maintainer decision GSD-3). Read once per touchpad.
+	local Timings = require("infra.timings")
+	local minimums = {
+		swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+		pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+		pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm"),
+	}
 
 	local function reset() state = nil end
 	reset()
@@ -68,11 +75,19 @@ function M.new(opts)
 		-- Only a decided axis counts: in the diagonal sector below the diagonal
 		-- minimum the classifier names the dominant straight axis, and the
 		-- name turning diagonal a frame later restarted the count each time.
-		local axis = Direction.decided_axis(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
+		local axis = Direction.decided_axis(rx, ry, Direction.minimums_mm(progress.fingers, minimums))
 		if not axis then return end
 		local direction = Direction.name(axis, rx, ry)
 		local slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
-		local answering = opts.slot_of(slot, progress.fingers, direction)
+		local answering, answering_direction = opts.slot_of(slot, progress.fingers, direction,
+			axis == "diag" and Direction.dominant(rx, ry) or nil)
+		assert(type(answering_direction) == "string", "slot_of must name the direction that answers")
+		if answering_direction ~= direction then
+			-- An unbound diagonal stands in for its dominant straight direction:
+			-- it counts and fires along that one, as its completed form would.
+			direction = answering_direction
+			slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
+		end
 		if opts.mode_of(answering) ~= "incremental" then return end
 		local step = opts.step_of(answering)
 

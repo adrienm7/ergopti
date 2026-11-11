@@ -19,10 +19,11 @@ require("test.network_transitions_contract").register(helpers)
 local function scripted()
 	local Watcher = helpers.load_with_stubs("modules.keystats.network_watcher")
 	local Timings = require("infra.timings")
-	local entries, now, vpn_answers, control = {}, 0, {}, { watched = nil, stopped = false }
+	local entries, now, vpn_answers, control = {}, 0, {}, { watched = nil, stopped = false, private = false }
 	helpers.assert_true(Watcher.start({
 		append = function(entry) entries[#entries + 1] = entry end,
 		app = function() return "Code" end,
+		private = function() return control.private end,
 		ports = {
 			watch_reachability = function(host, on_status)
 				control.host, control.watched = host, on_status
@@ -68,6 +69,24 @@ helpers.describe("macOS connectivity transitions: the watcher", function()
 			{ type = "vpn_connected", app = "Code", adapter = "vpn" },
 			{ type = "vpn_disconnected", app = "Code", adapter = "vpn" },
 		})
+		Watcher.stop()
+	end)
+
+	-- Windows' KL_AppendLog refuses every entry while the focused context is
+	-- filtered; the macOS watcher had no privacy input at all, so a transition
+	-- seen in an excluded app was stored under its name (KMM-002,
+	-- macos-network-private).
+	helpers.it("macos-network-private: no transition is recorded while logging is refused", function()
+		local Watcher, entries, control = scripted()
+		control.tick()
+		control.private = true
+		control.watched("down")
+		control.tick()
+		helpers.assert_eq(#entries, 0, "the refused context records nothing")
+		control.private = false
+		control.watched("up")
+		control.tick()
+		helpers.assert_eq(entries, { { type = "internet_up", app = "Code" } })
 		Watcher.stop()
 	end)
 

@@ -111,4 +111,23 @@ function M.new(opts)
 	return self
 end
 
+
+--- Whether one events_network network_change row is a Wi-Fi change, by the
+--- Windows rule (keystats_reader_db.ahk "wifi-day"): the poll also writes a
+--- first baseline and signal-only rows, so only a connectivity change, an SSID
+--- change while connected, or a disconnect from a known SSID counts.
+--- @param meta table The row's decoded meta_json.
+--- @return boolean
+function M.is_wifi_change(meta)
+	if type(meta) ~= "table" then return false end
+	local state, previous = meta.connection_state, meta.prev_connection_state
+	local hash, previous_hash = meta.ssid_hash, meta.prev_ssid_hash
+	local function known(value) return type(value) == "string" and value ~= "" end
+	if state == "connected" and previous == "disconnected" then return true end
+	if state == "disconnected" and previous == "connected" then return true end
+	if state == "connected" and (previous == "connected" or previous == nil)
+		and known(hash) and known(previous_hash) and hash ~= previous_hash then return true end
+	return state == "disconnected" and previous == nil and known(previous_hash)
+end
+
 return M

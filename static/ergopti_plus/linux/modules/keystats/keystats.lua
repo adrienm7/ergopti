@@ -836,8 +836,21 @@ function M.init(opts)
 	if registration_ok and registered == true then
 		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
 	end
+	-- awake_ms follows Windows and macOS (keep-awake sessions); earlier
+	-- sampled uptime is cleared and the definition's first date recorded.
+	if migration_ok and migrated == true then
+		migration_ok, migrated = pcall(SqliteWriter.ensure_awake_definition, _device_id, Calendar.capture().date)
+	end
 	local sqlite_ready = migration_ok and migrated == true
-	if sqlite_ready and identity then LedgerSetup.start(identity, options.metrics_dir) end
+	-- The ledger exporter and the at-rest text migration gate no recording:
+	-- the daemon runs them on its loop's first idle tick (options.defer), off
+	-- the boot path, since each sqlite3 query is a process of its own (about
+	-- 4 ms). Without a defer port (tests, tools) they run at the end of init.
+	local after_admission = {}
+	if sqlite_ready and identity then
+		local metrics_dir = options.metrics_dir
+		after_admission[#after_admission + 1] = function() LedgerSetup.start(identity, metrics_dir) end
+	end
 	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
 	_storage_blocked = not sqlite_ready and not sqlite_unavailable
 	if sqlite_ready then
@@ -896,9 +909,11 @@ function M.init(opts)
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
 	if sqlite_available() then
-		TextMigration.resume(
-			_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
-			_device_id)
+		local mode = _encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT
+		local device = _device_id
+		after_admission[#after_admission + 1] = function()
+			if sqlite_available() then TextMigration.resume(mode, device) end
+		end
 	end
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
@@ -929,6 +944,13 @@ function M.init(opts)
 
 	Logger.success(LOG, "Keystats initialised (log_dir=%s, password_apps=%d).",
 		_log_dir, #_password_apps)
+	-- A later init or a stop between now and the deferred tick retires these.
+	local generation = _flush_generation
+	local function run_after_admission()
+		if generation ~= _flush_generation or not _sqlite_admitted then return end
+		for _, task in ipairs(after_admission) do task() end
+	end
+	if type(options.defer) == "function" then options.defer(run_after_admission) else run_after_admission() end
 	return not _storage_blocked
 end
 
@@ -1598,13 +1620,16 @@ function M.record_network_event(kind, fields)
 	if not may_record() then return end
 	local allowed = require("keystats.network_transitions").KINDS[kind]
 	assert(allowed, "not an events_network kind: " .. tostring(kind))
+	-- Windows' KL_AppendLog refuses every entry while the focused app is
+	-- filtered, connectivity included: the row would name that app.
+	local app = M.last_app() or "unknown"
+	if M.is_unrecorded_app(app) then return end
 	fields = type(fields) == "table" and fields or {}
 	local clock = observe_calendar()
 	local meta = {}
 	for _, name in ipairs(allowed) do meta[name] = fields[name] end
 	_raw_pending.network[#_raw_pending.network + 1] = {
-		ts = clock.ts, date = clock.date, kind = kind,
-		app = dashboard_app_name(M.last_app() or "unknown"), meta = meta,
+		ts = clock.ts, date = clock.date, kind = kind, app = dashboard_app_name(app), meta = meta,
 	}
 end
 
@@ -3694,6 +3719,9 @@ function _maintenance.advance()
 		end
 		local Maintenance = require("keystats.metrics_maintenance")
 		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)
+		-- Linux rows stamp ts in UTC; the writer stores the offset of that
+		-- instant, from which the purge reads the tombstone's local time (KMD-1).
+		request.tombstone.ts = request.tombstone.metadata.utc
 		_pending_system_events[#_pending_system_events + 1] = request.tombstone
 		flush_dispatch()
 	end)

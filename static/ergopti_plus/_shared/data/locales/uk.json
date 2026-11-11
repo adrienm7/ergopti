@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti не може запуститися: {1} не є опублікованим нативним модулем.",
 	"linux_shell.install.already_installed": "{1} — уже встановлено",
 	"linux_shell.install.archive_digest_unavailable": "оновлення зі збереженим дескриптором потребують справжнього середовища OpenSSL3; можливість лишається недоступною.",
+	"linux_shell.install.bytecode_skipped": "Не вдалося створити попередньо скомпільовані модулі — Ergopti запускається з вихідного коду, трохи повільніше.",
 	"linux_shell.install.capability_verified": "{1} — можливість перевірено",
 	"linux_shell.install.command_still_missing": "{1} встановлено, але '{2}' досі не знайдено.",
 	"linux_shell.install.daemon_manual": "Щоб запустити службу вручну:",

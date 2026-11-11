@@ -181,4 +181,61 @@ helpers.with_fresh_modules({
 			helpers.assert_true(gated >= timed, "every tap manipulator gates its tap on the scoped variable")
 		end)
 	end)
+
+	--- Whether the emissions armed the one-shot Shift (its tagged F20).
+	local function armed(engine)
+		for _, emission in ipairs(engine:emissions()) do
+			if emission.key_code == "key_90" and emission.flags.left_control and emission.flags.left_option then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- rctrl.ahk 7.3 (the Windows RCtrl, macOS's right_option, tapping the
+	-- one-shot Shift with no hold): a quick release arms the one-shot; a long
+	-- press holds Shift past the threshold and arms nothing. The generator sent
+	-- the tap at key_down, as for any key with no hold, so even a long press
+	-- armed it and nothing held Shift (one-shot-no-hold-macos).
+	helpers.describe("right_option's one-shot Shift with no hold (one-shot-no-hold-macos)", function()
+		local rules = build({ right_option = { tap = "sticky_shift", hold = "none" } })
+		local function timeout(engine)
+			local manipulator = engine:down("right_option")
+			return manipulator and manipulator.parameters and manipulator.parameters[TIMEOUT_PARAMETER]
+		end
+
+		helpers.it("arms on a quick release, not at key-down (one-shot-no-hold-macos)", function()
+			local engine = engine_for(rules)
+			engine:down("right_option")
+			helpers.assert_true(not armed(engine), "nothing is armed at key-down")
+			engine:advance(TAP_MIN_MS + 50)
+			engine:up("right_option", true)
+			helpers.assert_true(armed(engine), "the quick release arms the one-shot")
+			helpers.assert_nil(next(engine:pressed()), "and holds nothing")
+		end)
+
+		helpers.it("holds Shift for a long press and arms nothing (one-shot-no-hold-macos)", function()
+			local engine = engine_for(rules)
+			local limit = timeout(engine)
+			helpers.assert_true(type(limit) == "number" and limit > TAP_MIN_MS, "the key has a tap threshold")
+			engine:advance(limit + 50)
+			helpers.assert_true(engine:pressed().left_shift == true, "past the threshold Shift is held")
+			engine:up("right_option", false)
+			helpers.assert_true(not armed(engine), "a long press arms nothing")
+			helpers.assert_nil(next(engine:pressed()), "and its release lets Shift go")
+		end)
+
+		helpers.it("keeps the tap minimum and the shift-hold variant (one-shot-no-hold-macos)", function()
+			local engine = engine_for(rules)
+			engine:down("right_option")
+			engine:advance(20)
+			engine:up("right_option", true)
+			helpers.assert_true(not armed(engine), "a 20 ms bounce arms nothing")
+			engine = engine_for(build({ right_option = { tap = "sticky_shift", hold = "shift" } }))
+			engine:down("right_option")
+			engine:advance(150)
+			engine:up("right_option", true)
+			helpers.assert_true(armed(engine), "the preset's shift hold still taps the one-shot")
+		end)
+	end)
 end)

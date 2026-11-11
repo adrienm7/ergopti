@@ -35,8 +35,8 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		isUrlBar = function() return false end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {
-		chat = function(target, model, _, _, chunk, done)
-			calls.ollama[#calls.ollama + 1] = { target = target, model = model, chunk = chunk, done = done }
+		chat = function(target, model, _, opts, chunk, done)
+			calls.ollama[#calls.ollama + 1] = { target = target, model = model, opts = opts, chunk = chunk, done = done }
 		end,
 		cancel = function() return true end,
 	}
@@ -1002,6 +1002,56 @@ helpers.describe("ordinary predictions retain their exact native target", functi
 		if not ok then error(err, 0) end
 	end)
 
+	-- AID-3 (decided by the maintainer on 2026-11-11): a settings change while a
+	-- request is in flight retires it, as on Windows; the next one uses the new settings.
+	for _, change in ipairs({
+		{ field = "key", value = "new-key" }, { field = "model", value = "other-model" },
+		{ field = "provider", value = "groq" }, { field = "base_url", value = "https://proxy.example/v1" },
+		{ field = "id", value = "cerebras-2" },
+	}) do
+		helpers.it("retires the request in flight when the API entry's " .. change.field
+			.. " changes (settings-retire-inflight)", function()
+			local entry = {}
+			for key, value in pairs(ENTRY) do entry[key] = value end
+			local engine, calls, scheduler, restore = load("api", entry, nil, nil, true)
+			local ok, err = pcall(function()
+				engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+				helpers.assert_eq(#calls.remote, 1)
+				entry[change.field == "key" and "token" or change.field] = change.value
+				calls.remote[1].done(" que tout le monde aille bien", nil)
+				scheduler.settle()
+				helpers.assert_eq(engine.has_suggestions(), false, "the old settings' answer is not offered")
+				helpers.assert_eq(engine.is_predicting(), false, "the request is retired")
+				helpers.assert_true(calls.cancelled >= 1, "its transport is cancelled")
+				engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+				helpers.assert_eq(#calls.remote, 2, "the next request is sent")
+				helpers.assert_eq(calls.remote[2].target[change.field == "key" and "token" or change.field],
+					change.value, "with the new settings")
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("a new request retires one still in flight with changed settings (settings-retire-inflight)", function()
+		local entry = {}
+		for key, value in pairs(ENTRY) do entry[key] = value end
+		local engine, calls, _, restore = load("api", entry, nil, nil, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			helpers.assert_eq(#calls.remote, 1, "unchanged settings: the request in flight is waited for")
+			entry.token = "new-key"
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			helpers.assert_eq(#calls.remote, 2, "changed settings: the old request is retired, the new one sent")
+			helpers.assert_eq(calls.remote[2].target.token, "new-key")
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(engine.has_suggestions(), false, "the retired answer never shows")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("refuses an already visible prediction after a native window switch (prediction-native-focus)", function()
 		local engine, calls, _, restore = load("api", ENTRY)
 		local ok, err = pcall(function()
@@ -1328,5 +1378,30 @@ helpers.describe("prediction engine: model warmup lifecycle", function()
 			helpers.assert_eq(world.warmup.pending(), false)
 		end)
 		restore_warmup(); restore(); if not okay then error(problem, 0) end
+	end)
+end)
+
+-- A retry never streams on Windows (DispatchVariant: `!Retry and streaming`)
+-- and macOS's quick retry is plain. On Linux a streamed attempt that then
+-- failed left its partial on offer while the retry ran, so Tab typed the
+-- truncated text of a failed call, and the retry streamed again
+-- (AIL-002, stream-retry-partial).
+helpers.describe("prediction: a failed streamed attempt (stream-retry-partial)", function()
+	helpers.it("withdraws the failed attempt's partial and retries without streaming (stream-retry-partial)", function()
+		local engine, calls, _, restore = load("ollama", ENTRY, { ["llm.display.streaming"] = true }, false, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			helpers.assert_eq(calls.ollama[1].opts.stream, true, "the first attempt streams")
+			calls.ollama[1].chunk(" que tout le monde aille bien")
+			helpers.assert_eq(#engine.get_suggestions(), 1, "the partial is shown while it streams")
+			calls.ollama[1].done(" que tout le monde aille bien", "Ollama stream ended before its terminal marker")
+			helpers.assert_eq(#calls.ollama, 2, "the failure is retried")
+			helpers.assert_eq(calls.ollama[2].opts.stream, false, "the retry does not stream")
+			helpers.assert_eq(#engine.get_suggestions(), 0, "nothing of the failed attempt stays on offer")
+			helpers.assert_eq(engine.accept(1), false, "so Tab types nothing of it")
+			helpers.assert_eq(engine.is_predicting(), true, "the retry is still awaited")
+		end)
+		restore()
+		if not ok then error(err, 0) end
 	end)
 end)

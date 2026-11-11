@@ -38,5 +38,12 @@
 		"folder": "docs/field-reports",
 		"base_config_key": "ergoptiFieldBase",
 		"environment": "ERGOPTI_FIELD_RUN_ROOT"
+	},
+	"bytecode_package": {
+		"manifest": "manifest",
+		"bundle": "bundle",
+		"format": "ergopti-bytecode-1",
+		"end_marker": "end",
+		"compiler": "linux/install/compile_bytecode.lua"
 	}
 }

@@ -123,6 +123,12 @@ else
 	               SHARED_LUA_DIR .. "/?.lua;" ..
 	               SHARED_LUA_DIR .. "/?/init.lua;" ..
 	               package.path
+	-- An installed tree's modules load from the bytecode its installer compiled
+	-- (compile time was most of the boot's first 200 ms); a checkout never
+	-- reads one. Decided here, before the first application module loads.
+	local BytecodePackage = assert(loadfile(SCRIPT_DIR .. "/infra/bytecode_package.lua"))()
+	package.loaded["infra.bytecode_package"] = BytecodePackage
+	BytecodePackage.install(SCRIPT_DIR)
 end
 
 -- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
@@ -951,6 +957,8 @@ local function main()
 	Logger.start(LOG, "Ergopti hotstrings daemon starting (version %s, pid %s)…",
 		Version.VERSION, DiagnosticSnapshot.pid() or "unknown")
 	BootProfiler.begin()
+	require("infra.bytecode_package").report(function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+		function(fmt, ...) Logger.warn(LOG, fmt, ...) end)
 	-- The options decide half of what follows (grab, tray, device pinning), and a
 	-- user log has no other record of how the unit was launched.
 	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s layout=%s keymap=%s config=%s.",
@@ -1094,7 +1102,8 @@ local function main()
 
 	-- 8.3) Initialise the full keystats.
 	BootProfiler.stage("keystats")
-	local metrics_initialized = keystats.init({})
+	-- Its background tasks (ledger export, text migration) wait for the loop.
+	local metrics_initialized = keystats.init({ defer = event_loop.defer })
 	if metrics_initialized == false and notifier then
 		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
 		if notice_i18n then
@@ -1182,6 +1191,11 @@ local function main()
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
 	local WordReset = require("modules.hotstrings.word_reset")
+	-- The erase-to-text pause only where Windows and macOS pace it: a terminal,
+	-- or an application nobody could name (the focus is unknown).
+	injector.set_erase_pacing(function()
+		return _cached_app_id == nil or WordReset.is_terminal_app(_cached_app_id)
+	end)
 	-- The action catalogue, bound once. It shares a module with the touchpad
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
@@ -2599,8 +2613,10 @@ local function main()
 	end
 	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
-	-- it, so the application never sees a chord Ergopti runs. It comes last: an
-	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- it, so the application never sees a chord Ergopti runs. An offered
+	-- prediction's own digit chord is contextual and outranks a binding; both run
+	-- before the layout emulation, as Windows runs a slot before its layout chord
+	-- and macOS lets the digit accept (ILL-001, ILL-002).
 	-- The press is recorded for the metrics exactly as the control callback
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
@@ -2634,21 +2650,35 @@ local function main()
 		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots.
-		if require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+		-- under the Shortcuts master like the keyboard slots, and only while no
+		-- layout is emulated, as on Windows.
+		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
+			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
-		}) then return true end
+		})
+		if accented then
+			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
+		end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.
 			-- Retire its old PRIMARY window before the deferred action can run.
 			wrap_on_type.end_selection_window()
 			return true
 		end
+		if prediction_engine
+			and type(prediction_engine.handle_shortcut) == "function"
+			and prediction_engine.handle_shortcut(detail) == true then
+			return true
+		end
+		-- A key the tooltip did not own is user activity: a pending prediction
+		-- stops before the typing path arms the next pause.
+		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
+		if consume_bound_chord(detail) then return true end
 		-- The layout emulation, after the actions the user bound on a key.
 		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
@@ -2660,16 +2690,7 @@ local function main()
 			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
 				release_callback = emulated_release }
 		end
-		if wrap_on_type.on_key(detail) then return true end
-		if prediction_engine
-			and type(prediction_engine.handle_shortcut) == "function"
-			and prediction_engine.handle_shortcut(detail) == true then
-			return true
-		end
-		-- A key the tooltip did not own is user activity: a pending prediction
-		-- stops before the typing path arms the next pause.
-		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
-		return consume_bound_chord(detail)
+		return wrap_on_type.on_key(detail) == true
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
 	local hold_token = keystats.hold_accounting_token

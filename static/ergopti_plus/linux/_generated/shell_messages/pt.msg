@@ -5,6 +5,7 @@ build_luv.module_generated=Módulo de rede do LuaJIT compilado a partir do códi
 build_luv.recipe_required=A compilação nativa do luv precisa da sua receita de código-fonte.
 install.already_installed={1} — já instalado
 install.archive_digest_unavailable=as atualizações com descritor retido exigem um ambiente OpenSSL3 real; a capacidade continua indisponível.
+install.bytecode_skipped=Não foi possível gerar os módulos pré-compilados — o Ergopti inicia a partir do código-fonte, um pouco mais devagar.
 install.capability_verified={1} — capacidade verificada
 install.command_still_missing={1} foi instalado, mas '{2}' continua sem ser encontrado.
 install.daemon_manual=Para iniciar o serviço manualmente:

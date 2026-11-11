@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti başlatılamıyor: {1} yayımlanmış bir yerel modül değil.",
 	"linux_shell.install.already_installed": "{1} — zaten yüklü",
 	"linux_shell.install.archive_digest_unavailable": "tutulan tanımlayıcılı güncellemeler gerçek bir OpenSSL3 çalışma zamanı gerektirir; yetenek kullanılamaz durumda kalıyor.",
+	"linux_shell.install.bytecode_skipped": "Önceden derlenmiş modüller oluşturulamadı — Ergopti kaynak koddan, biraz daha yavaş başlıyor.",
 	"linux_shell.install.capability_verified": "{1} — yetenek doğrulandı",
 	"linux_shell.install.command_still_missing": "{1} yüklendi, ancak '{2}' hâlâ bulunamıyor.",
 	"linux_shell.install.daemon_manual": "Daemon'u elle başlatmak için:",

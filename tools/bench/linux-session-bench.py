@@ -222,20 +222,28 @@ def wait_quiet(session, cursor, quiet=0.25, timeout=3.0):
     return (rows[-1][0] if rows else None), [row for _, row in rows]
 
 
+# --driver: the driver folder of an installed tree to boot instead of this
+# checkout, launched through its absolute physical path as install/launch.sh does.
+DAEMON_DRIVER = None
+
+
 def start_daemon(session):
     """Spawns the daemon; returns (spawn to ready ms, Popen)."""
     session.log.write_text("")
+    entry, cwd = "ergopti_hotstrings.lua", cs.DRIVER
+    if DAEMON_DRIVER is not None:
+        entry, cwd = str(DAEMON_DRIVER / "ergopti_hotstrings.lua"), DAEMON_DRIVER
     spawned = time.monotonic()
     session.daemon = subprocess.Popen(
         [
             "luajit",
-            "ergopti_hotstrings.lua",
+            entry,
             "--verbose",
             *session.daemon_flags,
             "--config",
-            "tests/e2e/fixtures/daemon_keys.toml",
+            str(cs.DRIVER / "tests/e2e/fixtures/daemon_keys.toml"),
         ],
-        cwd=cs.DRIVER,
+        cwd=cwd,
         env=dict(session.env, **session.daemon_env),
         stdout=open(session.log, "w"),
         stderr=subprocess.STDOUT,
@@ -465,7 +473,12 @@ REQUIRED_SPANS = (("daemon_spans", "input.latency"), ("daemon_spans_tray", "tray
 
 def judge_budgets(report):
     """Prints each budget's verdict; returns True when all hold."""
-    held = True
+    intact = report.get("hotstring_editor_intact") is True
+    held = intact
+    print(
+        "  %s every expansion reached the GTK field intact (tail %r)"
+        % ("ok  " if intact else "FAIL", report.get("hotstring_editor_tail"))
+    )
     for section, name in REQUIRED_SPANS:
         present = name in report.get(section, {})
         held = held and present
@@ -493,7 +506,12 @@ def main():
     parser.add_argument("--tray-rounds", type=int, default=5)
     parser.add_argument("--json")
     parser.add_argument("--budgets", action="store_true", help="exit 1 when a budget is exceeded")
+    parser.add_argument("--driver", help="boot the daemon from this installed tree's linux/ folder")
+    parser.add_argument("--boot-only", action="store_true", help="measure the boots, then stop")
     args = parser.parse_args()
+    global DAEMON_DRIVER
+    if args.driver:
+        DAEMON_DRIVER = pathlib.Path(args.driver).resolve()
 
     session = BenchSession("x11", [{"event": 90, "name": KEYBOARD, "kind": "keyboard"}])
     report = {}
@@ -536,6 +554,14 @@ def main():
         report["shutdown_ms"] = summarize(stop_ms)
         report["layout_resolves_per_boot"] = max(resolves)
         report["first_key_after_boot_ms"] = summarize(first_keys)
+        report["bytecode_package_used"] = "installed bytecode package" in session.log_text()
+        report["bytecode_fallback_warnings"] = session.log_text().count("Modules load from source")
+        if args.boot_only:
+            stop_daemon(session)
+            print(json.dumps(report, indent=2))
+            if args.json:
+                pathlib.Path(args.json).write_text(json.dumps(report, indent=2))
+            return 0
 
         # The privacy gate admits expansions after its first focus answer.
         session.tap(KEYBOARD, KEY_SPACE)
@@ -546,6 +572,13 @@ def main():
         report["hotstring_last_key_to_last_row_ms"] = summarize(last)
         report["hotstring_typing_per_char_ms"] = summarize(per_char)
         report["hotstring_sample_rows"] = sample
+        # What the focused GTK field holds after the loop: every expansion must
+        # have erased its trigger and typed its text intact, whatever pause the
+        # injector kept between the two.
+        text, _ = session.editor_state()
+        expected = (" " + REPLACEMENT) * len(last)
+        report["hotstring_editor_intact"] = bool(text) and len(last) > 0 and text.endswith(expected)
+        report["hotstring_editor_tail"] = (text or "")[-40:]
         taps, rows = bench_tap_hold(session, args.tap_holds)
         report["tap_hold_release_to_tap_ms"] = summarize(taps)
         report["tap_hold_sample_rows"] = rows

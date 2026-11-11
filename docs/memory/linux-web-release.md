@@ -190,7 +190,10 @@ so it fails on a host without luaposix too.
 ### project-linux-keymap-before-libxkbcommon-1-8
 
 `xkbcli dump-keymap-{wayland,x11}` only exists from libxkbcommon 1.8; Ubuntu
-24.04 ships 1.6. `adapters/keyboard_layout.lua` therefore falls back to
+24.04 ships 1.6. On X11 the keymap comes first from the source probe in
+process (`xkb_source_probe.dump_keymap`, the text `xkbcli dump-keymap-x11`
+prints, 0.6 ms against a 30 ms `xkbcomp` fork; `run_keymap_native_dump.lua`
+proves the parser reads both alike). `adapters/keyboard_layout.lua` otherwise falls back to
 XWayland's keymap (`xkbcomp -xkb $DISPLAY`, exact because XWayland receives the
 compositor's keymap) and then to `xkbcli compile-keymap` from the session's
 layout names (`infra/xkb_rmlvo.lua`). Action: a keymap source must be proven on
@@ -542,9 +545,12 @@ calls none of 128 of those modules before `BootProfiler.complete`, but they
 are only 21 ms of compile, some are used at the first key or tray draw on a
 desktop, and the largest (the HTTP engine behind `adapters/http_client`,
 `unicode_case.data`, `llm.parser`) carry identity or test-seam contracts.
-Action: measure with the probe before proposing lazy requires; the lever
-that moves the start is a precompiled-bytecode package, which needs a
-maintainer decision on its staleness contract with the shipped sources.
+Action: measure with the probe before proposing lazy requires. The lever that
+moves the start is the precompiled-bytecode package, decided and implemented on
+2026-11-11 (`infra/bytecode_package.lua`, `install/compile_bytecode.lua`,
+maintainer-decisions): in an installed tree the load phase went 200 → 90 ms
+and spawn to ready 488 → 355 ms (`tests/hardware/run_bytecode_installed_tree.py`).
+A dev checkout still compiles from source.
 
 ### project-linux-layout-proof-reuses-the-keymap-between-notifications
 
