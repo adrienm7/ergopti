@@ -84,6 +84,40 @@ M.META = {
 	size = "linux_ledger_size",
 }
 
+--- The one query that reads every ledger meta key: one line per stored key,
+--- its key and value JSON-quoted around a tab, so a value holding a NUL or a
+--- line break survives the CLI's line framing. Each sqlite3 query is a process
+--- of its own (about 4 ms at boot); the four keys used to be four of them.
+--- @return string
+function M.meta_query()
+	local keys = {}
+	for _, meta_key in pairs(M.META) do keys[#keys + 1] = "'" .. SqliteCommand.escape_literal(meta_key) .. "'" end
+	table.sort(keys)
+	return "SELECT json_quote(key) || char(9) || json_quote(value) FROM meta WHERE key IN ("
+		.. table.concat(keys, ", ") .. ");"
+end
+
+--- Decodes meta_query()'s lines into { field = value } by M.META's fields.
+--- @param lines table|nil Output lines; nil when the query was refused, any
+---   other value counted as one malformed answer.
+--- @return table recorded Absent and undecodable keys are left nil.
+--- @return number malformed Lines that did not decode.
+function M.decode_meta(lines)
+	-- Not a list of lines (a store breaking the query_rows contract) is malformed.
+	if lines ~= nil and type(lines) ~= "table" then return {}, 1 end
+	local field_of, recorded, malformed = {}, {}, 0
+	for field, meta_key in pairs(M.META) do field_of[meta_key] = field end
+	for _, line in ipairs(lines or {}) do
+		local quoted_key, quoted_value = line:match("^(\"[^\t]*\")\t(\".*\")$")
+		local ok_key, key = pcall(Json.decode, quoted_key or "")
+		local ok_value, value = pcall(Json.decode, quoted_value or "")
+		local field = ok_key and field_of[key] or nil
+		if field and ok_value and type(value) == "string" then recorded[field] = value
+		elseif line ~= "" then malformed = malformed + 1 end
+	end
+	return recorded, malformed
+end
+
 local LEGACY_PREFIX = "linux-"
 local DATE_PATTERN = "^%d%d%d%d%-%d%d%-%d%d$"
 local UUID_PATTERN = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-4%x%x%x%-[89ab]%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
@@ -361,8 +395,9 @@ function M.new(opts)
 		elseif json_status ~= "ok" then
 			return false, "device.json is unreadable"
 		end
-		local recorded = {}
-		for key, meta_key in pairs(M.META) do recorded[key] = store.get_meta(meta_key) end
+		-- An unreadable or malformed record regenerates the file, as an absent one does.
+		local recorded, malformed = M.decode_meta(store.query_rows(M.meta_query()))
+		if malformed > 0 then logger.warn(LOG, "The ledger's recorded position is malformed; data.sql is regenerated.") end
 		local size = fs.size(self.path)
 		local cursor, recorded_size = tonumber(recorded.cursor), tonumber(recorded.size)
 		prepared = true
