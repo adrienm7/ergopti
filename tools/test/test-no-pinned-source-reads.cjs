@@ -71,7 +71,8 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 // was said of 16 files while the honest count was 7 — it describes a shape, not
 // this number, and the 24 newly visible ones have not been triaged.
 // 2026-10-30: 31 → 23, local read helpers moved to _DriverFileSource.
-const BASELINE = 23;
+// 2026-11-11: 23 → 22, the keep-awake pause gate reads through _DriverFuncBody.
+const BASELINE = 22;
 
 // Second frozen baseline — the count of individual pinned path literals, not of
 // files. Counting files alone left two holes: a file already on the list could
@@ -93,7 +94,9 @@ const BASELINE = 23;
 //              opposite directions, which is why neither showed up as a failure.)
 //      380 → 173 (2026-10-30: 208 single-file reads moved to _DriverFileSource, which
 //              takes a base name and survives a move; the count had drifted to 382.)
-const READ_BASELINE = 173;
+//      174 → 171 (2026-11-11: the keep-awake and health-probe pause guards became
+//              behaviour tests; the count had drifted one above the baseline.)
+const READ_BASELINE = 171;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.

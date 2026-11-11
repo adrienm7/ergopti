@@ -685,6 +685,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_shortcuts.ahk
 #Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
+#Include unit/modules/shortcuts/test_keepawake_pause_gate.ahk
 #Include unit/suite/test_runner_shard.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
@@ -1523,7 +1524,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_mouse_hotkey_clobber.ahk
 #Include meta/modules/gestures/test_mouse_suspend_guard.ahk
 #Include meta/modules/keystats/test_scroll_flush_fn_cleared_on_stop.ahk
-#Include meta/infra/dispatch/test_timer_scheduler_pause_guard.ahk
 #Include meta/modules/keystats/test_keystats_watchers_pause_guard.ahk
 #Include unit/modules/keystats/test_keystats_session_privacy_transaction.ahk
 #Include unit/modules/keystats/test_keystats_session_close_retry.ahk
@@ -2157,7 +2157,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_walker_batch_critical.ahk
 #Include meta/modules/keystats/ergonomics/test_walker_pure_fns_match_shared_core.ahk
 #Include meta/modules/keystats/test_keystats_critical_restore.ahk
-#Include meta/modules/keystats/context/test_async_password_detect_suspend_guard.ahk
 #Include meta/modules/keystats/context/test_sensors_warmup_distinct_callback.ahk
 #Include meta/modules/keystats/context/test_kltopo_seen_hwnds_cap.ahk
 #Include meta/platform/remap/layers/test_remapped_list_unconditional.ahk
