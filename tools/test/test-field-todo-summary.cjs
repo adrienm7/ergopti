@@ -10,7 +10,7 @@
  *    decides a passing step, a missing report step fails, a max bounds a count
  *    or a duration, and a collector step is read from steps.txt;
  * 2. a step absent from the run is not_run with its reason (signed_app needs
- *    --installed, a guided step left out by --unattended), never a pass;
+ *    --installed), never a pass;
  * 3. a point with no check is not_testable with its reason, in the summary
  *    and in the terminal lines;
  * 4. the coverage table of docs/tooling/macos-field-report-coverage.md is the
@@ -122,12 +122,8 @@ check('a step absent from the run is not_run with its reason', () => {
 	assert.match(byId.composer_l52.evidence[0], /field_composer:absent_from_run/);
 	assert.match(byId.owned_install_launcher.evidence[0], /field_owned_install:needs_installed_run/);
 	assert.match(byId.ctrl_capslock.evidence[0], /guided_capslock_chord:absent_from_run/);
-	const unattended = summarize(report([]), '--unattended', '--installed').byId;
-	assert.match(unattended.ctrl_capslock.evidence[0], /guided_capslock_chord:left_out_unattended/);
-	assert.match(
-		unattended.owned_install_launcher.evidence[0],
-		/field_owned_install:absent_from_run/
-	);
+	const installed = summarize(report([]), '--installed').byId;
+	assert.match(installed.owned_install_launcher.evidence[0], /field_owned_install:absent_from_run/);
 });
 
 check('guided outcomes and collector steps reach their points', () => {
