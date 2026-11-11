@@ -43,6 +43,19 @@ JSON, `format = "ergopti-kbd-tables"`, `version = 1`. Characters are UTF-16 code
   key (DKF_DEAD, chains of any depth).
 - `scancodes[]`: the `{sc, vk}` moves of character keys; every other scan code keeps the standard table.
 - `key_names`, `key_names_ext`: `{sc, name}`.
+- `modifier_vks` (optional): the virtual key holding Kana, Roya or Loya when it is not the standard one, as
+  KbdEdit's momentary Kana on `VK_OEM_8`; `scancodes_e0` (optional): `{sc, vk}` moves of E0 keys, such as Right Alt
+  (E0 38) sending `VK_OEM_8`. The comparison checks `VK_TO_BIT` and the E0 table against them.
+
+`kbd-dll/source.cjs` converts both ways between this model and the Ergopti layout source: `toSource` writes one
+layer per column (`alt_right` for AltGr, `kana` for Kana), Caps Lock attributes as `keys.<code>.caps_lock` and
+`caps_altgr`, moved virtual keys as `virtual_key`, key names on their physical key (or `windows.key_names` for scan
+codes the registry has no key for) and the version texts in `exports.windows`; `fromSource` reads a source back,
+a Caps Lock layer of the base or Shift column becoming CAPLOK or SGCAPS, the Kana level the KBDKANA column held by
+`windows.kana_key` (Right Alt by default, through `VK_OEM_8`: decided by the coordinator on 2026-11-11, to review by
+the maintainer), and lists what Windows has no key or column for. `tools/test/test-layout-sources.cjs` proves
+`static/layouts/sources/bepo.toml` gives back the official `bepo.klc` table for table and that the four DLLs of
+bépo and of Ergopti (Kana included) read back as their tables.
 
 `fromKlc` follows MSKLC: KLLF_ALTGR when a column is Ctrl+Alt (6) unless an ATTRIBUTES section states the flags;
 a DEADKEY result written `xxxx@` is a chain; a keypad scan code keeps its navigation virtual key.
