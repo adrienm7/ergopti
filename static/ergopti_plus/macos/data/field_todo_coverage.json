@@ -1,0 +1,723 @@
+{
+	"_comment": "Maps every point of TODO.md « To confirm on the Mac » to the field report evidence that decides it. Each unchecked TODO line carries <!-- field-point: <id> --> on its first line. A check names a field run step of data/field_run.json (optionally the report steps that decide it, and a max for a count or duration) or a collector step of steps.txt. A point with no check states why a field report cannot test it (not_testable), and a point with a remainder no run can test says so too. tools/dev/field-todo-summary.py turns a report into one verdict per point (docs/tooling/macos-field-report-coverage.md); tests/unit/infra/field_run/test_field_todo_coverage.lua fails when a TODO line has no entry or an entry names a missing step.",
+	"schema": 1,
+	"todo": {
+		"file": "TODO.md",
+		"section": "## To confirm on the Mac",
+		"tag": "field-point"
+	},
+	"points": [
+		{
+			"id": "raw_telemetry",
+			"title": "Raw telemetry rows (window, capture, network, VPN)",
+			"checks": [
+				{
+					"step": "field_raw_telemetry",
+					"report": ["telemetry_db"]
+				},
+				{
+					"step": "guided_window_topology"
+				},
+				{
+					"step": "guided_capture_app"
+				},
+				{
+					"step": "guided_network_toggle"
+				},
+				{
+					"step": "guided_vpn"
+				}
+			],
+			"condition": "Metrics on; a second screen, Zoom or OBS and a configured VPN for the matching guided steps (each can be skipped by name)."
+		},
+		{
+			"id": "pac_real",
+			"title": "PAC route lists with a real PAC",
+			"checks": [
+				{
+					"step": "field_network",
+					"report": ["route_lookup", "pac_download", "pac_script"]
+				},
+				{
+					"step": "field_pac_fallback",
+					"report": ["pac_fallback_outcome"]
+				}
+			],
+			"condition": "A network that serves a PAC (dead relay then DIRECT, or a live relay)."
+		},
+		{
+			"id": "minimum_tap",
+			"title": "Minimum tap on a tap-hold key",
+			"checks": [
+				{
+					"step": "field_tap_hold_thresholds",
+					"report": ["thresholds_match"]
+				},
+				{
+					"step": "guided_minimum_tap"
+				}
+			],
+			"condition": "Caps Lock set to Enter on tap and Ctrl on hold."
+		},
+		{
+			"id": "mrt004_service_repair",
+			"title": "MRT-004 « Réparer le service »",
+			"checks": [],
+			"not_testable": "Needs the runtime rebuild that ships the repair role, then an administrator bootout of a system job: rebuild the owned runtime first; the Swift and Lua parsers are unit-tested (test_runtime_service_repair)."
+		},
+		{
+			"id": "rerun_2026_11_02",
+			"title": "Rerun of the 2026-11-02 report",
+			"checks": [
+				{
+					"step": "field_log_signals",
+					"report": ["log_keystats_rotation_warnings", "log_digest_mismatches"]
+				},
+				{
+					"step": "field_event_taps",
+					"report": ["holds_over_1000ms"],
+					"max": 0
+				},
+				{
+					"step": "field_menu_build",
+					"report": ["menu_rebuild_ms", "menu_layout_slowest"]
+				},
+				{
+					"step": "diagnostics"
+				},
+				{
+					"step": "field_idle_cost",
+					"report": ["idle_cpu_percent"]
+				},
+				{
+					"step": "ollama_model"
+				}
+			],
+			"condition": "The midnight rotation is read only when the Mac stayed on across midnight before the run."
+		},
+		{
+			"id": "two_copies_accessibility",
+			"title": "Two copies and one Accessibility switch",
+			"checks": [
+				{
+					"step": "field_login_items",
+					"report": ["this_copy_known"]
+				},
+				{
+					"step": "field_permissions",
+					"report": ["accessibility", "bundle_id"]
+				},
+				{
+					"step": "guided_two_copies_accessibility"
+				}
+			],
+			"condition": "A build/macos copy registered beside the /Applications prerelease, in an --installed run (the signed dev prerelease)."
+		},
+		{
+			"id": "owned_install_launcher",
+			"title": "Owned runtime install through the launcher",
+			"checks": [
+				{
+					"step": "field_owned_install"
+				},
+				{
+					"step": "owned_install_reload"
+				}
+			],
+			"condition": "An --installed run (the signed dev prerelease) after the next runtime rebuild; the administrator prompt is its one human step."
+		},
+		{
+			"id": "managed_ollama_0406",
+			"title": "Managed Ollama 0.40.6",
+			"checks": [
+				{
+					"step": "field_ai_local",
+					"report": ["ollama_binary"]
+				},
+				{
+					"step": "field_network_hosts"
+				}
+			],
+			"condition": "Rebuilt with tools/build/build-macos-managed-ollama.py, behind a PAC-only or explicit proxy with no direct route."
+		},
+		{
+			"id": "physical_shortcut_delivery",
+			"title": "Physical shortcut delivery",
+			"checks": [],
+			"not_testable": "Code work, not a confirmation: keyboard_shortcuts.physical_delivery_available stays false until the delivery is built; the greyed row is closed on the macOS lane."
+		},
+		{
+			"id": "taphold_word_reset",
+			"title": "Tap-hold word reset",
+			"checks": [
+				{
+					"step": "field_tap_copy",
+					"report": ["copies_lost"]
+				},
+				{
+					"step": "guided_taphold_word_reset"
+				}
+			],
+			"condition": "Karabiner-Elements delivering the tagged F20 and the untagged application key."
+		},
+		{
+			"id": "ai_inline_autotype",
+			"title": "AI inline auto-type",
+			"checks": [
+				{
+					"step": "prediction_tooltip",
+					"report": ["prediction_shown"]
+				},
+				{
+					"step": "guided_ai_real_model"
+				}
+			],
+			"condition": "« Inline auto-type » on and a model installed."
+		},
+		{
+			"id": "api_entries_backup",
+			"title": "Backup of the API entries",
+			"checks": [],
+			"not_testable": "Waits on « Maintainer decisions pending »: deleting an entry deletes its Keychain item, so « its key still works » cannot hold today."
+		},
+		{
+			"id": "onboarding_number_row",
+			"title": "Onboarding number-row order",
+			"checks": [
+				{
+					"step": "field_layout_rows",
+					"report": ["rows_build"]
+				},
+				{
+					"step": "guided_number_row"
+				}
+			]
+		},
+		{
+			"id": "owned_ollama_pulls",
+			"title": "Owned Ollama starts and pulls",
+			"checks": [
+				{
+					"step": "field_ai_local",
+					"report": ["ollama_listing"]
+				},
+				{
+					"step": "ollama_model"
+				}
+			]
+		},
+		{
+			"id": "test_models",
+			"title": "Test models",
+			"checks": [
+				{
+					"step": "ollama_model"
+				},
+				{
+					"step": "mlx_model"
+				}
+			],
+			"condition": "A connection that does not count."
+		},
+		{
+			"id": "timed_reload",
+			"title": "Timed reload under 4000 ms",
+			"checks": [
+				{
+					"step": "driver_reload",
+					"field": "reload_ms",
+					"max": 4000
+				}
+			]
+		},
+		{
+			"id": "remap_guardian",
+			"title": "Remap guardian",
+			"checks": [
+				{
+					"step": "field_login_items",
+					"report": ["guardian_registration"]
+				},
+				{
+					"step": "field_app_health",
+					"report": ["app_crash_reports_since_start"]
+				},
+				{
+					"step": "field_lease",
+					"report": ["guardian_state", "guardian_wait"]
+				}
+			],
+			"condition": "A Mac that holds an earlier build's Background Items record.",
+			"not_testable": "The same on an Intel Mac needs a second Mac: run the report there too."
+		},
+		{
+			"id": "main_thread_holds",
+			"title": "Main-thread holds (L16, L17, L18, L23)",
+			"checks": [
+				{
+					"step": "field_menu_build",
+					"report": ["menu_layout_slowest"]
+				},
+				{
+					"step": "field_slow_lines",
+					"report": [
+						"slow_hold_phase",
+						"slow_preferences_save_stage",
+						"slow_preferences_save_forks",
+						"slow_ingest_stage",
+						"worst_hold_site",
+						"slow_diagnostics_collector",
+						"slow_ignored_window_stage"
+					]
+				},
+				{
+					"step": "field_storage",
+					"report": ["keystats_start_ms"],
+					"max": 100
+				}
+			]
+		},
+		{
+			"id": "l24_key_events",
+			"title": "L24 key events",
+			"checks": [
+				{
+					"step": "field_lease",
+					"report": ["key_losses", "swallowed_keys"]
+				}
+			]
+		},
+		{
+			"id": "l32_memory",
+			"title": "L32 memory",
+			"checks": [
+				{
+					"step": "field_app_health",
+					"report": ["memory_footprint_mb", "lua_heap_mb"]
+				}
+			]
+		},
+		{
+			"id": "l42_off_company_network",
+			"title": "L42 off the company network",
+			"checks": [
+				{
+					"step": "field_network",
+					"report": ["pac_download", "pac_script", "route_lookup"]
+				}
+			],
+			"condition": "Off the company network (expected info:unreachable_direct, skip:not_fetched, pass:selected:direct)."
+		},
+		{
+			"id": "l43_karabiner_signature",
+			"title": "L43 Karabiner signature",
+			"checks": [
+				{
+					"step": "field_toolchain",
+					"report": ["karabiner_signature"]
+				}
+			]
+		},
+		{
+			"id": "item_116_toolchain",
+			"title": "Item 116 toolchain",
+			"checks": [
+				{
+					"step": "field_toolchain",
+					"report": ["shortcuts_cli", "brew_present", "karabiner_signature", "karabiner_gatekeeper"]
+				}
+			]
+		},
+		{
+			"id": "composer_l52",
+			"title": "Composer (L52)",
+			"checks": [
+				{
+					"step": "field_composer"
+				}
+			]
+		},
+		{
+			"id": "keystats_cache",
+			"title": "Keystats cache place",
+			"checks": [
+				{
+					"step": "field_storage",
+					"report": ["keystats_cache_place"]
+				}
+			]
+		},
+		{
+			"id": "lease_117_140",
+			"title": "Karabiner lease 117/140",
+			"checks": [
+				{
+					"step": "field_lease",
+					"report": ["lease_failure_kinds", "memory_free_percent"]
+				}
+			]
+		},
+		{
+			"id": "lease_deploy_write",
+			"title": "Lease deploy write",
+			"checks": [
+				{
+					"step": "field_lease",
+					"report": ["deploy_write_verdict"]
+				}
+			]
+		},
+		{
+			"id": "owned_karabiner_runtime",
+			"title": "Owned Karabiner runtime",
+			"checks": [
+				{
+					"step": "field_owned_runtime"
+				},
+				{
+					"step": "field_owned_start"
+				},
+				{
+					"step": "field_owned_pause"
+				}
+			],
+			"condition": "field_owned_start needs an --installed run (the signed dev prerelease); the next run's field_owned_start proves close-on-resume."
+		},
+		{
+			"id": "layout_rows",
+			"title": "Layout rows M4 to M6",
+			"checks": [
+				{
+					"step": "field_layout_rows",
+					"report": ["rows_build", "rows_replace", "rows_restore"]
+				}
+			]
+		},
+		{
+			"id": "apple_shortcuts",
+			"title": "Apple Shortcuts (106) and its actions",
+			"checks": [
+				{
+					"step": "field_apple_shortcuts",
+					"report": ["field_test_run"]
+				}
+			],
+			"condition": "A no-op shortcut named Ergopti Field Test in Shortcuts (created once)."
+		},
+		{
+			"id": "pac_unusable",
+			"title": "PAC unusable on a network whose PAC is unreachable",
+			"checks": [
+				{
+					"step": "field_pac_fallback",
+					"report": ["pac_fallback_outcome"]
+				},
+				{
+					"step": "ollama_model"
+				},
+				{
+					"step": "mlx_runtime"
+				}
+			],
+			"condition": "A network whose PAC is unreachable."
+		},
+		{
+			"id": "ollama_real_pac",
+			"title": "Ollama behind a real PAC",
+			"checks": [
+				{
+					"step": "field_ollama_blob_host",
+					"report": ["blob_host", "blob_range"]
+				},
+				{
+					"step": "field_network"
+				}
+			],
+			"condition": "A network that serves a PAC."
+		},
+		{
+			"id": "log_only_20261030",
+			"title": "Log-only checks of the 2026-10-30 report",
+			"checks": [
+				{
+					"step": "field_slow_lines",
+					"report": [
+						"log_shortcuts_still_unregistered",
+						"log_keystats_database_locked",
+						"log_lease_bound_failures",
+						"log_layout_change_before_baseline"
+					]
+				}
+			]
+		},
+		{
+			"id": "layout_emulation",
+			"title": "Layout emulation",
+			"checks": [
+				{
+					"step": "guided_layout_emulation"
+				}
+			]
+		},
+		{
+			"id": "hotstrings_asa",
+			"title": "Hotstrings (asa) and ordinary hotstrings",
+			"checks": [
+				{
+					"step": "guided_asa_held_key"
+				},
+				{
+					"step": "hotstring_roundtrip"
+				},
+				{
+					"step": "guided_hotstrings_apps"
+				}
+			]
+		},
+		{
+			"id": "omlx_8181",
+			"title": "oMLX on port 8181",
+			"checks": [
+				{
+					"step": "field_local_servers",
+					"report": ["servers_sweep"]
+				}
+			],
+			"condition": "oMLX running in API mode on port 8181."
+		},
+		{
+			"id": "l46_gestures",
+			"title": "L46 gestures without an explicit swipe_3 sensitivity",
+			"checks": [
+				{
+					"step": "field_gesture_frames"
+				},
+				{
+					"step": "field_log_signals",
+					"report": ["log_capture_stamp_errors", "log_three_finger_rejections"]
+				},
+				{
+					"step": "guided_three_finger_swipes"
+				},
+				{
+					"step": "guided_swipe_tabs"
+				}
+			],
+			"condition": "No explicit [gestures.sensitivities] swipe_3 value."
+		},
+		{
+			"id": "ctrl_capslock",
+			"title": "Ctrl+Caps Lock",
+			"checks": [
+				{
+					"step": "guided_capslock_chord"
+				},
+				{
+					"step": "field_capslock_chord"
+				}
+			]
+		},
+		{
+			"id": "dropped_letters",
+			"title": "Dropped letters",
+			"checks": [
+				{
+					"step": "field_lease",
+					"report": ["swallowed_keys"]
+				},
+				{
+					"step": "key_accounting"
+				}
+			],
+			"condition": "Run after a day of typing in Safari, TextEdit, Terminal, VS Code and an Electron app.",
+			"not_testable": "« Debug > Report a bug right when a letter disappears » happens when it happens, not during a run."
+		},
+		{
+			"id": "production_profile",
+			"title": "Production profile",
+			"checks": [
+				{
+					"step": "field_boot_cost"
+				},
+				{
+					"step": "field_idle_cost"
+				},
+				{
+					"step": "field_slow_lines"
+				}
+			],
+			"condition": "Run after a working day.",
+			"not_testable": "Three cold starts and one after a login need restarts the run cannot survive: their Boot complete lines are read from the day log by the analysis."
+		},
+		{
+			"id": "refused_taps_rollbacks",
+			"title": "Event taps refused, hotstring reload rolled back, MLX 404, screenshot without image",
+			"checks": [
+				{
+					"step": "field_event_taps"
+				},
+				{
+					"step": "field_permissions",
+					"report": ["accessibility"]
+				},
+				{
+					"step": "field_log_signals",
+					"report": ["log_start_rollbacks"]
+				}
+			],
+			"condition": "Read on the next occurrence: a clean run proves only that none happened today."
+		},
+		{
+			"id": "window_toggles",
+			"title": "Ten window-toggle actions",
+			"checks": [
+				{
+					"step": "field_log_signals",
+					"report": ["log_window_toggle_errors"]
+				},
+				{
+					"step": "guided_window_toggle"
+				}
+			]
+		},
+		{
+			"id": "menus",
+			"title": "Menus",
+			"checks": [
+				{
+					"step": "field_menu_build"
+				},
+				{
+					"step": "guided_menus"
+				}
+			]
+		},
+		{
+			"id": "typing",
+			"title": "Typing",
+			"checks": [
+				{
+					"step": "guided_typing"
+				}
+			]
+		},
+		{
+			"id": "ai_real_model",
+			"title": "AI with a real local model",
+			"checks": [
+				{
+					"step": "prediction_tooltip"
+				},
+				{
+					"step": "guided_ai_real_model"
+				}
+			],
+			"condition": "A local model installed."
+		},
+		{
+			"id": "network_updates",
+			"title": "Network and updates",
+			"checks": [
+				{
+					"step": "field_network"
+				},
+				{
+					"step": "guided_network_updates"
+				}
+			],
+			"not_testable": "The office network and home are two places: one run tests the network it is on; a Sparkle update needs a newer release published."
+		},
+		{
+			"id": "pages_light_dark",
+			"title": "Pages in light and dark, onboarding, App Cloner errors, quit while busy",
+			"checks": [
+				{
+					"step": "guided_pages_light_dark"
+				}
+			]
+		},
+		{
+			"id": "issue_100_99",
+			"title": "Issues 100 and 99",
+			"checks": [
+				{
+					"step": "field_lease",
+					"report": ["memory_free_percent", "lease_failure_kinds"]
+				},
+				{
+					"step": "field_login_items"
+				},
+				{
+					"step": "guided_issue_100_99"
+				}
+			],
+			"condition": "Ollama.app and a PAC proxy."
+		},
+		{
+			"id": "installed_app",
+			"title": "Installed app (guardian, VS Code bridge, 120 provider menu, issue 94)",
+			"checks": [
+				{
+					"step": "field_login_items",
+					"report": ["guardian_registration"]
+				},
+				{
+					"step": "guided_installed_app"
+				}
+			],
+			"condition": "An --installed run (the signed dev prerelease).",
+			"not_testable": "Both architectures need an Intel Mac besides this one."
+		},
+		{
+			"id": "app_cloner",
+			"title": "App Cloner without the Command Line Tools",
+			"checks": [],
+			"not_testable": "Needs a Mac without the Command Line Tools, which this collector itself requires: run it by hand on such a Mac."
+		},
+		{
+			"id": "vhid_offer",
+			"title": "VirtualHIDDevice offer",
+			"checks": [
+				{
+					"step": "field_owned_runtime",
+					"report": ["driver_verdict"]
+				}
+			],
+			"not_testable": "Needs a Mac whose active driver is older than 8.5.0; field_owned_runtime names the version this Mac has."
+		},
+		{
+			"id": "scpt_recompile",
+			"title": "AppleScript recompile on the field branch",
+			"checks": [
+				{
+					"collector": "scpt_recompile"
+				}
+			]
+		},
+		{
+			"id": "predictions_stop",
+			"title": "Predictions stop on activity",
+			"checks": [
+				{
+					"step": "guided_prediction_activity"
+				},
+				{
+					"step": "field_log_signals",
+					"report": ["log_prediction_activity_cancels"]
+				},
+				{
+					"step": "guided_prediction_stop_hands"
+				}
+			]
+		},
+		{
+			"id": "input_policies",
+			"title": "Branch wave3/input-policies: native one-shot Shift and CapsWord payloads",
+			"checks": [
+				{
+					"step": "guided_input_policies"
+				}
+			]
+		}
+	]
+}
