@@ -132,17 +132,10 @@ var LayoutEditorPage = (function () {
 		return entry ? t(entry.label_key) : id;
 	}
 
-	// How key names read: the OS being edited, and the base layer's characters
-	// as the legends of character keys (set by each render).
+	// How key names read: the OS scope being edited, else the host's OS, else
+	// OS-neutral names (the website states no OS); the base layer's characters
+	// are the legends of character keys (set by each render).
 	let keyView = null;
-
-	/** The OS the browser runs on, for key glyphs when no OS scope is chosen. */
-	function browserPlatform() {
-		const platform = String((navigator.userAgentData || {}).platform || navigator.platform || '');
-		if (/mac/i.test(platform)) return 'macos';
-		if (/win/i.test(platform)) return 'windows';
-		return 'linux';
-	}
 
 	function keyName(code) {
 		return keyView ? LayerModel.keyLegend(code, keyView) : code;
@@ -156,7 +149,7 @@ var LayoutEditorPage = (function () {
 			for (const [code, mapping] of Object.entries(base.keys))
 				if (typeof mapping.text === 'string' && mapping.text !== '')
 					legends[code] = visible(mapping.text);
-		return { os: platform || browserPlatform(), data: LAYER_EDITOR_DATA, t, legends };
+		return { os: platform, data: LAYER_EDITOR_DATA, t, legends };
 	}
 
 	/** The translated refusal of an edit or a file. */
@@ -1508,7 +1501,7 @@ var LayoutEditorPage = (function () {
 		// ============================
 
 		function render() {
-			keyView = makeKeyView(doc(), state.platform);
+			keyView = makeKeyView(doc(), state.platform || host.platform || null);
 			root.replaceChildren(
 				el('header', { class: 'le-header' }, [
 					el('h1', { text: tl('title') }),
