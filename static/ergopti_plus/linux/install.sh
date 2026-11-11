@@ -1307,7 +1307,7 @@ fi
 # previous receipt owned and the new one does not, when its bytes still match;
 # a file the user changed is kept, as uninstall.sh keeps it.
 prune_retired_payload() {
-	local current="$1" library_physical row digest relative owned parent actual
+	local current="$1" prior_receipt="${LIB_DIR}/.ergopti-owned-files" library_physical row digest relative owned parent actual
 	local -A shipped=()
 	library_physical="$(cd -- "$LIB_DIR" && pwd -P)" || return 1
 	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
@@ -1317,7 +1317,7 @@ prune_retired_payload() {
 		digest="${row%%$'\t'*}"
 		relative="${row#*$'\t'}"
 		if [[ ! "$digest" =~ ^[0-9a-f]{64}$ ]] || [ "$relative" = "$row" ]; then
-			printf '[install] code=prior-receipt-invalid path=%q\n' "${LIB_DIR}/.ergopti-owned-files" >&2
+			printf '[install] code=prior-receipt-invalid path=%q\n' "$prior_receipt" >&2
 			return 1
 		fi
 		case "$relative" in
