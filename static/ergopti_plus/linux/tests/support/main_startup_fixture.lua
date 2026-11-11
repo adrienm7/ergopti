@@ -115,11 +115,14 @@ function M.run(options)
 		output_broker = function() return {} end,
 		emit_key = noop,
 	}
+	local function layout_refresh()
+		observed.layout_refreshes = observed.layout_refreshes + 1
+		record("layout.refresh"); native_callback("layout.refresh"); return true
+	end
 	env.keyboard_layout = {
-		refresh = function()
-			observed.layout_refreshes = observed.layout_refreshes + 1
-			record("layout.refresh"); native_callback("layout.refresh"); return true
-		end,
+		refresh = layout_refresh,
+		-- The pre-grab resolve: the same boundary, proven or dumped again.
+		refresh_unless_current = layout_refresh,
 		is_ready = function() return true end,
 		publish_current_capture = function()
 			observed.preparing = true
