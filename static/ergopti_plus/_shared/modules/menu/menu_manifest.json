@@ -1704,6 +1704,28 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_owned_service_stopped_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_service_stopped",
+			"i18n": "menu.tapholds.owned_service_stopped",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_repair_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_owned_repair",
+			"i18n": "menu.tapholds.owned_repair",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_owned_other_running_rows": [
 		{
 			"type": "label",

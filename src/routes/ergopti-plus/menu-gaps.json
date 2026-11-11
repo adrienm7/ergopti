@@ -571,6 +571,22 @@
 		}
 	},
 	{
+		"path": "tap_hold_owned_repair_rows.tap_hold_owned_repair",
+		"visibility": "hide",
+		"labels": { "fr": "Réparer le service…", "en": "Repair the service…" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
+				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
+			},
+			"linux": {
+				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
+				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
+			}
+		}
+	},
+	{
 		"path": "metrics_menu.metrics_availability",
 		"visibility": "hide",
 		"labels": { "fr": "metrics_availability", "en": "metrics_availability" },

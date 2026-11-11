@@ -16,15 +16,40 @@ import Security
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled` when the prompt was closed (exit 1);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>[|<step>]` when the administrator shell failed (exit 75),
 ///   with the staged program's failing step when it named one.
+///
+/// `--request-owned-runtime-repair` runs the same staged helper's service repair (`--owned-repair-service`,
+/// OwnedRuntimeServiceRepairEntry) for an already published Runtime (MRT-004), with the same lines under the
+/// `OWNED_RUNTIME_REPAIR` and `OWNED_RUNTIME_REPAIR_REQUEST` kinds. It installs no driver package: a Mac without
+/// pqrs' daemon is refused before the prompt and keeps the first install's route.
 enum OwnedRuntimeInstallMainOperation {
+	/// The two transactions this role stages the helper for.
+	enum Mode {
+		case install, repair
+		var flag: String { self == .install ? OwnedRuntimeInstallMainOperation.flag : OwnedRuntimeInstallMainOperation.repairFlag }
+		/// The helper's argument.
+		var helperArgument: String { self == .install ? "--owned-install-first" : OwnedRuntimeServiceRepairEntry.argument }
+		/// The helper's closed result values (OwnedRuntimeIdleServiceEntry.Result, OwnedRuntimeServiceRepairEntry.Result).
+		var helperResults: Set<String> {
+			self == .install ? OwnedRuntimeInstallMainOperation.helperResults : ["service-repaired-observed", "service-repair-pending"]
+		}
+		/// The kind of the helper's relayed line, and of this role's own lines.
+		var helperKind: String { self == .install ? "OWNED_RUNTIME_INSTALL" : "OWNED_RUNTIME_REPAIR" }
+		var requestKind: String { helperKind + "_REQUEST" }
+		var logName: String { self == .install ? "owned runtime install" : "owned runtime service repair" }
+	}
 	static let flag = "--request-owned-runtime-install"
+	static let repairFlag = "--request-owned-runtime-repair"
 	/// The helper's two closed result values (OwnedRuntimeIdleServiceEntry.Result).
 	static let helperResults: Set<String> = ["files-published-services-observed-staging-retired", "files-published-service-cleanup-pending"]
 	private static let installerExecutable = "Contents/MacOS/ErgoptiPlus-Runtime-Installer"
 	/// AppleScript's error number for a prompt the user closed.
 	private static let userCancelled = -128
 
-	static func handles(arguments: [String]) -> Bool { arguments.count == 2 && arguments[1] == flag }
+	static func mode(arguments: [String]) -> Mode? {
+		guard arguments.count == 2 else { return nil }
+		return arguments[1] == flag ? .install : arguments[1] == repairFlag ? .repair : nil
+	}
+	static func handles(arguments: [String]) -> Bool { mode(arguments: arguments) != nil }
 
 	/// The `cdhash` of each architecture slice the helper carries, for the staged copy's requirement. The
 	/// requirement language compares the 20-byte truncated hash, and `codesign --all-architectures` checks every
@@ -83,9 +108,9 @@ enum OwnedRuntimeInstallMainOperation {
 		do { try FileHandle.standardOutput.write(contentsOf: Data((line + "\n").utf8)) } catch { return 75 }
 		return status
 	}
-	private static func refuse(_ reason: String, _ explanation: String) -> Int32 {
-		LauncherLog.write("owned runtime install: refused (\(reason)): \(explanation).")
-		return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|refused|" + reason, 77)
+	private static func refuse(_ reason: String, _ explanation: String, mode: Mode = .install) -> Int32 {
+		LauncherLog.write("\(mode.logName): refused (\(reason)): \(explanation).")
+		return answer(mode.requestKind + "|1|refused|" + reason, 77)
 	}
 	private static func hex(_ bytes: some Sequence<UInt8>) -> String { bytes.map { String(format: "%02x", $0) }.joined() }
 
@@ -110,7 +135,8 @@ enum OwnedRuntimeInstallMainOperation {
 
 	/// Deliberate signed Main CLI request, off the main thread (the AppleScript prompt runs here).
 	static func run(arguments: [String]) -> Int32 {
-		guard handles(arguments: arguments), !Thread.isMainThread, getuid() != 0, getuid() == geteuid() else { return 64 }
+		guard let mode = Self.mode(arguments: arguments), !Thread.isMainThread, getuid() != 0, getuid() == geteuid() else { return 64 }
+		func refuse(_ reason: String, _ explanation: String) -> Int32 { Self.refuse(reason, explanation, mode: mode) }
 		guard let publisher = OwnedRuntimePublisherIdentity.currentLauncher(), publisher.current() else {
 			return refuse("launcher_unsigned", "this launcher carries no stable Ergopti signature to vouch for the installer helper")
 		}
@@ -122,8 +148,12 @@ enum OwnedRuntimeInstallMainOperation {
 		}
 		// pqrs' driver package, when no pqrs daemon is installed yet: the Lua install port downloaded and
 		// verified it (runtime_vhid_update.lua fetch), and this same shell checks it again before the helper.
+		// A service repair installs no package: without the daemon there is no job to repair.
 		var driverStep = ""
-		if !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
+		if mode == .repair && !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
+			return refuse("driver_absent", "no VirtualHIDDevice daemon is installed, so the first install must run instead")
+		}
+		if mode == .install && !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
 			guard let package = OwnedRuntimeDownloadedHelper.currentDriverPackage() else {
 				return refuse("driver_package_absent", "no verified VirtualHIDDevice package is kept for the driver install")
 			}
@@ -162,7 +192,7 @@ enum OwnedRuntimeInstallMainOperation {
 				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
 				// The helper retires its own stage on success; any other exit leaves a copy only this shell can remove.
 				driverStep + "task_step=helper; task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
-					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " --owned-install-first) || task_status=$?; "
+					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " " + mode.helperArgument + ") || task_status=$?; "
 					+ "if [ -d \(directory) ] && [ ! -L \(directory) ]; then /bin/rm -rf \(directory); fi; "
 					+ "printf '%s\\n' \"$task_line\"; exit \"$task_status\""
 			}
@@ -174,28 +204,38 @@ enum OwnedRuntimeInstallMainOperation {
 				+ OwnedVirtualHIDDaemonReportMainOperation.quote(program)) + " with administrator privileges") else {
 			return refuse("launcher_changed", "this launcher's signature changed before the administrator prompt")
 		}
-		LauncherLog.write("owned runtime install: asking for the administrator prompt.")
+		LauncherLog.write("\(mode.logName): asking for the administrator prompt.")
 		var error: NSDictionary?
 		let output = script.executeAndReturnError(&error)
 		if let error {
 			let number = error[NSAppleScript.errorNumber] as? Int ?? 0
 			if number == userCancelled {
-				LauncherLog.write("owned runtime install: the administrator prompt was cancelled.")
-				return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled", 1)
+				LauncherLog.write("\(mode.logName): the administrator prompt was cancelled.")
+				return answer(mode.requestKind + "|1|cancelled", 1)
 			}
 			let message = error[NSAppleScript.errorMessage] as? String ?? ""
 			let step = failedStep(message)
-			LauncherLog.write("owned runtime install: the administrator shell failed with status \(number) at step "
+			LauncherLog.write("\(mode.logName): the administrator shell failed with status \(number) at step "
 				+ (step ?? "unnamed") + ": " + oneLine(message) + ".")
-			return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|failed|" + String(number) + (step.map { "|" + $0 } ?? ""), 75)
+			return answer(mode.requestKind + "|1|failed|" + String(number) + (step.map { "|" + $0 } ?? ""), 75)
 		}
 		let line = (output.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-		let prefix = "OWNED_RUNTIME_INSTALL|1|"
-		guard line.hasPrefix(prefix), helperResults.contains(String(line.dropFirst(prefix.count))) else {
-			LauncherLog.write("owned runtime install: the helper answered no closed result line.")
-			return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|failed|unanswered", 75)
+		guard let relayed = relayedLine(line, mode: mode) else {
+			LauncherLog.write("\(mode.logName): the helper answered no closed result line.")
+			return answer(mode.requestKind + "|1|failed|unanswered", 75)
 		}
-		LauncherLog.write("owned runtime install: the helper answered \(line).")
-		return answer(line, 0)
+		LauncherLog.write("\(mode.logName): the helper answered \(relayed).")
+		return answer(relayed, 0)
+	}
+
+	/// The helper's closed result line for this mode, or nil for anything else (another mode's line included).
+	/// - Parameters:
+	///   - line: The administrator shell's output, trimmed.
+	///   - mode: The transaction this role ran.
+	/// - Returns: The line to relay unchanged.
+	static func relayedLine(_ line: String, mode: Mode) -> String? {
+		let prefix = mode.helperKind + "|1|"
+		guard line.hasPrefix(prefix), mode.helperResults.contains(String(line.dropFirst(prefix.count))) else { return nil }
+		return line
 	}
 }

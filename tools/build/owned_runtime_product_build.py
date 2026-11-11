@@ -97,6 +97,8 @@ IDLE_CORE_SWIFT_SOURCES = tuple(
         "CorePlistCustody",
         "CoreExitObservation",
         "VirtualHIDProvisionOwner",
+        # MRT-004: the service repair of an already published Runtime.
+        "ServiceRepairEntry",
     )
 )
 REPORT_C_SOURCES = (

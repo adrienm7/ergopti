@@ -158,7 +158,34 @@ final class OwnedRuntimeCoreProvisionOwner {
 		try verifyForPlistCustody()
 		let absent = try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", Self.target])
 		guard absent.status == 113 else { OwnedRuntimeInstallTrail.note("core-print-" + String(absent.status)); throw OwnedRuntimeInstallFailure.traced(.destination) }
-		let custody = try OwnedRuntimeCorePlistCustody.createProduction(owner: self); self.custody = custody
+		return try startCore(adoptExisting: false)
+	}
+	/// Service repair of an already published Runtime (MRT-004): the same start as the first install's, from the
+	/// exact owned plist when it is already on disk. A loaded Core job is left as it is and answers nil. The
+	/// first-start fence is unchanged: the Core starts only while its system `core.json` is absent, which Ergopti
+	/// never writes (it writes the console user's configuration), and a present one is never moved or removed.
+	func repairAndStartCore() throws -> OwnedRuntimeCoreServiceOwner? {
+		guard !Thread.isMainThread else { throw OwnedRuntimeInstallFailure.traced(.principal) }
+		lock.lock(); defer { lock.unlock() }
+		guard !serviceTouched, !committed, custody == nil else { throw OwnedRuntimeInstallFailure.traced(.destination) }
+		try verifyForPlistCustody()
+		let observed = try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", Self.target])
+		if observed.status == 0 { OwnedRuntimeInstallTrail.note("core-already-loaded"); return nil }
+		guard observed.status == 113 else { OwnedRuntimeInstallTrail.note("core-print-" + String(observed.status)); throw OwnedRuntimeInstallFailure.traced(.destination) }
+		return try startCore(adoptExisting: true)
+	}
+	/// Whether this provision created or adopted a Core plist custody.
+	func holdsPlistCustody() -> Bool { lock.lock(); defer { lock.unlock() }; return custody != nil }
+	/// Whether a Core service step already ran, so a failure leaves service debt rather than a clean refusal.
+	func touchedService() -> Bool { lock.lock(); defer { lock.unlock() }; return serviceTouched }
+	/// Releases a repair's observations when it touched no Core service (the Core job was already loaded).
+	func retireUntouchedObservations() -> Bool {
+		lock.lock(); defer { lock.unlock() }
+		guard !serviceTouched, !committed, custody == nil else { return false }
+		do { try verifyForPlistCustody(); return closeOwnedObservations() } catch { return false }
+	}
+	private func startCore(adoptExisting: Bool) throws -> OwnedRuntimeCoreServiceOwner {
+		let custody = try OwnedRuntimeCorePlistCustody.createProduction(owner: self, adoptExisting: adoptExisting); self.custody = custody
 		try custody.prepare()
 		try Self.prepareDirectories(parent: Self.dataURL.deletingLastPathComponent(), protected: true, admission: { try self.verifyForPlistCustody() })
 		try verifyForPlistCustody(); try requireConfigurationAbsence()

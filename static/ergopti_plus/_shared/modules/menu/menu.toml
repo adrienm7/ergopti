@@ -1523,6 +1523,23 @@ i18n = "menu.tapholds.owned_install"
 platforms = ["hs"]
 unavailable = "hide"
 
+# An already published runtime whose service is not loaded (MRT-004): the
+# first install refuses an existing runtime by design, so this block offers
+# « Réparer le service », a confirmation, then the administrator prompt.
+[[menu.tap_hold_owned_service_stopped_rows]]
+type = "label"
+id = "tap_hold_owned_service_stopped"
+i18n = "menu.tapholds.owned_service_stopped"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_owned_repair_rows]]
+type = "command"
+id = "tap_hold_owned_repair"
+i18n = "menu.tapholds.owned_repair"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_owned_other_running_rows]]
 type = "label"
 id = "tap_hold_owned_other_running"

@@ -10,6 +10,7 @@
 	"tap_hold_close_other_karabiner_rows": "platform_reason.remap_engine_is_per_driver",
 	"tap_hold_vhid_update_rows": "platform_reason.remap_engine_is_per_driver",
 	"tap_hold_owned_install_rows": "platform_reason.remap_engine_is_per_driver",
+	"tap_hold_owned_repair_rows": "platform_reason.remap_engine_is_per_driver",
 	"gestures_menu": "platform_reason.touchpad_stack_is_per_driver",
 	"gesture_slot_mode_commands": "platform_reason.touchpad_stack_is_per_driver",
 	"gesture_change_action": "platform_reason.touchpad_stack_is_per_driver",
