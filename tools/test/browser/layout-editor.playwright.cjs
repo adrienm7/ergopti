@@ -119,7 +119,14 @@ async function exerciseManager(browser, origin) {
 		'that host keeps the composer'
 	);
 	await page.evaluate(
-		(state) => window.initData({ strings: {}, state, source_editor: true, source_pick: true }),
+		(state) =>
+			window.initData({
+				strings: {},
+				state,
+				source_editor: true,
+				source_pick: true,
+				nav_apply: true
+			}),
 		state
 	);
 	assert.equal(
@@ -173,6 +180,26 @@ async function exerciseManager(browser, origin) {
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_pick'));
 	await page.evaluate((text) => window.sourcePicked({ filename: 'mine.toml', text }), posted.text);
 	assert.match(await page.textContent('#le-message'), /mine\.toml/);
+
+	// The source's navigation layer applies through the host's navigation layer save.
+	await page.selectOption('#le-nav-hold', 'CapsLock');
+	await page.setInputFiles('#le-nav-file', NAV);
+	await page.waitForSelector('[data-layer="nav"].active');
+	await page.click('#le-apply-nav');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'nav_save'));
+	const nav = await page.evaluate(() => window.__posted.find((p) => p.action === 'nav_save'));
+	assert.match(nav.text, /\[layers\.nav\.all\]/);
+	await page.evaluate(() => window.navResult({ saved: true, applied: true, errors: [] }));
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.nav_applied']);
+	await page.click('#le-apply-nav');
+	await page.evaluate(() =>
+		window.navResult({
+			saved: false,
+			applied: false,
+			errors: [{ code: 'unknown_action', detail: 'KeyA' }]
+		})
+	);
+	assert.match(await page.textContent('#le-message'), /unknown_action/);
 
 	// « Install and use » goes through the composer host with the source and its compiled layout.
 	await page.click('#le-install');

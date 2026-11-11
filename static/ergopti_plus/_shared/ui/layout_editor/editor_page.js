@@ -2135,6 +2135,32 @@ var LayoutEditorPage = (function () {
 					})
 				);
 			if (host.install) buttons.push(installButton(report));
+			// The driver applies the navigation layer through its navigation layer editor's save.
+			if (host.applyNav && (doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
+				buttons.push(
+					el('button', {
+						type: 'button',
+						id: 'le-apply-nav',
+						text: tl('btn.apply_nav'),
+						onclick: () => {
+							let text;
+							try {
+								text = LayoutSourceIO.navLayerFile(doc(), data);
+							} catch (error) {
+								notify('error', problemText(error));
+								return;
+							}
+							Promise.resolve(host.applyNav(text)).then(
+								(result) =>
+									notify(
+										result && result.applied ? 'ok' : 'error',
+										tl(result && result.applied ? 'status.nav_applied' : 'status.nav_not_applied')
+									),
+								(error) => notify('error', problemText(error))
+							);
+						}
+					})
+				);
 			if ((doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
 				buttons.push(
 					el('button', {
