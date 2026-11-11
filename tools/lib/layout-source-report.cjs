@@ -16,15 +16,25 @@ const { loadLayoutSource } = require('./layout-source.cjs');
 const { exportXkb } = require('./layout-source-xkb.cjs');
 const { exportKlc } = require('./layout-source-klc.cjs');
 
-/** Run target admission before claiming an artifact can be produced. */
-function targetReport(document) {
+/**
+ * Run target admission before claiming an artifact can be produced.
+ * @param {object} document - A validated source.
+ * @param {object} [icons] - PNG file name -> bytes for the macOS bundle icons.
+ */
+function targetReport(document, icons) {
 	const source = loadLayoutSource();
 	const reports = source.capabilities(document);
 	// A structured source compiles through the shared generator; a preserved import
 	// keeps the pure model's verdict on its original .keylayout.
 	const macos = document.imported_keylayout
 		? []
-		: [{ target: 'macos', artifact: 'bundle', compile: (doc) => source.exportMacos(doc) }];
+		: [
+				{
+					target: 'macos',
+					artifact: 'bundle',
+					compile: (doc) => source.exportMacos(doc, undefined, icons)
+				}
+			];
 	for (const { target, artifact, compile } of [
 		...macos,
 		{ target: 'linux', artifact: 'xkb', compile: exportXkb },
