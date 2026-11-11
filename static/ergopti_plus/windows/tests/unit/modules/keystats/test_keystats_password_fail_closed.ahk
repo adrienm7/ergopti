@@ -268,6 +268,64 @@ _KLPW_ResidentProbeDelegatesToDisposableWorker() {
 Test("Keystats password: UIA faults stay inside the disposable worker (password-uia-process-isolation)",
 	_KLPW_ResidentProbeDelegatesToDisposableWorker)
 
+; A detector one-shot that lands while the driver is suspended must run no
+; Win32 or UIA round-trip and must release the scheduler latch, or every later
+; schedule for the same field is deduped and its typing stays dropped from the
+; metrics after resume (async-password-detect-suspend,
+; async-password-detect-suspend-latch). The resumed delivery is the positive
+; control: the same call then reaches the worker.
+_KLPW_SuspendedDetectRunsNothing() {
+	global _KLPW_WorkerRequest
+	SavedCache := _KLPW_CacheSnapshot()
+	WasSuspended := A_IsSuspended
+	Probes := {Hwnd: 0, Context: 0, Start: 0}
+	Hwnd := 702
+	CurrentHwnd(*) {
+		Probes.Hwnd += 1
+		return Hwnd
+	}
+	CurrentContext(*) {
+		Probes.Context += 1
+		return _KLPW_WorkerContext()
+	}
+	StartWorker(*) {
+		Probes.Start += 1
+		return true
+	}
+	try {
+		_KLPW_WorkerRequest := 0
+		KLPasswordCache.focus_tracking_active := true
+		KLPasswordCache.focus_generation := 212
+		KLPasswordCache.pending_hwnd := Hwnd
+		KLPasswordCache.pending_focus_generation := 212
+
+		Suspend(true)
+		AssertFalse(KL_AsyncPasswordDetect(Hwnd, 212, CurrentHwnd, CurrentContext,
+			_KLPW_CaptureWorkerRequest, StartWorker),
+			"a detector delivered while suspended must not report a dispatch")
+		AssertEqual(0, _KLPW_WorkerRequest, "a detector delivered while suspended must not reach the worker")
+		AssertEqual(0, Probes.Hwnd + Probes.Context + Probes.Start,
+			"a detector delivered while suspended must run no focus, context or worker round-trip")
+		AssertEqual(0, KLPasswordCache.pending_hwnd,
+			"the suspended abort must release the scheduler latch so a later schedule can re-arm")
+
+		Suspend(false)
+		KLPasswordCache.pending_hwnd := Hwnd
+		KLPasswordCache.pending_focus_generation := 212
+		AssertTrue(KL_AsyncPasswordDetect(Hwnd, 212, CurrentHwnd, CurrentContext,
+			_KLPW_CaptureWorkerRequest, StartWorker),
+			"positive control: the same delivery dispatches once the driver resumes")
+		AssertTrue(_KLPW_WorkerRequest is Map, "positive control: the resumed delivery reaches the worker")
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		_KLPW_WorkerRequest := 0
+		_KLPW_RestoreCache(SavedCache)
+	}
+}
+Test("Keystats password: a suspended detector runs nothing and releases its latch (async-password-detect-suspend-latch)",
+	_KLPW_SuspendedDetectRunsNothing)
+
 
 ; Native producer/lookup qualification; future samples are monotonic, not an
 ; actual uptime claim. Every case owns and restores the complete static cache.
