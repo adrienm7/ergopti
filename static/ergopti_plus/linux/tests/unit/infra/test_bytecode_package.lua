@@ -48,6 +48,8 @@ local function tree(receipt)
 		assert(io.open(helpers.driver_root() .. "/install/ownership_schema.sh", "rb")):read("*a"))
 	write(root .. "/linux/bc_probe_driver.lua", "return 'compiled'\n")
 	write(root .. "/_shared/lua/bc_probe_shared/init.lua", "return 'compiled'\n")
+	-- The file infra.paths probes to name a shared tree beside the driver
+	write(root .. "/_shared/data/locales/en.json", "{}\n")
 	if receipt then write(root .. "/.ergopti-owned-files", "") end
 	local digest = string.rep("a", 64)
 	local ok, failure = Owner.compile(root, {
@@ -170,6 +172,10 @@ helpers.describe("bytecode package: anything but a whole, matching package loads
 		end, "another root" },
 		{ "a missing bundle", function(directory) os.remove(directory .. "/bundle") end, "missing" },
 		{ "a missing manifest", function(directory) os.remove(directory .. "/manifest") end, "no bytecode manifest" },
+		-- The shared prefix comes from infra.paths, which names no tree here.
+		{ "a tree without its shared tree", function(directory)
+			os.remove(directory .. "/../_shared/data/locales/en.json")
+		end, "no shared tree" },
 	}
 	for _, case in ipairs(tamperings) do
 		helpers.it(case[1] .. " falls back to source with one warning", function()

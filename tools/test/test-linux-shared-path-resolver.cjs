@@ -71,13 +71,9 @@ const EXEMPT = new Set([
 	// trusted: they run before package.path includes the shared tree.
 	'ergopti_hotstrings.lua',
 	'modules/hotstrings/engine.lua',
-	// The bytecode package (e712a02128) matches package.searchpath's output and
-	// the chunk names LuaJIT stores, so it must spell the shared tree exactly as
-	// the bootstrap writes package.path ("<driver>/../_shared/lua/"), never the
-	// physical path Paths.shared() returns. Its depth is asserted below too.
-	'infra/bytecode_package.lua',
-	// The installer's compiler runs on an installation root holding linux/ and
-	// _shared/ side by side, before any driver module (or infra.paths) loads.
+	// The installer's bytecode compiler is a bootstrap too: it puts an
+	// installation root's linux/ and _shared/ on package.path, and infra.paths
+	// itself needs the shared tree (logger.shim) before it can resolve anything.
 	'install/compile_bytecode.lua'
 ]);
 
@@ -131,8 +127,7 @@ for (const abs of files) {
 // pattern had already reached.
 const BOOTSTRAPS = [
 	{ file: 'ergopti_hotstrings.lua', note: 'SCRIPT_DIR is the driver root' },
-	{ file: 'modules/hotstrings/engine.lua', note: '_linux_root is the driver root' },
-	{ file: 'infra/bytecode_package.lua', note: 'script_dir and root/linux are the driver root' }
+	{ file: 'modules/hotstrings/engine.lua', note: '_linux_root is the driver root' }
 ];
 for (const b of BOOTSTRAPS) {
 	const abs = path.join(DRIVER, b.file);
