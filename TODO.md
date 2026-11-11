@@ -1397,13 +1397,19 @@ coordinator on 2026-11-11, to review by the maintainer.
       summary, the last counter interval at exit, paired `[Span]` DEBUG lines for `tray.fill`, `layout.switch`,
       `config.reload`, `hotstring.expand` (macOS mirrors `hotstring.expand`), `input.latency` (kernel stamp to
       forwarded write). `run_perf_budget_container.py` joins the container proofs.
-- [ ] Startup compile: 126 of about 180 ms before the boot clock is LuaJIT compiling 6.5 MB of source; a precompiled
-      bytecode package needs the maintainer's staleness decision (memory: project-linux-startup-cost-is-compilation).
-- [ ] Keystats boot stage: 60 ms (first boot 200 ms) waiting on the sqlite3 child's round trips, 6 ms of CPU.
-- [ ] The first layout resolve forks `xkbcomp` (about 30 ms) although the X11 probe can serialize the same keymap
-      in 0.6 ms; needs a proof that `infra/xkb_keymap` parses libxkbcommon's serialization.
-- [ ] The 20 ms pause between an expansion's erase and its text blocks the loop (`INTER_PHASE_DELAY_MS`); a timer
-      continuation would free the loop but changes the injector's transaction shape.
+- [ ] Startup compile: 126 of about 180 ms before the boot clock is LuaJIT compiling 6.5 MB of source; a bytecode
+      searcher measured 170-240 → 110-130 ms. Proposal with the staleness contract to decide:
+      `docs/design/linux-bytecode-package.md` (maintainer decision).
+- [x] Keystats boot stage (round 2): the ledger reads its four meta keys in one sqlite3 query, and its exporter and
+      the text migration resume start on the loop's first idle tick (warm init 52-57 → 36-42 ms). Left: open_db's
+      own spawns (mkdir, schema checks), device registration and the open-walk read, about 30 ms of sqlite3
+      processes; a persistent sqlite3 child would remove them all.
+- [x] The layout resolve on X11 serializes the keymap in process (xkb_source_probe.dump_keymap) instead of forking
+      xkbcomp: refresh 38-45 → 11-14 ms; the parser reads both dumps alike on five layouts
+      (`run_keymap_native_dump.lua`).
+- [x] The 20 ms erase-to-text pause applies only to terminals and to applications nobody could name, as Windows and
+      macOS pace only terminals: xz → MATCH 34.4 → 14.7 ms; 20 expansions read back intact from a GTK field (X11),
+      15 from mousepad under sway. Decided by the coordinator on 2026-11-11, to review by the maintainer.
 - [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
       `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
