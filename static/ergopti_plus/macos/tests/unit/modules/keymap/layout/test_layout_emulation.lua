@@ -124,6 +124,21 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_nil(e.unicode, "a chord's text is the application's")
 	end)
 
+	-- A chord of two modifiers takes the key of the layout's character, as a
+	-- single-modifier chord does, the held flags kept (ILD-1, decided by the
+	-- maintainer on 2026-11-11: the logical key everywhere; two-modifier-chord).
+	helpers.it("moves a chord of two modifiers to the layout character's key (two-modifier-chord)", function()
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		M.reload()
+		for _, flags in ipairs({ { cmd = true, shift = true }, { ctrl = true, alt = true } }) do
+			local e = event(flags, "q")
+			helpers.assert_true(not M.key_down(e, KC_Q), "the chord is kept")
+			helpers.assert_eq(e.keycode, 6, "Z where Ergopti has z")
+			helpers.assert_eq(e.flags, flags, "with the modifiers the hand holds")
+			helpers.assert_nil(e.unicode)
+		end
+	end)
+
 	-- SendEvent "^{z}" sends a matched down and up; the release kept the
 	-- physical key code, so applications saw z down never released and a Q up
 	-- with no down (ILM-001, cmd-chord-release).
