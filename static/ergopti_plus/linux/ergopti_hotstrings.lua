@@ -1889,6 +1889,8 @@ local function main()
 	local function handle_physical(scancode, _key_name, _char, value, source)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		TapHold.observe_copy_activity()
+		-- Any key press ends a gesture's click hold, as on Windows.
+		if gestures then gestures.release_clicks_on_activity() end
 		capture_owned_scancodes[scancode] = nil
 		local allowed = not secure_focus_guard.blocks_text()
 		physical_privacy_admission = { code = scancode, allowed = allowed }

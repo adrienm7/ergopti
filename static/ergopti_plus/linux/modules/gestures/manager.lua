@@ -2479,6 +2479,14 @@ function M.release_clicks()
 	return _click_holds.release_all()
 end
 
+--- Releases the held buttons at a physical key press, as Windows' click hold
+--- does (click.ahk GestureOnKeyDown); a press with nothing held costs nothing.
+--- @return boolean True when nothing is held or every mouseup was acknowledged.
+function M.release_clicks_on_activity()
+	if not _click_holds.holding() then return true end
+	return M.release_clicks()
+end
+
 --- Stops reading the touchpad.
 --- @return boolean True only when the reader acknowledges closure.
 local function stop_reading(preserve_clicks)
