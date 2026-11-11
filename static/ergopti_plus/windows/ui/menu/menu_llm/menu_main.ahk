@@ -162,16 +162,21 @@ _LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn) {
 /**
  * Builds the IA submenu rows (toggle, warning, settings, about) into a new
  * detached Menu and returns it — no publish, no root rebuild, no tray touch.
- * initMenu builds IA inline at boot through this; LLM_Menu_Build uses it for
+ * initMenu publishes IA through this as a submenu built at its first open
+ * (MenuDeferOrBuild hands it the published child); LLM_Menu_Build uses it for
  * staged replacements. One row-construction site: the two must never drift.
  * Each native row retains this invocation's detached target. Nested builds
  * can publish a successor without redirecting the interrupted row or having
  * their published handle restored away by the older builder.
+ * @param {Menu} Target The empty child to fill; a new detached Menu when omitted.
  * @returns {Menu} Staged submenu with all rows.
  */
-LLM_Menu_BuildSubmenu() {
+LLM_Menu_BuildSubmenu(Target := 0) {
 	global _LLM_Menu
-	StagedHandle := Menu()
+	if Target is Menu
+		StagedHandle := Target
+	else
+		StagedHandle := Menu()
 	try {
 	_tStaged := A_TickCount
 
@@ -238,7 +243,9 @@ LLM_Menu_BuildSubmenu() {
 		ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled)
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", StagedHandle.Handle, "int"))
 	} catch as e {
-		try StagedHandle.Delete()
+		; A deferred child's owner restores its placeholder for the next open.
+		if !(Target is Menu)
+			try StagedHandle.Delete()
 		throw e
 	}
 	return StagedHandle
