@@ -25,9 +25,17 @@ local ProgramRunner = require("adapters.program_runner")
 local uv_loaded, uv = pcall(require, "luv")
 
 local WORK_PREFIX = ".ergopti-update."
--- How often the owned smoke child re-admits the install deadline while the
--- event loop keeps running; a refused admission kills its process group.
-local SMOKE_ADMISSION_POLL_MS = 50
+-- How often an owned child (the wrapper smoke, the ownership owner) re-admits
+-- the install deadline while the event loop keeps running; a refused admission
+-- kills its process group.
+local OWNED_CHILD_ADMISSION_POLL_MS = 50
+-- The receipt owner the running (previous) installation ships; it hashes the
+-- whole staged payload, which takes seconds on a real tree.
+local OWNERSHIP_OWNER = "/linux/install/ownership.sh"
+-- The owned child runs the bash owner through the POSIX shell, so bash is found
+-- on PATH exactly as the synchronous `bash owner` command finds it.
+local POSIX_SHELL = "/bin/sh"
+local EXEC_BASH = 'exec bash "$0" "$@"'
 
 
 
@@ -229,16 +237,15 @@ function DEFAULT_OPS.extract(archive_path, work_dir)
 end
 
 --- Records the new payload before it can replace the user's installation.
+--- @param run_owner function Runs (owner_path, arguments) and returns success.
 --- @param root string Validated staging root containing only release files.
 --- @param previous string Current installation whose launcher is retained.
 --- @return boolean success
-function DEFAULT_OPS.record_ownership(root, previous)
+local function record_ownership_with(run_owner, root, previous)
 	-- The running updater owns the receipt format, not the selected release.
 	local schema = Ownership.read_schema(previous)
 	if not schema then return false end
-	if not run_command("bash " .. shell_quote(previous .. "/linux/install/ownership.sh")
-		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
-		.. " " .. shell_quote(root)) then return false end
+	if not run_owner(previous .. OWNERSHIP_OWNER, { root .. "/linux", root .. "/_shared", root }) then return false end
 	local manifest = previous .. "/" .. schema.MANIFEST
 	local old, status = Ownership.read_current(manifest)
 	if status == "absent" then return true end
@@ -246,6 +253,18 @@ function DEFAULT_OPS.record_ownership(root, previous)
 	local record = Ownership.parse(old, schema)
 	if not record then return false end
 	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))
+end
+
+--- Records the new payload synchronously (the original synchronous install).
+--- @param root string Validated staging root containing only release files.
+--- @param previous string Current installation whose launcher is retained.
+--- @return boolean success
+function DEFAULT_OPS.record_ownership(root, previous)
+	return record_ownership_with(function(owner, arguments)
+		local quoted = {}
+		for index, argument in ipairs(arguments) do quoted[index] = shell_quote(argument) end
+		return run_command("bash " .. shell_quote(owner) .. " " .. table.concat(quoted, " "))
+	end, root, previous)
 end
 
 --- Validates a disposable installation tree through its canonical receipt owner.
@@ -551,19 +570,21 @@ local function refuse_owned_admission(finish, reservation, callback)
  return operation
 end
 
---- Starts the updated wrapper's `--help` smoke as an owned child of the event
---- loop, for the async installer.
+--- Starts one install child (the updated wrapper's `--help` smoke, the
+--- ownership owner) as an owned child of the event loop, for the async installer.
 ---
---- The synchronous smoke ran `os.execute` on the daemon's event loop: a slow
---- or hung wrapper stalled input and every timer, past the install deadline it
---- could not observe. Here the child runs in its own process group, a libuv
---- timer re-admits the install deadline while it runs, and a refused admission
---- kills the group; the result is delivered only once the group is gone.
---- @param wrapper string Absolute wrapper path.
+--- Both ran through `os.execute` on the daemon's event loop: a slow or hung
+--- child stalled input and every timer, past the install deadline it could not
+--- observe (the ownership owner hashes the whole payload: 9 s on a real tree,
+--- with the keyboard grabbed). Here the child runs in its own process group, a
+--- libuv timer re-admits the install deadline while it runs, and a refused
+--- admission kills the group; the result is delivered only once it is gone.
+--- @param executable string Absolute program path.
+--- @param arguments table Dense literal argv after the program.
 --- @param admitted function The install admission (deadline included).
 --- @param done function Receives { ok = boolean }.
 --- @return table operation is_settled, request_cancel and on_settled.
-local function start_owned_smoke(wrapper, admitted, done)
+local function start_owned_child(executable, arguments, admitted, done)
  local operation, listeners = {}, {}
  local settled, outcome, timer = false, nil, nil
  local function settle(result)
@@ -585,7 +606,7 @@ local function start_owned_smoke(wrapper, admitted, done)
   return operation
  end
  local cancelled = false
- local child = ProgramRunner.spawn(wrapper, { "--help" }, function(code) outcome = code end, function()
+ local child = ProgramRunner.spawn(executable, arguments, function(code) outcome = code end, function()
   return not cancelled and admitted()
  end)
  local function retire()
@@ -617,7 +638,7 @@ local function start_owned_smoke(wrapper, admitted, done)
   -- A refused spawn holds no process; an ambiguous one is still polled.
   if child.isSettled() then retire(); return operation end
  end
- local armed = pcall(timer.start, timer, SMOKE_ADMISSION_POLL_MS, SMOKE_ADMISSION_POLL_MS, tick)
+ local armed = pcall(timer.start, timer, OWNED_CHILD_ADMISSION_POLL_MS, OWNED_CHILD_ADMISSION_POLL_MS, tick)
  if not armed then
   cancelled = true
   child.terminate(true)
@@ -687,8 +708,16 @@ function M.install_owned(options, callback)
   return type(result) == "table" and result.ok == true
  end
  ops.smoke = function(wrapper)
-  local result = await(function(done) return start_owned_smoke(wrapper, owned_current, done) end)
+  local result = await(function(done) return start_owned_child(wrapper, { "--help" }, owned_current, done) end)
   return type(result) == "table" and result.ok == true
+ end
+ ops.record_ownership = function(root, previous)
+  return record_ownership_with(function(owner, arguments)
+   local argv = { "-c", EXEC_BASH, owner }
+   for _, argument in ipairs(arguments) do argv[#argv + 1] = argument end
+   local result = await(function(done) return start_owned_child(POSIX_SHELL, argv, owned_current, done) end)
+   return type(result) == "table" and result.ok == true
+  end, root, previous)
  end
  local captured = { context = rawget(options, "context"), expected_version = rawget(options, "expected_version"),
   archive_path = reservation, ops = ops }
