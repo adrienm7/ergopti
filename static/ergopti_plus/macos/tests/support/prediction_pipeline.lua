@@ -83,6 +83,8 @@ local function load_fixture(options)
 		DEFAULT_STATE = defaults,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
+		-- The settings a request is sent with (AID-3): unchanged unless a test edits them
+		request_settings = function() return { backend = "ollama", model = "test-model" } end,
 		-- The global profile, and the registry prompt actions look profiles up in
 		get_active_profile = function() return options.active_profile end,
 		find_profile = function(id) return (options.profiles or {})[id] end,
