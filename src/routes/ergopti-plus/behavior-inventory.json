@@ -201,7 +201,7 @@
 				{
 					"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "fb2197d0c3ea39df354322539477283653d105674d70922c212b87e0ceefe2dc"
+					"sha256": "4e952c2472e141b64bff465bf4e1b149e8284ba5b4b685c7c6b5cce5a9f2e3ed"
 				}
 			]
 		}
@@ -303,7 +303,7 @@
 				{
 					"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "fb2197d0c3ea39df354322539477283653d105674d70922c212b87e0ceefe2dc"
+					"sha256": "4e952c2472e141b64bff465bf4e1b149e8284ba5b4b685c7c6b5cce5a9f2e3ed"
 				}
 			]
 		}
