@@ -2338,7 +2338,7 @@ function M.dispatch_gesture(gesture)
 
 	-- A pause stops every gesture but the script-control ones, which are how the
 	-- user resumes; the reader keeps running so those still arrive.
-	if _is_paused() and not ScriptActions.is_script_action(action) then
+	if _is_paused() and not ScriptActions.runs_while_paused(action) then
 		Logger.debug(LOG, "Gesture %s → %s held back: the script is paused.", slot, action)
 		return false
 	end

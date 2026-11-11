@@ -43,7 +43,6 @@ local ShortcutCatalogue = require("shortcuts.catalogue")
 local ConfigOutdated = require("config_outdated")
 local SlotRoles = require("shortcuts.slot_roles")
 local Paths = require("infra.paths")
-local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
@@ -658,10 +657,11 @@ end
 
 --- The binding a chord would fire right now, or nil.
 ---
---- While the script is paused, and while the shortcuts feature is switched off,
---- only the script-control actions (pause, reload, quit) may fire: they are how
---- the user gets the script back, and every other binding firing through a pause
---- is the pause not working. A binding held back that way is reported, so the
+--- While the script is paused, in dry-run, and while the shortcuts feature is
+--- switched off, no keyboard slot fires, one bound to a script action included,
+--- as on Windows (slot hotkeys suspended) and macOS (every slot paused): the way
+--- back is the AltGr script chords and the menu (SCD-1, decided by the
+--- maintainer on 2026-11-11). A binding held back that way is reported, so the
 --- caller can leave its key alone.
 --- @param detail table|nil { key = string, mods = table } from the hook.
 --- @param only_script boolean
@@ -689,8 +689,7 @@ local function match(detail, only_script)
 				return {
 					slot = slot,
 					action = action,
-					held_back = (only_script and not ScriptActions.is_script_action(action))
-						or AiActions.blocked(action),
+					held_back = only_script or AiActions.blocked(action),
 				}
 			end
 		end
@@ -862,15 +861,16 @@ function M.consume(detail, opts)
 	local generation = _dispatch_generation
 	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
 	local pause_reader, pause_epoch = opts.pause_epoch, nil
-	local script_action = ScriptActions.is_script_action(hit.action)
-	if not script_action and pause_reader ~= nil then
+	-- No slot runs through a pause, a script action included (SCD-1), so every
+	-- claimed chord is retired by a pause that begins before its delivery.
+	if pause_reader ~= nil then
 		if type(pause_reader) ~= "function" then return false, nil end
 		local called, epoch = pcall(pause_reader)
 		if not called or type(epoch) ~= "number" then return false, nil end
 		pause_epoch = epoch
 	end
 	local function pause_current()
-		if script_action or pause_reader == nil then return true end
+		if pause_reader == nil then return true end
 		if opts.pause_epoch ~= pause_reader then return false end
 		local called, epoch = pcall(pause_reader)
 		return called and epoch == pause_epoch and opts.pause_epoch == pause_reader
@@ -894,8 +894,7 @@ function M.consume(detail, opts)
 		if not called or type(admission) ~= "table" or not owner_current() then return false end
 		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
 			or admission.inhibited ~= false then return false end
-		return pause_current() and (script_action
-			or (admission.master == true and admission.paused == false))
+		return pause_current() and admission.master == true and admission.paused == false
 	end
 	if not delivery_current() then return false, nil end
 	-- A scheduled callback has no delivery rights until its original queue ACK.

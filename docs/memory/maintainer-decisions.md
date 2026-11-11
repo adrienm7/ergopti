@@ -32,6 +32,20 @@ section (`_shared/tap_hold/SCHEMA.md`).
 - A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
   the two files each driver writes; each suite pins its own and reads the
   others'. Do not move a manifest row back into `tap_hold.toml`.
+## No Linux keyboard slot runs through a pause (2026-11-11)
+Decided by the maintainer on 2026-11-11 (SCD-1): on Linux a keyboard slot
+(`[shortcuts.keyboard]`) bound to a `script_*` action is held back while the
+driver is paused, in dry-run, or with Shortcuts off, like every other slot, as
+Windows (slot hotkeys suspended) and macOS (every slot paused) already do; the
+way back is the AltGr script chords and the menu. `keyboard_shortcuts.match`
+holds every slot back under `only_script` and `consume` no longer exempts a
+script action from the pause epoch or the live admission. What does run
+through a pause (script chords, gestures, tap keys in dry-run,
+`ScriptActions.allows`) is the shared `paused_actions` list of
+`_shared/modules/actions/script_chords.json`, read by
+`ScriptActions.runs_while_paused`, not the `script_` prefix:
+`script_save_reload` waits, `open_personal_shortcuts` runs. Regressions
+`scd1-slot-paused`, `scd1-paused-actions`. Windows needs no change.
 
 ## Windows swipes step with the fingers through raw HID reports (2026-11-11)
 

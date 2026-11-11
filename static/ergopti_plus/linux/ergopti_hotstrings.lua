@@ -2153,9 +2153,9 @@ local function main()
 			-- The same master switch gates CapsWord and every menu operation. It must
 			-- also gate modifier chords; otherwise "Shortcuts off" still opens ChatGPT
 			-- and runs the user's assignments while claiming the feature is disabled.
-			-- A pause gates them the same way. The script-control actions pass
-			-- both gates: they are how the user resumes, including after « Disable
-			-- all », which switches the shortcuts feature off.
+			-- A pause and dry-run gate them the same way, a slot bound to a script
+			-- action included (SCD-1): only the AltGr script chords stay live, they
+			-- are how the user resumes, including after « Disable all ».
 			local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 			pcall(keyboard_shortcuts.dispatch, detail, {
 				only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
@@ -2383,7 +2383,7 @@ local function main()
 		pause_epoch = script_actions.pause_epoch,
 		is_active = function(action)
 			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
-				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").is_script_action(action))
+				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").runs_while_paused(action))
 		end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
@@ -2625,7 +2625,8 @@ local function main()
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
 	-- Dry-run refuses before the hook claims a chord, and again at deferred
-	-- delivery through the live master gate. Script lifecycle actions stay live.
+	-- delivery through the live master gate. No slot runs through it, a script
+	-- action included (SCD-1); the AltGr script chords are their own consumer.
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 		local consumed = keyboard_shortcuts.consume(detail, {

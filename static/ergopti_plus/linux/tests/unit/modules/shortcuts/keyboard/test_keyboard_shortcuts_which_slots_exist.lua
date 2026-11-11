@@ -804,9 +804,10 @@ helpers.describe('keyboard shortcut after a pause cycle', function()
         assert(shortcuts.consume(chord('j',{ctrl=true}), opts))
         assert(script.toggle_pause()); assert(script.toggle_pause())
         queue[1]()
-        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload'} or {})
+        -- SCD-1: a pause cycle retires a claimed slot, a script action included.
+        helpers.assert_eq(fired, {})
         assert(shortcuts.consume(chord('j',{ctrl=true}),opts)); queue[2]()
-        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload','script_reload'} or {'select_line'})
+        helpers.assert_eq(fired, {action})
       end)
       gestures.execute_action = original
       drop_config()
