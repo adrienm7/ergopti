@@ -5,13 +5,16 @@
 --- DESCRIPTION:
 --- Windows records Internet and VPN transitions in events_network and Linux
 --- recorded none. These tests pin the Windows kinds, the Windows reducer
---- (an unknown sample keeps the state) and the sysfs tunnel probe.
+--- (an unknown sample keeps the state) and the sysfs tunnel probe; the shared
+--- contract replays the kinds, reducer and sampler both Lua drivers use.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local it = helpers.it
 
 local Network = require("modules.keystats.network_metrics")
+
+require("test.network_transitions_contract").register(helpers)
 
 --- A sampler over scripted probes; returns it, the recorded rows and the controls.
 local function scripted()
@@ -30,9 +33,7 @@ local function scripted()
 end
 
 helpers.describe("Linux connectivity transitions", function()
-	it("linux-network-reducer: an unknown sample keeps the state, as on Windows", function()
-		helpers.assert_eq(Network.reduce(true, "unknown"), { accepted = false, changed = false, next_up = true })
-		helpers.assert_eq(Network.reduce(true, "down"), { accepted = true, changed = true, next_up = false })
+	it("linux-network-lookup: a name-resolution refusal is down, another failure unknown", function()
 		helpers.assert_eq(Network.classify_lookup(nil, { { addr = "1.2.3.4" } }), "up")
 		helpers.assert_eq(Network.classify_lookup("EAI_NONAME: unknown node or service"), "down")
 		helpers.assert_eq(Network.classify_lookup("EAI_AGAIN: temporary failure"), "down")
