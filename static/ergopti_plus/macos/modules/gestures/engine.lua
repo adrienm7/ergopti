@@ -17,6 +17,7 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
+local ContactJoin = require("gestures.contact_join")
 local FrameClock = require("modules.gestures.frame_clock")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
@@ -274,6 +275,8 @@ local function resetGS()
 		contactsOrigin = nil,
 		contactsLast   = nil,
 		cohesive       = false,
+		-- Why the confirmed three contacts cannot be one hand's fingers, or nil.
+		contactRefusal = nil,
 		-- Gates that already logged a rejected candidate for this contact sequence.
 		rejections     = {},
 	}
@@ -299,6 +302,10 @@ local function snapshotContacts(touches)
 	}
 	gs.contactsLast = gs.contactsOrigin
 	gs.cohesive     = false
+	-- Three contacts that cannot be one hand's fingers (a resting thumb beside
+	-- a pair) never commit a three-finger tap; joins refuse them earlier.
+	local reason, detail = Geometry.joinRefusal(touches)
+	gs.contactRefusal = reason and (reason .. ": " .. detail) or nil
 end
 
 --- Tells whether a three-or-more-finger gesture may fire on this axis.
@@ -747,7 +754,11 @@ local function commitGesture(now)
 	if not had_live_fire and total_delta < TAP_MAX_DELTA then
 		Logger.debug(LOG, "commitGesture: classified as TAP candidate (lockedDir=%s, total_delta=%.2f < %.2f)",
 			tostring(gs.lockedDir), total_delta, TAP_MAX_DELTA)
-		if elapsed <= TAP_MAX_SEC and multiFingerAllowed(mf, nil, "tap_" .. tostring(mf)) then
+		local geometry_refused = mf == ContactJoin.JOINED_COUNT and gs.contactRefusal ~= nil
+		if geometry_refused then
+			rejectCandidate("finger geometry", "%s (tap_%d)", gs.contactRefusal, mf)
+		end
+		if elapsed <= TAP_MAX_SEC and not geometry_refused and multiFingerAllowed(mf, nil, "tap_" .. tostring(mf)) then
 			local slot = nil
 			if     mf == 2 then slot = "tap_2"
 			elseif mf == 3 then slot = "tap_3"
@@ -1222,6 +1233,17 @@ function M.process_frame(touches, frame_stamp)
 						snapshotContacts(touches)
 					end
 				end
+			elseif n > gs.maxFingers and n == ContactJoin.JOINED_COUNT and Geometry.joinRefusal(touches) then
+				-- A far or oversized third contact, a resting thumb beside the pair
+				-- (field report 2026-11-05): neither join path may take it. Judged
+				-- every frame, so no candidate is armed and the pair keeps its lock.
+				gs.tentativeLifting = false
+				local reason, detail = Geometry.joinRefusal(touches)
+				rejectCandidate("finger geometry", "%s, %s (%d -> %d), contacts %s", reason, detail,
+					gs.maxFingers, n, Geometry.describeContacts(touches))
+				gs.candidateFingers = nil
+				gs.candidateSince   = nil
+				gs.candidateFrames  = 0
 			elseif n > gs.maxFingers then
 				-- Reset tentative lifting if finger count is restored
 				gs.tentativeLifting = false
