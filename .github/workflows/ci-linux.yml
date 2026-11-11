@@ -5085,11 +5085,32 @@ jobs:
           path: ~/.local/share/flatpak
           key: ${{ steps.flatpak-cache.outputs.cache-primary-key }}
 
+      # flatpak-builder reuses a module from its state directory when the
+      # module's checksum is unchanged, so with this cache only the Ergopti
+      # module rebuilds; without it LuaJIT and the network modules compile from
+      # source (Build the Flatpak took 378 s on a cold run, 43012051378). The
+      # key names the files that define those modules; restore-keys keeps the
+      # downloaded sources and unchanged modules after a pin moves.
+      - name: Restore the Flatpak module cache
+        id: flatpak-builder-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/linux-flatpak-builder
+          key: flatpak-builder-state-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/build/build-linux-flatpak.sh', 'static/ergopti_plus/_shared/data/linux_native_runtime.json', 'tools/codegen/codegen-linux-native-runtime.cjs') }}
+          restore-keys: flatpak-builder-state-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Build the Flatpak
         # No --skip-flatpak: that flag returns before flatpak-builder. The
         # Flatpak compiles its own luajit inside the sandbox.
         shell: bash
         run: bash tools/build/build-linux-flatpak.sh
+
+      - name: Save the Flatpak module cache
+        if: steps.flatpak-builder-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/linux-flatpak-builder
+          key: ${{ steps.flatpak-builder-cache.outputs.cache-primary-key }}
 
       - name: The staged payload carries the driver and the shared data tree
         # The packager checks its own manifest; this checks the payload, which is

@@ -14,7 +14,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 20520, "min": 60, "max": 20520 },
+	"deadline_seconds": { "default": 20890, "min": 60, "max": 20890 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -258,6 +258,13 @@
 			"proves": "The Metrics tables events_window_topo, events_av and events_network are readable and their row count per declared kind is named; the guided steps compare it before and after a gesture."
 		},
 		{
+			"id": "field_physical_shortcuts",
+			"kind": "field_check",
+			"check": "physical_shortcuts",
+			"deadline_seconds": 10,
+			"proves": "Physical shortcut delivery is available, the bound physical slots are counted, and every key the physical hook suppressed this session reached its action."
+		},
+		{
 			"id": "field_slow_lines",
 			"kind": "field_check",
 			"check": "slow_lines",
@@ -388,6 +395,30 @@
 			"deadline_seconds": 150,
 			"gesture": "Press Ctrl+Caps Lock once, in any app.",
 			"proves": "A physical Ctrl+Caps Lock reaches the secondary_capslock slot: seen and delivered passes, seen and never delivered fails never_delivered."
+		},
+		{
+			"id": "guided_physical_shortcut",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "physical_shortcuts",
+			"until": {
+				"condition": "rises",
+				"steps": ["physical_suppressed", "physical_delivered"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "In « Raccourcis physiques », bind a physical slot (a key with no modifier) to an action that types text, save it, then press that key once in TextEdit.",
+			"proves": "A press of a bound physical slot is suppressed by the physical hook and delivered to its action exactly once, with nothing unacknowledged or dropped."
+		},
+		{
+			"id": "guided_physical_shortcut_output",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "physical_shortcuts",
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "Did the press type the action's text in TextEdit once, with no character of the key itself, no hotstring, tap-hold, layer or magic-key effect, under Karabiner and the keymap tap, and does the editor still show the slot after you reopen it?",
+			"proves": "The physical slot's output reaches the focused app alone and the editor keeps the saved slot."
 		},
 		{
 			"id": "guided_asa_held_key",
