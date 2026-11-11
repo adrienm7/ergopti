@@ -59,6 +59,17 @@ function M.runtime()
 	return { version = jit.version, arch = jit.arch, gc64 = ffi.abi("gc64") and "true" or "false" }
 end
 
+--- The shared Lua directory as the daemon spells it beside a driver directory:
+--- the resolver probes the sibling layout (<driver>/../_shared) before the child
+--- one in the order the bootstrap writes package.path, and keeps the spelling,
+--- so searchpath's names and the chunk names match it.
+--- @param driver_dir string The driver directory as the daemon spells it.
+--- @return string|nil prefix "<shared root>/lua/", nil when no shared tree is there.
+function M.shared_lua_prefix(driver_dir)
+	local shared = require("infra.paths").shared_root_from(driver_dir)
+	return shared and shared .. "/lua/" or nil
+end
+
 --- The spelling the daemon gives a module file at runtime, which LuaJIT keeps
 --- inside the dumped chunk as its source name.
 --- @param root string Physical installation root.
@@ -68,7 +79,8 @@ function M.runtime_filename(root, relative)
 	local driver = relative:match("^linux/(.+%.lua)$")
 	if driver then return root .. "/linux/" .. driver end
 	local shared = relative:match("^_shared/lua/(.+%.lua)$")
-	if shared then return root .. "/linux/../_shared/lua/" .. shared end
+	local prefix = shared and M.shared_lua_prefix(root .. "/linux")
+	if prefix then return prefix .. shared end
 	return nil
 end
 
@@ -237,7 +249,8 @@ function M.install(script_dir, options)
 		_state.detail = string.format("the bytecode bundle holds %s bytes, not %d", tostring(size), plan.size)
 		return false
 	end
-	local driver_prefix, shared_prefix = script_dir .. "/", script_dir .. "/../_shared/lua/"
+	local driver_prefix, shared_prefix = script_dir .. "/", M.shared_lua_prefix(script_dir)
+	if not shared_prefix then _state.detail = "the installed tree has no shared tree"; return false end
 	local searchers = options.searchers or package.loaders or package.searchers
 	--- Loads an application module from the bundle; any other module falls
 	--- through to the next searcher, exactly as before.
