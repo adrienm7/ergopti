@@ -1251,9 +1251,13 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### Linux (container proofs of 2026-11-10)
 
-- [ ] Linux X11 on GNOME and KDE: re-apply the user-tree layout (apply-x11) after the desktop puts its own layouts
+- [x] Linux X11 on GNOME and KDE: re-apply the user-tree layout (apply-x11) after the desktop puts its own layouts
       back (W4: a keyboard hotplug, a GNOME input-sources setting change); today the loaded layout is lost until the
-      next apply. Found by the 2026-11-11 container proof.
+      next apply. Found by the 2026-11-11 container proof. Done 2026-11-11: `modules/keymap/x11_layout_reapply.lua`,
+      armed by each live X11 apply, watches the server keymap from `adapters/x11_keymap_watch_worker.lua`, reads it
+      once a burst settles and loads the layout again when the desktop replaced it (at most three times a minute,
+      then it stops with a warning). `run_x11_reapply_live.sh` checks it on GNOME Shell 46 and Plasma 6.6.4 under X11
+      (`x11_reapply_*.txt`: one re-apply after a new keyboard, the server holds Bépo again).
 - [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on

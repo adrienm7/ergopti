@@ -446,6 +446,8 @@ local function default_deps(settings)
 	return {
 		settings = settings,
 		local_source = require("infra.installation").is_source_run(),
+		-- Re-applies a layout loaded live on X11 when the desktop replaces it.
+		keep_x11_layout = function(id) require("modules.keymap.x11_layout_reapply").arm(id) end,
 		-- The asynchronous runner: the refresh shares the daemon's loop with the
 		-- grabbed keyboard, so a blocking git would delay keys.
 		registry_changes = function(dir, callback)
@@ -1189,6 +1191,9 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
+				-- GNOME and Plasma under X11 put their own layouts back on a new
+				-- keyboard (W4): keep this one loaded from now on.
+				if deps.keep_x11_layout then deps.keep_x11_layout(base) end
 				finish(true, { id = base, rows = report })
 			end)
 		end)
@@ -1507,6 +1512,8 @@ end
 --- @return boolean acknowledged Every install/activation helper physically retired.
 function M.shutdown()
 	if not _stopping then _stopping = true; _epoch = _epoch + 1 end
+	local Reapply = package.loaded["modules.keymap.x11_layout_reapply"]
+	if Reapply then Reapply.shutdown() end
 	if _checking_shutdown then return false end
 	_checking_shutdown = true
 	if not _transports_cancelled then

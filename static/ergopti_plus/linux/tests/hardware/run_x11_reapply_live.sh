@@ -17,6 +17,8 @@
 # input-sources setting change. Each check states the behaviour observed on
 # 2026-11-11 (GNOME Shell 46, Plasma 6.6.4): the desktop keeps the loaded
 # keymap on a switch and puts its own layout list back on a new keyboard.
+# Then run_x11_reapply_daemon.lua checks that the daemon loads the layout again
+# after such a replacement.
 # Exit 0 = the desktop behaved as stated, 1 = it did not, 2 = a prerequisite is
 # missing. Run it as the desktop user: the installer writes that user's tree.
 # ==============================================================================
@@ -151,7 +153,8 @@ xinput create-master w4probe
 sleep 3
 holds_bepo
 check $((1 - $?)) "W4: a new keyboard makes the desktop put its own layouts back ($(held))"
-xinput remove-master "w4probe pointer" >/dev/null 2>&1
+# The probe keyboard stays: kwin_x11 6.6.4 crashes when a master is removed,
+# and a Plasma without KWin no longer re-applies its layouts.
 if [ "${DESKTOP}" = gnome ]; then
 	apply
 	gsettings set org.gnome.desktop.input-sources xkb-options "['compose:ralt']"
@@ -160,4 +163,8 @@ if [ "${DESKTOP}" = gnome ]; then
 	check $((1 - $?)) "W4: an input-sources setting change does too ($(held))"
 fi
 echo "=== ${CHECKS} check(s), ${FAILURES} failure(s) ==="
-[ "${FAILURES}" = 0 ]
+# The daemon's own answer: its layout manager arms the re-apply, which loads
+# the layout again after the desktop replaced it.
+luajit tests/hardware/run_x11_reapply_daemon.lua
+daemon=$?
+[ "${FAILURES}" = 0 ] && [ "${daemon}" = 0 ]
