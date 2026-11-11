@@ -58,8 +58,10 @@ local TAP_HOLDS_ON_PINS = {
 	-- chord is led by the tagged F20 the word reset reads (tap_hold_resets_word).
 	-- Then for the tap-hold modifier marker: a hold pressing Ctrl, Cmd or Option
 	-- of its own is led by the untagged context-menu key (the digest is the old
-	-- one with the marker left out).
-	recommended = { rules = 27, digest = "59901bdab5450f67" },
+	-- one with the marker left out). Then for the tap minimum
+	-- (tap_hold.tap_min_duration_ms): every release-judged tap is gated on a
+	-- variable a delayed action raises once the minimum has elapsed.
+	recommended = { rules = 27, digest = "d1098d0cef2f7cf4" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

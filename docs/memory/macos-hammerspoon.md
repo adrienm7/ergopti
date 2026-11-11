@@ -1303,6 +1303,22 @@ does, so a key or combo with a tap and no hold sends its tap as `to`. Action:
 prove a generator rule change through the model, extending the model from the
 source.
 
+### project-karabiner-tap-minimum-gates-each-tap-event
+
+`to_if_alone` has a maximum and no minimum, and Karabiner never feeds its own
+output back to the rules, but v16.3.0 evaluates each to-event's own
+`conditions` against the live variables when it posts it
+(`event_sender.hpp` `filter_and_replace_events`, also on `to_if_alone` at
+key-up). The tap minimum uses it: the key-down clears a `ke_held_<key>_tap_min`
+variable, a `to_delayed_action` timed by `tap_hold.tap_min_duration_ms` raises
+it, and every tap event requires it (`generator.lua` `apply_tap_minimum`). The
+delayed action is cancelled by any later key-down, never by its own key-up
+(`basic.hpp` calls `cancel` for key-downs only), so a late raise after a
+bounce is harmless: the next press clears it first. Keep the name a `ke_held_`
+logical name inside a `name` field, which the deploy scopes to the lease;
+an `expression_if` string would carry a bare, unscoped name. Rollover keys,
+which already own the delayed action, keep no minimum, as the Linux roll keys.
+
 ### project-karabiner-tap-decisions-are-only-visible-as-events
 
 Karabiner decides every macOS tap-hold inside its core and logs nothing about
