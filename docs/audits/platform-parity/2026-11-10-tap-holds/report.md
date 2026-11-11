@@ -79,8 +79,11 @@ Continued on November 11, 2026 (source `adfc5569`), from the remaining rows belo
   LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
 
 - **Linux:** done on November 11 (THL-005, THL-006 above).
-- **macOS:** RCtrl's one-shot Shift with no hold arms at key-down even on a
-  long press (Windows: a long press holds LShift and arms nothing); LAlt's
+- **macOS:** RCtrl's (right_option's) one-shot Shift with no hold armed at
+  key-down even on a long press; since November 11 it arms on a quick release
+  and holds Shift past the threshold (regression `one-shot-no-hold-macos`;
+  Karabiner drops that Shift when another key comes within the threshold,
+  where Windows and Linux press it at the threshold anyway). LAlt's
   one-shot Shift holds no Shift while down and fires under every modifier
   (Windows `lalt.ahk` 4.1 holds LShift and stands down under RCtrl, CapsLock,
   LShift or LCtrl). Both are non-default configurations of the Karabiner
