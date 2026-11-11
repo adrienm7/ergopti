@@ -85,19 +85,51 @@ helpers.describe("macOS window topology: the watcher", function()
 	end)
 
 	-- watchers.lua handed the watchers only the private-window flag, so a
-	-- disabled app, a secure field or a system-auth prompt was recorded.
+	-- disabled app, a secure field or a system-auth prompt was recorded. The
+	-- real watchers.lua starts the real watchers here, over scripted adapters
+	-- and a PrivacyContext that refuses on demand.
 	helpers.it("macos-topology-private: the watchers ask the whole privacy context", function()
-		local file = assert(io.open(helpers.driver_root() .. "modules/keystats/watchers.lua", "rb"))
-		local source = file:read("*a")
-		file:close()
-		local topology = assert(source:find("TopologyWatcher.start({", 1, true))
-		local network = assert(source:find("NetworkWatcher.start", 1, true))
-		for _, start in ipairs({ topology, network }) do
-			local block = source:sub(start, (source:find("})", start, true)))
-			helpers.assert_true(block:find("private = logging_refused", 1, true) ~= nil,
-				"each watcher takes the privacy context's verdict")
-		end
-		helpers.assert_true(source:find("PrivacyContext.allows_logging(_state)", 1, true) ~= nil)
+		helpers.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger",
+			"modules.keystats.privacy_context", "modules.keystats.topology_watcher", "modules.keystats.network_watcher",
+			"adapters.window_info", "adapters.network_info", "adapters.timer_scheduler",
+			"keystats.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local rows, refused, now, window, ids, reach = {}, true, 0, nil, {}, nil
+			package.loaded["modules.keystats.log_manager"] = { append_log = function(entry) rows[#rows + 1] = entry end }
+			package.loaded["modules.keystats.privacy_context"] = { allows_logging = function() return not refused end }
+			package.loaded["adapters.window_info"] = {
+				focused_topology = function() return window end,
+				running_bundle_ids = function() return ids end,
+			}
+			package.loaded["adapters.network_info"] = {
+				watch_host_reachability = function(_, on_status) reach = on_status; return { stop = function() end } end,
+				probe_vpn_status = function(answer) answer("down"); return true end,
+			}
+			local real_scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			package.loaded["adapters.timer_scheduler"] = setmetatable({ now_ns = function() return now * 1000000 end },
+				{ __index = real_scheduler })
+			local W = helpers.load_with_stubs("modules.keystats.watchers", {
+				wifi = false, battery = false, spaces = false, audiodevice = false,
+			})
+			local Topology = require("modules.keystats.topology_watcher")
+			local Network = require("modules.keystats.network_watcher")
+			helpers.assert_eq(W.init({ is_enabled = true, session_app_name = "Excluded" }, function() return false end), true)
+			helpers.assert_eq(W.init_hardware_watchers(), true)
+			local function tick() Topology.tick(); Network.tick(); now = now + 60000 end
+			local function move(x)
+				window = { window = 3, x = x, y = 10, w = 800, h = 600, state = "normal" }
+				tick(); tick()
+			end
+			tick()
+			move(10); move(400); ids = { "us.zoom.xos" }; reach("down"); tick(); tick()
+			helpers.assert_eq(#rows, 0, "a refused context records no topology, capture or network row")
+			refused = false
+			move(10); move(400); ids = {}; reach("up"); tick(); tick()
+			local kinds = {}
+			for _, row in ipairs(rows) do kinds[row.type] = true end
+			helpers.assert_true(kinds.window_move == true, "the control records the move")
+			W.stop_hardware_watchers()
+		end)
 	end)
 
 	helpers.it("macos-capture-presence: bundle ids open and close the interval, stop closes it too", function()
