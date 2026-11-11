@@ -106,6 +106,11 @@ local function fresh()
 	end
 	local store = helpers.load_module("modules.llm.api_token_store")
 	package.loaded["modules.llm.api_token_store"] = store
+	-- Under tests/run.lua an earlier module's secret-service fake can still be
+	-- installed on this store (CI 43024025237: each store answered at once, so
+	-- every attempt ended "done"); these cases run the real secret-tool path.
+	store._set_backend_for_test(nil)
+	store._set_async_start_for_test(nil)
 	store._set_tool_for_test(TOOL)
 	store._set_probe_tool_for_test(PROBE)
 	local entries = helpers.load_module("modules.llm.api_entries")
