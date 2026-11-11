@@ -73,9 +73,14 @@ function differences(a, b) {
 	return found;
 }
 
-// KbdEdit writes Kana on Command; macOS gets it on Option from the source.
+// KbdEdit writes Kana on Command and numbers the two keys Apple numbers apart the
+// ANSI way (50 left of 1, 10 the ISO key); the compiled source is ISO-numbered.
 const kbdedit = read(KBDEDIT_EXPORT);
-const expected = kbdedit.replace(/<modifier keys="command( anyShift)?"\/>/g, (_, shift) =>
+const isoNumbered = kbdedit.replace(
+	/(<key code=")(10|50)(")/g,
+	(_, a, code, b) => `${a}${code === '10' ? '50' : '10'}${b}`
+);
+const expected = isoNumbered.replace(/<modifier keys="command( anyShift)?"\/>/g, (_, shift) =>
 	shift ? '<modifier keys="anyOption anyShift"/>' : '<modifier keys="anyOption"/>'
 );
 assert.notEqual(expected, kbdedit, 'the export selects its Kana level with Command');
@@ -97,6 +102,21 @@ const reference = Composer.parseModel(expected);
 assert.deepEqual(differences(reference, model), [], 'ergopti.toml types as the KbdEdit export');
 assert.ok(differences.states >= 8, 'the walk visits every dead-key state');
 assert.deepEqual(JSON.parse(JSON.stringify(compiled.omitted)), [], 'nothing is left out on macOS');
+
+// No collision with Ergopti's own Option: its macOS layout already types this level
+// with Option, key for key (and ê sits on the ISO key, $ left of 1, as there).
+const registry = Composer.parseModel(
+	read(path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout'))
+);
+for (const level of [0, 2, 5, 6])
+	for (let code = 0; code < 51; code++)
+		assert.equal(
+			Composer.step(model, 'none', model.selects[level].index, code).output,
+			Composer.step(registry, 'none', registry.selects[level].index, code).output,
+			`level ${level} code ${code} matches the registry Ergopti macOS layout`
+		);
+assert.equal(source.layers[0].keys.IntlBackslash.text, 'ê');
+assert.equal(source.layers[0].keys.Backquote.text, '$');
 
 // The oracle can fail: one changed Kana-level output is a difference.
 const mutated = expected.replace(/(<keyMap index="5">[\s\S]*?output=")([^"&]+)"/, '$1Ж"');
@@ -222,7 +242,7 @@ assert.deepEqual(
 );
 assert.deepEqual(JSON.parse(JSON.stringify(ergoptiTables.modifier_vks)), { kana: 0xdf });
 assert.deepEqual(JSON.parse(JSON.stringify(ergoptiTables.scancodes_e0)), [{ sc: 0x38, vk: 0xdf }]);
-const exported = Composer.parseModel(kbdedit);
+const exported = Composer.parseModel(isoNumbered);
 const commandIndex = exported.selects.find((select) => select.keys.join(' ') === 'command').index;
 const physical = JSON.parse(
 	read(
