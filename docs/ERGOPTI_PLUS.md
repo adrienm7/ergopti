@@ -537,6 +537,12 @@ leur module à cause d'un écart de convention de nommage).
 
 Et **aucune des 14 fenêtres ne vit au même chemin sur les trois drivers.**
 
+Sur Windows, l'éditeur de hotstrings personnelles et celui des informations personnelles
+n'ont **aucun repli natif** (décision du 11/11/2026, `docs/memory/maintainer-decisions.md`) :
+quand WebView2 ne peut pas ouvrir la page, ils affichent le message `webview.required`
+(installer le runtime WebView2) et journalisent la cause en ERROR. macOS et Linux n'ont
+jamais eu d'autre forme que la page partagée.
+
 ### 6.11 Socle transverse
 
 | Bibliothèque                          | État                                                                                                                                                                                       |
