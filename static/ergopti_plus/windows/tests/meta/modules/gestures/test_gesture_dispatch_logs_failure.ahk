@@ -41,8 +41,11 @@
 ; ==================================================
 
 _GDLF_DispatchCatchesAndLogs() {
-	Body := _DriverFuncBody("GestureDispatch")
-	Assert(Body != "", "GestureDispatch(slot) must exist in modules/gestures.ahk")
+	; The shortcut route runs the shared action runner the incremental steps use.
+	Assert(InStr(_DriverFuncBody("GestureDispatch"), "GestureRunSlotAction(slot)") > 0,
+		"GestureDispatch(slot) must run its action through GestureRunSlotAction")
+	Body := _DriverFuncBody("GestureRunSlotAction")
+	Assert(Body != "", "GestureRunSlotAction(slot) must exist in modules/gestures/init.ahk")
 
 	Assert(InStr(Body, "catch") > 0,
 		"GestureDispatch must catch action throws instead of using a bare try (LOW-04)")

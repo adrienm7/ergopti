@@ -16,3 +16,13 @@ local helpers = require("tests.helpers")
 local json = require("json")
 
 require("test.incremental_steps_contract")(helpers, json, helpers.driver_root() .. "/../_shared")
+
+helpers.describe("incremental swipes: the Linux reversal floor", function()
+	helpers.it("is the corpus floor (incremental-step-vectors)", function()
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/gestures/incremental_steps.json", "rb"))
+		local corpus = json.decode(file:read("*a"))
+		file:close()
+		local Tracker = helpers.load_module("modules.gestures.incremental_tracker")
+		helpers.assert_eq(Tracker.REVERSE_FLOOR_MM, corpus.reverse_floor_mm)
+	end)
+end)
