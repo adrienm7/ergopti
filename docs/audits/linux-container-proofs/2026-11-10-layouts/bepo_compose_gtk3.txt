@@ -1,0 +1,14 @@
+  ok   GTK editor mousepad exposes its text on the accessibility bus
+  ok   Qt editor kwrite exposes its text on the accessibility bus
+== Bépo registry layout, desktop Compose
+  ok   Bépo is installed in the user tree: ok
+  ok   Bépo is loaded into the running server: ok nil
+  ok   ~/.XCompose carries the Bépo rules inline
+  ok   the installed Compose file has the ₢ rule: <onefifth> <dead_cedilla>
+  ok   the Bépo keymap types both keysyms (onefifth 33 shift altgr; dead_cedilla 35 altgr; )
+  ok   GTK editor restarted with the Bépo ~/.XCompose
+  ok   GTK monnaie then cédille types ₢ at once (got "₢")
+  ok   Qt editor restarted with the Bépo ~/.XCompose
+  ok   Qt monnaie then cédille types ₢ at once (got "₢")
+  ok   no output emergency stop ()
+=== 12 check(s), 0 failure(s) ===

@@ -148,11 +148,51 @@ class UserInstallerTests(unittest.TestCase):
         content = (self.home / ".XCompose").read_text(encoding="utf-8")
         self.assertTrue(content.startswith('<Multi_key> <a> <a> : "å"\n'))
         self.assertIn(installer.XCOMPOSE_MARKER + "\n", content)
-        include = installer.build_xcompose_block([self.root / "compose" / "ergol.XCompose"])[1]
-        self.assertTrue(
-            include.startswith('include "') and include.endswith('ergol.XCompose"'), include
+        installer.uninstall("ergol", self.root, self.home, deactivate=False)
+        self.assertEqual(
+            (self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <a> <a> : "å"\n'
         )
-        self.assertIn(include, content.splitlines())
+
+    def test_the_xcompose_block_repeats_single_character_rules_for_gtk3(self) -> None:
+        """gtk3-compose-inline: GTK 3's built-in input method ignores includes and
+        overflows on many multi-character outputs; libX11 and Qt read the include."""
+        legacy = installer.XCOMPOSE_MARKER + '\ninclude "/old/ergol.XCompose"\n'
+        (self.home / ".XCompose").write_text(
+            '<Multi_key> <a> <a> : "å"\n' + legacy, encoding="utf-8"
+        )
+        self.install("ergol", "French (Ergo-L)")
+        lines = (self.home / ".XCompose").read_text(encoding="utf-8").splitlines()
+        compose = self.root / "compose" / "ergol.XCompose"
+        rules = compose.read_text(encoding="utf-8").splitlines()
+        start = lines.index(installer.XCOMPOSE_MARKER)
+        self.assertEqual(
+            lines[:start], ['<Multi_key> <a> <a> : "å"'], "the user's rules stay first"
+        )
+        block = lines[start + 1 :]
+        self.assertEqual(block[0], 'include "%L"')
+        self.assertEqual(block[1], 'include "%s"' % compose, "libX11 and Qt read every rule")
+        self.assertEqual(block[-1], "# End of ErgoptiPlus managed layouts XCompose")
+        inline = block[2:-1]
+        self.assertTrue(inline, "GTK 3 gets the single-character rules")
+        self.assertEqual(
+            inline, [line for line in rules if line in set(inline)], "in the file's order"
+        )
+        for line in inline:
+            value = line.rsplit(":", 1)[1].strip()
+            self.assertEqual(
+                len(value.strip('"').replace('\\"', '"').replace("\\\\", "\\")), 1, line
+            )
+        multi = [
+            line
+            for line in rules
+            if line.rstrip().endswith('"') and len(line.rsplit('"', 2)[-2]) > 1
+        ]
+        self.assertTrue(
+            multi and not set(multi) & set(inline), "multi-character outputs stay in the include"
+        )
+        self.assertNotIn(
+            "/old/ergol.XCompose", "\n".join(lines), "the include-only block is replaced"
+        )
         installer.uninstall("ergol", self.root, self.home, deactivate=False)
         self.assertEqual(
             (self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <a> <a> : "å"\n'
