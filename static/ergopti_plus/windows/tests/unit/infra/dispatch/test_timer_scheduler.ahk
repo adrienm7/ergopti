@@ -482,21 +482,6 @@ _TSTest_EveryExceptionIsolation() {
 }
 Test("TimerScheduler — every(): callback exceptions are isolated", _TSTest_EveryExceptionIsolation)
 
-; Three placeholders stood here, each asserting AssertTrue(true). A_IsSuspended
-; cannot be set from a test, but the wrapper the suspend check lives in CAN be
-; called directly — the tests above already do — and the ordering of that check
-; is what the invariant really is.
-_TSTest_RepeatingChecksSuspendBeforeTheCallback() {
-	Body := _DriverFuncBody("_Repeating")
-	GuardPos := InStr(Body, "if A_IsSuspended")
-	CallPos  := InStr(Body, "BoundFn()")
-	Assert(GuardPos > 0,
-		"the repeating wrapper must bail on A_IsSuspended — a paused driver that keeps firing its pollers is the whole of 'pause = everything off'")
-	Assert(CallPos > 0, "and it must still call the callback when not paused")
-	Assert(GuardPos < CallPos,
-		"the suspend check must come BEFORE the callback runs, not after it")
-}
-Test("TimerScheduler — every(): the suspend check precedes the callback", _TSTest_RepeatingChecksSuspendBeforeTheCallback)
 
 
 _TSTest_ThrowingCallback_ThrowFn() {

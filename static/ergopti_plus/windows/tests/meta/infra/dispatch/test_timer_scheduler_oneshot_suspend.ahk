@@ -16,6 +16,12 @@
 ;
 ; The fix: when A_IsSuspended is true, the callback re-queues itself with a
 ; 500ms one-shot SetTimer so it eventually fires after suspension ends.
+;
+; The deferral itself is observed by a real suspended delivery in
+; unit/infra/dispatch/test_timer_scheduler_suspend.ahk. What stays here is the
+; atomicity of the re-queue: the native SetTimer call has no seam and a single
+; test thread cannot interrupt it, so only its position inside the Critical
+; section can be checked.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -25,45 +31,10 @@
 
 ; ===============================================================
 ; ===============================================================
-; ======= 1/ One-shot timer reschedules on A_IsSuspended ========
+; ======= 1/ Suspended re-queue stays non-interruptible =========
 ; ===============================================================
 ; ===============================================================
 
-_TSO_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
-}
-
-_TSO_OneShotReschedules() {
-	Src := _TSO_ReadSource("timer_scheduler.ahk")
-	; Use the definition pattern (with trailing " {") to avoid matching the call site at TimerAfter.
-	Body := _DriverFuncBody("_TimerAdapterMakeOneShot")
-
-	Assert(Body != "", "_TimerAdapterMakeOneShot must exist in timer_scheduler.ahk")
-
-	; The suspension guard must now reschedule instead of silently returning
-	Assert(RegExMatch(Body, "A_IsSuspended") > 0,
-		"_TimerAdapterMakeOneShot must still check A_IsSuspended (timer-scheduler-oneshot-suspend)")
-
-	; Re-queue with a negative-delay (one-shot) SetTimer
-	Assert(RegExMatch(Body, "SetTimer\([^,]+,\s*-\d+\)") > 0,
-		"_OneShot must reschedule itself with SetTimer(..., -N) when suspended (timer-scheduler-oneshot-suspend)")
-
-	; The bare `return` without reschedule must not appear immediately after the
-	; A_IsSuspended check (the reschedule + return replaces the bare return)
-	; We check that SetTimer appears before any plain `return` in the suspend block
-	SuspendIdx := InStr(Body, "A_IsSuspended")
-	SetTimerIdx := InStr(Body, "SetTimer(")
-	Assert(SetTimerIdx > SuspendIdx,
-		"SetTimer reschedule must follow the A_IsSuspended check in _OneShot (timer-scheduler-oneshot-suspend)")
-}
-Test("timer_scheduler: _OneShot reschedules itself when A_IsSuspended (timer-scheduler-oneshot-suspend)", _TSO_OneShotReschedules)
-
-; A one-shot that fires while suspended stores a second native callback in the
-; same handle. A restart or cancellation must never observe that logical owner
-; before the native SetTimer call has armed it: otherwise it can cancel nothing,
-; the old callback remains armed, and later fires into the restarted owner.
-; The outer callback must therefore enter Critical before its first handle read
-; and leave only after the suspended re-queue is armed or rejected.
 _TSO_SuspendedRequeueOwnershipIsAtomic() {
 	Body := _DriverFuncBody("_TimerAdapterMakeOneShot")
 	Assert(Body != "", "_TimerAdapterMakeOneShot must exist for the atomic suspended-requeue guard")
