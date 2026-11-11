@@ -151,7 +151,9 @@ end
 --- Whether the logger writes DEBUG lines now.
 --- @return boolean
 local function debug_on()
-	return Logger.current_level <= Logger.LEVELS.DEBUG
+	-- The logger's own predicate, as every other DEBUG gate asks it: its level
+	-- field is private, and a logger without one is no DEBUG logger.
+	return Logger.is_enabled(Logger.LEVELS.DEBUG)
 end
 
 --- Opens a segment a person waits on, with its paired TRACE line at DEBUG.
