@@ -28,6 +28,8 @@ if not loaded then luv = nil end
 
 local _owned = {}
 local MAX_PACKET_BYTES = Timings.count("limits", "proxy_packet_bytes")
+-- Largest pac_check_timeout_ms admitted: the bound of the child's PAC download.
+local MAX_PAC_CHECK_MS = Timings.ms("adapters", "proxy_pac_download_max_ms")
 
 
 -- =========================================
@@ -212,9 +214,10 @@ end
 
 --- Resolves one destination through the native desktop proxy configuration.
 --- Callers preserve the returned ordered proxies, including explicit DIRECT.
---- They must not interpret lookup success as PAC download/evaluation success:
---- with pac_check_timeout_ms, a DIRECT answer whose configured PAC could not be
---- downloaded carries pac_unavailable = "native_pac_download" (GNOME settings).
+--- With pac_check_timeout_ms, a GNOME-configured PAC is downloaded and
+--- evaluated by the lookup child itself, so the list is complete (GIO drops
+--- DIRECT); a DIRECT answer whose PAC could not be downloaded carries
+--- pac_unavailable = "native_pac_download".
 --- @param url string Private destination URL.
 --- @param options table { owner, timeout_ms, pac_check_timeout_ms? }
 --- @param callback function Receives the native selection after retirement.
@@ -227,7 +230,7 @@ function M.lookup_owned(url, options, callback)
 		or options.timeout_ms % 1 ~= 0 or type(callback) ~= "function"
 		or (options.on_native_terminal ~= nil and type(options.on_native_terminal) ~= "function")
 		or (options.pac_check_timeout_ms ~= nil and (type(options.pac_check_timeout_ms) ~= "number"
-			or options.pac_check_timeout_ms < 1 or options.pac_check_timeout_ms > 60000
+			or options.pac_check_timeout_ms < 1 or options.pac_check_timeout_ms > MAX_PAC_CHECK_MS
 			or options.pac_check_timeout_ms % 1 ~= 0)) then return nil, "proxy-options-invalid" end
 	if _owned[options.owner] then return nil, "proxy-owner-busy" end
 	if not luv then return nil, "proxy-async-unavailable" end

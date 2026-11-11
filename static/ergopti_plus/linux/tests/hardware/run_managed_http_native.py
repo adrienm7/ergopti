@@ -98,6 +98,8 @@ class PacHandler(http.server.BaseHTTPRequestHandler):
             time.sleep(3)
         if self.path == "/direct.pac":
             selection = "DIRECT"
+        elif self.path == "/dead_direct.pac":
+            selection = f"PROXY 127.0.0.1:{self.server.refused_port}; DIRECT"
         elif self.path == "/relay.pac":
             selection = f"PROXY 127.0.0.1:{self.server.refused_port}; PROXY 127.0.0.1:{self.server.proxy_port}; DIRECT"
         else:
@@ -734,8 +736,21 @@ class NativePublicControls(unittest.TestCase):
             "Actual paired-image/stat metric admission is unavailable",
         )
 
+    def test_actual_pac_dead_relay_then_direct_reaches_origin(self):
+        # GIO and libproxy 0.5 drop the DIRECT of this answer; the lookup child
+        # evaluates the PAC itself, so the failover reaches the origin direct.
+        receipt, _ = self.invoke(
+            mode="auto",
+            pac_name="dead_direct",
+            url=f"http://{self.origin_address}:{self.origin.server_port}/private",
+        )
+        self.assertTrue(receipt["ok"], receipt)
+        self.assertEqual(receipt["status"], 200)
+        self.assertEqual(receipt["process_count"], 3)
+        self.assertIn("/dead_direct.pac", self.pac.paths)
 
-# Additive actual fixture only. All preceding18 original method bodies remain exact.
+
+# Additive actual fixture only. All preceding 19 method bodies remain exact.
 import ssl
 
 HEADERS = {
