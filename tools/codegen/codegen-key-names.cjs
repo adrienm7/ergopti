@@ -96,6 +96,12 @@ const lua = [
 fs.writeFileSync(shared('lua', 'keycodes', 'key_names_data.lua'), lua, 'utf8');
 
 const WINDOWS = 'windows';
+/**
+ * An AutoHotkey double-quoted literal: its escape is the backtick, so a
+ * backslash stays itself and a backquote legend doubles.
+ * @param {string} value @returns {string}
+ */
+const ahkQuote = (value) => '"' + value.replace(/`/g, '``').replace(/"/g, '`"') + '"';
 const ahk = [
 	'﻿; _generated/key_names.ahk',
 	'',
@@ -110,6 +116,12 @@ const ahk = [
 	'\t\t"aliases", Map(',
 	Object.entries(data.aliases)
 		.map(([alias, id]) => `\t\t\t${quote(alias)}, ${quote(id)}`)
+		.join(',\n'),
+	'\t\t),',
+	`\t\t"numpad", ${ahkQuote(physical.numpad)},`,
+	'\t\t"legends", Map(',
+	Object.entries(physical.legends)
+		.map(([code, legend]) => `\t\t\t${ahkQuote(code)}, ${ahkQuote(legend)}`)
 		.join(',\n'),
 	'\t\t)',
 	'\t)',

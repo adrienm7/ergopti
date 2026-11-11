@@ -81,6 +81,26 @@ KeyNamesData() {
 			"audiovolumemute", "volume_mute",
 			"audiovolumedown", "volume_down",
 			"audiovolumeup", "volume_up"
+		),
+		"numpad", "key_name.numpad",
+		"legends", Map(
+			"Backquote", "``",
+			"Minus", "-",
+			"Equal", "=",
+			"BracketLeft", "[",
+			"BracketRight", "]",
+			"Backslash", "\",
+			"Semicolon", ";",
+			"Quote", "'",
+			"IntlBackslash", "<",
+			"Comma", ",",
+			"Period", ".",
+			"Slash", "/",
+			"NumpadDivide", "/",
+			"NumpadMultiply", "*",
+			"NumpadSubtract", "-",
+			"NumpadAdd", "+",
+			"NumpadDecimal", "."
 		)
 	)
 	return Data

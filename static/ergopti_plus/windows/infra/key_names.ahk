@@ -126,3 +126,40 @@ KeyNameFill(Key, Value, Translate := "") {
 		throw ValueError("A key name template does not hold {1}.", -1, Key)
 	return StrReplace(Template, "{1}", Value)
 }
+
+; How one physical position reads in a row: KeyA as A, Digit1 as 1, F5 as F5,
+; a sign position as its legend, a numpad position as « Pavé num. 7 », any
+; other code as the key it names. Port of key_names.lua physical_label.
+; @param Code {String} A W3C code of physical_keys.json.
+; @param Translate {Func} The lookup, when a caller injects one; t by default.
+; @returns {String}
+KeyNamePhysicalLabel(Code, Translate := "") {
+	if !(Code is String)
+		throw TypeError("A physical code must be a string.", -1)
+	if RegExMatch(Code, "^Key([A-Z])$", &Letter) || RegExMatch(Code, "^Digit(\d)$", &Letter)
+		return Letter[1]
+	if RegExMatch(Code, "^F\d\d?$")
+		return Code
+	Legends := KeyNamesData()["legends"]
+	Legend := Legends.Has(Code) ? Legends[Code] : ""
+	if RegExMatch(Code, "^Numpad(.+)$", &Pad) {
+		Inner := RegExMatch(Pad[1], "^\d$") ? Pad[1] : Legend
+		if (Inner == "" && KeyNameCanonical(Pad[1]) != "")
+			Inner := KeyNameLabel(Pad[1], Translate)
+		if (Inner == "")
+			throw ValueError("The key name table has no name for this physical key.", -1, Code)
+		Template := KeyNamesData()["numpad"]
+		Text := Translate == "" ? t(Template) : Translate.Call(Template)
+		; A catalogue miss shows its dotted key, like every other label.
+		if (Text == Template)
+			return Text . " " . Inner
+		if !InStr(Text, "{1}")
+			throw ValueError("A key name template does not hold {1}.", -1, Template)
+		return StrReplace(Text, "{1}", Inner)
+	}
+	if (Legend != "")
+		return Legend
+	if (KeyNameCanonical(Code) == "")
+		throw ValueError("The key name table has no name for this physical key.", -1, Code)
+	return KeyNameLabel(Code, Translate)
+}
