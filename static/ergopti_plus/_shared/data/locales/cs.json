@@ -1389,6 +1389,7 @@
 	"linux_shell.install.unreviewed_native_modules": "Zdroj obsahuje složku nativních modulů neznámého původu.",
 	"linux_shell.install.xdg_autostart": "automatické spuštění XDG: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ již v této relaci běží ({1} je obsazen); toto spuštění bylo odmítnuto.",
+	"linux_shell.launch.restarting": "Ergopti+ už v této relaci běží; bude požádán o ukončení a poté znovu spuštěn.",
 	"linux_shell.launch.authorization_failed": "Autorizace přístupu ke vstupu byla zrušena nebo selhala.",
 	"linux_shell.launch.groups_unavailable": "Relace nemohla získat své nakonfigurované vstupní skupiny.",
 	"linux_shell.launch.session_lock_invalid": "Adresář zámku relace musí být absolutní cesta.",

@@ -85,6 +85,7 @@ install.xdg_autostart=הפעלה אוטומטית של XDG: {1}
 launch.already_running=Ergopti+ כבר פועל בהפעלה זו ({1} תפוס); ניסיון ההפעלה הנוסף נדחה.
 launch.authorization_failed=הרשאת הגישה לקלט בוטלה או נכשלה.
 launch.groups_unavailable=ההפעלה לא הצליחה לקבל את קבוצות הקלט שהוגדרו לה.
+launch.restarting=Ergopti+ כבר פועל בהפעלה זו; הוא מתבקש להיסגר ולאחר מכן מופעל מחדש.
 launch.session_lock_invalid=תיקיית נעילת ההפעלה חייבת להיות נתיב מוחלט.
 launcher.dependencies_installed=התלויות הותקנו.
 launcher.driver_missing=שגיאה: תיקיית מנהל ההתקן של Linux לא נמצאה: {1}

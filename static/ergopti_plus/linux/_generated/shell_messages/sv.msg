@@ -85,6 +85,7 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ körs redan i den här sessionen ({1} är upptagen); den här starten avvisades.
 launch.authorization_failed=Auktoriseringen för inmatningsåtkomst avbröts eller misslyckades.
 launch.groups_unavailable=Sessionen kunde inte få sina konfigurerade inmatningsgrupper.
+launch.restarting=Ergopti+ körs redan i den här sessionen; den ombeds avsluta och startas sedan om.
 launch.session_lock_invalid=Mappen för sessionslåset måste vara en absolut sökväg.
 launcher.dependencies_installed=Beroenden installerade.
 launcher.driver_missing=Fel: katalogen för Linux-drivrutinen hittades inte: {1}

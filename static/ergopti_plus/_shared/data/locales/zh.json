@@ -1389,6 +1389,7 @@
 	"linux_shell.install.unreviewed_native_modules": "源代码中包含来源不明的原生模块文件夹。",
 	"linux_shell.install.xdg_autostart": "XDG 自动启动：{1}",
 	"linux_shell.launch.already_running": "Ergopti+ 已在此会话中运行（{1} 已被占用）；本次启动被拒绝。",
+	"linux_shell.launch.restarting": "Ergopti+ 已在此会话中运行；正在请求其退出，然后重新启动。",
 	"linux_shell.launch.authorization_failed": "输入访问授权已取消或失败。",
 	"linux_shell.launch.groups_unavailable": "会话无法获得已配置的输入组。",
 	"linux_shell.launch.session_lock_invalid": "会话锁定文件夹必须使用绝对路径。",

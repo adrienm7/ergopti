@@ -1389,6 +1389,7 @@
 	"linux_shell.install.unreviewed_native_modules": "Kaynak, kökeni bilinmeyen bir yerel modül klasörü içeriyor.",
 	"linux_shell.install.xdg_autostart": "XDG otomatik başlatma: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ bu oturumda zaten çalışıyor ({1} kilitli); bu başlatma reddedildi.",
+	"linux_shell.launch.restarting": "Ergopti+ bu oturumda zaten çalışıyor; kapanması isteniyor, ardından yeniden başlatılıyor.",
 	"linux_shell.launch.authorization_failed": "Giriş erişimi yetkilendirmesi iptal edildi veya başarısız oldu.",
 	"linux_shell.launch.groups_unavailable": "Oturum yapılandırılmış giriş gruplarını alamadı.",
 	"linux_shell.launch.session_lock_invalid": "Oturum kilidi klasörü mutlak bir yol olmalıdır.",

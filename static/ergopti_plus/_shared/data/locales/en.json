@@ -1384,6 +1384,7 @@
 	"linux_shell.install.unreviewed_native_modules": "The source holds a native module folder of unknown origin.",
 	"linux_shell.install.xdg_autostart": "XDG autostart: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ is already running in this session ({1} is held); this launch was refused.",
+	"linux_shell.launch.restarting": "Ergopti+ is already running in this session; asking it to quit, then restarting.",
 	"linux_shell.launch.authorization_failed": "Input permission authorization was cancelled or failed.",
 	"linux_shell.launch.groups_unavailable": "The session could not acquire its configured input groups.",
 	"linux_shell.launch.session_lock_invalid": "The session lock root must be an absolute path.",

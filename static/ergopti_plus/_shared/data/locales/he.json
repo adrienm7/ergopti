@@ -1389,6 +1389,7 @@
 	"linux_shell.install.unreviewed_native_modules": "המקור מכיל תיקיית מודולים מקוריים ממקור לא ידוע.",
 	"linux_shell.install.xdg_autostart": "הפעלה אוטומטית של XDG: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ כבר פועל בהפעלה זו ({1} תפוס); ניסיון ההפעלה הנוסף נדחה.",
+	"linux_shell.launch.restarting": "Ergopti+ כבר פועל בהפעלה זו; הוא מתבקש להיסגר ולאחר מכן מופעל מחדש.",
 	"linux_shell.launch.authorization_failed": "הרשאת הגישה לקלט בוטלה או נכשלה.",
 	"linux_shell.launch.groups_unavailable": "ההפעלה לא הצליחה לקבל את קבוצות הקלט שהוגדרו לה.",
 	"linux_shell.launch.session_lock_invalid": "תיקיית נעילת ההפעלה חייבת להיות נתיב מוחלט.",
