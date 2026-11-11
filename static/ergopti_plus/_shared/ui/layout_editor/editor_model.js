@@ -304,6 +304,51 @@ var LayoutEditorModel = (function () {
 		return commit(next);
 	}
 
+	/**
+	 * Moves or copies what a key does on a layer to another key, KbdEdit's drag
+	 * and drop: a move swaps the two keys, a copy leaves the source as it was.
+	 * @param {boolean} keep - True copies, false swaps.
+	 */
+	function transferMapping(doc, layerId, from, to, platform, keep) {
+		if (from === to) return doc;
+		const source = mappingAt(doc, layerId, from, platform);
+		const target = mappingAt(doc, layerId, to, platform);
+		const pick = (found) => (found && found.scope === (platform || 'all') ? found.mapping : null);
+		let next = setMapping(doc, layerId, to, pick(source), platform);
+		if (!keep) next = setMapping(next, layerId, from, pick(target), platform);
+		return next;
+	}
+
+	/** Replaces the Windows layout flags (KLLF and similar identifiers). */
+	function setWindowsFlags(doc, flags) {
+		const next = editable(doc);
+		next.windows = next.windows || {};
+		if (flags.length) next.windows.flags = flags.slice();
+		else delete next.windows.flags;
+		if (Object.keys(next.windows).length === 0) delete next.windows;
+		return commit(next);
+	}
+
+	const nlsId = (entry) => `${entry.key}:${entry.modifiers.slice().sort().join(',')}`;
+
+	/** Adds or replaces a Windows NLS special function on a key chord. */
+	function setNls(doc, entry) {
+		const next = editable(doc);
+		next.windows = next.windows || {};
+		next.windows.nls = (next.windows.nls || []).filter((e) => nlsId(e) !== nlsId(entry));
+		next.windows.nls.push(copy(entry));
+		return commit(next);
+	}
+
+	function removeNls(doc, key, modifiers) {
+		const next = editable(doc);
+		const id = nlsId({ key, modifiers });
+		next.windows.nls = (next.windows.nls || []).filter((e) => nlsId(e) !== id);
+		if (next.windows.nls.length === 0) delete next.windows.nls;
+		if (Object.keys(next.windows).length === 0) delete next.windows;
+		return commit(next);
+	}
+
 	// =============================
 	// ======= 5/ Preview ==========
 	// =============================
@@ -454,6 +499,10 @@ var LayoutEditorModel = (function () {
 		removeTapHold,
 		setLayout,
 		setExport,
+		transferMapping,
+		setWindowsFlags,
+		setNls,
+		removeNls,
 		layerFor,
 		simulate,
 		kindOf,

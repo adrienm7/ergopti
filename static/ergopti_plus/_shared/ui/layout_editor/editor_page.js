@@ -58,6 +58,11 @@ var LayoutEditorPage = (function () {
 		MetaRight: 'meta_right'
 	};
 	const TAP_HOLD_THRESHOLD_STEP = 10;
+	// Exact sticker sizes the print accepts, in millimetres (keycaps are about 18 mm).
+	const STICKER_MIN_MM = 8;
+	// The levels of another layout a layer can be filled from (the composer's levels).
+	const FILL_LEVELS = ['base', 'shift', 'altgr', 'shift_altgr', 'command'];
+	const STICKER_MAX_MM = 30;
 
 	// ============================
 	// ======= 2/ Helpers =========
@@ -195,6 +200,16 @@ var LayoutEditorPage = (function () {
 			confirm: null,
 			// Whether the exact import refused the file, so the approximate one is offered.
 			approximate: false,
+			// The board drawn: ISO or ANSI geometry (the source itself is described on ISO).
+			board: 'iso',
+			// A mapping copied with « Copy », pasted on another key.
+			clipboard: null,
+			// Sticker size: null fits the page, a number is the key size in millimetres.
+			stickerMm: null,
+			// Layouts a layer can be filled from (null until asked), and whether the
+			// host's registry list failed (the built-in references remain).
+			fillSources: null,
+			fillUnavailable: null,
 			// Physical modifier keys held in the preview, as sided modifier ids.
 			heldSides: new Set(),
 			lost: null,
@@ -412,6 +427,40 @@ var LayoutEditorPage = (function () {
 					text: tl('btn.print'),
 					onclick: () => window.print()
 				}),
+				el('label', { class: 'le-inline' }, [
+					tl('sticker.size'),
+					el('input', {
+						type: 'number',
+						id: 'le-sticker-mm',
+						min: STICKER_MIN_MM,
+						max: STICKER_MAX_MM,
+						placeholder: tl('sticker.fit'),
+						value: state.stickerMm === null ? '' : state.stickerMm,
+						onchange: (event) => {
+							const mm = Number(event.target.value);
+							state.stickerMm =
+								event.target.value === '' || !(mm >= STICKER_MIN_MM && mm <= STICKER_MAX_MM)
+									? null
+									: mm;
+							render();
+						}
+					})
+				]),
+				el('label', { class: 'le-inline' }, [
+					tl('board.label'),
+					select(
+						[
+							['iso', tl('physical.iso')],
+							['ansi', tl('physical.ansi')]
+						],
+						state.board,
+						(value) => {
+							state.board = value;
+							render();
+						},
+						{ id: 'le-board-form' }
+					)
+				]),
 				el('span', { class: 'le-sep' }),
 				el('label', { class: 'le-inline' }, [
 					tl('nav_hold'),
@@ -637,14 +686,43 @@ var LayoutEditorPage = (function () {
 			return found ? found : null;
 		}
 
+		function editableLayer() {
+			return Boolean(state.layer) && !LayoutSourceIO.isPreserved(doc());
+		}
+
+		function copyMapping(code) {
+			const found = currentMapping(code);
+			state.clipboard = found ? JSON.parse(JSON.stringify(found.mapping)) : null;
+			notify('ok', tl(found ? 'status.copied' : 'status.copied_empty', { key: keyName(code) }));
+		}
+
+		function pasteMapping(code) {
+			apply((d) =>
+				LayoutEditorModel.setMapping(d, state.layer, code, state.clipboard, state.platform || null)
+			);
+		}
+
+		/** Ctrl/Cmd+C and Ctrl/Cmd+V on a focused key copy and paste its mapping. */
+		function clipboardKey(event, code) {
+			if (!editableLayer() || !(event.ctrlKey || event.metaKey)) return;
+			if (event.key === 'c') copyMapping(code);
+			else if (event.key === 'v') pasteMapping(code);
+			else return;
+			event.preventDefault();
+		}
+
 		function board() {
+			const form = state.board;
 			const keys = data.keys.filter(
 				(k) =>
-					k.kind === 'key' && k.geometry && k.geometry.iso && (state.numpad || k.group !== 'numpad')
+					k.kind === 'key' &&
+					k.geometry &&
+					k.geometry[form] &&
+					(state.numpad || k.group !== 'numpad')
 			);
-			const width = Math.max(...keys.map((k) => k.geometry.iso.col + k.geometry.iso.width));
+			const width = Math.max(...keys.map((k) => k.geometry[form].col + k.geometry[form].width));
 			const height = Math.max(
-				...keys.map((k) => k.geometry.iso.row + (k.geometry.iso.height || 1))
+				...keys.map((k) => k.geometry[form].row + (k.geometry[form].height || 1))
 			);
 			const container = el('div', {
 				class: 'le-board',
@@ -653,7 +731,7 @@ var LayoutEditorPage = (function () {
 			});
 			const remap = doc().remap || {};
 			for (const key of keys) {
-				const g = key.geometry.iso;
+				const g = key.geometry[form];
 				const found = currentMapping(key.code);
 				const classes = ['le-key'];
 				if (found) classes.push(found.scope === 'all' ? 'mapped' : 'platform');
@@ -670,9 +748,30 @@ var LayoutEditorPage = (function () {
 							style:
 								`left:${g.col * KEY_UNIT_PX}px;top:${g.row * KEY_UNIT_PX}px;` +
 								`width:${g.width * KEY_UNIT_PX - 4}px;height:${(g.height || 1) * KEY_UNIT_PX - 4}px`,
+							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
 								state.selected = key.code;
 								render();
+							},
+							onkeydown: (event) => clipboardKey(event, key.code),
+							ondragstart: (event) => event.dataTransfer.setData('text/plain', key.code),
+							ondragover: (event) => event.preventDefault(),
+							// KbdEdit's drop: a plain drop swaps the two keys, Ctrl (or Alt) copies.
+							ondrop: (event) => {
+								event.preventDefault();
+								const from = event.dataTransfer.getData('text/plain');
+								if (!from || !editableLayer()) return;
+								const keep = event.ctrlKey || event.altKey;
+								apply((d) =>
+									LayoutEditorModel.transferMapping(
+										d,
+										state.layer,
+										from,
+										key.code,
+										state.platform || null,
+										keep
+									)
+								);
 							}
 						},
 						[
@@ -796,7 +895,59 @@ var LayoutEditorPage = (function () {
 						apply((d) =>
 							LayoutEditorModel.setMapping(d, state.layer, code, built(), state.platform || null)
 						)
-				})
+				}),
+				el('button', {
+					type: 'button',
+					id: 'le-copy',
+					text: tl('btn.copy'),
+					onclick: () => copyMapping(code)
+				}),
+				el('button', {
+					type: 'button',
+					id: 'le-paste',
+					text: tl('btn.paste'),
+					disabled: state.clipboard === null,
+					onclick: () => pasteMapping(code)
+				}),
+				el('p', { class: 'le-note', text: tl('drag_hint') })
+			]);
+		}
+
+		/** Where a character is typed in the source: every layer and key whose text holds it. */
+		function locate() {
+			const input = el('input', {
+				type: 'text',
+				id: 'le-locate',
+				size: 8,
+				placeholder: tl('palette.locate_placeholder')
+			});
+			const results = el('ul', { class: 'le-list', id: 'le-locate-results' });
+			const run = () => {
+				const raw = input.value.trim();
+				const hexForm = /^U\+([0-9A-Fa-f]{1,6})$/.exec(raw);
+				const point = hexForm ? parseInt(hexForm[1], 16) : null;
+				const valid = point === null || (point <= 0x10ffff && (point < 0xd800 || point > 0xdfff));
+				if (!raw || !valid)
+					return notify('error', problemText({ code: 'codepoint_invalid', path: raw }));
+				const wanted = point === null ? raw : String.fromCodePoint(point);
+				const found = [];
+				for (const layer of doc().layers || [])
+					for (const [code, mapping] of Object.entries(layer.keys))
+						if (typeof mapping.text === 'string' && mapping.text.includes(wanted))
+							found.push(`${layer.id} · ${keyName(code)}`);
+				results.replaceChildren(
+					...(found.length ? found : [tl('palette.locate_none')]).map((text) => el('li', { text }))
+				);
+			};
+			return el('span', { class: 'le-inline' }, [
+				input,
+				el('button', {
+					type: 'button',
+					id: 'le-locate-run',
+					text: tl('palette.locate'),
+					onclick: run
+				}),
+				results
 			]);
 		}
 
@@ -830,6 +981,7 @@ var LayoutEditorPage = (function () {
 					},
 					{ id: 'le-palette-block' }
 				),
+				locate(),
 				hex,
 				el('button', {
 					type: 'button',
@@ -865,12 +1017,26 @@ var LayoutEditorPage = (function () {
 				{ id: 'le-caps' }
 			);
 			const nameInput = el('input', { type: 'text', id: 'le-key-name', value: entry.name || '' });
+			const virtualKey = el('input', {
+				type: 'number',
+				id: 'le-virtual-key',
+				min: 0,
+				max: 255,
+				value: entry.virtual_key === undefined ? '' : entry.virtual_key
+			});
+			const capsAltgr = el('input', {
+				type: 'checkbox',
+				id: 'le-caps-altgr',
+				checked: entry.caps_altgr === true
+			});
 			return el('div', { class: 'le-group' }, [
 				el('h3', { text: tl('inspector.key') }),
 				el('label', { class: 'le-field' }, [tl('caps.label'), capsSelect]),
 				el('label', { class: 'le-field' }, [tl('caps.layer'), capsLayer]),
 				el('label', { class: 'le-field' }, [tl('caps.shift_layer'), capsShift]),
 				el('label', { class: 'le-field' }, [tl('key.name'), nameInput]),
+				el('label', { class: 'le-check' }, [capsAltgr, tl('key.caps_altgr')]),
+				el('label', { class: 'le-field' }, [tl('key.virtual_key'), virtualKey]),
 				el('button', {
 					type: 'button',
 					id: 'le-key-apply',
@@ -887,6 +1053,10 @@ var LayoutEditorPage = (function () {
 						}
 						if (nameInput.value) properties.name = nameInput.value;
 						else delete properties.name;
+						if (capsAltgr.checked) properties.caps_altgr = true;
+						else delete properties.caps_altgr;
+						if (virtualKey.value === '') delete properties.virtual_key;
+						else properties.virtual_key = Number(virtualKey.value);
 						apply((d) => LayoutEditorModel.setKeyProperties(d, code, properties));
 					}
 				})
@@ -1065,6 +1235,156 @@ var LayoutEditorPage = (function () {
 		// ==================================
 		// ======= 10/ Modifiers, dead keys ==
 		// ==================================
+
+		/** Lists the fill sources once: the built-in references, then the host's registry layouts. */
+		function loadFillSources() {
+			const loaded = host.loadSources
+				? Promise.resolve().then(() => host.loadSources())
+				: Promise.resolve([]);
+			loaded.then(
+				(supplied) => {
+					state.fillSources = LayoutSourceIO.fillSources(supplied);
+					render();
+				},
+				(error) => {
+					// The references still work; the panel says the registry list failed.
+					state.fillSources = LayoutSourceIO.fillSources([]);
+					state.fillUnavailable = problemText(error);
+					render();
+				}
+			);
+		}
+
+		/** The composer's job: fill the current layer from one level of another layout. */
+		function fillPanel() {
+			const parts = [
+				el('summary', { text: tl('fill.title') }),
+				el('p', { class: 'le-note', text: tl('fill.note') })
+			];
+			if (state.fillSources === null) {
+				parts.push(
+					el('button', {
+						type: 'button',
+						id: 'le-fill-load',
+						text: tl('fill.load'),
+						onclick: loadFillSources
+					})
+				);
+				return el('details', { class: 'le-panel', id: 'le-fill' }, parts);
+			}
+			const source = select(
+				state.fillSources.map((entry) => [entry.id, entry.name]),
+				null,
+				() => {},
+				{ id: 'le-fill-source' }
+			);
+			const level = select(
+				FILL_LEVELS.map((id) => [id, tl(`fill.level.${id}`)]),
+				FILL_LEVELS[0],
+				() => {},
+				{ id: 'le-fill-level' }
+			);
+			if (state.fillUnavailable)
+				parts.push(el('p', { class: 'le-message error', text: state.fillUnavailable }));
+			parts.push(
+				el('label', { class: 'le-field' }, [tl('fill.source'), source]),
+				el('label', { class: 'le-field' }, [tl('fill.level'), level]),
+				el('button', {
+					type: 'button',
+					id: 'le-fill-apply',
+					text: tl('fill.apply', { layer: state.layer }),
+					disabled: !state.layer,
+					onclick: () => {
+						const chosen = state.fillSources.find((entry) => entry.id === source.value);
+						const layerId = state.layer;
+						ask(tl('fill.confirm', { layer: layerId }), () =>
+							apply((d) => LayoutSourceIO.fillLayer(d, chosen, level.value, layerId))
+						);
+					}
+				})
+			);
+			return el('details', { class: 'le-panel', id: 'le-fill', open: true }, parts);
+		}
+
+		/** Windows-only records: layout flags and NLS special functions. */
+		function windowsPanel() {
+			const windows = doc().windows || {};
+			const flags = el('input', {
+				type: 'text',
+				id: 'le-win-flags',
+				value: (windows.flags || []).join(', '),
+				placeholder: 'kllf_altgr'
+			});
+			const key = select(
+				data.keys.filter((k) => k.kind === 'key').map((k) => [k.code, keyName(k.code)]),
+				null,
+				() => {},
+				{ id: 'le-nls-key' }
+			);
+			const modifiers = modifierOptions().map((id) =>
+				el('label', { class: 'le-check' }, [el('input', { type: 'checkbox', value: id }), id])
+			);
+			const fn = el('input', { type: 'text', id: 'le-nls-function', placeholder: 'kana_toggle' });
+			const parameter = select(
+				[['', tl('windows.no_parameter')]].concat(
+					data.keys.filter((k) => k.kind === 'key').map((k) => [k.code, keyName(k.code)])
+				),
+				'',
+				() => {},
+				{ id: 'le-nls-parameter' }
+			);
+			return el('details', { class: 'le-panel', id: 'le-windows' }, [
+				el('summary', { text: tl('windows.title') }),
+				el('p', { class: 'le-note', text: tl('windows.note') }),
+				el('label', { class: 'le-field' }, [tl('windows.flags'), flags]),
+				el('button', {
+					type: 'button',
+					id: 'le-win-flags-apply',
+					text: tl('btn.apply'),
+					onclick: () =>
+						apply((d) =>
+							LayoutEditorModel.setWindowsFlags(d, flags.value.split(/[\s,]+/).filter(Boolean))
+						)
+				}),
+				el(
+					'ul',
+					{ class: 'le-list', id: 'le-nls-list' },
+					(windows.nls || []).map((entry) =>
+						el('li', {}, [
+							`${entry.modifiers.concat([keyName(entry.key)]).join('+')} → ${entry.function} `,
+							el('button', {
+								type: 'button',
+								class: 'danger',
+								text: tl('btn.remove'),
+								onclick: () =>
+									apply((d) => LayoutEditorModel.removeNls(d, entry.key, entry.modifiers))
+							})
+						])
+					)
+				),
+				key,
+				el('div', { class: 'le-checks' }, modifiers),
+				el('label', { class: 'le-field' }, [tl('windows.nls_function'), fn]),
+				el('label', { class: 'le-field' }, [tl('windows.nls_parameter'), parameter]),
+				el('button', {
+					type: 'button',
+					id: 'le-nls-add',
+					text: tl('btn.add'),
+					onclick: () => {
+						const entry = {
+							key: key.value,
+							modifiers: modifiers
+								.map((c) => c.firstChild)
+								.filter((c) => c.checked)
+								.map((c) => c.value),
+							function: fn.value.trim()
+						};
+						if (parameter.value) entry.parameter_key = parameter.value;
+						apply((d) => LayoutEditorModel.setNls(d, entry));
+					}
+				})
+			]);
+		}
 
 		function modifiersPanel() {
 			const id = el('input', {
@@ -1421,6 +1741,27 @@ var LayoutEditorPage = (function () {
 						})
 					);
 			}
+			if (host.saveBinary && !LayoutSourceIO.isPreserved(doc()))
+				buttons.push(
+					el('button', {
+						type: 'button',
+						id: 'le-export-bundle',
+						text: tl('export.bundle'),
+						onclick: () => {
+							try {
+								const archive = LayoutSourceIO.macosBundleArchive(doc());
+								Promise.resolve(
+									host.saveBinary(archive.filename, archive.bytes, 'application/zip')
+								).then(
+									() => notify('ok', tl('status.saved', { name: archive.filename })),
+									(error) => notify('error', problemText(error))
+								);
+							} catch (error) {
+								notify('error', problemText(error));
+							}
+						}
+					})
+				);
 			if (host.install) buttons.push(installButton(report));
 			if ((doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
 				buttons.push(
@@ -1477,7 +1818,12 @@ var LayoutEditorPage = (function () {
 			const keys = data.keys.filter((k) => k.kind === 'key' && k.character);
 			return el(
 				'section',
-				{ class: 'le-stickers', id: 'le-stickers', 'aria-hidden': 'true' },
+				{
+					class: `le-stickers${state.stickerMm === null ? '' : ' exact'}`,
+					id: 'le-stickers',
+					'aria-hidden': 'true',
+					style: state.stickerMm === null ? null : `--le-sticker-size:${state.stickerMm}mm`
+				},
 				LayoutSourceIO.isPreserved(doc())
 					? []
 					: keys.map((key) =>
@@ -1514,6 +1860,8 @@ var LayoutEditorPage = (function () {
 				el('div', { class: 'le-main' }, [board(), inspector()]),
 				el('div', { class: 'le-panels' }, [
 					LayoutSourceIO.isPreserved(doc()) ? null : modifiersPanel(),
+					LayoutSourceIO.isPreserved(doc()) ? null : windowsPanel(),
+					LayoutSourceIO.isPreserved(doc()) ? null : fillPanel(),
 					LayoutSourceIO.isPreserved(doc()) ? null : deadKeysPanel()
 				]),
 				preview(),
