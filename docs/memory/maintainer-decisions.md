@@ -5,6 +5,20 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A token exchange answering 400 is a refused key (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (AID-2): a token exchange (watsonx
+IAM, Vertex OAuth) that answers HTTP 400 is never retried on any OS; the
+request fails at once with the service's own message. The rule lives in the
+shared classifier (`_shared/lua/llm/failure_class.lua`, phrase « the token
+exchange answered http 400 », corpus `auth_failure_vectors.json`) and the
+message in `api_token_exchange.read`'s refusal (error_description,
+errorMessage, error.message, message, then error; one line, at most
+`MAX_SERVICE_MESSAGE_BYTES`; corpus `api_token_exchange_vectors.json`).
+Windows mirrors both corpora: `LLM_TokenExchange_Read` must append the same
+message and `api_common.ahk`'s phrase list take the same phrase (or its
+prediction classifier honour `key_refused`).
+
 ## The macOS quick retry spends the attempt budget (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (AID-1): the quick retry of a failed

@@ -18,6 +18,10 @@
 --- 3. Providers that report a bad key with another status (Gemini answers 400
 ---    "API key not valid") are recognised by their message, matched
 ---    case-insensitively against a closed list of phrases.
+--- 4. A token exchange answering HTTP 400 (OAuth invalid_grant, an unknown
+---    IAM key) is a refused credential: the same key is refused again, so it
+---    fails at once with the service's message (maintainer decision AID-2 of
+---    11 November 2026). The phrase is api_token_exchange.read's refusal.
 --- ==============================================================================
 
 local M = {}
@@ -34,6 +38,7 @@ local AUTH_PHRASES = {
 	"api key is invalid", "api key is missing", "invalid x-api-key", "invalid authentication",
 	"authentication_error", "authentication failed", "unauthorized", "missing api key",
 	"no api key", "api key is missing or invalid", "invalid token", "permission_denied",
+	"the token exchange answered http 400",
 }
 
 local function has_auth_phrase(text)

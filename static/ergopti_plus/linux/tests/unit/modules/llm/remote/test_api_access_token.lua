@@ -174,8 +174,9 @@ helpers.describe("Access-token providers: the key is exchanged, never sent", fun
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			local endpoint, reason = remote.endpoint(ENTRY, ENTRY.model)
 			helpers.assert_nil(endpoint)
-			-- The request carries the exchange's status first (access_failure).
-			helpers.assert_eq(reason, "HTTP 400: the token exchange answered HTTP 400")
+			-- The request carries the exchange's status first (access_failure), then the service's message.
+			helpers.assert_eq(reason,
+				"HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found")
 			helpers.assert_eq(#calls, 1, "no second exchange at once")
 			clock.now = clock.now + 61
 			remote.endpoint(ENTRY, ENTRY.model)
@@ -204,10 +205,10 @@ helpers.describe("Access-token providers: the key is exchanged, never sent", fun
 			answer(calls, 1, 401, { errorMessage = "no" })
 			helpers.assert_eq(#calls, 1)
 			helpers.assert_eq(verdict.ok, false)
-			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401")
+			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401: no")
 			remote.test(ENTRY, function(ok, detail) verdict = { ok = ok, detail = detail } end)
 			helpers.assert_eq(#calls, 1, "a second test within the pause asks nothing")
-			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401")
+			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401: no")
 		end)
 	end)
 end)
@@ -413,6 +414,9 @@ helpers.describe("Access-token providers: the first request waits for the token 
 		end)
 	end)
 
+	-- AID-2 (decided by the maintainer on 2026-11-11): an exchange answering 400
+	-- (an unknown IAM key, OAuth invalid_grant) is a refused credential, never
+	-- retried, and the request fails with the service's own message.
 	helpers.it("a refused exchange answers the waiting chat with its reason (access-token-lease)", function()
 		with_remote(function(remote, calls)
 			local result
@@ -420,7 +424,10 @@ helpers.describe("Access-token providers: the first request waits for the token 
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			helpers.assert_eq(#calls, 1, "no completion")
 			helpers.assert_eq(result[1], "")
-			helpers.assert_eq(result[2], "HTTP 400: the token exchange answered HTTP 400")
+			helpers.assert_eq(result[2],
+				"HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found")
+			helpers.assert_true(require("llm.failure_class").is_authentication_failure(result[2]),
+				"a 400 exchange is a refused credential: never retried")
 		end)
 	end)
 
@@ -435,7 +442,7 @@ helpers.describe("Access-token providers: the first request waits for the token 
 				local result
 				remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
 				answer(calls, 1, status, { errorMessage = "no" })
-				helpers.assert_eq(result[2], "HTTP " .. status .. ": the token exchange answered HTTP " .. status)
+				helpers.assert_eq(result[2], "HTTP " .. status .. ": the token exchange answered HTTP " .. status .. ": no")
 				helpers.assert_true(FailureClass.is_authentication_failure(result[2]), "never retried")
 				result = nil
 				remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)

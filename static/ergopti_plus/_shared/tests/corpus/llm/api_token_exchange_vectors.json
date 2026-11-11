@@ -333,12 +333,49 @@
 			"expires_at": 1060
 		},
 		{
-			"name": "an HTTP refusal",
+			"name": "an HTTP refusal carries the service's message",
 			"block": "ibm",
 			"status": 400,
 			"json": { "errorMessage": "Provided API key could not be found" },
 			"now": 1000,
-			"reason": "the token exchange answered HTTP 400"
+			"reason": "the token exchange answered HTTP 400: Provided API key could not be found"
+		},
+		{
+			"name": "an OAuth refusal gives its description before its code",
+			"block": "google",
+			"status": 400,
+			"json": { "error": "invalid_grant", "error_description": "Invalid JWT Signature." },
+			"now": 1000,
+			"reason": "the token exchange answered HTTP 400: Invalid JWT Signature."
+		},
+		{
+			"name": "a Google error object gives its message, on one line",
+			"block": "google",
+			"status": 403,
+			"json": {
+				"error": {
+					"code": 403,
+					"message": "Permission denied\non resource",
+					"status": "PERMISSION_DENIED"
+				}
+			},
+			"now": 1000,
+			"reason": "the token exchange answered HTTP 403: Permission denied on resource"
+		},
+		{
+			"name": "a bare OAuth code is the message",
+			"block": "google",
+			"status": 400,
+			"json": { "error": "invalid_grant" },
+			"now": 1000,
+			"reason": "the token exchange answered HTTP 400: invalid_grant"
+		},
+		{
+			"name": "a refusal without JSON keeps its status alone",
+			"block": "ibm",
+			"status": 503,
+			"now": 1000,
+			"reason": "the token exchange answered HTTP 503"
 		},
 		{
 			"name": "no token",
