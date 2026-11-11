@@ -48,8 +48,8 @@ let checks = 0;
  * @returns {string[]} The differences, empty when equivalent.
  */
 function differences(left, right) {
-	const a = Composer.parseModel(left);
-	const b = Composer.parseModel(right);
+	const a = typeof left === 'string' ? Composer.parseModel(left) : left;
+	const b = typeof right === 'string' ? Composer.parseModel(right) : right;
 	const tokens = (keys) => keys.map((k) => k.split(/\s+/).filter(Boolean).sort().join(' '));
 	const found = [];
 	if (a.selects.length !== b.selects.length) return ['keyMapSelect count'];
@@ -123,16 +123,78 @@ for (const id of ['ergopti', 'ergopti_ansi', 'ergopti_plus', 'ergopti_plus_ansi'
 	checks++;
 }
 
-// The importer refuses what its records cannot hold, with stable codes.
-assert.throws(
-	() => Source.importStructured(registryXml('bepo'), 'bepo', 'iso'),
-	/source_import_hardware_layouts/
-);
-assert.throws(
-	() => Source.importStructured(registryXml('ergol'), 'ergol', 'ansi'),
-	/source_import_unnamed_key/
-);
-checks++;
+// Several hardware layouts (Bépo): the ISO map becomes the layers, the ANSI map the
+// ANSI variant, its differences from the derivation rule kept in each layer's ansi_keys.
+{
+	const xml = registryXml('bepo');
+	const original = Composer.parseModel(xml);
+	const reloaded = Source.read(Source.write(Source.importStructured(xml, 'bepo', 'iso')));
+	assert(
+		reloaded.layers.some((layer) => layer.ansi_keys),
+		'bepo: the ANSI map differs from the rule'
+	);
+	assert.deepEqual(differences(xml, Source.compileKeylayout(reloaded).text), [], 'bepo: ISO');
+	const ansiMap = Object.assign({}, original, { mapSet: 'ANSI' });
+	const ansi = Source.compileKeylayout(reloaded, { variant: 'ansi' });
+	assert.deepEqual(differences(ansiMap, ansi.text), [], 'bepo: ANSI map');
+	// Without its ansi_keys the ANSI variant follows the rule, which Bépo does not.
+	const ruleOnly = clone(reloaded);
+	for (const layer of ruleOnly.layers) delete layer.ansi_keys;
+	assert(
+		differences(ansiMap, Source.compileKeylayout(ruleOnly, { variant: 'ansi' }).text).length > 0,
+		'bepo: ansi_keys carry the difference'
+	);
+	// A layout set the records cannot hold is still refused with a stable code.
+	assert.throws(
+		() => Source.importStructured(xml, 'bepo', 'ansi'),
+		/source_import_hardware_layouts/
+	);
+	assert.throws(
+		() =>
+			Source.importStructured(
+				xml.replace(
+					'mapSet="ANSI" modifiers="commonModifiers"/>',
+					'mapSet="ISO" modifiers="commonModifiers"/>'
+				),
+				'bepo',
+				'iso'
+			),
+		/source_import_hardware_layouts/
+	);
+	checks++;
+}
+
+// A printable key at a code no key table names (Ergo-L's 66) is MacCode<n>: kept on
+// macOS, listed as omitted by the converter targets, which have no such key.
+{
+	const xml = registryXml('ergol');
+	const reloaded = Source.read(Source.write(Source.importStructured(xml, 'ergol', 'ansi')));
+	assert.deepEqual(clone(reloaded.layers[1].keys.MacCode66), { text: '*' }, 'ergol: code 66 named');
+	// An ANSI-numbered file is the ANSI variant of the physical source it imports to.
+	assert.deepEqual(
+		differences(xml, Source.compileKeylayout(reloaded, { variant: 'ansi' }).text),
+		[],
+		'ergol: behaviour'
+	);
+	const linux = Source.compileKeylayout(reloaded, { platform: 'linux' });
+	assert(
+		linux.omitted.some(
+			(entry) =>
+				entry.path.endsWith('.keys.MacCode66') && entry.reason === 'mac_only_key_code_not_in_linux'
+		),
+		'ergol: Linux lists code 66'
+	);
+	// A MacCode name for a code a table names, or out of range, is no key.
+	for (const name of ['MacCode0', 'MacCode128', 'MacCode066']) {
+		const source = clone(reloaded);
+		source.layers[0].keys = { [name]: { text: 'x' } };
+		assert(
+			Source.compileKeylayout(source).omitted.some((entry) => entry.path.endsWith(`.keys.${name}`)),
+			`${name} is not a key`
+		);
+	}
+	checks++;
+}
 
 // ISO edits, ANSI derived: the fixed rule reproduces the registry ANSI files.
 for (const [iso, ansi] of PAIRS) {

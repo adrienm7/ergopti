@@ -333,7 +333,7 @@ var LayoutSource = (function () {
 				(entry, at) => {
 					record(
 						entry,
-						['id', 'required', 'optional', 'alternatives', 'keys', 'platform_keys'],
+						['id', 'required', 'optional', 'alternatives', 'keys', 'platform_keys', 'ansi_keys'],
 						['id', 'required', 'optional', 'keys'],
 						at
 					);
@@ -350,6 +350,15 @@ var LayoutSource = (function () {
 					for (const [key, value] of Object.entries(entry.keys)) {
 						keyCode(key, `${at}.keys.${key}`);
 						mapping(value, `${at}.keys.${key}`, deadKeys, modifiers);
+					}
+					// The ANSI variant's own mappings where the derivation rule is not enough
+					// (Bépo's ANSI hardware map), applied after it, on every platform.
+					if (own(entry, 'ansi_keys')) {
+						requireValue(table(entry.ansi_keys), `${at}.ansi_keys`);
+						for (const [key, value] of Object.entries(entry.ansi_keys)) {
+							keyCode(key, `${at}.ansi_keys.${key}`);
+							mapping(value, `${at}.ansi_keys.${key}`, deadKeys, modifiers);
+						}
 					}
 					if (own(entry, 'platform_keys')) {
 						record(entry.platform_keys, ['windows', 'macos', 'linux'], [], `${at}.platform_keys`);
