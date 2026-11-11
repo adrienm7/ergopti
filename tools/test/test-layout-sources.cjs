@@ -9,6 +9,8 @@
  *   - ergopti.toml against KbdEdit's macOS export of Ergopti v2.2.2, whose
  *     Command level is the Windows Kana level: the source names it `kana`,
  *     which the macOS target compiles to the Option level.
+ *   - bepo_1_1rc2.toml against the official bépo 1.1rc2 macOS layout, its 115
+ *     chained dead keys included, and the chains its Windows tables carry;
  *   - bepo.toml against the official bepo.klc, table for table, and the four
  *     Windows DLLs built from each source read back as those tables.
  * The equivalence oracle walks every reachable pair of dead-key states and
@@ -227,6 +229,54 @@ assert.equal(
 	'bépo: every dead key enters its state on macOS'
 );
 
+// Bépo 1.1rc2 (the official macOS layout): its chained dead keys, up to three deep,
+// compile back on macOS and reach the Windows tables wherever kbd.h can hold them.
+const bepoMacXml = read(
+	path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'bepo', 'bepo.keylayout')
+);
+const bepo11 = Source.read(read(path.join(SOURCES, 'bepo_1_1rc2.toml')));
+const chained = bepo11.dead_keys.flatMap((dead) =>
+	dead.rules.filter((rule) => rule.next !== undefined).map((rule) => ({ dead, rule }))
+);
+assert.equal(chained.length, 115, 'the 115 chained transitions of bépo 1.1rc2');
+assert.ok(
+	chained.some(({ rule }) => {
+		const next = bepo11.dead_keys.find((dead) => dead.id === rule.next);
+		return next.rules.some((r) => r.next !== undefined);
+	}),
+	'a chain three dead keys deep'
+);
+const bepo11Mac = Composer.parseModel(Source.compileKeylayout(bepo11).text);
+assert.deepEqual(
+	differences(Composer.parseModel(bepoMacXml), bepo11Mac),
+	[],
+	'bepo_1_1rc2.toml types as bepo.keylayout'
+);
+const bepo11Windows = KbdSource.fromSource(bepo11);
+const tables = bepo11Windows.model;
+const unitOf = new Map(bepo11.dead_keys.map((dead, i) => [dead.id, tables.dead_keys[i].dead]));
+let carried = 0;
+const lost = [];
+for (const { dead, rule } of chained) {
+	const label = rule.input !== undefined ? rule.input : `@${rule.input_dead_key}`;
+	const base =
+		rule.input !== undefined ? rule.input : String.fromCharCode(unitOf.get(rule.input_dead_key));
+	const entry = tables.dead_keys
+		.find((d) => d.dead === unitOf.get(dead.id))
+		.rules.find((r) => base.length === 1 && r.base === base.charCodeAt(0));
+	if (entry && entry.dead === true && entry.result === unitOf.get(rule.next)) carried++;
+	else {
+		const why = bepo11Windows.omitted.find(
+			(o) => o.path === `dead_keys.${dead.id}.rules[${label}]`
+		);
+		assert.ok(why, `a chain Windows does not carry is said: ${dead.id} ${label}`);
+		lost.push(why.reason);
+	}
+}
+assert.equal(carried + lost.length, 115);
+assert.ok(carried >= 110, `bépo 1.1rc2: ${carried} of 115 chains in the Windows tables`);
+provenDlls(tables, 'bépo 1.1rc2');
+
 // Ergopti: Kana is the real KBDKANA column, held by Right Alt (VK_OEM_8), and
 // each Kana cell is the KbdEdit export's Command cell.
 const ergoptiWindows = KbdSource.fromSource(source);
@@ -347,5 +397,5 @@ assert.deepEqual(JSON.parse(JSON.stringify(kanaCaps.keys[0].caps_cells)), [
 provenDlls(kanaCaps, 'SGCAPS Kana');
 
 console.log(
-	`[OK] layout sources: ergopti.toml reproduces the KbdEdit v2.2.2 export over ${differences(reference, model).length === 0 ? differences.states : 0} dead-key states (Kana on Option; KBDKANA in its 4 DLLs), bepo.toml gives back bepo.klc and its 4 DLLs read back exactly`
+	`[OK] layout sources: ergopti.toml reproduces the KbdEdit v2.2.2 export over ${differences(reference, model).length === 0 ? differences.states : 0} dead-key states (Kana on Option; KBDKANA in its 4 DLLs), bepo.toml gives back bepo.klc and its 4 DLLs read back exactly, bepo_1_1rc2.toml keeps its 115 chained dead keys (${carried} in the Windows tables)`
 );
