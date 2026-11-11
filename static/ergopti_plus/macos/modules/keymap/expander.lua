@@ -184,7 +184,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 
 	-- The erase + replacement output of every expansion is built here, inside the
 	-- key-down callback, so a slow one is a typing hitch.
-	local inject_started = HotPath.now()
+	local inject_started = HotPath.trace("hotstring.expand")
 	local ok, emit_count, emitted_str, logical_text, order_delay = pcall(function()
 		return SyntheticInput.with_transaction(transaction, function()
 			assert(TextSender.eraseChars(deletes, 0) ~= false,
@@ -192,7 +192,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return emit_action()
 		end)
 	end)
-	HotPath.log_if_slow("hotstring.expand", inject_started)
+	HotPath.done("hotstring.expand", inject_started, ok and string.format("%s event(s)", tostring(emit_count)) or "failed")
 	if not ok then
 		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
 		-- every already-built prefix, so a producer that emits one token and then

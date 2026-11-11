@@ -391,10 +391,12 @@ end
 --- @param items table
 --- @param disabled boolean
 --- @param owned table
+--- @param path string The branch's position from the root ("root/3/2"), for timing lines.
 --- @return table node
-local function lazy_node(lib, parent, items, disabled, owned)
+local function lazy_node(lib, parent, items, disabled, owned, path)
 	local menu = lib.gtk.gtk_menu_new()
-	local node = { menu = menu, items = items, disabled = disabled, filled = false, rows = {}, fill_ids = {} }
+	local node = { menu = menu, items = items, disabled = disabled, filled = false, rows = {}, fill_ids = {},
+		path = path }
 	node.placeholder = lib.gtk.gtk_menu_item_new_with_label("")
 	lib.gtk.gtk_menu_shell_append(menu, node.placeholder)
 	local function fill() fill_node(lib, node, owned) end
@@ -426,7 +428,8 @@ local function add_row(lib, node, item, owned)
 		end
 	end
 	if row.has_sub then
-		row.sub = lazy_node(lib, row.widget, item.menu, disabled, owned)
+		row.sub = lazy_node(lib, row.widget, item.menu, disabled, owned,
+			node.path .. "/" .. (#node.rows + 1))
 	else
 		-- dbusmenu Event can activate an insensitive GTK item directly.
 		-- Unavailable rows therefore never receive an action capability.
@@ -447,6 +450,7 @@ end
 --- @param owned table
 fill_node = function(lib, node, owned)
 	if node.filled then return end
+	local started = Perf.trace("tray.fill")
 	node.filled = true
 	if node.placeholder ~= nil then
 		lib.gtk.gtk_widget_destroy(node.placeholder)
@@ -458,6 +462,9 @@ fill_node = function(lib, node, owned)
 		node.rows[#node.rows + 1] = add_row(lib, node, item, owned)
 	end
 	Perf.count("tray.rows", #node.rows)
+	Perf.count("tray.fills")
+	-- The branch by position, never by label: a label can be a user's own name.
+	Perf.done("tray.fill", started, string.format("branch %s, %d row(s)", node.path, #node.rows))
 end
 
 --- Whether a node's rows can take `items` in place: the same kinds, the same
@@ -537,7 +544,7 @@ end
 --- @return table node { menu = GtkMenu, ... }
 local function build_menu(lib, items, owned)
 	local node = { menu = lib.gtk.gtk_menu_new(), items = items or {}, disabled = false, filled = false,
-		rows = {}, fill_ids = {} }
+		rows = {}, fill_ids = {}, path = "root" }
 	fill_node(lib, node, owned)
 	lib.gtk.gtk_widget_show(node.menu)
 	return node
