@@ -475,7 +475,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local branch = body:find('if key_name == "backspace" then', 1, true)
       local record = body:find("keystats.record_correction(app_id,", 1, true)
       local privacy = branch and body:find("secure_focus_guard.blocks_text()", branch, true)
-      local undo = body:find("injector.inject(remaining - 1", 1, true)
+      local undo = body:find("pcall(injector.inject, remaining - 1", 1, true)
       helpers.assert_true(paused ~= nil and branch ~= nil and record ~= nil and undo ~= nil,
         "the control callback must route Backspace to the keystats")
       helpers.assert_true(paused < branch and branch < record,
