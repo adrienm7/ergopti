@@ -2412,7 +2412,7 @@
 		},
 		{
 			"type": "command",
-			"id": "layout_editor",
+			"id": "open_layout_editor",
 			"i18n": "menu.layout.edit",
 			"platforms": [
 				"hs",

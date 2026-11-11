@@ -132,9 +132,9 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
    `.keylayout` cannot hold (tap-holds, layer holds, multi-character outputs): an AHK port of
    `_shared/lua/layouts/source_emulation.lua`, tested by replaying `_shared/tests/corpus/layouts/source/
 emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
-5. Menu: in `_shared/modules/menu/menu.toml` row `layout_editor`, drop `platforms`, `unavailable` and `reason_key`
+5. Menu: in `_shared/modules/menu/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
    (and the locale key `platform_reason.layout_editor_host_pending_on_windows`); in `windows/ui/menu/menu_init.ahk`
-   bind `Commands[MenuCommand.LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
+   bind `Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
 
 **Installing from Windows.** The DLLs and the installer come from `tools/kbd-dll.cjs build <source.toml>
 <new-dir>` (`npm run kbd-dll -- build …`), which writes `<arch>/<dll>.dll` for x86, WOW64, x64 and arm64, the NSIS

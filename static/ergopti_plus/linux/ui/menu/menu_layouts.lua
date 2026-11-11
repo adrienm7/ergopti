@@ -52,7 +52,7 @@ local function _build_layouts(ctx)
 	end
 	-- « Create or edit a layout… »: the same window, straight on the layout editor
 	-- (ui/layout_manager/bridge.lua open_editor answers once the page is ready).
-	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_EDITOR] = function()
+	render_ctx.commands[require("config_keys").COMMAND.OPEN_LAYOUT_EDITOR] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layout editor cannot open.")
 			return false
