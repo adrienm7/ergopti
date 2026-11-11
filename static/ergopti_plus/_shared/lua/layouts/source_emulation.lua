@@ -399,6 +399,21 @@ function M.press(session, code, held, now)
 	end
 	-- An emulated layer has no keyMap for the OS to fall back on.
 	if not layer.native then return true, actions end
+	-- A hold reaching a native layer: no modifier selects it on the OS, so the
+	-- key goes out with the modifiers of the layer's first selector.
+	if session.hold ~= nil and session.hold.entry.hold_layer == layer.id then
+		local sent, modifiers = {}, {}
+		for _, id in ipairs(held_modifiers(held)) do sent[id] = true end
+		for _, id in ipairs(layer.selectors[1].required) do sent[id] = true end
+		for _, id in ipairs(M.REPORTED) do
+			if sent[id] then modifiers[#modifiers + 1] = id; sent[id] = nil end
+		end
+		for _, id in ipairs(layer.selectors[1].required) do
+			if sent[id] then modifiers[#modifiers + 1] = id; sent[id] = nil end
+		end
+		actions[#actions + 1] = { type = "key", key = code, modifiers = modifiers }
+		return true, actions
+	end
 	return false, actions
 end
 
