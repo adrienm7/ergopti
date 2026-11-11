@@ -108,8 +108,8 @@ local function controller(state, context)
 			end)
 		end
 	end
-	-- The composer's operations take their callback last (open, save, remove).
-	for _, method in ipairs({ "composer_open", "composer_save", "composer_remove" }) do
+	-- The composer's and the layout editor's operations take their callback last.
+	for _, method in ipairs({ "composer_open", "composer_save", "composer_remove", "source_open", "source_save" }) do
 		local operation = registry[method]
 		if type(operation) == "function" then
 			owned_registry[method] = function(...)
