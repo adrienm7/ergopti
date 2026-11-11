@@ -144,10 +144,9 @@ end
 
 local runtime_installer
 
---- Installs the owned runtime through the signed launcher's install role, once
---- the user confirmed it (platform/remap/runtime_install.lua).
---- @param callback function fn(ok, reason|nil, detail|nil).
-function M.install_runtime(callback)
+--- The one owned runtime installer, created on first use.
+--- @return table installer { install, repair } (platform/remap/runtime_install.lua).
+local function installer()
 	runtime_installer = runtime_installer or require("platform.remap.runtime_install").new({
 		launcher = function() return require("platform.remap.lease_helper").resolve() end,
 		exec = FieldCheckPorts.exec,
@@ -160,7 +159,21 @@ function M.install_runtime(callback)
 			vhid_updater.fetch(manifest.virtual_hid_device, fetched)
 		end,
 	})
-	runtime_installer.install(callback)
+	return runtime_installer
+end
+
+--- Installs the owned runtime through the signed launcher's install role, once
+--- the user confirmed it (platform/remap/runtime_install.lua).
+--- @param callback function fn(ok, reason|nil, detail|nil).
+function M.install_runtime(callback)
+	installer().install(callback)
+end
+
+--- Repairs the service of an already installed owned runtime through the
+--- signed launcher's repair role, once the user confirmed it (MRT-004).
+--- @param callback function fn(ok, reason|nil, detail|nil).
+function M.repair_runtime(callback)
+	installer().repair(callback)
 end
 
 --- The persisted record that Ergopti closed the user's own Karabiner.

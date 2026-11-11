@@ -145,11 +145,12 @@ An already published macOS owned runtime whose service needs recovery
 (`runtime_job_not_loaded`, or a first install that ended
 `files-published-service-cleanup-pending`) is to get its own localized repair
 action, not the install row: `--owned-install-first` refuses an existing
-`Runtime` by design. Not built yet (TODO MRT-004). The native half must adopt an existing exact Core and
-VirtualHIDDevice plist and decide how the first-start `core.json` absence
-fence applies to a runtime that already ran; today's provision owners refuse
-both, so it is a new authenticated helper role that needs a Swift build and
-native macOS qualification. Windows and Linux run no installed privileged
+`Runtime` by design. Built 2026-11-11 as the helper role `--owned-repair-service`
+(launcher `--request-owned-runtime-repair`): it adopts only an exact owned
+Core or VirtualHIDDevice plist and keeps the first-start `core.json` absence
+fence unchanged (a present system `core.json` refuses and is never moved),
+decided by the coordinator overnight, to review by the maintainer. It ships
+with the next runtime build. Windows and Linux run no installed privileged
 remap service, so they have no counterpart.
 
 ## The layout menu keeps layers and rows apart (2026-11-03)

@@ -5227,12 +5227,18 @@ function M.update_virtual_hid_driver(on_done)
 	return true
 end
 
---- The owner's reasons a first install resolves: no runtime files, a job
---- missing, or no VirtualHIDDevice driver at all.
+--- The owner's reasons a first install resolves: no runtime files, or no
+--- VirtualHIDDevice driver at all. A published runtime whose job is not
+--- loaded is the service repair's (MRT-004): the first install refuses an
+--- existing runtime by design.
 M.OWNED_INSTALL_REASONS = {
 	runtime_not_installed = true,
-	runtime_job_not_loaded = true,
 	virtual_hid_absent = true,
+}
+
+--- The owner's reasons the service repair resolves (MRT-004).
+M.OWNED_REPAIR_REASONS = {
+	runtime_job_not_loaded = true,
 }
 
 --- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
@@ -5249,6 +5255,23 @@ function M.install_owned_runtime(on_done)
 		return false
 	end
 	require("adapters.runtime_owner_ports").install_runtime(on_done)
+	return true
+end
+
+--- Restarts the services of the installed owned runtime after the user
+--- confirmed it (« Réparer le service », MRT-004). The caller reloads after
+--- telling the user, so the next owner admits the runtime or names what still
+--- blocks it (ui/owned_runtime_install.lua).
+--- @param on_done function fn(ok, reason|nil, detail|nil) called once.
+--- @return boolean started False when the owned runtime is not blocked by a stopped service.
+function M.repair_owned_runtime(on_done)
+	assert(type(on_done) == "function", "repair_owned_runtime(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table" or not M.OWNED_REPAIR_REASONS[status.reason] then
+		Logger.error(LOG, "Owned runtime service repair refused: the runtime is not blocked by a stopped service.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").repair_runtime(on_done)
 	return true
 end
 

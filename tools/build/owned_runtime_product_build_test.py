@@ -276,6 +276,8 @@ class DaemonReportBuildControls(unittest.TestCase):
                 "CoreExitObservation",
                 # WP8: the first install also loads the VirtualHIDDevice daemon job.
                 "VirtualHIDProvisionOwner",
+                # MRT-004: the service repair of an already published Runtime.
+                "ServiceRepairEntry",
             )
         )
         self.assertEqual(product.IDLE_CORE_SWIFT_SOURCES, expected)
@@ -303,6 +305,21 @@ class DaemonReportBuildControls(unittest.TestCase):
         self.assertNotIn("OwnedRuntimeInstallerEntry", live)
         self.assertIn("OwnedRuntimeInstallerEntry.runFirstInstallation()", files_only)
         self.assertNotIn("OwnedRuntimeIdleServiceEntry", files_only)
+
+    def test_service_repair_entry_is_dispatched_only_in_the_live_profile(self):
+        # MRT-004: the files-only profile carries no service owner to repair with.
+        text = (
+            Path(__file__).resolve().parent / "owned-runtime-installer/InstallerMain.swift"
+        ).read_text(encoding="utf-8")
+        blocks = text.split("#if ERGOPTI_OWNED_IDLE_CORE")[1:]
+        live = [block.partition("#endif")[0].partition("#else")[0] for block in blocks]
+        outside = text
+        for block in blocks:
+            outside = outside.replace(block.partition("#endif")[0], "")
+        self.assertEqual(
+            sum(block.count("OwnedRuntimeServiceRepairEntry.run()") for block in live), 1
+        )
+        self.assertNotIn("OwnedRuntimeServiceRepairEntry", outside)
 
     def test_validator_module_lifecycle_and_lipo_commands_are_unchanged(self):
         original, report = self.commands(False), self.commands(True)

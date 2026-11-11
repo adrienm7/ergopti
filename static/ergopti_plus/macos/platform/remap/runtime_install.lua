@@ -22,6 +22,11 @@
 ---    owner then names as `virtual_hid_not_active`.
 --- 5. One Install At A Time: callers that ask while one runs wait for it.
 --- 6. Ports Only: every effect goes through the ports given to `new`.
+--- 7. Service Repair (MRT-004): an already published runtime whose job is not
+---    loaded has its own role, `--request-owned-runtime-repair`, because the
+---    first install refuses an existing runtime by design. It installs no
+---    driver package and requests no activation: it restarts the services of
+---    the installed copy, and the next owner names any approval still due.
 --- ==============================================================================
 
 local M = {}
@@ -53,6 +58,15 @@ M.RESULT = {
 	CLEANUP_PENDING = "files-published-service-cleanup-pending",
 }
 
+--- The launcher's service repair role (OwnedRuntimeInstallMainOperation.swift Mode.repair).
+M.REPAIR_FLAG = "--request-owned-runtime-repair"
+
+--- The repair helper's closed result values (OwnedRuntimeServiceRepairEntry.swift).
+M.REPAIR_RESULT = {
+	REPAIRED = "service-repaired-observed",
+	PENDING = "service-repair-pending",
+}
+
 --- Stable reasons of a refused install.
 M.REASON = {
 	LAUNCHER = "install_launcher_unavailable",
@@ -66,6 +80,8 @@ M.REASON = {
 	DRIVER = "install_driver_failed",
 	-- The facade refused to start: the owned runtime is not blocked by a missing install.
 	NOT_OFFERED = "install_not_offered",
+	-- The repair restarted part of the services and left the rest for a retry.
+	REPAIR_PENDING = "repair_pending",
 }
 local REASON = M.REASON
 
@@ -83,34 +99,55 @@ local HELPER_CLEANUP = 75
 -- =================================
 -- =================================
 
---- Reads the launcher's one answer line.
+-- Each role's line kind and the helper results that settle it: true for the
+-- full success, a reason and a detail for a half-finished one.
+local KINDS = {
+	install = {
+		kind = "OWNED_RUNTIME_INSTALL",
+		results = {
+			[M.RESULT.INSTALLED] = true,
+			[M.RESULT.CLEANUP_PENDING] = { REASON.CLEANUP_PENDING,
+				"the runtime files were published but a service step did not finish" },
+		},
+		refused = "the staged helper failed its checks or refused the install (an earlier install is still on this Mac)",
+	},
+	repair = {
+		kind = "OWNED_RUNTIME_REPAIR",
+		results = {
+			[M.REPAIR_RESULT.REPAIRED] = true,
+			[M.REPAIR_RESULT.PENDING] = { REASON.REPAIR_PENDING,
+				"a service of the installed runtime was restarted but another step did not finish" },
+		},
+		refused = "the staged helper failed its checks or refused the repair (the installed runtime is not this release's"
+			.. " exact copy, or an owned service file is not Ergopti's own)",
+	},
+}
+
+--- Reads one role's answer line.
+--- @param role table KINDS entry.
 --- @param code any Exit status.
 --- @param stdout any Standard output.
---- @return boolean installed True only for the helper's full success.
---- @return string|nil reason Stable reason when not installed.
---- @return string|nil detail The refusal or status the line names.
-function M.parse(code, stdout)
+--- @return boolean done, string|nil reason, string|nil detail
+local function parse_role(role, code, stdout)
 	local line = type(stdout) == "string" and stdout:match("^([^\n]*)\n?$") or nil
 	if line == nil then return false, REASON.UNANSWERED, "no answer line" end
-	local result = line:match("^OWNED_RUNTIME_INSTALL|1|([%w%-]+)$")
+	local result = line:match("^" .. role.kind .. "|1|([%w%-]+)$")
 	if result and code == 0 then
-		if result == M.RESULT.INSTALLED then return true end
-		if result == M.RESULT.CLEANUP_PENDING then
-			return false, REASON.CLEANUP_PENDING, "the runtime files were published but a service step did not finish"
-		end
+		local settled = role.results[result]
+		if settled == true then return true end
+		if settled then return false, settled[1], settled[2] end
 		return false, REASON.UNANSWERED, "unknown helper result " .. result
 	end
-	if line == "OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled" then return false, REASON.CANCELLED, nil end
-	local refused = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|refused|([%w_%-]+)$")
+	local request = role.kind .. "_REQUEST|1|"
+	if line == request .. "cancelled" then return false, REASON.CANCELLED, nil end
+	local refused = line:match("^" .. request .. "refused|([%w_%-]+)$")
 	if refused then return false, REASON.REFUSED, refused end
-	local status, step = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|failed|(%-?[%w]+)|([%l_]+)$")
-	if not status then status = line:match("^OWNED_RUNTIME_INSTALL_REQUEST|1|failed|(%-?[%w]+)$") end
+	local status, step = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)$")
+	if not status then status = line:match("^" .. request .. "failed|(%-?[%w]+)$") end
 	if status then
 		local number = math.tointeger(tonumber(status))
 		if number == HELPER_REFUSED then
-			return false, REASON.REFUSED,
-				"the staged helper failed its checks or refused the install (an earlier install is still on this Mac)"
-					.. (step and (" at step " .. step) or "")
+			return false, REASON.REFUSED, role.refused .. (step and (" at step " .. step) or "")
 		end
 		if number == HELPER_CLEANUP then return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" end
 		if number == Update.EXIT_DIGEST or number == Update.EXIT_SIGNATURE then
@@ -121,6 +158,26 @@ function M.parse(code, stdout)
 		return false, REASON.FAILED, "administrator shell status " .. status .. (step and (" at step " .. step) or "")
 	end
 	return false, REASON.UNANSWERED, "unexpected answer: " .. line
+end
+
+--- Reads the install role's one answer line.
+--- @param code any Exit status.
+--- @param stdout any Standard output.
+--- @return boolean installed True only for the helper's full success.
+--- @return string|nil reason Stable reason when not installed.
+--- @return string|nil detail The refusal or status the line names.
+function M.parse(code, stdout)
+	return parse_role(KINDS.install, code, stdout)
+end
+
+--- Reads the service repair role's one answer line (MRT-004).
+--- @param code any Exit status.
+--- @param stdout any Standard output.
+--- @return boolean repaired True only when the helper observed every service.
+--- @return string|nil reason Stable reason when not repaired.
+--- @return string|nil detail The refusal or status the line names.
+function M.parse_repair(code, stdout)
+	return parse_role(KINDS.repair, code, stdout)
 end
 
 
@@ -141,7 +198,7 @@ end
 ---   fetch_driver(fn(ok, reason|nil, detail|nil)) downloads and verifies pqrs' pinned package into
 ---     Ergopti's folder (runtime_vhid_update.lua fetch), which the role installs when no driver is.
 --- @param ports table launcher, exec, exists, fetch_driver.
---- @return table installer { install }.
+--- @return table installer { install, repair }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing owned runtime install ports")
 	for _, name in ipairs({ "launcher", "exec", "exists", "fetch_driver" }) do
@@ -149,6 +206,7 @@ function M.new(ports)
 	end
 	local installer = {}
 	local waiters
+	local repair_waiters
 
 	--- Settles every waiter of the running install once.
 	local function settle(ok, reason, detail)
@@ -189,6 +247,12 @@ function M.new(ports)
 			waiters[#waiters + 1] = callback
 			return
 		end
+		if repair_waiters then
+			-- The repair's helper holds the lifecycle lock; the install would only be refused behind it.
+			local called, failure = pcall(callback, false, REASON.REFUSED, "a service repair is running")
+			if not called then Logger.error(LOG, "Owned runtime install callback failed: %s.", tostring(failure)) end
+			return
+		end
 		waiters = { callback }
 		local executable, detail, environment = ports.launcher()
 		if not executable then return settle(false, REASON.LAUNCHER, detail) end
@@ -208,6 +272,46 @@ function M.new(ports)
 			end
 			run_role()
 		end)
+	end
+
+	--- Settles every waiter of the running repair once.
+	local function settle_repair(ok, reason, detail)
+		local pending = repair_waiters
+		repair_waiters = nil
+		if ok then
+			Logger.success(LOG, "Owned runtime service repaired.")
+		elseif reason == REASON.CANCELLED then
+			Logger.info(LOG, "Owned runtime service repair cancelled at the administrator prompt.")
+		else
+			Logger.error(LOG, "Owned runtime service repair refused (%s): %s", tostring(reason), tostring(detail))
+		end
+		for _, waiter in ipairs(pending or {}) do
+			local called, failure = pcall(waiter, ok, reason, detail)
+			if not called then Logger.error(LOG, "Owned runtime service repair callback failed: %s.", tostring(failure)) end
+		end
+	end
+
+	--- Restarts the services of the installed runtime (MRT-004).
+	--- @param callback function fn(ok, reason|nil, detail|nil) called once.
+	function installer.repair(callback)
+		assert(type(callback) == "function", "Missing owned runtime repair callback")
+		if repair_waiters then
+			repair_waiters[#repair_waiters + 1] = callback
+			return
+		end
+		if waiters then
+			-- The install's own helper holds the lifecycle lock; the repair would only be refused behind it.
+			local called, failure = pcall(callback, false, REASON.REFUSED, "an install is running")
+			if not called then Logger.error(LOG, "Owned runtime service repair callback failed: %s.", tostring(failure)) end
+			return
+		end
+		repair_waiters = { callback }
+		local executable, detail, environment = ports.launcher()
+		if not executable then return settle_repair(false, REASON.LAUNCHER, detail) end
+		Logger.start(LOG, "Repairing the service of Ergopti's own Karabiner runtime on the user's request…")
+		ports.exec(executable, { M.REPAIR_FLAG }, M.INSTALL_TIMEOUT_SEC, function(code, stdout)
+			settle_repair(M.parse_repair(code, stdout))
+		end, environment)
 	end
 
 	return installer
