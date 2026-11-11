@@ -70,6 +70,7 @@
 			"Preserve literal desktop notification text",
 			"The webview push reaches a real WebKit page",
 			"A page's own request is answered in real WebKit",
+			"The reload signal survives an in-process WebView",
 			"Typing NONE clears actual WebKit rows and retains ALL controls",
 			"Install prerequisites for The release list window lists GitHub's releases in real WebKit",
 			"The release list window lists GitHub's releases in real WebKit",
@@ -311,6 +312,7 @@
 		],
 		"The webview push reaches a real WebKit page": ["Install WebKit2GTK and lgi"],
 		"A page's own request is answered in real WebKit": ["Install WebKit2GTK and lgi"],
+		"The reload signal survives an in-process WebView": ["Install WebKit2GTK and lgi"],
 		"Typing NONE clears actual WebKit rows and retains ALL controls": [
 			"Install WebKit2GTK and lgi"
 		],

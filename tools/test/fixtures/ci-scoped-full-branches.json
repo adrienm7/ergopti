@@ -1307,6 +1307,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "The reload signal survives an in-process WebView",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Typing NONE clears actual WebKit rows and retains ALL controls",
 			"protocol": 10
 		},
