@@ -124,6 +124,25 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_nil(e.unicode, "a chord's text is the application's")
 	end)
 
+	-- SendEvent "^{z}" sends a matched down and up; the release kept the
+	-- physical key code, so applications saw z down never released and a Q up
+	-- with no down (ILM-001, cmd-chord-release).
+	helpers.it("releases a moved Cmd chord on the key code it was pressed on (cmd-chord-release)", function()
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		M.reload()
+		local down = event({ cmd = true }, "q")
+		M.key_down(down, KC_Q)
+		helpers.assert_eq(down.keycode, 6, "Cmd+Z where Ergopti has z")
+		local up = event({ cmd = true }, "q")
+		up.keycode = KC_Q
+		helpers.assert_true(not M.key_up(up, KC_Q), "the release is kept")
+		helpers.assert_eq(up.keycode, 6, "and released on the same key code")
+		local next_up = event({}, "q")
+		next_up.keycode = KC_Q
+		M.key_up(next_up, KC_Q)
+		helpers.assert_eq(next_up.keycode, KC_Q, "only once")
+	end)
+
 	helpers.it("types the Option level as AltGr and clears the Option flag", function()
 		local M = fixture({ emulated_layout = "ergol", ergopti_base = true, ergopti_alt_gr = true })
 		M.reload()
