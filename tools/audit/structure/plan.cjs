@@ -29,6 +29,10 @@ const path = require('node:path');
 const Census = require('./census.cjs');
 const Rules = require('./rules.cjs');
 
+// A feature's sub-folders: a one-file sub-folder folds into the feature and
+// its file keeps its own name (clipboard/engine/x.lua → clipboard/x.lua).
+const SUB_NAMES = new Set(Rules.SUBS);
+
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const OUT_DIR = 'docs/design/structure-plan';
 const PREFIX = `${Census.BASE}/`;
@@ -63,7 +67,7 @@ function isCodeFolder(treeRelFolder) {
  * @param {Map<string, number>} existing The folders of the index today and their entry counts.
  */
 function foldSingletons(map, existing) {
-	for (let pass = 0; pass < 4; pass++) {
+	for (let pass = 0; pass < 8; pass++) {
 		const targets = [...map.values()].filter(Boolean);
 		const taken = new Set(targets);
 		const table = Census.folderTable(targets);
@@ -80,7 +84,10 @@ function foldSingletons(map, existing) {
 			if (entries.size !== 1 || folder.split('/').length < 2) continue;
 			// Only the driver trees and the _shared roots that mirror them fold:
 			// _shared/modules and _shared/data paths are read by codegen.
-			if (!/^(windows|macos|linux|_shared\/lua|_shared\/ui)\//.test(`${folder}/`)) continue;
+			if (!/^(windows|macos|linux|_shared)\//.test(`${folder}/`)) continue;
+			// Shared data keeps its folders: codegen and the drivers read them by
+			// path, and some by directory (db/migrations/).
+			if (/^_shared\/(.+\/)?data\//.test(`${folder}/`)) continue;
 			if (Census.exemptionOf(folder) || Census.exemptionOf(folder.split('/').slice(1).join('/')))
 				continue;
 			// Test runners discover suites by folder (module groups, stubs,
@@ -104,7 +111,26 @@ function foldSingletons(map, existing) {
 			const key = Census.counterpartKey(tree, rest.join('/'));
 			if (isCodeFolder(folder) && key && largest.get(key) >= Census.MIN_ENTRIES) continue;
 			const child = `${folder}/${only}`;
-			if (table.has(child)) continue; // a folder holding one folder: fold at the leaf instead
+			if (table.has(child)) {
+				// A folder holding one folder, such as core/events/ holding only
+				// adapters/: the child's content moves up one level.
+				const created = (f) => !existing.has(f) || existing.get(f) >= Census.MIN_ENTRIES;
+				if (!(isCodeFolder(folder) && isCodeFolder(child)) && !(created(folder) && created(child)))
+					continue;
+				const prefix = `${child}/`;
+				const hoisted = [...map].filter(([, t]) => t && t.startsWith(prefix));
+				if (hoisted.some(([, t]) => taken.has(`${folder}/${t.slice(prefix.length)}`))) continue;
+				for (const [old, t] of hoisted) map.set(old, `${folder}/${t.slice(prefix.length)}`);
+				changed = true;
+				continue;
+			}
+			// A test fold stops at the feature (or core/<domain>) it covers: a test
+			// file never lands loose in tests/<kind>/ or tests/<kind>/core/.
+			if (!isCodeFolder(folder)) {
+				const p = folder.split('/');
+				const depth = ['core', 'platform'].includes(p[3]) ? 5 : 4;
+				if (p[0] !== '_shared' && p[1] === 'tests' && p.length - 1 < depth) continue;
+			}
 			const parent = folder.split('/').slice(0, -1).join('/');
 			const dirName = folder.split('/').pop();
 			const ext = path.extname(only);
@@ -113,7 +139,7 @@ function foldSingletons(map, existing) {
 			if (isCodeFolder(folder) && ['init', 'bridge', dirName].includes(stem))
 				target = `${parent}/${dirName}${ext}`;
 			else if (isCodeFolder(folder) && !stem.startsWith(dirName))
-				target = `${parent}/${dirName}_${only}`;
+				target = SUB_NAMES.has(dirName) ? `${parent}/${only}` : `${parent}/${dirName}_${only}`;
 			else target = `${parent}/${only}`;
 			if (target && (table.has(target) || taken.has(target))) continue; // the name is taken: leave it for review
 			for (const [old, t] of map) {
@@ -158,29 +184,24 @@ function stepKeyOf(oldPath, target) {
 	const pick = target || oldPath;
 	const data = pick.match(/^[^/]+\/tests\/(fixtures|support|hardware)\//);
 	if (data) return `tests/${data[1]}`;
-	if (pick.startsWith('_shared/lua/test/')) return 'tests/shared_lua';
+	if (pick.startsWith('_shared/tests/lua/')) return 'tests/shared_lua';
 	let rel = pick.split('/').slice(1);
 	if (rel[0] === 'tests') rel = rel.slice(2);
-	if (rel[0] === 'lua') rel = rel.slice(1);
-	if (rel[0] === 'test') rel = rel.slice(1);
-	if (rel[0] === 'ui' && pick.startsWith('_shared/ui/')) return `ui/${rel[1] || 'lib'}`;
-	const layer = rel[0];
-	if (!['infra', 'adapters', 'modules', 'platform', 'ui'].includes(layer))
-		return `${layer || 'root'}`;
-	// A test file folded to its layer root joins that layer's sweep step.
-	if (rel.length === 2 && /\.[^.]+$/.test(rel[1]) && pick.includes('/tests/'))
-		return `${layer}/_root`;
-	return `${layer}/${rel[1] ? rel[1].replace(/\.[^.]+$/, '') : ''}`;
+	if (['core', 'platform'].includes(rel[0]) && rel.length > 2)
+		return `${rel[0]}/${rel[1].replace(/\.[^.]+$/, '')}`;
+	return (rel[0] || 'root').replace(/\.[^.]+$/, '');
 }
 
 // Leaves first, so each step's consumers still resolve the names it does not
 // touch: the plumbing every module requires moves before the modules.
-const LAYER_ORDER = ['infra', 'adapters', 'platform', 'modules', 'ui', 'tests'];
+const LAYER_ORDER = ['core', 'platform', 'settings', 'menu', 'tray', '*', 'tests'];
 
 function stepOrder(a, b) {
-	const la = LAYER_ORDER.indexOf(a.split('/')[0]);
-	const lb = LAYER_ORDER.indexOf(b.split('/')[0]);
-	return (la < 0 ? 99 : la) - (lb < 0 ? 99 : lb) || a.localeCompare(b);
+	const rank = (k) => {
+		const i = LAYER_ORDER.indexOf(k.split('/')[0]);
+		return i >= 0 ? i : LAYER_ORDER.indexOf('*');
+	};
+	return rank(a) - rank(b) || a.localeCompare(b);
 }
 
 /** Moves grouped by step, in order. */
@@ -204,13 +225,16 @@ function steps(map) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** The Lua module name of a tree-relative Lua path, or null. */
-function luaModuleName(treeRel) {
+function luaModuleName(treeRel, target = false) {
 	if (!treeRel || !treeRel.endsWith('.lua')) return null;
 	const [tree, ...rest] = treeRel.split('/');
 	let rel = rest.join('/');
 	if (tree === '_shared') {
-		if (!rel.startsWith('lua/')) return null;
-		rel = rel.slice(4);
+		// Today the shared Lua root is _shared/lua; in the target it is _shared.
+		// Both are on package.path while the migration runs, so a file still
+		// under lua/ keeps its old name in either mode.
+		if (rel.startsWith('lua/')) rel = rel.slice(4);
+		else if (!target || /^tests\//.test(rel)) return null;
 	}
 	return rel
 		.replace(/\.lua$/, '')
@@ -293,7 +317,7 @@ function references(map) {
 		const name = luaModuleName(old);
 		if (name) {
 			const root = old.startsWith('_shared/') ? '_shared' : old.split('/')[0];
-			byLuaName.set(`${root}|${name}`, [old, target, luaModuleName(target)]);
+			byLuaName.set(`${root}|${name}`, [old, target, luaModuleName(target, true)]);
 		}
 	}
 	const rows = [];
@@ -346,12 +370,12 @@ function references(map) {
  * @param {string[]} paths Tree-relative paths.
  * @returns {{driver: string, name: string, file: string}[]}
  */
-function luaCollisions(paths) {
+function luaCollisions(paths, target = true) {
 	const lib = (p) => !/\/tests?\//.test(`/${p}`);
 	const shared = new Set(
 		paths
-			.filter((p) => p.startsWith('_shared/lua/') && lib(p.slice(8)))
-			.map(luaModuleName)
+			.filter((p) => p.startsWith(target ? '_shared/' : '_shared/lua/') && lib(p.slice(8)))
+			.map((p) => luaModuleName(p, target))
 			.filter(Boolean)
 	);
 	const out = [];
@@ -454,7 +478,8 @@ function mismatchList(census, sharedLua) {
 function sharedLuaFolders(files) {
 	const out = new Set();
 	for (const folder of Census.folderTable(files).keys()) {
-		if (folder.startsWith('_shared/lua/')) out.add(folder.slice('_shared/lua/'.length));
+		const key = Census.counterpartKey('_shared', folder.slice('_shared/'.length));
+		if (folder.startsWith('_shared/') && key) out.add(key);
 	}
 	return out;
 }

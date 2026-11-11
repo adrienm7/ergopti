@@ -2,326 +2,668 @@
 
 /**
  * ==============================================================================
- * MODULE: Structure Plan Target Rules (Rule B)
+ * MODULE: Structure Plan Target Rules (Rule B, feature-first)
  * DESCRIPTION:
- * The proposed target tree of docs/design/structure-plan.md, written as data
- * so the move map is computed rather than typed: one vocabulary of domain and
- * sub-module names, applied identically to windows/, macos/, linux/ and to
- * _shared/lua/, so a file named the same way lands at the same place on every
- * driver.
+ * The target tree of docs/design/structure-plan.md, written as data so the
+ * move map is computed rather than typed. The top level of every driver and
+ * of _shared is one folder per feature a user can name (hotstrings, layouts,
+ * ai, metrics, …), plus core/ for the foundations every feature uses and
+ * platform/ for OS bindings no single feature owns. Inside a feature the
+ * same sub-folders, layered: engine/ (the feature's logic), adapters/ (its OS
+ * bindings), ui/ (what the user looks at), data/ (its data files), native/
+ * (compiled sources). Tests mirror the tree under tests/<kind>/.
+ *
+ * Decided by the maintainer on 2026-11-11: feature-first. The vocabulary
+ * below was decided by the coordinator on 2026-11-11, to review by the
+ * maintainer.
  *
  * WHY RULES AND NOT A HAND-WRITTEN MAP:
- * About ten thousand files are concerned and several sessions keep adding new
- * ones. A hand-written map is stale the day after it is written; rules give
- * the same answer for a file born tomorrow, and the plan regenerates its
- * appendices from them in seconds.
+ * About ten thousand files are concerned and several sessions keep adding
+ * new ones. Rules give the same answer for a file born tomorrow, and the
+ * plan regenerates its appendices from them in about a minute.
  *
- * WHAT IT DECIDES (decided by the coordinator on 2026-11-11, to review by the
- * maintainer):
- * 1. The top level keeps the layers every driver already has (adapters,
- *    infra, modules, platform, ui, native, data, apps, vendor, _generated,
- *    tests). Only folders outside the 2..20 entry bounds, and names that
- *    differ between drivers, move.
- * 2. Flat oversized folders split by DOMAIN: the same names under infra/,
- *    adapters/ and _shared/lua/.
- * 3. ui/ groups its windows: menu, panels, editors, dialogs, overlays, shell.
- * 4. A folder left with one file becomes that file, named after the folder
- *    (init.lua and bridge.lua take the folder name).
- * 5. A folder holding only a Convention S README is retired: its absence is
- *    declared in _shared/core/features.json instead of by an empty folder.
+ * HOW A PATH IS CLASSIFIED:
+ * Today's trees are layer-first (infra/, adapters/, modules/, platform/,
+ * ui/). The layer gives the sub-folder (modules and infra → engine, adapters
+ * and platform → adapters, ui → ui, data → data); the first segment after
+ * the layer, a folder name or a file stem, gives the feature through the
+ * tables below. The rest of the path is kept, so tests/unit/infra/config/…
+ * lands at tests/unit/settings/engine/… beside the code it covers.
  * ==============================================================================
  */
 
 'use strict';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Domain vocabulary
+// Feature vocabulary
 // ──────────────────────────────────────────────────────────────────────────────
 
-// Ordered [domain, pattern] pairs, matched against a file stem from which the
-// test markers and the layer's own redundant prefix have been removed. The
-// first match wins, so the specific patterns come first.
-const INFRA_DOMAINS = [
-	['field_check', /^(field_(check|run|probe)|startup_smoke|input_probe)/],
+// The user-visible features, the same names on every tree. `core/<domain>`
+// and `platform/<domain>` are the two cross-cutting roots.
+const FEATURES = [
+	'ai',
+	'apps',
+	'clipboard',
+	'diagnostics',
+	'gestures',
+	'hotstrings',
+	'layouts',
+	'menu',
+	'metrics',
+	'onboarding',
+	'remap',
+	'settings',
+	'shortcuts',
+	'tap_hold',
+	'tray',
+	'updater'
+];
+const CORE_DOMAINS = [
+	'crypto',
+	'events',
+	'fs',
+	'i18n',
+	'lifecycle',
+	'logger',
+	'network',
+	'process',
+	'text',
+	'timing',
+	'ui'
+];
+const PLATFORM_DOMAINS = ['desktop_focus', 'focus', 'input', 'native', 'system'];
+
+// The sub-folders a feature (or a core domain) may hold, in this order.
+const SUBS = ['engine', 'adapters', 'ui', 'data', 'native'];
+
+// Today's folder names that already name a feature or a domain: the folder
+// is absorbed into that root instead of nesting under it.
+const ALIASES = {
+	keystats: 'metrics',
+	metrics: 'metrics',
+	wpm: 'metrics',
+	llm: 'ai',
+	config: 'settings',
+	settings: 'settings',
+	scope: 'settings',
+	preferences: 'settings',
+	keymap: 'hotstrings',
+	hotstrings: 'hotstrings',
+	hotstring_engine: 'hotstrings',
+	dynamic_hotstrings: 'hotstrings',
+	layout: 'layouts',
+	layouts: 'layouts',
+	gestures: 'gestures',
+	shortcuts: 'shortcuts',
+	updater: 'updater',
+	diagnostics: 'diagnostics',
+	field_check: 'diagnostics',
+	healthcheck: 'diagnostics',
+	menu: 'menu',
+	tray: 'tray',
+	onboarding: 'onboarding',
+	remap: 'remap',
+	tap_hold: 'tap_hold',
+	clipboard: 'clipboard',
+	apps: 'apps',
+	logger: 'core/logger',
+	i18n: 'core/i18n',
+	locale: 'core/i18n',
+	lifecycle: 'core/lifecycle',
+	network: 'core/network',
+	toml: 'core/text',
+	toml_codec: 'core/text',
+	text: 'core/text',
+	text_utils: 'core/text',
+	timings: 'core/timing',
+	timer: 'core/timing',
+	file_system: 'core/fs',
+	storage: 'core/fs',
+	sqlite: 'core/fs',
+	process: 'core/process',
+	processes: 'core/process',
+	crypto: 'core/crypto',
+	webview: 'core/ui',
+	tooltip: 'core/ui',
+	input: 'platform/input',
+	keyboard: 'platform/input',
+	synthetic_input: 'platform/input',
+	keyboard_hook: 'platform/input',
+	system: 'platform/system',
+	runtime: 'platform/system',
+	// Folder names that exist only in today's test trees.
+	dispatch: 'platform/input',
+	uia: 'platform/focus',
+	atspi: 'platform/focus',
+	windows: 'core/ui',
+	dialogs: 'core/ui',
+	editors: 'core/ui',
+	ui_builder: 'core/ui',
+	hotstring_windows: 'hotstrings',
+	hotstrings_config: 'hotstrings',
+	composer_check: 'layouts',
+	archive: 'updater',
+	downloads: 'updater',
+	manifest: 'menu',
+	actions: 'shortcuts',
+	contracts: 'core/lifecycle',
+	shared_modules: 'core/lifecycle',
+	native_artifacts: 'core/lifecycle',
+	text_and_paths: 'core/text',
+	personal_files: 'settings',
+	karabiner_isolation: 'remap',
+	vscode_bridge: 'core/network',
+	file_watchers: 'core/fs',
+	app_picker: 'apps',
+	control: 'diagnostics',
+	field_run: 'diagnostics',
+	crash_report: 'diagnostics',
+	shell_runner: 'core/process',
+	log_transport: 'core/logger',
+	compositor_focus: 'platform/focus',
+	installed_source: 'layouts',
+	runtime_capture: 'diagnostics',
+	runtime_owner_ports: 'diagnostics',
+	field_check_ports: 'diagnostics',
+	prediction_tooltip_port: 'ai',
+	karabiner_coexistence: 'remap'
+};
+
+// The aliases that are mere synonyms of their root: their folder dissolves
+// into it. Any other alias (healthcheck, sqlite, tooltip, …) names a
+// sub-module and stays as a folder under its root.
+const SYNONYMS = new Set([
+	'keystats',
+	'metrics',
+	'llm',
+	'config',
+	'settings',
+	'hotstrings',
+	'layouts',
+	'gestures',
+	'shortcuts',
+	'updater',
+	'diagnostics',
+	'menu',
+	'tray',
+	'onboarding',
+	'remap',
+	'tap_hold',
+	'clipboard',
+	'apps',
+	'logger',
+	'i18n',
+	'locale',
+	'lifecycle',
+	'network',
+	'text',
+	'text_utils',
+	'timings',
+	'file_system',
+	'process',
+	'processes',
+	'crypto',
+	'input',
+	'system'
+]);
+
+// Ordered [root, pattern] pairs matched against a file stem (or a folder name)
+// of today's infra/, modules/ and _shared/lua/ trees. The first match wins.
+const LOGIC_FEATURES = [
 	[
 		'diagnostics',
-		/^(diagnostic|error_(report|policy|description)|issue_|crash|redact|git_status|bootstrap_log)/
+		/^(field_(check|run|probe|guided|todo)|startup_smoke|input_probe|diagnostic|error_(report|policy|description|net)|issue_|crash|redact|git_status|healthcheck|log_openers|console_window|adapter_errors)/
 	],
-	['config', /^timings?($|_)/],
+	['tap_hold', /^(tap_hold|one_shot_shift)/],
 	[
-		'logger',
-		/^(perf|phase_stats|hotpath|boot_profiler|tick_count|wall_clock|monotonic|.*_evidence$|key_event_health|keystroke_integrity|file_read_activity|reload_timing|paced_)/
-	],
-	['logger', /^(logger|log_)/],
-	['i18n', /^(i18n|locale|manifest_descriptions)/],
-	['menu', /^(menu_|manifest_|slot_roles|program_actions|user_actions)/],
-	[
-		'network',
-		/^(http_|managed_http|managed_redirect|proxy_|curl_|external_url|openssl_|asset_signature|fd_sha256|error_net|vscode_bridge|llm_bridge|route_origins)/
+		'remap',
+		/^(chord|tap_keys|sticky_modifiers|altgr|script_altgr|script_chord|capsword|caps_word|capslock|key_combination|nav_layer|wrap_pair|wrap_symbols|magic_editor|composed_text|suppressive_inputhook|slot_roles|remap|layers_loader|desktop_navigation)/
 	],
 	[
-		'lifecycle',
-		/^(boot|first_boot|startup_|teardown_|termination_|shutdown_|reload_|quit_|lifecycle|single_instance|instance_admission|suspend_|signal_handlers|restart_|daemon_restart|runtime_guard|launcher_|emergency_exit|session_lock|libuv_|deferred_work|main_thread_hold|updater_boot_ready|start_at_login|uninstall|installation|version|legacy_folder|bundle$|app_state|direct_require|literal_module_loader|dev_source|common_hotstrings_boot|accessibility_wait|master_gates|ui_restore|driver_control|script_scope|global_scope|account_name)/
+		'layouts',
+		/^(layout|keyboard_layout|keylayout|xkb_|composer_check|input_sources|pending_layout|number_row|pause_layout|x11_layout|system_layout|managed_python)/
 	],
 	[
-		'file_system',
-		/^(file_|fs_|native_directory|regular_file|no_replace_move|corrupt_aside|archive_|private_sqlite|sqlite|user_private_group|paths$|config_paths|app_folders|openstep_plist|factory_reset)/
+		'hotstrings',
+		/^(hotstring|personal_hotstrings|user_hotstring|legacy_hotstring|dynamic_hotstrings|common_hotstrings|personal_info|expander|registry_|terminator|tap_copy|magic_key|section_keys|control_sentinels|selftest_gate|extension_packs|text_case|user_code)/
+	],
+	['metrics', /^(keystats|metrics|wpm|typed_input|phase_stats|hotpath)/],
+	['ai', /^(llm|ai_|managed_ollama|ollama|mlx|prompt|prediction)/],
+	['gestures', /^(gesture|touchpad|absolute_motion)/],
+	[
+		'shortcuts',
+		/^(shortcut|personal_shortcuts|program_actions|user_actions?|user_action_parameter|action_parameter|brightness_actions|take_note|keep_awake|apple_shortcuts|physical_shortcut|open_target)/
+	],
+	['clipboard', /^(clipboard|selection)/],
+	['updater', /^(updater|update_|release|asset_signature|archive_|version$)/],
+	[
+		'apps',
+		/^(app_picker|app_folders|app_parameter|app_cloner|encryptor|bundled_apps|program_provider)/
+	],
+	['onboarding', /^(onboarding|first_boot|accessibility_wait|start_at_login|privacy_panes)/],
+	['tray', /^(tray_|appindicator|tray$)/],
+	['menu', /^(menu_|manifest_|feature_notice|native_presentation|ui_restore)/],
+	[
+		'settings',
+		/^(config|preferences|scope_|.*_scope$|.*_preferences$|script_settings|script_config|script_override|script_scope|global_scope|feature_(io|state)|personal_(features|file|info_mask|info_preview|toml)|factory_reset|registry$|program_parameter|program_binding|owned_programs|send_input_parameter|llm_defaults|llm_context_limit|wpm_constants|metrics_state_keys|features$|legacy_folder|legacy_rules)/
 	],
 	[
-		'config',
-		/^(config|preferences|scope_registry|.*_scope$|.*_preferences$|script_settings|feature_(io|state)|personal_|extension_packs|registry$|program_parameter|send_input_parameter|wrap_symbols_config|llm_defaults|llm_context_limit|wpm_constants|metrics_state_keys|owned_programs|program_binding)/
+		'core/logger',
+		/^(logger|log_|bootstrap_log|perf|boot_profiler|tick_count|wall_clock|monotonic|.*_evidence$|key_event_health|keystroke_integrity|file_read_activity)/
 	],
-	['hotstrings', /^(hotstring|user_hotstring|legacy_hotstring|dynamic_hotstrings)/],
 	[
-		'input',
-		/^(chord|tap_keys|sticky_modifiers|altgr|script_altgr|script_chord|capsword|capslock|key_|keycodes|keysym|evdev_codes|xkb_|hook_dispatcher|input_|typed_input|absolute_motion|nav_layer|wrap_pair|magic_editor|composed_text|text_case|suppressive_inputhook|device_|clipboard_)/
+		'core/timing',
+		/^(timings?($|_)|paced_|native_timer|native_sleep|owned_timer|reload_timing|deferred_work)/
 	],
-	['text', /^(text_|json|number|source_text_codec|gvariant|toml|identifiers|unicode)/],
+	['core/i18n', /^(i18n|locale)/],
 	[
-		'ui',
-		/^(ui_style|webview_|native_dialogs?|native_folder_picker|native_presentation|native_sleep|native_timer|dialog_util|window_utils|tray_|app_picker|notifications|display_server|gui_stack|open_target|quit_request)/
-	]
+		'core/network',
+		/^(http_|managed_http|managed_redirect|proxy_|curl_|external_url|openssl_|fd_sha256|vscode_bridge|route_origins|network)/
+	],
+	[
+		'core/fs',
+		/^(file_|fs_|native_directory|native_path|regular_file|no_replace_move|corrupt_aside|private_sqlite|sqlite|user_private_group|paths$|config_paths|app_dirs|openstep_plist|storage_owned|module_source)/
+	],
+	[
+		'core/text',
+		/^(text_|json|number|source_text_codec|gvariant|toml|identifiers|unicode|table_util)/
+	],
+	[
+		'core/lifecycle',
+		/^(boot|startup_|teardown_|termination_|shutdown_|reload_|quit_|lifecycle|single_instance|instance_admission|suspend_|signal_handlers|restart_|daemon_restart|runtime_guard|launcher_|emergency_exit|session_lock|libuv_|main_thread_hold|uninstall|installation|bundle$|app_state|direct_require|literal_module_loader|bytecode_package|dev_source|master_gates|driver_control|account_name|reload_gate|quit_admission|native_worker_owner|compat|core$|control$)/
+	],
+	[
+		'core/ui',
+		/^(ui_style|webview|native_dialogs?|native_folder_picker|dialog_util|window_utils|window_titles|cursor_window_policy|native_theme|native_app_switcher|notifications|display_server|gui_stack|quit_request|color|file_selection|error_dialog)/
+	],
+	[
+		'platform/input',
+		/^(key_|keycodes|keysym|evdev_codes|hook_dispatcher|input_|device_|send_input)/
+	],
+	['platform/focus', /^application_notifier/],
+	['core/process', /^(shell|process)/]
 ];
 
-const ADAPTER_DOMAINS = [
+// Today's adapters/ and platform/ files: OS bindings.
+const ADAPTER_FEATURES = [
 	[
 		'diagnostics',
-		/^(boot_fatal|boot_journal|log_transport|diagnostics_control|driver_control|reload_breadcrumb|field_\w+_ports|runtime_\w+_ports?|event_provenance|foreign_ledger|metadata_command_stats|crash_report|release_stage|console_window)/
+		/^(boot_fatal|diagnostics_control|field_\w+_ports|runtime_\w+_ports?|event_provenance|foreign_ledger|metadata_command_stats|crash_report|console_window|reload_breadcrumb)/
 	],
 	[
 		'clipboard',
-		/^(clipboard|selection_transaction|wayland_selection|x11_selection|editor_replace|accessibility_copies|unicode_carrier)/
+		/^(clipboard|selection_transaction|wayland_selection|x11_selection|editor_replace|accessibility_copies|unicode_carrier|uia_selection)/
+	],
+	['tap_hold', /^one_shot_shift/],
+	['remap', /^(karabiner|remap|system_switcher)/],
+	[
+		'layouts',
+		/^(keyboard_layout|input_source|installed_physical_source|layout|xkb_|x11_keymap|keyboard_source)/
 	],
 	[
-		'input',
-		/^(keyboard_hook|key_state|hotkey_registrar|text_sender|synthetic_input|modifier_|mouse_control|uinput_writer|evdev_reader|one_shot_shift|input_source|input_probe|xkb_|x11_keymap|keyboard_(layout|source|geometry)|installed_physical_source|layout_|physical_shortcut_hook|system_switcher|native_text|native_number|send_input|terminal_output)/
+		'ai',
+		/^(llm_|managed_ollama|ollama_|python_|native_python|native_bootstrap_pty|prediction_tooltip|mlx|source_alias_owner|suspended_image_owner|trusted_native_guardian)/
+	],
+	['shortcuts', /^(apple_shortcuts|physical_|window_switch|screen_brightness|mouse_control)/],
+	['metrics', /^(wpm_surface|keystats)/],
+	['updater', /^(updater_|update_launcher|release_stage)/],
+	['apps', /^(bundled_apps|app_launcher|desktop_opener|desktop_application)/],
+	['onboarding', /^(accessibility_permission|privacy_settings|tcc_grant)/],
+	['tray', /^(tray_|notify_icon|appindicator)/],
+	['core/logger', /^(log_transport|boot_journal)/],
+	[
+		'core/network',
+		/^(http_client|curl_http_client|system_curl|network_|proxy_override|system_proxy|tcp_probe|gio_)/
 	],
 	[
-		'network',
-		/^(http_client|curl_http_client|system_curl|network_|proxy_override|system_proxy|tcp_probe|updater_curl|ollama_identity|managed_ollama)/
+		'core/process',
+		/^(process_|shell_runner|owned_|program_|task_|sqlite_process_worker|uia_worker|crash_report_worker)/
 	],
 	[
-		'processes',
-		/^(process_|shell_runner|owned_|program_|task_|app_launcher|desktop_opener|sqlite_process_worker|uia_worker|crash_report_worker|native_bootstrap_pty|python_|native_python|llm_|bundled_apps|update_launcher)/
+		'core/fs',
+		/^(storage|sqlite_native|toml_cache|ledger_append|file_|write_lock_path|json_codec|legacy_folder)/
+	],
+	['core/crypto', /^crypto/],
+	[
+		'core/events',
+		/^(timer_scheduler|event_loop|event_clock|boot_clock|wake_watcher|physical_observation_clock)/
 	],
 	[
-		'storage',
-		/^(storage|sqlite_native|toml_cache|ledger_append|file_|write_lock_path|json_codec|crypto|keyboard_layout_files|legacy_folder)/
+		'core/ui',
+		/^(graphics_renderer|tooltip_renderer|webview_|native_folder_picker|native_text|native_number|spotlight_overlay|own_window|terminal_output)/
 	],
 	[
-		'focus',
-		/^(window_|own_window|running_application|atspi_|compositor_focus|cosmic_toplevel|x11_focus|secure_field|physical_|accessibility_permission|application_notifier|apple_shortcuts)/
+		'platform/focus',
+		/^(window_|running_application|atspi_|compositor_focus|cosmic_toplevel|x11_focus|secure_field|application_notifier)/
 	],
 	[
-		'system',
-		/^(system_|screen_|power_source|wake_watcher|notifier|notify_icon|privacy_settings|tcc_grant|event_clock|boot_clock|timer_scheduler|event_loop|tap_to_click|karabiner|graphics_renderer|tooltip_renderer|prediction_tooltip|tray_|spotlight_overlay|wpm_surface|webview_|native_folder_picker)/
-	]
+		'platform/input',
+		/^(keyboard_hook|key_state|hotkey_registrar|text_sender|synthetic_input|modifier_|uinput_writer|evdev_reader|input_probe|keyboard_geometry|send_input)/
+	],
+	['platform/system', /^(system_|screen_|power_source|notifier|tap_to_click|keyboard_)/]
 ];
 
-// The ui/ groups and the window or file names they hold. A ui/ entry that
-// matches none stays where it is and is reported.
-const UI_GROUPS = [
+// Today's ui/ windows and files.
+const UI_FEATURES = [
 	['menu', /^(menu|tray_menu)$/],
+	['updater', /^(changelog|update_check|download_window|release_notes)$/],
+	['diagnostics', /^(healthcheck|field_check|error_dialog|console_window|log_openers)$/],
+	['settings', /^(config_cleanup|paths_editor|config_dir_picker|reload_refusal)$/],
 	[
-		'panels',
-		/^(changelog|update_check|download_window|model_browser|healthcheck|field_check|onboarding|config_cleanup|metrics_apps|metrics_typing|bundled_apps)$/
+		'hotstrings',
+		/^(hotstring_editor|hotstrings_config_window|personal_info_editor|personal_toml_editor(_webview)?)$/
 	],
+	['layouts', /^(layer_editor|layout_manager|layout_composer|layout_editor)$/],
+	['shortcuts', /^(physical_shortcuts|action_picker(_webview)?|user_action_editor)$/],
 	[
-		'editors',
-		/^(layer_editor|layout_manager|hotstring_editor|hotstrings_config_window|personal_info_editor|personal_toml_editor(_webview)?|paths_editor|prompt_editor|physical_shortcuts|action_picker(_webview)?|user_action_editor|editors|config_dir_picker|app_chooser)$/
+		'ai',
+		/^(model_browser|prompt_editor|llm_enable_refusal|vision_parameter_prompt|owned_runtime_install|python_runtime_offer)$/
 	],
+	['metrics', /^(metrics_apps|metrics_typing|wpm|metrics_flush_bridge)$/],
+	['onboarding', /^(onboarding|permission_dialog)$/],
+	['gestures', /^(gesture_conflicts?|gesture_conflict_notice)$/],
 	[
-		'dialogs',
-		/^(error_dialog|permission_dialog|numeric_prompt|token_prompt|text_prompt|choice_prompt|modal|native_dialog|dialog_host|reload_refusal|llm_enable_refusal|vision_parameter_prompt|app_cloner_python_offer|python_runtime_offer|owned_runtime_install|virtual_hid_update|legacy_rules_cleanup|gesture_conflicts?|gesture_conflict_notice|proxy_override)$/
+		'apps',
+		/^(app_chooser|bundled_apps|app_cloner_python_offer|desktop_application_resolution(_worker)?)$/
 	],
-	['overlays', /^(tooltip|wpm|spotlight)$/],
+	['remap', /^(virtual_hid_update|legacy_rules_cleanup)$/],
+	['core/network', /^proxy_override$/],
 	[
-		'shell',
-		/^(webview_manager|webkit_host|webview_controller_pool|webview_close_owner|ui_builder|console_window|log_openers|window_toggle|desktop_application_resolution(_worker)?|metrics_flush_bridge)$/
+		'core/ui',
+		/^(tooltip|spotlight|numeric_prompt|token_prompt|text_prompt|choice_prompt|modal|native_dialog|dialog_host|webview_manager|webkit_host|webview_controller_pool|webview_close_owner|ui_builder|window_toggle|editors)$/
 	]
 ];
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Sub-module splits of oversized feature folders
-// ──────────────────────────────────────────────────────────────────────────────
-
-const KEYSTATS_SUBMODULES = [
-	['reader', /^(reader|sqlite_reader|ledger_replay|rebuild|export|ngrams?|frames|partial)/],
-	['apps', /^(app_categor|apps_editor)/],
-	[
-		'system',
-		/^(system_|session_events|virtual_desktop|window_topology|topology|watchers|network|shutdown|health)/
-	],
-	['privacy', /^(roi_|trigger_roi|privacy|text_cipher|text_migration|password)/],
-	[
-		'journal',
-		/^(journal|llm_journal|hotstring_log|hotstring_units|log_manager|rotation|rollover|sql|sqlite_writer|maintenance|prefetch|buffer_snapshot|event_id|timestamp|ingest)/
-	],
-	['walker', /^walker/],
-	[
-		'capture',
-		/^(hook|mouse|device|clipboard|physical|kc_bridge|sensors|collection|password|av_state|host_signature)/
-	],
-	['context', /^(context|ergonomics|json|constants)/],
-	['ui', /^(ui|webview)/],
-	['aggregator', /^aggregator/]
+// _shared/modules/<x> and _shared/data/<x>: data files, by name.
+const DATA_FEATURES = [
+	['core/timing', /^timings$/],
+	['core/logger', /^logger$/],
+	['core/i18n', /^(locales|locale_)/],
+	['core/network', /^(network|http|owned_runtimes|linux_native_runtime)/],
+	['core/fs', /^paths$/],
+	['core/ui', /^(tooltip|native_theme)/],
+	['core/text', /^identifiers/],
+	['core/crypto', /^crypto$/],
+	['hotstrings', /^(hotstrings|personal_info)$/],
+	['layouts', /^(layouts|keycodes)$/],
+	['ai', /^llm$/],
+	['menu', /^menu$/],
+	['updater', /^(updater|linux_appimage)/],
+	['metrics', /^(wpm_widget|keystats_|metrics_|db$)/],
+	['shortcuts', /^(actions|shortcuts)$/],
+	['settings', /^(config|features)$/],
+	['diagnostics', /^(control|diagnostics|field_)/],
+	['remap', /^wrap_symbols$/],
+	['apps', /^(app_cloner|encryptor)$/]
 ];
 
-const LLM_SUBMODULES = [
-	[
-		'api',
-		/^(api_|remote_formats|request_plan|option_validation|parser|rs256_signer|streaming_handler|stream_payload|backend_|provider_uses|thinking_families|opaque_network|proxy_relay|network_env|context$)/
-	],
-	['ollama', /^(ollama|managed_ollama|local_model|ensure-ollama)/],
-	[
-		'local_servers',
-		/^(local_server|warmup|owned_timer|runtime_|inference|model_|mlx|api_mlx|ensure-mlx)/
-	],
-	[
-		'bootstrap',
-		/^(managed_|native_python|boot_cleanup|bootstrap_|dependency_|ensure-|network-retry|uv-release|pty_process|.*-release)/
-	],
-	[
-		'prediction',
-		/^(prediction|prompt_|progressive_reveal|screen_answer|selection_|tone|rewrite|translat|vision|llm_request_latency|app_filter)/
-	],
-	['agent', /^agent/],
-	[
-		'settings',
-		/^(profiles?|profile_settings|settings|.*_settings|enable_admission|api_key_migration|api_entries|api_token_store|error_log|display|models)/
-	]
-];
-
-const MENU_SUBMODULES = [
-	['llm', /^(llm_|ai_parent|agent_rows|menu_agent|local_server_rows|llm_backend_rows|chatgpt_url)/],
-	['hotstrings', /^(menu_hotstring|hotstring|programmatic_hotstrings|magic_key)/],
-	[
-		'keyboard',
-		/^(menu_(keyboard|layout|tap|taphold|caps_word)|active_layout_rows|pause_layout_rows|key_combinations|quit_layout|keymap_lifecycle|base_delay)/
-	],
-	[
-		'features',
-		/^(menu_(apps|gestures|metrics|shortcuts|paths)|app_exclusion_rows|metrics_scope|gesture_scope|shortcut_utils|shortcuts_scope|hotstrings_scope|llm_scope)/
-	],
-	[
-		'transactions',
-		/_transaction$|^(scoped_preferences|session_demotions|recoverable_file_moves|refresh_scope|global_scope|unused_keys_cleanup|uninstall|start_at_login|profile_editor_request)/
-	],
-	[
-		'engine',
-		/^(builder|init|menu_(engine|init|rebuild|submenus|state|utils|watchers|actions|about|configuration|debug|dialogs|language|quit|reload)|branch_rows|canvas_badge|click_gate|rebuild_owner|timed_build|feature_notice)/
-	]
-];
-
-const MENU_LLM_SUBMODULES = [
-	['models', /^(models?_|custom_models|mlx_|ollama_|menu_models)/],
-	['panels', /_panel$/]
-];
-
-const CONFIG_SUBMODULES = [
-	[
-		'migration',
-		/^(config_(migrate|obsolete|outdated|unused|file_inverse|cleanup|transition)|legacy_)/
-	],
-	[
-		'publication',
-		/(_publication$|^config_(binding|reset|save|write_lease|registry_cache|user_models|defaults|keyboard))/
-	],
-	['scope', /(_scope$|^scope_|^config_scope|^config_global_scope|^global_scope|^script_scope)/],
-	[
-		'preferences',
-		/(preferences$|^script_settings|^personal_|^feature_(io|state)|^program_binding|^owned_programs)/
-	]
-];
-
-const LIFECYCLE_SUBMODULES = [
-	['reload', /^(reload|restart|daemon_restart|single_instance|instance_admission|suspend_)/],
-	[
-		'shutdown',
-		/^(quit|shutdown|termination|teardown|signal_handlers|emergency_exit|libuv_exit|session_lock|uninstall)/
-	]
-];
-
-const REMAP_SUBMODULES = [
-	['tap_hold', /^tap_hold/],
-	[
-		'keys',
-		/^(altgr|backspace|capslock|delete|enter|escape|lalt|lshift|rctrl|rshift|space|tab|win|one_shot_shift|key_combination)/
-	],
-	[
-		'runtime',
-		/^(runtime_|ke_|lease_|deploy_pacing|managed_rule|token_reuse|legacy_release|guardian)/
-	],
-	['layers', /^(nav_layer|layers_loader|scope_layer|script_chord)/]
-];
-
-const HOTSTRINGS_SUBMODULES = [
-	['engine', /^(hotstring_|terminator|preview_switches)/],
-	['catalogue', /^(hotstrings_|personal_|extension_packs|common_autocorrection)/]
-];
-
-/** Folder-specific splits, keyed by tree-relative folder (driver or _shared). */
-const SUBMODULE_SPLITS = {
-	'infra/config': { strip: null, table: CONFIG_SUBMODULES },
-	'infra/lifecycle': { strip: null, table: LIFECYCLE_SUBMODULES },
-	'platform/remap': { strip: null, table: REMAP_SUBMODULES },
-	'modules/hotstrings': { strip: null, table: HOTSTRINGS_SUBMODULES },
-	'ui/menu/llm': { strip: /^menu_/, table: MENU_LLM_SUBMODULES },
-	'modules/keystats': { strip: /^keystats_/, table: KEYSTATS_SUBMODULES },
-	'infra/text': { strip: null, table: [['toml', /^toml/]] },
-	'modules/llm': { strip: /^llm_(?!request)/, table: LLM_SUBMODULES },
-	'ui/menu': { strip: null, table: MENU_SUBMODULES }
-};
-
-// Flat test data folders (fixtures, support, hardware proofs, the shared Lua
-// tests) split by the feature their file names start with.
+// Test data folders (fixtures, support, hardware proofs, the shared Lua
+// contract tests) split by the feature their file names start with.
 const TEST_DATA_FEATURES = [
-	['keystats', /^(keystats|metrics|wpm|roi|ngram)/],
-	['llm', /^(llm|ollama|mlx|model|prompt|prediction|agent|translate|vision)/],
-	['layout', /^(layout|keylayout|xkb|xi2|keymap|phys|physical|keyboard|led|magic)/],
+	['metrics', /^(keystats|metrics|wpm|roi|ngram)/],
+	['ai', /^(llm|ollama|mlx|model|prompt|prediction|agent|translate|vision)/],
+	['layouts', /^(layout|keylayout|xkb|xi2|keymap|phys|physical|keyboard|led|magic)/],
 	['updater', /^(updater|update|release|download|bundle)/],
 	['gestures', /^(gesture|touchpad|trackpad)/],
-	['hotstrings', /^(hotstring|personal|terminator|sendinstant|wrap|user)/],
+	['hotstrings', /^(hotstring|personal|terminator|sendinstant|user)/],
 	['menu', /^(menu|tray|sni)/],
-	['config', /^(config|toml|paths|profile|pause|onboarding|script|scope)/],
+	['settings', /^(config|toml|paths|profile|pause|script|scope)/],
+	['onboarding', /^onboarding/],
+	['remap', /^(sticky|wrap|chord|tap|caps)/],
+	['clipboard', /^clipboard/],
 	[
-		'input',
-		/^(input|sticky|clipboard|synthetic|virtual|fake|key|tap|chord|text|plain|native|context|action)/
-	],
-	[
-		'ui',
-		/^(webview|ui|tooltip|window|healthcheck|application|screen|wayland|secure|atspi|desktop)/
-	],
-	[
-		'system',
-		/^(system|managed|winhttp|network|proxy|sqlite|session|startup|logger|lib|validate|runner|local|hotpath)/
+		'core',
+		/^(input|synthetic|virtual|fake|key|text|plain|native|context|action|webview|ui|tooltip|window|healthcheck|application|screen|wayland|secure|atspi|desktop|system|managed|winhttp|network|proxy|sqlite|session|startup|logger|lib|validate|runner|local|hotpath)/
 	]
 ];
+
+// File stems inside today's modules/<feature>/ that bind the OS.
+const OS_BINDING =
+	/(touchpad|_hid$|^raw_|virtual_desktops|screenshots|pointer_warp|workspace_switcher|window_cycle|native_app_switcher|_native$|_worker(_entry)?$|^x11_|wayland|atspi|^uia_|_watcher$|kc_bridge|network_watcher|topology_watcher|clipboard_telemetry)/;
+
+// The sections of the tray menu that belong to one feature, by the name of
+// the section (menu_<name>, or a row builder named after the feature).
+const MENU_SECTIONS = [
+	['gestures', /^gestures?/],
+	['hotstrings', /^(hotstring|programmatic_hotstrings|magic_key)/],
+	['metrics', /^(metrics|wpm)/],
+	['shortcuts', /^(shortcuts?|shortcut_utils)/],
+	['apps', /^(apps|app_exclusion_rows)/],
+	['ai', /^(llm|ai_parent|agent|local_server_rows)/],
+	['tap_hold', /^(tap_holds?|taphold|tap_keys)/],
+	[
+		'layouts',
+		/^(keyboard_layout|layouts?|active_layout_rows|pause_layout_rows|quit_layout|keyboard_slots)/
+	],
+	['remap', /^(caps_word|key_combinations)/],
+	[
+		'settings',
+		/^(paths|configuration|language|scoped_preferences|preferences_transaction|unused_keys_cleanup)/
+	],
+	['diagnostics', /^debug/],
+	['updater', /^about/],
+	['onboarding', /^start_at_login/]
+];
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Second-level splits of oversized sub-folders
+// ──────────────────────────────────────────────────────────────────────────────
+
+const SPLITS = {
+	'metrics/engine': {
+		strip: /^keystats_/,
+		table: [
+			[
+				'reader',
+				/^(reader|sqlite_reader|ledger_replay|rebuild|export|ngrams?|frames|partial|query)/
+			],
+			[
+				'journal',
+				/^(journal|llm_journal|hotstring_log|hotstring_units|log_manager|rotation|rollover|sql|sqlite_writer|maintenance|prefetch|buffer_snapshot|event_id|timestamp|ingest|write)/
+			],
+			['walker', /^walker/],
+			[
+				'capture',
+				/^(hook|mouse|device|clipboard|physical|kc_bridge|sensors|collection|password|av_state|host_signature)/
+			],
+			['apps', /^(app_categor|apps_editor)/],
+			[
+				'system',
+				/^(system_|session_events|virtual_desktop|window_topology|topology|watchers|network|shutdown|health)/
+			],
+			['privacy', /^(roi|trigger_roi|privacy|text_cipher|text_migration|text_crypto|token)/],
+			['aggregator', /^aggregator/],
+			['perf', /^(hotpath|phase_stats)/],
+			['wpm', /^(live_wpm|wpm)/],
+			['media', /^media_/],
+			['view', /^(ui|webview|private_window|manifest_keys|filters|shortcuts)/]
+		]
+	},
+	'ai/engine': {
+		strip: /^llm_(?!request)/,
+		table: [
+			[
+				'api',
+				/^(api_|remote_formats|request_plan|option_validation|parser|rs256_signer|streaming_handler|stream_payload|backend_|provider_uses|thinking_families|opaque_network|proxy_relay|network_env|context$)/
+			],
+			['ollama', /^(ollama|managed_ollama|local_model|ensure-ollama)/],
+			[
+				'local_servers',
+				/^(local_server|warmup|owned_timer|runtime_|inference|model_|mlx|api_mlx|ensure-mlx)/
+			],
+			[
+				'bootstrap',
+				/^(managed_|native_python|boot_cleanup|bootstrap_|dependency_|ensure-|network-retry|uv-release|pty_process|.*-release)/
+			],
+			[
+				'prediction',
+				/^(prediction|prompt_|progressive_reveal|screen_answer|selection_|tone|rewrite|translat|vision|llm_request_latency|app_filter)/
+			],
+			['agent', /^agent/],
+			[
+				'policy',
+				/(_policy$|_classifier$|^(failure_class|thinking_off|temperature|process_limits|provider_config|config_guard|app_identity|app_profile|process_port|finite_process_port|context_buffer))/
+			],
+			[
+				'settings',
+				/^(profiles?|profile_settings|settings|.*_settings|enable_admission|api_key_migration|api_entries|api_token_store|error_log|display|models)/
+			]
+		]
+	},
+	'menu/ui': {
+		strip: /^menu_/,
+		table: [
+			['llm', /^(llm|ai_parent|agent|local_server_rows|chatgpt_url)/],
+			['hotstrings', /^(hotstring|programmatic_hotstrings|magic_key)/],
+			[
+				'keyboard',
+				/^(keyboard|layout|tap|taphold|caps_word|active_layout_rows|pause_layout_rows|key_combinations|quit_layout|keymap_lifecycle|base_delay)/
+			],
+			[
+				'features',
+				/^(apps|gestures|metrics|shortcuts|paths|app_exclusion_rows|metrics_scope|gesture_scope|shortcut_utils|shortcuts_scope|hotstrings_scope|llm_scope)/
+			],
+			[
+				'transactions',
+				/_transaction$|^(scoped_preferences|session_demotions|recoverable_file_moves|refresh_scope|global_scope|unused_keys_cleanup|uninstall|start_at_login|profile_editor_request)/
+			],
+			[
+				'builder',
+				/^(builder|engine|init|rebuild|submenus|state|utils|watchers|actions|about|configuration|debug|dialogs|language|quit|reload|branch_rows|canvas_badge|click_gate|rebuild_owner|timed_build|feature_notice|hotstring_order|hotstring_switches)/
+			]
+		]
+	},
+	'ai/ui/menu': {
+		strip: /^menu_/,
+		table: [
+			['models', /^(models?_|custom_models|mlx_|ollama_|models$)/],
+			['panels', /_panel$/]
+		]
+	},
+	'settings/engine': {
+		strip: null,
+		table: [
+			[
+				'migration',
+				/^(config_(migrate|obsolete|outdated|unused|file_inverse|cleanup|transition)|legacy_)/
+			],
+			[
+				'publication',
+				/(_publication$|^config_(binding|reset|save|write_lease|registry_cache|user_models|defaults|keyboard))/
+			],
+			[
+				'scope',
+				/(_scope$|^scope_|^config_scope|^config_global_scope|^global_scope|^script_scope|^script_)/
+			],
+			[
+				'preferences',
+				/(preferences$|^script_settings|^personal_|^feature_(io|state)|^program_binding|^owned_programs)/
+			]
+		]
+	},
+	'core/lifecycle/engine': {
+		strip: null,
+		table: [
+			['reload', /^(reload|restart|daemon_restart|single_instance|instance_admission|suspend_)/],
+			[
+				'shutdown',
+				/^(quit|shutdown|termination|teardown|signal_handlers|emergency_exit|libuv_exit|session_lock|uninstall)/
+			]
+		]
+	},
+	'remap/engine': {
+		strip: null,
+		table: [
+			[
+				'keys',
+				/^(altgr|backspace|capslock|delete|enter|escape|lalt|lshift|rctrl|rshift|space|tab|win|key_combination|constants)/
+			],
+			['layers', /^(nav_layer|layers_loader|scope_layer|script_chord|chord|sticky)/],
+			[
+				'runtime',
+				/^(runtime_|ke_|lease_|deploy_pacing|managed_rule|token_reuse|legacy_release|guardian|generator|action_catalogue|watchers|config|defaults|onboarding|init)/
+			]
+		]
+	},
+	'hotstrings/engine': {
+		strip: null,
+		table: [
+			[
+				'matcher',
+				/^(hotstring_|terminator|preview_switches|expander|registry|tap_copy|section_keys|control_sentinels|selftest_gate|state|utils)/
+			],
+			[
+				'catalogue',
+				/^(hotstrings_|personal_|extension_packs|common_autocorrection|programmable|catalogue)/
+			],
+			['dynamic', /^(dynamic|user_code|date|personal_info|fields)/]
+		]
+	},
+	'diagnostics/engine': {
+		strip: null,
+		table: [
+			['field_check', /^field_(check|probe)/],
+			['field_run', /^(field_run|field_guided|startup_smoke|input_probe)/],
+			['reports', /^(crash|diagnostic|error_|issue_|redact|git_status)/]
+		]
+	},
+	'remap/adapters': {
+		strip: null,
+		table: [
+			['runtime', /^(runtime_|deploy_pacing|guardian|managed_rule|token_reuse)/],
+			['karabiner', /^(ke_|lease_|karabiner)/]
+		]
+	},
+	'ai/data': {
+		strip: null,
+		table: [
+			['local_servers', /^(local_server|mlx|managed_|ollama|validate_)/],
+			[
+				'policy',
+				/(_policy|_admission|thinking_off|display|parser_limits|model_capabilities|legacy_ids)/
+			]
+		]
+	},
+	'core/ui/engine': {
+		strip: null,
+		table: [
+			['webview', /^webview/],
+			['tooltip', /^tooltip/]
+		]
+	},
+	'core/text/engine': {
+		strip: null,
+		table: [['toml', /^toml/]]
+	},
+	'layouts/engine': {
+		strip: null,
+		table: [
+			['composer', /^(composer|source_|xkb_converter|keylayout|extension|catalogue)/],
+			['layers', /^(layer|control_signals|magic_key|terminators)/],
+			['registry', /^(layout_registry|registry|layout_rows|layouts?_)/],
+			['emulation', /^(layout_emulation|emulation|number_row|pause_layout|x11_layout)/]
+		]
+	}
+};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // OS-specific folders allowed on one driver only
 // ──────────────────────────────────────────────────────────────────────────────
 
-// Each entry names a folder that exists on its driver only, and why the name
-// says so. A folder on one or two drivers that is not listed is a mismatch.
 const OS_SPECIFIC = {
 	macos: {
 		launcher: 'the Swift host application of the macOS runtime',
-		'platform/remap/data': 'Karabiner remap data that only the macOS remap runtime reads',
-		'ui/dialogs/permission_dialog': 'a macOS privacy (TCC) grant walkthrough'
+		'remap/data': 'Karabiner remap data that only the macOS remap runtime reads',
+		'onboarding/ui': 'the macOS privacy (TCC) grant walkthrough lives here'
 	},
 	linux: {
 		install: 'the shell installers and launcher the Linux package runs before LuaJIT',
 		'platform/desktop_focus': 'GNOME Shell and KWin code reading the focused window under Wayland',
-		'native/archive_output': 'the O_TMPFILE/linkat archive publication of the Linux updater',
-		'ui/dialogs/numeric_prompt':
-			'Linux has no toolkit number prompt (hs.dialog, InputBox elsewhere)',
-		'ui/dialogs/token_prompt': 'Linux has no toolkit secret prompt'
+		'updater/native': 'the O_TMPFILE/linkat archive publication of the Linux updater'
 	},
 	windows: {
-		'native/keyboard_layout': 'the keyboard DLL sources generated from the .keylayout',
-		'native/nav_event_owner': 'the WH_KEYBOARD_LL component owning navigation events',
-		'ui/overlays/spotlight': 'the Windows spotlight overlay (macOS and Linux use the OS overlay)'
+		'layouts/native': 'the keyboard DLL sources generated from the .keylayout',
+		'platform/native': 'the WH_KEYBOARD_LL component owning navigation events'
 	}
 };
 
@@ -344,83 +686,143 @@ function classify(table, stem) {
 	return hit ? hit[0] : null;
 }
 
-/** The ui/ group of a ui-relative first segment, or null. */
-function uiGroup(segment) {
-	return classify(UI_GROUPS, segment.replace(/\.[^.]+$/, ''));
+/** True when a root is a cross-cutting domain, which has no feature sub-folders. */
+const isPlatform = (root) => root.startsWith('platform/');
+
+/**
+ * Builds a target from a feature root, a sub-folder and the remaining path.
+ * platform/ roots are OS bindings throughout and take no sub-folder.
+ */
+function place(root, sub, rest) {
+	const parts = isPlatform(root) ? [root, ...rest] : [root, sub, ...rest];
+	return applySplits(parts.join('/'));
 }
 
 /**
- * Maps the code part of a driver path (relative to the driver root, tests
- * prefix removed) to its target.
- * @param {string} rel e.g. "infra/logger.lua" or "ui/changelog/bridge.lua".
- * @param {boolean} isTest The path sits under tests/, so file stems carry test markers.
- * @returns {string} The target relative path.
+ * Classifies the segment that follows a layer: a folder name or a file stem.
+ * @returns {{root: string, absorb: boolean}|null}
  */
-function mapCode(rel, isTest) {
-	const parts = rel.split('/');
-	const layer = parts[0];
-	const name = parts[parts.length - 1];
-
-	// Rule 3: ui/ groups. A ui-relative first segment names a window or a file.
-	if (layer === 'ui' && parts.length >= 2) {
-		const first = parts.length === 2 ? classStem(parts[1]) : parts[1];
-		const group = uiGroup(first);
-		if (parts[1] === 'menu' && parts[2] === 'menu_llm')
-			return applySplits(['ui', 'menu', 'llm', ...parts.slice(3)].join('/'), isTest);
-		if (group && group !== parts[1])
-			return applySplits(['ui', group, ...parts.slice(1)].join('/'), isTest);
-		return applySplits(rel, isTest);
-	}
-
-	// Rule 2: flat infra/ and adapters/ files split by domain.
-	if ((layer === 'infra' || layer === 'adapters') && parts.length === 2) {
-		const table = layer === 'infra' ? INFRA_DOMAINS : ADAPTER_DOMAINS;
-		const domain = classify(table, classStem(name));
-		if (domain === 'diagnostics' && layer === 'infra') return `modules/diagnostics/${name}`;
-		if (domain === 'hotstrings' && layer === 'infra')
-			return applySplits(`modules/hotstrings/${name}`, isTest);
-		if (domain) return applySplits(`${layer}/${domain}/${name}`, isTest);
-		return rel;
-	}
-	if (layer === 'modules' && parts[1] === 'diagnostics') return rel;
-
-	// The canonical `layout` feature (features.json) is spread through keymap.
-	if (layer === 'modules' && parts[1] === 'keymap' && parts.length >= 3) {
-		if (parts.length >= 4 && parts[2] === 'layout')
-			return ['modules', 'layout', ...parts.slice(3)].join('/');
-		if (parts.length >= 4 && parts[2] === 'keylayout')
-			return ['modules', 'layout', ...parts.slice(2)].join('/');
-		if (parts.length === 3 && LAYOUT_STEM.test(classStem(name))) return `modules/layout/${name}`;
-	}
-	// Existing infra/ sub-folders that have a domain name elsewhere.
-	if (layer === 'infra' && parts.length >= 3 && !(isTest && parts[1] === 'toml')) {
-		const renamed = {
-			timings: 'infra/config',
-			toml: 'infra/text/toml',
-			metrics: 'modules/keystats'
-		}[parts[1]];
-		if (renamed) return [renamed, ...parts.slice(2)].join('/');
-	}
-	// Windows keeps the hotstring engine under infra/; the other drivers under modules/.
-	if (layer === 'infra' && parts[1] === 'hotstrings')
-		return applySplits(['modules', ...parts.slice(1)].join('/'), isTest);
-	return applySplits(rel, isTest);
+function rootOf(table, segment, isFile) {
+	const stem = isFile ? classStem(segment) : segment;
+	if (!isFile && ALIASES[stem]) return { root: ALIASES[stem], absorb: SYNONYMS.has(stem) };
+	const root = classify(table, stem) || (isFile ? null : classify(table, classStem(segment)));
+	return root ? { root, absorb: false } : null;
 }
 
-const LAYOUT_STEM =
-	/^(layout|composer_check|input_sources|pending_layout|number_row|pause_layout|x11_layout|system_layout|keylayout|managed_python)/;
-
-/** Applies the sub-module split of the folder a file sits directly in. */
-function applySplits(rel, isTest) {
+/**
+ * Maps the code part of a driver path (tests prefix removed).
+ * @param {string} rel e.g. "infra/logger.lua" or "ui/changelog/bridge.lua".
+ * @param {string} tree The driver.
+ * @returns {string} The target path relative to the driver root.
+ */
+function mapCode(rel, tree) {
 	const parts = rel.split('/');
-	const folder = parts.slice(0, -1).join('/');
-	const normalised = folder.replace(/^ui\/menu$/, 'ui/menu');
-	const split = SUBMODULE_SPLITS[normalised];
-	if (!split) return rel;
+	const [layer, segment] = parts;
+	if (parts.length < 2) return rel;
+	const isFile = parts.length === 2;
+	const rest = parts.slice(2);
+	const keep = (hit) => (hit.absorb || isFile ? (isFile ? [segment] : rest) : [segment, ...rest]);
+
+	if (layer === 'modules') {
+		// keymap holds the hotstring expander on macOS and the layout code on
+		// every driver: each file goes to its own feature.
+		if (segment === 'keymap' && !isFile) {
+			if (rest[0] === 'layout' && rest.length > 1) return place('layouts', 'engine', rest.slice(1));
+			if (rest[0] === 'keylayout') return place('layouts', 'engine', rest);
+			const own = rest.length === 1 ? classify(LOGIC_FEATURES, classStem(rest[0])) : null;
+			if (own && own !== 'hotstrings') return place(own, 'engine', rest);
+			// The rest of keymap is the macOS hotstring expander: a sub-module of
+			// hotstrings, kept apart from modules/hotstrings so the two never meet.
+			return place('hotstrings', 'engine', ['expander', ...rest]);
+		}
+		if (segment === 'dynamic_hotstrings' && !isFile)
+			return place('hotstrings', 'engine', ['dynamic', ...rest]);
+		const hit = rootOf(LOGIC_FEATURES, segment, isFile);
+		if (!hit || !hit.root) return rel;
+		// A flat module file is the feature's entry point and stays at its root.
+		if (isFile && ALIASES[classStem(segment)]) return `${hit.root}/${segment}`;
+		// Inside a feature module, a file whose name says it binds the OS goes
+		// to the feature's adapters/, the rest to its engine/.
+		const leaf = parts[parts.length - 1];
+		const sub = OS_BINDING.test(classStem(leaf)) ? 'adapters' : 'engine';
+		return place(hit.root, sub, keep(hit));
+	}
+	if (layer === 'infra' || layer === 'adapters' || layer === 'platform') {
+		const sub = layer === 'infra' ? 'engine' : 'adapters';
+		if (layer === 'platform' && !isFile) {
+			if (segment === 'remap') {
+				const leaf = rest[rest.length - 1];
+				const stem = classStem(leaf);
+				if (rest.length === 1 && /^tap_hold/.test(stem)) return place('tap_hold', 'engine', rest);
+				if (rest[0] === 'data') return place('remap', 'data', rest.slice(1));
+				if (
+					rest.length === 1 &&
+					/^(runtime_|ke_|lease_|deploy_pacing|managed_rule|token_reuse|guardian)/.test(stem)
+				)
+					return place('remap', 'adapters', rest);
+				return place('remap', 'engine', rest);
+			}
+			if (segment === 'network') return place('core/network', 'adapters', rest);
+			if (segment === 'tray') return place('tray', 'adapters', rest);
+		}
+		const table = layer === 'infra' ? LOGIC_FEATURES : ADAPTER_FEATURES;
+		// A file no table places (mostly cross-port tests such as the adapter
+		// compliance suite) goes to the layer's default domain, never back to a
+		// layer folder that no longer exists.
+		const hit = rootOf(table, segment, isFile) ||
+			rootOf(layer === 'infra' ? ADAPTER_FEATURES : LOGIC_FEATURES, segment, isFile) || {
+				root: layer === 'infra' ? 'core/lifecycle' : 'platform/system',
+				absorb: false
+			};
+		return place(hit.root, sub, keep(hit));
+	}
+	if (layer === 'ui') {
+		const stem = isFile ? classStem(segment) : segment;
+		const root =
+			classify(UI_FEATURES, stem) || (ALIASES[stem] && !isFile ? ALIASES[stem] : null) || 'core/ui';
+		const absorbed = !isFile && ALIASES[stem] === root && SYNONYMS.has(stem);
+		// The tray menu's builder stays in menu/; each feature's own section of
+		// the menu moves to that feature's ui/menu/, beside its other windows.
+		if (absorbed && root === 'menu' && rest[0] === 'menu_llm')
+			return place('ai', 'ui', ['menu', ...rest.slice(1)]);
+		if (absorbed && root === 'menu' && rest.length === 1) {
+			const section = classStem(rest[0]).replace(/^menu_/, '');
+			const owner = MENU_SECTIONS.find(([, re]) => re.test(section));
+			if (owner) return place(owner[0], 'ui', ['menu', rest[0]]);
+		}
+		return place(root, 'ui', isFile || absorbed ? (isFile ? [segment] : rest) : [segment, ...rest]);
+	}
+	if (layer === 'native') {
+		if (segment === 'keyboard_layout') return ['layouts', 'native', ...parts.slice(1)].join('/');
+		if (segment === 'archive_output') return ['updater', 'native', ...parts.slice(1)].join('/');
+		if (segment === 'nav_event_owner') return ['platform', 'native', ...parts.slice(1)].join('/');
+		if (isFile) return place('shortcuts', 'native', [segment]);
+	}
+	if (layer === 'data' && isFile) {
+		const stem = classStem(segment);
+		const root =
+			classify(
+				[
+					['diagnostics', /^field_/],
+					['onboarding', /^privacy_panes/],
+					['ai', /^generate_models/]
+				],
+				stem
+			) || 'settings';
+		return place(root, 'data', [segment]);
+	}
+	return rel;
+}
+
+/** Applies the second-level split of the folder a file sits directly in. */
+function applySplits(rel) {
+	const parts = rel.split('/');
 	const name = parts[parts.length - 1];
-	if (/^(README\.md|init\.(lua|ahk))$/.test(name)) return rel;
+	const folder = parts.slice(0, -1).join('/');
+	const split = SPLITS[folder];
+	if (!split || /^(README\.md|init\.(lua|ahk)|_index\.ahk)$/.test(name)) return rel;
 	const sub = classify(split.table, classStem(name, split.strip));
-	return sub ? `${folder}/${sub}/${name}` : rel;
+	return sub ? applySplits(`${folder}/${sub}/${name}`) : rel;
 }
 
 /**
@@ -433,152 +835,103 @@ function mapPath(treeRel) {
 	if (tree === '_shared') return `_shared/${mapShared(rest)}`;
 	if (!DRIVERS.includes(tree)) return treeRel;
 
-	// Linux-only folders folded into the canonical layers (see OS_SPECIFIC).
+	// Linux-only folders folded into their roots (see OS_SPECIFIC).
 	if (tree === 'linux' && rest.startsWith('desktop_focus/')) return `linux/platform/${rest}`;
 	if (tree === 'linux' && rest.startsWith('bin/')) return `linux/install/${rest.slice(4)}`;
+	if (tree === 'macos' && rest.startsWith('apps/')) return `macos/apps/bundled/${rest.slice(5)}`;
 
 	const test = rest.match(/^tests\/(unit|meta|integration|contract|e2e)\/(.+)$/);
-	if (test) return `${tree}/tests/${test[1]}/${mapCode(test[2], true)}`;
+	if (test) return `${tree}/tests/${test[1]}/${mapCode(test[2], tree)}`;
+	// Support and fixture folders that mirror a code layer follow that layer.
+	const mirrored = rest.match(
+		/^tests\/(fixtures|support)\/((?:infra|adapters|modules|platform|ui)\/.+)$/
+	);
+	if (mirrored) return `${tree}/tests/${mirrored[1]}/${mapCode(mirrored[2], tree)}`;
 	const data = rest.match(/^tests\/(fixtures|support|hardware)\/([^/]+)$/);
 	if (data) {
 		const feature = classify(TEST_DATA_FEATURES, classStem(data[2]));
 		return feature ? `${tree}/tests/${data[1]}/${feature}/${data[2]}` : treeRel;
 	}
 	if (rest.startsWith('tests/')) return treeRel;
-	return `${tree}/${mapCode(rest, false)}`;
+	return `${tree}/${mapCode(rest, tree)}`;
 }
 
-// Where each existing _shared/lua folder lands: the driver layer and the name
-// it has there, so _shared/lua mirrors <driver>/<layer>/<domain>.
-const SHARED_LUA_FOLDERS = {
-	actions: 'modules/actions',
-	app_parameter: 'modules/actions',
-	caps_word: 'modules/keymap',
-	chord: 'modules/keymap',
-	color: 'ui/shell',
-	compat: 'infra/lifecycle',
-	control: 'infra/field_check',
-	core: 'infra/lifecycle',
-	crypto: 'adapters/storage',
-	desktop_navigation: 'modules/shortcuts',
-	diagnostics: 'modules/diagnostics',
-	dynamic_hotstrings: 'modules/dynamic_hotstrings',
-	error_dialog: 'ui/dialogs',
-	features: 'infra/config',
-	file_selection: 'ui/editors',
-	file_system: 'infra/file_system',
-	gestures: 'modules/gestures',
-	healthcheck: 'ui/panels/healthcheck',
-	hotstring_engine: 'modules/hotstrings/engine',
-	hotstring_priority: 'modules/hotstrings',
-	hotstrings: 'modules/hotstrings',
-	input: 'infra/input',
-	keycodes: 'infra/input/keycodes',
-	keymap: 'modules/keymap',
-	keystats: 'modules/keystats',
-	layout: 'modules/layout',
-	layouts: 'modules/layout/registry',
-	llm: 'modules/llm',
-	locale: 'infra/i18n',
-	logger: 'infra/logger',
-	menu: 'ui/menu',
-	network: 'infra/network',
-	open_target: 'infra/ui',
-	personal_info: 'modules/dynamic_hotstrings',
-	process: 'adapters/processes',
-	send_input: 'infra/input',
-	shell: 'adapters/processes',
-	shortcuts: 'modules/shortcuts',
-	sqlite: 'infra/file_system/sqlite',
-	tap_hold: 'platform/remap/tap_hold',
-	test: 'test',
-	text_utils: 'infra/text/text_utils',
-	toml_codec: 'infra/text/toml',
-	tooltip: 'ui/overlays/tooltip',
-	tray: 'platform/tray',
-	unicode_case: 'infra/text',
-	updater: 'modules/updater',
-	webview: 'ui/shell',
-	wpm_widget: 'ui/overlays/wpm',
-	wrap_pair: 'infra/input'
-};
-
-// Flat _shared/lua files the infra vocabulary does not place.
-const SHARED_LUA_FLAT = [
-	['modules/actions', /^(action_parameter_label|user_action_parameter|brightness_actions)/],
-	['ui/panels/onboarding', /^onboarding_/],
-	['ui/shell', /^(window_titles|cursor_window_policy|native_theme_data|native_app_switcher_owner)/],
-	['ui/menu', /^feature_notice/],
-	['infra/config', /^(script_|scope_owner|program_provider|program_parameter|adapter_errors)/],
-	[
-		'infra/lifecycle',
-		/^(module_source_|native_worker_owner|owned_timer_slots|reload_gate|quit_admission)/
-	],
-	['infra/file_system', /^(app_dirs|storage_owned|native_path)/],
-	['infra/text', /^(table_util|number_policy)/],
-	['infra/menu', /^application_notifier/]
-];
-
-// The _shared/ui page folders take the same groups as the driver ui/ trees;
-// the page-independent scripts go to ui/lib/.
-function mapSharedUi(parts) {
-	const [, first, ...rest] = parts;
-	if (first === '_generated' || first === 'vendor') return parts.join('/');
-	if (rest.length === 0) return ['ui', 'lib', first].join('/');
-	const group =
-		uiGroup(first) ||
-		(/^(layout_composer|layout_editor)$/.test(first) ? 'editors' : null) ||
-		(first === 'release_notes' ? 'panels' : null);
-	return group ? ['ui', group, first, ...rest].join('/') : parts.join('/');
-}
-
-/** _shared/lua and _shared/ui mirror the driver trees; the other roots stay. */
+/** _shared: the same feature roots; Lua under engine/, pages under ui/, data under data/. */
 function mapShared(rest) {
 	const parts = rest.split('/');
-	if (parts[0] === 'ui') return mapSharedUi(parts);
-	if (parts[0] !== 'lua') return rest;
-	if (parts.length === 2) {
-		const name = parts[1];
-		const stem = classStem(name);
-		const flat = classify(SHARED_LUA_FLAT, stem);
-		if (flat) return `lua/${flat}/${name}`;
-		const domain = classify(INFRA_DOMAINS, stem);
-		if (domain === 'diagnostics') return `lua/modules/diagnostics/${name}`;
-		if (domain === 'hotstrings') return `lua/modules/hotstrings/${name}`;
-		if (domain) return applySplitsShared(`infra/${domain}/${name}`);
-		return rest;
-	}
-	if (parts[1] === 'test') {
-		if (parts.length !== 3) return rest;
-		const stem = classStem(parts[2]);
-		const domain = classify(TEST_DATA_FEATURES, stem) || classify(INFRA_DOMAINS, stem);
-		return domain ? `lua/test/${domain}/${parts[2]}` : rest;
-	}
-	const target = SHARED_LUA_FOLDERS[parts[1]];
-	if (!target) return rest;
+	const [root, segment] = parts;
+	const isFile = parts.length === 2;
 	const tail = parts.slice(2);
-	// A folder keeps its name under its target unless the target already ends
-	// with it; the singleton pass then turns a one-file folder into <name>.lua,
-	// which keeps the module's last name.
-	const absorbed = target.split('/').pop() === parts[1];
-	return applySplitsShared(
-		['lua', ...target.split('/'), ...(absorbed ? [] : [parts[1]]), ...tail].join('/')
-	);
-}
-
-/** Applies a sub-module split to a _shared/lua path, which mirrors driver paths. */
-function applySplitsShared(rel) {
-	const lua = rel.startsWith('lua/');
-	const inner = lua ? rel.slice(4) : rel;
-	return `lua/${applySplits(inner, false)}`;
+	if (root === 'lua') {
+		if (segment === 'test') {
+			const leaf = parts[2];
+			if (parts.length !== 3) return ['tests', 'lua', ...parts.slice(2)].join('/');
+			const f =
+				classify(TEST_DATA_FEATURES, classStem(leaf)) || classify(LOGIC_FEATURES, classStem(leaf));
+			return ['tests', 'lua', ...(f ? [f.replace(/\//g, '_')] : []), leaf].join('/');
+		}
+		if (segment === 'test_support' || segment === 'tests') return rest;
+		if (segment === 'keymap' && !isFile) return place('layouts', 'engine', tail);
+		// The same sub-module names the drivers use for these.
+		if (segment === 'dynamic_hotstrings' && !isFile)
+			return place('hotstrings', 'engine', ['dynamic', ...tail]);
+		if (segment === 'hotstring_engine' && !isFile)
+			return place('hotstrings', 'engine', ['matcher', ...tail]);
+		const hit =
+			rootOf(LOGIC_FEATURES, segment, isFile) ||
+			(isFile ? null : rootOf(LOGIC_FEATURES, segment, true));
+		if (!hit) return rest;
+		const kept = isFile ? [segment] : hit.absorb ? tail : [segment, ...tail];
+		return place(hit.root, 'engine', kept);
+	}
+	if (root === 'ui') {
+		if (segment === '_generated' || segment === 'vendor')
+			return ['core', 'ui', 'web', segment, ...tail].join('/');
+		if (isFile) return place('core/ui', 'ui', ['web', segment]);
+		const feature = classify(UI_FEATURES, segment) || ALIASES[segment];
+		return feature ? place(feature, 'ui', [segment, ...tail]) : rest;
+	}
+	if (root === 'modules' || root === 'data') {
+		const stem = isFile ? classStem(segment) : segment;
+		const feature = classify(DATA_FEATURES, stem);
+		if (!feature) return rest;
+		// modules/<feature>/ is the feature's data folder and dissolves into it;
+		// a data/<folder>/ beside it keeps a name, so the two never meet.
+		const absorbed =
+			root === 'modules' && !isFile && ALIASES[segment] === feature && SYNONYMS.has(segment);
+		const named = root === 'data' && segment === 'hotstrings' ? 'autocorrection' : segment;
+		return place(feature, 'data', isFile || !absorbed ? [named, ...tail] : tail);
+	}
+	if (root === 'core') {
+		if (segment === 'config_schema') return place('settings', 'data', ['config_schema', ...tail]);
+		if (segment === 'domain') return place('core/text', 'data', ['domain', ...tail]);
+		return rest; // core/ports and core/features.json keep their place
+	}
+	if (root === 'keymap') return place('layouts', 'data', [segment]);
+	if (root === 'tap_hold') return place('tap_hold', 'data', parts.slice(1));
+	if (root === 'ahk')
+		return segment === 'tap_hold'
+			? place('tap_hold', 'engine', tail)
+			: place('settings', 'engine', [segment]);
+	if (root === 'assets') return place('tray', 'data', [segment]);
+	if (root === 'python')
+		return place(/^network_proxy/.test(segment) ? 'core/network' : 'ai', 'adapters', [
+			'python',
+			segment
+		]);
+	if (root === 'go') return place('core/network', 'native', ['go', ...parts.slice(1)]);
+	if (root === 'native') return place('core/network', 'native', parts.slice(2));
+	return rest;
 }
 
 module.exports = {
-	INFRA_DOMAINS,
-	ADAPTER_DOMAINS,
-	UI_GROUPS,
-	SUBMODULE_SPLITS,
+	FEATURES,
+	CORE_DOMAINS,
+	PLATFORM_DOMAINS,
+	SUBS,
+	ALIASES,
 	OS_SPECIFIC,
+	SPLITS,
 	classStem,
 	mapPath
 };

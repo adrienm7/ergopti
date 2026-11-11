@@ -82,11 +82,11 @@ const HOMES = {
 		mechanism: 'shared data file; the call reads a named registry key'
 	},
 	lua_function: {
-		home: '_shared/lua/<target domain>/',
+		home: '_shared/<feature>/engine/',
 		mechanism: 'one Lua module both Lua drivers require'
 	},
 	lua_table: {
-		home: '_shared/modules/<domain>/*.json or _shared/lua/<target domain>/',
+		home: '_shared/<feature>/data/*.json or _shared/<feature>/engine/',
 		mechanism: 'shared data file (AHK can read it) or one Lua module'
 	}
 };
@@ -148,7 +148,10 @@ function kindOf(name, value) {
 /** The domain a driver file lands in under the structure plan. */
 function domainOf(treeRel) {
 	const target = Rules.mapPath(treeRel).split('/').slice(1);
-	return target.length > 2 ? `${target[0]}/${target[1]}` : target[0];
+	// A feature root, or core/<domain> and platform/<domain>.
+	return ['core', 'platform'].includes(target[0]) && target.length > 2
+		? `${target[0]}/${target[1]}`
+		: target[0];
 }
 
 function lineOf(text, index) {
@@ -308,7 +311,7 @@ function inventory() {
 	}
 	logic.sort((a, b) => b.similarity - a.similarity || (b.macos.lines || 0) - (a.macos.lines || 0));
 	for (const l of logic) {
-		const home = `_shared/lua/${domainOf(l.linux.file)}/`;
+		const home = `_shared/${domainOf(l.linux.file)}/engine/`;
 		items.push({
 			tree: 'macos+linux',
 			file: `${l.macos.file}:${l.macos.line} = ${l.linux.file}`,
@@ -438,7 +441,7 @@ function main() {
 	for (const l of inv.logic.slice(0, 150)) {
 		const label = l.kind === 'lua_table' ? `table \`${l.macos.name}\`` : `\`${l.macos.name}\``;
 		lines.push(
-			`| ${l.similarity.toFixed(2)} | ${label} \`${l.macos.file}:${l.macos.line}\` | \`${l.linux.file}:${l.linux.line}\` | \`_shared/lua/${domainOf(l.linux.file)}/\` |`
+			`| ${l.similarity.toFixed(2)} | ${label} \`${l.macos.file}:${l.macos.line}\` | \`${l.linux.file}:${l.linux.line}\` | \`_shared/${domainOf(l.linux.file)}/engine/\` |`
 		);
 	}
 	if (inv.logic.length > 150)

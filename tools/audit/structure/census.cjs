@@ -54,8 +54,9 @@ const EXEMPT = [
 	},
 	{ re: /\.app(\/|$)/, why: 'macOS application bundle layout' },
 	{ re: /(^|\/)tests\/corpus(\/|$)/, why: 'data corpus, one vector per file' },
-	{ re: /^_shared\/data\/locales$/, why: 'one catalogue per supported locale' },
-	{ re: /^_shared\/go\//, why: 'a Go package is one folder by language convention' },
+	{ re: /(^|\/)data\/locales$/, why: 'one catalogue per supported locale' },
+	{ re: /^_shared\/core\/ports$/, why: 'the port catalogue, one specification per port' },
+	{ re: /(^|\/)go\//, why: 'a Go package is one folder by language convention' },
 	{ re: /(^|\/)(__pycache__|node_modules|\.[^/]+)(\/|$)/, why: 'tool residue' }
 ];
 
@@ -99,9 +100,9 @@ function folderTable(files) {
 /** The tree-independent name of a folder, shared by its driver counterparts. */
 function counterpartKey(tree, folder) {
 	if (DRIVERS.includes(tree)) return folder;
-	if (tree === '_shared' && folder.startsWith('lua/') && !folder.startsWith('lua/test'))
-		return folder.slice(4);
-	return null;
+	if (tree !== '_shared' || /^(tests|lua\/test)(\/|$)/.test(folder)) return null;
+	// Today's shared Lua sits under lua/; the target puts it at the root.
+	return folder.startsWith('lua/') ? folder.slice(4) : folder;
 }
 
 /** True for the architecture part of a driver tree (tests and exemptions aside). */
