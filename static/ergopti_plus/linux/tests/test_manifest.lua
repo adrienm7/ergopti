@@ -264,6 +264,7 @@ return {
 	"tests.unit.adapters.layout.test_xkb_capture_direct_sources_retain",
 	"tests.unit.infra.lifecycle.test_build_commit",
 	"tests.unit.infra.config.test_config_migrate",
+	"tests.unit.infra.config.test_stage_owner",
 	"tests.unit.infra.config.test_config_directory_target",
 	"tests.unit.infra.config.test_config_outdated",
 	"tests.unit.infra.shared_modules.test_shared_module_contracts",

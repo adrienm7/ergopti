@@ -75,7 +75,7 @@ require("tests.support.metrics_preferences_fixture").with(function()
 		return open(candidate, mode)
 	end
 	Writer.open = function(candidate, mode)
-		if candidate == path .. ".tmp" then return wrap(native_open(candidate, mode)) end
+		if candidate == require("infra.stage_owner").stage_path(path) then return wrap(native_open(candidate, mode)) end
 		return native_open(candidate, mode)
 	end
 	Keystats.on_keydown("b", 1200, app)
@@ -104,6 +104,6 @@ require("tests.support.metrics_preferences_fixture").with(function()
 	end
 	assert(retry == false and row.pending_final == 3, "summary ACK cannot consume native SQLite source")
 	assert(final.apps[app].keystrokes == 3 and row.public_keystrokes == 3, "retry must save cumulative A+B+C exactly once")
-	assert(uv.fs_lstat(path .. ".tmp") == nil and uv.fs_lstat(folder .. "/metrics.sqlite") == nil)
+	assert(uv.fs_lstat(require("infra.stage_owner").stage_path(path)) == nil and uv.fs_lstat(folder .. "/metrics.sqlite") == nil)
 	write(folder .. "/complete", "complete")
 end, { initial = { ["metrics.encrypt"] = false } })

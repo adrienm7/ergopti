@@ -191,7 +191,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					fault = function(mode)
 						os.rename = function(source, destination)
 							-- Refuse only the real forward staging rename, preserving the inverse ACK.
-							if source == path .. ".tmp" and destination == path then
+							if source == helpers.stage_path(path) and destination == path then
 								refused_publications = refused_publications + 1
 								if mode == "throw" then error("controlled native publication refusal") end
 								if mode == "nil" then return nil, "refused" end

@@ -20,7 +20,18 @@ APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/
 FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
+# The store stages under this process's own name (pid and kernel start tick,
+# CFD-1), which the parent cannot know: the worker moves the alias the parent
+# prepared onto that name before the store is used, then reports it. rename()
+# keeps the inode, so the parent still compares the exact identity it made.
 WORKER = r"""
+local prepared = os.getenv("ERGOPTI_PREPARED_STAGE")
+if prepared then
+	local store = require("infra.config_paths").default_config_dir() .. "/storage.json"
+	local stage = require("infra.stage_owner").stage_path(store)
+	assert(os.rename(prepared, stage), "the prepared stage could not take the worker's name")
+	io.write("STAGE=", stage, "\n")
+end
 local Storage = require("adapters.storage")
 local mode = assert(os.getenv("ERGOPTI_NATIVE_STORAGE_MODE"))
 if mode ~= "fresh" then assert(Storage.get("value") == "retained") end
@@ -63,10 +74,12 @@ def main():
                 failures += 1
                 print(f"FAIL {name}: {failure}", flush=True)
 
-        def run(case_root, mode, limited=False):
+        def run(case_root, mode, limited=False, prepared=None):
             env = dict(os.environ)
             env["XDG_CONFIG_HOME"] = str(case_root)
             env["ERGOPTI_NATIVE_STORAGE_MODE"] = mode
+            if prepared is not None:
+                env["ERGOPTI_PREPARED_STAGE"] = str(prepared)
             env["LUA_PATH"] = (
                 "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
             )
@@ -84,7 +97,7 @@ def main():
             directory = case_root / FOLDER
             directory.mkdir(parents=True)
             store = directory / "storage.json"
-            staging = directory / "storage.json.tmp"
+            staging = directory / "prepared-stage"
             target = case_root / "foreign"
             store.write_bytes(original)
             if kind != "dangling":
@@ -105,7 +118,18 @@ def main():
             if kind == "denied-directory":
                 directory.chmod(0o555)
             try:
-                child = run(case_root, "refuse")
+                # A denied directory refuses the rename too: the store's own
+                # exclusive creation is what is refused there.
+                denied = kind == "denied-directory"
+                child = run(case_root, "refuse", prepared=None if denied else staging)
+                if not denied:
+                    named = [
+                        line[len("STAGE=") :]
+                        for line in child.stdout.splitlines()
+                        if line.startswith("STAGE=")
+                    ]
+                    assert len(named) == 1, (child.stdout + child.stderr)[-1000:]
+                    staging = pathlib.Path(named[0])
                 assert (
                     store.is_file() and not store.is_symlink() and store.read_bytes() == original
                 ), "foreign staging changed the committed store"
@@ -148,7 +172,7 @@ def main():
                 (directory / "storage.json").write_bytes(original)
             child = run(case_root, "fresh" if fresh else "healthy")
             assert child.returncode == 0, (child.stdout + child.stderr)[-1000:]
-            assert not (directory / "storage.json.tmp").exists()
+            assert not list(directory.glob("storage.json.*.tmp"))
             assert '"replacement"' in (directory / "storage.json").read_text()
 
         check("native first write creates its directory and reloads", lambda: healthy_case(True))
@@ -162,8 +186,8 @@ def main():
             store.write_bytes(original)
             child = run(case_root, "limit", limited=True)
             assert child.returncode == 0, (child.stdout + child.stderr)[-1000:]
-            assert (
-                store.read_bytes() == original and not (directory / "storage.json.tmp").exists()
+            assert store.read_bytes() == original and not list(
+                directory.glob("storage.json.*.tmp")
             ), "failed owned staging changed durable bytes or leaked its temp"
 
         check(

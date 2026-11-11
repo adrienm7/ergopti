@@ -990,6 +990,10 @@ local function main()
 		end
 		return notifier.send(message, { level = "error" })
 	end)
+	-- 7.9) Stages a killed or crashed Ergopti process left beside the settings
+	-- (storage.json and the TOML files) are removed before anything writes
+	-- there; a foreign file is never touched (CFD-1, infra/stage_owner.lua).
+	require("infra.stage_owner").reap_settings()
 	-- 8.0) Version config.toml before anything reads or writes it: the gesture
 	-- and shortcut managers below load the migrated file, and a file the wizard
 	-- creates carries this build's version. A file this build cannot version (a

@@ -60,4 +60,7 @@ return {
 	macos_notifications = {
 		launcher_quit_request = "com.ergoptiplus.app.quit-request",
 	},
+	linux_stage = {
+		infix = "ergopti",
+	},
 }

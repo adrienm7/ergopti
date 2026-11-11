@@ -28,17 +28,17 @@ exactly, where Windows' loader (`TomlConfigValueMatchesManifest`) admits a
 case variant of every enum. Each of them stores the value it admits, so
 they need the same canonical spelling, not a looser check.
 
-## Decisions pending (behaviour left unchanged)
+## Decided
 
-- **CFD-1, a staging file left by a crash.** Linux stages every TOML write
-  as `<file>.tmp` and `storage.json.tmp`, created exclusively; a stage the
-  driver itself left behind at a kill or power cut blocks every later write
-  of that file until it is deleted by hand (`toml_codec/writer.lua`,
-  `adapters/storage.lua`). Windows names each stage per process and reaps a
-  stage whose owner is gone (`toml_helpers.ahk` `_TOML_ReapStaleTemps`).
-  Linux deliberately refuses a foreign stage file (memory
-  `project-linux-json-store-publication`); recognizing its own needs a
-  per-process name or an owner record.
+- **CFD-1, a staging file left by a crash** (decided by the maintainer on
+  2026-11-11): Linux stages TOML and `storage.json` writes as
+  `<file>.ergopti-<pid>-<start>.tmp` (the kernel start tick, so a reused pid
+  is not the owner) and reaps at start the stages of a dead Ergopti process
+  older than `[adapters] stale_temp_age_ms`, as Windows
+  `_TOML_ReapStaleTemps` (`infra/stage_owner.lua`). A foreign stage is still
+  refused and never removed. macOS stages through stdio `"w"`, which
+  overwrites a leftover, and needs no change. Regressions
+  `cfd1-stage-owner`. Windows: no change.
 
 ## Refuted
 

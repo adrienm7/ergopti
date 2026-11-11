@@ -298,14 +298,14 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local i18n = require("infra.i18n")
 			i18n.init()
 			os.rename = function(from, to)
-				if from == path .. ".tmp" and to == path then
+				if from == helpers.stage_path(path) and to == path then
 					attempts = attempts + 1
 					if options.on_publish then options.on_publish(config) end
 					if options.rename == "throw" then error("owned rename refused") end
 					if options.rename == "false" then return nil, "owned rename refused", 13 end
 				end
 				local renamed, detail, errno = original_rename(from, to)
-				if renamed and from == path .. ".tmp" and to == path and options.after_publish then options.after_publish(config, path) end
+				if renamed and from == helpers.stage_path(path) and to == path and options.after_publish then options.after_publish(config, path) end
 				return renamed, detail, errno
 			end
 			observations = body(i18n, path, seed)
@@ -313,7 +313,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		os.rename = original_rename
 		logger.set_level(original_level)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-		os.remove(path .. ".tmp"); os.remove(path)
+		os.remove(helpers.stage_path(path)); os.remove(path)
 		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak")
 		if options.config then os.execute("rmdir " .. string.format("%q", root .. "/config")) end

@@ -80,7 +80,7 @@ local function with_binding(body, options)
 			body(owners, seen, path, reload)
 		end)
 	end)
-	for _, path in ipairs(backups) do os.remove(path); os.remove(path .. ".tmp") end
+	for _, path in ipairs(backups) do os.remove(path); os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path)) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end

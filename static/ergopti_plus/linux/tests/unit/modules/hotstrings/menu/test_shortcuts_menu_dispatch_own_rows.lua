@@ -563,7 +563,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		end)
 		os.rename = rename
 		for _, row in ipairs(loaded) do package.loaded[row.name] = row.value end
-		os.remove(path .. ".tmp")
+		os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path))
 		assert(os.remove(path), "the actual private chord config is retired")
 		if not called then error(failure, 0) end
 	end
@@ -580,7 +580,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 					local redraws, writes, rename = 0, 0, os.rename
 					local action = command(chords, function() redraws = redraws + 1 end)
 					os.rename = function(from, to)
-						if from == path .. ".tmp" and to == path then
+						if from == helpers.stage_path(path) and to == path then
 							writes = writes + 1
 							if outcome == "throw" then error("controlled native publication refusal") end
 							if outcome == "false" then return false end
@@ -622,7 +622,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 				helpers.assert_true(chords.set_chords_enabled(not initial), "the actual independent writer changes the live posture")
 				helpers.assert_eq(chords.chords_enabled(), not initial)
 				os.rename = function(from, to)
-					if from == path .. ".tmp" and to == path then writes = writes + 1 end
+					if from == helpers.stage_path(path) and to == path then writes = writes + 1 end
 					return rename(from, to)
 				end
 				local called, receipt, notices = observe(action)

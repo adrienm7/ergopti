@@ -12,7 +12,7 @@
 --- FEATURES & RATIONALE:
 --- 1. XDG-compliant path: respects XDG_CONFIG_HOME so containerised environments
 ---    and users with non-standard home directories work out of the box.
---- 2. Atomic write: data is written to a .tmp file then renamed so a crash during
+--- 2. Atomic write: data is written to a per-process .tmp file then renamed so a crash during
 ---    a write never corrupts the main store.
 --- 3. Lazy load: the JSON file is read only on the first call (or after reload),
 ---    keeping daemon startup fast.
@@ -82,7 +82,10 @@ local function _config_dir()
 end
 
 local _STORE_PATH = _config_dir() .. "storage.json"
-local _TMP_PATH   = _STORE_PATH .. ".tmp"
+-- Named after this process (pid and kernel start tick): a stage a killed
+-- daemon left never blocks this one, and infra/stage_owner.lua reaps it at
+-- start (CFD-1); a foreign file under this name still refuses the write.
+local _TMP_PATH   = require("infra.stage_owner").stage_path(_STORE_PATH)
 local _CORRUPT_PATH = _STORE_PATH .. ".corrupt"
 
 
