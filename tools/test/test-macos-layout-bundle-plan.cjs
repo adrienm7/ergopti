@@ -62,6 +62,25 @@ for (const vector of single)
 		vector.expected,
 		`${vector.variant} ${vector.name}`
 	);
+// Every dead-key sequence types its expectation through the compiled states (the
+// order of a chain is checked here, not first on the Mac).
+const { loadLayoutSource } = require('../lib/layout-source.cjs');
+const Composer = loadLayoutSource().composer;
+for (const vector of sequences) {
+	const parsed = Composer.parseModel(xml[vector.variant]);
+	let state = 'none';
+	let typed = '';
+	for (const press of vector.keys) {
+		const step = Composer.step(parsed, state, mapIndex(press.modifiers), press.code);
+		typed += step.output;
+		state = step.next;
+	}
+	assert.equal(
+		typed,
+		vector.expected,
+		`${vector.variant} ${vector.name} through the compiled states`
+	);
+}
 // The ANSI rule moved the ISO key: the two variants differ where the rule says.
 const at = (variant, name) => plan.vectors.find((v) => v.variant === variant && v.name === name);
 assert.notEqual(

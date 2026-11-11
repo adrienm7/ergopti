@@ -147,9 +147,10 @@ function plan(document, report) {
 		const dead = (id) => document.dead_keys.find((entry) => entry.id === id);
 		const rule = (id, input) => dead(id).rules.find((entry) => entry.input === input).text;
 		add('dead:circumflex+e', [press('BracketLeft'), press('KeyE')], rule('circumflex', 'e'));
+		// The circumflex pending, a diaeresis dead key chains to their combination.
 		add(
-			'dead:diaeresis+circumflex+o',
-			[press('Quote'), press('BracketLeft'), press('KeyO')],
+			'dead:circumflex+diaeresis+o',
+			[press('BracketLeft'), press('Quote'), press('KeyO')],
 			rule('circumflex_diaeresis', 'o')
 		);
 		add('dead:option-greek+a', [press('KeyE', ['alt_right']), press('KeyA')], rule('greek', 'a'));
