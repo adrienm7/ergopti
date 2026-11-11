@@ -30,8 +30,8 @@ local M = {}
 local PASS, FAIL, INFO, SKIP = Report.STATE_PASS, Report.STATE_FAIL, Report.STATE_INFO, Report.STATE_SKIP
 
 local SQLITE = "/usr/bin/sqlite3"
--- One grouped count over three indexed tables: far below the storage scan.
-local QUERY_SECONDS = 20
+-- One read of three small tables; shorter than the integrity check's bound.
+local TELEMETRY_COUNT_TIMEOUT = 20
 
 --- The tables read, each with its report prefix and its shared kind list.
 --- @type table { { table, prefix, kinds } } in report order
@@ -76,7 +76,7 @@ function M.raw_telemetry(ports, report, finish)
 		report.step("telemetry_db", SKIP, database.path == nil and "metrics_not_started" or "absent")
 		return finish()
 	end
-	ports.exec(SQLITE, { "-readonly", Probes.immutable_uri(database.path), M.query() }, QUERY_SECONDS,
+	ports.exec(SQLITE, { "-readonly", Probes.immutable_uri(database.path), M.query() }, TELEMETRY_COUNT_TIMEOUT,
 		function(code, output)
 			if code ~= 0 then
 				report.step("telemetry_db", FAIL, code == nil and "timeout" or ("sqlite_exit_" .. tostring(code)))

@@ -5,6 +5,47 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Linux API key migration never blocks the daemon (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: the boot-time move of a plaintext API
+key to the Linux keyring never blocks the daemon. The daemon starts at once;
+`modules/llm/api_key_migration.lua` runs the move in the background, each
+secret-service call an owned child with a bounded deadline, and retries until
+the keyring is unlocked (a D-Bus read of the default collection's `Locked`
+property, which never prompts, gates each attempt; the retry is periodic and
+bounded rather than an unlock signal). The plaintext key stays in
+`api_keys.json` until the move succeeds; each attempt logs a paired start and
+success or warning. Do not move a secret-service call back onto the boot
+path or into a synchronous `ui/modal` hand-over there. macOS already keeps
+every Keychain call async with a deadline; Windows DPAPI has no prompt.
+
+## Physical shortcut delivery is on (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (LIN-004): the production getter
+`keyboard_shortcuts.physical_delivery_available` answers true on Linux and
+macOS (both Lua drivers). Every safety refusal stays: each dispatch and each
+editor save still passes the source, collision and output-custody checks
+(`physical_match`/`physical_admitted` on Linux, `physical_admission` on macOS,
+`shortcuts.physical_availability`), and a getter answering false greys the
+editor row with `physical_shortcuts.delivery_unqualified`. Tests pin the true
+answer and drive each refusal under an explicit false answer. Windows has no
+host (no editor, no delivery); its menu reason says so. The Mac field report
+validates the macOS side.
+
+## A superseded site deployment stays red (2026-11-11)
+
+Decided by the coordinator on 2026-11-11, to review by the maintainer.
+
+- A `main` push whose site deployment is overtaken by a newer push keeps
+  failing with "target branch no longer names the admitted source"
+  (`tools/ci/site-deploy-admission.cjs`, `SupersededSource`). The red job is
+  true: that source was never deployed, and the newer push deploys its own.
+- No admitted skip output is added: the closed publication chain of
+  `test-ci-pipeline-wiring` forbids conditional jobs and steps, and a quiet
+  skip (bc14746520, reverted) would let a real admission failure read green.
+  Action: when a deploy fails with that message, check that the newer `main`
+  push deployed, then ignore the red one.
+
 ## Linux PAC lists and the managed-Ollama data folder (2026-11-10)
 
 - Linux evaluates the PAC itself: GIO (GNOME) keeps only the first entry of

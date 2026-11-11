@@ -89,6 +89,9 @@ local function load_fixture()
 	function keymap.sort_mappings()
 		return controls.sort_result
 	end
+	function keymap.dynamic_rule_within_delay()
+		return true
+	end
 	function keymap.register_interceptor(callback)
 		state.interceptors[#state.interceptors + 1] = callback
 	end
