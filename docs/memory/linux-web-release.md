@@ -48,6 +48,30 @@ prefix. `tests/desktop/run_update_restart_watcher.sh` runs a real
 `systemd --user` in a container by mounting a tmpfs on `/run/systemd` and
 creating `system/` there (sd_booted) in a private mount namespace.
 
+### project-linux-the-install-path-runs-no-synchronous-child
+
+The async installer (`Installer.install_owned`) runs on the daemon's event loop
+while the keyboard is grabbed. Every child on its path is an owned ProgramRunner
+child that re-admits the install deadline (`start_owned_child`): the updated
+wrapper's `--help` smoke (LUR-001) and the previous tree's
+`install/ownership.sh`, which hashes the whole payload (9 s natively on a real
+installed tree, found by `tests/hardware/phys_live_guest.sh`). What stays
+synchronous is in-process: `Ownership.verify` (about 0.25 s per call natively,
+three calls per install) and the moves. A new child on this path goes through
+`start_owned_child`, never `os.execute`; test it from a timer inside a running
+loop, because a child run before `uv.run` hides any stall.
+
+### project-linux-live-proof-host
+
+The cloud sandbox kernel has no uinput, no KVM and no systemd PID 1, so a
+systemd Docker container cannot host the live daemon either.
+`tests/hardware/run_phys_vm.sh` boots an Ubuntu cloud VM under QEMU (TCG without
+`/dev/kvm`, about 20 times slower: the first install takes about 25 minutes)
+and runs `phys_live_guest.sh` there. A loopback `HTTPS_PROXY` becomes
+`10.0.2.2` in the guest, and its apt sources must use https because the agent
+proxy refuses plain http with 405. On a GitHub-hosted Ubuntu runner the guest
+script runs directly as root.
+
 ### project-linux-device-descriptors-are-close-on-exec
 
 `EVIOCGRAB` and a uinput device belong to the open file, not to the daemon: the
@@ -214,7 +238,7 @@ Alpine; LuaJIT needs `lua51-*` (Arch), `luajit-*` (openSUSE), `lua5.1-*`
 (Alpine, Fedora). Fedora has no LuaJIT lgi, so its WebKit windows cannot open
 (declared in the `first-install-distros` matrix). GNOME shows no tray icon
 without an AppIndicator extension. Action: prove installer changes with
-`tests/distro/run_in_docker.sh <image>` and the first-install matrix.
+`tests/hardware/run_in_docker.sh <image>` and the first-install matrix.
 
 ### project-linux-tap-holds-run-in-the-daemon
 
@@ -416,6 +440,18 @@ predicate, and describe foreign error objects with `ErrorDescription`, never
 `nanosleep` after EINTR. libuv reports exit status and termination signal
 separately; a signal is a failure (SIGTERM is status 143), and ESRCH on a
 process group means already gone.
+
+### project-linux-webkit-takes-sigusr1
+
+WebKitGTK's JavaScriptCore suspends threads for its collector with SIGUSR1 and
+installs its handler over the daemon's ("Overriding existing handler for
+signal 10"), so the reload request (SIGUSR1) killed a daemon with a WebView
+open, SIGSEGV. `infra/signal_handlers.lua` `reserve_webkit_gc_signal()` sets
+`JSC_SIGNAL_FOR_GC=12` (SIGUSR2) at the top of `ergopti_hotstrings.lua`, before
+anything loads WebKit; verify with the process `SigCgt` mask
+(`tests/hardware/run_webkit_gc_signal.lua`). JSC still prints "invalid option:
+JSC*SIGNAL_FOR_GC=12": its option parser reads every `JSC*\*` variable, while
+WTF honours this one. A new signal the daemon handles must not be 12.
 
 ### project-linux-a-corrupt-store-moves-aside-without-replacing
 
