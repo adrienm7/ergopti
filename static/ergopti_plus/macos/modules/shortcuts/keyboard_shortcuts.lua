@@ -519,11 +519,13 @@ local function physical_receipt_current(receipt)
 end
 
 --- Reports whether native source, all-owner collisions and output custody are joined.
---- The physical broker/output integration is not yet qualified on macOS. Existing
---- named shortcuts and contextual native owners retain their separate lifecycles.
+--- Turned on by the maintainer on 2026-11-11 (LIN-004), on macOS as on Linux;
+--- the next Mac field report validates it. Each dispatch still passes the
+--- source, collision and output refusals of physical_admission. Named
+--- shortcuts and contextual native owners keep their separate lifecycles.
 --- @return boolean available Native physical delivery capability.
 function M.physical_delivery_available()
-	return false
+	return true
 end
 
 --- Carries one private receipt across source and runtime callbacks.

@@ -105,13 +105,12 @@ helpers.describe("the real Linux tray reads as text", function()
 		end)
 	end
 
-	-- While no driver can deliver an action bound to a physical key, the
-	-- editor's row says so instead of « Try reopening it » (physical-delivery-unqualified).
-	helpers.it("the physical shortcut editor row names its real cause", function()
+	--- The editor row of the English tray, and the head of the unqualified cause.
+	--- @return table|nil row, string head
+	local function editor_row()
 		local catalogue = check.catalogue(SHARED_ROOT, "en", require("json").decode)
 		local label = catalogue["physical_shortcuts.window_title"]
-		local reason = catalogue["physical_shortcuts.delivery_unqualified"]
-		local head = reason:match("^(.-):")
+		local head = catalogue["physical_shortcuts.delivery_unqualified"]:match("^(.-):")
 		local found = nil
 		local function walk(rows)
 			for _, row in ipairs(rows or {}) do
@@ -120,9 +119,32 @@ helpers.describe("the real Linux tray reads as text", function()
 			end
 		end
 		walk(tray("en"))
+		return found, head
+	end
+
+	-- Physical delivery answers true since the maintainer's decision of
+	-- 2026-11-11 (LIN-004): the row no longer names an unqualified delivery
+	-- (physical-delivery-available).
+	helpers.it("the physical shortcut editor row no longer names an unqualified delivery", function()
+		local found, head = editor_row()
 		helpers.assert_true(found ~= nil, "the editor row is drawn")
-		helpers.assert_eq(found.disabled, true)
-		helpers.assert_true(found.title:find(head, 1, true) ~= nil, found.title)
-		helpers.assert_true(found.title:find("reopening", 1, true) == nil, found.title)
+		helpers.assert_true(found.title:find(head, 1, true) == nil, found.title)
+	end)
+
+	-- Should the getter answer false (the safety refusal is kept), the row says
+	-- so instead of « Try reopening it ».
+	helpers.it("a getter answering false makes the editor row name its real cause", function()
+		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+		local original = keyboard.physical_delivery_available
+		keyboard.physical_delivery_available = function() return false end
+		local ok, err = pcall(function()
+			local found, head = editor_row()
+			helpers.assert_true(found ~= nil, "the editor row is drawn")
+			helpers.assert_eq(found.disabled, true)
+			helpers.assert_true(found.title:find(head, 1, true) ~= nil, found.title)
+			helpers.assert_true(found.title:find("reopening", 1, true) == nil, found.title)
+		end)
+		keyboard.physical_delivery_available = original
+		if not ok then error(err, 0) end
 	end)
 end)

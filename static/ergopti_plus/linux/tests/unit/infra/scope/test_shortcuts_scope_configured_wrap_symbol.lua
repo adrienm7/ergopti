@@ -79,6 +79,9 @@ helpers.describe("Linux configured wrap-symbol physical collision preflight", fu
 
 	helpers.it("(wrap-configured-preflight) explicit physical None preserves native intent without observing wrap reservations", function()
 		with_scope(function(scope, owners, controls, path)
+			-- Native intent publishes while delivery is unqualified: the production
+			-- getter answers true since 2026-11-11, so this case answers false.
+			owners.keyboard.physical_delivery_available = function() return false end
 			local original, calls = owners.manager.capture_collision_inventory, 0
 			owners.manager.capture_collision_inventory = function() calls = calls + 1; error("None does not acquire wrapping") end
 			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",

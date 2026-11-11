@@ -547,7 +547,7 @@ helpers.describe("Linux unqualified physical delivery admission", function()
 	end
 	helpers.it("(partial-physical-admission) refuses native physical dispatch without a qualified output owner", function()
 		with_scope(function(scope, owners, controls)
-			helpers.assert_eq(controls.native_delivery_available(), false)
+			helpers.assert_eq(controls.native_delivery_available(), true, "the production getter")
 			controls.delivery_available=false
 			helpers.assert_eq(scope.physical_delivery_available(), false)
 			helpers.assert_eq(owners.keyboard.consume({physical=true,code=36,key="x",mods={}}, options(owners,controls)), false)
@@ -711,7 +711,7 @@ helpers.describe("Physical preflight preserves original admission and parameter 
 	end)
 	helpers.it("ready parameter-only edits retain the actual typed publisher without a new input query", function()
 		with_scope(function(scope, owners, controls, path)
-			helpers.assert_eq(controls.native_delivery_available(), false)
+			helpers.assert_eq(controls.native_delivery_available(), true, "the production getter")
 			local calls, original = 0, owners.keyboard.capture_collision_inventory
 			owners.keyboard.capture_collision_inventory = function() calls = calls + 1; return original() end
 			helpers.assert_true(scope.edit({{ section = "gesture_parameters", key = "keyboard__physical_none_KeyJ__send_text", value = "★" }}))

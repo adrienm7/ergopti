@@ -4273,7 +4273,7 @@
 	"physical_shortcuts.save_failed": "This shortcut could not be saved. Try again.",
 	"physical_shortcuts.saved_reopen": "Saved. Reopen this window to continue.",
 	"physical_shortcuts.position_unavailable": "This key position is unavailable here.",
-	"physical_shortcuts.windows_unavailable": "Not yet on Windows: The physical shortcut editor is not yet available on Windows.",
+	"physical_shortcuts.windows_unavailable": "Not yet on Windows: Windows has no physical shortcut host yet, neither the editor nor the delivery of an action bound to a physical key. Physical shortcuts work on macOS and Linux.",
 	"physical_shortcuts.collision": "This key combination is already in use. Choose another.",
 	"physical_shortcuts.delivery_unqualified": "Not yet available: Ergopti cannot yet run an action bound to a physical key safely on this system. The named shortcuts keep working.",
 	"physical_shortcuts.window_unavailable": "This window is unavailable: Try reopening it.",

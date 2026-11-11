@@ -197,9 +197,12 @@ local function with_collision_scope(source, tap_config, body, navigation_text, c
 				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
 			controls.source_reads, controls.intentional_hook_changes = 0, 0
 			-- This fixture acknowledges initial readiness solely to reach preflight.
-			-- Restore the genuine false getter before any existing outcome assertion.
-			local native_delivery = owners.keyboard.physical_delivery_available
-			helpers.assert_eq(native_delivery(), false)
+			-- The genuine getter answers true since 2026-11-11 (LIN-004); outside an
+			-- edit these refusal cases run against a getter answering false, the
+			-- safety refusal every delivery still passes.
+			helpers.assert_eq(owners.keyboard.physical_delivery_available(), true)
+			local native_delivery = function() return false end
+			owners.keyboard.physical_delivery_available = native_delivery
 			local edit = scope.edit
 			scope.edit = function(rows, receipt)
 				controls.delivery_available = true

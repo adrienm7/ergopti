@@ -4273,7 +4273,7 @@
 	"physical_shortcuts.save_failed": "Не удалось сохранить сочетание клавиш. Повторите попытку.",
 	"physical_shortcuts.saved_reopen": "Сохранено. Откройте это окно снова, чтобы продолжить.",
 	"physical_shortcuts.position_unavailable": "Это положение клавиши здесь недоступно.",
-	"physical_shortcuts.windows_unavailable": "Пока недоступно в Windows: Редактор физических сочетаний клавиш пока недоступен в Windows.",
+	"physical_shortcuts.windows_unavailable": "Пока недоступно в Windows: В Windows пока нет хоста для физических сочетаний клавиш — ни редактора, ни запуска действия, назначенного физической клавише. Физические сочетания работают в macOS и Linux.",
 	"physical_shortcuts.collision": "Это сочетание клавиш уже используется. Выберите другое.",
 	"physical_shortcuts.delivery_unqualified": "Пока недоступно: Ergopti пока не может безопасно запускать действие, привязанное к физической клавише, в этой системе. Именованные сочетания клавиш продолжают работать.",
 	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова.",

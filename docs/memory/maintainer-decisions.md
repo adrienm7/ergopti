@@ -5,6 +5,19 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Physical shortcut delivery is on (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (LIN-004): the production getter
+`keyboard_shortcuts.physical_delivery_available` answers true on Linux and
+macOS (both Lua drivers). Every safety refusal stays: each dispatch and each
+editor save still passes the source, collision and output-custody checks
+(`physical_match`/`physical_admitted` on Linux, `physical_admission` on macOS,
+`shortcuts.physical_availability`), and a getter answering false greys the
+editor row with `physical_shortcuts.delivery_unqualified`. Tests pin the true
+answer and drive each refusal under an explicit false answer. Windows has no
+host (no editor, no delivery); its menu reason says so. The Mac field report
+validates the macOS side.
+
 ## Linux PAC lists and the managed-Ollama data folder (2026-11-10)
 
 - Linux evaluates the PAC itself: GIO (GNOME) keeps only the first entry of

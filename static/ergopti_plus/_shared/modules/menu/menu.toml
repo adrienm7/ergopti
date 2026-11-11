@@ -1299,10 +1299,12 @@ unavailable = "grey"
 reason_key = "physical_shortcuts.windows_unavailable"
 disabled_when = ["physical_shortcuts_editor_ready"]
 disabled_reason_key = "physical_shortcuts.window_unavailable"
-# The editor stays closed while the driver cannot deliver an action bound to
-# a physical key (each driver's keyboard_shortcuts.physical_delivery_available,
-# false until source, collision and output custody are qualified): the row
-# says so rather than inviting a retry.
+# Windows has no physical shortcut host (no editor, no delivery), as its
+# reason_key says. On macOS and Linux each driver's
+# keyboard_shortcuts.physical_delivery_available answers true since the
+# maintainer's decision of 2026-11-11 (LIN-004); should it answer false (the
+# safety refusal is kept), the editor stays closed and the row says so rather
+# than inviting a retry.
 disabled_reasons = [
 	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
 ]
