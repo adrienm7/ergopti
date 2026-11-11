@@ -5,7 +5,8 @@
 ; DESCRIPTION:
 ; Three public editor controls exercise the real successful-constructor return
 ; after native Close/reopen. Browser surfaces and presentation remain passive;
-; no page data/init/save or native fallback control is qualified by these cases.
+; no page data/init/save is qualified by these cases. The editor has no native
+; form: a window beyond the web host fails the child.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -91,12 +91,11 @@ _PNSE_Case(Kind) {
 for _PNSE_Kind in ["enable", "unknown"]
 	Test("personal new section: " . _PNSE_Kind . " (personal-new-section-enabled)", _PNSE_Case.Bind(_PNSE_Kind))
 
-; Both editors route the sections they create to that owner.
+; The editor routes the sections it creates to that owner.
 _PNSE_EditorsEnable() {
 	Web := _DriverFuncBody("_HsEdWeb_Save")
 	AssertContains(Web, "HS_PersonalSectionsAdded(ReadPersonalToml(true)[" . '"sections_order"' . "], order)")
 	AssertContains(_DriverFuncBody("_HsEdWeb_EnableAdded"), "HS_EnableNewPersonalSections(Added)")
 	AssertContains(_DriverFuncBody("_HsEdWeb_DeferredSaveCompleted"), "_HsEdWeb_EnableAdded(Added)")
-	AssertContains(_DriverFuncBody("_NewSection"), "HS_EnableNewPersonalSections([SecName])")
 }
-Test("personal new section: both editors enable what they create (personal-new-section-enabled)", _PNSE_EditorsEnable)
+Test("personal new section: the editor enables what it creates (personal-new-section-enabled)", _PNSE_EditorsEnable)

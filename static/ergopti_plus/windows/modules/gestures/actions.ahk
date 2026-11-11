@@ -1059,7 +1059,7 @@ _GestureToggleUIPage(which) {
 						}
 				case "hotstrings_editor":
 						return {
-								Hwnd: () => _GestureGuiHwnd(_HsEdWeb_Gui) || _GestureGuiHwnd(_PersonalEditorGui),
+								Hwnd: () => _GestureGuiHwnd(_HsEdWeb_Gui),
 								Open: () => OpenPersonalEditor(),
 						}
 				case "paths_editor":

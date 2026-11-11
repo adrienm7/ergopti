@@ -1,5 +1,5 @@
 {
-	"expected_count": 50,
+	"expected_count": 48,
 	"filters": [
 		{ "contains": "uia-suspend-worker-debt", "expected_count": 3 },
 		{ "contains": "hotstrings-grand-total-publication", "expected_count": 4 },
@@ -13,7 +13,6 @@
 		{ "contains": "action-picker-native-engine", "expected_count": 1 },
 		{ "contains": "keystats-fire-publication-owner", "expected_count": 3 },
 		{ "contains": "keepawake-timer-owner", "expected_count": 2 },
-		{ "contains": "keepawake-suspend-owner", "expected_count": 3 },
-		{ "contains": "personal-editor-window-retirement", "expected_count": 2 }
+		{ "contains": "keepawake-suspend-owner", "expected_count": 3 }
 	]
 }
