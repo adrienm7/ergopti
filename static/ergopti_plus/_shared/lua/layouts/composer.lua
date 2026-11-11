@@ -22,6 +22,10 @@
 --- 3. The declaration is stored first, then the layout installed: a failed
 ---    install leaves the composition editable.
 --- 4. PURE Lua: every file, digest, record and install operation is injected.
+--- 5. The page may save an Ergopti layout source (docs/design/layout-source-format.md)
+---    in place of a composition: the TOML is stored, and the .keylayout the shared
+---    source compiler built from it is installed and emulated the same way. One
+---    composed layout exists at a time, so saving one form removes the other.
 --- ==============================================================================
 
 local Registry = require("layouts.registry")
@@ -31,6 +35,8 @@ local TableUtil = require("table_util")
 local M = {}
 
 M.SCHEMA_VERSION = 1
+M.SOURCE_FORMAT = "ergopti-layout"
+M.SOURCE_VERSION = 1
 M.MAX_NAME_LENGTH = 64
 M.RECORD_VERSION = "1.0.0"
 
@@ -53,7 +59,8 @@ local CONVENTIONS = { iso = true, ansi = true }
 
 --- Validates the [composer] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/modules/layouts/defaults.json.
---- @return table|nil settings { id, folder, declaration_file, max_declaration_bytes, family }
+--- @return table|nil settings { id, folder, declaration_file, max_declaration_bytes, source_file,
+---   max_source_bytes, family }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local composer = type(layout_defaults) == "table" and layout_defaults.composer or nil
@@ -67,15 +74,23 @@ function M.settings(layout_defaults)
 	if type(composer.declaration_file) ~= "string" or not composer.declaration_file:match("^[A-Za-z0-9._-]+$") then
 		return nil, "the composer declaration file is not a plain file name"
 	end
-	if type(composer.max_declaration_bytes) ~= "number" or composer.max_declaration_bytes <= 0
-		or composer.max_declaration_bytes % 1 ~= 0 then
-		return nil, "the composer declaration bound is not a positive integer"
+	if type(composer.source_file) ~= "string" or not composer.source_file:match("^[A-Za-z0-9._-]+$")
+		or composer.source_file == composer.declaration_file then
+		return nil, "the composer source file is not a plain file name distinct from the declaration"
+	end
+	for _, field in ipairs({ "max_declaration_bytes", "max_source_bytes" }) do
+		local bound = composer[field]
+		if type(bound) ~= "number" or bound <= 0 or bound % 1 ~= 0 then
+			return nil, "the composer " .. field .. " bound is not a positive integer"
+		end
 	end
 	return {
 		id = composer.id,
 		folder = composer.folder,
 		declaration_file = composer.declaration_file,
 		max_declaration_bytes = composer.max_declaration_bytes,
+		source_file = composer.source_file,
+		max_source_bytes = composer.max_source_bytes,
 		family = composer.family,
 	}, nil
 end
@@ -148,6 +163,64 @@ function M.check(settings, max_file_bytes, declaration_text, keylayout, decode_j
 	return { name = name, convention = declaration.keycode_convention }, nil, nil
 end
 
+--- Checks an Ergopti layout source and the .keylayout the page compiled from it.
+--- The page owns the schema (source_model.js) and the compiler; the host checks
+--- what it relies on: the bounds, the format and version, the display name, and
+--- that the layout is the one the source names (its internal name).
+--- @param settings table From M.settings.
+--- @param max_file_bytes number
+--- @param source_text any The TOML source as the page wrote it.
+--- @param keylayout any The compiled (or, for a preserved import, the imported) .keylayout.
+--- @param decode_toml function
+--- @return table|nil checked { name, keyboard_name, convention }
+--- @return string|nil code M.FAILURE_INVALID
+--- @return string|nil detail
+function M.check_source(settings, max_file_bytes, source_text, keylayout, decode_toml)
+	local function refuse(why) return nil, M.FAILURE_INVALID, why end
+	if type(source_text) ~= "string" or type(keylayout) ~= "string" then
+		return refuse("the layout source must be sent as text")
+	end
+	if #source_text > settings.max_source_bytes then
+		return refuse("the layout source is larger than " .. settings.max_source_bytes .. " bytes")
+	end
+	if #keylayout > max_file_bytes then
+		return refuse("the compiled layout is larger than " .. max_file_bytes .. " bytes")
+	end
+	local ok, source = pcall(decode_toml, source_text)
+	if not ok or type(source) ~= "table" then return refuse("the layout source is not valid TOML") end
+	if source.format ~= M.SOURCE_FORMAT or source.version ~= M.SOURCE_VERSION then
+		return refuse("the layout source has an unknown format or version")
+	end
+	local layout = type(source.layout) == "table" and source.layout or {}
+	local name = layout.name
+	if type(name) ~= "string" or not name:match("%S") or character_count(name) > M.MAX_NAME_LENGTH
+		or name:find("[%z\1-\31\127]") then
+		return refuse("the layout name is empty, too long or holds control characters")
+	end
+	if not Registry.is_valid_id(layout.id) then return refuse("the layout id is not a source identifier") end
+	if not keylayout:match("^<%?xml") or keylayout:find("<!ENTITY", 1, true) then
+		return refuse("the compiled layout is not a plain .keylayout")
+	end
+	local parsed, parse_error = Keylayout.parse(keylayout)
+	if parsed == nil then
+		return refuse("the compiled layout is not a readable .keylayout: " .. tostring(parse_error))
+	end
+	-- A preserved import is its own .keylayout; a structured source compiles to ISO
+	-- under its internal name (exports.macos.internal_name, else the layout id).
+	local imported = type(source.imported_keylayout) == "table" and source.imported_keylayout or nil
+	local convention, expected = "iso", layout.id
+	local macos = type(source.exports) == "table" and type(source.exports.macos) == "table" and source.exports.macos or {}
+	if imported then
+		if imported.text ~= keylayout then return refuse("the layout is not the source's imported .keylayout") end
+		convention, expected = imported.convention, parsed.name
+	elseif type(macos.internal_name) == "string" then
+		expected = macos.internal_name
+	end
+	if not CONVENTIONS[convention] then return refuse("the keycode convention is neither iso nor ansi") end
+	if parsed.name ~= expected then return refuse("the compiled layout is not named after the source") end
+	return { name = name, keyboard_name = parsed.name, convention = convention }, nil, nil
+end
+
 --- The installed record's entry of a composition.
 --- @param settings table
 --- @param checked table From M.check.
@@ -160,7 +233,7 @@ function M.entry(settings, checked, keylayout, digest, platform)
 		id = settings.id,
 		name = checked.name,
 		family = settings.family,
-		keyboard_name = checked.name,
+		keyboard_name = checked.keyboard_name or checked.name,
 		version = M.RECORD_VERSION,
 		file = settings.id .. "/" .. settings.id .. ".keylayout",
 		sha256 = digest,
@@ -275,36 +348,56 @@ function M.new(env)
 		return env.config_dir .. settings.folder .. "/" .. settings.declaration_file
 	end
 
+	local function source_path()
+		return env.config_dir .. settings.folder .. "/" .. settings.source_file
+	end
+
+	--- A stored file within its bound, "unreadable" when it is not, nil when absent.
+	local function stored(path, bound, what)
+		if not env.exists(path) then return nil end
+		local text = env.read(path)
+		if type(text) ~= "string" or #text > bound then
+			env.log("error", "The stored %s %s is unreadable or larger than its bound.", what, path)
+			return "unreadable"
+		end
+		return text
+	end
+
 	--- Sends the page what it needs to compose.
 	--- @param on_done function on_done(data)
 	function operations.open(on_done)
-		local text = nil
-		if env.exists(declaration_path()) then
-			text = env.read(declaration_path())
-			if type(text) ~= "string" or #text > settings.max_declaration_bytes then
-				env.log("error", "The stored composition %s is unreadable or larger than its bound.",
-					declaration_path())
-				text = "unreadable"
-			end
-		end
+		local text = stored(declaration_path(), settings.max_declaration_bytes, "composition")
+		local source = stored(source_path(), settings.max_source_bytes, "layout source")
 		M.sources(env.sources_env(), function(sources)
 			on_done({
 				platform = env.platform,
 				sources = sources,
 				declaration = text,
+				source = source,
 				active = env.active_id() == settings.id,
 				shortcuts = env.shortcuts,
 			})
 		end)
 	end
 
-	--- Stores a composition and installs its layout.
-	--- @param payload table { declaration, keylayout, use }
+	--- Stores a composition or a layout source and installs its layout.
+	--- @param payload table { declaration | source, keylayout, use }
 	--- @param on_done function on_done(ok, code, detail, used, installed): installed is what the
 	---   driver's install reported (the macOS and Linux install results), for the Debug check.
 	function operations.save(payload, on_done)
-		local checked, code, detail = M.check(settings, env.max_file_bytes, payload.declaration, payload.keylayout,
-			env.decode_json)
+		local checked, code, detail
+		local stored_path, stored_text, other_path
+		if payload.source ~= nil and payload.declaration ~= nil then
+			checked, code, detail = nil, M.FAILURE_INVALID, "a save carries a composition or a source, not both"
+		elseif payload.source ~= nil then
+			checked, code, detail = M.check_source(settings, env.max_file_bytes, payload.source, payload.keylayout,
+				env.decode_toml)
+			stored_path, stored_text, other_path = source_path(), payload.source, declaration_path()
+		else
+			checked, code, detail = M.check(settings, env.max_file_bytes, payload.declaration, payload.keylayout,
+				env.decode_json)
+			stored_path, stored_text, other_path = declaration_path(), payload.declaration, source_path()
+		end
 		if not checked then
 			env.log("error", "The composition was refused: %s.", tostring(detail))
 			on_done(false, code, detail, false)
@@ -315,10 +408,16 @@ function M.new(env)
 				on_done(false, M.FAILURE_WRITE, "cannot digest the compiled layout: " .. tostring(digest_err), false)
 				return
 			end
-			local written, write_err = env.write(declaration_path(), payload.declaration)
+			local written, write_err = env.write(stored_path, stored_text)
 			if not written then
 				env.log("error", "The composition could not be stored: %s.", tostring(write_err))
 				on_done(false, M.FAILURE_WRITE, tostring(write_err), false)
+				return
+			end
+			-- The layout now comes from the form just stored; the other one would reopen stale.
+			if env.exists(other_path) and not env.delete(other_path) then
+				env.log("error", "The replaced composition %s could not be deleted.", other_path)
+				on_done(false, M.FAILURE_WRITE, "cannot delete " .. other_path, false)
 				return
 			end
 			local entry = M.entry(settings, checked, payload.keylayout, digest, env.platform)
@@ -357,9 +456,11 @@ function M.new(env)
 	--- @param on_done function on_done(ok, code, detail)
 	function operations.remove(on_done)
 		local function delete_declaration()
-			if env.exists(declaration_path()) and not env.delete(declaration_path()) then
-				on_done(false, M.FAILURE_WRITE, "cannot delete " .. declaration_path())
-				return
+			for _, path in ipairs({ declaration_path(), source_path() }) do
+				if env.exists(path) and not env.delete(path) then
+					on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
+					return
+				end
 			end
 			on_done(true)
 		end
