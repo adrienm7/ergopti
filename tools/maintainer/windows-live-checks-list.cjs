@@ -1358,8 +1358,19 @@ const CHECKS = [
 			await judge('after Clear', 0.5, '0');
 			pid = await ensureCategoryOn(session, pid, menu, 'Enable hotstrings');
 			const rows = await session.run('rows', ['Autocorrection delay', 'Delays and colours']);
-			if (!/Autocorrection delay : 500 ms \(default\)/.test(rows))
-				problems.push(`after Clear the row reads: ${rows}`);
+			// Since c0a80da57f a row joins its label and value through
+			// common.label_value ("{1}: {2}" in English), not a hardcoded " : ".
+			const locale = JSON.parse(
+				fs.readFileSync(
+					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					'utf8'
+				)
+			);
+			const shown = locale['common.label_value']
+				.replace('{1}', 'Autocorrection delay')
+				.replace('{2}', '500 ms (default)');
+			if (!rows.includes(shown))
+				problems.push(`after Clear the row reads: ${rows}; expected "${shown}"`);
 			await session.restart();
 			await judge('after Clear and a restart', 0.5, '0');
 			const errors = session.loggedErrors();
