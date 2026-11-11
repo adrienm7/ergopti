@@ -657,7 +657,7 @@ do
 			  return ok, result
 			end })
 			put("infra.input_access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
-			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes })
+			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
 			put("infra.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,

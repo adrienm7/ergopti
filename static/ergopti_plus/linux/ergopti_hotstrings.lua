@@ -125,6 +125,13 @@ else
 	               package.path
 end
 
+-- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
+-- the reload request's signal, and a reload with a WebView open crashed us.
+do
+	local reserved, reserve_error = require("infra.signal_handlers").reserve_webkit_gc_signal()
+	if not reserved then error(reserve_error, 0) end
+end
+
 --- Prints the CLI usage. Deliberately ENGLISH, not translated.
 ---
 --- This runs before the session lock, the logger and i18n.init() — which cannot move

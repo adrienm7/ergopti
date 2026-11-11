@@ -5,9 +5,38 @@
 --- Installs loop-thread luv signal callbacks without luaposix. Loading this module
 --- acquires nothing. Handles stay owned until their exact close callbacks retire;
 --- the shutdown coordinator starts that final phase after external cleanup ACKs.
+---
+--- It also owns the signal WebKitGTK may take. JavaScriptCore suspends threads
+--- for its garbage collector with SIGUSR1 unless JSC_SIGNAL_FOR_GC names another
+--- one, and installs its handler over ours; the reload request (SIGUSR1) then
+--- crashed a daemon that had a WebView open. reserve_webkit_gc_signal() moves
+--- the collector to SIGUSR2, which the daemon never handles, and must run before
+--- anything loads WebKit.
 --- ==============================================================================
 local M = {}
 local active = nil
+
+--- The signal the driver control protocol rings (tools/control/request_driver_reload.sh).
+M.RELOAD_SIGNAL = 10
+--- SIGUSR2 on Linux: the signal JavaScriptCore's collector uses in this process.
+M.WEBKIT_GC_SIGNAL = 12
+local WEBKIT_GC_ENV = "JSC_SIGNAL_FOR_GC"
+
+--- Moves WebKit's collector off the reload signal for this process and the
+--- WebKit processes it starts. Call before the first WebKit load.
+--- @param setenv function|nil (name, value) -> boolean; a seam for the tests.
+--- @return boolean reserved, string|nil error
+function M.reserve_webkit_gc_signal(setenv)
+	if not setenv then
+		local loaded, ffi = pcall(require, "ffi")
+		if not loaded then return false, "FFI is unavailable to reserve the WebKit GC signal" end
+		pcall(ffi.cdef, "int setenv(const char *, const char *, int);")
+		setenv = function(name, value) return ffi.C.setenv(name, value, 1) == 0 end
+	end
+	local set_ok, set = pcall(setenv, WEBKIT_GC_ENV, tostring(M.WEBKIT_GC_SIGNAL))
+	if not set_ok or set ~= true then return false, "The WebKit GC signal could not be reserved" end
+	return true
+end
 
 --- Reports physical retirement, including a refused partial installation.
 --- @return boolean settled
@@ -66,7 +95,7 @@ function M.start(opts)
 	local owner = { entries = {}, native = native, admitted = false }
 	active = owner
 	local specs = { { "sigint", opts.on_term, 2 }, { "sigterm", opts.on_term, 15 }, { "sighup", opts.on_hup, 1 } }
-	if opts.on_usr1 then specs[#specs + 1] = { "sigusr1", opts.on_usr1, 10 } end
+	if opts.on_usr1 then specs[#specs + 1] = { "sigusr1", opts.on_usr1, M.RELOAD_SIGNAL } end
 	for _, spec in ipairs(specs) do
 		local allocated, handle = pcall(native.new_signal)
 		if not allocated or handle == nil or handle == false then

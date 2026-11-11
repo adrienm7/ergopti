@@ -4240,6 +4240,29 @@ jobs:
           fi
         timeout-minutes: 5
 
+      # JavaScriptCore suspends threads for its collector with SIGUSR1 unless
+      # JSC_SIGNAL_FOR_GC names another signal; the reload request rings SIGUSR1,
+      # and a daemon with a WebView open died with SIGSEGV.
+      - name: The reload signal survives an in-process WebView
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_webkit_gc_signal.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Typing NONE clears actual WebKit rows and retains ALL controls
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
