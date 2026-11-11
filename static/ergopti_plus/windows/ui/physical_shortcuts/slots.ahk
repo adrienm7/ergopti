@@ -9,8 +9,19 @@
 ; the registry's ahk field (SCnnn); this owner never resolves logical text.
 ; ==============================================================================
 
+; The shared identifiers of the feature, read once.
+; @returns {Map} slot_prefix and app_id.
+PhysicalShortcutsShared() {
+	global _SharedDir
+	static Shared := 0
+	if !(Shared is Map)
+		Shared := JsonParse(FSReadStrict(_SharedDir . "\modules\shortcuts\physical_shortcuts.json"))
+	return Shared
+}
+
 class PhysicalSlots {
-	static PREFIX := "physical_"
+	; The slot prefix every driver names, from _shared/modules/shortcuts/physical_shortcuts.json.
+	static PREFIX => PhysicalShortcutsShared()["slot_prefix"]
 	static MODIFIER_ORDER := ["ctrl", "alt", "shift", "super"]
 	; Modifier positions are held, never bound as a physical shortcut key.
 	static MODIFIER_KEYS := Map("ShiftLeft", 1, "ShiftRight", 1, "ControlLeft", 1, "ControlRight", 1,
