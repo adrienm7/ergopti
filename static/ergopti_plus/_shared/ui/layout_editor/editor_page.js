@@ -250,6 +250,8 @@ var LayoutEditorPage = (function () {
 			// host's registry list failed (the built-in references remain).
 			fillSources: null,
 			fillUnavailable: null,
+			// « New » shows where a new layout starts from: blank or another layout.
+			starting: false,
 			// Physical modifier keys held in the preview, as sided modifier ids.
 			heldSides: new Set(),
 			lost: null,
@@ -417,12 +419,9 @@ var LayoutEditorPage = (function () {
 					id: 'le-new',
 					text: tl('btn.new'),
 					onclick: () => {
-						const fresh = () => {
-							replace(LayoutSourceIO.create('my_layout', tl('default_name')));
-							render();
-						};
-						if (state.dirty) ask(tl('discard_confirm'), fresh);
-						else fresh();
+						state.starting = !state.starting;
+						if (state.starting && state.fillSources === null) loadFillSources();
+						else render();
 					}
 				}),
 				el('button', {
@@ -1579,6 +1578,66 @@ var LayoutEditorPage = (function () {
 			);
 		}
 
+		/** « Start from »: a blank layout, or a copy of a built-in or registry layout. */
+		function startPanel() {
+			if (!state.starting) return null;
+			const begin = (make) => {
+				const run = () => {
+					let started;
+					try {
+						started = make();
+					} catch (error) {
+						notify('error', problemText(error));
+						return;
+					}
+					state.starting = false;
+					replace(started.doc, started.lost.length ? started.lost : null);
+					render();
+				};
+				if (state.dirty) ask(tl('discard_confirm'), run);
+				else run();
+			};
+			const choices = [
+				el('button', {
+					type: 'button',
+					'data-start': 'blank',
+					text: tl('start.blank'),
+					onclick: () =>
+						begin(() => ({
+							doc: LayoutSourceIO.create('my_layout', tl('default_name')),
+							lost: []
+						}))
+				})
+			];
+			for (const entry of state.fillSources || [])
+				choices.push(
+					el('button', {
+						type: 'button',
+						'data-start': entry.id,
+						text: entry.name,
+						onclick: () =>
+							begin(() =>
+								LayoutSourceIO.startFrom(
+									entry,
+									`${LayoutSourceIO.identifierFrom(entry.id, 'layout')}_custom`,
+									tl('start.copy_name', { name: entry.name })
+								)
+							)
+					})
+				);
+			return el('section', { class: 'le-panel le-start', id: 'le-start' }, [
+				el('h2', { text: tl('start.title') }),
+				el('p', { class: 'le-note', text: tl('start.note') }),
+				state.fillSources === null
+					? el('p', { class: 'le-note', text: tl('start.loading') })
+					: null,
+				state.fillUnavailable
+					? el('p', { class: 'le-message error', text: state.fillUnavailable })
+					: null,
+				el('div', { class: 'le-buttons' }, choices)
+			]);
+		}
+
 		/** The composer's job: fill the current layer from one level of another layout. */
 		function fillPanel() {
 			const parts = [
@@ -2389,6 +2448,7 @@ var LayoutEditorPage = (function () {
 					el('p', { class: 'le-subtitle', text: tl('subtitle') })
 				]),
 				toolbar(),
+				startPanel(),
 				messageBar(),
 				metadata(),
 				layerTabs(),

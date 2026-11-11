@@ -449,15 +449,8 @@ var LayoutSourceIO = (function () {
 		return { keys, deadKeys };
 	}
 
-	function approximateImport(doc) {
-		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
-		const { text, convention } = doc.imported_keylayout;
-		const parsed = LayoutComposer.parseSource(
-			doc.layout.id,
-			text,
-			convention,
-			LAYOUT_COMPOSER_DATA
-		);
+	/** The five character levels of a composer source as source layers and dead keys. */
+	function projectedLayers(parsed) {
 		const converted = composerLevels(
 			parsed,
 			PROJECTED_LAYERS.map((level) => level.composer),
@@ -469,6 +462,20 @@ var LayoutSourceIO = (function () {
 			optional: [],
 			keys: converted.keys[index]
 		}));
+		return { layers, deadKeys: converted.deadKeys };
+	}
+
+	function approximateImport(doc) {
+		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
+		const { text, convention } = doc.imported_keylayout;
+		const parsed = LayoutComposer.parseSource(
+			doc.layout.id,
+			text,
+			convention,
+			LAYOUT_COMPOSER_DATA
+		);
+		const converted = projectedLayers(parsed);
+		const layers = converted.layers;
 		const lost = ['keylayout_original_xml', 'keylayout_sided_modifiers'];
 		if (convention === 'ansi') lost.push('keylayout_ansi_projected_iso');
 		if (parsed.ambiguous.size > 0) lost.push('keylayout_ambiguous_compositions');
@@ -484,6 +491,37 @@ var LayoutSourceIO = (function () {
 			if (own(doc, field)) editable[field] = copy(doc[field]);
 		LayoutSource.validate(editable);
 		return { doc: editable, lost };
+	}
+
+	/**
+	 * A new editable source that starts as another layout: a registry layout
+	 * through the generator's exact importer, else (the importer refuses it, or
+	 * a built-in reference with no .keylayout) its five character levels.
+	 * @param {{id: string, name: string, parsed: object, text?: string, convention?: string}} entry
+	 *   One of fillSources.
+	 * @param {string} id - The new layout's identifier.
+	 * @param {string} name - Its displayed name.
+	 * @returns {{doc: object, lost: string[]}} What the copy could not hold (stable codes).
+	 */
+	function startFrom(entry, id, name) {
+		if (typeof entry.text === 'string') {
+			try {
+				const exact = convertImport(importKeylayout(entry.text, id, entry.convention)).doc;
+				exact.layout = Object.assign({}, exact.layout, { id, name });
+				return { doc: LayoutSource.validate(exact), lost: [] };
+			} catch (error) {
+				if (!(error instanceof LayoutSource.SourceError)) throw error;
+			}
+		}
+		const doc = create(id, name);
+		const converted = projectedLayers(entry.parsed);
+		doc.layers = converted.layers;
+		if (converted.deadKeys.length) doc.dead_keys = converted.deadKeys;
+		const lost = typeof entry.text === 'string' ? ['keylayout_sided_modifiers'] : [];
+		if (entry.convention === 'ansi') lost.push('keylayout_ansi_projected_iso');
+		if (entry.parsed.ambiguous && entry.parsed.ambiguous.size > 0)
+			lost.push('keylayout_ambiguous_compositions');
+		return { doc: LayoutSource.validate(doc), lost };
 	}
 
 	/**
@@ -503,6 +541,8 @@ var LayoutSourceIO = (function () {
 				sources.push({
 					id: entry.id,
 					name: entry.name,
+					text: entry.text,
+					convention: entry.convention,
 					parsed: LayoutComposer.parseSource(
 						entry.id,
 						entry.text,
@@ -676,6 +716,7 @@ var LayoutSourceIO = (function () {
 		convertImport,
 		approximateImport,
 		fillSources,
+		startFrom,
 		fillLayer,
 		keylayoutFile,
 		macosBundleArchive,

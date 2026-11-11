@@ -26,6 +26,15 @@ report as it is.
 
 ## Hosts
 
+« New » opens « Start from » (`startPanel`): a blank layout, QWERTY or AZERTY (`LAYOUT_COMPOSER_REFERENCE`), or a
+copy of every layout the host lists (`loadSources`: the registry index on the site, `composer_open` in
+ErgoptiPlus, so Bépo, Ergo-L and Ergopti). `LayoutSourceIO.startFrom` takes a registry `.keylayout` through the
+generator's exact importer and falls back to its five character levels, listing what it drops; the copy is named
+« My <layout> » with the id `<id>_custom`. The current system layout is not offered: no OS hands a page its active
+layout as a file (Apple's built-in layouts have no `.keylayout`, an XKB keymap has no importer here, a Windows DLL
+is read only by `tools/lib/kbd-dll/reader.cjs`), so the panel says to open its `.keylayout` or `.toml` instead.
+Decided by the coordinator on 2026-11-11, to review by the maintainer.
+
 - **Website.** `src/routes/editeur/+page.svelte` frames `layout_editor/index.html` served from `static/`.
 - **ErgoptiPlus, macOS and Linux.** The layout manager window (`layout_manager/index.html`) loads the same scripts and
   mounts the editor when `initData` carries `source_editor: true`. The page posts `source_open` and
