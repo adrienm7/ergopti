@@ -1211,6 +1211,12 @@ migrate_canonical_packs \
 # Exclude the canonical generated backend from the source copy. Checkout-local
 # fixture .so bytes can never be staged even briefly; only the freshly compiled
 # output (or release-bundle artifact) below supplies this exact destination.
+# The previous receipt, held until the new one exists: see
+# prune_retired_payload below.
+PRIOR_RECEIPT_ROWS=()
+if [ -f "${LIB_DIR}/.ergopti-owned-files" ] && [ ! -L "${LIB_DIR}/.ergopti-owned-files" ]; then
+	mapfile -t PRIOR_RECEIPT_ROWS < "${LIB_DIR}/.ergopti-owned-files" || exit 1
+fi
 NATIVE_LUV_RETAINED_DIGEST=""
 if [ -z "$NATIVE_LUV_STAGE" ] && [ -f "${LIB_DIR}/.ergopti-owned-files" ] \
 	&& [ ! -L "${LIB_DIR}/.ergopti-owned-files" ] \
@@ -1293,6 +1299,48 @@ if [ -n "$NATIVE_LUV_STAGE" ]; then
 	# retirement of compiler descendants solely from the installer's own exit.
 	ergopti_msg install.network_build_evidence "$NATIVE_LUV_STAGE"
 fi
+
+# A reinstall extracts over the previous tree, so a file the previous version
+# shipped and this one does not stayed behind, unowned: the tree then failed its
+# own receipt (modules/updater/ownership_receipt.lua verify) and, once it was
+# <root>.old, the next update could not retire it. Remove each payload file the
+# previous receipt owned and the new one does not, when its bytes still match;
+# a file the user changed is kept, as uninstall.sh keeps it.
+prune_retired_payload() {
+	local current="$1" library_physical row digest relative owned parent actual
+	local -A shipped=()
+	library_physical="$(cd -- "$LIB_DIR" && pwd -P)" || return 1
+	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
+		shipped["$relative"]=1
+	done < "$current"
+	for row in "${PRIOR_RECEIPT_ROWS[@]}"; do
+		digest="${row%%$'\t'*}"
+		relative="${row#*$'\t'}"
+		if [[ ! "$digest" =~ ^[0-9a-f]{64}$ ]] || [ "$relative" = "$row" ]; then
+			printf '[install] code=prior-receipt-invalid path=%q\n' "${LIB_DIR}/.ergopti-owned-files" >&2
+			return 1
+		fi
+		case "$relative" in
+			linux/*|_shared/*) ;;
+			*) continue ;;
+		esac
+		case "/$relative/" in
+			*/../*|*/./*|*//*|*\\*)
+				printf '[install] code=prior-receipt-unsafe path=%q\n' "$relative" >&2
+				return 1 ;;
+		esac
+		[ -z "${shipped[$relative]:-}" ] || continue
+		owned="${LIB_DIR}/$relative"
+		[ -f "$owned" ] && [ ! -L "$owned" ] || continue
+		# Only a file reached without a link below the library is ours to remove.
+		parent="$(cd -- "$(dirname -- "$owned")" && pwd -P)" || return 1
+		[ "$parent" = "$library_physical/$(dirname -- "$relative")" ] || continue
+		actual="$(sha256sum < "$owned")" || return 1
+		[ "${actual%% *}" = "$digest" ] || continue
+		rm -f -- "$owned" || return 1
+	done
+}
+prune_retired_payload "${LIB_DIR}/.ergopti-owned-files" || exit 1
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 LAUNCHER_TMP="$(mktemp "${BIN_DIR}/.ergopti-launcher.XXXXXX")"
