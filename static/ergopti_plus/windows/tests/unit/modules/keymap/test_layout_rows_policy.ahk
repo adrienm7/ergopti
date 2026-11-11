@@ -16,6 +16,7 @@
 #Requires AutoHotkey v2.0
 
 #Include %A_LineFile%\..\..\..\..\fixtures\layout_row_host_character.ahk
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
 
 
 
@@ -428,10 +429,20 @@ for _LRCZ_Sc in ["SC00C", "SC00D"]
 _LRNF_ChildSource() {
 	return _LRPS_ChildSource("layout_row_native_flags_body.ahk")
 }
+
+; The virtual key this thread's active layout gives SC010, the physical key
+; both native row probes inject and expect to type a letter.
+_LRN_TopRowVk() => DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+
+; Probed before the child opens its window, so a layout without a top-row
+; letter neither activates a window nor injects a key.
+_LRNF_Case(Mode) {
+	TestRequireHostCapability(TestTopRowLetterReceipt.Bind(_LRN_TopRowVk()))
+	_LRPS_LevelCustody(0, false, _LRNF_ChildSource,
+		[Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags")
+}
 for _LRNF_Mode in ["plain", "held", "released"]
-	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)",
-		_LRPS_LevelCustody.Bind(0, false, _LRNF_ChildSource,
-			[_LRNF_Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags"))
+	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)", _LRNF_Case.Bind(_LRNF_Mode))
 
 _LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
 	if Hwnd != Record["edit"].Hwnd || WParam != Record["vk"]
@@ -459,6 +470,8 @@ _LRNX_Case(Mode) {
 	static RetirementDebt := 0
 	if IsObject(RetirementDebt)
 		throw Error("A prior external receiver probe retains its owned process/window retirement debt.")
+	TopRowVk := _LRN_TopRowVk()
+	TestRequireHostCapability(TestTopRowLetterReceipt.Bind(TopRowVk))
 	Root := A_Temp . "\ergopti_external_row_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "typed", "", "failure", 0)
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
@@ -478,7 +491,7 @@ _LRNX_Case(Mode) {
 		Record["edit"].Focus()
 		for Name in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
 			AssertTrue(!GetKeyState(Name, "P") && !GetKeyState(Name), "release modifiers before native external row input")
-		Record["vk"] := DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+		Record["vk"] := TopRowVk
 		AssertTrue(Record["vk"] >= 0x41 && Record["vk"] <= 0x5A)
 		ExpectedHost := _LRN_HostCharacter(Record["vk"], Mode != "plain", DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
 		OnMessage(0x100, Receiver)
