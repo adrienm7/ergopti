@@ -378,6 +378,29 @@ LiveCmdHotstringBuffer(Args) {
 	return "buffer=" . HSE_Buffer
 }
 
+/**
+ * What the hotstring preview offers for the text typed so far, as JSON: the
+ * engine buffer, the rows the preview computes now (one per completion key, the
+ * end character and the magic key) and the rows the bubble last painted.
+ */
+LiveCmdPreviewState(Args) {
+	global HSE_Buffer, _PrefixVisibleFireDecisions
+	Computed := ""
+	for Candidate in _PrefixCollectCandidates()
+		Computed .= (Computed == "" ? "" : ",") . _LivePreviewRow(Candidate.Completion, Candidate.Output)
+	Visible := ""
+	for Decision in _PrefixVisibleFireDecisions
+		Visible .= (Visible == "" ? "" : ",") . _LivePreviewRow(
+			Decision.HasOwnProp("Completion") ? Decision.Completion : "", _PrefixDecisionDisplayText(Decision))
+	return '{"buffer":' . JsonStringLiteral(HSE_Buffer) . ',"computed":[' . Computed
+		. '],"visible":[' . Visible . ']}'
+}
+
+_LivePreviewRow(Completion, Output) {
+	return '{"completion":' . JsonStringLiteral(String(Completion)) . ',"output":'
+		. JsonStringLiteral(String(Output)) . '}'
+}
+
 /** Turns CapsWord on or off as its trigger does, and reports whether it is on. */
 LiveCmdCapsWordToggle(Args) {
 	ToggleCapsWord()
@@ -757,6 +780,7 @@ LiveRegister("edit_clear", LiveCmdEditClear)
 LiveRegister("edit_select", LiveCmdEditSelect)
 LiveRegister("hse_buffer", LiveCmdHotstringBuffer)
 LiveRegister("hse_reset", LiveCmdHotstringReset)
+LiveRegister("preview_state", LiveCmdPreviewState)
 LiveRegister("capsword_toggle", LiveCmdCapsWordToggle)
 LiveRegister("capsword_state", LiveCmdCapsWordState)
 LiveRegister("edit_close", LiveCmdEditClose)
