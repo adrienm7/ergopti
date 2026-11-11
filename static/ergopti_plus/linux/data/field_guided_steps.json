@@ -163,11 +163,25 @@
 			"proves": "Pointer activity and a key the tooltip does not own cancel a pending prediction, one User activity line each at DEBUG."
 		},
 		{
-			"id": "linux_prediction_hands",
+			"id": "linux_prediction_window_switch",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "prediction_focus_withdrawals",
+					"kind": "log_count",
+					"pattern": "Prediction withdrawn: another native window took the focus"
+				}
+			],
+			"gesture": "With a slow model, type until a prediction is pending, then switch to another window (Alt+Tab or a click); repeat once.",
+			"gesture_seconds": 180,
+			"proves": "Switching window withdraws a pending prediction within the focused-window poll, one line per withdrawal."
+		},
+		{
+			"id": "linux_prediction_keep",
 			"mode": "attest",
-			"gesture": "With a prediction pending, switch window: it hides. With one shown, press a validation digit and a navigation chord: it stays and acts.",
-			"gesture_seconds": 240,
-			"proves": "Switching window hides a pending prediction within the 250 ms poll, and the validation digits and navigation chords keep a shown one."
+			"gesture": "With a prediction shown, press a validation digit and a navigation chord: it stays and acts.",
+			"gesture_seconds": 180,
+			"proves": "The validation digits and the navigation chords keep a shown prediction and act on it."
 		},
 		{
 			"id": "linux_focus_hands",

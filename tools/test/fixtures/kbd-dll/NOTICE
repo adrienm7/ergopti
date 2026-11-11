@@ -1,0 +1,9 @@
+bepo.klc: the official bépo Windows layout source (Microsoft Keyboard Layout
+Creator format), downloaded unmodified from https://cdn.bepo.fr/windows/bepo.klc
+(SHA-256 eea43da5076d87120b2e35172780bb1f6cb796d2befe1650624f3ca88a2d4fb6).
+
+Copyright © the bépo community (https://bepo.fr). bepo.fr publishes the layout
+under CC BY-SA 3.0 and the GNU Free Documentation License; it is redistributed
+here under the Creative Commons Attribution-ShareAlike 3.0 Unported licence,
+whose text is static/layouts/registry/bepo/LICENSE. The DLLs the tests build
+from it are adaptations under the same licence and are not committed.

@@ -1,0 +1,11003 @@
+# Bépo 1.1rc2, the layout source of the official bépo macOS layout (docs/design/layout-source-format.md).
+# Imported from static/layouts/registry/bepo/bepo.keylayout (bépo 1.1rc2, see that folder's NOTICE): it keeps
+# its 94 dead keys and their 115 chained transitions, up to three deep. Licence: CC BY-SA
+# (static/layouts/registry/bepo/LICENSE); this derived file is shared under the same licence.
+# tools/test/test-layout-sources.cjs proves it compiles back to that layout and that its Windows
+# DLL tables carry every chain Windows can hold (exports.windows decided by the coordinator on 2026-11-11).
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "bepo_1_1rc2"
+name = "Bépo 1.1rc2"
+
+[physical]
+base = "iso"
+
+[[layers]]
+id = "base"
+required = []
+optional = []
+
+[[layers.alternatives]]
+required = [ "meta" ]
+optional = [ "shift", "caps_lock" ]
+
+[layers.keys.KeyA]
+text = "a"
+
+[layers.keys.KeyS]
+text = "u"
+
+[layers.keys.KeyD]
+text = "i"
+
+[layers.keys.KeyF]
+text = "e"
+
+[layers.keys.KeyH]
+text = "c"
+
+[layers.keys.KeyG]
+text = ","
+
+[layers.keys.KeyZ]
+text = "à"
+
+[layers.keys.KeyX]
+text = "y"
+
+[layers.keys.KeyC]
+text = "x"
+
+[layers.keys.KeyV]
+text = "."
+
+[layers.keys.Backquote]
+text = "$"
+
+[layers.keys.KeyB]
+text = "k"
+
+[layers.keys.KeyQ]
+text = "b"
+
+[layers.keys.KeyW]
+text = "é"
+
+[layers.keys.KeyE]
+text = "p"
+
+[layers.keys.KeyR]
+text = "o"
+
+[layers.keys.KeyY]
+dead_key = "circonflexe"
+
+[layers.keys.KeyT]
+text = "è"
+
+[layers.keys.Digit1]
+text = "\""
+compose_as = "guillemet"
+
+[layers.keys.Digit2]
+text = "«"
+
+[layers.keys.Digit3]
+text = "»"
+
+[layers.keys.Digit4]
+text = "("
+
+[layers.keys.Digit6]
+text = "@"
+
+[layers.keys.Digit5]
+text = ")"
+
+[layers.keys.Equal]
+text = "%"
+
+[layers.keys.Digit9]
+text = "/"
+
+[layers.keys.Digit7]
+text = "+"
+
+[layers.keys.Minus]
+text = "="
+
+[layers.keys.Digit8]
+text = "-"
+
+[layers.keys.Digit0]
+text = "*"
+
+[layers.keys.BracketRight]
+text = "w"
+
+[layers.keys.KeyO]
+text = "l"
+
+[layers.keys.KeyU]
+text = "v"
+
+[layers.keys.BracketLeft]
+text = "z"
+
+[layers.keys.KeyI]
+text = "d"
+
+[layers.keys.KeyP]
+text = "j"
+
+[layers.keys.KeyL]
+text = "r"
+
+[layers.keys.KeyJ]
+text = "t"
+
+[layers.keys.Quote]
+text = "m"
+
+[layers.keys.KeyK]
+text = "s"
+
+[layers.keys.Semicolon]
+text = "n"
+
+[layers.keys.Backslash]
+text = "ç"
+
+[layers.keys.Comma]
+text = "g"
+
+[layers.keys.Slash]
+text = "f"
+
+[layers.keys.KeyN]
+text = "’"
+
+[layers.keys.KeyM]
+text = "q"
+
+[layers.keys.Period]
+text = "h"
+
+[layers.keys.Space]
+text = " "
+compose_as = "espace"
+
+[layers.keys.IntlBackslash]
+text = "ê"
+
+[layers.keys.NumpadDecimal]
+text = ","
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "$"
+
+[layers.ansi_keys.IntlBackslash]
+text = "$"
+compose = false
+
+[[layers]]
+id = "shift"
+required = [ "shift" ]
+optional = []
+
+[layers.keys.KeyA]
+text = "A"
+
+[layers.keys.KeyS]
+text = "U"
+
+[layers.keys.KeyD]
+text = "I"
+
+[layers.keys.KeyF]
+text = "E"
+
+[layers.keys.KeyH]
+text = "C"
+
+[layers.keys.KeyG]
+text = ";"
+
+[layers.keys.KeyZ]
+text = "À"
+
+[layers.keys.KeyX]
+text = "Y"
+
+[layers.keys.KeyC]
+text = "X"
+
+[layers.keys.KeyV]
+text = ":"
+
+[layers.keys.Backquote]
+text = "#"
+
+[layers.keys.KeyB]
+text = "K"
+
+[layers.keys.KeyQ]
+text = "B"
+
+[layers.keys.KeyW]
+text = "É"
+
+[layers.keys.KeyE]
+text = "P"
+
+[layers.keys.KeyR]
+text = "O"
+
+[layers.keys.KeyY]
+text = "!"
+
+[layers.keys.KeyT]
+text = "È"
+
+[layers.keys.Digit1]
+text = "1"
+
+[layers.keys.Digit2]
+text = "2"
+
+[layers.keys.Digit3]
+text = "3"
+
+[layers.keys.Digit4]
+text = "4"
+
+[layers.keys.Digit6]
+text = "6"
+
+[layers.keys.Digit5]
+text = "5"
+
+[layers.keys.Equal]
+text = "`"
+
+[layers.keys.Digit9]
+text = "9"
+
+[layers.keys.Digit7]
+text = "7"
+
+[layers.keys.Minus]
+text = "°"
+
+[layers.keys.Digit8]
+text = "8"
+
+[layers.keys.Digit0]
+text = "0"
+
+[layers.keys.BracketRight]
+text = "W"
+
+[layers.keys.KeyO]
+text = "L"
+
+[layers.keys.KeyU]
+text = "V"
+
+[layers.keys.BracketLeft]
+text = "Z"
+
+[layers.keys.KeyI]
+text = "D"
+
+[layers.keys.KeyP]
+text = "J"
+
+[layers.keys.KeyL]
+text = "R"
+
+[layers.keys.KeyJ]
+text = "T"
+
+[layers.keys.Quote]
+text = "M"
+
+[layers.keys.KeyK]
+text = "S"
+
+[layers.keys.Semicolon]
+text = "N"
+
+[layers.keys.Backslash]
+text = "Ç"
+
+[layers.keys.Comma]
+text = "G"
+
+[layers.keys.Slash]
+text = "F"
+
+[layers.keys.KeyN]
+text = "?"
+
+[layers.keys.KeyM]
+text = "Q"
+
+[layers.keys.Period]
+text = "H"
+
+[layers.keys.Space]
+text = " "
+compose_as = "fineinsecable"
+
+[layers.keys.IntlBackslash]
+text = "Ê"
+
+[layers.keys.NumpadDecimal]
+text = ","
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "#"
+
+[layers.ansi_keys.IntlBackslash]
+text = "#"
+compose = false
+
+[[layers]]
+id = "caps_lock"
+required = [ "caps_lock" ]
+optional = []
+
+[layers.keys.KeyA]
+text = "A"
+
+[layers.keys.KeyS]
+text = "U"
+
+[layers.keys.KeyD]
+text = "I"
+
+[layers.keys.KeyF]
+text = "E"
+
+[layers.keys.KeyH]
+text = "C"
+
+[layers.keys.KeyG]
+text = ","
+
+[layers.keys.KeyZ]
+text = "À"
+
+[layers.keys.KeyX]
+text = "Y"
+
+[layers.keys.KeyC]
+text = "X"
+
+[layers.keys.KeyV]
+text = "."
+
+[layers.keys.Backquote]
+text = "$"
+
+[layers.keys.KeyB]
+text = "K"
+
+[layers.keys.KeyQ]
+text = "B"
+
+[layers.keys.KeyW]
+text = "É"
+
+[layers.keys.KeyE]
+text = "P"
+
+[layers.keys.KeyR]
+text = "O"
+
+[layers.keys.KeyY]
+dead_key = "circonflexe"
+
+[layers.keys.KeyT]
+text = "È"
+
+[layers.keys.Digit1]
+text = "1"
+
+[layers.keys.Digit2]
+text = "2"
+
+[layers.keys.Digit3]
+text = "3"
+
+[layers.keys.Digit4]
+text = "4"
+
+[layers.keys.Digit6]
+text = "6"
+
+[layers.keys.Digit5]
+text = "5"
+
+[layers.keys.Equal]
+text = "%"
+
+[layers.keys.Digit9]
+text = "9"
+
+[layers.keys.Digit7]
+text = "7"
+
+[layers.keys.Minus]
+text = "="
+
+[layers.keys.Digit8]
+text = "8"
+
+[layers.keys.Digit0]
+text = "0"
+
+[layers.keys.BracketRight]
+text = "W"
+
+[layers.keys.KeyO]
+text = "L"
+
+[layers.keys.KeyU]
+text = "V"
+
+[layers.keys.BracketLeft]
+text = "Z"
+
+[layers.keys.KeyI]
+text = "D"
+
+[layers.keys.KeyP]
+text = "J"
+
+[layers.keys.KeyL]
+text = "R"
+
+[layers.keys.KeyJ]
+text = "T"
+
+[layers.keys.Quote]
+text = "M"
+
+[layers.keys.KeyK]
+text = "S"
+
+[layers.keys.Semicolon]
+text = "N"
+
+[layers.keys.Backslash]
+text = "Ç"
+
+[layers.keys.Comma]
+text = "G"
+
+[layers.keys.Slash]
+text = "F"
+
+[layers.keys.KeyN]
+text = "’"
+
+[layers.keys.KeyM]
+text = "Q"
+
+[layers.keys.Period]
+text = "H"
+
+[layers.keys.Space]
+text = " "
+compose_as = "espace"
+
+[layers.keys.IntlBackslash]
+text = "Ê"
+
+[layers.keys.NumpadDecimal]
+text = "."
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "$"
+
+[layers.ansi_keys.IntlBackslash]
+text = "$"
+compose = false
+
+[[layers]]
+id = "shift_caps_lock"
+required = [ "shift", "caps_lock" ]
+optional = []
+
+[layers.keys.KeyA]
+text = "a"
+
+[layers.keys.KeyS]
+text = "u"
+
+[layers.keys.KeyD]
+text = "i"
+
+[layers.keys.KeyF]
+text = "e"
+
+[layers.keys.KeyH]
+text = "c"
+
+[layers.keys.KeyG]
+text = ";"
+
+[layers.keys.KeyZ]
+text = "à"
+
+[layers.keys.KeyX]
+text = "y"
+
+[layers.keys.KeyC]
+text = "x"
+
+[layers.keys.KeyV]
+text = ":"
+
+[layers.keys.Backquote]
+text = "#"
+
+[layers.keys.KeyB]
+text = "k"
+
+[layers.keys.KeyQ]
+text = "b"
+
+[layers.keys.KeyW]
+text = "é"
+
+[layers.keys.KeyE]
+text = "p"
+
+[layers.keys.KeyR]
+text = "o"
+
+[layers.keys.KeyY]
+text = "!"
+
+[layers.keys.KeyT]
+text = "è"
+
+[layers.keys.Digit1]
+text = "\""
+compose_as = "guillemet"
+
+[layers.keys.Digit2]
+text = "«"
+
+[layers.keys.Digit3]
+text = "»"
+
+[layers.keys.Digit4]
+text = "("
+
+[layers.keys.Digit6]
+text = "@"
+
+[layers.keys.Digit5]
+text = ")"
+
+[layers.keys.Equal]
+text = "`"
+
+[layers.keys.Digit9]
+text = "/"
+
+[layers.keys.Digit7]
+text = "+"
+
+[layers.keys.Minus]
+text = "°"
+
+[layers.keys.Digit8]
+text = "-"
+
+[layers.keys.Digit0]
+text = "*"
+
+[layers.keys.BracketRight]
+text = "w"
+
+[layers.keys.KeyO]
+text = "l"
+
+[layers.keys.KeyU]
+text = "v"
+
+[layers.keys.BracketLeft]
+text = "z"
+
+[layers.keys.KeyI]
+text = "d"
+
+[layers.keys.KeyP]
+text = "j"
+
+[layers.keys.KeyL]
+text = "r"
+
+[layers.keys.KeyJ]
+text = "t"
+
+[layers.keys.Quote]
+text = "m"
+
+[layers.keys.KeyK]
+text = "s"
+
+[layers.keys.Semicolon]
+text = "n"
+
+[layers.keys.Backslash]
+text = "ç"
+
+[layers.keys.Comma]
+text = "g"
+
+[layers.keys.Slash]
+text = "f"
+
+[layers.keys.KeyN]
+text = "?"
+
+[layers.keys.KeyM]
+text = "q"
+
+[layers.keys.Period]
+text = "h"
+
+[layers.keys.Space]
+text = " "
+compose_as = "fineinsecable"
+
+[layers.keys.IntlBackslash]
+text = "ê"
+
+[layers.keys.NumpadDecimal]
+text = "."
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "#"
+
+[layers.ansi_keys.IntlBackslash]
+text = "#"
+compose = false
+
+[[layers]]
+id = "alt"
+required = [ "alt" ]
+optional = []
+
+[layers.keys.KeyA]
+text = "æ"
+
+[layers.keys.KeyS]
+text = "ù"
+
+[layers.keys.KeyD]
+dead_key = "trema"
+
+[layers.keys.KeyF]
+text = "€"
+
+[layers.keys.KeyH]
+dead_key = "cedille"
+
+[layers.keys.KeyG]
+text = "'"
+
+[layers.keys.KeyZ]
+text = "\\"
+
+[layers.keys.KeyX]
+text = "{"
+
+[layers.keys.KeyC]
+text = "}"
+
+[layers.keys.KeyV]
+text = "…"
+
+[layers.keys.Backquote]
+text = "–"
+
+[layers.keys.KeyB]
+text = "~"
+
+[layers.keys.KeyQ]
+text = "|"
+
+[layers.keys.KeyW]
+dead_key = "aigu"
+
+[layers.keys.KeyE]
+text = "&"
+compose_as = "esperluette"
+
+[layers.keys.KeyR]
+text = "œ"
+
+[layers.keys.KeyY]
+text = "¡"
+
+[layers.keys.KeyT]
+dead_key = "grave"
+
+[layers.keys.Digit1]
+text = "—"
+
+[layers.keys.Digit2]
+text = "<"
+compose_as = "inferieur"
+
+[layers.keys.Digit3]
+text = ">"
+
+[layers.keys.Digit4]
+text = "["
+
+[layers.keys.Digit6]
+text = "^"
+
+[layers.keys.Digit5]
+text = "]"
+
+[layers.keys.Equal]
+text = "‰"
+
+[layers.keys.Digit9]
+text = "÷"
+
+[layers.keys.Digit7]
+text = "±"
+
+[layers.keys.Minus]
+text = "≠"
+
+[layers.keys.Digit8]
+text = "−"
+
+[layers.keys.Digit0]
+text = "×"
+
+[layers.keys.BracketRight]
+text = "⚜"
+
+[layers.keys.KeyO]
+dead_key = "barre"
+
+[layers.keys.KeyU]
+dead_key = "caron"
+
+[layers.keys.BracketLeft]
+dead_key = "raye"
+
+[layers.keys.KeyI]
+dead_key = "scientifique"
+
+[layers.keys.KeyP]
+text = "☮"
+
+[layers.keys.KeyL]
+dead_key = "breve"
+
+[layers.keys.KeyJ]
+dead_key = "exposant"
+
+[layers.keys.Quote]
+dead_key = "macron"
+
+[layers.keys.KeyK]
+dead_key = "latin"
+
+[layers.keys.Semicolon]
+dead_key = "tilde"
+
+[layers.keys.Backslash]
+text = "✈"
+
+[layers.keys.Comma]
+dead_key = "grec"
+
+[layers.keys.Slash]
+dead_key = "ogonek"
+
+[layers.keys.KeyN]
+text = "¿"
+
+[layers.keys.KeyM]
+dead_key = "rond"
+
+[layers.keys.Period]
+dead_key = "pointsouscrit"
+
+[layers.keys.Space]
+text = "_"
+
+[layers.keys.IntlBackslash]
+text = "/"
+
+[layers.keys.NumpadDecimal]
+text = ","
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "–"
+
+[layers.ansi_keys.IntlBackslash]
+text = ""
+compose = false
+
+[[layers]]
+id = "shift_alt"
+required = [ "shift", "alt" ]
+optional = [ "meta" ]
+
+[layers.keys.KeyA]
+text = "Æ"
+
+[layers.keys.KeyS]
+text = "Ù"
+
+[layers.keys.KeyD]
+dead_key = "pointsuscrit"
+
+[layers.keys.KeyF]
+dead_key = "monnaie"
+
+[layers.keys.KeyH]
+text = "©"
+
+[layers.keys.KeyG]
+dead_key = "virgule"
+
+[layers.keys.KeyZ]
+text = "‚"
+
+[layers.keys.KeyX]
+text = "‘"
+
+[layers.keys.KeyC]
+text = "’"
+
+[layers.keys.KeyV]
+text = "·"
+
+[layers.keys.Backquote]
+text = "¶"
+
+[layers.keys.KeyB]
+text = "‑"
+
+[layers.keys.KeyQ]
+text = "_"
+
+[layers.keys.KeyW]
+text = "♥"
+
+[layers.keys.KeyE]
+text = "§"
+
+[layers.keys.KeyR]
+text = "Œ"
+
+[layers.keys.KeyY]
+text = "☠"
+
+[layers.keys.KeyT]
+text = "`"
+
+[layers.keys.Digit1]
+text = "„"
+
+[layers.keys.Digit2]
+text = "“"
+
+[layers.keys.Digit3]
+text = "”"
+
+[layers.keys.Digit4]
+text = "⩽"
+
+[layers.keys.Digit6]
+text = "⚠"
+compose_as = "☭"
+
+[layers.keys.Digit5]
+text = "⩾"
+
+[layers.keys.Equal]
+text = "″"
+
+[layers.keys.Digit9]
+text = "½"
+
+[layers.keys.Digit7]
+text = "¬"
+
+[layers.keys.Minus]
+text = "′"
+
+[layers.keys.Digit8]
+text = "¼"
+
+[layers.keys.Digit0]
+text = "¾"
+
+[layers.keys.BracketRight]
+text = "♿"
+
+[layers.keys.KeyO]
+text = "£"
+
+[layers.keys.KeyU]
+text = "☢"
+
+[layers.keys.BracketLeft]
+text = "☙"
+
+[layers.keys.KeyI]
+text = "☣"
+
+[layers.keys.KeyP]
+text = "☯"
+
+[layers.keys.KeyL]
+text = "®"
+
+[layers.keys.KeyJ]
+text = "™"
+
+[layers.keys.Quote]
+text = "⛽"
+
+[layers.keys.KeyK]
+text = "ſ"
+
+[layers.keys.Semicolon]
+text = "⚓"
+
+[layers.keys.Backslash]
+text = "🄯"
+compose_as = "copyleft"
+
+[layers.keys.Comma]
+text = "†"
+
+[layers.keys.Slash]
+text = "⛄"
+
+[layers.keys.KeyN]
+dead_key = "crochet"
+
+[layers.keys.KeyM]
+dead_key = "corne"
+
+[layers.keys.Period]
+text = "‡"
+
+[layers.keys.Space]
+text = " "
+compose_as = "insecable"
+
+[layers.keys.IntlBackslash]
+text = "^"
+
+[layers.keys.NumpadDecimal]
+text = "."
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "¶"
+
+[layers.ansi_keys.IntlBackslash]
+text = ""
+compose = false
+
+[[layers]]
+id = "shift_alt_caps_lock"
+required = [ "shift", "caps_lock", "alt" ]
+optional = [ "meta" ]
+
+[layers.keys.KeyA]
+text = "æ"
+
+[layers.keys.KeyS]
+text = "ù"
+
+[layers.keys.KeyD]
+dead_key = "pointsuscrit"
+
+[layers.keys.KeyF]
+dead_key = "monnaie"
+
+[layers.keys.KeyH]
+text = "©"
+
+[layers.keys.KeyG]
+dead_key = "virgule"
+
+[layers.keys.KeyZ]
+text = "‚"
+
+[layers.keys.KeyX]
+text = "‘"
+
+[layers.keys.KeyC]
+text = "’"
+
+[layers.keys.KeyV]
+text = "·"
+
+[layers.keys.Backquote]
+text = "¶"
+
+[layers.keys.KeyB]
+text = "‑"
+
+[layers.keys.KeyQ]
+text = "_"
+
+[layers.keys.KeyW]
+text = "♥"
+
+[layers.keys.KeyE]
+text = "§"
+
+[layers.keys.KeyR]
+text = "œ"
+
+[layers.keys.KeyY]
+text = "☠"
+
+[layers.keys.KeyT]
+text = "`"
+
+[layers.keys.Digit1]
+text = "„"
+
+[layers.keys.Digit2]
+text = "“"
+
+[layers.keys.Digit3]
+text = "”"
+
+[layers.keys.Digit4]
+text = "⩽"
+
+[layers.keys.Digit6]
+text = "⚠"
+compose_as = "☭"
+
+[layers.keys.Digit5]
+text = "⩾"
+
+[layers.keys.Equal]
+text = "″"
+
+[layers.keys.Digit9]
+text = "½"
+
+[layers.keys.Digit7]
+text = "¬"
+
+[layers.keys.Minus]
+text = "′"
+
+[layers.keys.Digit8]
+text = "¼"
+
+[layers.keys.Digit0]
+text = "¾"
+
+[layers.keys.BracketRight]
+text = "♿"
+
+[layers.keys.KeyO]
+text = "£"
+
+[layers.keys.KeyU]
+text = "☢"
+
+[layers.keys.BracketLeft]
+text = "☙"
+
+[layers.keys.KeyI]
+text = "☣"
+
+[layers.keys.KeyP]
+text = "☯"
+
+[layers.keys.KeyL]
+text = "®"
+
+[layers.keys.KeyJ]
+text = "™"
+
+[layers.keys.Quote]
+text = "⛽"
+
+[layers.keys.KeyK]
+text = "ſ"
+
+[layers.keys.Semicolon]
+text = "⚓"
+
+[layers.keys.Backslash]
+text = "🄯"
+compose_as = "copyleft"
+
+[layers.keys.Comma]
+text = "†"
+
+[layers.keys.Slash]
+text = "⛄"
+
+[layers.keys.KeyN]
+dead_key = "crochet"
+
+[layers.keys.KeyM]
+dead_key = "corne"
+
+[layers.keys.Period]
+text = "‡"
+
+[layers.keys.Space]
+text = " "
+compose_as = "insecable"
+
+[layers.keys.IntlBackslash]
+text = "^"
+
+[layers.keys.NumpadDecimal]
+text = "."
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "¶"
+
+[layers.ansi_keys.IntlBackslash]
+text = ""
+compose = false
+
+[[layers]]
+id = "alt_caps_lock"
+required = [ "caps_lock", "alt" ]
+optional = []
+
+[layers.keys.KeyA]
+text = "Æ"
+
+[layers.keys.KeyS]
+text = "Ù"
+
+[layers.keys.KeyD]
+dead_key = "trema"
+
+[layers.keys.KeyF]
+text = "€"
+
+[layers.keys.KeyH]
+dead_key = "cedille"
+
+[layers.keys.KeyG]
+text = "'"
+
+[layers.keys.KeyZ]
+text = "\\"
+
+[layers.keys.KeyX]
+text = "{"
+
+[layers.keys.KeyC]
+text = "}"
+
+[layers.keys.KeyV]
+text = "…"
+
+[layers.keys.Backquote]
+text = "–"
+
+[layers.keys.KeyB]
+text = "~"
+
+[layers.keys.KeyQ]
+text = "|"
+
+[layers.keys.KeyW]
+dead_key = "aigu"
+
+[layers.keys.KeyE]
+text = "&"
+compose_as = "esperluette"
+
+[layers.keys.KeyR]
+text = "Œ"
+
+[layers.keys.KeyY]
+text = "¡"
+
+[layers.keys.KeyT]
+dead_key = "grave"
+
+[layers.keys.Digit1]
+text = "—"
+
+[layers.keys.Digit2]
+text = "<"
+compose_as = "inferieur"
+
+[layers.keys.Digit3]
+text = ">"
+
+[layers.keys.Digit4]
+text = "["
+
+[layers.keys.Digit6]
+text = "^"
+
+[layers.keys.Digit5]
+text = "]"
+
+[layers.keys.Equal]
+text = "‰"
+
+[layers.keys.Digit9]
+text = "÷"
+
+[layers.keys.Digit7]
+text = "±"
+
+[layers.keys.Minus]
+text = "≠"
+
+[layers.keys.Digit8]
+text = "−"
+
+[layers.keys.Digit0]
+text = "×"
+
+[layers.keys.BracketRight]
+text = "⚜"
+
+[layers.keys.KeyO]
+dead_key = "barre"
+
+[layers.keys.KeyU]
+dead_key = "caron"
+
+[layers.keys.BracketLeft]
+dead_key = "raye"
+
+[layers.keys.KeyI]
+dead_key = "scientifique"
+
+[layers.keys.KeyP]
+text = "☮"
+
+[layers.keys.KeyL]
+dead_key = "breve"
+
+[layers.keys.KeyJ]
+dead_key = "exposant"
+
+[layers.keys.Quote]
+dead_key = "macron"
+
+[layers.keys.KeyK]
+dead_key = "latin"
+
+[layers.keys.Semicolon]
+dead_key = "tilde"
+
+[layers.keys.Backslash]
+text = "✈"
+
+[layers.keys.Comma]
+dead_key = "grec"
+
+[layers.keys.Slash]
+dead_key = "ogonek"
+
+[layers.keys.KeyN]
+text = "¿"
+
+[layers.keys.KeyM]
+dead_key = "rond"
+
+[layers.keys.Period]
+dead_key = "pointsouscrit"
+
+[layers.keys.Space]
+text = "_"
+
+[layers.keys.IntlBackslash]
+text = "/"
+
+[layers.keys.NumpadDecimal]
+text = ","
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "–"
+
+[layers.ansi_keys.IntlBackslash]
+text = ""
+compose = false
+
+[[layers]]
+id = "alt_meta"
+required = [ "alt", "meta" ]
+optional = [ "caps_lock" ]
+
+[layers.keys.KeyA]
+text = "æ"
+
+[layers.keys.KeyS]
+text = "ù"
+
+[layers.keys.KeyD]
+dead_key = "trema"
+
+[layers.keys.KeyF]
+text = "€"
+
+[layers.keys.KeyH]
+dead_key = "cedille"
+
+[layers.keys.KeyG]
+text = "'"
+
+[layers.keys.KeyZ]
+text = "\\"
+
+[layers.keys.KeyX]
+text = "{"
+
+[layers.keys.KeyC]
+text = "}"
+
+[layers.keys.KeyV]
+text = "…"
+
+[layers.keys.Backquote]
+text = "–"
+
+[layers.keys.KeyB]
+text = "~"
+
+[layers.keys.KeyQ]
+text = "|"
+
+[layers.keys.KeyW]
+dead_key = "aigu"
+
+[layers.keys.KeyE]
+text = "&"
+compose_as = "esperluette"
+
+[layers.keys.KeyR]
+text = "œ"
+
+[layers.keys.KeyY]
+text = "¡"
+
+[layers.keys.KeyT]
+dead_key = "grave"
+
+[layers.keys.Digit1]
+text = "—"
+
+[layers.keys.Digit2]
+text = "<"
+compose_as = "inferieur"
+
+[layers.keys.Digit3]
+text = ">"
+
+[layers.keys.Digit4]
+text = "["
+
+[layers.keys.Digit6]
+text = "^"
+
+[layers.keys.Digit5]
+text = "]"
+
+[layers.keys.Equal]
+text = "‰"
+
+[layers.keys.Digit9]
+text = "÷"
+
+[layers.keys.Digit7]
+text = "±"
+
+[layers.keys.Minus]
+text = "≠"
+
+[layers.keys.Digit8]
+text = "−"
+
+[layers.keys.Digit0]
+text = "×"
+
+[layers.keys.BracketRight]
+text = "⚜"
+
+[layers.keys.KeyO]
+dead_key = "barre"
+
+[layers.keys.KeyU]
+dead_key = "caron"
+
+[layers.keys.BracketLeft]
+dead_key = "raye"
+
+[layers.keys.KeyI]
+dead_key = "scientifique"
+
+[layers.keys.KeyP]
+text = "☮"
+
+[layers.keys.KeyL]
+dead_key = "breve"
+
+[layers.keys.KeyJ]
+dead_key = "exposant"
+
+[layers.keys.Quote]
+dead_key = "macron"
+
+[layers.keys.KeyK]
+dead_key = "latin"
+
+[layers.keys.Semicolon]
+dead_key = "tilde"
+
+[layers.keys.Backslash]
+text = "✈"
+
+[layers.keys.Comma]
+dead_key = "grec"
+
+[layers.keys.Slash]
+dead_key = "ogonek"
+
+[layers.keys.KeyN]
+text = "¿"
+
+[layers.keys.KeyM]
+dead_key = "rond"
+
+[layers.keys.Period]
+dead_key = "pointsouscrit"
+
+[layers.keys.Space]
+text = "_"
+
+[layers.keys.IntlBackslash]
+text = "/"
+
+[layers.keys.NumpadDecimal]
+text = ","
+
+[layers.keys.NumpadMultiply]
+text = "*"
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "–"
+
+[layers.ansi_keys.IntlBackslash]
+text = ""
+compose = false
+
+[[layers]]
+id = "control"
+required = [ "control" ]
+optional = [ "shift", "caps_lock", "alt", "meta" ]
+
+[layers.keys.KeyA]
+text = "\u0001"
+
+[layers.keys.KeyS]
+text = "\u0015"
+
+[layers.keys.KeyD]
+text = "\t"
+
+[layers.keys.KeyF]
+text = "\u0005"
+
+[layers.keys.KeyH]
+text = "\u0003"
+
+[layers.keys.KeyG]
+text = ","
+compose = false
+
+[layers.keys.KeyZ]
+text = ";"
+
+[layers.keys.KeyX]
+text = "\u0019"
+
+[layers.keys.KeyC]
+text = "\b"
+
+[layers.keys.KeyV]
+text = "."
+compose = false
+
+[layers.keys.Backquote]
+text = "0"
+
+[layers.keys.KeyB]
+text = "\u000b"
+
+[layers.keys.KeyQ]
+text = "\u0002"
+
+[layers.keys.KeyW]
+text = "/"
+
+[layers.keys.KeyE]
+disabled = true
+
+[layers.keys.KeyR]
+text = "\u000f"
+
+[layers.keys.KeyY]
+text = "\u001c"
+
+[layers.keys.KeyT]
+text = "\u001b"
+
+[layers.keys.Digit1]
+text = "1"
+
+[layers.keys.Digit2]
+text = "2"
+
+[layers.keys.Digit3]
+text = "3"
+
+[layers.keys.Digit4]
+text = "4"
+
+[layers.keys.Digit6]
+text = "6"
+
+[layers.keys.Digit5]
+text = "5"
+
+[layers.keys.Equal]
+text = "="
+
+[layers.keys.Digit9]
+text = "9"
+
+[layers.keys.Digit7]
+text = "7"
+
+[layers.keys.Minus]
+text = "\u001f"
+
+[layers.keys.Digit8]
+text = "8"
+
+[layers.keys.Digit0]
+text = "0"
+
+[layers.keys.BracketRight]
+text = "\u0017"
+
+[layers.keys.KeyO]
+text = "\f"
+
+[layers.keys.KeyU]
+text = "\u0016"
+
+[layers.keys.BracketLeft]
+text = "\u001a"
+
+[layers.keys.KeyI]
+text = "\u0004"
+
+[layers.keys.KeyP]
+text = "\u0006"
+
+[layers.keys.KeyL]
+text = "\u000e"
+
+[layers.keys.KeyJ]
+text = "\u0014"
+
+[layers.keys.Quote]
+text = "\r"
+
+[layers.keys.KeyK]
+text = "\u0013"
+
+[layers.keys.Semicolon]
+text = "\u0012"
+
+[layers.keys.Backslash]
+text = "\u001d"
+
+[layers.keys.Comma]
+text = "\u0007"
+
+[layers.keys.Slash]
+text = "\n"
+
+[layers.keys.KeyN]
+text = "'"
+compose = false
+
+[layers.keys.KeyM]
+text = "\u0011"
+
+[layers.keys.Period]
+text = "\u0018"
+
+[layers.keys.Space]
+text = " "
+compose_as = "espace"
+
+[layers.keys.IntlBackslash]
+text = "`"
+compose = false
+
+[layers.keys.NumpadDecimal]
+text = "."
+compose = false
+
+[layers.keys.NumpadMultiply]
+text = "*"
+compose = false
+
+[layers.keys.NumpadAdd]
+text = "+"
+
+[layers.keys.NumpadDivide]
+text = "/"
+
+[layers.keys.NumpadSubtract]
+text = "-"
+
+[layers.keys.NumpadEqual]
+text = "="
+
+[layers.keys.Numpad0]
+text = "0"
+
+[layers.keys.Numpad1]
+text = "1"
+
+[layers.keys.Numpad2]
+text = "2"
+
+[layers.keys.Numpad3]
+text = "3"
+
+[layers.keys.Numpad4]
+text = "4"
+
+[layers.keys.Numpad5]
+text = "5"
+
+[layers.keys.Numpad6]
+text = "6"
+
+[layers.keys.Numpad7]
+text = "7"
+
+[layers.keys.Numpad8]
+text = "8"
+
+[layers.keys.Numpad9]
+text = "9"
+
+[layers.ansi_keys.Backquote]
+text = "0"
+
+[layers.ansi_keys.IntlBackslash]
+text = "`"
+compose = false
+
+[[dead_keys]]
+id = "aigu"
+action_id = "aigu"
+terminator = "´"
+
+[[dead_keys.rules]]
+input = "."
+text = "́"
+
+[[dead_keys.rules]]
+input = ":"
+text = "́"
+
+[[dead_keys.rules]]
+input = "?"
+text = "́"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Á"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ć"
+
+[[dead_keys.rules]]
+input = "E"
+text = "É"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ǵ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Í"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ḱ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ĺ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "Ḿ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ń"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ó"
+
+[[dead_keys.rules]]
+input = "P"
+text = "Ṕ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ŕ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ś"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ú"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ǘ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ẃ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ý"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ź"
+
+[[dead_keys.rules]]
+input = "_"
+text = "´"
+
+[[dead_keys.rules]]
+input = "a"
+text = "á"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "doubleaigu"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+next = "aigubarre"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "aigubreve"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ć"
+
+[[dead_keys.rules]]
+input_dead_key = "cedille"
+next = "aigucedille"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+next = "circonflexeaigu"
+
+[[dead_keys.rules]]
+input_dead_key = "corne"
+next = "aigucorne"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "́"
+
+[[dead_keys.rules]]
+input = "e"
+text = "é"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "´"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "´"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ǵ"
+
+[[dead_keys.rules]]
+input_dead_key = "grec"
+next = "grecaigu"
+
+[[dead_keys.rules]]
+input = "i"
+text = "í"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "´"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ḱ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ĺ"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ḿ"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "aigumacron"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ń"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ó"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ṕ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+next = "aigupoint"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ŕ"
+
+[[dead_keys.rules]]
+input_dead_key = "rond"
+next = "aigurond"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ś"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "aigutilde"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "aigutrema"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ú"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ǘ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ẃ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ý"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ź"
+
+[[dead_keys.rules]]
+input = "·"
+text = "́"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "́"
+
+[[dead_keys.rules]]
+input = "Æ"
+text = "Ǽ"
+
+[[dead_keys.rules]]
+input = "Ç"
+text = "Ḉ"
+
+[[dead_keys.rules]]
+input = "Ê"
+text = "Ế"
+
+[[dead_keys.rules]]
+input = "æ"
+text = "ǽ"
+
+[[dead_keys.rules]]
+input = "ç"
+text = "ḉ"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ế"
+
+[[dead_keys.rules]]
+input = "’"
+text = "́"
+
+[[dead_keys.rules]]
+input = "…"
+text = "́"
+
+[[dead_keys]]
+id = "aigubarre"
+terminator = "´/"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ǿ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ǿ"
+
+[[dead_keys]]
+id = "aigubreve"
+terminator = "´˘"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ắ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ắ"
+
+[[dead_keys]]
+id = "aigucedille"
+terminator = "´¸"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ḉ"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ḉ"
+
+[[dead_keys]]
+id = "aigucorne"
+terminator = "´̛"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ớ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ứ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ớ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ứ"
+
+[[dead_keys]]
+id = "aigumacron"
+terminator = "´¯"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ḗ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ṓ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ḗ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ṓ"
+
+[[dead_keys]]
+id = "aigupoint"
+terminator = "´˙"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ṥ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ṥ"
+
+[[dead_keys]]
+id = "aigurond"
+terminator = "´°"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ǻ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ǻ"
+
+[[dead_keys]]
+id = "aigutilde"
+terminator = "´~"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ṍ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ṹ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ṍ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ṹ"
+
+[[dead_keys]]
+id = "aigutrema"
+terminator = "´¨"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ḯ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ǘ"
+
+[[dead_keys.rules]]
+input_dead_key = "grec"
+next = "grectremaaigu"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ḯ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ǘ"
+
+[[dead_keys]]
+id = "barre"
+action_id = "barre"
+terminator = "/"
+
+[[dead_keys.rules]]
+input = "."
+text = "̸"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̸"
+
+[[dead_keys.rules]]
+input = "="
+text = "≠"
+
+[[dead_keys.rules]]
+input = ">"
+text = "≯"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̸"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ⱥ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ȼ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ɇ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ꞡ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ꝃ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ł"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ꞥ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ø"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "Ꝙ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ꞧ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ꞩ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ⱦ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ꞹ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ꝟ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "/"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ⱥ"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigubarre"
+
+[[dead_keys.rules]]
+input = "b"
+text = "␢"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+next = "doublebarre"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ȼ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̸"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ɇ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "/"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "/"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ꞡ"
+
+[[dead_keys.rules]]
+input = "inferieur"
+text = "≮"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "/"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ꝃ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ł"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "barrelatin"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ꞥ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ø"
+
+[[dead_keys.rules]]
+input = "q"
+text = "ꝙ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ꞧ"
+
+[[dead_keys.rules]]
+input_dead_key = "raye"
+next = "barreraye"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ꞩ"
+
+[[dead_keys.rules]]
+input_dead_key = "scientifique"
+next = "scientifiquebarre"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ⱦ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ꞹ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ꝟ"
+
+[[dead_keys.rules]]
+input = "~"
+text = "ꞣ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̸"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̸"
+
+[[dead_keys.rules]]
+input = "ſ"
+text = "ẜ"
+
+[[dead_keys.rules]]
+input = "‑"
+text = "Ꞣ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̸"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̸"
+
+[[dead_keys]]
+id = "barrelatin"
+terminator = "ß̸"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ꬿ"
+
+[[dead_keys]]
+id = "barreraye"
+terminator = "/̵"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ꝅ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ꝅ"
+
+[[dead_keys]]
+id = "breve"
+action_id = "breve"
+terminator = "˘"
+
+[[dead_keys.rules]]
+input = "."
+text = "̆"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̆"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̆"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ă"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ĕ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ğ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ḫ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ĭ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ŏ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ŭ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "˘"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ă"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigubreve"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "breveinverse"
+
+[[dead_keys.rules]]
+input_dead_key = "cedille"
+next = "brevecedille"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+next = "brevecrochet"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ĕ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "˘"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˘"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ğ"
+
+[[dead_keys.rules]]
+input_dead_key = "grave"
+next = "gravebreve"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ḫ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ĭ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˘"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ŏ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+next = "brevepoint"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "brevetilde"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ŭ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̆"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̆"
+
+[[dead_keys.rules]]
+input = "À"
+text = "Ằ"
+
+[[dead_keys.rules]]
+input = "à"
+text = "ằ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̆"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̆"
+
+[[dead_keys]]
+id = "brevecedille"
+terminator = "˘¸"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ḝ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ḝ"
+
+[[dead_keys]]
+id = "brevecrochet"
+terminator = "˘̉"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ẳ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ẳ"
+
+[[dead_keys]]
+id = "breveinverse"
+terminator = "̑"
+
+[[dead_keys.rules]]
+input = "."
+text = "̑"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̑"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̑"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ȃ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ȇ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ḫ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ȋ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ȏ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ȓ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ȗ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ȃ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̑"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ȇ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ḫ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ȋ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ȏ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ȓ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ȗ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̑"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̑"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̑"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̑"
+
+[[dead_keys]]
+id = "brevepoint"
+terminator = "˘."
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ặ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ặ"
+
+[[dead_keys]]
+id = "brevetilde"
+terminator = "˘~"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ẵ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ẵ"
+
+[[dead_keys]]
+id = "calligraphique"
+terminator = "𝓬"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝓐"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝓑"
+
+[[dead_keys.rules]]
+input = "C"
+text = "𝓒"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝓓"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝓔"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝓕"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝓖"
+
+[[dead_keys.rules]]
+input = "H"
+text = "𝓗"
+
+[[dead_keys.rules]]
+input = "I"
+text = "𝓘"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝓙"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝓚"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝓛"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝓜"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝓝"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝓞"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝓟"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝓠"
+
+[[dead_keys.rules]]
+input = "R"
+text = "𝓡"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝓢"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝓣"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝓤"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝓥"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝓦"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝓧"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝓨"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "𝓩"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝓪"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝓫"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝓬"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝓭"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝓮"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝓯"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝓰"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝓱"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝓲"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝓳"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝓴"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝓵"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝓶"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝓷"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝓸"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝓹"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝓺"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝓻"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝓼"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝓽"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝓾"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝓿"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝔀"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝔁"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝔂"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝔃"
+
+[[dead_keys]]
+id = "caron"
+action_id = "caron"
+terminator = "ˇ"
+
+[[dead_keys.rules]]
+input = "("
+text = "₍"
+
+[[dead_keys.rules]]
+input = ")"
+text = "₎"
+
+[[dead_keys.rules]]
+input = "+"
+text = "₊"
+
+[[dead_keys.rules]]
+input = "-"
+text = "₋"
+
+[[dead_keys.rules]]
+input = "."
+text = "̌"
+
+[[dead_keys.rules]]
+input = "0"
+text = "₀"
+
+[[dead_keys.rules]]
+input = "1"
+text = "₁"
+
+[[dead_keys.rules]]
+input = "2"
+text = "₂"
+
+[[dead_keys.rules]]
+input = "3"
+text = "₃"
+
+[[dead_keys.rules]]
+input = "4"
+text = "₄"
+
+[[dead_keys.rules]]
+input = "5"
+text = "₅"
+
+[[dead_keys.rules]]
+input = "6"
+text = "₆"
+
+[[dead_keys.rules]]
+input = "7"
+text = "₇"
+
+[[dead_keys.rules]]
+input = "8"
+text = "₈"
+
+[[dead_keys.rules]]
+input = "9"
+text = "₉"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̌"
+
+[[dead_keys.rules]]
+input = "="
+text = "₌"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̌"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ǎ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Č"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ď"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ě"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ǧ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ȟ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ǐ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ǩ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ľ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ň"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ǒ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ř"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Š"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ť"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ǔ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ǚ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ž"
+
+[[dead_keys.rules]]
+input = "_"
+text = "ˇ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ǎ"
+
+[[dead_keys.rules]]
+input = "c"
+text = "č"
+
+[[dead_keys.rules]]
+input_dead_key = "caron"
+text = "ˇ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̌"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ď"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ě"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "ˇ"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "ˇ"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ǧ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ȟ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ǐ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "ˇ"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ǰ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ǩ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ľ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "caronlatin"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ň"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ǒ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+next = "caronpoint"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ř"
+
+[[dead_keys.rules]]
+input = "s"
+text = "š"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ť"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "carontrema"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ǔ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ǚ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ž"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̌"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̌"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̌"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̌"
+
+[[dead_keys]]
+id = "caronlatin"
+terminator = "ß̌"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ǯ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ǯ"
+
+[[dead_keys]]
+id = "caronpoint"
+terminator = "ˇ˙"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ṧ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ṧ"
+
+[[dead_keys]]
+id = "caronsouscrit"
+terminator = "˰"
+
+[[dead_keys.rules]]
+input = "_"
+text = "˰"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "˰"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˰"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˰"
+
+[[dead_keys]]
+id = "carontrema"
+terminator = "ˇ¨"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ǚ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ǚ"
+
+[[dead_keys]]
+id = "cedille"
+action_id = "cedille"
+terminator = "¸"
+
+[[dead_keys.rules]]
+input = "."
+text = "̧"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̧"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̧"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ç"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ḑ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ȩ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ģ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ḩ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ķ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ļ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ņ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ŗ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ş"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ţ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "¸"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigucedille"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "brevecedille"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ç"
+
+[[dead_keys.rules]]
+input_dead_key = "cedille"
+text = "¸"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̧"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ḑ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ȩ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "¸"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "¸"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ģ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ḩ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "¸"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ķ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ļ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ņ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ŗ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ş"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ţ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̧"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̧"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̧"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̧"
+
+[[dead_keys]]
+id = "circonflexe"
+action_id = "circonflexe"
+terminator = "^"
+
+[[dead_keys.rules]]
+input = "("
+text = "⁽"
+
+[[dead_keys.rules]]
+input = ")"
+text = "⁾"
+
+[[dead_keys.rules]]
+input = "+"
+text = "⁺"
+
+[[dead_keys.rules]]
+input = "-"
+text = "⁻"
+
+[[dead_keys.rules]]
+input = "."
+text = "̂"
+
+[[dead_keys.rules]]
+input = "0"
+text = "⁰"
+
+[[dead_keys.rules]]
+input = "1"
+text = "¹"
+
+[[dead_keys.rules]]
+input = "2"
+text = "²"
+
+[[dead_keys.rules]]
+input = "3"
+text = "³"
+
+[[dead_keys.rules]]
+input = "4"
+text = "⁴"
+
+[[dead_keys.rules]]
+input = "5"
+text = "⁵"
+
+[[dead_keys.rules]]
+input = "6"
+text = "⁶"
+
+[[dead_keys.rules]]
+input = "7"
+text = "⁷"
+
+[[dead_keys.rules]]
+input = "8"
+text = "⁸"
+
+[[dead_keys.rules]]
+input = "9"
+text = "⁹"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̂"
+
+[[dead_keys.rules]]
+input = "="
+text = "⁼"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̂"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Â"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ĉ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ê"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ĝ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ĥ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Î"
+
+[[dead_keys.rules]]
+input = "J"
+text = "Ĵ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ṋ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ô"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ŝ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Û"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ŵ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ŷ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ẑ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "^"
+
+[[dead_keys.rules]]
+input = "a"
+text = "â"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "circonflexeaigu"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ĉ"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+next = "circonflexesouscrit"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+next = "circonflexecrochet"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ê"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "^"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "^"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ĝ"
+
+[[dead_keys.rules]]
+input_dead_key = "grave"
+next = "circonflexegrave"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ĥ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "î"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "^"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ĵ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ṋ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ô"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+next = "circonflexepoint"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ŝ"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "circonflexetilde"
+
+[[dead_keys.rules]]
+input = "u"
+text = "û"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ŵ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ŷ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ẑ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̂"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̂"
+
+[[dead_keys.rules]]
+input = "À"
+text = "Ầ"
+
+[[dead_keys.rules]]
+input = "È"
+text = "Ề"
+
+[[dead_keys.rules]]
+input = "É"
+text = "Ế"
+
+[[dead_keys.rules]]
+input = "à"
+text = "ầ"
+
+[[dead_keys.rules]]
+input = "è"
+text = "ề"
+
+[[dead_keys.rules]]
+input = "é"
+text = "ế"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̂"
+
+[[dead_keys.rules]]
+input = "„"
+text = ""
+
+[[dead_keys.rules]]
+input = "…"
+text = "̂"
+
+[[dead_keys]]
+id = "circonflexeaigu"
+terminator = "^´"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ấ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ế"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ố"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ấ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ế"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ố"
+
+[[dead_keys]]
+id = "circonflexecrochet"
+terminator = "^̉"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ẩ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ể"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ổ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ẩ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ể"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ổ"
+
+[[dead_keys]]
+id = "circonflexegrave"
+terminator = "^`"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ầ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ề"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ồ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ầ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ề"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ồ"
+
+[[dead_keys]]
+id = "circonflexepoint"
+terminator = "^."
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ậ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ệ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ộ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ậ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ệ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ộ"
+
+[[dead_keys]]
+id = "circonflexesouscrit"
+terminator = "˰"
+
+[[dead_keys.rules]]
+input = "."
+text = "̭"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̭"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̭"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ḓ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ḙ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ḽ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ṱ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ṷ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̭"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ḓ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ḙ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "˰"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˰"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˰"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ḽ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ṱ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ṷ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̭"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̭"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̭"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̭"
+
+[[dead_keys]]
+id = "circonflexetilde"
+terminator = "^~"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ẫ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ễ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ỗ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ẫ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ễ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ỗ"
+
+[[dead_keys]]
+id = "corne"
+action_id = "corne"
+terminator = "̛"
+
+[[dead_keys.rules]]
+input = "."
+text = "̛"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̛"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̛"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ơ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ư"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigucorne"
+
+[[dead_keys.rules]]
+input_dead_key = "corne"
+text = "̛"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+next = "cornecrochet"
+
+[[dead_keys.rules]]
+input_dead_key = "grave"
+next = "gravecorne"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ơ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+next = "pointsouscritcorne"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "tildecorne"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ư"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̛"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̛"
+
+[[dead_keys.rules]]
+input = "Ù"
+text = "Ừ"
+
+[[dead_keys.rules]]
+input = "ù"
+text = "ừ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̛"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̛"
+
+[[dead_keys]]
+id = "cornecrochet"
+terminator = "̛̉"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ở"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ử"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ở"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ử"
+
+[[dead_keys]]
+id = "cornepointsouscrit"
+terminator = ".̛"
+rules = []
+
+[[dead_keys]]
+id = "crochet"
+action_id = "crochet"
+terminator = "̉"
+
+[[dead_keys.rules]]
+input = "."
+text = "̉"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̉"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̉"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ả"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ɖ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ẻ"
+
+[[dead_keys.rules]]
+input = "F"
+text = "Ƒ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ꜧ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ỉ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "Ɱ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ɲ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ỏ"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "Ɋ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ɽ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ʈ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ủ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ỷ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ȥ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ả"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "brevecrochet"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+next = "circonflexecrochet"
+
+[[dead_keys.rules]]
+input_dead_key = "corne"
+next = "cornecrochet"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+next = "crosse"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ɖ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ẻ"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ƒ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ꜧ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ỉ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "crochetlatin"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ɱ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ɲ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ỏ"
+
+[[dead_keys.rules]]
+input = "q"
+text = "ɋ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ɽ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ʂ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ʈ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ủ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ỷ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ȥ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̉"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̉"
+
+[[dead_keys.rules]]
+input = "Ê"
+text = "Ể"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ể"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̉"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̉"
+
+[[dead_keys]]
+id = "crochetlatin"
+terminator = "ß̉"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ɚ"
+
+[[dead_keys]]
+id = "crosse"
+terminator = "ɗ"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Ɓ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ƈ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ɗ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ɠ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ɦ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ƙ"
+
+[[dead_keys.rules]]
+input = "P"
+text = "Ƥ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ƭ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ʋ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ⱳ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ƴ"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ɓ"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ƈ"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ɗ"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ɠ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ɦ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ƙ"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ƥ"
+
+[[dead_keys.rules]]
+input = "q"
+text = "ʠ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ƭ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ꭒ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ʋ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ⱳ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ƴ"
+
+[[dead_keys]]
+id = "doubleaigu"
+terminator = "˝"
+
+[[dead_keys.rules]]
+input = "."
+text = "̋"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̋"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̋"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ő"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ű"
+
+[[dead_keys.rules]]
+input = "_"
+text = "˝"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̋"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "˝"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˝"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˝"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ő"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ű"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̋"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̋"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̋"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̋"
+
+[[dead_keys]]
+id = "doublebarre"
+terminator = "//"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ꞣ"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+text = "/"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ꞣ"
+
+[[dead_keys]]
+id = "doublegrave"
+terminator = "̏"
+
+[[dead_keys.rules]]
+input = "."
+text = "̏"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̏"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̏"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ȁ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ȅ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ȉ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ȍ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ȑ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ȕ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ȁ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̏"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ȅ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ȉ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ȍ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ȑ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ȕ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̏"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̏"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̏"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̏"
+
+[[dead_keys]]
+id = "doubleraye"
+terminator = "="
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ⱡ"
+
+[[dead_keys.rules]]
+input = "P"
+text = "Ꝑ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ⱡ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "doublerayelatin"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ꝑ"
+
+[[dead_keys]]
+id = "doublerayelatin"
+terminator = "Ꝧ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ꝧ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ꝧ"
+
+[[dead_keys]]
+id = "doubletilde"
+terminator = "≈"
+rules = []
+
+[[dead_keys]]
+id = "doubletrait"
+terminator = "𝕓"
+
+[[dead_keys.rules]]
+input = "0"
+text = "𝟘"
+
+[[dead_keys.rules]]
+input = "1"
+text = "𝟙"
+
+[[dead_keys.rules]]
+input = "2"
+text = "𝟚"
+
+[[dead_keys.rules]]
+input = "3"
+text = "𝟛"
+
+[[dead_keys.rules]]
+input = "4"
+text = "𝟜"
+
+[[dead_keys.rules]]
+input = "5"
+text = "𝟝"
+
+[[dead_keys.rules]]
+input = "6"
+text = "𝟞"
+
+[[dead_keys.rules]]
+input = "7"
+text = "𝟟"
+
+[[dead_keys.rules]]
+input = "8"
+text = "𝟠"
+
+[[dead_keys.rules]]
+input = "9"
+text = "𝟡"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝔸"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝔹"
+
+[[dead_keys.rules]]
+input = "C"
+text = "ℂ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝔻"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝔼"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝔽"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝔾"
+
+[[dead_keys.rules]]
+input = "H"
+text = "ℍ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "𝕀"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝕁"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝕂"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝕃"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝕄"
+
+[[dead_keys.rules]]
+input = "N"
+text = "ℕ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝕆"
+
+[[dead_keys.rules]]
+input = "P"
+text = "ℙ"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "ℚ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "ℝ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝕊"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝕋"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝕌"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝕍"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝕎"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝕏"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝕐"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "ℤ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝕒"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝕓"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝕔"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝕕"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝕖"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝕗"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝕘"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝕙"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝕚"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝕛"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝕜"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝕝"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝕞"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝕟"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝕠"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝕡"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝕢"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝕣"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝕤"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝕥"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝕦"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝕧"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝕨"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝕩"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝕪"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝕫"
+
+[[dead_keys]]
+id = "exposant"
+action_id = "exposant"
+terminator = "ᵉ"
+
+[[dead_keys.rules]]
+input = "("
+text = "⁽"
+
+[[dead_keys.rules]]
+input = ")"
+text = "⁾"
+
+[[dead_keys.rules]]
+input = "+"
+text = "⁺"
+
+[[dead_keys.rules]]
+input = "-"
+text = "⁻"
+
+[[dead_keys.rules]]
+input = "0"
+text = "⁰"
+
+[[dead_keys.rules]]
+input = "1"
+text = "¹"
+
+[[dead_keys.rules]]
+input = "2"
+text = "²"
+
+[[dead_keys.rules]]
+input = "3"
+text = "³"
+
+[[dead_keys.rules]]
+input = "4"
+text = "⁴"
+
+[[dead_keys.rules]]
+input = "5"
+text = "⁵"
+
+[[dead_keys.rules]]
+input = "6"
+text = "⁶"
+
+[[dead_keys.rules]]
+input = "7"
+text = "⁷"
+
+[[dead_keys.rules]]
+input = "8"
+text = "⁸"
+
+[[dead_keys.rules]]
+input = "9"
+text = "⁹"
+
+[[dead_keys.rules]]
+input = "="
+text = "⁼"
+
+[[dead_keys.rules]]
+input = "A"
+text = "ᴬ"
+
+[[dead_keys.rules]]
+input = "B"
+text = "ᴮ"
+
+[[dead_keys.rules]]
+input = "C"
+text = ""
+
+[[dead_keys.rules]]
+input = "D"
+text = "ᴰ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "ᴱ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "ᴳ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "ᴴ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "ᴵ"
+
+[[dead_keys.rules]]
+input = "J"
+text = "ᴶ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "ᴷ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "ᴸ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "ᴹ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "ᴺ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "ᴼ"
+
+[[dead_keys.rules]]
+input = "P"
+text = "ᴾ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "ᴿ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "ᵀ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "ᵁ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "ⱽ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "ᵂ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ᵃ"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ᵇ"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ᶜ"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ᵈ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ᵉ"
+
+[[dead_keys.rules]]
+input_dead_key = "exposant"
+next = "indices"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ᶠ"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ᵍ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ʰ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ⁱ"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ʲ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ᵏ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ˡ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "latinexposant"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ᵐ"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+text = "º"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ⁿ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ᵒ"
+
+[[dead_keys.rules]]
+input_dead_key = "ogonek"
+text = "ª"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ᵖ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ʳ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ˢ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ᵗ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ᵘ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ᵛ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ʷ"
+
+[[dead_keys.rules]]
+input = "x"
+text = "ˣ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ʸ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ᶻ"
+
+[[dead_keys.rules]]
+input = "Æ"
+text = "ᴭ"
+
+[[dead_keys.rules]]
+input = "œ"
+text = "ꟹ"
+
+[[dead_keys]]
+id = "gotiques"
+terminator = "𝔉"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝔄"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝔅"
+
+[[dead_keys.rules]]
+input = "C"
+text = "ℭ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝔇"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝔈"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝔉"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝔊"
+
+[[dead_keys.rules]]
+input = "H"
+text = "ℌ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "ℑ"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝔍"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝔎"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝔏"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝔐"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝔑"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝔒"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝔓"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝔔"
+
+[[dead_keys.rules]]
+input = "R"
+text = "ℜ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝔖"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝔗"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝔘"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝔙"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝔚"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝔛"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝔜"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "ℨ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝔞"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝔟"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝔠"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝔡"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝔢"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝔣"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝔤"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝔥"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝔦"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝔧"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝔨"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝔩"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝔪"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝔫"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝔬"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝔭"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝔮"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝔯"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝔰"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝔱"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝔲"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝔳"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝔴"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝔵"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝔶"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝔷"
+
+[[dead_keys]]
+id = "gotiquesgras"
+terminator = "𝕱"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝕬"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝕭"
+
+[[dead_keys.rules]]
+input = "C"
+text = "𝕮"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝕯"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝕰"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝕱"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝕲"
+
+[[dead_keys.rules]]
+input = "H"
+text = "𝕳"
+
+[[dead_keys.rules]]
+input = "I"
+text = "𝕴"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝕵"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝕶"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝕷"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝕸"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝕹"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝕺"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝕻"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝕼"
+
+[[dead_keys.rules]]
+input = "R"
+text = "𝕽"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝕾"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝕿"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝖀"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝖁"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝖂"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝖃"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝖄"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "𝖅"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝖆"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝖇"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝖈"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝖉"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝖊"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝖋"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝖌"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝖍"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝖎"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝖏"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝖐"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝖑"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝖒"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝖓"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝖔"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝖕"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝖖"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝖗"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝖘"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝖙"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝖚"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝖛"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝖜"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝖝"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝖞"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝖟"
+
+[[dead_keys]]
+id = "gras"
+terminator = "𝐆"
+
+[[dead_keys.rules]]
+input = "0"
+text = "𝟬"
+
+[[dead_keys.rules]]
+input = "1"
+text = "𝟏"
+
+[[dead_keys.rules]]
+input = "2"
+text = "𝟮"
+
+[[dead_keys.rules]]
+input = "3"
+text = "𝟯"
+
+[[dead_keys.rules]]
+input = "4"
+text = "𝟰"
+
+[[dead_keys.rules]]
+input = "5"
+text = "𝟱"
+
+[[dead_keys.rules]]
+input = "6"
+text = "𝟲"
+
+[[dead_keys.rules]]
+input = "7"
+text = "𝟳"
+
+[[dead_keys.rules]]
+input = "8"
+text = "𝟴"
+
+[[dead_keys.rules]]
+input = "9"
+text = "𝟵"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝐀"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝐁"
+
+[[dead_keys.rules]]
+input = "C"
+text = "𝐂"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝐃"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝐄"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝐅"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝐆"
+
+[[dead_keys.rules]]
+input = "H"
+text = "𝐇"
+
+[[dead_keys.rules]]
+input = "I"
+text = "𝐈"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝐉"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝐊"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝐋"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝐌"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝐍"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝐎"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝐏"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝐐"
+
+[[dead_keys.rules]]
+input = "R"
+text = "𝐑"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝐒"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝐓"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝐔"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝐕"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝐖"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝐗"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝐘"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "𝐙"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝐚"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝐛"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝐜"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝐝"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝐞"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝐟"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝐠"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝐡"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝐢"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝐣"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝐤"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝐥"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝐦"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝐧"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝐨"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝐩"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝐪"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝐫"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝐬"
+
+[[dead_keys.rules]]
+input_dead_key = "scientifique"
+text = "𝛁"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝐭"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝐮"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝐯"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝐰"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝐱"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝐲"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝐳"
+
+[[dead_keys]]
+id = "grasitalique"
+terminator = "𝑰"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝑨"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝑩"
+
+[[dead_keys.rules]]
+input = "C"
+text = "𝑪"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝑫"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝑬"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝑭"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝑮"
+
+[[dead_keys.rules]]
+input = "H"
+text = "𝑯"
+
+[[dead_keys.rules]]
+input = "I"
+text = "𝑰"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝑱"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝑲"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝑳"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝑴"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝑵"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝑶"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝑷"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝙌"
+
+[[dead_keys.rules]]
+input = "R"
+text = "𝑹"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝑺"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝑻"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝑼"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝑽"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝑾"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝑿"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝒀"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "𝒁"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝒂"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝒃"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝒄"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝒅"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝒆"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝒇"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝒈"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝒉"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝒊"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝒋"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝒌"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝒍"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝒎"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝒏"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝒐"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝒑"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝒒"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝒓"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝒔"
+
+[[dead_keys.rules]]
+input_dead_key = "scientifique"
+text = "𝜵"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝒕"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝒖"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝒗"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝒘"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝒙"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝒚"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝒛"
+
+[[dead_keys]]
+id = "grave"
+action_id = "grave"
+terminator = "`"
+
+[[dead_keys.rules]]
+input = "."
+text = "̀"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̀"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̀"
+
+[[dead_keys.rules]]
+input = "A"
+text = "À"
+
+[[dead_keys.rules]]
+input = "E"
+text = "È"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ì"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ǹ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ò"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ù"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ǜ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ẁ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ỳ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "`"
+
+[[dead_keys.rules]]
+input = "a"
+text = "à"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "gravebreve"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+next = "circonflexegrave"
+
+[[dead_keys.rules]]
+input_dead_key = "corne"
+next = "gravecorne"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̀"
+
+[[dead_keys.rules]]
+input = "e"
+text = "è"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "`"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "`"
+
+[[dead_keys.rules]]
+input_dead_key = "grave"
+next = "doublegrave"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ì"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "`"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "gravemacron"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ǹ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ò"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "gravetrema"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ù"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ǜ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ẁ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ỳ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̀"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̀"
+
+[[dead_keys.rules]]
+input = "À"
+text = "Ȁ"
+
+[[dead_keys.rules]]
+input = "È"
+text = "Ȅ"
+
+[[dead_keys.rules]]
+input = "Ê"
+text = "Ề"
+
+[[dead_keys.rules]]
+input = "Ù"
+text = "Ȕ"
+
+[[dead_keys.rules]]
+input = "à"
+text = "ȁ"
+
+[[dead_keys.rules]]
+input = "è"
+text = "ȅ"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ề"
+
+[[dead_keys.rules]]
+input = "ù"
+text = "ȕ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̀"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̀"
+
+[[dead_keys]]
+id = "gravebreve"
+terminator = "`˘"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ằ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ằ"
+
+[[dead_keys]]
+id = "gravecorne"
+terminator = "`̛"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ờ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ừ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ờ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ừ"
+
+[[dead_keys]]
+id = "gravemacron"
+terminator = "`¯"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ḕ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ṑ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ḕ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ṑ"
+
+[[dead_keys]]
+id = "gravetrema"
+terminator = "`¨"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ǜ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ǜ"
+
+[[dead_keys]]
+id = "grec"
+action_id = "grec"
+terminator = "µ"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Α"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Β"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ψ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Δ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ε"
+
+[[dead_keys.rules]]
+input = "F"
+text = "Φ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Γ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Η"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ι"
+
+[[dead_keys.rules]]
+input = "J"
+text = "Ξ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Κ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Λ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "Μ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ν"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ο"
+
+[[dead_keys.rules]]
+input = "P"
+text = "Π"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ρ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Σ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Τ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Θ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ω"
+
+[[dead_keys.rules]]
+input = "X"
+text = "Χ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Υ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ζ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "α"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "grecaigu"
+
+[[dead_keys.rules]]
+input = "b"
+text = "β"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ψ"
+
+[[dead_keys.rules]]
+input = "d"
+text = "δ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ε"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "µ"
+
+[[dead_keys.rules]]
+input = "f"
+text = "φ"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "µ"
+
+[[dead_keys.rules]]
+input = "g"
+text = "γ"
+
+[[dead_keys.rules]]
+input_dead_key = "grec"
+text = "µ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "η"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ι"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "µ"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ξ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "κ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "λ"
+
+[[dead_keys.rules]]
+input = "m"
+text = "μ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ν"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ο"
+
+[[dead_keys.rules]]
+input = "p"
+text = "π"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ρ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "σ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "τ"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "grectrema"
+
+[[dead_keys.rules]]
+input = "u"
+text = "θ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ω"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ς"
+
+[[dead_keys.rules]]
+input = "x"
+text = "χ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "υ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ζ"
+
+[[dead_keys]]
+id = "grecaigu"
+terminator = "μ̍"
+
+[[dead_keys.rules]]
+input = "."
+text = "́"
+
+[[dead_keys.rules]]
+input = ":"
+text = "́"
+
+[[dead_keys.rules]]
+input = "?"
+text = "́"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ά"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Έ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ή"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ί"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ό"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ώ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ύ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "'"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ά"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "́"
+
+[[dead_keys.rules]]
+input = "e"
+text = "έ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "'"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "'"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ή"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ί"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "'"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ό"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "grectremaaigu"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ώ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ύ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "́"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "́"
+
+[[dead_keys.rules]]
+input = "’"
+text = "́"
+
+[[dead_keys.rules]]
+input = "…"
+text = "́"
+
+[[dead_keys]]
+id = "grectrema"
+terminator = "μ̈"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ϊ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ϋ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "¨"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "grectremaaigu"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "¨"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "¨"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ϊ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "¨"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ϋ"
+
+[[dead_keys]]
+id = "grectremaaigu"
+terminator = "μ̈́"
+
+[[dead_keys.rules]]
+input = "."
+text = "̈́"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̈́"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̈́"
+
+[[dead_keys.rules]]
+input = "_"
+text = "΅"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̈́"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "΅"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "΅"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ΐ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "΅"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ΰ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̈́"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̈́"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̈́"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̈́"
+
+[[dead_keys]]
+id = "indices"
+terminator = "ᵢ"
+
+[[dead_keys.rules]]
+input = "("
+text = "₍"
+
+[[dead_keys.rules]]
+input = ")"
+text = "₎"
+
+[[dead_keys.rules]]
+input = "+"
+text = "₊"
+
+[[dead_keys.rules]]
+input = "-"
+text = "₋"
+
+[[dead_keys.rules]]
+input = "0"
+text = "₀"
+
+[[dead_keys.rules]]
+input = "1"
+text = "₁"
+
+[[dead_keys.rules]]
+input = "2"
+text = "₂"
+
+[[dead_keys.rules]]
+input = "3"
+text = "₃"
+
+[[dead_keys.rules]]
+input = "4"
+text = "₄"
+
+[[dead_keys.rules]]
+input = "5"
+text = "₅"
+
+[[dead_keys.rules]]
+input = "6"
+text = "₆"
+
+[[dead_keys.rules]]
+input = "7"
+text = "₇"
+
+[[dead_keys.rules]]
+input = "8"
+text = "₈"
+
+[[dead_keys.rules]]
+input = "9"
+text = "₉"
+
+[[dead_keys.rules]]
+input = "="
+text = "₌"
+
+[[dead_keys.rules]]
+input = "A"
+text = "ᴀ"
+
+[[dead_keys.rules]]
+input = "B"
+text = "ʙ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "ᴄ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "ᴅ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "ᴇ"
+
+[[dead_keys.rules]]
+input = "F"
+text = "ꜰ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "ɢ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "ʜ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "ɪ"
+
+[[dead_keys.rules]]
+input = "J"
+text = "ᴊ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "ᴋ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "ʟ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "ᴍ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "ɴ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "ᴏ"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "ꞯ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "ʀ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "ꜱ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "ᴛ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "ᴜ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "ᴠ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "ᴡ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "ʏ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "ᴢ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ₐ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ₑ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ₕ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ᵢ"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ⱼ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ₖ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ₗ"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ₘ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ₙ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ₒ"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ₚ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ᵣ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ₛ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ₜ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ᵤ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ᵥ"
+
+[[dead_keys.rules]]
+input = "x"
+text = "ₓ"
+
+[[dead_keys.rules]]
+input = "Æ"
+text = "ᴁ"
+
+[[dead_keys.rules]]
+input = "Œ"
+text = "ɶ"
+
+[[dead_keys]]
+id = "italique"
+terminator = "𝑖"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝐴"
+
+[[dead_keys.rules]]
+input = "B"
+text = "𝐵"
+
+[[dead_keys.rules]]
+input = "C"
+text = "𝐶"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝐷"
+
+[[dead_keys.rules]]
+input = "E"
+text = "𝐸"
+
+[[dead_keys.rules]]
+input = "F"
+text = "𝐹"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝐺"
+
+[[dead_keys.rules]]
+input = "H"
+text = "𝐻"
+
+[[dead_keys.rules]]
+input = "I"
+text = "𝐼"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝐽"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝐾"
+
+[[dead_keys.rules]]
+input = "L"
+text = "𝐿"
+
+[[dead_keys.rules]]
+input = "M"
+text = "𝑀"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝑁"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝑂"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝑃"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝘘"
+
+[[dead_keys.rules]]
+input = "R"
+text = "𝑅"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝑆"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝑇"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝑈"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝑉"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝑊"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝑋"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝑌"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "𝑍"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝑎"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝑏"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝑐"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝑑"
+
+[[dead_keys.rules]]
+input = "e"
+text = "𝑒"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝑓"
+
+[[dead_keys.rules]]
+input = "g"
+text = "𝑔"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ℎ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝑖"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝑗"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝑘"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝑙"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝑚"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝑛"
+
+[[dead_keys.rules]]
+input = "o"
+text = "𝑜"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝑝"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝑞"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝑟"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝑠"
+
+[[dead_keys.rules]]
+input_dead_key = "scientifique"
+text = "𝛻"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝑡"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝑢"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝑣"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝑤"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝑥"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝑦"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝑧"
+
+[[dead_keys]]
+id = "latin"
+action_id = "latin"
+terminator = "ß"
+
+[[dead_keys.rules]]
+input = "!"
+text = "‽"
+
+[[dead_keys.rules]]
+input = "#"
+text = "♯"
+
+[[dead_keys.rules]]
+input = "$"
+text = "♭"
+
+[[dead_keys.rules]]
+input = "%"
+text = "‱"
+
+[[dead_keys.rules]]
+input = "'"
+text = "‛"
+
+[[dead_keys.rules]]
+input = "*"
+text = "∴"
+
+[[dead_keys.rules]]
+input = "+"
+text = "⁜"
+
+[[dead_keys.rules]]
+input = "-"
+text = "­"
+
+[[dead_keys.rules]]
+input = "."
+text = "•"
+
+[[dead_keys.rules]]
+input = "0"
+text = "ↂ"
+
+[[dead_keys.rules]]
+input = "1"
+text = "ↀ"
+
+[[dead_keys.rules]]
+input = "5"
+text = "ↁ"
+
+[[dead_keys.rules]]
+input = ":"
+text = "⁃"
+
+[[dead_keys.rules]]
+input = "?"
+text = "⸮"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ɑ"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Ꞵ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "ϴ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ð"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ə"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ɣ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ɂ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ɩ"
+
+[[dead_keys.rules]]
+input = "J"
+text = "Ĳ"
+
+[[dead_keys.rules]]
+input = "M"
+text = ""
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ŋ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ɔ"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "Ꭓ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "ẞ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Þ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ʊ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ʌ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ƿ"
+
+[[dead_keys.rules]]
+input = "X"
+text = "Ꞌ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ȝ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ʒ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "‾"
+
+[[dead_keys.rules]]
+input = "`"
+text = "◌"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ɑ"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ꞵ"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+next = "barrelatin"
+
+[[dead_keys.rules]]
+input = "c"
+text = "θ"
+
+[[dead_keys.rules]]
+input_dead_key = "caron"
+next = "caronlatin"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "ʻ"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ð"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ə"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "␣"
+
+[[dead_keys.rules]]
+input = "esperluette"
+text = "⁊"
+
+[[dead_keys.rules]]
+input_dead_key = "exposant"
+next = "latinexposant"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ª"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = " "
+
+[[dead_keys.rules]]
+input = "g"
+text = "ɣ"
+
+[[dead_keys.rules]]
+input = "guillemet"
+text = "‟"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ɂ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ɩ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "‿"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ĳ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ĸ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+text = "ß"
+
+[[dead_keys.rules]]
+input = "m"
+text = "º"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+text = "º"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ŋ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ɔ"
+
+[[dead_keys.rules]]
+input_dead_key = "ogonek"
+text = "ª"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+next = "latinpoint"
+
+[[dead_keys.rules]]
+input = "q"
+text = "ꭓ"
+
+[[dead_keys.rules]]
+input_dead_key = "raye"
+next = "rayelatin"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ß"
+
+[[dead_keys.rules]]
+input = "t"
+text = "þ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ʊ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ʌ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ƿ"
+
+[[dead_keys.rules]]
+input = "x"
+text = "ꞌ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ȝ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ʒ"
+
+[[dead_keys.rules]]
+input = "{"
+text = "ʿ"
+
+[[dead_keys.rules]]
+input = "}"
+text = "ʾ"
+
+[[dead_keys.rules]]
+input = "§"
+text = "℗"
+
+[[dead_keys.rules]]
+input = "«"
+text = "‹"
+
+[[dead_keys.rules]]
+input = "¬"
+text = "☞"
+
+[[dead_keys.rules]]
+input = "¶"
+text = "♮"
+
+[[dead_keys.rules]]
+input = "·"
+text = "▪"
+
+[[dead_keys.rules]]
+input = "»"
+text = "›"
+
+[[dead_keys.rules]]
+input = "¼"
+text = "⅓"
+
+[[dead_keys.rules]]
+input = "¾"
+text = "⅔"
+
+[[dead_keys.rules]]
+input = "À"
+text = "Ꜣ"
+
+[[dead_keys.rules]]
+input = "Æ"
+text = "Ꜥ"
+
+[[dead_keys.rules]]
+input = "Ç"
+text = "Ʃ"
+
+[[dead_keys.rules]]
+input = "È"
+text = "Ǝ"
+
+[[dead_keys.rules]]
+input = "É"
+text = "Ɛ"
+
+[[dead_keys.rules]]
+input = "Ê"
+text = "Ɪ"
+
+[[dead_keys.rules]]
+input = "×"
+text = "※"
+
+[[dead_keys.rules]]
+input = "Ù"
+text = "Ɥ"
+
+[[dead_keys.rules]]
+input = "à"
+text = "ꜣ"
+
+[[dead_keys.rules]]
+input = "æ"
+text = "ꜥ"
+
+[[dead_keys.rules]]
+input = "ç"
+text = "ʃ"
+
+[[dead_keys.rules]]
+input = "è"
+text = "ǝ"
+
+[[dead_keys.rules]]
+input = "é"
+text = "ɛ"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ɪ"
+
+[[dead_keys.rules]]
+input = "ù"
+text = "ɥ"
+
+[[dead_keys.rules]]
+input = "Œ"
+text = "Ꞷ"
+
+[[dead_keys.rules]]
+input = "œ"
+text = "ꞷ"
+
+[[dead_keys.rules]]
+input = "ſ"
+text = "ẞ"
+
+[[dead_keys.rules]]
+input = "–"
+text = "‒"
+
+[[dead_keys.rules]]
+input = "—"
+text = "―"
+
+[[dead_keys.rules]]
+input = "‘"
+text = "ʻ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "ʼ"
+
+[[dead_keys.rules]]
+input = "‚"
+text = "ʽ"
+
+[[dead_keys.rules]]
+input = "′"
+text = "‴"
+
+[[dead_keys.rules]]
+input = "″"
+text = "⁗"
+
+[[dead_keys.rules]]
+input = "−"
+text = "‐"
+
+[[dead_keys]]
+id = "latinexposant"
+terminator = "ßᵉ"
+
+[[dead_keys.rules]]
+input = "G"
+text = ""
+
+[[dead_keys.rules]]
+input = "I"
+text = ""
+
+[[dead_keys.rules]]
+input = "a"
+text = "ᵅ"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ᶿ"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ᶞ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ᵊ"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ˠ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ˀ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ᶥ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ᵑ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ᵓ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ᶷ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ᶺ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ᶾ"
+
+[[dead_keys.rules]]
+input = "È"
+text = "ᴲ"
+
+[[dead_keys.rules]]
+input = "ç"
+text = "ᶴ"
+
+[[dead_keys.rules]]
+input = "é"
+text = "ᵋ"
+
+[[dead_keys.rules]]
+input = "ù"
+text = "ᶣ"
+
+[[dead_keys]]
+id = "latinpoint"
+terminator = "ß̇"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ꜿ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ꜿ"
+
+[[dead_keys]]
+id = "macron"
+action_id = "macron"
+terminator = "¯"
+
+[[dead_keys.rules]]
+input = "."
+text = "̄"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̄"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̄"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ā"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ē"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ḡ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ī"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ō"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ū"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ǖ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ȳ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "¯"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ā"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigumacron"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̄"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ē"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "¯"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "¯"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ḡ"
+
+[[dead_keys.rules]]
+input_dead_key = "grave"
+next = "gravemacron"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ī"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "¯"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "macronsouscrit"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ō"
+
+[[dead_keys.rules]]
+input_dead_key = "ogonek"
+next = "macronogonek"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+next = "macronpointsouscrit"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+next = "macronpointsuscrit"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "tildemacron"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "tremamacron"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ū"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ǖ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ȳ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̄"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̄"
+
+[[dead_keys.rules]]
+input = "Æ"
+text = "Ǣ"
+
+[[dead_keys.rules]]
+input = "È"
+text = "Ḕ"
+
+[[dead_keys.rules]]
+input = "É"
+text = "Ḗ"
+
+[[dead_keys.rules]]
+input = "æ"
+text = "ǣ"
+
+[[dead_keys.rules]]
+input = "è"
+text = "ḕ"
+
+[[dead_keys.rules]]
+input = "é"
+text = "ḗ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̄"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̄"
+
+[[dead_keys]]
+id = "macronogonek"
+terminator = "¯˛"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ǭ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ǭ"
+
+[[dead_keys]]
+id = "macronpointsouscrit"
+terminator = "¯."
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ḹ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ṉ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ṝ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ḹ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ṉ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ṝ"
+
+[[dead_keys]]
+id = "macronpointsuscrit"
+terminator = "¯˙"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ǡ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ȱ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ǡ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ȱ"
+
+[[dead_keys]]
+id = "macronsouscrit"
+terminator = "_"
+
+[[dead_keys.rules]]
+input = "."
+text = "̱"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̱"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̱"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Ḇ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ḏ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ḵ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ḻ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ṟ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ṯ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ẕ"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ḇ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̱"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ḏ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ẖ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ḵ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ḻ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ṟ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ṯ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ẕ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̱"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̱"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̱"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̱"
+
+[[dead_keys]]
+id = "monnaie"
+action_id = "monnaie"
+terminator = "¤"
+
+[[dead_keys.rules]]
+input = "A"
+text = "₳"
+
+[[dead_keys.rules]]
+input = "B"
+text = "฿"
+
+[[dead_keys.rules]]
+input = "C"
+text = "₵"
+
+[[dead_keys.rules]]
+input = "D"
+text = "₯"
+
+[[dead_keys.rules]]
+input = "E"
+text = "€"
+
+[[dead_keys.rules]]
+input = "F"
+text = "₣"
+
+[[dead_keys.rules]]
+input = "G"
+text = "₲"
+
+[[dead_keys.rules]]
+input = "H"
+text = "₴"
+
+[[dead_keys.rules]]
+input = "I"
+text = "៛"
+
+[[dead_keys.rules]]
+input = "K"
+text = "₭"
+
+[[dead_keys.rules]]
+input = "L"
+text = "₤"
+
+[[dead_keys.rules]]
+input = "M"
+text = "ℳ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "₦"
+
+[[dead_keys.rules]]
+input = "O"
+text = "૱"
+
+[[dead_keys.rules]]
+input = "P"
+text = "₧"
+
+[[dead_keys.rules]]
+input = "R"
+text = "₹"
+
+[[dead_keys.rules]]
+input = "S"
+text = "₷"
+
+[[dead_keys.rules]]
+input = "T"
+text = "₮"
+
+[[dead_keys.rules]]
+input = "U"
+text = "圓"
+
+[[dead_keys.rules]]
+input = "W"
+text = "₩"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "円"
+
+[[dead_keys.rules]]
+input = "a"
+text = "؋"
+
+[[dead_keys.rules]]
+input = "b"
+text = "₿"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+text = "₾"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+text = "₨"
+
+[[dead_keys.rules]]
+input = "c"
+text = "¢"
+
+[[dead_keys.rules]]
+input_dead_key = "cedille"
+text = "₢"
+
+[[dead_keys.rules]]
+input = "d"
+text = "₫"
+
+[[dead_keys.rules]]
+input = "e"
+text = "₠"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "¤"
+
+[[dead_keys.rules]]
+input = "esperluette"
+text = "₰"
+
+[[dead_keys.rules]]
+input_dead_key = "exposant"
+text = "৳"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ƒ"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "¤"
+
+[[dead_keys.rules]]
+input = "g"
+text = "₲"
+
+[[dead_keys.rules]]
+input = "h"
+text = "₴"
+
+[[dead_keys.rules]]
+input = "i"
+text = "﷼"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "¤"
+
+[[dead_keys.rules]]
+input = "k"
+text = "₭"
+
+[[dead_keys.rules]]
+input = "l"
+text = "₺"
+
+[[dead_keys.rules]]
+input = "m"
+text = "₥"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+text = "₼"
+
+[[dead_keys.rules]]
+input_dead_key = "monnaie"
+text = "¤"
+
+[[dead_keys.rules]]
+input = "n"
+text = "₦"
+
+[[dead_keys.rules]]
+input = "o"
+text = "௹"
+
+[[dead_keys.rules]]
+input = "p"
+text = "₱"
+
+[[dead_keys.rules]]
+input = "r"
+text = "₽"
+
+[[dead_keys.rules]]
+input = "s"
+text = "₪"
+
+[[dead_keys.rules]]
+input = "t"
+text = "₸"
+
+[[dead_keys.rules]]
+input = "u"
+text = "元"
+
+[[dead_keys.rules]]
+input = "w"
+text = "₩"
+
+[[dead_keys.rules]]
+input = "y"
+text = "¥"
+
+[[dead_keys.rules]]
+input = "£"
+text = "₶"
+
+[[dead_keys.rules]]
+input = "©"
+text = "₡"
+
+[[dead_keys.rules]]
+input = "Ç"
+text = "₵"
+
+[[dead_keys.rules]]
+input = "ç"
+text = "₵"
+
+[[dead_keys.rules]]
+input = "™"
+text = "৲"
+
+[[dead_keys.rules]]
+input = "⛽"
+text = "₻"
+
+[[dead_keys]]
+id = "ogonek"
+action_id = "ogonek"
+terminator = "˛"
+
+[[dead_keys.rules]]
+input = "."
+text = "̨"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̨"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̨"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ą"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ę"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Į"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ǫ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ų"
+
+[[dead_keys.rules]]
+input = "_"
+text = "˛"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ą"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̨"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ę"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "˛"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˛"
+
+[[dead_keys.rules]]
+input = "i"
+text = "į"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˛"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "macronogonek"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ǫ"
+
+[[dead_keys.rules]]
+input_dead_key = "ogonek"
+text = "˛"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ų"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̨"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̨"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̨"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̨"
+
+[[dead_keys]]
+id = "points"
+terminator = "˙."
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ṩ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ṩ"
+
+[[dead_keys]]
+id = "pointsouscrit"
+action_id = "pointsouscrit"
+terminator = "."
+
+[[dead_keys.rules]]
+input = "."
+text = "̣"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̣"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̣"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ạ"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Ḅ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ḍ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ẹ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ḥ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ị"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ḳ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ḷ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "Ṃ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ṇ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ọ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ṛ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ṣ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ṭ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ụ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ṿ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ẉ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ỵ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ẓ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ạ"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ḅ"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "brevepoint"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+next = "circonflexepoint"
+
+[[dead_keys.rules]]
+input_dead_key = "corne"
+next = "pointsouscritcorne"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̣"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ḍ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ẹ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ḥ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ị"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ḳ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ḷ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "latinpoint"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ṃ"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "macronpointsouscrit"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ṇ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ọ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+text = "̣"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+next = "points"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ṛ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ṣ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ṭ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ụ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ṿ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ẉ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ỵ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ẓ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̣"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̣"
+
+[[dead_keys.rules]]
+input = "Ê"
+text = "Ệ"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ệ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̣"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̣"
+
+[[dead_keys]]
+id = "pointsouscritcorne"
+terminator = ".̛"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ợ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ự"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ợ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ự"
+
+[[dead_keys]]
+id = "pointsuscrit"
+action_id = "pointsuscrit"
+terminator = "˙"
+
+[[dead_keys.rules]]
+input = "."
+text = "̇"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̇"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̇"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ȧ"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Ḃ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ċ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Ḋ"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ė"
+
+[[dead_keys.rules]]
+input = "F"
+text = "Ḟ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ġ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ḣ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "İ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ŀ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "Ṁ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ṅ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ȯ"
+
+[[dead_keys.rules]]
+input = "P"
+text = "Ṗ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ṙ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ṡ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ṫ"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ẇ"
+
+[[dead_keys.rules]]
+input = "X"
+text = "Ẋ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ẏ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ż"
+
+[[dead_keys.rules]]
+input = "_"
+text = "˙"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ȧ"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigupoint"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ḃ"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ċ"
+
+[[dead_keys.rules]]
+input_dead_key = "caron"
+next = "caronpoint"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̇"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ḋ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ė"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "˙"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ḟ"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˙"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ġ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ḣ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ı"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˙"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ȷ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ŀ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "latinpoint"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ṁ"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "macronpointsuscrit"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ṅ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ȯ"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ṗ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+next = "points"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+text = "˙"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ṙ"
+
+[[dead_keys.rules]]
+input_dead_key = "raye"
+next = "rayepoint"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ṡ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ṫ"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ẇ"
+
+[[dead_keys.rules]]
+input = "x"
+text = "ẋ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ẏ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ż"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̇"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̇"
+
+[[dead_keys.rules]]
+input = "ſ"
+text = "ẛ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̇"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̇"
+
+[[dead_keys]]
+id = "raye"
+action_id = "raye"
+terminator = "–"
+
+[[dead_keys.rules]]
+input = "."
+text = "̶"
+
+[[dead_keys.rules]]
+input = "2"
+text = "ƻ"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̶"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̶"
+
+[[dead_keys.rules]]
+input = "B"
+text = "Ƀ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "Ꞓ"
+
+[[dead_keys.rules]]
+input = "D"
+text = "Đ"
+
+[[dead_keys.rules]]
+input = "F"
+text = "Ꞙ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "Ǥ"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ħ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ɨ"
+
+[[dead_keys.rules]]
+input = "J"
+text = "Ɉ"
+
+[[dead_keys.rules]]
+input = "K"
+text = "Ꝁ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ƚ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ɵ"
+
+[[dead_keys.rules]]
+input = "P"
+text = "Ᵽ"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "Ꝗ"
+
+[[dead_keys.rules]]
+input = "R"
+text = "Ɍ"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ŧ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ʉ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ɏ"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "Ƶ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "-"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ƀ"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+next = "barreraye"
+
+[[dead_keys.rules]]
+input = "c"
+text = "ꞓ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̶"
+
+[[dead_keys.rules]]
+input = "d"
+text = "đ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "-"
+
+[[dead_keys.rules]]
+input = "esperluette"
+text = "ꝑ"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ꞙ"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "-"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ǥ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ħ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ɨ"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "-"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ɉ"
+
+[[dead_keys.rules]]
+input = "k"
+text = "ꝁ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ƚ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+next = "rayelatin"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ɵ"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ᵽ"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsuscrit"
+next = "rayepoint"
+
+[[dead_keys.rules]]
+input = "q"
+text = "ꝗ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ɍ"
+
+[[dead_keys.rules]]
+input_dead_key = "raye"
+next = "doubleraye"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ŧ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ʉ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ɏ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ƶ"
+
+[[dead_keys.rules]]
+input = "§"
+text = "Ꝑ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̶"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̶"
+
+[[dead_keys.rules]]
+input = "ſ"
+text = "ẝ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̶"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̶"
+
+[[dead_keys]]
+id = "rayelatin"
+terminator = "ß̵"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ꝥ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ꬰ"
+
+[[dead_keys.rules]]
+input_dead_key = "exposant"
+text = "ꝧ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ᵼ"
+
+[[dead_keys.rules]]
+input_dead_key = "raye"
+next = "doublerayelatin"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ꝥ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ᵿ"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ᵻ"
+
+[[dead_keys.rules]]
+input = "™"
+text = "Ꝧ"
+
+[[dead_keys]]
+id = "rayepoint"
+terminator = "–̇"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ɟ"
+
+[[dead_keys]]
+id = "rond"
+action_id = "rond"
+terminator = "°"
+
+[[dead_keys.rules]]
+input = "."
+text = "̊"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̊"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̊"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Å"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ů"
+
+[[dead_keys.rules]]
+input = "_"
+text = "˚"
+
+[[dead_keys.rules]]
+input = "a"
+text = "å"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigurond"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̊"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "°"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "˚"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "˚"
+
+[[dead_keys.rules]]
+input_dead_key = "rond"
+next = "rondsouscrit"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ů"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ẘ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ẙ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̊"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̊"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̊"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̊"
+
+[[dead_keys]]
+id = "rondsouscrit"
+terminator = "̥"
+
+[[dead_keys.rules]]
+input = "."
+text = "̥"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̥"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̥"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ḁ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ḁ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̥"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ꬹ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ⱺ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̥"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̥"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̥"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̥"
+
+[[dead_keys]]
+id = "scientifique"
+action_id = "scientifique"
+terminator = "∞"
+
+[[dead_keys.rules]]
+input = "!"
+text = "⇒"
+
+[[dead_keys.rules]]
+input = "#"
+text = "☿"
+
+[[dead_keys.rules]]
+input = "$"
+text = "♀"
+
+[[dead_keys.rules]]
+input = "'"
+text = "⊃"
+
+[[dead_keys.rules]]
+input = "("
+text = "⌊"
+
+[[dead_keys.rules]]
+input = ")"
+text = "⌋"
+
+[[dead_keys.rules]]
+input = "*"
+text = "⊗"
+
+[[dead_keys.rules]]
+input = "+"
+text = "⊕"
+
+[[dead_keys.rules]]
+input = ","
+text = "∋"
+
+[[dead_keys.rules]]
+input = "-"
+text = "∞"
+
+[[dead_keys.rules]]
+input = "."
+text = "∙"
+
+[[dead_keys.rules]]
+input = "0"
+text = "∗"
+
+[[dead_keys.rules]]
+input = "1"
+text = "♃"
+
+[[dead_keys.rules]]
+input = "2"
+text = "≪"
+
+[[dead_keys.rules]]
+input = "3"
+text = "≫"
+
+[[dead_keys.rules]]
+input = "4"
+text = "⌈"
+
+[[dead_keys.rules]]
+input = "5"
+text = "⌉"
+
+[[dead_keys.rules]]
+input = "6"
+text = "⟼"
+
+[[dead_keys.rules]]
+input = "7"
+text = "⊞"
+
+[[dead_keys.rules]]
+input = "8"
+text = "∝"
+
+[[dead_keys.rules]]
+input = ":"
+text = "∎"
+
+[[dead_keys.rules]]
+input = "="
+text = "↔"
+
+[[dead_keys.rules]]
+input = ">"
+text = "≻"
+
+[[dead_keys.rules]]
+input = "?"
+text = "⋮"
+
+[[dead_keys.rules]]
+input = "@"
+text = "⟶"
+
+[[dead_keys.rules]]
+input = "A"
+text = "∀"
+
+[[dead_keys.rules]]
+input = "B"
+text = "ℶ"
+
+[[dead_keys.rules]]
+input = "C"
+text = "∁"
+
+[[dead_keys.rules]]
+input = "D"
+text = "∆"
+
+[[dead_keys.rules]]
+input = "E"
+text = "∃"
+
+[[dead_keys.rules]]
+input = "F"
+next = "gotiquesgras"
+
+[[dead_keys.rules]]
+input = "I"
+next = "grasitalique"
+
+[[dead_keys.rules]]
+input = "J"
+text = "↓"
+
+[[dead_keys.rules]]
+input = "K"
+text = "⥲"
+
+[[dead_keys.rules]]
+input = "L"
+text = "℔"
+
+[[dead_keys.rules]]
+input = "N"
+text = "ℵ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "∅"
+
+[[dead_keys.rules]]
+input = "P"
+text = "∏"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "∥"
+
+[[dead_keys.rules]]
+input = "S"
+text = "∑"
+
+[[dead_keys.rules]]
+input = "T"
+text = "⊤"
+
+[[dead_keys.rules]]
+input = "U"
+text = "∩"
+
+[[dead_keys.rules]]
+input = "V"
+text = "√"
+
+[[dead_keys.rules]]
+input = "W"
+text = "∿"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "℥"
+
+[[dead_keys.rules]]
+input = "["
+text = "⊏"
+
+[[dead_keys.rules]]
+input = "\\"
+text = "∖"
+
+[[dead_keys.rules]]
+input = "]"
+text = "⊐"
+
+[[dead_keys.rules]]
+input = "^"
+text = "⃗"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+text = "↺"
+
+[[dead_keys.rules]]
+input = "b"
+next = "doubletrait"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+next = "scientifiquebarre"
+
+[[dead_keys.rules]]
+input = "c"
+next = "calligraphique"
+
+[[dead_keys.rules]]
+input_dead_key = "caron"
+text = "⊻"
+
+[[dead_keys.rules]]
+input_dead_key = "cedille"
+text = "℃"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+text = "→"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "⋰"
+
+[[dead_keys.rules]]
+input = "d"
+text = "∂"
+
+[[dead_keys.rules]]
+input = "e"
+text = "∈"
+
+[[dead_keys.rules]]
+input_dead_key = "exposant"
+text = "⊢"
+
+[[dead_keys.rules]]
+input = "f"
+next = "gotiques"
+
+[[dead_keys.rules]]
+input = "g"
+next = "gras"
+
+[[dead_keys.rules]]
+input = "guillemet"
+text = "♄"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ℎ"
+
+[[dead_keys.rules]]
+input = "i"
+next = "italique"
+
+[[dead_keys.rules]]
+input = "inferieur"
+text = "≺"
+
+[[dead_keys.rules]]
+input = "j"
+text = "↑"
+
+[[dead_keys.rules]]
+input = "k"
+text = "∼"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ℓ"
+
+[[dead_keys.rules]]
+input_dead_key = "latin"
+text = "∮"
+
+[[dead_keys.rules]]
+input_dead_key = "monnaie"
+text = "⊆"
+
+[[dead_keys.rules]]
+input = "n"
+text = "‖"
+
+[[dead_keys.rules]]
+input = "o"
+text = "∘"
+
+[[dead_keys.rules]]
+input_dead_key = "ogonek"
+text = "℉"
+
+[[dead_keys.rules]]
+input = "p"
+text = "∐"
+
+[[dead_keys.rules]]
+input_dead_key = "pointsouscrit"
+text = "ℏ"
+
+[[dead_keys.rules]]
+input = "q"
+text = "⟂"
+
+[[dead_keys.rules]]
+input = "r"
+next = "scriptes"
+
+[[dead_keys.rules]]
+input_dead_key = "raye"
+text = "℈"
+
+[[dead_keys.rules]]
+input = "s"
+text = "∫"
+
+[[dead_keys.rules]]
+input_dead_key = "scientifique"
+text = "∇"
+
+[[dead_keys.rules]]
+input = "t"
+text = "⊥"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+text = "℩"
+
+[[dead_keys.rules]]
+input = "u"
+text = "∪"
+
+[[dead_keys.rules]]
+input = "v"
+text = "∨"
+
+[[dead_keys.rules]]
+input_dead_key = "virgule"
+text = "⊇"
+
+[[dead_keys.rules]]
+input = "w"
+text = "≈"
+
+[[dead_keys.rules]]
+input = "x"
+text = "⋊"
+
+[[dead_keys.rules]]
+input = "y"
+text = "⋉"
+
+[[dead_keys.rules]]
+input = "z"
+text = "​"
+
+[[dead_keys.rules]]
+input = "|"
+text = "∣"
+
+[[dead_keys.rules]]
+input = "~"
+text = "↪"
+
+[[dead_keys.rules]]
+input = "¡"
+text = "↦"
+
+[[dead_keys.rules]]
+input = "«"
+text = "⟨"
+
+[[dead_keys.rules]]
+input = "°"
+text = "⇔"
+
+[[dead_keys.rules]]
+input = "±"
+text = "⊎"
+
+[[dead_keys.rules]]
+input = "¶"
+text = "♁"
+
+[[dead_keys.rules]]
+input = "·"
+text = "⃜"
+
+[[dead_keys.rules]]
+input = "»"
+text = "⟩"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "⋱"
+
+[[dead_keys.rules]]
+input = "È"
+text = "⇐"
+
+[[dead_keys.rules]]
+input = "É"
+text = "⅋"
+
+[[dead_keys.rules]]
+input = "×"
+text = "⋆"
+
+[[dead_keys.rules]]
+input = "è"
+text = "←"
+
+[[dead_keys.rules]]
+input = "é"
+text = "∧"
+
+[[dead_keys.rules]]
+input = "œ"
+text = "⌀"
+
+[[dead_keys.rules]]
+input = "ſ"
+text = "∬"
+
+[[dead_keys.rules]]
+input = "‑"
+text = "↠"
+
+[[dead_keys.rules]]
+input = "–"
+text = "♂"
+
+[[dead_keys.rules]]
+input = "—"
+text = "♆"
+
+[[dead_keys.rules]]
+input = "’"
+text = "⋯"
+
+[[dead_keys.rules]]
+input = "„"
+text = "♅"
+
+[[dead_keys.rules]]
+input = "…"
+text = "⃛"
+
+[[dead_keys.rules]]
+input = "′"
+text = "⇄"
+
+[[dead_keys.rules]]
+input = "€"
+text = "⊂"
+
+[[dead_keys.rules]]
+input = "™"
+text = "⊧"
+
+[[dead_keys.rules]]
+input = "≠"
+text = "≡"
+
+[[dead_keys.rules]]
+input = "☠"
+text = "⇀"
+
+[[dead_keys.rules]]
+input = "☣"
+text = "⊲"
+
+[[dead_keys.rules]]
+input = "☭"
+text = "⃕"
+
+[[dead_keys.rules]]
+input = "☮"
+text = "⨡"
+
+[[dead_keys.rules]]
+input = "♥"
+text = "↻"
+
+[[dead_keys.rules]]
+input = "⚜"
+text = "⎓"
+
+[[dead_keys.rules]]
+input = "⩽"
+text = "≤"
+
+[[dead_keys.rules]]
+input = "⩾"
+text = "≥"
+
+[[dead_keys]]
+id = "scientifiquebarre"
+terminator = "∞̸"
+
+[[dead_keys.rules]]
+input = "'"
+text = "⊅"
+
+[[dead_keys.rules]]
+input = ","
+text = "∌"
+
+[[dead_keys.rules]]
+input = ">"
+text = "≯"
+
+[[dead_keys.rules]]
+input = "E"
+text = "∄"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "∦"
+
+[[dead_keys.rules]]
+input_dead_key = "caron"
+text = "⊼"
+
+[[dead_keys.rules]]
+input = "e"
+text = "∉"
+
+[[dead_keys.rules]]
+input_dead_key = "exposant"
+text = "⊬"
+
+[[dead_keys.rules]]
+input = "inferieur"
+text = "⊀"
+
+[[dead_keys.rules]]
+input = "k"
+text = "≁"
+
+[[dead_keys.rules]]
+input_dead_key = "monnaie"
+text = "⊊"
+
+[[dead_keys.rules]]
+input = "v"
+text = "⊽"
+
+[[dead_keys.rules]]
+input_dead_key = "virgule"
+text = "⊋"
+
+[[dead_keys.rules]]
+input = "w"
+text = "≉"
+
+[[dead_keys.rules]]
+input = "|"
+text = "∤"
+
+[[dead_keys.rules]]
+input = "€"
+text = "⊄"
+
+[[dead_keys.rules]]
+input = "™"
+text = "⊭"
+
+[[dead_keys.rules]]
+input = "≠"
+text = "≢"
+
+[[dead_keys.rules]]
+input = "☣"
+text = "⋪"
+
+[[dead_keys.rules]]
+input = "⩽"
+text = "≰"
+
+[[dead_keys.rules]]
+input = "⩾"
+text = "≱"
+
+[[dead_keys]]
+id = "scriptes"
+terminator = "𝓇"
+
+[[dead_keys.rules]]
+input = "A"
+text = "𝒜"
+
+[[dead_keys.rules]]
+input = "C"
+text = "𝒞"
+
+[[dead_keys.rules]]
+input = "D"
+text = "𝒟"
+
+[[dead_keys.rules]]
+input = "E"
+text = "ℰ"
+
+[[dead_keys.rules]]
+input = "F"
+text = "ℱ"
+
+[[dead_keys.rules]]
+input = "G"
+text = "𝒢"
+
+[[dead_keys.rules]]
+input = "H"
+text = "ℋ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "ℐ"
+
+[[dead_keys.rules]]
+input = "J"
+text = "𝒥"
+
+[[dead_keys.rules]]
+input = "K"
+text = "𝒦"
+
+[[dead_keys.rules]]
+input = "L"
+text = "ℒ"
+
+[[dead_keys.rules]]
+input = "M"
+text = "ℳ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "𝒩"
+
+[[dead_keys.rules]]
+input = "O"
+text = "𝒪"
+
+[[dead_keys.rules]]
+input = "P"
+text = "𝒫"
+
+[[dead_keys.rules]]
+input = "Q"
+text = "𝒬"
+
+[[dead_keys.rules]]
+input = "R"
+text = "ℛ"
+
+[[dead_keys.rules]]
+input = "S"
+text = "𝒮"
+
+[[dead_keys.rules]]
+input = "T"
+text = "𝒯"
+
+[[dead_keys.rules]]
+input = "U"
+text = "𝒰"
+
+[[dead_keys.rules]]
+input = "V"
+text = "𝒱"
+
+[[dead_keys.rules]]
+input = "W"
+text = "𝒲"
+
+[[dead_keys.rules]]
+input = "X"
+text = "𝒳"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "𝒴"
+
+[[dead_keys.rules]]
+input = "Z"
+text = "𝒵"
+
+[[dead_keys.rules]]
+input = "a"
+text = "𝒶"
+
+[[dead_keys.rules]]
+input = "b"
+text = "𝒷"
+
+[[dead_keys.rules]]
+input = "c"
+text = "𝒸"
+
+[[dead_keys.rules]]
+input = "d"
+text = "𝒹"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ℯ"
+
+[[dead_keys.rules]]
+input = "f"
+text = "𝒻"
+
+[[dead_keys.rules]]
+input = "g"
+text = "ℊ"
+
+[[dead_keys.rules]]
+input = "h"
+text = "𝒽"
+
+[[dead_keys.rules]]
+input = "i"
+text = "𝒾"
+
+[[dead_keys.rules]]
+input = "j"
+text = "𝒿"
+
+[[dead_keys.rules]]
+input = "k"
+text = "𝓀"
+
+[[dead_keys.rules]]
+input = "l"
+text = "𝓁"
+
+[[dead_keys.rules]]
+input = "m"
+text = "𝓂"
+
+[[dead_keys.rules]]
+input = "n"
+text = "𝓃"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ℴ"
+
+[[dead_keys.rules]]
+input = "p"
+text = "𝓅"
+
+[[dead_keys.rules]]
+input = "q"
+text = "𝓆"
+
+[[dead_keys.rules]]
+input = "r"
+text = "𝓇"
+
+[[dead_keys.rules]]
+input = "s"
+text = "𝓈"
+
+[[dead_keys.rules]]
+input = "t"
+text = "𝓉"
+
+[[dead_keys.rules]]
+input = "u"
+text = "𝓊"
+
+[[dead_keys.rules]]
+input = "v"
+text = "𝓋"
+
+[[dead_keys.rules]]
+input = "w"
+text = "𝓌"
+
+[[dead_keys.rules]]
+input = "x"
+text = "𝓍"
+
+[[dead_keys.rules]]
+input = "y"
+text = "𝓎"
+
+[[dead_keys.rules]]
+input = "z"
+text = "𝓏"
+
+[[dead_keys]]
+id = "tilde"
+action_id = "tilde"
+terminator = "~"
+
+[[dead_keys.rules]]
+input = "-"
+text = "≃"
+
+[[dead_keys.rules]]
+input = "."
+text = "̃"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "="
+text = "≈"
+
+[[dead_keys.rules]]
+input = ">"
+text = "≳"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ã"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ẽ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ĩ"
+
+[[dead_keys.rules]]
+input = "N"
+text = "Ñ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Õ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ũ"
+
+[[dead_keys.rules]]
+input = "V"
+text = "Ṽ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ỹ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "~"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ã"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigutilde"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+next = "tildebarre"
+
+[[dead_keys.rules]]
+input_dead_key = "breve"
+next = "brevetilde"
+
+[[dead_keys.rules]]
+input_dead_key = "circonflexe"
+next = "circonflexetilde"
+
+[[dead_keys.rules]]
+input_dead_key = "corne"
+next = "tildecorne"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ẽ"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "~"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "~"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ĩ"
+
+[[dead_keys.rules]]
+input = "inferieur"
+text = "≲"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "~"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "tildemacron"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ñ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "õ"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "tildeinscrit"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ũ"
+
+[[dead_keys.rules]]
+input = "v"
+text = "ṽ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ỹ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "Ê"
+text = "Ễ"
+
+[[dead_keys.rules]]
+input = "ê"
+text = "ễ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̃"
+
+[[dead_keys.rules]]
+input = "≠"
+text = "≉"
+
+[[dead_keys]]
+id = "tildebarre"
+terminator = "~/"
+
+[[dead_keys.rules]]
+input = "-"
+text = "≄"
+
+[[dead_keys.rules]]
+input = "="
+text = "≉"
+
+[[dead_keys]]
+id = "tildecorne"
+terminator = "~̛"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ỡ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ữ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ỡ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ữ"
+
+[[dead_keys]]
+id = "tildeinscrit"
+terminator = "ɫ"
+
+[[dead_keys.rules]]
+input = "."
+text = "̴"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̴"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̴"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ḛ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ḭ"
+
+[[dead_keys.rules]]
+input = "L"
+text = "Ɫ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ɵ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ṵ"
+
+[[dead_keys.rules]]
+input = "b"
+text = "ᵬ"
+
+[[dead_keys.rules]]
+input_dead_key = "barre"
+text = "ꬸ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̴"
+
+[[dead_keys.rules]]
+input = "d"
+text = "ᵭ"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ḛ"
+
+[[dead_keys.rules]]
+input = "f"
+text = "ᵮ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ḭ"
+
+[[dead_keys.rules]]
+input = "l"
+text = "ɫ"
+
+[[dead_keys.rules]]
+input = "m"
+text = "ᵯ"
+
+[[dead_keys.rules]]
+input = "n"
+text = "ᵰ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ɵ"
+
+[[dead_keys.rules]]
+input = "p"
+text = "ᵱ"
+
+[[dead_keys.rules]]
+input = "r"
+text = "ᵲ"
+
+[[dead_keys.rules]]
+input = "s"
+text = "ᵴ"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ᵵ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ṵ"
+
+[[dead_keys.rules]]
+input = "z"
+text = "ᵶ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̴"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̴"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̴"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̴"
+
+[[dead_keys]]
+id = "tildemacron"
+terminator = "~¯"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ȭ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ȭ"
+
+[[dead_keys]]
+id = "trema"
+action_id = "trema"
+terminator = "¨"
+
+[[dead_keys.rules]]
+input = "."
+text = "̈"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̈"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̈"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ä"
+
+[[dead_keys.rules]]
+input = "E"
+text = "Ë"
+
+[[dead_keys.rules]]
+input = "H"
+text = "Ḧ"
+
+[[dead_keys.rules]]
+input = "I"
+text = "Ï"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ö"
+
+[[dead_keys.rules]]
+input = "T"
+text = ""
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ü"
+
+[[dead_keys.rules]]
+input = "W"
+text = "Ẅ"
+
+[[dead_keys.rules]]
+input = "X"
+text = "Ẍ"
+
+[[dead_keys.rules]]
+input = "Y"
+text = "Ÿ"
+
+[[dead_keys.rules]]
+input = "_"
+text = "¨"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ä"
+
+[[dead_keys.rules]]
+input_dead_key = "aigu"
+next = "aigutrema"
+
+[[dead_keys.rules]]
+input_dead_key = "caron"
+next = "carontrema"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̈"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ë"
+
+[[dead_keys.rules]]
+input = "espace"
+text = "¨"
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = "¨"
+
+[[dead_keys.rules]]
+input_dead_key = "grave"
+next = "gravetrema"
+
+[[dead_keys.rules]]
+input_dead_key = "grec"
+next = "grectrema"
+
+[[dead_keys.rules]]
+input = "h"
+text = "ḧ"
+
+[[dead_keys.rules]]
+input = "i"
+text = "ï"
+
+[[dead_keys.rules]]
+input = "insecable"
+text = "¨"
+
+[[dead_keys.rules]]
+input_dead_key = "macron"
+next = "tremamacron"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ö"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ẗ"
+
+[[dead_keys.rules]]
+input_dead_key = "tilde"
+next = "trematilde"
+
+[[dead_keys.rules]]
+input_dead_key = "trema"
+next = "tremasouscrit"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ü"
+
+[[dead_keys.rules]]
+input = "w"
+text = "ẅ"
+
+[[dead_keys.rules]]
+input = "x"
+text = "ẍ"
+
+[[dead_keys.rules]]
+input = "y"
+text = "ÿ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̈"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̈"
+
+[[dead_keys.rules]]
+input = "Ù"
+text = "Ǜ"
+
+[[dead_keys.rules]]
+input = "ù"
+text = "ǜ"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̈"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̈"
+
+[[dead_keys]]
+id = "tremamacron"
+terminator = "¨¯"
+
+[[dead_keys.rules]]
+input = "A"
+text = "Ǟ"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ȫ"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ǖ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "ǟ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ȫ"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ǖ"
+
+[[dead_keys.rules]]
+input = "Ù"
+text = "Ṻ"
+
+[[dead_keys.rules]]
+input = "ù"
+text = "ṻ"
+
+[[dead_keys]]
+id = "tremasouscrit"
+terminator = "̤"
+
+[[dead_keys.rules]]
+input = "."
+text = "̤"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̤"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̤"
+
+[[dead_keys.rules]]
+input = "U"
+text = "Ṳ"
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̤"
+
+[[dead_keys.rules]]
+input = "u"
+text = "ṳ"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̤"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̤"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̤"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̤"
+
+[[dead_keys]]
+id = "trematilde"
+terminator = "¨~"
+
+[[dead_keys.rules]]
+input = "O"
+text = "Ṏ"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ṏ"
+
+[[dead_keys]]
+id = "virgule"
+action_id = "virgule"
+terminator = ","
+
+[[dead_keys.rules]]
+input = ","
+text = ","
+
+[[dead_keys.rules]]
+input = "."
+text = "̦"
+
+[[dead_keys.rules]]
+input = ":"
+text = "̦"
+
+[[dead_keys.rules]]
+input = "?"
+text = "̦"
+
+[[dead_keys.rules]]
+input = "S"
+text = "Ș"
+
+[[dead_keys.rules]]
+input = "T"
+text = "Ț"
+
+[[dead_keys.rules]]
+input = "_"
+text = ","
+
+[[dead_keys.rules]]
+input_dead_key = "crochet"
+text = "̦"
+
+[[dead_keys.rules]]
+input = "espace"
+text = ","
+
+[[dead_keys.rules]]
+input = "fineinsecable"
+text = ","
+
+[[dead_keys.rules]]
+input = "insecable"
+text = ","
+
+[[dead_keys.rules]]
+input = "s"
+text = "ș"
+
+[[dead_keys.rules]]
+input = "t"
+text = "ț"
+
+[[dead_keys.rules]]
+input = "·"
+text = "̦"
+
+[[dead_keys.rules]]
+input = "¿"
+text = "̦"
+
+[[dead_keys.rules]]
+input = "’"
+text = "̦"
+
+[[dead_keys.rules]]
+input = "…"
+text = "̦"
+
+[exports.macos]
+format = "bundle"
+internal_name = "bépo"
+keyboard_id = -32245
+
+[exports.windows]
+locale = "fr-FR"
+layout_id = "0000040c"
+dll_name = "bepo11"
+copyright = "CC BY-SA"
+company = "Disposition bépo : https://bepo.fr"

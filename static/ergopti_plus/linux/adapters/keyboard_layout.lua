@@ -493,6 +493,22 @@ function M.refresh(override_path)
 	return true
 end
 
+--- Resolves the layout again unless the published one is provably current.
+--- Current means bound to the desktop's XKB source (X11's native probe), whose
+--- keymap and group notifications revoke it, and still live by that check. Any
+--- other source (a Wayland dump, an override file) cannot prove it and is
+--- dumped again, as refresh() always did.
+--- @param override_path string|nil The same override refresh() takes.
+--- @return boolean True when a usable table is loaded.
+function M.refresh_unless_current(override_path)
+	local cohort = override_path == nil and _source ~= "override" and current_cohort() or nil
+	if cohort and cohort.receipt and XkbCapture.inverse_receipt_watched(cohort.receipt) then
+		Logger.debug(LOG, "Layout still current on the desktop source; not dumped again.")
+		return true
+	end
+	return M.refresh(override_path)
+end
+
 --- What produced the loaded keymap, or nil when none is loaded.
 --- @return string|nil
 function M.source()

@@ -800,6 +800,75 @@
 					"actions": []
 				}
 			]
+		},
+		{
+			"name": "a hold reaching a native layer sends the key with that layer's modifiers",
+			"steps": [
+				{
+					"press": "Quote",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 300,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyA",
+							"modifiers": ["shift"]
+						}
+					]
+				},
+				{
+					"press": "KeyB",
+					"held": ["control"],
+					"at": 310,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyB",
+							"modifiers": ["shift", "control"]
+						}
+					]
+				},
+				{
+					"release": "Quote",
+					"at": 400,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 500,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "Quote",
+					"held": [],
+					"at": 600,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Quote",
+					"at": 650,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "'"
+						}
+					]
+				}
+			]
 		}
 	]
 }

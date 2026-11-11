@@ -813,6 +813,16 @@ function M.inverse_table(require_source)
 	return detached, nil, receipt
 end
 
+--- Whether a receipt is bound to the desktop's own XKB source (the X11 native
+--- probe), whose keymap and group notifications revoke it: inverse_current()
+--- then proves it live without a new keymap dump.
+--- @param receipt table Receipt returned by inverse_table.
+--- @return boolean
+function M.inverse_receipt_watched(receipt)
+	local owned = _inverse_receipts[receipt]
+	return owned ~= nil and not owned.revoked and owned.desktop_generation ~= nil
+end
+
 --- The 1-based XKB group (layout index plus one) an inverse receipt was taken
 --- in: the group the text model must read for the same keymap.
 --- @param receipt table Receipt returned by inverse_table.

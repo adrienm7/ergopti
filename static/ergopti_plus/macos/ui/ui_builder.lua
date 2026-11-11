@@ -1054,6 +1054,11 @@ function M.show_webview(opts)
 				load_logged = true
 				Logger.info(LOG, "Webview '%s' page loaded in %.0f ms.", view_label,
 					now_ms() - opened_ms)
+				-- The pages follow the system appearance through their CSS; the
+				-- field run counts the loads per appearance (light and dark pages).
+				local styled, style = pcall(function() return hs.host.interfaceStyle() end)
+				Logger.debug(LOG, "Webview '%s' rendered in the %s appearance.", view_label,
+					(styled and style == "Dark") and "dark" or (styled and "light" or "unknown"))
 			elseif action == "didFailNavigation" or action == "didFailProvisionalNavigation" then
 				Logger.warn(LOG, "Webview '%s' navigation failed (%s).", view_label, tostring(action))
 			end

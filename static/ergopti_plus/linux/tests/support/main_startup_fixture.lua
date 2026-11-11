@@ -115,11 +115,14 @@ function M.run(options)
 		output_broker = function() return {} end,
 		emit_key = noop,
 	}
+	local function layout_refresh()
+		observed.layout_refreshes = observed.layout_refreshes + 1
+		record("layout.refresh"); native_callback("layout.refresh"); return true
+	end
 	env.keyboard_layout = {
-		refresh = function()
-			observed.layout_refreshes = observed.layout_refreshes + 1
-			record("layout.refresh"); native_callback("layout.refresh"); return true
-		end,
+		refresh = layout_refresh,
+		-- The pre-grab resolve: the same boundary, proven or dumped again.
+		refresh_unless_current = layout_refresh,
 		is_ready = function() return true end,
 		publish_current_capture = function()
 			observed.preparing = true
@@ -130,9 +133,11 @@ function M.run(options)
 	}
 	env.opts = { tray = true, grab = true, layout = "qwerty", dry_run = false }
 	env.device, env.mapping_count, env.config_path, env.SCRIPT_DIR = "/controlled/event0", 1, "/controlled/config.toml", "/controlled/driver"
+	observed.stages = {}
 	env.BootProfiler = { stage = function(name)
+		observed.stages[#observed.stages + 1] = "open " .. name
 		if name == "input hooks" then native_callback("input.stage") end
-	end, stage_done = noop, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
+	end, stage_done = function(name) observed.stages[#observed.stages + 1] = "close " .. name end, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
 	env.Logger = { info = function(_, message)
 		if message == "Keyboard hook started in %s mode." then native_callback("hook.log") end
 	end, error = function(_, message)
@@ -237,6 +242,9 @@ function M.run(options)
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "infra.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
+		elseif name == "infra.perf_counters" then
+			-- The real counters: the exit path flushes their last interval.
+			return require(name)
 		elseif name == "infra.dev_source" then
 			-- An installed daemon: no developer root, no source watchers.
 			return { root = function() return nil end, is_active = function() return false end,
