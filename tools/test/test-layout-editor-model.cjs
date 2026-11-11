@@ -286,10 +286,34 @@ test('the repository tool writes the payload « Install and use » sends', () =>
 	const { spawnSync } = require('node:child_process');
 	const file = path.join(ROOT, 'static', 'layouts', 'sources', 'ergopti.toml');
 	const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'install-payload-')), 'payload.json');
+	// The Linux E2E rows run the tool with no node_modules: any npm package it
+	// loads is refused here, as it is missing there.
+	const guard = path.join(path.dirname(out), 'no-packages.cjs');
+	fs.writeFileSync(
+		guard,
+		[
+			"const Module = require('node:module');",
+			'const resolve = Module._resolveFilename;',
+			'Module._resolveFilename = function (request, ...rest) {',
+			'\tif (!/^[./]/.test(request) && !Module.isBuiltin(request))',
+			'\t\tthrow new Error(`npm package ${request} is not installed in the E2E rows`);',
+			'\treturn resolve.call(this, request, ...rest);',
+			'};',
+			''
+		].join('\n')
+	);
 	try {
 		const run = spawnSync(
 			process.execPath,
-			[path.join(ROOT, 'tools', 'layout-source.cjs'), 'install-payload', file, 'linux', out],
+			[
+				'--require',
+				guard,
+				path.join(ROOT, 'tools', 'layout-source.cjs'),
+				'install-payload',
+				file,
+				'linux',
+				out
+			],
 			{ encoding: 'utf8' }
 		);
 		assert.equal(run.status, 0, run.stderr);
@@ -644,6 +668,52 @@ test('a layer fills from a reference or a registry layout, dead keys included', 
 			assert.equal(M.simulate(ergopti, press(code), null).text, cells.base.text, code);
 	refuses(() => IO.fillLayer(doc, azerty, 'base', 'missing'), 'layer_unknown');
 });
+
+test('a new layout starts blank or as a copy of a reference or a registry layout', () => {
+	const sources = IO.fillSources(
+		['bepo', 'ergol', 'ergopti'].map((id) => ({
+			id,
+			name: id,
+			convention: 'iso',
+			text: registry(id)
+		}))
+	);
+	const press = (...codes) => codes.map((code) => ({ code, held: [] }));
+	const shift = (code) => [{ code, held: ['shift'] }];
+	const azerty = IO.startFrom(
+		sources.find((entry) => entry.id === 'azerty'),
+		'azerty_custom',
+		'My AZERTY'
+	);
+	assert.deepEqual(plain(azerty.lost), [], 'a reference projects without loss');
+	assert.equal(azerty.doc.layout.id, 'azerty_custom');
+	assert.equal(azerty.doc.layout.name, 'My AZERTY');
+	assert.equal(M.simulate(azerty.doc, press('KeyQ', 'KeyW'), null).text, 'az');
+	assert.equal(M.simulate(azerty.doc, shift('KeyQ'), null).text, 'A', 'the Shift level came along');
+	for (const id of ['bepo', 'ergol', 'ergopti']) {
+		const started = IO.startFrom(
+			sources.find((entry) => entry.id === id),
+			`${id}_custom`,
+			`My ${id}`
+		);
+		assert.equal(LayoutSourceIO_preserved(started.doc), false, `${id}: an editable source`);
+		assert.equal(started.doc.layout.id, `${id}_custom`);
+		const reference = LayoutComposer.parseSource(id, registry(id), 'iso', COMPOSER).cells;
+		for (const [code, cells] of Object.entries(reference))
+			if (cells.base && cells.base.text !== undefined)
+				assert.equal(
+					M.simulate(started.doc, press(code), null).text,
+					cells.base.text,
+					`${id} ${code}`
+				);
+		// It compiles for the drivers like any source.
+		assert.match(IO.installPayload(started.doc, 'linux').keylayout, /<keyboard /);
+	}
+});
+
+function LayoutSourceIO_preserved(doc) {
+	return IO.isPreserved(doc);
+}
 
 let failed = 0;
 for (const [name, fn] of tests) {

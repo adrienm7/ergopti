@@ -54,6 +54,11 @@ local _opening_window = false
 -- the menu (M.set_nav_applier); nil until then, and nav_save is refused.
 local _nav_applier = nil
 
+-- « Emulate without installing »: makes the composed layout the emulated one and
+-- reloads the layout emulation, bound to the preferences by the menu
+-- (M.set_emulation_applier); nil until then, and composer_emulate is refused.
+local _emulation_applier = nil
+
 --- Settles exact window and callback owners before admitting another window.
 --- @return boolean settled Native cleanup committed or already consumed the window.
 local function settle_retired_window()
@@ -189,6 +194,14 @@ local function controller_for(view)
 				return
 			end
 			on_done(applier(text))
+		end or nil,
+		emulate = _emulation_applier and function(id, on_done)
+			local applier = _emulation_applier
+			if not applier then
+				on_done(false, "emulate_failed", "the layout emulation is not bound")
+				return
+			end
+			on_done(applier(id))
 		end or nil,
 	})
 	local on_message = controller.on_message
@@ -332,6 +345,25 @@ function M.set_nav_applier(applier)
 	_nav_applier = applier
 end
 
+--- Binds « Emulate without installing » to the layout emulation preferences.
+--- A window opened before this offers no such button.
+--- @param applier function|nil applier(id) -> ok, code, detail
+function M.set_emulation_applier(applier)
+	if applier ~= nil and type(applier) ~= "function" then
+		error("layout_manager.set_emulation_applier: a function or nil is required", 2)
+	end
+	_emulation_applier = applier
+end
+
+--- Opens the layout manager straight on the layout editor (the menu's « Create
+--- or edit a layout… »): the page shows it once it is ready.
+--- @return boolean opened
+function M.open_editor()
+	local opened = M.open()
+	if _controller == nil then return false end
+	return _controller.open_editor() and opened ~= false
+end
+
 --- The open window, for ui/window_toggle (nil when closed).
 --- @return userdata|nil view
 function M.window() return _webview end
@@ -345,6 +377,15 @@ function M.close() return close_window() end
 function M.menu_command()
 	return function()
 		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), M.open, "layout_manager.open")
+	end
+end
+
+--- Builds the « Create or edit a layout… » menu command.
+--- @return function
+function M.editor_menu_command()
+	return function()
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
+			"layout_manager.open_editor")
 	end
 end
 

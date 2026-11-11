@@ -33,8 +33,11 @@ _STDC_CheckPropagatesResult() {
 
 	Assert(InStr(Body, "return true") = 0,
 		"ST_Delete must not unconditionally return true -- it must propagate Reg_DeleteValue's real result so a genuine failure (not just a missing key) can be reported, per the Storage port's error_behavior=return_false contract")
-	Assert(InStr(Body, "return Reg_DeleteValue(") > 0,
-		"ST_Delete must return Reg_DeleteValue's own result directly")
+	; The port is Reg_DeleteValue for a real profile, the private store's otherwise.
+	Assert(InStr(Body, 'Map("delete_value", Reg_DeleteValue)') > 0,
+		"ST_Delete must take Reg_DeleteValue as its delete port")
+	Assert(InStr(Body, "return DeleteValue.Call(") > 0,
+		"ST_Delete must return its delete port's own result directly")
 }
 Test("storage: ST_Delete propagates Reg_DeleteValue's real result instead of hardcoding true (st-delete-return-contract)",
 	_STDC_CheckPropagatesResult)
@@ -527,3 +530,85 @@ for _STNF_Shape in ["map", "array"]
 	for _STNF_Mode in ["float-wide", "float-digits-control"]
 		Test("storage nested binary64 persistence: " . _STNF_Shape . "/" . _STNF_Mode
 			. " (storage-native-nested-float)", _STSP_ActualPayload.Bind(_STNF_Mode, _STNF_Shape))
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 3/ Isolated Profile =======
+; ===================================
+; ===================================
+
+; Regression (2026-11-11): a startup smoke or a live check
+; (ERGOPTI_STARTUP_SMOKE_DIR) shares the signed-in user's HKCU, so the WPM
+; widget position, LLM state and updater cadence it stored went to
+; HKCU\Software\Ergopti\Storage, the very values of the user's own driver. The
+; base below names no registry root: a value that reached the registry would be
+; refused there and fail this test, which therefore never touches the machine.
+_STIP_IsolatedProfileNeverReachesTheRegistry() {
+	global _DriverStartupSmokeDir, STORAGE_REG_BASE
+	HadSmoke := IsSet(_DriverStartupSmokeDir), SavedSmoke := HadSmoke ? _DriverStartupSmokeDir : ""
+	SavedBase := STORAGE_REG_BASE
+	Profile := A_Temp . "\ergopti_storage_isolated_" . DriverPid . "_" . A_TickCount . "_" . Random(1, 999999)
+	Private := Profile . "\storage_private.txt"
+	STORAGE_REG_BASE := "HKEY_ERGOPTI_NO_SUCH_ROOT\Software\Ergopti\Storage"
+	try {
+		_DriverStartupSmokeDir := ""
+		AssertEqual("", ST_PrivatePath(), "a real profile has no private store")
+		AssertFalse(ST_Set("wpm_pair", [12, 34]),
+			"a real profile writes the registry, which refuses this root")
+
+		_DriverStartupSmokeDir := Profile
+		AssertEqual(Private, ST_PrivatePath(), "the private store lives in the isolated profile")
+		; The WPM widget's own Storage port, then an LLM state Map and an updater number.
+		AssertTrue(_WPMWidget_StoreSet("wpm_pair", [12, 34]), "an isolated widget position is stored")
+		AssertTrue(ST_Set("llm_state", Map("refused", ["model-a"])), "an isolated Map is stored")
+		AssertTrue(ST_Set("Updater_Last", 42), "an isolated number is stored")
+		Reached := []
+		AssertTrue(_ST_SetWith("caller_port", "kept", (*) => (Reached.Push(1), true)),
+			"a caller's writer is replaced as well")
+		AssertEqual(0, Reached.Length, "and never called: it names the machine's key")
+
+		Lines := StrSplit(FileRead(Private, "UTF-8"), "`n")
+		AssertEqual(ST_PrivateHeader(), Lines[1], "the private store starts with its header")
+		AssertEqual("base " . STORAGE_REG_BASE, Lines[2], "and names the key it stands for")
+		Pair := _WPMWidget_StoreGet("wpm_pair")
+		AssertTrue(Pair is Array && Pair.Length == 2 && Pair[1] == 12 && Pair[2] == 34,
+			"the widget reads its position back from the private store")
+		Llm := ST_Get("LLM_STATE", "missing")
+		AssertTrue(Llm is Map && Llm["refused"][1] == "model-a",
+			"names are case-insensitive, like registry value names")
+		AssertEqual(42, ST_Get("updater_last", 0), "a number keeps its type")
+		AssertEqual("kept", ST_Get("caller_port", "missing"), "the caller's value is stored privately")
+		AssertTrue(ST_Has("llm_state"), "a stored value is present")
+		AssertFalse(ST_Has("absent"), "an unstored value is absent")
+		Exact := ST_ReadExact("caller_port")
+		AssertTrue(Exact.Ok && Exact.Value == "kept", "an exact read finds the private value")
+		Absent := ST_ReadExact("absent")
+		AssertTrue(Absent.Ok && Absent.Value == "", "an absent private value is missing, not unreadable")
+		AssertEqual(4, ST_Keys().Length, "the inventory is the private store's")
+
+		AssertTrue(ST_Delete("updater_last"), "a private value is deleted")
+		AssertFalse(ST_Has("Updater_Last"), "and is gone")
+		AssertTrue(ST_Delete("updater_last"), "deleting an absent value succeeds")
+		AssertTrue(_ST_ClearWith((*) => [{name: "machine_only"}]),
+			"a clear enumerates the private store, not a caller's registry inventory")
+		AssertEqual(0, ST_Keys().Length, "the clear emptied the private store")
+
+		FileDelete(Private)
+		FileAppend("not a private store`n", Private, "UTF-8")
+		AssertEqual("fallback", ST_Get("wpm_pair", "fallback"), "an invalid private store is never read")
+		AssertFalse(ST_Set("wpm_pair", [1, 2]), "nor overwritten")
+		AssertFalse(ST_ReadExact("wpm_pair").Ok, "and an exact read reports it unreadable")
+		AssertEqual("not a private store`n", FileRead(Private, "UTF-8"), "the invalid file is left as found")
+	} finally {
+		STORAGE_REG_BASE := SavedBase
+		_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
+		if DirExist(Profile)
+			DirDelete(Profile, true)
+	}
+}
+Test("storage: an isolated profile never writes the machine's registry (storage-isolated-profile)",
+	_STIP_IsolatedProfileNeverReachesTheRegistry)

@@ -98,6 +98,112 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_contains(state.pushes[1].js, '"nav_apply":false')
 		helpers.assert_true(Bridge.on_message({ action = "nav_save", text = "x" }, daemon_state).handled == false)
 	end)
+
+	--- The bridge with the composer's emulation and the editor's files.
+	local function emulating_bridge(choose_ok, reload_ok)
+		local Bridge, state, daemon_state = bridge()
+		state.emulated, state.stored = {}, {}
+		daemon_state.layout_registry.composer_emulate = function(payload, on_done)
+			state.stored[#state.stored + 1] = payload
+			on_done(true, nil, nil, "composed")
+		end
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		daemon_state.layout_emulation_preferences = {
+			choose = function(id) state.emulated[#state.emulated + 1] = id; return choose_ok ~= false end,
+		}
+		daemon_state.layout_emulation = { reload_if_started = function() return reload_ok ~= false end }
+		return Bridge, state, daemon_state
+	end
+
+	helpers.it("emulates a source without installing it (layout-editor-emulate)", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_contains(state.pushes[1].js, '"emulate":true')
+		local message = { action = "composer_emulate", source = "src", keylayout = "<k/>", emulation = "{}" }
+		helpers.assert_true(Bridge.on_message(message, daemon_state).handled)
+		helpers.assert_eq(state.stored, { { source = "src", keylayout = "<k/>", emulation = "{}" } })
+		helpers.assert_eq(state.emulated, { "composed" }, "the composed layout becomes the emulated one")
+		local result = nil
+		for _, push in ipairs(state.pushes) do
+			if push.js:find("window.composerResult(", 1, true) then result = push.js end
+		end
+		helpers.assert_contains(result, '"action":"composer_emulate"')
+		helpers.assert_contains(result, '"ok":true')
+		helpers.assert_true(Bridge.on_message({ action = "composer_emulate", keylayout = "<k/>" }, daemon_state).handled
+			== false, "an emulation without its source is refused")
+	end)
+
+	helpers.it("reports an emulation the settings or the engine refused (layout-editor-emulate)", function()
+		for _, case in ipairs({ { false, true, "emulate_not_saved" }, { true, false, "emulate_failed" } }) do
+			local Bridge, state, daemon_state = emulating_bridge(case[1], case[2])
+			Bridge.on_message({ action = "ready" }, daemon_state)
+			Bridge.on_message({ action = "composer_emulate", source = "src", keylayout = "<k/>" }, daemon_state)
+			local last = state.pushes[#state.pushes - 1].js
+			helpers.assert_contains(last, '"ok":false')
+			helpers.assert_contains(last, '"code":"' .. case[3] .. '"')
+		end
+	end)
+
+	helpers.it("offers no emulation without the emulation preferences (layout-editor-emulate)", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		daemon_state.layout_emulation_preferences = {}
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_contains(state.pushes[1].js, '"emulate":false')
+		helpers.assert_true(Bridge.on_message({ action = "composer_emulate", source = "s", keylayout = "k" },
+			daemon_state).handled == false)
+		helpers.assert_eq(#state.stored, 0)
+	end)
+
+	helpers.it("opens the editor from the menu once the page is ready (layout-editor-menu)", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		helpers.assert_true(Bridge.open_editor(), "asked before the page is ready")
+		helpers.assert_eq(#state.pushes, 0, "nothing is pushed into a page still loading")
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		local opened = state.pushes[#state.pushes].js
+		helpers.assert_contains(opened, "window.sourceData(")
+		helpers.assert_contains(opened, '"filename":"mine.toml"')
+		local count = #state.pushes
+		helpers.assert_true(Bridge.open_editor(), "asked again while the page is open")
+		helpers.assert_eq(#state.pushes, count + 1)
+		helpers.assert_contains(state.pushes[#state.pushes].js, "window.sourceData(")
+		Bridge.on_message({ action = "refresh" }, daemon_state)
+		helpers.assert_true(not state.pushes[#state.pushes].js:find("window.sourceData(", 1, true),
+			"a request is answered once")
+	end)
+end)
+
+helpers.describe("layout editor menu row (Linux)", function()
+	helpers.it("« Create or edit a layout… » shows the window straight on the editor (layout-editor-menu)", function()
+		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["ui.menu.builder"] }
+		local calls = {}
+		package.loaded["ui.layout_manager.bridge"] = {
+			open_editor = function() calls[#calls + 1] = "open_editor"; return true end,
+		}
+		package.loaded["ui.menu.builder"] = nil
+		local ok, err = pcall(function()
+			local module = helpers.load_module("ui.menu.builder")
+			local items = module.build({ webview = { show = function(name)
+				calls[#calls + 1] = "show " .. name
+				return true
+			end } })
+			local I18n = require("infra.i18n")
+			local row = nil
+			for _, top in ipairs(items) do
+				if top.title == I18n.get("menu.layout.title") then
+					for _, child in ipairs(top.menu) do
+						if child.title == I18n.get("menu.layout.edit") then row = child end
+					end
+				end
+			end
+			helpers.assert_eq(type(row), "table", "the row reaches the tray")
+			helpers.assert_eq(type(row.fn), "function")
+			row.fn()
+		end)
+		package.loaded["ui.layout_manager.bridge"], package.loaded["ui.menu.builder"] = saved.bridge, saved.builder
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(calls, { "show layout_manager", "open_editor" })
+	end)
 end)
 
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
