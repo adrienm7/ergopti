@@ -470,6 +470,19 @@ function M.reset(session)
 	session.state = M.NEUTRAL
 end
 
+--- Ends a pending dead key before a text typed outside the layout (the layout
+--- source emulation's), as a key typing outside every dead key does: the dead
+--- key's terminator, then the text.
+--- @param session table
+--- @return string terminator The printable terminator, "" when none was pending.
+function M.flush(session)
+	local state = session.state
+	session.state = M.NEUTRAL
+	if state == M.NEUTRAL then return "" end
+	local terminator = session.model.terminators[state]
+	return printable(terminator) and terminator or ""
+end
+
 --- Whether a dead key is pending.
 --- @param session table
 --- @return boolean

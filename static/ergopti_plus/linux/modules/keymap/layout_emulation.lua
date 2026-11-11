@@ -30,9 +30,18 @@
 ---    never a partial layout.
 --- 5. Every collaborator is injected (M.init), so tests drive the decisions
 ---    without a keyboard.
+--- 6. A layout source's records no .keylayout holds (custom modifiers, tap-holds,
+---    shortcuts sending another key, key chords, system-key remaps) come first,
+---    from the composed layout's emulation table (layouts/source_emulation.lua).
+---    Its held keys own their release through the hook's release callback; a
+---    press of a key the engine still holds means that release was lost, so it
+---    is settled before the new press. A built-in modifier a tap-hold holds
+---    applies to the keys pressed under it (typed shifted, or pressed with it),
+---    not to a mouse click.
 --- ==============================================================================
 
 local Emulation = require("layouts.keylayout_emulation")
+local SourceEmulation = require("layouts.source_emulation")
 local Settings = require("layouts.emulation_settings")
 local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
@@ -44,8 +53,16 @@ local LOG = "keymap.layout_emulation"
 -- Collaborators (M.init), the running session and the last reload's outcome.
 local _deps = nil
 local _session = nil
+local _extras = nil   -- the layout source emulation session, nil without a table
+local _virtual = {}   -- built-in modifiers a tap-hold holds for the user (engine ids)
 local _evdev_to_code = nil
 local _status = { active = false, id = nil, error = nil }
+
+-- The key each built-in modifier of the source emulation presses.
+local EMIT_MODIFIERS = {
+	shift = EvdevCodes.KEY_LEFTSHIFT, control = EvdevCodes.KEY_LEFTCTRL, alt = EvdevCodes.KEY_LEFTALT,
+	alt_right = EvdevCodes.KEY_RIGHTALT, meta = EvdevCodes.KEY_LEFTMETA,
+}
 
 -- The modifiers a shortcut chord keeps from the hand, as the hook names them.
 local CHORD_MODIFIERS = {
@@ -53,8 +70,11 @@ local CHORD_MODIFIERS = {
 	{ name = "alt", code = EvdevCodes.KEY_LEFTALT }, { name = "meta", code = EvdevCodes.KEY_LEFTMETA },
 }
 
+-- The engine's built-in modifier ids as the hook names them in detail.mods.
+local HOOK_MODIFIERS = { shift = "shift", control = "ctrl", alt = "alt", alt_right = "altgr", meta = "meta" }
+
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
-	"dispatch_char", "emit_shortcut", "caps_locked", "magic_evdev", "is_active" }
+	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "magic_evdev", "is_active" }
 
 
 
@@ -68,7 +88,8 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 
 --- Takes the collaborators. Called once, before the hook starts.
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
----   type_text, dispatch_char, emit_shortcut(char, code, mods), caps_locked, magic_evdev, is_active }
+---   type_text, dispatch_char, emit_shortcut(char, code, mods), emit_key(code, modifiers) where
+---   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, magic_evdev, is_active }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -93,6 +114,8 @@ end
 function M.reload()
 	if _deps == nil then error("layout_emulation.reload needs M.init first", 2) end
 	local settings = Settings.resolve(_deps.read_config(), _deps.default_for, _deps.report_outdated)
+	if _extras ~= nil then M.reset() end
+	_extras = nil
 	if not Settings.active(settings) then
 		_session = nil
 		_status = { active = false, id = settings.id, error = nil }
@@ -107,11 +130,13 @@ function M.reload()
 			settings.id, tostring(source_err))
 		return false
 	end
+	local extras = nil
 	local ok, built = pcall(function()
 		local model = Emulation.load(source.text, _deps.keycodes(), source.convention, { composer = source.composer })
 		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry(), require("json").is_null))
 		Emulation.configure(session, { base = settings.base, alt_gr = settings.alt_gr, layout = settings.layout,
 			number_row = settings.number_row, edges = settings.edges })
+		if source.emulation ~= nil then extras = SourceEmulation.new_session(SourceEmulation.compile(source.emulation)) end
 		return session
 	end)
 	if not ok then
@@ -121,10 +146,10 @@ function M.reload()
 			settings.id, tostring(built))
 		return false
 	end
-	_session = built
+	_session, _extras = built, extras
 	_status = { active = true, id = settings.id, error = nil }
-	Logger.info(LOG, "Layout emulation of '%s' on (base %s, AltGr %s).", settings.id,
-		tostring(settings.base), tostring(settings.alt_gr))
+	Logger.info(LOG, "Layout emulation of '%s' on (base %s, AltGr %s, source records %s).", settings.id,
+		tostring(settings.base), tostring(settings.alt_gr), tostring(extras ~= nil))
 	return true
 end
 
@@ -143,14 +168,18 @@ function M.status()
 	return { active = _status.active, id = _status.id, error = _status.error }
 end
 
---- Drops the running layout (stop, pause: a pending dead key does not survive).
+--- Drops the running layout (stop, pause: a pending dead key does not survive,
+--- nor a held or locked custom modifier or a tap-hold's held modifier).
 function M.reset()
 	if _session ~= nil then Emulation.reset(_session) end
+	if _extras ~= nil then SourceEmulation.reset(_extras) end
+	_virtual = {}
 end
 
 --- Forgets the collaborators and the session (test seam).
 function M._reset_for_test()
-	_deps, _session, _evdev_to_code = nil, nil, nil
+	_deps, _session, _extras, _evdev_to_code = nil, nil, nil, nil
+	_virtual = {}
 	_status = { active = false, id = nil, error = nil }
 end
 
@@ -177,21 +206,104 @@ local function type_in_place(text, code)
 	return true
 end
 
+--- The hook's modifiers with the ones a tap-hold holds for the user.
+local function merged_mods(mods)
+	if next(_virtual) == nil then return mods end
+	local merged = {}
+	for name, held in pairs(mods) do merged[name] = held end
+	for id in pairs(_virtual) do merged[HOOK_MODIFIERS[id]] = true end
+	return merged
+end
+
+--- The engine's held built-in modifiers of a press.
+local function engine_held(mods)
+	local held = {}
+	for id, name in pairs(HOOK_MODIFIERS) do
+		if mods[name] == true then held[id] = true end
+	end
+	if _deps.caps_locked() == true then held.caps_lock = true end
+	return held
+end
+
+--- Performs the source emulation's actions in order.
+--- @return boolean performed False when an output failed (logged).
+local function perform(actions, evdev_code)
+	for _, action in ipairs(actions) do
+		if action.type == "modifier" then
+			_virtual[action.id] = action.down == true or nil
+		elseif action.type == "text" then
+			local text = Emulation.flush(_session) .. action.text
+			if not type_in_place(text, evdev_code) then return false end
+		elseif action.type == "key" then
+			if _session ~= nil then Emulation.reset(_session) end
+			if _deps.emit_key(action.key, action.modifiers) ~= true then
+				Logger.error(LOG, "The emulated key %s could not be pressed.", tostring(action.key))
+				return false
+			end
+		end
+	end
+	return true
+end
+
+--- Decides a press with the layout source emulation first.
+--- @return boolean|nil consumed nil when the press goes on to the keylayout emulation.
+--- @return function|nil repeat_callback
+--- @return function|nil release_callback
+local function source_press(detail, code, mods)
+	local extras = _extras
+	local now = _deps.now_ms()
+	-- A real press of a key the engine holds: its release never arrived.
+	if extras.held_keys[code] ~= nil then perform(select(2, SourceEmulation.release(extras, code, now)), detail.code) end
+	local consumed, actions = SourceEmulation.press(extras, code, engine_held(mods), now)
+	local performed = perform(actions, detail.code)
+	if not consumed then return nil end
+	local function release(release_detail)
+		if _extras ~= extras then return true end
+		local _, released = SourceEmulation.release(extras, code, _deps.now_ms())
+		perform(released, type(release_detail) == "table" and release_detail.code or detail.code)
+		return true
+	end
+	if not performed then return false end
+	-- A held key (custom modifier, tap-hold) ignores its repeats; another repeats its output.
+	if extras.held_keys[code] ~= nil then return true, function() return true end, release end
+	local held = detail.code
+	return true, function(repeat_detail)
+		if type(repeat_detail) ~= "table" or repeat_detail.code ~= held or _extras ~= extras then return false end
+		local _, repeated = SourceEmulation.press(extras, code, engine_held(merged_mods(
+			type(repeat_detail.mods) == "table" and repeat_detail.mods or {})), _deps.now_ms())
+		return perform(repeated, held)
+	end, release
+end
+
 --- Decides one grabbed key press from the keyboard hook's consumption callback.
 --- @param detail table { code, mods, char } as the hook reports a key-down.
 --- @return boolean consumed True when the emulation typed in the key's place.
 --- @return function|nil repeat_callback Owner of the held press's repeats.
+--- @return function|nil release_callback Owner of the press's release (a source emulation key).
 function M.on_key(detail)
 	local session = _session
 	if session == nil or type(detail) ~= "table" then return false end
 	local code = _evdev_to_code[detail.code]
 	if code == nil or _deps.is_active() ~= true then return false end
-	local mods = type(detail.mods) == "table" and detail.mods or {}
+	local hand = type(detail.mods) == "table" and detail.mods or {}
+	if _extras ~= nil then
+		local consumed, repeat_callback, release_callback = source_press(detail, code, merged_mods(hand))
+		if consumed ~= nil then return consumed, repeat_callback, release_callback end
+	end
+	-- After the source emulation: this very press may have started a held modifier.
+	local mods = merged_mods(hand)
 	local magic = _deps.magic_evdev()
 	session.config.magic_code = magic and _evdev_to_code[magic] or nil
 	local decision, text = Emulation.decide(session, code, mods.shift == true, _deps.caps_locked() == true,
 		mods.altgr == true, mods.ctrl == true, mods.alt == true, mods.meta == true, detail.char)
-	if decision == Emulation.PASS then return false end
+	if decision == Emulation.PASS then
+		-- A modifier a tap-hold holds is the user's: the key goes out with it.
+		if next(_virtual) == nil then return false end
+		local held = {}
+		for id in pairs(engine_held(mods)) do if id ~= "caps_lock" then held[#held + 1] = id end end
+		table.sort(held)
+		return _deps.emit_key(code, held) == true
+	end
 	if decision == Emulation.SHORTCUT then
 		if _deps.emit_shortcut(text, detail.code, mods) == true then return true end
 		Logger.error(LOG, "The emulated shortcut key could not be pressed — the chord keeps its own key.")
@@ -253,7 +365,8 @@ function M.production_deps(ports)
 			return Settings.source(id, { installed = Registry.snapshot().installed,
 				read_installed = function(layout_id) return Registry.read_local_copy(layout_id) end,
 				shipped = function(layout_id) return Registry.shipped_layout(layout_id) end,
-				composer_id = composer and composer.id or nil })
+				composer_id = composer and composer.id or nil,
+				read_emulation = function() return Registry.composer_emulation() end })
 		end,
 		keycodes = function() return shared_json("modules/layouts/mac_keycodes.json", false) end,
 		registry = function() return shared_json("data/keycodes/physical_keys.json", true) end,
@@ -284,6 +397,22 @@ function M.production_deps(ports)
 			local pressed = require("modules.gestures.combo_emitter").press_codes(chord, { keycode }, "emulated shortcut")
 			return pressed == true
 		end,
+		emit_key = function(code, modifiers)
+			if ports.dry_run then return false end
+			local key = shared_json("data/keycodes/physical_keys.json", true).keys[code]
+			if type(key) ~= "table" or type(key.evdev) ~= "number" then return false end
+			-- Through the broker, as the shortcut above: the chord holds exactly these
+			-- modifiers, and any other the hand holds is suspended for it.
+			local chord = {}
+			for _, id in ipairs(modifiers) do
+				local evdev = EMIT_MODIFIERS[id]
+				if evdev == nil then return false end
+				chord[#chord + 1] = evdev
+			end
+			return require("modules.gestures.combo_emitter").press_codes(chord, { key.evdev },
+				"emulated layout source key") == true
+		end,
+		now_ms = function() return require("infra.monotonic").now_ms() end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
 		magic_evdev = ports.magic_evdev,
 		is_active = function() return not ports.is_paused() end,

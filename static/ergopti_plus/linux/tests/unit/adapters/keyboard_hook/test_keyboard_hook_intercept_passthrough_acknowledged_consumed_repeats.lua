@@ -36,7 +36,7 @@ local helpers, EV_KEY, ev =
 helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 	local function observe(mode)
 		local previous = package.loaded["modules.hotstrings.device_finder"]
-		local state = { origins = 0, consumed = 0, repeated = 0, raw = {}, values = {} }
+		local state = { origins = 0, consumed = 0, repeated = 0, raw = {}, values = {}, released = {} }
 		package.loaded["modules.hotstrings.device_finder"] = {
 			physical_sources = function(paths)
 				state.origins = state.origins + 1
@@ -74,6 +74,15 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 						return true
 					end }
 					if mode == "malformed" then receipt.foreign = true end
+					if mode == "release" then
+						local press = state.consumed
+						receipt.release_callback = function(release_detail)
+							state.released[#state.released + 1] = press .. ":" .. release_detail.code .. ":"
+								.. release_detail.value
+							return true
+						end
+					end
+					if mode == "bad_release" then receipt.release_callback = "not a function" end
 					return receipt
 				end,
 				onEmitRaw = function(code, value)
@@ -186,6 +195,23 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 		helpers.assert_eq(observed.repeated, 1)
 		helpers.assert_eq(observed.origins, 2, "acquisition and completed startup publish once each; repeats do not rescan")
 		helpers.assert_eq(observed.raw, {})
+	end)
+
+	helpers.it("(source-emulation-release) calls a press's release owner once, at its own key-up", function()
+		local state = observe("release")
+		helpers.assert_eq(state.consumed, 2)
+		helpers.assert_eq(state.repeated, 3, "repeats still reach the repeat owner")
+		helpers.assert_eq(state.released, { "1:36:0", "2:36:0" }, "each press's owner sees its release once")
+		helpers.assert_eq(state.raw, {}, "the consumed release still never reaches the application")
+		local plain = observe("accepted")
+		helpers.assert_eq(plain.released, {}, "a receipt without a release owner calls none")
+	end)
+
+	helpers.it("(source-emulation-release) a release owner that is not a function voids the receipt", function()
+		local state = observe("bad_release")
+		helpers.assert_eq(state.repeated, 0)
+		helpers.assert_eq(state.released, {})
+		helpers.assert_eq(state.raw, { "36:1", "36:2", "36:2", "36:0", "36:1", "36:2", "36:0" })
 	end)
 
 	helpers.it("(magic-source-repeat) ordinary boolean consumers stay nonrepeating", function()

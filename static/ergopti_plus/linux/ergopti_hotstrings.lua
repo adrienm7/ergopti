@@ -2614,12 +2614,15 @@ local function main()
 			return true
 		end
 		-- The layout emulation, after the actions the user bound on a key.
-		local emulated, emulated_repeat = require("modules.keymap.layout_emulation").on_key(detail)
+		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
 			-- Typed in the key's place: like a re-emitted key, it ends a selection.
 			wrap_on_type.end_selection_window()
 			if emulated_repeat == nil then return true end
-			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat) }
+			-- A held key of the layout source emulation (a custom modifier, a tap-hold)
+			-- owns its release, unguarded: a lost release would leave it held.
+			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
+				release_callback = emulated_release }
 		end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine
