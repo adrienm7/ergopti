@@ -1240,7 +1240,12 @@ between workers) green alone. All live checks pass, typed by the harness.
   before the registry loads. PAR-83: the host in `ollama_managed_files.ps1`. Moving `tests/run_*.ahk` to
   `tests/runners/` is not worth it (455 `A_ScriptDir` uses, 1,908 includes).
 - **Tests.** Source assertions left to convert to behaviour; `--reverse` on the `llm` group has 3 order-dependent reds.
-  PC run 2026-11-11: `--reverse` on the `llm` group passes 2295/2295 after the order fixes.
+  PC run 2026-11-11: `--reverse` on the `llm` group passes 2295/2295 after the order fixes. Count of `_Driver*` source
+  reads in the Windows tests: 3,780 in 994 files (meta 3,000, unit 778), down from 3,796. The timer, LLM tray probe,
+  keep-awake, scroll capture and password detector pause guards now run under a real `Suspend`. 80 meta files
+  still read `A_IsSuspended` from source. Guards that would send keys, paste or move the cursor when broken (text
+  sender, tap-hold, dead keys, `SimulateActivity`) need a seam first. The ROI half-life tick and the click
+  handlers are guarded a second time downstream, so a behaviour test of their own guard could not fail.
 - **Field report.** `field/win-2026-11-01-dev` ran with no driver; run it again with one.
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
