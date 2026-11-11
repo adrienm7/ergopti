@@ -80,7 +80,22 @@ helpers.describe("script lifecycle actions", function()
 		helpers.assert_true(not ScriptActions.is_script_action("open_url"))
 	end)
 
-	helpers.it("holds a user keyboard shortcut back while paused but still resumes", function()
+	-- SCD-1: the pause admits the shared catalogue's paused_actions, the list
+	-- Windows and macOS read, not every id with the script_ prefix.
+	helpers.it("reads the shared paused_actions list, not the script_ prefix (scd1-paused-actions)", function()
+		local controller = ScriptActions.new({
+			reset = function() end, reload = function() end, quit = function() end,
+		})
+		controller.toggle_pause()
+		helpers.assert_true(not controller.allows("script_save_reload"),
+			"script_save_reload is not a paused action of the shared catalogue")
+		helpers.assert_true(controller.allows("open_personal_shortcuts"),
+			"open_personal_shortcuts is a paused action of the shared catalogue")
+		helpers.assert_true(ScriptActions.runs_while_paused("script_reload"))
+		helpers.assert_true(not ScriptActions.runs_while_paused("script_save_reload"))
+	end)
+
+	helpers.it("holds every keyboard slot back while paused, a script action included (scd1-slot-paused)", function()
 		local storage_before = package.loaded["adapters.storage"]
 		local module_before = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		local gestures_before = package.loaded["modules.gestures.manager"]
@@ -105,6 +120,7 @@ helpers.describe("script lifecycle actions", function()
 		local shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 		shortcuts._reset()
 		local held_back = shortcuts.dispatch({ key = "j", mods = { ctrl = true } }, { only_script = true })
+		local running = shortcuts.dispatch({ key = "k", mods = { ctrl = true } }, { only_script = false })
 		local resumed = shortcuts.dispatch({ key = "k", mods = { ctrl = true } }, { only_script = true })
 		local chatgpt = shortcuts.dispatch({ key = "g", mods = { ctrl = true } }, { only_script = true })
 		package.loaded["adapters.storage"] = storage_before
@@ -113,8 +129,10 @@ helpers.describe("script lifecycle actions", function()
 		package.loaded["infra.config_paths"] = paths_before
 		os.remove(path)
 		helpers.assert_true(not held_back, "Ctrl+J fired select_line while the script was paused")
-		helpers.assert_true(resumed, "the resume shortcut must fire while paused")
+		helpers.assert_true(not resumed,
+			"a keyboard slot bound to script_pause_toggle fired while paused, unlike Windows and macOS")
 		helpers.assert_true(not chatgpt, "the default Ctrl+G must wait for resume too")
+		helpers.assert_true(running, "the same slot runs while the driver runs")
 		helpers.assert_eq(executed, { "script_pause_toggle" })
 	end)
 

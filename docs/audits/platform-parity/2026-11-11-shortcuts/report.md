@@ -29,18 +29,19 @@ modules under LuaJIT; no evdev/uinput, Hammerspoon or AHK was executed.
 | SCL-001 | AZERTY, emulation off, `e_grave` on: hold Ctrl and è                                    | `^SCxxx` hotkey (`accented_shortcuts.ahk` `_AccentedShortcutEmit`): Ctrl+Z on every repeat | The hook swallowed every repeat: one Ctrl+Z                 | `accented-shortcut-repeat` |
 | SCL-002 | Ergopti emulated over a system layout with é, `e_acute` on: Ctrl and the system's é key | `AccentedShortcuts_Register` only without the Ergopti emulation (`layout.ahk:883-888`)     | Ctrl+C before the emulation; a slot on that chord never ran | `accented-under-emulation` |
 
+## Decided
+
+- **SCD-1, script actions on keyboard slots while paused** (decided by the
+  maintainer on 2026-11-11): a Linux keyboard slot bound to a `script_*`
+  action is held back while the driver is paused, in dry-run or with
+  Shortcuts off, like every other slot, as on Windows and macOS
+  (`keyboard_shortcuts.match` and `consume`). What runs through a pause is the
+  shared `paused_actions` list (`ScriptActions.runs_while_paused`), no longer
+  the `script_` prefix. Regressions `scd1-slot-paused`, `scd1-paused-actions`.
+  Windows: no change.
+
 ## Decisions pending (behaviour left unchanged)
 
-- **SCD-1, script actions on keyboard slots while paused.** A keyboard slot
-  bound to a `script_*` action (Reload, Pause) stays live on Linux while the
-  driver is paused, in dry-run or with Shortcuts off (`consume_bound_chord`
-  `only_script`, a `script_` prefix test in `keyboard_shortcuts.match`); the
-  comment calls it deliberate. Windows binds no slot with Shortcuts off and
-  suspends every slot hotkey, only its AltGr script chords staying live
-  (`SCRIPT_SHORTCUT_SUSPEND_ALLOWED`); macOS pauses every slot. The prefix
-  test also admits `script_save_reload` and refuses `open_personal_shortcuts`,
-  unlike the shared `paused_actions` list (`script_chords.json`).
-  Recommendation: align Linux with Windows, or read the shared list.
 - **SCD-2, accented shortcuts with two non-Shift modifiers.** Linux turns
   Ctrl+Alt+é into Ctrl+Alt+C; Windows registers only `^ ^+ ! !+ # #+`, since
   Ctrl+Alt is AltGr there. It rides on ILD-1 (the logical key for chords of
