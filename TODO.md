@@ -1148,8 +1148,8 @@ between workers) green alone. All live checks pass, typed by the harness.
   (shipped recommended preset, 6 rounds): layout actions 1.1-1.8 ms, build 27-40 ms, merge 9-30 ms, encode 11-44 ms
   (258617 bytes); so the field 230 ms in `karabiner.layout_actions` is native, not the Lua loop. Next: split that
   phase on the Mac (`Layout.keyboard_form()` registry snapshot vs the 548 `hs.keycodes.map` lookups) before touching
-  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed.
-- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. Check the maintainer's machines against `docs/tooling/one-folder-name-handoff.md`; remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31).
+  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed. Done 2026-11-11: `Config.resolve_layout_actions` times that phase's two halves apart (`karabiner.layout_actions.keyboard_form`, the registry snapshot, and `karabiner.layout_actions.key_codes`, the 548 lookups; regression in `test_actions_not_rebuilt_per_layout`), so the next Mac field report's phase lines and slow-callback attributions name the half to move. Left: read that report, then decide.
+- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. Check the maintainer's machines against `docs/tooling/one-folder-name-handoff.md`; remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31). Checked 2026-11-11: no code step is left here. The runtime folder rename is the maintainer's release step: it changes the compiled runtime, so it needs a rebuilt and republished pinned remap runtime (`vendor/remap-runtime/manifest.json`), which agents do not touch; removing the migration waits for the maintainer's machine checks.
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November, all on `dev`:
   - Done: the owned runtime is the default (`RUNTIME_DEFAULT = "owned"`, the two Configuration rows and
@@ -1162,7 +1162,7 @@ between workers) green alone. All live checks pass, typed by the harness.
   - Decided: field-tested on the CI-signed dev build, never the ad hoc developer app; no Developer ID for now (item
     below).
   - Next: the maintainer's WP9 pass (handoff checklist) once a signed dev build is authorized, then the shared-mode
-    deletion. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
+    deletion. Checked 2026-11-11: both steps are the maintainer's (a signed dev build and a physical Mac); no code step precedes them. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
     the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** With the self-signed CI certificate the
   install takes one administrator prompt (the root Core and pqrs' daemon are LaunchDaemons bootstrapped by the
@@ -1177,7 +1177,7 @@ between workers) green alone. All live checks pass, typed by the harness.
   design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1
   November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
   under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
-  existing clones keep /usr/bin/python3 until re-cloned).
+  existing clones keep /usr/bin/python3 until re-cloned). Checked 2026-11-11: the managed-daemon relay row stays blocked on that design note (who launches the relay, how its refusal receipt reaches the Swift owner), a maintainer decision; no code step is open before it.
 - **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
   PAR-15 is confirmed by the next field run's result);
   the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.

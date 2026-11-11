@@ -453,9 +453,17 @@ function M.resolve_layout_actions(list, product)
 	-- One declaration owns every logical character in this generation. It names
 	-- the keycodes keys arrive as; the names are written for the deployed
 	-- virtual keyboard product, which passes the ISO pair through unswapped.
+	-- Two phases inside karabiner.layout_actions: the field's 230 ms there is
+	-- native work, and the registry snapshot and the per-character keycode
+	-- lookups are its two candidates (field report 2026-11-03); the next report
+	-- names the one to move before anything is changed.
+	local Phases = require("infra.phase_stats")
+	local stage_started = Phases.now()
 	local form = Layout.keyboard_form()
+	Phases.stop("karabiner.layout_actions.keyboard_form", stage_started)
 	product = product or Layout.default_virtual_keyboard_product()
 	local resolved = 0
+	stage_started = Phases.now()
 	for _, action in ipairs(list) do
 		if action.logical_char then
 			local key_code = Layout.key_code_for_char(action.logical_char, product)
@@ -468,6 +476,7 @@ function M.resolve_layout_actions(list, product)
 			resolved = resolved + 1
 		end
 	end
+	Phases.stop("karabiner.layout_actions.key_codes", stage_started)
 	-- One summary line, not one per action. DEBUG is this driver's default level
 	-- and every layout change re-runs this loop, so per-action lines were 548 log
 	-- writes for a fact the total already conveys.

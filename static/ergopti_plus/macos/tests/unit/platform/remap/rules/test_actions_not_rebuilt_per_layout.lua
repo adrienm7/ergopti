@@ -130,6 +130,20 @@ helpers.describe("karabiner actions: a layout change re-resolves, not rebuilds",
 			"and it must have been given a physical key code")
 	end)
 
+	-- Field report 2026-11-03: karabiner.layout_actions cost 230 ms cold, native
+	-- work; the next report must say whether the registry snapshot or the
+	-- keycode lookups hold it.
+	helpers.it("times the registry snapshot and the keycode lookups apart", function()
+		local Config = load_config()
+		local Phases = require("infra.phase_stats")
+		Phases.reset()
+		Config.resolve_layout_actions({ { id = "x", logical_char = "e" } })
+		for _, name in ipairs({ "karabiner.layout_actions.keyboard_form", "karabiner.layout_actions.key_codes" }) do
+			local figures = Phases.figures(name)
+			helpers.assert_eq(figures and figures.n, 1, name .. " is recorded once per resolution")
+		end
+	end)
+
 	helpers.it("rejects a non-table without raising", function()
 		-- Without this case the assertion above would pass against a function that
 		-- indexes its argument blindly — and it is called from a timer body, where a
