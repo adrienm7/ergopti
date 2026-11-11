@@ -3427,6 +3427,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/test_llm_selection_focus_state.py
           python3 static/ergopti_plus/linux/tests/hardware/run_llm_selection_focus.py
           else
               exit 1
