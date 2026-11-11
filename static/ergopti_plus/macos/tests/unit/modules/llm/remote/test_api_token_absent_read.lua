@@ -9,7 +9,8 @@
 --- holds. The launcher reports that read with its own exit
 --- (KeychainTokenWorkerExit.itemNotFound, 69), the resolver records the entry
 --- as needing its key, and the model selector page greys it with the
---- « re-enter its key » hint and an « API key… » action. Before, the read
+--- « re-enter its key » hint and an « API key… » action (driven in
+--- test_model_selector_page.lua). Before, the read
 --- failed like any Keychain error and the row read as a working entry
 --- (macos-api-key-restored-missing).
 --- ==============================================================================
@@ -32,11 +33,8 @@ helpers.describe("macos API entry restored without its key (macos-api-key-restor
 		helpers.assert_true(swift:find("case itemNotFound = 69", 1, true) ~= nil, "the Swift exit")
 		helpers.assert_true(swift:find("if status == errSecItemNotFound { return KeychainTokenWorkerExit.itemNotFound.rawValue }",
 			1, true) ~= nil, "a read of an absent item returns it")
-		local crypto = helpers.load_with_stubs("modules.llm.api_token_crypto")
-		helpers.assert_eq(crypto.ABSENT_EXIT_CODE, 69)
-		local lua = read("modules/llm/api_token_crypto.lua")
-		helpers.assert_true(lua:find('exit_code == M.ABSENT_EXIT_CODE then', 1, true) ~= nil
-			and lua:find('callback, false, nil, "absent")', 1, true) ~= nil, "the read reports reason absent")
+		-- The Lua mapping of that exit is driven behaviourally in
+		-- test_api_token_decrypt_async_behaviour.lua.
 	end)
 
 	helpers.it("an absent read marks the entry as needing its key until a new key replaces it", function()
@@ -70,19 +68,5 @@ helpers.describe("macos API entry restored without its key (macos-api-key-restor
 		end)
 		crypto.decrypt_async = original
 		if not ok then error(err, 0) end
-	end)
-
-	helpers.it("the page row of such an entry asks for its key and its action sets it", function()
-		local page = read("ui/menu/menu_llm/model_selector_page.lua")
-		helpers.assert_true(page:find('hint_key = e.key_absent and "model_browser.hint_api_key_reenter"', 1, true) ~= nil,
-			"the row says the key must be entered again")
-		helpers.assert_true(page:find('actions = { { id = "set_key", text = i18n.get("menu.llm.local_servers.api_key") } }', 1, true) ~= nil,
-			"its one action is « API key… »")
-		helpers.assert_true(page:find('if body.id == "set_key" and row.entry_id and row.key_absent then', 1, true) ~= nil,
-			"the action is dispatched before the greyed-row refusal")
-		local panel = helpers.load_with_stubs("ui.menu.menu_llm.api_panel")
-		helpers.assert_eq(type(panel.set_entry_token), "function", "the key goes through the panel's persistence")
-		helpers.assert_eq(panel.set_entry_token({ is_paused = function() return false end }, "restored", ""), false,
-			"an empty key is refused")
 	end)
 end)
