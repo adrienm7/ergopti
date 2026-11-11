@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
 	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "아직 Windows 제외: 토큰 단위 표시가 Windows에서 검증되지 않았으므로 이 옵션은 비활성 상태로 유지됩니다.",
-	"platform_reason.layout_editor_host_pending_on_windows": "아직 Windows에서는 안 됩니다: Windows 자판 관리자 창이 아직 자판 소스를 열거나 저장하지 못합니다. 편집기는 웹사이트에서 계속 쓸 수 있습니다.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Windows에서는 웹사이트의 편집기: Windows 자판 관리자 창에는 편집기가 없습니다. 자판 만들기, 편집, 내보내기는 Ergopti 웹사이트에서 합니다.",
 	"menu.layout.number_row": "숫자 행",
 	"menu.layout.number_row_native": "시스템 순서",
 	"menu.layout.number_row_digits": "숫자 우선",

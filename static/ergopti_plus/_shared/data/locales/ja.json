@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Windows ではまだ非対応: トークンごとの表示は Windows で検証されていないため、このオプションは無効のままです。",
-	"platform_reason.layout_editor_host_pending_on_windows": "Windows ではまだ使えません：Windows のレイアウト管理ウィンドウはまだレイアウトのソースを開いたり保存したりできません。エディターはウェブサイトで引き続き使えます。",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Windows ではエディターはサイト上：Windows のレイアウト管理ウィンドウにはエディターがありません。レイアウトの作成、編集、エクスポートは Ergopti のウェブサイトで行います。",
 	"menu.layout.number_row": "数字列",
 	"menu.layout.number_row_native": "システムの順序",
 	"menu.layout.number_row_digits": "数字を優先",

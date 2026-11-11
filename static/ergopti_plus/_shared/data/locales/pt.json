@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema.",
 	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Ainda não no Windows: a exibição token por token não foi validada no Windows, por isso esta opção permanece inativa.",
-	"platform_reason.layout_editor_host_pending_on_windows": "Ainda não no Windows: a janela do gestor de layouts do Windows ainda não abre nem guarda fontes de layout; o editor continua disponível no site.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "No Windows, editor no site: a janela do gestor de layouts do Windows não tem editor; crie, edite e exporte layouts no site da Ergopti.",
 	"menu.layout.number_row": "Fila de números",
 	"menu.layout.number_row_native": "Ordem nativa",
 	"menu.layout.number_row_digits": "Números primeiro",
