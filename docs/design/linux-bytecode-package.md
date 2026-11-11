@@ -2,9 +2,15 @@
 
 # Linux: a precompiled bytecode package (proposal, maintainer decision)
 
-Status: proposed on 2026-11-11 by the Linux performance pass. Not implemented.
-The decision it needs is the staleness contract between shipped bytecode and
-the sources beside it (memory: `project-linux-startup-cost-is-compilation`).
+Status: proposed on 2026-11-11 by the Linux performance pass, approved by the
+maintainer the same day for the installed tree only, and implemented
+(`infra/bytecode_package.lua`, `install/compile_bytecode.lua`; decision in
+`docs/memory/maintainer-decisions.md`). The receipt question was settled by
+excluding `.bytecode/` and admitting it by name. Measured after
+implementation, in an installed tree under the container session (three runs of
+7 boots, medians): spawn to `Daemon ready` 488 → 355 ms, load phase 200 → 90 ms,
+boot clock 294 → 255 ms, boot CPU 216 → 180 ms. The manifest's parse costs
+0.7 ms per boot.
 
 ## What it would save
 
@@ -53,6 +59,21 @@ session under bytecode was not run.
    it is either added to the receipt after compiling or excluded and
    rebuilt by the updater. The receipt's hash time (about 9 s natively on a
    full tree) grows with 8 MB more if it is included.
+
+## macOS (measured 2026-11-11, round 3, off-Mac)
+
+Hammerspoon also compiles every module from source at each boot. Under Lua 5.4.6
+the whole macOS tree (890 files, 14 MB with `_shared/lua`) compiles in 331 ms
+and loads as bytecode (`string.dump`, debug info kept, 9.3 MB) in 38 ms. A
+headless boot's first two require stages (`Path: config dir + paths.toml`, 342
+modules, and `Config-dependent module requires`, 166) cost 287 and 105 ms of
+CPU there, most of it this compile
+(`tests/bench/bench_boot_stages.lua`, `tests/bench/bench_lua_paths.lua
+--only=compile_driver_sources`). Lua 5.4 bytecode is tied to the interpreter's
+minor version and its integer and float sizes, not to the processor, so it
+could be produced once per Hammerspoon build rather than per Mac; the same three
+questions (who compiles, when bytecode is trusted, what a mismatch does) apply
+to the app bundle and its updater.
 
 ## Not proposed
 

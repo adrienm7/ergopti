@@ -157,11 +157,21 @@ helpers.describe("gesture axis slots: reachable from the touchpad", function()
 			"the unbound right direction falls back to the axis slot")
 	end)
 
-	helpers.it("keeps vertical, diagonal and tap gestures off the horizontal axis", function()
+	helpers.it("keeps vertical and tap gestures off the horizontal axis", function()
 		local bindings = { swipe_3_horiz = "tab_next" }
 		helpers.assert_eq(#pump(bindings, 3, 0, -600), 0, "a vertical swipe is not on the horizontal axis")
-		helpers.assert_eq(#pump(bindings, 3, 600, -600), 0, "a diagonal has its own slots, not the axis")
 		helpers.assert_eq(#pump(bindings, 3, 0, 0), 0, "a tap is not a swipe")
+	end)
+
+	-- Decided by the maintainer on 2026-11-11: an unbound diagonal runs its
+	-- dominant straight slot, and that slot's own fallback; a bound one wins.
+	helpers.it("runs an unbound diagonal's dominant direction, a bound diagonal its own (diagonal-unbound-fallback)", function()
+		local axis_only = pump({ swipe_3_horiz = "tab_next" }, 3, 600, -400)
+		helpers.assert_eq(#axis_only, 1, "a mostly horizontal diagonal reaches the horizontal axis slot")
+		local vertical_only = pump({ swipe_3_horiz = "tab_next" }, 3, 400, -600)
+		helpers.assert_eq(#vertical_only, 0, "a mostly vertical one has no horizontal slot to fall back to")
+		local bound, M = pump({ swipe_3_right_up = "tab_prev", swipe_3_right = "tab_next" }, 3, 600, -400)
+		helpers.assert_eq(bound, { M.emit_combo_for("tab_prev") }, "a bound diagonal keeps its own slot")
 	end)
 
 	helpers.it("gives two fingers no axis slot", function()

@@ -1387,6 +1387,17 @@ function M.composer_emulation(deps)
 	return Composer.read_emulation(settings, resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved)
 end
 
+--- The composed layout stored for the emulation alone (composer_emulate), for
+--- the layout emulation while the composed layout is not installed.
+--- @param deps table|nil
+--- @return table|nil composed { text, convention } nil when none is stored.
+--- @return string|nil error
+function M.composer_copy(deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.registry_copy((M.composer_settings()), resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved, TomlCodec.decode)
+end
+
 --- The text of an installed layout's copy, for the Debug check of the composer.
 --- @param id string Layout id.
 --- @param deps table|nil
@@ -1451,6 +1462,17 @@ end
 function M.composer_save(payload, on_done, deps)
 	return with_composer(deps, function(operations) operations.save(payload, on_done) end,
 		function(detail) on_done(false, M.FAILURE_WRITE, detail, false) end)
+end
+
+--- Stores a layout source for the layout emulation alone: nothing is installed
+--- in the system (layouts/composer.lua store).
+--- @param payload table { source, keylayout [, emulation] }
+--- @param on_done function on_done(ok, code, detail, id)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_emulate(payload, on_done, deps)
+	return with_composer(deps, function(operations) operations.store(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
 --- Removes the composition.

@@ -262,7 +262,10 @@ _SIHO_CustomModifierCapture(Hook, KeyName, SendKey) {
 		Hook.OnKeyDown := _SIHO_CustomModifierKey.Bind(Receipt, true)
 		Hook.OnKeyUp := _SIHO_CustomModifierKey.Bind(Receipt, false)
 		Hook.OnEnd := _SIHO_CustomModifierEnd.Bind(Receipt)
-		Hook.KeyOpt("{" . KeyName . "}{" . SendKey . "}", "+N")
+		; V as well as N: on a Kana-family layout (Ergopti's own KLC) VK_OEM_8 is
+		; also a dead key, so a hook without V swallowed the AltGr keydown and
+		; Windows never entered its level; the sticky modifiers already pass it.
+		Hook.KeyOpt("{" . KeyName . "}{" . SendKey . "}", "+NV")
 		return Receipt
 	} catch {
 		_SIHO_CustomModifierRelease(Receipt, Hook)

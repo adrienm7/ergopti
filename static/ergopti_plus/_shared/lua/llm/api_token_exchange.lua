@@ -49,6 +49,9 @@ M.MAX_EXPIRES_SECONDS = 86400
 -- The longest signed assertion: Google refuses one valid over an hour
 -- (RFC 7523 leaves it to the token service)
 M.MAX_ASSERTION_SECONDS = 3600
+-- The longest service message a refusal carries, in bytes: enough for an
+-- OAuth or IAM sentence, never a whole error page
+M.MAX_SERVICE_MESSAGE_BYTES = 200
 
 local FIELD_NAME = "^[%a_][%w_]*$"
 
@@ -368,18 +371,44 @@ function M.request(auth, key, unix_now)
 	end
 end
 
+--- The message a refusing token service gives, in the field its error format
+--- uses (OAuth error_description and error, IAM errorMessage, Google's
+--- error.message), flattened to one bounded line; nil when it gives none. A
+--- refusal is then explained by the service rather than by its status alone.
+--- @param decoded any The decoded JSON body.
+--- @return string|nil message
+local function service_message(decoded)
+	if type(decoded) ~= "table" then return nil end
+	local nested = type(decoded.error) == "table" and decoded.error.message or nil
+	-- A fixed count: absent fields are nil holes that ipairs would stop at
+	local candidates = { decoded.error_description, decoded.errorMessage, nested, decoded.message, decoded.error }
+	for index = 1, 5 do
+		local candidate = candidates[index]
+		if type(candidate) == "string" then
+			local line = TextUtils.trim((candidate:gsub("%c", " "):gsub("%s+", " ")))
+			if line ~= "" then return TextUtils.utf8_byte_prefix(line, M.MAX_SERVICE_MESSAGE_BYTES) end
+		end
+	end
+	return nil
+end
+
 --- Reads the answer of an exchange.
 --- @param auth table parse() output.
 --- @param status any The HTTP status.
 --- @param decoded any The decoded JSON body.
 --- @param now number The current time, in seconds.
 --- @return table|nil token { token, expires_at }.
---- @return string|nil reason Why the answer is refused (never its content).
+--- @return string|nil reason Why the answer is refused: its status and the service's
+---   own message (service_message), never a token.
 function M.read(auth, status, decoded, now)
 	if type(auth) ~= "table" or type(now) ~= "number" then
 		error("api_token_exchange.read requires a parsed auth block and the time", 2)
 	end
-	if status ~= 200 then return nil, "the token exchange answered HTTP " .. tostring(status) end
+	if status ~= 200 then
+		local refusal = "the token exchange answered HTTP " .. tostring(status)
+		local message = service_message(decoded)
+		return nil, message and (refusal .. ": " .. message) or refusal
+	end
 	if type(decoded) ~= "table" then return nil, "the token exchange answered no JSON object" end
 	local token = decoded[auth.token_field]
 	if type(token) ~= "string" or token == "" or token:find("[%c%s]") then

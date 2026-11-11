@@ -33,6 +33,7 @@ local sqlite3 = require("hs.sqlite3")
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local Queries = require("keystats.queries")
+local LocalTime = require("keystats.local_time")
 local WindowTopology = require("keystats.window_topology")
 local CapturePresence = require("keystats.capture_presence")
 local NetworkTransitions = require("keystats.network_transitions")
@@ -287,6 +288,20 @@ local function _initialize_db(db, existed)
 			Logger.error(LOG, "Semantic media schema rollback failed: %s.", tostring(rollback_result))
 		end
 		return false
+	end
+
+	-- A cache built before the UTC offset column (maintainer decision KMD-1 of
+	-- 2026-11-11) gains it on every raw table, and its purge triggers written
+	-- before it are retired, in one transaction; the purge schema below then
+	-- creates the current ones.
+	local UtcOffsetColumn = require("keystats.utc_offset_column")
+	local missing = {}
+	for row in db:nrows(UtcOffsetColumn.missing_query()) do missing[#missing + 1] = row.name end
+	local offset_statements = UtcOffsetColumn.statements(missing)
+	if #offset_statements > 0 then
+		_exec_startup_sql(db, "BEGIN IMMEDIATE;\n" .. table.concat(offset_statements, "\n") .. "\nCOMMIT;",
+			"UTC offset column")
+		Logger.info(LOG, "db.sqlite gained the UTC offset column on %d raw table(s); older rows keep none.", #missing)
 	end
 
 	-- The purge tombstone triggers run on every open, so a cache built before
@@ -560,6 +575,24 @@ local function _opt_text(value)
 	return tostring(value)
 end
 
+--- A row's instant in UTC and the offset in force when it was recorded
+--- (maintainer decision KMD-1 of 11 November 2026): today.log stamps local
+--- time, the stored row carries `ts` in UTC and `utc_offset_min`, while `date`
+--- stays the local day the timestamp names. The conversion uses this Mac's
+--- zone rules for that instant (keystats.local_time.from_local).
+--- @param e table The decoded JSONL entry, its timestamp admitted by build_inserts.
+--- @return string ts
+local function _utc_ts(e)
+	return (LocalTime.from_local(e.timestamp))
+end
+
+--- @param e table The decoded JSONL entry.
+--- @return integer offset Minutes east of UTC.
+local function _utc_offset(e)
+	local _, offset = LocalTime.from_local(e.timestamp)
+	return offset
+end
+
 function _builders.typing(e, id)
 	-- `text` and `events_json` are the only columns holding what the user
 	-- literally typed, so they are the only ones encrypted. The aggregates the
@@ -578,7 +611,7 @@ function _builders.typing(e, id)
 
 	return Queries.render("events.typing", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		app = tostring(e.app or "Unknown"), title = _opt_text(e.title), url = _opt_text(e.url),
 		field_role = _opt_text(e.field_role), layout = _opt_text(e.layout),
 		document_path = _opt_text(e.document_path),
@@ -597,7 +630,7 @@ end
 function _builders.app_switch(e, id)
 	return Queries.render("events.app_switch", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		prev_app = _opt_text(e.prev_app), next_app = _opt_text(e.next_app),
 		duration_ms = tonumber(e.duration_ms) or 0,
 	})
@@ -606,7 +639,7 @@ end
 function _builders.window_switch(e, id)
 	return Queries.render("events.window_switch", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		-- events_window_switch.app is TEXT NOT NULL; a nil would make INSERT OR
 		-- IGNORE drop the whole row. Same "Unknown" fallback the typing builder uses.
 		app = tostring(e.app or "Unknown"),
@@ -618,7 +651,7 @@ end
 function _builders.shortcut(e, id)
 	return Queries.render("events.shortcut", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		-- Both columns are TEXT NOT NULL. Losing the key name degrades one field;
 		-- emitting NULL loses the entire shortcut event to INSERT OR IGNORE.
 		app = tostring(e.app or "Unknown"), key = tostring(e.key or ""),
@@ -641,7 +674,7 @@ function _builders.system(e, id, action_override)
 	end
 	return Queries.render("events.system", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		-- The override covers the types that carry no `action` of their own, but a
 		-- bare "system_event" entry still relies on e.action being present — and the
 		-- column is NOT NULL, the exact swallow this function's docstring warns
@@ -662,7 +695,7 @@ function _builders.roi(e, id)
 	end
 	return Queries.render("events.roi", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = e.type, app = tostring(e.app or "Unknown"),
 		meta_json = _required_event_json(meta, "trigger ROI event"),
 	})
@@ -680,7 +713,7 @@ function _builders.clipboard(e, id)
 	end
 	return require("keystats.clipboard_events").insert_sql({
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = e.type, app = tostring(e.app or "Unknown"),
 		meta_json = _required_event_json(meta, "clipboard event"),
 	})
@@ -699,7 +732,7 @@ function _builders.kind_meta(statement, e, id)
 	end
 	return Queries.render(statement, "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = e.type, app = tostring(e.app or "Unknown"),
 		meta_json = _required_event_json(meta, statement .. " event"),
 	})
@@ -708,7 +741,7 @@ end
 function _builders.hotstring(e, id, kind)
 	return Queries.render("events.hotstring", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		app = tostring(e.app or "Unknown"), kind = tostring(kind),
 		trigger = tostring(e.trigger or ""), replacement = tostring(e.replacement or ""),
 		h_type = _opt_text(e.h_type), net_saved_chars = tonumber(e.net_saved_chars),
@@ -718,7 +751,7 @@ end
 function _builders.llm(e, id, kind)
 	local values = {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		app = tostring(e.app or "Unknown"), kind = tostring(kind),
 		context = _opt_text(e.context), prediction = _opt_text(e.prediction),
 		predictions_json = e.predictions ~= nil and _required_event_json(e.predictions, "LLM predictions") or nil,
@@ -736,7 +769,7 @@ end
 function _builders.session(e, id, kind)
 	return Queries.render("events.session", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = tostring(kind), duration_ms = tonumber(e.duration_ms),
 	})
 end
@@ -755,7 +788,10 @@ function M.build_inserts(entry)
 	-- the throw escapes ingest_once and the offset never advances past the poison
 	-- line. Coerce to the current wall-clock time so the entry is stored rather
 	-- than causing a permanent stall.
-	if type(entry.timestamp) ~= "string" then
+	-- A string that names no instant would raise the same way in the UTC
+	-- conversion (keystats.local_time), so it is coerced too.
+	if type(entry.timestamp) ~= "string"
+		or not entry.timestamp:match("^%d%d%d%d%-%d%d%-%d%d[ T]%d%d:%d%d:%d%d") then
 		entry.timestamp = _now_ts()
 	end
 	local t = entry.type

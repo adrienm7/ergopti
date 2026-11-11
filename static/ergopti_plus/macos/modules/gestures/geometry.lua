@@ -39,13 +39,18 @@ local ContactJoin = require("gestures.contact_join")
 -- =========================================
 -- =========================================
 
--- Minimum centroid displacement (Manhattan distance) thresholds. These are
--- driver-specific spatial tuning values (not shared cross-driver timings), kept
--- here as the single source of truth so the engine reads them back from this
--- module rather than re-declaring them.
-M.SWIPE_MIN   = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
-M.SWIPE_MIN_2 = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
-M.DIAG_MIN_2  = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
+-- Minimum centroid displacement (Manhattan distance) thresholds, from the
+-- shared timings registry the Linux tracker reads too ([gestures] *_minimum_mm,
+-- GSD-3); the engine reads them back from this module rather than re-declaring them.
+local Timings = require("infra.timings")
+local MINIMUMS = {
+	swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+	pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+	pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm"),
+}
+M.SWIPE_MIN, M.SWIPE_DIAG_MIN = Direction.minimums_mm(3, MINIMUMS) -- 3/4/5 fingers: minimum distance to validate a swipe
+-- 2 fingers: horiz/vert (left to macOS, diagonal only), and the total distance of a diagonal
+M.SWIPE_MIN_2, M.DIAG_MIN_2 = Direction.minimums_mm(2, MINIMUMS)
 
 -- Incremental mode: the shared step rule (_shared/lua/gestures/incremental.lua),
 -- the same one the Linux gesture manager counts with.
@@ -215,7 +220,7 @@ end
 --- @return string|nil Direction string.
 function M.computeDir(dx, dy, mf)
 	local min = (mf == 2) and M.SWIPE_MIN_2 or M.SWIPE_MIN
-	local diag_min = (mf == 2) and M.DIAG_MIN_2 or (min * Direction.DIAGONAL_MINIMUM_FACTOR)
+	local diag_min = (mf == 2) and M.DIAG_MIN_2 or M.SWIPE_DIAG_MIN
 	return Direction.axis(dx, dy, min, diag_min)
 end
 
@@ -230,7 +235,7 @@ end
 --- @return string|nil Direction string, nil while undecided.
 function M.lockDir(dx, dy, mf)
 	if mf == 2 then return M.computeDir(dx, dy, mf) end
-	return Direction.decided_axis(dx, dy, M.SWIPE_MIN, M.SWIPE_MIN * Direction.DIAGONAL_MINIMUM_FACTOR)
+	return Direction.decided_axis(dx, dy, M.SWIPE_MIN, M.SWIPE_DIAG_MIN)
 end
 
 return M

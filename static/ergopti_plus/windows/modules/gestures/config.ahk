@@ -988,6 +988,8 @@ _GestureRestartAbortReservation(Epoch) {
 GestureRestartTouchpadDevice(OnDone := 0) {
 		global _GestureRestartJob
 		LoggerStart("gestures", "Restarting touchpad device to apply gesture config…")
+		if TouchpadRegistrySkipsDeviceRestart(OnDone)
+				return True
 		if _GestureRestartJob.Get("starting", false) {
 				LoggerError("gestures", "Touchpad restart launch is already pending.")
 				return False

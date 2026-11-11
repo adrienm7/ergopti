@@ -18,8 +18,8 @@ topics routed by `docs/memory/README.md` record it at least eight times:
 `project-macos-initlua-no-compile-coverage` and
 `project-ahk-isset-requires-variable-load-crash`.
 
-Run `node tools/test/find-false-greens.cjs` first. It reports patterns 1, 2, 3
-and 5 mechanically. Patterns 4 and 6 need human judgement and are the two that
+Run `node tools/test/find-false-greens.cjs` first. It reports patterns 1, 2, 3,
+5 and 7 mechanically. Patterns 4 and 6 need human judgement and are the two that
 have actually shipped bugs here — read those sections even when the tool is
 green.
 
@@ -192,6 +192,18 @@ And remember source-introspection's structural blind spot: it reads text, never
 parses it. A load-time crash like `IsSet(obj.prop)` is invisible to the entire
 `_DriverFuncBody` / `_DriverSourceConcat` family.
 
+## 7. The error message as the only throw witness
+
+`try F() catch as E X := E.Message` followed by `AssertEqual("", X)` or
+`X != ""` judges "did F throw?" by the message. `Error("")` has an empty one,
+so the no-throw assertion passes on a throw and the must-throw assertion
+cannot tell it from success. Set a Boolean in the catch and assert it; keep
+the message only to describe the failure or for a presence check.
+
+`find-false-greens.cjs` reports this as `message-witness` (baseline 0). A catch
+that sets a literal `true`, or stores the message with other text, is not
+reported.
+
 ## The ratchet
 
 ```bash
@@ -200,7 +212,7 @@ node ./tools/test/find-false-greens.cjs --update-baseline  # only when the count
 ```
 
 It runs inside `npm run test:js`, so a new tautology or a new unguarded absence
-assertion fails the gate. It detects patterns 1, 2, 3 and 5; patterns 4 and 6 need
+assertion fails the gate. It detects patterns 1, 2, 3, 5 and 7; patterns 4 and 6 need
 human judgement and the tool says so rather than pretending otherwise.
 
 The baseline in `tools/test/false-greens-baseline.json` is a **debt ledger, not an

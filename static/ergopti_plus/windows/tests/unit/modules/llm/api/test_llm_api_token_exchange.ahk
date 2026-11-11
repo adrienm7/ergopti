@@ -176,7 +176,8 @@ _LTE_Answers() {
 	Corpus := _LTE_ExchangeCorpus()
 	AssertTrue(Corpus["answers"].Length >= 5, "the corpus holds answers")
 	for Row in Corpus["answers"] {
-		Token := LLM_TokenExchange_Read(Corpus[Row["block"]], Row["status"], Row["json"], Row["now"], &Reason)
+		; A row without "json" is an answer with no JSON body (the Lua twin reads nil).
+		Token := LLM_TokenExchange_Read(Corpus[Row["block"]], Row["status"], Row.Get("json", ""), Row["now"], &Reason)
 		if Row.Has("reason") {
 			AssertEqual("", Token, Row["name"])
 			AssertEqual(Row["reason"], Reason, Row["name"])
@@ -251,7 +252,8 @@ _LTE_Refusal() {
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		_LTE_Pump()
 		_LTE_Answer(Posts[1], "", 400)
-		AssertEqual("the token exchange answered HTTP 400", Results[1]["refusal"])
+		; The refusal carries the service's own sentence (AID-2, 2026-11-11).
+		AssertEqual("the token exchange answered HTTP 400: invalid_grant", Results[1]["refusal"])
 		AssertTrue(Results[1]["key_refused"], "the OAuth invalid-grant HTTP 400 identifies a refused credential")
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		AssertEqual(2, Results.Length, "during the pause the refusal answers at once")

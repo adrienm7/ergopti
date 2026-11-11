@@ -181,6 +181,52 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		end
 	end)
 
+	-- Decided by the maintainer on 2026-11-11 (reverses part of the GSL-001
+	-- change): an unbound diagonal falls back to its dominant straight slot,
+	-- live and completed; a bound diagonal still wins inside the band.
+	helpers.it("incremental: a drifting diagonal with its slot unbound steps the dominant slot (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		local pressed, M = pump({ swipe_3_right = "tab_prev" }, { swipe_3_right = "incremental" }, touch_events(drift), UNITS)
+		helpers.assert_true(count(pressed, M.emit_combo_for("tab_prev")) >= 4, "the straight right slot steps")
+	end)
+
+	helpers.it("x1: a completed diagonal with its slot unbound runs the dominant slot once (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		local pressed, M = pump({ swipe_3_right = "tab_prev" }, { swipe_3_right = "x1" }, touch_events(drift), UNITS)
+		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 1, "the straight right slot fires once")
+		local steep = {}
+		for i = 1, 40 do steep[#steep + 1] = { 0.25 * i, -0.5 * i } end
+		local up_pressed, up = pump({ swipe_3_up = "tab_prev" }, { swipe_3_up = "x1" }, touch_events(steep), UNITS)
+		helpers.assert_eq(count(up_pressed, up.emit_combo_for("tab_prev")), 1, "a steeper drift falls back to up")
+	end)
+
+	-- GSD-3 (decided by the maintainer on 2026-11-11): a pair decides its
+	-- direction from the shared 3.0 mm minimum, as macOS; three fingers 1.5 mm.
+	helpers.it("incremental: a pair needs the shared pair minimum before it counts (pair-incremental-minimum)", function()
+		local Direction = require("gestures.direction")
+		local Timings = require("infra.timings")
+		helpers.assert_eq(Direction.minimums_mm(2, { swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+			pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+			pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm") }), 3.0,
+			"the shared registry's pair minimum")
+		local function travel(fingers, mm)
+			local fired = 0
+			local tracker = require("modules.gestures.incremental_tracker").new({
+				units_x = UNITS, units_y = UNITS,
+				mode_of = function() return "incremental" end, step_of = function() return 1.0 end,
+				slot_of = function(slot, _, direction) return slot, direction end,
+				fire = function(_, _, _, count) fired = fired + count; return count end,
+			})
+			tracker:update({ fingers = fingers, dx = mm * UNITS, dy = 0 })
+			return fired
+		end
+		helpers.assert_eq(travel(2, 2.5), 0, "2.5 mm is below a pair's minimum")
+		helpers.assert_true(travel(2, 4.0) > 0, "4 mm decides a pair")
+		helpers.assert_true(travel(3, 2.5) > 0, "2.5 mm decides three fingers")
+	end)
+
 	helpers.it("incremental: the sensitivity sets the step, within the shared range", function()
 		local saved = package.loaded[MANAGER]
 		local M = helpers.load_module(MANAGER)

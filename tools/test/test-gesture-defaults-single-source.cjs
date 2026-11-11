@@ -20,6 +20,8 @@
  *      GestureSlotIds().
  *   2. Every slot each driver iterates has a manifest entry on that platform,
  *      so the build cannot fail at load.
+ *   3. The swipe minimums (a pair's 3.0 mm, GSD-3) are the shared timings
+ *      registry's [gestures] *_minimum_mm and no gesture source declares one.
  * A hand copy that is found is also compared value by value, so the report
  * names the slots that drifted. The Lua and AHK suites check the built values
  * at runtime.
@@ -269,6 +271,51 @@ for (const entry of linuxDefaults) {
 		errors.push(`Linux gesture default gestures.${entry.id} must stay neutral (none).`);
 }
 
+// ==================================================
+// ==================================================
+// ======= 5/ Swipe minimums ========================
+// ==================================================
+// ==================================================
+
+// GSD-3 (maintainer, 2026-11-11): the swipe minimums, a pair's 3.0 mm among
+// them, live once in the shared timings registry; macOS and Linux read them
+// through timings.count and no gesture source spells a copy.
+const SWIPE_MINIMUMS = {
+	swipe_minimum_mm: 1.5,
+	pair_swipe_minimum_mm: 3.0,
+	pair_diagonal_minimum_mm: 5.0
+};
+const registryGestures = parseToml(read('_shared/modules/timings/constants.toml')).gestures || {};
+for (const [key, value] of Object.entries(SWIPE_MINIMUMS))
+	if (registryGestures[key] !== value)
+		errors.push(
+			`[gestures] ${key} must be ${value} in the shared timings registry, found ${registryGestures[key]}.`
+		);
+const MINIMUM_LITERAL =
+	/\b(SWIPE_MIN\w*|DIAG_MIN\w*|\w*_MINIMUM_MM|PAIR_SCROLL_TRAVEL)\s*(?:=|:=)\s*-?\d/;
+const gestureSources = (dir) =>
+	fs.existsSync(path.join(SP, dir))
+		? fs
+				.readdirSync(path.join(SP, dir), { recursive: true })
+				.filter((name) => /\.(lua|ahk)$/.test(name))
+				.map((name) => path.join(dir, name))
+		: [];
+for (const rel of [
+	...gestureSources('_shared/lua/gestures'),
+	...gestureSources('macos/modules/gestures'),
+	...gestureSources('linux/modules/gestures'),
+	...gestureSources('windows/modules/gestures')
+]) {
+	read(rel)
+		.split('\n')
+		.forEach((line, index) => {
+			if (MINIMUM_LITERAL.test(line))
+				errors.push(
+					`${rel}:${index + 1} declares a swipe minimum locally; read [gestures] *_minimum_mm from the timings registry.`
+				);
+		});
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] Gesture recommended actions are not single-sourced:\x1b[0m');
 	for (const error of errors) console.error(`  - ${error}`);
@@ -276,5 +323,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-	'\x1b[32m[OK] macOS and Windows build their recommended gesture actions from the manifest.\x1b[0m'
+	'\x1b[32m[OK] macOS and Windows build their recommended gesture actions from the manifest; the swipe minimums come from the shared timings registry.\x1b[0m'
 );

@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "ead561e100f1e21467b940098895b26353dbfb8765e1785f13f0aa35cf456605"
+			"sha256": "ad5c2abfb037aa355582ba10382091cdea054580dbc641d55ddb5984afd43c7c"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -106,14 +106,14 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.key_down(e, key_code)",
-			"sha256": "bd1e2ab31623275ebd2a9c87464cec9089291d92cec1f0cfccd736a4d07dba02"
+			"sha256": "089b2f20f242cde57cbedc61d6211439a36c13439c77053154bebb464feefdc7"
 		},
 		{
 			"id": "linux-layout-emulation",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "2f14ad09c6a321186d64eea5f41321a32a63a233d2b70af41489e33097dbb49a"
+			"sha256": "88a3c45d69379de6e8d0535174f3e2d25281b302e2ab4c1277f5b144dff9fa76"
 		}
 	],
 	"behaviors": [

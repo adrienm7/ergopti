@@ -147,12 +147,16 @@ _LLV_NoticeRetirementPreservesForeignOwnership() {
 			for Interrupted in [false, true] {
 				Observed := []
 				Notice := ""
-				Failure := ""
+				; The caught state is the verdict: an Error with an empty message is
+				; still an exception, and the empty expected message alone accepted it.
+				Caught := false, Failure := ""
 				Outcome := true
 				try Outcome := _LLV_InvokeAndRetireNotice(_LLV_NoticeBoundaryAction.Bind(Interrupted, Observed), &Notice)
 				catch as Err {
+					Caught := true
 					Failure := Err.Message
 				}
+				AssertEqual(Interrupted, Caught, "only the interrupted callback may raise through the notice boundary")
 				AssertEqual(Interrupted ? "owned live-mode notice interruption" : "", Failure,
 					"the notice boundary preserves the actual callback exception")
 				if !Interrupted

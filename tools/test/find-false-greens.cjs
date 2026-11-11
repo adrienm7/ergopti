@@ -688,6 +688,108 @@ function findCorpusSkips(file, src, ext) {
 	return out;
 }
 
+/**
+ * PATTERN 7 — The error message as the only throw witness (Windows only).
+ * `try F() catch as E X := E.Message` followed by `AssertEqual("", X)` (or
+ * `X != ""`) judges "did F throw?" through the message alone. An exception whose
+ * Message is "" — `Error("")`, a bare rethrow of one, an OSError whose system
+ * text is empty — then reads as "did not throw", so the no-throw assertion cannot
+ * fail for it and the must-throw assertion cannot tell it from a silent success.
+ *
+ * The convention is an explicit caught state: a Boolean set in the catch, with
+ * the message kept only to describe the failure. A catch that sets any literal
+ * `true` is taken to carry one; a message stored with other text (`Type(E) . ":
+ * " . E.Message`) is never empty, so it is not this shape.
+ *
+ * Measured when the detector was added: 28 sites across 23 Windows test files,
+ * after a first instance in the personal-info read had been fixed by hand. All
+ * were converted, so the baseline is zero.
+ */
+function findMessageWitnesses(file, src) {
+	const out = [];
+	const lines = src.split(/\r?\n/);
+	const owners = ahkEnclosingFunction(src);
+	const functions = ahkAllFunctionBlocks(src);
+	const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+	for (let i = 0; i < lines.length; i++) {
+		if (isComment(lines[i], '.ahk')) continue;
+		const code = ahkStructuralCode(lines[i]);
+		const opener = code.match(/\bcatch\b[^{]*?\bas\s+(\w+)/i);
+		if (!opener) continue;
+		const errVar = opener[1];
+
+		// The catch body: the braced block it opens, or its single next statement.
+		// Braces are counted from the `catch` keyword on, because the usual
+		// spelling `} catch as E {` closes the try block on the same line.
+		let last = i;
+		if (/\{\s*$/.test(code)) {
+			let depth = 0;
+			for (let j = i; j < lines.length; j++) {
+				const counted = j === i ? code.slice(opener.index) : ahkStructuralCode(lines[j]);
+				for (const ch of counted) {
+					if (ch === '{') depth++;
+					else if (ch === '}') depth--;
+				}
+				last = j;
+				if (depth <= 0) break;
+			}
+		} else {
+			while (last + 1 < lines.length && isComment(lines[last + 1], '.ahk')) last++;
+			last = Math.min(last + 1, lines.length - 1);
+		}
+		const body = lines.slice(i, last + 1).filter((l) => !isComment(l, '.ahk'));
+		if (body.some((l) => /[\w\]]\s*:=\s*true\b/i.test(ahkStructuralCode(l)))) continue;
+
+		const assign = new RegExp(
+			`(?:^|[\\s,{}])([A-Za-z_][\\w.]*(?:\\[[^\\]\\n]+\\])?)\\s*:=\\s*${errVar}\\.Message\\s*(?:[,}]|;.*)?$`
+		);
+		for (let k = 0; k < body.length; k++) {
+			const m = body[k].match(assign);
+			if (!m) continue;
+			const target = m[1];
+			const at = lines.indexOf(body[k], i);
+			// A property outlives its method, so it is judged anywhere in the file; a
+			// plain local only inside the function that owns the catch.
+			const owner = owners[at];
+			const scope =
+				/[.[]/.test(target) || !owner || !functions.has(owner)
+					? lines
+					: functions.get(owner).text.split(/\r?\n/);
+			// A property is read back through another receiver: a fixture method
+			// writes `this.Failure` and the test asserts `F.Failure`, so only the
+			// member (`.Failure`, `["failure"]`) has to match, on any object.
+			const member = target.match(/(\.\w+|\[[^\]\n]+\])$/);
+			const t = member
+				? `(?<![\\w.\\]])[A-Za-z_]\\w*${escape(member[1])}(?![\\w.\\[])`
+				: `(?<![\\w.\\]])${escape(target)}(?![\\w.\\[])`;
+			const empty = new RegExp(
+				[
+					`${t}\\s*(?:==|=|!==|!=|<>)\\s*""`,
+					`""\\s*(?:==|=|!==|!=|<>)\\s*${t}`,
+					`AssertEqual\\(\\s*""\\s*,\\s*${t}\\s*[,)]`,
+					`AssertEqual\\(\\s*${t}\\s*,\\s*""\\s*[,)]`,
+					// A ternary expectation whose no-throw branch is the empty message.
+					`AssertEqual\\([^,\\n]*\\?[^,\\n]*:\\s*""\\s*,\\s*${t}\\s*[,)]`,
+					`AssertEqual\\([^,\\n]*\\?\\s*""\\s*:[^,\\n]*,\\s*${t}\\s*[,)]`,
+					`\\bAssert(?:True|False)?\\(\\s*!?\\s*${t}\\s*[,)]`,
+					`\\bStrLen\\(\\s*${t}\\s*\\)`,
+					`\\bif\\s*\\(?\\s*!?\\s*${t}\\s*\\)?\\s*(?:\\{|$)`
+				].join('|')
+			);
+			const judged = scope.find((l) => !isComment(l, '.ahk') && l !== body[k] && empty.test(l));
+			if (!judged) continue;
+			out.push({
+				file: rel(file),
+				line: at + 1,
+				text: body[k].trim(),
+				detail: `"${target}" holds only ${errVar}.Message — an Error("") reads as "did not throw"`
+			});
+		}
+	}
+	return out;
+}
+
 // ==================================================
 // ==================================================
 // ======= 4/ Scanning and reporting ================
@@ -930,7 +1032,8 @@ const PATTERNS = {
 	'dead-test': 'Test body that asserts nothing, or a Test() never registered',
 	'pcall-only': 'Assertion on a pcall status — proves "did not crash", nothing else',
 	'corpus-skip': 'Early return when a corpus could not be loaded — a missing contract passes',
-	'unfloored-scan': 'Source-scan loop that never asserts it matched anything'
+	'unfloored-scan': 'Source-scan loop that never asserts it matched anything',
+	'message-witness': 'Caught error message as the only throw witness — Error("") reads as no throw'
 };
 
 function scan() {
@@ -940,7 +1043,8 @@ function scan() {
 		'dead-test': [],
 		'pcall-only': [],
 		'corpus-skip': [],
-		'unfloored-scan': []
+		'unfloored-scan': [],
+		'message-witness': []
 	};
 	for (const tree of TREES) {
 		for (const file of walk(tree.dir, tree.ext)) {
@@ -949,8 +1053,10 @@ function scan() {
 			findings['dead-test'].push(...findDeadTests(file, src, tree.ext));
 			findings['corpus-skip'].push(...findCorpusSkips(file, src, tree.ext));
 			findings['unfloored-scan'].push(...findUnflooredScans(file, src, tree.ext));
-			if (tree.ext === '.ahk') findings['vacuous-absence'].push(...findVacuousAbsence(file, src));
-			else findings['pcall-only'].push(...findPcallOnly(file, src));
+			if (tree.ext === '.ahk') {
+				findings['vacuous-absence'].push(...findVacuousAbsence(file, src));
+				findings['message-witness'].push(...findMessageWitnesses(file, src));
+			} else findings['pcall-only'].push(...findPcallOnly(file, src));
 		}
 	}
 	return findings;

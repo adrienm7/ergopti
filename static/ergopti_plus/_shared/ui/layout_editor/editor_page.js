@@ -196,6 +196,8 @@ var LayoutEditorPage = (function () {
 	 *   initial?: string|null, onClose?: function}} host - saveFile(filename,
 	 *   text, mime) stores a file; initial is a source text to open; install({source,
 	 *   keylayout}) and platform ('macos'|'linux') when the host installs layouts;
+	 *   emulate(payload) the same way when its layout emulation can type the source
+	 *   without installing it;
 	 *   savedStatus names the message shown after a save; onClose leaves the editor;
 	 *   exportAssets() resolves what the XKB and KLC downloads run (standalone.js)
 	 *   on a host that can fetch them.
@@ -248,6 +250,8 @@ var LayoutEditorPage = (function () {
 			// host's registry list failed (the built-in references remain).
 			fillSources: null,
 			fillUnavailable: null,
+			// « New » shows where a new layout starts from: blank or another layout.
+			starting: false,
 			// Physical modifier keys held in the preview, as sided modifier ids.
 			heldSides: new Set(),
 			lost: null,
@@ -415,12 +419,9 @@ var LayoutEditorPage = (function () {
 					id: 'le-new',
 					text: tl('btn.new'),
 					onclick: () => {
-						const fresh = () => {
-							replace(LayoutSourceIO.create('my_layout', tl('default_name')));
-							render();
-						};
-						if (state.dirty) ask(tl('discard_confirm'), fresh);
-						else fresh();
+						state.starting = !state.starting;
+						if (state.starting && state.fillSources === null) loadFillSources();
+						else render();
 					}
 				}),
 				el('button', {
@@ -1577,6 +1578,66 @@ var LayoutEditorPage = (function () {
 			);
 		}
 
+		/** « Start from »: a blank layout, or a copy of a built-in or registry layout. */
+		function startPanel() {
+			if (!state.starting) return null;
+			const begin = (make) => {
+				const run = () => {
+					let started;
+					try {
+						started = make();
+					} catch (error) {
+						notify('error', problemText(error));
+						return;
+					}
+					state.starting = false;
+					replace(started.doc, started.lost.length ? started.lost : null);
+					render();
+				};
+				if (state.dirty) ask(tl('discard_confirm'), run);
+				else run();
+			};
+			const choices = [
+				el('button', {
+					type: 'button',
+					'data-start': 'blank',
+					text: tl('start.blank'),
+					onclick: () =>
+						begin(() => ({
+							doc: LayoutSourceIO.create('my_layout', tl('default_name')),
+							lost: []
+						}))
+				})
+			];
+			for (const entry of state.fillSources || [])
+				choices.push(
+					el('button', {
+						type: 'button',
+						'data-start': entry.id,
+						text: entry.name,
+						onclick: () =>
+							begin(() =>
+								LayoutSourceIO.startFrom(
+									entry,
+									`${LayoutSourceIO.identifierFrom(entry.id, 'layout')}_custom`,
+									tl('start.copy_name', { name: entry.name })
+								)
+							)
+					})
+				);
+			return el('section', { class: 'le-panel le-start', id: 'le-start' }, [
+				el('h2', { text: tl('start.title') }),
+				el('p', { class: 'le-note', text: tl('start.note') }),
+				state.fillSources === null
+					? el('p', { class: 'le-note', text: tl('start.loading') })
+					: null,
+				state.fillUnavailable
+					? el('p', { class: 'le-message error', text: state.fillUnavailable })
+					: null,
+				el('div', { class: 'le-buttons' }, choices)
+			]);
+		}
+
 		/** The composer's job: fill the current layer from one level of another layout. */
 		function fillPanel() {
 			const parts = [
@@ -2101,6 +2162,31 @@ var LayoutEditorPage = (function () {
 			});
 		}
 
+		/** « Emulate without installing »: the driver's emulation types the source over the system layout. */
+		function emulateButton(report) {
+			const row = report.find((entry) => entry.target === `driver_${host.platform}`);
+			return el('button', {
+				type: 'button',
+				id: 'le-emulate',
+				text: tl('btn.emulate'),
+				disabled: !row || row.status === 'unavailable',
+				onclick: () =>
+					ask(tl('emulate_confirm'), () => {
+						let payload;
+						try {
+							payload = LayoutSourceIO.installPayload(doc(), host.platform);
+						} catch (error) {
+							notify('error', problemText(error));
+							return;
+						}
+						Promise.resolve(host.emulate(payload)).then(
+							() => notify('ok', tl('status.emulated')),
+							(error) => notify('error', problemText(error))
+						);
+					})
+			});
+		}
+
 		function exportPanel() {
 			let report = [];
 			try {
@@ -2193,7 +2279,31 @@ var LayoutEditorPage = (function () {
 							}
 						})
 					);
+			// The four Windows DLL images, written in the page (no compiler).
+			if (host.saveBinary && !LayoutSourceIO.isPreserved(doc()))
+				buttons.push(
+					el('button', {
+						type: 'button',
+						id: 'le-export-dll',
+						text: tl('export.dll'),
+						onclick: () => {
+							let file;
+							try {
+								file = LayoutSourceIO.windowsDllArchive(doc());
+							} catch (error) {
+								notify('error', problemText(error));
+								return;
+							}
+							Promise.resolve(host.saveBinary(file.filename, file.bytes, 'application/zip')).then(
+								() => notify('ok', tl('status.saved', { name: file.filename })),
+								(error) => notify('error', problemText(error))
+							);
+						}
+					})
+				);
+			// The two ways ErgoptiPlus uses a layout, each said in one line.
 			if (host.install) buttons.push(installButton(report));
+			if (host.emulate) buttons.push(emulateButton(report));
 			// The driver applies the navigation layer through its navigation layer editor's save.
 			if (host.applyNav && (doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
 				buttons.push(
@@ -2257,8 +2367,15 @@ var LayoutEditorPage = (function () {
 						]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
+				el('p', { class: 'le-note', id: 'le-dll-note', text: tl('export.windows_dll_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
-				el('div', { class: 'le-buttons' }, buttons)
+				el('div', { class: 'le-buttons' }, buttons),
+				host.install
+					? el('p', { class: 'le-note', id: 'le-install-hint', text: tl('install_hint') })
+					: null,
+				host.emulate
+					? el('p', { class: 'le-note', id: 'le-emulate-hint', text: tl('emulate_hint') })
+					: null
 			]);
 		}
 
@@ -2354,6 +2471,7 @@ var LayoutEditorPage = (function () {
 					el('p', { class: 'le-subtitle', text: tl('subtitle') })
 				]),
 				toolbar(),
+				startPanel(),
 				messageBar(),
 				metadata(),
 				layerTabs(),

@@ -220,10 +220,10 @@ _PersonalTomlReadOpeningImage(FilePath) {
 	return Image
 }
 
-; Only the actual UI owners supply session authority. No arbitrary callback or
-; physical read runs here, including at the final short Critical boundary.
+; Only the actual UI owner (the WebView editor) supplies session authority. No
+; arbitrary callback or physical read runs here, including at the final short
+; Critical boundary.
 _PersonalTomlOpeningSessionIdentity(Source) {
-	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch, _PersonalEditorGui
 	global _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch, _HsEdWeb_Gui
 	if !(Source is Map) || !(Source.Get("admitted", false) is Integer)
 		|| Source.Get("admitted", false) != 1
@@ -233,13 +233,6 @@ _PersonalTomlOpeningSessionIdentity(Source) {
 	Kind := Source.Get("kind", "")
 	if !(Window is Gui) || !(Epoch is Integer) || Epoch < 1 || !(Kind is String)
 		return false
-	if Kind == "native" {
-		return IsSet(_PersonalEditorOpeningSource) && _PersonalEditorOpeningSource is Map
-			&& ObjPtr(_PersonalEditorOpeningSource) == ObjPtr(Source)
-			&& IsSet(_PersonalEditorSessionEpoch) && Epoch == _PersonalEditorSessionEpoch
-			&& IsSet(_PersonalEditorGui) && _PersonalEditorGui is Gui
-			&& ObjPtr(_PersonalEditorGui) == ObjPtr(Window)
-	}
 	if Kind == "webview" {
 		return IsSet(_HsEdWeb_OpeningSource) && _HsEdWeb_OpeningSource is Map
 			&& ObjPtr(_HsEdWeb_OpeningSource) == ObjPtr(Source)
@@ -255,8 +248,7 @@ _PersonalTomlOpeningSessionCurrent(Source) {
 		return false
 	; Native script completion is an existing logical receipt, not proof of
 	; application rendering. Refused/unsettled init submission grants no save.
-	return Source.Get("kind", "") != "webview"
-		|| (Source.Get("ready", false) is Integer && Source.Get("ready", false) == 1)
+	return Source.Get("ready", false) is Integer && Source.Get("ready", false) == 1
 }
 
 _PersonalTomlOpeningAuthority(Source, FilePath, OwnerToken) {
@@ -1944,7 +1936,7 @@ global PERSONAL_TOML_COMMIT_OK := 1
 global PERSONAL_TOML_COMMIT_DEFERRED := 2
 
 ; Recursively detach the editor model before either filesystem I/O or live
-; registration can yield. The native editor owns one mutable process-global Map;
+; registration can yield. A caller may retain and mutate the Map it passed;
 ; rejecting a nested writer is insufficient when that callback already mutated
 ; the Map the outer transaction planned to reload.
 _PersonalTomlCloneDetached(Value) {
@@ -2461,7 +2453,7 @@ PersonalTomlCommitAndReload(Data, RequestedSections := 0, WriterFn := 0,
 	}
 
 	; Pure memory only: take a stable candidate before a nested GUI callback can
-	; mutate the native editor's shared model. Critical is off again before any
+	; mutate the caller's model. Critical is off again before any
 	; validation, filesystem operation or registry rebuild.
 	PreviousCritical := Critical("On")
 	try Candidate := _PersonalTomlCloneDetached(Data)
@@ -2513,7 +2505,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	; _HS_RegisterPersonal already does at boot/full-rebuild time. Without this,
 	; saving an edit in a section the tray checkbox still shows as disabled
 	; silently activated it live (personal-hotstring-live-reload-ignores-gate).
-	; FeatureConfig is NOT used for this check — the caller (_SaveData) always
+	; FeatureConfig is NOT used for this check — the caller always
 	; passes the "autocorrection" sub-Map regardless of which section is being
 	; saved, so this reads the real per-section node from Features directly.
 	global Features

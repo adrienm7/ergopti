@@ -106,6 +106,7 @@ local function load_fixture()
 		end,
 		get_active_profile = function() return { label = "Fixture" } end,
 		get_backend = function() return "mlx" end,
+		request_settings = function() return { backend = "mlx", model = "fixture-model" } end,
 		get_current_model = function() return "fixture-model" end,
 		is_backend_ready = function() return true end,
 		pause_deferred_profile_warmup = function()

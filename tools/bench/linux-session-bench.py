@@ -222,20 +222,28 @@ def wait_quiet(session, cursor, quiet=0.25, timeout=3.0):
     return (rows[-1][0] if rows else None), [row for _, row in rows]
 
 
+# --driver: the driver folder of an installed tree to boot instead of this
+# checkout, launched through its absolute physical path as install/launch.sh does.
+DAEMON_DRIVER = None
+
+
 def start_daemon(session):
     """Spawns the daemon; returns (spawn to ready ms, Popen)."""
     session.log.write_text("")
+    entry, cwd = "ergopti_hotstrings.lua", cs.DRIVER
+    if DAEMON_DRIVER is not None:
+        entry, cwd = str(DAEMON_DRIVER / "ergopti_hotstrings.lua"), DAEMON_DRIVER
     spawned = time.monotonic()
     session.daemon = subprocess.Popen(
         [
             "luajit",
-            "ergopti_hotstrings.lua",
+            entry,
             "--verbose",
             *session.daemon_flags,
             "--config",
-            "tests/e2e/fixtures/daemon_keys.toml",
+            str(cs.DRIVER / "tests/e2e/fixtures/daemon_keys.toml"),
         ],
-        cwd=cs.DRIVER,
+        cwd=cwd,
         env=dict(session.env, **session.daemon_env),
         stdout=open(session.log, "w"),
         stderr=subprocess.STDOUT,
@@ -498,7 +506,12 @@ def main():
     parser.add_argument("--tray-rounds", type=int, default=5)
     parser.add_argument("--json")
     parser.add_argument("--budgets", action="store_true", help="exit 1 when a budget is exceeded")
+    parser.add_argument("--driver", help="boot the daemon from this installed tree's linux/ folder")
+    parser.add_argument("--boot-only", action="store_true", help="measure the boots, then stop")
     args = parser.parse_args()
+    global DAEMON_DRIVER
+    if args.driver:
+        DAEMON_DRIVER = pathlib.Path(args.driver).resolve()
 
     session = BenchSession("x11", [{"event": 90, "name": KEYBOARD, "kind": "keyboard"}])
     report = {}
@@ -541,6 +554,14 @@ def main():
         report["shutdown_ms"] = summarize(stop_ms)
         report["layout_resolves_per_boot"] = max(resolves)
         report["first_key_after_boot_ms"] = summarize(first_keys)
+        report["bytecode_package_used"] = "installed bytecode package" in session.log_text()
+        report["bytecode_fallback_warnings"] = session.log_text().count("Modules load from source")
+        if args.boot_only:
+            stop_daemon(session)
+            print(json.dumps(report, indent=2))
+            if args.json:
+                pathlib.Path(args.json).write_text(json.dumps(report, indent=2))
+            return 0
 
         # The privacy gate admits expansions after its first focus answer.
         session.tap(KEYBOARD, KEY_SPACE)

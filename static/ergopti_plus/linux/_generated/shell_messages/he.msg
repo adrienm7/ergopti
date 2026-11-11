@@ -5,6 +5,7 @@ build_luv.module_generated=מודול הרשת של LuaJIT נבנה מקוד ה�
 build_luv.recipe_required=הבנייה המקורית של luv דורשת את מתכון המקור שלה.
 install.already_installed={1} — כבר מותקן
 install.archive_digest_unavailable=עדכונים עם מתאר שמור דורשים סביבת OpenSSL3 אמיתית; היכולת נשארת לא זמינה.
+install.bytecode_skipped=לא ניתן היה ליצור את המודולים המהודרים מראש — Ergopti מופעל מקוד המקור, מעט לאט יותר.
 install.capability_verified={1} — היכולת אומתה
 install.command_still_missing={1} הותקן, אבל '{2}' עדיין לא נמצא.
 install.daemon_manual=כדי להפעיל את השירות ידנית:

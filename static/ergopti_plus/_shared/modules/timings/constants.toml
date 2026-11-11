@@ -285,6 +285,18 @@ terminal_hotstring_key_delay_ms = 20
 # ──────────────────────────────────────────────────────────────────────
 
 [gestures]
+# Least Manhattan travel, in millimetres, before a swipe has a direction: three
+# fingers or more, a pair (also the native scroll, so twice that), and a pair's
+# diagonal; the others' diagonal is gestures.direction's factor of theirs. One
+# value for every driver (maintainer decision GSD-3 of 2026-11-11); the swipe
+# step itself is each slot's own [gestures.sensitivities] setting.
+# HS: modules/gestures/geometry.lua. LX: modules/gestures/incremental_tracker.lua.
+# Windows receives each swipe finished by the Precision Touchpad settings and
+# measures no travel, so it reads none of them.
+swipe_minimum_mm = 1.5
+pair_swipe_minimum_mm = 3.0
+pair_diagonal_minimum_mm = 5.0
+
 # Windows: how long a gesture's synthetic keys stay marked, the settle after an
 # action's own window change, and the wait before the first auto-configuration.
 synthetic_clear_ms = 300
@@ -734,6 +746,12 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: how long TakeNote waits on a Notepad tab it has not bound before it
+# accepts it as the note it launched (Windows 11 tabbed Notepad, where a file
+# already open there stays selected instead of opening a new tab).
+# AHK: modules/take_note.ahk.
+take_note_tab_settle_ms = 1000
+
 # Linux X11: a layout loaded live from the user tree is put back when GNOME or
 # Plasma replaces it (a new keyboard, a GNOME input-sources change). A burst of
 # keymap events settles this long before one read of the server keymap; at

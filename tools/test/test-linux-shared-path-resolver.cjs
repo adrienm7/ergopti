@@ -70,7 +70,11 @@ const EXEMPT = new Set([
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.
 	'ergopti_hotstrings.lua',
-	'modules/hotstrings/engine.lua'
+	'modules/hotstrings/engine.lua',
+	// The installer's bytecode compiler is a bootstrap too: it puts an
+	// installation root's linux/ and _shared/ on package.path, and infra.paths
+	// itself needs the shared tree (logger.shim) before it can resolve anything.
+	'install/compile_bytecode.lua'
 ]);
 
 const files = walk(DRIVER);

@@ -34,7 +34,8 @@ sample(0)
 local day = assert(sample(interval))
 local expected = os.getenv("ERGOPTI_NATIVE_AUDIO_MUTED") == "true" and interval or 0
 assert(day.audio_muted_ms == expected, "localized native mute state lost or invented elapsed time")
-assert(day.awake_ms == interval and day.sleep_ms == 0)
+-- Unlocked time is no field of its own: awake_ms is keep-awake time (KMD-3).
+assert(day.awake_ms == 0 and day.sleep_ms == 0)
 """
 
 

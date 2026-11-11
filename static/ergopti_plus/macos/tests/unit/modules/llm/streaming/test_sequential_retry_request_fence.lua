@@ -179,6 +179,40 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 			end)
 		end)
 
+		-- AID-1 (decided by the maintainer on 2026-11-11): the quick retry is an
+		-- attempt of max_attempts, so every failure spends one, as on Windows and Linux.
+		for _, shape in ipairs({ { predictions = 1, sent = 2 }, { predictions = 2, sent = 4 } }) do
+			helpers.it(case.name .. " sends at most max_attempts requests for " .. shape.predictions
+				.. " prediction(s) when every attempt fails", function()
+				helpers.with_stub_scope({
+					case.module_name, "modules.llm.api_common", "modules.llm.profiles",
+					"modules.llm.progressive_reveal", "adapters.http_client",
+					"adapters.timer_scheduler", "adapters.shell_runner",
+				}, function()
+					local module = helpers.load_with_stubs(case.module_name)
+					local fetch = module.fetch_sequential
+					helpers.assert_true(set_upvalue(fetch, "ApiCommon", api_common))
+					helpers.assert_true(set_upvalue(fetch, "Profiles", profiles))
+					helpers.assert_true(set_upvalue(fetch, "TimerScheduler", scheduler))
+					local sent_tokens, failures, pending = {}, 0, {}
+					case.configure(module, function(...)
+						sent_tokens[#sent_tokens + 1] = select(6, ...)
+						pending[#pending + 1] = select(10, ...)
+					end)
+					module.fetch_sequential("full", "tail", "fixture-model", 0.5, 8, shape.predictions, {},
+						function() end, function() failures = failures + 1 end, function() return 9 end, false, nil)
+					local answered = 0
+					while answered < #pending do
+						answered = answered + 1
+						pending[answered]({ reason = "http_500", status = 500, message = "" })
+					end
+					helpers.assert_eq(#sent_tokens, shape.sent, "multiplier 2 allows two requests per prediction")
+					helpers.assert_eq(sent_tokens[2], 13, "the second request is the retry, with the extra tokens")
+					helpers.assert_eq(failures, 1, "the request fails once")
+				end)
+			end)
+		end
+
 		for _, streaming in ipairs({ false, true }) do
 			helpers.it(case.name .. " drops a completed variant after supersession with streaming=" .. tostring(streaming)
 				.. " (sequential-result-fence)", function()

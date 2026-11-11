@@ -131,3 +131,32 @@ new shutdown gate that settles by itself uses this retry and logs no error.
 `Changelog_Open` opens its WebView2 form only when `WebView_ShouldUseNativeFallback()`
 is false; below its free-memory threshold it opens the native window and there
 is no page to read. The check reports that as not executed.
+
+### project-an-isolated-driver-writes-no-machine-touchpad-key
+
+A smoke or live-check driver shares the signed-in user's HKCU: on 2026-11-11
+`clear-restore-categories` clicked the Gestures Clear all of a fresh profile,
+which has no touchpad backup, and the owner wrote the Windows factory values
+over the maintainer's own gesture settings. Under `ERGOPTI_STARTUP_SMOKE_DIR`
+the owner (`modules/gestures/touchpad_registry.ahk`) now swaps every machine
+port, a caller's included, for the profile's `touchpad_registry_private.txt`,
+and every launcher of the elevated device restart asks
+`TouchpadRegistrySkipsDeviceRestart` first. Judge a touchpad outcome from that
+file; the real key is read only to catch a leak. Action: a new machine-scoped
+writer (Startup folder, `HKCU\Software\Ergopti\Storage`, an OS setting) follows
+the same rule before a live check clicks it.
+
+### project-an-isolated-driver-keeps-off-startup-and-storage
+
+The same rule now covers the two other machine-scoped writers: APPDATA is not
+redirected for an isolated driver, so its start-at-login toggle reached the
+user's real `A_Startup` shortcut, and every `ST_*` value (WPM widget position,
+LLM refusal and agent state, updater cadence) went to the real
+`HKCU\Software\Ergopti\Storage`. `infra/start_at_login.ahk` takes its folder
+and approval reader from `_StartAtLoginIsolate` (private `startup_private\`,
+no Windows approval) and `adapters/storage.ahk` swaps every registry port in
+`_ST_Isolate` for `storage_private.txt`, a caller's included. Each logs one
+`Isolated profile:` line. No live check clicks start at login, and the real
+Storage key is not a leak oracle: the user's own driver writes it meanwhile.
+Action: a test that toggles one of them proves the private port before it
+mutates, so a regressed owner fails without touching the machine.

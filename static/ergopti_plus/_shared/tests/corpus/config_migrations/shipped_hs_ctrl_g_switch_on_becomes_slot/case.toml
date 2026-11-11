@@ -5,4 +5,4 @@ description = "The macOS Ctrl+G switch left on becomes the open_chatgpt action o
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 19
-to_version = 20
+to_version = 21

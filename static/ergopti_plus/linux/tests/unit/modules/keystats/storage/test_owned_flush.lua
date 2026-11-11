@@ -1450,7 +1450,8 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 			local tombstone = tombstones(operations[2])
 			helpers.assert_eq(#tombstone, 1)
 			helpers.assert_true(tombstone[1].ts:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$") ~= nil)
-			helpers.assert_true(tombstone[1].metadata.utc:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d$") ~= nil)
+			helpers.assert_true(tombstone[1].metadata.utc:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$") ~= nil)
+			helpers.assert_eq(tombstone[1].ts, tombstone[1].metadata.utc, "a Linux tombstone stamps ts in UTC (KMD-1)")
 			helpers.assert_eq(#replies, 0, "no answer before the tombstone commits")
 			operations[2].outcome, operations[2].physical = "commit", true
 			k.pump_flush()

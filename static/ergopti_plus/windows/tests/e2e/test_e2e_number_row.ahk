@@ -318,3 +318,101 @@ _E2ENR_EveryInstalledLayout(Azerty, Qwerty) {
 }
 Test("e2e[number-row] digits first on every installed layout (number-row-e2e)",
 	_E2ENR_With.Bind(_E2ENR_EveryInstalledLayout))
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 3/ Shared row option vectors =======
+; ============================================
+; ============================================
+
+; layouts/row_options_vectors.json, which the composer, the Linux converter and
+; the macOS keylayout editor replay, typed on the real AZERTY and US layouts
+; through the presses above. Not replayed, each with its reason:
+; - a case with "overrides": it edits a cell of the source layout, which only a
+;   composed layout can hold; Windows types the OS layout's own cells, and a
+;   composed layout reaches it as a registry .keylayout the vector does not carry;
+; - "altgr" presses and "sends" (Ctrl, Alt, Win): no number-row hotkey takes a
+;   press with those modifiers (_E2ENR_CriteriaMatchTheHotkeys), so the OS
+;   layout types them itself, which no Windows code decides.
+global E2ENR_ROW_OPTION_OVERRIDE_CASES := 2
+
+; A press's result as the character it types: "native:<c>", "{Text}<c>" or the
+; down and up of a digit.
+_E2ENR_Typed(Out) {
+	if SubStr(Out, 1, 7) == "native:"
+		return SubStr(Out, 8)
+	if SubStr(Out, 1, 6) == "{Text}" && !InStr(Out, "|")
+		return SubStr(Out, 7)
+	if RegExMatch(Out, "^\{(\d) Down\}\|\{\1 Up\}$", &Match)
+		return Match[1]
+	return "unrecognised:" . Out
+}
+
+; One "types" row of a vector on layout Hkl, its press spelled "[mods ]SCxxx".
+_E2ENR_RowOptionPress(Vector, Press, Expected, Hkl) {
+	Parts := StrSplit(Press, " ")
+	Sc := Integer("0x" . SubStr(Parts[Parts.Length], 3))
+	Shift := false, Caps := false
+	Loop Parts.Length - 1 {
+		switch Parts[A_Index] {
+			case "shift": Shift := true
+			case "caps": Caps := true
+			default: throw ValueError(Vector["id"] . ": unknown modifier " . Parts[A_Index])
+		}
+	}
+	Where := Vector["id"] . " " . Press
+	if !Caps {
+		AssertEqual(Expected, _E2ENR_Typed(_E2ENR_Press(Sc, Shift)), Where)
+		return
+	}
+	; The hotkeys pass the live CapsLock state to the same read; the vector's state
+	; is passed instead, so the machine's own CapsLock cannot steer the case.
+	AssertTrue(Sc >= 0x02 && Sc <= 0x0B && NumberRowEffectiveMode(Hkl, true) == "symbols",
+		Where . ": a CapsLock row is a digit key under symbols first")
+	AssertEqual(Expected, NumberRowSymbolsFirstText(Sc, Shift, Hkl, true), Where)
+}
+
+_E2ENR_RowOptionCase(Vector, Hkl) {
+	global _NumberRowForegroundLayout
+	Rows := Vector["rows"], Effective := Vector["effective"]
+	_E2ENR_UseLayout(_E2ENR_Settings(Map("direct_access_digits", Rows["order"],
+		"number_row_reorder_edges", Rows["edges"] ? true : false)))
+	_NumberRowForegroundLayout := Hkl
+	AssertEqual(Effective["order"], NumberRowEffectiveMode(Hkl, false), Vector["id"] . ": the ordering in effect")
+	AssertEqual(Effective["reason"],
+		NumberRowPolicyEffective(Rows["order"], NumberRowAvailability(Hkl, false))["reason"], Vector["id"] . ": why")
+	Edges := NumberRowEdgesState(Hkl, false)
+	AssertEqual(Effective["edges"]["applies"] ? 1 : 0, Edges["applies"] ? 1 : 0, Vector["id"] . ": the edge keys")
+	if Rows["edges"]
+		AssertEqual(Effective["edges"]["reason"], Edges["reason"], Vector["id"] . ": why the edge keys")
+	for Row in Vector["types"] {
+		if InStr(Row[1], "altgr ") == 1
+			continue
+		_E2ENR_RowOptionPress(Vector, Row[1], Row[2], Hkl)
+	}
+}
+
+_E2ENR_RowOptionVectors(Azerty, Qwerty) {
+	global _SharedDir
+	Cases := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\row_options_vectors.json", "UTF-8"))["cases"]
+	Sources := Map("azerty", Azerty, "qwerty", Qwerty)
+	Replayed := 0, Overrides := 0
+	for Vector in Cases {
+		if Vector.Has("overrides") {
+			Overrides += 1
+			continue
+		}
+		AssertTrue(Sources.Has(Vector["source"]), Vector["id"] . ": a source layout this harness loads")
+		_E2ENR_RowOptionCase(Vector, Sources[Vector["source"]])
+		Replayed += 1
+	}
+	AssertEqual(E2ENR_ROW_OPTION_OVERRIDE_CASES, Overrides, "a new override case needs a Windows owner first")
+	AssertEqual(Cases.Length - Overrides, Replayed, "every other case is replayed")
+	AssertTrue(Replayed >= 8, "the corpus lost its cases")
+}
+Test("e2e[number-row] the shared row option vectors type on real AZERTY and QWERTY (number-row-options-corpus)",
+	_E2ENR_With.Bind(_E2ENR_RowOptionVectors))

@@ -320,6 +320,7 @@ helpers.describe("keystats", function()
       local fake_writer = {
         open_db = function() return true end,
         ensure_token_encoding = function() return true end,
+        ensure_awake_definition = function() return true end,
         register_device = function() return true end,
         read_open_walk = function() return nil, true end,
         upsert_open_walk = function() return true end,

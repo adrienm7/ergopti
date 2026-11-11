@@ -1,5 +1,5 @@
 {
-	"expected_count": 167,
+	"expected_count": 139,
 	"filters": [
 		{
 			"contains": "key-combination-semantic-scope",
@@ -32,10 +32,6 @@
 		{
 			"contains": "tap-hold-semantic-consumers",
 			"expected_count": 14
-		},
-		{
-			"contains": "personal-native-modal-owner",
-			"expected_count": 28
 		},
 		{
 			"contains": "region-startup-",

@@ -68,7 +68,7 @@ var LayoutZipWriter = (function () {
 
 	/**
 	 * Packs files into a stored ZIP archive.
-	 * @param {{path: string, text: string, encoding: 'utf8'|'utf16le'}[]} files
+	 * @param {{path: string, text?: string, encoding?: 'utf8'|'utf16le', bytes?: Uint8Array}[]} files
 	 * @returns {Uint8Array}
 	 */
 	function pack(files) {
@@ -84,7 +84,8 @@ var LayoutZipWriter = (function () {
 			if (!file.path || file.path.startsWith('/') || file.path.split('/').includes('..'))
 				throw new Error(`zip: unsafe path ${file.path}`);
 			const name = new TextEncoder().encode(file.path);
-			const data = encode(file.text, file.encoding);
+			// A binary file (a DLL image) carries its bytes; a text file its text and encoding.
+			const data = file.bytes instanceof Uint8Array ? file.bytes : encode(file.text, file.encoding);
 			if (data.length > MAX_SIZE || offset > MAX_SIZE) throw new Error('zip: archive too large');
 			const crc = crc32(data);
 			const local = header(30);
