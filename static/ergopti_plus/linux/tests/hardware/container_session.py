@@ -183,6 +183,8 @@ class Session:
 
     def mount_devices(self):
         """Puts the model's nodes and device list where the kernel's are."""
+        # A kernel without evdev has no /dev/input: the mount point is made here.
+        os.makedirs("/dev/input", exist_ok=True)
         subprocess.run(["mount", "-t", "tmpfs", "tmpfs", "/dev/input"], check=True)
         for device in self.devices:
             node = "/dev/input/event%d" % device["event"]
@@ -350,9 +352,12 @@ class Session:
 
     def start_wayland(self):
         """sway headless (wlroots, with data-control) or mutter headless (GNOME, without)."""
-        runtime = pathlib.Path("/run/user/0")
-        runtime.mkdir(parents=True, exist_ok=True)
-        os.chmod(runtime, 0o700)
+        # A runtime folder of its own: sway names its socket wayland-N itself and
+        # reuses a stale name another session left in a shared folder. Short, as
+        # a Unix socket path is limited to 108 bytes.
+        runtime = pathlib.Path("/run/ergopti-proof-%d" % os.getpid())
+        runtime.mkdir(mode=0o700)
+        self.runtime = runtime
         self.env["XDG_RUNTIME_DIR"] = str(runtime)
         self.env.pop("DISPLAY", None)
         self.env["XDG_SESSION_TYPE"] = "wayland"
@@ -534,6 +539,8 @@ class Session:
             subprocess.run(["umount", path], check=False)
         subprocess.run(["umount", "/proc/bus/input/devices"], check=False)
         subprocess.run(["umount", "/dev/input"], check=False)
+        if getattr(self, "runtime", None):
+            shutil.rmtree(self.runtime, ignore_errors=True)
         if not os.environ.get("ERGOPTI_PROOF_KEEP"):
             shutil.rmtree(self.root, ignore_errors=True)
 
