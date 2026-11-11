@@ -33,7 +33,8 @@ report as it is.
   `_shared/lua/layouts/source_store.lua`. The host answers `window.sourceData({text, filename, folder})` and
   `window.sourceResult({ok, code, detail, filename})`. Files go to `layout_sources/` of the configuration folder
   (bounds in `_shared/modules/layouts/defaults.json` `[source]`); saving never installs or selects a layout.
-  « Install and use » sends `composer_save` with `source`, the compiled `.keylayout` for the host's OS and
+  « Install and use » sends `composer_save` with `source`, the compiled `.keylayout` for the host's OS, the
+  source's `emulation` table for that OS (`LayoutSourceIO.emulationTable`; none for a preserved import) and
   `use: true`: the composer host (`_shared/lua/layouts/composer.lua`) stores it, replaces any composition, installs
   it as the `composed` layout and switches to it; its `composerResult` is routed back to the editor.
   « Fill a layer from a layout » takes the host's `composer_open` sources (its `composerData` is routed to the

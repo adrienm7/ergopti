@@ -260,15 +260,31 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
-	 * What the ErgoptiPlus composer host installs: the TOML and the .keylayout
-	 * compiled for the host's OS (composer_save with `source`, composer.lua).
+	 * What the ErgoptiPlus composer host installs: the TOML, the .keylayout
+	 * compiled for the host's OS and, for a structured source, the emulation
+	 * table of that OS (composer_save with `source` and `emulation`,
+	 * composer.lua), which the driver performs for what the .keylayout cannot
+	 * hold (custom modifiers, tap-holds, shortcuts). A preserved import has none.
 	 * @param {object} doc
 	 * @param {'macos'|'linux'} platform
-	 * @returns {{source: string, keylayout: string}}
+	 * @returns {{source: string, keylayout: string, emulation?: string}}
 	 */
 	function installPayload(doc, platform) {
 		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
-		return { source: serialize(doc), keylayout: compiled.text };
+		const payload = { source: serialize(doc), keylayout: compiled.text };
+		if (!isPreserved(doc)) payload.emulation = JSON.stringify(emulationTable(doc, platform));
+		return payload;
+	}
+
+	/**
+	 * The emulation table of a structured source for one OS: what the drivers
+	 * and the page preview perform on top of the compiled .keylayout.
+	 * @param {object} doc
+	 * @param {'macos'|'linux'|'windows'} platform
+	 * @returns {object}
+	 */
+	function emulationTable(doc, platform) {
+		return LayoutSourceCompiler.compileEmulation(doc, tables(), { platform });
 	}
 
 	/** An identifier the format accepts, derived from free text. */
@@ -586,6 +602,7 @@ var LayoutSourceIO = (function () {
 		macosBundleArchive,
 		macosDownload,
 		installPayload,
+		emulationTable,
 		withNavLayer,
 		navLayerFile
 	};

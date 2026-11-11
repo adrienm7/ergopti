@@ -273,6 +273,9 @@ test('the exact conversion keeps the behaviour and compiles back to the same cha
 		const payload = IO.installPayload(converted.doc, 'linux');
 		assert.equal(IO.parse(payload.source).ok, true);
 		assert.match(payload.keylayout, /<keyboard /);
+		const emulation = JSON.parse(payload.emulation);
+		assert.equal(emulation.platform, 'linux');
+		assert.equal(emulation.layout, converted.doc.layout.id);
 	}
 	refuses(() => IO.convertImport(IO.create('a', 'A')), 'source_not_imported');
 });
@@ -281,6 +284,7 @@ test('a preserved import installs and exports its own XML, only in its own varia
 	const xml = registry('ergopti');
 	const doc = IO.importKeylayout(xml, 'ergopti', 'iso');
 	assert.equal(IO.installPayload(doc, 'macos').keylayout, xml);
+	assert.equal(IO.installPayload(doc, 'macos').emulation, undefined, 'an import has no table');
 	assert.equal(IO.keylayoutFile(doc, 'iso').text, xml);
 	refuses(() => IO.keylayoutFile(doc, 'ansi'), 'source_export_unavailable');
 });

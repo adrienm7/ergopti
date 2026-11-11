@@ -184,6 +184,10 @@ async function exerciseManager(browser, origin) {
 	assert.match(install.source, /format = "ergopti-layout"/);
 	assert.match(install.keylayout, /<keyboard /);
 	assert.equal(install.declaration, undefined);
+	// The drivers perform this table for what the .keylayout cannot hold.
+	const table = JSON.parse(install.emulation);
+	assert.equal(table.format, 'ergopti-layout-emulation');
+	assert.match(install.source, new RegExp(`id = "${table.layout}"`));
 	await page.evaluate(() =>
 		window.composerResult({ action: 'composer_save', ok: true, used: true })
 	);
