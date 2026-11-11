@@ -529,3 +529,60 @@ _KLMS_CompensatedBurst(Recorder) {
 }
 Test("scroll: compensated burst retires timing (scroll-zero-net-lifecycle)",
 	_KLMS_WithState.Bind(0, 0, 1000, 1100, _KLMS_CompensatedBurst))
+
+
+; Scroll hooks and the burst flush timer bypass native Suspend. While capture is
+; held (driver suspended or metrics paused) the accumulator must count nothing
+; and arm no timer, and a flush must publish nothing and retire the burst so a
+; post-resume flush does not measure the pause (mouse-handlers-bypass-suspend,
+; keystats-mouse-scroll-suspend-reset).
+_KLMS_SuspendedAccumulateAction(Recorder) {
+	WasSuspended := A_IsSuspended
+	try {
+		Suspend(true)
+		_KLMS_Accumulate("vertical", 1300, Recorder)
+		AssertEqual(2, KLMouse.scroll_ticks, "a wheel tick while suspended must not be accumulated")
+		AssertEqual(1000, KLMouse.scroll_last, "a wheel tick while suspended must not move the burst clock")
+		AssertEqual(0, Recorder.Calls.Length, "a wheel tick while suspended must not query, bump or arm anything")
+		Suspend(false)
+		_KLMS_Accumulate("vertical", 1300, Recorder)
+		AssertEqual(3, KLMouse.scroll_ticks, "positive control: the same tick accumulates once resumed")
+		AssertEqual(1, Recorder.Bumps, "positive control: the resumed tick bumps the counter")
+	} finally Suspend(WasSuspended)
+}
+Test("mouse: a wheel tick while suspended is not accumulated (mouse-handlers-bypass-suspend)",
+	_KLMS_WithState.Bind(2, 0, 1000, 1000, _KLMS_SuspendedAccumulateAction))
+
+_KLMS_SuspendedFlushAction(Recorder) {
+	WasSuspended := A_IsSuspended
+	try {
+		Suspend(true)
+		_KLMS_Flush(1500, Recorder)
+	} finally Suspend(WasSuspended)
+	AssertEqual(0, Recorder.Events.Length, "a flush while suspended must not publish a scroll event")
+	AssertEqual(0, Recorder.Calls.Length, "a flush while suspended must not query, refresh or sample the cursor")
+	for Field in ["scroll_ticks", "scroll_h_ticks", "scroll_start", "scroll_last"]
+		AssertEqual(0, KLMouse.%Field%, "a flush while suspended must retire KLMouse." . Field)
+}
+Test("mouse: a flush while suspended publishes nothing and retires the burst (keystats-mouse-scroll-suspend-reset)",
+	_KLMS_WithState.Bind(5, 0, 1000, 1000, _KLMS_SuspendedFlushAction))
+
+; Every mouse guard names KL_CaptureHeld, so it must hold for both pauses.
+_KLMS_CaptureHoldCoversBothPauses() {
+	WasSuspended := A_IsSuspended
+	WasPaused := KLCollection.suspended
+	try {
+		Suspend(false)
+		KLCollection.suspended := false
+		AssertFalse(KL_CaptureHeld(), "capture is open while neither pause is active")
+		Suspend(true)
+		AssertTrue(KL_CaptureHeld(), "capture is held while the driver is suspended")
+		Suspend(false)
+		KLCollection.suspended := true
+		AssertTrue(KL_CaptureHeld(), "capture is held while the user pauses metrics")
+	} finally {
+		KLCollection.suspended := WasPaused
+		Suspend(WasSuspended)
+	}
+}
+Test("mouse: the capture-hold gate covers native Suspend and the metrics pause", _KLMS_CaptureHoldCoversBothPauses)

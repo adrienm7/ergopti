@@ -48,22 +48,101 @@ function Assert-ErgoptiRemovalTarget {
 	}
 }
 
+function Get-ErgoptiFileIdentity {
+	param([IO.FileStream]$Stream)
+	# The volume serial and file index of the open object, which no rename or
+	# replacement of a name can fake. Windows PowerShell 5.1 has no public
+	# reader; its own hard-link code calls GetFileInformationByHandle, and the
+	# bundled scripts may not declare P/Invoke (tools/ci/windows-exe-av-surface.json).
+	$owner = [Management.Automation.PSObject].Assembly.GetType(
+		'Microsoft.PowerShell.Commands.InternalSymbolicLinkLinkCodeMethods', $true)
+	$reader = $owner.GetMethod('GetFileInformationByHandle', [Reflection.BindingFlags]'Static,Public,NonPublic')
+	if ($null -eq $reader) { throw 'The file identity reader is unavailable.' }
+	$arguments = @($Stream.SafeFileHandle.DangerousGetHandle(),
+		[Activator]::CreateInstance($reader.GetParameters()[1].ParameterType.GetElementType()))
+	if (-not $reader.Invoke($null, $arguments)) { throw 'The file identity could not be read.' }
+	$information = $arguments[1]
+	return '{0:x8}:{1:x8}{2:x8}' -f $information.VolumeSerialNumber, $information.FileIndexHigh, $information.FileIndexLow
+}
+
+function Open-ErgoptiFileAnchor {
+	param([string]$Path)
+	# Attribute access only: Windows applies no sharing check to such a handle,
+	# so it blocks no reader, writer, rename or recycle, and it keeps the object
+	# (so its file index) alive while it is open.
+	return New-Object IO.FileStream($Path, [IO.FileMode]::Open,
+		[Security.AccessControl.FileSystemRights]'ReadAttributes, Synchronize', [IO.FileShare]'ReadWrite, Delete',
+		4096, [IO.FileOptions]::None)
+}
+
+function Get-ErgoptiRecycleBinFolder {
+	param([string]$Path)
+	$user = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+	return Join-Path ([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($Path))) ('$Recycle.Bin\' + $user)
+}
+
+# The recycled entry ($R...) whose identity is Identity, or $null.
+function Find-ErgoptiRecycledIdentity {
+	param([string]$Bin, [string]$Identity)
+	if (-not (Test-Path -LiteralPath $Bin -PathType Container)) { return $null }
+	# The shell names a recycled file $R<id><extension>, beside its $I record.
+	foreach ($entry in Get-ChildItem -LiteralPath $Bin -Force -File -Filter '$R*') {
+		try { $candidate = Open-ErgoptiFileAnchor $entry.FullName }
+		catch [UnauthorizedAccessException], [IO.IOException] {
+			Write-Warning "Recycle Bin entry $($entry.Name) could not be compared: $($_.Exception.Message)"
+			continue
+		}
+		try { if ((Get-ErgoptiFileIdentity $candidate) -eq $Identity) { return $entry.FullName } }
+		finally { $candidate.Dispose() }
+	}
+	return $null
+}
+
 function Invoke-ErgoptiRemoval {
 	param([string]$Path, [string]$Hash, [scriptblock]$Authorize, [scriptblock]$WaitOwner, [scriptblock]$Recycle,
-		[scriptblock]$Unregister = {})
+		[scriptblock]$Unregister = {}, [scriptblock]$Locate = { param($Item, $Identity)
+			Find-ErgoptiRecycledIdentity (Get-ErgoptiRecycleBinFolder $Item) $Identity }, [scriptblock]$Released = {})
 	Assert-ErgoptiRemovalTarget $Path $Hash
 	if (-not (& $Authorize)) { return $false }
 	if (-not (& $WaitOwner)) { throw 'The application did not finish shutting down.' }
 	# The last check and the unregistration run under a handle that denies write,
 	# rename and delete: a pathname hash alone left the shortcut work, which takes
 	# COM calls, free to swap the image that the recycle then selected. Windows
-	# cannot recycle a pinned file, so the pin ends on the statement before it.
-	$pin = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+	# cannot recycle a pinned file, so the pin must end before the recycle; the
+	# identity read under it (volume serial and file index) then follows the
+	# exact object through its quarantine name into the Recycle Bin.
+	$anchor = $null
 	try {
-		Assert-ErgoptiRemovalTarget $Path $Hash
-		& $Unregister $Path
-	} finally { $pin.Dispose() }
-	& $Recycle $Path
+		$pin = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+		try {
+			Assert-ErgoptiRemovalTarget $Path $Hash
+			$identity = Get-ErgoptiFileIdentity $pin
+			& $Unregister $Path
+			# Opened under the pin, so it is the pinned object: it keeps that file
+			# index from being reused by another file until the end.
+			$anchor = Open-ErgoptiFileAnchor $Path
+			if ((Get-ErgoptiFileIdentity $anchor) -ne $identity) { throw 'The executable changed under its pin.' }
+		} finally { $pin.Dispose() }
+		& $Released $Path
+		# A fresh unguessable name in the same directory: the recycle selects this
+		# name, never the published one another program may recreate.
+		$quarantine = Join-Path ([IO.Path]::GetDirectoryName($Path)) (
+			'.ergopti-uninstall-' + [guid]::NewGuid().ToString('N') + '.exe')
+		[IO.File]::Move($Path, $quarantine)
+		$check = Open-ErgoptiFileAnchor $quarantine
+		try { $quarantined = (Get-ErgoptiFileIdentity $check) -eq $identity } finally { $check.Dispose() }
+		if (-not $quarantined) {
+			# The name was replaced between the pin and the rename: hand the foreign
+			# file its name back and recycle nothing.
+			[IO.File]::Move($quarantine, $Path)
+			throw 'The executable was replaced before its quarantine; nothing was recycled.'
+		}
+		& $Recycle $quarantine
+		if (Test-Path -LiteralPath $quarantine) { throw 'The quarantined executable was not recycled.' }
+		if ($null -eq (& $Locate $quarantine $identity)) {
+			throw 'The recycled file is not the confirmed executable; check the Recycle Bin.'
+		}
+	} finally { if ($null -ne $anchor) { $anchor.Dispose() } }
 	return $true
 }
 

@@ -852,3 +852,89 @@ for Kind in ["health", "tags"]
 for Kind in ["health", "tags"]
 	Test("menu-probe-clock-native64: full cycle " . Kind,
 		_LAO_ProbeClock.Bind(Kind, false, false, 0x100000000))
+
+; The tray health and installed-tag probes run from SetTimer, which native
+; Suspend does not disarm. A paused driver must start no probe (no curl child,
+; no WinHTTP request), whichever caller forces it, and a completion that lands
+; while paused must neither publish its status nor rebuild the tray
+; (health-probe-timer-not-suspend-guarded). Each case has an unsuspended
+; positive control on the same fixture, so a probe that never dispatches
+; cannot pass.
+_LAO_SuspendedProbe(Kind) {
+	global _LLM_Menu, _LLM_InstalledTagsCacheAt, _DriverInputInitPending
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	global LLM_HEALTH_PROBE_THROTTLE_MS, LLM_INSTALLED_CACHE_TTL_MS
+	Saved := { Menu: _LLM_Menu, CacheAt: _LLM_InstalledTagsCacheAt,
+		PendingSet: IsSet(_DriverInputInitPending),
+		Pending: IsSet(_DriverInputInitPending) ? _DriverInputInitPending : false,
+		Generation: _LLM_AuxGeneration, Counter: _LLM_AuxOwnerCounter,
+		Owners: _LLM_AuxOwners, Debt: _LLM_AuxCleanupDebt,
+		DebtCounter: _LLM_AuxCleanupDebtCounter, HealthTTLSet: IsSet(LLM_HEALTH_PROBE_THROTTLE_MS),
+		HealthTTL: IsSet(LLM_HEALTH_PROBE_THROTTLE_MS) ? LLM_HEALTH_PROBE_THROTTLE_MS : 0,
+		TagsTTL: LLM_INSTALLED_CACHE_TTL_MS }
+	WasSuspended := A_IsSuspended
+	Calls := []
+	Builds := []
+	Dispatch(Callback, Owner) => Calls.Push({ Callback: Callback, Owner: Owner })
+	Fire() {
+		if Kind == "health"
+			_LLM_Menu_FireHealthProbe(true, 5000, Dispatch)
+		else
+			_LLM_Menu_FireInstalledTagsProbe(5000, Dispatch)
+	}
+	try {
+		_LAO_ResetOwners()
+		LLM_HEALTH_PROBE_THROTTLE_MS := 1000
+		LLM_INSTALLED_CACHE_TTL_MS := 2000
+		_LLM_Menu := Map("enabled", true, "backend", "ollama", "last_health_probe_tick", 100,
+			"last_health_status", "ko")
+		_LLM_InstalledTagsCacheAt := 100
+		_DriverInputInitPending := false
+
+		Suspend(1)
+		Fire()
+		AssertEqual(0, Calls.Length, Kind . ": a forced probe must not dispatch while the driver is suspended")
+		if Kind == "health"
+			AssertEqual(100, _LLM_Menu["last_health_probe_tick"],
+				"a suspended health tick must not consume the throttle window")
+		Suspend(0)
+		Fire()
+		AssertEqual(1, Calls.Length, Kind . ": the same probe must dispatch once the driver resumes")
+		Owner := Calls[1].Owner
+		AssertTrue(LLM_AuxIsCurrent(Owner), "the resumed probe must hold a current owner")
+		if Kind != "health"
+			return
+
+		Suspend(1)
+		AssertFalse(_LLM_Menu_OnHealthProbeDone(true, Owner, (*) => Builds.Push("build")),
+			"a health completion landing while suspended must be refused")
+		AssertEqual("ko", _LLM_Menu["last_health_status"],
+			"a suspended health completion must not publish its status")
+		AssertEqual(0, Builds.Length, "a suspended health completion must not rebuild the tray")
+		AssertTrue(LLM_AuxIsCurrent(Owner), "a refused suspended completion must not retire its owner")
+		Suspend(0)
+		AssertTrue(_LLM_Menu_OnHealthProbeDone(true, Owner, (*) => Builds.Push("build")),
+			"the same completion must be accepted once the driver resumes")
+		AssertEqual("ok", _LLM_Menu["last_health_status"], "the resumed completion publishes its status")
+		AssertEqual(1, Builds.Length, "the resumed status flip rebuilds the tray once")
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		LLM_AuxInvalidate("suspended_probe_test")
+		_LLM_Menu := Saved.Menu
+		_LLM_InstalledTagsCacheAt := Saved.CacheAt
+		_DriverInputInitPending := Saved.PendingSet ? Saved.Pending : unset
+		_LLM_AuxGeneration := Saved.Generation
+		_LLM_AuxOwnerCounter := Saved.Counter
+		_LLM_AuxOwners := Saved.Owners
+		_LLM_AuxCleanupDebt := Saved.Debt
+		_LLM_AuxCleanupDebtCounter := Saved.DebtCounter
+		LLM_HEALTH_PROBE_THROTTLE_MS := Saved.HealthTTLSet ? Saved.HealthTTL : unset
+		LLM_INSTALLED_CACHE_TTL_MS := Saved.TagsTTL
+	}
+}
+Test("LLM tray: a suspended health probe neither dispatches nor rebuilds the tray (health-probe-timer-not-suspend-guarded)",
+	_LAO_SuspendedProbe.Bind("health"))
+Test("LLM tray: a suspended installed-tags probe does not dispatch (health-probe-timer-not-suspend-guarded)",
+	_LAO_SuspendedProbe.Bind("tags"))

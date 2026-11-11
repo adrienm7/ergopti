@@ -241,6 +241,7 @@ global _DefaultLogsDir := _LogsDir
 ; The layer editor host: validation, the atomic save and the page's messages,
 ; driven by unit/modules/keymap/test_layer_editor_host.ahk without a WebView.
 #Include ../ui/layer_editor/init.ahk
+#Include ../ui/physical_shortcuts/init.ahk
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
 #Include ../ui/menu/menu_hotstring_switches.ahk
@@ -316,6 +317,7 @@ global _DefaultLogsDir := _LogsDir
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/modules/keymap/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
+#Include ../modules/keymap/layout_registry_watch.ahk
 #Include ../modules/keymap/pause_layout_switch.ahk
 #Include ../modules/keymap/system_layout_install.ahk
 #Include ../ui/tooltip/init.ahk
@@ -556,6 +558,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/catalogue/test_terminator_admission.ahk
 #Include unit/modules/hotstrings/personal/test_personal_toml_editor.ahk
 #Include unit/ui/menu/test_menu_helpers.ahk
+#Include unit/ui/physical_shortcuts/test_physical_shortcut_host.ahk
 #Include unit/ui/menu/test_manifest_menu_resolve_disabled_when_failclosed.ahk
 #Include unit/ui/menu/test_manifest_menu_declarations_are_read.ahk
 #Include unit/ui/menu/test_manifest_menu_declared_groups.ahk
@@ -685,6 +688,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_shortcuts.ahk
 #Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
+#Include unit/modules/shortcuts/test_keepawake_pause_gate.ahk
 #Include unit/suite/test_runner_shard.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
@@ -1313,6 +1317,8 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/metrics/test_metrics_rebuild_snapshots.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_stages.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_open_failure.ahk
+#Include unit/modules/keystats/reader/test_klr_utc_offset_migration.ahk
+#Include unit/modules/keystats/reader/test_klr_utc_offset_rows.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_rejection_identity.ahk
 #Include unit/modules/keystats/reader/test_klr_rebuild_publication.ahk
 #Include unit/modules/keystats/reader/test_klr_ledger_listing_failure.ahk
@@ -1523,7 +1529,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_mouse_hotkey_clobber.ahk
 #Include meta/modules/gestures/test_mouse_suspend_guard.ahk
 #Include meta/modules/keystats/test_scroll_flush_fn_cleared_on_stop.ahk
-#Include meta/infra/dispatch/test_timer_scheduler_pause_guard.ahk
 #Include meta/modules/keystats/test_keystats_watchers_pause_guard.ahk
 #Include unit/modules/keystats/test_keystats_session_privacy_transaction.ahk
 #Include unit/modules/keystats/test_keystats_session_close_retry.ahk
@@ -2104,6 +2109,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/keymap/test_layout_rows_policy.ahk
 #Include unit/modules/keymap/test_pause_switch_policy.ahk
 #Include unit/modules/keymap/test_pause_layout_switch.ahk
+#Include unit/modules/keymap/test_layout_registry_watch.ahk
 #Include unit/modules/keymap/test_system_layout_install.ahk
 #Include unit/modules/keymap/test_number_row_native_hkl.ahk
 #Include meta/platform/remap/altgr/test_altgr_kana_taphold_entry.ahk
@@ -2157,7 +2163,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_walker_batch_critical.ahk
 #Include meta/modules/keystats/ergonomics/test_walker_pure_fns_match_shared_core.ahk
 #Include meta/modules/keystats/test_keystats_critical_restore.ahk
-#Include meta/modules/keystats/context/test_async_password_detect_suspend_guard.ahk
 #Include meta/modules/keystats/context/test_sensors_warmup_distinct_callback.ahk
 #Include meta/modules/keystats/context/test_kltopo_seen_hwnds_cap.ahk
 #Include meta/platform/remap/layers/test_remapped_list_unconditional.ahk

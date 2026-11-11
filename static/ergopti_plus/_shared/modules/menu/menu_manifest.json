@@ -1457,12 +1457,6 @@
 			"type": "command",
 			"id": "physical_shortcuts_editor",
 			"i18n": "physical_shortcuts.window_title",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "physical_shortcuts.windows_unavailable",
 			"disabled_when": [
 				"physical_shortcuts_editor_ready"
 			],
@@ -2419,7 +2413,7 @@
 				"linux"
 			],
 			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_editor_host_pending_on_windows"
+			"reason_key": "platform_reason.layout_editor_is_on_the_website_on_windows"
 		},
 		{
 			"type": "list",
