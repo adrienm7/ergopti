@@ -37,8 +37,8 @@ save as downloads; nothing leaves the visitor's computer.
 			<p>
 				Configurez votre propre disposition : couches, touches mortes, modificateurs, raccourcis et
 				couche de navigation. Ouvrez ou enregistrez le fichier source Ergopti (TOML), importez un
-				<code>.keylayout</code> et téléchargez ce que le générateur sait déjà produire. L’éditeur
-				fonctionne entièrement dans votre navigateur : aucun fichier n’est envoyé.
+				<code>.keylayout</code> et téléchargez ce que le générateur sait déjà produire. L’éditeur fonctionne
+				entièrement dans votre navigateur : aucun fichier n’est envoyé.
 			</p>
 		</bloc-introduction>
 	</svelte:fragment>
@@ -53,9 +53,9 @@ save as downloads; nothing leaves the visitor's computer.
 
 <style>
 	.layout-editor-frame {
-		display: block;
-		width: 100%;
 		border: 0;
 		border-radius: 8px;
+		display: block;
+		width: 100%;
 	}
 </style>
