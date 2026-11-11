@@ -213,10 +213,15 @@ _LMTO_Case(Enabled, ShowUi, ThrowBuild) {
 	_LMTO_State := Map("enabled", Enabled, "expected_ui", ShowUi, "throw_build", ThrowBuild,
 		"events", [], "timer", -1, "scheduled", 0, "show_ui", -1,
 		"invalidated", 0, "stopped", 0, "builds", 0, "hotkeys", 0, "curl", 0)
-	Observed := "", Accepted := false
+	; The caught state is the verdict: an Error with an empty message is still
+	; a throw, and the empty expected message alone accepted it.
+	Observed := "", Caught := false, Accepted := false
 	try Accepted := _LLM_Menu_ApplyToggleCommitted(Map("enabled", Enabled), ShowUi)
-	catch as Err
+	catch as Err {
+		Caught := true
 		Observed := Err.Message
+	}
+	AssertEqual(ThrowBuild, Caught, "only a held repaint refusal may escape the committed toggle")
 	AssertEqual(ThrowBuild ? "Controlled repaint refusal." : "", Observed)
 	AssertEqual(!ThrowBuild, Accepted)
 	AssertEqual(1, _LMTO_State["builds"])

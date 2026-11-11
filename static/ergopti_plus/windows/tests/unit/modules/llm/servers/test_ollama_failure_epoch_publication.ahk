@@ -24,8 +24,10 @@ class _OFEP_Fixture {
 		this.TimerCalls := 0
 		this.PriorityCalls := 0
 		this.FailureCalls := 0
-		this.ObserverFailure := ""
-		this.TimerFailure := ""
+		; The caught states are the verdicts: an Error with an empty message is
+		; still a hidden failure, and the message alone read it as none.
+		this.ObserverFailed := false, this.ObserverFailure := ""
+		this.TimerFailed := false, this.TimerFailure := ""
 	}
 	Setup() {
 		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
@@ -69,8 +71,10 @@ class _OFEP_Fixture {
 		try {
 			if this.Mode == "logger"
 				this.WaitForCancellation("pending")
-		} catch as Err
-			this.ObserverFailure := Err.Message
+		} catch as Err {
+			this.ObserverFailed := true
+			this.ObserverFailure := Type(Err) . ": " . Err.Message
+		}
 	}
 	WaitForCancellation(ExpectedState) {
 		global _LLM_Deps_State, _LLM_Deps_Epoch
@@ -82,7 +86,7 @@ class _OFEP_Fixture {
 		while this.TimerCalls == 0 && OllamaRuntime_Now() - Started < 1000
 			Sleep(10)
 		AssertEqual(1, this.TimerCalls, "a real timer must cancel before the observed call returns")
-		AssertEqual("", this.TimerFailure)
+		AssertFalse(this.TimerFailed, "the real cancellation timer must complete: " . this.TimerFailure)
 		AssertTrue(this.CancelResult, "real dependency cancellation must acknowledge only the empty owned ports")
 		AssertEqual(this.Epoch + 1, _LLM_Deps_Epoch, "the real cancel API must revoke the captured epoch")
 	}
@@ -98,8 +102,10 @@ class _OFEP_Fixture {
 			this.CancelMessage := _LLM_Deps_FailureMessage
 			this.CancelEpoch := _LLM_Deps_Epoch
 			this.PriorityAfterCancel := DllCall("GetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt")
-		} catch as Err
-			this.TimerFailure := Err.Message
+		} catch as Err {
+			this.TimerFailed := true
+			this.TimerFailure := Type(Err) . ": " . Err.Message
+		}
 	}
 	PriorityObserver(Priority) {
 		global _LLM_Deps_Epoch
@@ -112,7 +118,8 @@ class _OFEP_Fixture {
 			if this.Mode == "priority"
 				this.WaitForCancellation("failed")
 		} catch as Err {
-			this.ObserverFailure := Err.Message
+			this.ObserverFailed := true
+			this.ObserverFailure := Type(Err) . ": " . Err.Message
 			throw Err
 		}
 	}
@@ -171,8 +178,8 @@ _OFEP_Case(Mode) {
 		Critical("Off")
 		Result := _LLM_Deps_PublishFailure(F.Message, ObjBindMethod(F, "FailureObserver"), Captured,
 			ObjBindMethod(F, "PriorityObserver"))
-		AssertEqual("", F.ObserverFailure, "the real logger/priority observer must not hide assertion failures")
-		AssertEqual("", F.TimerFailure)
+		AssertFalse(F.ObserverFailed, "the real logger/priority observer must not hide assertion failures: " . F.ObserverFailure)
+		AssertFalse(F.TimerFailed, "the real cancellation timer must complete: " . F.TimerFailure)
 		if Mode == "logger" || Mode == "priority" {
 			AssertFalse(Result, "the revoked captured epoch cannot finish failure delivery")
 			AssertEqual(1, F.LogCalls)

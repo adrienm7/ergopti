@@ -45,12 +45,16 @@ _LMFS_FailedSetup(FailAt, Throws) {
 		%Name% := Sentinel
 	}
 	State := Map("paths", [], "dir", "")
-	Failure := ""
+	; The caught state is the verdict: a rejection raised with an empty message
+	; is still a rejection, and the message checks below then name it.
+	Rejected := false, Failure := ""
 	try {
 		try _LMT_InstallApiFixture("", _LMFS_Write.Bind(State, FailAt, Throws))
-		catch Error as Err
+		catch Error as Err {
+			Rejected := true
 			Failure := Err.Message
-		AssertTrue(Failure != "", "a failed initial write must reject fixture installation")
+		}
+		AssertTrue(Rejected, "a failed initial write must reject fixture installation")
 		AssertEqual(FailAt, State["paths"].Length, "setup must stop at the failed write")
 		if Throws
 			AssertEqual("Injected fixture write exception", Failure)
