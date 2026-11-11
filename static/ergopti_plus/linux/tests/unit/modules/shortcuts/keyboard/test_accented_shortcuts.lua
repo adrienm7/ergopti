@@ -90,6 +90,33 @@ helpers.describe("linux accented-letter shortcuts (linux-accented-shortcuts)", f
 			"paused, or the Shortcuts master off: the key goes to the application")
 	end)
 
+	-- AHK's ^SCxxx hotkeys fire on every auto-repeat: holding Ctrl+è undoes
+	-- repeatedly on Windows. Linux consumed the press with no repeat owner, so
+	-- the hook swallowed every repeat and the chord fired once (SCL-001,
+	-- accented-shortcut-repeat).
+	helpers.it("accented-shortcut: each auto-repeat presses the chord again (accented-shortcut-repeat)", function()
+		local Accented = fresh()
+		local queued, pressed, active = {}, {}, true
+		local options = {
+			active = function() return active end,
+			defer = function(fn) queued[#queued + 1] = fn return true end,
+			press = function(combo) pressed[#pressed + 1] = combo return true end,
+		}
+		for key, port in pairs(ports()) do options[key] = port end
+		local consumed, repeat_callback = Accented.on_key({ code = 8, value = 1, mods = { ctrl = true } }, options)
+		helpers.assert_eq(consumed, true)
+		helpers.assert_type(repeat_callback, "function", "the held chord owns its repeats")
+		helpers.assert_eq(repeat_callback({ code = 8, value = 2, mods = { ctrl = true } }), true)
+		helpers.assert_eq(repeat_callback({ code = 8, value = 2, mods = { ctrl = true, shift = true } }), true)
+		for _, fn in ipairs(queued) do fn() end
+		helpers.assert_eq(pressed, { "ctrl+z", "ctrl+z", "ctrl+shift+z" }, "one press per repeat, held modifiers read live")
+		helpers.assert_eq(repeat_callback({ code = 3, value = 2, mods = { ctrl = true } }), false,
+			"another key's repeat is not its own")
+		active = false
+		helpers.assert_eq(repeat_callback({ code = 8, value = 2, mods = { ctrl = true } }), false,
+			"paused mid-hold: the repeats go to the application")
+	end)
+
 	helpers.it("accented-shortcut: the settings are config.toml's, over the manifest defaults", function()
 		local path = os.tmpname()
 		local saved = package.loaded["infra.config_paths"]
