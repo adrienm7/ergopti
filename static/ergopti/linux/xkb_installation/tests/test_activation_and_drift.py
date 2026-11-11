@@ -22,6 +22,7 @@ from layout_package import (  # noqa: E402
     parse_kde_layouts,
     remove_layout_specs,
 )
+import desktop_activation  # noqa: E402
 import xkb_files_installer_clean as clean_installer  # noqa: E402
 
 LAYOUT_DIR = Path(__file__).resolve().parents[2]
@@ -71,6 +72,39 @@ class GSettingsMergeTests(unittest.TestCase):
         pairs = [("xkb", "fr"), ("xkb", "ergopti+plus")]
         formatted = format_gsettings_sources(pairs)
         self.assertEqual(parse_gsettings_sources(formatted), pairs)
+
+
+class GnomeLiveSelectTests(unittest.TestCase):
+    def test_a_running_shell_is_given_the_slot_alone_first(self):
+        """gnome-runtime-switch: GNOME Shell 46 keeps its in-memory recent list on
+        a sources change, so a list with the slot first left the old layout active."""
+        writes, sleeps = [], []
+        selection = desktop_activation.DesktopSelection(
+            "gnome",
+            {"sources": "[('xkb', 'us'), ('xkb', 'ergol')]", "mru-sources": "[('xkb', 'us')]"},
+            "ergol",
+        )
+
+        def fake_set(key, pairs, _label):
+            writes.append((key, list(pairs)))
+            return True
+
+        def fake_capture(command):
+            return desktop_activation.format_gsettings_sources(
+                [pairs for key, pairs in writes if key == command[-1]][-1]
+            )
+
+        with mock.patch.object(desktop_activation, "_gnome_set", fake_set), mock.patch.object(
+            desktop_activation, "run_capture", fake_capture
+        ), mock.patch.object(desktop_activation.time, "sleep", sleeps.append):
+            selected = desktop_activation._gnome_select(
+                "ergol_live", ("ergol", "ergol_live"), selection, 0.5
+            )
+        self.assertTrue(selected)
+        self.assertEqual(writes[0], ("sources", [("xkb", "ergol_live")]))
+        self.assertEqual(sleeps, [0.5], "the shell is given the settle time once")
+        self.assertEqual(writes[1], ("sources", [("xkb", "ergol_live"), ("xkb", "us")]))
+        self.assertEqual(writes[2], ("mru-sources", [("xkb", "ergol_live"), ("xkb", "us")]))
 
 
 class KDEMergeTests(unittest.TestCase):

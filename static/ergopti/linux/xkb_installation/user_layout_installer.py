@@ -517,6 +517,7 @@ def apply_wayland(
     languages: List[str],
     root: Path,
     home: Path,
+    gnome_settle_ms: int,
     environ: Optional[Dict[str, str]] = None,
 ) -> dict:
     """Replaces a layout live on a GNOME or KDE Wayland session.
@@ -557,7 +558,7 @@ def apply_wayland(
     )
     if not report["ok"]:
         return report
-    applied, code = select_live_slot(slot, slots, selection, root, environ)
+    applied, code = select_live_slot(slot, slots, selection, root, gnome_settle_ms / 1000, environ)
     if not applied:
         return _live_refusal(code, "not loaded: " + code)
     # The other slot is no longer selected, so rewriting it is invisible to the
@@ -593,6 +594,8 @@ def parse_arguments(argv: List[str]) -> argparse.Namespace:
     wayland_parser.add_argument("--display-name", required=True)
     wayland_parser.add_argument("--source-dir", required=True, type=Path)
     wayland_parser.add_argument("--language", action="append", default=[])
+    # The daemon passes the shared timing registry's gnome_input_source_settle_ms.
+    wayland_parser.add_argument("--gnome-settle-ms", required=True, type=int)
     for name in ("uninstall", "activate", "apply-x11"):
         command = commands.add_parser(name)
         command.add_argument("--layout-id", required=True)
@@ -621,8 +624,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.command == "apply-x11":
             report = apply_x11(args.layout_id, root)
         elif args.command == "apply-wayland":
+            if args.gnome_settle_ms <= 0:
+                raise InstallError(EXIT_ARGUMENTS, "--gnome-settle-ms must be positive")
             report = apply_wayland(
-                args.layout_id, args.display_name, args.source_dir, args.language, root, home
+                args.layout_id,
+                args.display_name,
+                args.source_dir,
+                args.language,
+                root,
+                home,
+                args.gnome_settle_ms,
             )
         else:
             report = activate(args.layout_id, root)

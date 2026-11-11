@@ -797,7 +797,8 @@ input_source_operation_timeout_ms = 10000
 # How long GNOME Shell is given to apply an input-source list that holds only
 # the target before the full list is written back: a write it has not yet read
 # is coalesced with the next, and the switch then does not happen.
-# Linux: adapters/input_source_switch.lua (GNOME switch plan).
+# Linux: adapters/input_source_switch.lua (GNOME switch plan) and
+# modules/keymap/layout_registry.lua (apply-wayland --gnome-settle-ms).
 gnome_input_source_settle_ms = 500
 
 # Karabiner ready notification debounce delay.
