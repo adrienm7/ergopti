@@ -1146,11 +1146,13 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 			-- swallowed (SWALLOWED_ON_LAYER); any other key is itself, with its
 			-- auto-repeat (Space types a space, LShift is a Shift that copies
 			-- nothing, RCtrl a Ctrl, Tab a Tab).
+			-- The swallower comes first: nav_layer.ahk's static *SC038 is created
+			-- before the layer's bindings and AHK fires the earliest variant.
 			if self.layer_depth > 0 then
 				cancel_taps(self, nil)
+				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
 				local spec = self.nav_layer[code]
 				if spec then return press_layer_key(self, code, spec) end
-				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
 				self.native_keys[code] = true
 				return pass(self, code, value)
 			end
@@ -1405,7 +1407,9 @@ function M:process(code, value, now_ms, receipt)
 			if own then return {} end
 			-- A new physical source selects the active layer before sharing an
 			-- older source's held tap-hold state.
-			local layer_spec = self.layer_depth > 0 and self.nav_layer[code]
+			local config = self.by_code[code]
+			-- A swallowed key never takes the layer's binding (see process).
+			local layer_spec = self.layer_depth > 0 and not (config and config.swallowed_on_layer) and self.nav_layer[code]
 			if layer_spec and not layer_group then
 				cancel_taps(self, nil)
 				local rows = press_layer_key(self, code, layer_spec)
@@ -1413,7 +1417,6 @@ function M:process(code, value, now_ms, receipt)
 				layer_groups[code] = { [source] = { generation = generation, native_owner = native_owner } }
 				return rows
 			end
-			local config = self.by_code[code]
 			if self.layer_depth > 0 and not layer_spec and config and config.swallowed_on_layer then
 				cancel_taps(self, nil)
 				instant_groups = instant_groups or {}; instant_sources[self] = instant_groups
