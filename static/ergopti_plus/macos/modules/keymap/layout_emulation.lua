@@ -60,7 +60,11 @@ local _rewritten = {}   -- physical key code -> the key code its key-down was re
 
 -- The engine's built-in modifier ids and the event flags they are.
 local FLAG_OF = { shift = "shift", control = "ctrl", alt = "alt", alt_right = "alt", meta = "cmd" }
-local ID_OF_FLAG = { shift = "shift", ctrl = "control", alt = "alt", cmd = "meta" }
+-- The inverse: an event flag names the unsided id (alt, not alt_right).
+local ID_OF_FLAG = {}
+for id, flag in pairs(FLAG_OF) do
+	if id ~= "alt_right" then ID_OF_FLAG[flag] = id end
+end
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "keyboard_type",
 	"physical_code", "keycode_for_char", "magic_code", "is_active", "autorepeat", "now_ms", "post" }
