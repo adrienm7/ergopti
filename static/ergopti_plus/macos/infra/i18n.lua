@@ -161,6 +161,14 @@ function M.get(key)
 	return s
 end
 
+--- Whether a key has a translation, for a caller probing optional keys: unlike
+--- get(), a miss decodes no fallback catalogue.
+--- @param key string Dot-notation key.
+--- @return boolean
+function M.has(key)
+	return locale_mod.has(key) == true
+end
+
 --- Returns the active locale code (e.g. ``"fr"``).
 
 --- Returns a localised string with its {n} placeholders substituted.
