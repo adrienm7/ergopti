@@ -68,4 +68,28 @@ helpers.describe("keystats init: device identifier", function()
 		package.loaded[writer_name], package.loaded[module_name] = previous_writer, previous_module
 		if not ok then error(failure, 0) end
 	end)
+
+	helpers.it("linux-keystats-boot-defer: the ledger starts on the deferred tick, not inside init", function()
+		-- Each sqlite3 query is a process (about 4 ms); the ledger export and the
+		-- text migration used to run inside the boot's keystats stage.
+		local writer_name, module_name = "modules.keystats.sqlite_writer", "modules.keystats.keystats"
+		local previous_writer, previous_module = package.loaded[writer_name], package.loaded[module_name]
+		local writer = Fakes.sqlite_writer({ fresh_store = true })
+		package.loaded[writer_name] = writer
+		package.loaded[module_name] = nil
+		local uv = require("luv")
+		local metrics = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-device-XXXXXX")) .. "/metrics"
+		local ok, failure = pcall(function()
+			local keystats = require(module_name)
+			local queued = {}
+			keystats.init({ sqlite_path = "/tmp/ergopti_init_spawn_probe.sqlite", metrics_dir = metrics,
+				defer = function(fn) queued[#queued + 1] = fn end })
+			helpers.assert_eq(#queued, 1, "one deferred task carries the background work")
+			helpers.assert_eq(keystats.ledger_status().available, false, "the ledger waits for the loop")
+			queued[1]()
+			helpers.assert_eq(keystats.ledger_status().available, true, "the deferred tick starts the ledger")
+		end)
+		package.loaded[writer_name], package.loaded[module_name] = previous_writer, previous_module
+		if not ok then error(failure, 0) end
+	end)
 end)
