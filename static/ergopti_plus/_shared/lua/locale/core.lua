@@ -201,6 +201,30 @@ end
 -- =============================
 -- =============================
 
+--- Whether a key resolves, without decoding a fallback catalogue for a miss.
+--- Every shipped catalogue carries exactly en.json's key set
+--- (test-locale-catalogue-complete), so a key the active catalogue lacks is
+--- absent from the fallbacks too; a caller probing for optional keys therefore
+--- never needs them, where get() decodes en.json for each boot's first miss.
+--- Only an active catalogue that failed to load is answered by the fallbacks.
+--- @param key string Dot-notation key.
+--- @return boolean
+function M.has(key)
+	if not require_init("has") then return false end
+	ensure_loaded()
+	local active = _state.strings
+	if active then
+		local s = active[key]
+		return type(s) == "string" and s ~= ""
+	end
+	ensure_fallbacks()
+	for _, catalogue in ipairs({ _state.strings_en or {}, _state.strings_fr or {} }) do
+		local s = catalogue[key]
+		if type(s) == "string" and s ~= "" then return true end
+	end
+	return false
+end
+
 --- Returns the translated string for the given dot-notation key,
 --- with ★ substituted for the current trigger character.
 --- Returns an empty string if the key is not found.

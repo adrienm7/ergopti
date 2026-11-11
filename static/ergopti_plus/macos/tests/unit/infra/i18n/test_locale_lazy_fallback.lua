@@ -6,7 +6,8 @@
 --- Every macOS boot decoded en.json (3823 keys, about 20 ms on the Mac) right
 --- after the active French locale, although a complete locale never falls back.
 --- The shared locale core now decodes a fallback only when the active locale
---- lacks a key, or when the merged page catalogue is asked for.
+--- lacks a key, or when the merged page catalogue is asked for; has() answers
+--- an optional key from the active locale alone.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -48,6 +49,24 @@ helpers.describe("locale core: lazy fallback", function()
 		helpers.assert_eq(Core.get("menu.english_only"), "english")
 		helpers.assert_eq(Core.get("menu.english_only"), "english")
 		helpers.assert_eq(loads.en, 1, "the fallback is decoded once, on the miss")
+		package.loaded["locale.core"] = nil
+	end)
+
+	helpers.it("has() answers a miss from the active locale without decoding a fallback", function()
+		local Core, loads = fresh_core()
+		Core.set_locale("fr")
+		helpers.assert_true(Core.has("menu.present"))
+		helpers.assert_eq(Core.has("menu.absent"), false)
+		helpers.assert_eq(loads.en, nil, "a probe for an optional key must not decode en.json")
+		package.loaded["locale.core"] = nil
+	end)
+
+	helpers.it("has() reads the fallbacks only when the active locale failed to load", function()
+		local Core, loads = fresh_core()
+		Core.set_locale("de")
+		helpers.assert_true(Core.has("menu.english_only"), "an unreadable active locale still answers from en")
+		helpers.assert_eq(Core.has("menu.absent"), false)
+		helpers.assert_eq(loads.en, 1)
 		package.loaded["locale.core"] = nil
 	end)
 
