@@ -1076,9 +1076,6 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       answered (`run_x11_reapply_live.sh`, `x11_reapply_*.txt`): GNOME Shell 46 and Plasma 6.6.4 under X11 put their
       own layouts back when a keyboard appears (GNOME also on an input-sources setting change), never on a switch.
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
-- [ ] Linux X11 on GNOME and KDE: re-apply the user-tree layout (apply-x11) after the desktop puts its own layouts
-      back (W4: a keyboard hotplug, a GNOME input-sources setting change); today the loaded layout is lost until the
-      next apply. Found by the 2026-11-11 container proof.
 - [ ] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running".
 - [ ] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane
@@ -1229,6 +1226,9 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### Linux (container proofs of 2026-11-10)
 
+- [ ] Linux X11 on GNOME and KDE: re-apply the user-tree layout (apply-x11) after the desktop puts its own layouts
+      back (W4: a keyboard hotplug, a GNOME input-sources setting change); today the loaded layout is lost until the
+      next apply. Found by the 2026-11-11 container proof.
 - [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
