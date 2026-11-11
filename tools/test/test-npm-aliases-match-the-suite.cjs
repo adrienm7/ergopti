@@ -107,6 +107,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium and WebKit layout of the composer runs separately in Core / js;
 	// test-desktop-ci-evidence.cjs rejects a missing or skipped browser step.
 	'tools/test/browser/layout-composer.playwright.cjs',
+	// Real Chromium drives the unified layout editor page separately in Core / js;
+	// test-ci-pipeline-wiring.cjs rejects a missing or redirected browser step.
+	'tools/test/browser/layout-editor.playwright.cjs',
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
 	'tools/test/browser/physical-shortcuts.playwright.cjs',
