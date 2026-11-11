@@ -61,6 +61,8 @@
 			"The secure-field probe on a real accessibility bus",
 			"The privacy owner follows real GTK fields on the accessibility bus",
 			"AI text reaches only its own real GTK field",
+			"Install prerequisites for API keys in a real locked and unlocked keyring",
+			"API keys in a real locked and unlocked keyring",
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"Launch the bounded accessibility helper with Lua interpreter options",
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown",
@@ -378,6 +380,9 @@
 		],
 		"AI text reaches only its own real GTK field": [
 			"Install prerequisites for The secure-field probe on a real accessibility bus"
+		],
+		"API keys in a real locked and unlocked keyring": [
+			"Install prerequisites for API keys in a real locked and unlocked keyring"
 		],
 		"The clipboard owner serves every target from a real X server": [
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown"

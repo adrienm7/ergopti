@@ -561,6 +561,12 @@ const PROGRAMS = {
 	ssh: optionalTool('the live proof VM console; the runner exits 2 without it', HOST),
 	scp: optionalTool('the live proof VM file copies; the runner exits 2 without it', HOST),
 	'ssh-keygen': optionalTool('the live proof VM key; the runner exits 2 without it', HOST),
+	// The real secret service of tests/hardware/run_keyring_receipts.sh.
+	'secret-tool': optionalTool('libsecret client of the keyring proof; it exits 2 without it', HOST),
+	'gnome-keyring-daemon': optionalTool(
+		'the keyring proof secret service; it exits 2 without it',
+		HOST
+	),
 	// The Ubuntu runner image ships iproute2 for the host proof (run_local_servers_container.py).
 	ss: why(
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
