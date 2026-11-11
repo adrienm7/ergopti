@@ -11,7 +11,8 @@
 --- the synthetic text moved off a held key (`asa` typed fast) and the pending
 --- predictions a user activity cancelled (a window switch counted apart), the
 --- window toggles that opened or raised a page, the hotstring expansions and
---- the completed boots of the day. A person reading the report then
+--- the completed boots of the day, and the API entries restored without their
+--- key and given one again. A person reading the report then
 --- knows which of those happened today without opening the log.
 ---
 --- FEATURES & RATIONALE:
@@ -75,6 +76,9 @@ M.COUNT_SIGNALS = {
 	{ step = "log_hotstring_expansions", name = "expansion" },
 	-- infra/boot_profiler.lua: one completed boot.
 	{ step = "log_boot_completions", name = "boot" },
+	-- modules/llm: an API entry restored without its Keychain key, then given one.
+	{ step = "log_api_key_absent", name = "api_key_absent" },
+	{ step = "log_api_key_reentered", name = "api_key_reentered" },
 }
 
 -- POSIX awk only: macOS ships the BWK awk.
@@ -94,6 +98,8 @@ function top(names,   name, best, best_n) {
 /Toggle '[^']*': open but not focused, bringing to front\./ { toggle_raise++ }
 /\] (Auto|Terminator)-expand: / { expansion++ }
 /\] Boot complete in [0-9]+ ms\./ { boot++ }
+/\[WARNING\] \[[^]]*\] Keychain holds no key for entry '[^']*'; it needs its key again\./ { api_key_absent++ }
+/\] API entry key change staged \(entry=/ { api_key_reentered++ }
 match($0, /Three-finger candidate rejected by [A-Za-z_][A-Za-z0-9_]*/) {
 	rejections++; gate[substr($0, RSTART + 35, RLENGTH - 35)]++
 }
@@ -106,6 +112,7 @@ END {
 	printf "rotation_warning %d\ndigest_mismatch %d\n", rotation_warning, digest_mismatch
 	printf "switch_cancel %d\ntoggle_open %d\ntoggle_raise %d\n", switch_cancel, toggle_open, toggle_raise
 	printf "expansion %d\nboot %d\n", expansion, boot
+	printf "api_key_absent %d\napi_key_reentered %d\n", api_key_absent, api_key_reentered
 	printf "rejections %d %s\nheld_key %d\ncancels %d %s\n", rejections, top(gate), held_key, cancels, top(reason)
 }
 ]=]

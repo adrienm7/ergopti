@@ -41,6 +41,7 @@ local function run(code, output)
 end
 
 local COUNTS = "switch_cancel 0\ntoggle_open 0\ntoggle_raise 0\nexpansion 0\nboot 0\n"
+	.. "api_key_absent 0\napi_key_reentered 0\n"
 local QUIET = "capture_stamp 0\nwindow_toggle 0\nstart_rollback 0\nrotation_warning 0\ndigest_mismatch 0\n"
 	.. "rejections 0 none\nheld_key 0\ncancels 0 none\n" .. COUNTS
 
@@ -64,7 +65,8 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 	helpers.it("fails each error signal by name and keeps activity as information", function()
 		local steps = run(0, "capture_stamp 2\nwindow_toggle 1\nstart_rollback 0\nrotation_warning 1\n"
 			.. "digest_mismatch 0\nrejections 7 tilt\nheld_key 3\ncancels 4 mouseMoved\n"
-			.. "switch_cancel 2\ntoggle_open 1\ntoggle_raise 3\nexpansion 9\nboot 4\n")
+			.. "switch_cancel 2\ntoggle_open 1\ntoggle_raise 3\nexpansion 9\nboot 4\n"
+			.. "api_key_absent 1\napi_key_reentered 1\n")
 		helpers.assert_eq(steps.log_capture_stamp_errors.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_capture_stamp_errors.value, "2")
 		helpers.assert_eq(steps.log_window_toggle_errors.state, Report.STATE_FAIL)
@@ -76,7 +78,8 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 		helpers.assert_eq(steps.log_held_key_moves.value, "3")
 		helpers.assert_eq(steps.log_prediction_activity_cancels.value, "4:mouseMoved")
 		for id, value in pairs({ log_prediction_switch_cancels = "2", log_window_toggle_opens = "1",
-			log_window_toggle_raises = "3", log_hotstring_expansions = "9", log_boot_completions = "4" }) do
+			log_window_toggle_raises = "3", log_hotstring_expansions = "9", log_boot_completions = "4",
+			log_api_key_absent = "1", log_api_key_reentered = "1" }) do
 			helpers.assert_eq(steps[id].state, Report.STATE_INFO, id)
 			helpers.assert_eq(steps[id].value, value, id)
 		end
@@ -141,6 +144,9 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 			"2026-11-10 10:00:22:001 [DEBUG] [keymap.expander] Auto-expand: private mapping fired (content withheld).",
 			"2026-11-10 10:00:23:001 [DEBUG] [keymap.expander] Terminator-expand: 'asa' → 'ASA'.",
 			"2026-11-10 10:00:24:001 [SUCCESS] [boot_profiler] Boot complete in 2140 ms.",
+			"2026-11-10 10:00:25:001 [WARNING] [llm.api_token_crypto] Keychain holds no key for entry 'e1'; it needs its key "
+				.. "again.",
+			"2026-11-10 10:00:26:001 [INFO] [menu_llm.api_panel] API entry key change staged (entry=e1).",
 		}, "\n") .. "\n")
 		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
 		local output = pipe:read("*a")
@@ -162,5 +168,7 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 		helpers.assert_eq(summary.toggle_raise, 1, "a focused toggle closes and is neither")
 		helpers.assert_eq(summary.expansion, 2)
 		helpers.assert_eq(summary.boot, 1)
+		helpers.assert_eq(summary.api_key_absent, 1)
+		helpers.assert_eq(summary.api_key_reentered, 1)
 	end)
 end)
