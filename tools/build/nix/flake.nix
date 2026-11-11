@@ -90,7 +90,7 @@
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
                   # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy dconf openssl xorg.libX11
+                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy duktape dconf openssl xorg.libX11
                   # END GENERATED LINUX NATIVE REQUIREMENTS
                 ])}
 
