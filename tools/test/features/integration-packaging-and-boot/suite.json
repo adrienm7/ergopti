@@ -193,6 +193,15 @@
 			"args": ["tools/test/test-linux-bundle-archive-publication.cjs"],
 			"repro": "node tools/test/test-linux-bundle-archive-publication.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-layout-extension-payload",
+			"ordinal": 612,
+			"name": "macOS and Linux packages carry every hotstring file the shipped layout extensions bind",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-extension-payload.cjs"],
+			"repro": "npm run test:layout-extension-payload",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }

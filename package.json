@@ -714,7 +714,8 @@
 		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
 		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",
 		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs",
-		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs"
+		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",
+		"test:layout-extension-payload": "node ./tools/test/test-layout-extension-payload.cjs"
 	},
 	"type": "module",
 	"imports": {
