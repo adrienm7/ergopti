@@ -471,7 +471,9 @@ class PacEngine(unittest.TestCase):
             env={
                 "PATH": "/usr/bin:/bin",
                 "ERGOPTI_PROOF_SHARED": str(SHARED),
-                "LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/lua/?.lua;;",
+                # The lookup child's own path (system_proxy_probe.lua): shared
+                # modules resolve from their init.lua too.
+                "LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/lua/?.lua;{SHARED}/lua/?/init.lua;;",
             },
             capture_output=True,
             text=True,
