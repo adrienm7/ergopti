@@ -1927,6 +1927,155 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'layout-emulation-row',
+		title:
+			'Keyboard layout > Layout to emulate: lists None, Ergopti, Ergopti➕ and the registry; a choice restarts on it; None types the system layout; a missing stored layout stays named',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const locale = englishLocale();
+			// The submenu row shows the choice in force: « Layout to emulate: Ergopti ».
+			const head = locale['common.label_value']
+				.split('{2}')[0]
+				.replace('{1}', locale['menu.layout.emulated_layout']);
+			const menu = ['re:Keyboard layout$', `re:^${escapeRegExp(head)}`];
+			const none = locale['onboarding.layout.emulated_none'];
+			const builtIn = [
+				none,
+				locale['onboarding.layout.emulated_ergopti'],
+				locale['onboarding.layout.emulated_ergopti_plus']
+			];
+			const { layouts } = JSON.parse(
+				fs.readFileSync(path.join(live.ROOT, 'static', 'layouts', 'registry', 'index.json'), 'utf8')
+			);
+			const registry = layouts
+				.filter((layout) => layout.id !== 'ergopti' && layout.id !== 'ergopti_plus')
+				.map((layout) => layout.name || layout.id);
+			const { levels } = JSON.parse(
+				fs.readFileSync(
+					path.join(live.WINDOWS, 'tests', 'fixtures', 'ergopti_emulation_golden.json'),
+					'utf8'
+				)
+			);
+			const codes = ['10', '11', '12', '13'];
+			const ergoptiText = codes.map((code) => levels.base[`SC0${code}`].text).join('');
+			const choices = async (session) =>
+				parseRows(
+					await session.run('rows', [
+						'.',
+						`> ${escapeRegExp(locale['menu.layout.emulated_layout'])}`
+					])
+				).filter((row) => row.path.length === 3);
+			const ticked = (rows) =>
+				rows
+					.filter((row) => row.checked)
+					.map((row) => row.path[2])
+					.join(', ');
+			const typeRow = async (session) => {
+				await session.run('edit_open');
+				session.type([
+					['mode', 'event'],
+					['level', '100'],
+					['gap', '80'],
+					...codes.map((code) => ['key', `{Blind}{SC0${code}}`]),
+					['wait', '500']
+				]);
+				const typed = (await session.run('edit_value')).replace(/^value=/, '');
+				const system = fields(await session.run('foreground_chars', codes));
+				await session.run('edit_close');
+				return { typed, system: system.chars.split(' ').join(''), hkl: system.hkl };
+			};
+			const problems = [];
+			const { session, pid: booted } = await bootEnglish(
+				context,
+				'emulation',
+				'[category_enabled]\nlayout = true\n'
+			);
+			let pid = (await session.quiesce(booted, { quietMs: 8000 })).pid;
+			const listed = await choices(session);
+			const captions = listed.map((row) => row.path[2]);
+			if (captions.slice(0, 3).join('|') !== builtIn.join('|'))
+				problems.push(`the list starts ${captions.slice(0, 3).join(', ')}`);
+			const missing = registry.filter((name) => !captions.slice(3).includes(name));
+			if (missing.length > 0)
+				problems.push(`the registry layouts ${missing.join(', ')} are not listed`);
+			if (ticked(listed) !== none) problems.push(`a fresh profile ticks "${ticked(listed)}"`);
+
+			const choose = async (caption) => {
+				const answer = fields(
+					await session.run('click_confirming', ['.', ...menu, caption], 180000, {
+						followReload: true
+					})
+				);
+				if (answer.dialog && answer.dialog !== 'none')
+					problems.push(`choosing ${caption} showed the dialog "${answer.dialog}"`);
+				const settled = await session.quiesce(pid, { quietMs: 4000 });
+				if (!settled.reloaded) problems.push(`choosing ${caption} did not restart the driver`);
+				pid = settled.pid;
+				const rows = await choices(session);
+				if (ticked(rows) !== caption)
+					problems.push(`after choosing ${caption} the tick is on "${ticked(rows)}"`);
+				return live.configSnapshot(session);
+			};
+			let config = await choose(builtIn[1]);
+			if (
+				config[KEY.LAYOUT_ERGOPTI_BASE] !== 'true' ||
+				config[KEY.LAYOUT_ERGOPTI_VARIANT] !== '"ergopti"'
+			)
+				problems.push(
+					`Ergopti stored base ${config[KEY.LAYOUT_ERGOPTI_BASE]}, variant ${config[KEY.LAYOUT_ERGOPTI_VARIANT]}`
+				);
+			const emulated = await typeRow(session);
+			if (emulated.typed !== ergoptiText)
+				problems.push(
+					`with Ergopti the top row typed "${emulated.typed}", "${ergoptiText}" expected`
+				);
+			config = await choose(builtIn[2]);
+			if (config[KEY.LAYOUT_ERGOPTI_VARIANT] !== '"ergopti_plus"')
+				problems.push(`Ergopti➕ stored the variant ${config[KEY.LAYOUT_ERGOPTI_VARIANT]}`);
+			config = await choose(none);
+			if (
+				config[KEY.LAYOUT_ERGOPTI_BASE] !== 'false' ||
+				config[KEY.LAYOUT_EMULATED_LAYOUT] !== '""'
+			)
+				problems.push(
+					`None stored base ${config[KEY.LAYOUT_ERGOPTI_BASE]}, emulated ${config[KEY.LAYOUT_EMULATED_LAYOUT]}`
+				);
+			const native = await typeRow(session);
+			if (native.system.includes('dead') || native.system.includes('none'))
+				problems.push(
+					`the system layout ${native.hkl} has a dead or empty key there: ${native.system}`
+				);
+			else if (native.typed !== native.system)
+				problems.push(
+					`with None the top row typed "${native.typed}", the system layout ${native.hkl} types "${native.system}"`
+				);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			await session.stop();
+
+			// A stored id that is neither built in nor installed keeps its own row, ticked.
+			const absent = 'zz_live_absent';
+			const stale = await bootEnglish(
+				context,
+				'absent',
+				`[category_enabled]\nlayout = true\n[layout]\nemulated_layout = "${absent}"\n`
+			);
+			await stale.session.quiesce(stale.pid, { quietMs: 8000 });
+			const kept = await choices(stale.session);
+			if (ticked(kept) !== absent)
+				problems.push(`an absent stored layout ticks "${ticked(kept)}", "${absent}" expected`);
+			if (!kept.some((row) => row.path[1].endsWith(absent)))
+				problems.push(`the submenu does not name ${absent}: ${kept[0]?.path[1]}`);
+			if (live.configSnapshot(stale.session)[KEY.LAYOUT_EMULATED_LAYOUT] !== `"${absent}"`)
+				problems.push('the boot dropped the absent stored layout');
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(
+				`${captions.length} choices (${captions.join(', ')}); Ergopti typed "${emulated.typed}", None typed "${native.typed}" like ${native.hkl}; ${absent} stays named and ticked`
+			);
+		}
+	},
+	{
 		id: 'gestures-info-row',
 		title: 'Tray > Gestures: exactly one "Info…" row, which opens its explanation',
 		async run(context) {
