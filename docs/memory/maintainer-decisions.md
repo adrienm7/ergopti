@@ -5,6 +5,18 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Windows personal editors are WebView only (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: on Windows the personal hotstrings
+editor (`OpenPersonalEditor`) and the personal information editor
+(`PersonalInformationEditor`) open only the shared WebView pages under
+`_shared/ui/`, as macOS does. Their native AutoHotkey Gui fallbacks were
+removed. When WebView2 cannot open the page, the editor shows the single
+`webview.required` message (install the WebView2 Runtime) and logs the reason
+at ERROR through the central logger; it never builds a native form. Do not
+bring a native editor back for these two windows. Linux already opens both
+through its WebKitGTK webview manager only.
+
 ## Metrics rows store UTC and their recorded offset (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (KMD-1): every raw `events_*` row
