@@ -134,6 +134,7 @@ function M.edit_setting(key, value)
 	local path = require("infra.config_paths").config("config.toml")
 	local timestamp = os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence
 	local backup = path .. ".edit-" .. timestamp .. ".bak"
+	local storage_backup = require("infra.config_paths").default_config_dir() .. "/storage.edit-" .. timestamp .. ".bak"
 	local field = assert(key:match("^script%.([%w_]+)$"))
 	local function prepare(target, updates, files)
 		local Writer, Codec = require("toml_codec.writer"), require("toml_codec")
@@ -147,7 +148,7 @@ function M.edit_setting(key, value)
 		return Writer.prepare_batch(target, script and script[field] ~= nil and updates or {}, files, source)
 	end
 	local owner = M.new({ path = path, backup_path = backup,
-		storage_backup_path = require("infra.config_paths").default_config_dir() .. "/storage.edit-" .. timestamp .. ".bak",
+		storage_backup_path = storage_backup,
 		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
 		aliases = { [key] = { alias = alias, native = require(native_name) } }, only = { [key] = true },
 		prepare_batch = prepare, preserve_unchanged = true,
@@ -157,7 +158,18 @@ function M.edit_setting(key, value)
 	_edit_owners[key] = owner
 	local committed = owner.apply_updates({ { section = "script", key = field, value = value } })
 	if committed ~= true then return false end
-	return owner.release() == true
+	if owner.release() ~= true then return false end
+	-- A released edit has nothing left to roll back: its two copies, named for
+	-- this edit alone, go. Windows and macOS keep no copy per edit (CFL-002).
+	for _, copy in ipairs({ backup, storage_backup }) do
+		local removed, detail = os.remove(copy)
+		local remaining = not removed and io.open(copy, "rb") or nil
+		if remaining then
+			remaining:close()
+			Logger.warn("infra.script_scope", "An edit's rollback copy could not be removed (%s): %s.", copy, tostring(detail))
+		end
+	end
+	return true
 end
 
 function M.edit_locale(value) return M.edit_setting(ConfigKeys.KEY.SCRIPT_LOCALE, value) end
