@@ -6,8 +6,10 @@
  * DESCRIPTION:
  * Holds the shape of the driver trees to the counts measured when the
  * structure plan was written (docs/design/structure-plan.md): folders outside
- * the 2..20 entry bounds (40 in tests), per tree, and the layer and domain
- * folders (depth two) present on one or two drivers only. No count may rise; a count that falls
+ * the 2..20 entry bounds (40 in tests), per tree, and the feature and
+ * sub-folder paths (depth two) present on one or two drivers only. A
+ * one-entry folder that mirrors a real folder on another driver is kept for
+ * parity and not counted. No count may rise; a count that falls
  * fails too until the baseline is lowered in the same change, so the ratchet
  * never carries slack a regression could hide in.
  *
@@ -38,10 +40,11 @@ function numbers(census) {
 	const out = {};
 	for (const [tree, s] of Object.entries(census.summary)) {
 		for (const k of KEYS) out[`${tree}.${k}`] = s[k];
-		// A singleton kept for parity is still a singleton: the plan turns plain
-		// ones into parity ones, so the two are ratcheted together.
-		out[`${tree}.code_singleton`] += s.code_singleton_parity;
-		out[`${tree}.tests_singleton`] += s.tests_singleton_parity;
+		// A one-entry folder whose counterpart on another driver is a real
+		// folder is not counted: the feature-first tree gives every feature the
+		// same sub-folders (engine/, adapters/, ui/, data/) on every driver, and
+		// Rule B's "same tree" wins over "no singleton" (docs/design/
+		// structure-plan.md, decisions). The census still reports them.
 	}
 	// Layer and domain level only: below it a sub-module exists where its code
 	// exists, and the plan creates such asymmetric sub-folders on purpose.
