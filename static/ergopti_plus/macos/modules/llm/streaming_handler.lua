@@ -344,10 +344,53 @@ function M.build_callbacks(ctx)
 		partial_thinking_filter:flush()
 	end
 
-	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens)
+	--- Takes a failed stream's rows off offer (partial_raw == false). A backend
+	--- retries a failed streamed attempt without streaming; until it answers, the
+	--- abandoned rows must not stay acceptable (AIM-001). Only the stream that
+	--- painted the current rows is withdrawn; an older identity is already gone.
+	--- @param stream_identity table|nil The failed stream; nil means the only one.
+	local function withdraw_stream(stream_identity)
+		if partial_filter_settled then return end
+		if stream_identity ~= nil and stream_identity ~= partial_stream_identity then return end
+		partial_stream_identity = nil
+		partial_thinking_filter = Parser.new_thinking_filter()
+		partial_raw_seen = ""
+		partial_visible = ""
+		partial_stream_valid = true
+		local kept = {}
+		for _, p in ipairs(pending_ref.value) do
+			if not p._is_stream_placeholder then table.insert(kept, p) end
+		end
+		if #kept == #pending_ref.value then return end
+		if #kept == 0 then
+			-- Back to the loading surface: nothing is on offer for Tab.
+			if not render_predictions("stream withdrawal", function()
+				return _tooltip.show_loading(i18n.get("llm.generating"),
+					ctx.is_ai_preview_enabled, _tooltip.tint("ai_loading"))
+			end) then return end
+			pending_ref.value = {}
+			visible_ref.value = false
+			return
+		end
+		if not render_predictions("stream withdrawal", function()
+			local current     = _tooltip.get_current_index()
+			local display_idx = (current and math.min(math.max(1, current), #kept)) or 1
+			return renderer().show({
+				predictions = kept, current_index = display_idx, enabled = ctx.is_ai_preview_enabled,
+				info_bar = streaming_info_bar, indent = prediction_indent, navigation_modifiers = navigation_mods,
+				background_color = _tooltip.tint("ai_prediction"), loading_text = "…",
+				reserved_count = num_predictions, session_id = my_fetch_id, commit_guard = request_is_current,
+			})
+		end) then return end
+		pending_ref.value = kept
+	end
+
+	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens).
+	-- A backend calls it with false and the stream's identity to withdraw a failed stream.
 	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw, stream_identity)
 		if not runtime_available() then return end
 		if not request_is_current() then return end
+		if partial_raw == false then withdraw_stream(stream_identity); return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 
 		local stripped = filter_partial_snapshot(partial_raw, stream_identity)

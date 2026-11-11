@@ -203,7 +203,10 @@ helpers.describe("sequential stream identity", function()
 			helpers.assert_eq(dispatches[2].kind, "plain",
 				"a retry would overwrite the growing preview with an unrelated completion")
 			helpers.assert_eq(dispatches[2].has_partial, false)
-			helpers.assert_eq(#partials, 1)
+			-- The failed stream is withdrawn before its retry (stream-retry-withdraw).
+			helpers.assert_eq(#partials, 2)
+			helpers.assert_eq(partials[2].raw, false)
+			helpers.assert_true(partials[2].identity == partials[1].identity, "the failed stream itself is withdrawn")
 		end)
 	end
 
@@ -214,6 +217,18 @@ helpers.describe("sequential stream identity", function()
 		helpers.assert_eq(#warnings, 0, table.concat(warnings, "; "))
 		helpers.assert_eq(#renders, 2, "the second variant must keep filling token by token")
 		helpers.assert_eq(renders[2], "second independent completion")
+	end)
+
+	helpers.it("(stream-retry-withdraw) handler ignores the withdrawal of a stream it no longer shows", function()
+		local partial, renders, warnings = build_handler()
+		local first, second = {}, {}
+		partial("first independent completion", first)
+		partial("second independent completion", second)
+		partial(false, first)
+		helpers.assert_eq(#renders, 2, "the second stream's rows stay as painted")
+		partial("second independent completion grows", second)
+		helpers.assert_eq(#renders, 3, "and keep streaming")
+		helpers.assert_eq(#warnings, 0, table.concat(warnings, "; "))
 	end)
 
 	helpers.it("(sequential-stream-identity) handler still rejects a broken prefix inside one stream", function()
