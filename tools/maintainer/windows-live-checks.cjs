@@ -552,6 +552,19 @@ function configSnapshot(session) {
 }
 
 /**
+ * The configuration the driver acts on: the stored keys over the manifest
+ * defaults. The driver stores sparsely, so a choice equal to its default
+ * removes the key instead of writing it.
+ * @param {LiveSession} session The session.
+ * @returns {Object<string, string>}
+ */
+function effectiveConfig(session) {
+	const template = path.join(WINDOWS, '_generated', 'config_template.toml');
+	const defaults = flattenToml(parseToml(fs.readFileSync(template, 'utf8')));
+	return { ...defaults, ...configSnapshot(session) };
+}
+
+/**
  * The keys whose value differs between two snapshots.
  * @param {Object<string, string>} before Earlier snapshot.
  * @param {Object<string, string>} after Later snapshot.
@@ -581,6 +594,7 @@ module.exports = {
 	processesMatching,
 	runningAutoHotkeyScripts,
 	configSnapshot,
+	effectiveConfig,
 	diffSnapshots,
 	table,
 	WINDOWS,

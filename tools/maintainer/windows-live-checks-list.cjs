@@ -2082,10 +2082,15 @@ const CHECKS = [
 						`> ${escapeRegExp(locale['menu.layout.emulated_layout'])}`
 					])
 				).filter((row) => row.path.length === 3);
+			// The menu keeps « Ergopti » and « Ergopti➕ » two native items by suffixing
+			// zero-width spaces to the later one (_MR_NativeDistinctRows): the user
+			// reads the caption without them, and a click must accept them.
+			const shown = (caption) => caption.replace(/\u200B+$/, '');
+			const choiceRow = (caption) => `re:^${escapeRegExp(caption)}(?:\\x{200B})*$`;
 			const ticked = (rows) =>
 				rows
 					.filter((row) => row.checked)
-					.map((row) => row.path[2])
+					.map((row) => shown(row.path[2]))
 					.join(', ');
 			const typeRow = async (session) => {
 				await session.run('edit_open');
@@ -2109,7 +2114,7 @@ const CHECKS = [
 			);
 			let pid = (await session.quiesce(booted, { quietMs: 8000 })).pid;
 			const listed = await choices(session);
-			const captions = listed.map((row) => row.path[2]);
+			const captions = listed.map((row) => shown(row.path[2]));
 			if (captions.slice(0, 3).join('|') !== builtIn.join('|'))
 				problems.push(`the list starts ${captions.slice(0, 3).join(', ')}`);
 			const missing = registry.filter((name) => !captions.slice(3).includes(name));
@@ -2119,7 +2124,7 @@ const CHECKS = [
 
 			const choose = async (caption) => {
 				const answer = fields(
-					await session.run('click_confirming', ['.', ...menu, caption], 180000, {
+					await session.run('click_confirming', ['.', ...menu, choiceRow(caption)], 180000, {
 						followReload: true
 					})
 				);
@@ -2131,7 +2136,7 @@ const CHECKS = [
 				const rows = await choices(session);
 				if (ticked(rows) !== caption)
 					problems.push(`after choosing ${caption} the tick is on "${ticked(rows)}"`);
-				return live.configSnapshot(session);
+				return live.effectiveConfig(session);
 			};
 			let config = await choose(builtIn[1]);
 			if (
