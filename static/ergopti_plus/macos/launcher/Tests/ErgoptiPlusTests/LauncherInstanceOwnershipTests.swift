@@ -12,6 +12,7 @@
 // NOTE: This target requires the macOS Swift toolchain; it runs on macOS CI.
 // ==============================================================================
 
+import AppKit
 import Darwin
 import Foundation
 import XCTest
@@ -53,6 +54,31 @@ final class LauncherInstanceOwnershipTests: XCTestCase {
 		first.release()
 		XCTAssertEqual(second.acquire(), .acquired, "a released lock is free for the next launcher")
 		second.release()
+	}
+
+	/// A second launcher hands over without touching MJConfigFile: an early write
+	/// before the lock repointed the running copy's runtime at the second
+	/// launcher's bundle (MLC-001).
+	@MainActor
+	func testASecondLauncherSeedsNothingWhileTheFirstHoldsTheLock() {
+		let first = LauncherInstanceLock(path: lockPath)
+		XCTAssertEqual(first.acquire(), .acquired)
+		var seeded: [String] = []
+		let handedOver = expectation(description: "the second launcher exits")
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in XCTFail("a second launcher starts no runtime") },
+			fatalReporter: { XCTFail("unexpected fatal: \($0)") },
+			applicationTerminator: { _ in handedOver.fulfill() },
+			loggerWorkerFactory: { nil },
+			instanceLock: LauncherInstanceLock(path: lockPath),
+			runningApplicationsReader: { _ in [] },
+			hammerspoonConfigSeeder: { seeded.append($0) }
+		)
+		delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
+		wait(for: [handedOver], timeout: 20)
+		XCTAssertEqual(seeded, [], "only the lock holder writes MJConfigFile")
+		first.release()
 	}
 
 	func testADuplicateAcquireOnTheSameOwnerIsRefused() {
