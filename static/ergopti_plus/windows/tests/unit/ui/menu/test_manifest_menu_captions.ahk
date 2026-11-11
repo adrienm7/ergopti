@@ -328,16 +328,16 @@ _MTF_CorpusImages() {
 	HadCache := IsSet(_I18nCache), PreviousCache := HadCache ? _I18nCache : false
 	HadLoaded := IsSet(_I18nCacheLoaded), PreviousLoaded := HadLoaded ? _I18nCacheLoaded : false
 	try {
-		for Case in Corpus["cases"] {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Case["language"] . ".json", "UTF-8"))
+		for Vector in Corpus["cases"] {
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Vector["language"] . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			ScriptInformation := HadInformation ? Prior.Clone() : Map()
-			ScriptInformation["MagicKey"] := Case["value"]
+			ScriptInformation["MagicKey"] := Vector["value"]
 			Rows := _HS_MagicKeyRows()
-			Name := Case["language"] . " " . Case["value"]
+			Name := Vector["language"] . " " . Vector["value"]
 			AssertTrue(Rows is Array, Name . ": the actual Windows Magic provider returns row data")
-			AssertEqual(Case["windows"].Length, Rows.Length, Name . ": Windows draws the corpus rows only")
-			for Index, Expected in Case["windows"]
+			AssertEqual(Vector["windows"].Length, Rows.Length, Name . ": Windows draws the corpus rows only")
+			for Index, Expected in Vector["windows"]
 				AssertEqual(Expected, Rows[Index]["label"], Name . ": row " . Index . " caption")
 		}
 	} finally {
