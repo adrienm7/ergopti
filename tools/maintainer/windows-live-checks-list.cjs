@@ -181,6 +181,46 @@ const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const squash = (text) => text.replace(/\s+/g, ' ').trim();
 
 /**
+ * Finds a rule in a shipped hotstring file, so a check typing it says when the
+ * data it relies on moved instead of failing on the driver.
+ * @param {string} relative Path under _shared/modules/hotstrings.
+ * @param {string} trigger The rule's trigger.
+ * @returns {{section: string, line: string}|null}
+ */
+function shippedRule(relative, trigger) {
+	const file = path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'hotstrings');
+	let section = '';
+	for (const line of fs.readFileSync(path.join(file, relative), 'utf8').split(/\r?\n/)) {
+		const header = /^\[\[([a-z0-9_]+)\]\]/.exec(line);
+		if (header) section = header[1];
+		else if (line.startsWith(`${JSON.stringify(trigger)} = {`)) return { section, line };
+	}
+	return null;
+}
+
+/**
+ * Types a script into a fresh typing target and reads back what it holds.
+ * No hse_reset: it makes the word start unknown, and word-start rules refuse.
+ * @param {object} session The session.
+ * @param {string[][]} steps Typist lines after the common head.
+ * @param {number} [gap] Milliseconds after each key.
+ * @returns {Promise<string>} The target's text, line breaks as backslash-n.
+ */
+async function typeInto(session, steps, gap = 120) {
+	await session.run('edit_open');
+	session.type([
+		['mode', 'event'],
+		['level', '100'],
+		['gap', String(gap)],
+		...steps,
+		['wait', '900']
+	]);
+	const value = (await session.run('edit_value')).replace(/^value=/, '');
+	await session.run('edit_close');
+	return value;
+}
+
+/**
  * Reads the `rows` command's answer as rows.
  * @param {string} answer "A > B > C  [checked]  [disabled] | ..." as LiveCmdRows writes it.
  * @returns {{path: string[], checked: boolean, disabled: boolean}[]}
@@ -2073,6 +2113,44 @@ const CHECKS = [
 			return pass(
 				`${captions.length} choices (${captions.join(', ')}); Ergopti typed "${emulated.typed}", None typed "${native.typed}" like ${native.hkl}; ${absent} stays named and ticked`
 			);
+		}
+	},
+	{
+		id: 'asa-space-fast',
+		title: '`asa` then Space fast, Space down before the last a is up, 20 times: always ASA',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const rule = shippedRule('autocorrection.toml', 'asa');
+			if (!rule || !/output = "ASA"/.test(rule.line))
+				return notExecuted('the shipped autocorrection data no longer holds asa -> ASA');
+			const { session } = await bootEnglish(
+				context,
+				'asa',
+				`[category_enabled]\nhotstrings = true\nautocorrection = true\n[hotstrings.autocorrection.${rule.section}]\nenabled = true\n`
+			);
+			await session.run('pump', ['3000']);
+			const word = [
+				['key', '{Blind}a'],
+				['key', '{Blind}s'],
+				['key', '{Blind}{a down}'],
+				['key', '{Blind}{SC039 down}'],
+				['key', '{Blind}{a up}'],
+				['key', '{Blind}{SC039 up}']
+			];
+			const times = 20;
+			const typed = await typeInto(session, Array.from({ length: times }, () => word).flat(), 15);
+			const words = typed.split(' ').slice(0, -1);
+			const wrong = words.filter((one) => one !== 'ASA');
+			const problems = [];
+			if (typed !== 'ASA '.repeat(times))
+				problems.push(
+					`${words.length} words, ${wrong.length} not ASA (${[...new Set(wrong)].join(', ')}): "${typed}"`
+				);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`${times} fast asa + Space typed ${times} ASA (section ${rule.section})`);
 		}
 	},
 	{
