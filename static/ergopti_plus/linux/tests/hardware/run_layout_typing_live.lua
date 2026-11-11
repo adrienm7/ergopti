@@ -99,6 +99,10 @@ local function capture(command)
 	return output
 end
 
+-- The editors are stopped by pattern (stop_editor): procps must be present.
+local has_pkill = os.execute("command -v pkill >/dev/null 2>&1")
+assert(has_pkill == true or has_pkill == 0, "ENVIRONMENT: pkill is missing")
+
 local function sleep_ms(ms) uv.sleep(ms) end
 
 --- Runs one asynchronous registry operation on the real event loop.
