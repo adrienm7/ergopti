@@ -719,3 +719,29 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 	end)
 end)
 
+
+-- The store holds every native setting. Under LuaJIT, the runtime the driver
+-- ships on, its staging file came from io.open "wx" and took the umask's
+-- 0644; only the Lua 5.4 branch passed 0600, so the suite on 5.4 never saw it
+-- (CFL-003, linux-storage-private-mode).
+helpers.describe("storage file mode (linux-storage-private-mode)", function()
+	helpers.it("publishes storage.json private to the user on every runtime (linux-storage-private-mode)", function()
+		local root = make_temp_config_root()
+		local path = root .. "/" .. FOLDER .. "/storage.json"
+		local Shell = require("adapters.shell_runner")
+		local real_getenv = os.getenv
+		os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
+		local ok, err = xpcall(function()
+			local storage = helpers.load_module("adapters.storage")
+			helpers.assert_true(storage.set("value", "private"))
+			local probe = assert(io.popen("umask 022; stat -c %a " .. Shell.quote(path)))
+			local mode = probe:read("*l")
+			probe:close()
+			helpers.assert_eq(mode, "600", "the store is readable by its owner alone")
+		end, debug.traceback)
+		os.getenv = real_getenv
+		package.loaded["adapters.storage"] = nil
+		os.remove(path); os.remove(root .. "/" .. FOLDER); os.remove(root)
+		helpers.assert_true(ok, tostring(err))
+	end)
+end)

@@ -229,13 +229,15 @@ local function _load()
 end
 
 --- Creates the staging inode exclusively and retains its original descriptor.
---- LuaJIT forwards C11 wx to libc; stock Lua rejects that stdio mode, so its
---- native libuv descriptor supplies the same no-clobber boundary.
+--- The native libuv descriptor gives the no-clobber boundary and the store's
+--- 0600 mode on every runtime. LuaJIT without libuv forwards C11 wx to libc,
+--- whose file takes the umask's mode: the shipped LuaJIT runtime published a
+--- 0644 store that way (CFL-003). Stock Lua rejects that stdio mode.
 --- @return file*|table|nil handle
 local function _open_owned_temp()
-	if _VERSION == "Lua 5.1" then return io.open(_TMP_PATH, "wx") end
 	local ok, uv = pcall(require, "luv")
 	if not ok or type(uv.fs_open) ~= "function" or type(uv.fs_write) ~= "function" or type(uv.fs_close) ~= "function" then
+		if _VERSION == "Lua 5.1" then return io.open(_TMP_PATH, "wx") end
 		return nil, "exclusive storage staging is unavailable"
 	end
 	local fd, err = uv.fs_open(_TMP_PATH, "wx", 384) -- Native 0600 permission bits.
