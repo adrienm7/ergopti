@@ -2,9 +2,15 @@
 
 # Linux: a precompiled bytecode package (proposal, maintainer decision)
 
-Status: proposed on 2026-11-11 by the Linux performance pass. Not implemented.
-The decision it needs is the staleness contract between shipped bytecode and
-the sources beside it (memory: `project-linux-startup-cost-is-compilation`).
+Status: proposed on 2026-11-11 by the Linux performance pass, approved by the
+maintainer the same day for the installed tree only, and implemented
+(`infra/bytecode_package.lua`, `install/compile_bytecode.lua`; decision in
+`docs/memory/maintainer-decisions.md`). The receipt question was settled by
+excluding `.bytecode/` and admitting it by name. Measured after
+implementation, in an installed tree under the container session (three runs of
+7 boots, medians): spawn to `Daemon ready` 488 → 355 ms, load phase 200 → 90 ms,
+boot clock 294 → 255 ms, boot CPU 216 → 180 ms. The manifest's parse costs
+0.7 ms per boot.
 
 ## What it would save
 
