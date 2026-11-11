@@ -1100,7 +1100,8 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
       Container proof 2026-11-10 ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Qt (kwrite) types ₢ at once; GTK 3 (mousepad, no IBus) types the
       borrowed trigger « ⅕ » (Linux remaining work); the installed X11 Bépo needed 03a47899. The other parts of this
-      line were not attempted.
+      line were not attempted. 2026-11-11: GTK 3 and Qt both type ₢ at once (`bepo_compose_gtk3.txt`); left: the
+      sticky delay row, the CapsWord menu change, the one-shot Shift and CapsWord device checks.
       types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row changes
       the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
       output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
@@ -1224,9 +1225,13 @@ between workers) green alone. All live checks pass, typed by the harness.
       running shell, but only once the shell processed each write: wait on the session keymap (XWayland group) between
       writes. The same holds for `apply-wayland`, and the shell lists no id it does not know from the system rules.
       [Proof and mechanism](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
-- [ ] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method compiles nothing from the
-      include block (an included file that itself includes `%L`), so Bépo's monnaie then cédille types « ⅕ » in
-      mousepad while Qt types ₢. Write the rules where GTK 3 reads them, or state the IBus requirement.
+- [x] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method ignores an `include` of
+      another file and aborts (« buffer overflow detected ») on a large set of multi-character outputs (Bépo has
+      21,742). Done 2026-11-11, decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: the
+      owned block keeps the include of each layout file (libX11 and Qt read every rule) and repeats its single-character
+      rules inline for GTK 3, in both installers; GTK 3 without IBus keeps no multi-character output. Proof:
+      `bepo_compose_gtk3.txt` in [the receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)
+      (mousepad and kwrite type ₢ at once).
 - [x] **KDE layout id across session types.** `getLayoutsList`'s middle field is Plasma's display label (`''` on
       Wayland, the short name on X11), read as a variant: the same layout is `us` on Wayland and `us(us)` on X11, so a
       stored pause layout does not match on the other session type.

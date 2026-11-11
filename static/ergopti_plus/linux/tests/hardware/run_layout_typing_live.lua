@@ -567,7 +567,7 @@ local function bepo_compose()
 	check(applied[1] == true, "Bépo is loaded into the running server: " .. tostring(applied[2]) .. " "
 		.. tostring(applied[3]))
 	local xcompose = read(SCRATCH .. "/home/.XCompose") or ""
-	check(xcompose:find("bepo", 1, true) ~= nil, "~/.XCompose includes the Bépo Compose file")
+	check(xcompose:find("<onefifth> <dead_cedilla>", 1, true) ~= nil, "~/.XCompose carries the Bépo rules inline")
 	refresh_layout()
 	write(CONFIG_PATH, "[layout]\nergopti_base = false\nergopti_variant = \"none\"\n")
 	assert(Emulation.reload())

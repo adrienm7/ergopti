@@ -71,7 +71,7 @@ From `static/ergopti_plus/linux`:
   and Bépo only in `~/.config/xkb`, mutter's XWayland keymap is Bépo with
   `ERGOPTI_SEVEN_LEVEL`, while the shell's InputSourceManager falls back to
   `us` (GnomeXkbInfo does not know the id).
-- **GTK 3 composes nothing from the managed `~/.XCompose`.** mousepad's built-in
+- **Fixed 2026-11-11 (`bepo_compose_gtk3.txt`): GTK 3 composed nothing from the managed `~/.XCompose`.** GTK 3.24 ignores includes and overflows on many multi-character outputs; the block now repeats the single-character rules inline. mousepad's built-in
   input method compiles no Compose cache from it (an include of a file that
   itself includes `%L`) and types the borrowed trigger « ⅕ ». Qt composes ₢.
   A desktop running IBus (GNOME) composes through IBus instead.

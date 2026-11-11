@@ -68,7 +68,9 @@ from layout_package import (  # noqa: E402
     EXIT_VALIDATION,
     LayoutSpec,
     build_evdev_post,
+    inline_xcompose_block,
     patch_symbols_default,
+    strip_xcompose_block,
     validate_layout_files,
 )
 
@@ -221,33 +223,6 @@ def with_file_marker(content: str, layout_id: str) -> str:
     return FILE_MARKER + layout_id + "\n" + content
 
 
-def build_xcompose_block(compose_files: List[Path]) -> List[str]:
-    """The owned ~/.XCompose lines: the marker, then one include per layout."""
-    if not compose_files:
-        return []
-    lines = [XCOMPOSE_MARKER]
-    for path in compose_files:
-        escaped = str(path).replace("\\", "\\\\").replace('"', '\\"')
-        lines.append('include "%s"' % escaped)
-    return lines
-
-
-def strip_xcompose_block(content: str) -> List[str]:
-    """Removes the owned block (the marker and the includes after it)."""
-    lines = content.splitlines()
-    kept = []
-    index = 0
-    while index < len(lines):
-        if lines[index].strip() != XCOMPOSE_MARKER:
-            kept.append(lines[index])
-            index += 1
-            continue
-        index += 1
-        while index < len(lines) and lines[index].lstrip().startswith('include "'):
-            index += 1
-    return kept
-
-
 # ---------------------------------------------------------------------------
 # Files
 # ---------------------------------------------------------------------------
@@ -320,9 +295,10 @@ def publish_shared_files(root: Path, home: Path, layouts: Dict[str, dict]) -> No
                 path.unlink()
     xcompose = home / ".XCompose"
     existing = xcompose.read_text(encoding="utf-8") if xcompose.exists() else ""
-    kept = strip_xcompose_block(existing)
+    kept, _ = strip_xcompose_block(existing, XCOMPOSE_MARKER)
     composes = [layout_paths(root, layout_id)["compose"] for layout_id in sorted(layouts)]
-    lines = kept + build_xcompose_block([path for path in composes if path.exists()])
+    texts = [(path, path.read_text(encoding="utf-8")) for path in composes if path.exists()]
+    lines = kept + inline_xcompose_block(XCOMPOSE_MARKER, texts)
     content = "\n".join(lines) + ("\n" if lines else "")
     if content.strip():
         if content != existing:
