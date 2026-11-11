@@ -25,6 +25,7 @@ const { shared } = require('../../lib/paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
 const NAV = shared('keymap', 'layers.recommended.toml');
+const SOURCE_FIXTURE = shared('tests', 'corpus', 'layouts', 'source', 'source.toml');
 const LOCALES = JSON.parse(fs.readFileSync(shared('data', 'locale_order.json'), 'utf8')).order;
 const TYPES = {
 	'.html': 'text/html',
@@ -405,6 +406,15 @@ async function exerciseManager(browser, origin) {
 		} finally {
 			fs.rmSync(reopened);
 		}
+
+		// The preview types through the web emulation: a tap-hold's tap and a shortcut.
+		await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
+		await page.waitForFunction(() => document.querySelector('#le-name').value === 'Source Fixture');
+		await page.focus('#le-preview-input');
+		await page.keyboard.press('KeyA');
+		await page.keyboard.press('Space');
+		await page.keyboard.press('Control+KeyA');
+		assert.equal(await page.textContent('#le-preview-output'), 'a ⟨control+KeyB⟩');
 		assert.deepEqual(errors, []);
 		await page.close();
 
