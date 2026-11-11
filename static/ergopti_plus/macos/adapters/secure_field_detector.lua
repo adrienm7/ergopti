@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Hammerspoon implementation of the SecureFieldDetector port contract defined in
 --- static/ergopti_plus/_shared/core/ports/SecureFieldDetector.spec.js. Wraps hs.axuielement
---- and a hardcoded list of known password-manager app names to detect whether the
+--- and the shared list of known password-manager app names
+--- (_shared/data/secure_apps.json) to detect whether the
 --- user is currently focused on a secure text field or a security-sensitive app.
 ---
 --- FEATURES & RATIONALE:
@@ -15,8 +16,9 @@
 ---    because native AppKit controls carry the marker on the role while
 ---    WebKit/Blink browsers carry it on the subrole of a plain AXTextField.
 --- 2. Known-app guard: some security apps never expose a secure role (e.g. vault
----    unlock screens rendered in WebKit); the hardcoded list provides a second
----    line of defence for those cases.
+---    unlock screens rendered in WebKit); the shared list, read once and
+---    common to the three drivers, provides a second line of defence for those
+---    cases: the whole application is secure.
 --- 3. Fail-safe returns: an incomplete AX classification is treated as secure so
 ---    neither local metrics nor LLM requests can capture credentials while a
 ---    browser replaces its focused element.
@@ -27,6 +29,7 @@ local M = {}
 local hs               = hs
 local Logger           = require("infra.logger")
 local AXResponsiveness = require("adapters.accessibility_permission")
+local SecureApps       = require("secure_apps")
 
 local LOG = "adapters.secure_field_detector"
 
@@ -44,20 +47,6 @@ local LOG = "adapters.secure_field_detector"
 -- the element's AXRole, while WebKit/Blink expose it as the AXSubrole of a plain
 -- AXTextField — so both attributes must be tested (see M.isSecureField).
 local SECURE_ROLE = "AXSecureTextField"
-
--- Apps whose entire surface is considered sensitive regardless of AX role
-local SECURE_APP_IDS = {
-	["1Password 7 - Password Manager"] = true,
-	["1Password"]                       = true,
-	["Keychain Access"]                 = true,
-	["Bitwarden"]                       = true,
-	["LastPass"]                        = true,
-	["Dashlane"]                        = true,
-	["KeePassXC"]                       = true,
-	["Authy Desktop"]                   = true,
-	["Google Authenticator"]            = true,
-	["Touch ID & Password"]             = true,
-}
 
 
 
@@ -315,11 +304,10 @@ end
 
 --- Returns true if the given app ID belongs to a known security-sensitive app.
 --- @param appId string|nil The application name to check.
---- @return boolean True when appId is in the SECURE_APP_IDS list.
+--- @return boolean True when appId is a macOS name of the shared list.
 function M.isSecureApp(appId)
 	if appId == nil or appId == "" then return false end
-	local key = tostring(appId)
-	return SECURE_APP_IDS[key] == true
+	return SecureApps.is_secure_app("macos", tostring(appId))
 end
 
 return M

@@ -112,6 +112,15 @@ helpers.describe("SecureFieldDetector: isSecureApp", function()
 			"Dashlane must be detected as secure")
 	end)
 
+	-- ADD-1 (decided by the maintainer on 2026-11-11): the macOS names come
+	-- from the shared list the three drivers read.
+	helpers.it("reads its names from the shared list (add1-secure-app)", function()
+		helpers.assert_true(adapter.isSecureApp("RoboForm") == true,
+			"RoboForm is a macOS name of _shared/data/secure_apps.json")
+		helpers.assert_eq(false, adapter.isSecureApp("roboform"),
+			"macOS display names stay exact")
+	end)
+
 	helpers.it("returns false for an unknown app", function()
 		helpers.assert_eq(false, adapter.isSecureApp("Safari"),
 			"Safari must not be secure")

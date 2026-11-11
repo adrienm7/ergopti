@@ -218,6 +218,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
 	},
 	{
+		script: 'codegen/codegen-secure-apps.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/secure_apps_data.lua']
+	},
+	{
 		script: 'codegen/codegen-adapter-errors.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/adapter_errors.lua']
 	},

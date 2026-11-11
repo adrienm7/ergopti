@@ -1,0 +1,77 @@
+{
+	"description": "Password managers, vaults and authenticators whose whole application is treated as a secure field on every driver (ADD-1, decided by the maintainer on 2026-11-11): hotstrings, keymap output, AI requests, clipboard borrowers and metrics stay inert there, whatever field has focus. `windows` lists process names (compared without case), `macos` application display names (exact), `linux` lowercase fragments of the application identity (the X11 WM class or Wayland app_id, /proc comm as fallback), matched as substrings so a reverse-DNS app_id such as org.keepassxc.KeePassXC is covered. Expand, never shrink. Read by _shared/lua/secure_apps.lua (macOS, Linux); pinned by tools/test/test-secure-apps-single-source.cjs.",
+	"apps": [
+		{
+			"id": "1password",
+			"windows": ["1Password.exe"],
+			"macos": ["1Password", "1Password 7 - Password Manager"],
+			"linux": ["1password"]
+		},
+		{
+			"id": "bitwarden",
+			"windows": ["Bitwarden.exe"],
+			"macos": ["Bitwarden"],
+			"linux": ["bitwarden"]
+		},
+		{
+			"id": "keepassxc",
+			"windows": ["KeePassXC.exe"],
+			"macos": ["KeePassXC"],
+			"linux": ["keepassxc"]
+		},
+		{
+			"id": "keepass",
+			"windows": ["KeePass.exe", "keepass2.exe"],
+			"macos": [],
+			"linux": ["keepass"]
+		},
+		{
+			"id": "lastpass",
+			"windows": ["LastPass.exe"],
+			"macos": ["LastPass"],
+			"linux": ["lastpass"]
+		},
+		{
+			"id": "dashlane",
+			"windows": ["Dashlane.exe"],
+			"macos": ["Dashlane"],
+			"linux": ["dashlane"]
+		},
+		{
+			"id": "roboform",
+			"windows": ["RoboForm.exe"],
+			"macos": ["RoboForm"],
+			"linux": ["roboform"]
+		},
+		{
+			"id": "authy",
+			"windows": ["Authy.exe"],
+			"macos": ["Authy Desktop"],
+			"linux": ["authy"]
+		},
+		{
+			"id": "google_authenticator",
+			"windows": [],
+			"macos": ["Google Authenticator"],
+			"linux": []
+		},
+		{
+			"id": "system_keychain",
+			"windows": ["credential_guard"],
+			"macos": ["Keychain Access", "Touch ID & Password"],
+			"linux": ["gnome-keyring-3", "seahorse"]
+		},
+		{
+			"id": "gnome_authenticator",
+			"windows": [],
+			"macos": [],
+			"linux": ["gnome-authenticator", "authenticator"]
+		},
+		{
+			"id": "yubikey_manager",
+			"windows": [],
+			"macos": [],
+			"linux": ["yubikey-manager"]
+		}
+	]
+}

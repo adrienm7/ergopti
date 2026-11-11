@@ -254,7 +254,9 @@ helpers.describe("Native field application privacy context", function()
 				local configuration = logger.configuration_snapshot()
 				configuration[filter] = false
 				helpers.assert_true(logger.apply_configuration(configuration))
-				helpers.assert_eq(guard.blocks_text(), false)
+				-- ADD-1: a password manager stays a secure field as a whole with the
+				-- metrics' secure filter off; only the private-window filter lifts.
+				helpers.assert_eq(guard.blocks_text(), filter == "secure_filter_enabled")
 				configuration[filter] = true
 				helpers.assert_true(logger.apply_configuration(configuration))
 				helpers.assert_true(guard.blocks_text())

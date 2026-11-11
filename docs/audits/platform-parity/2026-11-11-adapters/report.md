@@ -39,6 +39,23 @@ the case did not arise there.
 
 ## Decided
 
+- **ADD-1, password-manager applications** (decided by the maintainer on
+  2026-11-11): every application of `_shared/data/secure_apps.json` (the
+  three driver lists merged) is a secure field as a whole on the three
+  drivers. macOS `isSecureApp` and Linux `isSecureApp` and the metrics read
+  the file (rule `_shared/lua/secure_apps.lua`); Linux
+  `keystats.is_context_protected` protects a listed application whatever the
+  metrics filters say, and the focus guard publishes that verdict to every
+  text consumer (hotstrings, AI, clipboard borrowers). The keystats comment
+  claiming the detector list was « consulted in addition » is replaced.
+  Regressions `add1-secure-app`; gate `test-secure-apps-single-source.cjs`.
+  Windows counterpart, for the maintainer
+  (`adapters/secure_field_detector.ahk`): build `SFD_SECURE_APPS` from the
+  file's `windows` names (a `Map` with `CaseSense := "Off"`, a read or parse
+  failure treating every application as secure), and return true at the top
+  of `SFD_IsSecureField` when `SFD_IsSecureApp` holds the focused window's
+  process name (`WinGetProcessName`); test in `test_secure_field_detector.ahk`
+  that a `RoboForm.exe` window is secure.
 - **ADD-2, restoring an empty clipboard** (decided by the maintainer on
   2026-11-11): a Linux borrow of a clipboard nobody owned gives it back
   unowned, as macOS clears its pasteboard (`clipboard.lua` snapshot
@@ -49,15 +66,6 @@ the case did not arise there.
 
 ## Decisions pending (behaviour left unchanged)
 
-- **ADD-1, password-manager applications.** macOS treats every field of a
-  listed password manager (1Password, Bitwarden, KeePassXC…) as secure
-  (`macos/modules/keymap/utils.lua` `isSecureApp`), so hotstrings and keymap
-  output are inert there. Linux (`adapters/secure_field_detector.lua`
-  `isSecureApp`) and Windows (`SFD_IsSecureApp`) keep such a list with no
-  production caller, and the Linux keystats comment that says the list is
-  « consulted in addition » is not true; the three lists also differ.
-  Recommendation: make the app-wide gate the contract on the three drivers,
-  from one shared list.
 - **ADD-3, the Linux application identity.** X11 reports `/proc/<pid>/comm`,
   which the kernel cuts to 15 bytes (`window_info.lua`); Wayland reports the
   `app_id` or window class. An exclusion list built under one session type
@@ -67,7 +75,7 @@ the case did not arise there.
 ## Windows, report only
 
 `SFD_IsSecureApp` (`secure_field_detector.ahk:604`) has no production
-caller; it rides on ADD-1.
+caller; ADD-1 above gives its counterpart.
 
 ## Refuted
 

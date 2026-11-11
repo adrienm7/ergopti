@@ -657,6 +657,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-shared-literal-inventory.cjs"],
 			"repro": "node tools/audit/shared-literal-inventory.cjs"
+		},
+		{
+			"id": "js-0509",
+			"ordinal": 625,
+			"name": "secure applications single source (macOS, Linux and Windows read _shared/data/secure_apps.json, ADD-1)",
+			"cmd": "node",
+			"args": ["tools/test/test-secure-apps-single-source.cjs"],
+			"repro": "node tools/test/test-secure-apps-single-source.cjs"
 		}
 	]
 }

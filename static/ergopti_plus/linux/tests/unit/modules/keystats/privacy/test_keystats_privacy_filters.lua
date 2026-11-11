@@ -392,6 +392,34 @@ helpers.describe("keystats privacy — coverage never narrows", function()
 		kl.set_system_auth_filter_enabled(true)
 	end)
 
+	-- ADD-1 (decided by the maintainer on 2026-11-11): a password manager of the
+	-- shared list is a secure field as a whole, as on macOS, whatever the
+	-- metrics switches say: the published verdict also gates hotstrings, AI
+	-- and clipboard borrowers. Its Wayland app_id is matched, not only comm.
+	it("protects a shared-list password manager whatever the metrics filters (add1-secure-app)", function()
+		local kl = fresh_keystats()
+		kl.set_secure_filter_enabled(false)
+		local ok, failure = pcall(function()
+			for _, app in ipairs({ "org.keepassxc.KeePassXC", "com.bitwarden.desktop", "RoboForm", "Dashlane" }) do
+				helpers.assert_true(kl.is_context_protected(app, "Vault"),
+					"the whole application must stay protected with the secure filter off: " .. app)
+			end
+			helpers.assert_eq(kl.is_context_protected("firefox", "Mail"), false)
+		end)
+		kl.set_secure_filter_enabled(true)
+		if not ok then error(failure, 0) end
+	end)
+
+	it("reads the shared list in the detector and the metrics (add1-secure-app)", function()
+		local Detector = helpers.load_module("adapters.secure_field_detector")
+		for _, app in ipairs({ "org.keepassxc.KeePassXC", "1password", "Seahorse", "org.gnome.seahorse.Application" }) do
+			helpers.assert_true(Detector.isSecureApp(app), "the detector must match " .. app)
+		end
+		local kl = fresh_keystats()
+		helpers.assert_true(kl.is_password_app("roboform"), "the metrics list is the shared one")
+		helpers.assert_eq(Detector.isSecureApp("gedit"), false)
+	end)
+
 	it("still ignores ordinary applications", function()
 		local kl = fresh_keystats()
 		helpers.assert_eq(kl.is_password_app("firefox"), false)

@@ -89,6 +89,9 @@ local OWNED = {
 	-- The real TOML reader opens its source through this shared owner.
 	"toml_codec.source_open",
 	"wrap_pair",
+	-- The secure-app rule and its generated list, loaded with the detector.
+	"secure_apps",
+	"secure_apps_data",
 
 	"adapters.accessibility_permission",
 	"adapters.clipboard",
