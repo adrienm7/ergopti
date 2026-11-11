@@ -127,11 +127,14 @@ for (const vector of corpus.vectors) {
 	for (const token of actual) if (token.key) covered.add(token.key);
 }
 
-// What the Windows editor's help line lists is promised to the user, so each one
-// resolves and has a vector.
-const editor = fs.readFileSync(path.join(SP, 'windows', 'ui', 'personal_toml_editor.ahk'), 'utf8');
-const help = /"(\{Enter\}[^"\n]*\{End\})"/.exec(editor);
-check(help !== null, 'the Windows editor must still list its tokens on one line');
+// What the shared editor's token palette offers is promised to the user, so each
+// one resolves and has a vector. Every driver shows this same page.
+const editor = fs.readFileSync(
+	path.join(SP, '_shared', 'ui', 'hotstring_editor', 'script.js'),
+	'utf8'
+);
+const help = /const TOKEN_NAMES = \[([^\]]*)\]/.exec(editor);
+check(help !== null, 'the shared editor must still declare its TOKEN_NAMES palette');
 for (const name of help ? help[1].match(/[A-Za-z]+/g) : []) {
 	const entry = findKey(name.toLowerCase());
 	check(entry !== null, `the editor promises {${name}}, which send_keys.json does not name`);

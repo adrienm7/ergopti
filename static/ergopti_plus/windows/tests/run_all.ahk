@@ -1098,6 +1098,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/ui/webview/test_webview_range_mount.ahk
 #Include unit/ui/webview/test_webview_profile_ownership.ahk
 #Include unit/ui/webview/test_webview_fit_to_window.ahk
+#Include unit/ui/webview/test_personal_editors_webview_only.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/infra/toml/test_uridecode_literal_unicode.ahk
 #Include meta/ui/webview/test_webview_script_observer.ahk
@@ -2132,7 +2133,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_byref_call_sites.ahk
 #Include meta/adapters/uia/test_uia_probe_bounded.ahk
 #Include meta/ui/healthcheck/test_healthcheck_collectors_guarded.ahk
-#Include meta/modules/hotstrings/personal/test_personal_editor_section_guard.ahk
 #Include meta/modules/gestures/test_gestures_init_lifecycle_pair.ahk
 #Include meta/infra/config/persistence/test_paths_file_single_writer.ahk
 #Include meta/modules/updater/test_changelog_fetch_status_logged.ahk

@@ -230,41 +230,9 @@
 				"zh"
 			]
 		},
-		"editor.hotstrings.col_auto": {
-			"reason": "loanword-or-cognate",
-			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
-		},
-		"editor.hotstrings.col_final": {
-			"reason": "loanword-or-cognate",
-			"locales": ["da", "de", "es", "fr", "pt"]
-		},
-		"editor.hotstrings.col_priority": {
-			"reason": "loanword-or-cognate",
-			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
-		},
-		"editor.hotstrings.col_trigger": {
-			"reason": "loanword-or-cognate",
-			"locales": ["it", "nl"]
-		},
-		"editor.hotstrings.desc_title": {
-			"reason": "loanword-or-cognate",
-			"locales": ["fr"]
-		},
-		"editor.hotstrings.label_trigger": {
-			"reason": "loanword-or-cognate",
-			"locales": ["it", "nl"]
-		},
 		"editor.hotstrings.sec_desc_label": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
-		},
-		"editor.hotstrings.title_confirm": {
-			"reason": "loanword-or-cognate",
-			"locales": ["fr"]
-		},
-		"editor.hotstrings.title_error": {
-			"reason": "loanword-or-cognate",
-			"locales": ["es"]
 		},
 		"editor.hotstrings.trigger_label": {
 			"reason": "loanword-or-cognate",
