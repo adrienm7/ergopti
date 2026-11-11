@@ -128,3 +128,44 @@ boot_total_ms`, key and tap-hold under `[logger] hotpath_slow_ms`, typing
   deliberate (slow applications) and blocks the loop.
 - **Shutdown** (114 ms) and the key, tap-hold and first-row paths were
   already at the bench's floor (FIFO, Python reader thread).
+
+## Round 2 (same day, same method, after the integration on dev)
+
+Baseline: the first round's after figures (above). After: the round-2 commits
+on `claude/ergopti-todo-linux-perf`, three runs of 7 boots.
+
+| Path                                           | Round 1: median / p95 / max | Round 2: median / p95 / max | Change |
+| ---------------------------------------------- | --------------------------- | --------------------------- | ------ |
+| Startup, spawn to `Daemon ready`               | 498 / 710 / 710 ms          | 462 / 625 / 625 ms          | -7 %   |
+| Boot clock total                               | 309 / 530 / 530 ms          | 272 / 429 / 429 ms          | -12 %  |
+| Keystats stage                                 | 63 ms                       | 38 ms                       | -40 %  |
+| Callbacks stage (the first layout resolve)     | 127 ms                      | 105 ms                      | -17 %  |
+| Hotstring `xz` → `MATCH`: last key to last row | 34.4 / 40.4 / 45.6 ms       | 15.0 / 21.7 / 23.3 ms       | -56 %  |
+| Key press to output, tap-hold, tray re-open    | unchanged                   | unchanged                   |        |
+
+Every expansion of each run read back intact from the focused GTK field.
+
+1. **The X11 keymap is serialized in process.** Each resolve forked `xkbcli
+dump-keymap-x11` (absent before libxkbcommon 1.8) and then `xkbcomp`.
+   `xkb_source_probe.dump_keymap()` serializes the same text through the
+   probe's own libxkbcommon-x11 connection: `refresh()` 38-45 → 11-14 ms on
+   Xvfb. `run_keymap_native_dump.lua` proves on us, fr, de, ch(fr) and
+   us(dvorak) that `infra/xkb_keymap` parses both dumps to the same entries and
+   that both type the same characters.
+2. **The keystats stage stopped waiting on background work.** Every sqlite3
+   query is a shell and a process (about 4 ms). The ledger read its four meta
+   keys in four of them; it now reads them in one, and its exporter and the
+   at-rest text migration start on the loop's first idle tick after the ready
+   announcement. Warm `keystats.init`: 52-57 → 36-42 ms. What remains (about
+   30 ms: `open_db`'s mkdir and schema checks, device registration, the
+   open-walk read) would need a persistent sqlite3 child.
+3. **The erase-to-text pause follows the other drivers.** Linux paused 20 ms
+   after every erase in every application; Windows and macOS pace only a
+   terminal or TUI prompt. The injector now asks a pacing port that answers
+   true for a terminal or an application nobody could name (a compositor
+   without focus queries keeps the pause). The pause was unrelated to the
+   keymap proof made cheap in round 1.
+4. **Bytecode stays a proposal.** An experimental searcher measured the
+   process start to the boot clock at 110-130 ms against 170-240 ms from
+   source: `docs/design/linux-bytecode-package.md` sets out the staleness
+   contract to decide.

@@ -190,7 +190,10 @@ so it fails on a host without luaposix too.
 ### project-linux-keymap-before-libxkbcommon-1-8
 
 `xkbcli dump-keymap-{wayland,x11}` only exists from libxkbcommon 1.8; Ubuntu
-24.04 ships 1.6. `adapters/keyboard_layout.lua` therefore falls back to
+24.04 ships 1.6. On X11 the keymap comes first from the source probe in
+process (`xkb_source_probe.dump_keymap`, the text `xkbcli dump-keymap-x11`
+prints, 0.6 ms against a 30 ms `xkbcomp` fork; `run_keymap_native_dump.lua`
+proves the parser reads both alike). `adapters/keyboard_layout.lua` otherwise falls back to
 XWayland's keymap (`xkbcomp -xkb $DISPLAY`, exact because XWayland receives the
 compositor's keymap) and then to `xkbcli compile-keymap` from the session's
 layout names (`infra/xkb_rmlvo.lua`). Action: a keymap source must be proven on
@@ -543,8 +546,9 @@ are only 21 ms of compile, some are used at the first key or tray draw on a
 desktop, and the largest (the HTTP engine behind `adapters/http_client`,
 `unicode_case.data`, `llm.parser`) carry identity or test-seam contracts.
 Action: measure with the probe before proposing lazy requires; the lever
-that moves the start is a precompiled-bytecode package, which needs a
-maintainer decision on its staleness contract with the shipped sources.
+that moves the start is a precompiled-bytecode package (an experimental
+searcher measured 180 → 120 ms to the boot clock), which needs a maintainer
+decision on its staleness contract: `docs/design/linux-bytecode-package.md`.
 
 ### project-linux-layout-proof-reuses-the-keymap-between-notifications
 
