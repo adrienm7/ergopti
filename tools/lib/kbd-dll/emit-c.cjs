@@ -190,7 +190,7 @@ function emitC(input) {
 	if (lgMax) line(`_Static_assert(sizeof(LIGATURE_N) == ${4 + 2 * lgMax}, "LIGATURE layout");`);
 	line('');
 	line('static const VK_TO_BIT aVkToBits[] = {');
-	for (const name of names) line(`\t{ ${hex(C.MOD_VK[name], 2)}, ${hex(C.MOD_BITS[name], 2)} },`);
+	for (const key of Model.modifierKeys(model)) line(`\t{ ${hex(key.vk, 2)}, ${hex(key.bit, 2)} },`);
 	line('\t{ 0, 0 }');
 	line('};');
 	line(
@@ -254,7 +254,8 @@ function emitC(input) {
 		);
 	line('};');
 	line('static const VSC_VK aE0VscToVk[] = {');
-	for (const [sc, vk] of C.DEFAULT_E0) line(`\t{ ${hex(sc, 2)}, ${hex(vk | C.SC_FLAGS.EXT)} },`);
+	for (const [sc, vk] of Model.e0Table(model))
+		line(`\t{ ${hex(sc, 2)}, ${hex(vk | C.SC_FLAGS.EXT)} },`);
 	line('\t{ 0, 0 }');
 	line('};');
 	line('static const VSC_VK aE1VscToVk[] = {');
