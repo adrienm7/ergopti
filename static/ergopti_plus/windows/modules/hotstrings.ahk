@@ -42,12 +42,13 @@
 ; restarting the script via Reload. Called once at boot from ErgoptiPlus.ahk
 ; right after the #Include, and again on every live hotstring toggle.
 ;
-; ``DeferHeavy`` remains for compatibility with explicit live callers. The boot
-; passes false: the driver may publish ready only after every advertised trigger
-; and its preview index are available. A live rebuild also passes false so it
-; atomically returns a complete registry. ColdBoot is reserved for the sole
-; startup call: unavailable common families are classified while unrelated
-; registrars still run. Live callers refuse before the first registry mutation.
+; ``DeferHeavy`` is the boot's: the emoji and symbol sections keep their rank but
+; register after ready, in slices (RegisterEmojisSymbolsDeferred), and the boot
+; starts them once ready. A live rebuild passes false so it atomically returns a
+; complete registry, and drops a deferred job still pending. ColdBoot is reserved
+; for the sole startup call: unavailable common families are classified while
+; unrelated registrars still run. Live callers refuse before the first registry
+; mutation.
 RegisterAllHotstrings(DeferHeavy := false, ColdBoot := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
@@ -60,7 +61,7 @@ RegisterAllHotstrings(DeferHeavy := false, ColdBoot := false) {
 	}
 
 	if (!DeferHeavy) {
-		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
+		HSE_DeferredRegistrationCancel()
 	}
 
 	; Recompute SpaceAroundSymbols from the live Features on every run, so a live

@@ -52,20 +52,22 @@ _MetaCheckBootDeferredTasks() {
 	Assert(ReadyPos > 0,
 		"ErgoptiPlus.ahk must execute the 'Driver fully initialised' ready log")
 
-	; Emoji/symbol hotstrings are deliberately the exception to the deferred-task
-	; rule: they are part of the advertised input contract and must finish before
-	; ready.  A first trigger must never be literal because its registration timer
-	; has not run yet, nor may that timer contend with the user's first keystroke.
-	HotstringsPos := InStr(Body, "RegisterAllHotstrings(false, true)")
+	; The emoji/symbol hotstrings reserve their rank during the synchronous
+	; registration and register their rows in slices only once ready: a slice
+	; armed before ready would preempt the boot exactly as described above.
+	HotstringsPos := InStr(Body, "RegisterAllHotstrings(true, true)")
 	PrefixIndexPos := InStr(Body, "HotstringPrefixWatcherRebuildIndex()")
+	SlicesPos := InStr(Body, "HSE_DeferredRegistrationStart()")
 	Assert(HotstringsPos > 0,
-		"ErgoptiPlus.ahk must register all hotstrings synchronously at boot")
+		"ErgoptiPlus.ahk must register the hotstrings synchronously at boot")
 	Assert(PrefixIndexPos > HotstringsPos && PrefixIndexPos < ReadyPos,
 		"the prefix index must be rebuilt after synchronous hotstring registration and before ready")
 	Assert(HotstringsPos < ReadyPos,
-		"emoji/symbol hotstrings must finish registering before the driver reports ready")
+		"the boot hotstring registration, which reserves the emoji/symbol rank, must precede ready")
+	Assert(SlicesPos > ReadyPos,
+		"the emoji/symbol slices must start only after the driver reports ready")
 	Assert(InStr(Body, "SetTimer(RegisterEmojisSymbolsDeferred") = 0,
-		"the boot entrypoint must not arm a post-ready emoji/symbol registration timer")
+		"the boot entrypoint must not arm the emoji/symbol pass as one timer")
 
 	; Every remaining heavy deferred task must be armed strictly AFTER the ready
 	; marker. InStr returns the FIRST occurrence, so Pos > ReadyPos proves NO
