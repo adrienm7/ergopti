@@ -663,15 +663,29 @@ three-OS CI is green on the final source. See the handoff above for the current 
       `.migrated`); Linux leaves another driver's keys alone and names a macOS `hold_action` once. The cross-driver
       corpus `_shared/tests/corpus/tap_hold_shared_file/` pins each Lua writer's file byte for byte and what each
       reader reads from both (`expected.toml`, contract `_shared/lua/test/tap_hold_shared_file_contract.lua`).
-      Left: (1) Linux `[mod_combos]` still lives in `config.toml` (`modules/shortcuts/key_combinations.lua`,
-      `ui/menu/key_combinations.lua` through the features scope): route the `mod_combos.*` manifest paths to
-      `tap_hold.toml`, add `[legacy_imports.linux]` (`config.toml` `[mod_combos]`, a new closed translation in
-      `migrate.lua`), and add `mod_combos` reads to `expected.toml`; until then a macOS file's combinations do not
-      reach Linux. (2) Windows (maintainer): `tap_hold_loader.ahk` / `tap_hold_writer.ahk` read and write the shared
-      layout (catalogue ids, `[mod_combos]` from `config.toml` with its own legacy import, ignore `[karabiner]`,
-      `hold_action`, `cmd`/`fn` with one warning, write `_meta.schema_version`), `tap_hold_migration.ahk` accepts the
-      `[legacy_imports]` table of `migrations.toml` and validates it like `migrate.parse_legacy_imports`, and the AHK
-      suite reads both corpus files with `[reads.<file>.ahk]` added to `expected.toml`.
+      Left: Windows (maintainer), below; Linux and macOS are done.
+  - [x] **Linux `[mod_combos]` in `tap_hold.toml`.** Decided by the coordinator on 2026-11-11 overnight, to review by
+        the maintainer: the `[[features.mod_combos]]` rows keep their manifest declaration and are stored in
+        `tap_hold.toml`, as on macOS. `modules/shortcuts/key_combinations.lua` reads the taps, holds and switch from
+        `config.toml` and `[mod_combos]` from `tap_hold.toml` only, every receipt and lease check covering both files;
+        `infra/key_combinations_scope.lua` and `infra/shortcuts_scope.lua` publish `mod_combos.*` rows through the
+        transaction's new `companions` port, prepared by `tap_hold_writer.prepare_combo_rows` (versioned, stamped,
+        line-preserving), with its own backup and inverse. The boot moves `config.toml` `[mod_combos]` once
+        (`tap_hold_writer.import_config_combos`, `[legacy_imports.linux]`, translation `config_section` in
+        `migrate.lua`): both files backed up, `tap_hold.toml` published first, a crash between the writes finished
+        at the next start, a different `[mod_combos]` already in `tap_hold.toml` wins. `expected.toml` pins what
+        Linux reads of both corpus files' `[mod_combos]`.
+  - [ ] **Windows shared `tap_hold.toml` (maintainer).** `tap_hold_loader.ahk` / `tap_hold_writer.ahk` read and write
+        the shared layout: catalogue ids, `[mod_combos]` in `tap_hold.toml` (the combinations' reader and writer move
+        there, `config.toml` keeps the pair taps, holds and `[category_enabled] key_combinations`), ignore
+        `[karabiner]`, `hold_action`, `cmd`/`fn` with one warning, write `_meta.schema_version`. A
+        `[legacy_imports.ahk]` entry with `translate = "config_section"` and `section = "mod_combos"` moves
+        `config.toml` `[mod_combos]` the way Linux does (both backed up, `tap_hold.toml` first, equal copies only
+        delete the old one, a different shared copy wins), beside the Windows `config.toml` tap-hold keys' own
+        import. `tap_hold_migration.ahk` accepts the `[legacy_imports]` table of `migrations.toml` and validates it
+        like `migrate.parse_legacy_imports` (per translation: `retired_suffix` for `karabiner`, `section` for
+        `config_section`). The AHK suite reads both corpus files with `[reads.<file>.ahk]` added to `expected.toml`,
+        `mod_combos` included.
 - [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
