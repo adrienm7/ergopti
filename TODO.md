@@ -300,7 +300,10 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### Policy, documentation and verification debt
 
-- [ ] **[CI] Native Lua acquisition:** qualify current-source macOS LuaSocket/native-client build and launch after Lua.org timeouts; the upstream byte-identical Debian mirror changes for Linux and macOS are integrated, and targeted fetch/refusal controls pass. The earlier failed CI sources predate the macOS mirror fix. Preserve exact hashes and native receiving requirements. [Delivery evidence](docs/audits/platform-parity/2026-11-05-sequential/delivery.md).
+- [x] **[CI] Native Lua acquisition:** qualify current-source macOS LuaSocket/native-client build and launch after Lua.org timeouts; the upstream byte-identical Debian mirror changes for Linux and macOS are integrated, and targeted fetch/refusal controls pass. The earlier failed CI sources predate the macOS mirror fix. Preserve exact hashes and native receiving requirements. [Delivery evidence](docs/audits/platform-parity/2026-11-05-sequential/delivery.md).
+      Done 2026-11-11 in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) at `6736a355`: Build fetches `lua.tar.gz` and `luasocket.tar.gz` with their exact hashes
+      (`OK`) and builds the bundled LuaSocket; the installed app boots and quits in the clean, karabiner config,
+      upgraded, symlink and cold-bootstrap Install-and-launch rows (arm64, macOS 15 and 26).
 - [ ] **[CI] Native keyboard-source fixture:** investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
       2026-11-11: the refusal of run 42014901978 (Intel macOS 15) follows one line no passing log shows,
       `CFMessagePortSendRequest FAILED(-1) to send to port com.apple.tsm.uiserver`: the service that applies the
@@ -1266,7 +1269,7 @@ Each closes on a named green hosted or native run, recorded here.
 - [ ] **Ollama Go cell** (cda1e10c5e) on the final source before a release (passed on run 40021624397).
       Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
       it closes only on the release candidate's own source, which tonight's no-release rule excludes.
-- [ ] **36.** macOS Package job: Sparkle install/refusal/retry/relaunch, both Brew positives, full-policy denial, Brew
+- [x] **36.** macOS Package job: Sparkle install/refusal/retry/relaunch, both Brew positives, full-policy denial, Brew
       archive scenarios; Linux Flatpak/AppImage installation and PAC/session/TLS delivery.
       2026-11-11: the item 36 cohort passes 24/24 in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Archive update controls, macOS 26), including
       `testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch` and
@@ -1277,6 +1280,8 @@ Each closes on a named green hosted or native run, recorded here.
       A hosted runner runs the eight variants only against the ad hoc signed app of the "karabiner config"
       Install-and-launch row (`hs_native_bootstrap_probe.py`); the Developer ID signature exists only on a release
       build, which tonight's no-release rule forbids, so the signed run needs the next release candidate.
+      Ad hoc receipt 2026-11-11: `macOS launch gate [karabiner_config] passed on arm64` in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482253),
+      which requires all eight variants to build, merge and publish on the installed app.
 - [ ] **104, 105.** Common autocorrection sections (native Windows/macOS, per-section E2E, package); dynamic
       hotstrings on macOS.
 - [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both extension TOML files;
@@ -1312,6 +1317,9 @@ Each closes on a named green hosted or native run, recorded here.
       4 other failures). A new intermittent, `NativeAppClonerBundleOwnershipTests.testActualNativeCliLogLimits...`
       (runs 42438031643, 42480689370, `[Errno 1] Operation not permitted`), is fixed at its cause in bce01f27: XNU
       answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
+      New 2026-11-11: Install-and-launch `symlink_logs_dir` failed once in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482167) with "Quit did
+      not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
+      0.3–0.4 s in every other row; the failed job is re-running to separate a flake from a regression.
 
 ## Maintainer decisions pending
 
