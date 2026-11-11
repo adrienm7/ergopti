@@ -46,13 +46,20 @@ const GROUPS = [
 	'service_labels',
 	'hosts',
 	'dev_source',
-	'field_report'
+	'field_report',
+	'bytecode_package'
 ];
+// Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
+// AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone.
+const LUA_ONLY_GROUPS = new Set(['bytecode_package']);
+const PROJECTED_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-
 // separated plain segments, with an optional final slash for a prefix.
 const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
-const GROUP_SHAPE = { field_report: PATH_SHAPE };
+// The bytecode package's file names, wire markers and the compiler's root-relative
+// path (linux/infra/bytecode_package.lua, modules/updater/installer.lua).
+const GROUP_SHAPE = { field_report: PATH_SHAPE, bytecode_package: PATH_SHAPE };
 
 /** Stops generation with one exact reason. */
 function fail(message) {
@@ -123,7 +130,7 @@ ${BANNER('#')}
 # Application names, bundle ids, service labels, external hosts and the field
 # report names, for the shell tools and installers that source this file. Hosts
 # are bare names: build a URL as "https://\${ERGOPTI_HOST_GITHUB}/...".
-${GROUPS.flatMap((group) =>
+${PROJECTED_GROUPS.flatMap((group) =>
 	Object.entries(source[group]).map(
 		([key, value]) => `${SHELL_PREFIX[group]}_${key.toUpperCase()}="${value}"`
 	)
@@ -136,7 +143,7 @@ const python = `${BANNER('#')}
 Hosts are bare names: build a URL as f"https://{HOSTS['github']}/...".
 """
 
-${GROUPS.map((group) => {
+${PROJECTED_GROUPS.map((group) => {
 	const rows = Object.entries(source[group]).map(([key, value]) => `    "${key}": "${value}",`);
 	return `${group.toUpperCase()} = {\n${rows.join('\n')}\n}`;
 }).join('\n\n')}
@@ -148,7 +155,7 @@ const js = `${BANNER('//')}
 // classic-script pages. Hosts are bare names: build a URL as
 // 'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/...'.
 const ERGOPTI_IDENTIFIERS = Object.freeze({
-${GROUPS.map((group) => {
+${PROJECTED_GROUPS.map((group) => {
 	const rows = Object.entries(source[group]).map(([key, value]) => `\t\t${key}: '${value}'`);
 	return `\t${group}: Object.freeze({\n${rows.join(',\n')}\n\t})`;
 }).join(',\n')}
@@ -171,7 +178,7 @@ const swift = `${BANNER('//')}
 /// Application names, bundle ids, service labels and external hosts. Hosts are
 /// bare names: build a URL as "https://\\(Identifiers.Hosts.github)/...".
 enum Identifiers {
-${GROUPS.map((group) => {
+${PROJECTED_GROUPS.map((group) => {
 	const rows = Object.entries(source[group]).map(
 		([key, value]) => `\t\tstatic let ${camel(key)} = "${value}"`
 	);
@@ -195,7 +202,7 @@ ${BANNER(';')}
 ; ==============================================================================
 
 class Identifiers {
-${GROUPS.map((group) => {
+${PROJECTED_GROUPS.map((group) => {
 	const rows = Object.entries(source[group]).map(
 		([key, value]) => `\t\tstatic ${key.toUpperCase()} := "${value}"`
 	);
@@ -216,4 +223,6 @@ for (const [file, text] of [
 	fs.writeFileSync(file, text, 'utf8');
 	console.log(`  wrote ${path.relative(ROOT, file).split(path.sep).join('/')}`);
 }
-console.log(`[OK] identifiers generated: ${seen.size} value(s) in ${GROUPS.length} group(s).`);
+console.log(
+	`[OK] identifiers generated: ${seen.size} value(s) in ${PROJECTED_GROUPS.length} group(s).`
+);

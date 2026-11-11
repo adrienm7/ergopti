@@ -26,19 +26,21 @@
 ---    verifier admits it by name (OWNERSHIP_DERIVED_TREE), uninstall removes it.
 ---
 --- This module runs before the logger and the shared path owners load: it
---- depends on nothing but LuaJIT itself.
+--- depends on LuaJIT and the generated identifiers table alone.
 --- ==============================================================================
 
 local M = {}
 
-M.MANIFEST = "manifest"
-M.BUNDLE = "bundle"
--- The tree's own receipt and derived-tree names: the ownership schema is their
--- one source, shared with install.sh, uninstall.sh and the receipt verifier.
+-- The package's file names and wire markers (_shared/data/identifiers.json).
+local Names = require("identifiers").bytecode_package
+M.MANIFEST = Names.manifest
+M.BUNDLE = Names.bundle
+local FORMAT = Names.format
+local END_MARKER = Names.end_marker
+-- The tree's own receipt, derived-tree names and digest length: the ownership
+-- schema is their one source, shared with install.sh, uninstall.sh and the
+-- receipt verifier.
 local SCHEMA = "/linux/install/ownership_schema.sh"
-local FORMAT = "ergopti-bytecode 1"
-local END_MARKER = "end"
-local DIGEST_LENGTH = 64
 
 
 
@@ -72,7 +74,7 @@ end
 
 --- Reads the receipt and derived-tree names from a tree's ownership schema.
 --- @param root string Installation root.
---- @return table|nil names { receipt, directory }
+--- @return table|nil names { receipt, directory, hex_length }
 function M.schema_names(root)
 	local file = io.open(root .. SCHEMA, "rb")
 	if not file then return nil end
@@ -80,8 +82,9 @@ function M.schema_names(root)
 	file:close()
 	local receipt = text:match("\nOWNERSHIP_MANIFEST='([%w_.-]+)'\n")
 	local directory = text:match("\nOWNERSHIP_DERIVED_TREE='([%w_.-]+)'\n")
-	if not receipt or not directory then return nil end
-	return { receipt = receipt, directory = directory }
+	local hex_length = tonumber(text:match("\nOWNERSHIP_HEX_LENGTH='(%d+)'\n"))
+	if not receipt or not directory or not hex_length then return nil end
+	return { receipt = receipt, directory = directory, hex_length = hex_length }
 end
 
 --- Whether a root-relative path may name a chunk: a .lua file below linux/ or
@@ -129,9 +132,10 @@ end
 --- @param text string Manifest bytes.
 --- @param root string Physical installation root the daemon runs from.
 --- @param runtime table M.runtime().
+--- @param digest_length number Hex digits of a source SHA-256 (OWNERSHIP_HEX_LENGTH).
 --- @return table|nil package { offsets = { [relative] = n }, lengths = { [relative] = n }, size, count }
 --- @return string|nil reason Why the package cannot be trusted.
-function M.parse(text, root, runtime)
+function M.parse(text, root, runtime, digest_length)
 	-- Plain searches: a pattern class scan of the whole text cost 1.5 ms.
 	if type(text) ~= "string" or text:sub(-1) ~= "\n" or text:find("\r", 1, true) or text:find("\0", 1, true) then
 		return nil, "manifest is partial"
@@ -156,7 +160,7 @@ function M.parse(text, root, runtime)
 		local stop = text:find("\n", position, true)
 		local offset, length, digest, relative = text:sub(position + 6, stop - 1):match("^(%d+) (%d+) (%x+) (.+)$")
 		offset, length = tonumber(offset), tonumber(length)
-		if not offset or offset ~= next_offset or length < 1 or #digest ~= DIGEST_LENGTH
+		if not offset or offset ~= next_offset or length < 1 or #digest ~= digest_length
 			or not valid_relative(relative) or offsets[relative] then
 			return nil, "manifest chunk " .. (count + 1) .. " is malformed"
 		end
@@ -223,7 +227,7 @@ function M.install(script_dir, options)
 	local directory = root .. "/" .. names.directory
 	local text = read_file(directory .. "/" .. M.MANIFEST)
 	if not text then _state.detail = "the installed tree has no bytecode manifest"; return false end
-	local plan, reason = M.parse(text, root, options.runtime or M.runtime())
+	local plan, reason = M.parse(text, root, options.runtime or M.runtime(), names.hex_length)
 	if not plan then _state.detail = reason; return false end
 	local bundle = io.open(directory .. "/" .. M.BUNDLE, "rb")
 	if not bundle then _state.detail = "the bytecode bundle is missing"; return false end
@@ -324,7 +328,7 @@ function M.compile(root, sources)
 	for _, source in ipairs(sources) do
 		local filename = M.runtime_filename(root, source.relative)
 		local chunk, load_error = filename and loadfile(filename)
-		if not chunk or not valid_relative(source.relative) or #tostring(source.digest) ~= DIGEST_LENGTH then
+		if not chunk or not valid_relative(source.relative) or #tostring(source.digest) ~= names.hex_length then
 			bundle:close()
 			discard(staging)
 			return false, "cannot compile " .. tostring(source.relative) .. ": " .. tostring(load_error)
