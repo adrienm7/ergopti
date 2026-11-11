@@ -15,8 +15,9 @@ const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
 	// 49: the install steps of the real keyring proof (run_keyring_receipts.sh),
 	// the live desktop actions proof (run_desktop_actions_live.sh) and the
-	// Wayland clipboard owner receipt (run_clipboard_owner_wayland.sh).
-	['ci-linux.yml', 49],
+	// Wayland clipboard owner receipt (run_clipboard_owner_wayland.sh); 50: the
+	// layout source installed into a real X server (run_layout_source_live.lua).
+	['ci-linux.yml', 50],
 	['ci-macos.yml', 3],
 	['ci-common.yml', 2],
 	['linux-layout.yml', 2]
