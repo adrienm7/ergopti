@@ -381,6 +381,21 @@ in some tab. Action: keep `adapters/file_manager_folder.lua` refusing every
 other owner, and prove a new file manager with
 `tests/hardware/run_file_manager_folder.sh`.
 
+### project-linux-key-combinations-two-files
+
+The Linux combinations owner (`modules/shortcuts/key_combinations.lua`) reads
+its pair taps, holds and switch from `config.toml` and `[mod_combos]` from the
+`tap_hold.toml` beside it, the shared file (`_shared/tap_hold/SCHEMA.md`).
+Every source receipt, guard and lease check carries a nested `chord` frame for
+the second file; compare frames with `same_source_frame`, never by path and
+content alone. The scopes publish `mod_combos.*` rows through the transaction's
+`companions` port (`_shared/lua/config_scope_transaction.lua`), prepared by
+`tap_hold_writer.prepare_combo_rows`: a companion is always read, published and
+backed up only when its candidate changes it. A test fixture that stubs
+`ConfigPaths.config` or a file port must keep `tap_hold.toml` beside
+`config.toml` and give the port a conditional remover, or the inverse of a
+publication that created the file cannot run.
+
 ## Linux native boundaries
 
 ### project-linux-absence-needs-enoent
