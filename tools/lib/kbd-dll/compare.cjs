@@ -30,6 +30,11 @@ function compareLayout(model, layout) {
 		if (json(a) !== json(b)) diffs.push({ path, model: json(a), dll: json(b) });
 	};
 	same('columns', model.columns, layout.columns);
+	same(
+		'modifiers',
+		Model.modifierKeys(model).map((key) => ({ vk: key.vk, bit: key.bit })),
+		layout.modifiers
+	);
 	same('flags', Model.localeFlags(model) & 0xffff, layout.flags);
 	const byVk = new Map(layout.keys.map((key) => [key.vk, key]));
 	for (const key of model.keys) {
@@ -69,6 +74,11 @@ function compareLayout(model, layout) {
 	const scan = C.DEFAULT_SCANCODES.slice();
 	for (const entry of model.scancodes || []) scan[entry.sc] = entry.vk;
 	same('scancodes', scan, layout.scancodes);
+	same(
+		'e0',
+		Model.e0Table(model).map(([sc, vk]) => [sc, vk & 0xff]),
+		layout.e0.map((entry) => [entry.sc, entry.vk & 0xff])
+	);
 	same(
 		'numpad',
 		C.NUMPAD_KEYS.map((k) => [C.VK[k.vk], k.char]),

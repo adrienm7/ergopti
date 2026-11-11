@@ -127,6 +127,31 @@ function check(model) {
 			if (rule.dead === true && !deadIds.has(rule.result)) fail('kbd_dead_chain_undeclared', path);
 		});
 	});
+	if (model.modifier_vks !== undefined) {
+		if (
+			!model.modifier_vks ||
+			typeof model.modifier_vks !== 'object' ||
+			Array.isArray(model.modifier_vks)
+		)
+			fail('kbd_modifier_vks', 'modifier_vks');
+		for (const [name, vk] of Object.entries(model.modifier_vks)) {
+			if (!['kana', 'roya', 'loya'].includes(name))
+				fail('kbd_modifier_vks', `modifier_vks.${name}`);
+			if (!Number.isInteger(vk) || vk < 1 || vk >= C.VK_FOLLOW_ROW)
+				fail('kbd_vk', `modifier_vks.${name}`);
+		}
+	}
+	if (model.scancodes_e0 !== undefined) {
+		if (!Array.isArray(model.scancodes_e0)) fail('kbd_scancode', 'scancodes_e0');
+		const seen = new Set();
+		model.scancodes_e0.forEach((entry, i) => {
+			if (!Number.isInteger(entry.sc) || entry.sc < 1 || entry.sc > 0x7f || seen.has(entry.sc))
+				fail('kbd_scancode', `scancodes_e0[${i}].sc`);
+			seen.add(entry.sc);
+			if (!Number.isInteger(entry.vk) || entry.vk < 1 || entry.vk >= C.VK_FOLLOW_ROW)
+				fail('kbd_vk', `scancodes_e0[${i}].vk`);
+		});
+	}
 	const vks = new Set();
 	(model.keys || []).forEach((key, i) => {
 		const path = `keys[${i}]`;
@@ -174,6 +199,30 @@ function check(model) {
 }
 
 /** The modifier names a model's columns use, in bit order (VK_TO_BIT rows). */
+/**
+ * The virtual key each declared modifier bit is held with: the standard one
+ * (VK_SHIFT, VK_CONTROL, VK_MENU, VK_KANA, VK_OEM_FJ_ROYA, VK_OEM_FJ_LOYA),
+ * or the model's `modifier_vks` override, as KbdEdit puts a momentary Kana on
+ * VK_OEM_8 (only Kana, Roya and Loya can move: Shift, Ctrl and Alt are the
+ * system's).
+ * @returns {{name: string, vk: number, bit: number}[]}
+ */
+function modifierKeys(model) {
+	const overrides = model.modifier_vks || {};
+	return modifierNames(model).map((name) => ({
+		name,
+		vk: Object.hasOwn(overrides, name) ? overrides[name] : C.MOD_VK[name],
+		bit: C.MOD_BITS[name]
+	}));
+}
+
+/** The E0 scan-code table: the standard one with the model's `scancodes_e0` moves. */
+function e0Table(model) {
+	const table = new Map(C.DEFAULT_E0.map(([sc, vk]) => [sc, vk]));
+	for (const move of model.scancodes_e0 || []) table.set(move.sc, move.vk);
+	return [...table].sort((a, b) => a[0] - b[0]);
+}
+
 function modifierNames(model) {
 	const used = model.columns.reduce((a, b) => a | b, 0);
 	// Shift, Ctrl and Alt are always declared, as every Windows layout does.
@@ -196,5 +245,7 @@ module.exports = {
 	ModelError,
 	check,
 	modifierNames,
+	modifierKeys,
+	e0Table,
 	localeFlags
 };
