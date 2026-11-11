@@ -126,7 +126,7 @@ function M.register(helpers, shared)
 			helpers.assert_true(not match({ required = { "shift_left" }, optional = {} }, { "shift_right" }),
 				"two sides never match")
 			helpers.assert_true(not match({ required = {}, optional = {} }, { "shift" }), "a held one must be allowed")
-			helpers.assert_true(not match({ required = { "kana_left" }, optional = {} }, { "kana" }),
+			helpers.assert_true(not match({ required = { "roya_left" }, optional = {} }, { "roya" }),
 				"a custom id has no sides")
 		end)
 	end)

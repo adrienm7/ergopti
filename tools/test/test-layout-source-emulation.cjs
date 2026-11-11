@@ -66,7 +66,7 @@ for (const platform of ['macos', 'linux', 'windows']) {
 assert.deepEqual(
 	golden.linux.not_emulated.map((entry) => `${entry.path}:${entry.reason}`),
 	[
-		'modifiers.kana.keys[1]:physical_key_not_emulated',
+		'modifiers.kana_lock.keys[1]:physical_key_not_emulated',
 		'modifiers.nav.keys[0]:physical_key_not_emulated',
 		'layers.roya.keys.KeyE:dead_key_not_emulated',
 		'layers.kana.keys.KeyJ:action_not_emulated',

@@ -115,7 +115,10 @@ var LayoutSourceEmulation = (function () {
 				model.modifierKeys.set(key, { id: modifier.id, mode: modifier.mode });
 			}
 		}
-		const known = (id) => REPORTED.includes(id) || model.custom.has(id) || SIDED.has(family(id));
+		// Kana is a built-in no driver reports: the targets compile its layers to
+		// their native Option/AltGr level, so a selector naming it never matches here.
+		const known = (id) =>
+			REPORTED.includes(id) || id === 'kana' || model.custom.has(id) || SIDED.has(family(id));
 		const ids = (list, where) => {
 			if (!Array.isArray(list)) fail(`The emulation table holds no modifier list at ${where}.`);
 			for (const id of list)

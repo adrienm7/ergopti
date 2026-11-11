@@ -66,6 +66,9 @@ var LayoutSourceCompiler = (function () {
 		control_left: null,
 		control_right: null
 	});
+	// The native level Kana compiles to (see platformTokens); not an import token.
+	const KANA_TOKEN = 'anyOption';
+	const ALT_IDS = ['alt', 'alt_left', 'alt_right'];
 	const FROM_TOKEN = Object.fromEntries(Object.entries(TOKENS).map(([id, token]) => [token, id]));
 	// Selector names follow this order so an imported layer id does not depend on token order.
 	const NAME_ORDER = Object.keys(TOKENS);
@@ -245,9 +248,26 @@ var LayoutSourceCompiler = (function () {
 	// ======= 4/ Compilation ======
 	// =============================
 
-	/** The modifierMap tokens a platform's compilation may use. */
-	function platformTokens(platform) {
-		return TARGETS[platform].tokens;
+	/** Whether a source has a layer selected by an Alt modifier of its own. */
+	function usesAlt(source) {
+		return (source.layers || []).some((layer) =>
+			[layer, ...(layer.alternatives || [])].some((selector) =>
+				[...selector.required, ...selector.optional].some((id) => ALT_IDS.includes(id))
+			)
+		);
+	}
+
+	/**
+	 * The modifierMap tokens a platform's compilation of this source may use.
+	 * Kana has no macOS or XKB modifier of its own: it compiles to the Option
+	 * level (AltGr through the XKB and KLC converters), where Ergopti's macOS and
+	 * Linux layouts put what its Windows layout puts on Kana, unless the source
+	 * already selects a layer with Alt; that Kana level is then left out.
+	 */
+	function platformTokens(platform, source) {
+		return Object.assign({}, TARGETS[platform].tokens, {
+			kana: source && usesAlt(source) ? null : KANA_TOKEN
+		});
 	}
 
 	/** One modifier combination as a modifierMap keys attribute, or null when the target has no token. */
@@ -300,12 +320,19 @@ var LayoutSourceCompiler = (function () {
 			note(`modifiers.${modifier.id}`, 'custom_modifier_not_in_keylayout');
 		(source.layers || []).forEach((layer) => {
 			const selectors = [layer, ...(layer.alternatives || [])];
-			if (selectors.every((selector) => selectorKeys(selector, platformTokens(platform)) !== null))
+			if (
+				selectors.every(
+					(selector) => selectorKeys(selector, platformTokens(platform, source)) !== null
+				)
+			)
 				return;
 			const ids = selectors.flatMap((selector) => [...selector.required, ...selector.optional]);
-			const reason = ids.some((id) => custom.has(id) || !own(TOKENS, id))
-				? 'modifier_not_in_keylayout'
-				: `sided_modifier_not_in_${platform}`;
+			const reason =
+				ids.includes('kana') && usesAlt(source)
+					? 'kana_level_taken_by_alt'
+					: ids.some((id) => custom.has(id) || (id !== 'kana' && !own(TOKENS, id)))
+						? 'modifier_not_in_keylayout'
+						: `sided_modifier_not_in_${platform}`;
 			note(`layers.${layer.id}`, reason);
 		});
 		for (const [from, to] of Object.entries(source.remap || {}))
@@ -350,7 +377,7 @@ var LayoutSourceCompiler = (function () {
 		const layers = [];
 		for (const layer of source.layers || []) {
 			const selectors = [layer, ...(layer.alternatives || [])].map((selector) =>
-				selectorKeys(selector, platformTokens(platform))
+				selectorKeys(selector, platformTokens(platform, source))
 			);
 			if (selectors.includes(null)) continue;
 			layers.push({ layer, selectors, keys: layerKeys(source, layer, platform, variant, table) });
@@ -552,12 +579,15 @@ var LayoutSourceCompiler = (function () {
 				optional: selector.optional.slice()
 			}));
 			const native = selectors.every(
-				(selector) => selectorKeys(selector, platformTokens(platform)) !== null
+				(selector) => selectorKeys(selector, platformTokens(platform, source)) !== null
 			);
 			const ids = selectors.flatMap((selector) => [...selector.required, ...selector.optional]);
 			const entry = { id: layer.id, selectors, native, keys: {} };
 			if (!native && !reported(ids)) {
-				skip(`layers.${layer.id}`, 'sided_modifier_not_emulated');
+				skip(
+					`layers.${layer.id}`,
+					ids.includes('kana') ? 'kana_level_taken_by_alt' : 'sided_modifier_not_emulated'
+				);
 				entry.selectable = false;
 				return entry;
 			}

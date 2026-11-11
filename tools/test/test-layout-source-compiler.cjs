@@ -251,7 +251,7 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 		'regenerate with: npm run layout-source -- export-macos <corpus>/source.toml <new-dir> iso'
 	);
 	assert.deepEqual(clone(compiled.omitted), [
-		{ path: 'modifiers.kana', reason: 'custom_modifier_not_in_keylayout' },
+		{ path: 'modifiers.kana_lock', reason: 'custom_modifier_not_in_keylayout' },
 		{ path: 'layers.kana', reason: 'modifier_not_in_keylayout' },
 		{ path: 'remap.CapsLock', reason: 'system_or_modifier_key_remap' },
 		{ path: 'shortcuts.KeyA', reason: 'shortcut_output_not_in_keylayout' },
@@ -483,7 +483,7 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 	const linux = exportXkb(fixture);
 	assert.equal(linux.report.status, 'partial');
 	assert.deepEqual(clone(linux.report.omitted.map((entry) => entry.path)), [
-		'modifiers.kana',
+		'modifiers.kana_lock',
 		'layers.kana',
 		'remap.CapsLock',
 		'shortcuts.KeyA',

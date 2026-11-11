@@ -22,7 +22,7 @@ mode = "held"
 keys = ["IntlBackslash"]
 
 [[modifiers]]
-id = "kana"
+id = "kana_lock"
 mode = "locked"
 keys = ["Insert", "ScrollLock"]
 
@@ -65,7 +65,7 @@ KeyE = { dead_key = "acute" }
 
 [[layers]]
 id = "kana"
-required = ["kana"]
+required = ["kana_lock"]
 optional = ["caps_lock"]
 
 [layers.keys]
@@ -85,7 +85,7 @@ KeyL = { key = "ArrowRight" }
 
 [[layers]]
 id = "right_kana"
-required = ["shift_right", "kana"]
+required = ["shift_right", "kana_lock"]
 optional = []
 
 [layers.keys]

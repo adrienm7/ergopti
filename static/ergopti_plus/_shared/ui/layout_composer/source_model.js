@@ -42,7 +42,10 @@ var LayoutSource = (function () {
 		'meta_right',
 		'caps_lock',
 		'num_lock',
-		'scroll_lock'
+		'scroll_lock',
+		// Windows' Kana level (KBDKANA), the level Ergopti's KbdEdit layout uses in
+		// place of AltGr; each target maps it to its closest native level.
+		'kana'
 	];
 	const TARGETS = [
 		{ target: 'macos', artifact: 'keylayout' },

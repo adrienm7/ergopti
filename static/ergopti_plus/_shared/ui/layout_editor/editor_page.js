@@ -33,7 +33,7 @@ var LayoutEditorPage = (function () {
 	const PREFIX = 'layout_editor.';
 	const KEY_UNIT_PX = 46;
 	const MAPPING_CHOICES = ['none', 'text', 'dead_key', 'action', 'key', 'disabled'];
-	const BUILTIN_MODIFIERS = ['shift', 'control', 'alt', 'meta', 'caps_lock'];
+	const BUILTIN_MODIFIERS = ['shift', 'control', 'alt', 'meta', 'caps_lock', 'kana'];
 	// Ranges of the Unicode palette; the block name is a locale key.
 	const PALETTE_BLOCKS = [
 		{ id: 'latin1', from: 0x00a1, to: 0x00ff },
@@ -1895,7 +1895,23 @@ var LayoutEditorPage = (function () {
 				if (event[flag] && !held.some((h) => h.startsWith(id + '_'))) held.push(id);
 			for (const id of state.heldCustom) held.push(id);
 			for (const id of state.locked) held.push(id);
-			return held;
+			return kanaHeld(held);
+		}
+
+		/**
+		 * The Kana level is typed with Alt in the preview, as the targets compile it
+		 * to the Option/AltGr level, when no layer of the source selects Alt itself.
+		 */
+		function kanaHeld(held) {
+			const selects = (ids) =>
+				(doc().layers || []).some((layer) =>
+					[layer, ...(layer.alternatives || [])].some((selector) =>
+						[...selector.required, ...selector.optional].some((id) => ids.includes(id))
+					)
+				);
+			const alt = ['alt', 'alt_left', 'alt_right'];
+			if (!selects(['kana']) || selects(alt) || !held.some((id) => alt.includes(id))) return held;
+			return held.filter((id) => !alt.includes(id)).concat('kana');
 		}
 
 		function customModifier(code) {
