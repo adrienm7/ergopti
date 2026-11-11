@@ -49,4 +49,30 @@ helpers.describe("layout manager window (macOS)", function()
 		helpers.assert_eq(refreshed, 4, "each initial window refresh runs once, with explicit refreshes preserved")
 		helpers.assert_eq(#evaluated, 0, "a window that is not the current one receives nothing")
 	end)
+
+	helpers.it("offers the navigation layer save once the menu binds it (layout-editor-nav-apply)", function()
+		local Host = helpers.load_with_stubs("ui.layout_manager")
+		helpers.assert_true(not pcall(Host.set_nav_applier, "not a function"), "only a function binds")
+		local saved = package.loaded["modules.keymap.layout_registry"]
+		package.loaded["modules.keymap.layout_registry"] = {
+			snapshot = function() return { platform = "macos", installed = {} } end,
+			refresh = function() end,
+		}
+		local texts = {}
+		local ok, err = pcall(function()
+			local view = { evaluateJavaScript = function() end }
+			helpers.assert_true(Host._controller_for(view).on_message({ action = "nav_save", text = "a" }) == false,
+				"without a bound save nav_save is refused")
+			Host.set_nav_applier(function(text)
+				texts[#texts + 1] = text
+				return { saved = true, applied = true, errors = {} }
+			end)
+			helpers.assert_true(Host._controller_for(view).on_message({ action = "nav_save", text = "b" }) == true)
+		end)
+		Host.set_nav_applier(nil)
+		package.loaded["modules.keymap.layout_registry"] = saved
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(#texts, 1)
+		helpers.assert_eq(texts[1], "b")
+	end)
 end)

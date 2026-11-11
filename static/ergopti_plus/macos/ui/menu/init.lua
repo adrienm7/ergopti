@@ -1668,6 +1668,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	WindowToggle.set_opener("layer_editor", function()
 		return require("ui.layer_editor").open({ karabiner = karabiner })
 	end)
+	-- The layout editor applies a source's navigation layer through the same save.
+	require("ui.layout_manager").set_nav_applier(function(text)
+		return require("ui.layer_editor").apply_text(text, { karabiner = karabiner })
+	end)
 	WindowToggle.set_opener("changelog", function()
 		return require("ui.changelog").open({ channel_owner = channel_owner })
 	end)

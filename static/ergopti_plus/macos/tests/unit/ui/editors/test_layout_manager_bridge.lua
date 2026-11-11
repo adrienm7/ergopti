@@ -127,3 +127,46 @@ helpers.describe("layout manager bridge: what the page may ask", function()
 		helpers.assert_eq(state.closed, 1)
 	end)
 end)
+
+helpers.describe("layout manager bridge: the layout editor's navigation layer", function()
+	--- A controller whose host applies the navigation layer, or none.
+	local function nav_controller(apply_nav)
+		local pushes, logs = {}, {}
+		local instance = ManagerBridge.new({
+			registry = { snapshot = function() return { platform = "macos", installed = {} } end,
+				refresh = function() end },
+			push = function(name, payload) pushes[#pushes + 1] = { name = name, payload = payload }; return true end,
+			strings = function() return {} end,
+			open_url = function() end, close = function() end,
+			log = function(level, message) logs[#logs + 1] = level .. ": " .. message end,
+			apply_nav = apply_nav,
+		})
+		return instance, pushes, logs
+	end
+
+	helpers.it("routes nav_save to the host's navigation layer save and answers navResult (layout-editor-nav-apply)", function()
+		local texts = {}
+		local instance, pushes = nav_controller(function(text, on_done)
+			texts[#texts + 1] = text
+			on_done({ saved = true, applied = false, errors = {} })
+		end)
+		helpers.assert_true(instance.on_message({ action = "ready" }))
+		helpers.assert_eq(pushes[1].payload.nav_apply, true)
+		helpers.assert_true(instance.on_message({ action = "nav_save", text = "[layers]\n" }))
+		helpers.assert_eq(texts[1], "[layers]\n")
+		local answer = pushes[#pushes]
+		helpers.assert_eq(answer.name, "navResult")
+		helpers.assert_eq(answer.payload.saved, true)
+		helpers.assert_eq(answer.payload.applied, false)
+		helpers.assert_true(instance.on_message({ action = "nav_save", text = 3 }) == false, "a non-text save is refused")
+		helpers.assert_eq(#texts, 1)
+	end)
+
+	helpers.it("refuses nav_save on a host without the navigation layer save (layout-editor-nav-apply)", function()
+		local instance, pushes, logs = nav_controller(nil)
+		helpers.assert_true(instance.on_message({ action = "ready" }))
+		helpers.assert_eq(pushes[1].payload.nav_apply, false)
+		helpers.assert_true(instance.on_message({ action = "nav_save", text = "x" }) == false)
+		helpers.assert_true(#logs >= 1, "the refusal is logged")
+	end)
+end)

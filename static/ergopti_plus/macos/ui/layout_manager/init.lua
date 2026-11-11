@@ -49,6 +49,11 @@ local _retiring_lease = nil
 local _settling_retired_window = false
 local _opening_window = false
 
+-- Applies a layers.toml the layout editor built from a source's navigation
+-- layer: the navigation layer editor's own save, bound to the remap facade by
+-- the menu (M.set_nav_applier); nil until then, and nav_save is refused.
+local _nav_applier = nil
+
 --- Settles exact window and callback owners before admitting another window.
 --- @return boolean settled Native cleanup committed or already consumed the window.
 local function settle_retired_window()
@@ -177,6 +182,14 @@ local function controller_for(view)
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 		pick_source = pick_source,
+		apply_nav = _nav_applier and function(text, on_done)
+			local applier = _nav_applier
+			if not applier then
+				on_done({ saved = false, applied = false, errors = {} })
+				return
+			end
+			on_done(applier(text))
+		end or nil,
 	})
 	local on_message = controller.on_message
 	local ready = false
@@ -306,6 +319,17 @@ function M.open()
 	_opening_window = false
 	Logger.success(LOG, "Layout manager opened.")
 	return true
+end
+
+--- Binds the layout editor's « Apply the navigation layer » to the navigation
+--- layer editor's save (ui/layer_editor apply_text). A window opened before
+--- this offers no such button.
+--- @param applier function|nil applier(text) -> { saved, applied, errors }
+function M.set_nav_applier(applier)
+	if applier ~= nil and type(applier) ~= "function" then
+		error("layout_manager.set_nav_applier: a function or nil is required", 2)
+	end
+	_nav_applier = applier
 end
 
 --- The open window, for ui/window_toggle (nil when closed).

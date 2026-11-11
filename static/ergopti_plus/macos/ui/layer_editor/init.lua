@@ -326,6 +326,43 @@ local function push_legends(session)
 	call_page(session, "setLegends", current_legends(ctx))
 end
 
+--- Validates and publishes a layers.toml text, then applies it: the one save
+--- path of the navigation layer editor window and of the layout editor's
+--- « Apply the navigation layer » (ui/layout_manager).
+--- @param opts table { text, ctx, config_dir, file_adapter, karabiner, current }
+---   where current() says whether the caller still owns the destination.
+--- @return table result { saved, applied, errors, path }
+local function save_and_apply(opts)
+	local result = LayerEditor.save({
+		text = opts.text, ctx = opts.ctx, config_dir = opts.config_dir,
+		toml_decode = TomlCodec.decode, file_adapter = opts.file_adapter,
+	})
+	if not result.saved then
+		for _, err in ipairs(result.errors) do
+			Logger.warn(LOG, "Refused: %s (%s) — %s.", tostring(err.code),
+				table.concat({ tostring(err.layer or ""), tostring(err.section or ""), tostring(err.key or "") }, "."),
+				tostring(err.detail))
+		end
+		Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
+		return { saved = false, errors = result.errors, path = result.path }
+	end
+	local stale = { saved = true, applied = false, errors = {}, path = result.path }
+	if not opts.current() then
+		Logger.warn(LOG, "The layer was saved, but its editor destination changed before application.")
+		return stale
+	end
+	local applied = request_regeneration(opts.karabiner)
+	if not opts.current() then return stale end
+	reconcile_wheel()
+	if not opts.current() then return stale end
+	if applied then
+		Logger.success(LOG, "Navigation layer saved to '%s'; the Karabiner rules are regenerating.", result.path)
+	else
+		Logger.error(LOG, "Navigation layer saved to '%s' but its regeneration was refused.", result.path)
+	end
+	return { saved = true, applied = applied, errors = {}, path = result.path }
+end
+
 --- Validates and saves the page's text, then applies it.
 --- @param session table
 --- @param text any The payload's text.
@@ -338,42 +375,13 @@ local function save(session, text)
 			errors = { { code = LayerEditor.WRITE_FAILED, detail = "the layer editor source is no longer current" } } })
 		return
 	end
-	local result = LayerEditor.save({
+	local result = save_and_apply({
 		text = text, ctx = opening.ctx, config_dir = opening.config_dir,
-		toml_decode = TomlCodec.decode, file_adapter = opening_files(session, opening),
+		file_adapter = opening_files(session, opening), karabiner = session.karabiner,
+		current = function() return opening_current(session, opening) end,
 	})
-	if not result.saved then
-		for _, err in ipairs(result.errors) do
-			Logger.warn(LOG, "Refused: %s (%s) — %s.", tostring(err.code),
-				table.concat({ tostring(err.layer or ""), tostring(err.section or ""), tostring(err.key or "") }, "."),
-				tostring(err.detail))
-		end
-		Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
-		call_page(session, "saveResult", { saved = false, errors = result.errors })
-		return
-	end
-	if not opening_current(session, opening) then
-		Logger.warn(LOG, "The layer was saved, but its editor destination changed before application.")
-		call_page(session, "saveResult", { saved = true, applied = false, errors = {} })
-		return
-	end
-	local applied = request_regeneration(session.karabiner)
-	if not opening_current(session, opening) then
-		call_page(session, "saveResult", { saved = true, applied = false, errors = {} })
-		return
-	end
-	reconcile_wheel()
-	if not opening_current(session, opening) then
-		call_page(session, "saveResult", { saved = true, applied = false, errors = {} })
-		return
-	end
-	if applied then
-		Logger.success(LOG, "Navigation layer saved to '%s'; the Karabiner rules are regenerating.", result.path)
-	else
-		Logger.error(LOG, "Navigation layer saved to '%s' but its regeneration was refused.", result.path)
-	end
-	call_page(session, "saveResult", { saved = true, applied = applied, errors = {} })
-	if applied then close_session(session) end
+	call_page(session, "saveResult", { saved = result.saved, applied = result.applied, errors = result.errors })
+	if result.applied then close_session(session) end
 end
 
 --- Routes one message of the page.
@@ -475,6 +483,40 @@ function M.open(opts)
 	session.webview = webview
 	Logger.info(LOG, "Layer editor opened.")
 	return true
+end
+
+--- Saves and applies a layers.toml the layout editor built from a source's
+--- navigation layer, through the window's own save path. The destination is
+--- the user's layers.toml as read now: it is replaced only while it still holds
+--- those bytes (LayerEditor.save's exact-byte precondition).
+--- @param text any The layers.toml text.
+--- @param opts table { karabiner = the remap facade }.
+--- @return table result { saved, applied, errors }
+function M.apply_text(text, opts)
+	Logger.start(LOG, "Applying the navigation layer from the layout editor…")
+	local karabiner = type(opts) == "table" and opts.karabiner or nil
+	local function refused(detail)
+		Logger.error(LOG, "The navigation layer was not applied: %s.", detail)
+		return { saved = false, applied = false, errors = { { code = LayerEditor.WRITE_FAILED, detail = detail } } }
+	end
+	if type(karabiner) ~= "table" or type(karabiner.regenerate) ~= "function" then
+		return refused("the remap facade is unavailable")
+	end
+	local ok_ctx, ctx = pcall(load_context)
+	if not ok_ctx then return refused("the layer data could not be read: " .. tostring(ctx)) end
+	local get_config_dir = ConfigPaths.get_config_dir
+	local dir_ok, config_dir = pcall(get_config_dir)
+	if not dir_ok or type(config_dir) ~= "string" or config_dir == "" then
+		return refused("the configuration folder is unknown")
+	end
+	local result = save_and_apply({
+		text = text, ctx = ctx, config_dir = config_dir, file_adapter = FileSystem, karabiner = karabiner,
+		current = function()
+			local ok, dir = pcall(ConfigPaths.get_config_dir)
+			return ok and dir == config_dir
+		end,
+	})
+	return { saved = result.saved, applied = result.applied == true, errors = result.errors }
 end
 
 --- The open window, for ui/window_toggle (nil when closed).

@@ -125,6 +125,8 @@ local function controller(state, context)
 	end
 	local shell = dependency(state, "shell", "adapters.shell_runner")
 	local i18n = dependency(state, "i18n", "infra.i18n")
+	local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
+	if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
 	local function push(function_name, payload)
 		if not current() then return false end
 		local ok, encoded = pcall(Json.encode, payload)
@@ -159,6 +161,13 @@ local function controller(state, context)
 			return false
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- The layout editor applies a source's navigation layer through the
+		-- navigation layer editor's own save (ui/layer_editor/bridge.lua).
+		apply_nav = layer_editor and function(text, done)
+			if not current() then return false end
+			local result = layer_editor.apply_text(text, state)
+			if current() then done(result) end
+		end or nil,
 	})
 	owner.registry, owner.controller = registry, _controller
 	owner.publish = function()
