@@ -222,6 +222,20 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
+	 * The macOS bundle (ISO and ANSI .keylayout, plists, UTF-16 strings) of a
+	 * structured source as one stored ZIP archive the browser downloads.
+	 * @param {object} doc
+	 * @returns {{filename: string, bytes: Uint8Array}}
+	 */
+	function macosBundleArchive(doc) {
+		if (isPreserved(doc))
+			throw new SourceIOError('source_export_unavailable', 'imported_keylayout');
+		const { files } = LayoutSourceCompiler.exportMacos(doc, tables(), 'bundle');
+		const root = files[0].path.split('/')[0];
+		return { filename: `${root}.zip`, bytes: LayoutZipWriter.pack(files) };
+	}
+
+	/**
 	 * What the ErgoptiPlus composer host installs: the TOML and the .keylayout
 	 * compiled for the host's OS (composer_save with `source`, composer.lua).
 	 * @param {object} doc
@@ -272,6 +286,50 @@ var LayoutSourceIO = (function () {
 	 * @returns {{doc: object, lost: string[]}} The editable source and what the
 	 *   projection cannot hold (stable codes the page translates).
 	 */
+	/**
+	 * The keys of one composer level and the dead keys they reach, from a
+	 * composer source (a parsed .keylayout or a built-in reference). Dead-key
+	 * ids are prefixed so several sources never collide.
+	 * @param {object} parsed - LayoutComposer.parseSource / referenceSource output.
+	 * @param {string[]} levels - Composer levels (base, shift, altgr, shift_altgr, command).
+	 * @param {string} prefix - Dead-key id prefix.
+	 * @returns {{keys: object[], deadKeys: object[]}} keys[i] is the table of levels[i].
+	 */
+	function composerLevels(parsed, levels, prefix) {
+		const stateIds = new Map();
+		const deadId = (state) => {
+			if (!stateIds.has(state))
+				stateIds.set(state, `${prefix}${identifierFrom(state, 's')}_${stateIds.size + 1}`);
+			return stateIds.get(state);
+		};
+		const keys = levels.map((level) => {
+			const table = {};
+			for (const [code, cells] of Object.entries(parsed.cells)) {
+				const cell = cells[level];
+				if (!cell) continue;
+				if (own(cell, 'text')) table[code] = { text: cell.text };
+				else table[code] = { dead_key: deadId(parsed.actions[cell.dead.action].none.next) };
+			}
+			return table;
+		});
+		// Chained states reached only through another dead key still need a record.
+		const queue = [...stateIds.keys()];
+		for (let index = 0; index < queue.length; index++)
+			for (const rule of Object.values(parsed.compositions[queue[index]] || {}))
+				if (rule.next && !stateIds.has(rule.next)) {
+					deadId(rule.next);
+					queue.push(rule.next);
+				}
+		const deadKeys = [];
+		for (const [state, id] of stateIds) {
+			const rules = Object.entries(parsed.compositions[state] || {}).map(([input, rule]) =>
+				rule.next ? { input, next: deadId(rule.next) } : { input, text: rule.output }
+			);
+			deadKeys.push({ id, name: state, terminator: parsed.terminators[state] || '', rules });
+		}
+		return { keys, deadKeys };
+	}
+
 	function approximateImport(doc) {
 		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
 		const { text, convention } = doc.imported_keylayout;
@@ -281,35 +339,17 @@ var LayoutSourceIO = (function () {
 			convention,
 			LAYOUT_COMPOSER_DATA
 		);
-		const stateIds = new Map();
-		const deadId = (state) => {
-			if (!stateIds.has(state))
-				stateIds.set(state, `${DEAD_KEY_PREFIX}${identifierFrom(state, 's')}_${stateIds.size + 1}`);
-			return stateIds.get(state);
-		};
-		const layers = PROJECTED_LAYERS.map((level) => {
-			const keys = {};
-			for (const [code, cells] of Object.entries(parsed.cells)) {
-				const cell = cells[level.composer];
-				if (!cell) continue;
-				if (own(cell, 'text')) keys[code] = { text: cell.text };
-				else {
-					const neutral = parsed.actions[cell.dead.action].none;
-					keys[code] = { dead_key: deadId(neutral.next) };
-				}
-			}
-			return { id: level.id, required: level.required.slice(), optional: [], keys };
-		});
-		// Chained states reached only through another dead key still need a record.
-		for (const rules of Object.values(parsed.compositions))
-			for (const rule of Object.values(rules)) if (rule.next) deadId(rule.next);
-		const deadKeys = [];
-		for (const [state, id] of stateIds) {
-			const rules = Object.entries(parsed.compositions[state] || {}).map(([input, rule]) =>
-				rule.next ? { input, next: deadId(rule.next) } : { input, text: rule.output }
-			);
-			deadKeys.push({ id, name: state, terminator: parsed.terminators[state] || '', rules });
-		}
+		const converted = composerLevels(
+			parsed,
+			PROJECTED_LAYERS.map((level) => level.composer),
+			DEAD_KEY_PREFIX
+		);
+		const layers = PROJECTED_LAYERS.map((level, index) => ({
+			id: level.id,
+			required: level.required.slice(),
+			optional: [],
+			keys: converted.keys[index]
+		}));
 		const lost = ['keylayout_original_xml', 'keylayout_sided_modifiers'];
 		if (convention === 'ansi') lost.push('keylayout_ansi_projected_iso');
 		if (parsed.ambiguous.size > 0) lost.push('keylayout_ambiguous_compositions');
@@ -320,11 +360,66 @@ var LayoutSourceIO = (function () {
 			physical: { base: 'iso' },
 			layers
 		};
-		if (deadKeys.length) editable.dead_keys = deadKeys;
+		if (converted.deadKeys.length) editable.dead_keys = converted.deadKeys;
 		for (const field of ['modifiers', 'keys', 'remap', 'shortcuts', 'windows', 'exports'])
 			if (own(doc, field)) editable[field] = copy(doc[field]);
 		LayoutSource.validate(editable);
 		return { doc: editable, lost };
+	}
+
+	/**
+	 * The layouts a layer can be filled from: the built-in references (QWERTY,
+	 * AZERTY) and the registry layouts a host supplies as {id, name, convention, text}.
+	 * @param {object[]} supplied
+	 * @returns {{id: string, name: string, parsed: object}[]} Unreadable ones are left out.
+	 */
+	function fillSources(supplied) {
+		const sources = Object.entries(LAYOUT_COMPOSER_REFERENCE).map(([id, reference]) => ({
+			id,
+			name: reference.name,
+			parsed: LayoutComposer.referenceSource(id, reference)
+		}));
+		for (const entry of supplied || []) {
+			try {
+				sources.push({
+					id: entry.id,
+					name: entry.name,
+					parsed: LayoutComposer.parseSource(
+						entry.id,
+						entry.text,
+						entry.convention,
+						LAYOUT_COMPOSER_DATA
+					)
+				});
+			} catch (error) {
+				if (!(error instanceof LayoutComposer.ComposerError)) throw error;
+			}
+		}
+		return sources;
+	}
+
+	/**
+	 * The composer's job inside the editor: replaces one layer's keys with one
+	 * level of another layout, and brings that level's dead keys along.
+	 * @param {object} doc - An editable source.
+	 * @param {{id: string, parsed: object}} source - From fillSources.
+	 * @param {string} level - base, shift, altgr, shift_altgr or command.
+	 * @param {string} layerId - The layer to fill.
+	 */
+	function fillLayer(doc, source, level, layerId) {
+		if (isPreserved(doc)) throw new SourceIOError('source_preserved', 'imported_keylayout');
+		const prefix = `${identifierFrom(source.id, 'l')}_${level}_`;
+		const filled = composerLevels(source.parsed, [level], prefix);
+		const next = copy(doc);
+		const layer = (next.layers || []).find((entry) => entry.id === layerId);
+		if (!layer) throw new SourceIOError('layer_unknown', `layers.${layerId}`);
+		layer.keys = filled.keys[0];
+		const ids = new Set(filled.deadKeys.map((entry) => entry.id));
+		next.dead_keys = (next.dead_keys || [])
+			.filter((entry) => !ids.has(entry.id))
+			.concat(filled.deadKeys);
+		if (next.dead_keys.length === 0) delete next.dead_keys;
+		return LayoutSource.validate(next);
 	}
 
 	// =======================================
@@ -461,7 +556,10 @@ var LayoutSourceIO = (function () {
 		identifierFrom,
 		convertImport,
 		approximateImport,
+		fillSources,
+		fillLayer,
 		keylayoutFile,
+		macosBundleArchive,
 		installPayload,
 		withNavLayer,
 		navLayerFile

@@ -110,9 +110,19 @@ async function exerciseManager(browser, origin) {
 		false,
 		'no editor without host support'
 	);
+	assert.equal(
+		await page.locator('#btn-compose').isVisible(),
+		true,
+		'that host keeps the composer'
+	);
 	await page.evaluate(
 		(state) => window.initData({ strings: {}, state, source_editor: true }),
 		state
+	);
+	assert.equal(
+		await page.locator('#btn-compose').isVisible(),
+		false,
+		'the editor replaces the composer'
 	);
 	await page.click('#btn-editor');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_open'));
@@ -128,6 +138,25 @@ async function exerciseManager(browser, origin) {
 		window.sourceResult({ ok: true, detail: '/c/my_layout.toml', filename: 'my_layout.toml' })
 	);
 	assert.match(await page.textContent('#le-message'), /ErgoptiPlus/);
+
+	// Fill sources come from the composer host's own list.
+	await page.click('#le-fill summary');
+	await page.click('#le-fill-load');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_open'));
+	const keylayoutText = fs.readFileSync(KEYLAYOUT, 'utf8');
+	await page.evaluate(
+		(text) =>
+			window.composerData({
+				sources: [{ id: 'ergopti', name: 'Ergopti', convention: 'iso', text }]
+			}),
+		keylayoutText
+	);
+	await page.waitForSelector('#le-fill-source option[value="ergopti"]', { state: 'attached' });
+	assert.equal(
+		await page.locator('#composer').isVisible(),
+		false,
+		'the composer section stays closed'
+	);
 
 	// « Install and use » goes through the composer host with the source and its compiled layout.
 	await page.click('#le-install');
@@ -213,6 +242,57 @@ async function exerciseManager(browser, origin) {
 		const compiled = await downloaded(page, () => page.click('#le-export-keylayout-ansi'));
 		assert.match(compiled.text, /<keyboard /);
 		assert.notEqual(compiled.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
+
+		// The macOS bundle downloads as one ZIP archive.
+		const [bundle] = await Promise.all([
+			page.waitForEvent('download'),
+			page.click('#le-export-bundle')
+		]);
+		assert.match(bundle.suggestedFilename(), /\.bundle\.zip$/);
+		assert.equal(
+			fs
+				.readFileSync(await bundle.path())
+				.subarray(0, 2)
+				.toString('latin1'),
+			'PK'
+		);
+
+		// Drag and drop swaps two keys; copy and paste repeats one.
+		const legendOf = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+		const [a, s] = [await legendOf('KeyA'), await legendOf('KeyS')];
+		await page.dragAndDrop('#le-board [data-code="KeyA"]', '#le-board [data-code="KeyS"]');
+		assert.deepEqual([await legendOf('KeyA'), await legendOf('KeyS')], [s, a]);
+		await page.click('#le-board [data-code="KeyA"]');
+		await page.click('#le-copy');
+		await page.click('#le-board [data-code="KeyD"]');
+		await page.click('#le-paste');
+		assert.equal(await legendOf('KeyD'), s);
+
+		// The ANSI board has no ISO extra key; Windows flags and exact stickers apply.
+		await page.selectOption('#le-board-form', 'ansi');
+		assert.equal(await page.locator('#le-board [data-code="IntlBackslash"]').count(), 0);
+		await page.selectOption('#le-board-form', 'iso');
+		await page.click('#le-windows summary');
+		await page.fill('#le-win-flags', 'kllf_altgr');
+		await page.click('#le-win-flags-apply');
+		assert.equal(await page.inputValue('#le-win-flags'), 'kllf_altgr');
+		await page.fill('#le-sticker-mm', '18');
+		await page.dispatchEvent('#le-sticker-mm', 'change');
+		assert.match(await page.getAttribute('#le-stickers', 'style'), /--le-sticker-size:18mm/);
+		await page.click('#le-undo');
+
+		// The composer's job: fill the base layer from AZERTY. This loopback server
+		// has no registry folder, so the panel says the catalogue list failed.
+		await page.click('[data-layer="base"]');
+		await page.click('#le-fill summary');
+		await page.click('#le-fill-load');
+		await page.waitForSelector('#le-fill-source');
+		assert.equal(await page.locator('#le-fill .le-message.error').count(), 1);
+		await page.selectOption('#le-fill-source', 'azerty');
+		await page.selectOption('#le-fill-level', 'base');
+		await page.click('#le-fill-apply');
+		await page.click('#le-confirm-yes');
+		assert.equal(await legendOf('KeyQ'), 'a');
 
 		// The navigation layer imports as a layer and exports as layers.toml again.
 		await page.selectOption('#le-nav-hold', 'CapsLock');

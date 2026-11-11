@@ -1275,6 +1275,87 @@
 				"zh"
 			]
 		},
+		"layout_editor.fill.level.altgr": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.fill.level.base": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it", "pt"]
+		},
+		"layout_editor.fill.level.shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.fill.level.shift_altgr": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.fill.source": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "it", "pt", "sv"]
+		},
 		"layout_editor.kind.action": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
