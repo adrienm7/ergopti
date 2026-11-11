@@ -5,17 +5,18 @@
 ; DESCRIPTION:
 ; Renders the personal-information form on Windows via WebView2, loading the
 ; shared frontend at _shared/ui/personal_info_editor/ so the AHK and Hammerspoon
-; drivers show an identical standalone window. Replaces the native multi-field
-; Gui dialog (PersonalInformationEditor).
+; drivers show an identical standalone window. It is the only editor: when
+; WebView2 cannot open, PersonalInformationEditor refuses with the
+; WebView2-required message (maintainer decision 2026-11-11).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared frontend — same index.html/script.js/style.css as macOS, resolved
 ;    through a virtual-host mapping over _SharedDir.
 ; 2. Dynamic fields — the field list is built from the live PersonalInformation
-;    map, carrying each entry's "(@letter<MagicKey>)" trigger hint, exactly like
-;    the native dialog did.
+;    map, carrying each entry's "(@letter<MagicKey>)" trigger hint, the same on
+;    every driver.
 ; 3. JS<->AHK bridge — the page posts {action} messages (ready/save/cancel);
-;    saving writes personal_info.toml and reloads, like the native dialog.
+;    saving writes personal_info.toml and reloads.
 ; 4. Singleton — a second open focuses the existing window.
 ; ==============================================================================
 
@@ -63,9 +64,11 @@ _PiEdWeb_Available() {
 	return IsSet(WebView2) && FileExist(loader)
 }
 
-; Attempts to show the editor in a WebView2 window. Returns true on success (the
-; caller must NOT also build the native dialog), false to fall back.
-_PiEdWeb_TryOpen() {
+; Attempts to show the editor in a WebView2 window. Returns true once this
+; request is settled (shown, focused or superseded by a newer opening), false
+; when WebView2 could not open it.
+; @param FailureReason string Receives what failed when the result is false.
+_PiEdWeb_TryOpen(&FailureReason := "") {
 	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_WebView
 	global _PiEdWeb_MsgSub, _PiEdWeb_NavSub, _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch
 	global _VendorDir, _SharedDir
@@ -75,8 +78,11 @@ _PiEdWeb_TryOpen() {
 	_PiEdWeb_RetryRetiredHosts()
 	if _PiEdWeb_SessionEpoch != EntryEpoch
 		return true
-	if !_PiEdWeb_Available()
+	FailureReason := ""
+	if !_PiEdWeb_Available() {
+		FailureReason := "the WebView2 binding or WebView2Loader.dll is missing from " . _VendorDir
 		return false
+	}
 
 	if (_PiEdWeb_Gui != 0) {
 		WMPresentWindow(_PiEdWeb_Gui)
@@ -100,7 +106,7 @@ _PiEdWeb_TryOpen() {
 
 	g := Gui_Create("+Resize +MinSize480x400", t("dialog.personal_info.title"))
 	Controller := unset, MsgSub := unset, NavSub := unset
-	Installed := false, Host := 0, FallbackRequested := false, ResetReceipt := false
+	Installed := false, Host := 0, RefusalRequested := false, ResetReceipt := false
 	try {
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
@@ -165,9 +171,10 @@ _PiEdWeb_TryOpen() {
 		try Controller.Fill()
 		try LoggerSuccess("PersonalInfo", "Personal info editor shown via WebView2.")
 	} catch as Err {
-		try LoggerError("PersonalInfo", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
+		try LoggerError("PersonalInfo", "WebView2 create failed: {1}.", Err.Message)
+		FailureReason := "WebView2 create failed: " . Err.Message
 		; Decide only after cleanup, which may open a successor.
-		FallbackRequested := !Installed && _PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
+		RefusalRequested := !Installed && _PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 	} finally {
 		if !Installed {
 			; Preserve an earlier plumbing-only Reset's retained-window intent.
@@ -188,10 +195,10 @@ _PiEdWeb_TryOpen() {
 		}
 	}
 
-	if FallbackRequested {
+	if RefusalRequested {
 		PreviousCritical := Critical("On")
 		try {
-			; Only this frame's acknowledged Reset may lend a fallback admission.
+			; Only this frame's acknowledged Reset may report its refusal.
 			if ResetReceipt && _PiEdWeb_ResetDone && _PiEdWeb_SessionEpoch == SessionEpoch + 1
 					&& _PiEdWeb_Gui == 0
 				return false
@@ -282,7 +289,7 @@ _PiEdWeb_EditorSourceCurrent(Epoch, EditorSource) {
 }
 
 ; Persists the edited values to personal_info.toml and reloads (the engine
-; rebuilds its personal-info expansions on load), mirroring the native dialog.
+; rebuilds its personal-info expansions on load).
 _PiEdWeb_Save(Values, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, EditorSource := unset) {
 	global ScriptInformation
@@ -329,7 +336,7 @@ _PiEdWeb_Save(Values, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 
 ; Builds window.initData({fields, strings}). Each field carries the live value
 ; and, when the key is bound to a personal-info letter, the "(@letter<star>)"
-; trigger hint shown beside its label — same affordance as the native dialog.
+; trigger hint shown beside its label.
 _PiEdWeb_InitDataJs(EditorSource := unset) {
 	global PersonalInformation, PersonalInformationLetters, ScriptInformation
 	Star := ScriptInformation.Has("MagicKey") ? ScriptInformation["MagicKey"] : Chr(0x2605)

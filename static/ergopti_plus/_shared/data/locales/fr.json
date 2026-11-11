@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Copie du chemin d'accès",
 	"dialog.personal_info.save_failed": "Vos coordonnées personnelles n’ont pas pu être enregistrées. L’éditeur reste ouvert pour vous permettre de réessayer.",
 	"dialog.personal_info.save_failed_title": "Échec de l’enregistrement",
-	"dialog.personal_info.saved": "Nouvelles coordonnées :",
 	"dialog.personal_info.title": "Modifier les coordonnées personnelles",
 	"dialog.reset_defaults.failed": "Échec de la réinitialisation.\n\nMotif : {1}",
 	"dialog.reset_defaults.failed_title": "Échec de la réinitialisation",

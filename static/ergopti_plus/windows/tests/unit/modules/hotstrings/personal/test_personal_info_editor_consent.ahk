@@ -106,23 +106,12 @@ _PIEC_Exercise(Surface, Mode, Path, State) {
 	BeforeInformation := PersonalInformation, BeforeLetters := PersonalInformationLetters
 	Generation := HSE_RuntimeDecisionGeneration
 	Receipt := Map("notify", 0, "reload", 0, "confirm", 0)
-	if Surface == "native" {
-		State.Gui := Gui("+ToolWindow", "Private personal consent")
-		State.Hwnd := State.Gui.Hwnd
-		Edits := Map()
-		for Key, Value in Values
-			Edits[Key] := State.Gui.Add("Edit", "w160", Value)
-	}
-	; Both adapters must preserve a supplied value through their real Critical
+	; The adapter must preserve a supplied value through its real Critical
 	; recursion. A provided false is not the historical omitted argument.
 	PreviousCritical := Critical("On")
 	try {
-		if Surface == "native"
-			Result := ProcessUserInput(State.Gui, Edits, 0, 0, 0, 0,
-				_PIES_Notify.Bind(Receipt), _PIES_Reload.Bind(Receipt), _PIES_Confirm.Bind(Receipt), Provided)
-		else
-			Result := _PiEdWeb_Save(Values, 0, 0, 0, 0,
-				_PIES_Notify.Bind(Receipt), _PIES_Reload.Bind(Receipt), Provided)
+		Result := _PiEdWeb_Save(Values, 0, 0, 0, 0,
+			_PIES_Notify.Bind(Receipt), _PIES_Reload.Bind(Receipt), Provided)
 		AssertTrue(A_IsCritical)
 	} finally Critical(PreviousCritical)
 	if Mode == "live" {
@@ -131,8 +120,6 @@ _PIEC_Exercise(Surface, Mode, Path, State) {
 		AssertEqual("Original", PersonalInformation["last_name"])
 		AssertEqual(1, Receipt["reload"])
 		AssertEqual(0, Receipt["notify"])
-		if Surface == "native"
-			AssertFalse(DllCall("IsWindow", "Ptr", State.Hwnd, "Int"))
 	} else {
 		_PISW_Bytes(Winner, FSReadBytesStrict(Path),
 			"a retained or malformed explicit form must preserve the current source")
@@ -142,8 +129,6 @@ _PIEC_Exercise(Surface, Mode, Path, State) {
 		AssertEqual(0, Receipt["reload"])
 		AssertEqual(1, Receipt["notify"])
 		AssertEqual(0, Receipt["confirm"])
-		if Surface == "native"
-			AssertTrue(DllCall("IsWindow", "Ptr", State.Hwnd, "Int"))
 	}
 	Lease := _PersonalTomlWriteLeaseTryAcquire(Path, "personal-editor-consent-control")
 	AssertTrue(Lease is Object)
@@ -229,10 +214,7 @@ _PIEC_Case(Surface, Mode) {
 		throw CleanupError
 }
 
-for _PIEC_Surface in ["native", "web"]
-	for _PIEC_Mode in ["live", "renewed", "false", "unknown", "malformed"]
-		Test("personal editor consent: " . _PIEC_Surface . " " . _PIEC_Mode
-			. " (personal-info-editor-consent)", _PIEC_Case.Bind(_PIEC_Surface, _PIEC_Mode))
-for _PIEC_Mode in ["reinit", "retired"]
+; The WebView editor is the only personal-information editor on Windows.
+for _PIEC_Mode in ["live", "renewed", "false", "unknown", "malformed", "reinit", "retired"]
 	Test("personal editor consent: web " . _PIEC_Mode . " (personal-info-editor-consent)",
 		_PIEC_Case.Bind("web", _PIEC_Mode))

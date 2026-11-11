@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "パスをコピー",
 	"dialog.personal_info.save_failed": "個人情報を保存できませんでした。もう一度試せるように、エディターは開いたままになっています。",
 	"dialog.personal_info.save_failed_title": "保存に失敗しました",
-	"dialog.personal_info.saved": "詳細を更新しました:",
 	"dialog.personal_info.title": "個人詳細を編集",
 	"dialog.reset_defaults.failed": "リセットに失敗しました。\n\n理由：{1}",
 	"dialog.reset_defaults.failed_title": "リセット失敗",

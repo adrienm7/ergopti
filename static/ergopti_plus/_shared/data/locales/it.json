@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Copia percorso",
 	"dialog.personal_info.save_failed": "Non è stato possibile salvare i tuoi dati personali. L’editor è rimasto aperto per consentirti di riprovare.",
 	"dialog.personal_info.save_failed_title": "Salvataggio non riuscito",
-	"dialog.personal_info.saved": "Dati aggiornati:",
 	"dialog.personal_info.title": "Modifica dati personali",
 	"dialog.reset_defaults.failed": "Ripristino non riuscito.\n\nMotivo: {1}",
 	"dialog.reset_defaults.failed_title": "Ripristino non riuscito",

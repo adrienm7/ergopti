@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "نسخ المسار",
 	"dialog.personal_info.save_failed": "تعذر حفظ معلوماتك الشخصية. أبقينا المحرر مفتوحًا كي تتمكن من المحاولة مرة أخرى.",
 	"dialog.personal_info.save_failed_title": "فشل الحفظ",
-	"dialog.personal_info.saved": "البيانات المُحدَّثة:",
 	"dialog.personal_info.title": "تعديل البيانات الشخصية",
 	"dialog.reset_defaults.failed": "فشلت إعادة التعيين.\n\nالسبب: {1}",
 	"dialog.reset_defaults.failed_title": "فشلت إعادة التعيين",

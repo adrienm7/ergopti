@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Copiar ruta",
 	"dialog.personal_info.save_failed": "No se pudo guardar su información personal. El editor se ha mantenido abierto para que pueda intentarlo de nuevo.",
 	"dialog.personal_info.save_failed_title": "Error al guardar",
-	"dialog.personal_info.saved": "Datos actualizados:",
 	"dialog.personal_info.title": "Editar datos personales",
 	"dialog.reset_defaults.failed": "Error al restablecer.\n\nMotivo: {1}",
 	"dialog.reset_defaults.failed_title": "Error al restablecer",

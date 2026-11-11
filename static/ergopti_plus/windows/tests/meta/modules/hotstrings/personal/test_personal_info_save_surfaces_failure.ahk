@@ -35,7 +35,7 @@
 ; ==================================================================
 
 _PISF_SaveBranchesBeforeReload() {
-	for FunctionName in ["_PiEdWeb_Save", "ProcessUserInput"] {
+	for FunctionName in ["_PiEdWeb_Save"] {
 		Body := _DriverFuncBody(FunctionName)
 		Assert(Body != "", FunctionName . " must exist in the driver source")
 		Assert(InStr(Body, "InheritedCritical := A_IsCritical") > 0
@@ -64,7 +64,7 @@ _PISF_SaveBranchesBeforeReload() {
 			FunctionName . " must make the failure visible to the user")
 	}
 }
-Test("meta personal-info-save: both editors use the admitted transaction and stop before reload",
+Test("meta personal-info-save: the editor uses the admitted transaction and stops before reload",
 	_PISF_SaveBranchesBeforeReload)
 
 

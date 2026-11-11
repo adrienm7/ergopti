@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Kopiuj ścieżkę",
 	"dialog.personal_info.save_failed": "Nie udało się zapisać danych osobowych. Edytor pozostał otwarty, aby można było spróbować ponownie.",
 	"dialog.personal_info.save_failed_title": "Zapisywanie nie powiodło się",
-	"dialog.personal_info.saved": "Zaktualizowane dane:",
 	"dialog.personal_info.title": "Edytuj dane osobowe",
 	"dialog.reset_defaults.failed": "Resetowanie nie powiodło się.\n\nPrzyczyna: {1}",
 	"dialog.reset_defaults.failed_title": "Resetowanie nie powiodło się",

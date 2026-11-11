@@ -4,10 +4,11 @@
 ; MODULE: Config Editors (GUI dialogs)
 ; DESCRIPTION:
 ; Small modal GUI editors for user-configurable values: the magic key, the
-; repeat-key toggle, personal information, and the ChatGPT link. Extracted
-; verbatim from ErgoptiPlus.ahk (the entry-point decomposition) and #Include'd at
-; the original position so boot order is unchanged. Functions are hoisted, so
-; their menu/hotkey call sites elsewhere are unaffected.
+; repeat-key toggle and the ChatGPT link, plus the entry point of the WebView
+; personal-information editor. Extracted verbatim from ErgoptiPlus.ahk (the
+; entry-point decomposition) and #Include'd at the original position so boot
+; order is unchanged. Functions are hoisted, so their menu/hotkey call sites
+; elsewhere are unaffected.
 ; ==============================================================================
 
 ; The generated key vocabulary the word-reset and cascade settings are named by
@@ -834,113 +835,14 @@ _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 	return false
 }
 
+; Opens the personal-information editor. WebView only (maintainer decision
+; 2026-11-11): when WebView2 cannot open the shared page, the user is told
+; WebView2 is required and the reason is logged; no native form is built.
+; @returns {Boolean} False when WebView2 refused the opening.
 PersonalInformationEditor(*) {
-		global PersonalInformation, PersonalInformationLetters
-		; Prefer the shared WebView2 editor (identical UI to macOS); the native
-		; multi-field dialog below remains as an automatic fallback.
-		if _PiEdWeb_TryOpen()
-				return
-		Path := PersonalInfoTomlPath()
-		ConfiguredKey := _ConfigWriteLeaseKey(Path)
-		ReadPersonalInfoToml(Path)
-		EditorSource := _PersonalInfoCaptureEditorSource(Path, true, ConfiguredKey)
-		if !_PersonalInfoEditorPathCurrent(EditorSource)
-			return
-		GuiToShow := Gui_Create(, t("dialog.personal_info.title"))
-		GuiToShow.OnEvent("Close", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
-		GuiToShow.OnEvent("Escape", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
-		UpdatedPersonalInformation := Map()
-		ReverseLetters := Map()
-		for k, v in EditorSource["letters"]
-				ReverseLetters[v] := k
-		for PersonalInformationKey, OldValue in EditorSource["information"] {
-				TextToAdd := ""
-				if ReverseLetters.Has(PersonalInformationKey)
-						TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation["MagicKey"] . ")"
-				GuiToShow.SetFont("bold")
-				GuiToShow.Add("Text", , PersonalInformationKey . TextToAdd)
-				GuiToShow.SetFont("norm")
-				NewValue := GuiToShow.Add("Edit", "w300", OldValue)
-				UpdatedPersonalInformation[PersonalInformationKey] := NewValue
-		}
-		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click",
-			(*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation, 0, 0, 0, 0, 0, 0, 0, EditorSource))
-		GuiToShow.Show("Center")
-}
-
-_PersonalInfoCloseEditor(Window, EditorSource, *) {
-	EditorSource["active"] := false
-	Window.Destroy()
-}
-
-ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
-		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0, EditorSource := unset) {
-	global PersonalInformation, ScriptInformation
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		; GUI confirmation, durable persistence and reload can all block. A caller
-		; may be Critical, but this complete user action must remain interruptible.
-		Critical("Off")
-		try return ProcessUserInput(gui, edits, WriterFn, ReplaceFn, DeleteFn,
-			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn, EditorSource?)
-		finally Critical(InheritedCritical)
-	}
-	if !(edits is Map) {
-		try LoggerError("PersonalInfo", "The native personal-information editor returned a malformed control map.")
-		return _PersonalInfoReportSaveFailure(NotifyFn)
-	}
-	Values := Map()
-	Changed := Map()
-	for Key, EditControl in edits {
-		try NewValue := EditControl.Text
-		catch as Err {
-			try LoggerError("PersonalInfo",
-				"Could not read field '{1}' from the native personal-information editor: {2}.",
-				Key, Err.Message)
-			return _PersonalInfoReportSaveFailure(NotifyFn)
-		}
-		if !(NewValue is String) {
-			try LoggerError("PersonalInfo",
-				"The native personal-information editor returned a non-string value for '{1}'.", Key)
-			return _PersonalInfoReportSaveFailure(NotifyFn)
-		}
-		Values[Key] := NewValue
-		OldValue := PersonalInformation.Has(Key) ? PersonalInformation[Key] : ""
-		if (NewValue != OldValue)
-			Changed[Key] := true
-	}
-
-	Path := ScriptInformation["PersonalInfoTomlPath"]
-	if !IsSet(EditorSource) {
-		AdapterSource := _PersonalInfoEditorAdapterSource(Path)
-		if AdapterSource is Map
-			EditorSource := AdapterSource
-	}
-	if IsSet(EditorSource) && EditorSource is Map && EditorSource.Get("path", 0) is String
-		Path := EditorSource["path"]
-	if !PersonalInfoCommitValues(Path,
-			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, EditorSource?) {
-		try LoggerError("PersonalInfo",
-			"Personal information NOT saved — keeping the native editor open so the values are not lost.")
-		return _PersonalInfoReportSaveFailure(NotifyFn)
-	}
-
-	PersonalInformationSummary := ""
-	for Key, _ in Changed
-		PersonalInformationSummary .= LabelValue(Key, PersonalInformation[Key]) . "`n"
-	try {
-		if HasMethod(ConfirmFn, "Call")
-			ConfirmFn.Call(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
-		else
-			Ui_MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
-	}
-	catch as Err
-		try LoggerError("PersonalInfo", "Could not display the personal-information save confirmation: {1}.", Err.Message)
-	if !_EditorReloadAfterCommit(ReloadFn)
-		return false
-	if !_EditorDestroyAfterCommit(gui, "personal-information editor")
-		return false
-	return true
+	if _PiEdWeb_TryOpen(&FailureReason)
+		return true
+	return WebView_RefuseUnavailable("personal information editor", FailureReason)
 }
 
 ; Every opening creates a fresh native dialog. Default Close only hides it,

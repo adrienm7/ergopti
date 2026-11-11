@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Copiar caminho",
 	"dialog.personal_info.save_failed": "Não foi possível guardar os seus dados pessoais. O editor foi mantido aberto para que possa tentar novamente.",
 	"dialog.personal_info.save_failed_title": "Falha ao guardar",
-	"dialog.personal_info.saved": "Informações atualizadas:",
 	"dialog.personal_info.title": "Editar informações pessoais",
 	"dialog.reset_defaults.failed": "Falha ao repor.\n\nMotivo: {1}",
 	"dialog.reset_defaults.failed_title": "Falha ao repor",

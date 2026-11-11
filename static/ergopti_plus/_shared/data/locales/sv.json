@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Kopiera sökväg",
 	"dialog.personal_info.save_failed": "Dina personuppgifter kunde inte sparas. Redigeraren har lämnats öppen så att du kan försöka igen.",
 	"dialog.personal_info.save_failed_title": "Det gick inte att spara",
-	"dialog.personal_info.saved": "Uppdaterad information:",
 	"dialog.personal_info.title": "Redigera personlig information",
 	"dialog.reset_defaults.failed": "Återställningen misslyckades.\n\nOrsak: {1}",
 	"dialog.reset_defaults.failed_title": "Återställningen misslyckades",

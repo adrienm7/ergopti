@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Pfad kopieren",
 	"dialog.personal_info.save_failed": "Ihre persönlichen Daten konnten nicht gespeichert werden. Der Editor bleibt geöffnet, damit Sie es erneut versuchen können.",
 	"dialog.personal_info.save_failed_title": "Speichern fehlgeschlagen",
-	"dialog.personal_info.saved": "Aktualisierte Daten:",
 	"dialog.personal_info.title": "Persönliche Daten bearbeiten",
 	"dialog.reset_defaults.failed": "Zurücksetzen fehlgeschlagen.\n\nGrund: {1}",
 	"dialog.reset_defaults.failed_title": "Zurücksetzen fehlgeschlagen",

@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Kopier sti",
 	"dialog.personal_info.save_failed": "Dine personlige oplysninger kunne ikke gemmes. Editorvinduet er holdt åbent, så du kan prøve igen.",
 	"dialog.personal_info.save_failed_title": "Kunne ikke gemme",
-	"dialog.personal_info.saved": "Opdaterede detaljer:",
 	"dialog.personal_info.title": "Rediger personlige detaljer",
 	"dialog.reset_defaults.failed": "Nulstilling mislykkedes.\n\nÅrsag: {1}",
 	"dialog.reset_defaults.failed_title": "Nulstilling mislykkedes",
