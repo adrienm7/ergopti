@@ -35,6 +35,13 @@
 			"version": "1.9.1",
 			"source": "https://cdn.jsdelivr.net/npm/smol-toml@1.9.1/dist/index.cjs",
 			"sha256": "f9029370259e9a43a2f3e64fa1d39e72f3598188380ace83a0abb8261fa33555"
+		},
+		{
+			"file": "fengari-web.js",
+			"package": "fengari-web",
+			"version": "0.1.4",
+			"source": "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js",
+			"sha256": "fbea0ee4b2e38840f96b03eb7ee162ae391127df26fccd000a2b8756535c8186"
 		}
 	]
 }

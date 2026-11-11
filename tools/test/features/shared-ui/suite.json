@@ -397,6 +397,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-sources.cjs"],
 			"repro": "npm run test:layout-sources"
+		},
+		{
+			"id": "layout-editor-target-exports",
+			"ordinal": 616,
+			"name": "layout editor page writes the tool's XKB and KLC bytes through fengari and the shared adapters",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-target-exports.cjs"],
+			"repro": "npm run test:layout-editor-target-exports"
 		}
 	]
 }

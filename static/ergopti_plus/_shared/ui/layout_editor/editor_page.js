@@ -196,7 +196,9 @@ var LayoutEditorPage = (function () {
 	 *   initial?: string|null, onClose?: function}} host - saveFile(filename,
 	 *   text, mime) stores a file; initial is a source text to open; install({source,
 	 *   keylayout}) and platform ('macos'|'linux') when the host installs layouts;
-	 *   savedStatus names the message shown after a save; onClose leaves the editor.
+	 *   savedStatus names the message shown after a save; onClose leaves the editor;
+	 *   exportAssets() resolves what the XKB and KLC downloads run (standalone.js)
+	 *   on a host that can fetch them.
 	 * @returns {{open: function(string, string): void, current: function(): object}}
 	 */
 	function mount(root, host) {
@@ -1626,7 +1628,7 @@ var LayoutEditorPage = (function () {
 			return el('details', { class: 'le-panel', id: 'le-fill', open: true }, parts);
 		}
 
-		/** Windows-only records: layout flags and NLS special functions. */
+		/** Windows-only records: the .klc metadata, layout flags and NLS special functions. */
 		function windowsPanel() {
 			const windows = doc().windows || {};
 			const flags = el('input', {
@@ -1653,8 +1655,39 @@ var LayoutEditorPage = (function () {
 				() => {},
 				{ id: 'le-nls-parameter' }
 			);
+			// The .klc metadata (exports.windows): all three, or none.
+			const klc = (doc().exports || {}).windows || {};
+			const klcFields = [
+				['locale', 'fr-FR'],
+				['layout_id', '0000040c'],
+				['dll_name', 'kbdmine']
+			].map(([field, placeholder]) => [
+				field,
+				el('input', {
+					type: 'text',
+					id: `le-win-${field.replace('_', '-')}`,
+					value: klc[field] || '',
+					placeholder
+				})
+			]);
 			return el('details', { class: 'le-panel', id: 'le-windows' }, [
 				el('summary', { text: tl('windows.title') }),
+				el('p', { class: 'le-note', text: tl('windows.klc_note') }),
+				...klcFields.map(([field, input]) =>
+					el('label', { class: 'le-field' }, [tl(`windows.${field}`), input])
+				),
+				el('button', {
+					type: 'button',
+					id: 'le-win-klc-apply',
+					text: tl('btn.apply'),
+					onclick: () => {
+						const values = Object.fromEntries(
+							klcFields.map(([field, input]) => [field, input.value.trim()])
+						);
+						const empty = Object.values(values).every((value) => value === '');
+						apply((d) => LayoutEditorModel.setExport(d, 'windows', empty ? null : values));
+					}
+				}),
 				el('p', { class: 'le-note', text: tl('windows.note') }),
 				el('label', { class: 'le-field' }, [tl('windows.flags'), flags]),
 				el('button', {
@@ -2134,6 +2167,32 @@ var LayoutEditorPage = (function () {
 						}
 					})
 				);
+			if (host.exportAssets && host.saveBinary)
+				for (const [target, build, mime] of [
+					['xkb', LayoutSourceIO.xkbArchive, 'application/zip'],
+					['klc', LayoutSourceIO.klcFile, 'application/octet-stream']
+				])
+					buttons.push(
+						el('button', {
+							type: 'button',
+							id: `le-export-${target}`,
+							text: tl(`export.${target}`),
+							onclick: () => {
+								// The host loads the converters on the first click; the build runs on the current source.
+								Promise.resolve(host.exportAssets())
+									.then((assets) => {
+										const file = build(doc(), assets);
+										return Promise.resolve(host.saveBinary(file.filename, file.bytes, mime)).then(
+											() => file.filename
+										);
+									})
+									.then(
+										(name) => notify('ok', tl('status.saved', { name })),
+										(error) => notify('error', problemText(error))
+									);
+							}
+						})
+					);
 			if (host.install) buttons.push(installButton(report));
 			// The driver applies the navigation layer through its navigation layer editor's save.
 			if (host.applyNav && (doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
@@ -2198,11 +2257,7 @@ var LayoutEditorPage = (function () {
 						]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
-				el('p', { class: 'le-note', text: tl('export.tooling_note') }),
-				el('code', {
-					class: 'le-cli',
-					text: `npm run layout-source -- export-xkb ${doc().layout.id}.toml out-linux`
-				}),
+				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
 				el('div', { class: 'le-buttons' }, buttons)
 			]);
 		}

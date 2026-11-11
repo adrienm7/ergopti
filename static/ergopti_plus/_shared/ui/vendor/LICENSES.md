@@ -1,14 +1,21 @@
 # Third-party licenses
 
-The chart libraries below use the MIT license; smol-toml uses the BSD 3-Clause
-license, whose notice follows the MIT text; the Unicode data of the layout
-editor uses the Unicode License v3, last. Copyright notices are retained below.
+The chart libraries and fengari-web below use the MIT license; smol-toml and the
+sprintf-js code embedded in fengari-web use the BSD 3-Clause license, whose
+notices follow the MIT text; the Unicode data of the layout editor uses the
+Unicode License v3, last. Copyright notices are retained below.
 
 - Chart.js 4.4.9: Copyright (c) 2014-2024 Chart.js Contributors.
 - chartjs-adapter-date-fns 3.0.0: Copyright (c) 2019 Chart.js Contributors.
 - Embedded date-fns code: Copyright (c) 2021 Sasha Koss and Lesha Koss.
 - Hammer.js 2.0.8: Copyright (c) 2011-2014 Jorik Tangelder (Eight Media).
 - chartjs-plugin-zoom 2.2.0: Copyright (c) 2013-2021 chartjs-plugin-zoom contributors.
+- fengari-web 0.1.4 (`fengari-web.js`, the unmodified `dist/fengari-web.js`, the
+  Lua VM the layout editor runs the shared XKB converter in), with the fengari
+  0.1.4 and fengari-interop 0.1.2 code it bundles: Copyright © 2017 Benoit
+  Giannangeli, Copyright © 2017-2018 Daurnimator.
+- Lua 5.3, which fengari implements and whose notice it embeds: Copyright © 1994–2017
+  Lua.org, PUC-Rio.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -56,6 +63,34 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## sprintf-js 1.1.1 (BSD-3-Clause), embedded in fengari-web.js
+
+Copyright (c) 2007-present, Alexandru Mărășteanu <hello@alexei.ro>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+- Neither the name of this software nor the names of its contributors may be
+  used to endorse or promote products derived from this software without
+  specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Unicode Character Database 17.0.0 (Unicode License v3)
 
