@@ -1294,17 +1294,15 @@ type = "---"
 type = "command"
 id = "physical_shortcuts_editor"
 i18n = "physical_shortcuts.window_title"
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "physical_shortcuts.windows_unavailable"
 disabled_when = ["physical_shortcuts_editor_ready"]
 disabled_reason_key = "physical_shortcuts.window_unavailable"
-# Windows has no physical shortcut host (no editor, no delivery), as its
-# reason_key says. On macOS and Linux each driver's
+# Every driver hosts the editor. On macOS and Linux each driver's
 # keyboard_shortcuts.physical_delivery_available answers true since the
-# maintainer's decision of 2026-11-11 (LIN-004); should it answer false (the
-# safety refusal is kept), the editor stays closed and the row says so rather
-# than inviting a retry.
+# maintainer's decision of 2026-11-11 (LIN-004); Windows has its host, but its
+# PhysicalShortcutDeliveryAvailable answers false until the maintainer
+# qualifies it on real hardware (decision of 2026-11-11). A getter answering
+# false keeps the editor closed and the row says so rather than inviting a
+# retry.
 disabled_reasons = [
 	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
 ]

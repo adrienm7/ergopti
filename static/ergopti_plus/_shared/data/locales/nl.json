@@ -4264,7 +4264,6 @@
 	"physical_shortcuts.save_failed": "Deze sneltoets kon niet worden opgeslagen. Probeer het opnieuw.",
 	"physical_shortcuts.saved_reopen": "Opgeslagen. Open dit venster opnieuw om verder te gaan.",
 	"physical_shortcuts.position_unavailable": "Deze toetspositie is hier niet beschikbaar.",
-	"physical_shortcuts.windows_unavailable": "Nog niet op Windows: Windows heeft nog geen host voor fysieke sneltoetsen, noch de editor noch het uitvoeren van een actie die aan een fysieke toets is gekoppeld. Fysieke sneltoetsen werken op macOS en Linux.",
 	"physical_shortcuts.collision": "Deze toetsencombinatie is al in gebruik. Kies een andere.",
 	"physical_shortcuts.delivery_unqualified": "Nog niet beschikbaar: Ergopti kan op dit systeem nog geen actie veilig uitvoeren die aan een fysieke toets is gekoppeld. De benoemde sneltoetsen blijven werken.",
 	"physical_shortcuts.window_unavailable": "Dit venster is niet beschikbaar: Probeer het opnieuw te openen.",

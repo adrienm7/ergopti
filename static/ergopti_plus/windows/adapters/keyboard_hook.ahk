@@ -213,6 +213,122 @@ _KH_DispatchKey(IsDown, IH, VK, SC) {
 	_KH_ON_KEY(Evt)
 }
 
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 3/ Physical Key Position Capture =============
+; ======================================================
+; ======================================================
+
+; Position capture observes the shared InputHook. It never suppresses a key,
+; lends a logical action or reserves output; it hands the physical editor one
+; key-down's scan code and the modifiers physically held with it, as
+; keyboard_hook.capture_position does on Linux and macOS.
+global _KH_POSITION_PENDING := 0
+global _KH_POSITION_BUSY    := false
+global _KH_POSITION_TOKENS  := Map()
+global _KH_POSITION_CB      := 0
+; Virtual keys a capture waits past: they are the held modifiers, not the key.
+global _KH_POSITION_MODIFIER_VKS := Map(0x10, 1, 0x11, 1, 0x12, 1, 0x14, 1,
+	0xA0, 1, 0xA1, 1, 0xA2, 1, 0xA3, 1, 0xA4, 1, 0xA5, 1, 0x5B, 1, 0x5C, 1)
+
+; Reports the existing observation prerequisites without enrolling anything.
+; @returns {Integer} 1 when the shared hook runs and no capture is pending.
+KHPositionCaptureAvailable() {
+	global _KH_POSITION_PENDING, _KH_POSITION_BUSY
+	return !A_IsSuspended && !_KH_POSITION_BUSY && !IsObject(_KH_POSITION_PENDING)
+		&& HookDispatcher._started ? 1 : 0
+}
+
+; Enrolls one exact page's observation-only position request.
+; @param Current {Func} The page and inventory guard, read again before delivery.
+; @param Receive {Func} Takes Map("native_code", "SCnnn", "mods", name → 0/1).
+; @returns {Object|Integer} The exact cancellation token, or 0 when refused.
+KHCapturePosition(Current, Receive) {
+	global _KH_POSITION_PENDING, _KH_POSITION_BUSY, _KH_POSITION_TOKENS, _KH_POSITION_CB
+	if !HasMethod(Current, "Call") || !HasMethod(Receive, "Call") || KHPositionCaptureAvailable() != 1
+		return 0
+	Token := {}
+	Record := { Current: Current, Receive: Receive, Token: Token }
+	_KH_POSITION_BUSY := true
+	try Accepted := Current.Call() == true
+	catch as Err {
+		LoggerError("KeyboardHook", "The position capture guard failed: {1}.", Err.Message)
+		Accepted := false
+	}
+	_KH_POSITION_BUSY := false
+	if !Accepted
+		return 0
+	_KH_POSITION_TOKENS[Token] := Record
+	_KH_POSITION_PENDING := Record
+	if (_KH_POSITION_CB == 0)
+		_KH_POSITION_CB := _KH_ObservePosition.Bind()
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _KH_POSITION_CB)
+	return Token
+}
+
+; Cancels only the original observation; forwarding and key ownership continue.
+; @param Token {Object} The exact enrollment token, never a page field.
+; @returns {Integer} 1 when retired.
+KHCancelPosition(Token) {
+	global _KH_POSITION_TOKENS, _KH_POSITION_PENDING
+	if !IsObject(Token) || !_KH_POSITION_TOKENS.Has(Token)
+		return 0
+	Record := _KH_POSITION_TOKENS[Token]
+	if IsObject(_KH_POSITION_PENDING) && _KH_POSITION_PENDING == Record
+		_KH_FinishPosition()
+	_KH_POSITION_TOKENS.Delete(Token)
+	return 1
+}
+
+_KH_FinishPosition() {
+	global _KH_POSITION_PENDING, _KH_POSITION_CB
+	_KH_POSITION_PENDING := 0
+	if (_KH_POSITION_CB != 0)
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_POSITION_CB)
+}
+
+; The modifiers physically held, by their canonical physical-slot names. AltGr
+; is refused rather than read as Alt: its fake LCtrl and the layout's third
+; level belong to another owner.
+; @param &Mods {Map} Receives name → 0/1.
+; @returns {Integer} 1, or 0 while AltGr is held.
+_KH_PositionModifiers(&Mods) {
+	if GetKeyState("RAlt", "P")
+		return 0
+	Mods := Map(
+		"ctrl", (GetKeyState("LCtrl", "P") || GetKeyState("RCtrl", "P")) ? 1 : 0,
+		"alt", GetKeyState("LAlt", "P") ? 1 : 0,
+		"shift", (GetKeyState("LShift", "P") || GetKeyState("RShift", "P")) ? 1 : 0,
+		"super", (GetKeyState("LWin", "P") || GetKeyState("RWin", "P")) ? 1 : 0)
+	return 1
+}
+
+; EVT_KB_DOWN subscriber while a capture is pending. The shared hook ignores
+; Ergopti's own sends (I1); the key must also be physically down, so an
+; injected key cannot mint a position.
+_KH_ObservePosition(IH, VK, SC) {
+	global _KH_POSITION_PENDING, _KH_POSITION_BUSY, _KH_POSITION_MODIFIER_VKS
+	Record := _KH_POSITION_PENDING
+	if !IsObject(Record) || _KH_POSITION_BUSY || _KH_POSITION_MODIFIER_VKS.Has(VK) || SC <= 0
+		return
+	; One primary key per request, accepted or refused.
+	_KH_FinishPosition()
+	Name := Format("SC{:03X}", SC)
+	if !GetKeyState(Name, "P") || !_KH_PositionModifiers(&Mods)
+		return
+	_KH_POSITION_BUSY := true
+	try {
+		if Record.Current.Call() == true
+			Record.Receive.Call(Map("native_code", Name, "mods", Mods))
+	} catch as Err
+		LoggerError("KeyboardHook", "The position capture could not be delivered: {1}.", Err.Message)
+	finally _KH_POSITION_BUSY := false
+}
+
 ; Port dispatch map (ADAPTER_KEYBOARD_HOOK) — the single-source-of-truth contract
 ; surface, verified against _shared/core/ports/contracts.json by
 ; tools/test/test-port-compliance.cjs.

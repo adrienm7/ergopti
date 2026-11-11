@@ -4264,7 +4264,6 @@
 	"physical_shortcuts.save_failed": "Nie udało się zapisać skrótu. Spróbuj ponownie.",
 	"physical_shortcuts.saved_reopen": "Zapisano. Otwórz ponownie to okno, aby kontynuować.",
 	"physical_shortcuts.position_unavailable": "To położenie klawisza jest tutaj niedostępne.",
-	"physical_shortcuts.windows_unavailable": "Jeszcze niedostępne w Windows: Windows nie ma jeszcze hosta skrótów fizycznych, ani edytora, ani uruchamiania akcji przypisanej do fizycznego klawisza. Skróty fizyczne działają w systemach macOS i Linux.",
 	"physical_shortcuts.collision": "Ta kombinacja klawiszy jest już używana. Wybierz inną.",
 	"physical_shortcuts.delivery_unqualified": "Jeszcze niedostępne: Ergopti nie potrafi jeszcze bezpiecznie uruchomić akcji przypisanej do fizycznego klawisza w tym systemie. Nazwane skróty nadal działają.",
 	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie.",
