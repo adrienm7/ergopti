@@ -390,6 +390,7 @@
 	"layout_editor.error.toml_syntax": "Het bestand is geen geldige TOML.",
 	"layout_editor.export.bundle": "macOS-bundel downloaden (ZIP)",
 	"layout_editor.export.bundle_note": "Pak de macOS-bundel uit in ~/Library/Keyboard Layouts en voeg de lay-out daarna toe in de systeeminstellingen; ErgoptiPlus installeert hem direct.",
+	"layout_editor.export.windows_dll_note": "Windows: de .klc downloadt u hier; het toetsenbordstuurprogramma (DLL) en het installatieprogramma (.exe) worden uit de bron gebouwd met het hulpmiddel van de repository (node tools/kbd-dll.cjs build), niet in een pagina.",
 	"layout_editor.export.keylayout_ansi": ".keylayout downloaden (ANSI)",
 	"layout_editor.export.keylayout_iso": ".keylayout downloaden (ISO)",
 	"layout_editor.export.klc": "Het Windows-.klc-bestand downloaden",

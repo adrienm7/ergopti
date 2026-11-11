@@ -390,6 +390,7 @@
 	"layout_editor.error.toml_syntax": "Dosya geçerli bir TOML değil.",
 	"layout_editor.export.bundle": "macOS paketini indir (ZIP)",
 	"layout_editor.export.bundle_note": "macOS paketini ~/Library/Keyboard Layouts klasörüne açın, ardından düzeni sistem ayarlarından ekleyin; ErgoptiPlus onu doğrudan yükler.",
+	"layout_editor.export.windows_dll_note": "Windows: .klc buradan indirilir; klavye DLL'i ve yükleyicisi (.exe) bir sayfada değil, deponun aracıyla kaynaktan derlenir (node tools/kbd-dll.cjs build).",
 	"layout_editor.export.keylayout_ansi": ".keylayout dosyasını indir (ANSI)",
 	"layout_editor.export.keylayout_iso": ".keylayout dosyasını indir (ISO)",
 	"layout_editor.export.klc": "Windows .klc dosyasını indir",
