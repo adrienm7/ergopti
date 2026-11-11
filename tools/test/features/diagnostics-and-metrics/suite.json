@@ -473,6 +473,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-roi-case.cjs"],
 			"repro": "node tools/test/test-keystats-roi-case.cjs"
+		},
+		{
+			"id": "js-windows-diagnostic-progress-reader",
+			"ordinal": 612,
+			"name": "Windows diagnostic worker commits its archive while the host reads its progress",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-diagnostic-progress-reader.cjs"],
+			"repro": "node tools/test/test-windows-diagnostic-progress-reader.cjs",
+			"platforms": ["win32"]
 		}
 	]
 }

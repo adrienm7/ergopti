@@ -486,10 +486,16 @@ function receiveOwnedStream(source) {
 		source.indexOf('function Write-CollectionText('),
 		source.indexOf('function Write-CollectionJson(')
 	);
+	// The exclusive open waits out a host read but stays exclusive (remaining finding 6).
+	const exclusiveOpen = source.slice(
+		source.indexOf('function Open-CollectionExclusive('),
+		source.indexOf('function Write-CollectionText(')
+	);
 	return {
 		'exclusive acquired update':
-			body.includes(
-				'$taskOutput = [IO.File]::Open($taskTarget, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)'
+			body.includes('$taskOutput = Open-CollectionExclusive $taskTarget') &&
+			exclusiveOpen.includes(
+				'return [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)'
 			) &&
 			body.includes('(Get-CollectionStreamHash $taskOutput) -cne $taskPrior.sha256') &&
 			body.includes('$taskOutput.SetLength(0)') &&
