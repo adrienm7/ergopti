@@ -5,6 +5,282 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Windows swipes step with the fingers through raw HID reports (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: Windows gets the incremental touchpad
+gesture modes and step sizes of macOS and Linux (`gestures.modes`,
+`gestures.sensitivities`, the `[gestures.modes]` / `[gestures.sensitivities]`
+sections and the shared swipe-slot template), through a raw HID digitizer
+reader the driver owns: `RegisterRawInputDevices` for usage page 0x0D, usage
+0x05 (`modules/gestures/raw_touchpad.ahk`, natives in
+`adapters/raw_input.ahk`), contact X/Y and contact count read with `HidP_*`
+from the preparsed descriptor, travel turned into millimetres with the
+descriptor's logical-to-physical scale, and the shared step and reversal rule
+ported to AutoHotkey and pinned by `_shared/tests/corpus/gestures/incremental_steps.json`.
+`platform_reason.gesture_modes_and_steps_need_finger_travel` is retired; the
+two- and five-finger, diagonal and axis entries keep
+`platform_reason.windows_touchpad_slots_are_three_and_four_fingers`.
+
+- Ownership of a swipe: the Precision Touchpad settings keep sending each
+  finished swipe's shortcut (`^#+F2`..`^#+F10`). A raw touch that stepped
+  owns its swipe: its shortcut is swallowed whether it arrives before or after
+  the last raw frame (within `[gestures] incremental_handoff_ms` of the lift).
+  A touch that did not step lets the shortcut fire once; an incremental slot's
+  shortcut waits for the touch's end, an x1 slot's fires at once. This is the
+  Linux rule (`if not _incremental:finish() then dispatch`) made independent
+  of the order Windows delivers the two.
+- Only a slot the system routes to Ergopti's shortcut steps: an unmapped slot
+  also runs Windows' own gesture. A descriptor without a physical size fires
+  incremental slots once, as Linux does for a pad with no resolution.
+- Do not write the PrecisionTouchPad registry to silence the shortcut of an
+  incremental slot: the handoff owns the double-fire risk, and the registry
+  mapping stays the discrete path for x1 slots and for pads the reader cannot
+  measure.
+
+## The config migration registry starts at v20, the schema of 1.0.9 (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: the old steps of
+`_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
+the registry every driver parses at boot and most of the config test time.
+`oldest_version` is v20, what 1.0.9 (the latest public release) and every
+1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
+cleanly on every driver: never written, the session read-only, one ERROR at
+boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
+(it still climbs v12 and v16). There is no silent partial upgrade. Do not bring
+the squashed steps back; the next squash raises the floor only to the schema
+of a public release that climbs every older public schema, and moves the
+bridge and the compiled-upgrade pin with it.
+
+## The Windows physical shortcut host is built, delivery refused (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: Windows gets the host and the editor
+of the physical shortcuts, as macOS and Linux have them, while delivery stays
+refused. The production getter `PhysicalShortcutDeliveryAvailable`
+(`windows/ui/physical_shortcuts/host.ahk`, the Windows
+`physical_delivery_available`) answers false until the maintainer qualifies
+it on real hardware; only the maintainer turns it true.
+
+- Chain: the shared page `_shared/ui/physical_shortcuts/` in a WebView2 host
+  (WebView only, no native form), the menu port `PhysicalEditorMenu` and the
+  scope `PhysicalShortcutsScope`. While the getter answers false the editor
+  stays closed with no scope captured, the refusal is told once and the shared
+  row greys with `physical_shortcuts.delivery_unqualified`; the row no longer
+  carries a Windows platform restriction.
+- Even with the getter true, `PhysicalShortcutsScope.Edit` refuses every
+  mapping until a Windows collision owner exists. Key capture is
+  `KHCapturePosition` (`adapters/keyboard_hook.ahk`).
+- Pinned by `tests/unit/ui/physical_shortcuts/test_physical_shortcut_host.ahk`
+  on the real chain. Do not turn the getter true, or drop the collision
+  refusal, without the maintainer's hardware qualification (TODO.md).
+
+## A Windows layout registry change is captured at once (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: a change of the Windows keyboard-layout
+registry must be seen immediately, not only at the one-second layout poll's
+next capture. `modules/keymap/layout_registry_watch.ahk` arms
+`RegNotifyChangeKeyValue` (subtree, names and values) on `HKCU\Keyboard Layout`
+and `KLS_LAYOUTS_KEY`, one auto-reset event each. AutoHotkey has one thread and
+a thread-pool wait would call back on another, so the driver polls the events
+with a zero timeout every `[adapters] layout_registry_watch_poll_ms` (100 ms),
+arms a signaled key again, then runs `CheckKeyboardLayoutChange` at once. The
+entry starts it after the poll's timer and `Ergopti_OnShutdown` stops it; a
+second start throws and a refused start closes what it opened. The poll stays
+the backstop: do not remove it, and do not lengthen the event poll to the
+poll's second. macOS and Linux have no such registry; their own layout owners
+are outside this decision.
+
+## The Windows uninstall recycles the exact checked file (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (finding 3 of
+`docs/audits/windows-2026-10-28`): the portable uninstall worker
+(`windows/vendor/ergopti_uninstall.ps1`) must recycle the very executable it
+checked, not whatever holds its name once the pin is released (Windows cannot
+recycle a pinned file). `Invoke-ErgoptiRemoval` reads the volume serial and
+file index under the pin, keeps an attribute-only anchor handle open (it blocks
+nothing and keeps the file index from being reused), renames the file to an
+unguessable `.ergopti-uninstall-<guid>.exe` in the same directory, checks that
+name's identity, recycles it, then requires the same identity among the
+Recycle Bin's `$R` entries. A replacement before the rename gets its name back
+and nothing is recycled; one inside the recycle fails the uninstall with an
+error, never a success. Permanent deletion stays out of the contract. Windows
+PowerShell 5.1 has no public identity reader and the bundled scripts may not
+declare P/Invoke (`tools/ci/windows-exe-av-surface.json`), so the identity is
+read through PowerShell's own `GetFileInformationByHandle` wrapper; do not
+replace it with `Add-Type`. Linux and macOS remove their installed trees
+through their own owners (`uninstall.sh`, `UninstallWorker.swift`); this
+pinned-image race is specific to the portable Windows executable.
+
+## The Windows personal editors are WebView only (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: on Windows the personal hotstrings
+editor (`OpenPersonalEditor`) and the personal information editor
+(`PersonalInformationEditor`) open only the shared WebView pages under
+`_shared/ui/`, as macOS does. Their native AutoHotkey Gui fallbacks were
+removed. When WebView2 cannot open the page, the editor shows the single
+`webview.required` message (install the WebView2 Runtime) and logs the reason
+at ERROR through the central logger; it never builds a native form. Do not
+bring a native editor back for these two windows. Linux already opens both
+through its WebKitGTK webview manager only.
+
+## Metrics rows store UTC and their recorded offset (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (KMD-1): every raw `events_*` row
+stores `ts` in UTC and `utc_offset_min`, the local UTC offset in force when it
+was recorded (nullable column, last in each table, `schema.sql` and every
+`events.*` catalogue statement); `date` stays the local day. Hour-of-day,
+night wakes and a day read from `ts` use ts + offset, the local time the user
+lived (`_shared/lua/keystats/local_time.lua`). Rows recorded before the column
+have NULL: a Linux row then held UTC and is read with the reading device's
+current offset, which the rebuild logs; a macOS or Windows row held local time.
+Display follows the viewer's zone: no dashboard shows a raw instant today, so
+a future one converts `ts` from UTC.
+
+- Writers: Linux `sqlite_writer` stores the offset of each row's UTC instant
+  (`_render_event`); macOS `sqlite_writer` converts today.log's local stamp
+  with `local_time.from_local` (the system's choice in a fall-back hour). The
+  purge tombstone's `metadata.utc` carries milliseconds and the Linux tombstone
+  stamps `ts` in UTC.
+- Migration: `_shared/lua/keystats/utc_offset_column.lua` adds the column to an
+  older store and drops the purge triggers written before it, run on open
+  before `purge_schema.sql` (Linux `_ensure_utc_offset_column`, macOS
+  `_initialize_db`). `purge_schema.sql` compares a row with an offset (or an
+  older Linux row) in UTC and an older macOS or Windows row with the
+  tombstone's local time.
+- Readers: Linux `ledger_rebuild.walk_device`, macOS
+  `_publish_rebuilt_partitions` (log_manager).
+- Windows (maintainer): add the same column on open of an existing cache and
+  drop the 16 purge triggers before `KLR_LoadPurgeSchema`
+  (`keystats_reader_db.ahk`); until then an existing Windows cache refuses
+  every raw INSERT, which now names the column. Pass `ts` in UTC and
+  `utc_offset_min` in every `KeystatsQuery("events.*")` of `keystats_sql.ahk`
+  and the network, topology, capture, ROI and clipboard writers; the
+  tombstone of `keystats_maintenance.ahk` gives `utc` milliseconds and its own
+  offset; `keystats_walker_events.ahk` reads ts + offset (an older Linux row
+  with the current offset) for `KLW_IsNightWake`, the hour slot and the days
+  of `KLW_WalkAppSwitch`, `KLW_WalkWindowSwitch` and `KLW_WalkSystemEvent`.
+
+## A pair swipe decides from 3.0 mm on macOS and Linux (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (GSD-3): a two-finger swipe, an
+incremental one included, decides its direction from 3.0 mm of travel
+(diagonal 5.0 mm) on Linux as on macOS; three fingers or more keep 1.5 mm.
+The one value is the shared timings registry's `[gestures]`
+`swipe_minimum_mm`, `pair_swipe_minimum_mm` and `pair_diagonal_minimum_mm`
+(`_shared/modules/timings/constants.toml`), read with `Timings.count` by macOS
+`geometry.lua` and the Linux `incremental_tracker.lua`; the finger-count rule
+is `gestures.direction.minimums_mm`. `test-gesture-defaults-single-source.cjs`
+fails on a gesture source (any driver, Windows included) that declares a swipe
+minimum locally. « Still user-adjustable » is read as the slot's own step
+(`[gestures.sensitivities]`), which stays the user's: the minimum only gates
+the direction (reading decided by the coordinator on 2026-11-11, to review by
+the maintainer). Windows receives finished swipes, has no live minimum and no
+literal to remove. The Linux decoder's own threshold and pair-scroll travel
+(120 device units) are GSD-2, still pending: not moved.
+
+## An unbound diagonal falls back to its dominant straight slot (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, reversing the coordinator's default of
+the same day: on macOS and Linux a diagonal swipe (live or completed) whose
+own slot is unbound runs the slot of its dominant straight direction
+(`gestures.direction.dominant`, a tie is horizontal), and that slot's own
+horizontal-axis fallback; a bound diagonal still wins inside the diagonal
+band. Linux: `answering_slot` (manager), the decoder's `dominant` field and
+the incremental tracker, which counts and fires along the straight direction;
+macOS: `resolveSwipeSlot` returns the answering slot and its axis.
+Regressions `diagonal-unbound-fallback`. Windows receives finished swipes
+classified by the Precision Touchpad and has no diagonal slots.
+
+## Linux awake_ms is keep-awake time (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (KMD-3): Linux `awake_ms` is the time
+of finished keep-awake sessions, as Windows (`KLR_RebuildAggregates`, the
+`passive_period` kind `awake` rows) and macOS (`aggregator/events.lua`)
+define it. `modules/keep_awake.lua` credits a session from its confirmed
+inhibition to its native release through
+`system_metrics.record_awake_session`, which adds the day's `awake_ms` and a
+`passive_period` row; the sampler no longer credits unlocked uptime to any
+field. Old Linux days held sampled uptime: `sqlite_writer.ensure_awake_definition`
+clears this device's `agg_system_day.awake_ms` once (a rebuild from raw rows
+gives the same 0) and records `meta.linux_awake_ms_definition` and the first
+date it holds for, `meta.linux_awake_ms_since`, so the two periods are never
+added (clearing rather than keeping the old values: decided by the
+coordinator on 2026-11-11, to review by the maintainer).
+
+## Non-typing metrics rows follow the excluded-app rule (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (KMD-2): rows that do not come from
+typing (connectivity, window topology, capture presence) are refused while an
+excluded app is focused, on every OS, as Windows' `KL_AppendLog` refuses
+every entry; a neutral app label is not used. Linux: `record_network_event`
+and `record_topology_event` return on `is_unrecorded_app` (regressions
+`linux-network-excluded-app`, `linux-topology-excluded-app`); macOS: the
+topology, capture and network watchers take the whole `PrivacyContext`
+verdict (`macos-network-private`, `macos-topology-private`).
+
+## A settings change retires the AI request in flight (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (AID-3): a change of the backend, the
+API entry, its provider, model, endpoint or key while a prediction is in
+flight retires that request on macOS and Linux, as Windows does; the next
+request uses the new settings. The field list and the comparison are shared
+(`_shared/lua/llm/request_settings.lua`); each driver snapshots its own
+sources at dispatch (Linux `prediction_engine.predict`, macOS
+`modules.llm.request_settings()`) and compares at every backend and
+streaming callback: the macOS engine routes every request id read through
+it, Linux checks it in `request_current` and before admitting a new
+request. A retired request is dismissed (its transport cancelled, its answer
+never shown). The key is only compared, never logged.
+
+## A token exchange answering 400 is a refused key (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (AID-2): a token exchange (watsonx
+IAM, Vertex OAuth) that answers HTTP 400 is never retried on any OS; the
+request fails at once with the service's own message. The rule lives in the
+shared classifier (`_shared/lua/llm/failure_class.lua`, phrase « the token
+exchange answered http 400 », corpus `auth_failure_vectors.json`) and the
+message in `api_token_exchange.read`'s refusal (error_description,
+errorMessage, error.message, message, then error; one line, at most
+`MAX_SERVICE_MESSAGE_BYTES`; corpus `api_token_exchange_vectors.json`).
+Windows mirrors both corpora: `LLM_TokenExchange_Read` must append the same
+message and `api_common.ahk`'s phrase list take the same phrase (or its
+prediction classifier honour `key_refused`).
+
+## The macOS quick retry spends the attempt budget (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (AID-1): the quick retry of a failed
+prediction variant on macOS (`api_ollama`, `api_mlx_fetch`, `api_remote`
+`fetch_sequential`) is one of the `max_attempts` attempts, as on Windows and
+Linux (`Inference.max_attempts`). One prediction at multiplier 2 sends at most
+two requests, never four. The retry keeps its extra tokens and warmer
+temperature; it is simply counted.
+
+## Linux installed trees load a precompiled bytecode package (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, following
+`docs/design/linux-bytecode-package.md`: the installer and the updater compile
+an installed tree with the target's own luajit into `<root>/.bytecode/` (a
+bundle and a manifest naming `jit.version`, the architecture, the GC64 flag,
+the physical root and each chunk's source SHA-256). Bytecode is trusted only
+in an installed tree, launched through its physical path, and only when the
+whole manifest matches the running luajit; a checkout never reads it. On any
+mismatch the daemon loads every module from source and logs one warning, and
+the next updater run recompiles; no boot mixes the two. The tree is derived:
+excluded from the ownership receipt, admitted by name
+(`OWNERSHIP_DERIVED_TREE`) and removed whole by uninstall. Do not ship
+bytecode built on a CI runner.
+
+## The AI menu lists no model; the model browser page selects (2026-10-27)
+
+Decided by the maintainer on 2026-10-27 and built in e55038c902 on the three
+drivers: the tray draws one button, the backend's emoji then the model, which
+opens the model browser page; the Backend chooser, the model list, the API
+entries, the provider Add rows and the custom-model dialog left the tray. Do
+not bring tray model rows back. The menu vectors that described them
+(backend, model header, hardware, catalogue, readout and complete-model frames,
+and the Windows backend and model-health captions) were retired with no
+consumer left on 2026-11-11.
+
 ## X11 same-group XKB notify renews the layout receipt (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: after an XKB new-keyboard notify that
@@ -49,8 +325,8 @@ editor save still passes the source, collision and output-custody checks
 (`physical_match`/`physical_admitted` on Linux, `physical_admission` on macOS,
 `shortcuts.physical_availability`), and a getter answering false greys the
 editor row with `physical_shortcuts.delivery_unqualified`. Tests pin the true
-answer and drive each refusal under an explicit false answer. Windows has no
-host (no editor, no delivery); its menu reason says so. The Mac field report
+answer and drive each refusal under an explicit false answer. Windows has its
+host since the decision above, its delivery refused. The Mac field report
 validates the macOS side.
 
 ## A superseded site deployment stays red (2026-11-11)
@@ -532,9 +808,10 @@ desktop (`space_next` / `space_prev` on macOS), up / down = next / previous
 window of the active app; `tap_3` = `left_click_toggle`, `tap_4` =
 `alt_tab_monitor`; on macOS five fingers up / down = `mission_control` /
 `app_expose` (the macOS order), so both overviews survive turning the system's
-four-finger gestures off. On macOS the three-finger horizontal swipes scale with
-the distance (mode "incremental"); Windows gets one shortcut per swipe and
-cannot, and the four-finger swipes stay one step per swipe everywhere. Linux
+four-finger gestures off. The three-finger horizontal swipes scale with the
+distance (mode "incremental"; on Windows through the raw touchpad reader since
+2026-11-11, see the first entry), and the four-finger swipes stay one step per
+swipe everywhere. Linux
 keeps the 2026-10-24 rule for its swipes, which stay "none": the touchpad is
 read without a grab, so the desktop acts on the same swipes (a double action);
 its five-finger swipe stays "none" too (no Mission Control equivalent). macOS

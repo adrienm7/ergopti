@@ -31,16 +31,31 @@ only the request it fails carries the status.
 
 ## Decisions pending (behaviour left unchanged)
 
-- **AID-1, macOS's inner quick retry.** It runs outside `max_attempts`: one
-  prediction at multiplier 2 sends four requests on macOS when every attempt
-  fails, two on Windows and Linux (left « intent unresolved » by the deep
-  macOS review, untracked until now).
-- **AID-2, a token exchange answering 400 (`invalid_grant`).** Windows marks it
-  `key_refused` but its classifier ignores the flag: retried on all three.
+- **AID-1, macOS's inner quick retry.** It ran outside `max_attempts`: one
+  prediction at multiplier 2 sent four requests on macOS when every attempt
+  failed, two on Windows and Linux. Decided by the maintainer on 2026-11-11:
+  the quick retry spends an attempt; macOS now sends two
+  (`test_sequential_retry_request_fence.lua`).
+- **AID-2, a token exchange answering 400 (`invalid_grant`).** Windows marked
+  it `key_refused` but its classifier ignored the flag: retried on all three.
+  Decided by the maintainer on 2026-11-11: never retried, failing at once with
+  the service's message. Shared: `failure_class` reads the exchange's 400
+  refusal as a refused key and `api_token_exchange.read` carries the service's
+  message (both corpora updated). Linux fails the chat with
+  « HTTP 400: the token exchange answered HTTP 400: <message> »; macOS already
+  failed an unresolved entry as `no_credential` (never retried) and now logs
+  the message. **Windows counterpart (maintainer):** `LLM_TokenExchange_Read`
+  appends the same message, `api_common.ahk` takes the phrase « the token
+  exchange answered http 400 »; `test_llm_shared_vectors.ahk` and
+  `test_llm_api_token_exchange.ahk` replay the new vectors.
 - **AID-3, a settings change while a request is in flight.** Windows retires
   the request by its semantic signature (temperature, count, word bounds,
-  profile, auto-type); Linux and macOS only on a model or backend change. The
-  activity rule usually cancels first; not replayed.
+  profile, auto-type); Linux and macOS did only on a model or backend change.
+  Decided by the maintainer on 2026-11-11: a change of the model, key,
+  provider or endpoint retires it on macOS and Linux too, and the next request
+  uses the new settings (shared `llm.request_settings`; regressions
+  `settings-retire-inflight` in `test_prediction_backend.lua` and
+  `test_prediction_settings_change_retires.lua`). Windows already retires.
 
 ## Refuted
 
@@ -55,12 +70,15 @@ batch-mode retries, focus or privacy changes during retries.
   unresolved entry, a refused exchange included, with `reason =
 "no_credential"`, which `llm.failure_class` reads as a refused credential (a
   transient 5xx exchange is not retried either, stricter than Windows).
-  AIM-001 stands in source: the quick retry runs inside each backend
-  (`api_ollama`, `api_mlx_fetch`, `api_remote`), so `streaming_handler` never
-  learns the streamed attempt failed and keeps its `_is_stream_placeholder`
-  rows on offer until a success or the final failure; a fix needs a withdraw
-  signal through `on_partial` from the three backends and a handler path that
-  drops the placeholders.
+  AIM-001 fixed (taken on the coordinator's decision of 2026-11-11, to review
+  by the maintainer): the quick retry ran inside the backend, so
+  `streaming_handler` never learned the streamed attempt failed and kept its
+  `_is_stream_placeholder` rows on offer, and Tab typed the abandoned
+  completion. `api_ollama` and `api_mlx_fetch` now withdraw the failed stream
+  through `on_partial(false, identity)` and the handler drops its rows, back to
+  the loading surface when nothing else is on offer; `api_remote` never
+  streams. Regression `stream-retry-withdraw`: a replay through the real
+  engine, handler and backend sequential fetch.
 - **Linux:** deterministic refusals before sending (no model, empty base URL,
   no account address) are retried synchronously; not compared with Windows.
 - **Native receiving:** no live provider, AHK or Hammerspoon run.

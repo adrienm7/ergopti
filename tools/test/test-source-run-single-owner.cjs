@@ -169,7 +169,7 @@ expect(
 for (const [file, name] of [
 	['infra/uninstall.ahk', 'ShowUninstallErgopti'],
 	['infra/start_at_login.ahk', 'StartAtLoginEnabled'],
-	['infra/start_at_login.ahk', 'ToggleStartAtLogin'],
+	['infra/start_at_login.ahk', 'StartAtLoginToggle'],
 	['modules/updater/self_update.ahk', 'Updater_DownloadAndInstall'],
 	['ui/changelog/init.ahk', '_CLW_InstallBlocked']
 ]) {

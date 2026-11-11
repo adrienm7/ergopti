@@ -39,7 +39,9 @@ SetWorkingDir(A_ScriptDir)
 ;                    a single failing test without the whole suite.
 ;   --module=<group> run only one module group (TEST_MODULE_GROUPS in
 ;                    test_framework.ahk); the CI runs one group per runner.
-;   --list=<file>    run only the tests named in <file>, one per line, in order.
+;   --list=<file>    run only the tests named in <file>, one per line, in
+;                    registry order whatever the file's order; add --reverse
+;                    to replay the predecessors of a reversed run.
 ;   --dump-plan=<f>  append "group<TAB>file<TAB>name" for each selected test.
 ;   --reverse        run the selected tests backwards to expose tests that rely
 ;                    on state an earlier test left behind.
@@ -239,6 +241,7 @@ global _DefaultLogsDir := _LogsDir
 ; The layer editor host: validation, the atomic save and the page's messages,
 ; driven by unit/modules/keymap/test_layer_editor_host.ahk without a WebView.
 #Include ../ui/layer_editor/init.ahk
+#Include ../ui/physical_shortcuts/init.ahk
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
 #Include ../ui/menu/menu_hotstring_switches.ahk
@@ -314,6 +317,7 @@ global _DefaultLogsDir := _LogsDir
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/modules/keymap/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
+#Include ../modules/keymap/layout_registry_watch.ahk
 #Include ../modules/keymap/pause_layout_switch.ahk
 #Include ../modules/keymap/system_layout_install.ahk
 #Include ../ui/tooltip/init.ahk
@@ -554,6 +558,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/catalogue/test_terminator_admission.ahk
 #Include unit/modules/hotstrings/personal/test_personal_toml_editor.ahk
 #Include unit/ui/menu/test_menu_helpers.ahk
+#Include unit/ui/physical_shortcuts/test_physical_shortcut_host.ahk
 #Include unit/ui/menu/test_manifest_menu_resolve_disabled_when_failclosed.ahk
 #Include unit/ui/menu/test_manifest_menu_declarations_are_read.ahk
 #Include unit/ui/menu/test_manifest_menu_declared_groups.ahk
@@ -673,6 +678,10 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_swap_recovery.ahk
 #Include unit/modules/updater/test_updater_swap_cleanup.ahk
 #Include unit/modules/gestures/test_gesture_emit_actions.ahk
+#Include unit/modules/gestures/test_gesture_incremental_rule.ahk
+#Include unit/modules/gestures/test_touchpad_hid.ahk
+#Include unit/modules/gestures/test_raw_touchpad_owner.ahk
+#Include unit/modules/gestures/test_gesture_swipe_slot_menu.ahk
 #Include unit/modules/updater/test_updater_constants_single_source.ahk
 #Include unit/infra/lifecycle/test_runtime_contract_version.ahk
 #Include meta/modules/updater/test_updater_load_interval_guard.ahk
@@ -683,6 +692,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_shortcuts.ahk
 #Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
+#Include unit/modules/shortcuts/test_keepawake_pause_gate.ahk
 #Include unit/suite/test_runner_shard.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
@@ -1096,6 +1106,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/ui/webview/test_webview_range_mount.ahk
 #Include unit/ui/webview/test_webview_profile_ownership.ahk
 #Include unit/ui/webview/test_webview_fit_to_window.ahk
+#Include unit/ui/webview/test_personal_editors_webview_only.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/infra/toml/test_uridecode_literal_unicode.ahk
 #Include meta/ui/webview/test_webview_script_observer.ahk
@@ -1310,6 +1321,8 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/metrics/test_metrics_rebuild_snapshots.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_stages.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_open_failure.ahk
+#Include unit/modules/keystats/reader/test_klr_utc_offset_migration.ahk
+#Include unit/modules/keystats/reader/test_klr_utc_offset_rows.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_rejection_identity.ahk
 #Include unit/modules/keystats/reader/test_klr_rebuild_publication.ahk
 #Include unit/modules/keystats/reader/test_klr_ledger_listing_failure.ahk
@@ -1374,6 +1387,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_ahk_brace_balance.ahk
 #Include meta/suite/test_run_all_include_integrity.ahk
 #Include meta/suite/test_runner_only_filter.ahk
+#Include meta/suite/test_host_capability_probes.ahk
 #Include meta/suite/test_runner_failure_ergonomics.ahk
 #Include unit/suite/test_qualification_parser_owner.ahk
 #Include meta/suite/test_ahk_os_purity_ratchet.ahk
@@ -1519,7 +1533,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_mouse_hotkey_clobber.ahk
 #Include meta/modules/gestures/test_mouse_suspend_guard.ahk
 #Include meta/modules/keystats/test_scroll_flush_fn_cleared_on_stop.ahk
-#Include meta/infra/dispatch/test_timer_scheduler_pause_guard.ahk
 #Include meta/modules/keystats/test_keystats_watchers_pause_guard.ahk
 #Include unit/modules/keystats/test_keystats_session_privacy_transaction.ahk
 #Include unit/modules/keystats/test_keystats_session_close_retry.ahk
@@ -1724,6 +1737,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_keystats_aggregation.ahk
 #Include meta/corpus/test_corpus_keystats_session_events.ahk
 #Include meta/corpus/test_corpus_keystats_correction_erased.ahk
+#Include meta/corpus/test_corpus_keystats_metrics_maintenance.ahk
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
 #Include meta/corpus/test_corpus_healthcheck_snapshot.ahk
@@ -1967,6 +1981,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/tooltip/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/infra/logger/test_error_net_guarded_send.ahk
 #Include meta/infra/logger/test_error_net_dedup_throttle.ahk
+#Include meta/infra/logger/test_error_net_smoke_fatal_stderr.ahk
 #Include unit/infra/logger/test_error_report_dedup_ownership.ahk
 #Include meta/infra/logger/test_error_net_uia_orphan_suppress.ahk
 #Include meta/adapters/crash_report/test_deferred_crash_report_catch.ahk
@@ -2098,6 +2113,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/keymap/test_layout_rows_policy.ahk
 #Include unit/modules/keymap/test_pause_switch_policy.ahk
 #Include unit/modules/keymap/test_pause_layout_switch.ahk
+#Include unit/modules/keymap/test_layout_registry_watch.ahk
 #Include unit/modules/keymap/test_system_layout_install.ahk
 #Include unit/modules/keymap/test_number_row_native_hkl.ahk
 #Include meta/platform/remap/altgr/test_altgr_kana_taphold_entry.ahk
@@ -2127,7 +2143,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_byref_call_sites.ahk
 #Include meta/adapters/uia/test_uia_probe_bounded.ahk
 #Include meta/ui/healthcheck/test_healthcheck_collectors_guarded.ahk
-#Include meta/modules/hotstrings/personal/test_personal_editor_section_guard.ahk
 #Include meta/modules/gestures/test_gestures_init_lifecycle_pair.ahk
 #Include meta/infra/config/persistence/test_paths_file_single_writer.ahk
 #Include meta/modules/updater/test_changelog_fetch_status_logged.ahk
@@ -2152,7 +2167,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_walker_batch_critical.ahk
 #Include meta/modules/keystats/ergonomics/test_walker_pure_fns_match_shared_core.ahk
 #Include meta/modules/keystats/test_keystats_critical_restore.ahk
-#Include meta/modules/keystats/context/test_async_password_detect_suspend_guard.ahk
 #Include meta/modules/keystats/context/test_sensors_warmup_distinct_callback.ahk
 #Include meta/modules/keystats/context/test_kltopo_seen_hwnds_cap.ahk
 #Include meta/platform/remap/layers/test_remapped_list_unconditional.ahk

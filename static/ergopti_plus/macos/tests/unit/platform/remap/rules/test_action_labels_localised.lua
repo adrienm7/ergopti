@@ -59,6 +59,8 @@ local function fresh()
 		-- when a key has no entry — and is the sentinel the code must recognise.
 		return key
 	end
+	-- The catalogue answers which keys exist without decoding a fallback locale.
+	i18n.has = function(key) return key == "sg_actions." .. KEYED_ID end
 	return config
 end
 
@@ -136,6 +138,25 @@ helpers.describe("remap action labels: localisation", function()
 		helpers.assert_true(found.label:find("sg_actions.", 1, true) == nil,
 			"and must not be the unresolved key: i18n.get answers with the KEY when it cannot resolve, " ..
 			"so writing it through would put 'sg_actions." .. UNKEYED_ID .. "' in the menu")
+	end)
+
+	helpers.it("an unresolved key is asked of the catalogue, never translated", function()
+		-- i18n.get decodes en.json on the active locale's first miss: these
+		-- probes made every boot decode it, although every shipped catalogue
+		-- carries the same keys, so the miss was certain.
+		local config = fresh()
+		local i18n = require("infra.i18n")
+		local translate = i18n.get
+		local probed = {}
+		i18n.get = function(key)
+			if key:find("^sg_actions%.") then probed[#probed + 1] = key end
+			return translate(key)
+		end
+		helpers.assert_eq(type(config.load_available_actions(ACTIONS_JSON)), "table", "the catalogue must load")
+		for _, key in ipairs(probed) do
+			helpers.assert_eq(key, "sg_actions." .. KEYED_ID, "only a key the catalogue has is translated")
+		end
+		helpers.assert_true(#probed >= 1, "the keyed action is still translated")
 	end)
 end)
 

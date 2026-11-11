@@ -31,16 +31,20 @@ _OllamaStreamUtf8_EncodingBoundary(Bytes, Expected, Newline) {
 		_TLAO_AppendRawBytes(Handle.TmpStdout, Bytes)
 		FileAppend('"},"done":true}' . (Newline ? "`n" : ""), Handle.TmpStdout, "UTF-8-RAW")
 		Cursor := Map("last_pos", 0)
-		ReadError := ""
+		; The caught state is the verdict: an Error with an empty message is still a
+		; refusal, and the empty message alone read it as an admission.
+		Refused := false, ReadError := ""
 		ReadText := ""
 		try ReadText := _LLM_Ollama_ReadStreamText(Handle.TmpStdout, Cursor, true)
-		catch as Err
+		catch as Err {
+			Refused := true
 			ReadError := Err.Message
+		}
 		if Expected == "" {
 			AssertContains(ReadError, "UTF-8", "invalid bytes must be refused instead of silently repaired")
 			AssertEqual(0, Cursor["last_pos"], "a rejected encoding must retain its original byte checkpoint")
 		} else {
-			AssertEqual("", ReadError, "valid multibyte UTF-8 must still be admitted")
+			AssertFalse(Refused, "valid multibyte UTF-8 must still be admitted: " . ReadError)
 			AssertContains(ReadText, Expected, "the real reader must preserve the complete Unicode scalar")
 			AssertEqual(FileGetSize(Handle.TmpStdout), Cursor["last_pos"],
 				"only an accepted byte image may advance the checkpoint")

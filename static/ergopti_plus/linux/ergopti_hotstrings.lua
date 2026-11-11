@@ -123,6 +123,12 @@ else
 	               SHARED_LUA_DIR .. "/?.lua;" ..
 	               SHARED_LUA_DIR .. "/?/init.lua;" ..
 	               package.path
+	-- An installed tree's modules load from the bytecode its installer compiled
+	-- (compile time was most of the boot's first 200 ms); a checkout never
+	-- reads one. Decided here, before the first application module loads.
+	local BytecodePackage = assert(loadfile(SCRIPT_DIR .. "/infra/bytecode_package.lua"))()
+	package.loaded["infra.bytecode_package"] = BytecodePackage
+	BytecodePackage.install(SCRIPT_DIR)
 end
 
 -- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
@@ -951,6 +957,8 @@ local function main()
 	Logger.start(LOG, "Ergopti hotstrings daemon starting (version %s, pid %s)…",
 		Version.VERSION, DiagnosticSnapshot.pid() or "unknown")
 	BootProfiler.begin()
+	require("infra.bytecode_package").report(function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+		function(fmt, ...) Logger.warn(LOG, fmt, ...) end)
 	-- The options decide half of what follows (grab, tray, device pinning), and a
 	-- user log has no other record of how the unit was launched.
 	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s layout=%s keymap=%s config=%s.",
@@ -2605,8 +2613,10 @@ local function main()
 	end
 	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
-	-- it, so the application never sees a chord Ergopti runs. It comes last: an
-	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- it, so the application never sees a chord Ergopti runs. An offered
+	-- prediction's own digit chord is contextual and outranks a binding; both run
+	-- before the layout emulation, as Windows runs a slot before its layout chord
+	-- and macOS lets the digit accept (ILL-001, ILL-002).
 	-- The press is recorded for the metrics exactly as the control callback
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
@@ -2640,21 +2650,35 @@ local function main()
 		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots.
-		if require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+		-- under the Shortcuts master like the keyboard slots, and only while no
+		-- layout is emulated, as on Windows.
+		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
+			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
-		}) then return true end
+		})
+		if accented then
+			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
+		end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.
 			-- Retire its old PRIMARY window before the deferred action can run.
 			wrap_on_type.end_selection_window()
 			return true
 		end
+		if prediction_engine
+			and type(prediction_engine.handle_shortcut) == "function"
+			and prediction_engine.handle_shortcut(detail) == true then
+			return true
+		end
+		-- A key the tooltip did not own is user activity: a pending prediction
+		-- stops before the typing path arms the next pause.
+		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
+		if consume_bound_chord(detail) then return true end
 		-- The layout emulation, after the actions the user bound on a key.
 		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
@@ -2666,16 +2690,7 @@ local function main()
 			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
 				release_callback = emulated_release }
 		end
-		if wrap_on_type.on_key(detail) then return true end
-		if prediction_engine
-			and type(prediction_engine.handle_shortcut) == "function"
-			and prediction_engine.handle_shortcut(detail) == true then
-			return true
-		end
-		-- A key the tooltip did not own is user activity: a pending prediction
-		-- stops before the typing path arms the next pause.
-		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
-		return consume_bound_chord(detail)
+		return wrap_on_type.on_key(detail) == true
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
 	local hold_token = keystats.hold_accounting_token
@@ -2847,19 +2862,14 @@ local function main()
 			end,
 			-- A check asked from the tray: its answer is told, and the menu redrawn
 			-- so an install row appears for a found release.
-			on_update_checked = function(available, release, err)
+			on_update_checked = function(result)
 				if notifier and ok_i18n and i18n_mod then
-					local body
-					if available and release then
-						body = i18n_mod.get("updater.tray_new_version_body")
-							:gsub("{1}", (tostring(release.tag):gsub("%%", "%%%%")))
-					elseif err then
-						body = i18n_mod.get("updater.no_connection")
-					else
-						body = i18n_mod.get("updater.up_to_date")
-							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
-					end
-					notifier.send(body, { title = i18n_mod.get("updater.window_title"), level = "info" })
+					local body = require("modules.updater.check_notice").body(result, i18n_mod.get, function(id)
+						local channel = updater.CHANNELS.channel(id)
+						return channel and i18n_mod.get(channel.label_key) or tostring(id)
+					end)
+					notifier.send(body, { title = i18n_mod.get("updater.window_title"),
+						level = result.state == "error" and "warning" or "info" })
 				end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
@@ -3222,14 +3232,10 @@ local function main()
 			-- notified here since the updater existed and the strings are already
 			-- translated into all twenty-one locales; this driver wrote a log line
 			-- nobody reads and left the news in the tray label.
-			--
-			-- The tag lands on the REPLACEMENT side of gsub, where "%" is special:
-			-- a release tagged "v2.1%-rc1" would raise inside the notification and
-			-- take the menu rebuild below with it.
+			-- A release read from the public feed says it cannot be installed yet.
 			local accepted = false
 			if notifier and ok_i18n and i18n_mod then
-				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
-				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
+				local body = require("modules.updater.check_notice").release_body(release, i18n_mod.get)
 				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",

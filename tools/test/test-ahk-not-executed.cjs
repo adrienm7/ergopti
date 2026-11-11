@@ -4,7 +4,9 @@
  * A case the host cannot run is reported as NOT EXECUTED by the AHK runner,
  * the execution manifest and the CI summary, and is never counted as a pass.
  * A capability-gated case on a capable or unknown host still runs, so its
- * failure stays a failure. The native half runs the real framework on Windows.
+ * failure stays a failure. On hosted CI an absent capability fails instead, so
+ * a lane can never skip what its runner provides. The native half runs the
+ * real framework on Windows, once as a developer machine and once as hosted CI.
  */
 
 'use strict';
@@ -137,7 +139,8 @@ try {
 }
 
 // The real runner: an incapable host is NOT EXECUTED, capable and unknown hosts fail.
-function nativeRun() {
+// With GITHUB_ACTIONS=true the incapable host fails too.
+function nativeRun(hostedCi) {
 	if (process.platform !== 'win32') {
 		console.log('SKIP (not executed): native AHK not-executed runner: requires Windows');
 		return;
@@ -159,15 +162,18 @@ function nativeRun() {
 			path.join(temporary, 'test_framework.ahk')
 		);
 		const results = path.join(temporary, 'results.txt');
+		const env = {
+			...process.env,
+			TEMP: temporary,
+			TMP: temporary,
+			ERGOPTI_AHK_RESULTS_FILE: results
+		};
+		if (hostedCi) env.GITHUB_ACTIONS = 'true';
+		else delete env.GITHUB_ACTIONS;
 		const run = spawnSync(
 			ahk,
 			['/ErrorStdOut', path.join(fixtures, 'framework_not_executed_fixture.ahk')],
-			{
-				windowsHide: true,
-				encoding: 'utf8',
-				timeout: 15000,
-				env: { ...process.env, TEMP: temporary, TMP: temporary, ERGOPTI_AHK_RESULTS_FILE: results }
-			}
+			{ windowsHide: true, encoding: 'utf8', timeout: 15000, env }
 		);
 		assert.ifError(run.error);
 		assert.equal(
@@ -177,10 +183,16 @@ function nativeRun() {
 		);
 		const tap = fs.readFileSync(results, 'utf8');
 		assert.match(tap, /^ok 1 - not-executed fixture pass\r?$/m);
-		assert.match(
-			tap,
-			/^ok 2 - not-executed fixture host lacks the capability # SKIP NOT EXECUTED: host capability example is absent: the fixture probe reports it missing\r?$/m
-		);
+		if (hostedCi)
+			assert.match(
+				tap,
+				/^not ok 2 - not-executed fixture host lacks the capability — hosted CI must provide host capability example, which is absent: the fixture probe reports it missing/m
+			);
+		else
+			assert.match(
+				tap,
+				/^ok 2 - not-executed fixture host lacks the capability # SKIP NOT EXECUTED: host capability example is absent: the fixture probe reports it missing\r?$/m
+			);
 		assert.match(
 			tap,
 			/^not ok 3 - not-executed fixture capable host still fails — intentional gated fixture failure/m
@@ -189,17 +201,25 @@ function nativeRun() {
 			tap,
 			/^not ok 4 - not-executed fixture unknown capability still runs — intentional gated fixture failure/m
 		);
-		assert.match(tap, /^# NOT EXECUTED on this host: 1 case\(s\), none counted as passed:\r?$/m);
-		assert.match(tap, /^# 1 passed, 2 failed, 1 not executed\.\r?$/m);
 		const native = validateAhkSuiteManifest(tap);
 		assert.equal(native.complete, true, native.errors.join('\n'));
 		assert.equal(native.passed, 1);
-		assert.equal(native.failed, 2);
-		assert.equal(native.not_executed, 1);
+		if (hostedCi) {
+			assert.doesNotMatch(tap, /NOT EXECUTED/, 'hosted CI never reports a case as not executed');
+			assert.match(tap, /^# 1 passed, 3 failed\.\r?$/m);
+			assert.equal(native.failed, 3);
+			assert.equal(native.not_executed, 0);
+		} else {
+			assert.match(tap, /^# NOT EXECUTED on this host: 1 case\(s\), none counted as passed:\r?$/m);
+			assert.match(tap, /^# 1 passed, 2 failed, 1 not executed\.\r?$/m);
+			assert.equal(native.failed, 2);
+			assert.equal(native.not_executed, 1);
+		}
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
 }
-nativeRun();
+nativeRun(false);
+nativeRun(true);
 
 console.log('AHK not-executed reporting: ok');

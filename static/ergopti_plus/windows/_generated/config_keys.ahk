@@ -485,6 +485,7 @@ class MenuCommand {
 	static NUMBER_ROW_EDGES := "number_row_edges"
 	static NUMBER_ROW_MODE := "number_row_mode"
 	static OPEN_ERROR_LOG := "open_error_log"
+	static OPEN_LAYOUT_EDITOR := "open_layout_editor"
 	static OPEN_LOGS := "open_logs"
 	static OPEN_TODAY_LOG := "open_today_log"
 	static OPEN_USER_HOTSTRING_SOURCE := "open_user_hotstring_source"

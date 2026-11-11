@@ -61,13 +61,18 @@ _BuildShortcutsSubmenu(TargetMenu := unset) {
 		IsSet(TargetMenu) ? TargetMenu : unset, , DeclaredFrames)
 }
 
-; The checked_when getters of the Shortcuts submenu: its switch, and the ticks
-; of the key-combinations and script-control group titles.
+; The checked_when getters of the Shortcuts submenu: its switch, the ticks of
+; the key-combinations and script-control group titles, and the disabled_when
+; getters of the physical shortcut editor row.
 _SC_Getters() {
-	return Map(
+	Getters := Map(
 		"shortcuts_enabled", () => IsCategoryGated("Shortcuts"),
 		"key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
 		"script_control_enabled", () => ScriptShortcutChordsAreOn())
+	; The physical shortcut editor row: ready, and the cause it names when greyed.
+	for Key, Getter in PhysicalShortcutsMenuGetters()
+		Getters[Key] := Getter
+	return Getters
 }
 
 ; The « Combinaisons de touches » group: its own first-row switch (the
@@ -511,6 +516,7 @@ _SC_ScopeCommands(Options := unset) {
 	return Map(
 		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
 		MenuCommand.EDIT_SHORTCUTS, OpenPersonalShortcuts,
+		MenuCommand.PHYSICAL_SHORTCUTS_EDITOR, ObjBindMethod(PhysicalShortcutsMenuPort(), "Open"),
 		MenuCommand.SCOPE_RESTORE, (*) => _SC_ApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => _SC_ApplyScope("clear", OwnedOptions))
 }

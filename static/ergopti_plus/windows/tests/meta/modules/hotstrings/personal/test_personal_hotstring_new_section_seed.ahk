@@ -14,8 +14,9 @@
 ; returned false with ZERO logging, and the caller ignored the return value,
 ; rebuilt the (unchanged) hotstring engine, and reported success.
 ;
-; The fix seeds the Features node right where the section is created
-; (_NewSection), and adds two defensive backstops mirroring the existing
+; The fix seeded the Features node where the section was created (the native
+; editor, removed on 2026-11-11; the WebView save enables new sections through
+; HS_EnableNewPersonalSections), and added two defensive backstops mirroring the existing
 ; manifest-driven code path: WriteFeatureV2 now logs a WARNING on an unresolved
 ; path (like its sibling WriteFeatureBatchV2 already does), and
 ; MenuRowWithLabel now skips (with a WARNING) an item whose feature does not
@@ -26,15 +27,6 @@
 
 
 
-
-_PHNS_AssertNewSectionSeeds() {
-	Body := _DriverFuncBody("_NewSection")
-	Assert(Body != "", "_NewSection() declaration must exist in ui/personal_toml_editor.ahk")
-	Assert(InStr(Body, "EnsurePersonalHotstringFeature(SecName)") > 0,
-		"_NewSection must seed the brand-new section into Features before the tray menu can ever toggle it live (personal-hotstring-live-toggle-seed)")
-}
-Test("editor: _NewSection seeds the Features node for a brand-new section (personal-hotstring-live-toggle-seed)",
-	_PHNS_AssertNewSectionSeeds)
 
 _PHNS_AssertMenuRowWithLabelGuarded() {
 	Body := _DriverFuncBody("MenuRowWithLabel")

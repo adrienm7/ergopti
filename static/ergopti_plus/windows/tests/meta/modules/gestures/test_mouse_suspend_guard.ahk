@@ -26,9 +26,12 @@
 ; 4. KL_Mouse_Stop: `scroll_flush_fn := unset` must appear after the timer
 ;    cancellation so re-entry cannot re-arm a stale timer reference.
 ;
-; This is a meta-static test (scans source text) because keystats_mouse.ahk
-; registers top-level HookDispatcher subscribers and cannot be #Included by the
-; headless runner without pulling in the full driver.
+; The scroll guards (2, 3) and the gate itself are observed by calling the real
+; handlers under a real Suspend in
+; tests/unit/modules/keystats/test_keystats_mouse_privacy_transaction.ahk. The
+; click guards (1) stay source scans: _KL_Mouse_GestureAuthorized refuses a
+; held capture again before the bump, so removing the outer guard changes no
+; observable counter and a behavioural test of it could not fail.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -87,74 +90,6 @@ _MMSG_RUpGuardBeforeBump() {
 		"KL_Mouse_OnRUp: KL_CaptureHeld() guard must appear BEFORE KL_BumpMouseClick so the click counter is not bumped while paused")
 }
 Test("mouse: KL_Mouse_OnRUp has a capture-hold guard before KL_BumpMouseClick", _MMSG_RUpGuardBeforeBump)
-
-
-_MMSG_AccumScrollHasSuspendGuard() {
-	Src := _MMSG_ReadSource("keystats_mouse.ahk")
-	Body := _DriverFuncBody("KL_Mouse_AccumScroll")
-	Assert(Body != "", "KL_Mouse_AccumScroll must exist in keystats_mouse.ahk")
-	Assert(InStr(Body, "KL_CaptureHeld()") > 0,
-		"KL_Mouse_AccumScroll must check KL_CaptureHeld() — SetTimer-backed scroll accumulation bypasses Suspend; without this guard ticks are counted and a flush timer is armed while paused")
-}
-Test("mouse: KL_Mouse_AccumScroll has a capture-hold guard", _MMSG_AccumScrollHasSuspendGuard)
-
-
-_MMSG_FlushScrollHasSuspendGuard() {
-	Src := _MMSG_ReadSource("keystats_mouse.ahk")
-	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
-	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keystats_mouse.ahk")
-	Assert(InStr(Body, "KL_CaptureHeld()") > 0,
-		"KL_Mouse_FlushScroll must check KL_CaptureHeld() — a one-shot timer armed before pause fires after Suspend is set; without this guard stale scroll data is flushed to the log while paused")
-}
-Test("mouse: KL_Mouse_FlushScroll has a capture-hold guard", _MMSG_FlushScrollHasSuspendGuard)
-
-
-; keystats-mouse-scroll-suspend-reset: unlike KL_Mouse_ParkTick (which resets
-; prev_x/prev_y/park_last_x on its suspended path), KL_Mouse_FlushScroll's
-; suspended branch used to return without clearing scroll_start/scroll_last.
-; A one-shot flush timer armed just before a Suspend, then firing WHILE
-; suspended, left those timestamps stale for the whole pause window; the next
-; post-resume scroll then flushed a duration/velocity spanning the entire pause
-; instead of just the burst that actually occurred.
-_MMSG_FlushScrollResetsAccumulatorWhenSuspended() {
-	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
-	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keystats_mouse.ahk")
-
-	GuardPos := InStr(Body, "KL_CaptureHeld()")
-	Assert(GuardPos > 0, "KL_Mouse_FlushScroll must check KL_CaptureHeld()")
-
-	; All four accumulator fields must be reset, and the reset must happen
-	; INSIDE the suspended branch (before its own "return"), not merely
-	; somewhere later in the function (that would only cover the non-suspended path).
-	SuspendedBranchEnd := InStr(Body, "return", , GuardPos)
-	Assert(SuspendedBranchEnd > 0, "KL_Mouse_FlushScroll's KL_CaptureHeld() branch must contain a return")
-	SuspendedBranch := SubStr(Body, GuardPos, SuspendedBranchEnd - GuardPos)
-
-	; Column-aligned assignments (KLMouse.scroll_ticks   := 0) use variable
-	; whitespace before `:=`, matching the existing non-suspended reset block's
-	; style — tolerate any run of spaces there instead of assuming exactly one.
-	for _, Field in ["scroll_ticks", "scroll_h_ticks", "scroll_start", "scroll_last"]
-		Assert(RegExMatch(SuspendedBranch, "KLMouse\." . Field . "\s*:=\s*0"),
-			"KL_Mouse_FlushScroll's KL_CaptureHeld() branch must reset KLMouse." . Field
-			. " := 0 before returning — mirroring KL_Mouse_ParkTick's own suspended-path "
-			. "reset — otherwise stale pre-suspend timestamps corrupt the next post-resume "
-			. "flush's duration/velocity (keystats-mouse-scroll-suspend-reset)")
-}
-Test("mouse: KL_Mouse_FlushScroll resets the scroll accumulator on its suspended path (keystats-mouse-scroll-suspend-reset)",
-	_MMSG_FlushScrollResetsAccumulatorWhenSuspended)
-
-
-; The handlers above name KL_CaptureHeld(); native Suspend must stay one of
-; its two reasons, or every guard above would stop covering a paused driver.
-_MMSG_CaptureHoldIncludesSuspend() {
-	Body := _DriverFuncBody("KL_CaptureHeld")
-	Code := _DriverMaskNonCode(&Body)
-	Assert(RegExMatch(Code, "\bA_IsSuspended\b"),
-		"KL_CaptureHeld must hold capture while the driver is suspended")
-	Assert(RegExMatch(Code, "\bKLCollection\.suspended\b"),
-		"KL_CaptureHeld must hold capture while the user pauses metrics")
-}
-Test("mouse: the capture-hold gate covers native Suspend and the metrics pause", _MMSG_CaptureHoldIncludesSuspend)
 
 
 _MMSG_StopClearsScrollFlushFn() {

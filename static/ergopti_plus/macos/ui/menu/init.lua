@@ -1677,6 +1677,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	require("ui.layout_manager").set_nav_applier(function(text)
 		return require("ui.layer_editor").apply_text(text, { karabiner = karabiner })
 	end)
+	-- « Emulate without installing » in the layout editor stores the composed
+	-- layout as the emulated one, as the « Layout to emulate » menu does.
+	require("ui.layout_manager").set_emulation_applier(function(id)
+		if not require("infra.layout_emulation_preferences").choose(state, save_prefs, id) then
+			return false, "emulate_not_saved", "the layout emulation settings were not saved"
+		end
+		if require("modules.keymap.layout_emulation").reload_if_started() == false then
+			return false, "emulate_failed", "the layout emulation did not reload the composed layout"
+		end
+		if type(updateMenu) == "function" then updateMenu() end
+		return true
+	end)
 	WindowToggle.set_opener("changelog", function()
 		return require("ui.changelog").open({ channel_owner = channel_owner })
 	end)

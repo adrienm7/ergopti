@@ -13,7 +13,7 @@ save as downloads; nothing leaves the visitor's computer.
 -->
 
 <script>
-	import { asset } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import PageWrapper from '../PageWrapper.svelte';
 
 	/** Height of the framed editor; it scrolls inside the frame beyond that. */
@@ -40,6 +40,28 @@ save as downloads; nothing leaves the visitor's computer.
 				<code>.keylayout</code> et téléchargez ce que le générateur sait déjà produire. L’éditeur fonctionne
 				entièrement dans votre navigateur : aucun fichier n’est envoyé.
 			</p>
+			<ol class="layout-editor-steps">
+				<li>
+					<strong>Partir de</strong> : « Nouvelle » propose une disposition vierge, QWERTY, AZERTY, Bépo,
+					Ergo-L ou Ergopti, à modifier.
+				</li>
+				<li>
+					<strong>Exporter pour chaque système</strong> : le paquet macOS (<code>.bundle</code>),
+					les fichiers XKB de Linux et le <code>.klc</code> de Windows se téléchargent ici. Le
+					pilote
+					<code>.dll</code> de Windows et son installateur <code>.exe</code> ne se construisent pas
+					dans un navigateur : ils sortent de l’outil du dépôt (<code
+						>node tools/kbd-dll.cjs build</code
+					>).
+				</li>
+				<li>
+					<strong>Installer ou émuler</strong> : dans
+					<a href={resolve('/ergopti-plus')}>ErgoptiPlus</a>, le menu « Disposition clavier » ouvre
+					le même éditeur, qui sait installer la disposition sur le système ou l’émuler sans rien
+					installer (sans droit administrateur).
+					<a href={resolve('/ergopti-plus') + '#ep-telecharger'}>Télécharger ErgoptiPlus</a>.
+				</li>
+			</ol>
 		</bloc-introduction>
 	</svelte:fragment>
 

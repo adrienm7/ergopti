@@ -203,6 +203,28 @@ function M.collect_reports(collect)
 	return scan
 end
 
+--- The manifest spelling of an enum value written in another case. Windows'
+--- loader admits a case variant (AHK's = compares without case) and keeps the
+--- manifest's spelling; a reader that adopts a hand-written value spells it the
+--- same way (CFS-001). Any other value is returned unchanged.
+--- @param entry table|nil Manifest feature entry.
+--- @param value any Persisted value.
+--- @return any value The listed spelling, or the value itself.
+function M.canonical_enum_value(entry, value)
+	if type(entry) ~= "table" or entry.type ~= "enum" or type(entry.enum_values) ~= "table"
+		or type(value) ~= "string" then
+		return value
+	end
+	local folded = value:lower()
+	for _, allowed in ipairs(entry.enum_values) do
+		if allowed == value then return value end
+	end
+	for _, allowed in ipairs(entry.enum_values) do
+		if type(allowed) == "string" and allowed:lower() == folded then return allowed end
+	end
+	return value
+end
+
 --- Checks a persisted value against its manifest entry: the entry must exist
 --- for this driver and the value must still be one it accepts.
 --- @param entry table|nil Manifest feature entry.

@@ -434,7 +434,8 @@ _CMG_OlderFileNamesItsCauseInWords() {
 	Saved := IsSet(ConfigurationFile) ? ConfigurationFile : ""
 	try {
 		ConfigurationFile := Dir . "\config.toml"
-		Old := "[_meta]`nschema_version = 1`n`n[gestures]`nenabled = true`n"
+		; What ErgoptiPlus 1.0.7 and 1.0.8 wrote: released, yet below the squashed floor.
+		Old := "[_meta]`nschema_version = 16`n`n[gestures]`nenabled = true`n"
 		AssertTrue(FSWriteDurable(ConfigurationFile, Old))
 		AssertEqual("unsupported", ConfigMigrateBoot(ConfigurationFile)["status"])
 		AssertTrue(ConfigOlderSchemaReadOnly(), "the session names the old file as the cause")
@@ -444,7 +445,7 @@ _CMG_OlderFileNamesItsCauseInWords() {
 		AssertEqual(1, Messages.Length)
 		AssertEqual(t("config.read_only.older_schema"), Messages[1], "the user reads the sentence, not a key")
 		AssertFalse(Messages[1] == "config.read_only.older_schema", "the locale carries the sentence")
-		Assert(InStr(Messages[1], "1.0.8"), "the sentence names the release that bridges the file")
+		Assert(InStr(Messages[1], "1.0.9"), "the sentence names the release that bridges the file")
 		ConfigReportPersistenceFailure("the test", (Message, *) => Messages.Push(Message))
 		AssertEqual(t("config.read_only.older_schema"), Messages[2], "a refused save repeats the cause")
 		AssertEqual("menu.read_only.older_schema", _LLM_Menu_ConfigBlockReason(), "the native parents name the cause")

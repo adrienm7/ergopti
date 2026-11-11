@@ -881,12 +881,41 @@ end
 ---   told, when the request was refused for one.
 function M.predict(context, output_context, override, automatic)
 	if _runtime_closed or _scope_owner then return false end
-	if _predicting or type(context) ~= "string" or context == "" then return end
-	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
+	-- The secure-field gate comes before any work, the settings reads and the
+	-- retirement of a changed request included: a gate consulted after the
+	-- request is not a gate.
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return false
 	end
+	local RequestSettings = require("llm.request_settings")
+	--- What a prediction is sent with: the backend and, under the API backend,
+	--- the active entry's id, provider, model, endpoint and key; under Ollama
+	--- its server address (a model change already retires through set_model).
+	--- @return table snapshot
+	local function settings_now()
+		local kind = M.get_backend()
+		if kind ~= "api" then
+			local profiles = get_profiles()
+			return RequestSettings.snapshot({ backend = kind, endpoint = profiles and profiles.get_base_url() or nil })
+		end
+		local entries = get_api_entries()
+		local entry = entries and entries.active() or nil
+		if not entry then return RequestSettings.snapshot({ backend = kind }) end
+		return RequestSettings.snapshot({ backend = kind, entry = entry.id, provider = entry.provider,
+			model = entry.model, endpoint = entry.base_url, key = entry.token })
+	end
+	-- A request sent with settings changed since is retired, not waited for
+	-- (maintainer decision AID-3, llm.request_settings).
+	local inflight = _predicting and type(_suggestion_context) == "table" and _suggestion_context.settings or nil
+	local changed = inflight and RequestSettings.change(inflight, settings_now()) or nil
+	if changed then
+		Logger.info(LOG, "Prediction in flight retired: its %s changed.", changed)
+		M.dismiss()
+		if _runtime_closed or _scope_owner then return false end
+	end
+	if _predicting or type(context) ~= "string" or context == "" then return end
+	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
 	-- The applications the user switched the trigger off in (llm.trigger.disabled_apps)
 	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil, automatic) then
 		Logger.debug(LOG, "Prediction suppressed: the application is excluded.")
@@ -912,6 +941,7 @@ function M.predict(context, output_context, override, automatic)
 	local backend, target, model, runtime_response = M.resolve_backend()
 	if not admission_current() then return false end
 	if not backend then return end
+	local settings = settings_now()
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
@@ -986,6 +1016,7 @@ function M.predict(context, output_context, override, automatic)
 		focus = focus,
 		live = override ~= nil and override.live == true,
 		automatic = type(output_context) == "table" and output_context.automatic == true,
+		settings = settings,
 	}
 	_offer_notified = false
 	_predicting = true
@@ -1025,6 +1056,12 @@ function M.predict(context, output_context, override, automatic)
 
 	local function request_current(verify_focus)
 		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+		local changed_field = RequestSettings.change(settings, settings_now())
+		if changed_field then
+			Logger.info(LOG, "Prediction retired: its %s changed while it was in flight.", changed_field)
+			M.dismiss()
+			return false
+		end
 		if verify_focus then
 			local blocked = global_privacy_blocks()
 			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end

@@ -64,7 +64,9 @@ function M.tombstone(epoch)
 		ts = os.date("%Y-%m-%d %H:%M:%S", seconds) .. string.format(".%03d", millis),
 		date = os.date("%Y-%m-%d", seconds),
 		action = M.TOMBSTONE_ACTION,
-		metadata = { utc = os.date("!%Y-%m-%d %H:%M:%S", seconds) },
+		-- With its milliseconds: a row of the same second stamped in UTC with
+		-- milliseconds (macOS, maintainer decision KMD-1) still precedes it.
+		metadata = { utc = os.date("!%Y-%m-%d %H:%M:%S", seconds) .. string.format(".%03d", millis) },
 	}
 end
 

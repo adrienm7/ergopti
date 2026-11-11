@@ -1457,12 +1457,6 @@
 			"type": "command",
 			"id": "physical_shortcuts_editor",
 			"i18n": "physical_shortcuts.window_title",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "physical_shortcuts.windows_unavailable",
 			"disabled_when": [
 				"physical_shortcuts_editor_ready"
 			],
@@ -2411,6 +2405,17 @@
 			"i18n": "menu.layout.manage"
 		},
 		{
+			"type": "command",
+			"id": "open_layout_editor",
+			"i18n": "menu.layout.edit",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_editor_is_on_the_website_on_windows"
+		},
+		{
 			"type": "list",
 			"id": "layout_bundle",
 			"status_rows": {
@@ -3301,12 +3306,7 @@
 			"i18n": "menu.gestures.mode_single",
 			"checked_when": [
 				"gesture_mode_is_single"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "check",
@@ -3314,42 +3314,22 @@
 			"i18n": "menu.gestures.mode_incremental",
 			"checked_when": [
 				"gesture_mode_is_incremental"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"gesture_sensitivity_head": [
 		{
 			"type": "section_header",
 			"id": "gesture_sensitivity_heading",
-			"i18n": "menu.gestures.sensitivity_label",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.gestures.sensitivity_label"
 		},
 		{
 			"type": "label",
 			"id": "gesture_sensitivity_hint",
-			"i18n": "menu.gestures.sensitivity_hint",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.gestures.sensitivity_hint"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		}
 	],
 	"gesture_change_action": [
@@ -3361,6 +3341,7 @@
 				"gesture_slot_choice_ready"
 			],
 			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"unavailable": "hide"
@@ -3885,6 +3866,7 @@
 		{
 			"type": "---",
 			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"unavailable": "hide"
@@ -3895,6 +3877,7 @@
 			"i18n": "menu.gestures.mode_current",
 			"caption_getter": "gesture_mode_current_label",
 			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"unavailable": "hide"
@@ -3908,6 +3891,7 @@
 				"gesture_mode_incremental_ready"
 			],
 			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"unavailable": "hide"

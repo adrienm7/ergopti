@@ -285,6 +285,40 @@ terminal_hotstring_key_delay_ms = 20
 # ──────────────────────────────────────────────────────────────────────
 
 [gestures]
+# Least Manhattan travel, in millimetres, before a swipe has a direction: three
+# fingers or more, a pair (also the native scroll, so twice that), and a pair's
+# diagonal; the others' diagonal is gestures.direction's factor of theirs. One
+# value for every driver (maintainer decision GSD-3 of 2026-11-11); the swipe
+# step itself is each slot's own [gestures.sensitivities] setting.
+# HS: modules/gestures/geometry.lua. LX: modules/gestures/incremental_tracker.lua.
+# AHK: modules/gestures/raw_touchpad.ahk, from the raw HID digitizer reports.
+swipe_minimum_mm = 1.5
+pair_swipe_minimum_mm = 3.0
+pair_diagonal_minimum_mm = 5.0
+
+# The incremental swipe step rule and the live direction lock, for a driver
+# that cannot require the shared Lua modules: travel before the first action
+# (FIRST_STEP), the most actions one frame may earn before a sensor jump is
+# refused (MAX_ACTIONS_PER_FRAME), the smallest reversal (macOS LIVE_AXIS_MIN,
+# Linux REVERSE_FLOOR_MM), the straight-axis sector (AXIS_MAX_DEGREES) and a
+# diagonal's minimum as a factor of the swipe's (DIAGONAL_MINIMUM_FACTOR). The
+# shared corpora (_shared/tests/corpus/gestures/incremental_steps.json and
+# direction_vectors.json) pin these to the Lua constants on every driver.
+# HS, LX: _shared/lua/gestures/incremental.lua, direction.lua.
+# AHK: modules/gestures/incremental.ahk, direction.ahk.
+incremental_first_step_mm = 4.0
+incremental_max_actions_per_frame = 100
+incremental_reverse_floor_mm = 1.0
+swipe_axis_max_degrees = 25
+swipe_diagonal_minimum_factor = 1.5
+
+# Windows: how long after a raw touch ends the Precision Touchpad settings'
+# shortcut for that swipe still belongs to it. A touch that stepped while
+# moving swallows the shortcut within this window; a touch whose frames stop
+# for this long without a lift frame is over, so a deferred shortcut fires.
+# AHK: modules/gestures/raw_touchpad.ahk.
+incremental_handoff_ms = 300
+
 # Windows: how long a gesture's synthetic keys stay marked, the settle after an
 # action's own window change, and the wait before the first auto-configuration.
 synthetic_clear_ms = 300
@@ -701,6 +735,13 @@ complex_key_delay_multiplier = 2
 # bonus is dropped so it cannot stretch an expansion on an unrelated key.
 complex_key_carry_ms = 300
 
+# Windows: the emoji and symbol sections register after ready, at their boot
+# rank, in slices of this length; the keyboard waits at most one slice. A gap
+# between two slices lets the input queued meanwhile run.
+# AHK: infra/hotstrings/hotstring_engine_main.ahk HSE_DeferredRegistrationSlice.
+deferred_registration_slice_ms = 25
+deferred_registration_gap_ms = 15
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Ergonomics warnings
@@ -734,6 +775,12 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: how long TakeNote waits on a Notepad tab it has not bound before it
+# accepts it as the note it launched (Windows 11 tabbed Notepad, where a file
+# already open there stays selected instead of opening a new tab).
+# AHK: modules/take_note.ahk.
+take_note_tab_settle_ms = 1000
+
 # Linux X11: a layout loaded live from the user tree is put back when GNOME or
 # Plasma replaces it (a new keyboard, a GNOME input-sources change). A burst of
 # keymap events settles this long before one read of the server keymap; at
@@ -1160,6 +1207,11 @@ input_probe_step_ms = 10
 input_probe_settle_ms = 40
 # Windows: an updater completion run off the current thread.
 updater_callback_defer_ms = 50
+# Windows: the poll of the keyboard-layout registry watch's change events
+# (RegNotifyChangeKeyValue): a change of the installed layouts is captured
+# within this delay rather than at the next one-second layout poll.
+# AHK: modules/keymap/layout_registry_watch.ahk.
+layout_registry_watch_poll_ms = 100
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).

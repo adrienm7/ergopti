@@ -14,6 +14,12 @@ local it = require("tests.support.metrics_preferences_fixture").it
 
 local sw     = helpers.load_module("modules.keystats.sqlite_writer")
 
+--- Recognizes the open's probe for raw tables lacking the UTC offset column
+--- (KMD-1), which an empty answer settles: none lacks it.
+local function is_utc_offset_probe(command)
+	return command:find("pragma_table_info", 1, true) ~= nil and command:find("utc_offset_min", 1, true) ~= nil
+end
+
 --- Recognizes the mandatory additive initializer separately from target faults.
 --- A real CLI first-open control below checks that this DDL actually commits.
 local function is_media_schema_startup(command)
@@ -35,7 +41,7 @@ local function with_writer_read_receipts(body, status, test, startup_status)
 		local content, code
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
-		elseif is_media_schema_startup(command) then
+		elseif is_media_schema_startup(command) or is_utc_offset_probe(command) then
 			content, code = "", startup_status or 0
 		else
 			content, code = type(body) == "function" and body(command) or body, status
@@ -131,7 +137,7 @@ local function with_meta_value_output(value, status, test)
 		local content, code = "", status
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
-		elseif is_media_schema_startup(command) then
+		elseif is_media_schema_startup(command) or is_utc_offset_probe(command) then
 			content, code = "", 0
 		elseif command:find("SELECT json_quote(value)", 1, true) then
 			content = value == nil and "" or require("json").encode(value) .. "\n"

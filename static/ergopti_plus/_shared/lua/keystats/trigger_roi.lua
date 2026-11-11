@@ -21,24 +21,29 @@ local DISCARD_KEYS = { Escape = true, PageUp = true, PageDown = true, End = true
 	Home = true, Left = true, Up = true, Right = true, Down = true, Delete = true }
 local MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 
+-- One character of a string already proven valid UTF-8; gsub copies any byte it
+-- does not match (only NUL), which has no case mapping either.
+local UTF8_CHARACTER = "[\1-\127\194-\244][\128-\191]*"
+
 --- Uses the qualified Windows ROI profile; general Unicode case conversion has different semantics.
+--- Each caller has validated the text, so one gsub over the generated table maps every
+--- character (the per-codepoint decode through compat.utf8 cost 55 ms per corpus index).
 local function lower_key(text)
-	local characters = {}
-	for _, cp in Utf8.codes(text) do
-		local character = Utf8.char(cp)
-		characters[#characters + 1] = Case.lower[character] or character
-	end
-	return table.concat(characters)
+	return (text:gsub(UTF8_CHARACTER, Case.lower))
 end
 
 --- Counts UTF-16 units, the Windows owner's StrLen contract, without accepting malformed UTF-8.
 --- @param text string
 --- @return integer|nil
 function M.utf16_length(text)
-	if type(text) ~= "string" or Utf8.len(text) == nil then return nil end
-	local count = 0
-	for _, cp in Utf8.codes(text) do count = count + (cp > 0xFFFF and 2 or 1) end
-	return count
+	if type(text) ~= "string" then return nil end
+	if not text:find("[\128-\255]") then return #text end
+	local length = Utf8.len(text)
+	if length == nil then return nil end
+	-- In valid UTF-8 these bytes only lead a four-byte sequence: the characters
+	-- outside the BMP, which count two UTF-16 units.
+	local _, astral = text:gsub("[\240-\244]", "")
+	return length + astral
 end
 
 --- Indexes only a registry's admitted mappings using the Windows lowercase exclusion rule.

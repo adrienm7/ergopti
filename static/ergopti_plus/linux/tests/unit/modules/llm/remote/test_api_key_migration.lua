@@ -93,8 +93,78 @@ local function run_loop(limit_ms, done)
 	return ticks
 end
 
+--- A scheduler the test fires by hand: the attempts run when the case says
+--- so, never on a timer that can race the loop's tick.
+--- @return table scheduler { after, cancel, fire, pending }
+local function manual_scheduler()
+	local scheduler = { queue = {} }
+	function scheduler.after(delay_s, fn)
+		local handle = { delay_s = delay_s, fn = fn }
+		scheduler.queue[#scheduler.queue + 1] = handle
+		return handle
+	end
+	function scheduler.cancel(handle)
+		if type(handle) == "table" then handle.cancelled = true end
+		return true
+	end
+	--- The armed timers not yet fired or cancelled.
+	function scheduler.pending()
+		local live = {}
+		for _, handle in ipairs(scheduler.queue) do
+			if not handle.cancelled and not handle.fired then live[#live + 1] = handle end
+		end
+		return live
+	end
+	--- Fires the one armed timer, as its delay ending would.
+	function scheduler.fire()
+		local live = scheduler.pending()
+		helpers.assert_eq(#live, 1, "exactly one attempt is armed")
+		live[1].fired = true
+		live[1].fn()
+		return live[1]
+	end
+	return scheduler
+end
+
+--- The store's background calls, recorded in the order their answers arrive:
+--- the cases wait on this log, which only grows, never on a passing state.
+--- @param store table The real api_token_store.
+--- @return table proxy, table log
+local function recording_store(store)
+	local log = {}
+	local proxy = setmetatable({}, { __index = store })
+	function proxy.probe_lock_async(timeout_ms, callback)
+		log[#log + 1] = "probe"
+		return store.probe_lock_async(timeout_ms, function(lock, reason)
+			log[#log + 1] = "probe:" .. tostring(lock)
+			callback(lock, reason)
+		end)
+	end
+	function proxy.store_async(entry_id, token, timeout_ms, callback)
+		log[#log + 1] = "store"
+		return store.store_async(entry_id, token, timeout_ms, function(reference, reason)
+			log[#log + 1] = reference and "store:ok" or "store:refused"
+			callback(reference, reason)
+		end)
+	end
+	return proxy, log
+end
+
+--- Whether the log holds an entry.
+--- @param log table
+--- @param entry string
+--- @return boolean
+local function logged(log, entry)
+	for _, value in ipairs(log) do if value == entry then return true end end
+	return false
+end
+
+-- Deadlines far above any loop jitter: a case never wins or loses a race
+-- against them. The store's own is what the first case waits out.
+local PROBE_MS, STORE_MS, RETRY_MS = 10000, 3000, 60000
+
 --- A fresh store, entries file and migration owner over the stand-ins.
---- @return table migration, table entries, table store
+--- @return table migration, table entries, table store, table scheduler, table log
 local function fresh()
 	os.execute("rm -rf '" .. DIR .. "' && mkdir -p '" .. DIR .. "'")
 	write(PATH, LEGACY)
@@ -116,10 +186,12 @@ local function fresh()
 	local entries = helpers.load_module("modules.llm.api_entries")
 	entries._set_path_for_test(PATH)
 	helpers.assert_eq(#entries.plaintext_keys(), 1, "the fixture's plaintext entry loads")
+	local scheduler = manual_scheduler()
+	local recorded, log = recording_store(store)
 	local migration = helpers.load_module("modules.llm.api_key_migration")
-	helpers.assert_eq(migration.init({ entries = entries, store = store,
-		timings = { probe_ms = 2000, store_ms = 400, retry_ms = 150, retry_max_ms = 300 } }), true)
-	return migration, entries, store
+	helpers.assert_eq(migration.init({ entries = entries, store = recorded, scheduler = scheduler,
+		timings = { probe_ms = PROBE_MS, store_ms = STORE_MS, retry_ms = RETRY_MS, retry_max_ms = RETRY_MS } }), true)
+	return migration, entries, store, scheduler, log
 end
 
 --- Whether a process is gone.
@@ -133,13 +205,17 @@ local function gone(pid)
 	return not alive:find("alive", 1, true)
 end
 
---- Runs a case over a fresh migration, always shutting it down after.
---- @param fn function Receives (migration, entries, store).
 -- The real child-process owners: an earlier suite module may leave a stand-in
 -- that "succeeds" at once without spawning anything, and every case here is
 -- about a real child (CI 43024025237: each attempt ended "done" at once).
 local PROCESS_OWNERS = { "adapters.owned_process", "adapters.shell_runner", "adapter_errors" }
 
+-- Longest wait for a child to answer: a bound on a loaded runner, never a
+-- timing the case relies on.
+local SETTLE_MS = 20000
+
+--- Runs a case over a fresh migration, always shutting it down after.
+--- @param fn function Receives (migration, entries, store, scheduler, log).
 local function with_migration(fn)
 	local saved = {}
 	for _, name in ipairs(PROCESS_OWNERS) do
@@ -148,8 +224,8 @@ local function with_migration(fn)
 	end
 	for _, name in ipairs(PROCESS_OWNERS) do require(name) end
 	local ok, err = pcall(function()
-		local migration, entries, store = fresh()
-		local called, failure = pcall(fn, migration, entries, store)
+		local migration, entries, store, scheduler, log = fresh()
+		local called, failure = pcall(fn, migration, entries, store, scheduler, log)
 		migration.shutdown()
 		store._set_tool_for_test(nil)
 		store._set_probe_tool_for_test(nil)
@@ -164,26 +240,33 @@ end
 helpers.describe("api_key_migration: a locked keyring never delays input readiness (linux-api-key-background-migration)", function()
 
 	helpers.it("a blocking secret-tool leaves the loop ticking, is killed at its deadline and keeps the plaintext", function()
-		with_migration(function(migration, _, store)
+		with_migration(function(migration, _, store, scheduler, log)
 			blocking_tool()
 			probe("")
 			local before = uv.hrtime()
 			helpers.assert_eq(migration.start(), true)
 			local elapsed_ms = (uv.hrtime() - before) / 1e6
 			helpers.assert_true(elapsed_ms < 100, "start() returns at once, not after the store: " .. elapsed_ms .. " ms")
-			-- While the store blocks (its deadline is 400 ms), input stays served.
-			local ticks = run_loop(300)
-			helpers.assert_true(ticks >= 15, "the loop keeps ticking while secret-tool blocks: " .. ticks)
+			helpers.assert_eq(scheduler.pending()[1].delay_s, 0, "the first attempt waits for the next loop turn")
+			scheduler.fire()
 			helpers.assert_eq(migration.status(), "running")
+			run_loop(SETTLE_MS, function() return read(DIR .. "/blocked.pid") ~= nil end)
 			local pid = tonumber(read(DIR .. "/blocked.pid") or "")
 			helpers.assert_true(pid ~= nil, "the blocking store did run")
-			run_loop(8000, function() return migration.status() == "waiting" end)
-			helpers.assert_eq(migration.status(), "waiting", "the attempt ended at its deadline and a retry is armed")
+			-- While the store blocks, input stays served: the loop keeps ticking
+			-- until the store's deadline settles the attempt.
+			local ticks = run_loop(SETTLE_MS, function() return logged(log, "store:refused") end)
+			helpers.assert_true(logged(log, "store:refused"), "the blocked store was refused at its deadline")
+			helpers.assert_true(ticks >= STORE_MS / 1000 * 10, "the loop kept ticking while secret-tool blocked: " .. ticks)
+			helpers.assert_eq(migration.status(), "waiting", "a retry is armed")
+			helpers.assert_eq(scheduler.pending()[1].delay_s, RETRY_MS / 1000)
+			run_loop(SETTLE_MS, function() return gone(pid) end)
 			helpers.assert_true(gone(pid), "the blocked secret-tool was killed")
 			helpers.assert_eq(read(PATH), LEGACY, "the plaintext key stays until a move succeeds")
 			-- The keyring unlocks: the next attempt moves the key.
 			working_tool()
-			run_loop(8000, function() return migration.status() == "done" end)
+			scheduler.fire()
+			run_loop(SETTLE_MS, function() return migration.status() == "done" end)
 			helpers.assert_eq(migration.status(), "done")
 			local text = read(PATH)
 			helpers.assert_eq(text:find(CANARY, 1, true), nil, "the plaintext key left the file")
@@ -195,42 +278,46 @@ helpers.describe("api_key_migration: a locked keyring never delays input readine
 	end)
 
 	helpers.it("a locked keyring is waited for without any store, so no prompt opens", function()
-		with_migration(function(migration)
+		with_migration(function(migration, _, _, scheduler, log)
 			working_tool()
 			probe("(<true>,)")
 			helpers.assert_eq(migration.start(), true)
-			-- start() arms the first attempt in "waiting"; see it run, then let the
-			-- probe child settle on its own time under a loaded suite.
-			run_loop(2000, function() return migration.status() == "running" end)
+			scheduler.fire()
 			helpers.assert_eq(migration.status(), "running", "the first attempt started")
-			run_loop(8000, function() return migration.status() == "waiting" or read(DIR .. "/argv") ~= nil end)
-			helpers.assert_eq(read(DIR .. "/argv"), nil, "nothing is stored while the keyring is locked")
+			run_loop(SETTLE_MS, function() return logged(log, "probe:locked") end)
+			helpers.assert_true(logged(log, "probe:locked"), "the probe read the keyring locked")
+			helpers.assert_eq(logged(log, "store"), false, "nothing is stored while the keyring is locked")
+			helpers.assert_eq(read(DIR .. "/argv"), nil, "secret-tool never ran")
 			helpers.assert_eq(migration.status(), "waiting")
+			helpers.assert_eq(scheduler.pending()[1].delay_s, RETRY_MS / 1000, "a locked keyring is probed again later")
 			helpers.assert_eq(read(PATH), LEGACY)
 			probe("(<false>,)")
-			run_loop(8000, function() return migration.status() == "done" end)
+			scheduler.fire()
+			run_loop(SETTLE_MS, function() return migration.status() == "done" end)
 			helpers.assert_eq(migration.status(), "done", "an unlocked keyring lets the next probe through")
+			helpers.assert_true(logged(log, "probe:unlocked") and logged(log, "store:ok"))
 			helpers.assert_eq(read(PATH):find(CANARY, 1, true), nil)
 		end)
 	end)
 
 	helpers.it("shutdown fences an attempt in flight and refuses a second owner", function()
-		with_migration(function(migration)
+		with_migration(function(migration, _, _, scheduler, log)
 			blocking_tool()
 			probe("")
 			helpers.assert_eq(migration.init(), false, "a second init is refused")
 			helpers.assert_eq(migration.start(), true)
 			helpers.assert_eq(migration.start(), false, "a second start is refused")
-			run_loop(400, function() return read(DIR .. "/blocked.pid") ~= nil end)
+			scheduler.fire()
+			run_loop(SETTLE_MS, function() return read(DIR .. "/blocked.pid") ~= nil end)
 			local pid = tonumber(read(DIR .. "/blocked.pid") or "")
 			helpers.assert_true(pid ~= nil, "the blocking store did run")
 			helpers.assert_eq(migration.shutdown(), true)
 			helpers.assert_eq(migration.status(), "stopped")
-			run_loop(3000, function() return gone(pid) end)
+			run_loop(SETTLE_MS, function() return gone(pid) end)
 			helpers.assert_true(gone(pid), "shutdown killed the blocked secret-tool")
-			working_tool()
-			run_loop(800)
-			run_loop(3000)
+			helpers.assert_eq(#scheduler.pending(), 0, "no attempt stays armed")
+			helpers.assert_eq(logged(log, "store:refused") or logged(log, "store:ok"), false,
+				"a cancelled child calls nothing back")
 			helpers.assert_eq(read(PATH), LEGACY, "nothing is published after shutdown")
 		end)
 	end)

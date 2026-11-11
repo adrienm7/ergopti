@@ -330,11 +330,12 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 #Include *i vendor/UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor/ (source: https://github.com/Descolada/UIA-v2)
 BootProfile_Stamp("UIA include initialised")
-; *i = no error if the file isn't found. UIA is only used by WrapTextIfSelected
-; (a Shift/AltGr shortcut that wraps the selection with the typed symbol). If
-; that feature is disabled in your INI and you want to trim boot time / memory,
-; you can safely delete ``vendor\UIA.ahk``: WrapTextIfSelected falls back to
-; a plain SendNewResult via ``isSet(UIA)`` at the call site (see modules/keymap/layout.ahk).
+; *i = no error if the file isn't found. UIA is used by WrapTextIfSelected
+; (a Shift/AltGr shortcut that wraps the selection with the typed symbol) and by
+; TakeNote to tell the Windows 11 Notepad tabs apart. If you want to trim boot
+; time / memory, you can delete ``vendor\UIA.ahk``: WrapTextIfSelected falls
+; back to a plain SendNewResult via ``isSet(UIA)`` at the call site (see
+; modules/keymap/layout.ahk), and TakeNote binds a note to a whole Notepad window.
 ; AHK v2 resolves #Include at parse time, so there is no true runtime lazy-load.
 
 ; The global error net itself is armed far above, before Bundle_Init()'s
@@ -1419,6 +1420,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
+#Include ui/physical_shortcuts/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk
 
@@ -1479,12 +1481,15 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; process stuck on the AltGr layer for the first keystrokes (transient
 ; « AltGr bloqué »). See _ReleasePhantomModifiers in infra/lifecycle.ahk.
 _ReleasePhantomModifiers()
-; Ready is an output contract: every advertised trigger, including emoji/symbol
-; sections and its preview index, must exist before the driver publishes ready.
-; Deferring these ~3000 registrations after ready made a first emoji/symbol trigger
-; literal for seconds and allowed the timer to stall the first typing burst.
+; Every trigger registers before ready except the emoji and symbol sections (about
+; 1,600 rows, 400 ms): their sequence block is reserved at their inline
+; position, so the collision tie-break is unchanged, and their rows register in
+; slices of a few tens of ms once ready (HSE_DeferredRegistrationStart below). An
+; earlier deferral ran them as one 1.5 s-late block that stalled the first typing
+; burst; a slice holds the keyboard for at most its budget. The preview catalogue
+; is built from the cache, complete, before ready.
 BootProfile_StageBegin("hotstrings")
-_BootHotstringsReceipt := RegisterAllHotstrings(false, true)
+_BootHotstringsReceipt := RegisterAllHotstrings(true, true)
 if !(_BootHotstringsReceipt is Map) || !_BootHotstringsReceipt.Get("committed", false)
 	throw Error("Cold hotstring registration did not return a committed receipt.")
 BootProfile_StageEnd("hotstrings")
@@ -1573,6 +1578,8 @@ PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepComp
 PerfCounters_Flush()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 _DriverBootTailPending := false
+; The emoji and symbol rows the hotstring stage queued at their boot rank.
+HSE_DeferredRegistrationStart()
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
 ; A tray clicked while the keyboard was registering opens now, from a timer, and
@@ -1754,6 +1761,8 @@ global _PENDING_KEYBOARD_HKL := 0
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
+; Sees a keyboard-layout registry change at once and runs the poll's capture.
+#Include modules/keymap/layout_registry_watch.ahk
 ; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
 #Include modules/keymap/pause_layout_switch.ahk
 #Include modules/keymap/system_layout_install.ahk
@@ -1801,3 +1810,5 @@ CheckKeyboardLayoutChange() {
 }
 AltGrFamilyStartFollowing()
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)
+; The poll stays the backstop; the watch captures a registry change at once.
+LayoutRegistryWatch_Start(CheckKeyboardLayoutChange)

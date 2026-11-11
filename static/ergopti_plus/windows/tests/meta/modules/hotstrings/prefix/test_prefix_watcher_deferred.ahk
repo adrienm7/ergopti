@@ -8,14 +8,12 @@
 ;
 ; WHY THIS MATTERS (the regression this encodes):
 ;   HotstringPrefixWatcherInit used to rescan every category TOML synchronously at
-;   boot. It now starts the InputHook with an EMPTY index; a SINGLE off-path pass
-;   builds it — at the END of RegisterEmojisSymbolsDeferred, after the emoji/symbol
-;   HSE sections register. By then HotstringsResolve is memoised for every section and
-;   the boot has settled, so the rebuild is reliably ~220 ms. (An earlier "warm-up"
-;   SetTimer also built it, but it fired during peak boot contention before
-;   HotstringsResolve was warm, giving erratic 250 ms–6 s timings, so it was removed.)
-;   If a future edit moves the build back into init, time-to-ready regresses ~200 ms;
-;   if the deferred build is dropped, the live preview never appears. Both are caught.
+;   boot. It now starts the InputHook with an EMPTY index, and ONE build fills it
+;   from the in-memory cache after the hotstring registration, before ready. The
+;   cache, not the registry, is its source, so the emoji/symbol rows that register
+;   in slices after ready are already in it and their slices do not rebuild it.
+;   If a future edit moves the build back into init, or makes the slices rebuild
+;   it, the cost returns to the boot or the first seconds after it.
 ;
 ; SCOPE: source introspection of the watcher + hotstrings modules (not loaded by
 ;   the headless runner). Timer ordering is enforced by test_boot_deferred_tasks.
@@ -40,19 +38,21 @@ _MetaCheckPrefixWatcherDeferred() {
 	Assert(InStr(WBody, "index build deferred off the boot path"),
 		"HotstringPrefixWatcherInit must defer the trigger-index build off the boot critical path")
 
-	; The SINGLE index build happens at the END of the deferred emoji/symbol pass:
-	; RegisterEmojisSymbolsDeferred registers the HSE sections, THEN rebuilds the prefix
-	; index once. By then HotstringsResolve is memoised for every section and the boot
-	; has settled, so the rebuild is reliably ~220 ms (the earlier warm-up SetTimer, which
-	; ran during peak contention with erratic 250 ms–6 s timings, was removed). Body-scoped
-	; so an unrelated rebuild call elsewhere in modules/ cannot satisfy or trip the check.
+	; The index is built ONCE at boot, after the synchronous registration and before
+	; ready (test_hotstrings_ready_contract pins the position). It reads the bundled
+	; cache and the feature switches, never the registry, so the emoji/symbol rows
+	; that register in slices after ready are already in it: the slices must not
+	; rebuild it again. Body-scoped so an unrelated rebuild call elsewhere in modules/
+	; cannot satisfy or trip the check.
 	DeferBody := _DriverFuncBody("RegisterEmojisSymbolsDeferred")
 	Assert(DeferBody != "", "hotstrings.ahk must define RegisterEmojisSymbolsDeferred()")
-	Assert(InStr(DeferBody, "_RegisterEmojisSymbolsSections"),
-		"RegisterEmojisSymbolsDeferred must register the emoji/symbol HSE sections")
-	Assert(InStr(DeferBody, "HotstringPrefixWatcherRebuildIndex"),
-		"RegisterEmojisSymbolsDeferred must build the prefix index once (after the HSE "
-		. "sections register and the boot settles) — the single, reliably-fast index build")
+	Assert(InStr(DeferBody, "_EmojisSymbolsSections()"),
+		"RegisterEmojisSymbolsDeferred must walk the emoji/symbol section list the inline load walks")
+	Assert(!InStr(DeferBody, "HotstringPrefixWatcherRebuildIndex"),
+		"the deferred emoji/symbol rows are already in the cache-built index; a second build is wasted work")
+	CacheIndex := _DriverFuncBody("_RegisterCategoryTriggersFromCache")
+	Assert(InStr(CacheIndex, "_HS_CACHE_ROWS") and !InStr(CacheIndex, "HSE_RegistryByGroup"),
+		"the cache-built index must not depend on which rows the registry holds yet")
 }
 
 Test("meta prefix-watcher: trigger index built off the boot critical path",

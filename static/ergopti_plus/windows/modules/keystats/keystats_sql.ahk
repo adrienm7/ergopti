@@ -13,6 +13,7 @@
 ; ==============================================================================
 
 #Include keystats_hotstring_units.ahk
+#Include keystats_local_time.ahk
 #Include ../../_generated/keystats_queries.ahk
 
 ; Only INSERT statements are emitted from AHK. They go straight into
@@ -97,13 +98,25 @@ KL_BuildInsertTyping(e, id) {
     return KeystatsQuery("events.typing", Slots)
 }
 
-; The four columns every event shares, for a catalogue statement's typed slots.
+; The time columns of a journal entry: the journal stamps local time, a row
+; stores its UTC instant and the offset in force then, and its date stays the
+; local day (maintainer decision KMD-1, keystats_local_time.ahk).
+; @param e {Map} Journal entry.
+; @returns {Map} ts (UTC), date (local day) and utc_offset_min.
+KL_EventTime(e) {
+    LocalTs := String(e["timestamp"])
+    Instant := KL_TimestampFromLocal(LocalTs)
+    return Map("ts", Instant["ts"], "date", SubStr(LocalTs, 1, 10), "utc_offset_min", Instant["utc_offset_min"])
+}
+
+; The columns every event shares, for a catalogue statement's typed slots.
 ; @param e {Map} Journal entry.
 ; @param id {Integer} Stable event id.
 ; @returns {Map} Slot values, extended by the caller.
 KL_EventSlots(e, id) {
-    ts := String(e["timestamp"])
-    return Map("device_id", Keystats.device_id, "id", id, "ts", ts, "date", SubStr(ts, 1, 10))
+    Time := KL_EventTime(e)
+    return Map("device_id", Keystats.device_id, "id", id, "ts", Time["ts"], "date", Time["date"],
+        "utc_offset_min", Time["utc_offset_min"])
 }
 
 ; An empty text is an absent value: a nullable slot renders it as NULL.
@@ -275,127 +288,60 @@ KL_BuildInserts(entry) {
     return []
 }
 
-KL_BuildInsertWindowTopoEvent(e, id) {
-    ts   := e["timestamp"]
-    EventType := e["type"]
+; One row of a raw table shaped (kind, app, meta_json): every entry field but
+; the excluded ones goes into meta_json.
+; @param Table {String} The events_* table.
+; @param Kind {String} The row's kind.
+; @param e {Map} Journal entry.
+; @param id {Integer} Stable event id.
+; @param Excluded {Array} Entry fields kept out of meta_json.
+; @returns {String} One INSERT OR IGNORE statement.
+KL_BuildInsertKindRow(Table, Kind, e, id, Excluded) {
     meta := Map()
     for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "app")
+        Kept := true
+        for Name in Excluded
+            if (k = Name)
+                Kept := false
+        if Kept
             meta[k] := v
     }
+    Time := KL_EventTime(e)
     return Format(
-        "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(EventType),
+        "INSERT OR IGNORE INTO {1} (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ({2}, {3}, {4}, {5}, {6}, {7}, {8}, {9});",
+        Table, Keystats._device_id_lit, id,
+        KL_SqlStr(Time["ts"]), KL_SqlStr(Time["date"]),
+        KL_SqlStr(Kind),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
+        KL_SqlJson(meta),
+        Time["utc_offset_min"]
     )
+}
+
+KL_BuildInsertWindowTopoEvent(e, id) {
+    return KL_BuildInsertKindRow("events_window_topo", e["type"], e, id, ["type", "timestamp", "app"])
 }
 
 KL_BuildInsertErgoEvent(e, id) {
-    ts   := e["timestamp"]
-    meta := Map()
-    for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "kind" && k != "app")
-            meta[k] := v
-    }
-    return Format(
-        "INSERT OR IGNORE INTO events_ergo (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(KL_GetMap(e, "kind", "")),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
-    )
+    return KL_BuildInsertKindRow("events_ergo", KL_GetMap(e, "kind", ""), e, id, ["type", "timestamp", "kind", "app"])
 }
 
 KL_BuildInsertMouseEvent(e, id) {
-    ts   := e["timestamp"]
-    EventType := e["type"]
-    meta := Map()
-    for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "app")
-            meta[k] := v
-    }
-    return Format(
-        "INSERT OR IGNORE INTO events_mouse (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(EventType),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
-    )
+    return KL_BuildInsertKindRow("events_mouse", e["type"], e, id, ["type", "timestamp", "app"])
 }
 
 KL_BuildInsertAvEvent(e, id) {
-    ts   := e["timestamp"]
-    EventType := e["type"]
-    meta := Map()
-    for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "app")
-            meta[k] := v
-    }
-    return Format(
-        "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(EventType),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
-    )
+    return KL_BuildInsertKindRow("events_av", e["type"], e, id, ["type", "timestamp", "app"])
 }
 
 KL_BuildInsertNetworkEvent(e, id) {
-    ts   := e["timestamp"]
-    EventType := e["type"]
-    meta := Map()
-    for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "app")
-            meta[k] := v
-    }
-    return Format(
-        "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(EventType),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
-    )
+    return KL_BuildInsertKindRow("events_network", e["type"], e, id, ["type", "timestamp", "app"])
 }
 
 KL_BuildInsertClipboardEvent(e, id) {
-    ts   := e["timestamp"]
-    EventType := e["type"]
-    meta := Map()
-    for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "app")
-            meta[k] := v
-    }
-    return Format(
-        "INSERT OR IGNORE INTO events_clipboard (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(EventType),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
-    )
+    return KL_BuildInsertKindRow("events_clipboard", e["type"], e, id, ["type", "timestamp", "app"])
 }
 
 KL_BuildInsertRoiEvent(e, id) {
-    ts   := e["timestamp"]
-    EventType := e["type"]
-    meta := Map()
-    for k, v in e {
-        if (k != "type" && k != "timestamp" && k != "app")
-            meta[k] := v
-    }
-    return Format(
-        "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(EventType),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlJson(meta)
-    )
+    return KL_BuildInsertKindRow("events_roi", e["type"], e, id, ["type", "timestamp", "app"])
 }

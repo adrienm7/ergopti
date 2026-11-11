@@ -154,6 +154,7 @@ assert.ok(
 const { fromKlc } = require('../lib/kbd-dll/klc.cjs');
 const KbdSource = require('../lib/kbd-dll/source.cjs');
 const { buildDlls, toolchainAvailable } = require('../lib/kbd-dll/build.cjs');
+const PeWriter = require('../lib/kbd-dll/pe-writer.cjs');
 const { readDll } = require('../lib/kbd-dll/reader.cjs');
 const { compareLayout } = require('../lib/kbd-dll/compare.cjs');
 
@@ -191,6 +192,14 @@ function provenDlls(model, label) {
 			compareLayout(model, readDll(bytes).layout),
 			[],
 			`${label} ${arch} reads back as its tables`
+		);
+	// The compiler-free writer gives the same tables (test-kbd-dll.cjs proves the rest).
+	const written = PeWriter.writeDlls(model);
+	for (const [arch, bytes] of Object.entries(written))
+		assert.deepEqual(
+			readDll(bytes, { trace: true }).trace,
+			readDll(dlls[arch], { trace: true }).trace,
+			`${label} ${arch}: the compiler-free image holds clang's tables`
 		);
 	return dlls;
 }

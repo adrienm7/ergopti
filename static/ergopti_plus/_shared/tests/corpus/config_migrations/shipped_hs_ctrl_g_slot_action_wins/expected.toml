@@ -1,7 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_slot_action_wins/expected.toml
-
-[_meta]
-schema_version = 20
-
-[shortcuts.keyboard]
-secondary_g = "paste_plain"

@@ -37,7 +37,10 @@ _CTWP_NativeReadCustodyTick(State) {
 			return
 		}
 	} catch as Err {
-		State.failure := Err.Message
+		; The caught state is the verdict: an Error with an empty message is
+		; still an observer failure, and the message alone read it as none.
+		State.failed := true
+		State.failure := Type(Err) . ": " . Err.Message
 		State.active := false
 	}
 }
@@ -277,7 +280,7 @@ _CTWP_NativeReadTemporalCustody() {
 		for Mode in ["control", "hash", "port"] {
 			_TestPrint("# acquired-read timer custody mode " . Mode)
 			State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode,
-				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: "",
+				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failed: false, failure: "",
 				restoreErrors: []}
 			State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
 				: ((*) => (State.observerCalls += 1, Digest))
@@ -299,7 +302,7 @@ _CTWP_NativeReadTemporalCustody() {
 				}
 			}
 			Restore()
-			AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
+			AssertFalse(State.failed, "actual timer observer failure is retained rather than swallowed: " . State.failure)
 			AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
 			Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
 			AssertEqual(0, State.timerCritical, "the original native read remains interruptible")
@@ -363,7 +366,10 @@ _CTWP_GuardedReadCustodyTick(State) {
 			return
 		}
 	} catch as Err {
-		State.failure := Err.Message
+		; The caught state is the verdict: an Error with an empty message is
+		; still an observer failure, and the message alone read it as none.
+		State.failed := true
+		State.failure := Type(Err) . ": " . Err.Message
 		State.active := false
 	}
 }
@@ -432,7 +438,7 @@ _CTWP_GuardedReadTemporalCustody() {
 			default: TargetCallback := false
 			}
 			State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode, callback: TargetCallback,
-				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: "",
+				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failed: false, failure: "",
 				restoreErrors: []}
 			State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
 				: ((*) => (State.observerCalls += 1, Mode == "hash" ? Digest : 1))
@@ -468,7 +474,7 @@ _CTWP_GuardedReadTemporalCustody() {
 					AssertThrows(() => Captured.port["hash"].Call(NewSource))
 			}
 			Restore()
-			AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
+			AssertFalse(State.failed, "actual timer observer failure is retained rather than swallowed: " . State.failure)
 			AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
 			Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
 			AssertEqual(0, State.timerCritical, "the original native read remains interruptible")

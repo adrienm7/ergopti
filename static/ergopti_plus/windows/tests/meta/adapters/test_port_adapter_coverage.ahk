@@ -230,10 +230,12 @@ _MetaCheckSharedPurity(SharedDir := unset) {
 	}
 	if !(SharedDir is String) || SharedDir == "" || !DirExist(SharedDir)
 		throw ValueError("The shared purity census requires an existing directory.")
-	; ``\bhs\.`` (word boundary) so the Hammerspoon global is matched but not the
-	; "hs." inside ordinary words like "months." — the looser ``hs\.`` produced
-	; false positives that forced this gate to stay warn-only.
-	ForbiddenPatterns := ["io\.open", "\bhs\.", "SendInput", "SendEvent", "TrayTip", "FileAppend", "FileRead"]
+	; ``(?<![\w.-])hs\.`` so the Hammerspoon global is matched but not the "hs."
+	; inside ordinary words like "months." nor in a file name such as
+	; "codegen-hid-key-identity-hs.cjs" (a generated table's description): the
+	; looser ``hs\.`` produced false positives that forced this gate to stay
+	; warn-only.
+	ForbiddenPatterns := ["io\.open", "(?<![\w.-])hs\.", "SendInput", "SendEvent", "TrayTip", "FileAppend", "FileRead"]
 
 	SharedFiles := _MetaPACListFiles(SharedDir, "js")
 	Violations  := 0

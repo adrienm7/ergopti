@@ -830,6 +830,8 @@ function M.build(ctx)
 		return true
 	end
 	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
+	-- « Create or edit a layout… » opens the same window straight on the layout editor.
+	render_ctx.commands[require("config_keys").COMMAND.OPEN_LAYOUT_EDITOR] = LayoutManagerWindow.editor_menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end

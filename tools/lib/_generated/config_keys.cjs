@@ -494,6 +494,7 @@ module.exports = Object.freeze({
 		NUMBER_ROW_EDGES: "number_row_edges",
 		NUMBER_ROW_MODE: "number_row_mode",
 		OPEN_ERROR_LOG: "open_error_log",
+		OPEN_LAYOUT_EDITOR: "open_layout_editor",
 		OPEN_LOGS: "open_logs",
 		OPEN_TODAY_LOG: "open_today_log",
 		OPEN_USER_HOTSTRING_SOURCE: "open_user_hotstring_source",
