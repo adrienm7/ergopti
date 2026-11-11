@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Копіювати шлях",
 	"dialog.personal_info.save_failed": "Не вдалося зберегти особисті дані. Редактор залишено відкритим, щоб ви могли повторити спробу.",
 	"dialog.personal_info.save_failed_title": "Не вдалося зберегти",
-	"dialog.personal_info.saved": "Дані оновлено:",
 	"dialog.personal_info.title": "Змінити особисті дані",
 	"dialog.reset_defaults.failed": "Не вдалося скинути налаштування.\n\nПричина: {1}",
 	"dialog.reset_defaults.failed_title": "Помилка скидання",

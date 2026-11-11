@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Копировать путь",
 	"dialog.personal_info.save_failed": "Не удалось сохранить личные данные. Редактор оставлен открытым, чтобы вы могли повторить попытку.",
 	"dialog.personal_info.save_failed_title": "Не удалось сохранить",
-	"dialog.personal_info.saved": "Данные обновлены:",
 	"dialog.personal_info.title": "Изменить личные данные",
 	"dialog.reset_defaults.failed": "Сброс не выполнен.\n\nПричина: {1}",
 	"dialog.reset_defaults.failed_title": "Сбой сброса",

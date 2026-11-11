@@ -64,3 +64,6 @@ _PEWO_Case(Surface, OpenFn, StateFn) {
 
 Test("Personal hotstrings editor: an absent WebView2 shows the required message and builds no native Gui (personal-editors-webview-only)",
 	_PEWO_Case.Bind("personal hotstrings editor", () => OpenPersonalEditor("alpha"), () => IsObject(_HsEdWeb_Gui)))
+
+Test("Personal information editor: an absent WebView2 shows the required message and builds no native Gui (personal-editors-webview-only)",
+	_PEWO_Case.Bind("personal information editor", () => PersonalInformationEditor(), () => IsObject(_PiEdWeb_Gui)))

@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Kopírovat cestu",
 	"dialog.personal_info.save_failed": "Vaše osobní údaje se nepodařilo uložit. Editor zůstal otevřený, abyste to mohli zkusit znovu.",
 	"dialog.personal_info.save_failed_title": "Uložení se nezdařilo",
-	"dialog.personal_info.saved": "Aktualizované údaje:",
 	"dialog.personal_info.title": "Upravit osobní údaje",
 	"dialog.reset_defaults.failed": "Obnovení se nezdařilo.\n\nDůvod: {1}",
 	"dialog.reset_defaults.failed_title": "Obnovení se nezdařilo",

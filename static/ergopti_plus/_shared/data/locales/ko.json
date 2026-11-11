@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "경로 복사",
 	"dialog.personal_info.save_failed": "개인 정보를 저장할 수 없습니다. 다시 시도할 수 있도록 편집기를 열어 두었습니다.",
 	"dialog.personal_info.save_failed_title": "저장 실패",
-	"dialog.personal_info.saved": "업데이트된 정보:",
 	"dialog.personal_info.title": "개인 정보 편집",
 	"dialog.reset_defaults.failed": "초기화에 실패했습니다.\n\n이유: {1}",
 	"dialog.reset_defaults.failed_title": "초기화 실패",

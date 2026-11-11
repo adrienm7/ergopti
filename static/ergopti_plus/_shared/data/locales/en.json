@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Copy path",
 	"dialog.personal_info.save_failed": "Your personal information could not be saved. The editor has been kept open so you can try again.",
 	"dialog.personal_info.save_failed_title": "Save failed",
-	"dialog.personal_info.saved": "Updated details:",
 	"dialog.personal_info.title": "Edit personal details",
 	"dialog.reset_defaults.failed": "Reset failed.\n\nReason: {1}",
 	"dialog.reset_defaults.failed_title": "Reset failed",

@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Pad kopiëren",
 	"dialog.personal_info.save_failed": "Uw persoonlijke gegevens konden niet worden opgeslagen. De editor is opengebleven zodat u het opnieuw kunt proberen.",
 	"dialog.personal_info.save_failed_title": "Opslaan mislukt",
-	"dialog.personal_info.saved": "Bijgewerkte gegevens:",
 	"dialog.personal_info.title": "Persoonlijke gegevens bewerken",
 	"dialog.reset_defaults.failed": "Opnieuw instellen mislukt.\n\nReden: {1}",
 	"dialog.reset_defaults.failed_title": "Opnieuw instellen mislukt",

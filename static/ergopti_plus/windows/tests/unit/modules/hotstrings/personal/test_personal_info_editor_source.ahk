@@ -40,10 +40,6 @@ _PIES_Reload(Receipt, *) {
 	return true
 }
 
-_PIES_Confirm(Receipt, *) {
-	Receipt["confirm"] += 1
-}
-
 _PIES_Run(Surface, Mode, Path, State) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 	global HSE_RuntimeDecisionGeneration
@@ -55,15 +51,7 @@ _PIES_Run(Surface, Mode, Path, State) {
 	AssertTrue(_ReadPersonalInfoTomlCache is Map, "the actual loader must retain model A")
 	LoadedInformation := PersonalInformation, LoadedLetters := PersonalInformationLetters
 	Generation := HSE_RuntimeDecisionGeneration
-	Values := Surface == "web" ? _PIES_WebValues() : PersonalInformation.Clone()
-	if Surface == "native" {
-		State.Gui := Gui("+ToolWindow", "Private personal information source")
-		State.Hwnd := State.Gui.Hwnd
-		Edits := Map()
-		for Key, Value in Values
-			Edits[Key] := State.Gui.Add("Edit", "w160", Value)
-		AssertTrue(DllCall("IsWindow", "Ptr", State.Hwnd, "Int"))
-	}
+	Values := _PIES_WebValues()
 
 	; Neither the loader cache nor the already rendered form sees this edit.
 	if Mode != "live"
@@ -76,15 +64,8 @@ _PIES_Run(Surface, Mode, Path, State) {
 	AssertEqual("Original", _ReadPersonalInfoTomlCache["info"]["last_name"])
 	Values["first_name"] := "Edited"
 	Receipt := Map("notify", 0, "reload", 0, "confirm", 0)
-	if Surface == "native" {
-		Edits["first_name"].Text := Values["first_name"]
-		AssertEqual("Original", Edits["last_name"].Text,
-			"only the first field is edited in the real native controls")
-		Result := ProcessUserInput(State.Gui, Edits, 0, 0, 0, 0,
-			_PIES_Notify.Bind(Receipt), _PIES_Reload.Bind(Receipt), _PIES_Confirm.Bind(Receipt))
-	} else
-		Result := _PiEdWeb_Save(Values, 0, 0, 0, 0,
-			_PIES_Notify.Bind(Receipt), _PIES_Reload.Bind(Receipt))
+	Result := _PiEdWeb_Save(Values, 0, 0, 0, 0,
+		_PIES_Notify.Bind(Receipt), _PIES_Reload.Bind(Receipt))
 
 	if Mode != "live" {
 		; This business oracle precedes the Boolean: the old code overwrites B
@@ -101,9 +82,6 @@ _PIES_Run(Surface, Mode, Path, State) {
 		AssertEqual(1, Receipt["notify"])
 		AssertEqual(0, Receipt["reload"])
 		AssertEqual(0, Receipt["confirm"])
-		if Surface == "native"
-			AssertTrue(DllCall("IsWindow", "Ptr", State.Hwnd, "Int"),
-				"a refused save must retain the real editor controls")
 	} else {
 		AssertTrue(Result is Integer && Result == 1)
 		AssertEqual("Edited", PersonalInformation["first_name"])
@@ -111,10 +89,7 @@ _PIES_Run(Surface, Mode, Path, State) {
 		AssertEqual("first_name", PersonalInformationLetters["p"])
 		AssertEqual(1, Receipt["reload"])
 		AssertEqual(0, Receipt["notify"])
-		AssertEqual(Surface == "native" ? 1 : 0, Receipt["confirm"])
-		if Surface == "native"
-			AssertFalse(DllCall("IsWindow", "Ptr", State.Hwnd, "Int"),
-				"a successful native save retires its own real controls")
+		AssertEqual(0, Receipt["confirm"])
 	}
 	Stages := 0
 	loop files, Path . ".*.tmp"
@@ -192,7 +167,7 @@ _PIES_Case(Surface, Mode) {
 		throw CleanupError
 }
 
-for _PIES_Surface in ["native", "web"]
-	for _PIES_Mode in ["last", "letters", "live"]
-		Test("personal info editor source: " . _PIES_Surface . " " . _PIES_Mode
-			. " (personal-info-editor-source)", _PIES_Case.Bind(_PIES_Surface, _PIES_Mode))
+; The WebView editor is the only personal-information editor on Windows.
+for _PIES_Mode in ["last", "letters", "live"]
+	Test("personal info editor source: web " . _PIES_Mode
+		. " (personal-info-editor-source)", _PIES_Case.Bind("web", _PIES_Mode))

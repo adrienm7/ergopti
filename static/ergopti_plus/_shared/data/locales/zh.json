@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "复制路径",
 	"dialog.personal_info.save_failed": "无法保存您的个人信息。编辑器将保持打开，以便您重试。",
 	"dialog.personal_info.save_failed_title": "保存失败",
-	"dialog.personal_info.saved": "已更新信息：",
 	"dialog.personal_info.title": "编辑个人信息",
 	"dialog.reset_defaults.failed": "重置失败。\n\n原因：{1}",
 	"dialog.reset_defaults.failed_title": "重置失败",

@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "העתק נתיב",
 	"dialog.personal_info.save_failed": "לא ניתן היה לשמור את המידע האישי שלך. העורך נשאר פתוח כדי שתוכל לנסות שוב.",
 	"dialog.personal_info.save_failed_title": "השמירה נכשלה",
-	"dialog.personal_info.saved": "פרטים מעודכנים:",
 	"dialog.personal_info.title": "ערוך פרטים אישיים",
 	"dialog.reset_defaults.failed": "האיפוס נכשל.\n\nסיבה: {1}",
 	"dialog.reset_defaults.failed_title": "האיפוס נכשל",

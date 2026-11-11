@@ -700,7 +700,6 @@
 	"dialog.path_copy.title": "Yolu kopyala",
 	"dialog.personal_info.save_failed": "Kişisel bilgileriniz kaydedilemedi. Yeniden deneyebilmeniz için düzenleyici açık bırakıldı.",
 	"dialog.personal_info.save_failed_title": "Kaydetme başarısız",
-	"dialog.personal_info.saved": "Güncellenen bilgiler:",
 	"dialog.personal_info.title": "Kişisel bilgileri düzenle",
 	"dialog.reset_defaults.failed": "Sıfırlama başarısız oldu.\n\nNeden: {1}",
 	"dialog.reset_defaults.failed_title": "Sıfırlama başarısız",
