@@ -27,6 +27,7 @@ local Manifest         = require("infra.manifest_reader")
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
+local RefreshScope  = require("ui.menu.refresh_scope")
 local QuitAdmission = require("quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
@@ -235,6 +236,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- then re-push the static menu (coalesced) instead of rebuilding per click.
 	local _menu_primed       = false
 	local _menu_refresh_timer = nil
+	-- How much of the tree the pending refresh rebuilds: one branch when only
+	-- clicks in that branch asked for it, else everything (ui.menu.refresh_scope).
+	local _refresh_scope     = RefreshScope.new()
 	-- Forward declarations so updateMenu (assigned below) can schedule a refresh
 	-- whose implementation is defined further down.
 	local schedule_menu_refresh
@@ -266,6 +270,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				i18n.get("menu.reload_replay.lost"), "warning")
 		end,
 		now = os.time,
+		around_click = function(path, run)
+			local previous = _refresh_scope.enter_click(Builder.branch_local_refresh_of(path[1]))
+			local results = table.pack(pcall(run))
+			_refresh_scope.leave_click(previous)
+			if not results[1] then error(results[2], 0) end
+			return table.unpack(results, 2, results.n)
+		end,
 	})
 	M._click_gate = click_gate
 	click_gate.inherit()
@@ -1669,6 +1680,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			and type(core_mods.shortcuts_mod.set_extras) == "function" then
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
+		_refresh_scope.request()
 		_menu_dirty = true
 		-- After priming, the menu is static (no per-click callback to lazily
 		-- rebuild), so a state change must actively re-push the tree. Coalesced so
@@ -1711,12 +1723,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return " Slowest: " .. table.concat(parts, ", ") .. "."
 	end
 
-	local function rebuild_menu_cache()
+	--- @param only_branch string|nil The one top-level branch to rebuild; nil rebuilds all.
+	local function rebuild_menu_cache(only_branch)
 		require("ui.menu.start_at_login").request("status", function()
 			if type(updateMenu) == "function" then updateMenu() end
 		end)
 		local t0 = hs.timer.secondsSinceEpoch()
-		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
+		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions, { only_branch = only_branch })
 		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000
 		if ok_b and type(items) == "table" then
 			click_gate.wrap(items)
@@ -1733,7 +1746,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
-			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
+			PhaseStats.add(only_branch and "menu.rebuild_branch" or "menu.rebuild", elapsed_ms * 1e6)
+			if only_branch then Logger.debug(LOG, "Menu refresh rebuilt the '%s' branch alone.", only_branch) end
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
 				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
 			require("perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
@@ -1770,7 +1784,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		ctx.paused = core_mods.shortcuts_mod
 			and type(core_mods.shortcuts_mod.is_paused) == "function"
 			and core_mods.shortcuts_mod.is_paused() or false
-		rebuild_menu_cache()
+		local scope = _refresh_scope.take()
+		rebuild_menu_cache(scope ~= RefreshScope.ALL and scope or nil)
 	end
 	schedule_menu_refresh = function()
 		PhaseStats.count("menu.refresh_requested")

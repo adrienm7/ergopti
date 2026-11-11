@@ -665,7 +665,16 @@ three-OS CI is green on the final source. See the handoff above for the current 
       tree 125 → 1.2 ms, a toggle 118 → 1.0 ms, RSS 137 → 122 MB, headless SNI host; the shared Lua tree build,
       about 78 ms, is unchanged); macOS `menu_keyboard_layout.sources`
       re-reads the bundle variants from disk per rebuild (57-415 ms spikes) and needs a proven cache contract;
-      hs.menubar has no per-row update, so a macOS toggle still rebuilds the root.
+      hs.menubar has no per-row update, so a macOS toggle still re-pushes the root, but since 11 November its Lua
+      build is bounded: a refresh asked only by clicks in one branch (`ui/menu/refresh_scope.lua`, through the click
+      gate's `around_click`) rebuilds that branch's rows and reuses the last build's rows for the others; a pause flip,
+      a request from outside a click, two branches, or a branch whose choices reach the whole tray (layout, AI,
+      agent, configuration, language, about) still rebuilds everything (`BRANCH_LOCAL_REFRESH` in
+      `ui/menu/builder.lua`). Real-module tray harness (median of 15 builds, 1,531 rows): full tree 20.1 ms and 2.77 MB
+      allocated, one branch 4.3-11.8 ms and 0.14-1.38 MB (gestures the largest); tests `(menu-branch-refresh)` in
+      `test_tray_every_submenu_populated`, `test_menu_refresh_scope`, `(menu-click-scope)`. Not timed on a Mac (the
+      next field report's `menu.rebuild_branch` phase); the branch list was decided by the coordinator on 2026-11-11
+      overnight, to review by the maintainer.
       macOS, 6 November (wave 3): no cache: the build was repeating work with one answer. Both Keyboard Layouts
       scopes were listed up to four times per rebuild (input-source map, active version, bundles stage, version
       row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
