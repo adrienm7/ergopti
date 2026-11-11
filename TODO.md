@@ -80,6 +80,7 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       Done (2026-11-11, macOS/Linux/shared/web): the web emulation runs in the unified editor's live preview on the site and in the macOS/Linux layout manager (`LayoutEditorModel.previewTypist` performs the scope's OS table, macOS on the site, with `source_emulation.js`; the composer page compiles compositions, which hold no emulated records). Golden vectors per target: macOS bundle (registry round trips and the fixture golden, plus `test-macos-layout-bundle-plan.cjs` and its native check on a CI Mac, which installs the bundle, registers it with TIS and types the source vectors through UCKeyTranslate), XKB and KLC (`test-layout-source.cjs` golden corpus, byte equality in `test-layout-source-compiler.cjs`), emulation tables and their typing vectors for macOS, Linux and the web (`test-layout-source-emulation.cjs`, Lua replay). The preview's default OS: decided by the coordinator on 2026-11-11, to review by the maintainer.
       Done (2026-11-11, Windows DLL and installer, built on Linux): `npm run kbd-dll -- build <source.toml|file.klc> <dir>` writes the x86, x64, ARM64 and WOW64 DLLs from our own kbd.h tables (clang + lld-link), reads each back with an independent PE/KBDTABLES reader that checks every pointer, size and alignment and compares every key × level × dead key × ligature with the model, and builds the unsigned NSIS installer (KLID a0nn<LCID>, free Layout Id, InstallLayoutOrTip, clean uninstall); `kbd-dll/source.cjs` turns a source into those tables, Kana as KBDKANA on Right Alt (`docs/design/layout-windows-dll.md`). Left: Windows (maintainer): make `windows/ui/layout_manager/keylayout_emulation.ahk` perform the source's emulation table like `source_emulation.lua`, replaying `_shared/tests/corpus/layouts/source/emulation_vectors.json` (the native-hold-layer vector included: a hold reaching a native layer sends its keys with that layer's modifiers); and run the native check of `docs/design/layout-windows-dll.md` « Windows check »: install `bepo-setup.exe` and `kbdergop-setup.exe` on Windows 11 (x64, ARM64 if available), type every level and dead key in a 64-bit and a 32-bit application, use the layout for a day, then Event Viewer → Windows Logs → Application, no « Application Error » naming `ctfmon.exe` or the layout DLL since the install; uninstall and check the `a0nn040c` key, `HKCU\Keyboard Layout\Preload`/`Substitutes` and the System32/SysWOW64 DLL are gone (after a reboot).
       Fidelity (2026-11-11): `static/layouts/sources/bepo.toml` comes from the official `bepo.klc` and gives it back table for table; `static/layouts/sources/ergopti.toml` comes from KbdEdit's macOS export of Ergopti v2.2.2 and compiles back to it (Kana on Option); both build into DLLs that read back exactly (`tools/test/test-layout-sources.cjs`). The `.kbe` files and KbdEdit's `.exe` payloads are encrypted and are not decrypted (decided by the coordinator on 2026-11-11): the maintainer's installed DLLs, when sent, become the stronger golden reference, and the KbdEdit 1.1rc2 chained dead keys (absent from `bepo.klc`) come with them.
+      Also left: Windows (maintainer): sign the four DLLs, the uninstaller and `<dll>-setup.exe` (SHA-256, RFC 3161 timestamp) once SignPath or the release PFX is on, as `docs/design/layout-windows-dll.md` « Signing » describes (unsigned installers meet SmartScreen); and exclude `static/ergopti_plus/_shared/ui/vendor/fengari-web.js` (the site's Lua VM, unused by the drivers) from the Windows bundle in `tools/build/windows_bundle_manifest.json`. Bépo chains: `static/layouts/sources/bepo_1_1rc2.toml`, from the official 1.1rc2 macOS layout, keeps its 115 chained dead keys and its Windows tables carry 110 (`tools/test/test-layout-sources.cjs`); the maintainer's installed 1.1rc2 DLL, when sent, is the Windows golden.
 - [x] **Two uses of one source.** (1) The TOML source generates a standalone installable layout per OS that never
       assumes ErgoptiPlus is installed: it carries as many features as that OS expresses natively (macOS bundle,
       Linux XKB with its extra levels and dead keys, Windows DLL and installer), and the export says what was left
@@ -1378,6 +1379,35 @@ between workers) green alone. All live checks pass, typed by the harness.
       Done 2026-11-11: the variants come from kxkbrc (LayoutList, VariantList), read on both session types, and a
       kxkbrc the daemon disagrees with lists nothing; the middle field is read as the display label. A pause layout
       stored as `x(x)` on X11 before this no longer matches and is refused with its reason until chosen again.
+
+### Linux performance (2026-11-11, branch `claude/ergopti-todo-linux-perf`)
+
+Measured with `tools/bench/linux-session-bench.py` (real daemon, Xvfb session over the kernel model; report in
+`docs/audits/performance/linux/2026_11_11/report.md`). Budgets and the reuse rules below were decided by the
+coordinator on 2026-11-11, to review by the maintainer.
+
+- [x] Tray: the idle wait polls the GLib main context with the input sources (submenu re-open 26 → 3.5 ms, root
+      15–17 → 3–4 ms, every submenu's first open 300 → 116 ms).
+- [x] Typing an expansion: the per-press layout proof reuses the keymap text between XKB keymap notifications
+      (probe read 0.83 → 0.16 ms, about 1.1 → 0.45 ms per typed character).
+- [x] Boot: the second pre-grab layout resolve is skipped when the X11 source proves the first still current
+      (watchers stage 63 → 12 ms); Wayland and `--keymap` still resolve twice.
+- [x] First key: the shortcut assignments load on the loop's first idle tick, not inside the first key's dispatch.
+- [x] Instrumentation: millisecond log timestamps, a `load=` phase and `callbacks`/`watchers` stages in the boot
+      summary, the last counter interval at exit, paired `[Span]` DEBUG lines for `tray.fill`, `layout.switch`,
+      `config.reload`, `hotstring.expand` (macOS mirrors `hotstring.expand`), `input.latency` (kernel stamp to
+      forwarded write). `run_perf_budget_container.py` joins the container proofs.
+- [ ] Startup compile: 126 of about 180 ms before the boot clock is LuaJIT compiling 6.5 MB of source; a precompiled
+      bytecode package needs the maintainer's staleness decision (memory: project-linux-startup-cost-is-compilation).
+- [ ] Keystats boot stage: 60 ms (first boot 200 ms) waiting on the sqlite3 child's round trips, 6 ms of CPU.
+- [ ] The first layout resolve forks `xkbcomp` (about 30 ms) although the X11 probe can serialize the same keymap
+      in 0.6 ms; needs a proof that `infra/xkb_keymap` parses libxkbcommon's serialization.
+- [ ] The 20 ms pause between an expansion's erase and its text blocks the loop (`INTER_PHASE_DELAY_MS`); a timer
+      continuation would free the loop but changes the injector's transaction shape.
+- [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
+      `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
+      millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
+      `input.latency`; a `load` phase before `BootProfiler` starts; the last interval summary at exit.
 
 ## CI acceptance
 
