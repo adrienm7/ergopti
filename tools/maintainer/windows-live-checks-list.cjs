@@ -2154,6 +2154,71 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'personal-priority-and-left',
+		title:
+			'A personal sru -> SRU at priority 100 beats the bundled sru -> sur; a personal {Left} moves the caret',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const bundled = shippedRule('french/autocorrection.toml', 'sru');
+			if (!bundled || !/output = "sur"/.test(bundled.line))
+				return notExecuted('the shipped French autocorrection no longer holds sru -> sur');
+			const toml = [
+				'[category_enabled]',
+				'hotstrings = true',
+				'french_autocorrection = true',
+				`[hotstrings.french_autocorrection.${bundled.section}]`,
+				'enabled = true',
+				'[hotstrings.personal.live]',
+				'enabled = true',
+				'time_activation_seconds = 0',
+				''
+			].join('\n');
+			const problems = [];
+			// Without the personal file the bundled correction fires: the win below is the priority's.
+			const control = await bootEnglish(context, 'bundled', toml);
+			await control.session.run('pump', ['3000']);
+			const alone = await typeInto(control.session, [
+				['text', 'sru'],
+				['key', '{SC039}']
+			]);
+			if (alone !== 'sur ')
+				problems.push(`with no personal rule sru typed "${alone}", "sur " expected`);
+			await control.session.stop();
+
+			const session = context.newSession('personal');
+			session.seed('autohotkey/config.toml', ENGLISH + toml);
+			session.seed(
+				'hotstrings/personal_hotstrings.toml',
+				[
+					'[[live]]',
+					'"sru" = { output = "SRU", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true, priority = 100 }',
+					'"zqpar" = { output = "(){Left}", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }',
+					''
+				].join('\n')
+			);
+			await session.start();
+			await session.run('pump', ['3000']);
+			const won = await typeInto(session, [
+				['text', 'sru'],
+				['key', '{SC039}']
+			]);
+			if (won !== 'SRU ')
+				problems.push(`with the personal rule sru typed "${won}", "SRU " expected`);
+			// The caret is judged by where the next character lands.
+			const caret = await typeInto(session, [
+				['text', 'zqpar'],
+				['wait', '600'],
+				['text', 'X']
+			]);
+			if (caret !== '(X)') problems.push(`zqpar then X typed "${caret}", "(X)" expected`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`bundled alone "${alone}", personal priority 100 "${won}", {Left} "${caret}"`);
+		}
+	},
+	{
 		id: 'gestures-info-row',
 		title: 'Tray > Gestures: exactly one "Info…" row, which opens its explanation',
 		async run(context) {
