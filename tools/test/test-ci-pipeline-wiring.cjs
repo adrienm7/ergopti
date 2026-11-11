@@ -602,6 +602,13 @@ const STEP_CONDITIONS = [
 		'Save the Flatpak runtimes',
 		"steps.flatpak-cache.outputs.cache-hit != 'true'"
 	],
+	// The module cache is saved only when its exact key missed.
+	[
+		LINUX_BOX,
+		'package-linux',
+		'Save the Flatpak module cache',
+		"steps.flatpak-builder-cache.outputs.cache-hit != 'true'"
+	],
 	// Each E2E row saves the Ubuntu archives it used only when the set changed.
 	[LINUX_BOX, 'e2e-linux', 'Name the used Ubuntu archive set', '${{ !cancelled() }}'],
 	[
