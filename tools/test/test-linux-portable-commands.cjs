@@ -463,7 +463,7 @@ const PROGRAMS = {
 	nmcli: optionalTool('network metric'),
 	iwgetid: optionalTool('Wi-Fi metric'),
 	'gnome-extensions': optionalTool('AppIndicator extension on GNOME'),
-	loginctl: optionalTool('logind sessions'),
+	loginctl: optionalTool('logind sessions; the live proof host enables lingering', DRIVER_HOST),
 	tar: why(
 		`the installer probes it and refuses clearly when absent; the archive tests probe it, installed by CI: ${DISTRO_PREP}`,
 		ALL,
@@ -554,6 +554,13 @@ const PROGRAMS = {
 	),
 	// The driver reads /proc instead; the hardware lanes probe procps first.
 	ps: optionalTool('procps process listing of the hardware lanes', HOST),
+	// The live proof host of tests/hardware/run_phys_vm.sh: a QEMU VM reached over ssh.
+	'qemu-system-x86_64': optionalTool('the live proof VM; the runner exits 2 without it', HOST),
+	'qemu-img': optionalTool('the live proof VM disk; the runner exits 2 without it', HOST),
+	'cloud-localds': optionalTool('the live proof VM seed; the runner exits 2 without it', HOST),
+	ssh: optionalTool('the live proof VM console; the runner exits 2 without it', HOST),
+	scp: optionalTool('the live proof VM file copies; the runner exits 2 without it', HOST),
+	'ssh-keygen': optionalTool('the live proof VM key; the runner exits 2 without it', HOST),
 	// The Ubuntu runner image ships iproute2 for the host proof (run_local_servers_container.py).
 	ss: why(
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
@@ -567,7 +574,7 @@ const PROGRAMS = {
 		proof: { file: INSTALLER, token: '\\|\\| echo "dev"' }
 	}),
 	// Package managers: each distribution's own, reached through the detection of install.sh.
-	'apt-get': packageManager('the Debian package manager', DRIVER_TEST),
+	'apt-get': packageManager('the Debian package manager', ALL),
 	'apt-cache': packageManager('the Debian package database', DRIVER_TEST),
 	'dpkg-query': why('the Debian package database, probed by uninstall.sh', DRIVER, {
 		probed: true
