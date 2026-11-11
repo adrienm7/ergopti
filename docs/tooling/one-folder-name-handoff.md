@@ -62,6 +62,14 @@ contract (macOS, Linux) and by
 - A paths.toml whose ConfigDirPath or LogsDirPath named an old default folder
   is rewritten, after its previous text is kept as
   `paths.toml.before-folder-migration` (never replaced).
+- A custom logs folder whose last name is exactly the old folder name (or its
+  application-named subfolder, as the logs owner saves it) becomes the same
+  parent's `Ergopti` (`ergopti` on Linux), and the logs written into its
+  application-named subfolder move there; the user's own entries of the old
+  folder stay, and any other custom folder is kept (decided by the coordinator
+  on 2026-11-11 overnight, to review by the maintainer). macOS rewrites
+  LogsDirPath, Linux the `paths.logs_dir` setting; Windows has not taken the
+  rule yet.
 - Every outcome is logged through the central logger.
 
 Drivers:
