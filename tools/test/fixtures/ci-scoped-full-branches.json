@@ -1109,6 +1109,18 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for The clipboard owner serves every target over the Wayland data-control protocol",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "The clipboard owner serves every target over the Wayland data-control protocol",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"protocol": 10
 		},

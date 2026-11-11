@@ -65,6 +65,8 @@
 			"API keys in a real locked and unlocked keyring",
 			"Install prerequisites for Desktop actions change the real trash, pointer and color scheme",
 			"Desktop actions change the real trash, pointer and color scheme",
+			"Install prerequisites for The clipboard owner serves every target over the Wayland data-control protocol",
+			"The clipboard owner serves every target over the Wayland data-control protocol",
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"Launch the bounded accessibility helper with Lua interpreter options",
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown",
@@ -388,6 +390,9 @@
 		],
 		"Desktop actions change the real trash, pointer and color scheme": [
 			"Install prerequisites for Desktop actions change the real trash, pointer and color scheme"
+		],
+		"The clipboard owner serves every target over the Wayland data-control protocol": [
+			"Install prerequisites for The clipboard owner serves every target over the Wayland data-control protocol"
 		],
 		"The clipboard owner serves every target from a real X server": [
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown"

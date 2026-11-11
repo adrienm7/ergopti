@@ -948,10 +948,11 @@ check(
 			'swift_root_suite'
 		])
 			assert.equal(full.includes(removed), false, removed);
-		// 210: the WebKit reload-signal, GTK privacy owner, AI destination and
-		// clipboard owner receipts, the real keyring proof and the live desktop
-		// actions proof (each with its install step) joined the desktop-webview shard.
-		assert.equal(Scoped.contract.slots.length, 210);
+		// 212: the WebKit reload-signal, GTK privacy owner, AI destination and
+		// clipboard owner receipts, the real keyring proof, the live desktop actions
+		// proof and the Wayland clipboard owner receipt (each with its install step)
+		// joined the desktop-webview shard.
+		assert.equal(Scoped.contract.slots.length, 212);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(
