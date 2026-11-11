@@ -29,8 +29,9 @@ local READER = "adapters.evdev_reader"
 -- Device units per millimetre of the fake pad.
 local UNITS = 10
 
---- The evdev events of a three-finger touch following a path of x offsets.
---- @param path table Offsets in millimetres from the landing point, one frame each.
+--- The evdev events of a three-finger touch following a path of offsets.
+--- @param path table Offsets in millimetres from the landing point, one frame
+---   each: an x offset, or { x, y } for a path that moves vertically too.
 --- @return table events
 local function touch_events(path)
 	local events = {}
@@ -49,9 +50,12 @@ local function touch_events(path)
 	-- The count must hold for the decoder's stable frames before it is the peak.
 	for _ = 1, 4 do push(Decoder.EV_SYN, Decoder.SYN_REPORT, 0) end
 	for _, offset in ipairs(path) do
+		local ox, oy = offset, nil
+		if type(offset) == "table" then ox, oy = offset[1], offset[2] end
 		for index = 0, fingers - 1 do
 			push(Decoder.EV_ABS, Decoder.ABS_MT_SLOT, index)
-			push(Decoder.EV_ABS, Decoder.ABS_MT_POSITION_X, base_x + index * 200 + math.floor(offset * UNITS))
+			push(Decoder.EV_ABS, Decoder.ABS_MT_POSITION_X, base_x + index * 200 + math.floor(ox * UNITS))
+			if oy then push(Decoder.EV_ABS, Decoder.ABS_MT_POSITION_Y, base_y + math.floor(oy * UNITS)) end
 		end
 		push(Decoder.EV_SYN, Decoder.SYN_REPORT, 0)
 	end
@@ -140,6 +144,41 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		-- landing point earn four steps right. Measured from -20 instead, the
 		-- drift before lift-off would count as a reversal.
 		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_next")), 4, "15.5 mm right after the reversal: four steps")
+	end)
+
+	-- A diagonal is counted along its own axis. Signed by dx + dy, the
+	-- right_up / left_down axis was noise: a jitter of a tenth of a millimetre
+	-- across the swipe read as reversals while the fingers kept moving forward
+	-- (GSS-001, diagonal-axis-travel).
+	helpers.it("incremental: right_up earns the steps right_down earns (diagonal-axis-travel)", function()
+		local function diagonal(sy)
+			local points = {}
+			for i = 1, 20 do points[#points + 1] = { 1.5 * i, sy * 1.5 * i + ((i % 2 == 0) and 0.1 or -0.1) } end
+			return points
+		end
+		local down, M = pump({ swipe_3_right_down = "tab_next" }, { swipe_3_right_down = "incremental" },
+			touch_events(diagonal(1)), UNITS)
+		local steps = count(down, M.emit_combo_for("tab_next"))
+		helpers.assert_true(steps >= 8, "the right_down control steps (" .. steps .. ")")
+		local up = pump({ swipe_3_right_up = "tab_next" }, { swipe_3_right_up = "incremental" },
+			touch_events(diagonal(-1)), UNITS)
+		helpers.assert_eq(count(up, M.emit_combo_for("tab_next")), steps, "right_up: the same travel, the same steps")
+	end)
+
+	-- A slow diagonal sits a few frames in the band where the classifier names
+	-- the dominant straight axis; the tracker re-classified each frame and
+	-- restarted its count whenever the name turned diagonal, so it never
+	-- stepped while moving (GSL-001, diagonal-decided-axis).
+	helpers.it("incremental: a slow or drifting diagonal steps while moving (diagonal-decided-axis)", function()
+		local slow, drift = {}, {}
+		for i = 1, 40 do slow[#slow + 1] = { 0.4 * i, -0.4 * i } end
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		for label, points in pairs({ slow = slow, drift = drift }) do
+			local pressed, M = pump({ swipe_3_right_up = "tab_next", swipe_3_right = "tab_prev" },
+				{ swipe_3_right_up = "incremental", swipe_3_right = "incremental" }, touch_events(points), UNITS)
+			helpers.assert_true(count(pressed, M.emit_combo_for("tab_next")) >= 4, label .. ": right_up steps")
+			helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 0, label .. ": never the straight slot")
+		end
 	end)
 
 	helpers.it("incremental: the sensitivity sets the step, within the shared range", function()

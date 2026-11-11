@@ -116,6 +116,12 @@ function M.new(active)
 		return false
 	end
 
+	--- Whether a button is held, or still settling.
+	--- @return boolean
+	function owner.holding()
+		return next(states) ~= nil
+	end
+
 	--- Retires DOWN helpers before admitting their compensating UP helpers.
 	function owner.release_all()
 		epoch = epoch + 1
