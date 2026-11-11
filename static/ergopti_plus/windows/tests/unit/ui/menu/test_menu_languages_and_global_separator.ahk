@@ -127,6 +127,51 @@ _MLG_ConfigurationRowsInOrder() {
 Test("menu layout: the Configuration rows rewrite first, then open windows (menu-configuration)",
 	_MLG_ConfigurationRowsInOrder)
 
+; Runs Body under one shipped locale, then restores the translation cache.
+_MLG_WithLocale(Code, Body) {
+	global _SharedDir, _I18nCache, _I18nCacheLoaded
+	HadCache := IsSet(_I18nCache), OldCache := HadCache ? _I18nCache : false
+	HadLoaded := IsSet(_I18nCacheLoaded), OldLoaded := HadLoaded ? _I18nCacheLoaded : false
+	try {
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCacheLoaded := true
+		Body.Call()
+	} finally {
+		if HadCache
+			_I18nCache := OldCache
+		else
+			_I18nCache := unset
+		if HadLoaded
+			_I18nCacheLoaded := OldLoaded
+		else
+			_I18nCacheLoaded := unset
+	}
+}
+
+; The shared corpus captions the Configuration parent and its rows in English
+; and French ("-" is a separator); the real Windows builder draws them.
+_MLG_ConfigurationCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\configuration_parent.json", "UTF-8"))
+	for _, Code in ["en", "fr"] {
+		AssertTrue(Corpus.Has(Code), "the corpus captions the " . Code . " Configuration parent")
+		_MLG_WithLocale(Code, _MLG_CheckConfigurationCorpus.Bind(Code, Corpus[Code]))
+	}
+}
+
+_MLG_CheckConfigurationCorpus(Code, Expected) {
+	AssertEqual(Expected["parent"], t("menu.configuration.title"), Code . ": the parent caption _MI_StageConfiguration adds")
+	Built := _MI_BuildConfigurationMenu()
+	try {
+		Labels := _MLG_NativeLabels(Built)
+		AssertEqual(Expected["children"].Length, Labels.Length, Code . ": one native row per corpus row")
+		for Position, Caption in Expected["children"]
+			AssertEqual(Caption == "-" ? "" : Caption, Labels[Position], Code . ": Configuration row " . Position)
+	} finally _CTC_ReleaseMenu(Built)
+}
+Test("menu layout: the Configuration parent and rows keep their corpus captions (configuration-parent)",
+	_MLG_ConfigurationCorpus)
+
 ; Versions, Configuration, then Language at the top level, and « Afficher une
 ; fenêtre à chaque erreur » right under « Diagnostic système » in Debug (the
 ; maintainer's requests of 2026-10-02).
