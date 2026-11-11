@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/desktop/run_wayland_sessions.sh
+# tests/hardware/desktop/run_wayland_sessions.sh
 #
 # ==============================================================================
 # MODULE: Headless Wayland Sessions For The Desktop-Change And Focus Proofs
@@ -22,8 +22,8 @@
 # ==============================================================================
 
 set -u
-DRIVER_ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 2
-TESTS="${DRIVER_ROOT}/tests/desktop"
+DRIVER_ROOT="$(cd "$(dirname "$0")/../../.." && pwd -P)" || exit 2
+TESTS="${DRIVER_ROOT}/tests/hardware/desktop"
 missing() { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }
 command -v sway >/dev/null 2>&1 || missing sway
 command -v swaymsg >/dev/null 2>&1 || missing swaymsg

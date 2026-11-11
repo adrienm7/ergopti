@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/desktop/run_encryptor.sh
+# tests/hardware/desktop/run_encryptor.sh
 #
 # ==============================================================================
 # MODULE: Encryptor Container Proof
@@ -13,7 +13,7 @@ set -u
 . "$(dirname "$0")/lib/session.sh"
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-encryptor-XXXXXX")" || exit 2
 desktop_session_run x11-openbox 96 env -u LUA_PATH -u LUA_CPATH \
-	luajit "${DESKTOP_DRIVER_ROOT}/tests/desktop/run_encryptor.lua" "${scratch}" 2>"${scratch}/stderr"
+	luajit "${DESKTOP_DRIVER_ROOT}/tests/hardware/desktop/run_encryptor.lua" "${scratch}" 2>"${scratch}/stderr"
 status=$?
 [ "${status}" -eq 0 ] || grep -vE "fd limit|dbus-daemon|SpiRegistry|libEGL" "${scratch}/stderr" | tail -20 >&2
 rm -rf "${scratch}"

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# tests/desktop/lib/session.sh
+# tests/hardware/desktop/lib/session.sh
 #
 # ==============================================================================
 # MODULE: Headless Desktop Sessions For The Container Proofs
 # DESCRIPTION:
-# Sourced by the tests/desktop launchers. desktop_session_run starts one real
+# Sourced by the tests/hardware/desktop launchers. desktop_session_run starts one real
 # desktop session in a private runtime folder and runs a command inside it,
 # with the daemon's Lua paths, from the driver root:
 #   x11-openbox    Xvfb, a session bus, openbox.
@@ -20,7 +20,7 @@
 # Exit 2 from desktop_session_run means the session could not start.
 # ==============================================================================
 
-DESKTOP_DRIVER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+DESKTOP_DRIVER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
 
 # Runs "$@" inside the named session; prints nothing of its own on success.
 desktop_session_run() {

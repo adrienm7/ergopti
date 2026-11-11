@@ -1,5 +1,5 @@
 # Receipt: update restart watcher, real systemd user manager and terminal relay (2026-11-10)
-# Proof: tests/desktop/run_update_restart_watcher.sh, as root on Ubuntu 24.04 (kernel 6.18.44), base
+# Proof: tests/hardware/desktop/run_update_restart_watcher.sh, as root on Ubuntu 24.04 (kernel 6.18.44), base
 # 6e36ba7249 with the Quit and $-escaping fixes. Real: modules/updater/restarter.lua,
 # infra/updater_boot_ready.lua, infra/quit_request.lua, the watcher shell, systemd --user 255 with the
 # repository unit; the trees and launchers are scratch files.

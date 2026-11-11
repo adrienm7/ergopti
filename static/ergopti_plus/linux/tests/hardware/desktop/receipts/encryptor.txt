@@ -1,5 +1,5 @@
 Applications > Encryptor, container proof (2026-11-10)
-Command: bash tests/desktop/run_encryptor.sh   (exit 0, 13 check(s), 0 failure(s))
+Command: bash tests/hardware/desktop/run_encryptor.sh   (exit 0, 13 check(s), 0 failure(s))
 Host: Ubuntu 24.04 container, Xvfb + openbox 3.6.1, GTK 3.24.41, LuaJIT 2.1, OpenSSL 3.0.
 Started as install/launch.sh starts the daemon: absolute script, no LUA_PATH in the
 environment. Path: ui/bundled_apps.lua rows() Encryptor row -> launch() -> luv spawn of

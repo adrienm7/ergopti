@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/desktop/run_secret_service.sh
+# tests/hardware/desktop/run_secret_service.sh
 #
 # ==============================================================================
 # MODULE: Secret Service Container Proof
@@ -29,9 +29,9 @@ desktop_session_run x11-openbox 95 bash -c '
 	# Creates the login keyring with this password, then locks it.
 	printf "%s" "${password}" | gnome-keyring-daemon --unlock --components=secrets >/dev/null || exit 2
 	lock || { echo "ENVIRONMENT: the login keyring cannot be locked" >&2; exit 2; }
-	luajit tests/desktop/run_secret_service.lua add "${scratch}" "${password}" || exit 1
+	luajit tests/hardware/desktop/run_secret_service.lua add "${scratch}" "${password}" || exit 1
 	lock || exit 1
-	luajit tests/desktop/run_secret_service.lua migrate "${scratch}" "${password}"
+	luajit tests/hardware/desktop/run_secret_service.lua migrate "${scratch}" "${password}"
 ' secret-service "${scratch}" 2>"${scratch}/stderr"
 status=$?
 [ "${status}" -eq 0 ] || grep -vE "fd limit|dbus-daemon|SpiRegistry|libEGL|Activat" "${scratch}/stderr" | tail -20 >&2

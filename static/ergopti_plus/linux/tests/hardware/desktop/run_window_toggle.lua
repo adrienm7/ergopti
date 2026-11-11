@@ -1,4 +1,4 @@
---- tests/desktop/run_window_toggle.lua
+--- tests/hardware/desktop/run_window_toggle.lua
 
 --- ==============================================================================
 --- MODULE: The Ten Window-Toggle Actions On A Real Desktop

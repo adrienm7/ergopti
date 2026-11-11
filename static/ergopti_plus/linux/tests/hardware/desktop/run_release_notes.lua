@@ -1,4 +1,4 @@
---- tests/desktop/run_release_notes.lua
+--- tests/hardware/desktop/run_release_notes.lua
 
 --- ==============================================================================
 --- MODULE: The Update-Check Window's Release Notes Pane (PAR-52), Live

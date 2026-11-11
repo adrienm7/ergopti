@@ -58,11 +58,10 @@
  *
  * SCOPES. A launch is judged where its file runs: "driver" (a user's machine:
  * driver, installer, launcher), "test" (the distribution containers, which hold
- * only the CI image preparation) or "host" (tests/hardware, the container
- * desktop proofs of tests/desktop and the other files that only the Ubuntu
- * runners or a prepared container execute). An entry lists the scopes it is
- * valid for, and
- * a machine-checked proof must back each of them: a file proof this gate reads
+ * only the CI image preparation) or "host" (tests/hardware, its container
+ * desktop proofs under tests/hardware/desktop, and the other files that only the
+ * Ubuntu runners or a prepared container execute). An entry lists the scopes it
+ * is valid for, and a machine-checked proof must back each of them: a file proof this gate reads
  * (an install by CI, a declared dependency, the container entry point of every
  * image), bound to the scopes it covers, or a probe of the program in every file
  * of the probed scopes that launches it, host scripts included. No program
@@ -634,7 +633,7 @@ const PROGRAMS = {
 			proof: { file: CI_LINUX, token: 'sudo unshare --mount' }
 		}
 	),
-	// The headless desktop proofs (tests/desktop) run in a prepared container,
+	// The headless desktop proofs (tests/hardware/desktop) run in a prepared container,
 	// never on CI: each probes these with command -v and exits 2 without them.
 	labwc: packageManager('Wayland compositor of the container desktop proofs', HOST),
 	foot: packageManager('Wayland terminal window of the container desktop proofs', HOST),
@@ -2108,7 +2107,6 @@ const EXCLUDED_DIRS = ['/vendor/', '/_generated/', '/native/'];
 function scopeOf(rel) {
 	if (
 		rel.startsWith(`${LINUX_DIR}/tests/hardware/`) ||
-		rel.startsWith(`${LINUX_DIR}/tests/desktop/`) ||
 		rel === `${LINUX_DIR}/tests/distro/run_in_docker.sh` ||
 		HOST_FILES.has(rel)
 	)

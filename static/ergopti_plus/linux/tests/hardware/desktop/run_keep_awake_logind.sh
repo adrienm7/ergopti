@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# static/ergopti_plus/linux/tests/desktop/run_keep_awake_logind.sh
+# static/ergopti_plus/linux/tests/hardware/desktop/run_keep_awake_logind.sh
 #
 # A real system bus and a real systemd-logind, then run_keep_awake_logind.lua
 # twice: under an X11 session (Xvfb :81 with openbox) and under a Wayland one
@@ -11,7 +11,7 @@
 # Exit 0 = both sessions passed; 1 = a failure; 2 = no environment.
 
 set -u
-cd "$(dirname "$0")/../.." || exit 2
+cd "$(dirname "$0")/../../.." || exit 2
 export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 LOGIND=/usr/lib/systemd/systemd-logind
 need() {
@@ -52,13 +52,13 @@ sleep 1
 DISPLAY=:81 openbox >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
-env -u WAYLAND_DISPLAY DISPLAY=:81 XDG_SESSION_TYPE=x11 luajit tests/desktop/run_keep_awake_logind.lua || STATUS=1
+env -u WAYLAND_DISPLAY DISPLAY=:81 XDG_SESSION_TYPE=x11 luajit tests/hardware/desktop/run_keep_awake_logind.lua || STATUS=1
 
 WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman sway -c /dev/null >"${RUNTIME}/sway.log" 2>&1 &
 PIDS="${PIDS} $!"
 for _ in $(seq 50); do ls "${RUNTIME}"/wayland-* >/dev/null 2>&1 && break; sleep 0.1; done
 SOCKET="$(basename "$(ls "${RUNTIME}"/wayland-? 2>/dev/null | head -n 1)")"
 [ -n "${SOCKET}" ] || { echo "ENVIRONMENT: sway did not open a socket" >&2; exit 2; }
-env -u DISPLAY WAYLAND_DISPLAY="${SOCKET}" XDG_SESSION_TYPE=wayland luajit tests/desktop/run_keep_awake_logind.lua || STATUS=1
+env -u DISPLAY WAYLAND_DISPLAY="${SOCKET}" XDG_SESSION_TYPE=wayland luajit tests/hardware/desktop/run_keep_awake_logind.lua || STATUS=1
 rm -rf "${RUNTIME}"
 exit "${STATUS}"
