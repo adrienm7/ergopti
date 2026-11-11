@@ -232,10 +232,13 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	; ===============================================
 
 	; The emoji + symbol categories are by far the heaviest (~3000 registrations,
-	; ~410 ms). On the boot pass (DeferHeavy = true) they are skipped here and loaded
-	; off the critical path by RegisterEmojisSymbolsDeferred() below; on a live
-	; rebuild (DeferHeavy = false) they load inline, exactly as before.
-	if !DeferHeavy {
+	; ~410 ms). On the boot pass (DeferHeavy = true) RegisterEmojisSymbolsDeferred
+	; reserves their sequence block HERE and registers their rows after ready, so
+	; the dynamic hotstrings and the repeat key below still rank after them; on a
+	; live rebuild (DeferHeavy = false) they load inline, exactly as before.
+	if DeferHeavy {
+		RegisterEmojisSymbolsDeferred()
+	} else {
 		_RegisterEmojisSymbolsSections()
 	}
 

@@ -713,6 +713,13 @@ complex_key_delay_multiplier = 2
 # bonus is dropped so it cannot stretch an expansion on an unrelated key.
 complex_key_carry_ms = 300
 
+# Windows: the emoji and symbol sections register after ready, at their boot
+# rank, in slices of this length; the keyboard waits at most one slice. A gap
+# between two slices lets the input queued meanwhile run.
+# AHK: infra/hotstrings/hotstring_engine_main.ahk HSE_DeferredRegistrationSlice.
+deferred_registration_slice_ms = 25
+deferred_registration_gap_ms = 15
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Ergonomics warnings
