@@ -848,8 +848,20 @@ const CHECKS = [
 		title: 'A key-combination pair assignment is saved and still shown after the reload',
 		async run(context) {
 			const { session, pid: first } = await bootEnglish(context, 'pairsave');
-			const row = ['^Escape \\+ Tab : ', 'Escape'];
+			// Since c0a80da57f a pair row joins its pair and its action through
+			// common.label_value ("{1}: {2}" in English), not a hardcoded " : ".
+			const locale = JSON.parse(
+				fs.readFileSync(
+					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					'utf8'
+				)
+			);
+			const pair = `${locale['key_name.escape']} + ${locale['key_name.tab']}`;
+			const head = locale['common.label_value'].split('{2}')[0].replace('{1}', pair);
+			const row = [`^${head.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, locale['key_name.escape']];
 			const before = await session.run('rows', row);
+			if (before.split(' | ').filter(Boolean).length !== 1)
+				return fail(`not one pair row matches "${row[0]}" before the assignment: "${before}"`);
 			await session.run('pair_assign', ['escape', 'tab', 'tap', 'caps_word'], 180000, {
 				followReload: true
 			});
