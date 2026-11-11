@@ -13,9 +13,10 @@ const root = path.resolve(__dirname, '../..');
 // Each floor is the workflow's exact count of signed acquisitions, so dropping any
 // one of them fails (ci-linux.yml 45 -> 46: the container proofs of 2026-11-10).
 const scopes = new Map([
-	// 48: the install steps of the real keyring proof (run_keyring_receipts.sh)
-	// and of the live desktop actions proof (run_desktop_actions_live.sh).
-	['ci-linux.yml', 48],
+	// 49: the install steps of the real keyring proof (run_keyring_receipts.sh),
+	// the live desktop actions proof (run_desktop_actions_live.sh) and the
+	// Wayland clipboard owner receipt (run_clipboard_owner_wayland.sh).
+	['ci-linux.yml', 49],
 	['ci-macos.yml', 3],
 	['ci-common.yml', 2],
 	['linux-layout.yml', 2]

@@ -3477,6 +3477,41 @@ jobs:
           fi
         timeout-minutes: 5
 
+      - name: Install prerequisites for The clipboard owner serves every target over the Wayland data-control protocol
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends sway wl-clipboard luajit lua-luv
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # The same receipts as the X11 step, through wl-clipboard against a real
+      # wlroots compositor (sway, headless backend): text, HTML and a 300 kB
+      # binary target served by the owner and read back byte for byte.
+      - name: The clipboard owner serves every target over the Wayland data-control protocol
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          bash static/ergopti_plus/linux/tests/hardware/run_clipboard_owner_wayland.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
