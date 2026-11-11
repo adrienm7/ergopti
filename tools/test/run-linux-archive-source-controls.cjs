@@ -165,7 +165,7 @@ async function run({
 			if (kind === 'connect') {
 				if (
 					identities.get(source) !==
-					'6cd972642c8fa01d437b90aa47f9421aa23588241067eb3c24d5f223378fd3ea'
+					'ec2095c7ada8b4e51bd0b5d581fa58e362f2fd527a8ab9c89a6dfdfaaef0bf27'
 				)
 					throw new Error('CONNECT fixture identity refused');
 				args = [

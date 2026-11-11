@@ -212,9 +212,18 @@ assert(constructed, "Native fixture construction raised; owned cleanup completed
 if input.inspect_argv then assert(argv_observations > 0, "actual native curl argv observation is unavailable") end
 assert(live_native_handles() == native_handles_before, "every native handle must retire, including inactive boolean-request handles")
 assert(not client.isActive("native-public"), "public logical activity must finish")
-for _, pid in ipairs(pids) do
+-- A killed group member whose parent died first is reaped by the session's
+-- subreaper, not by this process: its group vanishes once that reaper has run.
+local function group_absent(pid)
 	local accepted, _, code = uv.kill(-pid, 0)
-	assert(accepted == nil and code == "ESRCH", "every actual managed child group must be absent")
+	return accepted == nil and code == "ESRCH"
+end
+for _, pid in ipairs(pids) do
+	for _ = 1, 200 do
+		if group_absent(pid) then break end
+		uv.sleep(10)
+	end
+	assert(group_absent(pid), "every actual managed child group must be absent")
 end
 if operation then assert(operation:is_settled(), "owned public operation must physically settle") end
 if input.cancel then assert(#replies == 0, "cancelled actual operation cannot publish a stale result")
