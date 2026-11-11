@@ -1,0 +1,158 @@
+PASS: real GTK/AT-SPI field privacy, role changes, source freshness and native cleanup
+{
+  "scope": "native GTK/AT-SPI; controlled logical input seam; no evdev claim",
+  "receipts": [
+    {
+      "case": "ordinary native field",
+      "receipt": {
+        "allowed": 5,
+        "buffer": "DUMMY",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": false,
+        "path": "/org/a11y/atspi/accessible/5",
+        "raw_delta": 5,
+        "resets": 5,
+        "role": 61,
+        "verdict": "insecure",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "second field of the identical native window",
+      "receipt": {
+        "allowed": 5,
+        "buffer": "DUMMY",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": false,
+        "path": "/org/a11y/atspi/accessible/2",
+        "raw_delta": 5,
+        "resets": 9,
+        "role": 61,
+        "verdict": "insecure",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "programmatic focus into password",
+      "receipt": {
+        "allowed": 0,
+        "buffer": "",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": true,
+        "path": "/org/a11y/atspi/accessible/3",
+        "raw_delta": 0,
+        "resets": 11,
+        "role": 40,
+        "verdict": "secure",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "same native object changes to password role",
+      "receipt": {
+        "allowed": 0,
+        "buffer": "",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": true,
+        "path": "/org/a11y/atspi/accessible/5",
+        "raw_delta": 0,
+        "resets": 16,
+        "role": 40,
+        "verdict": "secure",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "busy parent recovers through a fresh resident barrier",
+      "receipt": {
+        "allowed": 5,
+        "buffer": "DUMMY",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": false,
+        "path": "/org/a11y/atspi/accessible/5",
+        "raw_delta": 5,
+        "resets": 21,
+        "role": 61,
+        "verdict": "insecure",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "stopped resident remains private beyond its lease",
+      "receipt": {
+        "allowed": 0,
+        "buffer": "",
+        "focus_changes": 0,
+        "metric_secure": true,
+        "raw_delta": 0,
+        "resets": 24,
+        "verdict": "unknown",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "same resident recovers after SIGCONT",
+      "receipt": {
+        "allowed": 5,
+        "buffer": "DUMMY",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": false,
+        "path": "/org/a11y/atspi/accessible/5",
+        "raw_delta": 5,
+        "resets": 27,
+        "role": 61,
+        "verdict": "insecure",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "resident death cannot borrow an old ordinary verdict",
+      "receipt": {
+        "allowed": 0,
+        "buffer": "",
+        "focus_changes": 0,
+        "metric_secure": true,
+        "raw_delta": 0,
+        "resets": 28,
+        "verdict": "unknown",
+        "window_identity": "x11:22078:2097155"
+      }
+    },
+    {
+      "case": "physically settled restart permits ordinary input",
+      "receipt": {
+        "allowed": 5,
+        "buffer": "DUMMY",
+        "bus": ":1.0",
+        "focus_changes": 0,
+        "metric_secure": false,
+        "path": "/org/a11y/atspi/accessible/5",
+        "raw_delta": 5,
+        "resets": 33,
+        "role": 61,
+        "verdict": "insecure",
+        "window_identity": "x11:22078:2097155"
+      }
+    }
+  ],
+  "parent_jit": true,
+  "warmup_requests": 128,
+  "warmup_latency_ms": {
+    "max": 2.2408309997990727,
+    "median": 1.1209680000320077,
+    "p95": 1.2841119999065995
+  },
+  "source_sha256": {
+    "adapters/atspi_focus.lua": "62520f1d6c5183a041b367d4317d4f2840f54dbe89638a2346565ba1ae775f5f",
+    "adapters/atspi_focus_watch.lua": "d07e80ae657bfedac4bffd2a8dd10647f34d4b5d365e4f707ee7f1962bd07f26",
+    "adapters/atspi_focus_watch_worker.lua": "cf7861c80aa814886443c280481298e75aa8fa56d87a1ddb80cab2c5816e151a",
+    "adapters/secure_field_detector.lua": "50402b18cfcdfd8f358eca2ea1e3f78e61a9e3113223146c68adb7ea29ed33fe",
+    "modules/keystats/focus_guard.lua": "09457462789a02ed57959c73993cf0ea853021118e7f3caf51d67c2276c856ce"
+  }
+}

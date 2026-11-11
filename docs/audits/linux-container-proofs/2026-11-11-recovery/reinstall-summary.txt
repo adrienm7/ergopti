@@ -1,0 +1,9 @@
+=== Reinstall over an older tree ===
+  ok   the older version installs
+  ok   the older tree ships linux/phys-retired-probe.lua
+  ok   the newer version installs over it
+  ok   linux/phys-retired-probe.lua is gone
+  ok   the reinstalled tree passes its own receipt: 64769:283492
+  ok   as <root>.old it passes the updater's retirement check: 64769:287635
+
+6 checks, 0 failures

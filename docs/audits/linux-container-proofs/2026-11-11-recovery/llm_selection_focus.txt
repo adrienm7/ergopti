@@ -1,0 +1,5 @@
+Native AI first character: 1.6ms; synchronous helpers=0
+Native resident AT-SPI destination: median=1.3ms max=1.5ms (20 probes)
+Native wedged AT-SPI refusal: 20.7ms
+Native selected-range helper timeout and settlement: 1003.2ms
+PASS native GTK AI text focus: 31 cases; correct controls type; changed fields/windows and passwords refuse request/output
