@@ -1079,11 +1079,72 @@ WAYLAND_COMPILE_FAILED = "compile_failed"
 WAYLAND_SELECT_REFUSED = "select_refused"
 WAYLAND_NOT_LOADED = "not_loaded"
 WAYLAND_STALE_KEYMAP = "stale_keymap"
+WAYLAND_NEEDS_RELOGIN = "needs_relogin"
 
 # The compositor compiles the new keymap in its own time after the setting
 # changes; XWayland then receives it. A bounded poll, never a fixed sleep.
 WAYLAND_READBACK_SECONDS = 10.0
 WAYLAND_READBACK_INTERVAL_SECONDS = 0.2
+
+
+# GNOME Shell (checked on 46) reads the layout registry, the user tree's
+# rules/evdev.xml included, once when it starts: an id registered later is
+# unknown to it until the next login, and it falls back to "us" when the
+# setting names that id alone. A process start time is known to the second
+# (/proc/stat btime), so a registry written within this margin of the shell
+# start counts as written after it.
+GNOME_SHELL_PROCESS = "gnome-shell"
+GNOME_REGISTRY_MARGIN_SECONDS = 1.0
+
+
+def process_started_at(name: str, proc: Path = Path("/proc")) -> float | None:
+    """When the newest process ``name`` of this user started (epoch seconds),
+    or ``None`` when this user runs none."""
+    boot = next(
+        (
+            float(line.split()[1])
+            for line in (proc / "stat").read_text(encoding="ascii").splitlines()
+            if line.startswith("btime ")
+        ),
+        None,
+    )
+    if boot is None:
+        raise RuntimeError("%s/stat has no btime line" % proc)
+    ticks_per_second = os.sysconf("SC_CLK_TCK")
+    newest = None
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            if entry.stat().st_uid != os.getuid():
+                continue
+            if (entry / "comm").read_text(encoding="utf-8").strip() != name:
+                continue
+            fields = (entry / "stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            # The process ended (or hides itself) while the folder was read.
+            continue
+        # Field 22 of /proc/<pid>/stat, the 20th after the command name.
+        started = boot + int(fields[19]) / ticks_per_second
+        newest = started if newest is None else max(newest, started)
+    return newest
+
+
+def registry_lists_layout(registry: Path, layout_id: str) -> bool:
+    """Whether a rules/evdev.xml registry names ``layout_id``."""
+    try:
+        text = registry.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    return ("<name>%s</name>" % layout_id) in text
+
+
+def gnome_shell_knows_layout(registry: Path, layout_id: str, shell_started_at: float) -> bool:
+    """Whether a GNOME Shell started at ``shell_started_at`` read ``layout_id``
+    from the user registry: the registry named it before the shell started."""
+    if not registry_lists_layout(registry, layout_id):
+        return False
+    return registry.stat().st_mtime < shell_started_at - GNOME_REGISTRY_MARGIN_SECONDS
 
 
 def live_slots(layout_id: str) -> tuple[str, str]:

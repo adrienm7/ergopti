@@ -1069,7 +1069,10 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
       Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
       46 `apply-wayland` ends `not_loaded` and rolls back (the shell lists no user-tree id, mutter still compiles it);
-      on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted.
+      on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted. 2026-11-11: GNOME W1 to W3 hold
+      after one login (`user_layout_wayland_gnome.txt`, Bépo: the slot loads with `ERGOPTI_SEVEN_LEVEL`, the
+      digits-first build under the other slot replaces it with no restart); a layout first registered during the
+      session answers `needs_relogin` and leaves the setting alone. KDE (not re-run with Bépo) and W4 still open.
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
 - [ ] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running".
@@ -1233,7 +1236,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       now writes the slot alone first and waits the settle time the daemon passes (`--gnome-settle-ms` from the shared
       registry), and its XWayland read-back finds the layout by content in mutter's « (unnamed) » keymap (before, it
       looked only for the layout's name, which mutter never writes, so every GNOME apply ended `not_loaded`). Still
-      `not_loaded` on GNOME 46 headless with both in place: one more cause is not found yet. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
+      `not_loaded` on GNOME 46 headless with both in place: one more cause is not found yet. Found 2026-11-11: GNOME
+      Shell reads the user registry (`~/.config/xkb/rules/evdev.xml`) only when it starts, so an id registered after
+      login is unknown to it and the slot alone switches the session to its `us` fallback. apply-wayland now compares
+      the registry's date with the shell's start, registers both slots and answers `needs_relogin` without touching
+      the setting; after the next login every build alternates live. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
 - [x] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method ignores an `include` of
       another file and aborts (« buffer overflow detected ») on a large set of multi-character outputs (Bépo has
       21,742). Done 2026-11-11, decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: the
