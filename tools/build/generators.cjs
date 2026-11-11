@@ -248,6 +248,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/layout_composer/_generated/composer_data.js']
 	},
 	{
+		script: 'codegen/codegen-layout-editor-tables-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/key_tables.js']
+	},
+	{
 		script: 'codegen/codegen-layout-composer-corpus.cjs',
 		outputs: ['static/ergopti_plus/_shared/tests/corpus/layouts/composer/composed.keylayout']
 	},
