@@ -210,8 +210,8 @@ assert.equal(new Set(listed).size, listed.length, 'a step is listed twice');
 assert.equal(FIXTURE.shared.length, 11);
 assert.equal(
 	listed.length,
-	208,
-	'the former E2E job had 158 steps, gained 25 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, gained the two manual acceptance steps, then the live number-row and reload restart steps, then the installed Ollama route plan and its install step, then the field run step, then the five shared Ubuntu archive cache steps, then the Go proxy sign-in relay, then the owned dialog host profile and its install step, then the managed Python live probe, then the X11 clipboard owner timestamp receipt, then the compositor focus worker on a real session bus, then the owned Ollama start and the local server detection proofs, then the Linux container proofs and their install step, then the WebKit reload-signal receipt; none may be lost'
+	211,
+	'the former E2E job had 158 steps, gained 25 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, gained the two manual acceptance steps, then the live number-row and reload restart steps, then the installed Ollama route plan and its install step, then the field run step, then the five shared Ubuntu archive cache steps, then the Go proxy sign-in relay, then the owned dialog host profile and its install step, then the managed Python live probe, then the X11 clipboard owner timestamp receipt, then the compositor focus worker on a real session bus, then the owned Ollama start and the local server detection proofs, then the Linux container proofs and their install step, then the WebKit reload-signal receipt, then the GTK privacy owner, AI destination and clipboard owner receipts; none may be lost'
 );
 assert.deepEqual(
 	Object.keys(FIXTURE.subjects),
