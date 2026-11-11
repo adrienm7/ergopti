@@ -268,6 +268,30 @@ _LiveConfirm(Seen, Hwnd) {
 }
 
 /**
+ * Clicks a row that must open a message box of this process, reports its
+ * caption and every text it shows, and presses its first button. No dialog is
+ * an error. Arguments: the caption pattern, then the row's path.
+ */
+LiveCmdClickReadDialog(Args) {
+	Pattern := Args[1]
+	Path := Args.Clone()
+	Path.RemoveAt(1)
+	Row := LiveRowByPath(Path)
+	Seen := {Title: "", Text: ""}
+	State := LiveDriveWindow(() => LiveDialogMatching(Pattern), _LiveReadDialog.Bind(Seen), 15000)
+	LiveClickRow(Row)
+	LiveAwaitDrive(State, "the dialog of '" . Row.Caption . "'")
+	LivePump(300)
+	return "title=" . LiveOneLine(Seen.Title) . " text=" . LiveOneLine(Seen.Text)
+}
+
+_LiveReadDialog(Seen, Hwnd) {
+	Seen.Title := WinGetTitle("ahk_id " . Hwnd)
+	Seen.Text := WinGetText("ahk_id " . Hwnd)
+	LiveClickDialogButton("Button1", Hwnd)
+}
+
+/**
  * Opens the unused-settings window and the API endpoint dialog for real and
  * reports the caption the operating system holds for each.
  */
@@ -706,6 +730,7 @@ LiveRegister("click", LiveCmdClick)
 LiveRegister("rowinfo", LiveCmdRowInfo)
 LiveRegister("click_repeat", LiveCmdClickRepeat)
 LiveRegister("click_confirming", LiveCmdClickConfirming)
+LiveRegister("click_read_dialog", LiveCmdClickReadDialog)
 LiveRegister("reload_request_during_reload", LiveCmdReloadRequestDuringReload)
 LiveRegister("pump", LiveCmdPump)
 LiveRegister("answer_inputbox", LiveCmdAnswerInputBox)

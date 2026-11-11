@@ -161,6 +161,41 @@ function closeExplorerWindows(folder) {
 /** The count of driver processes of a session, successors included. */
 const driverCount = (session) => session.processes().length;
 
+/**
+ * The shipped English locale, which names every row of an English driver.
+ * @returns {Object<string, string>}
+ */
+function englishLocale() {
+	return JSON.parse(
+		fs.readFileSync(
+			path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+			'utf8'
+		)
+	);
+}
+
+/** A literal text as a regular expression that matches only it. */
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Collapses every run of white space, so a dialog's line breaks compare as spaces. */
+const squash = (text) => text.replace(/\s+/g, ' ').trim();
+
+/**
+ * Reads the `rows` command's answer as rows.
+ * @param {string} answer "A > B > C  [checked]  [disabled] | ..." as LiveCmdRows writes it.
+ * @returns {{path: string[], checked: boolean, disabled: boolean}[]}
+ */
+function parseRows(answer) {
+	return answer
+		.split(' | ')
+		.filter(Boolean)
+		.map((line) => ({
+			path: line.replace(/ {2}\[(checked|disabled)\]/g, '').split(' > '),
+			checked: line.includes('  [checked]'),
+			disabled: line.includes('  [disabled]')
+		}));
+}
+
 /** Parses "key=value" pairs out of a command's detail line. */
 function fields(detail) {
 	const found = {};
@@ -870,7 +905,7 @@ const CHECKS = [
 			);
 			const pair = `${locale['key_name.escape']} + ${locale['key_name.tab']}`;
 			const head = locale['common.label_value'].split('{2}')[0].replace('{1}', pair);
-			const row = [`^${head.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, locale['key_name.escape']];
+			const row = [`^${escapeRegExp(head)}`, locale['key_name.escape']];
 			const before = await session.run('rows', row);
 			if (before.split(' | ').filter(Boolean).length !== 1)
 				return fail(`not one pair row matches "${row[0]}" before the assignment: "${before}"`);
@@ -1765,6 +1800,50 @@ const CHECKS = [
 			return pass(
 				`refused after ${deadline} ms with a notice, the driver kept serving; a later Quit and a Quit that waited both exit 0`
 			);
+		}
+	},
+	{
+		id: 'gestures-info-row',
+		title: 'Tray > Gestures: exactly one "Info…" row, which opens its explanation',
+		async run(context) {
+			const locale = englishLocale();
+			const caption = locale['menu.gestures.recommended_info'];
+			const { session, pid: booted } = await bootEnglish(context, 'gesinfo');
+			// An off category greys its rows and suffixes them « — Category off » (77f417280e).
+			const infoRows = async () =>
+				parseRows(await session.run('rows', [`^${escapeRegExp(caption)}( — |$)`])).filter(
+					(row) => row.path.length === 2 && /Gestures$/.test(row.path[0])
+				);
+			let rows = await infoRows();
+			if (rows.length === 1 && rows[0].disabled) {
+				await ensureCategoryOn(session, booted, 're:Gestures$', 'Enable gestures');
+				rows = await infoRows();
+			}
+			if (rows.length !== 1)
+				return fail(
+					`${rows.length} "${caption}" rows in the Gestures menu: ${rows.map((r) => r.path.join(' > ')).join(' | ')}`
+				);
+			const [row] = rows;
+			if (row.disabled || row.path[1] !== caption)
+				return fail(
+					`with the gestures on the row reads "${row.path[1]}", disabled: ${row.disabled}`
+				);
+			const title = locale['menu.gestures.notify_title'];
+			const seen = fields(
+				await session.run('click_read_dialog', [escapeRegExp(title), ...row.path])
+			);
+			const problems = [];
+			if (!seen.title.includes(title))
+				problems.push(`the dialog is titled "${seen.title}", "${title}" expected`);
+			const reason = squash(locale['menu.gestures.recommended_reason_windows']);
+			if (!squash(seen.text).includes(reason))
+				problems.push(`the dialog shows "${seen.text}", not the Windows reason`);
+			const dialogs = await session.run('dialogs');
+			if (dialogs !== 'dialogs=') problems.push(`a dialog stays open after OK: ${dialogs}`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`one "${caption}" row; it opened "${seen.title}" with the Windows reason`);
 		}
 	}
 ];
