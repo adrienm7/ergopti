@@ -1434,6 +1434,8 @@ Each closes on a named green hosted or native run, recorded here.
       field probe covered by the green Unit lots, not Swift. Still open: native Hotstrings category boot publication
       and obsolete-leaf setters need an installed driver on a real Mac (no hosted row types into them), and item 31's
       lane waits on its runtime build, which the pinned runtime rules keep out of scope tonight.
+      Requalified 2026-11-11 at `85f3dfee20` in [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158): macOS Unit, Integration, all 12 E2E cells, Build (with the
+      layout extension payload receipt) and all five Install-and-launch rows green; macOS Verdict job 130559010960 green.
 - [ ] **Ollama Go cell** (cda1e10c5e) on the final source before a release (passed on run 40021624397).
       Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
       it closes only on the release candidate's own source, which tonight's no-release rule excludes.
