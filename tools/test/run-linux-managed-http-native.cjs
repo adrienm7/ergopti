@@ -453,6 +453,7 @@ async function run({
 		return 0;
 	}
 	let work,
+		phaseSink = null,
 		phase = 'prerequisites',
 		gateCancelled = false;
 	const gateDeadline = process.hrtime.bigint() + BigInt(TOTAL_GATE_MS) * 1000000n;
@@ -507,6 +508,8 @@ async function run({
 		) {
 			if (gateCancelled || process.hrtime.bigint() >= gateDeadline) refuse();
 			const label = String(++serial).padStart(2, '0');
+			// The phase's stderr sink, read back only to name a refused public case.
+			phaseSink = path.join(work, label + '.stderr');
 			const fixtureSha = kind === 'command' ? undefined : hash(fs.readFileSync(args[1]));
 			return await ownPhase({
 				command,
@@ -742,8 +745,7 @@ async function run({
 				phase +
 				': admission or completed cleanup receipt refused.'
 		);
-		if (phase === 'public30' && work)
-			error('  ' + publicProgress(path.join(work, 'public30.stderr')));
+		if (phase === 'public30' && phaseSink) error('  ' + publicProgress(phaseSink));
 		return 1;
 	} finally {
 		if (!activeChildren.size) {
