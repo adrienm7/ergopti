@@ -338,7 +338,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 		end)
 		writer.batch_write, os.rename = batch, rename
 		package.loaded["modules.shortcuts.manager"] = prior
-		os.remove(path .. ".tmp")
+		os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path))
 		local removed = os.remove(path)
 		assert(removed, "the owned master fixture is physically retired")
 		if not called then error(failure, 0) end
@@ -357,7 +357,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					local renamed, published = os.rename, 0
 					if outcome:match("^rename%-") then
 						os.rename = function(from, to)
-							if from == path .. ".tmp" and to == path then
+							if from == helpers.stage_path(path) and to == path then
 								published = published + 1
 								if outcome == "rename-throw" then error("controlled publication refusal") end
 								if outcome == "rename-nil" then return nil, "controlled publication refusal" end
@@ -422,7 +422,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					local rename, execute, modal = os.rename, os.execute, require("ui.modal")
 					local run = modal.run
 					os.rename = function(from, to)
-						if from == path .. ".tmp" and to == path then
+						if from == helpers.stage_path(path) and to == path then
 							attempts = attempts + 1
 							if outcome == "throw" then error("controlled publication refusal") end
 							if outcome == "false" then return false end

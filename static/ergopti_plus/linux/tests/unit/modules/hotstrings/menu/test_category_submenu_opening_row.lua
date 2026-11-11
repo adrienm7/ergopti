@@ -470,7 +470,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 				local action = section_action(c.config)
 				local rename, publications = os.rename, 0
 				os.rename = function(from, to)
-					if from == c.path .. ".tmp" and to == c.path then
+					if from == helpers.stage_path(c.path) and to == c.path then
 						publications = publications + 1
 						if outcome == "throw" then error("inert owned publication refusal") end
 						if outcome == "nil" then return nil, "inert owned publication refusal" end
@@ -645,7 +645,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 				local action = section_action(c.config)
 				local rename, publications = os.rename, 0
 				os.rename = function(from, to)
-					if from == c.path .. ".tmp" and to == c.path then
+					if from == helpers.stage_path(c.path) and to == c.path then
 						publications = publications + 1
 						if outcome == "throw" then error("inert owned publication refusal") end
 						if outcome == "nil" then return nil, "inert owned publication refusal" end

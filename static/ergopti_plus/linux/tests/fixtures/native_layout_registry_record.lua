@@ -28,7 +28,8 @@ local local_dir = ConfigPaths.config(settings.local_folder) .. "/"
 assert(local_dir:sub(1, #folder + 1) == folder .. "/", "the actual production locator must stay private")
 assert(Shell.run("mkdir -p -- " .. Shell.quote(local_dir)))
 local path, target = local_dir .. settings.installed_file, folder .. "/target"
-local stage = path .. ".tmp"
+-- The native writer stages under this process's name (CFD-1).
+local stage = require("infra.stage_owner").stage_path(path)
 local function write(candidate, bytes)
 	local file = assert(open(candidate, "wb")); assert(file:write(bytes)); assert(file:close())
 end

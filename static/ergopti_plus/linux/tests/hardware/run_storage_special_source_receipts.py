@@ -103,7 +103,7 @@ def main():
                 if not kind.startswith("regular"):
                     after = source.lstat()
                     assert (after.st_ino, after.st_mode) == (before.st_ino, before.st_mode)
-                    assert not pathlib.Path(str(source) + ".tmp").exists()
+                    assert not list(source.parent.glob(source.name + ".*.tmp"))
                     assert not pathlib.Path(str(source) + ".corrupt").exists()
                     if kind == "fifo-link":
                         assert source.readlink() == endpoint and stat.S_ISFIFO(

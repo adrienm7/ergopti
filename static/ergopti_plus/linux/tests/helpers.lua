@@ -272,6 +272,14 @@ function M.openssl_stdout_receipt(command, output, status)
 	return output
 end
 
+--- The staging path the native TOML writer and the store use for a destination:
+--- named after this process (CFD-1, infra/stage_owner.lua).
+--- @param path string Destination path.
+--- @return string stage
+function M.stage_path(path)
+	return require("infra.stage_owner").stage_path(path)
+end
+
 --- Hands one admitted regular source to stdio on its own path name.
 --- Production reads TOML through a pinned /proc/self/fd alias, which a test's
 --- io.open double keyed on the path never sees. Native classification still
@@ -290,7 +298,7 @@ function M.route_source_through_stdio(path, virtual)
 	if virtual then
 		Writer = require("infra.regular_file_writer"); native_write = Writer.open
 		Writer.open = function(candidate, mode)
-			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
+			if candidate ~= M.stage_path(path) or mode ~= "wx" then return native_write(candidate, mode) end
 			local stream, detail, errno = io.open(candidate, "w")
 			return stream, detail, errno, function() return os.remove(candidate) end, function() return true end
 		end

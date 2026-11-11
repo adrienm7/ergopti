@@ -19,7 +19,7 @@ helpers.describe("hotstring priority overrides", function()
 		local previous_rename = os.rename
 		local previous_remove = os.remove
 		local override_path = "/virtual-home/.config/ergopti/hotstrings_overrides.toml"
-		local temporary_path = override_path .. ".tmp"
+		local temporary_path = helpers.stage_path(override_path)
 		local persisted = nil
 		local staged = nil
 		local fail_writes = false
@@ -280,7 +280,7 @@ helpers.describe("hotstring priority overrides", function()
 		os.rename = previous_rename
 		os.remove = previous_remove
 		os.remove(choice_path)
-		os.remove(choice_path .. ".tmp")
+		os.remove(choice_path .. ".tmp"); os.remove(helpers.stage_path(choice_path))
 		Loader.load_catalogue = previous_load_catalogue
 		package.loaded["adapters.storage"] = previous_storage
 		package.loaded["adapters.shell_runner"] = previous_shell
@@ -331,7 +331,7 @@ helpers.describe("hotstring override leaf ownership", function()
 		io.open, os.rename, os.remove, NativeWriter.open = old_open, old_rename, old_remove, old_stage
 		package.loaded["modules.hotstrings.hotstrings_config"] = old_config
 		package.loaded["adapters.shell_runner"] = old_shell
-		os.remove(path .. ".tmp")
+		os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path))
 		os.remove(path)
 		os.remove(choices)
 		os.remove(root)
@@ -397,7 +397,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			local old_stage, staged = NativeWriter.open, 0
 			local foreign = source .. "# Edit after staging.\n"
 			NativeWriter.open = function(name, mode)
-				if name ~= path .. ".tmp" or mode ~= "wx" then return old_stage(name, mode) end
+				if name ~= helpers.stage_path(path) or mode ~= "wx" then return old_stage(name, mode) end
 				local function opened(handle, ...)
 					if not handle then return handle, ... end
 					return {
@@ -497,7 +497,7 @@ helpers.describe("hotstring override leaf ownership", function()
 				local NativeWriter = require("infra.regular_file_writer")
 				local old_stage, old_rename, faults = NativeWriter.open, os.rename, 0
 				NativeWriter.open = function(name, mode)
-					if name ~= path .. ".tmp" or mode ~= "wx" then return old_stage(name, mode) end
+					if name ~= helpers.stage_path(path) or mode ~= "wx" then return old_stage(name, mode) end
 					if fault == "open" then faults = faults + 1; return nil, "owned open refusal" end
 					local function opened(handle, ...)
 						if not handle then return handle, ... end
