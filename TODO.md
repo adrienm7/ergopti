@@ -661,12 +661,20 @@ three-OS CI is green on the final source. See the handoff above for the current 
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
       Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
       and the queued early tray click are committed (keyboard registered at 4.5 s instead of 5.1 s on the smoke
-      fixture). Next, largest first: the emoji and symbol sections take 406 of the 1031 ms hotstrings stage on that
-      fixture; defer them after ready in slices of a few tens of ms, but their registration order feeds the
-      collision tie-break (`_DynHS_RegisterAll` and the repeat key must stay after them): reserve their `Seq` block at
-      the boot position, and keep the preview index complete. Then script parse (lighter boot includes; AHK has no
+      fixture). Done 11 November: the emoji and symbol sections (1,575 rows on the maintainer's config) register
+      after ready in 25 ms Critical slices (`HSE_DeferRegistration`, `[hotstrings] deferred_registration_*`), their
+      `Seq` block reserved at the boot position: the registry after the slices is the boot one, 4,242 specs in the
+      same order (dumped from both boots), and `(hotstring-deferred-rank)` pins the tie-break, the slicing and the
+      stop at a registry clear; the prefix catalogue reads the cache, complete before ready. The AI submenu is
+      built at its first open (`MenuDeferOrBuild`, `(llm-menu-built-at-first-open)`), so neither the boot nor a
+      toggle's full root rebuild draws its rows. Medians of 7 interleaved boots of the maintainer-config fixture
+      (metrics off in the copy: a quarantined smoke is paused and keystats refuses a new ledger while paused, so
+      that fixture aborts beside a resident driver), summed `process_cpu`: emoji deferral 9,828 → 9,047 ms
+      (hotstrings stage 2,344 → 1,734 ms CPU); then lazy AI 8,609 → 8,391 ms (`menu row llm` 156 → 63 ms, `tray menu`
+      719 → 563 ms). The deferred slices cost about 0.75 s of wall over 1.2 s after ready on a loaded machine.
+      Next: script parse (lighter boot includes; AHK has no
       runtime include, so only a smaller graph or a worker helps) and layout (rejected disk cache: native hotkey
-      registration). Measure each with interleaved base/candidate smoke-fixture boots (summed `process_cpu`). CI of
+      registration); the remote AI catalogue (212 ms) can now be measured again with the AI root lazy. Measure each with interleaved base/candidate smoke-fixture boots (summed `process_cpu`). CI of
       the branch: run 41737399378 (first run 41732233161 found two branch regressions, fixed since; its PAC and
       action-picker WebView reds pass locally).
       Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
@@ -678,12 +686,12 @@ three-OS CI is green on the final source. See the handoff above for the current 
       copies, one boot snapshot read for the AI options (4 → 1), personal-file metadata decodes only `[_meta]`
       (468 → 29 ms for three 35 KB files). Gate: the startup smoke bounds the boot's counted operations
       (`BOOT_OPERATION_CEILINGS`). Left, deliberate or rejected: parse, layout and hotstring registration (about
-      4.4 s) are needed at the first key; the remote AI catalogue (212 ms, rejected while the AI root is eager); the
+      4.4 s) are needed at the first key; the remote AI catalogue (212 ms, rejected while the AI root was eager); the
       boot's 9-13 registry deep compares (every write compares).
       macOS, 6 November: the four script-chord slot rows open the shared action picker, as on Windows, instead of
       inlining the 840-action catalogue each: the Shortcuts submenu fell from 3,537 to 177 rows (unit harness:
       35.5 → 2.6 ms, 5.1 → 0.4 MB allocated per build; field rebuilds grew the heap 13-16 MB and the GC landed in
-      this stage, 320-342 ms). Left: the Windows AI submenu is still eager; Linux done 10 November: the tray builds a submenu's GTK
+      this stage, 320-342 ms). The Windows AI submenu is lazy since 11 November; Linux done 10 November: the tray builds a submenu's GTK
       rows when a dbusmenu client opens it and updates a toggled row in place (native publication of the 1007-row
       tree 125 → 1.2 ms, a toggle 118 → 1.0 ms, RSS 137 → 122 MB, headless SNI host; the shared Lua tree build,
       about 78 ms, is unchanged); macOS `menu_keyboard_layout.sources`
