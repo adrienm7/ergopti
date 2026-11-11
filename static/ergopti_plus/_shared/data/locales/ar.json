@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "النقر الأوسط",
 	"menu.caps_word.pointer.other_buttons": "أزرار الفأرة الأخرى",
 	"platform_reason.caps_word_gestures_stay_with_windows": "ليس على Windows: يحتفظ النظام بإيماءات لوحة اللمس لنفسه ولا يمرر أي لمسة إلى Ergopti. يظل التمرير بإصبعين محسوبًا تمريرًا.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "ليس على Windows: يسلّم Windows إلى برنامج التشغيل كل إيماءة جاهزة، بعد اكتمالها فقط، من إعدادات لوحة اللمس، لذا لا يمكن أن يتكرر السحب خطوة بخطوة ما دامت الأصابع تتحرك. أما macOS وLinux فيتتبعان الأصابع بنفسيهما.",
 	"platform_reason.hotstrings_master_is_macos_engine": "macOS فقط بهذا الاسم: هو المفتاح الرئيسي لمحرك الكتابة في macOS الذي يشغّله البرنامج ويوقفه. يحتفظ Windows بمفتاحه الرئيسي كبوابة hotstrings في category_enabled، ويفعّل Linux مجموعات hotstrings واحدة تلو الأخرى.",
 	"platform_reason.category_gates_are_windows": "Windows فقط: يحتفظ Windows ببوابة رئيسية لكل فئة أمام مفاتيح الفئة نفسها. يحتفظ macOS بمفتاح hotstrings الرئيسي في hotstrings.enabled، ويفعّل Linux مجموعات hotstrings واحدة تلو الأخرى.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "هذا الاختصار يخص النظام الذي يربطه: يعرض كل برنامج إجراءاته على التركيبات التي يتركها نظامه حرة (تركيبات مفتاح Windows في Windows، وCtrl وCmd في macOS، وخانات لوحة المفاتيح في Linux) ويحفظ الاختيار باسمه الخاص.",

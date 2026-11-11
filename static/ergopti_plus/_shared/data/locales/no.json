@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "Midtklikk",
 	"menu.caps_word.pointer.other_buttons": "Andre museknapper",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Ikke på Windows: systemet beholder styreflatebevegelsene selv og sender ingen berøring videre til Ergopti. Rulling med to fingre teller fortsatt som rulling.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Ikke på Windows: Windows gir driveren hver bevegelse ferdig, først når den er fullført, fra styreplateinnstillingene, så et sveip kan ikke gjentas trinn for trinn mens fingrene beveger seg. macOS og Linux følger fingrene selv.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Bare macOS under dette navnet: det er hovedbryteren for macOS’ skrivemotor, som driveren starter og stopper. Windows har hovedbryteren som hotstrings-porten i category_enabled, og Linux slår på hotstring-gruppene én etter én.",
 	"platform_reason.category_gates_are_windows": "Bare Windows: Windows har én hovedport per kategori foran kategoriens egne brytere. macOS har hotstrings-hovedbryteren som hotstrings.enabled, og Linux slår på hotstring-gruppene én etter én.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Denne snarveien tilhører systemet som binder den: hver driver tilbyr handlingene sine på kombinasjonene systemet lar være ledige (Windows-tastkombinasjoner på Windows, Ctrl og Cmd på macOS, tastaturplasser på Linux) og lagrer valget under sitt eget navn.",

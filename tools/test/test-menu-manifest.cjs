@@ -2855,7 +2855,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.deepEqual(declared[corpus.section], expected);
 	assert.deepEqual(generated[corpus.section], expected);
 	assert.deepEqual(corpus.platform_rows, {
-		ahk: [],
+		ahk: ['gesture_mode_single', 'gesture_mode_incremental'],
 		hs: ['gesture_mode_single', 'gesture_mode_incremental'],
 		linux: ['gesture_mode_single', 'gesture_mode_incremental']
 	});
@@ -3859,7 +3859,12 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		gesture_sensitivity_options: 'gesture_sensitivity_head'
 	});
 	assert.deepEqual(corpus.platform_rows, {
-		ahk: [],
+		ahk: [
+			'gesture_slot_change_action',
+			'separator',
+			'gesture_mode_options',
+			'gesture_sensitivity_options'
+		],
 		hs: [
 			'gesture_slot_change_action',
 			'separator',

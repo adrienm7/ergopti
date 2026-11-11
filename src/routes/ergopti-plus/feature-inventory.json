@@ -4202,10 +4202,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4220,10 +4220,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4238,10 +4238,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4256,10 +4256,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4274,10 +4274,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4292,10 +4292,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4310,10 +4310,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4328,10 +4328,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4342,15 +4342,12 @@
 			"en": "Mode — 3-finger swipe ←"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_3_right",
@@ -4360,15 +4357,12 @@
 			"en": "Mode — 3-finger swipe →"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_3_up",
@@ -4378,15 +4372,12 @@
 			"en": "Mode — 3-finger swipe ↑"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_3_down",
@@ -4396,15 +4387,12 @@
 			"en": "Mode — 3-finger swipe ↓"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_3_left_down",
@@ -4418,10 +4406,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4436,10 +4424,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4454,10 +4442,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4472,10 +4460,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4486,15 +4474,12 @@
 			"en": "Mode — 4-finger swipe ←"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_4_right",
@@ -4504,15 +4489,12 @@
 			"en": "Mode — 4-finger swipe →"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_4_up",
@@ -4522,15 +4504,12 @@
 			"en": "Mode — 4-finger swipe ↑"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_4_down",
@@ -4540,15 +4519,12 @@
 			"en": "Mode — 4-finger swipe ↓"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.modes.swipe_4_left_down",
@@ -4562,10 +4538,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4580,10 +4556,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4598,10 +4574,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4616,10 +4592,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4634,10 +4610,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4652,10 +4628,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4670,10 +4646,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4688,10 +4664,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4706,10 +4682,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4724,10 +4700,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4742,10 +4718,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4760,10 +4736,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4778,10 +4754,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4796,10 +4772,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4814,10 +4790,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4832,10 +4808,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4850,10 +4826,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4868,10 +4844,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4886,10 +4862,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4904,10 +4880,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -4918,15 +4894,12 @@
 			"en": "Sensitivity — 3-finger swipe ←"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_3_right",
@@ -4936,15 +4909,12 @@
 			"en": "Sensitivity — 3-finger swipe →"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_3_up",
@@ -4954,15 +4924,12 @@
 			"en": "Sensitivity — 3-finger swipe ↑"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_3_down",
@@ -4972,15 +4939,12 @@
 			"en": "Sensitivity — 3-finger swipe ↓"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_3_left_down",
@@ -4994,10 +4958,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5012,10 +4976,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5030,10 +4994,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5048,10 +5012,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5062,15 +5026,12 @@
 			"en": "Sensitivity — 4-finger swipe ←"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_4_right",
@@ -5080,15 +5041,12 @@
 			"en": "Sensitivity — 4-finger swipe →"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_4_up",
@@ -5098,15 +5056,12 @@
 			"en": "Sensitivity — 4-finger swipe ↑"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_4_down",
@@ -5116,15 +5071,12 @@
 			"en": "Sensitivity — 4-finger swipe ↓"
 		},
 		"platforms": {
-			"windows": false,
+			"windows": true,
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
-		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "gestures.sensitivities.swipe_4_left_down",
@@ -5138,10 +5090,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5156,10 +5108,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5174,10 +5126,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5192,10 +5144,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5210,10 +5162,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5228,10 +5180,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5246,10 +5198,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5264,10 +5216,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5282,10 +5234,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5300,10 +5252,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5318,10 +5270,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5336,10 +5288,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5354,10 +5306,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5372,10 +5324,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5390,10 +5342,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5408,10 +5360,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5426,10 +5378,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{
@@ -5444,10 +5396,10 @@
 			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
+		"reason_key": "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 		"reason": {
-			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
+			"fr": "Pas sous Windows : les paramètres de Windows n’attribuent un raccourci qu’aux touchers à trois et quatre doigts et aux balayages dans les quatre directions droites, et ne transmettent aucune donnée tactile à Ergopti. Il n’y a donc ni emplacement à deux ou cinq doigts, ni diagonale, ni emplacement de balayage horizontal.",
+			"en": "Not on Windows: Windows Settings lets you assign a shortcut only to three- and four-finger taps and to swipes in the four straight directions, and passes no touch data to Ergopti. There are no two- or five-finger slots, diagonals or horizontal-swipe slots there."
 		}
 	},
 	{

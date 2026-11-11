@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "मध्य क्लिक",
 	"menu.caps_word.pointer.other_buttons": "माउस के अन्य बटन",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Windows पर नहीं: सिस्टम टचपैड जेस्चर अपने पास रखता है और Ergopti को कोई स्पर्श नहीं भेजता। दो उँगलियों से स्क्रॉल करना फिर भी स्क्रॉलिंग गिना जाता है।",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Windows पर नहीं: Windows ड्राइवर को हर जेस्चर अपनी टचपैड सेटिंग्स से तैयार रूप में, उसके पूरा होने के बाद ही देता है, इसलिए उंगलियाँ चलते रहने तक कोई स्वाइप क़दम-दर-क़दम दोहराया नहीं जा सकता। macOS और Linux उंगलियों को स्वयं ट्रैक करते हैं।",
 	"platform_reason.hotstrings_master_is_macos_engine": "केवल macOS, इसी नाम से: यह macOS के टाइपिंग इंजन का मुख्य स्विच है, जिसे ड्राइवर शुरू और बंद करता है। Windows अपना मुख्य स्विच category_enabled के hotstrings गेट के रूप में रखता है, और Linux अपने hotstring समूह एक-एक करके चालू करता है।",
 	"platform_reason.category_gates_are_windows": "केवल Windows: Windows हर श्रेणी के अपने स्विचों के आगे एक मुख्य गेट रखता है। macOS अपना hotstrings मुख्य स्विच hotstrings.enabled के रूप में रखता है, और Linux अपने hotstring समूह एक-एक करके चालू करता है।",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "यह शॉर्टकट उसी सिस्टम का है जो इसे बाँधता है: हर ड्राइवर अपनी क्रियाएँ उन कुंजी-संयोजनों पर देता है जो उसका सिस्टम खाली छोड़ता है (Windows पर Windows कुंजी संयोजन, macOS पर Ctrl और Cmd, Linux पर कीबोर्ड स्लॉट) और चुनाव अपने नाम से सहेजता है।",

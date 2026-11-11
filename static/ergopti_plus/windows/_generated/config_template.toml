@@ -633,6 +633,30 @@ tap_4 = "none"
 
 
 
+[gestures.modes]
+swipe_3_left = "incremental"
+swipe_3_right = "incremental"
+swipe_3_up = "x1"
+swipe_3_down = "x1"
+swipe_4_left = "x1"
+swipe_4_right = "x1"
+swipe_4_up = "x1"
+swipe_4_down = "x1"
+
+
+
+[gestures.sensitivities]
+swipe_3_left = 3.5
+swipe_3_right = 3.5
+swipe_3_up = 25
+swipe_3_down = 25
+swipe_4_left = 3.5
+swipe_4_right = 3.5
+swipe_4_up = 3.5
+swipe_4_down = 3.5
+
+
+
 
 
 [layout]

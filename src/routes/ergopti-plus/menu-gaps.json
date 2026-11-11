@@ -981,39 +981,11 @@
 		}
 	},
 	{
-		"path": "gesture_slot_mode_commands.gesture_mode_single",
-		"visibility": "hide",
-		"labels": { "fr": "Action unique (x1)", "en": "Single action (x1)" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
-			}
-		}
-	},
-	{
-		"path": "gesture_slot_mode_commands.gesture_mode_incremental",
-		"visibility": "hide",
-		"labels": { "fr": "Envoi incrémental (distance)", "en": "Incremental send (distance)" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
-			}
-		}
-	},
-	{
 		"path": "gesture_change_action.gesture_slot_change_action",
 		"visibility": "hide",
 		"labels": { "fr": "Changer l'action", "en": "Change action" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": true, "macos": true, "linux": false },
 		"reasons": {
-			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
-			},
 			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
@@ -1252,12 +1224,8 @@
 		"path": "gesture_swipe_slot_menu.gesture_mode_options",
 		"visibility": "hide",
 		"labels": { "fr": "Mode : %s", "en": "Mode: %s" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": true, "macos": true, "linux": false },
 		"reasons": {
-			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
-			},
 			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
@@ -1268,12 +1236,8 @@
 		"path": "gesture_swipe_slot_menu.gesture_sensitivity_options",
 		"visibility": "hide",
 		"labels": { "fr": "Sensibilité : %s", "en": "Sensitivity: %s" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": true, "macos": true, "linux": false },
 		"reasons": {
-			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
-			},
 			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."

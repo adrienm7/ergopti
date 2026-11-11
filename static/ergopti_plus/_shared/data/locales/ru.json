@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "Средний щелчок",
 	"menu.caps_word.pointer.other_buttons": "Другие кнопки мыши",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Не в Windows: система оставляет жесты тачпада себе и не передаёт Ergopti ни одного касания. Прокрутка двумя пальцами по-прежнему считается прокруткой.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Не в Windows: Windows передаёт драйверу каждый жест готовым, только после его завершения, из настроек тачпада, поэтому свайп не может повторяться шаг за шагом, пока пальцы двигаются. macOS и Linux сами отслеживают пальцы.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Только macOS под этим именем: это главный выключатель движка набора macOS, который драйвер запускает и останавливает. В Windows главный выключатель хранится как шлюз hotstrings в category_enabled, а Linux включает группы hotstrings по одной.",
 	"platform_reason.category_gates_are_windows": "Только Windows: Windows хранит по одному главному шлюзу на категорию перед собственными переключателями категории. macOS хранит главный переключатель hotstrings как hotstrings.enabled, а Linux включает группы hotstrings по одной.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Это сочетание принадлежит системе, которая его назначает: каждый драйвер предлагает свои действия на тех сочетаниях, которые оставляет свободными его система (сочетания с клавишей Windows в Windows, Ctrl и Cmd в macOS, слоты клавиатуры в Linux), и хранит выбор под своим именем.",

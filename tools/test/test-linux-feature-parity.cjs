@@ -62,8 +62,8 @@ const inventoryModel = inventory.withSectionReasons(
 	featureModel.manifest.sections
 );
 assert.strictEqual(
-	inventoryModel.find((row) => row.path === 'gestures.modes.swipe_2_left').reason_key,
-	'platform_reason.gesture_modes_and_steps_need_finger_travel'
+	inventoryModel.find((row) => row.path === 'category_enabled.hotstrings').reason_key,
+	'platform_reason.category_gates_are_windows'
 );
 const inheritedFixture = inventory.withSectionReasons(
 	[{ section: 'one', platforms: ['hs', 'linux'] }],

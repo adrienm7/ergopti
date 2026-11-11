@@ -681,6 +681,7 @@ InstallSendNoOps()
 #Include unit/modules/gestures/test_gesture_incremental_rule.ahk
 #Include unit/modules/gestures/test_touchpad_hid.ahk
 #Include unit/modules/gestures/test_raw_touchpad_owner.ahk
+#Include unit/modules/gestures/test_gesture_swipe_slot_menu.ahk
 #Include unit/modules/updater/test_updater_constants_single_source.ahk
 #Include unit/infra/lifecycle/test_runtime_contract_version.ahk
 #Include meta/modules/updater/test_updater_load_interval_guard.ahk

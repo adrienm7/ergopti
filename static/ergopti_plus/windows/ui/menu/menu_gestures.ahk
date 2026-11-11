@@ -154,7 +154,9 @@ _GES_PushStatusRows(Rows, Status) {
 	return true
 }
 
-; One slot row: the slot, the action bound to it, and its availability.
+; One slot row: the slot, the action bound to it, and its availability. A
+; swipe slot with a mode opens the shared swipe template (change action, mode,
+; step), as on macOS; a tap slot opens its action picker directly.
 _GES_SlotRow(Slot) {
 	global GestureAssignments, GESTURE_ACTIONS, Features
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
@@ -165,12 +167,56 @@ _GES_SlotRow(Slot) {
 		? GestureActionDisplayLabel(CurrentAction, GestureBindingId("gesture", Slot))
 		: t("dialog.action_picker.disabled")
 	Reason := GestureSystemUnavailableReason(Slot)
-	return Map(
+	PickAction := ((_s, _l) => (*) => ShowActionPicker(_l,
+		GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
+		(Id) => SetGestureSlotAction(_s, Id), false, GestureBindingId("gesture", _s)))(Slot, SlotLabel)
+	Row := Map(
 		"label",    LabelValue(SlotLabel, CurrentLabel) . (Reason != "" ? " — " . Reason : ""),
-		"disabled", !GestEnabled || Reason != "",
-		"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
-			GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
-			(Id) => SetGestureSlotAction(_s, Id), false, GestureBindingId("gesture", _s)))(Slot, SlotLabel))
+		"disabled", !GestEnabled || Reason != "")
+	Items := GestureSlotMode(Slot) != "" ? _GES_SwipeSlotItems(Slot, PickAction, GestEnabled) : false
+	if (Items is Array)
+		Row["items"] := Items
+	else
+		Row["action"] := PickAction
+	return Row
+}
+
+; The shared swipe template of one slot: its action picker, its mode (x1 or
+; incremental) and its step in millimetres, which only an incremental slot
+; uses (modules/gestures/raw_touchpad.ahk follows the fingers for it).
+; @param Slot {String} A swipe slot with a mode.
+; @param PickAction {Func} Opens the slot's action picker.
+; @param Ready {Boolean} Whether gestures are on.
+; @returns {Array|Boolean} Provider rows, false when a template is refused.
+_GES_SwipeSlotItems(Slot, PickAction, Ready) {
+	global GESTURE_SENSITIVITY_OPTIONS
+	Incremental := GestureSlotMode(Slot) == "incremental"
+	Step := GestureSlotSensitivity(Slot)
+	Commands := Map(
+		MenuCommand.GESTURE_SLOT_CHANGE_ACTION, PickAction,
+		MenuCommand.GESTURE_MODE_SINGLE, (*) => GestureSetSlotMode(Slot, "x1"),
+		MenuCommand.GESTURE_MODE_INCREMENTAL, (*) => GestureSetSlotMode(Slot, "incremental"))
+	ModeRows := MenuRenderer_TemplateRows("gesture_slot_mode_commands", Commands, Map(
+		"gesture_mode_is_single", () => !Incremental,
+		"gesture_mode_is_incremental", () => Incremental), Map())
+	StepRows := MenuRenderer_TemplateRows("gesture_sensitivity_head", Map(), Map(), Map())
+	if !(ModeRows is Array) || !(StepRows is Array)
+		return false
+	Default := ManifestDefaultFor(ConfigKey.GESTURES_SENSITIVITIES . "." . Slot)
+	for Value in GESTURE_SENSITIVITY_OPTIONS {
+		Label := Format("{:.1f}", Value)
+		if (Value = Default)
+			Label .= " " . t("menu.gestures.default_sensitivity")
+		StepRows.Push(Map("label", Label, "checked", Step != "" && Step = Value ? 1 : 0,
+			"action", ((_s, _v) => (*) => GestureSetSlotSensitivity(_s, _v))(Slot, Value)))
+	}
+	Getters := Map(
+		"gesture_slot_choice_ready", () => Ready ? true : false,
+		"gesture_mode_current_label", () => t(Incremental ? "menu.gestures.mode_incremental" : "menu.gestures.mode_single"),
+		"gesture_sensitivity_current_label", () => Step != "" ? Format("{:.1f}", Step) : "-",
+		"gesture_mode_incremental_ready", () => Incremental)
+	return MenuRenderer_TemplateRows("gesture_swipe_slot_menu", Commands, Getters,
+		Map("gesture_mode_options", ModeRows, "gesture_sensitivity_options", StepRows))
 }
 
 ; Applies a new action to a gesture slot and reloads.
