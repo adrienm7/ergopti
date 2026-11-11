@@ -154,8 +154,12 @@ local CHORDS_SOURCE = SOURCE .. '[shortcuts.script_control]\nchords_enabled = fa
 local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 
 --- Real configuration/claim owners; only the native map observation is modeled.
-local function with_collision_scope(source, tap_config, body, navigation_text)
+--- @param chord_config string|nil `[mod_combos]` text for the tap_hold.toml beside
+---   config.toml, the file the combinations owner reads its third slots from.
+local function with_collision_scope(source, tap_config, body, navigation_text, chord_config)
 	with_scope(function(scope, owners, controls, path)
+		local chord_path = chord_config and require("modules.shortcuts.key_combinations").chord_path_for(path)
+		if chord_path then Sandbox.write_bytes(chord_path, chord_config) end
 		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -231,6 +235,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			helpers.assert_eq(hook.calls, before + controls.intentional_hook_changes, "validation adds no native ownership change beyond the controlled fault injection")
 		end)
 		if Manager then Manager._reset_for_test() end
+		if chord_path then os.remove(chord_path) end
 		if tap_path then
 			local removed, detail = os.remove(tap_path)
 			if navigation_made and removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Tap fixture cleanup refused: " .. tostring(detail) end
