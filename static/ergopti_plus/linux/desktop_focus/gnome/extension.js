@@ -33,7 +33,9 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 const BUS_NAME = 'org.ergopti.Focus';
 const OBJECT_PATH = '/org/ergopti/Focus';
 const INTERFACE = 'org.ergopti.Focus1';
-const CALL_TIMEOUT_MS = 1000;
+// How long the shell waits for the worker to take one report; the worker's own
+// bus calls have their bound in adapters/compositor_focus.lua.
+const REPORT_TIMEOUT_MS = 1000;
 
 export default class ErgoptiFocusExtension extends Extension {
 	enable() {
@@ -114,7 +116,7 @@ export default class ErgoptiFocusExtension extends Extension {
 			parameters,
 			null,
 			Gio.DBusCallFlags.NO_AUTO_START,
-			CALL_TIMEOUT_MS,
+			REPORT_TIMEOUT_MS,
 			null,
 			(connection, result) => {
 				try {
