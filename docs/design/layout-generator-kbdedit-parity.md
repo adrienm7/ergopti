@@ -31,9 +31,12 @@ extra modifier levels (user modifiers, held or locked, and layers that require t
 chord, per-key Caps Lock modes (unaffected, Shift, separate layers), dead keys with chains, terminators and
 multi-character results, ligatures, numpad and media keys, physical remapping, tap-holds, a Unicode palette
 (blocks and code-point entry), printable stickers (four levels per key), a live typing preview and undo/redo.
-Still open against this inventory: drag and drop, clipboard and auto case mapping between keys, Unicode name
-search and magnifier, sticker layout options (exact key size, per-block visibility), NLS functions, Windows flags
-and virtual-key editing, keyboard types beyond ISO/ANSI, and every compiled export of edited layouts (generator).
+Added the same night: drag and drop between keys (swap, Ctrl copies), copy/paste of a mapping, ISO/ANSI board,
+locating a character, exact sticker size, Caps Lock + AltGr, Windows virtual keys, layout flags and NLS
+functions, compiled `.keylayout` and bundle exports, and filling a layer from another layout. Still open against
+this inventory: Unicode name search and the character magnifier (no Unicode names table ships with the page),
+auto case mapping, sticker per-block visibility, keyboard types beyond ISO/ANSI, XKB/KLC exports in the browser
+and the Windows DLL.
 
 ## KbdEdit capability inventory
 
