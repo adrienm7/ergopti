@@ -353,9 +353,9 @@ body {
 		display: grid;
 		font-size: 9pt;
 		grid-template-columns: 1fr 1fr;
-		height: 14mm;
+		height: var(--le-sticker-size, 14mm);
 		padding: 0.5mm 1mm;
-		width: 14mm;
+		width: var(--le-sticker-size, 14mm);
 	}
 
 	/* Shift top left, base bottom left, AltGr levels on the right. */

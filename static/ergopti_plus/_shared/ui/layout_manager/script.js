@@ -439,7 +439,11 @@ window.initData = function (data) {
 		applyDomStrings();
 	}
 	// Only a host that stores the editor's files offers it (macOS and Linux).
-	document.getElementById('btn-editor').hidden = data.source_editor !== true;
+	// There the editor replaces the composer, which fills layers from the same
+	// sources; Windows keeps the composer until its host accepts a source.
+	const editor = data.source_editor === true;
+	document.getElementById('btn-editor').hidden = !editor;
+	document.getElementById('btn-compose').hidden = editor;
 	window.updateState(data.state);
 };
 
@@ -454,6 +458,7 @@ window.initData = function (data) {
 let _editor = null;
 let _pendingSave = null;
 let _pendingInstall = null;
+let _pendingSources = null;
 
 /** Shows the editor or the layout list. */
 function showEditor(visible) {
@@ -493,8 +498,33 @@ function hostInstall(payload) {
 	});
 }
 
-/** Routes the composer host's answer to an editor install, else to the composer section. */
+/**
+ * The registry layouts a layer can be filled from: the composer host's own
+ * sources ({id, name, convention, text}), asked with composer_open.
+ */
+function hostSources() {
+	return new Promise(function (resolve, reject) {
+		if (_pendingSources) {
+			reject({ code: 'save_busy', path: 'composer_open' });
+			return;
+		}
+		_pendingSources = resolve;
+		send('composer_open');
+	});
+}
+
+/** Routes the composer host's answers to the editor when it asked, else to the composer section. */
 function routeComposerResults() {
+	const composerData = window.composerData;
+	window.composerData = function (data) {
+		const pending = _pendingSources;
+		if (!pending) {
+			if (typeof composerData === 'function') composerData(data);
+			return;
+		}
+		_pendingSources = null;
+		pending(data && Array.isArray(data.sources) ? data.sources : []);
+	};
 	const composerResult = window.composerResult;
 	window.composerResult = function (result) {
 		const pending = _pendingInstall;
@@ -524,6 +554,7 @@ window.sourceData = function (data) {
 	_editor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
 		saveFile: hostSave,
 		install: hostInstall,
+		loadSources: hostSources,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,
