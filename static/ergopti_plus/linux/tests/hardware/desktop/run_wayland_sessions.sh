@@ -52,6 +52,10 @@ cleanup() {
 	rm -rf -- "${WORK}"
 }
 trap cleanup EXIT
+# GNOME Shell aborts without logind on the system bus (lib/system_bus.sh).
+. "${TESTS}/lib/system_bus.sh"
+system_logind_ensure || exit 2
+PIDS="${PIDS} ${SYSTEM_LOGIND_PID}"
 
 mkdir -p "${WORK}/bin"
 gcc -Wall -Wextra -Werror -O1 -o "${WORK}/bin/lswt" "${TESTS}/foreign_toplevel_probe.c" -lwayland-client \
