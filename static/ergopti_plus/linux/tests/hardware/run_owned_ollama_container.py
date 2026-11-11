@@ -22,6 +22,7 @@ homes. In a root container, run it through `su` as a throwaway user.
 
 from __future__ import annotations
 
+import grp
 import http.server
 import json
 import os
@@ -302,6 +303,19 @@ class OwnedOllamaContainer(unittest.TestCase):
         result, _, owned = self.start()
         self.assert_owned_started(result, owned)
         self.assertEqual(result["served"][0]["proxy"], {})
+
+    def test_umask_0002_private_group_parents_install_and_start(self):
+        # Debian, Ubuntu and Fedora give each account a private group and the
+        # umask 0002: the data folders are group-writable by that group only.
+        if grp.getgrgid(os.getgid()).gr_name != pwd.getpwuid(os.getuid()).pw_name:
+            self.skipTest("the account has no private group")
+        self.proxy_settings("none")
+        for folder in (self.case, self.data):
+            folder.mkdir(exist_ok=True)
+            os.chmod(folder, 0o775)
+        result, _, owned = self.start()
+        self.assert_owned_started(result, owned)
+        self.assertEqual(os.stat(self.data).st_mode & 0o777, 0o775)
 
     def test_unreachable_pac_warns_then_pulls_direct(self):
         # Nothing listens on the PAC's port: GIO cannot fetch the PAC.

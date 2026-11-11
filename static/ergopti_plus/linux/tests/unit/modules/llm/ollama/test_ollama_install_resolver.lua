@@ -19,8 +19,8 @@ local function release() return assert(Json.decode_lossless(release_text)) end
 local catalogue = release()
 local function fixture()
 	local f = { nodes = {}, created = {}, uid = 1000, machine = "x86_64", next_inode = 1 }
-	function f.node(path, uid, mode, kind)
-		local value = { uid = uid, mode = mode, type = kind or "directory", dev = 7, ino = f.next_inode }
+	function f.node(path, uid, mode, kind, gid)
+		local value = { uid = uid, gid = gid or uid, mode = mode, type = kind or "directory", dev = 7, ino = f.next_inode }
 		f.next_inode = f.next_inode + 1 f.nodes[path] = value return value
 	end
 	f.node("/", 0, 493) f.node("/home", 0, 493) f.node("/home/test", 1000, 448)
@@ -38,7 +38,10 @@ local function fixture()
 		expect(not f.nodes[path], "exclusive missing-directory admission")
 		f.node(path, 1000, mode) f.created[#f.created + 1] = path return true
 	end
-	f.options = { native = native, catalogue = release(), app_dirs = AppDirs, environment = { HOME = "/home/test" } }
+	-- The private-group answers of the system account databases, by gid.
+	f.private_groups = {}
+	f.options = { native = native, catalogue = release(), app_dirs = AppDirs, environment = { HOME = "/home/test" },
+		private_group = function(gid) return f.private_groups[gid] == true end }
 	function f.new() return Resolver.new(f.options) end
 	return f
 end
@@ -156,6 +159,67 @@ test("group or other writable ancestor cannot borrow private child", function()
 		local resolver, reason = f.new()
 		expect(resolver == nil and reason == "install_ancestor_writable_by_others", "mutable ancestor refused")
 	end
+end)
+
+-- (umask-0002-private-group) Debian, Ubuntu and Fedora give each account a
+-- private group and the umask 0002, so ~/.local/share is created 0775.
+test("an ancestor writable only by the user's private group is admitted", function()
+	local f = fixture()
+	f.node("/home/test/.local", 1000, 509, nil, 1000) f.node("/home/test/.local/share", 1000, 509, nil, 1000)
+	f.private_groups[1000] = true
+	local resolver, reason = f.new()
+	expect(resolver ~= nil, tostring(reason))
+	expect(assert(resolver.prepare({ explicit_consent = true, authorized = function() return true end })), "prepared")
+	for _, path in ipairs(f.created) do expect(f.nodes[path].mode == 448, "created parents stay owner-only") end
+end)
+
+test("an ancestor writable by another shared group is still refused", function()
+	local f = fixture()
+	f.node("/home/test/.local", 1000, 509, nil, 100)
+	f.private_groups[1000] = true
+	local resolver, reason = f.new()
+	expect(resolver == nil and reason == "install_ancestor_writable_by_others", "shared group refused")
+end)
+
+test("a world-writable ancestor is refused even in the user's private group", function()
+	for _, mode in ipairs({ 511, 495 }) do
+		local f = fixture()
+		f.node("/home/test/.local", 1000, mode, nil, 1000)
+		f.private_groups[1000] = true
+		local resolver, reason = f.new()
+		expect(resolver == nil and reason == "install_ancestor_writable_by_others", "world write refused")
+	end
+end)
+
+test("a private group's write bit on a root-owned ancestor stays refused when the group is shared", function()
+	local f = fixture() f.nodes["/home"].mode = 509 f.nodes["/home"].gid = 0
+	local resolver, reason = f.new()
+	expect(resolver == nil and reason == "install_ancestor_writable_by_others", "root's group is not private to the user")
+end)
+
+test("an ancestor's group changing after capture withdraws admission", function()
+	local f = fixture()
+	f.node("/home/test/.local", 1000, 509, nil, 1000)
+	f.private_groups[1000] = true
+	local resolver = assert(f.new())
+	f.nodes["/home/test/.local"].gid = 100
+	expect(not resolver.current(), "the captured gid is part of the identity")
+end)
+
+test("a group-writable ancestor whose group cannot be read is refused", function()
+	local f = fixture()
+	f.node("/home/test/.local", 1000, 509, nil, 1000) f.nodes["/home/test/.local"].gid = nil
+	f.private_groups[1000] = true
+	local resolver, reason = f.new()
+	expect(resolver == nil and reason == "install_ancestor_writable_by_others", "unknown group refused")
+end)
+
+test("the private-group lookup raising refuses the group bit", function()
+	local f = fixture()
+	f.node("/home/test/.local", 1000, 509, nil, 1000)
+	f.options.private_group = function() error("account database unavailable") end
+	local resolver, reason = f.new()
+	expect(resolver == nil and reason == "install_ancestor_writable_by_others", "lookup failure is closed")
 end)
 
 test("actual native UID ignores environment identity hints", function()
