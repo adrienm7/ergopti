@@ -136,6 +136,17 @@ if (!/candidate\.bundleIdentifier == embeddedBundleId/.test(ownership)) {
 			'identity only, so a Hammerspoon the user installed is never terminated.'
 	);
 }
+// A leftover runtime gets its own controlled-exit bound before it is killed;
+// a 3 s literal killed it inside its quit fence (MLC-004).
+if (
+	!/^let kStaleRuntimeTerminateGrace = LauncherTimings\.userQuitDeadline$/m.test(ownership) ||
+	!/^let kStaleRuntimePoll = LauncherTimings\.staleRuntimePoll$/m.test(ownership)
+) {
+	errors.push(
+		'LauncherInstanceOwnership.swift: the leftover-runtime grace must be [ui] user_quit_deadline_ms ' +
+			'and its poll [launcher] stale_runtime_poll_ms, both from LauncherTimings (MLC-004).'
+	);
+}
 const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');
 // Both Lua sites read the ids from identifiers.json (generated into identifiers.lua);
 // the ids below are what that file declares, compared with the build script's.
