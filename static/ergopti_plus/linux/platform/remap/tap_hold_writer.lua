@@ -45,6 +45,7 @@ local Shapes = require("platform.remap.tap_hold_shapes")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Migration = require("platform.remap.tap_hold_migration")
 local Paths = require("infra.paths")
+local NativePath = require("native_path")
 local ConfigKeys = require("config_keys")
 local LoneTap = require("tap_hold.lone_tap")
 
@@ -119,11 +120,11 @@ end
 --- Copies a file's bytes to a new backup beside it, then reads them back.
 --- @param path string The file being replaced.
 --- @param text string Its bytes.
---- @param label string|nil What the backup is for, in its name; "tap_holds" by default.
+--- @param label string|nil What the backup is for, in its name; the [tap_holds] section by default.
 --- @return string|nil backup The backup path, nil when it could not be made.
 local function back_up(path, text, label)
 	_backup_sequence = _backup_sequence + 1
-	local backup = string.format("%s.%s-%s-%d.bak", path, label or "tap_holds", os.date("%Y%m%d-%H%M%S"), _backup_sequence)
+	local backup = string.format("%s.%s-%s-%d.bak", path, label or ConfigKeys.KEY.TAP_HOLDS, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
 	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, backup, "wx")
 	if not opened or not fh then return nil end
 	if type(remove_owned) ~= "function" or type(current_image) ~= "function" then
@@ -965,7 +966,7 @@ function M.import_config_combos(config_path, path)
 	end
 	local spec = Migration.registry().legacy_imports.linux
 	if type(spec) ~= "table" or spec.translate ~= "config_section" or spec.section ~= COMBOS_SECTION
-		or config_path:match("[^/]+$") ~= spec.source then
+		or NativePath.basename(config_path) ~= spec.source then
 		error("migrations.toml [legacy_imports.linux] does not move config.toml's [" .. COMBOS_SECTION .. "]", 0)
 	end
 	local text, status, detail = TomlWriter.read_classified(config_path)
@@ -1009,7 +1010,7 @@ function M.import_config_combos(config_path, path)
 			Logger.error(LOG, "The key combinations of '%s' cannot be written to '%s' (%s).", config_path, path, tostring(refusal))
 			return "failed", tostring(refusal)
 		end
-		if source.status == "ok" and not back_up(path, current_text, "mod_combos") then
+		if source.status == "ok" and not back_up(path, current_text, COMBOS_SECTION) then
 			Logger.error(LOG, "'%s' could not be backed up — the key combinations stay in '%s'.", path, config_path)
 			return "failed", "'" .. path .. "' could not be backed up"
 		end
@@ -1021,7 +1022,7 @@ function M.import_config_combos(config_path, path)
 		end
 	end
 	local plan = require("config_migrate").plan_operations(text, deletes)
-	local backup = plan.outcome == "migrated" and back_up(config_path, text, "mod_combos") or nil
+	local backup = plan.outcome == "migrated" and back_up(config_path, text, COMBOS_SECTION) or nil
 	local removed, remove_err = false, plan.detail or plan.outcome
 	if backup then
 		removed, remove_err = TomlWriter.publish_if_unchanged(config_path, plan.candidate, nil, { status = "ok", content = text })
