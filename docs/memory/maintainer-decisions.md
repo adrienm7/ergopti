@@ -5,6 +5,20 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Linux API key migration never blocks the daemon (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: the boot-time move of a plaintext API
+key to the Linux keyring never blocks the daemon. The daemon starts at once;
+`modules/llm/api_key_migration.lua` runs the move in the background, each
+secret-service call an owned child with a bounded deadline, and retries until
+the keyring is unlocked (a D-Bus read of the default collection's `Locked`
+property, which never prompts, gates each attempt; the retry is periodic and
+bounded rather than an unlock signal). The plaintext key stays in
+`api_keys.json` until the move succeeds; each attempt logs a paired start and
+success or warning. Do not move a secret-service call back onto the boot
+path or into a synchronous `ui/modal` hand-over there. macOS already keeps
+every Keychain call async with a deadline; Windows DPAPI has no prompt.
+
 ## Physical shortcut delivery is on (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (LIN-004): the production getter

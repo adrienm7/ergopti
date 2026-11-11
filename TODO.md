@@ -1093,7 +1093,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       of `tests/hardware/run_nav_pointer_container.py`: a notch under the layer is the volume key and never scrolls,
       outside it the mouse is not grabbed (receipt `docs/audits/linux/2026-11-10-container-proofs`).
 - [x] Wayland desktop changes: on sway, Hyprland and KDE Plasma 6 Wayland, switch workspaces a few times (each at least 1 s apart); Metrics shows the desktop-change count rising by one per switch, and GNOME Wayland still shows « — » with its reason. Container proof (2026-11-10, e15b6aac0a, `linux/tests/hardware/desktop/run_wayland_sessions.sh`, receipt `tests/hardware/desktop/receipts/wayland_desktop_changes.txt`): on headless sway 1.9 and KWin 5.27 (`--virtual`), `current_workspace_source` → `system_metrics` counts 4 switches made through `workspace_switcher.switch` one by one (a round trip inside the 1 s reuse window is missed, as documented); GNOME Shell 46 headless answers `unsupported` and the metric names `desktop_changes_need_workspace_interface`. Not emulable here: Hyprland and Plasma 6 are not packaged by Ubuntu 24.04 and their upstreams are unreachable from the container; KWin 5.27 answers the same `currentDesktop`/`setCurrentDesktop` D-Bus calls the module uses.
-- [x] Secret service: with gnome-keyring locked, adding a key opens GNOME's « Unlock Login Keyring » prompt inside `keyboard_hook.while_released`; the file keeps a secret-service reference, and after a restart `migrate_plaintext` moves a plaintext `api_keys.json` entry (e93a4f7368, 939c0f60). Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_secret_service.sh`, 5/5 then 6/6 after the restart (`receipts/secret_service.txt`). Not emulable here: that `while_released` ungrabs a real keyboard so the prompt gets the keys, because the container has no /dev/input or /dev/uinput nodes and Xvfb takes its keys from XTEST, not evdev; it rides on the evdev grab of « Physical acceptance ».
+- [x] Secret service: with gnome-keyring locked, adding a key opens GNOME's « Unlock Login Keyring » prompt inside `keyboard_hook.while_released`; the file keeps a secret-service reference, and after a restart `migrate_plaintext` moves a plaintext `api_keys.json` entry (e93a4f7368, 939c0f60); since 2026-11-11 the boot moves it in the background (`modules/llm/api_key_migration.lua`), never blocking the daemon. Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_secret_service.sh`, 5/5 then 6/6 after the restart (`receipts/secret_service.txt`). Not emulable here: that `while_released` ungrabs a real keyboard so the prompt gets the keys, because the container has no /dev/input or /dev/uinput nodes and Xvfb takes its keys from XTEST, not evdev; it rides on the evdev grab of « Physical acceptance ».
 - [x] Owned Ollama: with `ollama serve` on 11434, enabling the AI starts Ergopti's on 11435 (32fa07be7f). Container
       proof 2026-11-10 (`static/ergopti_plus/linux/tests/hardware/run_owned_ollama_container.py`, CI `network-ai`): an Ollama stand-in speaking its HTTP
       API on 11434 and an `ollama` on PATH are never contacted or run; the menu's enable starts the managed binary
@@ -1291,6 +1291,19 @@ between workers) green alone. All live checks pass, typed by the harness.
   ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
   `test-linux-field-report-contract` (setup error), `test-menu-manifest` in a worktree (a `node_modules` junction
   copy fails with `EPERM`). Make each one pass locally or skip with a stated reason.
+- [x] **Linux: the boot-time move of a plaintext API key never blocks the daemon.** Decided by the maintainer on
+      2026-11-11: the boot ran `api_entries.migrate_plaintext()` synchronously, and with a locked keyring its
+      `secret-tool store` waited on a prompt nobody answered before the output keyboard opened (worked around in the
+      live harness by cbbf7766). Done: `modules/llm/api_key_migration.lua` (one owner, explicit init, refused second
+      init) arms the move after boot; every secret-service call is an owned child with a deadline
+      (`api_key_migration_*` in the timing registry), a locked default collection is read over D-Bus without a
+      prompt and waited for, and the attempt retries (60 s, doubling after other failures up to 30 min). The
+      plaintext key stays in `api_keys.json` until the file names its reference. Regression:
+      `test_api_key_migration.lua` (a secret-tool that blocks: the loop keeps ticking, the child is killed at its
+      deadline, the plaintext stays, the next attempt moves it) and `run_daemon_live.sh`, whose live daemon now
+      boots beside a blocking secret-tool. macOS has no such boot step (Keychain calls are owned async tasks with a
+      10 s deadline and the load is deferred off the boot path). Windows counterpart for the maintainer: DPAPI has
+      no prompt and no service to wait on; check that no boot path calls a credential store that can block.
 - [ ] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
       Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the core keyboard changes (the daemon's
       virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
