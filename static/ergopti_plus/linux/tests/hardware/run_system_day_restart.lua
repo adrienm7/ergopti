@@ -3,7 +3,8 @@
 --- MODULE: Native System-Day Restart Hydration (Linux)
 --- DESCRIPTION:
 --- Actual public collector, sampler and SQLite operations in separate processes.
---- Elapsed awake time is native; historical sensor rows are supplied software data.
+--- Elapsed awake time is native (one keep-awake session of the measured
+--- interval); historical sensor rows are supplied software data.
 --- ==============================================================================
 
 local uv = require("luv")
@@ -47,8 +48,13 @@ local observation
 if phase == "first" then
 	assert(Metrics.current() == nil)
 	assert(Metrics.sample())
+	local started = uv.hrtime()
 	uv.sleep(30080)
-	local day = assert(Metrics.sample())
+	assert(Metrics.sample())
+	-- awake_ms is keep-awake time (KMD-3): the genuine elapsed interval is
+	-- credited as one session through the collector's own entry point.
+	assert(Metrics.record_awake_session((uv.hrtime() - started) / 1e6))
+	local day = assert(Metrics.current())
 	assert(os.date("%Y-%m-%d") == date)
 	Drain.flush(K)
 	check("native awake time accumulates before restart", function()
