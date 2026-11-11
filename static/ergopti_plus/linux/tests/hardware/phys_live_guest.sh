@@ -99,6 +99,12 @@ alive() { [ -n "$1" ] && [ "$1" != 0 ] && [ -d "/proc/$1" ] && ! grep -q '^State
 in_unit() { grep -q '/ergopti-hotstrings.service$' "/proc/$1/cgroup" 2>/dev/null; }
 
 section "Installer"
+# A first install: nothing of an earlier run of this script survives. A
+# reinstall over an older tree keeps the files it no longer ships, which is a
+# separate installer defect (TODO.md), not this scenario.
+user_systemctl "stop ergopti-hotstrings.service" 2>/dev/null || true
+rm -rf "${PHYS_HOME}/.local/lib/ergopti" "${PHYS_HOME}/.local/lib/ergopti.old" "${PHYS_HOME}/.local/bin/ergopti-hotstrings" \
+	"${PHYS_HOME}/.config/systemd/user/ergopti-hotstrings.service.d"
 rm -rf "${PHYS_HOME}/ergopti"
 mkdir -p "${PHYS_HOME}/ergopti/static/layouts" "${PHYS_HOME}/ergopti/tools/build"
 cp -r "${SRC}/static/ergopti_plus" "${PHYS_HOME}/ergopti/static/"
