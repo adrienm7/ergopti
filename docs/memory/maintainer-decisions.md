@@ -5,6 +5,19 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A borrowed unowned Linux clipboard goes back unowned (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ADD-2): when a Linux borrower
+(paste, selection read or transform, paste stage) finds a clipboard nobody
+owns, it restores it unowned, as macOS clears its pasteboard, instead of
+writing an owned empty string that clipboard managers record. The snapshot
+carries `unowned = true` and `restore_snapshot` calls the backend's `clear`:
+X11 `x11_selection_stamp.disown` (`XSetSelectionOwner(CLIPBOARD, None)`,
+checked by reading the owner back), Wayland `wl-copy --clear`; a backend
+with no `clear` refuses the borrow. Regressions `clipboard-unowned-empty`.
+Windows needs no change: assigning an empty `ClipboardAll` runs
+`EmptyClipboard`, which offers no format.
+
 ## No Linux keyboard slot runs through a pause (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (SCD-1): on Linux a keyboard slot

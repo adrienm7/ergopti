@@ -59,10 +59,15 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		-- Real xclip exits 1 when nobody owns the clipboard; the libX11 owner
 		-- probe tells that empty clipboard from a failed read.
 		s.owner_probes = 0
+		s.disowns = 0
 		package.loaded["adapters.x11_selection_stamp"] = { owned = function()
 			s.owner_probes = s.owner_probes + 1
 			if unowned == nil then error("the owner probe runs only after a failed read", 0) end
 			return unowned.owned
+		end, disown = function()
+			s.disowns = s.disowns + 1
+			s.value, s.cleared = "", true
+			return true
 		end }
 		package.loaded["adapters.keyboard_layout"] = {
 			shortcut_keycode = function(char, fallback)
@@ -90,7 +95,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 			end
 			if command == clipboard or command == primary or command == uri then
 				s.reads[#s.reads + 1] = command
-				if unowned ~= nil and #s.writes == 0 then return { ok = false, output = "" } end
+				if unowned ~= nil and (#s.writes == 0 or s.cleared) then return { ok = false, output = "" } end
 				return { ok = true, output = s.value }
 			end
 			-- Decode the real generated command independently; no writer/guard mock.
@@ -102,7 +107,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 			local text = rest:sub(1, #rest - #suffix)
 			assert(#text == tonumber(count), "the actual writer must preserve exact byte length")
 			s.writes[#s.writes + 1] = text
-			s.value = text
+			s.value, s.cleared = text, false
 			return true
 		end)
 		local clip = require("adapters.clipboard")
@@ -196,12 +201,17 @@ helpers.describe("clipboard snapshot restorability", function()
 				end)
 			end)
 		end
-		helpers.it("snapshot preflight: " .. owner .. " borrows a clipboard nobody owns as empty (clipboard-unowned-empty)", function()
+		-- ADD-2 (decided by the maintainer on 2026-11-11): the clipboard goes
+		-- back unowned, as macOS clears its pasteboard, never as an owned "".
+		helpers.it("snapshot preflight: " .. owner .. " gives a clipboard nobody owns back unowned (clipboard-unowned-empty)", function()
 			with_snapshot("", function(_, s)
 				local accepted = s.invoke(owner)
 				helpers.assert_eq(accepted, true, "an ownerless clipboard is an empty one, not a failed read")
-				helpers.assert_eq(s.owner_probes, 1)
-				helpers.assert_eq(s.writes[#s.writes], "", "the empty clipboard is restored")
+				helpers.assert_eq(s.disowns, 1, "the restore must leave the clipboard without an owner")
+				helpers.assert_eq(s.cleared, true)
+				for _, written in ipairs(s.writes) do
+					helpers.assert_true(written ~= "", "an owned empty string was written back")
+				end
 			end, nil, nil, { owned = false })
 		end)
 		for _, probe in ipairs({ { name = "owned", owned = true }, { name = "unknown", owned = nil } }) do
