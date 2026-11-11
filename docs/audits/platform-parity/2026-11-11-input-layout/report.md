@@ -26,27 +26,25 @@ ILL-003 and ILM-002 fall back to the character's US key, where GTK, Qt and
 macOS resolve a shortcut under a non-Latin layout; a character with no US key
 keeps the physical one.
 
-## Open (not fixed: order of the daemon's key consumers)
+## Fixed by order of the daemon's key consumers
 
-- **ILL-001:** Linux runs the layout emulation (`ergopti_hotstrings.lua`
-  on-consume chain) before the bound-chord consumer, and the emulation
-  consumes every Ctrl/Alt/Super chord on an emulated key, so a keyboard
-  shortcut slot bound to that chord never fires; reached, it would also match
-  the system layout's key rather than the emulated letter. Windows asks
-  `KeyboardShortcutRunLayoutChord` first (`layout.ahk` `_RemapChordEmit`) and
-  its slot follows the letter. A fix offers the bound-chord consumer the
-  emulated character as its key before `emit_shortcut`.
-- **ILL-002:** with the number row emulated, a bare digit is consumed by the
+Decided by the coordinator on 2026-11-11, to review by the maintainer: the
+Linux on-consume chain now runs `prediction_engine.handle_shortcut`, then the
+bound-chord consumer, then the layout emulation (regression
+`emulation-consume-order` in `test_prediction_control_retirement.lua`).
+
+- **ILL-001:** the emulation ran before the bound-chord consumer and consumed
+  every Ctrl/Alt/Super chord on an emulated key, so a keyboard shortcut slot
+  bound to that chord never fired. Windows asks
+  `KeyboardShortcutRunLayoutChord` first (`layout.ahk` `_RemapChordEmit`).
+  Still open: the slot matches the system layout's key, where Windows' slot
+  follows the emulated letter; offering the consumer the emulated character
+  needs the emulation to expose its mapping.
+- **ILL-002:** with the number row emulated, a bare digit was consumed by the
   emulation before `prediction_engine.handle_shortcut`, so the default
-  validation chord types the digit instead of accepting the prediction (macOS
-  accepts it: the keymap rewrites the text but keeps the key code). Which
-  Windows variant wins between the prediction's digit hotkey and the
-  emulation's is not established.
-
-Both change the order of the consumer chain in the daemon's main module, which
-the coordinator or the maintainer should settle; a regression would drive the
-real chain through the main-module harness of
-`test_prediction_control_retirement.lua`.
+  validation chord typed the digit instead of accepting the prediction, as
+  macOS does. Which Windows variant wins between the prediction's digit hotkey
+  and the emulation's is not established.
 
 ## Decisions pending
 
