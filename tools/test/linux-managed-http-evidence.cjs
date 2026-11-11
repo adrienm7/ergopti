@@ -119,7 +119,7 @@ function readNativeCounts(text, expectedSha, expectedNativeDigest) {
 		!output ||
 		output[1] !== '18' ||
 		!publicResult ||
-		publicResult[1] !== '30' ||
+		publicResult[1] !== '31' ||
 		!source ||
 		source[1] !== expectedSha ||
 		source[3] !== expectedNativeDigest

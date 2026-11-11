@@ -401,10 +401,10 @@ if not decoded or type(request) ~= "table" or type(request.url) ~= "string"
 	emit({ ok = false, error = "proxy-request-invalid" })
 	os.exit(0)
 end
--- A caller that passes pac_check_timeout_ms bounds the PAC download with it.
+-- A caller that passes pac_check_timeout_ms bounds the PAC download with it;
+-- the parent adapter admits it against timings adapters.proxy_pac_download_max_ms.
 local pac_check_ms = request.pac_check_timeout_ms
-if pac_check_ms ~= nil and (type(pac_check_ms) ~= "number" or pac_check_ms < 1 or pac_check_ms > 60000
-	or pac_check_ms % 1 ~= 0) then
+if pac_check_ms ~= nil and (type(pac_check_ms) ~= "number" or pac_check_ms < 1 or pac_check_ms % 1 ~= 0) then
 	emit({ ok = false, error = "proxy-request-invalid" })
 	os.exit(0)
 end

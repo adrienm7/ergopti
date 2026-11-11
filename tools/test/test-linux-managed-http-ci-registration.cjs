@@ -338,7 +338,7 @@ const expectedHead = '1'.repeat(40);
 const expectedNative = '2'.repeat(64);
 const nativeReceipt = [
 	'[OK] Linux managed HTTP retained output: 18 actual native controls passed; 0 skipped.',
-	'[OK] Linux managed HTTP public transport: 30 actual native controls passed; 0 skipped.',
+	'[OK] Linux managed HTTP public transport: 31 actual native controls passed; 0 skipped.',
 	'Linux managed HTTP source: ' +
 		expectedHead +
 		'; inventory ' +
@@ -350,7 +350,7 @@ const nativeReceipt = [
 ].join('\n');
 assert.deepEqual(Evidence.readNativeCounts(nativeReceipt, expectedHead, expectedNative), {
 	output: 18,
-	public: 30
+	public: 31
 });
 passed++;
 for (const invalid of [
@@ -359,7 +359,7 @@ for (const invalid of [
 	nativeReceipt + nativeReceipt,
 	nativeReceipt.replace(/\n/g, '\r\n'),
 	nativeReceipt.replace('18 actual', '0 actual'),
-	nativeReceipt.replace('30 actual', '29 actual'),
+	nativeReceipt.replace('31 actual', '30 actual'),
 	nativeReceipt.replace('18 actual', '018 actual'),
 	nativeReceipt.replace('0 skipped', '1 skipped'),
 	nativeReceipt.replace('[OK]', '[FAIL]'),

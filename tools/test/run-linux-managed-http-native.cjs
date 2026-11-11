@@ -36,6 +36,7 @@ const PUBLIC_CASES = [
 	'test_actual_parent_budget_spans_native_lookup_and_physical_retirement',
 	'test_actual_older_native_curl_does_not_request_or_publish_new_metric',
 	'test_actual_metric_positive_requires_supported_paired_native_receipt',
+	'test_actual_pac_dead_relay_then_direct_reaches_origin',
 	'test_actual_same_origin_relative_path_query_selects_new_proxy',
 	'test_actual_cross_origin_strips_all_canonical_credentials',
 	'test_actual_query_only_location_changes_native_pac_choice',
@@ -49,6 +50,9 @@ const PUBLIC_CASES = [
 	'test_actual_cancel_at_second_lookup_suppresses_terminal_and_retires',
 	'test_actual_redirect_url_and_credentials_stay_outside_native_argv'
 ];
+// The first cases run in NativePublicControls, the rest in PerHopControls.
+const NATIVE_PUBLIC_CASES = 19;
+const RAN_LINE = new RegExp(`^Ran ${PUBLIC_CASES.length} tests in [0-9.]+s$`);
 
 const OUTPUT_CASES = [
 	'actual HTTP output has exactly one retained anonymous regular inode',
@@ -93,7 +97,7 @@ function publicReceipt(result) {
 	if (!completed(result) || result.stdout !== '') return false;
 	const lines = result.stderr.split(/\r?\n/);
 	if (
-		lines.filter((line) => /^Ran 30 tests in [0-9.]+s$/.test(line)).length !== 1 ||
+		lines.filter((line) => RAN_LINE.test(line)).length !== 1 ||
 		lines.filter((line) => line === 'OK').length !== 1
 	)
 		return false;
@@ -110,16 +114,15 @@ function publicReceipt(result) {
 			const position = PUBLIC_CASES.indexOf(witness[1]);
 			if (
 				position < 0 ||
-				witness[2] !== (position < 18 ? 'NativePublicControls' : 'PerHopControls')
+				witness[2] !== (position < NATIVE_PUBLIC_CASES ? 'NativePublicControls' : 'PerHopControls')
 			)
 				return false;
 			observed.push(witness[1]);
-		} else if (!/^Ran 30 tests in [0-9.]+s$/.test(line) && line !== 'OK' && !/^-+$/.test(line))
-			return false;
+		} else if (!RAN_LINE.test(line) && line !== 'OK' && !/^-+$/.test(line)) return false;
 	}
 	return (
-		observed.length === 30 &&
-		new Set(observed).size === 30 &&
+		observed.length === PUBLIC_CASES.length &&
+		new Set(observed).size === PUBLIC_CASES.length &&
 		PUBLIC_CASES.every((name) => observed.includes(name))
 	);
 }
@@ -666,7 +669,9 @@ async function run({
 		// Never insert a competing subreaper or group-kill wrapper in this path.
 		const publicResult = await child('python3', args, env, work, 'public30', 900000);
 		if (!publicReceipt(publicResult)) refuse();
-		log('[OK] Linux managed HTTP public transport: 30 actual native controls passed; 0 skipped.');
+		log(
+			`[OK] Linux managed HTTP public transport: ${PUBLIC_CASES.length} actual native controls passed; 0 skipped.`
+		);
 		if (gateCancelled || process.hrtime.bigint() >= gateDeadline) refuse();
 		fs.writeFileSync(
 			path.join(work, 'QUALIFICATION.json'),
@@ -674,7 +679,7 @@ async function run({
 				{
 					status: 'passed',
 					output_native: 18,
-					public_native: 30,
+					public_native: PUBLIC_CASES.length,
 					skipped: 0,
 					owner_kernel_sha256: ownerSha,
 					phase_worker_sha256: workerSha,
