@@ -22,7 +22,10 @@
 ---    by its progress instead of the wall clock: it times out only after a
 ---    full deadline without progress, or at its bound.
 --- 4. Nothing faked. A step that needs a person (typing, a permission prompt)
----    is reported with that verdict and its reason and is not run.
+---    is reported with that verdict and its reason and is not run. A guided
+---    step (infra/field_run_guided.lua) prompts one gesture through the
+---    collector's terminal and records what it observed or the person answered;
+---    no gesture within its bound is needs_person, never a pass.
 --- 5. The user's configuration is snapshot before the first step and compared
 ---    after the last; anything a step changed is put back and named in the
 ---    config_guard result, which then fails. A file the running preferences
@@ -49,6 +52,7 @@ local Json = require("json")
 local Report = require("field_check_report")
 local ModelCatalogue = require("llm.model_catalogue")
 local TerminationCoordinator = require("infra.termination_coordinator")
+local Guided = require("infra.field_run_guided")
 
 local LOG = "field_run"
 
@@ -147,7 +151,8 @@ function M.validate(spec)
 			or spec.step_by_id[step.id] or step.id == M.ALL_STEPS then
 			error("field run: a step has an invalid or duplicate id", 2)
 		end
-		if step.kind ~= "field_check" and step.kind ~= "diagnostics" and step.kind ~= "ai" and step.kind ~= "reload" then
+		if step.kind ~= "field_check" and step.kind ~= "diagnostics" and step.kind ~= "ai" and step.kind ~= "reload"
+			and step.kind ~= "guided" then
 			error("field run: step " .. step.id .. " has an unknown kind", 2)
 		end
 		if step.disabled ~= nil and (type(step.disabled) ~= "string" or not step.disabled:match("^[a-z][a-z0-9_]*$")) then
@@ -171,11 +176,14 @@ function M.validate(spec)
 			or step.progress_max_seconds < step.deadline_seconds) then
 			error("field run: step " .. step.id .. " needs progress_max_seconds of at least its deadline", 2)
 		end
+		-- A guided step prompts the person's gesture and observes or asks its outcome
+		if step.kind == "guided" then Guided.validate_step(step) end
 		if step.person ~= nil and (not spec.verdict_set[step.person] or type(step.reason) ~= "string") then
 			error("field run: step " .. step.id .. " names an unknown person verdict or no reason", 2)
 		end
 		spec.step_by_id[step.id] = step
 	end
+	Guided.validate_section(spec.guided)
 	if type(spec.guard_step) ~= "string" or spec.step_by_id[spec.guard_step] then
 		error("field run: guard_step must name a step outside the requestable list", 2)
 	end
@@ -727,7 +735,26 @@ function Session:run_step(index, step, continue)
 		if timer then run.timers[timer] = true end
 	end
 	arm(math.min(progress_aware and stall_ms or deadline_ms, deadline_ms) / 1000)
-	local ran, err = pcall(ports.run_step, step, function(verdict, codes, report)
+	local runner = ports.run_step
+	if step.kind == "guided" then
+		local guided = spec.guided
+		runner = function(_, finish)
+			return Guided.run(step, {
+				prompt_path = self.folder .. "/" .. guided.prompt,
+				answer_path = self.folder .. "/" .. guided.answer,
+				request_id = run.request.request_id,
+				schema = spec.schema,
+				poll_seconds = guided.poll_seconds,
+				active = function() return not settled and not run.abandoned end,
+				ports = ports,
+				-- The observed state is a field check, run as its own step would run it
+				run_check = function(check, callback)
+					ports.run_step({ id = step.id, kind = "field_check", check = check }, callback)
+				end,
+			}, finish)
+		end
+	end
+	local ran, err = pcall(runner, step, function(verdict, codes, report)
 		settle(verdict, codes, report)
 	end)
 	if not ran then
