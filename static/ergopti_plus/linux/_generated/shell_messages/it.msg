@@ -85,6 +85,7 @@ install.xdg_autostart=avvio automatico XDG: {1}
 launch.already_running=Ergopti+ è già in esecuzione in questa sessione ({1} è occupato); questo avvio è stato rifiutato.
 launch.authorization_failed=L’autorizzazione all’accesso all’input è stata annullata o non è riuscita.
 launch.groups_unavailable=La sessione non è riuscita a ottenere i gruppi di input configurati.
+launch.restarting=Ergopti+ è già in esecuzione in questa sessione; gli viene chiesto di chiudersi, poi viene riavviato.
 launch.session_lock_invalid=La cartella del blocco della sessione deve essere un percorso assoluto.
 launcher.dependencies_installed=Dipendenze installate.
 launcher.driver_missing=Errore: directory del driver Linux non trovata: {1}

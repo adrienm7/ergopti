@@ -85,6 +85,7 @@ install.xdg_autostart=XDG 자동 시작: {1}
 launch.already_running=Ergopti+가 이 세션에서 이미 실행 중입니다({1} 사용 중). 이번 실행은 거부되었습니다.
 launch.authorization_failed=입력 접근 권한 승인이 취소되었거나 실패했습니다.
 launch.groups_unavailable=세션이 설정된 입력 그룹을 얻지 못했습니다.
+launch.restarting=Ergopti+가 이 세션에서 이미 실행 중입니다. 종료를 요청한 다음 다시 시작합니다.
 launch.session_lock_invalid=세션 잠금 폴더는 절대 경로여야 합니다.
 launcher.dependencies_installed=종속성을 설치했습니다.
 launcher.driver_missing=오류: Linux 드라이버 디렉터리를 찾을 수 없습니다: {1}

@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "يحتوي المصدر على مجلد وحدات أصلية مجهول المصدر.",
 	"linux_shell.install.xdg_autostart": "التشغيل التلقائي لـ XDG: {1}",
 	"linux_shell.launch.already_running": "يعمل Ergopti+ بالفعل في هذه الجلسة ({1} محجوز)؛ رُفض هذا التشغيل.",
+	"linux_shell.launch.restarting": "يعمل Ergopti+ بالفعل في هذه الجلسة؛ يُطلب منه الإنهاء ثم تتم إعادة تشغيله.",
 	"linux_shell.launch.authorization_failed": "أُلغي تفويض الوصول إلى الإدخال أو فشل.",
 	"linux_shell.launch.groups_unavailable": "تعذّر على الجلسة الحصول على مجموعات الإدخال المكوّنة لها.",
 	"linux_shell.launch.session_lock_invalid": "يجب أن يكون مسار مجلد قفل الجلسة مطلقًا.",

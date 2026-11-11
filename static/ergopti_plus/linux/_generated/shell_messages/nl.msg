@@ -85,6 +85,7 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ draait al in deze sessie ({1} is bezet); deze start is geweigerd.
 launch.authorization_failed=De autorisatie voor invoertoegang is geannuleerd of mislukt.
 launch.groups_unavailable=De sessie kon haar ingestelde invoergroepen niet verkrijgen.
+launch.restarting=Ergopti+ draait al in deze sessie; het wordt gevraagd af te sluiten en daarna opnieuw gestart.
 launch.session_lock_invalid=De map voor de sessievergrendeling moet een absoluut pad zijn.
 launcher.dependencies_installed=Afhankelijkheden geïnstalleerd.
 launcher.driver_missing=Fout: map van het Linux-stuurprogramma niet gevonden: {1}

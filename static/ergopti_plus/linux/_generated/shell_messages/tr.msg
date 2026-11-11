@@ -85,6 +85,7 @@ install.xdg_autostart=XDG otomatik başlatma: {1}
 launch.already_running=Ergopti+ bu oturumda zaten çalışıyor ({1} kilitli); bu başlatma reddedildi.
 launch.authorization_failed=Giriş erişimi yetkilendirmesi iptal edildi veya başarısız oldu.
 launch.groups_unavailable=Oturum yapılandırılmış giriş gruplarını alamadı.
+launch.restarting=Ergopti+ bu oturumda zaten çalışıyor; kapanması isteniyor, ardından yeniden başlatılıyor.
 launch.session_lock_invalid=Oturum kilidi klasörü mutlak bir yol olmalıdır.
 launcher.dependencies_installed=Bağımlılıklar yüklendi.
 launcher.driver_missing=Hata: Linux sürücüsü dizini bulunamadı: {1}

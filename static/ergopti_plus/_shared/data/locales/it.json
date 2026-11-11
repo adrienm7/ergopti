@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "I sorgenti contengono una cartella di moduli nativi di origine sconosciuta.",
 	"linux_shell.install.xdg_autostart": "avvio automatico XDG: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ è già in esecuzione in questa sessione ({1} è occupato); questo avvio è stato rifiutato.",
+	"linux_shell.launch.restarting": "Ergopti+ è già in esecuzione in questa sessione; gli viene chiesto di chiudersi, poi viene riavviato.",
 	"linux_shell.launch.authorization_failed": "L’autorizzazione all’accesso all’input è stata annullata o non è riuscita.",
 	"linux_shell.launch.groups_unavailable": "La sessione non è riuscita a ottenere i gruppi di input configurati.",
 	"linux_shell.launch.session_lock_invalid": "La cartella del blocco della sessione deve essere un percorso assoluto.",
