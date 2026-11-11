@@ -38,6 +38,9 @@ var LayoutSourceCompiler = (function () {
 	const NEUTRAL = 'none';
 	const UNUSED = '\u0010';
 	const MAX_CODE = 127;
+	// A macOS code no key table names (Ergo-L types at code 66, a legacy keypad
+	// position): the source names it MacCode<n>, which only the macOS target owns.
+	const MAC_CODE = /^MacCode(\d{1,3})$/;
 
 	// Built-in modifier -> TN2056 modifierMap token. A plain token is the left key.
 	const TOKENS = {
@@ -132,7 +135,16 @@ var LayoutSourceCompiler = (function () {
 		);
 		for (const [name, key] of unregistered)
 			if (!byName.has(name) && !byMac.has(key.hs)) add(name, key.hs);
-		return { byName, byMac, character };
+		return { byName, byMac, character, code: (name) => macCode(byName, byMac, name) };
+	}
+
+	/** The macOS code of a physical name: its table entry, or the MacCode<n> it spells. */
+	function macCode(byName, byMac, name) {
+		if (byName.has(name)) return byName.get(name);
+		const match = MAC_CODE.exec(name);
+		if (!match) return undefined;
+		const mac = Number(match[1]);
+		return mac <= MAX_CODE && !byMac.has(mac) && String(mac) === match[1] ? mac : undefined;
 	}
 
 	/** macOS code -> the standard control output of a key that types no character. */
@@ -258,7 +270,8 @@ var LayoutSourceCompiler = (function () {
 			else if (original[to] !== undefined) keys[from] = original[to];
 			else delete keys[from];
 		}
-		if (variant === 'ansi') keys = swapped(keys, ansiPairs(source));
+		if (variant === 'ansi')
+			keys = Object.assign(swapped(keys, ansiPairs(source)), layer.ansi_keys || {});
 		return keys;
 	}
 
@@ -356,9 +369,14 @@ var LayoutSourceCompiler = (function () {
 			const rows = new Map();
 			for (const [name, mapping] of Object.entries(keys)) {
 				const path = `layers.${layer.id}.keys.${name}`;
-				const mac = table.byName.get(name);
+				const mac = table.code(name);
 				if (mac === undefined || MODIFIER_KEYS.has(name)) {
 					omitted.push({ path, reason: 'physical_key_not_in_keylayout' });
+					continue;
+				}
+				// The XKB and KLC converters place no key at an unnamed macOS code.
+				if (platform !== 'macos' && !table.byName.has(name)) {
+					omitted.push({ path, reason: `mac_only_key_code_not_in_${platform}` });
 					continue;
 				}
 				if (own(mapping, 'text')) {
@@ -480,6 +498,28 @@ var LayoutSourceCompiler = (function () {
 	}
 
 	/**
+	 * The keyMapSet of the ANSI hardware, for a file declaring several hardware
+	 * layouts: null for a single one. Accepted only as Bépo has them, every layout
+	 * on one modifierMap, keyboard type 0 on the ISO map the import reads and every
+	 * other type on one ANSI map; the source then holds the ANSI variant itself.
+	 */
+	function ansiMapSet(model, convention) {
+		if (model.layoutCount === 1) return null;
+		const sets = new Set(model.layouts.map((layout) => layout.mapSet));
+		const first = model.layouts.find((layout) => layout.first === '0');
+		const others = model.layouts.filter((layout) => layout.mapSet !== first.mapSet);
+		if (
+			convention !== 'iso' ||
+			sets.size !== 2 ||
+			model.layouts.some((layout) => layout.modifiers !== first.modifiers) ||
+			model.layouts.some((layout) => layout.mapSet === first.mapSet && layout !== first) ||
+			first.last !== '0'
+		)
+			fail('source_import_hardware_layouts', 'layouts');
+		return others[0].mapSet;
+	}
+
+	/**
 	 * Import a .keylayout into structured records that compile back to the same
 	 * behaviour. Refuses what the records cannot hold instead of approximating it.
 	 * @param {string} text - The .keylayout content.
@@ -496,7 +536,7 @@ var LayoutSourceCompiler = (function () {
 		} catch (error) {
 			fail('source_keylayout', error.code || error.message);
 		}
-		if (model.layoutCount !== 1) fail('source_import_hardware_layouts', 'layouts');
+		const ansiSet = ansiMapSet(model, convention);
 		if (model.defaultIndex !== 0) fail('source_import_default_index', 'modifier_map.default_index');
 		const table = keyTable(tables, convention);
 		const defaults = systemDefaults();
@@ -532,6 +572,33 @@ var LayoutSourceCompiler = (function () {
 			} else if (whens.size > 1) composing.add(action);
 		}
 
+		/** One keyMap entry as a named mapping, or null for a key left implicit. */
+		const keyMapping = (entry, mac, at) => {
+			let name = table.byMac.get(mac);
+			if (entry.kind === 'output') {
+				if (name === undefined && LayoutComposer.isPrintable(entry.value)) name = `MacCode${mac}`;
+				if (name === undefined || MODIFIER_KEYS.has(name)) {
+					if (LayoutComposer.isPrintable(entry.value)) fail('source_import_unnamed_key', at);
+					return null;
+				}
+				if (!table.character.has(name) && defaults.get(mac) === entry.value) return null;
+				if (entry.value === UNUSED) return { name, mapping: { disabled: true } };
+				const mapping = { text: entry.value };
+				if (composing.has(entry.value)) mapping.compose = false;
+				return { name, mapping };
+			}
+			const whens = model.actions.get(entry.value);
+			if (!whens) fail('source_import_undefined_action', at);
+			const neutral = whens.get(NEUTRAL);
+			if (name === undefined && neutral.next === '' && LayoutComposer.isPrintable(neutral.output))
+				name = `MacCode${mac}`;
+			if (name === undefined || MODIFIER_KEYS.has(name)) fail('source_import_unnamed_key', at);
+			if (neutral.next !== '') return { name, mapping: { dead_key: stateIds.get(neutral.next) } };
+			const mapping = { text: neutral.output };
+			if (entry.value !== neutral.output) mapping.compose_as = entry.value;
+			return { name, mapping };
+		};
+
 		const layers = [];
 		const takenLayers = new Set();
 		model.selects.forEach((select, position) => {
@@ -543,33 +610,28 @@ var LayoutSourceCompiler = (function () {
 			layer.keys = {};
 			for (let mac = 0; mac <= MAX_CODE; mac++) {
 				const entry = LayoutComposer.keyEntry(model, select.index, mac);
-				if (!entry) continue;
-				const name = table.byMac.get(mac);
-				const at = `keyMap[${select.index}].key[${mac}]`;
-				let mapping;
-				if (entry.kind === 'output') {
-					if (name === undefined || MODIFIER_KEYS.has(name)) {
-						if (LayoutComposer.isPrintable(entry.value)) fail('source_import_unnamed_key', at);
-						continue;
-					}
-					if (!table.character.has(name) && defaults.get(mac) === entry.value) continue;
-					if (entry.value === UNUSED) mapping = { disabled: true };
-					else {
-						mapping = { text: entry.value };
-						if (composing.has(entry.value)) mapping.compose = false;
-					}
-				} else {
-					const whens = model.actions.get(entry.value);
-					if (!whens) fail('source_import_undefined_action', at);
-					const neutral = whens.get(NEUTRAL);
-					if (name === undefined || MODIFIER_KEYS.has(name)) fail('source_import_unnamed_key', at);
-					if (neutral.next !== '') mapping = { dead_key: stateIds.get(neutral.next) };
-					else {
-						mapping = { text: neutral.output };
-						if (entry.value !== neutral.output) mapping.compose_as = entry.value;
-					}
+				const imported = entry && keyMapping(entry, mac, `keyMap[${select.index}].key[${mac}]`);
+				if (imported) layer.keys[imported.name] = imported.mapping;
+			}
+			if (ansiSet !== null) {
+				// The ANSI map is read in the same numbering, so it differs from the
+				// derived ANSI variant exactly where the rule moves too little.
+				const ansiModel = Object.assign({}, model, { mapSet: ansiSet });
+				const derived = swapped(layer.keys, ansiPairs({ physical: {} }));
+				const ansiKeys = {};
+				for (let mac = 0; mac <= MAX_CODE; mac++) {
+					const at = `ANSI keyMap[${select.index}].key[${mac}]`;
+					const entry = LayoutComposer.keyEntry(ansiModel, select.index, mac);
+					const imported = entry && keyMapping(entry, mac, at);
+					const name = imported ? imported.name : table.byMac.get(mac);
+					if (name === undefined) continue;
+					const expected = imported ? imported.mapping : undefined;
+					if (JSON.stringify(expected) === JSON.stringify(derived[name])) continue;
+					// An ANSI key that types nothing where the derivation types something has no record.
+					if (expected === undefined) fail('source_import_hardware_layouts', at);
+					ansiKeys[name] = expected;
 				}
-				layer.keys[name] = mapping;
+				if (Object.keys(ansiKeys).length) layer.ansi_keys = ansiKeys;
 			}
 			layers.push(layer);
 		});
@@ -585,7 +647,14 @@ var LayoutSourceCompiler = (function () {
 			deadKeys.push(record);
 		}
 		const byState = new Map(deadKeys.map((record) => [record.state || record.id, record]));
+		const referenced = new Set();
+		for (const maps of model.keyMapSets.values())
+			for (const keys of maps.values())
+				for (const entry of keys.values()) if (entry.kind === 'action') referenced.add(entry.value);
 		for (const [action, whens] of model.actions) {
+			// No key reaches an action with an empty id (Bépo declares one), and no rule
+			// can answer to empty text: it has no behaviour to keep.
+			if (action === '' && !referenced.has(action)) continue;
 			const neutral = whens.get(NEUTRAL);
 			for (const [state, when] of whens) {
 				if (state === NEUTRAL) continue;
