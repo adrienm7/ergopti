@@ -148,6 +148,8 @@ local _slots = {}
 
 -- Descriptors handed to the multi-source wait, reused so a wait allocates nothing.
 local _wait_fds = {}
+-- Wait companions that failed once and are no longer polled.
+local _refused_companions = setmetatable({}, { __mode = "k" })
 
 --- The state for a slot, created on first use.
 --- @param slot string|nil Defaults to the keyboard.
@@ -296,9 +298,14 @@ local function build_ffi_backend()
 		-- Waits for any of several descriptors; the idle loop sleeps here instead
 		-- of waking to find nothing. One array, regrown on demand, so a wait
 		-- allocates nothing in steady state.
-		poll_many = function(fds, count, timeout_ms)
-			if count > many_capacity then
-				many_capacity = count * 2
+		-- `extra` / `extra_count`: a companion's own pollfd-shaped records (the
+		-- tray's GLib descriptors), polled with their own events and handed back
+		-- their revents.
+		poll_many = function(fds, count, timeout_ms, extra, extra_count)
+			extra_count = extra and extra_count or 0
+			local total = count + extra_count
+			if total > many_capacity then
+				many_capacity = total * 2
 				many = native_new("struct pollfd[?]", many_capacity)
 			end
 			for index = 1, count do
@@ -306,8 +313,14 @@ local function build_ffi_backend()
 				many[index - 1].events = POLLIN
 				many[index - 1].revents = 0
 			end
-			local rc = tonumber(native_poll(many, count, timeout_ms))
+			for index = 0, extra_count - 1 do
+				many[count + index].fd = extra[index].fd
+				many[count + index].events = extra[index].events
+				many[count + index].revents = 0
+			end
+			local rc = tonumber(native_poll(many, total, timeout_ms))
 			if rc == nil or rc < 0 then return nil end
+			for index = 0, extra_count - 1 do extra[index].revents = many[count + index].revents end
 			return rc > 0
 		end,
 		close = function(fd)
@@ -664,11 +677,14 @@ end
 --- open, so an idle daemon wakes once per timeout instead of spinning, and a key
 --- wakes it at once. Nothing is read: the pump still owns every event.
 --- @param timeout_ms integer Milliseconds; 0 returns at once.
+--- @param companion table|nil A second event source polled in the same wait (the
+---   tray's GLib main context): { begin() -> pollfd-shaped records, count;
+---   finish() }. A companion that raises once is retired for the process.
 --- @return boolean|nil ready True when a source is readable (or in error, so the
 ---   pump sees and retires it); false on timeout; nil when no wait is possible
 ---   (busy reader, no open source, or a backend without a multi-descriptor wait),
 ---   so the caller yields another way instead of treating it as a quiet wait.
-function M.wait_any_readable(timeout_ms)
+function M.wait_any_readable(timeout_ms, companion)
 	if _busy or _native_debt or not _backend then return nil end
 	local many = rawget(_backend, "poll_many")
 	if type(many) ~= "function" then return nil end
@@ -681,9 +697,35 @@ function M.wait_any_readable(timeout_ms)
 	end
 	if count == 0 then return nil end
 	for index = count + 1, #_wait_fds do _wait_fds[index] = nil end
+	if companion ~= nil and (type(companion) ~= "table" or type(companion.begin) ~= "function"
+		or type(companion.finish) ~= "function") then
+		error("a wait companion needs begin() and finish()", 2)
+	end
+	if companion and _refused_companions[companion] then companion = nil end
+	local extra, extra_count = nil, 0
+	if companion then
+		local begun, records, records_count = pcall(companion.begin)
+		if begun then
+			extra, extra_count = records, records_count or 0
+		else
+			-- Retired after one report: the input wait alone stays correct. Its
+			-- finish still runs, so a half-opened begin releases what it took.
+			pcall(companion.finish)
+			_refused_companions[companion] = true
+			companion = nil
+			Logger.error(LOG, "The idle wait companion failed: %s; it is no longer polled.", tostring(records))
+		end
+	end
 	_busy = true
-	local ok, ready = pcall(many, _wait_fds, count, timeout_ms)
+	local ok, ready = pcall(many, _wait_fds, count, timeout_ms, extra, extra_count)
 	_busy = false
+	if companion then
+		local finished, failure = pcall(companion.finish)
+		if not finished then
+			_refused_companions[companion] = true
+			Logger.error(LOG, "The idle wait companion did not finish: %s; it is no longer polled.", tostring(failure))
+		end
+	end
 	if not ok or type(ready) ~= "boolean" then return nil end
 	return ready
 end

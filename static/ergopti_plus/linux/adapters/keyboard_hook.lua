@@ -3112,13 +3112,15 @@ end
 --- it arrives. An event already read and not yet dispatched (a drain that hit
 --- its bound) must not sleep behind the wait, so it answers at once.
 --- @param timeout_ms integer Longest wait.
+--- @param companion table|nil The tray's GLib half of the wait
+---   (tray_menu.wait_companion), polled with the input sources.
 --- @return boolean|nil ready True when a source can be read now, false after a
 ---   quiet wait, nil when no wait is possible (hook stopped or reacquiring,
 ---   no open source): the loop then yields a fixed millisecond.
-function M.idle_wait(timeout_ms)
+function M.idle_wait(timeout_ms, companion)
 	if not _running or _reacquiring or _source_reconciliation then return nil end
 	if next(_pending_events) ~= nil then return true end
-	return EvdevReader.wait_any_readable(timeout_ms)
+	return EvdevReader.wait_any_readable(timeout_ms, companion)
 end
 
 --- The text a key would type now, in the live layout and with the modifiers

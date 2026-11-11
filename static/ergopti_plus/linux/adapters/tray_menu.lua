@@ -239,6 +239,15 @@ function M.pump()
 	Indicator.pump()
 end
 
+--- The tray's half of the daemon's idle wait while an icon is live, or nil: a
+--- panel's request then wakes the wait at once instead of waiting out its
+--- timeout (each dbusmenu call cost up to 8 ms before, 26 ms per submenu).
+--- @return table|nil { begin, finish } for keyboard_hook.idle_wait.
+function M.wait_companion()
+	if not _started then return nil end
+	return Indicator.wait_companion()
+end
+
 --- The backend in use, or nil when there is none.
 --- @return string|nil
 function M.getBackend()
