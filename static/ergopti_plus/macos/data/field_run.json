@@ -14,7 +14,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 20890, "min": 60, "max": 20890 },
+	"deadline_seconds": { "default": 21310, "min": 60, "max": 21310 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -421,6 +421,20 @@
 			"proves": "The physical slot's output reaches the focused app alone and the editor keeps the saved slot."
 		},
 		{
+			"id": "guided_api_key_reenter",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_api_key_absent", "log_api_key_reentered"]
+			},
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "Make a configuration backup that holds an API entry, delete that entry (its Keychain key goes), restore the backup, open the model selector (the entry is greyed « Clé manquante ») and give it a key with « API key… ». The configuration guard puts your settings back after the run.",
+			"proves": "An API entry restored from a backup without its Keychain key asks for its key again and takes a new one."
+		},
+		{
 			"id": "guided_asa_held_key",
 			"kind": "guided",
 			"mode": "observe",
@@ -514,12 +528,16 @@
 		{
 			"id": "guided_hotstrings_apps",
 			"kind": "guided",
-			"mode": "attest",
+			"mode": "observe",
 			"check": "log_signals",
-			"gesture_seconds": 300,
-			"deadline_seconds": 360,
-			"gesture": "Type three ordinary hotstrings in Edge, VS Code and a terminal each: each expands once, with the right case and no stray character.",
-			"proves": "Ordinary hotstrings expand in Edge, VS Code and a terminal."
+			"until": {
+				"condition": "rises",
+				"steps": ["log_hotstring_expansions"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Type three ordinary hotstrings in Edge, then in VS Code, then in a terminal (Debug > Log level > DEBUG).",
+			"proves": "Ordinary hotstrings typed in real applications expand, one expansion line each in the day log."
 		},
 		{
 			"id": "guided_window_toggle",

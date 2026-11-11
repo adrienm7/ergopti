@@ -51,7 +51,11 @@ JSON, `format = "ergopti-kbd-tables"`, `version = 1`. Characters are UTF-16 code
 layer per column (`alt_right` for AltGr, `kana` for Kana), Caps Lock attributes as `keys.<code>.caps_lock` and
 `caps_altgr`, moved virtual keys as `virtual_key`, key names on their physical key (or `windows.key_names` for scan
 codes the registry has no key for) and the version texts in `exports.windows`; `fromSource` reads a source back,
-a Caps Lock layer of the base or Shift column becoming CAPLOK or SGCAPS, the Kana level the KBDKANA column held by
+Caps Lock layers read per column pair (a column and its Shift): unchanged, swapped (CAPLOK for the base pair,
+CAPLOKALTGR for the AltGr pair), or any other change, the Kana columns included (kbd.h has no Caps Lock attribute
+for Kana), held by a Caps Lock row (SGCAPS) for every column; a Caps Lock row cannot hold a dead key or a ligature,
+nor sit beside a dead key, and such a source is refused. That SGCAPS rows apply to the Kana columns is to confirm
+on Windows. The Kana level the KBDKANA column held by
 `windows.kana_key` (Right Alt by default, through `VK_OEM_8`: decided by the coordinator on 2026-11-11, to review by
 the maintainer), and lists what Windows has no key or column for. `tools/test/test-layout-sources.cjs` proves
 `static/layouts/sources/bepo.toml` gives back the official `bepo.klc` table for table and that the four DLLs of
@@ -128,6 +132,38 @@ verified images, and checks the script.
   the uninstall entry. Other users' `Preload` lists are not edited: Windows drops a layout whose KLID is gone.
 - Decided by the coordinator on 2026-11-11, to review by the maintainer: NSIS (free, builds on Linux, small stub)
   rather than WiX or Inno Setup; unsigned, as the request states.
+
+## Signing (maintainer)
+
+The images and the installer are unsigned. Windows loads unsigned keyboard layout DLLs (MSKLC's are unsigned too),
+but an unsigned `<dll>-setup.exe` downloaded from the Internet meets SmartScreen's « Windows protected your PC »
+until it has reputation, and a corporate proxy may detonate it as an unknown (see
+[windows-exe-flagged-by-proxy.md](../tooling/windows-exe-flagged-by-proxy.md)). The project's Windows signing is
+decided in [signpath-foundation-application.md](../tooling/signpath-foundation-application.md): unsigned until
+SignPath Foundation is on, then SignPath, or the PFX secrets `WINDOWS_SIGNING_CERTIFICATE_BASE64` and
+`WINDOWS_SIGNING_CERTIFICATE_PASSWORD` the Windows release job already reads. For these artifacts:
+
+1. **What to sign, in order.** Each DLL first (x86, wow64, x64, arm64: the installer embeds them and a later
+   signature would change bytes the reader verified), then the uninstaller NSIS writes, then the installer. Sign
+   with SHA-256 and an RFC 3161 timestamp, so the signature outlives the certificate.
+2. **On Windows** (signtool from the Windows SDK):
+   `signtool sign /fd SHA256 /f cert.pfx /p <password> /tr http://timestamp.digicert.com /td SHA256 <file>`, then
+   `signtool verify /pa /v <file>`.
+3. **On Linux** (CI or this tool): `osslsigncode sign -pkcs12 cert.pfx -pass <password> -h sha256
+-ts http://timestamp.digicert.com -in <file> -out <file>.signed`, then `osslsigncode verify -in <file>.signed`.
+   A certificate kept in a hardware or cloud key (EV certificates must be) is used through its own signer
+   (`jsign` with the provider's key store, Azure Trusted Signing's `signtool` dlib, or SignPath's GitHub action),
+   never as a file in the repository or the build log.
+4. **NSIS hooks.** NSIS 3.08+ runs a signing command on the uninstaller and on the installer at build time:
+   `!uninstfinalize 'osslsigncode sign … -in "%1" -out "%1.signed" && mv "%1.signed" "%1"' = 0` and
+   `!finalize '…' = 0`; `installer.cjs` would add them when the build is given a signing command, and read the
+   images after signing, so the comparison and the 7-Zip check run on the signed bytes.
+5. **SmartScreen.** An EV certificate (or SignPath's) carries reputation at once; an OV certificate builds it with
+   downloads. Keep one publisher name across releases, and submit a flagged build through Microsoft's file
+   submission ([windows-exe-false-positive-submission-pack.md](../tooling/windows-exe-false-positive-submission-pack.md)).
+6. **Check on Windows:** right-click → Properties → Digital Signatures shows the publisher and the timestamp for
+   each DLL in System32/SysWOW64 after install and for the installer; `Get-AuthenticodeSignature <file>` answers
+   `Valid`.
 
 ## Not done here
 

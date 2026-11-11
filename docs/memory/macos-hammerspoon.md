@@ -2186,7 +2186,9 @@ baseline` line (item 38).
   « application or window switch » reason, whose spaces the generic count
   refuses), `log_window_toggle_opens` and `log_window_toggle_raises` (the DEBUG
   toggle lines), `log_hotstring_expansions` (auto and terminator expansions)
-  and `log_boot_completions` are counts the guided steps watch rise and the
+  `log_boot_completions`, `log_api_key_absent` (« Keychain holds no key for
+  entry … ») and `log_api_key_reentered` (« API entry key change staged ») are
+  counts the guided steps watch rise and the
   TODO summary bounds (`min` 4 boots for the production profile).
 - `field_raw_telemetry` runs after `field_ai_local`: one read-only, lock-free
   `sqlite3` query names the `events_window_topo`, `events_av` and

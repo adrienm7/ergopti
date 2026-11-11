@@ -188,8 +188,12 @@
 		{
 			"id": "api_entries_backup",
 			"title": "Backup of the API entries",
-			"checks": [],
-			"not_testable": "Waits on « Maintainer decisions pending »: deleting an entry deletes its Keychain item, so « its key still works » cannot hold today."
+			"checks": [
+				{
+					"step": "guided_api_key_reenter"
+				}
+			],
+			"condition": "An API entry the person can delete and restore during the run (decided by the maintainer on 2026-11-11: the restored entry asks for its key again)."
 		},
 		{
 			"id": "onboarding_number_row",
@@ -488,7 +492,8 @@
 					"report": ["log_hotstring_expansions"],
 					"min": 1
 				}
-			]
+			],
+			"not_testable": "Whether each expansion in Edge, VS Code and a terminal has the right case and no stray character is read on screen: the day log withholds the expanded text."
 		},
 		{
 			"id": "omlx_8181",

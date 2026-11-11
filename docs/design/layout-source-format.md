@@ -336,6 +336,16 @@ maintainer:
 | Windows KLC           | The AltGr columns, the only extra level MSKLC writes.                                                                  | Carry `KBDKANA`: the keyboard DLL generator (`docs/design/layout-windows-dll.md`) writes the real level. |
 | Emulation and preview | A native layer: no driver reports Kana, so the engines know the id and never select it; the preview types it with Alt. | Emulate a Kana level the target left out.                                                                |
 
+No collision with Ergopti's own Option on macOS: Ergopti's macOS layout (`static/layouts/registry/ergopti/ergopti.keylayout`)
+already types this level with Option (keyMaps `anyOption caps?` and `anyOption anyShift caps?`), and ErgoptiPlus's
+Karabiner rules make the right Command key a right Option, the AltGr the maintainer types this level with; the
+Kana level of `ergopti.toml` on Option equals that layout's Option level on every character key, with and without
+Shift (`test-layout-sources.cjs`). KbdEdit's export numbers the two keys Apple numbers apart the ANSI way (code 50
+left of 1), so `ergopti.toml` was imported with that convention: `ê` on the ISO key, `$` left of 1, as the
+registry layout and the older Kalamine KLCs have them. The script-control chords that hold a right-hand AltGr
+read the same physical key. On Windows the level is the real Kana (KBDKANA on Right Alt through `VK_OEM_8`, see
+[layout-windows-dll.md](layout-windows-dll.md)), so Right Alt never doubles as AltGr there.
+
 When the source also selects a layer with `alt`, `alt_left` or `alt_right`, Kana cannot share the Option level: its
 layers are left out with `kana_level_taken_by_alt` (macOS, Linux, Windows KLC, emulation). `static/layouts/sources/ergopti.toml`,
 imported from KbdEdit's macOS export of Ergopti v2.2.2 (Command renamed back to `kana`), compiles to that export with
