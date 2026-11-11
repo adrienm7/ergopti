@@ -2091,6 +2091,28 @@ function M.get_current_model()
 	return resolve_model_for_backend(label, CoreState.backend)
 end
 
+--- The settings a prediction is sent with (llm.request_settings): the
+--- backend; under the API backend the active entry's id, provider, model,
+--- endpoint and key (its stored reference, only compared); under Ollama or MLX
+--- the selected model and the server address. A change while a request is in
+--- flight retires it, as on Windows and Linux (maintainer decision AID-3 of
+--- 11 November 2026).
+--- @return table snapshot
+function M.request_settings()
+	local RequestSettings = require("llm.request_settings")
+	local backend = CoreState.backend
+	if backend == "api" then
+		local entry = ApiRemote.get_active_entry()
+		if not entry then return RequestSettings.snapshot({ backend = backend }) end
+		return RequestSettings.snapshot({ backend = backend, entry = entry.id, provider = entry.provider,
+			model = entry.model, endpoint = entry.base_url, key = entry.token })
+	end
+	local mlx = backend == "mlx"
+	return RequestSettings.snapshot({ backend = backend,
+		model = mlx and CoreState.llm_model_mlx or CoreState.llm_model_ollama,
+		endpoint = (mlx and ApiMlx or ApiOllama).get_base_url() })
+end
+
 --- Sets the model for Ollama backend.
 --- @param model_name string The model identifier for Ollama.
 function M.set_llm_model_ollama(model_name)

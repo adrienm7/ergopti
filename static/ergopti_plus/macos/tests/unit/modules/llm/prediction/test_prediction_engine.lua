@@ -59,6 +59,7 @@ package.loaded["modules.llm"] = {
 	},
 	get_current_model       = function() return "llama3" end,
 	get_backend             = function() return "ollama" end,
+	request_settings        = function() return { backend = "ollama", model = "llama3" } end,
 	get_runtime_llm_enabled = function() return true end,
 	set_llm_model_mlx       = function(_) return true end,
 	set_llm_model_ollama    = function(_) return true end,

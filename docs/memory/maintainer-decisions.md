@@ -5,6 +5,20 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A settings change retires the AI request in flight (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (AID-3): a change of the backend, the
+API entry, its provider, model, endpoint or key while a prediction is in
+flight retires that request on macOS and Linux, as Windows does; the next
+request uses the new settings. The field list and the comparison are shared
+(`_shared/lua/llm/request_settings.lua`); each driver snapshots its own
+sources at dispatch (Linux `prediction_engine.predict`, macOS
+`modules.llm.request_settings()`) and compares at every backend and
+streaming callback: the macOS engine routes every request id read through
+it, Linux checks it in `request_current` and before admitting a new
+request. A retired request is dismissed (its transport cancelled, its answer
+never shown). The key is only compared, never logged.
+
 ## A token exchange answering 400 is a refused key (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (AID-2): a token exchange (watsonx

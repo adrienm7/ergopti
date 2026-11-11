@@ -50,8 +50,12 @@ only the request it fails carries the status.
   `test_llm_api_token_exchange.ahk` replay the new vectors.
 - **AID-3, a settings change while a request is in flight.** Windows retires
   the request by its semantic signature (temperature, count, word bounds,
-  profile, auto-type); Linux and macOS only on a model or backend change. The
-  activity rule usually cancels first; not replayed.
+  profile, auto-type); Linux and macOS did only on a model or backend change.
+  Decided by the maintainer on 2026-11-11: a change of the model, key,
+  provider or endpoint retires it on macOS and Linux too, and the next request
+  uses the new settings (shared `llm.request_settings`; regressions
+  `settings-retire-inflight` in `test_prediction_backend.lua` and
+  `test_prediction_settings_change_retires.lua`). Windows already retires.
 
 ## Refuted
 

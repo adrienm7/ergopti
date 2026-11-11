@@ -90,6 +90,7 @@ local function load_fixture(loading_result, options)
 		DEFAULT_STATE = DEFAULTS,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
+		request_settings = function() return { backend = "ollama", model = "test-model" } end,
 		get_active_profile = function() return nil end,
 		is_backend_ready = function() return true end,
 		set_runtime_llm_enabled = function() end,
