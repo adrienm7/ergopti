@@ -129,7 +129,7 @@ _WTC_ReplayRefusesTitleFailure(Action, Stage) {
 		AssertTrue(KLR_LoadSchema(Db))
 		AssertTrue(KLR_PrepareTypingProjection(Db))
 		AssertTrue(SQLite_Exec(Db, "INSERT INTO events_window_switch VALUES "
-			. "('failure-device',1,'2026-01-01T10:00:00','2026-01-01','fixture.exe','title','title',23);"))
+			. "('failure-device',1,'2026-01-01T10:00:00','2026-01-01','fixture.exe','title','title',23,NULL);"))
 		AssertTrue(_WTC_InsertTitleTyping(Db, "failure-device", 1, "2026-01-01", "fixture.exe", "title", _WTC_TitleManualEvents(1)))
 		AssertTrue(KLR_PrepareTypingProjection(Db))
 		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",

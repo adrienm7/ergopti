@@ -11,12 +11,15 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The three devices' ledgers replay in each of their six orders into a store
-;    built by KLR_LoadSchema, the rows written by KL_BuildInsertSystem under the
-;    device that owns them: whichever order a sync delivers them in, a purged row
-;    never comes back and a later row survives.
+;    built by KLR_LoadSchema: whichever order a sync delivers them in, a purged
+;    row never comes back and a later row survives. The vector rows have no
+;    utc_offset_min, rows recorded before the column (maintainer decision
+;    KMD-1), so they are inserted as stored; the current builders' UTC rows are
+;    replayed by test_klr_utc_offset_rows.ahk.
 ; 2. The Windows tombstone takes its local timestamp from the journal clock
-;    rather than from an epoch, so the vector's millis are checked on the shape
-;    of KL_NowTimestamp, and its UTC instant on the vector's epoch.
+;    rather than from an epoch: the vector's millis are checked on the shape of
+;    KL_NowTimestamp, and its UTC instant on the vector's epoch read in this
+;    zone's local time.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,7 +41,12 @@ _CTMM_Tombstone() {
 	AssertTrue(RegExMatch(LocalTs, Vector["ts_pattern"]) > 0, "the journal clock stamps " . LocalTs)
 	Millis := SubStr(LocalTs, -StrLen(Vector["millis"]))
 	AssertTrue(RegExMatch(Millis, "^\.\d{3}$") > 0, "the millisecond suffix " . Millis . " has the shape of " . Vector["millis"])
-	Entry := KL_MetricsTombstone(LocalTs, _CTMM_UtcStamp(Vector["epoch"]))
+	Stamp := _CTMM_UtcStamp(Vector["epoch"])
+	AssertEqual(FormatTime(Stamp, "yyyy-MM-dd HH:mm:ss") . Vector["millis"], Vector["utc"], "the vector's utc is its epoch")
+	AssertEqual(Vector["millis"], Format(".{:03d}", Mod(Round(Vector["epoch"] * 1000), 1000)), "the vector's millis are its epoch's")
+	Offset := KL_UtcOffsetAt(Stamp)
+	EpochLocalTs := KL_RowLocalTimestamp(Vector["utc"], Offset)
+	Entry := KL_MetricsTombstone(EpochLocalTs)
 	AssertEqual("system_event", Entry["type"])
 	AssertEqual(Vector["action"], Entry["action"])
 	AssertEqual(Vector["utc"], Entry["utc"])
@@ -48,13 +56,16 @@ _CTMM_Tombstone() {
 		AssertTrue(KLR_LoadSchema(Db), "the reader schema loads")
 		Keystats.device_id := "pc-device"
 		AssertTrue(SQLite_Exec(Db, KL_BuildInsertSystem(Entry, 1)), "the tombstone row is written")
-		Rows := SQLite_Query(Db, "SELECT action, date, ts, json_extract(metadata_json, '$.utc') AS utc FROM events_system WHERE id = 1;")
+		Rows := SQLite_Query(Db, "SELECT action, date, ts, utc_offset_min, json_extract(metadata_json, '$.utc') AS utc"
+			. " FROM events_system WHERE id = 1;")
 		AssertEqual(1, Rows.Length, "the tombstone row lands")
 		AssertEqual(Vector["action"], Rows[1]["action"])
-		AssertEqual(Vector["utc"], Rows[1]["utc"], "the row carries the UTC instant Linux rows are compared with")
-		AssertEqual(LocalTs, Rows[1]["ts"])
+		AssertEqual(Vector["utc"], Rows[1]["utc"], "the row carries the UTC instant rows are compared with")
+		AssertEqual(Vector["utc"], Rows[1]["ts"], "the row stores its instant in UTC")
+		AssertTrue(RegExMatch(Rows[1]["ts"], Vector["ts_pattern"]) > 0, "the row's ts " . Rows[1]["ts"])
+		AssertEqual(Offset, Rows[1]["utc_offset_min"], "the row stores its own offset")
 		AssertTrue(RegExMatch(Rows[1]["date"], Vector["date_pattern"]) > 0, "the row's date " . Rows[1]["date"])
-		AssertEqual(SubStr(LocalTs, 1, 10), Rows[1]["date"])
+		AssertEqual(SubStr(EpochLocalTs, 1, 10), Rows[1]["date"], "the row's date is its local day")
 	} finally {
 		Keystats.device_id := SavedDevice
 		SQLite_Close(Db)
@@ -108,12 +119,10 @@ _CTMM_Replay(Replay, Order) {
 			Keystats.device_id := DeviceId
 			for Row in Replay["ledgers"][DeviceId] {
 				AssertEqual("events_system", Row["table"], "the vectors replay system rows only")
-				Entry := Map("type", "system_event", "action", Row["action"], "timestamp", Row["ts"])
-				if Row.Has("metadata_json")
-					for Key, Value in JsonParse(Row["metadata_json"])
-						Entry[Key] := Value
-				AssertEqual(Row["date"], SubStr(Row["ts"], 1, 10), "the builder dates a row by its timestamp")
-				AssertTrue(SQLite_Exec(Db, KL_BuildInsertSystem(Entry, Row["id"])), DeviceId . ":" . Row["id"])
+				AssertTrue(SQLite_Exec(Db, "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action,"
+					. " metadata_json) VALUES (" . SQLite_Q(DeviceId) . ", " . Row["id"] . ", " . SQLite_Q(Row["ts"])
+					. ", " . SQLite_Q(Row["date"]) . ", " . SQLite_Q(Row["action"]) . ", "
+					. SQLite_Q(Row.Get("metadata_json", "{}")) . ");"), DeviceId . ":" . Row["id"])
 			}
 		}
 		Raw := []

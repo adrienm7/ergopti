@@ -19,6 +19,7 @@
 ; ==============================================================================
 
 #Include keystats_hotstring_units.ahk
+#Include keystats_local_time.ahk
 
 
 
@@ -106,7 +107,9 @@ KLR_LoadMediaSchema(db) {
 }
 
 ; Install the purge tombstone triggers after the media tables exist, so every
-; replayed ledger applies a tombstone and never re-imports a purged row.
+; replayed ledger applies a tombstone and never re-imports a purged row. An
+; image created before the utc_offset_min column first gains it, and loses the
+; triggers written before it, which CREATE TRIGGER IF NOT EXISTS would keep.
 KLR_LoadPurgeSchema(db) {
 		global _SharedDir
 		try purge_schema := FSReadStrict(_SharedDir . "\data\db\purge_schema.sql")
@@ -114,8 +117,98 @@ KLR_LoadPurgeSchema(db) {
 				try LoggerError("KLReader", "Metrics purge schema read failed: {1}.", err.Message)
 				return _KLR_RefuseSchema("purge_schema.sql is unreadable")
 		}
+		if !KLR_EnsureUtcOffsetColumn(db, purge_schema)
+				return false
 		if !SQLite_Exec(db, purge_schema)
 				return _KLR_RefuseSchema("purge_schema.sql was refused by SQLite")
+		return true
+}
+
+; The utc_offset_min migration's shape, read from the shared schema: every raw
+; events_* table of schema.sql carries the column, last, with one definition
+; (maintainer decision KMD-1; the same statements as
+; _shared/lua/keystats/utc_offset_column.lua).
+; @returns {Map} tables {Array} and definition {String}; throws on a schema
+;   that does not spell them.
+KLR_UtcOffsetShape() {
+		static Shape := 0
+		if IsObject(Shape)
+				return Shape
+		Schema := FSReadStrict(KLR_ResolveSchemaPath())
+		Tables := []
+		Position := 1
+		while Position := RegExMatch(Schema, "CREATE TABLE IF NOT EXISTS (events_\w+) \(", &Found, Position) {
+				Tables.Push(Found[1])
+				Position += Found.Len[0]
+		}
+		if !Tables.Length || !RegExMatch(Schema, "m)^\s*utc_offset_min (INTEGER CHECK .+\)),\s*$", &Column)
+				throw Error("schema.sql spells no raw table or no utc_offset_min definition")
+		Shape := Map("tables", Tables, "definition", Column[1])
+		return Shape
+}
+
+; The raw tables of an image still without utc_offset_min, by name.
+; @param db {Integer} Open handle.
+; @returns {Array} Table names.
+KLR_UtcOffsetMissing(db) {
+		Quoted := ""
+		for Name in KLR_UtcOffsetShape()["tables"]
+				Quoted .= (A_Index > 1 ? "," : "") . SQLite_Q(Name)
+		Missing := []
+		for Row in SQLite_Query(db, "SELECT m.name FROM sqlite_master m WHERE m.type = 'table' AND m.name IN ("
+				. Quoted . ") AND NOT EXISTS (SELECT 1 FROM pragma_table_info(m.name) p WHERE p.name = 'utc_offset_min')"
+				. " ORDER BY m.name;")
+				Missing.Push(Row["name"])
+		return Missing
+}
+
+; The statements that add utc_offset_min to the named tables, then retire the
+; purge triggers written before it (every trigger purge_schema.sql creates);
+; none when no table lacks it.
+; @param Missing {Array} Table names from KLR_UtcOffsetMissing.
+; @param PurgeSchema {String} The text of purge_schema.sql.
+; @returns {Array} Statements, in order; run before purge_schema.sql.
+KLR_UtcOffsetStatements(Missing, PurgeSchema) {
+		Statements := []
+		if !Missing.Length
+				return Statements
+		Definition := KLR_UtcOffsetShape()["definition"]
+		for Name in Missing
+				Statements.Push("ALTER TABLE " . Name . " ADD COLUMN utc_offset_min " . Definition . ";")
+		Position := 1
+		while Position := RegExMatch(PurgeSchema, "CREATE TRIGGER IF NOT EXISTS (\w+)", &Found, Position) {
+				Statements.Push("DROP TRIGGER IF EXISTS " . Found[1] . ";")
+				Position += Found.Len[0]
+		}
+		return Statements
+}
+
+; Adds utc_offset_min to an image created before it, in one savepoint, so a
+; ledger row naming the column is accepted again.
+; @param db {Integer} Open handle.
+; @param PurgeSchema {String} The text of purge_schema.sql.
+; @returns {Boolean} True once every raw table has the column.
+KLR_EnsureUtcOffsetColumn(db, PurgeSchema) {
+		try {
+				Missing := KLR_UtcOffsetMissing(db)
+				Statements := KLR_UtcOffsetStatements(Missing, PurgeSchema)
+		} catch as err {
+				try LoggerError("KLReader", "Metrics utc_offset_min migration could not be planned: {1}.", err.Message)
+				return _KLR_RefuseSchema("the utc_offset_min migration could not be planned")
+		}
+		if !Statements.Length
+				return true
+		Sql := "SAVEPOINT klr_utc_offset;"
+		for Statement in Statements
+				Sql .= "`n" . Statement
+		if !SQLite_Exec(db, Sql . "`nRELEASE klr_utc_offset;") {
+				Reason := SQLite_LastError(db)
+				SQLite_Exec(db, "ROLLBACK TO klr_utc_offset; RELEASE klr_utc_offset;")
+				try LoggerError("KLReader", "Metrics utc_offset_min migration was refused by SQLite: {1}.", Reason)
+				return _KLR_RefuseSchema("the utc_offset_min migration was refused by SQLite")
+		}
+		try LoggerInfo("KLReader", "Metrics image gained utc_offset_min on {1} raw table(s); purge triggers renewed.",
+				Missing.Length)
 		return true
 }
 
@@ -405,15 +498,16 @@ KLR_BuildDatabase(metrics_dir) {
 }
 
 ; Preserve the already-validated offsets and numeric projection when an old
-; cache predates the additive media schema. The read-only image stays unchanged
-; until a complete private successor can be published.
+; cache predates the additive media schema or the utc_offset_min column (whose
+; absence made every raw INSERT of a newer ledger fail). The read-only image
+; stays unchanged until a complete private successor can be published.
 KLR_UpgradeMediaCache(LoadMedia := unset) {
 		static UnretiredCandidate := 0
 		if UnretiredCandidate
 				throw Error("Semantic media cache upgrade has an unretired candidate.")
 		Rows := SQLite_Query(KLRCache.db,
 				"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
-		if Rows[1]["n"] = 2
+		if Rows[1]["n"] = 2 && !KLR_UtcOffsetMissing(KLRCache.db).Length
 				return true
 		Candidate := KLR_CloneCandidate(KLRCache.db)
 		if !Candidate
@@ -425,7 +519,7 @@ KLR_UpgradeMediaCache(LoadMedia := unset) {
 						throw Error("Semantic media cache schema installation failed.")
 				Rows := SQLite_Query(Candidate,
 						"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
-				if Rows[1]["n"] != 2
+				if Rows[1]["n"] != 2 || KLR_UtcOffsetMissing(Candidate).Length
 						throw Error("Semantic media cache schema installation is incomplete.")
 				KLR_PublishCandidate(Candidate, KLR_CopyOffsets(KLRCache.last_sizes),
 						KLR_CopyLedgerSnapshots(KLRCache.ledger_snapshots))
@@ -1646,12 +1740,12 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	; per-hour totals reconcile with the daily chars figure (LENGTH(text)
 	; would under-count and break that invariant). Only `c` is written here;
 	; the per-hour error columns (e/em/es/e_buckets) stay walker-owned.
-	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(" . KLR_LocalTsSql("t") . ",12,2) AS hour, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; agg_app_day_hourly_min5 — keystrokes per 5-min slot from events_typing
 	; (same non-synthetic json_each count as the hourly rollup).
-	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT device_id, date, app, substr(lts,12,2) || ':' || CASE WHEN (CAST(substr(lts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(lts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(chars) FROM (SELECT t.device_id, t.date, t.app, " . KLR_LocalTsSql("t") . " AS lts, p.chars FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . ") GROUP BY device_id, date, app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; Standalone SQL refreshes remain bounded; replay restores these counts
@@ -1848,29 +1942,31 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								"entries_since_flush", 0,
 								"activity", Map(),
 								"replayed", 0,
-								"ok", true
+								"ok", true,
+								"legacy_offset", KLR_LegacyRowOffset(db, device_id),
+								"legacy_rows", 0
 						)
 
 						device_where := " WHERE device_id=" . SQLite_Q(device_id) . date_scope
 						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, app_category, title, layout, "
 								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
-								. "'' AS shortcut_key "
+								. "'' AS shortcut_key, utc_offset_min "
 								. "FROM events_typing AS t JOIN temp.klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
 								. _KLR_DateScope(Dates, "t.date")
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, context, prediction, "
-								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key FROM events_llm"
+								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key, utc_offset_min FROM events_llm"
 								. device_where . " AND kind='accepted' AND context=" . accepted_marker
 								. " UNION ALL SELECT ts, id, 'shortcut' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, '' AS context, "
-								. "'' AS prediction, 0 AS deletes, key AS shortcut_key "
+								. "'' AS prediction, 0 AS deletes, key AS shortcut_key, utc_offset_min "
 								. "FROM events_shortcut" . device_where
 								. " ORDER BY id;"
-						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
+						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms, utc_offset_min FROM events_window_switch"
 								. device_where . " ORDER BY ts, id;"
-						system_sql := "SELECT ts, action, metadata_json FROM events_system"
+						system_sql := "SELECT ts, action, metadata_json, utc_offset_min FROM events_system"
 								. device_where . " ORDER BY ts, id;"
 
 						if !KLR_ReplaySweep(db, logical_sql,
@@ -1905,6 +2001,9 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								break
 						}
 						replayed += KLRReplay["replayed"]
+						if KLRReplay["legacy_rows"]
+								try LoggerInfo("KLReader", "Read {1} Linux row(s) of {2} recorded before utc_offset_min with this device's offset, {3} min.",
+										KLRReplay["legacy_rows"], device_id, KLRReplay["legacy_offset"])
 				}
 		} catch Error as Err {
 				KLR_CaptureReplayFailure("driver",
@@ -1934,6 +2033,44 @@ KLR_RowValue(row, key, default := "") {
 		return (row is Map && row.Has(key)) ? row[key] : default
 }
 
+; The offset an offset-less row of a device is read with: a Linux row recorded
+; before utc_offset_min held UTC and takes this device's current offset; any
+; other held local time and takes none (maintainer decision KMD-1).
+; @param db {Integer} Open handle.
+; @param DeviceId {String} The replayed device.
+; @returns {Integer|String} The offset, "" for a device whose rows held local time.
+KLR_LegacyRowOffset(db, DeviceId) {
+		Rows := SQLite_Query(db, "SELECT os FROM devices WHERE device_id=" . SQLite_Q(DeviceId) . ";")
+		return (Rows.Length && Rows[1]["os"] = "linux") ? KL_CurrentUtcOffset() : ""
+}
+
+; The offset a replayed row is read with: its own, else its device's legacy
+; reading (counted, so the replay names how many Linux rows took it).
+; @param row {Map} A row selected with utc_offset_min.
+; @returns {Integer|String} Minutes east of UTC, "" for a row in local time.
+KLR_RowOffset(row) {
+		global KLRReplay
+		Offset := KLR_RowValue(row, "utc_offset_min", "")
+		if (Offset != "")
+				return Integer(Offset)
+		Legacy := (KLRReplay is Map) ? KLRReplay.Get("legacy_offset", "") : ""
+		if (Legacy != "")
+				KLRReplay["legacy_rows"] += 1
+		return Legacy
+}
+
+; The local time of a raw row, as SQL over the table alias A: ts plus its
+; offset, an older Linux row's ts plus this device's current offset, any other
+; older row's ts as it is. Its hour and minute are the ones the user lived.
+; @param A {String} The events_* table alias.
+; @returns {String} An SQL expression.
+KLR_LocalTsSql(A) {
+		return "CASE WHEN " . A . ".utc_offset_min IS NOT NULL THEN strftime('%Y-%m-%d %H:%M:%f', " . A . ".ts, printf('%+d minutes', "
+				. A . ".utc_offset_min)) WHEN " . A . ".device_id IN (SELECT device_id FROM devices WHERE os = 'linux') THEN "
+				. "strftime('%Y-%m-%d %H:%M:%f', " . A . ".ts, printf('%+d minutes', " . KL_CurrentUtcOffset() . ")) ELSE "
+				. A . ".ts END"
+}
+
 ; Convert a durable typing row back to the exact entry shape the live walker
 ; receives.  The hand-written JSON parser works on the shipped 64-bit AHK,
 ; unlike the old ScriptControl path, so historical physical key metadata (`kc`
@@ -1944,6 +2081,7 @@ KLR_TypingRowToEntry(row) {
 				return 0
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"app_category", KLR_RowValue(row, "app_category", ""),
 				"title", KLR_RowValue(row, "title", ""),
@@ -1976,6 +2114,7 @@ KLR_LlmAcceptedRowToEntry(row) {
 
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"title", KLR_RowValue(row, "title", ""),
 				"layout", KLR_RowValue(row, "layout", ""),
@@ -1986,6 +2125,7 @@ KLR_LlmAcceptedRowToEntry(row) {
 KLR_ShortcutRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"key", KLR_RowValue(row, "shortcut_key", "")
 		)
@@ -1994,6 +2134,7 @@ KLR_ShortcutRowToEntry(row) {
 KLR_WindowRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"prev_title", KLR_RowValue(row, "prev_title", ""),
 				"next_title", KLR_RowValue(row, "next_title", ""),
@@ -2015,6 +2156,7 @@ KLR_SystemRowToEntry(row) {
 				metadata.Delete("duration_ms")
 		metadata := _KL_JsonNormalizeNull(metadata)
 		metadata["timestamp"] := KLR_RowValue(row, "ts", "")
+		metadata["utc_offset_min"] := KLR_RowOffset(row)
 		metadata["action"] := KLR_RowValue(row, "action", "")
 		return metadata
 }
@@ -2023,7 +2165,7 @@ KLR_SystemRowToEntry(row) {
 ; N-grams retain their existing per-device stream and documented scope behavior.
 KLR_ReplayActivityEntry(Entry) {
 		App := KLW_GetMap(Entry, "app", "Unknown")
-		Day := _KLW_ResolveTypingTime(KLW_GetMap(Entry, "timestamp", ""))["date"]
+		Day := _KLW_ResolveTypingTime(KLW_EntryLocalTimestamp(Entry))["date"]
 		States := KLRReplay["activity"]
 		if !States.Has(App)
 				States[App] := Map()
