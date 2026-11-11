@@ -57,6 +57,38 @@ const IMAGES = Object.freeze({
 
 const align = (n, a) => Math.ceil(n / a) * a;
 
+// Plain Uint8Array bytes, so the page (no Node Buffer) runs the same writer.
+const Bytes = Object.freeze({
+	alloc: (n) => new Uint8Array(n),
+	of: (values) => Uint8Array.from(values),
+	utf16: (text) => {
+		const out = new Uint8Array(2 * text.length);
+		for (let i = 0; i < text.length; i++) {
+			out[2 * i] = text.charCodeAt(i) & 0xff;
+			out[2 * i + 1] = text.charCodeAt(i) >>> 8;
+		}
+		return out;
+	},
+	concat: (parts) => {
+		const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+		let at = 0;
+		for (const p of parts) {
+			out.set(p, at);
+			at += p.length;
+		}
+		return out;
+	},
+	view: (bytes) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+	u16: (bytes, v, at) => Bytes.view(bytes).setUint16(at, v, true),
+	u32: (bytes, v, at) => Bytes.view(bytes).setUint32(at, v >>> 0, true),
+	i32: (bytes, v, at) => Bytes.view(bytes).setInt32(at, v, true),
+	u64: (bytes, v, at) => Bytes.view(bytes).setBigUint64(at, BigInt(v), true),
+	read16: (bytes, at) => Bytes.view(bytes).getUint16(at, true),
+	latin1: (bytes, text, at) => {
+		for (let i = 0; i < text.length; i++) bytes[at + i] = text.charCodeAt(i);
+	}
+});
+
 /** A growable little-endian byte area with pointer fixups to named objects. */
 class Area {
 	constructor() {
@@ -263,7 +295,7 @@ function rdata(model, image, rva) {
 		size: fnAt + fn.length + 1 - exportAt,
 		patch: (bytes, codeRva) => {
 			const w = (off, v) => {
-				bytes.writeUInt32LE(v >>> 0, off);
+				Bytes.u32(bytes, v, off);
 			};
 			w(exportAt + 12, rva + nameAt);
 			w(exportAt + 16, 1);
@@ -281,13 +313,13 @@ function rdata(model, image, rva) {
 	area.u8(0);
 	for (const ch of fn) area.u8(ch.charCodeAt(0));
 	area.u8(0);
-	const bytes = Buffer.from(area.bytes);
+	const bytes = Bytes.of(area.bytes);
 	// Pointer slots hold virtual addresses; the relocations let the loader move them.
 	const relocations = [];
 	for (const fix of area.fixups) {
 		const va = image.base + rva + at.get(fix.target);
-		if (image.plus) bytes.writeBigUInt64LE(BigInt(va), fix.offset);
-		else bytes.writeUInt32LE(va >>> 0, fix.offset);
+		if (image.plus) Bytes.u64(bytes, va, fix.offset);
+		else Bytes.u32(bytes, va, fix.offset);
 		relocations.push({ rva: rva + fix.offset, type: image.plus ? REL_DIR64 : REL_HIGHLOW });
 	}
 	return { bytes, relocations, tablesRva: rva + at.get('KbdTables'), exportsDir };
@@ -296,52 +328,52 @@ function rdata(model, image, rva) {
 /** KbdLayerDescriptor's code: return &KbdTables. */
 function descriptorCode(image, codeRva, tablesRva) {
 	if (image.machine === 0x014c) {
-		const code = Buffer.from([0xb8, 0, 0, 0, 0, 0xc3]);
-		code.writeUInt32LE((image.base + tablesRva) >>> 0, 1);
+		const code = Bytes.of([0xb8, 0, 0, 0, 0, 0xc3]);
+		Bytes.u32(code, image.base + tablesRva, 1);
 		return { code, relocations: [{ rva: codeRva + 1, type: REL_HIGHLOW }] };
 	}
 	if (image.machine === 0x8664) {
-		const code = Buffer.from([0x48, 0x8d, 0x05, 0, 0, 0, 0, 0xc3]);
-		code.writeInt32LE(tablesRva - (codeRva + 7), 3);
+		const code = Bytes.of([0x48, 0x8d, 0x05, 0, 0, 0, 0, 0xc3]);
+		Bytes.i32(code, tablesRva - (codeRva + 7), 3);
 		return { code, relocations: [] };
 	}
 	const pages = (tablesRva >> 12) - (codeRva >> 12);
 	const immlo = pages & 3;
 	const immhi = (pages >> 2) & 0x7ffff;
-	const code = Buffer.alloc(12);
-	code.writeUInt32LE((0x90000000 | (immlo << 29) | (immhi << 5)) >>> 0, 0);
-	code.writeUInt32LE((0x91000000 | ((tablesRva & 0xfff) << 10)) >>> 0, 4);
-	code.writeUInt32LE(0xd65f03c0, 8);
+	const code = Bytes.alloc(12);
+	Bytes.u32(code, 0x90000000 | (immlo << 29) | (immhi << 5), 0);
+	Bytes.u32(code, 0x91000000 | ((tablesRva & 0xfff) << 10), 4);
+	Bytes.u32(code, 0xd65f03c0, 8);
 	return { code, relocations: [] };
 }
 
 /** One length-prefixed VS_VERSIONINFO node (wLength, wValueLength, wType, key, value, children). */
 function versionNode(key, value, type, children) {
 	const parts = [];
-	const head = Buffer.alloc(6);
-	const keyBytes = Buffer.from(`${key}\0`, 'utf16le');
-	let body = Buffer.concat([head, keyBytes]);
-	body = Buffer.concat([body, Buffer.alloc(align(body.length, 4) - body.length)]);
+	const head = Bytes.alloc(6);
+	const keyBytes = Bytes.utf16(`${key}\0`);
+	let body = Bytes.concat([head, keyBytes]);
+	body = Bytes.concat([body, Bytes.alloc(align(body.length, 4) - body.length)]);
 	let valueLength = 0;
 	if (value !== null) {
-		body = Buffer.concat([body, value.bytes]);
+		body = Bytes.concat([body, value.bytes]);
 		valueLength = value.length;
 	}
 	for (const child of children) {
-		body = Buffer.concat([body, Buffer.alloc(align(body.length, 4) - body.length), child]);
+		body = Bytes.concat([body, Bytes.alloc(align(body.length, 4) - body.length), child]);
 	}
-	body.writeUInt16LE(body.length, 0);
-	body.writeUInt16LE(valueLength, 2);
-	body.writeUInt16LE(type, 4);
+	Bytes.u16(body, body.length, 0);
+	Bytes.u16(body, valueLength, 2);
+	Bytes.u16(body, type, 4);
 	parts.push(body);
-	return Buffer.concat(parts);
+	return Bytes.concat(parts);
 }
 
 /** The keyboard-driver version resource emitRc describes. */
 function versionResource(model) {
 	const v = (model.version_string || '1.0').split('.').map(Number);
 	while (v.length < 4) v.push(0);
-	const fixed = Buffer.alloc(52);
+	const fixed = Bytes.alloc(52);
 	const words = [
 		0xfeef04bd,
 		0x00010000,
@@ -357,9 +389,9 @@ function versionResource(model) {
 		0,
 		0
 	];
-	words.forEach((word, i) => fixed.writeUInt32LE(word, 4 * i));
+	words.forEach((word, i) => Bytes.u32(fixed, word, 4 * i));
 	const text = (s) => {
-		const bytes = Buffer.from(`${s}\0`, 'utf16le');
+		const bytes = Bytes.utf16(`${s}\0`);
 		return { bytes, length: bytes.length / 2 };
 	};
 	const strings = [
@@ -372,9 +404,9 @@ function versionResource(model) {
 		['ProductName', model.layout_text],
 		['ProductVersion', model.version_string || '1.0']
 	].map(([key, value]) => versionNode(key, text(value), 1, []));
-	const translation = Buffer.alloc(4);
-	translation.writeUInt16LE(0x409, 0);
-	translation.writeUInt16LE(1200, 2);
+	const translation = Bytes.alloc(4);
+	Bytes.u16(translation, 0x409, 0);
+	Bytes.u16(translation, 1200, 2);
 	return versionNode('VS_VERSION_INFO', { bytes: fixed, length: 52 }, 0, [
 		versionNode('StringFileInfo', null, 1, [versionNode('040904B0', null, 1, strings)]),
 		versionNode('VarFileInfo', null, 1, [
@@ -389,11 +421,11 @@ function stringBlock(model) {
 	const parts = [];
 	for (let i = 0; i < 16; i++) {
 		const s = i === id % 16 ? model.layout_text : '';
-		const len = Buffer.alloc(2);
-		len.writeUInt16LE(s.length, 0);
-		parts.push(len, Buffer.from(s, 'utf16le'));
+		const len = Bytes.alloc(2);
+		Bytes.u16(len, s.length, 0);
+		parts.push(len, Bytes.utf16(s));
 	}
-	return { name: Math.floor(id / 16) + 1, data: Buffer.concat(parts) };
+	return { name: Math.floor(id / 16) + 1, data: Bytes.concat(parts) };
 }
 
 /** The .rsrc section: type → name → language directories, data entries, data. */
@@ -404,8 +436,8 @@ function resources(model, rva) {
 		{ type: RT_VERSION, name: 1, data: versionResource(model) }
 	];
 	const dir = (count) => {
-		const b = Buffer.alloc(16 + 8 * count);
-		b.writeUInt16LE(count, 14);
+		const b = Bytes.alloc(16 + 8 * count);
+		Bytes.u16(b, count, 14);
 		return b;
 	};
 	// Layout: root, one name directory per type, one language directory per name.
@@ -422,7 +454,7 @@ function resources(model, rva) {
 		dataAt.push(at);
 		at += leaf.data.length;
 	}
-	const out = Buffer.alloc(at);
+	const out = Bytes.alloc(at);
 	let cursor = root.length;
 	const nameAt = [];
 	for (const b of names) {
@@ -435,20 +467,20 @@ function resources(model, rva) {
 		cursor += b.length;
 	}
 	leaves.forEach((leaf, i) => {
-		root.writeUInt32LE(leaf.type, 16 + 8 * i);
-		root.writeUInt32LE((0x80000000 | nameAt[i]) >>> 0, 20 + 8 * i);
-		names[i].writeUInt32LE(leaf.name, 16);
-		names[i].writeUInt32LE((0x80000000 | langAt[i]) >>> 0, 20);
-		langs[i].writeUInt32LE(RESOURCE_LANGUAGE, 16);
-		langs[i].writeUInt32LE(entriesAt + 16 * i, 20);
+		Bytes.u32(root, leaf.type, 16 + 8 * i);
+		Bytes.u32(root, (0x80000000 | nameAt[i]) >>> 0, 20 + 8 * i);
+		Bytes.u32(names[i], leaf.name, 16);
+		Bytes.u32(names[i], (0x80000000 | langAt[i]) >>> 0, 20);
+		Bytes.u32(langs[i], RESOURCE_LANGUAGE, 16);
+		Bytes.u32(langs[i], entriesAt + 16 * i, 20);
 		const entry = entriesAt + 16 * i;
-		out.writeUInt32LE(rva + dataAt[i], entry);
-		out.writeUInt32LE(leaf.data.length, entry + 4);
-		leaf.data.copy(out, dataAt[i]);
+		Bytes.u32(out, rva + dataAt[i], entry);
+		Bytes.u32(out, leaf.data.length, entry + 4);
+		out.set(leaf.data, dataAt[i]);
 	});
-	root.copy(out, 0);
-	names.forEach((b, i) => b.copy(out, nameAt[i]));
-	langs.forEach((b, i) => b.copy(out, langAt[i]));
+	out.set(root, 0);
+	names.forEach((b, i) => out.set(b, nameAt[i]));
+	langs.forEach((b, i) => out.set(b, langAt[i]));
 	return out;
 }
 
@@ -463,13 +495,13 @@ function relocationSection(relocations) {
 	const blocks = [];
 	for (const [page, entries] of pages) {
 		if (entries.length % 2) entries.push(0);
-		const b = Buffer.alloc(8 + 2 * entries.length);
-		b.writeUInt32LE(page, 0);
-		b.writeUInt32LE(b.length, 4);
-		entries.forEach((e, i) => b.writeUInt16LE(e, 8 + 2 * i));
+		const b = Bytes.alloc(8 + 2 * entries.length);
+		Bytes.u32(b, page, 0);
+		Bytes.u32(b, b.length, 4);
+		entries.forEach((e, i) => Bytes.u16(b, e, 8 + 2 * i));
 		blocks.push(b);
 	}
-	return Buffer.concat(blocks);
+	return Bytes.concat(blocks);
 }
 
 /** The PE checksum: 16-bit one's-complement sum of the file, checksum field skipped, plus its length. */
@@ -477,7 +509,7 @@ function peChecksum(bytes, checksumOffset) {
 	let sum = 0;
 	for (let i = 0; i < bytes.length; i += 2) {
 		if (i === checksumOffset || i === checksumOffset + 2) continue;
-		sum += i + 1 < bytes.length ? bytes.readUInt16LE(i) : bytes[i];
+		sum += i + 1 < bytes.length ? Bytes.read16(bytes, i) : bytes[i];
 		sum = (sum & 0xffff) + Math.floor(sum / 0x10000);
 	}
 	sum = (sum & 0xffff) + (sum >>> 16);
@@ -488,7 +520,7 @@ function peChecksum(bytes, checksumOffset) {
  * One layout DLL image.
  * @param {object} model - A checked kbd tables model.
  * @param {string} arch - x86, wow64, x64 or arm64.
- * @returns {Buffer}
+ * @returns {Uint8Array}
  */
 function writeImage(model, arch) {
 	const image = IMAGES[arch];
@@ -515,55 +547,55 @@ function writeImage(model, arch) {
 		s.rawSize = align(s.bytes.length, FILE_ALIGN);
 		raw += s.rawSize;
 	}
-	const file = Buffer.alloc(raw);
-	file.writeUInt16LE(0x5a4d, 0);
-	file.writeUInt32LE(PE_OFFSET, 0x3c);
+	const file = Bytes.alloc(raw);
+	Bytes.u16(file, 0x5a4d, 0);
+	Bytes.u32(file, PE_OFFSET, 0x3c);
 	const pe = PE_OFFSET;
-	file.writeUInt32LE(0x00004550, pe);
+	Bytes.u32(file, 0x00004550, pe);
 	const optSize = image.plus ? 0xf0 : 0xe0;
-	file.writeUInt16LE(image.machine, pe + 4);
-	file.writeUInt16LE(sections.length, pe + 6);
-	file.writeUInt16LE(optSize, pe + 20);
-	file.writeUInt16LE(image.chars, pe + 22);
+	Bytes.u16(file, image.machine, pe + 4);
+	Bytes.u16(file, sections.length, pe + 6);
+	Bytes.u16(file, optSize, pe + 20);
+	Bytes.u16(file, image.chars, pe + 22);
 	const opt = pe + 24;
 	const sizeOf = (flags) =>
 		sections.filter((s) => s.flags === flags).reduce((a, s) => a + s.rawSize, 0);
-	file.writeUInt16LE(image.plus ? 0x20b : 0x10b, opt);
+	Bytes.u16(file, image.plus ? 0x20b : 0x10b, opt);
 	file[opt + 2] = 14;
-	file.writeUInt32LE(sizeOf(SCN.code), opt + 4);
-	file.writeUInt32LE(sizeOf(SCN.rdata) + sizeOf(SCN.reloc), opt + 8);
-	file.writeUInt32LE(0, opt + 16);
-	file.writeUInt32LE(codeRva, opt + 20);
-	if (image.plus) file.writeBigUInt64LE(BigInt(image.base), opt + 24);
+	Bytes.u32(file, sizeOf(SCN.code), opt + 4);
+	Bytes.u32(file, sizeOf(SCN.rdata) + sizeOf(SCN.reloc), opt + 8);
+	Bytes.u32(file, 0, opt + 16);
+	Bytes.u32(file, codeRva, opt + 20);
+	if (image.plus) Bytes.u64(file, image.base, opt + 24);
 	else {
-		file.writeUInt32LE(rdataRva, opt + 24);
-		file.writeUInt32LE(image.base, opt + 28);
+		Bytes.u32(file, rdataRva, opt + 24);
+		Bytes.u32(file, image.base, opt + 28);
 	}
-	file.writeUInt32LE(SECTION_ALIGN, opt + 32);
-	file.writeUInt32LE(FILE_ALIGN, opt + 36);
-	file.writeUInt16LE(6, opt + 40);
-	file.writeUInt16LE(6, opt + 48);
-	file.writeUInt32LE(relocRva + align(reloc.length, SECTION_ALIGN), opt + 56);
-	file.writeUInt32LE(HEADERS_SIZE, opt + 60);
-	file.writeUInt16LE(1, opt + 68);
-	file.writeUInt16LE(image.dll, opt + 70);
+	Bytes.u32(file, SECTION_ALIGN, opt + 32);
+	Bytes.u32(file, FILE_ALIGN, opt + 36);
+	Bytes.u16(file, 6, opt + 40);
+	Bytes.u16(file, 6, opt + 48);
+	Bytes.u32(file, relocRva + align(reloc.length, SECTION_ALIGN), opt + 56);
+	Bytes.u32(file, HEADERS_SIZE, opt + 60);
+	Bytes.u16(file, 1, opt + 68);
+	Bytes.u16(file, image.dll, opt + 70);
 	const reserve = [0x100000, 0x1000, 0x100000, 0x1000];
 	let field = opt + 72;
 	for (const value of reserve) {
 		if (image.plus) {
-			file.writeBigUInt64LE(BigInt(value), field);
+			Bytes.u64(file, value, field);
 			field += 8;
 		} else {
-			file.writeUInt32LE(value, field);
+			Bytes.u32(file, value, field);
 			field += 4;
 		}
 	}
 	field += 4;
-	file.writeUInt32LE(16, field);
+	Bytes.u32(file, 16, field);
 	const dirs = field + 4;
 	const dirEntry = (index, rva, size) => {
-		file.writeUInt32LE(rva, dirs + 8 * index);
-		file.writeUInt32LE(size, dirs + 8 * index + 4);
+		Bytes.u32(file, rva, dirs + 8 * index);
+		Bytes.u32(file, size, dirs + 8 * index + 4);
 	};
 	dirEntry(0, rdataRva + data.exportsDir.offset, data.exportsDir.size);
 	dirEntry(2, rsrcRva, rsrc.length);
@@ -571,23 +603,23 @@ function writeImage(model, arch) {
 	const table = opt + optSize;
 	sections.forEach((s, i) => {
 		const at = table + 40 * i;
-		file.write(s.name, at, 'latin1');
-		file.writeUInt32LE(s.bytes.length, at + 8);
-		file.writeUInt32LE(s.rva, at + 12);
-		file.writeUInt32LE(s.rawSize, at + 16);
-		file.writeUInt32LE(s.raw, at + 20);
-		file.writeUInt32LE(s.flags, at + 36);
-		s.bytes.copy(file, s.raw);
+		Bytes.latin1(file, s.name, at);
+		Bytes.u32(file, s.bytes.length, at + 8);
+		Bytes.u32(file, s.rva, at + 12);
+		Bytes.u32(file, s.rawSize, at + 16);
+		Bytes.u32(file, s.raw, at + 20);
+		Bytes.u32(file, s.flags, at + 36);
+		file.set(s.bytes, s.raw);
 	});
 	const checksumAt = opt + 64;
-	file.writeUInt32LE(peChecksum(file, checksumAt), checksumAt);
+	Bytes.u32(file, peChecksum(file, checksumAt), checksumAt);
 	return file;
 }
 
 /**
  * The four layout DLL images of a model, written without a toolchain.
  * @param {object} input - A kbd tables model.
- * @returns {Object<string, Buffer>} x86, wow64, x64 and arm64 images.
+ * @returns {Object<string, Uint8Array>} x86, wow64, x64 and arm64 images.
  */
 function writeDlls(input) {
 	const model = Model.check(input);

@@ -72,7 +72,9 @@ function resourceLeaves(bytes) {
  * a valid PE checksum, as the clang one does.
  */
 function provePeWriter(model, label, clangDlls) {
-	const written = PeWriter.writeDlls(model);
+	const written = Object.fromEntries(
+		Object.entries(PeWriter.writeDlls(model)).map(([arch, bytes]) => [arch, Buffer.from(bytes)])
+	);
 	assert.deepEqual(Object.keys(written), Object.keys(clangDlls));
 	for (const [arch, bytes] of Object.entries(written)) {
 		const mine = readDll(bytes, { trace: true });
@@ -292,7 +294,14 @@ for (const arch of Object.keys(again))
 const writtenOnce = PeWriter.writeDlls(bepo);
 const writtenTwice = PeWriter.writeDlls(bepo);
 for (const arch of Object.keys(writtenOnce))
-	assert.ok(writtenOnce[arch].equals(writtenTwice[arch]), `${arch} written reproducibly`);
+	assert.ok(
+		Buffer.from(writtenOnce[arch]).equals(Buffer.from(writtenTwice[arch])),
+		`${arch} written reproducibly`
+	);
+assert.ok(
+	writtenOnce.x64 instanceof Uint8Array && !Buffer.isBuffer(writtenOnce.x64),
+	'plain bytes, as the page gets them'
+);
 checks++;
 
 // 7b. The CLI's verified build without the toolchain: the same checks, writer pe.
@@ -302,7 +311,10 @@ checks++;
 	assert.equal(built.report.writer, 'pe');
 	assert.equal(built.sources, null, 'no C, resource script or module definition is needed');
 	for (const arch of Object.keys(writtenOnce))
-		assert.ok(built.dlls[arch].equals(writtenOnce[arch]), `${arch} is the writer's image`);
+		assert.ok(
+			Buffer.from(built.dlls[arch]).equals(Buffer.from(writtenOnce[arch])),
+			`${arch} is the writer's image`
+		);
 	assert.throws(() => buildVerified(bepo, 'msvc'), /unknown writer/);
 	checks++;
 }
