@@ -343,7 +343,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.key_down(e, key_code)",
-					"sha256": "85c525f297d98db42ca451ae661889628bfc7bc62586d04e6cd4bd5ba4b0614a"
+					"sha256": "ec2fa9362b6c5812c68b0c763c9bac9ea8ee0694b8634922a215a97642ecbf3c"
 				},
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
