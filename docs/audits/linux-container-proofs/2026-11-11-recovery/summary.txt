@@ -1,0 +1,60 @@
+
+=== Host ===
+  ..   kernel 6.8.0-147-generic; systemd 255
+
+=== Installer ===
+  ok   install.sh exited 0 with a reachable user manager
+  ok   the installer enabled the user unit
+  ok   the standalone tree is installed at ~/.local/lib/ergopti
+
+=== Session ===
+  ..   test keyboard /dev/input/event3
+  ok   the user can read the keyboard (input group of the new login)
+  ok   the unit's daemon grabs the keyboard and re-emits keys
+  ok   the daemon runs inside the unit (MainPID 9403)
+  ..   baseline: n=40 seen=40 missing=0 p50_ms=28.5 p90_ms=91.9 max_ms=1022.2 output=/dev/input/event4
+  ok   baseline input latency
+
+=== systemd restart ===
+  ok   the tool reads completed (exit 0, state completed)
+  ok   the user manager started a new MainPID: 9403 -> 10325
+  ok   the successor completed the request itself
+  ok   the replaced daemon is gone
+  ok   the successor runs inside the unit
+  ok   the restart went through the user manager (journal names the stop and start)
+  ..   after the systemd restart: n=40 seen=40 missing=0 p50_ms=29.0 p90_ms=97.8 max_ms=892.7 output=/dev/input/event4
+  ok   keys flow through the successor
+
+=== Owned smoke deadline ===
+       ok   the installed tree resolves as a standalone installation: standalone /home/ergopti-phys/.local/lib/ergopti
+       ..   ownership owner took 283375 ms; install deadline 880126 ms
+       ok   the installed tree verifies against its receipt
+       ..   one receipt verification took 4682 ms; callback margin 18046 ms
+       ok   the active tree digest was captured
+       ok   exactly one terminal callback: 1
+       ok   the hung smoke failed the install and restored the previous tree: updated wrapper smoke failed; previous installation restored
+       ok   the callback came after the 880126 ms deadline, within its margin: 891809 ms
+       ok   the hung smoke's process group was gone at the callback
+       ok   the candidate's hung --help smoke started
+       ok   the event loop kept ticking during the smoke: max gap 226.3 ms over 54668 ticks, smoke 572097 ms
+       ok   the active tree is byte-for-byte the tree before the install
+       ok   no staging folder is left beside the installation
+     RECEIPT smoke_deadline timeout_ms=880126 callback_ms=891809 smoke_max_gap_ms=226.3 ticks=54668 rollback_max_gap_ms=11661.4 verify_ms=4682 detail="updated wrapper smoke failed; previous installation restored"
+     11 checks, 0 failures
+  ok   the installed async installer's checks hold (exit 0)
+  ..   keys during the install: n=300 seen=300 missing=0 p50_ms=28.6 p90_ms=62.6 max_ms=812.3 output=/dev/input/event4
+  ok   the daemon kept re-emitting keys while the smoke hung
+  ok   the unit's daemon was not disturbed by the rolled-back install
+  ok   the unit restarts on the restored tree and re-emits keys
+
+=== Relay restart ===
+  ok   the daemon started outside the unit (pid 31891)
+  ok   the tool reads completed (exit 0, state completed)
+  ok   the relay started a new process: 31891 -> 32539
+  ok   the first process is gone
+  ok   the successor is alive and outside the unit
+  ok   the unit stayed inactive (no second daemon)
+  ..   after the relay restart: n=40 seen=40 missing=0 p50_ms=30.8 p90_ms=116.3 max_ms=892.2 output=/dev/input/event4
+  ok   keys flow through the relay's successor
+
+25 checks, 0 failures
