@@ -1213,9 +1213,10 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **Layout editor host on Windows (maintainer request, 2026-11-11).** One pass, as planned in
       [layout-editor.md « Windows host »](docs/design/layout-editor.md#windows-host): `init.ahk` accepts `source_open`,
       `source_save`, `nav_save`, `composer_emulate` and sends `source_editor`, `emulate`, `nav_apply`; a new
-      `source_store.ahk`; `composer.ahk` takes the source form of `composer_save` (`tools/kbd-dll.cjs build`, one UAC
-      prompt for `<dll>-setup.exe /S`, `LoadKeyboardLayoutW`, « already installed » from the `Keyboard Layouts` KLID and
-      the `Ergopti_kbd_<dll>` uninstall entry) and `composer_emulate` (`[layout] emulated_layout = "composed"`);
+      `source_store.ahk`; `composer.ahk` takes the source form of `composer_save`, whose `dlls` the page writes (no Node, NSIS or
+      clang): it stages them and runs a new elevated `kbd_register.ahk install` (one UAC prompt: System32/SysWOW64
+      copies, the `Keyboard Layouts\<KLID>` key, `InstallLayoutOrTip`, the `Ergopti_kbd_<dll>` uninstall entry, and the
+      matching `uninstall`), then `LoadKeyboardLayoutW`; « already installed » from that entry, a foreign key refused and `composer_emulate` (`[layout] emulated_layout = "composed"`);
       `keylayout_emulation.ahk` reads `layout_composer\layout_source.keylayout` and performs
       `layout_source_emulation.json` (replay `emulation_vectors.json`); `menu_init.ahk` binds
       `MenuCommand.OPEN_LAYOUT_EDITOR` and the `open_layout_editor` row loses its Windows grey reason. Then empty `windowsPending`
