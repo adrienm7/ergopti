@@ -382,7 +382,13 @@ function read(folder, name) {
 				const topology = JSON.parse(read(folder, 'field_guided/05_linux_window_topology.json'));
 				assert.equal(topology.verdict, 'fail', 'no Metrics database is named, never a pass');
 				assert.match(topology.codes.join(','), /topo_window_move_no_metrics_database/);
-				const hands = JSON.parse(read(folder, 'field_guided/09_linux_prediction_hands.json'));
+				// The day log exists but holds no withdrawal: no gesture, never a pass
+				const window = JSON.parse(
+					read(folder, 'field_guided/09_linux_prediction_window_switch.json')
+				);
+				assert.equal(window.verdict, 'needs_person');
+				assert.deepEqual(window.codes, ['gesture_not_observed_1s']);
+				const hands = JSON.parse(read(folder, 'field_guided/10_linux_prediction_keep.json'));
 				assert.equal(hands.verdict, 'needs_person');
 				assert.deepEqual(hands.codes, ['no_answer_1s']);
 				assert.match(
