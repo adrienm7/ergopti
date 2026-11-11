@@ -5,6 +5,19 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## An unbound diagonal falls back to its dominant straight slot (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, reversing the coordinator's default of
+the same day: on macOS and Linux a diagonal swipe (live or completed) whose
+own slot is unbound runs the slot of its dominant straight direction
+(`gestures.direction.dominant`, a tie is horizontal), and that slot's own
+horizontal-axis fallback; a bound diagonal still wins inside the diagonal
+band. Linux: `answering_slot` (manager), the decoder's `dominant` field and
+the incremental tracker, which counts and fires along the straight direction;
+macOS: `resolveSwipeSlot` returns the answering slot and its axis.
+Regressions `diagonal-unbound-fallback`. Windows receives finished swipes
+classified by the Precision Touchpad and has no diagonal slots.
+
 ## Linux awake_ms is keep-awake time (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (KMD-3): Linux `awake_ms` is the time

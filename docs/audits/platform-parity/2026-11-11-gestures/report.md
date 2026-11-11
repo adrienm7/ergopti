@@ -43,9 +43,11 @@ the Linux tracker counts only a decided axis, the macOS lock of three fingers
 or more waits for one (`Geometry.lockDir`), and a pair keeps its immediate
 lock, which is what makes it a scroll. A swipe whose final classification is a
 diagonal now runs the diagonal slot on both drivers while it moves, as their
-commit already classified it: a 26.6 degree drift with right_up unbound fires
-nothing on either, where macOS fired its straight right slot (decided by the
-coordinator on 2026-11-11, to review by the maintainer). GSL-002: the daemon's
+commit already classified it. A 26.6 degree drift with right_up unbound first
+fired nothing on either (coordinator default); decided by the maintainer on
+2026-11-11: it falls back to the dominant straight slot on macOS and Linux,
+live and completed, while a bound diagonal still wins inside the band
+(`diagonal-unbound-fallback`). GSL-002: the daemon's
 physical key observer releases the held buttons ahead of its privacy gate.
 
 ## Decisions pending (behaviour left unchanged)
