@@ -56,12 +56,28 @@ check). Every file beside this one is a receipt the run printed.
   outside systemd the daemon died. The daemon now sets `JSC_SIGNAL_FOR_GC=12`
   before anything loads WebKit.
 
-## Found, not fixed here
+## Reinstall over an older tree (fixed, eb443380)
 
-- A reinstall over an older tree keeps the files the older version shipped and
-  the new one does not (`install.sh` extracts over the tree): the reinstalled
-  tree then fails `Ownership.verify` against its own receipt. Recorded in
-  TODO.md; the run above is a first install.
+A reinstall kept the files the older version shipped and the new one does not
+(`install.sh` extracted over the tree), so the reinstalled tree failed
+`Ownership.verify` against its own receipt (4 leftover files seen by
+`phys_smoke_deadline.lua` on a reinstalled tree), and once it became
+`<root>.old` the next update could not retire it. The installer now removes
+each file the previous receipt owned and the new one does not, when its bytes
+still match. `tests/hardware/phys_reinstall_guest.sh` (after
+`phys_live_guest.sh`, same VM): `reinstall-summary.txt`, 6/6 checks, the
+dropped file gone, the tree and a `<root>.old` copy both verified.
+
+## Real-desktop receipts that ran nowhere before (7c29e091)
+
+Run on Ubuntu 24.04 under Xvfb with at-spi2-core and GTK 3 (`python3.12` here,
+whose GObject bindings match), and now in the desktop-webview CI shard:
+
+| Harness                                      | Receipt                   | Outcome                                                                                                                                                     |
+| -------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/hardware/run_clipboard_owner.lua x11` | `clipboard_owner_x11.txt` | Text, HTML and a 300 kB binary target (INCR) served by the clipboard owner and read back byte for byte through xclip.                                       |
+| `tests/hardware/run_llm_selection_focus.py`  | `llm_selection_focus.txt` | 31 AI text-destination cases on real GTK/AT-SPI with XTest output: correct controls receive the text; changed fields, changed windows and passwords refuse. |
+| `tests/hardware/run_secure_focus_watch.py`   | `secure_focus_watch.txt`  | The resident privacy owner on owned GTK fields: ordinary, password and role-changing fields, source freshness and native cleanup.                           |
 
 ## Limits
 
