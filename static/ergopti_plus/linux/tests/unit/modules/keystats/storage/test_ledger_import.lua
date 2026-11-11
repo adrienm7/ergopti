@@ -164,6 +164,30 @@ helpers.describe("Linux foreign metrics ledger import", function()
 		helpers.assert_eq(Import.last_complete_batch(text:sub(1, -3)), 0)
 	end)
 
+	-- Every driver writes a CR or a NUL in text as a char() concatenation
+	-- (_shared/lua/sqlite/literal.lua, Windows SQLite_Q). The importer read only
+	-- plain literals, refused such a statement and retried the same batch on
+	-- every tick: that device's ledger was stuck for good (KML-001,
+	-- linux-import-control-bytes).
+	it("linux-import-control-bytes: a CR or NUL written as char() passes, as its exact bytes", function()
+		local columns = Import.raw_columns(schema_sql())
+		local Literal = require("sqlite.literal")
+		local row = "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ('d', %d, "
+			.. "'%s', '2026-11-05', 'k', '', NULL);\n"
+		local text = "BEGIN TRANSACTION;\n" .. string.format(row, 1, Literal.escape("l1\r\nl2"))
+			.. string.format(row, 2, Literal.escape("a\0b'c")) .. string.format(row, 3, "x'||char(13)||'") .. "COMMIT;\n"
+		local statements, reason = Import.admit(text, "d", columns)
+		helpers.assert_eq(reason, nil)
+		helpers.assert_eq(#statements, 3)
+		helpers.assert_true(statements[1]:find("CAST(X'6C310D0A6C32' AS TEXT)", 1, true) ~= nil, "CR LF kept")
+		helpers.assert_true(statements[2]:find("CAST(X'6100622763' AS TEXT)", 1, true) ~= nil, "NUL and quote kept")
+		helpers.assert_true(statements[3]:find("CAST(X'780D' AS TEXT)", 1, true) ~= nil, "a trailing CR")
+		for _, hostile in ipairs({ "a'||char(65)||'b", "a'||lower('B')||'", "a'||char(13)", "a'||(SELECT 1)||'" }) do
+			local refused = Import.admit("BEGIN TRANSACTION;\n" .. string.format(row, 4, hostile) .. "COMMIT;\n", "d", columns)
+			helpers.assert_nil(refused, "only char(0) and char(13) between literals: " .. hostile)
+		end
+	end)
+
 	it("linux-import-refusal: subqueries, ATTACH, functions, other devices and unknown tables never pass", function()
 		local columns = Import.raw_columns(schema_sql())
 		local row = "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s);"
