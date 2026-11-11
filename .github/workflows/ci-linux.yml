@@ -3442,6 +3442,41 @@ jobs:
           fi
         timeout-minutes: 5
 
+      - name: Install prerequisites for Desktop actions change the real trash, pointer and color scheme
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gvfs gvfs-daemons gsettings-desktop-schemas libglib2.0-bin openbox xdotool dbus-x11 xvfb luajit lua-luv lua-lgi gir1.2-gtk-3.0
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # empty_trash (its question cancelled, then confirmed), center_mouse and
+      # two overlapping toggle_dark_mode, through the gestures' own executor,
+      # read back from a real gio trash, X pointer and GSettings key.
+      - name: Desktop actions change the real trash, pointer and color scheme
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          bash static/ergopti_plus/linux/tests/hardware/run_desktop_actions_live.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux

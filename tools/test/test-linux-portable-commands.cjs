@@ -567,6 +567,8 @@ const PROGRAMS = {
 		'the keyring proof secret service; it exits 2 without it',
 		HOST
 	),
+	// The GVfs client of tests/hardware/run_desktop_actions_live.sh (the real trash).
+	gio: optionalTool('GVfs client of the desktop actions proof; it exits 2 without it', HOST),
 	// The Ubuntu runner image ships iproute2 for the host proof (run_local_servers_container.py).
 	ss: why(
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,

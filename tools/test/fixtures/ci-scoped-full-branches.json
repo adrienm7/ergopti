@@ -1097,6 +1097,18 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Desktop actions change the real trash, pointer and color scheme",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Desktop actions change the real trash, pointer and color scheme",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"protocol": 10
 		},
