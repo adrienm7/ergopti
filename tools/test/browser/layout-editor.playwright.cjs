@@ -116,9 +116,7 @@ async function exerciseManager(browser, origin) {
 	);
 	await page.click('#btn-editor');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_open'));
-	await page.evaluate(() =>
-		window.sourceData({ text: null, folder: 'layout_sources/' })
-	);
+	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');
 	assert.equal(await page.locator('#layout-view').isVisible(), false);
 	await page.click('#le-save');
