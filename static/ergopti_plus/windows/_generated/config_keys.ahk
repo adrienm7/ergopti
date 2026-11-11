@@ -417,6 +417,7 @@ class MenuCommand {
 	static KEY_COMBINATIONS_TOGGLE := "key_combinations_toggle"
 	static KEY_COMBINATION_CLEAR := "key_combination_clear"
 	static KEY_HISTORY := "key_history"
+	static LAYOUT_EDITOR := "layout_editor"
 	static LAYOUT_ENABLE_VARIANT := "layout_enable_variant"
 	static LAYOUT_INSTALL := "layout_install"
 	static LAYOUT_MANAGER := "layout_manager"

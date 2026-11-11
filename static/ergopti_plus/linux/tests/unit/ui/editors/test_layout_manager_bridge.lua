@@ -173,6 +173,39 @@ helpers.describe("layout manager bridge (Linux)", function()
 	end)
 end)
 
+helpers.describe("layout editor menu row (Linux)", function()
+	helpers.it("« Create or edit a layout… » shows the window straight on the editor (layout-editor-menu)", function()
+		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["ui.menu.builder"] }
+		local calls = {}
+		package.loaded["ui.layout_manager.bridge"] = {
+			open_editor = function() calls[#calls + 1] = "open_editor"; return true end,
+		}
+		package.loaded["ui.menu.builder"] = nil
+		local ok, err = pcall(function()
+			local module = helpers.load_module("ui.menu.builder")
+			local items = module.build({ webview = { show = function(name)
+				calls[#calls + 1] = "show " .. name
+				return true
+			end } })
+			local I18n = require("infra.i18n")
+			local row = nil
+			for _, top in ipairs(items) do
+				if top.title == I18n.get("menu.layout.title") then
+					for _, child in ipairs(top.menu) do
+						if child.title == I18n.get("menu.layout.edit") then row = child end
+					end
+				end
+			end
+			helpers.assert_eq(type(row), "table", "the row reaches the tray")
+			helpers.assert_eq(type(row.fn), "function")
+			row.fn()
+		end)
+		package.loaded["ui.layout_manager.bridge"], package.loaded["ui.menu.builder"] = saved.bridge, saved.builder
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(calls, { "show layout_manager", "open_editor" })
+	end)
+end)
+
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)

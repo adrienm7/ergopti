@@ -43,6 +43,29 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
 	end)
 
+	helpers.it("« Create or edit a layout… » opens the layout manager straight on the editor (layout-editor-menu)", function()
+		local saved = package.loaded["ui.layout_manager"]
+		local deferred = 0
+		local window = {
+			menu_command = function() return function() end end,
+			editor_menu_command = function() return function() deferred = deferred + 1 end end,
+		}
+		package.loaded["ui.layout_manager"] = window
+		local ok, err = pcall(function()
+			local row = tray_row(make_ctx())
+			local editor
+			for _, child in ipairs(row and row.menu or {}) do
+				if child.title == "menu.layout.edit" then editor = child end
+			end
+			helpers.assert_true(type(editor) == "table", "the editor row must be in the rendered submenu")
+			helpers.assert_eq(type(editor.fn), "function")
+			editor.fn()
+		end)
+		package.loaded["ui.layout_manager"] = saved
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(deferred, 1, "the row runs the window's editor command")
+	end)
+
 	-- The emulated rows group handed its finished rows back as `items` too, so
 	-- « Rangées émulées » opened onto nothing.
 	helpers.it("the emulated rows submenu carries its four switches", function()
