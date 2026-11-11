@@ -37,7 +37,7 @@ M.IOREG_ARGS = { "-d2", "-c", "IOPlatformExpertDevice" }
 M.MIN_LENGTH = 8
 
 -- ioreg answers in about 150 ms; past this bound the start stops waiting for it.
-M.TIMEOUT_SEC = 3.0
+M.IOREG_TIMEOUT_SEC = 3.0
 
 -- idle | pending | resolved | failed
 local _status = "idle"
@@ -131,7 +131,7 @@ function M.prefetch(on_settled)
 	local generation = _generation
 	_status = "pending"
 	Logger.start(LOG, "Reading the hardware UUID off the main thread…")
-	local bounded = DeferredWork.after(M.TIMEOUT_SEC, function()
+	local bounded = DeferredWork.after(M.IOREG_TIMEOUT_SEC, function()
 		settle(generation, nil, "no answer within the bound")
 	end, "keystats.host_signature.timeout")
 	if not bounded then
