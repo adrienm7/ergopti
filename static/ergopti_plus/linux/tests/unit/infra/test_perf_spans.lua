@@ -146,34 +146,44 @@ helpers.describe("timing spans: the boot's load phase", function()
 	end)
 end)
 
-helpers.describe("timing spans: wiring in the daemon", function()
-	local function source(path)
-		local handle = assert(io.open(helpers.driver_root() .. "/" .. path, "rb"))
-		local text = handle:read("*a")
-		handle:close()
-		return text
-	end
-
-	helpers.it("emits the last interval summary at exit, before the final flush", function()
-		local entry = source("ergopti_hotstrings.lua")
-		local flushed = entry:find('require("infra.perf_counters").flush_now()', 1, true)
-		local exiting = entry:find('Logger.info(LOG, "Daemon exiting.")', 1, true)
-		helpers.assert_not_nil(flushed, "the shutdown path never flushed the counters")
-		helpers.assert_true(flushed < exiting)
+helpers.describe("timing spans: the daemon's own paths", function()
+	helpers.it("times a catalogue reload with its paired lines and its outcome", function()
+		local perf, lines = fixture(10)
+		local Outcome = helpers.load_module("infra.reload_outcome")
+		helpers.assert_true(Outcome.run(function() return 7, true end))
+		helpers.assert_eq(Outcome.run(function() return 0, false, "pending" end), false)
+		helpers.assert_eq(perf.snapshot().spans["config.reload"].n, 2, "both reloads are timed")
+		helpers.assert_eq(#matching(lines, "[Span] config.reload done in "), 2)
+		helpers.assert_eq(#matching(lines, "(7 mapping(s))."), 1)
+		helpers.assert_eq(#matching(lines, "(refused)."), 1)
 	end)
 
-	helpers.it("times the stages the boot summary used to leave between two stages", function()
-		local entry = source("ergopti_hotstrings.lua")
-		for _, stage in ipairs({ "callbacks", "watchers" }) do
-			helpers.assert_contains(entry, 'BootProfiler.stage("' .. stage .. '")')
-			helpers.assert_contains(entry, 'BootProfiler.stage_done("' .. stage .. '")')
-		end
+	helpers.it("records a forwarded press's age from its kernel stamp", function()
+		local perf = fixture(20)
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		local luv = require("luv")
+		local seconds, microseconds = luv.gettimeofday()
+		local stamp = seconds * 1000000 + microseconds - 1500
+		hook._test_drive({
+			{ type = 1, code = 30, value = 1, at_ms = 10, timestamp_us = stamp },
+			{ type = 1, code = 30, value = 0, at_ms = 30, timestamp_us = stamp + 20000 },
+		}, { onEmitRaw = function() return true end, onChar = function() end }, true)
+		local span = perf.snapshot().spans["input.latency"]
+		helpers.assert_eq(span.n, 1, "the press counts once, its release does not")
+		helpers.assert_true(span.max_ms >= 1.5, "age measured from the kernel stamp: " .. tostring(span.max_ms))
 	end)
 
-	helpers.it("times each tray branch, the layout switch and the catalogue reload", function()
-		helpers.assert_contains(source("platform/tray/appindicator.lua"), 'Perf.done("tray.fill"')
-		helpers.assert_contains(source("ergopti_hotstrings.lua"), '.done("layout.switch"')
-		helpers.assert_contains(source("infra/reload_outcome.lua"), 'Perf.done("config.reload"')
-		helpers.assert_contains(source("adapters/keyboard_hook.lua"), 'Perf.record_age("input.latency"')
+	helpers.it("times the boot stages that used to sit between two stages, and flushes at exit", function()
+		local perf = fixture(20)
+		local flushes, flush = 0, perf.flush_now
+		perf.flush_now = function() flushes = flushes + 1; return flush() end
+		local state = require("tests.support.main_startup_fixture").run()
+		perf.flush_now = flush
+		helpers.assert_true(state.ok, tostring(state.error))
+		local stages = table.concat(state.stages, ",")
+		helpers.assert_contains(stages, "close callbacks,open tray")
+		helpers.assert_contains(stages, "open watchers")
+		helpers.assert_contains(stages, "close watchers,open input hooks")
+		helpers.assert_eq(flushes, 1, "the exit path emits the last counter interval once")
 	end)
 end)

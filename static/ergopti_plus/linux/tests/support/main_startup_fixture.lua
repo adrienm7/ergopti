@@ -133,9 +133,11 @@ function M.run(options)
 	}
 	env.opts = { tray = true, grab = true, layout = "qwerty", dry_run = false }
 	env.device, env.mapping_count, env.config_path, env.SCRIPT_DIR = "/controlled/event0", 1, "/controlled/config.toml", "/controlled/driver"
+	observed.stages = {}
 	env.BootProfiler = { stage = function(name)
+		observed.stages[#observed.stages + 1] = "open " .. name
 		if name == "input hooks" then native_callback("input.stage") end
-	end, stage_done = noop, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
+	end, stage_done = function(name) observed.stages[#observed.stages + 1] = "close " .. name end, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
 	env.Logger = { info = function(_, message)
 		if message == "Keyboard hook started in %s mode." then native_callback("hook.log") end
 	end, error = function(_, message)
