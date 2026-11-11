@@ -102,8 +102,13 @@ _TNDO_WaitJob(JobId) {
 	}
 	_TNDO_ObserveWindows()
 	_TNDO_Require(!_TakeNotePending.Has(JobId), "The real note job must reach its bounded terminal outcome")
-	_TNDO_Require(_TNDO_Ops.Errors.Length == 0 && _TNDO_Ops.Warnings.Length == 0,
-		"The actual window/focus path must complete without a technical refusal")
+	Refusals := ""
+	for Message in _TNDO_Ops.Errors
+		Refusals .= " error=" . Message
+	for Waited in _TNDO_Ops.Warnings
+		Refusals .= " timeout_waiting_for=" . Waited
+	_TNDO_Require(Refusals == "", "The actual window/focus path must complete without a technical refusal:" . Refusals
+		. " after " . TickElapsed64(Started) . " ms")
 }
 _TNDO_WindowCurrent(Receipt) {
 	try return WinExist("ahk_id " . Receipt.Hwnd)
