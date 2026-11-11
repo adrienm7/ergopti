@@ -25,7 +25,8 @@ done
 	|| { echo "ENVIRONMENT: ${PYTHON} has no Gtk 3 / Atspi bindings" >&2; exit 2; }
 status=0
 for proof in run_nav_pointer_container.py run_tap_copy_container.py run_ai_inline_container.py \
-	run_physical_shortcut_container.py run_perf_budget_container.py; do
+	run_physical_shortcut_container.py run_perf_budget_container.py \
+	run_bytecode_installed_tree.py; do
 	echo "=== ${proof} ==="
 	unshare --mount --propagation private "${PYTHON}" "${proof}"
 	result=$?
