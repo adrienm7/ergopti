@@ -128,11 +128,19 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		operation(report)
 		return true
 	end
-	if type(payload.declaration) ~= "string" or type(payload.keylayout) ~= "string" then
-		deps.log("warn", "Refused a layout composer save without its declaration and layout.")
+	-- A save carries a composition (declaration) or an Ergopti layout source, with its layout.
+	local declaration = type(payload.declaration) == "string"
+	local source = type(payload.source) == "string"
+	if declaration == source or type(payload.keylayout) ~= "string" then
+		deps.log("warn", "Refused a layout composer save without exactly one of a declaration or a source, and its layout.")
 		return false
 	end
-	operation({ declaration = payload.declaration, keylayout = payload.keylayout, use = payload.use == true }, report)
+	operation({
+		declaration = declaration and payload.declaration or nil,
+		source = source and payload.source or nil,
+		keylayout = payload.keylayout,
+		use = payload.use == true,
+	}, report)
 	return true
 end
 

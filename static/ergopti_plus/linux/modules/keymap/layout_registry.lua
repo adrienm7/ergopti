@@ -39,6 +39,7 @@ local FileDigest    = require("adapters.file_digest")
 local ShellRunner   = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
 local Json          = require("json")
+local TomlCodec     = require("toml_codec")
 local Keylayout     = require("layouts.keylayout")
 local XkbConverter  = require("layouts.xkb_converter")
 local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
@@ -1309,6 +1310,8 @@ local function composer_operations(deps)
 		shortcuts = "single",
 		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
 		decode_json = deps.decode_json,
+		-- The page may save an Ergopti layout source in place of a composition.
+		decode_toml = TomlCodec.decode,
 		read = deps.read,
 		exists = deps.exists,
 		delete = deps.delete,
