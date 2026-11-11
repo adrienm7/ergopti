@@ -252,6 +252,14 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/key_tables.js']
 	},
 	{
+		script: 'codegen/codegen-unicode-names.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/unicode_names.js']
+	},
+	{
+		script: 'codegen/codegen-layout-editor-klc-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/klc_generator.js']
+	},
+	{
 		script: 'codegen/codegen-layout-composer-corpus.cjs',
 		outputs: ['static/ergopti_plus/_shared/tests/corpus/layouts/composer/composed.keylayout']
 	},

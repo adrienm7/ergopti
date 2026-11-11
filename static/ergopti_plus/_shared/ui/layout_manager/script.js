@@ -35,7 +35,8 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'composer_remove',
 	'source_open',
 	'source_save',
-	'source_pick'
+	'source_pick',
+	'nav_save'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -446,6 +447,7 @@ window.initData = function (data) {
 	document.getElementById('btn-editor').hidden = !editor;
 	document.getElementById('btn-compose').hidden = editor;
 	_hostPicks = data.source_pick === true;
+	_hostAppliesNav = data.nav_apply === true;
 	window.updateState(data.state);
 };
 
@@ -462,6 +464,9 @@ let _pendingSave = null;
 let _pendingInstall = null;
 let _pendingSources = null;
 let _pendingPick = null;
+let _pendingNav = null;
+// Whether the host applies the source's navigation layer (nav_save), from initData.
+let _hostAppliesNav = false;
 // Whether the host opens files in a native panel (macOS), from initData.
 let _hostPicks = false;
 
@@ -495,11 +500,10 @@ function hostInstall(payload) {
 			return;
 		}
 		_pendingInstall = { resolve: resolve, reject: reject };
-		send('composer_save', undefined, {
-			source: payload.source,
-			keylayout: payload.keylayout,
-			use: true
-		});
+		const message = { source: payload.source, keylayout: payload.keylayout, use: true };
+		// The drivers perform the source's emulation table for what the .keylayout cannot hold.
+		if (payload.emulation !== undefined) message.emulation = payload.emulation;
+		send('composer_save', undefined, message);
 	});
 }
 
@@ -544,6 +548,39 @@ function routeComposerResults() {
 	};
 }
 
+/**
+ * Applies the layers.toml the editor built from the source's navigation layer
+ * through the host's navigation layer editor save (nav_save); settles on navResult.
+ */
+function hostApplyNav(text) {
+	return new Promise(function (resolve, reject) {
+		if (_pendingNav) {
+			reject({ code: 'save_busy', path: 'nav_save' });
+			return;
+		}
+		_pendingNav = { resolve: resolve, reject: reject };
+		send('nav_save', undefined, { text: text });
+	});
+}
+
+/**
+ * Called by the host once the navigation layer is saved: { saved, applied, errors }.
+ * A refused save rejects with its first error's code.
+ * @param {Object} result
+ */
+window.navResult = function (result) {
+	const pending = _pendingNav;
+	_pendingNav = null;
+	if (!pending) return;
+	const errors = result && Array.isArray(result.errors) ? result.errors : [];
+	if (result && result.saved === true) pending.resolve({ applied: result.applied === true });
+	else
+		pending.reject({
+			code: (errors[0] && errors[0].code) || 'host_save_failed',
+			path: (errors[0] && errors[0].detail) || ''
+		});
+};
+
 /** Opens a file in the host's native panel; settles on sourcePicked. */
 function hostPick() {
 	return new Promise(function (resolve, reject) {
@@ -587,6 +624,7 @@ window.sourceData = function (data) {
 		install: hostInstall,
 		loadSources: hostSources,
 		pickFile: _hostPicks ? hostPick : null,
+		applyNav: _hostAppliesNav ? hostApplyNav : null,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,

@@ -40,7 +40,12 @@ local function run(code, output)
 	return steps_of(report)
 end
 
-local QUIET = "capture_stamp 0\nwindow_toggle 0\nstart_rollback 0\nrejections 0 none\nheld_key 0\ncancels 0 none\n"
+local COUNTS = "switch_cancel 0\ntoggle_open 0\ntoggle_raise 0\nexpansion 0\nboot 0\n"
+	.. "api_key_absent 0\napi_key_reentered 0\n"
+	.. "swipe_dispatch 0\nscope_commit 0\ntap_hold_reset 0\nemulation_on 0\nnumber_row_apply 0\n"
+	.. "page_dark 0\npage_light 0\n"
+local QUIET = "capture_stamp 0\nwindow_toggle 0\nstart_rollback 0\nrotation_warning 0\ndigest_mismatch 0\n"
+	.. "rejections 0 none\nheld_key 0\ncancels 0 none\n" .. COUNTS
 
 
 
@@ -60,16 +65,30 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 	end)
 
 	helpers.it("fails each error signal by name and keeps activity as information", function()
-		local steps = run(0, "capture_stamp 2\nwindow_toggle 1\nstart_rollback 0\nrejections 7 tilt\n"
-			.. "held_key 3\ncancels 4 mouseMoved\n")
+		local steps = run(0, "capture_stamp 2\nwindow_toggle 1\nstart_rollback 0\nrotation_warning 1\n"
+			.. "digest_mismatch 0\nrejections 7 tilt\nheld_key 3\ncancels 4 mouseMoved\n"
+			.. "switch_cancel 2\ntoggle_open 1\ntoggle_raise 3\nexpansion 9\nboot 4\n"
+			.. "api_key_absent 1\napi_key_reentered 1\n"
+			.. "swipe_dispatch 5\nscope_commit 2\ntap_hold_reset 1\nemulation_on 1\nnumber_row_apply 1\n"
+			.. "page_dark 3\npage_light 2\n")
 		helpers.assert_eq(steps.log_capture_stamp_errors.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_capture_stamp_errors.value, "2")
 		helpers.assert_eq(steps.log_window_toggle_errors.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_start_rollbacks.state, Report.STATE_PASS)
+		helpers.assert_eq(steps.log_keystats_rotation_warnings.state, Report.STATE_FAIL)
+		helpers.assert_eq(steps.log_digest_mismatches.state, Report.STATE_PASS)
 		helpers.assert_eq(steps.log_three_finger_rejections.state, Report.STATE_INFO)
 		helpers.assert_eq(steps.log_three_finger_rejections.value, "7:tilt")
 		helpers.assert_eq(steps.log_held_key_moves.value, "3")
 		helpers.assert_eq(steps.log_prediction_activity_cancels.value, "4:mouseMoved")
+		for id, value in pairs({ log_prediction_switch_cancels = "2", log_window_toggle_opens = "1",
+			log_window_toggle_raises = "3", log_hotstring_expansions = "9", log_boot_completions = "4",
+			log_api_key_absent = "1", log_api_key_reentered = "1", log_gesture_swipe_dispatches = "5",
+			log_scope_commits = "2", log_tap_hold_word_resets = "1", log_layout_emulations_on = "1",
+			log_number_row_applies = "1", log_pages_dark = "3", log_pages_light = "2" }) do
+			helpers.assert_eq(steps[id].state, Report.STATE_INFO, id)
+			helpers.assert_eq(steps[id].value, value, id)
+		end
 	end)
 
 	helpers.it("fails on a missing log, a timeout or a summary without its totals", function()
@@ -114,6 +133,39 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 				.. "publication transaction rolled back after a refused publish.",
 			"2026-11-10 10:00:11:001 [INFO] [window_toggle] Page 'changelog' opened.",
 			"2026-11-10 10:00:12:001 [INFO] [gestures] Touch frame from device=1 has no capture timestamp.",
+			"2026-11-10 10:00:13:001 [WARNING] [keystats.watchers] Midnight rotation stalled — will retry on next "
+				.. "maintenance tick.",
+			"2026-11-10 10:00:14:001 [WARNING] [keystats.log_manager] day_rollover: today.log not fully drained — "
+				.. "file preserved, rotation skipped.",
+			"2026-11-10 10:00:15:001 [INFO] [keystats.watchers] Midnight rotation stalled in a quoted note.",
+			"2026-11-10 10:00:16:001 [WARNING] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed its digest "
+				.. "check; Ollama removed the layer, so it is pulled once more.",
+			"2026-11-10 10:00:17:001 [INFO] [menu_llm.ollama] The Ollama pull of granite4:350m-h finished.",
+			"2026-11-10 10:00:18:001 [DEBUG] [keymap.llm_bridge] User activity (application or window switch) — "
+				.. "pending prediction cancelled.",
+			"2026-11-10 10:00:19:001 [DEBUG] [window_toggle] Toggle 'model_browser': closed, opening.",
+			"2026-11-10 10:00:20:001 [DEBUG] [window_toggle] Toggle 'model_browser': open but not focused, "
+				.. "bringing to front.",
+			"2026-11-10 10:00:21:001 [DEBUG] [window_toggle] Toggle 'model_browser': focused, closing.",
+			"2026-11-10 10:00:22:001 [DEBUG] [keymap.expander] Auto-expand: private mapping fired (content withheld).",
+			"2026-11-10 10:00:23:001 [DEBUG] [keymap.expander] Terminator-expand: 'asa' → 'ASA'.",
+			"2026-11-10 10:00:24:001 [SUCCESS] [boot_profiler] Boot complete in 2140 ms.",
+			"2026-11-10 10:00:25:001 [WARNING] [llm.api_token_crypto] Keychain holds no key for entry 'e1'; it needs its key "
+				.. "again.",
+			"2026-11-10 10:00:26:001 [INFO] [menu_llm.api_panel] API entry key change staged (entry=e1).",
+			"2026-11-10 10:00:27:001 [DEBUG] [gestures.engine] Gesture dispatched: slot=swipe_3_up action=next_tab.",
+			"2026-11-10 10:00:28:001 [DEBUG] [gestures.engine] Gesture dispatched: slot=tap_3 action=left_click.",
+			"2026-11-10 10:00:29:001 [INFO] [menu] Scope hotstrings recommended committed.",
+			"2026-11-10 10:00:30:001 [SUCCESS] [config_scope_composition] Scope global clear committed: hotstrings, gestures.",
+			"2026-11-10 10:00:31:001 [INFO] [menu] Scope gestures restore refused.",
+			"2026-11-10 10:00:32:001 [DEBUG] [keymap] Tap-hold command marker received (word reset: yes).",
+			"2026-11-10 10:00:33:001 [DEBUG] [keymap] Tap-hold command marker received (word reset: no).",
+			"2026-11-10 10:00:34:001 [INFO] [keymap.layout_emulation] Layout emulation of 'ergopti_plus' on (base fr, "
+				.. "AltGr true, source records true).",
+			"2026-11-10 10:00:35:001 [INFO] [keymap.number_row_live] Number-row options applied live (order "
+				.. "symbols_first, edges false).",
+			"2026-11-10 10:00:36:001 [DEBUG] [ui_builder] Webview 'Diagnostics' rendered in the dark appearance.",
+			"2026-11-10 10:00:37:001 [DEBUG] [ui_builder] Webview 'Diagnostics' rendered in the light appearance.",
 		}, "\n") .. "\n")
 		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
 		local output = pipe:read("*a")
@@ -124,8 +176,25 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 		helpers.assert_eq(summary.capture_stamp, 1, "only the ERROR line counts")
 		helpers.assert_eq(summary.window_toggle, 1, "only the window_toggle ERROR line counts")
 		helpers.assert_eq(summary.start_rollback, 2)
+		helpers.assert_eq(summary.rotation_warning, 2, "only the WARNING rotation lines count")
+		helpers.assert_eq(summary.digest_mismatch, 1, "only the failed digest check counts")
 		helpers.assert_eq(summary.rejections, { count = 3, top = "tilt" })
 		helpers.assert_eq(summary.held_key, 1)
-		helpers.assert_eq(summary.cancels, { count = 3, top = "mouseMoved" })
+		helpers.assert_eq(summary.cancels, { count = 3, top = "mouseMoved" },
+			"a window switch, whose reason holds spaces, is counted apart")
+		helpers.assert_eq(summary.switch_cancel, 1)
+		helpers.assert_eq(summary.toggle_open, 1)
+		helpers.assert_eq(summary.toggle_raise, 1, "a focused toggle closes and is neither")
+		helpers.assert_eq(summary.expansion, 2)
+		helpers.assert_eq(summary.boot, 1)
+		helpers.assert_eq(summary.api_key_absent, 1)
+		helpers.assert_eq(summary.api_key_reentered, 1)
+		helpers.assert_eq(summary.swipe_dispatch, 1, "only a three-finger swipe slot counts")
+		helpers.assert_eq(summary.scope_commit, 2, "a category and the global scope, never a refusal")
+		helpers.assert_eq(summary.tap_hold_reset, 1, "only a marker that reset the word")
+		helpers.assert_eq(summary.emulation_on, 1)
+		helpers.assert_eq(summary.number_row_apply, 1)
+		helpers.assert_eq(summary.page_dark, 1)
+		helpers.assert_eq(summary.page_light, 1)
 	end)
 end)

@@ -22,10 +22,12 @@
 ---    whole, never written in plaintext. A changed key gets a new revision and
 ---    the old one is deleted only once the file names the new one, so a failed
 ---    save never leaves the file naming a key it did not publish.
---- 6. A key an earlier build wrote in plaintext is moved to the service by
----    migrate_plaintext(), which the daemon runs once at boot, or by the next
----    save. A load alone never rewrites the file. Without a service the key
----    stays as it was, and the migration logs why.
+--- 6. A key an earlier build wrote in plaintext is moved to the service in the
+---    background by modules/llm/api_key_migration.lua, which the daemon starts
+---    after boot and which retries until the keyring is unlocked, or by the
+---    next save (migrate_plaintext() is that synchronous move). A load alone
+---    never rewrites the file. Until a move succeeds the key stays as it was,
+---    and the migration logs why.
 --- 4. `label` stays required, so this file still loads in the builds before
 ---    2026-10; it holds the automatic name the tray writes and no build after
 ---    them reads it: every tray names an entry after its provider and model.
@@ -151,9 +153,11 @@ end
 --- A usable entry, or nil.
 --- @param raw any
 --- @param stored boolean|nil True only for an existing physical source row.
+--- @param key_missing boolean|nil The row's key is absent from the secret
+---   service: its empty key is not checked against the provider's policy.
 --- @return table|nil
 --- @return string|nil detail Exact obsolete identity reason, when proven.
-local function valid_entry(raw, stored)
+local function valid_entry(raw, stored, key_missing)
 	if type(raw) ~= "table" then return nil end
 	for _, key in ipairs({ "id", "provider", "label" }) do
 		if type(raw[key]) ~= "string" or raw[key] == "" then return nil end
@@ -172,7 +176,7 @@ local function valid_entry(raw, stored)
 	end
 	-- An unavailable inventory cannot disprove a stored optional-auth choice.
 	-- Candidate admission keeps its existing strict authentication owner.
-	if identity ~= "unpublished" then
+	if identity ~= "unpublished" and key_missing ~= true then
 		local _, servers = LocalCatalogue.load({})
 		if not AuthPolicy.entry_token_allowed(raw.provider, raw.token, raw.base_url, servers) then return nil end
 	end
@@ -216,7 +220,7 @@ end
 local function state()
 	if _state then return _state end
 	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {},
-		secrets = {}, plaintext = 0 }
+		secrets = {}, plaintext = 0, key_missing = {} }
 	local text, read_status = SourceWriter.read_classified(M.path())
 	if read_status ~= "ok" and read_status ~= "absent" then
 		_state.write_refusal = "its physical source could not be read completely"
@@ -260,7 +264,17 @@ local function state()
 	for index, raw in ipairs(root.entries) do
 		local reference = type(raw) == "table" and TokenStore.is_reference(raw.token) and raw.token or nil
 		local entry, outdated_reason
-		if reference and not tokens[reference] then
+		if reference and not tokens[reference] and unread[reference] == "absent" then
+			-- The service confirms no such item: a restored backup whose key was
+			-- deleted with its entry (decided by the maintainer on 2026-11-11).
+			-- The entry is listed as needing its key again; its reference is
+			-- written back unchanged until a new key replaces it.
+			local candidate = {}
+			for key, value in pairs(raw) do candidate[key] = value end
+			candidate.token = ""
+			entry, outdated_reason = valid_entry(candidate, true, true)
+			if entry then _state.key_missing[entry.id] = reference end
+		elseif reference and not tokens[reference] then
 			-- Kept as written, like any row this load cannot use: the key is
 			-- still in the service, and the next load that reaches it uses it.
 			outdated_reason = "its key is in the desktop secret service, which could not be read ("
@@ -332,8 +346,11 @@ end
 --- @param admit function|nil Exact live runtime admission.
 --- @param publication table|nil Private reservation and rename acknowledgement.
 --- @param quiet boolean|nil Defers logging until tentative RAM is restored.
+--- @param prestored table|nil Entry id to { reference, token } the background
+---   migration already stored; those keys are not stored again, and a failed
+---   publication leaves their deletion to the migration.
 --- @return boolean
-local function persist(admit, publication, quiet)
+local function persist(admit, publication, quiet, prestored)
 	local current = state()
 	-- The reason belongs to this attempt only: a caller reads it right after.
 	current.store_refusal = nil
@@ -357,6 +374,8 @@ local function persist(admit, publication, quiet)
 			held[entry.id] = false
 		elseif secret and secret.token == entry.token then
 			held[entry.id] = secret
+		elseif prestored and prestored[entry.id] and prestored[entry.id].token == entry.token then
+			held[entry.id] = prestored[entry.id]
 		else
 			local reference, reason = TokenStore.store(entry.id, entry.token)
 			if not reference then store_refusal = reason; break end
@@ -373,7 +392,12 @@ local function persist(admit, publication, quiet)
 		end
 		return false
 	end
-	local function token_of(entry) return held[entry.id] and held[entry.id].reference or "" end
+	local function token_of(entry)
+		if held[entry.id] then return held[entry.id].reference end
+		-- A key still to re-enter keeps the reference it was restored with.
+		if entry.token == "" and current.key_missing[entry.id] then return current.key_missing[entry.id] end
+		return ""
+	end
 	local entries = {}
 	local pending = {}
 	for _, entry in ipairs(current.entries) do pending[entry.id] = entry end
@@ -443,6 +467,81 @@ function M.migrate_plaintext()
 	end
 	Logger.error(LOG, "%d API key(s) stay in plaintext in '%s' until a desktop secret service is available.",
 		count, M.path())
+	return false
+end
+
+--- The keys an earlier build wrote in plaintext, for the background
+--- migration (modules/llm/api_key_migration.lua) to store asynchronously.
+--- @return table keys List of { id, token }, in the user's order.
+function M.plaintext_keys()
+	local current = state()
+	local keys = {}
+	if current.plaintext == 0 then return keys end
+	for _, entry in ipairs(current.entries) do
+		if entry.token ~= "" and not current.secrets[entry.id] then
+			keys[#keys + 1] = { id = entry.id, token = entry.token }
+		end
+	end
+	return keys
+end
+
+--- Publishes the file with the references the background migration stored,
+--- without calling the secret service. Refused when an entry changed since
+--- those keys were read, or a key is still missing: the caller deletes what
+--- it stored and tries again.
+--- @param stored table Entry id to reference, one per plaintext_keys() row.
+--- @param tokens table Entry id to the key stored under that reference.
+--- @return boolean published, string|nil reason
+--- @return boolean uncertain True when an unacknowledged rename may have
+---   published the references: the caller must then keep their keys.
+function M.publish_migrated(stored, tokens)
+	local current = state()
+	if current.plaintext == 0 then return false, "no plaintext key is left to move" end
+	if current.publishing then return false, "API entries are already publishing" end
+	local prestored = {}
+	for _, entry in ipairs(current.entries) do
+		if entry.token ~= "" and not current.secrets[entry.id] then
+			local reference = stored[entry.id]
+			if type(reference) ~= "string" or tokens[entry.id] ~= entry.token then
+				return false, "entry '" .. entry.id .. "' changed while its key was being moved"
+			end
+			prestored[entry.id] = { reference = reference, token = entry.token }
+		end
+	end
+	if persist(nil, nil, false, prestored) then return true end
+	return false, current.store_refusal or "the API entries file could not be published", current.publishing == true
+end
+
+--- Whether an entry was restored without its key: its reference names no
+--- item of the secret service, so it needs its key re-entered.
+--- @param id string
+--- @return boolean
+function M.key_missing(id)
+	local entry = M.get(id)
+	return entry ~= nil and entry.token == "" and state().key_missing[id] ~= nil
+end
+
+--- Gives an entry a new key, stored in the secret service before the file
+--- names it. The entry's other fields and the selection stay as they were.
+--- @param id string
+--- @param token string A non-empty key.
+--- @return boolean saved
+function M.set_token(id, token)
+	if type(token) ~= "string" or token == "" then return false end
+	local current = state()
+	for _, entry in ipairs(current.entries) do
+		if entry.id == id then
+			local previous, missing = entry.token, current.key_missing[id]
+			entry.token = token
+			current.key_missing[id] = nil
+			if persist() then
+				Logger.info(LOG, "API entry '%s' has a new key.", id)
+				return true
+			end
+			entry.token, current.key_missing[id] = previous, missing
+			return false
+		end
+	end
 	return false
 end
 
@@ -590,7 +689,7 @@ function M.set_model(id, model)
 			local copy = {}
 			for key, value in pairs(entry) do copy[key] = value end
 			copy.model = model
-			local changed = valid_entry(copy)
+			local changed = valid_entry(copy, nil, entry.token == "" and current.key_missing[id] ~= nil)
 			if not changed then return false end
 			local previous = current.active_id
 			current.entries[index], current.active_id = changed, id

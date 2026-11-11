@@ -127,6 +127,12 @@ local _dispatcher = nil
 -- second tray item (the WPM readout) keeps its own rows alive.
 local _menu_actions = {}
 
+-- The idle wait's GLib half (M.wait_companion): the default main context, its
+-- last queried GPollFD records (regrown on demand, so a wait allocates nothing
+-- in steady state), and whether this tick holds the context.
+local _glib_wait = { native = nil, context = nil, fds = nil, capacity = 0, count = 0,
+	priority = nil, timeout = nil, held = false }
+
 --- Loads the first of a list of sonames that resolves.
 --- @param ffi table The FFI module.
 --- @param names table Candidate sonames.
@@ -391,10 +397,12 @@ end
 --- @param items table
 --- @param disabled boolean
 --- @param owned table
+--- @param path string The branch's position from the root ("root/3/2"), for timing lines.
 --- @return table node
-local function lazy_node(lib, parent, items, disabled, owned)
+local function lazy_node(lib, parent, items, disabled, owned, path)
 	local menu = lib.gtk.gtk_menu_new()
-	local node = { menu = menu, items = items, disabled = disabled, filled = false, rows = {}, fill_ids = {} }
+	local node = { menu = menu, items = items, disabled = disabled, filled = false, rows = {}, fill_ids = {},
+		path = path }
 	node.placeholder = lib.gtk.gtk_menu_item_new_with_label("")
 	lib.gtk.gtk_menu_shell_append(menu, node.placeholder)
 	local function fill() fill_node(lib, node, owned) end
@@ -426,7 +434,8 @@ local function add_row(lib, node, item, owned)
 		end
 	end
 	if row.has_sub then
-		row.sub = lazy_node(lib, row.widget, item.menu, disabled, owned)
+		row.sub = lazy_node(lib, row.widget, item.menu, disabled, owned,
+			node.path .. "/" .. (#node.rows + 1))
 	else
 		-- dbusmenu Event can activate an insensitive GTK item directly.
 		-- Unavailable rows therefore never receive an action capability.
@@ -447,6 +456,7 @@ end
 --- @param owned table
 fill_node = function(lib, node, owned)
 	if node.filled then return end
+	local started = Perf.trace("tray.fill")
 	node.filled = true
 	if node.placeholder ~= nil then
 		lib.gtk.gtk_widget_destroy(node.placeholder)
@@ -458,6 +468,9 @@ fill_node = function(lib, node, owned)
 		node.rows[#node.rows + 1] = add_row(lib, node, item, owned)
 	end
 	Perf.count("tray.rows", #node.rows)
+	Perf.count("tray.fills")
+	-- The branch by position, never by label: a label can be a user's own name.
+	Perf.done("tray.fill", started, string.format("branch %s, %d row(s)", node.path, #node.rows))
 end
 
 --- Whether a node's rows can take `items` in place: the same kinds, the same
@@ -537,7 +550,7 @@ end
 --- @return table node { menu = GtkMenu, ... }
 local function build_menu(lib, items, owned)
 	local node = { menu = lib.gtk.gtk_menu_new(), items = items or {}, disabled = false, filled = false,
-		rows = {}, fill_ids = {} }
+		rows = {}, fill_ids = {}, path = "root" }
 	fill_node(lib, node, owned)
 	lib.gtk.gtk_widget_show(node.menu)
 	return node
@@ -627,6 +640,86 @@ end
 -- GTK can enter a Lua callback during any iteration. LuaJIT forbids that
 -- transition from compiled FFI calls, even after many callback-free iterations.
 if jit then jit.off(M.pump) end
+
+--- Binds the GLib main-context calls the idle wait needs, once.
+--- @param lib table
+--- @return boolean
+local function bind_glib_wait(lib)
+	if _glib_wait.native ~= nil then return _glib_wait.native ~= false end
+	_glib_wait.native = false
+	-- GPollFD is struct pollfd on every Unix GLib supports (gpoll.h).
+	local ok_cdef, cdef_err = pcall(lib.ffi.cdef, [[
+		typedef struct { int fd; unsigned short events; unsigned short revents; } ErgoptiGPollFD;
+		void*    g_main_context_default(void);
+		gboolean g_main_context_acquire(void *context);
+		void     g_main_context_release(void *context);
+		gboolean g_main_context_prepare(void *context, int *priority);
+		int      g_main_context_query(void *context, int max_priority, int *timeout_, ErgoptiGPollFD *fds, int n_fds);
+		gboolean g_main_context_check(void *context, int max_priority, ErgoptiGPollFD *fds, int n_fds);
+	]])
+	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
+		Logger.error(LOG, "GLib wait bindings refused: %s; tray requests wait for the idle tick.", tostring(cdef_err))
+		return false
+	end
+	_glib_wait.native = lib.gobject
+	_glib_wait.context = lib.gobject.g_main_context_default()
+	_glib_wait.priority = lib.ffi.new("int[1]")
+	_glib_wait.timeout = lib.ffi.new("int[1]")
+	return true
+end
+
+--- Opens the GLib half of one idle wait: acquires the default main context,
+--- prepares it and queries its descriptors, so the daemon's poll also wakes on
+--- a D-Bus request (the panel opening a submenu) or a window event instead of
+--- sleeping out its timeout first. Nothing is dispatched here: the next idle
+--- tick's pump() does that, outside the input reader. GLib's own timeout is
+--- not adopted, so a source that is always ready cannot turn the wait into a
+--- spin; GLib timers keep the idle tick's cadence, as before.
+--- @return cdata|nil fds ErgoptiGPollFD records, nil when this tick has none.
+--- @return integer count
+local function glib_wait_begin()
+	local lib = bind()
+	if not lib or not _indicator or not bind_glib_wait(lib) then return nil, 0 end
+	local native, context = _glib_wait.native, _glib_wait.context
+	if native.g_main_context_acquire(context) == 0 then return nil, 0 end
+	_glib_wait.held = true
+	native.g_main_context_prepare(context, _glib_wait.priority)
+	local priority = _glib_wait.priority[0]
+	local count = native.g_main_context_query(context, priority, _glib_wait.timeout, _glib_wait.fds,
+		_glib_wait.capacity)
+	if count > _glib_wait.capacity then
+		_glib_wait.capacity = count * 2
+		_glib_wait.fds = lib.ffi.new("ErgoptiGPollFD[?]", _glib_wait.capacity)
+		count = native.g_main_context_query(context, priority, _glib_wait.timeout, _glib_wait.fds,
+			_glib_wait.capacity)
+	end
+	_glib_wait.count = count
+	return _glib_wait.fds, count
+end
+
+--- Closes the GLib half of the wait: hands GLib the descriptors' readiness
+--- (check acknowledges its wakeup) and releases the context. Runs on every
+--- path glib_wait_begin() acquired, a failed poll included.
+local function glib_wait_finish()
+	if not _glib_wait.held then return end
+	local native, context = _glib_wait.native, _glib_wait.context
+	_glib_wait.held = false
+	native.g_main_context_check(context, _glib_wait.priority[0], _glib_wait.fds, _glib_wait.count)
+	native.g_main_context_release(context)
+end
+
+-- Compiled FFI frames must not be entered by a GLib callback (see pump()).
+if jit then jit.off(glib_wait_begin); jit.off(glib_wait_finish) end
+
+-- One companion for the process, so the input reader can retire a failing one.
+local _companion = { begin = glib_wait_begin, finish = glib_wait_finish }
+
+--- The companion the input reader's idle wait polls with
+--- (evdev_reader.wait_any_readable): { begin() -> fds, count; finish() }.
+--- @return table
+function M.wait_companion()
+	return _companion
+end
 
 --- Hides the icon and releases the menu.
 function M.destroy()

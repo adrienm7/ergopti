@@ -373,6 +373,54 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-emulation.cjs"],
 			"repro": "npm run test:layout-source-emulation"
+		},
+		{
+			"id": "macos-layout-bundle-plan",
+			"ordinal": 615,
+			"name": "macOS bundle native check types source vectors that match the compiled cells",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-layout-bundle-plan.cjs"],
+			"repro": "npm run test:macos-layout-bundle-plan"
+		},
+		{
+			"id": "layout-editor-unicode-names",
+			"ordinal": 616,
+			"name": "layout editor Unicode names table decodes every name and answers wildcard searches",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-unicode-names.cjs"],
+			"repro": "npm run test:layout-editor-unicode-names"
+		},
+		{
+			"id": "layout-sources",
+			"ordinal": 618,
+			"name": "kept layout sources reproduce the layouts they were made from, Kana level included",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-sources.cjs"],
+			"repro": "npm run test:layout-sources"
+		},
+		{
+			"id": "layout-editor-target-exports",
+			"ordinal": 619,
+			"name": "layout editor page writes the tool's XKB and KLC bytes through fengari and the shared adapters",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-target-exports.cjs"],
+			"repro": "npm run test:layout-editor-target-exports"
+		},
+		{
+			"id": "kbd-dll",
+			"ordinal": 620,
+			"name": "Windows layout DLLs build from a KLC and read back as their model on every architecture",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-dll.cjs"],
+			"repro": "npm run test:kbd-dll"
+		},
+		{
+			"id": "kbd-installer",
+			"ordinal": 621,
+			"name": "keyboard layout installer holds the verified DLLs and registers and unregisters the layout",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-installer.cjs"],
+			"repro": "npm run test:kbd-installer"
 		}
 	]
 }

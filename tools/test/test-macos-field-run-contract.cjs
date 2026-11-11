@@ -45,6 +45,9 @@ const FIELD_GIT = 'tools/dev/field-report-git.sh';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+// The per-TODO-point summary and the coverage table it reads.
+const TODO_SUMMARY = 'tools/dev/field-todo-summary.py';
+const TODO_COVERAGE = 'static/ergopti_plus/macos/data/field_todo_coverage.json';
 // The app's own crash reports are summarized without paths or user data.
 const IPS_SUMMARY = 'tools/dev/field-ips-summary.py';
 // The analyser and the declarations it reads its budgets from.
@@ -128,6 +131,8 @@ function fixture(name, { onDev = false } = {}) {
 		LOG_SCRUB,
 		REPORT_REDACT,
 		COLLISIONS,
+		TODO_SUMMARY,
+		TODO_COVERAGE,
 		IPS_SUMMARY,
 		BUNDLED_SAMPLE,
 		FIELD_PATHS,
@@ -234,6 +239,21 @@ const timer = setInterval(() => {
 		fs.mkdirSync(dir, { recursive: true });
 		fs.writeFileSync(path.join(dir, spec.files.accepted), JSON.stringify({ schema: 1, request_id: request.request_id }));
 		fs.writeFileSync(path.join(dir, '01_field_lease.json'), JSON.stringify({ schema: 1, step: 'field_lease', verdict: 'pass', codes: [] }));
+	} else if (mode === 'guided') {
+		// One guided step: its prompt stays published for two polls, then the run ends
+		const dir = path.join(folder, spec.files.results, request.request_id);
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, spec.files.accepted), JSON.stringify({ schema: 1, request_id: request.request_id }));
+		const prompt = path.join(folder, spec.guided.prompt);
+		fs.writeFileSync(prompt, JSON.stringify({ schema: 1, request_id: request.request_id, step: 'guided_capslock_chord',
+			mode: 'observe', gesture: 'Press Ctrl+Caps Lock once, in any app.', seconds: 90, answers: ['skip'] }));
+		setTimeout(() => {
+			fs.rmSync(prompt);
+			fs.writeFileSync(path.join(dir, '01_guided_capslock_chord.json'), JSON.stringify({ schema: 1,
+				step: 'guided_capslock_chord', verdict: 'needs_person', codes: ['gesture_not_observed_90s'] }));
+			fs.writeFileSync(path.join(dir, spec.files.done), JSON.stringify({ schema: 1, request_id: request.request_id,
+				interrupted: false, verdicts: { guided_capslock_chord: 'needs_person' } }));
+		}, 3500);
 	} else if (mode === 'refuse') {
 		fs.writeFileSync(path.join(folder, spec.files.refused), JSON.stringify({ schema: 1, request_id: request.request_id, reason: 'busy' }));
 	} else {
@@ -945,7 +965,10 @@ function reportFolder(paths) {
 					assert.deepEqual(signedOnly, [
 						'field_owned_install',
 						'owned_install_reload',
-						'field_owned_start'
+						'field_owned_start',
+						// Guided checks of the installed copy (TODO two copies, installed app)
+						'guided_two_copies_accessibility',
+						'guided_installed_app'
 					]);
 					assert.deepEqual(
 						request.steps,
@@ -978,6 +1001,49 @@ function reportFolder(paths) {
 					assert.match(committed, /field_run\/done\.json/);
 					assert.match(committed, /\/analysis\.md$/m);
 					assert.match(committed, /\/analysis\.json$/m);
+				} finally {
+					driver.child.kill();
+				}
+			}
+		);
+
+		await check(
+			'the collector prints a guided prompt once and ends on one verdict per TODO point',
+			async () => {
+				const paths = fixture('guided');
+				const driver = startDriver(paths, 'guided');
+				try {
+					await waitFor(driver.readyPath);
+					const result = await runCollector(paths);
+					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+					const announced = result.stdout.match(
+						/👉 GUIDED guided_capslock_chord \(up to 90 s\): Press Ctrl\+Caps Lock once/g
+					);
+					assert.equal(announced?.length, 1, `the prompt is printed once:\n${result.stdout}`);
+					assert.match(result.stdout, /type s and Enter to skip it/);
+					assert.match(result.stdout, /Stay at the Mac: the guided steps print a gesture here/);
+					// No terminal here: the collector never answers for the person
+					assert(!fs.existsSync(path.join(paths.clone, spec.folder, spec.guided.answer)));
+					const folder = reportFolder(paths);
+					assert.match(
+						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						/^todo_summary\s+exit=0$/m
+					);
+					const summary = JSON.parse(
+						fs.readFileSync(path.join(folder, 'todo_summary.json'), 'utf8')
+					);
+					const coverage = JSON.parse(fs.readFileSync(path.join(ROOT, TODO_COVERAGE), 'utf8'));
+					assert.deepEqual(
+						summary.points.map((point) => point.id),
+						coverage.points.map((point) => point.id)
+					);
+					const capslock = summary.points.find((point) => point.id === 'ctrl_capslock');
+					assert.equal(capslock.verdict, 'needs_person');
+					assert.match(result.stdout, /TODO « To confirm on the Mac », one verdict per point/);
+					assert.match(result.stdout, /needs_person +ctrl_capslock/);
+					assert.match(result.stdout, /not_testable +app_cloner +\(not field-testable: /);
+					const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
+					assert.match(committed, /\/todo_summary\.md$/m);
 				} finally {
 					driver.child.kill();
 				}

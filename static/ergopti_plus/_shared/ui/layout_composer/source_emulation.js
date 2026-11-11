@@ -115,7 +115,10 @@ var LayoutSourceEmulation = (function () {
 				model.modifierKeys.set(key, { id: modifier.id, mode: modifier.mode });
 			}
 		}
-		const known = (id) => REPORTED.includes(id) || model.custom.has(id) || SIDED.has(family(id));
+		// Kana is a built-in no driver reports: the targets compile its layers to
+		// their native Option/AltGr level, so a selector naming it never matches here.
+		const known = (id) =>
+			REPORTED.includes(id) || id === 'kana' || model.custom.has(id) || SIDED.has(family(id));
 		const ids = (list, where) => {
 			if (!Array.isArray(list)) fail(`The emulation table holds no modifier list at ${where}.`);
 			for (const id of list)
@@ -314,6 +317,16 @@ var LayoutSourceEmulation = (function () {
 		if (!layer) return { consumed: false, actions };
 		if (layer.keys.has(code)) {
 			perform(layer.keys.get(code), actions);
+			return { consumed: true, actions };
+		}
+		// A hold reaching a native layer: no modifier selects it on the OS, so the
+		// key goes out with the modifiers of the layer's first selector.
+		if (layer.native && session.hold && session.hold.entry.holdLayer === layer.id) {
+			const sent = new Set(heldModifiers(held).concat(layer.selectors[0].required));
+			const modifiers = REPORTED.filter((id) => sent.has(id)).concat(
+				[...sent].filter((id) => !REPORTED.includes(id))
+			);
+			actions.push({ type: 'key', key: code, modifiers });
 			return { consumed: true, actions };
 		}
 		// An emulated layer has no keyMap for the OS to fall back on.

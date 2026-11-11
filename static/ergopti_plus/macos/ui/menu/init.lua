@@ -1264,6 +1264,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if not owner then return false end
 		local committed = owner.apply(mode)
 		if committed == true then
+			-- One line per committed restore or clear, which the field run counts
+			Logger.info(LOG, "Scope gestures %s committed.", tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 		end
@@ -1466,6 +1468,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local before = scope == "keyboard_layout" and layout_scope_rows() or nil
 		local committed = owner.apply(mode)
 		if committed == true then
+			Logger.info(LOG, "Scope %s %s committed.", tostring(scope), tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 			-- The layout's own restore rebuilds the typing layout for the new rows.
@@ -1494,6 +1497,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if not owner then return false end
 		local committed = owner.apply(mode, require("ui.menu.shortcuts_scope").script_chord_rows)
 		if committed == true then
+			Logger.info(LOG, "Scope shortcuts.script_chords %s committed.", tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 		end
@@ -1518,6 +1522,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local committed = owner.apply(mode,
 			require("ui.menu.shortcuts_scope").keyboard_group_rows(slot_ids, Shortcuts.keyboard_binding_id))
 		if committed == true then
+			Logger.info(LOG, "Scope shortcuts.%s %s committed.", tostring(prefix), tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 		end
@@ -1667,6 +1672,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local WindowToggle = require("ui.window_toggle")
 	WindowToggle.set_opener("layer_editor", function()
 		return require("ui.layer_editor").open({ karabiner = karabiner })
+	end)
+	-- The layout editor applies a source's navigation layer through the same save.
+	require("ui.layout_manager").set_nav_applier(function(text)
+		return require("ui.layer_editor").apply_text(text, { karabiner = karabiner })
 	end)
 	WindowToggle.set_opener("changelog", function()
 		return require("ui.changelog").open({ channel_owner = channel_owner })

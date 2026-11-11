@@ -695,7 +695,7 @@ do
 			put("infra.llm_preferences", preferences)
 			put("modules.llm.profiles", { init = yes, is_enabled = yes })
 			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end,
-			  migrate_plaintext = yes })
+			  migrate_plaintext = yes, plaintext_keys = function() return {} end })
 			put("modules.llm.api_remote", { serves = yes, provider = function() return { default_model = "fixture-model" } end,
 			  chat = function(_, _, messages, _, stream, done) state.requests[#state.requests + 1] = { messages = messages, stream = stream, done = done }; return true end,
 			  cancel = function() state.cancellations = state.cancellations + 1; return true end })

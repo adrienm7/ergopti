@@ -170,7 +170,8 @@ var LayoutSourceIO = (function () {
 	/**
 	 * Per-target support: the format owner's report, with the compiler's own
 	 * macOS and driver rows for a structured source, as tools/lib/layout-source-report.cjs
-	 * builds them. Linux XKB and Windows KLC run as Node/Lua tooling only.
+	 * builds them. The Linux XKB and Windows KLC rows stay the format owner's
+	 * until a download runs their converters (xkbArchive, klcFile).
 	 */
 	function capabilities(doc) {
 		const report = LayoutSource.capabilities(doc);
@@ -236,15 +237,133 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
-	 * What the ErgoptiPlus composer host installs: the TOML and the .keylayout
-	 * compiled for the host's OS (composer_save with `source`, composer.lua).
+	 * Runs a target export step, its refusal turned into this module's error.
+	 * @param {function(): *} step
+	 */
+	function targetStep(step) {
+		try {
+			return step();
+		} catch (error) {
+			if (error && error.name === 'TargetExportError')
+				throw new SourceIOError('target_export_refused', error.message);
+			throw error;
+		}
+	}
+
+	/**
+	 * The Linux XKB files of a source as one stored ZIP archive, written by the
+	 * shared target export and the shared Lua converter the repository tool
+	 * runs (`export-xkb`), so the files are byte for byte the tool's.
+	 * @param {object} doc
+	 * @param {{lua: {call: function}, keysyms: object, template: string, types: string}} assets
+	 *   A LayoutLuaRunner and key_sym.json, xkb_symbols.txt, xkb_types.txt.
+	 * @returns {{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}}
+	 */
+	function xkbArchive(doc, assets) {
+		const imported = LayoutSourceCompiler.targetKeylayout(doc, tables(), 'linux');
+		const request = targetStep(() =>
+			LayoutTargetExport.xkbRequest(doc, imported, {
+				keycodes: tables().macKeycodes,
+				keysyms: assets.keysyms,
+				template: assets.template,
+				types: assets.types
+			})
+		);
+		const output = assets.lua.call('xkb', request.input);
+		const { report, files } = targetStep(() =>
+			LayoutTargetExport.xkbFiles(imported, request, output, assets.types)
+		);
+		const root = `${request.id}_xkb`;
+		return {
+			filename: `${root}.zip`,
+			bytes: LayoutZipWriter.pack(
+				files.map((file) => ({ path: `${root}/${file.path}`, text: file.text, encoding: 'utf8' }))
+			),
+			files,
+			report
+		};
+	}
+
+	/**
+	 * The Windows .klc of a source in MSKLC bytes (UTF-16LE, BOM, CRLF), written
+	 * by the shared target export with the repository tool's KLC generator
+	 * (`export-klc`), so the bytes are the tool's.
+	 * @param {object} doc
+	 * @param {{lua: {call: function}, generator: object}} assets
+	 *   A LayoutLuaRunner and LayoutKlcGenerator.
+	 * @returns {{filename: string, bytes: Uint8Array, report: object}}
+	 */
+	function klcFile(doc, assets) {
+		const imported = LayoutSourceCompiler.targetKeylayout(doc, tables(), 'windows');
+		const metadata = targetStep(() => LayoutTargetExport.klcMetadata(doc));
+		const read = assets.lua.call('read', { xml: imported.text });
+		if (!read.ok) throw new SourceIOError('target_export_refused', read.reason);
+		const exported = targetStep(() =>
+			LayoutTargetExport.klcExport(
+				doc,
+				imported,
+				read.canonical,
+				{ keycodes: tables().macKeycodes, physicalKeys: tables().physicalKeys },
+				assets.generator
+			)
+		);
+		return {
+			filename: `${metadata.dll_name}.klc`,
+			bytes: LayoutTargetExport.encodeKlc(exported.klc),
+			report: exported.report
+		};
+	}
+
+	/**
+	 * The macOS download the export drop-down chooses (`exports.macos.format`,
+	 * `bundle` by default): the bundle as one ZIP, or the single .keylayout of
+	 * ISO or ANSI, zipped only when an icon file travels beside it. A preserved
+	 * import downloads unchanged, as its own variant only.
+	 * @param {object} doc
+	 * @param {'bundle'|'iso'|'ansi'} [format] - Defaults to the source's choice.
+	 * @returns {{filename: string, mime: string, text?: string, bytes?: Uint8Array}}
+	 */
+	function macosDownload(doc, format) {
+		if (isPreserved(doc)) {
+			const variant = format || doc.imported_keylayout.convention;
+			if (variant === 'bundle')
+				throw new SourceIOError('source_export_unavailable', 'imported_keylayout');
+			const file = keylayoutFile(doc, variant);
+			return { filename: file.filename, mime: 'application/xml', text: file.text };
+		}
+		const { files } = LayoutSourceCompiler.exportMacos(doc, tables(), format);
+		if (files.length === 1 && files[0].encoding === 'utf8')
+			return { filename: files[0].path, mime: 'application/xml', text: files[0].text };
+		const root = files[0].path.split('/')[0].replace(/\.keylayout$/, '');
+		return { filename: `${root}.zip`, mime: 'application/zip', bytes: LayoutZipWriter.pack(files) };
+	}
+
+	/**
+	 * What the ErgoptiPlus composer host installs: the TOML, the .keylayout
+	 * compiled for the host's OS and, for a structured source, the emulation
+	 * table of that OS (composer_save with `source` and `emulation`,
+	 * composer.lua), which the driver performs for what the .keylayout cannot
+	 * hold (custom modifiers, tap-holds, shortcuts). A preserved import has none.
 	 * @param {object} doc
 	 * @param {'macos'|'linux'} platform
-	 * @returns {{source: string, keylayout: string}}
+	 * @returns {{source: string, keylayout: string, emulation?: string}}
 	 */
 	function installPayload(doc, platform) {
 		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
-		return { source: serialize(doc), keylayout: compiled.text };
+		const payload = { source: serialize(doc), keylayout: compiled.text };
+		if (!isPreserved(doc)) payload.emulation = JSON.stringify(emulationTable(doc, platform));
+		return payload;
+	}
+
+	/**
+	 * The emulation table of a structured source for one OS: what the drivers
+	 * and the page preview perform on top of the compiled .keylayout.
+	 * @param {object} doc
+	 * @param {'macos'|'linux'|'windows'} platform
+	 * @returns {object}
+	 */
+	function emulationTable(doc, platform) {
+		return LayoutSourceCompiler.compileEmulation(doc, tables(), { platform });
 	}
 
 	/** An identifier the format accepts, derived from free text. */
@@ -560,7 +679,11 @@ var LayoutSourceIO = (function () {
 		fillLayer,
 		keylayoutFile,
 		macosBundleArchive,
+		macosDownload,
+		xkbArchive,
+		klcFile,
 		installPayload,
+		emulationTable,
 		withNavLayer,
 		navLayerFile
 	};

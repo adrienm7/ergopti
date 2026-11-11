@@ -25,6 +25,7 @@ const { shared } = require('../../lib/paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
 const NAV = shared('keymap', 'layers.recommended.toml');
+const SOURCE_FIXTURE = shared('tests', 'corpus', 'layouts', 'source', 'source.toml');
 const LOCALES = JSON.parse(fs.readFileSync(shared('data', 'locale_order.json'), 'utf8')).order;
 const TYPES = {
 	'.html': 'text/html',
@@ -33,15 +34,20 @@ const TYPES = {
 	'.json': 'application/json'
 };
 
-/** Serves the shared tree read-only on loopback. */
+// The XKB converter data the site serves beside the shared tree, at the URL the
+// standalone host computes from the page (../../../../ergopti/linux/...).
+const XKB_DATA_URL = '/ergopti/linux/xkb_generation/data/';
+const XKB_DATA = path.join(ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
+
+/** Serves the shared tree and the XKB converter data read-only on loopback. */
 function serve() {
 	const server = http.createServer((request, response) => {
-		const file = path.resolve(shared(), new URL(request.url, 'http://localhost').pathname.slice(1));
-		if (
-			!file.startsWith(shared() + path.sep) ||
-			!fs.existsSync(file) ||
-			!fs.statSync(file).isFile()
-		) {
+		const pathname = new URL(request.url, 'http://localhost').pathname;
+		const [root, relative] = pathname.startsWith(XKB_DATA_URL)
+			? [XKB_DATA, pathname.slice(XKB_DATA_URL.length)]
+			: [shared(), pathname.slice(1)];
+		const file = path.resolve(root, relative);
+		if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
 			response.writeHead(404);
 			response.end();
 			return;
@@ -56,10 +62,12 @@ function serve() {
 }
 
 async function open(browser, origin, lang) {
-	const page = await browser.newPage({
+	const context = await browser.newContext({
 		acceptDownloads: true,
 		viewport: { width: 1280, height: 900 }
 	});
+	await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('request', (request) => {
@@ -116,7 +124,14 @@ async function exerciseManager(browser, origin) {
 		'that host keeps the composer'
 	);
 	await page.evaluate(
-		(state) => window.initData({ strings: {}, state, source_editor: true, source_pick: true }),
+		(state) =>
+			window.initData({
+				strings: {},
+				state,
+				source_editor: true,
+				source_pick: true,
+				nav_apply: true
+			}),
 		state
 	);
 	assert.equal(
@@ -129,6 +144,13 @@ async function exerciseManager(browser, origin) {
 	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');
 	assert.equal(await page.locator('#layout-view').isVisible(), false);
+	// The inline host lists the names table: the magnifier names a character at once.
+	assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'object');
+	await page.click('#le-board [data-code="KeyQ"]');
+	await page.selectOption('#le-kind', 'text');
+	await page.click('.le-palette summary');
+	await page.hover('#le-palette .le-glyph[title="U+00E9"]');
+	assert.match(await page.textContent('#le-magnifier-rows'), /LATIN SMALL LETTER E WITH ACUTE/);
 	await page.click('#le-save');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_save'));
 	const posted = await page.evaluate(() => window.__posted.find((p) => p.action === 'source_save'));
@@ -164,6 +186,26 @@ async function exerciseManager(browser, origin) {
 	await page.evaluate((text) => window.sourcePicked({ filename: 'mine.toml', text }), posted.text);
 	assert.match(await page.textContent('#le-message'), /mine\.toml/);
 
+	// The source's navigation layer applies through the host's navigation layer save.
+	await page.selectOption('#le-nav-hold', 'CapsLock');
+	await page.setInputFiles('#le-nav-file', NAV);
+	await page.waitForSelector('[data-layer="nav"].active');
+	await page.click('#le-apply-nav');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'nav_save'));
+	const nav = await page.evaluate(() => window.__posted.find((p) => p.action === 'nav_save'));
+	assert.match(nav.text, /\[layers\.nav\.all\]/);
+	await page.evaluate(() => window.navResult({ saved: true, applied: true, errors: [] }));
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.nav_applied']);
+	await page.click('#le-apply-nav');
+	await page.evaluate(() =>
+		window.navResult({
+			saved: false,
+			applied: false,
+			errors: [{ code: 'unknown_action', detail: 'KeyA' }]
+		})
+	);
+	assert.match(await page.textContent('#le-message'), /unknown_action/);
+
 	// « Install and use » goes through the composer host with the source and its compiled layout.
 	await page.click('#le-install');
 	await page.click('#le-confirm-yes');
@@ -175,6 +217,10 @@ async function exerciseManager(browser, origin) {
 	assert.match(install.source, /format = "ergopti-layout"/);
 	assert.match(install.keylayout, /<keyboard /);
 	assert.equal(install.declaration, undefined);
+	// The drivers perform this table for what the .keylayout cannot hold.
+	const table = JSON.parse(install.emulation);
+	assert.equal(table.format, 'ergopti-layout-emulation');
+	assert.match(install.source, new RegExp(`id = "${table.layout}"`));
 	await page.evaluate(() =>
 		window.composerResult({ action: 'composer_save', ok: true, used: true })
 	);
@@ -200,6 +246,45 @@ async function exerciseManager(browser, origin) {
 		await page.fill('#le-text', 'æ');
 		await page.click('#le-apply');
 		assert.equal(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), 'æ');
+
+		// The name search loads the names table lazily, then maps a result to the key.
+		assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'undefined');
+		await page.click('#le-board [data-code="KeyW"]');
+		await page.selectOption('#le-kind', 'text');
+		await page.click('.le-palette summary');
+		await page.fill('#le-name-search', 'e*acute');
+		await page.fill('#le-name-limit', '3');
+		await page.press('#le-name-search', 'Enter');
+		await page.waitForSelector('#le-name-results [data-point="U+00E9"]');
+		assert.equal(await page.locator('#le-name-results .le-glyph').count(), 3);
+		assert.match(await page.textContent('#le-name-count'), /3/);
+		await page.hover('#le-name-results [data-point="U+00E9"]');
+		assert.equal(await page.textContent('#le-magnifier-glyph'), 'é');
+		assert.match(
+			await page.textContent('#le-magnifier-rows'),
+			/U\+00E9 LATIN SMALL LETTER E WITH ACUTE · Latin-1 Supplement/
+		);
+		await page.click('#le-name-results [data-point="U+00E9"]');
+		assert.equal(await page.inputValue('#le-text'), 'é');
+		await page.click('#le-apply');
+		assert.equal(await page.textContent('#le-board [data-code="KeyW"] .le-legend'), 'é');
+		// A rendered page keeps the palette open with its last answer.
+		assert.equal(await page.locator('#le-name-results [data-point="U+00E9"]').count(), 1);
+		// Dropping a result on another key maps that key to the character (the two are
+		// far apart on the page, so the drag events carry one DataTransfer directly).
+		const transfer = await page.evaluateHandle(() => new DataTransfer());
+		await page.dispatchEvent('#le-name-results [data-point="U+00C9"]', 'dragstart', {
+			dataTransfer: transfer
+		});
+		await page.dispatchEvent('#le-board [data-code="KeyE"]', 'drop', { dataTransfer: transfer });
+		assert.equal(await page.textContent('#le-board [data-code="KeyE"] .le-legend'), 'É');
+		// Hovering a key magnifies its legend; Copy puts it on the clipboard.
+		await page.hover('#le-board [data-code="KeyE"]');
+		assert.equal(await page.textContent('#le-magnifier-glyph'), 'É');
+		await page.click('#le-magnifier-copy');
+		assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'É');
+		await page.click('#le-undo');
+		await page.click('#le-undo');
 
 		// A dead key with a rule types its composition in the preview.
 		await page.click('#le-dead-keys summary');
@@ -233,26 +318,27 @@ async function exerciseManager(browser, origin) {
 		await page.selectOption('#le-import-convention', 'iso');
 		await page.setInputFiles('#le-open-file', KEYLAYOUT);
 		await page.waitForSelector('#le-preserved');
-		assert.equal(
-			await page.locator('#le-export-keylayout-ansi').count(),
-			0,
-			'an ISO import is not ANSI'
-		);
-		const exported = await downloaded(page, () => page.click('#le-export-keylayout-iso'));
+		assert.equal(await page.locator('#le-macos-format').count(), 0, 'an import keeps its variant');
+		assert.equal(await page.getAttribute('#le-export-macos', 'data-format'), 'iso');
+		const exported = await downloaded(page, () => page.click('#le-export-macos'));
 		assert.equal(exported.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
 		await page.click('#le-convert');
 		await page.click('#le-confirm-yes');
 		await page.waitForSelector('#le-lost');
 		assert.notEqual(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), '');
 		// The converted source compiles both variants through the shared compiler.
-		const compiled = await downloaded(page, () => page.click('#le-export-keylayout-ansi'));
+		// The macOS drop-down chooses the download: one .keylayout, or the bundle as one ZIP.
+		await page.selectOption('#le-macos-format', 'ansi');
+		const compiled = await downloaded(page, () => page.click('#le-export-macos'));
 		assert.match(compiled.text, /<keyboard /);
 		assert.notEqual(compiled.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
-
-		// The macOS bundle downloads as one ZIP archive.
+		await page.selectOption('#le-macos-format', 'iso');
+		const iso = await downloaded(page, () => page.click('#le-export-macos'));
+		assert.notEqual(iso.text, compiled.text, 'ISO and ANSI differ');
+		await page.selectOption('#le-macos-format', 'bundle');
 		const [bundle] = await Promise.all([
 			page.waitForEvent('download'),
-			page.click('#le-export-bundle')
+			page.click('#le-export-macos')
 		]);
 		assert.match(bundle.suggestedFilename(), /\.bundle\.zip$/);
 		assert.equal(
@@ -262,6 +348,28 @@ async function exerciseManager(browser, origin) {
 				.toString('latin1'),
 			'PK'
 		);
+
+		// Linux XKB and Windows KLC download from the shared converters run in the page.
+		const [xkb] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-xkb')]);
+		assert.equal(xkb.suggestedFilename(), 'ergopti_xkb.zip');
+		const xkbBytes = fs.readFileSync(await xkb.path());
+		assert.equal(xkbBytes.subarray(0, 2).toString('latin1'), 'PK');
+		for (const name of ['ergopti.xkb', 'ergopti.XCompose', 'xkb_types.txt', 'export.json'])
+			assert(xkbBytes.includes(`ergopti_xkb/${name}`), `the XKB archive holds ${name}`);
+		// The KLC needs its Windows metadata first: the refusal says so.
+		await page.click('#le-export-klc');
+		await page.waitForSelector('.le-message.error');
+		await page.click('#le-windows summary');
+		await page.fill('#le-win-locale', 'fr-FR');
+		await page.fill('#le-win-layout-id', '0000040c');
+		await page.fill('#le-win-dll-name', 'kbdergo');
+		await page.click('#le-win-klc-apply');
+		const [klc] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-klc')]);
+		assert.equal(klc.suggestedFilename(), 'kbdergo.klc');
+		const klcBytes = fs.readFileSync(await klc.path());
+		assert.deepEqual([...klcBytes.subarray(0, 2)], [0xff, 0xfe], 'MSKLC UTF-16LE with a BOM');
+		assert.match(klcBytes.toString('utf16le'), /KBD\tkbdergo\t/);
+		await page.click('#le-undo');
 
 		// Drag and drop swaps two keys; copy and paste repeats one.
 		const legendOf = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
@@ -285,6 +393,41 @@ async function exerciseManager(browser, origin) {
 		await page.fill('#le-sticker-mm', '18');
 		await page.dispatchEvent('#le-sticker-mm', 'change');
 		assert.match(await page.getAttribute('#le-stickers', 'style'), /--le-sticker-size:18mm/);
+		await page.click('#le-undo');
+
+		// KbdEdit's automatic case mapping fills Shift, replacing it only when asked.
+		await page.click('[data-layer="base"]');
+		await page.click('#le-board [data-code="KeyD"]');
+		await page.selectOption('#le-kind', 'text');
+		await page.fill('#le-text', 'ŵ');
+		await page.check('#le-case-overwrite');
+		await page.click('#le-apply');
+		await page.click('[data-layer="shift"]');
+		assert.equal(await legendOf('KeyD'), 'Ŵ');
+		// Stickers print the chosen levels and can hide a Shift legend that is only the capital.
+		const sticker = (level) =>
+			page.evaluate(
+				(cls) =>
+					[...document.querySelectorAll(`#le-stickers .le-sticker-${cls}`)].map(
+						(e) => e.textContent
+					),
+				level
+			);
+		assert.ok((await sticker('shift')).includes('Ŵ'));
+		await page.click('#le-sticker-levels summary');
+		await page.check('#le-sticker-hide-case');
+		assert.ok(!(await sticker('shift')).includes('Ŵ'), 'the capital of the base is hidden');
+		await page.click('#le-sticker-levels summary');
+		await page.uncheck('#le-sticker-layer-shift');
+		assert.equal((await sticker('shift')).length, 0, 'an unchosen level is not printed');
+		// « Move every key »: the Shift layer's mappings go to the base layer at once.
+		await page.click('#le-move-all summary');
+		await page.selectOption('#le-move-target', 'base');
+		await page.click('#le-move-layer');
+		assert.equal(await legendOf('KeyD'), '', 'the moved layer is empty');
+		await page.click('[data-layer="base"]');
+		assert.equal(await legendOf('KeyD'), 'Ŵ');
+		await page.click('#le-undo');
 		await page.click('#le-undo');
 
 		// The composer's job: fill the base layer from AZERTY. This loopback server
@@ -317,6 +460,15 @@ async function exerciseManager(browser, origin) {
 		} finally {
 			fs.rmSync(reopened);
 		}
+
+		// The preview types through the web emulation: a tap-hold's tap and a shortcut.
+		await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
+		await page.waitForFunction(() => document.querySelector('#le-name').value === 'Source Fixture');
+		await page.focus('#le-preview-input');
+		await page.keyboard.press('KeyA');
+		await page.keyboard.press('Space');
+		await page.keyboard.press('Control+KeyA');
+		assert.equal(await page.textContent('#le-preview-output'), 'a ⟨control+KeyB⟩');
 		assert.deepEqual(errors, []);
 		await page.close();
 

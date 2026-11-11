@@ -152,7 +152,11 @@ function M.compile(table_)
 			model.modifier_keys[key] = { id = modifier.id, mode = modifier.mode }
 		end
 	end
-	local function known(id) return REPORTED[id] == true or model.custom[id] ~= nil or SIDED[family(id)] == true end
+	-- Kana is a built-in no driver reports: the targets compile its layers to
+	-- their native Option/AltGr level, so a selector naming it never matches here.
+	local function known(id)
+		return REPORTED[id] == true or id == "kana" or model.custom[id] ~= nil or SIDED[family(id)] == true
+	end
 	for index, layer in ipairs(table_.layers or {}) do
 		if type(layer.id) ~= "string" or type(layer.selectors) ~= "table" or type(layer.keys) ~= "table" then
 			error("The emulation table holds a malformed layer.")
@@ -395,6 +399,21 @@ function M.press(session, code, held, now)
 	end
 	-- An emulated layer has no keyMap for the OS to fall back on.
 	if not layer.native then return true, actions end
+	-- A hold reaching a native layer: no modifier selects it on the OS, so the
+	-- key goes out with the modifiers of the layer's first selector.
+	if session.hold ~= nil and session.hold.entry.hold_layer == layer.id then
+		local sent, modifiers = {}, {}
+		for _, id in ipairs(held_modifiers(held)) do sent[id] = true end
+		for _, id in ipairs(layer.selectors[1].required) do sent[id] = true end
+		for _, id in ipairs(M.REPORTED) do
+			if sent[id] then modifiers[#modifiers + 1] = id; sent[id] = nil end
+		end
+		for _, id in ipairs(layer.selectors[1].required) do
+			if sent[id] then modifiers[#modifiers + 1] = id; sent[id] = nil end
+		end
+		actions[#actions + 1] = { type = "key", key = code, modifiers = modifiers }
+		return true, actions
+	end
 	return false, actions
 end
 

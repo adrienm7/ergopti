@@ -52,6 +52,12 @@ const APP_DIRS = 'static/ergopti_plus/_shared/lua/app_dirs.lua';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+// The collector's guided and probe steps, and the per-TODO-point summary.
+const GUIDED = 'tools/dev/field-guided.py';
+const GUIDED_STEPS = 'static/ergopti_plus/linux/data/field_guided_steps.json';
+const TODO_SUMMARY = 'tools/dev/field-todo-summary.py';
+const TODO_COVERAGE = 'static/ergopti_plus/linux/data/field_todo_coverage.json';
+const RUN_STEPS = 'static/ergopti_plus/linux/data/field_run_steps.json';
 const SHELL_CHECKS = 'tools/dev/linux-field-shell-checks.sh';
 const FIELD_RUN = 'tools/dev/linux-field-run.sh';
 const SERVICE = 'static/ergopti_plus/linux/ergopti-hotstrings.service';
@@ -142,6 +148,11 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		LOG_SCRUB,
 		REPORT_REDACT,
 		COLLISIONS,
+		GUIDED,
+		GUIDED_STEPS,
+		TODO_SUMMARY,
+		TODO_COVERAGE,
+		RUN_STEPS,
 		BUNDLED_SAMPLE,
 		SHELL_CHECKS,
 		FIELD_RUN,
@@ -173,7 +184,14 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	);
 	fs.writeFileSync(path.join(logs, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`), 'old\n');
 	fs.writeFileSync(path.join(logs, LOG_FILES.bootstrap), 'refused session_lock\n');
-	const env = { ...process.env, ...GIT_IDENTITY, HOME: home, USER: 'fixtureuser' };
+	// No person here: each guided step waits one second for its gesture.
+	const env = {
+		...process.env,
+		...GIT_IDENTITY,
+		HOME: home,
+		USER: 'fixtureuser',
+		FIELD_GUIDED_SECONDS_OVERRIDE: '1'
+	};
 	git(clone, 'init', '-q', '-b', 'dev');
 	git(clone, 'add', '-A');
 	git(clone, 'commit', '-q', '-m', 'fixture');
@@ -189,7 +207,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	shim(
 		bin,
 		'luajit',
-		`case "$*" in *get_logs_dir*) printf '%s\\n' "${logs}" "${LOG_FILES.main}" "${LOG_FILES.errors}" "${LOG_FILES.extension}" "${LOG_FILES.bootstrap}" "${LOG_FILES.crashes}" "${home}/personal_hotstrings.toml" ;; *) echo "LuaJIT fixture" ;; esac`
+		`case "$*" in *get_logs_dir*) printf '%s\\n' "${logs}" "${LOG_FILES.main}" "${LOG_FILES.errors}" "${LOG_FILES.extension}" "${LOG_FILES.bootstrap}" "${LOG_FILES.crashes}" "${home}/personal_hotstrings.toml" "${home}/metrics.sqlite" ;; *) echo "LuaJIT fixture" ;; esac`
 	);
 	// A fact that names the home folder and the user: both must be masked.
 	shim(bin, 'localectl', `echo "VC Keymap: fr in ${home}/keymaps for fixtureuser"`);
@@ -356,6 +374,38 @@ function read(folder, name) {
 				const dayLog = `${LOG_FILES.main}${today()}${LOG_FILES.extension}`;
 				assert.match(steps, new RegExp(`^${escapeRegExp(dayLog)}\\s+copied \\(scrubbed\\)$`, 'm'));
 				assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
+				// The guided and probe steps, then one verdict per TODO point
+				assert.match(steps, /^field_guided\s+exit=0$/m);
+				assert.match(steps, /^todo_summary\s+exit=0$/m);
+				const autostart = JSON.parse(read(folder, 'field_guided/02_linux_autostart.json'));
+				assert.equal(autostart.verdict, 'pass', 'the systemctl stand-in answers 0');
+				const topology = JSON.parse(read(folder, 'field_guided/05_linux_window_topology.json'));
+				assert.equal(topology.verdict, 'fail', 'no Metrics database is named, never a pass');
+				assert.match(topology.codes.join(','), /topo_window_move_no_metrics_database/);
+				// The day log exists but holds no withdrawal: no gesture, never a pass
+				const window = JSON.parse(
+					read(folder, 'field_guided/09_linux_prediction_window_switch.json')
+				);
+				assert.equal(window.verdict, 'needs_person');
+				assert.deepEqual(window.codes, ['gesture_not_observed_1s']);
+				const hands = JSON.parse(read(folder, 'field_guided/10_linux_prediction_keep.json'));
+				assert.equal(hands.verdict, 'needs_person');
+				assert.deepEqual(hands.codes, ['no_answer_1s']);
+				assert.match(
+					result.stdout,
+					/👉 GUIDED linux_network_toggle \(up to 1 s\): Unplug the network/
+				);
+				const todoSummary = JSON.parse(read(folder, 'todo_summary.json'));
+				const coverage = JSON.parse(fs.readFileSync(path.join(ROOT, TODO_COVERAGE), 'utf8'));
+				assert.deepEqual(
+					todoSummary.points.map((point) => point.id),
+					coverage.points.map((point) => point.id)
+				);
+				assert.match(result.stdout, /TODO « To confirm on Linux », one verdict per point/);
+				assert.match(
+					result.stdout,
+					/not_testable +physical_shortcut_delivery +\(not field-testable: /
+				);
 				assert.doesNotMatch(
 					read(folder, dayLog),
 					/TYPEDCANARY/,

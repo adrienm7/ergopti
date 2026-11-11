@@ -13,7 +13,7 @@
 				]
 			},
 			{
-				"id": "kana",
+				"id": "kana_lock",
 				"mode": "locked",
 				"keys": [
 					"Insert"
@@ -88,7 +88,7 @@
 				"selectors": [
 					{
 						"required": [
-							"kana"
+							"kana_lock"
 						],
 						"optional": [
 							"caps_lock"
@@ -140,7 +140,7 @@
 					{
 						"required": [
 							"shift_right",
-							"kana"
+							"kana_lock"
 						],
 						"optional": []
 					}
@@ -196,6 +196,14 @@
 				},
 				"hold_modifier": "roya",
 				"threshold_ms": 150
+			},
+			{
+				"key": "Quote",
+				"tap": {
+					"text": "'"
+				},
+				"hold_layer": "shift",
+				"threshold_ms": 180
 			}
 		],
 		"remaps": [
@@ -210,7 +218,7 @@
 		],
 		"not_emulated": [
 			{
-				"path": "modifiers.kana.keys[1]",
+				"path": "modifiers.kana_lock.keys[1]",
 				"reason": "physical_key_not_emulated"
 			},
 			{
@@ -257,7 +265,7 @@
 				]
 			},
 			{
-				"id": "kana",
+				"id": "kana_lock",
 				"mode": "locked",
 				"keys": [
 					"Insert"
@@ -332,7 +340,7 @@
 				"selectors": [
 					{
 						"required": [
-							"kana"
+							"kana_lock"
 						],
 						"optional": [
 							"caps_lock"
@@ -384,7 +392,7 @@
 					{
 						"required": [
 							"shift_right",
-							"kana"
+							"kana_lock"
 						],
 						"optional": []
 					}
@@ -440,6 +448,14 @@
 				},
 				"hold_modifier": "roya",
 				"threshold_ms": 150
+			},
+			{
+				"key": "Quote",
+				"tap": {
+					"text": "'"
+				},
+				"hold_layer": "shift",
+				"threshold_ms": 180
 			}
 		],
 		"remaps": [
@@ -454,7 +470,7 @@
 		],
 		"not_emulated": [
 			{
-				"path": "modifiers.kana.keys[1]",
+				"path": "modifiers.kana_lock.keys[1]",
 				"reason": "physical_key_not_emulated"
 			},
 			{
@@ -501,7 +517,7 @@
 				]
 			},
 			{
-				"id": "kana",
+				"id": "kana_lock",
 				"mode": "locked",
 				"keys": [
 					"Insert"
@@ -576,7 +592,7 @@
 				"selectors": [
 					{
 						"required": [
-							"kana"
+							"kana_lock"
 						],
 						"optional": [
 							"caps_lock"
@@ -628,7 +644,7 @@
 					{
 						"required": [
 							"shift_right",
-							"kana"
+							"kana_lock"
 						],
 						"optional": []
 					}
@@ -684,6 +700,14 @@
 				},
 				"hold_modifier": "roya",
 				"threshold_ms": 150
+			},
+			{
+				"key": "Quote",
+				"tap": {
+					"text": "'"
+				},
+				"hold_layer": "shift",
+				"threshold_ms": 180
 			}
 		],
 		"remaps": [
@@ -698,7 +722,7 @@
 		],
 		"not_emulated": [
 			{
-				"path": "modifiers.kana.keys[1]",
+				"path": "modifiers.kana_lock.keys[1]",
 				"reason": "physical_key_not_emulated"
 			},
 			{

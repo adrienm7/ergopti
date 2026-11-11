@@ -99,7 +99,7 @@ const complete = {
 	layout: { id: 'sample', name: 'Sample', languages: ['fr', 'en'], author: 'Example' },
 	physical: { base: 'iso', ansi_extra_key: 'Backquote' },
 	modifiers: [
-		{ id: 'kana', mode: 'locked', keys: ['ScrollLock'] },
+		{ id: 'roya', mode: 'locked', keys: ['ScrollLock'] },
 		{ id: 'navigation', mode: 'held', keys: ['CapsLock'] }
 	],
 	layers: [

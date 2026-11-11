@@ -14,10 +14,16 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 10320, "min": 60, "max": 10320 },
+	"deadline_seconds": { "default": 21310, "min": 60, "max": 21310 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
+	"guided": {
+		"_comment": "A guided step (infra/field_run_guided.lua) writes the prompt file in the folder with the exact gesture; the collector prints it, and for an attest step (or to skip) writes the answer file {step, answer} with pass, fail or skip. An observe step reads its check before the prompt and every poll_seconds until each until step rose (or turned to a failure); no gesture within gesture_seconds is needs_person.",
+		"prompt": "prompt.json",
+		"answer": "answer.json",
+		"poll_seconds": 3
+	},
 	"steps": [
 		{
 			"id": "field_owned_install",
@@ -245,6 +251,20 @@
 			"proves": "The owned Ollama passes a strict signature check, its running server lists its models and predicts one token with an installed model; the MLX models on disk are counted."
 		},
 		{
+			"id": "field_raw_telemetry",
+			"kind": "field_check",
+			"check": "raw_telemetry",
+			"deadline_seconds": 30,
+			"proves": "The Metrics tables events_window_topo, events_av and events_network are readable and their row count per declared kind is named; the guided steps compare it before and after a gesture."
+		},
+		{
+			"id": "field_physical_shortcuts",
+			"kind": "field_check",
+			"check": "physical_shortcuts",
+			"deadline_seconds": 10,
+			"proves": "Physical shortcut delivery is available, the bound physical slots are counted, and every key the physical hook suppressed this session reached its action."
+		},
+		{
 			"id": "field_slow_lines",
 			"kind": "field_check",
 			"check": "slow_lines",
@@ -299,6 +319,370 @@
 			"check": "apple_shortcuts",
 			"deadline_seconds": 35,
 			"proves": "The run_apple_shortcut action lists the Shortcuts library through its owner and command-line transport, and runs the shortcut named Ergopti Field Test end to end when the library holds one (skipped by name otherwise)."
+		},
+		{
+			"id": "guided_window_topology",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "raw_telemetry",
+			"until": {
+				"condition": "rises",
+				"steps": [
+					"topo_window_move",
+					"topo_window_resize",
+					"topo_window_state_change",
+					"topo_monitor_focus_change"
+				]
+			},
+			"gesture_seconds": 150,
+			"deadline_seconds": 210,
+			"gesture": "Metrics on: move a window, resize it, make it full screen and back, then drag it to a second screen (a Mac with one screen: press s to skip).",
+			"proves": "Each window gesture adds its events_window_topo row (move, resize, state change, monitor change) within the ingest period."
+		},
+		{
+			"id": "guided_capture_app",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "raw_telemetry",
+			"until": {
+				"condition": "rises",
+				"steps": ["av_screen_recording_start"]
+			},
+			"gesture_seconds": 150,
+			"deadline_seconds": 210,
+			"gesture": "Open Zoom or OBS (or start a QuickTime screen recording), wait 40 s, then quit it (press s if none is installed).",
+			"proves": "A screen-capture or conferencing application adds its events_av screen_recording_start row."
+		},
+		{
+			"id": "guided_network_toggle",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "raw_telemetry",
+			"until": {
+				"condition": "rises",
+				"steps": ["network_internet_down", "network_internet_up"],
+				"steady": ["network_vpn_connected"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Turn Wi-Fi off, wait 40 s, turn it back on and wait 40 s (Ethernet: unplug and plug it back). Connect no VPN during this step.",
+			"proves": "Internet loss and return add events_network internet_down and internet_up rows, and a tunnel left idle (iCloud Private Relay) adds no vpn_connected row."
+		},
+		{
+			"id": "guided_vpn",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "raw_telemetry",
+			"until": {
+				"condition": "rises",
+				"steps": ["network_vpn_connected", "network_vpn_disconnected"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Connect a VPN (WireGuard or the system IPsec client), wait 30 s, disconnect it and wait 30 s (press s if no VPN is configured).",
+			"proves": "A VPN connection and disconnection add events_network vpn_connected and vpn_disconnected rows."
+		},
+		{
+			"id": "guided_capslock_chord",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "capslock_chord",
+			"until": {
+				"condition": "rises",
+				"steps": ["capslock_chord_presses"]
+			},
+			"gesture_seconds": 90,
+			"deadline_seconds": 150,
+			"gesture": "Press Ctrl+Caps Lock once, in any app.",
+			"proves": "A physical Ctrl+Caps Lock reaches the secondary_capslock slot: seen and delivered passes, seen and never delivered fails never_delivered."
+		},
+		{
+			"id": "guided_physical_shortcut",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "physical_shortcuts",
+			"until": {
+				"condition": "rises",
+				"steps": ["physical_suppressed", "physical_delivered"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "In « Raccourcis physiques », bind a physical slot (a key with no modifier) to an action that types text, save it, then press that key once in TextEdit.",
+			"proves": "A press of a bound physical slot is suppressed by the physical hook and delivered to its action exactly once, with nothing unacknowledged or dropped."
+		},
+		{
+			"id": "guided_physical_shortcut_output",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "physical_shortcuts",
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "Did the press type the action's text in TextEdit once, with no character of the key itself, no hotstring, tap-hold, layer or magic-key effect, under Karabiner and the keymap tap, and does the editor still show the slot after you reopen it?",
+			"proves": "The physical slot's output reaches the focused app alone and the editor keeps the saved slot."
+		},
+		{
+			"id": "guided_api_key_reenter",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_api_key_absent", "log_api_key_reentered"]
+			},
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "Make a configuration backup that holds an API entry, delete that entry (its Keychain key goes), restore the backup, open the model selector (the entry is greyed « Clé manquante ») and give it a key with « API key… ». The configuration guard puts your settings back after the run.",
+			"proves": "An API entry restored from a backup without its Keychain key asks for its key again and takes a new one."
+		},
+		{
+			"id": "guided_asa_held_key",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_held_key_moves"]
+			},
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "In TextEdit, type asa then Space fast twenty times, also holding the a of the trigger down; then undo it.",
+			"proves": "The hotstring carrier moved its text off the held trigger key (Synthetic text moved off a held key), counted in the day log."
+		},
+		{
+			"id": "guided_three_finger_swipes",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "gesture_frames",
+			"until": {
+				"condition": "rises",
+				"steps": ["gesture_frames_stamped"]
+			},
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "In Safari with several tabs, scroll with two fingers for a while, then do deliberate vertical three-finger swipes: slow, flick, staggered, after a scroll, finger resting, ten half a second apart.",
+			"proves": "Every touch frame of the swipes carried the trackpad's capture stamp (no unstamped frame); whether each swipe switched exactly one tab is the next attested step."
+		},
+		{
+			"id": "guided_prediction_activity",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_prediction_activity_cancels"]
+			},
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "With the AI on and a model installed, type a few words in TextEdit until a prediction shows, then move the pointer; repeat with a scroll and a click elsewhere.",
+			"proves": "User activity cancels a pending prediction, one User activity line per cancellation at DEBUG."
+		},
+		{
+			"id": "guided_swipe_tabs",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_gesture_swipe_dispatches"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "In Safari with several tabs, do ten deliberate vertical three-finger swipes half a second apart, then scroll with two fingers for a while (Debug > Log level > DEBUG).",
+			"proves": "Deliberate three-finger swipes dispatch their slot's action, one Gesture dispatched line per swipe at DEBUG."
+		},
+		{
+			"id": "guided_minimum_tap",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "tap_hold_thresholds",
+			"gesture_seconds": 300,
+			"deadline_seconds": 360,
+			"gesture": "With Caps Lock set to Enter on tap and Ctrl on hold: brush Caps Lock very briefly (about 20 ms) in TextEdit: nothing is typed and no Ctrl stays held; a normal 60 ms tap types Enter; Space still types at once in fast typing. Pass if all three hold.",
+			"proves": "Karabiner's owned minimum tap (to_delayed_action, apply_tap_minimum) drops a bounce, keeps a real tap and delays no ordinary key; the keyboard is read below the event system, so only the person sees it."
+		},
+		{
+			"id": "guided_taphold_word_reset",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_tap_hold_word_resets"]
+			},
+			"gesture_seconds": 300,
+			"deadline_seconds": 360,
+			"gesture": "With « Un tap ou un hold sur une touche tap-hold commence un nouveau mot » on, type a word, use a tap-hold copy (Cmd+C tap), then type a word-start hotstring (Debug > Log level > DEBUG).",
+			"proves": "Karabiner's tap-hold command marker reaches Ergopti before its chord and resets the word, one marker line each at DEBUG."
+		},
+		{
+			"id": "guided_number_row",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_number_row_applies"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "In Keyboard layout, change the number-row order (or the onboarding's number-row choice), then type the row in TextEdit, unshifted then shifted.",
+			"proves": "A number-row order change is applied to the typing layout live, one Number-row options applied line each."
+		},
+		{
+			"id": "guided_layout_emulation",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_layout_emulations_on"]
+			},
+			"gesture_seconds": 300,
+			"deadline_seconds": 360,
+			"gesture": "With French (or ABC) as the input source, choose Keyboard layout > Layout to emulate > Ergopti➕, then type letters, Shift, Caps Lock, Option levels and ^ then e in TextEdit.",
+			"proves": "Choosing a layout to emulate turns the emulation on over the system layout, one Layout emulation line each."
+		},
+		{
+			"id": "guided_hotstrings_apps",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_hotstring_expansions"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Type three ordinary hotstrings in Edge, then in VS Code, then in a terminal (Debug > Log level > DEBUG).",
+			"proves": "Ordinary hotstrings typed in real applications expand, one expansion line each in the day log."
+		},
+		{
+			"id": "guided_window_toggle",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_window_toggle_opens", "log_window_toggle_raises"],
+				"steady": ["log_window_toggle_errors"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Right after the reload, with the AI off, press the shortcut bound to open_model_browser (it opens); cover it with another window and press it again (it is raised); minimise it and press it once more (it is restored).",
+			"proves": "A window-toggle action opens its page right after a reload with the AI off and raises a covered or minimised one, with no window_toggle error."
+		},
+		{
+			"id": "guided_menus",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_scope_commits"]
+			},
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "In the menu, use Clear then Restore on one category, on the Shortcuts group, and the global ones; also check the tap delay row, « Use global delay (…) », the tap and hold pickers, « Combinaisons de touches » and that the row order is unchanged. The configuration guard puts your settings back after the run.",
+			"proves": "The menu's restore and clear commit for a category, a Shortcuts group and the global scope, one Scope committed line each."
+		},
+		{
+			"id": "guided_typing",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "log_signals",
+			"gesture_seconds": 600,
+			"deadline_seconds": 660,
+			"gesture": "Type: chained expansions, the magic key on ISO and ANSI, undo by Backspace, a password field, an ignored app, no wrong erase count (PAR-76 R26); tap-hold rolls; Right Option + Return/Delete/Backspace/Escape; Backspace at a word start (Terminal, TextEdit, Safari Cmd+L); CapsWord cancelled by the pointer (44).",
+			"proves": "The typing behaviours listed in TODO hold under the person's own keyboard."
+		},
+		{
+			"id": "guided_ai_real_model",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "prediction_tooltip",
+			"gesture_seconds": 600,
+			"deadline_seconds": 660,
+			"gesture": "With a real local model: request floor, an explicit shortcut never held, variants, replace in flight, debounce « never », live mode; AI off disarms the keys and agent actions (PAR-65); the tooltip near the screen edges on two displays (111); with « Inline auto-type » on, the prediction is typed into a real editor.",
+			"proves": "The AI behaviours with a real model hold, the AI switch disarms everything, and the tooltip stays on screen."
+		},
+		{
+			"id": "guided_prediction_stop_hands",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_prediction_switch_cancels"]
+			},
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "With the AI on, type until a prediction is pending, then press Cmd+Tab to another app; again, then click in another app's window; again, then press F5.",
+			"proves": "An application or window switch cancels a pending prediction, one User activity line per cancellation at DEBUG."
+		},
+		{
+			"id": "guided_network_updates",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "network",
+			"gesture_seconds": 600,
+			"deadline_seconds": 660,
+			"gesture": "Debug > Test network (here; repeat on the other network in a later run), an http:// company PAC if available (issue 101); the release notes pane in light and dark (PAR-52); a Sparkle update; a Homebrew live upgrade; MLX behind a proxy (119/130/136, code 74). Pass if what this network allows works.",
+			"proves": "The network and update paths available on this network work."
+		},
+		{
+			"id": "guided_pages_light_dark",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "log_signals",
+			"until": {
+				"condition": "rises",
+				"steps": ["log_pages_dark", "log_pages_light"]
+			},
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "Open a few pages (Diagnostics, the model browser, the onboarding wizard) in light mode, switch System Settings > Appearance to Dark and open them again (Debug > Log level > DEBUG).",
+			"proves": "Pages load under both system appearances, one rendered line per appearance at DEBUG."
+		},
+		{
+			"id": "guided_issue_100_99",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "lease",
+			"gesture_seconds": 480,
+			"deadline_seconds": 540,
+			"gesture": "With Ollama.app and a PAC proxy, enable the AI: the model downloads; hold the menu open: no lease timeout; decline a download: no error window opens.",
+			"proves": "Issues 100 and 99 stay fixed; the lease report names memory pressure and the second Hammerspoon's login item."
+		},
+		{
+			"id": "guided_input_policies",
+			"kind": "guided",
+			"mode": "attest",
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "Native one-shot Shift: tap Shift then a letter, a dead key and in an IME (Japanese or Chinese): one capital each; CapsWord: its key and the control payloads end it as specified.",
+			"proves": "One-shot Shift and CapsWord payloads behave natively under the person's keyboard."
+		},
+		{
+			"id": "guided_two_copies_accessibility",
+			"signed_app": true,
+			"kind": "guided",
+			"mode": "attest",
+			"check": "permissions",
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "With a build/macos copy registered beside the /Applications prerelease: the Accessibility dialog names …/build/macos/ErgoptiPlus.app with no tccutil reset; trash that copy, switch the entry on: the boot resumes once.",
+			"proves": "Two copies share one Accessibility switch and the boot resumes once the stray copy is trashed."
+		},
+		{
+			"id": "guided_installed_app",
+			"signed_app": true,
+			"kind": "guided",
+			"mode": "attest",
+			"check": "login_items",
+			"gesture_seconds": 420,
+			"deadline_seconds": 480,
+			"gesture": "Installed app: VS Code bridge retirement (127), the 120 provider menu, issue 94 (tap-hold refusal, symbol-wrap clipboard).",
+			"proves": "The installed-app checks of TODO hold on this architecture."
 		},
 		{
 			"id": "field_owned_pause",

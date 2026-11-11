@@ -510,6 +510,13 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "API key migration",
+			stop = function()
+				local migration = package.loaded["modules.llm.api_key_migration"]
+				return not migration or migration.shutdown() == true
+			end,
+		},
+		{
 			-- The runtime stop above already ended the chain; this releases its ports.
 			name = "LLM model warmup",
 			stop = function() return require("modules.llm.warmup").shutdown() end,
@@ -1136,6 +1143,9 @@ local function main()
 	end
 	Logger.info(LOG, "Using device: %s.", device)
 	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
+	-- 8.5 to 8.8 had no stage: the boot summary left their time between two
+	-- stages, unattributed (about 170 ms in a measured X11 session).
+	BootProfiler.stage("callbacks")
 
 	-- Focused app id, cached off the input path by the process_lifecycle
 	-- onFocusChange callback (see 8.12). Declared BEFORE on_char so on_char
@@ -2054,14 +2064,18 @@ local function main()
 			require("modules.llm.warmup").schedule("startup")
 		end
 		-- API keys an earlier build wrote in plaintext move to the desktop secret
-		-- service once, here: a load never rewrites the file, and waiting for the
-		-- next save would keep them in plaintext while nothing changes.
-		-- A failure here costs the migration, never the boot.
-		local entries_loaded, entries = pcall(require, "modules.llm.api_entries")
-		local migration_ran, failure = entries_loaded, entries
-		if entries_loaded then migration_ran, failure = pcall(entries.migrate_plaintext) end
-		if not migration_ran then
-			Logger.error(LOG, "Plaintext API keys were not migrated: %s", tostring(failure))
+		-- service in the background: a load never rewrites the file, and waiting
+		-- for the next save would keep them in plaintext while nothing changes.
+		-- The boot only arms the move; a locked keyring never delays input
+		-- readiness (decided by the maintainer on 2026-11-11), and a failure
+		-- here costs the migration, never the boot.
+		local migration_loaded, migration = pcall(require, "modules.llm.api_key_migration")
+		local migration_armed, failure = migration_loaded, migration
+		if migration_loaded then
+			migration_armed, failure = pcall(function() return migration.init() and migration.start() end)
+		end
+		if not migration_armed or failure ~= true then
+			Logger.error(LOG, "The background move of plaintext API keys was not armed: %s", tostring(failure))
 		end
 	end
 
@@ -2703,6 +2717,7 @@ local function main()
 	end
 
 
+	BootProfiler.stage_done("callbacks")
 	-- 8.9) Start the tray menu if requested.
 	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
@@ -2764,6 +2779,7 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
+					local switch_started = require("infra.perf_counters").trace("layout.switch")
 					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
 					local function selected_map_current()
 						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
@@ -2775,6 +2791,7 @@ local function main()
 						return selected_map_current() and set_layout(new_layout) == true
 							and selected_map_current() and refresh(selected_keymap) == true
 					end, selected_map_current) then
+						require("infra.perf_counters").done("layout.switch", switch_started, "refused")
 						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
 						return
 					end
@@ -2790,7 +2807,8 @@ local function main()
 					-- So the tick moves to the row the user just chose. Without it the
 					-- menu still marks the old layout and the change reads as ignored.
 					if rebuild_tray_menu then rebuild_tray_menu() end
-					Logger.success(LOG, "Layout '%s' applied.", tostring(new_layout))
+					Logger.success(LOG, "Layout '%s' applied in %.0f ms.", tostring(new_layout),
+						require("infra.perf_counters").done("layout.switch", switch_started))
 				end,
 		keystats     = keystats,
 		llm           = prediction_engine,
@@ -3228,6 +3246,8 @@ local function main()
 	if not opts.dry_run then require("infra.personal_shortcuts").load() end
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
+	-- The snapshot, the watchers and the loop's setup, unattributed before.
+	BootProfiler.stage("watchers")
 
 	-- Discover environment facts while the desktop still owns the keyboard.
 	-- Only cached metadata formatting/logging may follow the ready announcement.
@@ -3493,10 +3513,12 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	CrashReporter.remove_legacy_dumps()
 	if not privacy_owners.startup_checkpoint() then return end
-	-- UI preparation can outlive an XKB change; resolve again before grabbing.
-	if not keyboard_layout.refresh(opts.keymap) then
+	-- UI preparation can outlive an XKB change; resolve again before grabbing,
+	-- unless the desktop source proves the published layout still current.
+	if not keyboard_layout.refresh_unless_current(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	BootProfiler.stage_done("watchers")
 	if not privacy_owners.startup_checkpoint() then return end
 	-- Retain the selected inverse publisher before any source-acquisition callback.
 	local capture_layout = keyboard_layout
@@ -3611,6 +3633,16 @@ local function main()
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
+	-- The first key used to load the shortcut assignments (a config read and a
+	-- TOML decode, about 8 ms in a measured X11 session) inside its own
+	-- dispatch. They load once per process either way; the loop's first idle
+	-- tick takes them now, after the ready announcement.
+	event_loop.defer(function()
+		local loaded, failure = pcall(require("modules.shortcuts.keyboard_shortcuts").get_assignments)
+		if not loaded then
+			Logger.error(LOG, "Shortcut assignments could not be loaded before the first key: %s.", tostring(failure))
+		end
+	end)
 
 	event_loop.run({
 		onIdle = function()
@@ -3654,8 +3686,11 @@ local function main()
 		end,
 		onPeriodic = on_periodic,
 		periodSec = 0.25,
-		-- Sleep on the input descriptors between ticks instead of spinning a core.
-		idleWait = keyboard_hook.idle_wait,
+		-- Sleep on the input descriptors between ticks instead of spinning a core,
+		-- and on the tray's GLib descriptors, so a panel's request wakes it too.
+		idleWait = function(timeout_ms)
+			return keyboard_hook.idle_wait(timeout_ms, tray_menu and tray_menu.wait_companion() or nil)
+		end,
 	})
 
 	-- 8.14) Clean exit.
@@ -3677,6 +3712,8 @@ local function main()
 	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
+	-- The interval since the last summary, which a short session never reached.
+	require("infra.perf_counters").flush_now()
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end

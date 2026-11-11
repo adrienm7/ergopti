@@ -21,6 +21,11 @@
 ---    the same pair per stage.
 --- 3. Explicit ownership: begin() may run once per process; a second call is a
 ---    programming error and raises.
+--- 4. The time before begin() is a phase of its own. The runtime's start and
+---    every module the entry file requires at load ran before the boot clock,
+---    so begin() reads the process's age from /proc (its start time against
+---    the system uptime, both in clock ticks of 10 ms) and reports it as the
+---    "load" phase; a spawn-to-ready time is then the sum of the two.
 --- ==============================================================================
 
 local M = {}
@@ -60,6 +65,42 @@ local _done_stages = {}
 -- Total boot duration frozen by complete(); nil while booting.
 local _boot_ms = nil
 
+-- The process age at begin() in milliseconds, nil when /proc did not say.
+local _load_ms = nil
+
+-- The kernel's USER_HZ: /proc/<pid>/stat counts start time in these ticks, a
+-- userspace ABI constant (100) on every architecture Linux supports.
+local USER_HZ = 100
+
+--- Reads a whole small file, or nil.
+--- @param path string
+--- @return string|nil
+local function read_small(path)
+	local handle = io.open(path, "r")
+	if not handle then return nil end
+	local text = handle:read("*a")
+	handle:close()
+	return text
+end
+
+--- The process's age in milliseconds from /proc, or nil when unreadable.
+--- @param read function|nil Reader of a /proc file (tests replace it).
+--- @return number|nil
+function M.process_age_ms(read)
+	read = read or read_small
+	local uptime = tonumber(((read("/proc/uptime") or ""):match("^(%d+%.?%d*)")))
+	-- Field 22 counted after the command name, which may hold spaces and parentheses.
+	local after_name = (read("/proc/self/stat") or ""):match("^.*%)%s(.*)$")
+	if not uptime or not after_name then return nil end
+	local fields = {}
+	for field in after_name:gmatch("%S+") do fields[#fields + 1] = field end
+	-- after_name starts at field 3 (state), so field 22 is its 20th word.
+	local start_ticks = tonumber(fields[20])
+	if not start_ticks then return nil end
+	local age_ms = (uptime - start_ticks / USER_HZ) * MILLISECONDS_PER_SECOND
+	return age_ms >= 0 and age_ms or nil
+end
+
 
 
 
@@ -76,7 +117,12 @@ function M.begin()
 	end
 	_origin_ms = Monotonic.now_ms()
 	_cpu_origin_ms = _cpu_ms()
-	Logger.info(LOG, "Boot timing started.")
+	_load_ms = M.process_age_ms()
+	if _load_ms then
+		Logger.info(LOG, "Boot timing started, %.0f ms after the process (runtime start and module loading).", _load_ms)
+	else
+		Logger.info(LOG, "Boot timing started; the process age was unreadable.")
+	end
 end
 
 --- Returns the process CPU milliseconds consumed since begin().
@@ -144,8 +190,9 @@ function M.complete()
 	for _, stage in ipairs(_done_stages) do
 		parts[#parts + 1] = string.format("%s=%.0fms(cpu %.0fms)", stage[1], stage[2], stage[3])
 	end
-	Logger.evidence(LOG, "Boot summary: total=%.0fms (cpu %.0fms) heap=%dKB stages: %s.", _boot_ms,
-		boot_cpu_ms, math.floor(collectgarbage("count")), table.concat(parts, " "))
+	Logger.evidence(LOG, "Boot summary: total=%.0fms (cpu %.0fms) heap=%dKB load=%s stages: %s.", _boot_ms,
+		boot_cpu_ms, math.floor(collectgarbage("count")),
+		_load_ms and string.format("%.0fms", _load_ms) or "unknown", table.concat(parts, " "))
 	return _boot_ms
 end
 
@@ -164,6 +211,7 @@ end
 --- Resets every piece of state. Tests only.
 function M._reset_for_test()
 	_origin_ms, _cpu_origin_ms, _open, _open_cpu, _boot_ms, _done_stages = nil, nil, {}, {}, nil, {}
+	_load_ms = nil
 	_cpu_ms = process_cpu_ms
 end
 

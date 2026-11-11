@@ -2179,7 +2179,51 @@ baseline` line (item 38).
   frequent gate), `log_held_key_moves` (« Synthetic text moved off a held
   key ») and `log_prediction_activity_cancels` (count and most frequent
   activity) are information; the last two kinds are DEBUG lines, so a 0 at a
-  higher log level says nothing.
+  higher log level says nothing. `log_keystats_rotation_warnings` (« Midnight
+  rotation stalled » or a day rollover that kept `today.log`) and
+  `log_digest_mismatches` (an Ollama pull that failed its digest check, even
+  retried) fail on any WARNING or ERROR line. `log_prediction_switch_cancels` (the
+  « application or window switch » reason, whose spaces the generic count
+  refuses), `log_window_toggle_opens` and `log_window_toggle_raises` (the DEBUG
+  toggle lines), `log_hotstring_expansions` (auto and terminator expansions)
+  `log_boot_completions`, `log_api_key_absent` (« Keychain holds no key for
+  entry … ») and `log_api_key_reentered` (« API entry key change staged ») are
+  counts, as are the event lines added for the guided steps on 2026-11-11 (one
+  per event): `log_gesture_swipe_dispatches` (« Gesture dispatched:
+  slot=swipe_3… », DEBUG), `log_scope_commits` (« Scope <scope> <mode>
+  committed »), `log_tap_hold_word_resets` (« Tap-hold command marker received
+  (word reset: yes) », logged after the eventtap returns), `log_layout_emulations_on`,
+  `log_number_row_applies` and `log_pages_dark` / `log_pages_light` (« Webview
+  '…' rendered in the <appearance> appearance », DEBUG, from
+  `hs.host.interfaceStyle()` at the first load). The guided steps watch them rise and the
+  TODO summary bounds (`min` 4 boots for the production profile).
+- `field_raw_telemetry` runs after `field_ai_local`: one read-only, lock-free
+  `sqlite3` query names the `events_window_topo`, `events_av` and
+  `events_network` rows per kind of the shared reducers (`topo_<kind>`,
+  `av_<kind>`, `network_<kind>`, 0 when absent); `telemetry_db` skips as
+  `metrics_not_started` with Metrics off. The guided steps read it before and
+  after their gesture.
+- `field_physical_shortcuts` reads the counts `adapters/physical_shortcut_hook.lua`
+  keeps (`M.counts`): `physical_suppressed` and `physical_delivered`, which
+  `guided_physical_shortcut` watches rise around one press, and
+  `physical_delivery_balance`, which fails as `unacknowledged:<n>+dropped:<n>`
+  (each suppressed key has exactly one outcome; a stop inside the running action
+  leaves its outcome to the action). Delivery unavailable, no slot bound or no
+  press skip by name.
+- The guided steps (`kind = "guided"`, `infra/field_run_guided.lua`) run as
+  one block before `field_owned_pause`: each publishes its gesture in
+  `prompt.json`, the collector prints it (👉 GUIDED) and, on a terminal, writes
+  `answer.json` from y, n or s. `observe` steps read their check before the
+  prompt and every `poll_seconds` until each `until` report step rose (or
+  turned to a failure; a `steady` count that rose fails them as
+  `rose_<step>`); `attest` steps take the person's answer and still run their
+  check, whose failure overrides a pass. No gesture or answer in
+  `gesture_seconds` is `needs_person` (`gesture_not_observed_<n>s`,
+  `no_answer_<n>s`); a skip is `skipped_by_person`. A menu attest can change
+  the configuration: the guard puts it back and names it. No mode leaves
+  the block out: one report does everything. `tools/dev/field-todo-summary.py` then gives every
+  TODO « To confirm on the Mac » point its verdict in `todo_summary.md`
+  (`data/field_todo_coverage.json`; docs/tooling/macos-field-report-coverage.md).
 - `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
   first so a regressed guard cannot freeze the app, checks `followed_mode`
   gives `named_pipe` and `exists` sees it, and removes the folder.
