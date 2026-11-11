@@ -432,7 +432,8 @@ def main():
                 print("\n".join(worker_log.read_text().splitlines()[-200:]), file=sys.stderr)
             raise
         return 0
-    for tool in ("xvfb-run", "dbus-run-session", "openbox", "xdotool", "luajit"):
+    # xclip: the clipboard owner seeds and reads the native clipboard control.
+    for tool in ("xvfb-run", "dbus-run-session", "openbox", "xdotool", "xclip", "luajit"):
         if shutil.which(tool) is None:
             print(f"ENVIRONMENT: {tool} is missing", file=sys.stderr)
             return 2
