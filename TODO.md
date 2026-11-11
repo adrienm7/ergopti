@@ -829,7 +829,7 @@ Field run, no person needed (read the next report):
 - [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery: `keyboard_shortcuts.physical_delivery_available` answers true since the maintainer's decision of 2026-11-11 (the « Pas encore disponible » row was closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) before that; `test_physical_shortcuts_row_available` now pins that a false answer still greys it so). Field report: with a physical slot bound in « Raccourcis physiques », the source key is suppressed once, no other owner (tap-hold, layer, hotstring, magic key) acts on it, and the action's output reaches the focused app under Karabiner and the keymap tap; the editor captures and saves the slot.
 - [ ] <!-- field-point: taphold_word_reset --> Tap-hold word reset: with « Un tap ou un hold sur une touche tap-hold commence un nouveau mot » on and « Un raccourci clavier commence un nouveau mot » off, a tap-hold copy (Cmd+C tap) between two words makes the next word-start hotstring fire, the user's own Cmd+C does not, and no F20 reaches TextEdit or a Finder rename; switching the option off keeps the word. Karabiner-Elements must deliver the tagged F20 before the chord. Then with Caps Lock (or another tap-hold key) held as Ctrl or Cmd: a shortcut struck under it follows the same option, the user's own Cmd+C afterwards follows « Un raccourci clavier commence un nouveau mot », Ctrl held by hand before the key still reaches the tap (Ctrl+Enter), and no context-menu key reaches TextEdit or a Finder rename (Karabiner-Elements must deliver the untagged `application` key before the hold's modifier).
 - [ ] <!-- field-point: ai_inline_autotype --> AI inline auto-type: the engine (typed without Tab, a correction with deletions stays in the bubble) is `test_prediction_inline_autotype`; the typing into a real editor with a model is field report: `prediction_tooltip` with « Inline auto-type » on.
-- [ ] <!-- field-point: api_entries_backup --> Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`), but « its key still works » cannot hold today: deleting the entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), and the backup keeps only the `keychain:<account>` reference. Waits on « Maintainer decisions pending ».
+- [ ] <!-- field-point: api_entries_backup --> Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`). Decided by the maintainer on 2026-11-11: deleting an entry keeps deleting its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), so an entry restored from a backup taken before that deletion needs its key re-entered. Field report: restore such a backup; the model selector page greys the entry with « Clé manquante : cette entrée est revenue d’une sauvegarde sans sa clé… » and its « Clé API… » action takes a new key, after which the entry answers (unit-tested by `test_api_token_absent_read`: the launcher's `itemNotFound` exit 69, the resolver's mark, the page row). An entry whose key survived still works unchanged.
 - [ ] <!-- field-point: onboarding_number_row --> Onboarding number-row order: the offer, the greyed reason with a system layout and the live apply before the reload are `test_onboarding_number_row` and `test_number_row_live`; the symbols typed after the reload are field report: `field_layout_rows` (a layout build read back) plus one person typing the row.
 - [x] Navigation layer repeat count: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_nav_layer_rule` replays `Digit3 = "repeat_count:3"` then `arrow_up` with Karabiner's matching (three up arrows, then one, nothing after re-entry) and `test_generator_layers` proves the count reset on layer entry.
 - [ ] <!-- field-point: owned_ollama_pulls --> Owned Ollama starts and pulls: field report: `field_ai_local` (ready daemon) and `ollama_model` (a done pull) (6170813ea9, 6335790e5a, 894585a213, b71b4a67db, 4545f672d1, 721074f21d).
@@ -1311,20 +1311,24 @@ between workers) green alone. All live checks pass, typed by the harness.
       boots beside a blocking secret-tool. macOS has no such boot step (Keychain calls are owned async tasks with a
       10 s deadline and the load is deferred off the boot path). Windows counterpart for the maintainer: DPAPI has
       no prompt and no service to wait on; check that no boot path calls a credential store that can block.
-- [ ] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
+- [x] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
       Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the core keyboard changes (the daemon's
       virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
-      notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group change, so after one switch
-      `KeyboardLayout.is_ready()` stays false and every replacement takes the clipboard route. Reproduce: drop the XTEST
-      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Kept as is, decided by the
-      coordinator on 2026-11-11 overnight, to review by the maintainer: no proof can re-validate the receipt today. The
-      first proof, `keyboard_hook.refresh_capture`, requires the previous receipt to still be current before it dumps
-      the keymap again, and a typing request may renew only across a group change
-      (`test_keyboard_layout_terminal_plan_observation.lua`, "an equal-group source replacement does not renew an old
-      plan"). A fix needs a new capture re-acquisition owned by the hook, off the input path, that dumps the server
-      keymap and rebuilds capture and inverse together as at startup. The clipboard route then also fails while the
-      clipboard has no owner (a fresh session): `xclip -o` exits 1 as for a read error, and the snapshot refuses to
-      borrow what it cannot restore. Wayland and macOS have no slave switch.
+      notify and `adapters/xkb_capture.lua` renewed a revoked inverse only for a group change, so after one switch
+      `KeyboardLayout.is_ready()` stayed false and every replacement took the clipboard route. Decided by the
+      maintainer on 2026-11-11: after a same-group notify, re-read the keymap and renew the receipt when it is
+      identical. Done: `xkb_capture.inverse_retarget` renews an equal group too, since the fresh inverse is only
+      issued after `source_group` dumps the server keymap and the probe refuses it unless it equals the capture's
+      map (`native-keymap-unacknowledged`), so a keymap that really differs keeps the receipt revoked; a fresh
+      receipt is minted, the old plans stay retired; `KeyboardLayout.is_ready()` goes through the same renewal.
+      Reproduced with the recipe (the XTEST warm-up dropped from `tests/hardware/container_session.py`, now for
+      good): `run_ai_inline_container.py` gains « the prediction was typed through the layout, not pasted », which
+      fails on the baseline (the prediction is pasted) and passes with the fix; the physical-shortcut, navigation
+      pointer and X11 tap-copy proofs still pass without the warm-up. Unit: the equal-group and unacknowledged-map
+      cases of `test_keyboard_layout_terminal_plan_observation.lua` and `test_keyboard_layout_xkb_keymap_parsing.lua`
+      now pin the renewal and the kept revocation. The clipboard route's own failure while the clipboard has no
+      owner (`xclip -o` exits 1 as for a read error) is unchanged and stays open. Wayland and macOS have no slave
+      switch; Windows has no XKB.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
@@ -1470,8 +1474,16 @@ Each closes on a named green hosted or native run, recorded here.
       `_shared/data/db/purge_schema.sql`; writers `request_metrics_maintenance` (Linux keystats, macOS `log_manager`) and
       `KL_RunMetricsMaintenance` (Windows); the Windows path is checked by source contracts only and still wants a live
       Windows run.
-- [ ] An API entry restored from a pre-install backup comes back without its key (found 2026-11-10 closing « Backup
+- [x] An API entry restored from a pre-install backup comes back without its key (found 2026-11-10 closing « Backup
       of the API entries »): deleting an entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids`
-      → `retry_pending_api_token_deletes`) and the backup holds only the `keychain:<account>` reference. Choose:
-      keep a deleted entry's Keychain item while a retained backup still references it (the restore then works), or
-      keep deleting it and have the restored entry ask for its key again (the Mac line then reads so).
+      → `retry_pending_api_token_deletes`) and the backup holds only the `keychain:<account>` reference. Decided by
+      the maintainer on 2026-11-11: keep deleting it; the restored entry asks for its key again, on Linux too.
+      Done: macOS reads an absent item as its own exit (`KeychainTokenWorkerExit.itemNotFound`, 69, reason
+      `absent`), `api_remote.entry_key_absent` marks the entry, and the model selector page greys it with
+      `model_browser.hint_api_key_reenter` (21 locales) and an « API key… » action (`api_panel.set_entry_token`).
+      Linux lists an entry whose secret-service item is absent with an empty key and its reference kept
+      (`api_entries.key_missing`, `set_token`) and its page row is the same. On macOS an entry is marked once a
+      read finds its key absent: the active entry's at load, any other when it is used (decided by the coordinator
+      on 2026-11-11, to review by the maintainer: no extra Keychain read at load); Linux reads every key at load. Windows counterpart
+      for the maintainer: DPAPI keeps the key inside the backup, so check whether a restored Windows entry can
+      come back without a usable key (another user or machine) and give it the same row.

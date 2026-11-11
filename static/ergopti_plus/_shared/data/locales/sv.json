@@ -2637,6 +2637,7 @@
 	"model_browser.install_paused": "Ergopti är pausat: återuppta det för att installera {name}.",
 	"model_browser.reason_install_ai_on": "Stäng av AI:n först: när Ollama installeras slås den på igen med Ollama.",
 	"model_browser.hint_api_no_key": "API-nyckel saknas: lägg till den för att använda modellen.",
+	"model_browser.hint_api_key_reenter": "Nyckel saknas: den här posten kom tillbaka från en säkerhetskopia utan sin nyckel. Ange nyckeln igen med API-nyckel… för att använda den.",
 	"model_browser.hint_api_listing_unavailable": "Leverantörens modellista är inte tillgänglig här: de kända modellerna visas; skriv ett annat id med Annan modell…",
 	"model_browser.hint_api_listing_refused": "Leverantören vägrade lista sina modeller (kontrollera nyckeln): de kända modellerna, eller skriv ett annat id.",
 	"model_browser.hint_api_listing_pending": "Läser in leverantörens modeller…",
