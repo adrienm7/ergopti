@@ -3333,7 +3333,8 @@ jobs:
         timeout-minutes: 15
 
       # xdotool: the privacy owner and AI destination receipts below find and
-      # activate their GTK windows with it.
+      # activate their GTK windows with it; xclip: the AI receipt seeds the
+      # clipboard through the clipboard owner.
       - name: Install prerequisites for The secure-field probe on a real accessibility bus
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
@@ -3344,7 +3345,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb xdotool
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb xdotool xclip
           else
               exit 1
           fi
