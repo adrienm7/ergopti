@@ -113,6 +113,12 @@ FLATPAK_DIR="$BUILD_DIR/flatpak"
 PAYLOAD_DIR="$FLATPAK_DIR/payload"
 REPO_DIR="$FLATPAK_DIR/repo"
 BUILDER_DIR="$FLATPAK_DIR/build"
+# flatpak-builder keeps each built module in its state directory under the
+# module's own checksum, so a rebuild compiles only the modules whose inputs
+# changed (the Ergopti payload) instead of LuaJIT and every network module. It
+# sits beside the build directory: the driver build and step 2 below both wipe
+# their own trees, and CI caches this one between runs.
+FLATPAK_STATE_DIR="${BUILD_DIR%/}-flatpak-builder"
 PACKAGE_NAME="ergopti"
 # The bundle branch. Flatpak needs one to address the ref in the local repo, and
 # `stable` is what the manifest declares as its default-branch.
@@ -416,7 +422,7 @@ echo "Structure: $(find "$FLATPAK_DIR" -type f | wc -l) files under $FLATPAK_DIR
 print_manual_commands() {
   echo "To build on a Linux host with flatpak-builder:"
   echo "  flatpak install -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08"
-  echo "  flatpak-builder --force-clean --disable-rofiles-fuse --repo=$REPO_DIR $BUILDER_DIR $MANIFEST_FILE"
+  echo "  flatpak-builder --force-clean --disable-rofiles-fuse --state-dir=$FLATPAK_STATE_DIR --repo=$REPO_DIR $BUILDER_DIR $MANIFEST_FILE"
   echo "  flatpak build-bundle $REPO_DIR $FLATPAK_FILE $APP_ID $BRANCH"
 }
 
@@ -440,6 +446,7 @@ echo "Building the Flatpak..."
 # --disable-rofiles-fuse: CI containers and many sandboxes have no FUSE, and
 # without this flag flatpak-builder aborts before it compiles anything.
 flatpak-builder --force-clean --disable-rofiles-fuse \
+  --state-dir="$FLATPAK_STATE_DIR" \
   --repo="$REPO_DIR" "$BUILDER_DIR" "$MANIFEST_FILE"
 
 # Preserve an existing bundle until the producer has completed a fresh one.
