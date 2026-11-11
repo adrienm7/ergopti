@@ -92,8 +92,15 @@
 		{
 			"id": "physical_shortcut_delivery",
 			"title": "Physical shortcut delivery (LIN-004)",
-			"checks": [],
-			"not_testable": "Code work, not a confirmation: keyboard_shortcuts.physical_delivery_available stays false until the editor's physical capture and save are proven (decided by the coordinator on 2026-11-11 overnight)."
+			"checks": [
+				{
+					"step": "linux_physical_shortcut"
+				},
+				{
+					"step": "linux_physical_shortcut_output"
+				}
+			],
+			"condition": "A real keyboard under the evdev grab (decided by the maintainer on 2026-11-11: the getter answers true)."
 		},
 		{
 			"id": "predictions_stop",

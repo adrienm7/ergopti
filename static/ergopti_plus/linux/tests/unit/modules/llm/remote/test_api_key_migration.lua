@@ -106,6 +106,11 @@ local function fresh()
 	end
 	local store = helpers.load_module("modules.llm.api_token_store")
 	package.loaded["modules.llm.api_token_store"] = store
+	-- Under tests/run.lua an earlier module's secret-service fake can still be
+	-- installed on this store (CI 43024025237: each store answered at once, so
+	-- every attempt ended "done"); these cases run the real secret-tool path.
+	store._set_backend_for_test(nil)
+	store._set_async_start_for_test(nil)
 	store._set_tool_for_test(TOOL)
 	store._set_probe_tool_for_test(PROBE)
 	local entries = helpers.load_module("modules.llm.api_entries")
@@ -130,14 +135,29 @@ end
 
 --- Runs a case over a fresh migration, always shutting it down after.
 --- @param fn function Receives (migration, entries, store).
+-- The real child-process owners: an earlier suite module may leave a stand-in
+-- that "succeeds" at once without spawning anything, and every case here is
+-- about a real child (CI 43024025237: each attempt ended "done" at once).
+local PROCESS_OWNERS = { "adapters.owned_process", "adapters.shell_runner", "adapter_errors" }
+
 local function with_migration(fn)
-	local migration, entries, store = fresh()
-	local ok, err = pcall(fn, migration, entries, store)
-	migration.shutdown()
-	store._set_tool_for_test(nil)
-	store._set_probe_tool_for_test(nil)
-	-- Let a killed child of a failed case retire before the next case.
-	run_loop(100)
+	local saved = {}
+	for _, name in ipairs(PROCESS_OWNERS) do
+		saved[name] = package.loaded[name]
+		package.loaded[name] = nil
+	end
+	for _, name in ipairs(PROCESS_OWNERS) do require(name) end
+	local ok, err = pcall(function()
+		local migration, entries, store = fresh()
+		local called, failure = pcall(fn, migration, entries, store)
+		migration.shutdown()
+		store._set_tool_for_test(nil)
+		store._set_probe_tool_for_test(nil)
+		-- Let a killed child of a failed case retire before the next case.
+		run_loop(100)
+		if not called then error(failure, 0) end
+	end)
+	for _, name in ipairs(PROCESS_OWNERS) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end
 
