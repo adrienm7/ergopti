@@ -2182,7 +2182,12 @@ baseline` line (item 38).
   higher log level says nothing. `log_keystats_rotation_warnings` (« Midnight
   rotation stalled » or a day rollover that kept `today.log`) and
   `log_digest_mismatches` (an Ollama pull that failed its digest check, even
-  retried) fail on any WARNING or ERROR line.
+  retried) fail on any WARNING or ERROR line. `log_prediction_switch_cancels` (the
+  « application or window switch » reason, whose spaces the generic count
+  refuses), `log_window_toggle_opens` and `log_window_toggle_raises` (the DEBUG
+  toggle lines), `log_hotstring_expansions` (auto and terminator expansions)
+  and `log_boot_completions` are counts the guided steps watch rise and the
+  TODO summary bounds (`min` 4 boots for the production profile).
 - `field_raw_telemetry` runs after `field_ai_local`: one read-only, lock-free
   `sqlite3` query names the `events_window_topo`, `events_av` and
   `events_network` rows per kind of the shared reducers (`topo_<kind>`,

@@ -829,7 +829,7 @@ Field run, no person needed (read the next report):
 - [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery: `keyboard_shortcuts.physical_delivery_available` answers true since the maintainer's decision of 2026-11-11 (the « Pas encore disponible » row was closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) before that; `test_physical_shortcuts_row_available` now pins that a false answer still greys it so). Field report: with a physical slot bound in « Raccourcis physiques », the source key is suppressed once, no other owner (tap-hold, layer, hotstring, magic key) acts on it, and the action's output reaches the focused app under Karabiner and the keymap tap; the editor captures and saves the slot.
 - [ ] <!-- field-point: taphold_word_reset --> Tap-hold word reset: with « Un tap ou un hold sur une touche tap-hold commence un nouveau mot » on and « Un raccourci clavier commence un nouveau mot » off, a tap-hold copy (Cmd+C tap) between two words makes the next word-start hotstring fire, the user's own Cmd+C does not, and no F20 reaches TextEdit or a Finder rename; switching the option off keeps the word. Karabiner-Elements must deliver the tagged F20 before the chord. Then with Caps Lock (or another tap-hold key) held as Ctrl or Cmd: a shortcut struck under it follows the same option, the user's own Cmd+C afterwards follows « Un raccourci clavier commence un nouveau mot », Ctrl held by hand before the key still reaches the tap (Ctrl+Enter), and no context-menu key reaches TextEdit or a Finder rename (Karabiner-Elements must deliver the untagged `application` key before the hold's modifier).
 - [ ] <!-- field-point: ai_inline_autotype --> AI inline auto-type: the engine (typed without Tab, a correction with deletions stays in the bubble) is `test_prediction_inline_autotype`; the typing into a real editor with a model is field report: `prediction_tooltip` with « Inline auto-type » on.
-- [ ] <!-- field-point: api_entries_backup --> Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`), but « its key still works » cannot hold today: deleting the entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), and the backup keeps only the `keychain:<account>` reference. Waits on « Maintainer decisions pending ».
+- [ ] <!-- field-point: api_entries_backup --> Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`). Decided by the maintainer on 2026-11-11: deleting an entry keeps deleting its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), so an entry restored from a backup taken before that deletion needs its key re-entered. Field report: restore such a backup; the model selector page greys the entry with « Clé manquante : cette entrée est revenue d’une sauvegarde sans sa clé… » and its « Clé API… » action takes a new key, after which the entry answers (unit-tested by `test_api_token_absent_read`: the launcher's `itemNotFound` exit 69, the resolver's mark, the page row). An entry whose key survived still works unchanged.
 - [ ] <!-- field-point: onboarding_number_row --> Onboarding number-row order: the offer, the greyed reason with a system layout and the live apply before the reload are `test_onboarding_number_row` and `test_number_row_live`; the symbols typed after the reload are field report: `field_layout_rows` (a layout build read back) plus one person typing the row.
 - [x] Navigation layer repeat count: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_nav_layer_rule` replays `Digit3 = "repeat_count:3"` then `arrow_up` with Karabiner's matching (three up arrows, then one, nothing after re-entry) and `test_generator_layers` proves the count reset on layer entry.
 - [ ] <!-- field-point: owned_ollama_pulls --> Owned Ollama starts and pulls: field report: `field_ai_local` (ready daemon) and `ollama_model` (a done pull) (6170813ea9, 6335790e5a, 894585a213, b71b4a67db, 4545f672d1, 721074f21d).
@@ -1024,10 +1024,15 @@ Account and tester actions (maintainer, from the PC):
 
 ## To confirm on Linux
 
-- [ ] Raw telemetry (2026-11-11): under X11, move, resize and maximise a window and change monitor:
+Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh` run answers each
+of them in `docs/field-reports/linux-<stamp>/todo_summary.md` (probe steps read the session, guided steps prompt the
+gestures in the terminal): coverage table, verdicts and what no run can test in
+[docs/tooling/linux-field-report-coverage.md](docs/tooling/linux-field-report-coverage.md).
+
+- [ ] <!-- field-point: raw_telemetry --> Raw telemetry (2026-11-11): under X11, move, resize and maximise a window and change monitor:
       `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a WireGuard
       tunnel up then down: `events_network` holds the four Internet and VPN kinds.
-- [ ] Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
+- [ ] <!-- field-point: wayland_focus --> Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
 - [x] Hotstring section order: move/reset sections through the tray, restart, and verify persistence plus refusal of a stale menu after external config changes. Container proof 2026-11-10 (318b803d42): `linux/tests/hardware/desktop/run_hotstring_section_order.sh` (receipt `…/desktop/receipts/hotstring_section_order.txt`, 16/16): the real catalogue, menu builder and libayatana tray clicked over D-Bus moves and resets Autocorrection's sections, a new tray process draws the saved order (first row's « Monter » greyed), and a menu built before an external config.toml edit refuses the write with the « ErgoptiPlus — Erreur » dialog and keeps the edit byte for byte. The daemon process itself needs an evdev keyboard the container lacks.
 - [x] WPM: verify pointer-before-key and key-before-pointer ordering on a real desktop, preview/drag visibility, AI > hotstring > autocorrection holds, and no retained colour after disable/re-enable. Container proof 2026-11-10 (6de85913ce): `linux/tests/hardware/desktop/run_wpm_ordering.sh` (receipt `…/desktop/receipts/wpm_ordering.txt`, 24/24) on Xvfb/openbox with the real collector, SQLite owner, GTK surface, cairo pixels and an xdotool drag; key and pointer events enter at the daemon's callbacks (`keystats.on_keydown`, `wpm_widget.observe_pointer`) since the container has no /dev/input.
 
@@ -1058,7 +1063,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       three lines. Container proof (2026-11-10): `tests/hardware/run_nav_pointer_container.py` (21 assertions,
       receipt `docs/audits/linux/2026-11-10-container-proofs`) in mousepad on Xvfb; a leaked click would paste a PRIMARY marker. It found and fixed a stopped
       daemon: the next device watchdog tick after the layer gave the mouse back refused the source cohort.
-- [ ] Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
+- [ ] <!-- field-point: physical_acceptance --> Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
       grab, injection and hotplug (30); real kernel capture (93: ordered pairs need Xorg or a compositor on real
       evdev nodes). Container pass (2026-11-10): not closable in the cloud container, whose kernel has no uinput or
       evdev (`mknod /dev/uinput` opens with `ENODEV`) and no systemd PID 1, so a real-node grab, the polkit agent,
@@ -1107,7 +1112,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       a PAC it could not download, so the WARNING never appeared on Linux; the lookup child now downloads the GNOME
       PAC itself and the stage logs « lookup unusable at native_pac_download », then the pull succeeds direct
       (`pac-download-direct`). A PAC that says DIRECT warns nothing; a dead relay as the last entry fails the pull.
-- [ ] Item 50 cascade and the composed layout typed on a physical keyboard.
+- [ ] <!-- field-point: item50_cascade --> Item 50 cascade and the composed layout typed on a physical keyboard.
       Not attempted in the 2026-11-10 container pass; the emulation proof above can type the composer's
       `composed.keylayout` once it is the emulated layout. 2026-11-11, the cascade through the daemon's real main()
       (`tests/e2e/run_e2e.lua`, scripted keyboard, uinput into a model field; the container kernel has no evdev or
@@ -1116,7 +1121,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       cases are typed on a uinput keyboard in `run_daemon_live.lua`: CI run 42952845748 (native lane, real
       uinput and grab) received « Facebook » and Space, and « Facebook » then Enter. Left: the
       physical keyboard and the composed layout.
-- [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
+- [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
       Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
       46 `apply-wayland` ends `not_loaded` and rolls back (the shell lists no user-tree id, mutter still compiles it);
       on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted. 2026-11-11: GNOME W1 to W3 hold
@@ -1129,9 +1134,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [x] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running". Container proof (2026-11-10, d5f6f8119c): `linux/tests/hardware/desktop/run_linux_dev_mode.sh`, the real runner, `launch.sh`, daemon and tray (read through `sni_host.py`) on Xvfb with a real `systemd --user`. The keyboard node is a FIFO with `evdev_fifo_shim.c` because this kernel has no evdev or uinput, and the installed unit runs a stand-in. A second `--tray` run prints the held-lock message and exits 0, as `launch.sh` intends (receipt `tests/hardware/desktop/receipts/linux_dev_mode.txt`).
 - [x] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane (PAR-52). Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_window_toggle.sh` on openbox, xfwm4 and GNOME Shell 46 Wayland, 50/50 checks each (receipt `tests/hardware/desktop/receipts/window_toggle.txt`); it found GNOME Wayland leaving a covered page covered (no activation token, so `present()` cannot raise), fixed by mapping the window again before `present()` (5a303edcf3). Release notes: `tests/hardware/desktop/run_release_notes.sh` on X11 and GNOME Wayland, changelog shown without the download table, only the repository link opens (`receipts/release_notes.txt`).
-- [ ] Owned GTK host (split from the window-toggle line): tap delay row and every tray dialog (ca680655d7), group restore and clear, open target, Backspace word start.
+- [ ] <!-- field-point: owned_gtk_host --> Owned GTK host (split from the window-toggle line): tap delay row and every tray dialog (ca680655d7), group restore and clear, open target, Backspace word start.
 - [x] Wayland focus through lswt: on labwc or Wayfire with lswt 2.x, `lswt -j` marks the focused window `activated` and per-application rules follow it; GNOME, KDE and COSMIC log the single "no focused-window query" line. Container proof (2026-11-10, e15b6aac0a, `linux/tests/hardware/desktop/run_wayland_sessions.sh`, receipt `tests/hardware/desktop/receipts/wayland_focus_lswt.txt`): on headless labwc 0.7.1 (`zwlr_foreign_toplevel_manager_v1` v3) with two foot windows, `window_info` reports the activated toplevel and `process_lifecycle.onFocusChange` follows 3 activations; GNOME Shell 46 and KWin 5.27 answer unknown 5 times with one "No focused-window query" line. Substitute: lswt is not packaged by Ubuntu 24.04 and git.sr.ht is refused by the proxy, so `tests/hardware/desktop/foreign_toplevel_probe.c` stands in on the PATH, printing lswt 2.x's JSON from labwc's own protocol events. Not emulable here: the real lswt binary's output; Wayfire will not start without a DRM render node (the container has no `/dev/dri`); COSMIC is not packaged by Ubuntu 24.04.
-- [ ] Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
+- [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
       suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
       output reaches the focused window under the grab; only that evidence may turn
       `keyboard_shortcuts.physical_delivery_available` true. Delivery proven on the kernel model (2026-11-11):
@@ -1155,14 +1160,14 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       (`static/ergopti_plus/linux/tests/hardware/run_local_servers_container.py`, CI `network-ai`): stand-ins under the servers' own names and flags;
       the sweep names llama.cpp and vLLM (port from the command line), Lemonade (`~/.config/lemonade/config.json`)
       and KoboldCpp (its listening socket through ss), each up with its model, every other server « not running ».
-- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
+- [ ] <!-- field-point: predictions_stop --> Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
       press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
       Not emulable in the cloud (2026-11-10): the container kernel has no uinput module and no /dev/input
       (`mknod c 10 223` opens with ENODEV), so no pointer, wheel or touchpad device can reach the hook's evdev
       reader, and no compositor runs the spinner or the focused-window poll; the event routing is covered by
       `test_prediction_control_retirement.lua` (« Main cancels AI on pointer activity »).
-- [ ] Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
+- [ ] <!-- field-point: input_policies --> Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
       Container proof 2026-11-10 ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Qt (kwrite) types ₢ at once; GTK 3 (mousepad, no IBus) types the
       borrowed trigger « ⅕ » (Linux remaining work); the installed X11 Bépo needed 03a47899. The other parts of this
       line were not attempted. 2026-11-11: GTK 3 and Qt both type ₢ at once (`bepo_compose_gtk3.txt`); left: the
@@ -1306,20 +1311,24 @@ between workers) green alone. All live checks pass, typed by the harness.
       boots beside a blocking secret-tool. macOS has no such boot step (Keychain calls are owned async tasks with a
       10 s deadline and the load is deferred off the boot path). Windows counterpart for the maintainer: DPAPI has
       no prompt and no service to wait on; check that no boot path calls a credential store that can block.
-- [ ] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
+- [x] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
       Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the core keyboard changes (the daemon's
       virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
-      notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group change, so after one switch
-      `KeyboardLayout.is_ready()` stays false and every replacement takes the clipboard route. Reproduce: drop the XTEST
-      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Kept as is, decided by the
-      coordinator on 2026-11-11 overnight, to review by the maintainer: no proof can re-validate the receipt today. The
-      first proof, `keyboard_hook.refresh_capture`, requires the previous receipt to still be current before it dumps
-      the keymap again, and a typing request may renew only across a group change
-      (`test_keyboard_layout_terminal_plan_observation.lua`, "an equal-group source replacement does not renew an old
-      plan"). A fix needs a new capture re-acquisition owned by the hook, off the input path, that dumps the server
-      keymap and rebuilds capture and inverse together as at startup. The clipboard route then also fails while the
-      clipboard has no owner (a fresh session): `xclip -o` exits 1 as for a read error, and the snapshot refuses to
-      borrow what it cannot restore. Wayland and macOS have no slave switch.
+      notify and `adapters/xkb_capture.lua` renewed a revoked inverse only for a group change, so after one switch
+      `KeyboardLayout.is_ready()` stayed false and every replacement took the clipboard route. Decided by the
+      maintainer on 2026-11-11: after a same-group notify, re-read the keymap and renew the receipt when it is
+      identical. Done: `xkb_capture.inverse_retarget` renews an equal group too, since the fresh inverse is only
+      issued after `source_group` dumps the server keymap and the probe refuses it unless it equals the capture's
+      map (`native-keymap-unacknowledged`), so a keymap that really differs keeps the receipt revoked; a fresh
+      receipt is minted, the old plans stay retired; `KeyboardLayout.is_ready()` goes through the same renewal.
+      Reproduced with the recipe (the XTEST warm-up dropped from `tests/hardware/container_session.py`, now for
+      good): `run_ai_inline_container.py` gains « the prediction was typed through the layout, not pasted », which
+      fails on the baseline (the prediction is pasted) and passes with the fix; the physical-shortcut, navigation
+      pointer and X11 tap-copy proofs still pass without the warm-up. Unit: the equal-group and unacknowledged-map
+      cases of `test_keyboard_layout_terminal_plan_observation.lua` and `test_keyboard_layout_xkb_keymap_parsing.lua`
+      now pin the renewal and the kept revocation. The clipboard route's own failure while the clipboard has no
+      owner (`xclip -o` exits 1 as for a read error) is unchanged and stays open. Wayland and macOS have no slave
+      switch; Windows has no XKB.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
@@ -1465,8 +1474,16 @@ Each closes on a named green hosted or native run, recorded here.
       `_shared/data/db/purge_schema.sql`; writers `request_metrics_maintenance` (Linux keystats, macOS `log_manager`) and
       `KL_RunMetricsMaintenance` (Windows); the Windows path is checked by source contracts only and still wants a live
       Windows run.
-- [ ] An API entry restored from a pre-install backup comes back without its key (found 2026-11-10 closing « Backup
+- [x] An API entry restored from a pre-install backup comes back without its key (found 2026-11-10 closing « Backup
       of the API entries »): deleting an entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids`
-      → `retry_pending_api_token_deletes`) and the backup holds only the `keychain:<account>` reference. Choose:
-      keep a deleted entry's Keychain item while a retained backup still references it (the restore then works), or
-      keep deleting it and have the restored entry ask for its key again (the Mac line then reads so).
+      → `retry_pending_api_token_deletes`) and the backup holds only the `keychain:<account>` reference. Decided by
+      the maintainer on 2026-11-11: keep deleting it; the restored entry asks for its key again, on Linux too.
+      Done: macOS reads an absent item as its own exit (`KeychainTokenWorkerExit.itemNotFound`, 69, reason
+      `absent`), `api_remote.entry_key_absent` marks the entry, and the model selector page greys it with
+      `model_browser.hint_api_key_reenter` (21 locales) and an « API key… » action (`api_panel.set_entry_token`).
+      Linux lists an entry whose secret-service item is absent with an empty key and its reference kept
+      (`api_entries.key_missing`, `set_token`) and its page row is the same. On macOS an entry is marked once a
+      read finds its key absent: the active entry's at load, any other when it is used (decided by the coordinator
+      on 2026-11-11, to review by the maintainer: no extra Keychain read at load); Linux reads every key at load. Windows counterpart
+      for the maintainer: DPAPI keeps the key inside the backup, so check whether a restored Windows entry can
+      come back without a usable key (another user or machine) and give it the same row.

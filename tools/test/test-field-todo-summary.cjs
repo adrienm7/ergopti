@@ -169,9 +169,86 @@ check('a point no run can test says why, in the summary and the terminal', () =>
 	assert.equal(Object.keys(byId).length, coverage.points.length, 'one record per point');
 });
 
+check('a Linux report reads the field run and the collector steps of its own coverage', () => {
+	const folder = report([]);
+	fs.mkdirSync(path.join(folder, 'field_guided'));
+	const guided = (index, step, verdict, codes, steps = []) =>
+		fs.writeFileSync(
+			path.join(folder, 'field_guided', `${String(index).padStart(2, '0')}_${step}.json`),
+			JSON.stringify({ schema: 1, step, verdict, codes, report: { check: step, steps } })
+		);
+	guided(
+		1,
+		'linux_input_access',
+		'pass',
+		['probes_met'],
+		[
+			{ id: 'uinput_writable', state: 'pass', value: '1' },
+			{ id: 'evdev_readable', state: 'pass', value: '9' }
+		]
+	);
+	guided(
+		2,
+		'linux_autostart',
+		'pass',
+		['probes_met'],
+		[{ id: 'unit_enabled', state: 'pass', value: '0' }]
+	);
+	guided(
+		3,
+		'linux_polkit_agent',
+		'fail',
+		['polkit_agent_1'],
+		[{ id: 'polkit_agent', state: 'fail', value: '1' }]
+	);
+	guided(11, 'linux_physical_hands', 'pass', ['attested_pass']);
+	guided(13, 'linux_layout_emulation_kde', 'needs_person', ['no_answer_420s']);
+	const result = run('--os', 'linux', '--report', folder);
+	assert.equal(result.status, 0, result.stderr);
+	const summary = JSON.parse(fs.readFileSync(path.join(folder, 'todo_summary.json'), 'utf8'));
+	const byId = Object.fromEntries(summary.points.map((point) => [point.id, point]));
+	const linux = JSON.parse(
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/linux/data/field_todo_coverage.json'),
+			'utf8'
+		)
+	);
+	assert.deepEqual(
+		Object.keys(byId),
+		linux.points.map((point) => point.id)
+	);
+	assert.equal(byId.physical_acceptance.verdict, 'fail', 'no polkit agent fails the point by name');
+	assert.match(byId.physical_acceptance.evidence.join(' '), /polkit_agent=fail:1/);
+	assert.equal(byId.layout_emulation_w1_w4.verdict, 'needs_person');
+	assert.equal(byId.owned_gtk_host.verdict, 'not_run');
+	assert.equal(byId.physical_shortcut_delivery.verdict, 'not_testable');
+	assert(
+		fs
+			.readFileSync(path.join(folder, 'todo_summary.md'), 'utf8')
+			.includes('« To confirm on Linux »')
+	);
+});
+
+check('a count bound reads a minimum as well as a maximum', () => {
+	const { byId } = summarize(
+		report([
+			{
+				step: 'field_log_signals',
+				verdict: 'pass',
+				codes: [],
+				report: { steps: [{ id: 'log_boot_completions', state: 'info', value: '2' }] }
+			}
+		])
+	);
+	assert.equal(byId.production_profile.verdict, 'fail', 'two boots today are fewer than four');
+	assert.match(byId.production_profile.evidence.join(' '), /log_boot_completions=info:2<4/);
+});
+
 check('the documentation carries the generated coverage table', () => {
 	const result = run('--check-doc');
 	assert.equal(result.status, 0, result.stderr);
+	const linux = run('--os', 'linux', '--check-doc');
+	assert.equal(linux.status, 0, linux.stderr);
 	const doc = fs.readFileSync(
 		path.join(ROOT, 'docs/tooling/macos-field-report-coverage.md'),
 		'utf8'
