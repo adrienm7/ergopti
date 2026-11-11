@@ -1218,7 +1218,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       the `Ergopti_kbd_<dll>` uninstall entry) and `composer_emulate` (`[layout] emulated_layout = "composed"`);
       `keylayout_emulation.ahk` reads `layout_composer\layout_source.keylayout` and performs
       `layout_source_emulation.json` (replay `emulation_vectors.json`); `menu_init.ahk` binds
-      `MenuCommand.LAYOUT_EDITOR` and the `layout_editor` row loses its Windows grey reason. Then empty `windowsPending`
+      `MenuCommand.OPEN_LAYOUT_EDITOR` and the `open_layout_editor` row loses its Windows grey reason. Then empty `windowsPending`
       in `test-layout-manager-page.cjs`.
 - [ ] **KMD-1 on AHK (blocking: Windows metrics stop writing on an existing cache since dev `bffd1929`).** Decided by the
       maintainer on 2026-11-11: rows store `ts` in UTC and `utc_offset_min`. `windows/_generated/keystats_queries.ahk` was

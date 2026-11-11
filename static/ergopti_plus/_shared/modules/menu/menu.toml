@@ -2158,7 +2158,7 @@ i18n = "menu.layout.manage"
 # 2026-11-11, to review by the maintainer).
 [[menu.layout_menu]]
 type = "command"
-id = "layout_editor"
+id = "open_layout_editor"
 i18n = "menu.layout.edit"
 platforms = ["hs", "linux"]
 unavailable = "grey"

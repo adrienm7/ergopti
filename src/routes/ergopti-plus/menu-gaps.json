@@ -635,6 +635,18 @@
 		}
 	},
 	{
+		"path": "layout_menu.open_layout_editor",
+		"visibility": "grey",
+		"labels": { "fr": "Créer ou modifier une disposition…", "en": "Create or edit a layout…" },
+		"platforms": { "windows": false, "macos": true, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Not on Windows yet: the Windows layout manager window cannot open or save layout sources yet; the editor stays available on the website.",
+				"fr": "Pas encore sous Windows : la fenêtre du gestionnaire de dispositions de Windows ne sait pas encore ouvrir ni enregistrer les sources de disposition ; l'éditeur reste disponible sur le site."
+			}
+		}
+	},
+	{
 		"path": "layout_menu.layout_bundle",
 		"visibility": "hide",
 		"labels": { "fr": "layout_bundle", "en": "layout_bundle" },
