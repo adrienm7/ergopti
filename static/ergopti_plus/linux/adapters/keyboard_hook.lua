@@ -159,6 +159,9 @@ local _intercept = false
 local _emit_raw = nil
 local _on_consume = nil
 local _consumed_down = {}
+-- The release owner a consumer named for its consumed press (a held key of the
+-- layout source emulation), called once on that press's key-up.
+local _consumed_release = {}
 local _sync_dropped = {}
 local _forwarded_down = {}
 local _physical_down = {}
@@ -598,6 +601,7 @@ local function _reset_modifier_state()
 	_shift_held, _ctrl_held, _alt_held = false, false, false
 	_altgr_held, _meta_held = false, false
 	_consumed_down = {}
+	_consumed_release = {}
 	_pressed_at = {}
 	_hold_owners = {}
 end
@@ -1280,15 +1284,19 @@ function M.arm_action_one_shot()
 end
 
 --- Accepts only the explicit native repeat receipt; boolean consumers stay once-only.
+--- A receipt may also name the owner of the press's release.
 --- @param receipt any Consumer result.
 --- @return function|nil callback Exact callback owned by this physical press.
+--- @return function|nil release_callback Called once on the press's key-up.
 local function consumed_repeat_callback(receipt)
 	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or receipt.consume ~= true
 		or type(receipt.repeat_callback) ~= "function" then return nil end
 	for key in pairs(receipt) do
-		if key ~= "consume" and key ~= "repeat_callback" then return nil end
+		if key ~= "consume" and key ~= "repeat_callback" and key ~= "release_callback" then return nil end
 	end
-	return receipt.repeat_callback
+	local release = receipt.release_callback
+	if release ~= nil and type(release) ~= "function" then return nil end
+	return receipt.repeat_callback, release
 end
 
 --- Detaches the native event identity and its already-published origin epoch.
@@ -1851,6 +1859,12 @@ local function _dispatch_post_remap(ev, source)
 	if _consumed_down[consumed_key] then
 		if ev.value == InputEvent.VALUE_UP then
 			_consumed_down[consumed_key] = nil
+			local release_callback = _consumed_release[consumed_key]
+			_consumed_release[consumed_key] = nil
+			if release_callback ~= nil then
+				_call_callback("consumed-key release callback", release_callback,
+					consumption_detail(ev, source, identity, char))
+			end
 		else
 			-- XKB read each auto-repeat of the consumed press too, a dead key's
 			-- included, and the application saw none of them.
@@ -1878,7 +1892,7 @@ local function _dispatch_post_remap(ev, source)
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
 		local ok_consume, consume, retired = _call_callback("key-consumption callback", _on_consume,
 			consumption_detail(ev, source, identity, char))
-		local repeat_callback = consumed_repeat_callback(consume)
+		local repeat_callback, release_callback = consumed_repeat_callback(consume)
 		if not ok_consume then
 			if not retired then return end
 			_number_row.abandon(row_plan, ev, false)
@@ -1893,6 +1907,7 @@ local function _dispatch_post_remap(ev, source)
 				M.emergency_stop("native number-row consumed transition refused"); return
 			end
 			_consumed_down[consumed_key] = repeat_callback or true
+			_consumed_release[consumed_key] = release_callback
 			-- A dead key consumed here (a tap key or the physical magic key on
 			-- a French ^ or a US-international ') would otherwise stay pending.
 			if not _withdraw_capture_compose(compose_mark) then
@@ -4548,6 +4563,7 @@ function M.stop()
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_consumed_release = {}
 	_remap_owned = {}
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
@@ -4615,6 +4631,7 @@ function M.emergency_stop(reason)
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_consumed_release = {}
 	_remap_owned = {}
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
