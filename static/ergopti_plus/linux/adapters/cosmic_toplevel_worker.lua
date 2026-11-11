@@ -259,7 +259,8 @@ end
 --- @param soname string libwayland-client's soname.
 --- @param parent_pid number The daemon's process id.
 --- @param emit function(record) Prints one record; false when stdout is gone.
---- @return string reason Why the worker stopped.
+--- @return string detail Why the worker stopped, for its stderr line.
+--- @return boolean parent_gone True when it stopped because the daemon exited.
 function M.run(soname, parent_pid, emit)
 	require("jit").off()
 	local ffi = require("ffi")
@@ -299,10 +300,10 @@ function M.run(soname, parent_pid, emit)
 	assert(info ~= nil, "toplevel info bind refused")
 
 	local tracker = M.new_tracker()
-	local ready, stopped = false, nil
+	local ready, stopped, parent_gone = false, nil, false
 	local keys = {}
 	local function key_of(handle) return tostring(ffi.cast("uintptr_t", handle)) end
-	local function stop(reason) if not stopped then stopped = reason end end
+	local function stop(detail) if not stopped then stopped = detail end end
 	local function publish(record)
 		if record and ready and not emit(record) then stop("stdout closed") end
 	end
@@ -359,16 +360,19 @@ function M.run(soname, parent_pid, emit)
 
 	-- Two round trips: the bind, then the first batch of every window.
 	for _ = 1, 2 do assert(wl.wl_display_roundtrip(display) >= 0, "Wayland connection lost") end
-	if stopped then return stopped end
+	if stopped then return stopped, false end
 	ready = true
 	if not emit({ kind = "ready" }) then return "stdout closed" end
 	publish(tracker.current())
 	while not stopped do
 		if wl.wl_display_dispatch(display) < 0 then stop("Wayland connection lost") end
-		if tonumber(ffi.C.getppid()) ~= parent_pid then stop("parent exited") end
+		if tonumber(ffi.C.getppid()) ~= parent_pid then
+			parent_gone = not stopped
+			stop("parent exited")
+		end
 	end
 	wl.wl_display_disconnect(display)
-	return stopped
+	return stopped, parent_gone
 end
 
 if type(arg) == "table" and type(arg[0]) == "string"
@@ -387,9 +391,9 @@ if type(arg) == "table" and type(arg[0]) == "string"
 		local written = io.stdout:write(Json.encode(record), "\n")
 		return written ~= nil and io.stdout:flush() ~= nil
 	end
-	local ok, reason = pcall(M.run, arg[1], tonumber(arg[2]), emit)
-	io.stderr:write("COSMIC toplevel worker stopped: " .. tostring(reason) .. "\n")
-	os.exit(ok and reason == "parent exited" and 0 or 1)
+	local ok, detail, parent_gone = pcall(M.run, arg[1], tonumber(arg[2]), emit)
+	io.stderr:write("COSMIC toplevel worker stopped: " .. tostring(detail) .. "\n")
+	os.exit(ok and parent_gone and 0 or 1)
 end
 
 return M

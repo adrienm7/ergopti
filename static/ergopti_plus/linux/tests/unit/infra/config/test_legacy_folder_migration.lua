@@ -248,7 +248,7 @@ helpers.describe("Linux legacy folder migration", function()
 		local report = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage(values, false) })
 		helpers.assert_eq(values[AppDirs.linux_storage_key], "/data/" .. LEGACY)
 		helpers.assert_true(table.concat(snapshot(), " "):find("/data/" .. LEGACY .. "/" .. NAME .. "/a.log", 1, true) ~= nil)
-		helpers.assert_eq(report.kept[#report.kept].reason, "setting_refused")
+		helpers.assert_eq(report.kept[#report.kept].reason, "refused")
 	end)
 
 	helpers.it("keeps any other custom logs folder (legacy-folder-migration-linux-custom-kept)", function()

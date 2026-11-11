@@ -597,7 +597,7 @@ local KEPT_REASONS = {
 	list_failed = "its folder could not be listed",
 	remove_failed = "its emptied folder could not be removed",
 	restore_failed = "it could not be moved back to the folder its locator names",
-	setting_refused = "the setting naming it could not be stored",
+	refused = "the setting naming it could not be stored",
 }
 
 --- Why paths.toml still names an old folder, for its warning.

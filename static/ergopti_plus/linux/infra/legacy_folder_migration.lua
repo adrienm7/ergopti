@@ -182,7 +182,7 @@ local function rename_custom_logs(report, store, ports)
 	local name = AppDirs.linux.folder_name
 	local renamed = NativePath.dirname(custom) .. "/" .. name
 	if not store.set(key, renamed) then
-		report.kept[#report.kept + 1] = { from = custom, to = renamed, reason = "setting_refused" }
+		report.kept[#report.kept + 1] = { from = custom, to = renamed, reason = "refused" }
 		return
 	end
 	report.relocated[#report.relocated + 1] = { key = key, from = value, to = renamed }
