@@ -915,3 +915,91 @@ def remove_generation_two_links(system_root: Path) -> int:
         except OSError:
             continue
     return removed
+
+
+# ---------------------------------------------------------------------------
+# Owned ~/.XCompose block
+# ---------------------------------------------------------------------------
+
+# GTK 3's built-in input method (gtk-im-context-simple, used wherever IBus is
+# not) reads only the rules written in ~/.XCompose itself and ignores an
+# ``include`` of another file, while libX11 and Qt read includes. Its table
+# also overflows on a large set of multi-character outputs (Bépo's 21,742
+# abort GTK 3 applications with "buffer overflow detected"). The owned block
+# therefore includes each layout file, as libX11 and Qt need, then repeats its
+# single-character rules inline for GTK 3; multi-character outputs stay
+# libX11's and Qt's (IBus and GTK 4 read includes). The repeated rules are the
+# included file's own, in its order, so libX11 and Qt end in the same state.
+LOCALE_INCLUDE = 'include "%L"'
+_COMPOSE_VALUE = re.compile(r':\s*"((?:[^"\\]|\\.)*)"')
+
+
+def compose_include_line(path: Path) -> str:
+    """An XCompose include of one file."""
+    escaped = str(path).replace("\\", "\\\\").replace('"', '\\"')
+    return f'include "{escaped}"'
+
+
+def single_character_rules(text: str) -> list[str]:
+    """The rules of one XCompose file whose output is one character."""
+    rules = []
+    for line in text.splitlines():
+        match = _COMPOSE_VALUE.search(line)
+        if match and len(re.sub(r"\\(.)", r"\1", match.group(1))) == 1:
+            rules.append(line)
+    return rules
+
+
+def xcompose_end_marker(marker: str) -> str:
+    """The line closing an owned block opened by ``marker`` ("# X" -> "# End of X")."""
+    return "# End of " + marker.lstrip("# ")
+
+
+def inline_xcompose_block(marker: str, composes: list[tuple[Path, str]]) -> list[str]:
+    """The owned block: the marker, the locale include, then per layout file its
+    include and its single-character rules, then the end marker.
+
+    ``composes`` holds each layout's generated XCompose path and text.
+    """
+    if not composes:
+        return []
+    lines = [marker, LOCALE_INCLUDE]
+    for path, text in composes:
+        lines.append(compose_include_line(path))
+        lines.extend(single_character_rules(text))
+    lines.append(xcompose_end_marker(marker))
+    return lines
+
+
+def strip_xcompose_block(content: str, marker: str) -> tuple[list[str], bool]:
+    """Removes the owned block, never adjacent user lines.
+
+    A block that has an end marker runs to it; one written before the rules
+    were inlined is the marker and the include lines right after it.
+    """
+    lines = content.splitlines()
+    end = xcompose_end_marker(marker)
+    kept: list[str] = []
+    removed = False
+    index = 0
+    while index < len(lines):
+        if lines[index].strip() != marker:
+            kept.append(lines[index])
+            index += 1
+            continue
+        removed = True
+        closing = next(
+            (
+                position
+                for position in range(index + 1, len(lines))
+                if lines[position].strip() == end
+            ),
+            None,
+        )
+        if closing is not None:
+            index = closing + 1
+            continue
+        index += 1
+        while index < len(lines) and lines[index].lstrip().startswith('include "'):
+            index += 1
+    return kept, removed
