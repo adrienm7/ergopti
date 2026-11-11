@@ -573,7 +573,17 @@ helpers.describe("field run: a run", function()
 			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
 			session:start()
 			state.request({ schema = 1, request_id = "r11", steps = Json.array({ "all" }) })
-			state.advance(0)
+			-- The guided steps wait for a gesture no one makes here: the clock runs past each bound
+			local settle_ms = 0
+			for _, step in ipairs(spec.steps) do
+				if step.kind == "guided" then settle_ms = settle_ms + step.deadline_seconds * 1000 end
+			end
+			-- Second by second, so the clock stops at the reload a step asks for
+			local function advance_to_reload(count)
+				local limit = state.now + settle_ms
+				repeat state.advance(1000) until #state.reloads >= count or state.now >= limit
+			end
+			advance_to_reload(1)
 			-- Each timed reload: this state is torn down, the reloaded one carries on
 			local reload_steps = 0
 			for _, step in ipairs(spec.steps) do if step.kind == "reload" then reload_steps = reload_steps + 1 end end
@@ -588,7 +598,7 @@ helpers.describe("field run: a run", function()
 				session = FieldRun.new({ spec = enabled_spec_of(FieldRun), folder = FOLDER, pid = 4343 + reload,
 					ports = state.ports })
 				session:start()
-				state.advance(0)
+				advance_to_reload(reload + 1)
 			end
 			for index, step in ipairs(spec.steps) do
 				local result = state.json(result_path("r11", index, step.id))
@@ -614,7 +624,21 @@ helpers.describe("field run: a run", function()
 			for _, id in ipairs(state.calls) do ran[id] = true end
 			for _, step in ipairs(spec.steps) do
 				helpers.assert_nil(step.person, step.id .. " waits for a person: the field run must be automatic")
-				if step.kind ~= "reload" then helpers.assert_true(ran[step.id], step.id .. " did not run") end
+				if step.kind == "guided" then
+					-- No gesture and no answer here: recorded as waiting for the person, never a pass
+					local index
+					for position, item in ipairs(spec.steps) do if item == step then index = position end end
+					local guided = state.json(result_path("r11", index, step.id))
+					helpers.assert_eq(guided.verdict, "needs_person", step.id)
+					local bound_code = "^[a-z_]+_" .. step.gesture_seconds .. "s$"
+					helpers.assert_true(tostring(guided.codes[1]):match(bound_code) ~= nil, step.id)
+					-- An observed step reads its check for the baseline; an attested one only on an answer
+					if step.mode == "observe" then
+						helpers.assert_true(ran[step.id], step.id .. " never read its check")
+					end
+				elseif step.kind ~= "reload" then
+					helpers.assert_true(ran[step.id], step.id .. " did not run")
+				end
 			end
 			local lease_index
 			for index, step in ipairs(spec.steps) do

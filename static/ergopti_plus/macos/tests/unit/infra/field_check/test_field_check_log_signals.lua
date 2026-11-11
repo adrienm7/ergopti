@@ -40,7 +40,8 @@ local function run(code, output)
 	return steps_of(report)
 end
 
-local QUIET = "capture_stamp 0\nwindow_toggle 0\nstart_rollback 0\nrejections 0 none\nheld_key 0\ncancels 0 none\n"
+local QUIET = "capture_stamp 0\nwindow_toggle 0\nstart_rollback 0\nrotation_warning 0\ndigest_mismatch 0\n"
+	.. "rejections 0 none\nheld_key 0\ncancels 0 none\n"
 
 
 
@@ -60,12 +61,14 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 	end)
 
 	helpers.it("fails each error signal by name and keeps activity as information", function()
-		local steps = run(0, "capture_stamp 2\nwindow_toggle 1\nstart_rollback 0\nrejections 7 tilt\n"
-			.. "held_key 3\ncancels 4 mouseMoved\n")
+		local steps = run(0, "capture_stamp 2\nwindow_toggle 1\nstart_rollback 0\nrotation_warning 1\n"
+			.. "digest_mismatch 0\nrejections 7 tilt\nheld_key 3\ncancels 4 mouseMoved\n")
 		helpers.assert_eq(steps.log_capture_stamp_errors.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_capture_stamp_errors.value, "2")
 		helpers.assert_eq(steps.log_window_toggle_errors.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.log_start_rollbacks.state, Report.STATE_PASS)
+		helpers.assert_eq(steps.log_keystats_rotation_warnings.state, Report.STATE_FAIL)
+		helpers.assert_eq(steps.log_digest_mismatches.state, Report.STATE_PASS)
 		helpers.assert_eq(steps.log_three_finger_rejections.state, Report.STATE_INFO)
 		helpers.assert_eq(steps.log_three_finger_rejections.value, "7:tilt")
 		helpers.assert_eq(steps.log_held_key_moves.value, "3")
@@ -114,6 +117,14 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 				.. "publication transaction rolled back after a refused publish.",
 			"2026-11-10 10:00:11:001 [INFO] [window_toggle] Page 'changelog' opened.",
 			"2026-11-10 10:00:12:001 [INFO] [gestures] Touch frame from device=1 has no capture timestamp.",
+			"2026-11-10 10:00:13:001 [WARNING] [keystats.watchers] Midnight rotation stalled — will retry on next "
+				.. "maintenance tick.",
+			"2026-11-10 10:00:14:001 [WARNING] [keystats.log_manager] day_rollover: today.log not fully drained — "
+				.. "file preserved, rotation skipped.",
+			"2026-11-10 10:00:15:001 [INFO] [keystats.watchers] Midnight rotation stalled in a quoted note.",
+			"2026-11-10 10:00:16:001 [WARNING] [menu_llm.ollama] The Ollama pull of granite4:350m-h failed its digest "
+				.. "check; Ollama removed the layer, so it is pulled once more.",
+			"2026-11-10 10:00:17:001 [INFO] [menu_llm.ollama] The Ollama pull of granite4:350m-h finished.",
 		}, "\n") .. "\n")
 		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
 		local output = pipe:read("*a")
@@ -124,6 +135,8 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 		helpers.assert_eq(summary.capture_stamp, 1, "only the ERROR line counts")
 		helpers.assert_eq(summary.window_toggle, 1, "only the window_toggle ERROR line counts")
 		helpers.assert_eq(summary.start_rollback, 2)
+		helpers.assert_eq(summary.rotation_warning, 2, "only the WARNING rotation lines count")
+		helpers.assert_eq(summary.digest_mismatch, 1, "only the failed digest check counts")
 		helpers.assert_eq(summary.rejections, { count = 3, top = "tilt" })
 		helpers.assert_eq(summary.held_key, 1)
 		helpers.assert_eq(summary.cancels, { count = 3, top = "mouseMoved" })
