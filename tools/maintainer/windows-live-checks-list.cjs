@@ -2116,6 +2116,101 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'hotstring-preview-boundaries',
+		title:
+			'Hotstring preview: after punctuation, with a custom delimiter and a changed magic key, the bubble and the expansion agree',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const asa = shippedRule('autocorrection.toml', 'asa');
+			const cest = shippedRule('french/magickey.toml', 'c★');
+			if (!asa || !cest)
+				return notExecuted('the shipped data no longer holds asa -> ASA and c★ -> c’est');
+			const magic = '¤';
+			const { session } = await bootEnglish(
+				context,
+				'preview',
+				[
+					'[category_enabled]',
+					'hotstrings = true',
+					'autocorrection = true',
+					'french_magickey = true',
+					'[hotstrings]',
+					`trigger_char = "${magic}"`,
+					// No delay: a bubble whose window ran out is not painted.
+					`[hotstrings.autocorrection.${asa.section}]`,
+					'enabled = true',
+					'time_activation_seconds = 0',
+					`[hotstrings.french_magickey.${cest.section}]`,
+					'enabled = true',
+					'time_activation_seconds = 0',
+					'[[hotstrings.terminators]]',
+					'key = "custom_section"',
+					'char = "§"',
+					'label = "Section"',
+					'consume = false',
+					''
+				].join('\n')
+			);
+			await session.run('pump', ['3000']);
+			const cases = [
+				{ name: 'a parenthesis before the word', word: '(asa', end: ' ', expected: '(ASA ' },
+				{ name: 'the custom delimiter §', word: 'asa', end: '§', expected: 'ASA§' },
+				{ name: `the magic key changed to ${magic}`, word: 'c', end: magic, expected: 'c’est' }
+			];
+			const problems = [];
+			const seen = [];
+			for (const item of cases) {
+				await session.run('edit_open');
+				session.type([
+					['mode', 'event'],
+					['level', '100'],
+					['gap', '120'],
+					['text', item.word],
+					['wait', '900']
+				]);
+				const preview = JSON.parse(await session.run('preview_state'));
+				// The bubble asks the end character and the magic key; a delimiter
+				// other than the first is answered by the end-character row.
+				const kind = item.end === magic ? magic : null;
+				const pick = (rows) =>
+					rows.find((row) => (kind ? row.completion === kind : row.completion !== magic));
+				const computed = pick(preview.computed);
+				const painted = pick(preview.visible);
+				session.type([
+					['mode', 'event'],
+					['level', '100'],
+					['gap', '120'],
+					item.end === ' ' ? ['key', '{SC039}'] : ['text', item.end],
+					['wait', '900']
+				]);
+				const typed = (await session.run('edit_value')).replace(/^value=/, '');
+				await session.run('edit_close');
+				if (typed !== item.expected)
+					problems.push(`${item.name}: typed "${typed}", "${item.expected}" expected`);
+				if (!computed)
+					problems.push(
+						`${item.name}: no preview row after "${item.word}" (buffer "${preview.buffer}")`
+					);
+				else if (!typed.includes(computed.output))
+					problems.push(
+						`${item.name}: the preview offered "${computed.output}", the key typed "${typed}"`
+					);
+				if (computed && (!painted || painted.output !== computed.output))
+					problems.push(
+						`${item.name}: the bubble painted ${painted ? `"${painted.output}"` : 'nothing'}, the preview computed "${computed.output}"`
+					);
+				if (preview.computed.some((row) => row.completion === '★'))
+					problems.push(`${item.name}: a row still answers the old magic key ★`);
+				seen.push(`${item.name}: "${computed?.output}" -> "${typed}"`);
+			}
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(seen.join('; '));
+		}
+	},
+	{
 		id: 'asa-space-fast',
 		title: '`asa` then Space fast, Space down before the last a is up, 20 times: always ASA',
 		async run(context) {

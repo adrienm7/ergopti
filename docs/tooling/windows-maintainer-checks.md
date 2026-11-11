@@ -94,6 +94,7 @@ single-owner mutex.
 | `hotstring-section-order`               | Hotstring section order: move, restart, reset, a stale menu   | `test_hotstring_dynamic_menu_scope.ahk`, `section_order_vectors.json`   |
 | `layout-emulation-row`                  | Layout emulation row: the list, the tick, None, a missing id  | `test_layout_manager_host.ahk`                                          |
 | `gestures-info-row`                     | Tray > Gestures: one « Infos… » row that opens the dialog     | `test_gesture_menu_status.ahk`                                          |
+| `hotstring-preview-boundaries`          | Hotstring preview boundaries: punctuation, delimiter, ★       | `preview-word-opening`, `boundary-cache`                                |
 | `asa-space-fast`                        | `asa` then Space fast, 20 times                               | `test_text_carrier_avoids_held_key.lua` (macOS)                         |
 | `personal-priority-and-left`            | Personal `sru` at priority 100; a hotstring with `{left}`     | `final_result_vectors.json`                                             |
 | `cascade-fb-item-50`                    | Item 50: `fb` at 1, 2 and 3 arrows, consumed and not          | `cascade_vectors.json`, `test_hotstring_cascade.ahk`                    |
