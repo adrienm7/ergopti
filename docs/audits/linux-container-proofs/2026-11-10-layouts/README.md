@@ -75,7 +75,7 @@ From `static/ergopti_plus/linux`:
   input method compiles no Compose cache from it (an include of a file that
   itself includes `%L`) and types the borrowed trigger « ⅕ ». Qt composes ₢.
   A desktop running IBus (GNOME) composes through IBus instead.
-- **The KDE layout id depends on the session type.** The middle field of
+- **Fixed 2026-11-11: the KDE layout id depended on the session type.** The middle field of
   `getLayoutsList` is Plasma's display label (`''` on Wayland, the short name
   on X11), not a variant: the same layout is `us` on Wayland and `us(us)` on
   X11, so a pause layout stored on one does not match on the other.

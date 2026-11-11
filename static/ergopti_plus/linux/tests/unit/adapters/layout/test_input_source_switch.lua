@@ -23,7 +23,10 @@ end
 local GNOME_SOURCES = "[('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]\n"
 local GNOME_MRU = "[('xkb', 'fr+ergopti'), ('xkb', 'fr')]\n"
 local KDE_CALL = "gdbus call --session --dest org.kde.keyboard --object-path /Layouts --method org.kde.KeyboardLayouts."
-local KDE_LIST = "([('fr', 'ergopti', 'French (Ergopti)'), ('us', '', \"English (US, int'l)\"), ('de', 'neo', 'German (Neo 2)')],)\n"
+-- The reply's middle field is the user's display label, never the variant
+-- (Plasma 6.6.4, checked on Wayland and X11): the variants are kxkbrc's.
+local KDE_LIST = "([('fr', '', 'French (Ergopti)'), ('us', 'us', \"English (US, int'l)\"), ('de', 'DE', 'German (Neo 2)')],)\n"
+local KXKBRC = "[Layout]\nDisplayNames=,,DE\nLayoutList=fr,us,de\nUse=true\nVariantList=ergopti,,neo\n"
 local X11_QUERY = "rules:      evdev\nmodel:      pc105\nlayout:     fr,us,de\nvariant:    ergopti,,neo\n"
 
 --- A port whose commands answer from a table and are recorded in order.
@@ -35,6 +38,7 @@ local function fake_port(backend, answers, deferred)
 	local calls, waiting = {}, {}
 	local port = {
 		backend = function() return backend end,
+		kde_config = function() return answers.kxkbrc end,
 		run = function(program, args, on_done)
 			local line = program .. " " .. table.concat(args, " ")
 			calls[#calls + 1] = line
@@ -78,7 +82,8 @@ helpers.describe("input source switch: parsers", function()
 	helpers.it("reads the KDE daemon's layouts and index, and refuses what it cannot read", function()
 		local layouts = Switch.parse_kde_layouts(KDE_LIST)
 		helpers.assert_eq(#layouts, 3)
-		helpers.assert_eq(layouts[1].variant, "ergopti")
+		helpers.assert_eq(layouts[1].label, "")
+		helpers.assert_eq(layouts[3].label, "DE", "the middle field is the display label")
 		helpers.assert_eq(layouts[2].name, "English (US, int'l)", "a double-quoted name keeps its apostrophe")
 		helpers.assert_eq(#Switch.parse_kde_layouts("([],)"), 0)
 		helpers.assert_eq(Switch.parse_kde_layouts("([('fr;rm', '', 'x')],)"), nil, "a name outside XKB's alphabet")
@@ -234,7 +239,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-settlement: waits for an outstanding listing", function()
 		local pending, settled, changed = nil, false, nil
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending = callback; return true end })
 		switcher.refresh(function(value) changed = value end)
 		helpers.assert_eq(switcher.is_settled(), false)
@@ -247,7 +252,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: an older completion cannot replace newer choices", function()
 		local pending, completed = {}, {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		switcher.refresh(function(changed) completed[#completed + 1] = changed end)
 		switcher.refresh(function(changed) completed[#completed + 1] = changed end)
@@ -258,7 +263,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: an old refresh cannot replace a switcher's newer listing", function()
 		local pending = {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		switcher.refresh()
 		local switched
@@ -271,7 +276,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: a refresh waits for an active switch", function()
 		local pending = {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		local switched
 		switcher.select("fr", function(ok) switched = ok end)
@@ -287,7 +292,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: reentrant completion refreshes before settlement", function()
 		local pending, settled, refresh_done = {}, false, false
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		switcher.select("fr", function(ok)
 			helpers.assert_true(ok)
@@ -304,7 +309,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: synchronous deferred refreshes all retire before settlement", function()
 		local calls, pending, events = 0, {}, {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback)
 				calls = calls + 1
 				if calls <= 2 then pending[calls] = callback else callback({ ok = true, stdout = "layout: fr\n" }) end
@@ -336,7 +341,7 @@ helpers.describe("input source switch: switcher", function()
 
 	helpers.it("lists a KDE session's layouts from the keyboard daemon with the active one", function()
 		local port, calls = fake_port(Switch.KDE, {
-			[KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 2,)\n",
+			[KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 2,)\n", kxkbrc = KXKBRC,
 		})
 		local switcher = Switch.new(port)
 		local changed
@@ -352,7 +357,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("switches a KDE session by the daemon's index and fails when it refuses", function()
-		local answers = { [KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+		local answers = { [KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 0,)", kxkbrc = KXKBRC,
 			[KDE_CALL .. "setLayout 2"] = "(true,)\n", [KDE_CALL .. "setLayout 1"] = "(false,)\n" }
 		local port, calls = fake_port(Switch.KDE, answers)
 		local switcher = Switch.new(port)
@@ -366,6 +371,39 @@ helpers.describe("input source switch: switcher", function()
 		switcher.select("it", function(ok, detail) result = { ok, detail } end)
 		helpers.assert_eq(result[1], false)
 		helpers.assert_true(tostring(result[2]):find("not configured in this KDE session", 1, true) ~= nil)
+	end)
+
+	helpers.it("names a KDE layout the same on Wayland and X11, from kxkbrc (kde-layout-id-session-types)", function()
+		local wayland = "([('us', '', 'English (US)'), ('fr', '', 'French (BEPO)'), ('fr', 'FR', 'French')],)"
+		local x11 = "([('us', 'us', 'English (US)'), ('fr', 'fr', 'French (BEPO)'), ('fr', 'FR', 'French')],)"
+		local config = "[Layout]\nLayoutList=us,fr,fr\nVariantList=,bepo,\nDisplayNames=,,FR\n"
+		local ids = {}
+		for _, list in ipairs({ wayland, x11 }) do
+			local port = fake_port(Switch.KDE, { [KDE_CALL .. "getLayoutsList"] = list,
+				[KDE_CALL .. "getLayout"] = "(uint32 0,)", kxkbrc = config })
+			local switcher = Switch.new(port)
+			switcher.refresh()
+			local names = {}
+			for _, choice in ipairs(switcher.choices()) do names[#names + 1] = choice.id end
+			ids[#ids + 1] = table.concat(names, " ")
+		end
+		helpers.assert_eq(ids[1], "us fr(bepo) fr", "Wayland")
+		helpers.assert_eq(ids[2], ids[1], "X11 names the same layouts the same")
+		local function listed(answers)
+			local port = fake_port(Switch.KDE, answers)
+			local switcher = Switch.new(port)
+			switcher.refresh()
+			return #switcher.choices()
+		end
+		helpers.assert_eq(listed({ [KDE_CALL .. "getLayoutsList"] = wayland, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+			kxkbrc = "[Layout]\nLayoutList=us,de\n" }), 0, "kxkbrc and the daemon disagree: nothing is listed")
+		helpers.assert_eq(listed({ [KDE_CALL .. "getLayoutsList"] = wayland, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+			kxkbrc = false }), 0, "an unreadable kxkbrc lists nothing")
+		local plain = fake_port(Switch.KDE, { [KDE_CALL .. "getLayoutsList"] = "([('us', 'us', 'English (US)')],)",
+			[KDE_CALL .. "getLayout"] = "(uint32 0,)" })
+		local switcher = Switch.new(plain)
+		switcher.refresh()
+		helpers.assert_eq(switcher.choices()[1].id, "us", "no configured layout list: the session default, no variant")
 	end)
 
 	helpers.it("reads the current sources before every switch and runs the plan in order", function()
@@ -490,7 +528,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("rejects a port without its two functions and a switch without an id", function()
-		assert_refused("needs a port with backend and run", Switch.new, { backend = function() end })
+		assert_refused("needs a port with backend, run and kde_config", Switch.new, { backend = function() end })
 		local switcher = Switch.new(fake_port(Switch.GNOME, gnome_answers()))
 		assert_refused("a layout id is required", switcher.select, "", function() end)
 		assert_refused("a completion callback is required", switcher.select, "xkb:fr")
