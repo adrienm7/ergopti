@@ -31,6 +31,7 @@ struct Vector: Decodable {
 struct Plan: Decodable {
 	let bundle: String
 	let sources: [String]
+	let names: [String]
 	let vectors: [Vector]
 }
 
@@ -40,12 +41,24 @@ func property(_ source: TISInputSource, _ key: CFString) -> AnyObject? {
 	return Unmanaged<AnyObject>.fromOpaque(raw).takeUnretainedValue()
 }
 
-/// The installed source with this identifier, enabled or not.
-func installedSource(_ identifier: String) -> TISInputSource? {
-	let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-	guard let list = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource]
-	else { return nil }
-	return list.first
+/// Every installed keyboard layout source, enabled or not.
+func keyboardLayouts() -> [TISInputSource] {
+	let filter = [kTISPropertyInputSourceType as String: kTISTypeKeyboardLayout as String] as CFDictionary
+	return (TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource]) ?? []
+}
+
+/// The installed source of a variant: by the plist's identifier, else by its
+/// displayed name (macOS may list a session-registered bundle under another
+/// identifier until the next login).
+func installedSource(_ identifier: String, _ name: String) -> (TISInputSource, String)? {
+	let all = keyboardLayouts()
+	for source in all where (property(source, kTISPropertyInputSourceID) as? String) == identifier {
+		return (source, "identifier")
+	}
+	for source in all where (property(source, kTISPropertyLocalizedName) as? String) == name {
+		return (source, "name")
+	}
+	return nil
 }
 
 /// Types one sequence of presses, carrying the dead-key state between them.
@@ -84,15 +97,18 @@ if registered != noErr { failures.append("TISRegisterInputSource answered \(regi
 
 var layouts: [String: CFData] = [:]
 var sources: [[String: Any]] = []
-for identifier in plan.sources {
-	guard let source = installedSource(identifier) else {
-		failures.append("\(identifier) is not listed")
+for (identifier, name) in zip(plan.sources, plan.names) {
+	guard let found = installedSource(identifier, name) else {
+		failures.append("\(identifier) (\(name)) is not listed")
 		continue
 	}
+	let (source, matched) = found
 	let icon = property(source, kTISPropertyIconImageURL) as? URL
 	let data = property(source, kTISPropertyUnicodeKeyLayoutData)
 	sources.append([
 		"id": identifier,
+		"listed_id": (property(source, kTISPropertyInputSourceID) as? String) ?? "",
+		"matched_by": matched,
 		"name": (property(source, kTISPropertyLocalizedName) as? String) ?? "",
 		"icon": icon?.lastPathComponent ?? "",
 		"layout_bytes": data.map { CFDataGetLength(($0 as! CFData)) } ?? 0,
@@ -103,6 +119,12 @@ for identifier in plan.sources {
 	}
 }
 receipt["sources"] = sources
+// What macOS lists after the registration, for a refusal to be diagnosable.
+receipt["listed_layouts"] = keyboardLayouts().compactMap { source -> String? in
+	let id = (property(source, kTISPropertyInputSourceID) as? String) ?? ""
+	let name = (property(source, kTISPropertyLocalizedName) as? String) ?? ""
+	return id.hasPrefix("com.apple.keylayout.") ? nil : "\(id) | \(name)"
+}
 
 var typedCount = 0
 for vector in plan.vectors {
