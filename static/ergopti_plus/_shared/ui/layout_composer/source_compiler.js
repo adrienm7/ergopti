@@ -84,11 +84,12 @@ var LayoutSourceCompiler = (function () {
 	]);
 	// What each compilation target can carry. macOS reads the keylayout itself, with
 	// every sided token and an unused cell for a disabled key; Linux and Windows reach
-	// it through the XKB and KLC converters, which have neither.
+	// it through the XKB and KLC converters, which have neither and place no key at
+	// an unnamed macOS key code.
 	const TARGETS = {
-		macos: { tokens: TOKENS, disabledCharacterCell: true },
-		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false },
-		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false }
+		macos: { tokens: TOKENS, disabledCharacterCell: true, unnamedMacCodes: true },
+		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false },
+		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false }
 	};
 	const VARIANTS = ['iso', 'ansi'];
 	const MACOS_FORMATS = ['bundle', 'iso', 'ansi'];
@@ -385,8 +386,7 @@ var LayoutSourceCompiler = (function () {
 					omitted.push({ path, reason: 'physical_key_not_in_keylayout' });
 					continue;
 				}
-				// The XKB and KLC converters place no key at an unnamed macOS code.
-				if (platform !== 'macos' && !table.byName.has(name)) {
+				if (!TARGETS[platform].unnamedMacCodes && !table.byName.has(name)) {
 					omitted.push({ path, reason: `mac_only_key_code_not_in_${platform}` });
 					continue;
 				}
@@ -518,7 +518,7 @@ var LayoutSourceCompiler = (function () {
 	function compileEmulation(source, tables, options = {}) {
 		LayoutSource.validate(source);
 		const platform = options.platform || 'macos';
-		if (!PLATFORMS.includes(platform)) fail('source_platform', String(platform));
+		if (!Object.hasOwn(TARGETS, platform)) fail('source_platform', String(platform));
 		if (source.imported_keylayout) fail('source_imported_preserved', 'imported_keylayout');
 		const table = keyTable(tables, 'iso');
 		const custom = new Set((source.modifiers || []).map((modifier) => modifier.id));
