@@ -23,6 +23,15 @@ return function(helpers, Json, ports)
 	local SOURCE_DIGEST = string.rep("cd", 32)
 	local DECLARATION_PATH = ports.config_dir .. "layout_composer/composition.json"
 	local SOURCE_PATH = ports.config_dir .. "layout_composer/layout_source.toml"
+	local EMULATION_PATH = ports.config_dir .. "layout_composer/layout_source_emulation.json"
+	-- The table the shared compiler writes for this platform (source_emulation.json).
+	local EMULATION_TABLES = Json.decode(corpus("source_emulation.json", "source"))
+	local function emulation_text(platform, change)
+		local table_ = Json.decode(Json.encode(EMULATION_TABLES[platform]))
+		if change then change(table_) end
+		return Json.encode(table_)
+	end
+	local EMULATION = emulation_text(ports.platform)
 
 	local function replace_once(text, old, new)
 		local first, last = text:find(old, 1, true)
@@ -223,6 +232,50 @@ return function(helpers, Json, ports)
 		end)
 	end)
 
+	helpers.describe("layout composer (" .. ports.name .. "): a source's emulation table", function()
+		helpers.it("refuses an emulation table that is not this source's for this driver (layout-source)", function()
+			local registry, deps, state = fresh()
+			local other = ports.platform == "linux" and "macos" or "linux"
+			local refused = {
+				["not json"] = "{",
+				["another platform"] = emulation_text(other),
+				["another layout"] = emulation_text(ports.platform, function(t) t.layout = "other" end),
+				["a future version"] = emulation_text(ports.platform, function(t) t.version = 2 end),
+				["an unknown hold layer"] = emulation_text(ports.platform,
+					function(t) t.tap_holds[1].hold_layer = "missing" end),
+				["an oversized table"] = EMULATION .. string.rep(" ", 262145),
+			}
+			for label, emulation in pairs(refused) do
+				local result = saved(registry, deps, { source = SOURCE, emulation = emulation, keylayout = SOURCE_KEYLAYOUT })
+				helpers.assert_true(not result.ok, label .. " must be refused")
+				helpers.assert_eq(result.code, "invalid", label)
+			end
+			local beside = saved(registry, deps, { declaration = DECLARATION, emulation = EMULATION, keylayout = KEYLAYOUT })
+			helpers.assert_true(not beside.ok, "an emulation table comes only with a source")
+			helpers.assert_nil(state.files[SOURCE_PATH], "nothing is stored")
+			helpers.assert_nil(state.files[EMULATION_PATH], "no table is stored")
+		end)
+
+		helpers.it("stores the table with its source and drops it with the source (layout-source)", function()
+			local registry, deps, state = fresh()
+			local result = saved(registry, deps, { source = SOURCE, emulation = EMULATION, keylayout = SOURCE_KEYLAYOUT })
+			helpers.assert_true(result.ok, "the save must succeed: " .. tostring(result.detail))
+			helpers.assert_eq(state.files[EMULATION_PATH], EMULATION, "the table is stored as sent")
+			helpers.assert_true(saved(registry, deps, { source = SOURCE, keylayout = SOURCE_KEYLAYOUT }).ok)
+			helpers.assert_nil(state.files[EMULATION_PATH], "a source saved without a table drops the old one")
+			helpers.assert_true(saved(registry, deps, { source = SOURCE, emulation = EMULATION,
+				keylayout = SOURCE_KEYLAYOUT }).ok)
+			helpers.assert_true(saved(registry, deps, { declaration = DECLARATION, keylayout = KEYLAYOUT }).ok)
+			helpers.assert_nil(state.files[EMULATION_PATH], "a composition drops the table")
+			helpers.assert_true(saved(registry, deps, { source = SOURCE, emulation = EMULATION,
+				keylayout = SOURCE_KEYLAYOUT }).ok)
+			local removed
+			registry.composer_remove(function(ok) removed = ok end, deps)
+			helpers.assert_true(removed, "the removal must succeed")
+			helpers.assert_nil(state.files[EMULATION_PATH], "the removal deletes the table")
+		end)
+	end)
+
 	helpers.describe("layout composer (" .. ports.name .. "): the manager bridge", function()
 		helpers.it("routes the three composer messages and pushes their results (layout-composer)", function()
 			local ManagerBridge = require("layouts.manager_bridge")
@@ -250,6 +303,12 @@ return function(helpers, Json, ports)
 				source = SOURCE, keylayout = KEYLAYOUT }), "a save carries one form")
 			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE,
 				keylayout = SOURCE_KEYLAYOUT }), "a source save is routed")
+			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE,
+				emulation = EMULATION, keylayout = SOURCE_KEYLAYOUT }), "a source save with its table is routed")
+			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = DECLARATION,
+				emulation = EMULATION, keylayout = KEYLAYOUT }), "a table comes only with a source")
+			helpers.assert_true(not controller.on_message({ action = "composer_save", source = SOURCE,
+				emulation = 5, keylayout = SOURCE_KEYLAYOUT }), "a table is text")
 			helpers.assert_true(controller.on_message({ action = "composer_save", declaration = DECLARATION,
 				keylayout = KEYLAYOUT, use = false }))
 			local result

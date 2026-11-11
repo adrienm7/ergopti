@@ -141,9 +141,15 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		deps.log("warn", "Refused a layout composer save without exactly one of a declaration or a source, and its layout.")
 		return false
 	end
+	-- A source may come with the emulation table the shared compiler built from it.
+	if payload.emulation ~= nil and (not source or type(payload.emulation) ~= "string") then
+		deps.log("warn", "Refused a layout composer save whose emulation table is not text beside a source.")
+		return false
+	end
 	operation({
 		declaration = declaration and payload.declaration or nil,
 		source = source and payload.source or nil,
+		emulation = source and payload.emulation or nil,
 		keylayout = payload.keylayout,
 		use = payload.use == true,
 	}, report)
