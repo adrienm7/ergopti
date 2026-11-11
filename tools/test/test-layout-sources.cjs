@@ -73,10 +73,18 @@ function differences(a, b) {
 	return found;
 }
 
-// KbdEdit writes Kana on Command; macOS gets it on Option from the source.
+// KbdEdit writes Kana on Command and numbers the two keys Apple numbers apart the
+// ANSI way (50 left of 1, 10 the ISO key); the compiled source is ISO-numbered.
+// Its Caps Lock + Command falls to the base level, a quirk of the export: the
+// source keeps Kana under Caps Lock, as Ergopti's macOS layout (`anyOption caps?`)
+// and Windows' Kana columns do.
 const kbdedit = read(KBDEDIT_EXPORT);
-const expected = kbdedit.replace(/<modifier keys="command( anyShift)?"\/>/g, (_, shift) =>
-	shift ? '<modifier keys="anyOption anyShift"/>' : '<modifier keys="anyOption"/>'
+const isoNumbered = kbdedit.replace(
+	/(<key code=")(10|50)(")/g,
+	(_, a, code, b) => `${a}${code === '10' ? '50' : '10'}${b}`
+);
+const expected = isoNumbered.replace(/<modifier keys="command( anyShift)?"\/>/g, (_, shift) =>
+	shift ? '<modifier keys="anyOption anyShift caps?"/>' : '<modifier keys="anyOption caps?"/>'
 );
 assert.notEqual(expected, kbdedit, 'the export selects its Kana level with Command');
 
@@ -97,6 +105,21 @@ const reference = Composer.parseModel(expected);
 assert.deepEqual(differences(reference, model), [], 'ergopti.toml types as the KbdEdit export');
 assert.ok(differences.states >= 8, 'the walk visits every dead-key state');
 assert.deepEqual(JSON.parse(JSON.stringify(compiled.omitted)), [], 'nothing is left out on macOS');
+
+// No collision with Ergopti's own Option: its macOS layout already types this level
+// with Option, key for key (and ê sits on the ISO key, $ left of 1, as there).
+const registry = Composer.parseModel(
+	read(path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout'))
+);
+for (const level of [0, 2, 5, 6])
+	for (let code = 0; code < 51; code++)
+		assert.equal(
+			Composer.step(model, 'none', model.selects[level].index, code).output,
+			Composer.step(registry, 'none', registry.selects[level].index, code).output,
+			`level ${level} code ${code} matches the registry Ergopti macOS layout`
+		);
+assert.equal(source.layers[0].keys.IntlBackslash.text, 'ê');
+assert.equal(source.layers[0].keys.Backquote.text, '$');
 
 // The oracle can fail: one changed Kana-level output is a difference.
 const mutated = expected.replace(/(<keyMap index="5">[\s\S]*?output=")([^"&]+)"/, '$1Ж"');
@@ -222,7 +245,7 @@ assert.deepEqual(
 );
 assert.deepEqual(JSON.parse(JSON.stringify(ergoptiTables.modifier_vks)), { kana: 0xdf });
 assert.deepEqual(JSON.parse(JSON.stringify(ergoptiTables.scancodes_e0)), [{ sc: 0x38, vk: 0xdf }]);
-const exported = Composer.parseModel(kbdedit);
+const exported = Composer.parseModel(isoNumbered);
 const commandIndex = exported.selects.find((select) => select.keys.join(' ') === 'command').index;
 const physical = JSON.parse(
 	read(
@@ -254,6 +277,74 @@ for (const [code, mapping] of Object.entries(
 }
 assert.ok(kanaCells > 40, 'the Kana level is checked key by key');
 provenDlls(ergoptiTables, 'Ergopti');
+
+// Caps Lock on the AltGr and Kana columns: a swapped AltGr pair is CAPLOKALTGR, any
+// other change (the Kana columns included) a Caps Lock row (SGCAPS); both read back.
+const capsSource = (extra) =>
+	Source.read(
+		Source.write({
+			format: 'ergopti-layout',
+			version: 1,
+			layout: { id: 'caps', name: 'Caps' },
+			physical: { base: 'iso' },
+			layers: [
+				{ id: 'base', required: [], optional: [], keys: { KeyQ: { text: 'q' } } },
+				{ id: 'shift', required: ['shift'], optional: [], keys: { KeyQ: { text: 'Q' } } },
+				...extra
+			],
+			exports: { windows: { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdcaps' } }
+		})
+	);
+const altgrCaps = KbdSource.fromSource(
+	capsSource([
+		{ id: 'caps', required: ['caps_lock'], optional: [], keys: { KeyQ: { text: 'Q' } } },
+		{
+			id: 'caps_shift',
+			required: ['caps_lock', 'shift'],
+			optional: [],
+			keys: { KeyQ: { text: 'q' } }
+		},
+		{ id: 'altgr', required: ['alt_right'], optional: [], keys: { KeyQ: { text: 'æ' } } },
+		{
+			id: 'shift_altgr',
+			required: ['alt_right', 'shift'],
+			optional: [],
+			keys: { KeyQ: { text: 'Æ' } }
+		},
+		{
+			id: 'caps_altgr',
+			required: ['caps_lock', 'alt_right'],
+			optional: [],
+			keys: { KeyQ: { text: 'Æ' } }
+		},
+		{
+			id: 'caps_shift_altgr',
+			required: ['caps_lock', 'alt_right', 'shift'],
+			optional: [],
+			keys: { KeyQ: { text: 'æ' } }
+		}
+	])
+).model;
+assert.equal(altgrCaps.keys[0].attributes, 0x01 | 0x04, 'CAPLOK and CAPLOKALTGR');
+provenDlls(altgrCaps, 'CAPLOKALTGR');
+const kanaCaps = KbdSource.fromSource(
+	capsSource([
+		{ id: 'kana', required: ['kana'], optional: [], keys: { KeyQ: { text: 'く' } } },
+		{
+			id: 'caps_kana',
+			required: ['caps_lock', 'kana'],
+			optional: [],
+			keys: { KeyQ: { text: 'ク' } }
+		}
+	])
+).model;
+assert.equal(kanaCaps.keys[0].attributes, 0x02, 'a Kana change needs a Caps Lock row');
+assert.deepEqual(JSON.parse(JSON.stringify(kanaCaps.keys[0].caps_cells)), [
+	{ char: 0x71 },
+	{ char: 0x51 },
+	{ char: 0x30af }
+]);
+provenDlls(kanaCaps, 'SGCAPS Kana');
 
 console.log(
 	`[OK] layout sources: ergopti.toml reproduces the KbdEdit v2.2.2 export over ${differences(reference, model).length === 0 ? differences.states : 0} dead-key states (Kana on Option; KBDKANA in its 4 DLLs), bepo.toml gives back bepo.klc and its 4 DLLs read back exactly`
