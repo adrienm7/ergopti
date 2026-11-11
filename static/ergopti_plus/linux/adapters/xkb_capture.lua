@@ -930,10 +930,16 @@ local function retarget_inverse(previous)
 	inverse_retargeting = true
 	local fresh
 	local called, built, reason, receipt = pcall(function()
+		-- An equal group is renewed too (decided by the maintainer on 2026-11-11):
+		-- Xorg sends a new-keyboard notify whenever the slave feeding the core
+		-- keyboard changes, which bumps the native generation without changing
+		-- the layout. source_identity() has just dumped the server keymap and
+		-- the probe refuses it unless it equals the capture's own map, so a
+		-- keymap that really differs keeps the receipt revoked.
 		local observed_generation, _, observed = source_identity()
 		local group = _source_group
 		if not provenance() or not observed_generation or type(observed) ~= "function"
-			or group == owned.group then return nil, "inverse-group-renewal-refused" end
+			or type(group) ~= "number" then return nil, "inverse-group-renewal-refused" end
 		local values, why, next_receipt = issue_inverse(true)
 		fresh = _inverse_receipts[next_receipt]
 		if not values or not fresh then return nil, why or "inverse-group-renewal-refused" end
@@ -958,8 +964,10 @@ local function retarget_inverse(previous)
 	return built, reason, receipt
 end
 
---- Renews an automatic desktop inverse for an observed different group only.
---- Exact old map/session/issuer provenance stays required; old plans stay revoked.
+--- Renews an automatic desktop inverse after an observed native source change:
+--- a different group, or the same group whose server keymap was re-read equal
+--- to the capture's map. Exact old map/session/issuer provenance stays
+--- required; old plans stay revoked.
 --- @param previous table Retired inverse receipt from the same live capture.
 --- @return table|nil built Detached output steps, never input/output authority.
 --- @return string|nil reason Closed refusal.

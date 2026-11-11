@@ -2645,6 +2645,7 @@
 	"model_browser.install_paused": "Ergopti ist pausiert: Setzen Sie es fort, um {name} zu installieren.",
 	"model_browser.reason_install_ai_on": "Schalten Sie zuerst die KI aus: Die Installation von Ollama schaltet sie mit Ollama wieder ein.",
 	"model_browser.hint_api_no_key": "API-Schlüssel fehlt: hinterlegen Sie ihn, um dieses Modell zu nutzen.",
+	"model_browser.hint_api_key_reenter": "Schlüssel fehlt: Dieser Eintrag wurde ohne seinen Schlüssel aus einer Sicherung wiederhergestellt. Gib seinen Schlüssel über API-Schlüssel… erneut ein, um ihn zu verwenden.",
 	"model_browser.hint_api_listing_unavailable": "Die Modellliste dieses Anbieters ist hier nicht verfügbar: seine bekannten Modelle werden angezeigt; geben Sie mit Anderes Modell… eine andere Kennung ein.",
 	"model_browser.hint_api_listing_refused": "Der Anbieter hat die Modellliste verweigert (Schlüssel prüfen): seine bekannten Modelle, oder geben Sie eine andere Kennung ein.",
 	"model_browser.hint_api_listing_pending": "Modelle dieses Anbieters werden geladen…",

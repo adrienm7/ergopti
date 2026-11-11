@@ -1,0 +1,215 @@
+{
+	"_comment": "Linux collector-side steps (tools/dev/field-guided.py, run by tools/dev/collect-linux-field-report.sh after the daemon's field run): probe steps read a state once with no person, observe steps prompt a gesture and watch a count rise in the day log or the Metrics database, attest steps take the person's y, n or s. Counts and closed codes only reach the report; the commands are fixed argv lists run without a shell. Each TODO « To confirm on Linux » point names the steps that decide it in field_todo_coverage.json.",
+	"schema": 1,
+	"poll_seconds": 3,
+	"steps": [
+		{
+			"id": "linux_input_access",
+			"mode": "probe",
+			"probes": [
+				{
+					"id": "uinput_writable",
+					"kind": "path_access",
+					"glob": "/dev/uinput",
+					"access": "write"
+				},
+				{
+					"id": "evdev_readable",
+					"kind": "path_access",
+					"glob": "/dev/input/event*",
+					"access": "read"
+				}
+			],
+			"proves": "The daemon's input path is open to this user: /dev/uinput is writable and at least one evdev node is readable."
+		},
+		{
+			"id": "linux_autostart",
+			"mode": "probe",
+			"probes": [
+				{
+					"id": "unit_enabled",
+					"kind": "command_exit",
+					"argv": ["systemctl", "--user", "is-enabled", "--quiet", "ergopti-hotstrings.service"],
+					"expect": "zero"
+				}
+			],
+			"proves": "The user manager starts Ergopti at login: its systemd user unit is enabled."
+		},
+		{
+			"id": "linux_polkit_agent",
+			"mode": "probe",
+			"probes": [
+				{
+					"id": "polkit_agent",
+					"kind": "command_exit",
+					"argv": ["pgrep", "-f", "polkit.*agent|polkit-gnome|polkit-kde|lxpolkit|mate-polkit"],
+					"expect": "zero"
+				}
+			],
+			"proves": "A polkit authentication agent runs in this session, so an administrator prompt can appear."
+		},
+		{
+			"id": "linux_focus_listener",
+			"mode": "probe",
+			"probes": [
+				{
+					"id": "focus_listening",
+					"kind": "log_count",
+					"pattern": "\\[INFO\\] \\[[^]]*\\] Listening for (GNOME Shell|KWin|cosmic-comp) focus reports"
+				}
+			],
+			"proves": "On GNOME or KDE Wayland the compositor focus reporter answered: the day log says Listening for GNOME Shell or KWin focus reports."
+		},
+		{
+			"id": "linux_window_topology",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "topo_window_move",
+					"kind": "sqlite_count",
+					"table": "events_window_topo",
+					"row_kind": "window_move"
+				},
+				{
+					"id": "topo_window_resize",
+					"kind": "sqlite_count",
+					"table": "events_window_topo",
+					"row_kind": "window_resize"
+				},
+				{
+					"id": "topo_window_state_change",
+					"kind": "sqlite_count",
+					"table": "events_window_topo",
+					"row_kind": "window_state_change"
+				},
+				{
+					"id": "topo_monitor_focus_change",
+					"kind": "sqlite_count",
+					"table": "events_window_topo",
+					"row_kind": "monitor_focus_change"
+				}
+			],
+			"gesture": "Under X11 with Metrics on: move a window, resize it, maximise it and back, then move it to another monitor (one monitor: press s).",
+			"gesture_seconds": 180,
+			"proves": "Each window gesture adds its events_window_topo row (move, resize, state change, monitor change) from the libxcb and RandR reads."
+		},
+		{
+			"id": "linux_network_toggle",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "network_internet_down",
+					"kind": "sqlite_count",
+					"table": "events_network",
+					"row_kind": "internet_down"
+				},
+				{
+					"id": "network_internet_up",
+					"kind": "sqlite_count",
+					"table": "events_network",
+					"row_kind": "internet_up"
+				}
+			],
+			"steady": [
+				{
+					"id": "network_vpn_connected",
+					"kind": "sqlite_count",
+					"table": "events_network",
+					"row_kind": "vpn_connected"
+				}
+			],
+			"gesture": "Unplug the network (or switch Wi-Fi off), wait 40 s, plug it back and wait 40 s. Bring no VPN up during this step.",
+			"gesture_seconds": 240,
+			"proves": "Unplugging the network and plugging it back adds events_network internet_down and internet_up rows, and no vpn_connected row while no tunnel came up."
+		},
+		{
+			"id": "linux_wireguard",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "network_vpn_connected",
+					"kind": "sqlite_count",
+					"table": "events_network",
+					"row_kind": "vpn_connected"
+				},
+				{
+					"id": "network_vpn_disconnected",
+					"kind": "sqlite_count",
+					"table": "events_network",
+					"row_kind": "vpn_disconnected"
+				}
+			],
+			"gesture": "Bring a WireGuard tunnel up (wg-quick up <name>), wait 30 s, bring it down and wait 30 s (press s if none is configured).",
+			"gesture_seconds": 240,
+			"proves": "A WireGuard tunnel brought up then down adds events_network vpn_connected and vpn_disconnected rows."
+		},
+		{
+			"id": "linux_prediction_activity",
+			"mode": "observe",
+			"probes": [
+				{
+					"id": "prediction_pointer_cancels",
+					"kind": "log_count",
+					"pattern": "User activity \\(pointer [a-z_]+\\) — pending prediction cancelled"
+				},
+				{
+					"id": "prediction_keystroke_cancels",
+					"kind": "log_count",
+					"pattern": "User activity \\(keystroke\\) — pending prediction cancelled"
+				}
+			],
+			"gesture": "With a slow model, type until the spinner shows, then move the mouse; again, then turn the wheel; again, then touch the touchpad; again, then press F5.",
+			"gesture_seconds": 240,
+			"proves": "Pointer activity and a key the tooltip does not own cancel a pending prediction, one User activity line each at DEBUG."
+		},
+		{
+			"id": "linux_prediction_hands",
+			"mode": "attest",
+			"gesture": "With a prediction pending, switch window: it hides. With one shown, press a validation digit and a navigation chord: it stays and acts.",
+			"gesture_seconds": 240,
+			"proves": "Switching window hides a pending prediction within the 250 ms poll, and the validation digits and navigation chords keep a shown one."
+		},
+		{
+			"id": "linux_focus_hands",
+			"mode": "attest",
+			"gesture": "On GNOME or KDE Wayland: switch between an excluded app and another (hotstrings stop and resume), change a browser tab (the title follows), then switch the GNOME extension off (the identity becomes unknown).",
+			"gesture_seconds": 300,
+			"proves": "The focused window drives the excluded-applications rules and the per-app metrics, a browser title change updates the title, and the GNOME extension off makes the identity unknown."
+		},
+		{
+			"id": "linux_physical_hands",
+			"mode": "attest",
+			"gesture": "On Wayland run the setup wizard to the end; press the magic key in an editor; unplug and replug the keyboard and press it again: it still works.",
+			"gesture_seconds": 420,
+			"proves": "The wizard runs on Wayland, and the magic key grabs, injects and survives a keyboard hotplug on real evdev nodes."
+		},
+		{
+			"id": "linux_cascade_composed",
+			"mode": "attest",
+			"gesture": "On the physical keyboard type fb then Space, fb then Enter, and fb with ★ at 1, 2 and 3 arrows; then make the composed layout the emulated one and type its symbols row.",
+			"gesture_seconds": 420,
+			"proves": "On a physical keyboard the item 50 cascade types the cascade_vectors texts and the composed layout types its symbols."
+		},
+		{
+			"id": "linux_layout_emulation_kde",
+			"mode": "attest",
+			"gesture": "On KDE Plasma (Wayland) with Bépo: choose the emulated layout, log out and in, type letters and digits; then switch to the digits-first build: it applies without a restart.",
+			"gesture_seconds": 420,
+			"proves": "On KDE the layout emulation W1 to W3 hold after one login and the digits-first build replaces the slot without a restart."
+		},
+		{
+			"id": "linux_gtk_host",
+			"mode": "attest",
+			"gesture": "Open the tap delay row and each tray dialog; restore and clear a group; use open target; press Backspace at a word start in an editor.",
+			"gesture_seconds": 420,
+			"proves": "The owned GTK host shows the tap delay row and every tray dialog, group restore and clear, open target, and Backspace at a word start."
+		},
+		{
+			"id": "linux_input_policies",
+			"mode": "attest",
+			"gesture": "Change Tap-holds > sticky delay and tap Shift then a letter (the wait follows); change CapsWord in the menu (it applies at once); one-shot Shift and CapsWord on the physical keyboard.",
+			"gesture_seconds": 420,
+			"proves": "The sticky delay row changes the one-shot wait, a CapsWord menu change applies at once, and one-shot Shift and CapsWord behave on a real device."
+		}
+	]
+}

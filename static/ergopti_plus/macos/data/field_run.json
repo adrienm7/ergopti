@@ -14,7 +14,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 20520, "min": 60, "max": 20520 },
+	"deadline_seconds": { "default": 20890, "min": 60, "max": 20890 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -258,6 +258,13 @@
 			"proves": "The Metrics tables events_window_topo, events_av and events_network are readable and their row count per declared kind is named; the guided steps compare it before and after a gesture."
 		},
 		{
+			"id": "field_physical_shortcuts",
+			"kind": "field_check",
+			"check": "physical_shortcuts",
+			"deadline_seconds": 10,
+			"proves": "Physical shortcut delivery is available, the bound physical slots are counted, and every key the physical hook suppressed this session reached its action."
+		},
+		{
 			"id": "field_slow_lines",
 			"kind": "field_check",
 			"check": "slow_lines",
@@ -390,6 +397,30 @@
 			"proves": "A physical Ctrl+Caps Lock reaches the secondary_capslock slot: seen and delivered passes, seen and never delivered fails never_delivered."
 		},
 		{
+			"id": "guided_physical_shortcut",
+			"kind": "guided",
+			"mode": "observe",
+			"check": "physical_shortcuts",
+			"until": {
+				"condition": "rises",
+				"steps": ["physical_suppressed", "physical_delivered"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "In « Raccourcis physiques », bind a physical slot (a key with no modifier) to an action that types text, save it, then press that key once in TextEdit.",
+			"proves": "A press of a bound physical slot is suppressed by the physical hook and delivered to its action exactly once, with nothing unacknowledged or dropped."
+		},
+		{
+			"id": "guided_physical_shortcut_output",
+			"kind": "guided",
+			"mode": "attest",
+			"check": "physical_shortcuts",
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "Did the press type the action's text in TextEdit once, with no character of the key itself, no hotstring, tap-hold, layer or magic-key effect, under Karabiner and the keymap tap, and does the editor still show the slot after you reopen it?",
+			"proves": "The physical slot's output reaches the focused app alone and the editor keeps the saved slot."
+		},
+		{
 			"id": "guided_asa_held_key",
 			"kind": "guided",
 			"mode": "observe",
@@ -493,12 +524,17 @@
 		{
 			"id": "guided_window_toggle",
 			"kind": "guided",
-			"mode": "attest",
+			"mode": "observe",
 			"check": "log_signals",
-			"gesture_seconds": 300,
-			"deadline_seconds": 360,
-			"gesture": "Right after the reload, with the AI off, run the shortcut bound to open_model_browser; then minimise a toggled window and run its shortcut again: it is restored.",
-			"proves": "Window-toggle actions log no error after a reload with the AI off, and a minimised window is restored by its toggle."
+			"until": {
+				"condition": "rises",
+				"steps": ["log_window_toggle_opens", "log_window_toggle_raises"],
+				"steady": ["log_window_toggle_errors"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Right after the reload, with the AI off, press the shortcut bound to open_model_browser (it opens); cover it with another window and press it again (it is raised); minimise it and press it once more (it is restored).",
+			"proves": "A window-toggle action opens its page right after a reload with the AI off and raises a covered or minimised one, with no window_toggle error."
 		},
 		{
 			"id": "guided_menus",
@@ -533,12 +569,16 @@
 		{
 			"id": "guided_prediction_stop_hands",
 			"kind": "guided",
-			"mode": "attest",
+			"mode": "observe",
 			"check": "log_signals",
-			"gesture_seconds": 300,
-			"deadline_seconds": 360,
-			"gesture": "With a prediction showing: Cmd+Tab, a click in another app and F5 each dismiss it, and moving the pointer adds no visible pointer lag.",
-			"proves": "The prediction stops on the activity no log line names, with no visible pointer lag."
+			"until": {
+				"condition": "rises",
+				"steps": ["log_prediction_switch_cancels"]
+			},
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "With the AI on, type until a prediction is pending, then press Cmd+Tab to another app; again, then click in another app's window; again, then press F5.",
+			"proves": "An application or window switch cancels a pending prediction, one User activity line per cancellation at DEBUG."
 		},
 		{
 			"id": "guided_network_updates",

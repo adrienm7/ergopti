@@ -196,7 +196,7 @@
 		},
 		{
 			"id": "js-layout-extension-payload",
-			"ordinal": 613,
+			"ordinal": 614,
 			"name": "macOS and Linux packages carry every hotstring file the shipped layout extensions bind",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-extension-payload.cjs"],

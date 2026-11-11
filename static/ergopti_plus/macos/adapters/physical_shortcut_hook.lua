@@ -7,6 +7,9 @@
 --- event tap. Unlike named hotkeys, the callback can reject Ergopti output and
 --- unreadable input before any suppression. Positions needing board-form proof
 --- remain unavailable; this adapter never registers both swapped positions.
+--- The process keeps counts of what it suppressed and delivered (M.counts), so
+--- the field run reads a person's press without the log: every suppressed key
+--- is delivered, unacknowledged or dropped by a later fence, exactly once.
 --- ==============================================================================
 
 local M = {}
@@ -19,6 +22,27 @@ local Logger = require("infra.logger")
 
 local LOG = "adapters.physical_shortcut_hook"
 local CONSUMER = "shortcuts.physical"
+
+-- What this process suppressed and what became of each, for the field run
+-- (infra/field_check_physical_shortcuts.lua). Counts only, never a key.
+local _counts = { suppressed = 0, delivered = 0, unacknowledged = 0, dropped = 0 }
+
+--- Counts one suppressed record's outcome, once: a stop inside its own turn
+--- cancels the record and then returns from it.
+--- @param record table A queued record.
+--- @param outcome string "delivered", "unacknowledged" or "dropped".
+local function count_outcome(record, outcome)
+	if not record.counted or record.outcome ~= nil then return end
+	record.outcome = outcome
+	_counts[outcome] = _counts[outcome] + 1
+end
+
+--- A copy of the delivery counts since the process started.
+--- @return table counts { suppressed, delivered, unacknowledged, dropped }
+function M.counts()
+	return { suppressed = _counts.suppressed, delivered = _counts.delivered,
+		unacknowledged = _counts.unacknowledged, dropped = _counts.dropped }
+end
 
 --- Creates one keyboard-owned native input lifecycle.
 --- @param model table Shared physical-slot policy over canonical registry data.
@@ -50,7 +74,10 @@ function M.new(model)
 			if record.installing then settled = false
 			elseif record.timer ~= nil then
 				local called, cancelled = pcall(Timer.cancel, record.timer)
-				if called and cancelled == true then pending[record] = nil
+				if called and cancelled == true then
+					pending[record] = nil
+					-- A stop from inside the running action leaves its outcome to the action
+					if not record.executing then count_outcome(record, "dropped") end
 				else settled = false end
 			else pending[record] = nil end
 		end
@@ -76,21 +103,30 @@ function M.new(model)
 		if admitted(current, epoch, nil, receipt) ~= true then return false end
 		local record = { generation = epoch, admission = receipt, installing = true, fenced = false }
 		pending[record] = true
-		local called, timer, armed = pcall(Timer.after, 0, function()
-			if record.installing then record.early = true; return end
-			if admitted(current, epoch, record, receipt) ~= true then return end
+		local function deliver()
+			if admitted(current, epoch, record, receipt) ~= true then return false end
 			local action_called, current_action = pcall(current.action, slot)
-			if not action_called or current_action ~= action or not live(current, epoch, record) then return end
+			if not action_called or current_action ~= action or not live(current, epoch, record) then return false end
 			local native = model.stable_native_code(slot, "hs")
 			local descriptor = model.parse(slot)
-			if not native or not descriptor or not live(current, epoch, record) then return end
+			if not native or not descriptor or not live(current, epoch, record) then return false end
 			local conflict_called, conflict = pcall(current.conflicts, slot, descriptor.mods, native)
-			if not conflict_called or conflict ~= false or not live(current, epoch, record) then return end
-			if admitted(current, epoch, record, receipt) ~= true or not live(current, epoch, record) then return end
+			if not conflict_called or conflict ~= false or not live(current, epoch, record) then return false end
+			if admitted(current, epoch, record, receipt) ~= true or not live(current, epoch, record) then return false end
+			record.executing = true
 			local delivered, result = pcall(current.execute, slot, action, receipt)
 			if not delivered or result ~= true then
+				count_outcome(record, "unacknowledged")
 				Logger.error(LOG, "Physical shortcut '%s' did not acknowledge action '%s'.", slot, action)
+			else
+				count_outcome(record, "delivered")
 			end
+			return true
+		end
+		local called, timer, armed = pcall(Timer.after, 0, function()
+			if record.installing then record.early = true; return end
+			-- A fence between the suppression and its turn drops the action
+			if not deliver() then count_outcome(record, "dropped") end
 		end)
 		record.timer, record.installing = called and timer or nil, false
 		if not called or timer == nil or timer == false then pending[record] = nil; return false end
@@ -102,6 +138,8 @@ function M.new(model)
 			if cancelled and result == true then pending[record] = nil end
 			return false
 		end
+		_counts.suppressed = _counts.suppressed + 1
+		record.counted = true
 		return true
 	end
 

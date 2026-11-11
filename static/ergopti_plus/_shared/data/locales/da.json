@@ -2645,6 +2645,7 @@
 	"model_browser.install_paused": "Ergopti er sat på pause: genoptag det for at installere {name}.",
 	"model_browser.reason_install_ai_on": "Slå først AI'en fra: installation af Ollama slår den til igen med Ollama.",
 	"model_browser.hint_api_no_key": "API-nøglen mangler: tilføj den for at bruge denne model.",
+	"model_browser.hint_api_key_reenter": "Nøgle mangler: denne post kom tilbage fra en sikkerhedskopi uden sin nøgle. Indtast dens nøgle igen med API-nøgle… for at bruge den.",
 	"model_browser.hint_api_listing_unavailable": "Denne udbyders modelliste er ikke tilgængelig her: de kendte modeller vises; skriv et andet id med Anden model…",
 	"model_browser.hint_api_listing_refused": "Udbyderen nægtede at vise sine modeller (tjek nøglen): de kendte modeller, eller skriv et andet id.",
 	"model_browser.hint_api_listing_pending": "Indlæser denne udbyders modeller…",

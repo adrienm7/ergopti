@@ -185,6 +185,7 @@
 		"test:field-report-redact": "node ./tools/test/test-field-report-redact.cjs",
 		"test:field-log-analyse": "node ./tools/test/test-field-log-analyse.cjs",
 		"test:field-todo-summary": "node ./tools/test/test-field-todo-summary.cjs",
+		"test:field-guided": "node ./tools/test/test-field-guided.cjs",
 		"test:field-run-protocol": "node ./tools/test/test-field-run-protocol.cjs",
 		"test:feature-requirements": "node ./tools/test/test-feature-requirements.cjs",
 		"test:windows-field-report-contract": "node ./tools/test/test-windows-field-report-contract.cjs",
@@ -725,7 +726,8 @@
 		"test:macos-layout-bundle-plan": "node ./tools/test/test-macos-layout-bundle-plan.cjs",
 		"test:layout-extension-payload": "node ./tools/test/test-layout-extension-payload.cjs",
 		"test:layout-sources": "node ./tools/test/test-layout-sources.cjs",
-		"test:kbd-installer": "node ./tools/test/test-kbd-installer.cjs"
+		"test:kbd-installer": "node ./tools/test/test-kbd-installer.cjs",
+		"test:linux-flatpak-module-cache": "node ./tools/test/test-linux-flatpak-module-cache.cjs"
 	},
 	"type": "module",
 	"imports": {

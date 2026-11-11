@@ -143,8 +143,19 @@
 		{
 			"id": "physical_shortcut_delivery",
 			"title": "Physical shortcut delivery",
-			"checks": [],
-			"not_testable": "Code work, not a confirmation: keyboard_shortcuts.physical_delivery_available stays false until the delivery is built; the greyed row is closed on the macOS lane."
+			"checks": [
+				{
+					"step": "field_physical_shortcuts",
+					"report": ["physical_delivery_available"]
+				},
+				{
+					"step": "guided_physical_shortcut"
+				},
+				{
+					"step": "guided_physical_shortcut_output"
+				}
+			],
+			"condition": "Karabiner-Elements and the keymap tap running; a physical slot the person binds during the run."
 		},
 		{
 			"id": "taphold_word_reset",
@@ -471,6 +482,11 @@
 				},
 				{
 					"step": "guided_hotstrings_apps"
+				},
+				{
+					"step": "field_log_signals",
+					"report": ["log_hotstring_expansions"],
+					"min": 1
 				}
 			]
 		},
@@ -544,10 +560,14 @@
 				},
 				{
 					"step": "field_slow_lines"
+				},
+				{
+					"step": "field_log_signals",
+					"report": ["log_boot_completions"],
+					"min": 4
 				}
 			],
-			"condition": "Run after a working day.",
-			"not_testable": "Three cold starts and one after a login need restarts the run cannot survive: their Boot complete lines are read from the day log by the analysis."
+			"condition": "Run after a working day with three cold starts and one start after a login earlier today: the day log's Boot complete lines are counted."
 		},
 		{
 			"id": "refused_taps_rollbacks",
@@ -708,7 +728,8 @@
 				{
 					"step": "guided_prediction_stop_hands"
 				}
-			]
+			],
+			"not_testable": "Whether moving the pointer adds visible lag is a person's eye on the screen: no log line measures it."
 		},
 		{
 			"id": "input_policies",

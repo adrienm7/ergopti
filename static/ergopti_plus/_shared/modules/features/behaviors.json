@@ -85,7 +85,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
 			"symbol": "local function resolve_press(keycode)",
-			"sha256": "5ed9e04682f32a7c5bb810b8f45171609e0b0dcd7dfbb5374319ad02f9d1bcfa"
+			"sha256": "6f54f1a7c6032507c7c6d7c5e4a6f5042c84e470a5de37c937e4258cf5db0735"
 		},
 		{
 			"id": "linux-dead-consume",

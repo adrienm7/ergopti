@@ -2182,13 +2182,25 @@ baseline` line (item 38).
   higher log level says nothing. `log_keystats_rotation_warnings` (« Midnight
   rotation stalled » or a day rollover that kept `today.log`) and
   `log_digest_mismatches` (an Ollama pull that failed its digest check, even
-  retried) fail on any WARNING or ERROR line.
+  retried) fail on any WARNING or ERROR line. `log_prediction_switch_cancels` (the
+  « application or window switch » reason, whose spaces the generic count
+  refuses), `log_window_toggle_opens` and `log_window_toggle_raises` (the DEBUG
+  toggle lines), `log_hotstring_expansions` (auto and terminator expansions)
+  and `log_boot_completions` are counts the guided steps watch rise and the
+  TODO summary bounds (`min` 4 boots for the production profile).
 - `field_raw_telemetry` runs after `field_ai_local`: one read-only, lock-free
   `sqlite3` query names the `events_window_topo`, `events_av` and
   `events_network` rows per kind of the shared reducers (`topo_<kind>`,
   `av_<kind>`, `network_<kind>`, 0 when absent); `telemetry_db` skips as
   `metrics_not_started` with Metrics off. The guided steps read it before and
   after their gesture.
+- `field_physical_shortcuts` reads the counts `adapters/physical_shortcut_hook.lua`
+  keeps (`M.counts`): `physical_suppressed` and `physical_delivered`, which
+  `guided_physical_shortcut` watches rise around one press, and
+  `physical_delivery_balance`, which fails as `unacknowledged:<n>+dropped:<n>`
+  (each suppressed key has exactly one outcome; a stop inside the running action
+  leaves its outcome to the action). Delivery unavailable, no slot bound or no
+  press skip by name.
 - The guided steps (`kind = "guided"`, `infra/field_run_guided.lua`) run as
   one block before `field_owned_pause`: each publishes its gesture in
   `prompt.json`, the collector prints it (👉 GUIDED) and, on a terminal, writes
