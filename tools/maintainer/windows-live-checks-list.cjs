@@ -1803,6 +1803,130 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'hotstring-section-order',
+		title:
+			'Hotstring section order: Move down through the tray, kept over a restart, Restore default, a stale menu refused',
+		async run(context) {
+			const locale = englishLocale();
+			const order = locale['menu.hotstrings.section_order'];
+			const up = locale['menu.hotstrings.move_up'];
+			const down = locale['menu.hotstrings.move_down'];
+			const reset = locale['hs_config.btn_reset_default'];
+			const { session, pid: booted } = await bootEnglish(context, 'order');
+			// A first boot saves its full state late: that save would make the menu stale.
+			let pid = (await session.quiesce(booted, { quietMs: 8000 })).pid;
+			pid = await ensureCategoryOn(session, pid, 're:Hotstrings \\(', 'Enable hotstrings');
+			pid = (await session.quiesce(pid, { quietMs: 8000 })).pid;
+			// One Move up row per section of every category's order submenu, in menu order.
+			const moves = async (caption) =>
+				parseRows(
+					await session.run('rows', [`^${escapeRegExp(caption)}$`, ` > ${escapeRegExp(order)} > `])
+				);
+			const categoryOf = (row) => row.path.slice(0, row.path.indexOf(order) + 1);
+			const downs = await moves(down);
+			const first = downs.find((row) => !row.disabled);
+			if (!first)
+				return fail(`no enabled "${down}" row under any "${order}" submenu (${downs.length} rows)`);
+			const prefix = categoryOf(first);
+			const sameCategory = (row) => categoryOf(row).join(' > ') === prefix.join(' > ');
+			const sections = async () =>
+				(await moves(up)).filter(sameCategory).map((row) => row.path[prefix.length]);
+			const where = prefix.slice(0, -1).join(' > ');
+			const moveDown = (label) =>
+				session.run('click', [...prefix, label, down], 180000, { followReload: true });
+			const overrides = (snapshot) =>
+				Object.entries(snapshot).filter(([key]) => key.startsWith('hotstrings.order_overrides.'));
+			const problems = [];
+
+			const initial = await sections();
+			const label = first.path[prefix.length];
+			const at = initial.indexOf(label);
+			if (at < 0 || at + 1 >= initial.length)
+				return fail(`${where}: "${label}" has no section below it in ${initial.join(', ')}`);
+			const expected = [...initial];
+			[expected[at], expected[at + 1]] = [expected[at + 1], expected[at]];
+			const beforeMove = live.configSnapshot(session);
+			await moveDown(label);
+			pid = (await session.quiesce(pid)).pid;
+			const moved = await sections();
+			if (moved.join('|') !== expected.join('|'))
+				problems.push(`after Move down the order reads ${moved.join(', ')}`);
+			const afterMove = live.configSnapshot(session);
+			const changed = live.diffSnapshots(beforeMove, afterMove).map((change) => change.key);
+			const stored = overrides(afterMove);
+			if (stored.length !== 1 || !Array.isArray(JSON.parse(stored[0][1])))
+				problems.push(`the move stored ${stored.length} order lists: ${changed.join(', ')}`);
+			const stray = changed.filter((key) => !key.startsWith('hotstrings.order_overrides.'));
+			if (stray.length > 0) problems.push(`the move changed ${stray.join(', ')}`);
+
+			// Each boot may save late too: the menu is walked, and so built, after that.
+			const settle = async () => {
+				const served = Number(/pid=(\d+)/.exec(await session.run('info'))[1]);
+				return (await session.quiesce(served, { quietMs: 8000 })).pid;
+			};
+			await session.restart();
+			pid = await settle();
+			const restarted = await sections();
+			if (restarted.join('|') !== expected.join('|'))
+				problems.push(`after a restart the order reads ${restarted.join(', ')}`);
+			if (JSON.stringify(overrides(live.configSnapshot(session))) !== JSON.stringify(stored))
+				problems.push('a restart changed the stored order');
+
+			await session.run('click', [...prefix, reset], 180000, { followReload: true });
+			pid = (await session.quiesce(pid)).pid;
+			const restored = await sections();
+			if (restored.join('|') !== initial.join('|'))
+				problems.push(`after ${reset} the order reads ${restored.join(', ')}`);
+			if (overrides(live.configSnapshot(session)).length !== 0)
+				problems.push(`${reset} left an order list in the configuration`);
+
+			// The rows just walked built the menu over the file as it is now: an edit made
+			// outside the driver afterwards makes that menu stale.
+			const file = path.join(session.config, 'autohotkey', 'config.toml');
+			fs.appendFileSync(file, '\n[zz_live_external]\nedited = true\n');
+			const external = fs.readFileSync(file);
+			const logged = new Set(session.logLines(''));
+			await moveDown(label);
+			pid = (await session.quiesce(pid)).pid;
+			if (!fs.readFileSync(file).equals(external))
+				problems.push('the stale menu wrote over the external edit');
+			if (
+				(await waitForLog(
+					session,
+					'Could not persist the hotstring section order',
+					logged,
+					8000
+				)) === null
+			)
+				problems.push('the stale menu click was not logged as refused');
+			const dialogs = await session.run('dialogs');
+			if (dialogs !== 'dialogs=') problems.push(`a dialog is on screen: ${dialogs}`);
+
+			// A fresh menu over the edited file moves again and keeps the edit.
+			await session.restart();
+			pid = await settle();
+			await moveDown(label);
+			pid = (await session.quiesce(pid)).pid;
+			const fresh = live.configSnapshot(session);
+			if (overrides(fresh).length !== 1) problems.push('a fresh menu did not store the move');
+			if (fresh['zz_live_external.edited'] !== 'true')
+				problems.push('the fresh move lost the external edit');
+			// The refusal itself logs two errors: the writer's and the commit's.
+			const errors = session
+				.loggedErrors()
+				.filter(
+					(line) =>
+						!line.includes('Could not persist the hotstring section order') &&
+						!line.includes('the source changed during candidate preparation')
+				);
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(`${where}: ${problems.join('; ')}`);
+			return pass(
+				`${where}: "${label}" moved down (${initial.join(', ')} -> ${moved.join(', ')}), kept over a restart, reset, refused over an external edit, moved again once the menu was fresh`
+			);
+		}
+	},
+	{
 		id: 'gestures-info-row',
 		title: 'Tray > Gestures: exactly one "Info…" row, which opens its explanation',
 		async run(context) {
