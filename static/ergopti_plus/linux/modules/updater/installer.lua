@@ -315,8 +315,6 @@ function DEFAULT_OPS.smoke(wrapper)
 	return run_command(shell_quote(wrapper) .. " --help >/dev/null 2>&1")
 end
 
--- The compiler the activated release ships (infra/bytecode_package.lua).
-local BYTECODE_COMPILER = "/linux/install/compile_bytecode.lua"
 
 --- The interpreter running this daemon, which is the one the installed
 --- launcher starts: bytecode is only valid for the luajit that compiled it.
@@ -337,7 +335,9 @@ end
 function DEFAULT_OPS.compile_bytecode(root)
 	local interpreter = running_interpreter()
 	if not interpreter then return false end
-	return run_command(shell_quote(interpreter) .. " " .. shell_quote(root .. BYTECODE_COMPILER)
+	-- The compiler the activated release ships (infra/bytecode_package.lua).
+	local compiler = root .. "/" .. require("identifiers").bytecode_package.compiler
+	return run_command(shell_quote(interpreter) .. " " .. shell_quote(compiler)
 		.. " " .. shell_quote(root) .. " >/dev/null 2>&1")
 end
 
