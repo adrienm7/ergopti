@@ -26,6 +26,7 @@ local M = {}
 
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
+local NativePath = require("native_path")
 local NoReplaceMove = require("infra.no_replace_move")
 -- The installer bundles luv; without it a folder is reported as unlistable
 -- (so nothing is merged, and no link can be mistaken for a second folder).
@@ -150,6 +151,50 @@ local function follow_locators(report, storage, ports)
 	end
 end
 
+--- The custom logs folder named like the old folder: a logs setting whose
+--- last name is exactly the old one, or that folder's ergopti subfolder as
+--- config_paths stores it. Any other custom folder is not the migration's
+--- (decided by the coordinator on 2026-11-11 overnight, to review by the
+--- maintainer; the macOS LogsDirPath follows the same rule).
+--- @param value any The logs setting.
+--- @return string|nil folder The old-named folder, without a trailing slash.
+function M.custom_legacy_logs(value)
+	if type(value) ~= "string" or value:sub(1, 1) ~= "/" then return nil end
+	local folder = value:gsub("/+$", "")
+	if NativePath.basename(folder) == AppDirs.linux.folder_name then folder = NativePath.dirname(folder) or "" end
+	if NativePath.basename(folder) ~= AppDirs.migration.linux.legacy_folder then return nil end
+	if not NativePath.dirname(folder) then return nil end
+	return folder
+end
+
+--- Renames a custom logs folder named like the old folder: the setting names
+--- its parent's ergopti folder first, then the logs the logger wrote into the
+--- old folder's ergopti subfolder move there. The user's own entries of the old
+--- folder stay. A refused setting moves nothing.
+--- @param report table Core report; receives relocated, moved and kept rows.
+--- @param store table adapters.storage (get, set).
+--- @param ports table Native effects.
+local function rename_custom_logs(report, store, ports)
+	local key = AppDirs.linux_storage_key
+	local value = store.get(key, nil)
+	local custom = M.custom_legacy_logs(value)
+	if not custom then return end
+	local name = AppDirs.linux.folder_name
+	local renamed = NativePath.dirname(custom) .. "/" .. name
+	if not store.set(key, renamed) then
+		report.kept[#report.kept + 1] = { from = custom, to = renamed, reason = "setting_refused" }
+		return
+	end
+	report.relocated[#report.relocated + 1] = { key = key, from = value, to = renamed }
+	local step = { from_dir = custom .. "/" .. name, to_dir = renamed,
+		backup_dir = renamed .. "/" .. AppDirs.migration.backup_folder .. "/" .. AppDirs.migration.linux.legacy_folder }
+	if not ports.exists(step.from_dir) then return end
+	local moved = Core.apply({ step }, ports)
+	for kind, rows in pairs(moved) do
+		for _, row in ipairs(rows) do report[kind][#report[kind] + 1] = row end
+	end
+end
+
 --- Runs the migration and prepares the cache folder.
 --- @param options table|nil { config_paths, ports, storage } test seams; defaults are the real ones.
 --- @return table report The shared core report, logged later by log().
@@ -159,6 +204,7 @@ function M.run(options)
 	local ports = options.ports or M.native_ports()
 	local report = Core.apply(M.plan(config_paths), ports)
 	follow_locators(report, options.storage, ports)
+	rename_custom_logs(report, options.storage or require("adapters.storage"), ports)
 	-- The updater sends a conditional request only when its cache folder exists
 	-- and never creates it from the event loop, so boot creates it here.
 	report.cache_ready = ports.make_dir(config_paths.cache())

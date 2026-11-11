@@ -265,9 +265,26 @@ local function below(path, folder)
 	return NativePath.without_trailing_separators(path:sub(#base + 1))
 end
 
+--- The folder a custom locator names in place of `renamed.from`: the same
+--- parent, with the folder named `renamed.to`. Only a folder whose last name is
+--- exactly the old one is renamed, or its `renamed.to` subfolder (the logs
+--- owner appends one to a folder not named after the application); any other
+--- custom folder is kept.
+--- @param value string Current value, without its trailing separator.
+--- @param renamed table { from, to } folder names.
+--- @return string|nil new
+local function renamed_folder(value, renamed)
+	local folder = value
+	if NativePath.basename(folder) == renamed.to then folder = NativePath.dirname(folder) or "" end
+	if NativePath.basename(folder) ~= renamed.from then return nil end
+	local parent = NativePath.dirname(folder)
+	if not parent then return nil end
+	return folder:sub(1, #parent + 1) .. renamed.to
+end
+
 --- The new value of one locator, or nil when the rule does not name it.
 --- @param value string Current value.
---- @param rule table { old, new, under }.
+--- @param rule table { old, new, under, renamed }.
 --- @return string|nil new
 local function rebased(value, rule)
 	if value == "" then return nil end
@@ -276,6 +293,10 @@ local function rebased(value, rule)
 		if same_folder(value, old) then return NativePath.without_trailing_separators(rule.new) .. trailing end
 		local rest = below(value, old)
 		if rest then return NativePath.without_trailing_separators(rule.under or rule.new) .. rest .. trailing end
+	end
+	if rule.renamed then
+		local new = renamed_folder(NativePath.without_trailing_separators(value), rule.renamed)
+		if new then return new .. trailing end
 	end
 	return nil
 end
@@ -380,17 +401,33 @@ local function parse_assignment(line)
 		rest = line:sub(value_after) }
 end
 
+--- The value of the first `key = "value"` line of paths.toml, as the boot
+--- TOML reader reads it.
+--- @param text string paths.toml content.
+--- @param key string Key to read.
+--- @return string|nil value Nil when no line assigns it.
+function M.paths_value(text, key)
+	assert(type(text) == "string", "paths.toml text must be a string")
+	for line in text:gmatch("[^\n]+") do
+		local parts = parse_assignment(line)
+		if parts and parts.key == key then return parts.value end
+	end
+	return nil
+end
+
 --- Rewrites the paths.toml keys that name an old default folder.
 ---
 --- Only a `Key = "value"` line whose value is one of the key's old spellings,
 --- or a folder below one, is changed: the old folder itself becomes `new`, a
 --- folder below it the same folder below `under` (where the old folder went;
---- `new` by default), with the same trailing separator. A quoted key and a
+--- `new` by default), with the same trailing separator. A rule with `renamed`
+--- = { from, to } also changes a custom folder whose last name is exactly
+--- `from` into the same parent's `to`; every other custom folder is kept. A quoted key and a
 --- literal string are read as the boot TOML reader reads them, and the new
 --- value keeps the string kind of the old one. Every other line is kept byte
 --- for byte, comments included.
 --- @param text string paths.toml content.
---- @param rewrites table Array of { key, old = {spellings}, new, under }.
+--- @param rewrites table Array of { key, old = {spellings}, new, under, renamed }.
 --- @return string|nil rewritten New text, or nil when nothing changed.
 function M.rewrite_paths_text(text, rewrites)
 	assert(type(text) == "string", "paths.toml text must be a string")
@@ -507,7 +544,8 @@ function M.settle_rewrites(rules, report)
 		if kind == "moved" or kind == "backed_up" then
 			-- A folder chosen below the old one is where its ancestor went, the
 			-- backup included; the old folder itself becomes the new default.
-			settled[#settled + 1] = { key = rule.key, old = rule.old, new = rule.new, under = entry.to }
+			settled[#settled + 1] = { key = rule.key, old = rule.old, new = rule.new, under = entry.to,
+				renamed = rule.renamed }
 		elseif kind ~= "kept" then
 			settled[#settled + 1] = rule
 		end
@@ -559,6 +597,7 @@ local KEPT_REASONS = {
 	list_failed = "its folder could not be listed",
 	remove_failed = "its emptied folder could not be removed",
 	restore_failed = "it could not be moved back to the folder its locator names",
+	setting_refused = "the setting naming it could not be stored",
 }
 
 --- Why paths.toml still names an old folder, for its warning.

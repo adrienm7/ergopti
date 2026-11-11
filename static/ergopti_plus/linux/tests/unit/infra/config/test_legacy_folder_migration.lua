@@ -175,7 +175,8 @@ helpers.describe("Linux legacy folder migration", function()
 				cache = function() return dir .. "/cache/" .. NAME end,
 			}
 			for _ = 1, 2 do
-				local report = Migration.run({ config_paths = paths })
+				local report = Migration.run({ config_paths = paths,
+					storage = { get = function(_, default) return default end, set = function() return true end } })
 				helpers.assert_eq(read(base .. "/" .. NAME .. "/config.toml"), "ACTIVE", "the live file stays")
 				helpers.assert_eq(#report.aliased, 1, "the link is recognised as the current folder")
 				helpers.assert_eq(#report.backed_up + #report.kept + #report.moved, 0, "nothing is archived")
@@ -217,6 +218,51 @@ helpers.describe("Linux legacy folder migration", function()
 		local logged = table.concat(lines, "\n")
 		helpers.assert_true(logged:find("back to " .. old_custom, 1, true) ~= nil, "the move back is warned")
 		helpers.assert_true(logged:find("paths.toml", 1, true) == nil, "naming the Linux locator, not paths.toml")
+	end)
+
+	helpers.it("renames a custom logs folder named like the old folder and moves its logs (legacy-folder-migration-linux-custom-logs)",
+		function()
+		local function storage(values, accepts)
+			return {
+				get = function(key, default) local value = values[key]; if value == nil then return default end; return value end,
+				set = function(key, value) if not accepts then return false end; values[key] = value; return true end,
+			}
+		end
+		for _, value in ipairs({ "/data/" .. LEGACY, "/data/" .. LEGACY .. "/" .. NAME, "/data/" .. LEGACY .. "/" }) do
+			local values = { [AppDirs.linux_storage_key] = value }
+			local ports, snapshot = Contract.memory_ports({
+				"/data/" .. LEGACY .. "/" .. NAME .. "/ErgoptiPlus_2026-11-05.log",
+				"/data/" .. LEGACY .. "/notes.txt",
+			})
+			local report = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage(values, true) })
+			local after = " " .. table.concat(snapshot(), " ") .. " "
+			helpers.assert_eq(values[AppDirs.linux_storage_key], "/data/" .. NAME, value)
+			helpers.assert_true(after:find(" /data/" .. NAME .. "/ErgoptiPlus_2026-11-05.log ", 1, true) ~= nil,
+				"the logs follow: " .. after)
+			helpers.assert_true(after:find(" /data/" .. LEGACY .. "/notes.txt ", 1, true) ~= nil, "the user's files stay")
+			helpers.assert_eq(#report.relocated, 1)
+		end
+		-- A refused setting moves nothing.
+		local values = { [AppDirs.linux_storage_key] = "/data/" .. LEGACY }
+		local ports, snapshot = Contract.memory_ports({ "/data/" .. LEGACY .. "/" .. NAME .. "/a.log" })
+		local report = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage(values, false) })
+		helpers.assert_eq(values[AppDirs.linux_storage_key], "/data/" .. LEGACY)
+		helpers.assert_true(table.concat(snapshot(), " "):find("/data/" .. LEGACY .. "/" .. NAME .. "/a.log", 1, true) ~= nil)
+		helpers.assert_eq(report.kept[#report.kept].reason, "setting_refused")
+	end)
+
+	helpers.it("keeps any other custom logs folder (legacy-folder-migration-linux-custom-kept)", function()
+		for _, value in ipairs({ "/data/logs", "/data/logs/" .. NAME, "/data/" .. LEGACY .. "_old", "/data/" .. LEGACY .. "/sub",
+			LEGACY, "" }) do
+			helpers.assert_nil(Migration.custom_legacy_logs(value), value)
+		end
+		local values = { [AppDirs.linux_storage_key] = "/data/logs/" .. NAME }
+		local ports = Contract.memory_ports({ "/data/logs/" .. NAME .. "/a.log" })
+		Migration.run({ config_paths = fake_paths, ports = ports, storage = {
+			get = function(key, default) return values[key] or default end,
+			set = function() error("an unrelated custom folder must not be stored") end,
+		} })
+		helpers.assert_eq(values[AppDirs.linux_storage_key], "/data/logs/" .. NAME)
 	end)
 
 	helpers.it("logs every move, backup and kept entry", function()
