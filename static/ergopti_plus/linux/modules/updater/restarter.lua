@@ -38,7 +38,7 @@ M.UNIT = "ergopti-hotstrings.service"
 -- process of its cgroup, the shell and the systemctl client still reporting
 -- the queued job included. Killed there, the call reads as a refusal although
 -- the job runs: the restart then disarmed its update watcher and logged a
--- refusal (seen under a real user manager, tests/desktop). Ignoring TERM, which
+-- refusal (seen under a real user manager, tests/hardware/desktop). Ignoring TERM, which
 -- the client inherits, lets it report; it exits right after, as before.
 M.OWN_UNIT_JOB_PREFIX = "trap '' TERM; "
 

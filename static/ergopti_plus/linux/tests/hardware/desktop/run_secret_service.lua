@@ -1,4 +1,4 @@
---- tests/desktop/run_secret_service.lua
+--- tests/hardware/desktop/run_secret_service.lua
 
 --- ==============================================================================
 --- MODULE: API Keys In A Locked Real Secret Service

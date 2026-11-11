@@ -1,4 +1,4 @@
---- tests/desktop/update_watch_daemon.lua
+--- tests/hardware/desktop/update_watch_daemon.lua
 
 --- ==============================================================================
 --- MODULE: Update Watch Daemon Stand-In

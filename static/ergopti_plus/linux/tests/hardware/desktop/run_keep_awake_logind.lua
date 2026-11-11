@@ -1,4 +1,4 @@
---- tests/desktop/run_keep_awake_logind.lua
+--- tests/hardware/desktop/run_keep_awake_logind.lua
 
 --- ==============================================================================
 --- MODULE: Keep Awake Against a Real logind

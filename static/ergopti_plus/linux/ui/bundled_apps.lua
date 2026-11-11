@@ -110,7 +110,7 @@ end
 --- paths and private runtime, as ordered { name, value } pairs. The daemon
 --- sets its package.path itself (ergopti_hotstrings.lua) and exports no
 --- LUA_PATH, so an app started without these could not load one module of
---- its own (tests/desktop/run_encryptor.sh).
+--- its own (tests/hardware/desktop/run_encryptor.sh).
 --- @param deps table
 --- @return table pairs
 function M.app_environment(deps)

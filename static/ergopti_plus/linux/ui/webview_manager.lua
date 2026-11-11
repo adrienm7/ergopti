@@ -1393,7 +1393,7 @@ end
 --- from an input event on one of the client's own surfaces, and the daemon
 --- reads the keyboard from evdev, so it has none: GNOME Shell only marked the
 --- covered page as demanding attention, and the toggle's next press found it
---- still covered (tests/desktop/run_window_toggle.sh). A window mapped anew
+--- still covered (tests/hardware/desktop/run_window_toggle.sh). A window mapped anew
 --- is focused as any new window is; GTK keeps its WebKit view, its page and
 --- its size, so the page is raised, not reopened.
 --- @param window userdata The Gtk.Window.

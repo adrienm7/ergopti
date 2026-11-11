@@ -308,11 +308,8 @@ const testsShared = [...testsUnion]
 // Measured 2026-10-30. Raise the first and lower the second as the trees converge;
 // never the other way to make a change pass.
 const BASELINE_TESTS_SHARED = 11;
-// 62 -> 66 on 2026-11-11 (coordinator, overnight; to review by the maintainer):
-// the Linux headless desktop proofs landed in tests/desktop (with lib and
-// receipts) beside tests/hardware/desktop. Temporary: consolidating them into
-// tests/hardware/desktop brings this back to 63 (hardware/desktop only).
-const BASELINE_TESTS_UNION = 66;
+// 62 -> 63 on 2026-11-11: the Linux container desktop proofs (tests/hardware/desktop).
+const BASELINE_TESTS_UNION = 63;
 
 if (testsShared.length < BASELINE_TESTS_SHARED) {
 	errors.push(

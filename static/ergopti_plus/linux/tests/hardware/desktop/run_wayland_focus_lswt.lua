@@ -1,4 +1,4 @@
---- tests/desktop/run_wayland_focus_lswt.lua
+--- tests/hardware/desktop/run_wayland_focus_lswt.lua
 
 --- ==============================================================================
 --- MODULE: Wayland Focus Through The Foreign-Toplevel Listing

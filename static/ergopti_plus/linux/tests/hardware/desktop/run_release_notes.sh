@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/desktop/run_release_notes.sh
+# tests/hardware/desktop/run_release_notes.sh
 #
 # ==============================================================================
 # MODULE: Release Notes Pane Container Proof
@@ -20,7 +20,7 @@ display=88
 for kind in x11-openbox gnome-wayland; do
 	rm -f "${scratch}/opened"
 	PATH="${scratch}/bin:${PATH}" desktop_session_run "${kind}" "${display}" \
-		luajit tests/desktop/run_release_notes.lua "${scratch}/opened" 2>"${scratch}/stderr"
+		luajit tests/hardware/desktop/run_release_notes.lua "${scratch}/opened" 2>"${scratch}/stderr"
 	status=$?
 	if [ "${status}" -ne 0 ]; then
 		grep -vE "fd limit|dbus-daemon|SpiRegistry|libEGL|Activat" "${scratch}/stderr" | tail -20 >&2

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# static/ergopti_plus/linux/tests/desktop/run_linux_dev_mode.sh
+# static/ergopti_plus/linux/tests/hardware/desktop/run_linux_dev_mode.sh
 #
 # Developer mode with the package installed, through the real
 # tools/dev/run-linux-dev.sh and the real daemon it starts:
@@ -23,9 +23,9 @@
 # Exit 0 = every step passed; 1 = a failure; 2 = no environment.
 
 set -u
-DRIVER="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 2
+DRIVER="$(cd "$(dirname "$0")/../../.." && pwd -P)" || exit 2
 REPO="$(cd "${DRIVER}/../../.." && pwd -P)"
-SELF="${DRIVER}/tests/desktop/run_linux_dev_mode.sh"
+SELF="${DRIVER}/tests/hardware/desktop/run_linux_dev_mode.sh"
 UNIT=ergopti-hotstrings.service
 PY=python3.12
 need() {
@@ -113,7 +113,7 @@ B: LED=7
 
 DEVICES
 mount --bind "${S}/devices" /proc/bus/input/devices || exit 2
-gcc -shared -fPIC -O2 -Wall -o "${S}/evdev_fifo_shim.so" "${DRIVER}/tests/desktop/evdev_fifo_shim.c" -ldl || exit 2
+gcc -shared -fPIC -O2 -Wall -o "${S}/evdev_fifo_shim.so" "${DRIVER}/tests/hardware/desktop/evdev_fifo_shim.c" -ldl || exit 2
 
 # The installed package's unit, under a real user manager.
 mount -t tmpfs none /run/systemd || exit 2

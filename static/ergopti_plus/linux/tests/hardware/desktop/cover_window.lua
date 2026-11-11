@@ -1,4 +1,4 @@
---- tests/desktop/cover_window.lua
+--- tests/hardware/desktop/cover_window.lua
 
 --- ==============================================================================
 --- MODULE: Covering Window For The Desktop Proofs

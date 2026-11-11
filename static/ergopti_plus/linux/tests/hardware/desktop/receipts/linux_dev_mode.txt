@@ -1,5 +1,5 @@
 # Receipt: developer mode with the package installed (2026-11-10)
-# Proof: tests/desktop/run_linux_dev_mode.sh, as root in the input and uinput groups, Ubuntu 24.04
+# Proof: tests/hardware/desktop/run_linux_dev_mode.sh, as root in the input and uinput groups, Ubuntu 24.04
 # (kernel 6.18.44), base ac832229e2. Real: tools/dev/run-linux-dev.sh, install/launch.sh, the daemon,
 # its tray (libayatana-appindicator, read by tests/hardware/sni_host.py) and systemd --user 255.
 # Emulated: the keyboard node (FIFO + evdev_fifo_shim.c; this kernel has no evdev and no uinput), and

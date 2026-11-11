@@ -1,4 +1,4 @@
-/* static/ergopti_plus/linux/tests/desktop/evdev_fifo_shim.c
+/* static/ergopti_plus/linux/tests/hardware/desktop/evdev_fifo_shim.c
  *
  * ==============================================================================
  * MODULE: Evdev ioctl shim for a FIFO keyboard node

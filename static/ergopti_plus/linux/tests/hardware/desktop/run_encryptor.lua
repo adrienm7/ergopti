@@ -1,4 +1,4 @@
---- tests/desktop/run_encryptor.lua
+--- tests/hardware/desktop/run_encryptor.lua
 
 --- ==============================================================================
 --- MODULE: Applications > Encryptor On A Real X11 Desktop
@@ -45,7 +45,7 @@ if not os.getenv("DISPLAY") then abort("no X11 display.") end
 -- As install/launch.sh starts the daemon: an absolute script, no LUA_PATH in
 -- the environment, the module paths set in package.path by the entry point.
 if os.getenv("LUA_PATH") then abort("run without LUA_PATH, as install/launch.sh starts the daemon.") end
-local driver_root = assert(arg[0]:match("^(/.*)/tests/desktop/run_encryptor%.lua$"), "run with an absolute path")
+local driver_root = assert(arg[0]:match("^(/.*)/tests/hardware/desktop/run_encryptor%.lua$"), "run with an absolute path")
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driver_root .. "/../_shared/lua/?.lua;"
 	.. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
 for _, tool in ipairs({ "xdotool", "openssl" }) do
