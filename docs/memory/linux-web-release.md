@@ -517,16 +517,22 @@ native `getcwd` rather than `$PWD`, and the at-rest key falls back to
 ### project-linux-gio-hides-pac-failures
 
 GProxyResolverGnome (glib-networking 2.80, libproxy 0.5.4) answers
-`direct://` with no error for a PAC it could not download, and keeps only the
-first entry of a PAC answer (`PROXY a; DIRECT` reaches the driver as `a`
-alone, while libproxy's own `PX_FORCE_CONFIG` path returns both). So a lookup
-error never stands for an unreachable PAC on GNOME: a caller that must tell
-the two apart passes `pac_check_timeout_ms` to `adapters/system_proxy.lua`,
-and the lookup child downloads the GSettings `autoconfig-url` itself and
-reports `pac_unavailable = "native_pac_download"` beside the DIRECT answer.
-A PAC fallback walk cannot reach an entry GIO dropped. Container proofs of
-the managed runtime run as a normal user under `umask 022`: the resolver
-refuses group-writable ancestors and root-owned trees.
+`direct://` with no error for a PAC it could not download, and libproxy's
+answer parser keeps only the `METHOD host` entries of a PAC answer:
+`PROXY a; DIRECT` reaches GIO as `a` alone (both PROXY entries of
+`PROXY a; PROXY b` survive). So GIO can never stand for a PAC on GNOME: a
+caller that walks the list or must tell an unreachable PAC from DIRECT passes
+`pac_check_timeout_ms` to `adapters/system_proxy.lua`, and the lookup child
+skips GIO, downloads the GSettings `autoconfig-url` itself and evaluates it in
+the system Duktape (`platform/network/pac_runtime.lua`, SONAME in
+`linux_native_runtime.json` `network_runtime.pac_engine`) with the shared
+`pac_helpers.js`. A PAC it could not download answers DIRECT with
+`pac_unavailable = "native_pac_download"`; one that raises or breaks a bound is
+`proxy-pac-evaluation-failed` (stage `native_pac_evaluation`). The system
+engine has no execution-timeout hook: only the child's deadline bounds a
+script, so never run it in the daemon. Container proofs of the managed
+runtime run as a normal user; the resolver refuses root-owned trees and a
+group-writable ancestor unless its group is the user's private group.
 
 ### project-linux-ci-runner-prerequisites
 

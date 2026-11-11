@@ -4,16 +4,17 @@
 
 TODO « To confirm on Linux »: with `ollama serve` on 11434, enabling the AI
 starts Ergopti's Ollama on 11435; with the PAC unreachable, an Ollama pull
-logs the WARNING and then succeeds direct.
+logs the WARNING and then succeeds direct. TODO « Linux PAC lists through
+GIO »: a PAC whose first relay is dead walks on to DIRECT or to a live relay.
 
 The pinned Ollama release cannot be downloaded here, so the managed runtime
 tree holds the protocol-faithful stand-in (fake_ollama_server.py) as its
 binary; a second stand-in plays the user's system Ollama on the stock port,
 and an `ollama` first on PATH plays its executable. Everything else is the
 production driver: prediction engine, enable admission, runtime repair and
-composition, managed proxy stage on the real GIO lookup (a PAC evaluated by
-the real glib-pacrunner on a private D-Bus), owned process port, curl, and the
-model download. Only the refusal dialog's choice and WebKit are scripted.
+composition, managed proxy stage on the real lookup child (GIO's resolver and
+the PAC it evaluates itself in the system Duktape engine), owned process port,
+curl, and the model download. Only the refusal dialog's choice and WebKit are scripted.
 
 Run it as a normal user, as CI does: the managed runtime refuses root-owned
 homes. In a root container, run it through `su` as a throwaway user.
@@ -362,6 +363,140 @@ class OwnedOllamaContainer(unittest.TestCase):
         self.assertEqual(
             [(e["route"], e["relay_reached"]) for e in owned if e["event"] == "pull"],
             [("proxy", False)],
+        )
+
+    def serve_pac(self, body):
+        """Serves one PAC for the rest of the case and returns its URL."""
+        pac = PacServer(body)
+        thread = threading.Thread(target=pac.serve_forever)
+        thread.start()
+
+        def stop():
+            pac.shutdown()
+            pac.server_close()
+            thread.join(2)
+
+        self.addCleanup(stop)
+        self.pac = pac
+        return f"http://127.0.0.1:{pac.server_port}/proxy.pac"
+
+    def unreachable_warnings(self, logs):
+        return [
+            line
+            for line in logs
+            if line.startswith("WARN modules.llm.managed_ollama_proxy") and "unreachable" in line
+        ]
+
+    def test_pac_dead_relay_then_direct_walks_to_direct(self):
+        # GIO and libproxy 0.5 keep only "PROXY a" of this answer; the lookup
+        # child evaluates the PAC itself, so the walk reaches DIRECT.
+        dead = free_port()
+        url = self.serve_pac(
+            f'function FindProxyForURL(url, host) {{ return "PROXY 127.0.0.1:{dead}; DIRECT"; }}'
+        )
+        self.proxy_settings("auto", url)
+        result, logs, owned = self.start(pull=MODEL)
+        self.assertTrue(self.pac.paths, "the lookup child fetched the PAC")
+        self.assert_owned_started(result, owned)
+        self.assertEqual(len(self.unreachable_warnings(logs)), 2, logs)
+        self.assertFalse([line for line in logs if "lookup unusable" in line], logs)
+        self.assertNotIn("HTTPS_PROXY", result["served"][0]["proxy"])
+        self.assertTrue(result["pull_succeeded"], result)
+        self.assertEqual([e["route"] for e in owned if e["event"] == "pull"], ["direct"])
+
+    def test_pac_dead_relay_then_live_relay_pulls_through_the_live_one(self):
+        dead = free_port()
+        live = socket.socket()
+        live.bind(("127.0.0.1", 0))
+        live.listen(16)
+        self.addCleanup(live.close)
+        port = live.getsockname()[1]
+        url = self.serve_pac(
+            "function FindProxyForURL(url, host) "
+            f'{{ return "PROXY 127.0.0.1:{dead}; PROXY 127.0.0.1:{port}; DIRECT"; }}'
+        )
+        self.proxy_settings("auto", url)
+        result, logs, owned = self.start(pull=MODEL)
+        self.assert_owned_started(result, owned)
+        self.assertEqual(len(self.unreachable_warnings(logs)), 2, logs)
+        self.assertEqual(
+            result["served"][0]["proxy"].get("HTTPS_PROXY"), f"http://127.0.0.1:{port}"
+        )
+        self.assertTrue(result["pull_succeeded"], result)
+        self.assertEqual(
+            [(e["route"], e["relay_reached"]) for e in owned if e["event"] == "pull"],
+            [("proxy", True)],
+        )
+
+
+ENGINE_CASES = r"""
+local Runtime = require("platform.network.pac_runtime")
+local Json = require("json")
+local file = assert(io.open(os.getenv("ERGOPTI_PROOF_SHARED") .. "/modules/network/pac_helpers.js", "rb"))
+local helpers = file:read("*a")
+file:close()
+local limits = { max_heap_bytes = 67108864, max_native_queries = 128, max_output_bytes = 65536,
+    max_selections = 128 }
+local cases = Json.decode(io.read("*a"))
+local answers = {}
+for index, script in ipairs(cases) do
+    local proxies, refusal = Runtime.evaluate(script, helpers, "https://registry.ollama.ai/v2/", limits)
+    answers[index] = proxies and table.concat(proxies, " ") or refusal
+end
+io.write(Json.encode(answers))
+"""
+
+
+class PacEngine(unittest.TestCase):
+    """The system Duktape engine the lookup child loads, with the shared helpers."""
+
+    def evaluate(self, *scripts):
+        completed = subprocess.run(
+            ["luajit", "-e", ENGINE_CASES],
+            input=json.dumps(list(scripts)),
+            env={
+                "PATH": "/usr/bin:/bin",
+                "ERGOPTI_PROOF_SHARED": str(SHARED),
+                "LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/lua/?.lua;;",
+            },
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return json.loads(completed.stdout)
+
+    def test_the_whole_ordered_list_and_the_standard_helpers(self):
+        self.assertEqual(
+            self.evaluate(
+                'function FindProxyForURL(u, h) { return "PROXY 127.0.0.1:9; PROXY b:1; DIRECT"; }',
+                'function FindProxyForURL(u, h) { return shExpMatch(h, "*.ollama.ai") && '
+                'isInNet("127.0.0.1", "127.0.0.0", "255.0.0.0") && isResolvable("localhost") '
+                '&& dnsDomainIs(h, ".ai") ? "DIRECT" : "PROXY x:1"; }',
+                'function FindProxyForURL(u, h) { return "SOCKS " + dnsResolve("localhost") + ":1080"; }',
+            ),
+            [
+                "http://127.0.0.1:9 http://b:1 direct://",
+                "direct://",
+                "socks5://127.0.0.1:1080",
+            ],
+        )
+
+    def test_a_failing_or_unbounded_script_is_refused(self):
+        refused = "proxy-pac-evaluation-failed"
+        self.assertEqual(
+            self.evaluate(
+                'function FindProxyForURL(u, h) { throw new Error("x"); }',
+                "function FindProxyForURL(u, h) { return 5; }",
+                "not javascript (",
+                'function FindProxyForURL(u, h) { return "FTP a:1"; }',
+                # The heap cap of proxy_policy.json native_pac.
+                'function FindProxyForURL(u, h) { var a = []; while (true) a.push("x" + a.length); }',
+                # The native query cap of the same policy.
+                "function FindProxyForURL(u, h) { for (var i = 0; i < 200; i++) "
+                'dnsResolve("localhost"); return "DIRECT"; }',
+            ),
+            [refused] * 6,
         )
 
 

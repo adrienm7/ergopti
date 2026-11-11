@@ -211,9 +211,26 @@ it("an empty exported variable does not count as a proxy", function()
 	eq(w:run().environment[1], "HTTPS_PROXY=http://p:1")
 end)
 
+it("(linux-pac-evaluation) a missing PAC engine refuses the start instead of guessing a route", function()
+	local result = world({ receipt = { ok = false, error = "proxy-pac-engine-unavailable" } }):run()
+	eq(result.ok, false)
+	eq(result.error, "proxy_lookup_failed")
+end)
+
+it("(linux-pac-evaluation) a dead first relay of the evaluated PAC list falls to DIRECT", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://127.0.0.1:9", "direct://" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(w.tcp_probes[1].host, "127.0.0.1")
+	eq(w.tcp_probes[1].port, 9)
+end)
+
 it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemon direct", function()
 	for receipt_error, stage in pairs({ ["proxy-lookup-failed"] = "native_proxy_lookup",
-		["proxy-lookup-timeout"] = "native_proxy_budget" }) do
+		["proxy-lookup-timeout"] = "native_proxy_budget",
+		-- (linux-pac-evaluation) a PAC the lookup child ran and that raised.
+		["proxy-pac-evaluation-failed"] = "native_pac_evaluation" }) do
 		local warnings = {}
 		local Logger = require("logger.shim")
 		local original = Logger.warn
@@ -242,7 +259,9 @@ it("(pac-download-direct) a DIRECT answer for an undownloadable PAC warns and re
 	local ok, result = pcall(function()
 		local w = world({ receipt = { ok = true, proxies = { "direct://" }, pac_unavailable = "native_pac_download" } })
 		local answer = w:run()
-		eq(w.lookup_options.pac_check_timeout_ms, 1000)
+		-- The child downloads the PAC under the whole lookup's bound.
+		eq(w.lookup_options.pac_check_timeout_ms, w.lookup_options.timeout_ms)
+		eq(w.lookup_options.timeout_ms, 3000)
 		return answer
 	end)
 	Logger.warn = original

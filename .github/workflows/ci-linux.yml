@@ -3650,8 +3650,9 @@ jobs:
               exit 1
           fi
         timeout-minutes: 3
-      # Enabling the AI beside a system Ollama starts Ergopti's own on its port, and a
-      # PAC GIO cannot download warns, then the pull goes direct (Ollama stand-in).
+      # Enabling the AI beside a system Ollama starts Ergopti's own on its port; a PAC
+      # the lookup child cannot download warns, then the pull goes direct; a dead first
+      # PAC relay walks on to DIRECT or a live relay (Ollama stand-in, system Duktape).
       - name: Qualify the owned Ollama start and PAC-unreachable pull
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
