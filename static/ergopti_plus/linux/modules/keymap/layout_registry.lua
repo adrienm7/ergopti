@@ -48,6 +48,7 @@ local Registry      = require("layouts.registry")
 local Catalogue     = require("layouts.catalogue")
 local Extension     = require("layouts.extension")
 local Composer      = require("layouts.composer")
+local SourceStore   = require("layouts.source_store")
 local RegistryStore = require("layouts.registry_store")
 
 local M = {}
@@ -1440,6 +1441,62 @@ end
 function M.composer_remove(on_done, deps)
 	return with_composer(deps, function(operations) operations.remove(on_done) end,
 		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- The layout editor's file store over this module (see layouts/source_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function source_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = SourceStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return SourceStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
+		read = deps.read,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Runs a layout editor file operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_source(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = source_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout editor store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Sends the layout editor the last source it saved.
+--- @param on_done function on_done({ text, filename, folder })
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_open(on_done, deps)
+	return with_source(deps, function(operations) operations.open(on_done) end,
+		function() on_done({}) end)
+end
+
+--- Stores one file of the layout editor (its source or an export).
+--- @param payload table { filename, text }
+--- @param on_done function on_done(ok, code, detail, filename)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_save(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, SourceStore.FAILURE_WRITE, detail, nil) end)
 end
 
 --- Revokes every registry workflow before cancelling its external transports.
