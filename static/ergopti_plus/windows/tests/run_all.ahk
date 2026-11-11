@@ -39,7 +39,9 @@ SetWorkingDir(A_ScriptDir)
 ;                    a single failing test without the whole suite.
 ;   --module=<group> run only one module group (TEST_MODULE_GROUPS in
 ;                    test_framework.ahk); the CI runs one group per runner.
-;   --list=<file>    run only the tests named in <file>, one per line, in order.
+;   --list=<file>    run only the tests named in <file>, one per line, in
+;                    registry order whatever the file's order; add --reverse
+;                    to replay the predecessors of a reversed run.
 ;   --dump-plan=<f>  append "group<TAB>file<TAB>name" for each selected test.
 ;   --reverse        run the selected tests backwards to expose tests that rely
 ;                    on state an earlier test left behind.
