@@ -677,7 +677,7 @@ do
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
 			local injector = put("modules.hotstrings.injector", {
 			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,
-			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes,
+			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes, set_erase_pacing = yes,
 			  inject = function(deletes, text, _, _, publication)
 			    assert(publication.current() and publication.cached(), "real Main must admit original field")
 			    state.output = state.output + 1

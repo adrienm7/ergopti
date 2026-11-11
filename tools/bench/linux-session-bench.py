@@ -465,7 +465,12 @@ REQUIRED_SPANS = (("daemon_spans", "input.latency"), ("daemon_spans_tray", "tray
 
 def judge_budgets(report):
     """Prints each budget's verdict; returns True when all hold."""
-    held = True
+    intact = report.get("hotstring_editor_intact") is True
+    held = intact
+    print(
+        "  %s every expansion reached the GTK field intact (tail %r)"
+        % ("ok  " if intact else "FAIL", report.get("hotstring_editor_tail"))
+    )
     for section, name in REQUIRED_SPANS:
         present = name in report.get(section, {})
         held = held and present
@@ -546,6 +551,13 @@ def main():
         report["hotstring_last_key_to_last_row_ms"] = summarize(last)
         report["hotstring_typing_per_char_ms"] = summarize(per_char)
         report["hotstring_sample_rows"] = sample
+        # What the focused GTK field holds after the loop: every expansion must
+        # have erased its trigger and typed its text intact, whatever pause the
+        # injector kept between the two.
+        text, _ = session.editor_state()
+        expected = (" " + REPLACEMENT) * len(last)
+        report["hotstring_editor_intact"] = bool(text) and len(last) > 0 and text.endswith(expected)
+        report["hotstring_editor_tail"] = (text or "")[-40:]
         taps, rows = bench_tap_hold(session, args.tap_holds)
         report["tap_hold_release_to_tap_ms"] = summarize(taps)
         report["tap_hold_sample_rows"] = rows

@@ -1183,6 +1183,11 @@ local function main()
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
 	local WordReset = require("modules.hotstrings.word_reset")
+	-- The erase-to-text pause only where Windows and macOS pace it: a terminal,
+	-- or an application nobody could name (the focus is unknown).
+	injector.set_erase_pacing(function()
+		return _cached_app_id == nil or WordReset.is_terminal_app(_cached_app_id)
+	end)
 	-- The action catalogue, bound once. It shares a module with the touchpad
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
