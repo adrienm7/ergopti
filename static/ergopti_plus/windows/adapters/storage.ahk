@@ -23,6 +23,12 @@
 ; and Arrays retain their types. Untagged values written by older releases are
 ; still returned as strings. Reads use Reg_TryRead's out-of-band success receipt
 ; so every possible stored payload remains representable.
+;
+; ISOLATED PROFILE:
+; A startup smoke or a live check (ERGOPTI_STARTUP_SMOKE_DIR) boots beside the
+; user's own driver and shares the signed-in user's HKCU, so its writes would
+; move the real driver's WPM widget, LLM and updater state. Every registry port
+; of such a driver is its profile's private store file instead (section 3).
 ; ==============================================================================
 
 
@@ -83,11 +89,13 @@ ST_Set(Key, Value) {
 	return _ST_SetWith(Key, Value, Reg_WriteString)
 }
 
+; A caller's writer is replaced too in an isolated profile (section 3).
 _ST_SetWith(Key, Value, WriteFn) {
 	try {
 		if !_ST_TryNativeKeyName(Key, &Name)
 			return false
-		return WriteFn.Call(STORAGE_REG_BASE, Name, _ST_EncodeValue(Value))
+		Write := _ST_Isolate(Map("write", WriteFn), true)["write"]
+		return Write.Call(STORAGE_REG_BASE, Name, _ST_EncodeValue(Value))
 	} catch {
 		return false
 	}
@@ -186,7 +194,8 @@ ST_Get(Key, DefaultValue) {
 		if !_ST_TryNativeKeyName(Key, &Name)
 			return DefaultValue
 		local Result := ""
-		if !Reg_TryRead(STORAGE_REG_BASE, Name, &Result)
+		TryRead := _ST_Isolate(Map("try_read", Reg_TryRead))["try_read"]
+		if !TryRead.Call(STORAGE_REG_BASE, Name, &Result)
 			return DefaultValue
 		return _ST_DecodeValue(Result)
 	} catch {
@@ -197,7 +206,8 @@ ST_Get(Key, DefaultValue) {
 ; Exact read: a missing registry value is distinct from an unreadable store.
 ST_ReadExact(Key) {
 	try {
-		Result := RegRead(STORAGE_REG_BASE, Key)
+		Read := _ST_Isolate(Map("read", RegRead))["read"]
+		Result := Read.Call(STORAGE_REG_BASE, Key)
 	} catch as Err {
 		if (Err is OSError && Err.Number == 2)
 			return { Ok: true, Value: "" }
@@ -218,7 +228,8 @@ ST_Delete(Key) {
 	try {
 		if !_ST_TryNativeKeyName(Key, &Name)
 			return false
-		return Reg_DeleteValue(STORAGE_REG_BASE, Name)
+		DeleteValue := _ST_Isolate(Map("delete_value", Reg_DeleteValue), true)["delete_value"]
+		return DeleteValue.Call(STORAGE_REG_BASE, Name)
 	} catch as e {
 		LoggerError("storage", "ST_Delete failed for '{1}': {2}.", Key, e.Message)
 		return false
@@ -233,7 +244,8 @@ ST_Has(Key) {
 		if !_ST_TryNativeKeyName(Key, &Name)
 			return false
 		local Result := ""
-		return Reg_TryRead(STORAGE_REG_BASE, Name, &Result)
+		TryRead := _ST_Isolate(Map("try_read", Reg_TryRead))["try_read"]
+		return TryRead.Call(STORAGE_REG_BASE, Name, &Result)
 	} catch {
 		return false
 	}
@@ -243,13 +255,15 @@ ST_Has(Key) {
 ; an inaccessible one. The public keys() contract deliberately collapses both
 ; to [], but clear() must not mistake an access failure for successful work.
 ; @param Names {Array} Receives key name strings, or an empty Array on failure.
-; @param EnumValuesFn {Func|Integer} Optional deterministic test boundary.
+; @param EnumValuesFn {Func|Integer} Optional deterministic test boundary; an
+;   isolated profile enumerates its private store instead (section 3).
 ; @return {Boolean} True when registry enumeration completed, false on error.
 _ST_EnumerateKeys(&Names, EnumValuesFn := 0) {
 	Names := []
 	try {
-		if !IsObject(EnumValuesFn) {
-			if !Reg_TryEnumValueNames(STORAGE_REG_BASE, &Names) {
+		if !IsObject(EnumValuesFn) || ST_PrivatePath() != "" {
+			Enumerate := _ST_Isolate(Map("enumerate", Reg_TryEnumValueNames))["enumerate"]
+			if !Enumerate.Call(STORAGE_REG_BASE, &Names) {
 				try LoggerError("storage", "The native registry value-name inventory could not be completely read.")
 				return false
 			}
@@ -306,3 +320,180 @@ global ADAPTER_STORAGE := Map(
     "keys",   ST_Keys,
     "clear",  ST_Clear,
 )
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 3/ Isolated Profile =======
+; ===================================
+; ===================================
+
+; The first line of the private store file; a different line is refused.
+; @return {String}
+ST_PrivateHeader() {
+	return "ergopti-storage-private 1"
+}
+
+; The file that stands for HKCU\Software\Ergopti\Storage in an isolated profile,
+; or "" for a real one. ERGOPTI_STARTUP_SMOKE_DIR already moves the paths, logs
+; and configuration of a startup smoke or a live check into its scratch folder
+; (infra/boot.ahk); the store follows, so the harness can read it there.
+; @return {String} Absolute path, or "" when the driver owns the real profile.
+ST_PrivatePath() {
+	global _DriverStartupSmokeDir
+	if !IsSet(_DriverStartupSmokeDir) || _DriverStartupSmokeDir == ""
+		return ""
+	return _DriverStartupSmokeDir . "\storage_private.txt"
+}
+
+; Replaces the registry ports of an isolated profile with its private store's.
+; A caller's own port is replaced too: every port here names the machine's key,
+; which an isolated driver must never reach.
+; @param Ports {Map} Any of write, try_read, read, delete_value, enumerate.
+; @param Announce {Boolean} Logs, once per store, which store the writes reach.
+; @return {Map} The ports to use, the given ones for a real profile.
+_ST_Isolate(Ports, Announce := false) {
+	static Announced := ""
+	Path := ST_PrivatePath()
+	if (Path == "")
+		return Ports
+	Private := Map("write", _ST_PrivateWrite.Bind(Path),
+		"try_read", _ST_PrivateTryRead.Bind(Path),
+		"read", _ST_PrivateRead.Bind(Path),
+		"delete_value", _ST_PrivateDelete.Bind(Path),
+		"enumerate", _ST_PrivateEnumerate.Bind(Path))
+	Isolated := Map()
+	for Name in Ports {
+		if !Private.Has(Name)
+			throw ValueError("The storage adapter has no private port named " . Name . ".")
+		Isolated[Name] := Private[Name]
+	}
+	if (Announce && Announced != Path) {
+		Announced := Path
+		LoggerInfo("storage",
+			"Isolated profile: the stored values go to the private store '{1}', never to the machine's registry.", Path)
+	}
+	return Isolated
+}
+
+; Refuses a key other than the current base: the private file stands for it only.
+; @param Base {String} Registry key path a port was given.
+_ST_PrivateRequireBase(Base) {
+	global STORAGE_REG_BASE
+	if (Base != STORAGE_REG_BASE)
+		throw ValueError("The private store stands for " . STORAGE_REG_BASE . " only.")
+}
+
+; Reads the private store; an absent file is the store of a fresh profile.
+; @param Path {String} ST_PrivatePath().
+; @return {Map} name => stored REG_SZ text, case-insensitive like registry names; throws when invalid.
+_ST_PrivateLoad(Path) {
+	global STORAGE_REG_BASE
+	Values := Map()
+	Values.CaseSense := "Off"
+	if !FSStrictExists(Path)
+		return Values
+	Lines := StrSplit(StrReplace(FSReadStrict(Path), "`r", ""), "`n", , 3)
+	if (Lines.Length != 3 || Lines[1] != ST_PrivateHeader() || Lines[2] != "base " . STORAGE_REG_BASE)
+		throw ValueError("the private store '" . Path . "' has no valid header")
+	Stored := JsonParse(Trim(Lines[3], "`n"))
+	if !(Stored is Map)
+		throw ValueError("the private store '" . Path . "' holds no object")
+	for Name, Text in Stored {
+		if !(Text is String) || Values.Has(Name)
+			throw ValueError("the private store '" . Path . "' holds an invalid value " . Name)
+		Values[Name] := Text
+	}
+	return Values
+}
+
+; Writes the whole private store back.
+; @param Path {String} ST_PrivatePath().
+; @param Values {Map} name => stored REG_SZ text.
+_ST_PrivateSave(Path, Values) {
+	global STORAGE_REG_BASE
+	Text := ST_PrivateHeader() . "`n" . "base " . STORAGE_REG_BASE . "`n" . _ST_JsonEncode(Values) . "`n"
+	SplitPath(Path, , &Directory)
+	FSEnsureDirectoryStrict(Directory)
+	if !FSWriteDurable(Path, Text)
+		throw Error("the private store '" . Path . "' could not be written")
+}
+
+; Reg_WriteString's contract, over the private store.
+; @return {Boolean} True once the value is stored; a failure is logged.
+_ST_PrivateWrite(Path, Base, Name, Value) {
+	try {
+		_ST_PrivateRequireBase(Base)
+		Values := _ST_PrivateLoad(Path)
+		Values[Name] := String(Value)
+		_ST_PrivateSave(Path, Values)
+		return true
+	} catch as Err {
+		LoggerError("storage", "The private stored value {1} could not be written: {2}.", Name, Err.Message)
+		return false
+	}
+}
+
+; Reg_TryRead's contract, over the private store.
+; @return {Boolean} True only when the value exists; Value receives it, or "".
+_ST_PrivateTryRead(Path, Base, Name, &Value) {
+	Value := ""
+	try {
+		_ST_PrivateRequireBase(Base)
+		Values := _ST_PrivateLoad(Path)
+	} catch as Err {
+		LoggerError("storage", "The private store could not be read for {1}: {2}.", Name, Err.Message)
+		return false
+	}
+	if !Values.Has(Name)
+		return false
+	Value := Values[Name]
+	return true
+}
+
+; RegRead's contract, over the private store: an absent value throws
+; ERROR_FILE_NOT_FOUND, any other failure its own error.
+; @return {String} The stored REG_SZ text.
+_ST_PrivateRead(Path, Base, Name) {
+	_ST_PrivateRequireBase(Base)
+	Values := _ST_PrivateLoad(Path)
+	if !Values.Has(Name)
+		throw OSError(2, A_ThisFunc, Name)
+	return Values[Name]
+}
+
+; Reg_DeleteValue's contract, over the private store: an absent value is deleted already.
+; @return {Boolean} True once the value is absent; a failure is logged.
+_ST_PrivateDelete(Path, Base, Name) {
+	try {
+		_ST_PrivateRequireBase(Base)
+		Values := _ST_PrivateLoad(Path)
+		if Values.Has(Name) {
+			Values.Delete(Name)
+			_ST_PrivateSave(Path, Values)
+		}
+		return true
+	} catch as Err {
+		LoggerError("storage", "The private stored value {1} could not be deleted: {2}.", Name, Err.Message)
+		return false
+	}
+}
+
+; Reg_TryEnumValueNames's contract, over the private store.
+; @return {Boolean} True when the inventory is complete; Names receives it.
+_ST_PrivateEnumerate(Path, Base, &Names) {
+	Names := []
+	try {
+		_ST_PrivateRequireBase(Base)
+		Values := _ST_PrivateLoad(Path)
+	} catch as Err {
+		LoggerError("storage", "The private store could not be enumerated: {1}.", Err.Message)
+		return false
+	}
+	for Name in Values
+		Names.Push(Name)
+	return true
+}
