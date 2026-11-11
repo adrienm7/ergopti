@@ -51,11 +51,16 @@ batch-mode retries, focus or privacy changes during retries.
 
 ## Remaining work
 
-- **macOS (source only):** AIS-001's route there differs (entry resolution
-  hands back `access_token_unavailable` or the bare reason); a streamed
-  placeholder of a failed Ollama/MLX attempt probably stays on offer during the
-  quick retry (`streaming_handler.lua`). Both need a replay with the
-  `2026-11-04-deep/macos-llm` harness before a fix.
+- **macOS:** AIS-001 does not reproduce there: `post_and_parse` fails any
+  unresolved entry, a refused exchange included, with `reason =
+"no_credential"`, which `llm.failure_class` reads as a refused credential (a
+  transient 5xx exchange is not retried either, stricter than Windows).
+  AIM-001 stands in source: the quick retry runs inside each backend
+  (`api_ollama`, `api_mlx_fetch`, `api_remote`), so `streaming_handler` never
+  learns the streamed attempt failed and keeps its `_is_stream_placeholder`
+  rows on offer until a success or the final failure; a fix needs a withdraw
+  signal through `on_partial` from the three backends and a handler path that
+  drops the placeholders.
 - **Linux:** deterministic refusals before sending (no model, empty base URL,
   no account address) are retried synchronously; not compared with Windows.
 - **Native receiving:** no live provider, AHK or Hammerspoon run.
