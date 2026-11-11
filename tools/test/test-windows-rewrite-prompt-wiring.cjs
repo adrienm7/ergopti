@@ -763,7 +763,7 @@ function validateManualRequester(agent, vision) {
 	);
 	assert.match(
 		bodyOf(vision, 'LLM_Vision_SendText'),
-		/Transport := _LLM_Engine_ResolveRemoteTransport\(\)\s+if !_LLM_Vision_CallbackCurrent\(CurrentFn\)\s+return false\s+Transport\.Call\(/
+		/Transport := _LLM_Engine_Port\("http"\)\s+if !_LLM_Vision_CallbackCurrent\(CurrentFn\)\s+return false\s+Transport\.Post\(/
 	);
 	assert.match(
 		bodyOf(vision, '_LLM_Vision_Send'),
@@ -827,8 +827,8 @@ const manualRequesterInverses = [
 	],
 	[
 		'vision',
-		'Transport := _LLM_Engine_ResolveRemoteTransport()\n\t\tif !_LLM_Vision_CallbackCurrent(CurrentFn)',
-		'Transport := _LLM_Engine_ResolveRemoteTransport()\n\t\tif false'
+		'Transport := _LLM_Engine_Port("http")\n\t\tif !_LLM_Vision_CallbackCurrent(CurrentFn)',
+		'Transport := _LLM_Engine_Port("http")\n\t\tif false'
 	],
 	[
 		'vision',

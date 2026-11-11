@@ -609,10 +609,10 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail, CurrentFn := 0) 
 		LLM_Engine_CancelInflight()
 		_LLM_Engine_Plan().OnSent(A_TickCount)
 		; No PREFIX/TAIL in these prompts: the user turn goes as it is
-		Transport := _LLM_Engine_ResolveRemoteTransport()
+		Transport := _LLM_Engine_Port("http")
 		if !_LLM_Vision_CallbackCurrent(CurrentFn)
 			return false
-		Transport.Call(Entry, System, User,
+		Transport.Post(Entry, System, User,
 			_LLM_Engine["temperature"] + 0.0, OnSuccess, OnFail, "", MaxTokens, "", 0, CurrentFn)
 		return true
 	}

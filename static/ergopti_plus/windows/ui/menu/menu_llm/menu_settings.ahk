@@ -1054,7 +1054,7 @@ _LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
 		Entry := _LLM_Engine_GetActiveApiEntry()
 		if (Entry == "")
 			throw Error("no API entry is selected")
-		_LLM_Engine_ResolveRemoteTransport().Call(Entry, System, Sample, Temperature, OnSuccess, OnFail, "", "", "", 0, Current)
+		_LLM_Engine_Port("http").Post(Entry, System, Sample, Temperature, OnSuccess, OnFail, "", "", "", 0, Current)
 		return
 	}
 	LLM_OllamaGenerate_Async(LLM_ResolveOllamaTag(_LLM_Menu["model"]), System, Sample, Temperature, OnSuccess, OnFail,
