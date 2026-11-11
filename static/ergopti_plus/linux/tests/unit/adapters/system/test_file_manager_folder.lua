@@ -85,6 +85,13 @@ helpers.describe("Linux file manager folder owner", function()
 			{ ["/w/1"] = { "file:///a'b" } })
 	end)
 
+	helpers.it("encodes a folder as a file URI the GVariant quoting never has to escape", function()
+		helpers.assert_eq(Folder.file_uri("/home/ann/Docs"), "file:///home/ann/Docs")
+		helpers.assert_eq(Folder.file_uri("/tmp/l'été & co/"), "file:///tmp/l%27%C3%A9t%C3%A9%20%26%20co/")
+		local FileSelection = require("file_selection")
+		helpers.assert_eq(FileSelection.parse_uri_list(Folder.file_uri("/tmp/a b'c")), { "/tmp/a b'c" })
+	end)
+
 	helpers.it("refuses malformed or unexpected GVariant text", function()
 		for _, text in ipairs({
 			"", "()", "(<{'/w/1': ['file:///a']>,)", "(<{'/w/1': ['file:///a'}>,)",
