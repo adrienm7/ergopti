@@ -1734,41 +1734,30 @@ var LayoutEditorPage = (function () {
 					onclick: saveSource
 				})
 			];
-			for (const variant of ['iso', 'ansi']) {
-				let file = null;
-				try {
-					file = LayoutSourceIO.keylayoutFile(doc(), variant);
-				} catch (error) {
-					// This variant is not producible here; the report row says why.
-				}
-				if (file)
-					buttons.push(
-						el('button', {
-							type: 'button',
-							id: `le-export-keylayout-${variant}`,
-							text: tl(`export.keylayout_${variant}`),
-							onclick: () => save(file.filename, file.text, 'application/xml')
-						})
-					);
+			const preserved = LayoutSourceIO.isPreserved(doc());
+			const macFormat = preserved
+				? doc().imported_keylayout.convention
+				: ((doc().exports || {}).macos || {}).format || 'bundle';
+			let macos = null;
+			try {
+				macos = LayoutSourceIO.macosDownload(doc(), macFormat);
+			} catch (error) {
+				// Not producible here; the macOS report row says why.
 			}
-			if (host.saveBinary && !LayoutSourceIO.isPreserved(doc()))
+			// A ZIP needs a host that saves bytes; the webview hosts install the layout instead.
+			if (macos && (macos.text !== undefined || host.saveBinary))
 				buttons.push(
 					el('button', {
 						type: 'button',
-						id: 'le-export-bundle',
-						text: tl('export.bundle'),
+						id: 'le-export-macos',
+						'data-format': macFormat,
+						text: tl(macFormat === 'bundle' ? 'export.bundle' : `export.keylayout_${macFormat}`),
 						onclick: () => {
-							try {
-								const archive = LayoutSourceIO.macosBundleArchive(doc());
-								Promise.resolve(
-									host.saveBinary(archive.filename, archive.bytes, 'application/zip')
-								).then(
-									() => notify('ok', tl('status.saved', { name: archive.filename })),
-									(error) => notify('error', problemText(error))
-								);
-							} catch (error) {
-								notify('error', problemText(error));
-							}
+							if (macos.text !== undefined) return save(macos.filename, macos.text, macos.mime);
+							Promise.resolve(host.saveBinary(macos.filename, macos.bytes, macos.mime)).then(
+								() => notify('ok', tl('status.saved', { name: macos.filename })),
+								(error) => notify('error', problemText(error))
+							);
 						}
 					})
 				);
@@ -1788,25 +1777,26 @@ var LayoutEditorPage = (function () {
 						}
 					})
 				);
-			const macFormat = ((doc().exports || {}).macos || {}).format || 'bundle';
 			return el('section', { class: 'le-export', id: 'le-export' }, [
 				el('h2', { text: tl('export.title') }),
-				el('label', { class: 'le-inline' }, [
-					tl('export.macos_format'),
-					select(
-						['bundle', 'iso', 'ansi'].map((f) => [f, tl(`export.macos.${f}`)]),
-						macFormat,
-						(value) =>
-							apply((d) =>
-								LayoutEditorModel.setExport(
-									d,
-									'macos',
-									Object.assign({}, (d.exports || {}).macos, { format: value })
-								)
-							),
-						{ id: 'le-macos-format' }
-					)
-				]),
+				preserved
+					? null
+					: el('label', { class: 'le-inline' }, [
+							tl('export.macos_format'),
+							select(
+								['bundle', 'iso', 'ansi'].map((f) => [f, tl(`export.macos.${f}`)]),
+								macFormat,
+								(value) =>
+									apply((d) =>
+										LayoutEditorModel.setExport(
+											d,
+											'macos',
+											Object.assign({}, (d.exports || {}).macos, { format: value })
+										)
+									),
+								{ id: 'le-macos-format' }
+							)
+						]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
 				el('p', { class: 'le-note', text: tl('export.tooling_note') }),

@@ -233,26 +233,27 @@ async function exerciseManager(browser, origin) {
 		await page.selectOption('#le-import-convention', 'iso');
 		await page.setInputFiles('#le-open-file', KEYLAYOUT);
 		await page.waitForSelector('#le-preserved');
-		assert.equal(
-			await page.locator('#le-export-keylayout-ansi').count(),
-			0,
-			'an ISO import is not ANSI'
-		);
-		const exported = await downloaded(page, () => page.click('#le-export-keylayout-iso'));
+		assert.equal(await page.locator('#le-macos-format').count(), 0, 'an import keeps its variant');
+		assert.equal(await page.getAttribute('#le-export-macos', 'data-format'), 'iso');
+		const exported = await downloaded(page, () => page.click('#le-export-macos'));
 		assert.equal(exported.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
 		await page.click('#le-convert');
 		await page.click('#le-confirm-yes');
 		await page.waitForSelector('#le-lost');
 		assert.notEqual(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), '');
 		// The converted source compiles both variants through the shared compiler.
-		const compiled = await downloaded(page, () => page.click('#le-export-keylayout-ansi'));
+		// The macOS drop-down chooses the download: one .keylayout, or the bundle as one ZIP.
+		await page.selectOption('#le-macos-format', 'ansi');
+		const compiled = await downloaded(page, () => page.click('#le-export-macos'));
 		assert.match(compiled.text, /<keyboard /);
 		assert.notEqual(compiled.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
-
-		// The macOS bundle downloads as one ZIP archive.
+		await page.selectOption('#le-macos-format', 'iso');
+		const iso = await downloaded(page, () => page.click('#le-export-macos'));
+		assert.notEqual(iso.text, compiled.text, 'ISO and ANSI differ');
+		await page.selectOption('#le-macos-format', 'bundle');
 		const [bundle] = await Promise.all([
 			page.waitForEvent('download'),
-			page.click('#le-export-bundle')
+			page.click('#le-export-macos')
 		]);
 		assert.match(bundle.suggestedFilename(), /\.bundle\.zip$/);
 		assert.equal(
