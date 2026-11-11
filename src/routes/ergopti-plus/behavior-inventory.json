@@ -16,8 +16,8 @@
 				"en": "Repeats a mid-word character when no expansion matches and magic-key repeat is enabled."
 			},
 			"linux": {
-				"fr": "La répétition par touche magique existe, mais les répétitions consécutives perdent actuellement leur contexte après la première expansion. Les corrections suivant une répétition sont aussi affectées.",
-				"en": "Magic-key repeat exists, but consecutive repeats currently lose their context after the first expansion. Following repeat-correction mappings are also affected."
+				"fr": "Répète un caractère au milieu d’un mot si aucune expansion ne correspond et si la répétition par touche magique est activée.",
+				"en": "Repeats a mid-word character when no expansion matches and magic-key repeat is enabled."
 			}
 		},
 		"evidence": {
@@ -55,15 +55,15 @@
 			"fr": "Restaurer une expansion avec Retour arrière",
 			"en": "Restore an expansion with Backspace"
 		},
-		"platforms": { "windows": true, "macos": false, "linux": true },
+		"platforms": { "windows": true, "macos": true, "linux": true },
 		"notes": {
 			"windows": {
 				"fr": "Un Retour arrière immédiat sans modificateur peut restaurer une expansion en texte simple éligible ; le comportement des champs natifs reste à vérifier.",
 				"en": "An immediate unmodified Backspace can restore an eligible plain-text expansion; native text-field behavior remains unqualified."
 			},
 			"macos": {
-				"fr": "Pas de restauration automatique du déclencheur avec Retour arrière ; l’annulation de l’application est distincte.",
-				"en": "No automatic trigger restoration with Backspace; the application’s Undo is separate."
+				"fr": "Un Retour arrière immédiat sans modificateur peut restaurer une expansion en texte simple éligible ; le comportement des champs natifs reste à vérifier.",
+				"en": "An immediate unmodified Backspace can restore an eligible plain-text expansion; native text-field behavior remains unqualified."
 			},
 			"linux": {
 				"fr": "Un Retour arrière immédiat sans modificateur peut restaurer une expansion en texte simple éligible ; le comportement des champs natifs reste à vérifier.",
@@ -88,6 +88,11 @@
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
 					"sha256": "21eb83190bf6cd55e012e75fd02af46463f17473ceb5ff391e5ecc02413c2d13"
+				},
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+					"symbol": "function M.undo_on_backspace",
+					"sha256": "333801081620d8cce9bc13076d68e8849380374a00121286f41845afdc6cc1e2"
 				}
 			],
 			"linux": [
@@ -105,7 +110,7 @@
 			"fr": "Délai d’activation de la répétition par touche magique",
 			"en": "Magic-key repeat activation window"
 		},
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": false, "macos": true, "linux": true },
 		"notes": {
 			"windows": {
 				"fr": "Aucun délai d’activation propre à la répétition de secours ; le début d’un nouveau mot après une pause est indépendant.",
@@ -116,8 +121,8 @@
 				"en": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent."
 			},
 			"linux": {
-				"fr": "Aucun délai d’activation propre à la répétition de secours ; le début d’un nouveau mot après une pause est indépendant.",
-				"en": "No separate activation window for fallback repetition; idle word reset is independent."
+				"fr": "Utilise le délai effectif de la touche magique, avec les règles de temporisation des modificateurs ; zéro désactive ce délai. Le début d’un nouveau mot après une pause est indépendant.",
+				"en": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent."
 			}
 		},
 		"evidence": {
