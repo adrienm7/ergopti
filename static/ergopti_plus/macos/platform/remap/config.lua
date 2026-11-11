@@ -274,10 +274,10 @@ local function localise_action_labels(actions)
 	for _, action in ipairs(actions) do
 		if type(action) == "table" and type(action.id) == "string" then
 			local key = "sg_actions." .. (aliases[action.id] or action.id)
-			local translated = i18n.get(key)
-			-- i18n.get answers with the KEY when it does not resolve, which is the
-			-- signal that this action has no registry row and no alias. Writing it
-			-- through would put "sg_actions.hyper" in the menu.
+			-- A missing key means this action has no registry row and no alias.
+			-- i18n.has answers it from the active catalogue: i18n.get decoded
+			-- en.json for the first miss of every boot only to miss again.
+			local translated = i18n.has(key) and i18n.get(key) or nil
 			if translated and translated ~= key and translated ~= "" then
 				if StickyLabel.is_sticky(action.id) then
 					translated = StickyLabel.label(action.id, key, "macos", i18n.get)
