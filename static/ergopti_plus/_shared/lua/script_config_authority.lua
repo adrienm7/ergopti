@@ -129,6 +129,8 @@ function M.adopt(options)
 		local value = source_value(document, path)
 		local entry, available
 		if value ~= nil then entry, available = declared(options.manifest, path, options.platform) end
+		-- A case variant of a listed value is that value, as on Windows (CFS-001).
+		if value ~= nil and available then value = Outdated.canonical_enum_value(entry, value) end
 		if value ~= nil and available then
 			local fits, reason = Outdated.manifest_value_fits(entry, value, options.platform, VALUE_RULES[path])
 			if not fits then

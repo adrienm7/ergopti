@@ -92,6 +92,28 @@ function M.run(helpers, options)
 			end
 		end)
 
+		-- Windows' loader admits an enum's case variant (AHK's = compares without
+		-- case) and keeps the manifest spelling. A hand-written « debug » did
+		-- nothing on the Lua drivers and was offered for deletion (CFS-001,
+		-- script-config-enum-case).
+		helpers.it("adopts an enum value in another case as its manifest spelling (script-config-enum-case)", function()
+			local path = scratch('[script]\nlog_level = "debug"\n')
+			local native = store({ [level_alias] = "INFO" })
+			local logger = silent()
+			local adopted = adopt(path, native, logger)
+			os.remove(path)
+			helpers.assert_eq(native.values[level_alias], "DEBUG", "the level is the manifest's DEBUG")
+			helpers.assert_eq(adopted["script.log_level"], "DEBUG")
+			for _, line in ipairs(logger.logged) do
+				helpers.assert_true(line:find("^warn:") == nil, "and nothing is reported as outdated: " .. line)
+			end
+			path = scratch('[script]\nlog_level = "verbose"\n')
+			native = store({ [level_alias] = "INFO" })
+			adopt(path, native)
+			os.remove(path)
+			helpers.assert_eq(native.values[level_alias], "INFO", "a value no case of which is listed is still refused")
+		end)
+
 		helpers.it("refuses an undeclared value and a malformed file (script-config-refusals)", function()
 			local path = scratch('[script]\nlocale = "xx"\n')
 			local native = store({ [locale_alias] = "fr" })
