@@ -264,6 +264,13 @@ local function interceptor(event, km_buffer, ctx)
 
 	local rule   = match.rule
 	local result = match.result
+	-- The magic key must follow the suffix within the family's delay, as on
+	-- Windows and Linux; an expired rule fires nothing and the key goes on.
+	if not _km.dynamic_rule_within_delay(rule.section, ctx and ctx.elapsed) then
+		Logger.debug(LOG, "Dynamic rule '%s' expired before the magic key (section=%s).",
+			rule.suffix, tostring(rule.section))
+		return nil
+	end
 	local len_ok, n_back = pcall(utf8.len, rule.suffix)
 	if not len_ok or type(n_back) ~= "number" or n_back < 1 then
 		Logger.error(LOG, "Dynamic rule suffix is not valid UTF-8; output refused.")

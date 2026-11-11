@@ -89,7 +89,7 @@ end
 --- @return table|nil events
 local function deliver_retained(fixture, callback)
 	fixture.synthetic.enter_callback()
-	local result = callback(physical_event(MAGIC), "zz", { chars = MAGIC, flags = {} })
+	local result = callback(physical_event(MAGIC), "zz", { chars = MAGIC, flags = {}, elapsed = 0 })
 	return fixture.synthetic.leave_callback(result == "consume")
 end
 
