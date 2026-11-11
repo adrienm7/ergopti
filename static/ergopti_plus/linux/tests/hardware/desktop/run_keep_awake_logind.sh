@@ -13,7 +13,6 @@
 set -u
 cd "$(dirname "$0")/../../.." || exit 2
 export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-LOGIND=/usr/lib/systemd/systemd-logind
 need() {
 	command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }
 }
@@ -24,21 +23,13 @@ need dbus-daemon
 need systemd-inhibit
 need luajit
 need busctl
-[ -x "${LOGIND}" ] || { echo "ENVIRONMENT: ${LOGIND} is missing" >&2; exit 2; }
 PIDS=""
 cleanup() { for pid in ${PIDS}; do kill "${pid}" 2>/dev/null; done; }
 trap cleanup EXIT
 
-if [ ! -S /run/dbus/system_bus_socket ]; then
-	mkdir -p /run/dbus
-	dbus-daemon --system --fork || exit 2
-fi
-if ! busctl --system status org.freedesktop.login1 >/dev/null 2>&1; then
-	"${LOGIND}" >/dev/null 2>&1 &
-	PIDS="${PIDS} $!"
-	sleep 1
-fi
-busctl --system status org.freedesktop.login1 >/dev/null 2>&1 || { echo "ENVIRONMENT: logind did not start" >&2; exit 2; }
+. tests/hardware/desktop/lib/system_bus.sh
+system_logind_ensure || exit 2
+PIDS="${PIDS} ${SYSTEM_LOGIND_PID}"
 echo "logind: $(busctl --system get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager BlockInhibited)"
 
 RUNTIME="$(mktemp -d)"
