@@ -248,6 +248,27 @@ const SENTINELS_TOML = [
 ].join('\n');
 
 /**
+ * Ticks a category's enable row when it reads off. Since 77f417280e an off category
+ * greys every other row of its menu (menu.category_off_reason), its Restore and
+ * Clear included, and a fresh profile starts with the categories off.
+ * @param {object} session The session.
+ * @param {number} pid The serving driver.
+ * @param {string} menu The category submenu's click specifier ('re:Shortcuts$').
+ * @param {string} enable The enable row's English caption, unique in the tray.
+ * @param {string} [dialog] A confirmation the switch shows ('.' for none).
+ * @returns {Promise<number>} The driver serving afterwards.
+ */
+async function ensureCategoryOn(session, pid, menu, enable, dialog = '.') {
+	const rows = (await session.run('rows', [`^${enable}`])).split(' | ').filter(Boolean);
+	if (rows.length !== 1) throw new Error(`${rows.length} "${enable}" rows in the tray`);
+	if (rows[0].includes('[checked]')) return pid;
+	await session.run('click_confirming', [dialog, menu, `re:^${enable}`], 180000, {
+		followReload: true
+	});
+	return (await session.quiesce(pid)).pid;
+}
+
+/**
  * Clicks one Clear or Restore row and judges what any scoped change must respect.
  * @param {object} session The session.
  * @param {number} pid The serving pid.
@@ -420,7 +441,7 @@ const CHECKS = [
 		title: 'Shortcuts > a modifier group > Clear all, then Restore: only that group changes',
 		async run(context) {
 			const { session, pid: first } = await bootEnglish(context, 'group');
-			let pid = first;
+			let pid = await ensureCategoryOn(session, first, 're:Shortcuts$', 'Enable shortcuts');
 			await session.run('click', ['re:Shortcuts$', 're:Restore recommended']);
 			pid = (await session.quiesce(pid)).pid;
 			const recommended = live.configSnapshot(session);
@@ -1051,20 +1072,38 @@ const CHECKS = [
 			const report = [];
 			// Each row's own namespace; category_enabled is the master switch it may set.
 			const categories = [
-				['Tap-Holds', 're:Tap-Holds$', /^(tap_hold|category_enabled|shortcuts\.key_combinations)/],
-				['Shortcuts', 're:Shortcuts$', /^(shortcuts|category_enabled|gestures\.action_parameters)/],
-				['Gestures', 're:Gestures$', /^(gestures|category_enabled)/],
-				['Keyboard layout', 're:Keyboard layout$', /^(layout|category_enabled)/],
-				['Hotstrings', 're:Hotstrings \\(', /^(hotstrings|category_enabled)/]
+				[
+					'Tap-Holds',
+					're:Tap-Holds$',
+					/^(tap_hold|category_enabled|shortcuts\.key_combinations)/,
+					'Enable tap-holds'
+				],
+				[
+					'Shortcuts',
+					're:Shortcuts$',
+					/^(shortcuts|category_enabled|gestures\.action_parameters)/,
+					'Enable shortcuts'
+				],
+				['Gestures', 're:Gestures$', /^(gestures|category_enabled)/, 'Enable gestures'],
+				[
+					'Keyboard layout',
+					're:Keyboard layout$',
+					/^(layout|category_enabled)/,
+					'Enable the layout'
+				],
+				['Hotstrings', 're:Hotstrings \\(', /^(hotstrings|category_enabled)/, 'Enable hotstrings']
 			];
-			for (const [name, menu, scope] of categories) {
+			for (const [name, menu, scope, enable] of categories) {
 				const restore = [menu, 're:Restore recommended'];
 				const clear = [menu, 're:Clear all'];
+				// An off category greys its Restore and Clear: switch it on first, and
+				// again after Clear all, which may set its switch back to the default.
+				pid = await ensureCategoryOn(session, pid, menu, enable);
 				const r1 = await clickScoped(session, pid, restore, `${name} Restore`, scope, problems);
 				const c = await clickScoped(session, r1.pid, clear, `${name} Clear`, scope, problems);
 				const r2 = await clickScoped(
 					session,
-					c.pid,
+					await ensureCategoryOn(session, c.pid, menu, enable),
 					restore,
 					`${name} Restore again`,
 					scope,
@@ -1085,7 +1124,7 @@ const CHECKS = [
 			}
 			const metrics = await clickScoped(
 				session,
-				pid,
+				await ensureCategoryOn(session, pid, 're:Metrics$', 'Enable metrics', 'Security Warning'),
 				['re:Metrics$', 're:Restore recommended'],
 				'Metrics Restore',
 				/^(metrics|keystats|category_enabled)/,
@@ -1195,9 +1234,11 @@ const CHECKS = [
 		// 2026): a restore has nothing to write and a clear leaves the declared delay.
 		title: 'Hotstring delays: the declared 0.5 s after Restore recommended and after Clear all',
 		async run(context) {
-			const { session, pid: first } = await bootEnglish(context, 'delays');
+			const { session, pid: booted } = await bootEnglish(context, 'delays');
 			const problems = [];
 			const menu = 're:Hotstrings \\(';
+			// An off category greys its Restore and Clear (77f417280e).
+			const first = await ensureCategoryOn(session, booted, menu, 'Enable hotstrings');
 			const families = ['names', 'abbreviations', 'technical_terms'];
 			const judge = async (label, delay, override) => {
 				for (const family of families) {
@@ -1216,6 +1257,7 @@ const CHECKS = [
 			});
 			pid = (await session.quiesce(pid)).pid;
 			await judge('after Clear', 0.5, '0');
+			pid = await ensureCategoryOn(session, pid, menu, 'Enable hotstrings');
 			const rows = await session.run('rows', ['Autocorrection delay', 'Delays and colours']);
 			if (!/Autocorrection delay : 500 ms \(default\)/.test(rows))
 				problems.push(`after Clear the row reads: ${rows}`);
@@ -1480,28 +1522,33 @@ const CHECKS = [
 	},
 	{
 		id: 'test-prediction-ai-off',
-		title: 'AI > Test a prediction, with the AI off: refused, says why, sends nothing',
+		// Since 77f417280e (maintainer rule for 1.0.9) an off category greys every row
+		// of its menu but its enable row, Test a prediction included, with
+		// menu.category_off_reason: the row cannot be clicked, so it says why itself.
+		title: 'AI > Test a prediction, with the AI off: greyed, says why, sends nothing',
 		async run(context) {
 			const { session } = await bootEnglish(context, 'testpred');
 			const before = fields(await session.run('ai_state'));
 			if (before.enabled !== '0') return notExecuted('the AI is on in a default configuration');
 			const started = session.logLines('Test prediction #').length;
-			const state = await session.run('click_read_notice', [
-				're:Artificial Intelligence$',
-				're:^Test a prediction'
-			]);
-			const expected = (await session.run('translate', ['llm.manual_prediction.disabled'])).replace(
-				/^text=/,
-				''
-			);
-			if (!state.includes(expected))
-				return fail(`the notice reads: ${state}; expected "${expected}"`);
+			const reason = (await session.run('translate', ['menu.category_off_reason']))
+				.replace(/^text=/, '')
+				.split(':')[0];
+			const row = (await session.run('rows', ['^Test a prediction', 'Artificial Intelligence']))
+				.split(' | ')
+				.filter(Boolean);
+			if (row.length !== 1)
+				return fail(`the AI submenu holds ${row.length} Test a prediction rows`);
+			const problems = [];
+			if (!row[0].includes('[disabled]')) problems.push(`the row is enabled: ${row[0]}`);
+			if (!row[0].includes(reason)) problems.push(`the row does not say "${reason}": ${row[0]}`);
 			if (session.logLines('Test prediction #').length !== started)
-				return fail('a test prediction was sent');
-			if ((await session.run('dialogs')) !== 'dialogs=') return fail('a dialog opened');
+				problems.push('a test prediction was sent');
+			if ((await session.run('dialogs')) !== 'dialogs=') problems.push('a dialog opened');
 			if (session.loggedErrors().length > 0)
-				return fail(`the log holds an error: ${session.loggedErrors()[0]}`);
-			return pass(`refused with the notice "${expected}", nothing sent, no dialog`);
+				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`greyed with "${reason}", nothing sent, no dialog`);
 		}
 	},
 	{
