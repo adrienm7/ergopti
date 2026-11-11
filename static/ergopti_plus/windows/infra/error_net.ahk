@@ -210,8 +210,12 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 								"erreur de démarrage", "Iconx")
 				try KL_Stop()
 				try HookDispatcher.Stop()
+				; The flush above returns without writing when this thread interrupted
+				; a flush already in progress (the smoke's own LoggerPrepareShutdown,
+				; or any timer's), and ExitProcess never lets that owner resume. The
+				; smoke's harness owns standard error, so the fault is written there.
 				if SmokeRun
-						PLC_ExitProcessNow(1)
+						PLC_ExitProcessNow(1, ErrorNet_StartupSmokeFatalLine(Exc, _DriverBootPhase))
 				ExitApp(1)
 				return true
 		}
@@ -303,6 +307,21 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; thread would starve the keyboard hook and drop every key pressed while it
 		; is up.
 		return true
+}
+
+; The one standard-error line of a startup smoke ended by an uncaught error. Its
+; fatal log line can be lost (see the smoke branch above), and an exit code
+; with empty streams told the 2026-11-09 upgrade run nothing. One line, so the
+; harness reads it as one diagnostic.
+; @param Exc {Any} The thrown value.
+; @param Phase {String} The boot phase the error interrupted.
+; @returns {String}
+ErrorNet_StartupSmokeFatalLine(Exc, Phase) {
+	Site := ""
+	try Site := (IsObject(Exc) && Exc.HasProp("What")) ? String(Exc.What) : ""
+	Line := "startup-smoke: uncaught " . Type(Exc) . " during phase '" . Phase . "'"
+		. (Site != "" ? " in " . Site : "") . ": " . ErrorNet_Describe(Exc)
+	return RegExReplace(Line, "[\r\n]+", " ")
 }
 
 ; The message of a thrown value with what AutoHotkey keeps beside it: Extra

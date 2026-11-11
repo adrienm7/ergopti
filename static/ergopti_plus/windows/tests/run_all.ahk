@@ -1969,6 +1969,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/tooltip/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/infra/logger/test_error_net_guarded_send.ahk
 #Include meta/infra/logger/test_error_net_dedup_throttle.ahk
+#Include meta/infra/logger/test_error_net_smoke_fatal_stderr.ahk
 #Include unit/infra/logger/test_error_report_dedup_ownership.ahk
 #Include meta/infra/logger/test_error_net_uia_orphan_suppress.ahk
 #Include meta/adapters/crash_report/test_deferred_crash_report_catch.ahk
