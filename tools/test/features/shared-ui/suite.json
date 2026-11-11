@@ -389,6 +389,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-unicode-names.cjs"],
 			"repro": "npm run test:layout-editor-unicode-names"
+		},
+		{
+			"id": "layout-sources",
+			"ordinal": 614,
+			"name": "kept layout sources reproduce the layouts they were made from, Kana level included",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-sources.cjs"],
+			"repro": "npm run test:layout-sources"
 		}
 	]
 }
