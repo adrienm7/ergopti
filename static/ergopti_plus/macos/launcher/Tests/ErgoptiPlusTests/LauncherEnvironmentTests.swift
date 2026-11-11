@@ -524,24 +524,31 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertEqual(fatalMessages, [])
 	}
 
-	/// A first-launch clean exit before logger readiness receives one bounded retry.
+	/// A first-launch clean exit before logger readiness receives one bounded retry,
+	/// with MJConfigFile seeded again first: another launcher may have rewritten it
+	/// meanwhile, and the retry booted that copy's Lua (MLC-001).
 	func testPrematureCleanExitRetriesBootstrapExactlyOnce() {
 		var childStartCount = 0
 		var cleanTerminationCount = 0
 		var fatalMessages: [String] = []
+		var seeded: [(path: String, startsBefore: Int)] = []
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
 			applicationLauncher: { _, _, _ in childStartCount += 1 },
 			fatalReporter: { fatalMessages.append($0) },
 			applicationTerminator: { _ in cleanTerminationCount += 1 },
-			loggerWorkerFactory: { loggerWorker }
+			loggerWorkerFactory: { loggerWorker },
+			hammerspoonConfigSeeder: { seeded.append((path: $0, startsBefore: childStartCount)) }
 		)
 
 		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
 
 		XCTAssertEqual(childStartCount, 2)
+		XCTAssertEqual(seeded.count, 1, "the retry seeds MJConfigFile once")
+		XCTAssertEqual(seeded.first?.startsBefore, 1, "before the retried runtime starts")
+		XCTAssertTrue(seeded.first?.path.hasSuffix("/init.lua") == true)
 		XCTAssertEqual(cleanTerminationCount, 0)
 		XCTAssertEqual(fatalMessages, [])
 

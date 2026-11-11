@@ -550,6 +550,41 @@ enum LauncherLog {
 // =====================================
 // =====================================
 
+// Write Hammerspoon preference overrides directly via CFPreferencesSetValue.
+// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
+// bypassing the cfprefsd async pipeline that `defaults write` goes through.
+// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
+// its own bundle ID (rewritten to kEmbeddedHammerspoonBundleId at build time);
+// the outer bundle prohibits duplicate instances, so the GUI child must keep
+// a distinct Launch Services identity. The plist is flushed before each
+// runtime launch so HS sees the correct path on the very first read, even on
+// first-ever launch, and a user who moved the .app sees the new path.
+/// - Parameter initLuaPath: The init.lua this launcher's runtime must load.
+func seedEmbeddedHammerspoonConfig(initLuaPath: String) {
+	let appId = kEmbeddedHammerspoonBundleId as CFString
+	let user  = kCFPreferencesCurrentUser
+	let host  = kCFPreferencesAnyHost
+
+	// Point HS at our bundled init.lua — MJConfigFile takes the full file path.
+	CFPreferencesSetValue(
+		kHammerspoonConfigKey as CFString,
+		initLuaPath as CFString,
+		appId, user, host)
+
+	// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
+	// Ergopti provides its own menubar item via hs.menubar; the HS default
+	// icons are redundant and reveal the underlying dependency.
+	for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
+		CFPreferencesSetValue(
+			key as CFString,
+			false as CFBoolean,
+			appId, user, host)
+	}
+
+	// Flush synchronously so the plist is on disk before we exec Hammerspoon.
+	CFPreferencesSynchronize(appId, user, host)
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var hsApplication: NSRunningApplication?
@@ -587,6 +622,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let childActivity: EmbeddedChildActivity
 	private let instanceLock: LauncherInstanceLock
 	private let runningApplicationsReader: (String) -> [NSRunningApplication]
+	/// Seeds MJConfigFile; only the sole launcher calls it, before each runtime launch.
+	private let hammerspoonConfigSeeder: (String) -> Void
 	private var applicationIsTerminating = false
 	// Monotonic origin of this launcher's startup trail.
 	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
@@ -608,6 +645,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - childActivity: Keeps App Nap off the launcher while its child runs.
 	///   - instanceLock: Per-user lock that makes this process the sole launcher.
 	///   - runningApplicationsReader: Lists running applications by bundle identifier.
+	///   - hammerspoonConfigSeeder: Points the embedded runtime at this launcher's init.lua.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -635,7 +673,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		instanceLock: LauncherInstanceLock = LauncherInstanceLock(path: launcherInstanceLockPath()),
 		runningApplicationsReader: @escaping (String) -> [NSRunningApplication] = {
 			NSRunningApplication.runningApplications(withBundleIdentifier: $0)
-		}
+		},
+		hammerspoonConfigSeeder: @escaping (String) -> Void = { seedEmbeddedHammerspoonConfig(initLuaPath: $0) }
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -647,6 +686,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.childActivity = childActivity
 		self.instanceLock = instanceLock
 		self.runningApplicationsReader = runningApplicationsReader
+		self.hammerspoonConfigSeeder = hammerspoonConfigSeeder
 		super.init()
 	}
 
@@ -713,6 +753,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		case .packaged:
 			break
 		}
+		// Tell the embedded Hammerspoon where to read its Lua config from, before
+		// anything (Sparkle included) can fail: only the lock holder writes it.
+		seedHammerspoonConfig()
 		// A developer app is never updated in place: Sparkle would replace it.
 		if luaSource.developerRoot == nil {
 			startSparkleUpdater()
@@ -720,9 +763,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			LauncherLog.write("launcher stage: Sparkle updater not started: a developer source build is never updated")
 		}
 
-		// Tell the embedded Hammerspoon where to read its Lua config from.
-		seedConfigDirDefault()
-		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
 
 		// Spawn the embedded Hammerspoon binary; if it cannot be located we
 		// surface a hard error rather than silently degrading.
@@ -910,47 +950,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		return bundledConfigDir() + "/init.lua"
 	}
 
+	/// Seeds MJConfigFile with this launcher's init.lua and logs it.
+	private func seedHammerspoonConfig() {
+		hammerspoonConfigSeeder(bundledInitLuaPath())
+		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
+	}
+
 
 
 
 	// =====================================
 	// ===== 2.3) Hammerspoon Lifecycle ====
 	// =====================================
-
-	// Write Hammerspoon preference overrides directly via CFPreferencesSetValue.
-	// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
-	// bypassing the cfprefsd async pipeline that `defaults write` goes through.
-	// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
-	// its own bundle ID (rewritten to kEmbeddedHammerspoonBundleId at build time);
-	// the outer bundle prohibits duplicate instances, so the GUI child must keep
-	// a distinct Launch Services identity. The plist
-	// is flushed before launchHammerspoon() so HS sees the correct path on the
-	// very first read, even on first-ever launch.
-	// Done at every startup so a user who moved the .app sees the new path.
-	private func seedConfigDirDefault() {
-		let appId = kEmbeddedHammerspoonBundleId as CFString
-		let user  = kCFPreferencesCurrentUser
-		let host  = kCFPreferencesAnyHost
-
-		// Point HS at our bundled init.lua — MJConfigFile takes the full file path.
-		CFPreferencesSetValue(
-			kHammerspoonConfigKey as CFString,
-			bundledInitLuaPath() as CFString,
-			appId, user, host)
-
-		// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
-		// Ergopti provides its own menubar item via hs.menubar; the HS default
-		// icons are redundant and reveal the underlying dependency.
-		for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
-			CFPreferencesSetValue(
-				key as CFString,
-				false as CFBoolean,
-				appId, user, host)
-		}
-
-		// Flush synchronously so the plist is on disk before we exec Hammerspoon.
-		CFPreferencesSynchronize(appId, user, host)
-	}
 
 	// Launch the embedded Hammerspoon through Launch Services. A nested AppKit
 	// bundle cannot be bootstrapped reliably by executing its inner Mach-O: on
@@ -1214,6 +1225,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			LauncherLog.write(
 				"embedded Hammerspoon exited before bootstrap readiness; retrying once"
 			)
+			// Another launcher may have rewritten the preference meanwhile.
+			seedHammerspoonConfig()
 			launchHammerspoon(
 				at: launchContext.binaryPath,
 				remapGuardianStatus: launchContext.guardianStatus
@@ -1421,21 +1434,10 @@ if InstalledPhysicalSourceBridge.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(InstalledPhysicalSourceBridge.run())
 }
 
-// Write MJConfigFile via CFPreferences before NSApplication.run() so Hammerspoon
-// always sees the correct config path, even if applicationDidFinishLaunching is
-// never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).
-// CFPreferencesSynchronize flushes synchronously to disk before app.run().
-let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/ergopti_plus/macos/init.lua"
-CFPreferencesSetValue(
-    kHammerspoonConfigKey as CFString,
-    _earlyInitLua as CFString,
-    kEmbeddedHammerspoonBundleId as CFString,
-    kCFPreferencesCurrentUser,
-    kCFPreferencesAnyHost)
-CFPreferencesSynchronize(
-    kEmbeddedHammerspoonBundleId as CFString,
-    kCFPreferencesCurrentUser,
-    kCFPreferencesAnyHost)
+// MJConfigFile is seeded only once this process holds the sole-launcher lock
+// (finishLaunchingAsSoleLauncher) and again before each runtime launch: an
+// early write here let a second launcher repoint the running copy's runtime at
+// its own bundle before finding the lock held (MLC-001).
 
 let app      = NSApplication.shared
 let delegate = AppDelegate()
