@@ -99,14 +99,14 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.key_down(e, key_code)",
-			"sha256": "787fce71958f6929dc9370de59baa59eb91ef18b715b975d394aa30cca85d40e"
+			"sha256": "2feccaba6a1501497f2ead4ea775ed0dd09399abcb1e29f338edd287e6aa7e01"
 		},
 		{
 			"id": "linux-layout-emulation",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "3b48263035543d67b7c5e5e96e9ded1d5e86aaae8ec81d736dd634fc5ea061f7"
+			"sha256": "0156e6bd82ec37ca761a3169ef18aa0125d8d1e93f3bd97bc1bd34e865245fb8"
 		}
 	],
 	"behaviors": [

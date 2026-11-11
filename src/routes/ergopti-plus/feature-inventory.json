@@ -2401,8 +2401,8 @@
 		},
 		"reason_key": "platform_reason.key_combinations_are_karabiner_settings_on_macos",
 		"reason": {
-			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans config_karabiner.toml.",
-			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in config_karabiner.toml."
+			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans tap_hold.toml.",
+			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in tap_hold.toml."
 		}
 	},
 	{
@@ -2419,8 +2419,8 @@
 		},
 		"reason_key": "platform_reason.key_combinations_are_karabiner_settings_on_macos",
 		"reason": {
-			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans config_karabiner.toml.",
-			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in config_karabiner.toml."
+			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans tap_hold.toml.",
+			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in tap_hold.toml."
 		}
 	},
 	{
@@ -2437,8 +2437,8 @@
 		},
 		"reason_key": "platform_reason.key_combinations_are_karabiner_settings_on_macos",
 		"reason": {
-			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans config_karabiner.toml.",
-			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in config_karabiner.toml."
+			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans tap_hold.toml.",
+			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in tap_hold.toml."
 		}
 	},
 	{
@@ -5722,8 +5722,8 @@
 		},
 		"reason_key": "platform_reason.key_combinations_are_karabiner_settings_on_macos",
 		"reason": {
-			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans config_karabiner.toml.",
-			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in config_karabiner.toml."
+			"fr": "Pas sous ce nom sous macOS : Karabiner-Elements y exécute les combinaisons de touches, donc macOS les garde avec leur interrupteur dans ses réglages Karabiner, sous mod_combos dans tap_hold.toml.",
+			"en": "Not on macOS under this name: Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings, as mod_combos in tap_hold.toml."
 		}
 	},
 	{
