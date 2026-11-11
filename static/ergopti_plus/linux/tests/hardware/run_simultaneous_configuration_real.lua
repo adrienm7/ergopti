@@ -268,9 +268,13 @@ local function run()
 	burst(58,15); expect(COPY,8,"reloaded copied slot dispatches through the original catalogue")
 	completed[#completed + 1] = "published-reload-copy"
 
+	-- The copy now spans both files: a refused one leaves each byte for byte.
+	local saved_config = assert(Files.read_with_status(config_path))
+	local saved_chords = assert(Files.read_with_status(tap_path))
 	script.toggle_pause()
 	assert(script.is_paused() and not Manager.is_active(), "real script controller withdraws remapping")
-	check(Scope.copy_taps_to_chords(script.is_paused) == false and Files.read_with_status(config_path) == saved,
+	check(Scope.copy_taps_to_chords(script.is_paused) == false and Files.read_with_status(config_path) == saved_config
+		and Files.read_with_status(tap_path) == saved_chords,
 		"paused original policy refuses copy and preserves exact saved bytes")
 	burst(58,15); expect(PASSTHROUGH,8,"paused session forwards the original edges without business copy")
 	script.toggle_pause(); assert(not script.is_paused() and Manager.is_active())
