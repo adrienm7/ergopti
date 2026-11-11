@@ -35,6 +35,21 @@ local function check_preset(id, port, options)
 	assert(port.prefixes == nil or type(port.prefixes) == "table", "scope preset " .. id .. " has invalid prefixes")
 end
 
+--- Validates one companion file owner port.
+--- @param id string Companion identifier chosen by the host.
+--- @param port table Path, backup path, absorbed prefixes and preparation owner.
+--- @param options table Transaction options, for path distinctness.
+local function check_companion(id, port, options)
+	assert(type(id) == "string" and id ~= "" and type(port) == "table", "invalid scope companion owner")
+	assert(not (options.presets and options.presets[id]), "scope companion " .. id .. " shadows a preset")
+	assert(type(port.path) == "string" and type(port.backup_path) == "string"
+		and port.path ~= port.backup_path and port.path ~= options.path
+		and port.backup_path ~= options.backup_path and port.backup_path ~= options.path,
+		"scope companion " .. id .. " requires its own distinct file and backup paths")
+	assert(type(port.prepare) == "function", "scope companion " .. id .. " requires a preparation owner")
+	assert(type(port.prefixes) == "table" and #port.prefixes > 0, "scope companion " .. id .. " requires its prefixes")
+end
+
 --- Creates a session owner with explicit platform and runtime boundaries.
 --- Runtime apply/restore must return literal true after terminal completion.
 --- Optional prepare_batch(path, updates, files) delegates an owned inline table
@@ -43,6 +58,13 @@ end
 --- of a manifest preset: rows under `prefixes` are routed to it, and
 --- render(mode, source_document, rows, shapes) returns its complete candidate
 --- bytes; the optional canonical receipt keeps empty arrays distinct from maps.
+--- Optional companions[id] = { path, backup_path, prefixes, prepare } owns a
+--- second file every plan and edit of this owner may reach, whatever the
+--- manifest says: rows under `prefixes` are routed to it, and
+--- prepare(rows, files) returns true, detail, its candidate bytes and its exact
+--- source, as prepare_batch does. Its source is always read, so the runtime sees
+--- the file as it stands; it is backed up and published, inside the same
+--- conflict and compensation boundary, only when its candidate changes it.
 --- Optional select(path) narrows a scope to the rows it returns true for: a
 --- submenu that restores or clears one part of its scope (the script chords of
 --- the Shortcuts scope) keeps the scope's owner, backup and compensation.
@@ -64,6 +86,13 @@ function M.new(options)
 	assert(options.select == nil or type(options.select) == "function", "invalid scope row selection")
 	assert(options.presets == nil or type(options.presets) == "table", "invalid scope preset owners")
 	for id, port in pairs(options.presets or {}) do check_preset(id, port, options) end
+	assert(options.companions == nil or type(options.companions) == "table", "invalid scope companion owners")
+	local companion_ids = {}
+	for id, port in pairs(options.companions or {}) do
+		check_companion(id, port, options)
+		companion_ids[#companion_ids + 1] = id
+	end
+	table.sort(companion_ids)
 	local prepare_batch = options.prepare_batch or Writer.prepare_batch
 	local owner, debt, committed, busy = {}, nil, nil, false
 	-- Debt is ordered: the runtime inverse first, then every published file in
@@ -169,6 +198,10 @@ function M.new(options)
 				if port == nil then return false, "scope requires separate preset ownership" end
 				presets[#presets + 1] = { id = request.preset, port = port, rows = {} }
 			end
+			local companions = {}
+			for _, id in ipairs(companion_ids) do
+				companions[#companions + 1] = { id = id, port = options.companions[id], rows = {} }
+			end
 			local owned_paths = type(options.owned_paths) == "function" and options.owned_paths() or {}
 			assert(type(owned_paths) == "table", "dynamic configuration ownership is unavailable")
 			local plan
@@ -185,6 +218,11 @@ function M.new(options)
 					for _, preset in ipairs(presets) do
 						for _, prefix in ipairs(preset.port.prefixes or {}) do
 							if belongs(path, prefix) then target = preset end
+						end
+					end
+					for _, companion in ipairs(companions) do
+						for _, prefix in ipairs(companion.port.prefixes) do
+							if belongs(path, prefix) then target = companion end
 						end
 					end
 					local rows = target and target.rows or updates
@@ -219,8 +257,38 @@ function M.new(options)
 				rendered[preset.id] = { decoded = file.decoded, shapes = file.shapes, candidate = file.candidate, source = file.source }
 				files[#files + 1] = file
 			end
+			-- A companion is read even without rows: the runtime candidate needs
+			-- the file as it stands, and the source check below covers it.
+			local companion_sources = {}
+			for _, companion in ipairs(companions) do
+				local port = companion.port
+				local prepared, why, bytes, prior = port.prepare(companion.rows, options.files)
+				if prepared ~= true then return false, why end
+				if type(bytes) ~= "string" or type(prior) ~= "table"
+					or (prior.status ~= "ok" and prior.status ~= "absent")
+					or (prior.status == "ok" and type(prior.content) ~= "string") then
+					return false, "companion " .. companion.id .. " did not return an exact source and candidate"
+				end
+				local document, shapes = Codec.decode_with_shapes(bytes)
+				if type(document) ~= "table" then return false, "companion " .. companion.id .. " candidate is not valid TOML" end
+				local exact = { status = prior.status, content = prior.status == "ok" and prior.content or nil }
+				local unchanged = prior.status == "ok" and bytes == prior.content or prior.status == "absent" and bytes == ""
+				rendered[companion.id] = { decoded = document, shapes = shapes, candidate = bytes, source = exact,
+					published = not unchanged }
+				companion_sources[#companion_sources + 1] = { path = port.path, source = exact }
+				if not unchanged then
+					files[#files + 1] = { id = companion.id, path = port.path, backup_path = port.backup_path,
+						candidate = bytes, source = exact }
+				end
+			end
 			if config and not config.skip then files[#files + 1] = config end
 			local function prepared_source_current()
+				for _, companion in ipairs(companion_sources) do
+					local bytes, status = Writer.read_classified(companion.path, options.files)
+					if status ~= companion.source.status or (status == "ok" and bytes ~= companion.source.content) then
+						return false
+					end
+				end
 				if not preparation_current(preparation_check) then return false end
 				if preparation_check == nil and not (config and config.skip) then return true end
 				local bytes, status = Writer.read_classified(config.path, options.files)
