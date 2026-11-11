@@ -27,6 +27,12 @@
 ;    before modules/gestures/init.ahk runs, when a top-level global of this
 ;    file would still be unset. Every I/O boundary is injectable so the unit
 ;    suite proves the ordering without touching the real registry.
+; 5. An isolated profile never reaches the machine: a startup smoke or a live
+;    check boots beside the user's own driver and shares the signed-in user's
+;    HKCU, so its key, snapshot and device restart are its profile's private
+;    file instead, whatever port the caller passed. On 2026-11-11 a live check's
+;    Gestures « Tout effacer » found no backup in its fresh profile and reset the
+;    maintainer's own gesture settings to the Windows factory values.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -136,7 +142,8 @@ _TouchpadRegistryNames(Data) {
 TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "", ReadFn := 0) {
 	Tag := TouchpadRegistryLogTag()
 	Path := BackupPath != "" ? BackupPath : TouchpadRegistryBackupPath()
-	Snapshot := HasMethod(SnapshotFn, "Call") ? SnapshotFn : TouchpadRegistrySnapshot
+	Snapshot := _TouchpadRegistryIsolate(Map("snapshot",
+		HasMethod(SnapshotFn, "Call") ? SnapshotFn : TouchpadRegistrySnapshot))["snapshot"]
 	Create := HasMethod(CreateFn, "Call") ? CreateFn : FSWriteCreateDurable
 	Exists := HasMethod(ExistsFn, "Call") ? ExistsFn : FSStrictExists
 	Read := HasMethod(ReadFn, "Call") ? ReadFn : FSReadStrict
@@ -190,11 +197,12 @@ TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, Back
 TouchpadRegistryApply(WriteFn := 0, SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "", ReadFn := 0) {
 	Tag := TouchpadRegistryLogTag()
 	LoggerStart(Tag, "Writing the Precision Touchpad gesture values…")
+	Write := _TouchpadRegistryIsolate(Map("write",
+		HasMethod(WriteFn, "Call") ? WriteFn : Reg_WriteDword), true)["write"]
 	if !TouchpadRegistryEnsureBackup(SnapshotFn, CreateFn, ExistsFn, BackupPath, ReadFn) {
 		LoggerError(Tag, "No touchpad value was written: the prior values are not backed up.")
 		return false
 	}
-	Write := HasMethod(WriteFn, "Call") ? WriteFn : Reg_WriteDword
 	Data := TouchpadRegistryData()
 	Failed := 0
 	for _, Entry in Data["values"] {
@@ -279,7 +287,8 @@ _TouchpadRegistryFactoryEntries(Data) {
 ; otherwise.
 ; @param OnDone {Func|0} Touchpad-restart completion, fn(Ok).
 ; @param Io {Map|0} Test seams, each optional: exists, read, write,
-;   delete_value, delete_file, restart, backup_path.
+;   delete_value, delete_file, restart, backup_path. In an isolated profile the
+;   write, delete_value and restart ports are the private key's (section 4).
 ; @return {String} "restored" (from the backup), "factory_defaults" or "failed".
 TouchpadRegistryRestore(OnDone := 0, Io := 0) {
 	Tag := TouchpadRegistryLogTag()
@@ -287,11 +296,14 @@ TouchpadRegistryRestore(OnDone := 0, Io := 0) {
 	Path := Seams.Get("backup_path", "") != "" ? Seams["backup_path"] : TouchpadRegistryBackupPath()
 	Exists := Seams.Get("exists", FSStrictExists)
 	Read := Seams.Get("read", FSReadStrict)
-	Write := Seams.Get("write", Reg_WriteDword)
-	DeleteValue := Seams.Get("delete_value", Reg_DeleteValue)
 	DeleteFile := Seams.Get("delete_file", FSDelete)
-	Restart := Seams.Get("restart", GestureRestartTouchpadDevice)
 	LoggerStart(Tag, "Restoring the Windows touchpad gestures…")
+	Machine := _TouchpadRegistryIsolate(Map("write", Seams.Get("write", Reg_WriteDword),
+		"delete_value", Seams.Get("delete_value", Reg_DeleteValue),
+		"restart", Seams.Get("restart", GestureRestartTouchpadDevice)), true)
+	Write := Machine["write"]
+	DeleteValue := Machine["delete_value"]
+	Restart := Machine["restart"]
 	try {
 		Data := TouchpadRegistryData()
 		FromBackup := Exists.Call(Path)
@@ -367,4 +379,162 @@ TouchpadRegistryClearFromScope(Options) {
 	if !(Options is Map) || !Options.Has("touchpad_restore")
 		throw ValueError("A clear to the system behaviour requires its touchpad_restore port.")
 	return TouchpadRegistryClearToSystem(Options["touchpad_restore"], Options.Get("touchpad_notify", 0))
+}
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 4/ Isolated Profile =======
+; ===================================
+; ===================================
+
+; The first line of the private key file; a different line is refused.
+; @return {String}
+TouchpadRegistryPrivateHeader() {
+	return "ergopti-touchpad-private-key 1"
+}
+
+; The file that stands for the machine's touchpad key in an isolated profile,
+; or "" for a real one. ERGOPTI_STARTUP_SMOKE_DIR already moves the paths, logs
+; and configuration of a startup smoke or a live check into its scratch folder
+; (infra/boot.ahk); the touchpad key follows, so the harness can read it there.
+; @return {String} Absolute path, or "" when the driver owns the real profile.
+TouchpadRegistryPrivatePath() {
+	global _DriverStartupSmokeDir
+	if !IsSet(_DriverStartupSmokeDir) || _DriverStartupSmokeDir == ""
+		return ""
+	return _DriverStartupSmokeDir . "\touchpad_registry_private.txt"
+}
+
+; Replaces the machine ports of an isolated profile with its private key's.
+; A caller's own port is replaced too: every port here names the machine's key
+; or device, which an isolated driver must never reach.
+; @param Ports {Map} Any of snapshot, write, delete_value, restart.
+; @param Announce {Boolean} Logs once which key the writes of this call reach.
+; @return {Map} The ports to use, the given ones for a real profile.
+_TouchpadRegistryIsolate(Ports, Announce := false) {
+	Path := TouchpadRegistryPrivatePath()
+	if (Path == "")
+		return Ports
+	Private := Map("snapshot", _TouchpadRegistryPrivateSnapshot.Bind(Path),
+		"write", _TouchpadRegistryPrivateWrite.Bind(Path),
+		"delete_value", _TouchpadRegistryPrivateDelete.Bind(Path),
+		"restart", TouchpadRegistrySkipsDeviceRestart)
+	Isolated := Map()
+	for Name in Ports {
+		if !Private.Has(Name)
+			throw ValueError("The touchpad owner has no private port named " . Name . ".")
+		Isolated[Name] := Private[Name]
+	}
+	if Announce
+		LoggerInfo(TouchpadRegistryLogTag(),
+			"Isolated profile: the touchpad values go to the private key '{1}', never to the machine's.", Path)
+	return Isolated
+}
+
+; Refuses a key other than the generated one: the private file stands for it only.
+; @param Key {String} Registry key path a port was given.
+_TouchpadRegistryPrivateRequireKey(Key) {
+	if (Key != TouchpadRegistryData()["key"])
+		throw ValueError("The private touchpad key stands for " . TouchpadRegistryData()["key"] . " only.")
+}
+
+; Reads the private key; an absent file is the key of a fresh profile.
+; @param Path {String} TouchpadRegistryPrivatePath().
+; @return {Map} name => DWORD, case-insensitive like registry names; throws when invalid.
+_TouchpadRegistryPrivateLoad(Path) {
+	Values := Map()
+	Values.CaseSense := "Off"
+	if !FSStrictExists(Path)
+		return Values
+	Lines := StrSplit(RTrim(StrReplace(FSReadStrict(Path), "`r", ""), "`n"), "`n")
+	if (Lines.Length < 2 || Lines[1] != TouchpadRegistryPrivateHeader()
+			|| Lines[2] != "key " . TouchpadRegistryData()["key"])
+		throw ValueError("the private touchpad key '" . Path . "' has no valid header")
+	Index := 3
+	while (Index <= Lines.Length) {
+		Parts := StrSplit(Lines[Index], " ")
+		if !(Parts.Length == 3 && Parts[2] == "dword" && RegExMatch(Parts[3], "^\d{1,10}$")
+				&& Integer(Parts[3]) <= 0xFFFFFFFF)
+			throw ValueError("malformed private touchpad key line " . Index)
+		Values[Parts[1]] := Integer(Parts[3])
+		Index += 1
+	}
+	return Values
+}
+
+; Writes the whole private key back.
+; @param Path {String} TouchpadRegistryPrivatePath().
+; @param Values {Map} name => DWORD.
+_TouchpadRegistryPrivateSave(Path, Values) {
+	Text := TouchpadRegistryPrivateHeader() . "`n" . "key " . TouchpadRegistryData()["key"] . "`n"
+	for Name, Value in Values
+		Text .= Name . " dword " . Value . "`n"
+	SplitPath(Path, , &Directory)
+	FSEnsureDirectoryStrict(Directory)
+	if !FSWriteDurable(Path, Text)
+		throw Error("the private touchpad key '" . Path . "' could not be written")
+}
+
+; TouchpadRegistrySnapshot's contract, over the private key.
+; @return {Map} name => Map("type", "REG_DWORD", "value", <DWORD>).
+_TouchpadRegistryPrivateSnapshot(Path, Key, Names) {
+	_TouchpadRegistryPrivateRequireKey(Key)
+	Stored := _TouchpadRegistryPrivateLoad(Path)
+	Values := Map()
+	for _, Name in Names {
+		if Stored.Has(Name)
+			Values[Name] := Map("type", "REG_DWORD", "value", Stored[Name])
+	}
+	return Values
+}
+
+; Reg_WriteDword's contract, over the private key.
+; @return {Boolean} True once the value is stored; a failure is logged.
+_TouchpadRegistryPrivateWrite(Path, Key, Name, Value) {
+	try {
+		_TouchpadRegistryPrivateRequireKey(Key)
+		Values := _TouchpadRegistryPrivateLoad(Path)
+		Values[Name] := Integer(Value)
+		_TouchpadRegistryPrivateSave(Path, Values)
+		return true
+	} catch as Err {
+		LoggerError(TouchpadRegistryLogTag(), "The private touchpad value {1} could not be written: {2}.",
+			Name, Err.Message)
+		return false
+	}
+}
+
+; Reg_DeleteValue's contract, over the private key: an absent value is deleted already.
+; @return {Boolean} True once the value is absent; a failure is logged.
+_TouchpadRegistryPrivateDelete(Path, Key, Name) {
+	try {
+		_TouchpadRegistryPrivateRequireKey(Key)
+		Values := _TouchpadRegistryPrivateLoad(Path)
+		if Values.Has(Name)
+			Values.Delete(Name)
+		_TouchpadRegistryPrivateSave(Path, Values)
+		return true
+	} catch as Err {
+		LoggerError(TouchpadRegistryLogTag(), "The private touchpad value {1} could not be deleted: {2}.",
+			Name, Err.Message)
+		return false
+	}
+}
+
+; An isolated profile never restarts the touchpad device: the machine's key did
+; not change, and the elevated worker would disable and re-enable the real
+; touchpad behind a UAC prompt. Every launcher of that worker asks here first.
+; @param OnDone {Func|0} Restart completion, fn(Ok); it still arrives, with true.
+; @return {Boolean} True when the profile is isolated, so the caller launches nothing.
+TouchpadRegistrySkipsDeviceRestart(OnDone := 0) {
+	if (TouchpadRegistryPrivatePath() == "")
+		return false
+	LoggerInfo(TouchpadRegistryLogTag(), "Isolated profile: the touchpad device is not restarted.")
+	if HasMethod(OnDone, "Call")
+		SetTimer(() => OnDone.Call(true), -1)
+	return true
 }
