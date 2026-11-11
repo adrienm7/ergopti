@@ -5,6 +5,29 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A password manager is a secure field as a whole, from one list (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ADD-1): every application of
+`_shared/data/secure_apps.json` (1Password, Bitwarden, KeePassXC, KeePass,
+LastPass, Dashlane, RoboForm, Authy, the system keychains and authenticators)
+is a secure field as a whole on the three drivers, so hotstrings, keymap
+output, AI requests, clipboard borrowers and metrics stay inert there. The
+file holds one row per application with its `windows` process names (no case),
+`macos` display names (exact) and `linux` lowercase fragments of the WM class
+or Wayland app_id (substring, so `org.keepassxc.KeePassXC` matches); the rule
+is `_shared/lua/secure_apps.lua`. macOS `adapters/secure_field_detector.lua`
+`isSecureApp` reads it; Linux reads it once in `infra/secure_apps.lua`, used by
+`secure_field_detector.isSecureApp` and the metrics' `_SECURE_APPS` (still
+behind the metrics secure filter for recording), and
+`keystats.is_context_protected` returns true for a listed application
+whatever the metrics filters say: that verdict is what the focus guard
+publishes to the detector every text consumer reads. A missing or malformed
+list raises (fail closed). `test-secure-apps-single-source.cjs` fails on a
+driver-local list and on a Windows `SFD_SECURE_APPS` name missing from the
+file. Windows (maintainer): read the file in `secure_field_detector.ahk` and
+call `SFD_IsSecureApp` from `SFD_IsSecureField`; see TODO « Windows (the PC
+agent's) ». Regressions `add1-secure-app`.
+
 ## A borrowed unowned Linux clipboard goes back unowned (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (ADD-2): when a Linux borrower
