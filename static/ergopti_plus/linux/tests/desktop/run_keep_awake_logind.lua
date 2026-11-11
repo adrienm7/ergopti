@@ -21,9 +21,9 @@ local POLL_MS = 100
 --- Counts the Ergopti idle inhibitors logind currently holds.
 --- @return integer count
 local function held()
-	local pipe = assert(io.popen("systemd-inhibit --list --no-pager --no-legend 2>/dev/null"))
+	local pipe = assert(io.popen("command -v systemd-inhibit >/dev/null 2>&1 && systemd-inhibit --list --no-pager --no-legend 2>/dev/null"))
 	local text = pipe:read("*a")
-	pipe:close()
+	assert(pipe:close(), "systemd-inhibit is missing or refused to list the inhibitors")
 	local count = 0
 	for line in text:gmatch("[^\n]+") do
 		if line:match("^Ergopti%s") and line:find("idle", 1, true) then count = count + 1 end
