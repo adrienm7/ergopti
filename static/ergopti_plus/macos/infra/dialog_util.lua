@@ -348,6 +348,49 @@ function M.choose_path(message, title)
 	return type(path) == "string" and path ~= "" and path or nil
 end
 
+--- Builds the native open panel of the layout editor: one Ergopti layout
+--- source (.toml) or macOS layout (.keylayout), from the user's home. The
+--- layout manager webview cannot rely on <input type="file"> (WKWebView needs
+--- a UI delegate for it), so the host opens the file itself.
+--- @param message string The panel's unchanged message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string script The escaped native panel source.
+function M.layout_source_picker_script(message, title)
+	return text_utils.applescript_format([[
+use framework "AppKit"
+use scripting additions
+set panel to current application's NSOpenPanel's openPanel()
+panel's setTitle:"%s"
+panel's setMessage:"%s"
+panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:"%s")
+panel's setCanChooseFiles:true
+panel's setCanChooseDirectories:false
+panel's setAllowsMultipleSelection:false
+panel's setAllowedFileTypes:{"toml", "keylayout"}
+panel's setResolvesAliases:true
+set response to panel's runModal()
+if response is not (current application's NSModalResponseOK) then return missing value
+set chosenURLs to panel's |URLs|()
+if (chosenURLs's |count|()) is 0 then return missing value
+set chosenURL to chosenURLs's firstObject()
+return (chosenURL's |path|()) as text
+]], WindowTitles.compose(title), message, HOME_DIR)
+end
+
+--- Focus-aware open panel of the layout editor. Modal, like choose_path, and
+--- opened from a page button, never from the keyboard tap.
+--- @param message string The panel's message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string|nil path The chosen file, nil when cancelled.
+function M.choose_layout_source(message, title)
+	focus_hammerspoon()
+	local ok, path = Logger.run_modal(hs.osascript.applescript, M.layout_source_picker_script(message, title))
+	if ok ~= true then
+		error("dialog_util.choose_layout_source: the native open panel failed", 2)
+	end
+	return type(path) == "string" and path ~= "" and path or nil
+end
+
 -- hs.dialog.alert(x, y, callback, message, informativeText, buttonOne,
 -- buttonTwo, style): at most eight arguments, the optional ones strings.
 local ALERT_MAX_ARGS = 8

@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Палитра Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Выберите исходный файл раскладки Ergopti (.toml) или раскладку macOS (.keylayout).",
+	"layout_editor.pick_title": "Открыть раскладку",
 	"layout_editor.preserved_note": "Этот .keylayout сохранён точно в импортированном виде, поэтому его можно экспортировать без изменений. Преобразуйте его, чтобы редактировать клавиши.",
 	"layout_editor.preview.pending": "Мёртвая клавиша {id} ждёт следующую клавишу.",
 	"layout_editor.preview.placeholder": "Печатайте здесь на своей клавиатуре",

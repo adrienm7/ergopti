@@ -744,7 +744,7 @@ check('the three hosts accept exactly the actions the page sends', () => {
 	// sends no source_editor and the page hides the editor button there. Decided
 	// by the coordinator on 2026-11-11 overnight, to review by the maintainer.
 	// Once Windows accepts them, this list must be emptied.
-	const windowsPending = ['source_open', 'source_save'];
+	const windowsPending = ['source_open', 'source_save', 'source_pick'];
 	for (const action of windowsPending)
 		assert.ok(
 			!ahkActions.includes(action),

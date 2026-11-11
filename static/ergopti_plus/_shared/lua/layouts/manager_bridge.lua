@@ -43,6 +43,7 @@ M.ACTIONS = {
 	composer_remove = true,
 	source_open = true,
 	source_save = true,
+	source_pick = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -192,6 +193,9 @@ end
 --- deps.registry may offer the layout editor's source_open(on_done) and
 ---   source_save(payload, on_done) (_shared/lua/layouts/source_store.lua); a
 ---   registry without them refuses source_open and source_save.
+--- deps.pick_source(on_done) optionally opens a native file panel for the
+---   layout editor and answers {filename, text} or {} when cancelled, or
+---   {code, detail} on a refusal (macOS); without it source_pick is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -238,7 +242,8 @@ function M.new(deps)
 			controller.result = nil
 			deps.push("initData", { strings = deps.strings(),
 				state = M.page_state(deps.registry.snapshot(), nil),
-				source_editor = offers_source(deps.registry) })
+				source_editor = offers_source(deps.registry),
+				source_pick = type(deps.pick_source) == "function" })
 			deps.registry.refresh(function() push_state() end)
 			return true
 		end
@@ -255,6 +260,14 @@ function M.new(deps)
 		end
 		if action == "source_open" or action == "source_save" then
 			return M.handle_source(deps, action, payload)
+		end
+		if action == "source_pick" then
+			if type(deps.pick_source) ~= "function" then
+				deps.log("warn", "Refused a layout editor file pick: this host lets the page pick files.")
+				return false
+			end
+			deps.pick_source(function(data) deps.push("sourcePicked", data) end)
+			return true
 		end
 		if type(id) ~= "string" or not id:match(ID_PATTERN) then
 			deps.log("warn", "Refused a layout manager '%s' without a valid layout id.", action)

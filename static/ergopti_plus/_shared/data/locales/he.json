@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "לוח תווי Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "בחרו קובץ מקור של פריסת Ergopti (.toml) או פריסת macOS (.keylayout).",
+	"layout_editor.pick_title": "פתיחת פריסה",
 	"layout_editor.preserved_note": "קובץ ה-.keylayout הזה נשמר בדיוק כפי שיובא, כך שאפשר לייצא אותו ללא שינוי. המירו אותו כדי לערוך את המקשים שלו.",
 	"layout_editor.preview.pending": "המקש המת {id} ממתין למקש הבא.",
 	"layout_editor.preview.placeholder": "הקלידו כאן עם המקלדת שלכם",

@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode 팔레트",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Ergopti 배열 소스(.toml) 또는 macOS 배열(.keylayout)을 선택하세요.",
+	"layout_editor.pick_title": "자판 배열 열기",
 	"layout_editor.preserved_note": "이 .keylayout은 가져온 그대로 유지되므로 변경 없이 내보낼 수 있습니다. 키를 편집하려면 변환하세요.",
 	"layout_editor.preview.pending": "데드 키 {id}이(가) 다음 키를 기다리는 중입니다.",
 	"layout_editor.preview.placeholder": "키보드로 여기에 입력하세요",

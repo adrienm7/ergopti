@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "لوحة Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "اختر مصدر تخطيط Ergopti (‎.toml) أو تخطيط macOS (‎.keylayout).",
+	"layout_editor.pick_title": "فتح تخطيط",
 	"layout_editor.preserved_note": "يُحفظ ملف .keylayout هذا كما استُورد تمامًا، لذا يمكن تصديره دون تغيير. حوّله لتحرير مفاتيحه.",
 	"layout_editor.preview.pending": "المفتاح الميت {id} ينتظر المفتاح التالي.",
 	"layout_editor.preview.placeholder": "اكتب هنا بلوحة مفاتيحك",

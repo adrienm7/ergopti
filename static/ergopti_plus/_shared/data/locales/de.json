@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode-Palette",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Wähle eine Ergopti-Layoutquelle (.toml) oder ein macOS-Layout (.keylayout).",
+	"layout_editor.pick_title": "Layout öffnen",
 	"layout_editor.preserved_note": "Diese .keylayout bleibt genau wie importiert erhalten und kann daher unverändert exportiert werden. Wandle sie um, um ihre Tasten zu bearbeiten.",
 	"layout_editor.preview.pending": "Tottaste {id} wartet auf die nächste Taste.",
 	"layout_editor.preview.placeholder": "Hier mit deiner Tastatur tippen",
