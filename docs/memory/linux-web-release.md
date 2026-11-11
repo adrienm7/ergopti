@@ -391,6 +391,15 @@ a parent row must block that row's open handler. Action: prove tray changes
 with `tests/hardware/sni_host.py` (`--expect-lazy`, `--toggle-label`), which
 opens submenus as a panel does.
 
+The daemon's idle wait polls the GLib main context's descriptors with the
+input sources (`appindicator.wait_companion`: acquire, prepare, query, poll,
+check, release; dispatch stays in the next tick's `pump()`). Before 2026-11-11
+only evdev was polled, so every dbusmenu call waited out the 8 ms idle wait: a
+submenu open cost 26 ms whatever its size. GLib's own timeout is deliberately
+not adopted (an always-ready source would spin the loop). Action: a new GLib
+or GTK consumer on the daemon's thread relies on this wake, and a change to
+the wait keeps `run_perf_budget_container.py`'s tray budgets green.
+
 ### project-linux-file-manager-folder-needs-the-window-own-bus
 
 The folder of a file manager window is read only where the window publishes
@@ -498,14 +507,23 @@ quadratic on a long value, and `unescape_body` returns a body that needs no
 decoding as it is. Any new scanner there is proven against the previous one
 with a differential fuzz over every repository TOML file before it ships.
 `infra/perf_counters` holds the permanent closed-enum counters and spans, one
-evidence line per minute; measure with `tools/bench/linux-hot-path.lua`.
+evidence line per minute and one at exit (`flush_now`); measure with
+`tools/bench/linux-hot-path.lua`, and the whole daemon in an X session with
+`tools/bench/linux-session-bench.py` (median and p95, `--budgets`). Spans a
+person waits on (`tray.fill`, `layout.switch`, `config.reload`,
+`hotstring.expand`) use `trace()`/`done()`, which add a paired `[Span]` DEBUG
+pair (macOS writes the same tag and names); a key's kernel stamp to its
+forwarded write is `input.latency` (`record_age`). Log lines carry real
+milliseconds (`logger_sink.timestamp_provider`).
 
 ### project-linux-startup-cost-is-compilation
 
-Before the first boot stage the entry's file-scope requires load about 300
-modules (4.7 MB of Lua); `tools/bench/linux-module-graph.lua` measures them.
-Most of that CPU is LuaJIT compiling source (2026-10-24: 105 of 162 ms;
-the same chunks loaded as bytecode with debug info took 12 ms). A real boot
+Before the first boot stage the entry's file-scope requires load about 440
+modules (6.5 MB of Lua on 2026-11-11, 4.7 MB on 2026-10-24);
+`tools/bench/linux-module-graph.lua` measures them, and the boot summary now
+reports the process age at `BootProfiler.begin` as `load=` (160 to 210 ms).
+Most of that CPU is LuaJIT compiling source (2026-11-11: 126 of about 180 ms;
+the same chunks loaded as bytecode with debug info took 8 ms). A real boot
 calls none of 128 of those modules before `BootProfiler.complete`, but they
 are only 21 ms of compile, some are used at the first key or tray draw on a
 desktop, and the largest (the HTTP engine behind `adapters/http_client`,
@@ -513,6 +531,19 @@ desktop, and the largest (the HTTP engine behind `adapters/http_client`,
 Action: measure with the probe before proposing lazy requires; the lever
 that moves the start is a precompiled-bytecode package, which needs a
 maintainer decision on its staleness contract with the shipped sources.
+
+### project-linux-layout-proof-reuses-the-keymap-between-notifications
+
+Each injected press re-proves the layout live (`injector` admission →
+`xkb_capture.inverse_current` → `xkb_source_probe.read`). The read used to
+download and serialize the whole server keymap every time (48 KB, 0.6 ms on an
+idle Xvfb, about 1.1 ms per typed character with the round trips). It now
+reuses the text it last downloaded while no XkbNewKeyboardNotify or
+XkbMapNotify has been drained on the same connection; the drains before and
+after the read synchronize with `XSync`, so a change in between still refuses
+the read. Action: any new keymap event kind that can change the keymap bumps
+`_keymap_events`; prove changes with `tests/hardware/run_xkb_source_read_cost.lua`
+(cost budget and a `setxkbmap` invalidation).
 
 ### project-linux-directory-walks-in-process
 
