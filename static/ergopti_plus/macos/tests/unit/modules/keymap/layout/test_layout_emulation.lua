@@ -143,6 +143,22 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_eq(next_up.keycode, KC_Q, "only once")
 	end)
 
+	-- With a non-Latin input source hs.keycodes.map has no Latin letter, and
+	-- the chord silently kept the physical key code: Cmd + physical D (Ergopti
+	-- e) went out as Cmd+D. macOS resolves a Command shortcut on the US
+	-- positions there, so the fallback is the character's US key code
+	-- (ILM-002, cmd-chord-us-key).
+	helpers.it("finds a character's US key code for a source that lacks it (cmd-chord-us-key)", function()
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		local table_of = require("json").decode(assert(require("adapters.file_system").read(
+			require("infra.paths").shared("modules/layouts/mac_keycodes.json"))))
+		helpers.assert_eq(M.us_keycode("e", table_of), 14, "kVK_ANSI_E")
+		helpers.assert_eq(M.us_keycode("Z", table_of), 6, "kVK_ANSI_Z")
+		helpers.assert_eq(M.us_keycode("1", table_of), 18, "kVK_ANSI_1")
+		helpers.assert_eq(M.us_keycode(".", table_of), 47, "kVK_ANSI_Period")
+		helpers.assert_nil(M.us_keycode("é", table_of), "no US key: none")
+	end)
+
 	helpers.it("types the Option level as AltGr and clears the Option flag", function()
 		local M = fixture({ emulated_layout = "ergol", ergopti_base = true, ergopti_alt_gr = true })
 		M.reload()
