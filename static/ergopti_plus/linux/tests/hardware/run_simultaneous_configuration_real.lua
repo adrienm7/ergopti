@@ -189,10 +189,12 @@ end
 local function run()
 	assert(type(Combinations.get_chord) == "function" and type(Manager.managed_pair_options_current) == "function",
 		"reviewed simultaneous Manager/source-owner software bootstrap is mandatory")
+	-- config.toml keeps the pair taps and the switch; [mod_combos] lives in tap_hold.toml.
 	assert(Files.write(config_path, '[category_enabled]\nkey_combinations = true\n[shortcuts.key_combination_taps]\n'
-		.. 'tab_then_caps_lock = "copy"\n[mod_combos]\nenabled = true\nsymmetric = true\nsimultaneous_threshold_ms = 87\n'
+		.. 'tab_then_caps_lock = "copy"\n'))
+	assert(Files.write(tap_path, '[_meta]\nschema_version = 1\n[tap_hold]\nenabled = false\ninherit_defaults = false\n'
+		.. '[mod_combos]\nenabled = true\nsymmetric = true\nsimultaneous_threshold_ms = 87\n'
 		.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n[mod_combos.config.future_keep]\ncombo = "unknown-kept"\n'))
-	assert(Files.write(tap_path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n'))
 	assert(Writer.use_ffi_backend() and Reader.use_ffi_backend(), "original native transport is mandatory")
 	assert(node_for(source_name) == nil and node_for(Names.VIRTUAL_KEYBOARD) == nil, "owned virtual names must be absent")
 	local source_writer = require("tests.hardware.keyboard_source_writer").load(source_name)
@@ -251,8 +253,10 @@ local function run()
 		"original publisher clears only the known third slot")
 	local before = assert(Writer.output_view(output))
 	assert(Scope.copy_taps_to_chords(script.is_paused, edit_source()), "original owner copies real saved taps")
-	local saved = assert(Files.read_with_status(config_path))
-	local document = assert(Codec.decode(saved))
+	local document = assert(Codec.decode(assert(Files.read_with_status(config_path))))
+	local chords = assert(Codec.decode(assert(Files.read_with_status(tap_path))))
+	check(document.mod_combos == nil, "config.toml never gets a [mod_combos]")
+	document.mod_combos = chords.mod_combos
 	check(document.category_enabled.key_combinations == true and document.mod_combos.enabled == true
 		and document.mod_combos.symmetric == true and document.mod_combos.simultaneous_threshold_ms == 87,
 		"copy preserves both masters and saved settings")

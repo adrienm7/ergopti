@@ -430,7 +430,7 @@ helpers.describe("exact configuration route after native callbacks",function()
 			local owned=Pair.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},
 				hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,route=function() return route end,
 				is_paused=function() return s.paused end,actions=s.gestures,changed=function() return true end})
-			local owner=Scope.new({path=path,backup_path=backup,files=s.files,combinations=owned,parameters=s.gestures,
+			local owner=Scope.new({path=path,backup_path=backup,chord_path=Fixture.chord_path,chord_backup_path=Fixture.chord_backup,files=s.files,combinations=owned,parameters=s.gestures,
 				manifest={scope_plan=function() return {presets={},operations={}} end},is_paused=function() return s.paused end})
 			local apply=s.gestures.apply_parameter_configuration
 			s.gestures.apply_parameter_configuration=function(token,params)
@@ -465,7 +465,7 @@ helpers.describe("final ordered-pair publication route ownership",function()
 						if phase=="pair_release" and s.publications==1 and not owned.configuration_pending() then handoff() end
 						return true
 					end})
-				local owner=Scope.new({path=path,backup_path=backup,files=s.files,combinations=owned,parameters=s.gestures,
+				local owner=Scope.new({path=path,backup_path=backup,chord_path=Fixture.chord_path,chord_backup_path=Fixture.chord_backup,files=s.files,combinations=owned,parameters=s.gestures,
 					manifest={scope_plan=function() return {presets={},operations={}} end},is_paused=function() return s.paused end})
 				if phase=="publication" then
 					s.before_publish=function(target,candidate)
@@ -619,7 +619,7 @@ helpers.describe("staged publication source after native pause callback",functio
 					if armed and not handed then calls=calls+1;if calls==5 then handed=true;route=other;s.bytes[other]=s.bytes[path] end end
 					return false
 				end,actions=s.gestures,changed=function() return true end})
-			local owner=Scope.new({path=path,backup_path=backup,files=s.files,combinations=owned,parameters=s.gestures,
+			local owner=Scope.new({path=path,backup_path=backup,chord_path=Fixture.chord_path,chord_backup_path=Fixture.chord_backup,files=s.files,combinations=owned,parameters=s.gestures,
 				manifest={scope_plan=function() return {presets={},operations={}} end},is_paused=function() return false end})
 			local release=s.gestures.release_parameter_configuration
 			s.gestures.release_parameter_configuration=function(token)
