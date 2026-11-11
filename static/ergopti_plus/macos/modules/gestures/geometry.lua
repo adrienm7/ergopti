@@ -27,6 +27,7 @@
 local M = {}
 local Direction = require("gestures.direction")
 local Incremental = require("gestures.incremental")
+local ContactJoin = require("gestures.contact_join")
 
 
 
@@ -121,6 +122,25 @@ function M.contactsAcross(touches, axis)
 	end
 	table.sort(contacts, function(a, b) return a[across] < b[across] end)
 	return contacts
+end
+
+--- Tells why the contacts of one frame cannot be three fingers of one hand:
+--- a far or oversized third contact, a resting thumb beside a pair (shared
+--- rule, _shared/lua/gestures/contact_join.lua; the trackpad reports
+--- millimetres). Any other count is not judged.
+--- @param touches table Trackpad touch arrays.
+--- @return string|nil reason "far" or "oversized", nil when admitted.
+--- @return string|nil detail The measured value, for the log.
+function M.joinRefusal(touches)
+	local contacts = {}
+	for _, t in ipairs(type(touches) == "table" and touches or {}) do
+		local p = type(t) == "table" and type(t.absoluteVector) == "table"
+			and t.absoluteVector.position or nil
+		if type(p) ~= "table" then return nil end
+		contacts[#contacts + 1] = { x = tonumber(p.x) or 0, y = tonumber(p.y) or 0,
+			major = tonumber(t.majorAxis) }
+	end
+	return ContactJoin.refusal(contacts)
 end
 
 --- Describes each contact of one frame for the log: its position and its

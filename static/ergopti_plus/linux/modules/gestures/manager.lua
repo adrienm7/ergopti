@@ -2407,10 +2407,20 @@ function M.start_reading()
 		return false
 	end
 
-	_decoder = Decoder.new()
+	local units_x, units_y = Finder.read_resolution(touchpad.path)
+	-- The third-contact rule measures millimetres: the pad's resolution, or
+	-- libinput's assumed size for a pad that reports none (tap_detector).
+	local mm_x, mm_y = units_x, units_y
+	if not (mm_x and mm_y) then
+		mm_x, mm_y = require("modules.gestures.tap_detector").units_per_mm(Finder.read_axes(touchpad.path))
+	end
+	if not (mm_x and mm_y) then
+		Logger.warn(LOG, "%s reports no MT axes: a resting thumb beside a pair cannot be told from a third finger.",
+			touchpad.path)
+	end
+	_decoder = Decoder.new({ units_per_mm = (mm_x and mm_y) and { x = mm_x, y = mm_y } or nil })
 	_touchpad = touchpad
 	_reading = true
-	local units_x, units_y = Finder.read_resolution(touchpad.path)
 	_incremental = new_incremental(units_x, units_y)
 	if _incremental then
 		Logger.info(LOG, "%s: %d x %d units per mm; incremental swipes count millimetres.", touchpad.path, units_x, units_y)

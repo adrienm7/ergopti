@@ -25,6 +25,7 @@ require("llm.local_server_menu") -- pure: the remote backend names the local ser
 require("keycodes.key_names") -- pure, with its data: the gesture actions name their chord keys with it
 require("actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
 require("gestures.incremental") -- pure: the gesture geometry steps an incremental swipe with it
+require("gestures.contact_join") -- pure: the gesture geometry judges a third contact with it
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local SharedLogger = require("logger")

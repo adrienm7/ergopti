@@ -48,6 +48,7 @@ local function with_manager(open_fails, init_opts, body, no_touchpad)
 	package.loaded["adapters.evdev_reader"] = reader
 	package.loaded["modules.gestures.touchpad_finder"] = {
 		read_resolution = function() return nil end,
+		read_axes = function() return nil end,
 		find = function()
 			if no_touchpad then return nil, "no device reports multitouch slots" end
 			return {
