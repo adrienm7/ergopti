@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti non può avviarsi: {1} non è un modulo nativo pubblicato.",
 	"linux_shell.install.already_installed": "{1} — già installato",
 	"linux_shell.install.archive_digest_unavailable": "gli aggiornamenti con descrittore trattenuto richiedono un vero runtime OpenSSL3; la funzionalità resta non disponibile.",
+	"linux_shell.install.bytecode_skipped": "Non è stato possibile creare i moduli precompilati — Ergopti si avvia dai sorgenti, un po' più lentamente.",
 	"linux_shell.install.capability_verified": "{1} — funzionalità verificata",
 	"linux_shell.install.command_still_missing": "{1} è stato installato, ma '{2}' è ancora introvabile.",
 	"linux_shell.install.daemon_manual": "Per avviare il servizio manualmente:",

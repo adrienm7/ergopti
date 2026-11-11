@@ -5,6 +5,7 @@ build_luv.module_generated=已从源代码构建 LuaJIT 网络模块。
 build_luv.recipe_required=luv 原生构建需要其源代码配方。
 install.already_installed={1} — 已安装
 install.archive_digest_unavailable=保留描述符的更新需要真实的 OpenSSL3 运行时；该功能仍不可用。
+install.bytecode_skipped=无法生成预编译模块 — Ergopti 将从源代码启动，速度稍慢。
 install.capability_verified={1} — 功能已验证
 install.command_still_missing=已安装 {1}，但仍找不到 '{2}'。
 install.daemon_manual=要手动启动守护进程：
