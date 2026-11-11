@@ -5,6 +5,17 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Non-typing metrics rows follow the excluded-app rule (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (KMD-2): rows that do not come from
+typing (connectivity, window topology, capture presence) are refused while an
+excluded app is focused, on every OS, as Windows' `KL_AppendLog` refuses
+every entry; a neutral app label is not used. Linux: `record_network_event`
+and `record_topology_event` return on `is_unrecorded_app` (regressions
+`linux-network-excluded-app`, `linux-topology-excluded-app`); macOS: the
+topology, capture and network watchers take the whole `PrivacyContext`
+verdict (`macos-network-private`, `macos-topology-private`).
+
 ## A settings change retires the AI request in flight (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (AID-3): a change of the backend, the

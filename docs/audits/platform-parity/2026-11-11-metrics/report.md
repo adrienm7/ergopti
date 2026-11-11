@@ -41,8 +41,12 @@ network stage after the system one.
   offset. No row carries that offset; a fix needs a recorded offset or local
   `ts` on Linux, a cross-device contract decision.
 - **KMD-2, excluded-app scope for telemetry that is not typing.** The fixes
-  above follow Windows (refuse the row). Whether connectivity should instead
-  be kept with a neutral app label is open.
+  above follow Windows (refuse the row). Decided by the maintainer on
+  2026-11-11: refused on every OS, no neutral label. Verified on dev: Linux
+  d379d11a (network; topology and capture already refused, now pinned by
+  `linux-topology-excluded-app`), macOS ed0d90e9 (`macos-network-private`,
+  `macos-topology-private`); Windows already refuses in `KL_AppendLog`.
+  Closed.
 - **KMD-3, Linux `awake_ms`.** Sampled unlocked uptime on Linux, keep-awake
   sessions on Windows and macOS (raised by the 2026-11-04 deep review, no TODO
   item).
