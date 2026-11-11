@@ -9,11 +9,18 @@ and `version = 1`. The executable schema is
 inline tables and arrays of tables are accepted. A canonical save retains data,
 not TOML comments or formatting.
 
-The generator foundation provides validation, interchange, an exact `.keylayout`
-preservation path and partial Linux XKB / Windows KLC exports of admitted imports. It does **not** compile the superset,
-install layouts, change a driver, create the ISO/ANSI bundle, or replace either
-editor. Those consumers must use this model when the existing composer,
-navigation layer editor and layout manager are unified. The target remains
+A source is either **structured** (layers, dead keys and the other records
+below, the form a user edits) or a **preserved import** (the original XML kept
+byte for byte). The one generator,
+`static/ergopti_plus/_shared/ui/layout_composer/source_compiler.js`, compiles a
+structured source into a `.keylayout` per physical variant, lays out the macOS
+bundle, and reports per record what each target leaves out. The Linux XKB and
+Windows KLC exports read that same compiled `.keylayout` through their existing
+converters, so every target consumes one compilation. It is a pure classic
+script: pages, the app webviews and the Node tools load it after
+`composer_model.js` and `source_model.js` and pass it the key tables. The unified
+editor (still to be built from the composer, navigation layer editor and layout
+manager) consumes this model; it adds no second format. The target remains
 [KbdEdit parity](layout-generator-kbdedit-parity.md).
 
 ## Commands available now
@@ -22,6 +29,9 @@ Run from the repository root with the pinned Node version and installed npm
 dependencies. Output paths must not already exist.
 
 ```sh
+npm run layout-source -- import-structured my_layout iso source.keylayout source.toml
+npm run layout-source -- export-all source.toml build/layout-source/my_layout
+npm run layout-source -- export-macos source.toml new-output-directory [bundle|iso|ansi]
 npm run layout-source -- import my_layout iso source.keylayout source.toml
 npm run layout-source -- validate source.toml
 npm run layout-source -- report source.toml
@@ -30,11 +40,17 @@ npm run layout-source -- export-xkb source.toml new-output-directory
 npm run layout-source -- export-klc source.toml new-output-directory
 ```
 
-`import` takes an explicit `iso` or `ansi` keycode convention; the XML itself
-does not establish which physical convention its author used. `validate`
+`import-structured` converts a `.keylayout` into structured records (below);
+`import` keeps it as a preserved import. Both take an explicit `iso` or `ansi`
+keycode convention; the XML itself does not establish which physical convention
+its author used. `export-all` writes `macos/`, `linux/` and `windows/` (each with
+its `export.json`) and `report.json` into a new directory; a refused target
+writes no folder and is listed with its reason. Generated Windows files go to a
+build directory such as the ignored `build/layout-source/`, never into the
+driver tree. `validate`
 prints the accepted format/version/id. `report` prints every target's actual
 tool support, artifact and refusal reason. `export-keylayout` is explicitly a
-single-file preservation operation, not the future default bundle exporter.
+single-file preservation operation of an import; `export-macos` is the bundle exporter.
 No command overwrites an existing destination, and an export refusal creates
 no file. Input must be valid UTF-8.
 
@@ -68,7 +84,8 @@ references, ambiguous transitions, controls on character keys or in action IDs,
 states and outputs,
 Compose conflicts and unplaced non-keypad typing keys. It reuses the canonical
 reader's tag scanner; it is not an additional XML parser or a DTD validator.
-Superset edits and physical relocations remain refused. Linux name/description
+An edited preserved import is refused; a structured source reaches the
+converter as its compiled `.keylayout` (see [The generator](#the-generator)). Linux name/description
 metadata are compiled, while other target preferences do not affect this
 export. Description characters unsafe in the existing converter's XKB quoted
 string are refused. Registry-specific driver hints are not inferred from a name.
@@ -76,8 +93,8 @@ string are refused. Registry-specific driver hints are not inferred from a name.
 The common registry corpus currently exports all four Ergopti variants with
 document-specific partial reports; Bépo's alternative hardware maps and Ergo-L's
 character-key control outputs are refused. Tests compare admitted files against
-the existing converter byte for byte. Installation, native keyboard execution,
-Windows DLL generation and macOS bundles remain separate work. The pure browser
+the existing converter byte for byte. Installation, native keyboard execution
+and Windows DLL generation remain separate work. The pure browser
 model stays conservative; the CLI's `report` augments it with the installed Lua
 tooling route, including runtime failures.
 
@@ -168,34 +185,42 @@ function names are also checked syntactically. A future compiler must admit
 them against its actual catalogues and platform limits; structural validation
 does not claim that every syntactically valid name is implemented.
 
-| Record               | Required fields                                      | Optional fields and contract                                                                                                                                                                                                                         |
-| -------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Root                 | `format`, `version`, `layout`, `physical`            | The records below. A new source without an import requires a layer named `base`.                                                                                                                                                                     |
-| `layout`             | `id`, `name`                                         | `description`, `author`, unique `languages` strings; these describe the source, not installation state.                                                                                                                                              |
-| `physical`           | `base` (`iso` or `ansi`)                             | `ansi_extra_key`: destination of the ISO extra key when deriving ANSI; no relocation is applied yet. Newly authored layouts use ISO.                                                                                                                 |
-| `imported_keylayout` | `text`, `convention` (`iso` or `ansi`)               | The exact original XML; no cached conversion projection.                                                                                                                                                                                             |
-| `modifiers[]`        | `id`, `mode`, nonempty unique `keys[]`               | Mode is `held` or `locked`. Custom IDs, including `kana`, `roya` and `loya`, cannot shadow built-ins.                                                                                                                                                |
-| `layers[]`           | `id`, `required[]`, `optional[]`, `keys`             | Ordered layers; required and optional modifier IDs cannot overlap. `platform_keys` contains optional `windows`, `macos`, `linux` mapping tables, each overriding `keys` by physical position. This retains the navigation editor's per-OS ownership. |
-| `dead_keys[]`        | `id`, `terminator`, `rules[]`                        | Optional `name`. A rule has unique nonempty `input` and at least one of `text` or `next`; `next` names a declared dead key. Both may be present. Cycles and multi-character results are representable.                                               |
-| `keys.<physical>`    | None                                                 | `name`, `caps_lock` (`unaffected`, `shift`, `separate`), `caps_altgr` boolean, `virtual_key` integer 0–255. `separate` requires `caps_layer` and `caps_shift_layer` referencing layers; those fields are forbidden in the other modes.               |
-| `remap`              | None                                                 | Physical source keys map to physical target keys; an empty target disables the key. Repeated destinations are legal.                                                                                                                                 |
-| `shortcuts[]`        | `key`, `modifiers[]`, `send_key`, `send_modifiers[]` | Physical chord output is independent of typed text. Modifiers reference built-ins or declarations; duplicate unordered source chords are refused.                                                                                                    |
-| `tap_holds[]`        | `key`, `tap`, `threshold_ms`                         | Exactly one of `hold_layer` or `hold_modifier`, referencing its declaration. Threshold is a positive safe integer in milliseconds. `tap` is a mapping.                                                                                               |
-| `windows`            | None                                                 | Unique `flags[]` identifiers and `nls[]` records. Each NLS record has `key`, `modifiers[]`, `function`, with optional `parameter_key`, `keyup_function`, `keyup_parameter_key`; source chords are unique.                                            |
-| `exports.macos`      | `format`                                             | `bundle`, `iso` or `ansi`; the future ordinary export defaults to `bundle`. The preservation command refuses any format other than the import's convention.                                                                                          |
-| `exports.windows`    | None                                                 | `locale`, `layout_id`, `dll_name` strings. KLC requires all three; `layout_id` must be a language LCID, while custom KLIDs remain reserved for a future installer.                                                                                   |
-| `exports.linux`      | None                                                 | `name`, `description` strings. XKB export requires an identifier name and a description without quotes, backslashes or controls.                                                                                                                     |
+| Record               | Required fields                                      | Optional fields and contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Root                 | `format`, `version`, `layout`, `physical`            | The records below. A new source without an import requires a layer named `base`.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `layout`             | `id`, `name`                                         | `description`, `author`, unique `languages` strings; these describe the source, not installation state.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `physical`           | `base` (`iso` or `ansi`)                             | `ansi_extra_key`: where the ANSI derivation moves the ISO key left of Z (default `Backquote`); `ansi_swaps`: further `[key, key]` position pairs swapped for ANSI, each key in one pair at most. A structured source is always `iso`.                                                                                                                                                                                                                                                                                    |
+| `imported_keylayout` | `text`, `convention` (`iso` or `ansi`)               | The exact original XML; no cached conversion projection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `modifiers[]`        | `id`, `mode`, nonempty unique `keys[]`               | Mode is `held` or `locked`. Custom IDs, including `kana`, `roya` and `loya`, cannot shadow built-ins.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `layers[]`           | `id`, `required[]`, `optional[]`, `keys`             | Ordered layers (the first matching selector wins); required and optional modifier IDs cannot overlap. `alternatives[]` holds further `{required, optional}` combinations selecting the same layer. `platform_keys` contains optional `windows`, `macos`, `linux` mapping tables, each overriding `keys` by physical position for that target. This retains the navigation editor's per-OS ownership.                                                                                                                     |
+| `dead_keys[]`        | `id`, `terminator`, `rules[]`                        | Optional `name`; `state` and `action_id`, the `.keylayout` state and dead-key action names when they differ from the defaults (the id; the terminator when it is one free character, else `dead_<state>`). A rule has exactly one of `input` (the typed text it answers to) or `input_dead_key` (a dead key pressed while this one is pending), unique within the dead key, and at least one of `text` or `next`; `next` names a declared dead key. Cycles and multi-character results are representable.                |
+| `keys.<physical>`    | None                                                 | `name`, `caps_lock` (`unaffected`, `shift`, `separate`), `caps_altgr` boolean, `virtual_key` integer 0–255. `separate` requires `caps_layer` and `caps_shift_layer` referencing layers; those fields are forbidden in the other modes.                                                                                                                                                                                                                                                                                   |
+| `remap`              | None                                                 | Physical source keys map to physical target keys; an empty target disables the key. Repeated destinations are legal.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `shortcuts[]`        | `key`, `modifiers[]`, `send_key`, `send_modifiers[]` | Physical chord output is independent of typed text. Modifiers reference built-ins or declarations; duplicate unordered source chords are refused.                                                                                                                                                                                                                                                                                                                                                                        |
+| `tap_holds[]`        | `key`, `tap`, `threshold_ms`                         | Exactly one of `hold_layer` or `hold_modifier`, referencing its declaration. Threshold is a positive safe integer in milliseconds. `tap` is a mapping.                                                                                                                                                                                                                                                                                                                                                                   |
+| `windows`            | None                                                 | Unique `flags[]` identifiers and `nls[]` records. Each NLS record has `key`, `modifiers[]`, `function`, with optional `parameter_key`, `keyup_function`, `keyup_parameter_key`; source chords are unique.                                                                                                                                                                                                                                                                                                                |
+| `exports.macos`      | `format`                                             | `bundle` (ISO + ANSI, the default), `iso` or `ansi` (one `.keylayout`). `internal_name`/`ansi_internal_name` (file name, `KLInfo_` key and strings key; default the layout id and `<internal>_ansi`), `ansi_display_name` (default `<name> ANSI`), `keyboard_id`/`ansi_keyboard_id` (default derived from the internal name), `input_source_id` (default `com.apple.keyboardlayout.<id>`, ANSI adds `.ansi`), `version` (default `1.0`). The preservation command refuses any format other than the import's convention. |
+| `exports.windows`    | None                                                 | `locale`, `layout_id`, `dll_name` strings. KLC requires all three; `layout_id` must be a language LCID, while custom KLIDs remain reserved for a future installer.                                                                                                                                                                                                                                                                                                                                                       |
+| `exports.linux`      | None                                                 | `name`, `description` strings. XKB export requires an identifier name and a description without quotes, backslashes or controls.                                                                                                                                                                                                                                                                                                                                                                                         |
 
 A key mapping has exactly one of `text`, `dead_key`, `action`, `key` or
 `disabled = true`. The `key` form may also contain a unique `modifiers` array.
+A `text` mapping takes part in the dead keys through its **compose identity**:
+the text itself, or `compose_as` when the key answers to another rule input (the
+Ergopti+ magic key types `★` and composes as `j`). `compose = false` types the
+text outside every dead key: a pending dead key types its terminator, then the
+text.
 Empty text is an explicit empty output. Dead keys and modifiers must resolve
 to declarations. The built-in modifiers are `shift`, `control`, `alt`, `meta`,
 their `_left` and `_right` variants, and `caps_lock`, `num_lock`, `scroll_lock`.
 Their separate names avoid collapsing platform-specific shortcut semantics.
 
 For example, this new source expresses a ligature, a locked custom modifier,
-a navigation layer, a physical shortcut and a tap-hold. It validates and saves;
-every target remains unavailable until its compiler is implemented.
+a navigation layer, a physical shortcut and a tap-hold. It validates, saves and
+compiles; every export lists the custom modifier, its layer (with the action
+mapping it holds), the shortcut and the tap-hold as omitted. The fuller fixture
+`_shared/tests/corpus/layouts/source/source.toml` and its golden
+`source.keylayout` pin the compiler.
 
 ```toml
 format = "ergopti-layout"
@@ -242,22 +267,109 @@ threshold_ms = 180
 format = "bundle"
 ```
 
+## The generator
+
+### Structured import
+
+`importStructured` reads a `.keylayout` with the composer reader and refuses
+what its records cannot hold: several hardware layouts (Bépo), a nonzero
+`defaultIndex`, a printable key with no `KeyboardEvent.code` name (Ergo-L's
+code 66), an action without a neutral transition, or two dead-key actions
+entering one state. Each `keyMapSelect` becomes a layer named after its first
+selector's required modifiers, its unfolded tokens kept (`shift` is the left
+Shift, `anyShift` either). Action and state names survive where the compiler
+would not derive them. System keys typing their standard control output are left
+implicit; every other key is recorded. Physical names come from
+`mac_keycodes.json` (the 49 character keys, by convention), `physical_keys.json`
+and the keys no layer binds in `hid_usages.json` (`unregistered`; F13 wins over
+PrintScreen for the same macOS code).
+
+The tests import the registry `ergopti`, `ergopti_ansi`, `ergopti_plus` and
+`ergopti_plus_ansi` files, write and reread the TOML, compile it and compare the
+result with the original as macOS runs it: the same selectors, and the same text
+for every key of every keyMap from every reachable pair of dead-key states. The
+XKB files of the structured sources equal those of the original files byte for
+byte, and the Ergopti KLC likewise.
+
+### Compilation and what is left out
+
+`compileKeylayout(source, tables, {variant, platform})` writes one keyMap per
+layer whose modifiers have a `.keylayout` token, the standard control output of
+every system key a layer does not map, one action per compose identity that a
+rule answers to (keys typing a text no rule uses stay plain outputs), one action
+per dead key, and its terminators. A remap between two character keys is applied
+natively (the source key does what the target did, read before any remap). The
+report lists, with a stable reason, every record no `.keylayout` holds: custom
+modifiers and their layers, remaps of system or modifier keys, shortcuts,
+tap-holds, Windows flags, per-key Caps Lock fields (layer selection owns Caps
+Lock there), `action`/`key` mappings, and keys with no macOS code. Two keys
+sharing a compose identity with different texts are refused
+(`source_compose_conflict`).
+
+For Linux and Windows the compilation is the input of their converters, which
+read Option as AltGr: `alt_right` folds onto it (AltGr is the right Alt key),
+other sided modifiers drop their layer with `sided_modifier_not_in_<platform>`,
+and a disabled character key becomes an empty cell
+(`disabled_key_is_empty_cell`). Each converter's own report (projection levels,
+KLC column limits) follows.
+
+### ISO edits, ANSI derived
+
+Decided 2026-11-06: the user edits the ISO layout. The ANSI variant swaps the
+mapping of `IntlBackslash` with `ansi_extra_key` (default `Backquote`), then each
+`ansi_swaps` pair. The Ergopti rule
+(`keylayout_ansi_creation.py`: macOS codes 10↔50 and 42↔30) is
+`ansi_swaps = [["Backslash", "BracketRight"]]`; with it the compiled ANSI
+variants of Ergopti and Ergopti+ behave exactly as the registry ANSI files.
+
+### macOS bundle
+
+`exportMacos` writes, by default, `<internal>.bundle/Contents/` with
+`Info.plist` (one `KLInfo_<internal>` entry per variant, its `TISInputSourceID`
+and the first `layout.languages` entry as `TISIntendedLanguage`),
+`version.plist`, `Resources/<internal>.keylayout` and
+`<internal>_ansi.keylayout`, and `en.lproj`/`fr.lproj` `InfoPlist.strings` in
+UTF-16LE with a byte-order mark, keyed by the internal name, as the shipped
+Ergopti bundles are: macOS rejects a bundle whose strings are keyed by the input
+source id. `iso` and `ansi` write one `.keylayout`. Icons are not generated, and
+native loading by macOS is not certified by the export.
+
+### Drivers: the source through the layout composer host
+
+On macOS and Linux the layout manager page may save an Ergopti source in place
+of a composition: it sends the TOML and the `.keylayout` the shared compiler
+built from it (`composer_save` with `source` instead of `declaration`).
+`_shared/lua/layouts/composer.lua` checks the bounds (`source_file`,
+`max_source_bytes` in `_shared/modules/layouts/defaults.json`), the format and
+version, the display name, and that the layout carries the source's internal
+name (a preserved import must send its own XML); it stores the TOML, removes the
+other form, and installs the layout as the `composed` entry, which each driver
+then emulates or installs as for any composition. The driver therefore offers
+what the compiled `.keylayout` carries and the report's `driver_macos` and
+`driver_linux` entries list the rest. The page side belongs to the unified
+editor. Windows has the same host in `windows/ui/layout_manager/composer.ahk`,
+which does not accept a source yet.
+
 ## Capability evidence and remaining consumers
 
 The report covers macOS, Linux, Windows, the three driver emulators and web.
-Only a preserved imported `.keylayout` can report `native`; this denotes its
-artifact format, not native execution evidence. The CLI's Linux and Windows routes report
+A preserved imported `.keylayout` reports `native` from the pure model; a
+structured source reports the bundle export's `native` or `partial` with its
+omissions. Either denotes the artifact format, not native execution evidence. The CLI's Linux and Windows routes report
 `partial` with its actual projection losses or `unavailable` with the refusal
 reason. The pure browser model reports `tooling_export_required` for Linux and Windows;
 other unfinished routes report `exporter_not_implemented`. The preservation
 route names edits it cannot compile. These are tool limitations, not claims that
-the operating system cannot express a feature. No route reports `emulated`
-until a driver actually consumes the source.
+the operating system cannot express a feature. The CLI reports `driver_macos` and
+`driver_linux` from the composer host route above (`emulated`, or `partial` with
+the omissions); Windows and web stay `unavailable` until they consume the source.
 
 Next consumers must replace these conservative reports with measured per-feature
 native/emulated/impossible results and golden vectors before enabling export.
-The work still includes lossless structural import, superset target compilers,
-ISO/ANSI derivation, bundle construction, the single shared editor, website
-embedding, and direct source loading by every driver. More detailed hardware,
+The work still includes the single shared editor and its page side of the
+source save, website embedding, emulation of the records no `.keylayout`
+carries (custom modifiers, tap-holds, shortcuts) from the source, the Windows
+host, keyboard DLL and installer from the generated KLC, and native loading
+proof of the generated bundle on a Mac. More detailed hardware,
 printing/palette and NLS semantics should evolve through an explicit versioned
 schema change if they cannot fit the declared records.
