@@ -32,7 +32,9 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'close',
 	'composer_open',
 	'composer_save',
-	'composer_remove'
+	'composer_remove',
+	'source_open',
+	'source_save'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -436,7 +438,75 @@ window.initData = function (data) {
 		_strings = data.strings;
 		applyDomStrings();
 	}
+	// Only a host that stores the editor's files offers it (macOS and Linux).
+	document.getElementById('btn-editor').hidden = data.source_editor !== true;
 	window.updateState(data.state);
+};
+
+// ========================================
+// ========================================
+// ======= 5/ Layout editor ===============
+// ========================================
+// ========================================
+
+// The unified layout editor (_shared/ui/layout_editor), mounted in this window
+// once the host sent the last saved source; files save through the host.
+let _editor = null;
+let _pendingSave = null;
+
+/** Shows the editor or the layout list. */
+function showEditor(visible) {
+	document.getElementById('layout-view').hidden = visible;
+	document.getElementById('layout-editor').hidden = !visible;
+}
+
+/** Saves one editor file through the host; settles on sourceResult. */
+function hostSave(filename, text) {
+	return new Promise(function (resolve, reject) {
+		if (_pendingSave) {
+			reject({ code: 'save_busy', path: filename });
+			return;
+		}
+		_pendingSave = { resolve: resolve, reject: reject };
+		send('source_save', undefined, { filename: filename, text: text });
+	});
+}
+
+/**
+ * Called by the host with the last saved source: { text, filename, folder }.
+ * @param {Object} data
+ */
+window.sourceData = function (data) {
+	const initial = data && typeof data.text === 'string' ? data.text : null;
+	showEditor(true);
+	if (_editor) {
+		if (initial !== null) _editor.open(data.filename, initial);
+		return;
+	}
+	_editor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
+		saveFile: hostSave,
+		savedStatus: 'status.saved_in_app',
+		initial: initial,
+		onClose: function () {
+			showEditor(false);
+		}
+	});
+};
+
+/**
+ * Called by the host once a file is stored: { ok, code, detail, filename }.
+ * @param {Object} result
+ */
+window.sourceResult = function (result) {
+	const pending = _pendingSave;
+	_pendingSave = null;
+	if (!pending) return;
+	if (result && result.ok === true) pending.resolve();
+	else
+		pending.reject({
+			code: (result && result.code) || 'host_save_failed',
+			path: (result && result.detail) || ''
+		});
 };
 
 /**
@@ -450,12 +520,16 @@ window.updateState = function (state) {
 
 // ========================================
 // ========================================
-// ======= 5/ Events & Ready ==============
+// ======= 6/ Events & Ready ==============
 // ========================================
 // ========================================
 
 document.getElementById('btn-refresh').addEventListener('click', function () {
 	send('refresh');
+});
+
+document.getElementById('btn-editor').addEventListener('click', function () {
+	send('source_open');
 });
 
 document.getElementById('btn-close').addEventListener('click', function () {
