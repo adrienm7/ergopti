@@ -1,0 +1,20 @@
+# _shared/tests/corpus/config_migrations/shipped_release_settings_kept_on_windows/expected.toml
+
+[_meta]
+schema_version = 21
+
+[category_enabled]
+shortcuts = true
+
+[hotstrings]
+cascade_max_arrows = 3
+
+[hotstrings.dynamic]
+enabled = false
+
+[llm]
+trigger_shortcut = "^!a"
+
+[shortcuts.keyboard]
+primary_g = "open_hotstrings_editor"
+meta_e = "search_web"

@@ -67,7 +67,7 @@ for (const name of fs.readdirSync(CORPUS).sort()) {
 	}
 }
 // Every authored fixture climbs from the oldest supported version, as a file of
-// 1.0.0 would: a file with no stamp would skip the steps these boots exercise.
+// 1.0.9 would: a file with no stamp would skip the steps these boots exercise.
 const OLDEST_SCHEMA_VERSION = parseToml(
 	fs.readFileSync(
 		path.join(WINDOWS, '..', '_shared', 'core', 'config_schema', 'migrations.toml'),
@@ -87,11 +87,12 @@ function writeSeededConfig(file, toml) {
 	fs.writeFileSync(file, stamped);
 }
 
-// A config.toml a pre-release stamped, seeded byte for byte: the one boot that
-// must log its refusal, keep every byte and write no backup.
+// A config.toml ErgoptiPlus 1.0.8 stamped, below the squashed floor, seeded byte
+// for byte: the one boot that must log its refusal, keep every byte and write
+// no backup.
 const TOO_OLD_FIXTURE = 'too-old-config';
 const TOO_OLD_SOURCE =
-	'# from a pre-release\n[_meta]\nschema_version = 11\n\n[gestures]\nenabled = true\n';
+	'# from ErgoptiPlus 1.0.8\n[_meta]\nschema_version = 16\n\n[gestures]\nenabled = true\n';
 
 // config.toml files that change the script chords, and the slots each leaves
 // running (every other fixture runs all four: they start with their preset).

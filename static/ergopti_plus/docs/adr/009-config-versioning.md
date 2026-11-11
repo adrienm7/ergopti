@@ -49,7 +49,7 @@ At boot, before anything applies or saves the file, each driver classifies it:
   since it was read;
 - **current**: nothing is written;
 - **stamped below `oldest_version`**: the file is never written, the session
-  is read-only, one ERROR is logged and a notice names the way out (run 1.0.8
+  is read-only, one ERROR is logged and a notice names the way out (run 1.0.9
   once, or move the file aside). The chain starts at `oldest_version`;
 - **no stamp, once `unstamped_version` is below `oldest_version`**: treated as
   current, as a hand-written file must keep working. No step runs, no backup is
@@ -89,8 +89,11 @@ placeholder stamped with the current version.
 - **Squash old steps**: raise `oldest_version` and delete the steps below it,
   with the corpus cases that only they exercised. On 2026-11-01 it became v12,
   the schema of the first public release (1.0.0): v2 to v11 existed only in
-  pre-releases and no release from 1.0.0 on writes them. It stays at or below
-  the oldest public schema unless the maintainer decides otherwise.
+  pre-releases and no release from 1.0.0 on writes them. On 2026-11-11 the
+  maintainer raised it to v20, the schema of 1.0.9, the latest public release:
+  1.0.0 to 1.0.6 wrote v12 and 1.0.7 and 1.0.8 wrote v16, and 1.0.9 still climbs
+  both, so the notice names it as the bridge. It stays at or below the schema
+  of the latest public release, which must climb every older public schema.
 - **Change a value's domain** (an enum renamed, `0`/`1` turned into booleans):
   add a `map_value` op; its `from` and `to` sets are disjoint so a replay
   changes nothing.

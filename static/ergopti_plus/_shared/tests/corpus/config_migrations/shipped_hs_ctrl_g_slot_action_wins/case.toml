@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_slot_action_wins/case.toml
-
-[case]
-description = "An action the user chose for the macOS Ctrl+G slot wins over the switch, which is dropped."
-drivers = ["hs"]
-outcome = "migrated"
-from_version = 19
-to_version = 21
