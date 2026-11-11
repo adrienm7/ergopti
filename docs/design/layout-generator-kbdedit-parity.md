@@ -33,9 +33,10 @@ multi-character results, ligatures, numpad and media keys, physical remapping, t
 (blocks and code-point entry), printable stickers (four levels per key), a live typing preview and undo/redo.
 Added the same night: drag and drop between keys (swap, Ctrl copies), copy/paste of a mapping, ISO/ANSI board,
 locating a character, exact sticker size, Caps Lock + AltGr, Windows virtual keys, layout flags and NLS
-functions, compiled `.keylayout` and bundle exports, and filling a layer from another layout. Still open against
-this inventory: Unicode name search and the character magnifier (no Unicode names table ships with the page),
-auto case mapping, sticker per-block visibility, keyboard types beyond ISO/ANSI, XKB/KLC exports in the browser
+functions, compiled `.keylayout` and bundle exports, and filling a layer from another layout. Unicode 17.0 name
+search (words, `*` and `?` wildcards, glyph, `U+XXXX`, aliases, adjustable cap of 1000) and the character
+magnifier (glyph, code points, names, block, Copy) on hovered keys, palette cells and results. Still open against
+this inventory: auto case mapping, sticker per-block visibility, keyboard types beyond ISO/ANSI, XKB/KLC exports in the browser
 and the Windows DLL.
 
 ## Capability checklist (2026-11-11)
