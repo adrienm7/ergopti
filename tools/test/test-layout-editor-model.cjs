@@ -397,6 +397,52 @@ test('drag and drop swaps two keys, and a copy leaves the source', () => {
 	assert.equal(M.transferMapping(doc, 'base', 'KeyA', 'KeyA', null, false), doc);
 });
 
+test('a letter fills its other case on the case layer, never over a mapping', () => {
+	let doc = IO.create('a', 'A');
+	assert.equal(M.caseLayer(doc, 'base'), null, 'no Shift layer yet');
+	doc = M.addLayer(doc, 'shift', ['shift'], []);
+	assert.equal(M.caseLayer(doc, 'base').id, 'shift');
+	assert.equal(M.caseLayer(doc, 'shift').id, 'base');
+	doc = M.setMappingWithCase(doc, 'base', 'KeyQ', { text: 'é' }, null, false);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyQ', null).mapping.text, 'É');
+	doc = M.setMappingWithCase(doc, 'shift', 'KeyW', { text: 'Ω' }, null, false);
+	assert.equal(M.mappingAt(doc, 'base', 'KeyW', null).mapping.text, 'ω');
+	doc = M.setMapping(doc, 'shift', 'KeyE', { text: '!' }, null);
+	doc = M.setMappingWithCase(doc, 'base', 'KeyE', { text: 'e' }, null, false);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyE', null).mapping.text, '!', 'a mapped partner stays');
+	doc = M.setMappingWithCase(doc, 'base', 'KeyE', { text: 'e' }, null, true);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyE', null).mapping.text, 'E', 'overwrite replaces it');
+	// No one-letter other case: ß (SS), a digit, a ligature.
+	for (const text of ['ß', '1', 'ff'])
+		assert.equal(
+			M.mappingAt(
+				M.setMappingWithCase(doc, 'base', 'KeyR', { text }, null, false),
+				'shift',
+				'KeyR',
+				null
+			),
+			null,
+			text
+		);
+	// A platform override fills the partner's override, not the shared cell.
+	doc = M.setMappingWithCase(doc, 'base', 'KeyT', { text: 'þ' }, 'linux', false);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyT', 'linux').scope, 'linux');
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyT', null), null);
+});
+
+test('every mapping of a layer moves or copies to another layer at once', () => {
+	let doc = M.addLayer(IO.create('a', 'A'), 'shift', ['shift'], []);
+	doc = M.setMapping(doc, 'base', 'KeyA', { text: 'a' }, null);
+	doc = M.setMapping(doc, 'shift', 'KeyB', { text: 'B' }, null);
+	const moved = M.transferLayer(doc, 'base', 'shift', false);
+	assert.equal(M.mappingAt(moved, 'shift', 'KeyA', null).mapping.text, 'a');
+	assert.equal(M.mappingAt(moved, 'shift', 'KeyB', null).mapping.text, 'B', 'other cells stay');
+	assert.equal(M.mappingAt(moved, 'base', 'KeyA', null), null);
+	const copied = M.transferLayer(doc, 'base', 'shift', true);
+	assert.equal(M.mappingAt(copied, 'base', 'KeyA', null).mapping.text, 'a');
+	refuses(() => M.transferLayer(doc, 'base', 'nowhere', true), 'layer_unknown');
+});
+
 test('Windows flags and NLS functions are edited and refused like any record', () => {
 	let doc = IO.create('a', 'A');
 	doc = M.setWindowsFlags(doc, ['kllf_altgr']);

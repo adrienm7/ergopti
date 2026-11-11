@@ -288,6 +288,41 @@ async function exerciseManager(browser, origin) {
 		assert.match(await page.getAttribute('#le-stickers', 'style'), /--le-sticker-size:18mm/);
 		await page.click('#le-undo');
 
+		// KbdEdit's automatic case mapping fills Shift, replacing it only when asked.
+		await page.click('[data-layer="base"]');
+		await page.click('#le-board [data-code="KeyD"]');
+		await page.selectOption('#le-kind', 'text');
+		await page.fill('#le-text', 'ŵ');
+		await page.check('#le-case-overwrite');
+		await page.click('#le-apply');
+		await page.click('[data-layer="shift"]');
+		assert.equal(await legendOf('KeyD'), 'Ŵ');
+		// Stickers print the chosen levels and can hide a Shift legend that is only the capital.
+		const sticker = (level) =>
+			page.evaluate(
+				(cls) =>
+					[...document.querySelectorAll(`#le-stickers .le-sticker-${cls}`)].map(
+						(e) => e.textContent
+					),
+				level
+			);
+		assert.ok((await sticker('shift')).includes('Ŵ'));
+		await page.click('#le-sticker-levels summary');
+		await page.check('#le-sticker-hide-case');
+		assert.ok(!(await sticker('shift')).includes('Ŵ'), 'the capital of the base is hidden');
+		await page.click('#le-sticker-levels summary');
+		await page.uncheck('#le-sticker-layer-shift');
+		assert.equal((await sticker('shift')).length, 0, 'an unchosen level is not printed');
+		// « Move every key »: the Shift layer's mappings go to the base layer at once.
+		await page.click('#le-move-all summary');
+		await page.selectOption('#le-move-target', 'base');
+		await page.click('#le-move-layer');
+		assert.equal(await legendOf('KeyD'), '', 'the moved layer is empty');
+		await page.click('[data-layer="base"]');
+		assert.equal(await legendOf('KeyD'), 'Ŵ');
+		await page.click('#le-undo');
+		await page.click('#le-undo');
+
 		// The composer's job: fill the base layer from AZERTY. This loopback server
 		// has no registry folder, so the panel says the catalogue list failed.
 		await page.click('[data-layer="base"]');
