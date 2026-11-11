@@ -31,6 +31,7 @@
 local Registry = require("layouts.registry")
 local Keylayout = require("layouts.keylayout")
 local TableUtil = require("table_util")
+local SourceEmulation = require("layouts.source_emulation")
 
 local M = {}
 
@@ -60,7 +61,7 @@ local CONVENTIONS = { iso = true, ansi = true }
 --- Validates the [composer] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/modules/layouts/defaults.json.
 --- @return table|nil settings { id, folder, declaration_file, max_declaration_bytes, source_file,
----   max_source_bytes, family }
+---   max_source_bytes, emulation_file, max_emulation_bytes, family }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local composer = type(layout_defaults) == "table" and layout_defaults.composer or nil
@@ -78,7 +79,11 @@ function M.settings(layout_defaults)
 		or composer.source_file == composer.declaration_file then
 		return nil, "the composer source file is not a plain file name distinct from the declaration"
 	end
-	for _, field in ipairs({ "max_declaration_bytes", "max_source_bytes" }) do
+	if type(composer.emulation_file) ~= "string" or not composer.emulation_file:match("^[A-Za-z0-9._-]+$")
+		or composer.emulation_file == composer.declaration_file or composer.emulation_file == composer.source_file then
+		return nil, "the composer emulation file is not a plain file name distinct from the other two"
+	end
+	for _, field in ipairs({ "max_declaration_bytes", "max_source_bytes", "max_emulation_bytes" }) do
 		local bound = composer[field]
 		if type(bound) ~= "number" or bound <= 0 or bound % 1 ~= 0 then
 			return nil, "the composer " .. field .. " bound is not a positive integer"
@@ -91,6 +96,8 @@ function M.settings(layout_defaults)
 		max_declaration_bytes = composer.max_declaration_bytes,
 		source_file = composer.source_file,
 		max_source_bytes = composer.max_source_bytes,
+		emulation_file = composer.emulation_file,
+		max_emulation_bytes = composer.max_emulation_bytes,
 		family = composer.family,
 	}, nil
 end
@@ -219,6 +226,51 @@ function M.check_source(settings, max_file_bytes, source_text, keylayout, decode
 	if not CONVENTIONS[convention] then return refuse("the keycode convention is neither iso nor ansi") end
 	if parsed.name ~= expected then return refuse("the compiled layout is not named after the source") end
 	return { name = name, keyboard_name = parsed.name, convention = convention }, nil, nil
+end
+
+--- Checks the emulation table the page sends beside a source: the shared
+--- compiler's table of that layout for this platform, which the engine compiles.
+--- @param settings table From M.settings.
+--- @param emulation_text any The table's JSON as the page wrote it.
+--- @param source_text string The source it was compiled from (already checked).
+--- @param platform string "macos" or "linux".
+--- @param decode_json function
+--- @param decode_toml function
+--- @return boolean|nil ok
+--- @return string|nil code M.FAILURE_INVALID
+--- @return string|nil detail
+function M.check_emulation(settings, emulation_text, source_text, platform, decode_json, decode_toml)
+	local function refuse(why) return nil, M.FAILURE_INVALID, why end
+	if type(emulation_text) ~= "string" then return refuse("the emulation table must be sent as text") end
+	if #emulation_text > settings.max_emulation_bytes then
+		return refuse("the emulation table is larger than " .. settings.max_emulation_bytes .. " bytes")
+	end
+	local ok, table_ = pcall(decode_json, emulation_text)
+	if not ok or type(table_) ~= "table" then return refuse("the emulation table is not valid JSON") end
+	local compiled, compile_err = pcall(SourceEmulation.compile, table_)
+	if not compiled then return refuse("the emulation table cannot be performed: " .. tostring(compile_err)) end
+	local source = decode_toml(source_text)
+	if table_.layout ~= source.layout.id then return refuse("the emulation table is not the source's") end
+	if table_.platform ~= platform then return refuse("the emulation table is not compiled for " .. platform) end
+	return true, nil, nil
+end
+
+--- The emulation table stored beside the composed layout's source, decoded.
+--- @param settings table From M.settings.
+--- @param config_dir string The configuration folder, with a trailing slash.
+--- @param ports table { exists(path), read(path), decode_json(text) }
+--- @return table|nil table_ nil when none is stored.
+--- @return string|nil error Why a stored table cannot be read.
+function M.read_emulation(settings, config_dir, ports)
+	local path = config_dir .. settings.folder .. "/" .. settings.emulation_file
+	if not ports.exists(path) then return nil, nil end
+	local text = ports.read(path)
+	if type(text) ~= "string" or #text > settings.max_emulation_bytes then
+		return nil, "the stored emulation table " .. path .. " is unreadable or larger than its bound"
+	end
+	local ok, table_ = pcall(ports.decode_json, text)
+	if not ok or type(table_) ~= "table" then return nil, "the stored emulation table " .. path .. " is not JSON" end
+	return table_, nil
 end
 
 --- The installed record's entry of a composition.
@@ -352,6 +404,10 @@ function M.new(env)
 		return env.config_dir .. settings.folder .. "/" .. settings.source_file
 	end
 
+	local function emulation_path()
+		return env.config_dir .. settings.folder .. "/" .. settings.emulation_file
+	end
+
 	--- A stored file within its bound, "unreadable" when it is not, nil when absent.
 	local function stored(path, bound, what)
 		if not env.exists(path) then return nil end
@@ -380,8 +436,9 @@ function M.new(env)
 		end)
 	end
 
-	--- Stores a composition or a layout source and installs its layout.
-	--- @param payload table { declaration | source, keylayout, use }
+	--- Stores a composition or a layout source (with its emulation table, when
+	--- the source has records no .keylayout holds) and installs its layout.
+	--- @param payload table { declaration | source [, emulation], keylayout, use }
 	--- @param on_done function on_done(ok, code, detail, used, installed): installed is what the
 	---   driver's install reported (the macOS and Linux install results), for the Debug check.
 	function operations.save(payload, on_done)
@@ -392,7 +449,14 @@ function M.new(env)
 		elseif payload.source ~= nil then
 			checked, code, detail = M.check_source(settings, env.max_file_bytes, payload.source, payload.keylayout,
 				env.decode_toml)
+			if checked and payload.emulation ~= nil then
+				local emulation_ok, emulation_code, emulation_detail = M.check_emulation(settings, payload.emulation,
+					payload.source, env.platform, env.decode_json, env.decode_toml)
+				if not emulation_ok then checked, code, detail = nil, emulation_code, emulation_detail end
+			end
 			stored_path, stored_text, other_path = source_path(), payload.source, declaration_path()
+		elseif payload.emulation ~= nil then
+			checked, code, detail = nil, M.FAILURE_INVALID, "an emulation table comes only with a source"
 		else
 			checked, code, detail = M.check(settings, env.max_file_bytes, payload.declaration, payload.keylayout,
 				env.decode_json)
@@ -414,11 +478,24 @@ function M.new(env)
 				on_done(false, M.FAILURE_WRITE, tostring(write_err), false)
 				return
 			end
-			-- The layout now comes from the form just stored; the other one would reopen stale.
-			if env.exists(other_path) and not env.delete(other_path) then
-				env.log("error", "The replaced composition %s could not be deleted.", other_path)
-				on_done(false, M.FAILURE_WRITE, "cannot delete " .. other_path, false)
-				return
+			-- The layout now comes from the form just stored; the other one would reopen
+			-- stale, and an emulation table belongs to the source it was sent with.
+			if payload.emulation ~= nil then
+				local emulation_written, emulation_err = env.write(emulation_path(), payload.emulation)
+				if not emulation_written then
+					env.log("error", "The emulation table could not be stored: %s.", tostring(emulation_err))
+					on_done(false, M.FAILURE_WRITE, tostring(emulation_err), false)
+					return
+				end
+			end
+			local stale = { other_path }
+			if payload.emulation == nil then stale[#stale + 1] = emulation_path() end
+			for _, path in ipairs(stale) do
+				if env.exists(path) and not env.delete(path) then
+					env.log("error", "The replaced composition %s could not be deleted.", path)
+					on_done(false, M.FAILURE_WRITE, "cannot delete " .. path, false)
+					return
+				end
 			end
 			local entry = M.entry(settings, checked, payload.keylayout, digest, env.platform)
 			env.install(entry, payload.keylayout, function(installed, install_code, install_detail)
@@ -456,7 +533,7 @@ function M.new(env)
 	--- @param on_done function on_done(ok, code, detail)
 	function operations.remove(on_done)
 		local function delete_declaration()
-			for _, path in ipairs({ declaration_path(), source_path() }) do
+			for _, path in ipairs({ declaration_path(), source_path(), emulation_path() }) do
 				if env.exists(path) and not env.delete(path) then
 					on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
 					return

@@ -8,12 +8,16 @@
 			{
 				"id": "roya",
 				"mode": "held",
-				"keys": ["IntlBackslash"]
+				"keys": [
+					"IntlBackslash"
+				]
 			},
 			{
 				"id": "kana",
 				"mode": "locked",
-				"keys": ["Insert"]
+				"keys": [
+					"Insert"
+				]
 			},
 			{
 				"id": "nav",
@@ -42,7 +46,9 @@
 				"id": "shift",
 				"selectors": [
 					{
-						"required": ["shift"],
+						"required": [
+							"shift"
+						],
 						"optional": []
 					}
 				],
@@ -53,8 +59,12 @@
 				"id": "roya",
 				"selectors": [
 					{
-						"required": ["roya"],
-						"optional": ["shift"]
+						"required": [
+							"roya"
+						],
+						"optional": [
+							"shift"
+						]
 					}
 				],
 				"native": false,
@@ -67,7 +77,9 @@
 					},
 					"KeyD": {
 						"key": "KeyC",
-						"modifiers": ["control"]
+						"modifiers": [
+							"control"
+						]
 					}
 				}
 			},
@@ -75,8 +87,12 @@
 				"id": "kana",
 				"selectors": [
 					{
-						"required": ["kana"],
-						"optional": ["caps_lock"]
+						"required": [
+							"kana"
+						],
+						"optional": [
+							"caps_lock"
+						]
 					}
 				],
 				"native": false,
@@ -97,8 +113,13 @@
 				"id": "nav",
 				"selectors": [
 					{
-						"required": ["nav"],
-						"optional": ["shift", "control"]
+						"required": [
+							"nav"
+						],
+						"optional": [
+							"shift",
+							"control"
+						]
 					}
 				],
 				"native": false,
@@ -117,7 +138,10 @@
 				"id": "right_kana",
 				"selectors": [
 					{
-						"required": ["shift_right", "kana"],
+						"required": [
+							"shift_right",
+							"kana"
+						],
 						"optional": []
 					}
 				],
@@ -129,13 +153,19 @@
 		"shortcuts": [
 			{
 				"key": "KeyA",
-				"modifiers": ["control"],
+				"modifiers": [
+					"control"
+				],
 				"send_key": "KeyB",
-				"send_modifiers": ["control"]
+				"send_modifiers": [
+					"control"
+				]
 			},
 			{
 				"key": "KeyQ",
-				"modifiers": ["alt"],
+				"modifiers": [
+					"alt"
+				],
 				"send_key": "Escape",
 				"send_modifiers": []
 			}
@@ -222,12 +252,16 @@
 			{
 				"id": "roya",
 				"mode": "held",
-				"keys": ["IntlBackslash"]
+				"keys": [
+					"IntlBackslash"
+				]
 			},
 			{
 				"id": "kana",
 				"mode": "locked",
-				"keys": ["Insert"]
+				"keys": [
+					"Insert"
+				]
 			},
 			{
 				"id": "nav",
@@ -256,7 +290,9 @@
 				"id": "shift",
 				"selectors": [
 					{
-						"required": ["shift"],
+						"required": [
+							"shift"
+						],
 						"optional": []
 					}
 				],
@@ -267,8 +303,12 @@
 				"id": "roya",
 				"selectors": [
 					{
-						"required": ["roya"],
-						"optional": ["shift"]
+						"required": [
+							"roya"
+						],
+						"optional": [
+							"shift"
+						]
 					}
 				],
 				"native": false,
@@ -281,7 +321,9 @@
 					},
 					"KeyD": {
 						"key": "KeyC",
-						"modifiers": ["control"]
+						"modifiers": [
+							"control"
+						]
 					}
 				}
 			},
@@ -289,8 +331,12 @@
 				"id": "kana",
 				"selectors": [
 					{
-						"required": ["kana"],
-						"optional": ["caps_lock"]
+						"required": [
+							"kana"
+						],
+						"optional": [
+							"caps_lock"
+						]
 					}
 				],
 				"native": false,
@@ -311,8 +357,13 @@
 				"id": "nav",
 				"selectors": [
 					{
-						"required": ["nav"],
-						"optional": ["shift", "control"]
+						"required": [
+							"nav"
+						],
+						"optional": [
+							"shift",
+							"control"
+						]
 					}
 				],
 				"native": false,
@@ -331,7 +382,10 @@
 				"id": "right_kana",
 				"selectors": [
 					{
-						"required": ["shift_right", "kana"],
+						"required": [
+							"shift_right",
+							"kana"
+						],
 						"optional": []
 					}
 				],
@@ -343,13 +397,19 @@
 		"shortcuts": [
 			{
 				"key": "KeyA",
-				"modifiers": ["control"],
+				"modifiers": [
+					"control"
+				],
 				"send_key": "KeyB",
-				"send_modifiers": ["control"]
+				"send_modifiers": [
+					"control"
+				]
 			},
 			{
 				"key": "KeyQ",
-				"modifiers": ["alt"],
+				"modifiers": [
+					"alt"
+				],
 				"send_key": "Escape",
 				"send_modifiers": []
 			}
@@ -436,12 +496,16 @@
 			{
 				"id": "roya",
 				"mode": "held",
-				"keys": ["IntlBackslash"]
+				"keys": [
+					"IntlBackslash"
+				]
 			},
 			{
 				"id": "kana",
 				"mode": "locked",
-				"keys": ["Insert"]
+				"keys": [
+					"Insert"
+				]
 			},
 			{
 				"id": "nav",
@@ -470,7 +534,9 @@
 				"id": "shift",
 				"selectors": [
 					{
-						"required": ["shift"],
+						"required": [
+							"shift"
+						],
 						"optional": []
 					}
 				],
@@ -481,8 +547,12 @@
 				"id": "roya",
 				"selectors": [
 					{
-						"required": ["roya"],
-						"optional": ["shift"]
+						"required": [
+							"roya"
+						],
+						"optional": [
+							"shift"
+						]
 					}
 				],
 				"native": false,
@@ -495,7 +565,9 @@
 					},
 					"KeyD": {
 						"key": "KeyC",
-						"modifiers": ["control"]
+						"modifiers": [
+							"control"
+						]
 					}
 				}
 			},
@@ -503,8 +575,12 @@
 				"id": "kana",
 				"selectors": [
 					{
-						"required": ["kana"],
-						"optional": ["caps_lock"]
+						"required": [
+							"kana"
+						],
+						"optional": [
+							"caps_lock"
+						]
 					}
 				],
 				"native": false,
@@ -525,8 +601,13 @@
 				"id": "nav",
 				"selectors": [
 					{
-						"required": ["nav"],
-						"optional": ["shift", "control"]
+						"required": [
+							"nav"
+						],
+						"optional": [
+							"shift",
+							"control"
+						]
 					}
 				],
 				"native": false,
@@ -545,7 +626,10 @@
 				"id": "right_kana",
 				"selectors": [
 					{
-						"required": ["shift_right", "kana"],
+						"required": [
+							"shift_right",
+							"kana"
+						],
 						"optional": []
 					}
 				],
@@ -557,13 +641,19 @@
 		"shortcuts": [
 			{
 				"key": "KeyA",
-				"modifiers": ["control"],
+				"modifiers": [
+					"control"
+				],
 				"send_key": "KeyB",
-				"send_modifiers": ["control"]
+				"send_modifiers": [
+					"control"
+				]
 			},
 			{
 				"key": "KeyQ",
-				"modifiers": ["alt"],
+				"modifiers": [
+					"alt"
+				],
 				"send_key": "Escape",
 				"send_modifiers": []
 			}

@@ -87,7 +87,8 @@ function M.register(helpers)
 		-- A fixture: the shipped cap lives in _shared/modules/layouts/defaults.json
 		local DEFAULTS = { composer = { id = "composed", folder = "layout_composer",
 			declaration_file = "composition.json", max_declaration_bytes = 8192,
-			source_file = "layout_source.toml", max_source_bytes = 262144, family = "composed" } }
+			source_file = "layout_source.toml", max_source_bytes = 262144,
+			emulation_file = "layout_source_emulation.json", max_emulation_bytes = 262144, family = "composed" } }
 
 		--- A copy of the defaults with one composer field changed.
 		local function with(field, value)
@@ -105,6 +106,8 @@ function M.register(helpers)
 				{ with("declaration_file", "../x.json") }, { with("max_declaration_bytes", 0) },
 				{ with("max_declaration_bytes", 1.5) }, { with("max_declaration_bytes", "9") },
 				{ with("source_file", "../x.toml") }, { with("max_source_bytes", 0) },
+				{ with("emulation_file", "../x.json") }, { with("emulation_file", "layout_source.toml") },
+				{ with("emulation_file", "composition.json") }, { with("max_emulation_bytes", 0) },
 			}) do
 				local value, err = Composer.settings(bad[1])
 				helpers.assert_nil(value)

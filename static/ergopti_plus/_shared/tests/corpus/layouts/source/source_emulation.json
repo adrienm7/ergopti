@@ -1,0 +1,392 @@
+{
+	"macos": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "source_fixture",
+		"platform": "macos",
+		"modifiers": [
+			{
+				"id": "kana",
+				"mode": "locked",
+				"keys": []
+			}
+		],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					},
+					{
+						"required": [
+							"caps_lock"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "option",
+				"selectors": [
+					{
+						"required": [
+							"alt_right"
+						],
+						"optional": [
+							"shift"
+						]
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "kana",
+				"selectors": [
+					{
+						"required": [
+							"kana"
+						],
+						"optional": []
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "あ"
+					}
+				}
+			},
+			{
+				"id": "command",
+				"selectors": [
+					{
+						"required": [
+							"meta"
+						],
+						"optional": [
+							"shift",
+							"caps_lock"
+						]
+					}
+				],
+				"native": true,
+				"keys": {}
+			}
+		],
+		"shortcuts": [
+			{
+				"key": "KeyA",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyB",
+				"send_modifiers": [
+					"control"
+				]
+			}
+		],
+		"tap_holds": [
+			{
+				"key": "Space",
+				"tap": {
+					"text": " "
+				},
+				"hold_layer": "command",
+				"threshold_ms": 180
+			}
+		],
+		"remaps": [],
+		"not_emulated": [
+			{
+				"path": "modifiers.kana.keys[0]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "layers.command.keys.KeyJ",
+				"reason": "action_not_emulated"
+			},
+			{
+				"path": "remap.CapsLock",
+				"reason": "modifier_key_not_emulated"
+			}
+		]
+	},
+	"linux": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "source_fixture",
+		"platform": "linux",
+		"modifiers": [
+			{
+				"id": "kana",
+				"mode": "locked",
+				"keys": []
+			}
+		],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					},
+					{
+						"required": [
+							"caps_lock"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "option",
+				"selectors": [
+					{
+						"required": [
+							"alt_right"
+						],
+						"optional": [
+							"shift"
+						]
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "kana",
+				"selectors": [
+					{
+						"required": [
+							"kana"
+						],
+						"optional": []
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "あ"
+					}
+				}
+			},
+			{
+				"id": "command",
+				"selectors": [
+					{
+						"required": [
+							"meta"
+						],
+						"optional": [
+							"shift",
+							"caps_lock"
+						]
+					}
+				],
+				"native": true,
+				"keys": {}
+			}
+		],
+		"shortcuts": [
+			{
+				"key": "KeyA",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyB",
+				"send_modifiers": [
+					"control"
+				]
+			}
+		],
+		"tap_holds": [
+			{
+				"key": "Space",
+				"tap": {
+					"text": " "
+				},
+				"hold_layer": "command",
+				"threshold_ms": 180
+			}
+		],
+		"remaps": [],
+		"not_emulated": [
+			{
+				"path": "modifiers.kana.keys[0]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "layers.command.keys.KeyJ",
+				"reason": "action_not_emulated"
+			},
+			{
+				"path": "remap.CapsLock",
+				"reason": "modifier_key_not_emulated"
+			}
+		]
+	},
+	"windows": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "source_fixture",
+		"platform": "windows",
+		"modifiers": [
+			{
+				"id": "kana",
+				"mode": "locked",
+				"keys": []
+			}
+		],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					},
+					{
+						"required": [
+							"caps_lock"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "option",
+				"selectors": [
+					{
+						"required": [
+							"alt_right"
+						],
+						"optional": [
+							"shift"
+						]
+					}
+				],
+				"native": true,
+				"keys": {}
+			},
+			{
+				"id": "kana",
+				"selectors": [
+					{
+						"required": [
+							"kana"
+						],
+						"optional": []
+					}
+				],
+				"native": false,
+				"keys": {
+					"KeyA": {
+						"text": "あ"
+					}
+				}
+			},
+			{
+				"id": "command",
+				"selectors": [
+					{
+						"required": [
+							"meta"
+						],
+						"optional": [
+							"shift",
+							"caps_lock"
+						]
+					}
+				],
+				"native": true,
+				"keys": {}
+			}
+		],
+		"shortcuts": [
+			{
+				"key": "KeyA",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyB",
+				"send_modifiers": [
+					"control"
+				]
+			}
+		],
+		"tap_holds": [
+			{
+				"key": "Space",
+				"tap": {
+					"text": " "
+				},
+				"hold_layer": "command",
+				"threshold_ms": 180
+			}
+		],
+		"remaps": [],
+		"not_emulated": [
+			{
+				"path": "modifiers.kana.keys[0]",
+				"reason": "physical_key_not_emulated"
+			},
+			{
+				"path": "layers.command.keys.KeyJ",
+				"reason": "action_not_emulated"
+			},
+			{
+				"path": "remap.CapsLock",
+				"reason": "modifier_key_not_emulated"
+			}
+		]
+	}
+}
