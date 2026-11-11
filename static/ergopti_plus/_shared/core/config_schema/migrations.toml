@@ -98,7 +98,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 20
+current_version = 21
 unstamped_version = 2
 oldest_version = 12
 
@@ -826,4 +826,19 @@ reason = "The macOS Ctrl+G switch becomes its keyboard slot, as the other switch
 ops = [
 	{ op = "rename", section = "shortcuts.keys", key = "ctrl_g", to_section = "shortcuts.keyboard", to_key = "secondary_g" },
 	{ op = "map_value", section = "shortcuts.keyboard", key = "secondary_g", map = [{ from = true, to = "open_chatgpt" }, { from = false, to = "none" }] },
+]
+
+[steps.v20_to_v21]
+from = 20
+to = 21
+drivers = ["ahk"]
+reason = "The Windows tray stored the section order of a language category under its file stem, the key of the neutral category of the same name; each language category now has its own key, its group id, as on macOS and Linux."
+# Until v21 the French autocorrection and magic-key menus read and wrote
+# hotstrings.order_overrides.autocorrection and .magickey, the lists of the
+# neutral categories. That one list is what both menus showed, so it is copied
+# to the group id: neither menu changes at the upgrade, and the two lists part
+# from the next move on. A list already under the group id keeps its value.
+ops = [
+	{ op = "copy_if_absent", section = "hotstrings.order_overrides", key = "autocorrection", to_key = "french_autocorrection" },
+	{ op = "copy_if_absent", section = "hotstrings.order_overrides", key = "magickey", to_key = "french_magickey" },
 ]

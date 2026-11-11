@@ -5,4 +5,4 @@ description = "A URL the user set on the Win+G slot is the link it keeps opening
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 18
-to_version = 20
+to_version = 21
