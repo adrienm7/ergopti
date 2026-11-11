@@ -70,6 +70,37 @@ function M.register(helpers, opts)
 		end)
 
 		local index = decode(read(corpus .. "/cases.toml")).corpus.cases
+		helpers.it("a config_section import names its section and nothing else", function()
+			local imports = Migrate.parse_legacy_imports({ linux = { source = "config.toml", translate = "config_section", section = "mod_combos" } })
+			helpers.assert_eq(imports.linux, { source = "config.toml", translate = "config_section", section = "mod_combos" })
+			for _, entry in ipairs({
+				{ source = "config.toml", translate = "config_section" },
+				{ source = "config.toml", translate = "config_section", section = "mod_combos", retired_suffix = ".migrated" },
+				{ source = "config_karabiner.toml", translate = "karabiner", section = "mod_combos", retired_suffix = ".migrated" },
+			}) do
+				helpers.assert_eq((pcall(Migrate.parse_legacy_imports, { linux = entry })), false)
+			end
+		end)
+
+		helpers.it("config_section moves every leaf of the section as it is", function()
+			local document, shapes = decode('[mod_combos]\nsymmetric = true\nlist = [1, 2]\n'
+				.. '[mod_combos.config.escape_then_tab]\ncombo = "copy"\nfuture = 17\n[other]\nkeep = 1\n')
+			local function is_table(value) return type(value) == "table" and not shapes.arrays[value] end
+			local rows, deletes = Migrate.from_config_section(document, "mod_combos", is_table)
+			helpers.assert_eq(rows, {
+				{ section = "mod_combos.config.escape_then_tab", key = "combo", value = "copy" },
+				{ section = "mod_combos.config.escape_then_tab", key = "future", value = 17 },
+				{ section = "mod_combos", key = "list", value = { 1, 2 } },
+				{ section = "mod_combos", key = "symmetric", value = true },
+			}, "keys in sorted order, a table where it sorts")
+			helpers.assert_eq(#deletes, 4); helpers.assert_eq(deletes[3], { op = "delete", section = "mod_combos", key = "list" })
+			helpers.assert_eq(document.other, { keep = 1 }, "the document is not edited")
+			helpers.assert_eq((Migrate.from_config_section(decode("[other]\nkeep = 1\n"), "mod_combos", is_table)), nil)
+			local occupied = decode('mod_combos = "occupied"\n')
+			local none, _, why = Migrate.from_config_section(occupied, "mod_combos", is_table)
+			helpers.assert_eq(none, nil); helpers.assert_true(type(why) == "string")
+		end)
+
 		helpers.it("the corpus index lists every pinned case", function()
 			helpers.assert_eq(#index, M.CASE_COUNT)
 		end)
