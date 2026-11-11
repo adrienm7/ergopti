@@ -113,7 +113,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "d06f14ae1e8b0bd26c71cff87d8f0d5238aba20c636b701070c05b4895b75cbd"
+			"sha256": "2f14ad09c6a321186d64eea5f41321a32a63a233d2b70af41489e33097dbb49a"
 		}
 	],
 	"behaviors": [
