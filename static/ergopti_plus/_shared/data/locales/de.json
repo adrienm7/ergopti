@@ -4264,7 +4264,6 @@
 	"physical_shortcuts.save_failed": "Das Tastenkürzel konnte nicht gespeichert werden. Versuchen Sie es erneut.",
 	"physical_shortcuts.saved_reopen": "Gespeichert. Öffnen Sie dieses Fenster erneut, um fortzufahren.",
 	"physical_shortcuts.position_unavailable": "Diese Tastenposition ist hier nicht verfügbar.",
-	"physical_shortcuts.windows_unavailable": "Noch nicht für Windows: Windows hat noch keinen Host für physische Tastenkürzel, weder den Editor noch das Ausführen einer an eine physische Taste gebundenen Aktion. Physische Tastenkürzel funktionieren unter macOS und Linux.",
 	"physical_shortcuts.collision": "Diese Tastenkombination wird bereits verwendet. Wählen Sie eine andere.",
 	"physical_shortcuts.delivery_unqualified": "Noch nicht verfügbar: Ergopti kann auf diesem System noch keine Aktion sicher ausführen, die an eine physische Taste gebunden ist. Die benannten Tastenkürzel funktionieren weiter.",
 	"physical_shortcuts.window_unavailable": "Dieses Fenster ist nicht verfügbar: Versuchen Sie, es erneut zu öffnen.",
