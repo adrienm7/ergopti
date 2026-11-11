@@ -79,6 +79,19 @@ M.COUNT_SIGNALS = {
 	-- modules/llm: an API entry restored without its Keychain key, then given one.
 	{ step = "log_api_key_absent", name = "api_key_absent" },
 	{ step = "log_api_key_reentered", name = "api_key_reentered" },
+	-- modules/gestures/engine.lua: a three-finger swipe slot that dispatched its action.
+	{ step = "log_gesture_swipe_dispatches", name = "swipe_dispatch" },
+	-- ui/menu/init.lua and the shared global composition: a committed restore or clear.
+	{ step = "log_scope_commits", name = "scope_commit" },
+	-- modules/keymap/init.lua: Karabiner's tap-hold command marker that reset the word.
+	{ step = "log_tap_hold_word_resets", name = "tap_hold_reset" },
+	-- modules/keymap/layout_emulation.lua: an emulated layout turned on.
+	{ step = "log_layout_emulations_on", name = "emulation_on" },
+	-- modules/keymap/number_row_live.lua: number-row options applied live.
+	{ step = "log_number_row_applies", name = "number_row_apply" },
+	-- ui/ui_builder.lua: a page's first load, per system appearance.
+	{ step = "log_pages_dark", name = "page_dark" },
+	{ step = "log_pages_light", name = "page_light" },
 }
 
 -- POSIX awk only: macOS ships the BWK awk.
@@ -100,6 +113,13 @@ function top(names,   name, best, best_n) {
 /\] Boot complete in [0-9]+ ms\./ { boot++ }
 /\[WARNING\] \[[^]]*\] Keychain holds no key for entry '[^']*'; it needs its key again\./ { api_key_absent++ }
 /\] API entry key change staged \(entry=/ { api_key_reentered++ }
+/\] Gesture dispatched: slot=swipe_3/ { swipe_dispatch++ }
+/\] Scope [A-Za-z_.]+ (recommended|clear) committed/ { scope_commit++ }
+/\] Tap-hold command marker received \(word reset: yes\)/ { tap_hold_reset++ }
+/\] Layout emulation of '[^']*' on \(/ { emulation_on++ }
+/\] Number-row options applied live / { number_row_apply++ }
+/\] Webview '[^']*' rendered in the dark appearance/ { page_dark++ }
+/\] Webview '[^']*' rendered in the light appearance/ { page_light++ }
 match($0, /Three-finger candidate rejected by [A-Za-z_][A-Za-z0-9_]*/) {
 	rejections++; gate[substr($0, RSTART + 35, RLENGTH - 35)]++
 }
@@ -113,6 +133,9 @@ END {
 	printf "switch_cancel %d\ntoggle_open %d\ntoggle_raise %d\n", switch_cancel, toggle_open, toggle_raise
 	printf "expansion %d\nboot %d\n", expansion, boot
 	printf "api_key_absent %d\napi_key_reentered %d\n", api_key_absent, api_key_reentered
+	printf "swipe_dispatch %d\nscope_commit %d\ntap_hold_reset %d\n", swipe_dispatch, scope_commit, tap_hold_reset
+	printf "emulation_on %d\nnumber_row_apply %d\n", emulation_on, number_row_apply
+	printf "page_dark %d\npage_light %d\n", page_dark, page_light
 	printf "rejections %d %s\nheld_key %d\ncancels %d %s\n", rejections, top(gate), held_key, cancels, top(reason)
 }
 ]=]

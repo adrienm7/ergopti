@@ -526,12 +526,15 @@ local function triggerAction(action, sign, slot)
 	local single_status, single_detail = dispatchAction("execute_single", action, slot)
 	if single_status == "accepted" then
 		gs.dispatchRefusal = nil
+		-- One line per dispatched gesture, which the field run counts per slot
+		Logger.debug(LOG, "Gesture dispatched: slot=%s action=%s.", tostring(slot), action)
 		return true
 	end
 	if single_status ~= "refused" then return false end
 	local axis_status, axis_detail = dispatchAction("execute_axis", action, sign > 0)
 	if axis_status == "accepted" then
 		gs.dispatchRefusal = nil
+		Logger.debug(LOG, "Gesture dispatched: slot=%s action=%s.", tostring(slot), action)
 		return true
 	end
 	if axis_status == "refused" then

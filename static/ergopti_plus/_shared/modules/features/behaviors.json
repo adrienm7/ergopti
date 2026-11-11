@@ -36,7 +36,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "4c0a2c8c2c10fb39168e79d08a75f08eaea6ab2f6d7af8659f300d7d260094d8"
+			"sha256": "99e74d9e1a4641845556369c3b353324355dd3982d408b484ac4b0bc6e178094"
 		},
 		{
 			"id": "macos-undo",
@@ -78,7 +78,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "4c0a2c8c2c10fb39168e79d08a75f08eaea6ab2f6d7af8659f300d7d260094d8"
+			"sha256": "99e74d9e1a4641845556369c3b353324355dd3982d408b484ac4b0bc6e178094"
 		},
 		{
 			"id": "linux-dead-capture",

@@ -101,7 +101,12 @@ function M.apply(rows, on_done, deps)
 		return false
 	end
 	return resolved.build.replace(source, rows, function(ok, code_or_result, detail)
-		if ok then return on_done(true, nil, nil, code_or_result) end
+		if ok then
+			-- One line per live apply, which the field run counts
+			Logger.info(LOG, "Number-row options applied live (order %s, edges %s).", tostring(rows and rows.order),
+				tostring(rows and rows.edges))
+			return on_done(true, nil, nil, code_or_result)
+		end
 		on_done(false, code_or_result, detail, nil)
 	end, resolved.build_deps)
 end
