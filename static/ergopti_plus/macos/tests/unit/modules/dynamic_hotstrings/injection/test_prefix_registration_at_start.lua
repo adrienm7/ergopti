@@ -39,6 +39,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 			-- default boot where enable_group is a delta-only no-op.
 			set_post_load_hook        = function(_, fn) RE._captured_hook = fn end,
 			register_interceptor      = function() end,
+			dynamic_rule_within_delay      = function() return true end,
 			register_preview_provider = function() end,
 			registry_transaction      = function(_, mutation) return mutation() == true end,
 		}
@@ -63,6 +64,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 			set_group_context = function() end, sort_mappings = function() end,
 			register_lua_group = function() end, set_post_load_hook = function() end,
 			register_interceptor = function() end, register_preview_provider = function() end,
+			dynamic_rule_within_delay = function() return true end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 		}
 		RE.inject_data({ phone_number = "0612345678" }, "*")
@@ -84,6 +86,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 			set_group_context = function() end, sort_mappings = function() end,
 			register_lua_group = function() end, set_post_load_hook = function() end,
 			register_interceptor = function() end, register_preview_provider = function() end,
+			dynamic_rule_within_delay = function() return true end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 		}
 		RE.inject_data({ phone_number = "612345678" }, "*")
@@ -102,6 +105,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 			set_group_context = function() end, sort_mappings = function() end,
 			register_lua_group = function() end, set_post_load_hook = function() end,
 			register_interceptor = function() end, register_preview_provider = function() end,
+			dynamic_rule_within_delay = function() return true end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 		}
 		local iban = "FR76 12 3456"
@@ -122,6 +126,7 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 			set_group_context = function() end, sort_mappings = function() end,
 			register_lua_group = function() end, set_post_load_hook = function() end,
 			register_interceptor = function() end, register_preview_provider = function() end,
+			dynamic_rule_within_delay = function() return true end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 		}
 		local phone = "06 12 34 56 78"

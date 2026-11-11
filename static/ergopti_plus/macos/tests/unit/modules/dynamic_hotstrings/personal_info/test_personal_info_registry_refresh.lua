@@ -97,6 +97,7 @@ local function with_fixture(scenario, source)
 				is_group_enabled = Registry.is_group_enabled,
 				is_section_enabled = Registry.is_section_enabled,
 				register_interceptor = function() end,
+				dynamic_rule_within_delay = function() return true end,
 				register_lua_group = Registry.register_lua_group,
 				register_preview_provider = function() end,
 				registry_transaction = Registry.registry_transaction,

@@ -39,6 +39,7 @@ helpers.describe("dynamic UTF-8 delete count", function()
 			register_lua_group = function() end,
 			set_post_load_hook = function() end,
 			register_interceptor = function(fn) interceptor = fn end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = function(fn) provider = fn end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			invalidate_hotstring_preview = function() return true end,

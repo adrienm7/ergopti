@@ -1179,6 +1179,17 @@ function M.capture_user_hotstring(rule)
 		destination = destination, magic = M.get_trigger_char() }
 end
 
+--- Whether a dynamic rule the magic key completes is within its expansion
+--- delay, as Windows (TimeActivationSeconds) and Linux (within_delay) gate the
+--- date hotstrings: the gap from the preceding physical key to the magic key,
+--- under the dynamic family's delay for the rule's section.
+--- @param section string The rule's section (date_fr, date, ...).
+--- @param elapsed number|nil Seconds since the preceding physical key; nil fails closed.
+--- @return boolean allowed
+function M.dynamic_rule_within_delay(section, elapsed)
+	return CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = section }, elapsed, 1) == true
+end
+
 --- Admits a deferred programmable action only for its original cursor context.
 --- @param capture table Exact receipt returned by capture_user_hotstring().
 --- @return boolean current
@@ -1904,7 +1915,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- next to the ones that fall through to step 8 and read it anyway.
 	local chars = e:getCharacters(false)
 	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars,
-		start_is_word_boundary = CoreState.start_is_word_boundary }
+		start_is_word_boundary = CoreState.start_is_word_boundary, elapsed = dt }
 	local suppress_triggers = false
 	for idx, interceptor in ipairs(CoreState.interceptors) do
 		-- The already-fetched event fields are handed over as a third argument.

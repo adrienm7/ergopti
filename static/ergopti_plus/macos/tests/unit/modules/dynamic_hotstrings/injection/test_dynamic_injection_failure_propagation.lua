@@ -230,6 +230,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 			register_lua_group = noop,
 			set_post_load_hook = noop,
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function()
@@ -280,6 +281,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 			register_lua_group = noop,
 			set_post_load_hook = noop,
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			suppress_rescan = noop,
@@ -320,6 +322,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local inject_calls = 0
 		local fake_keymap = {
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			classify_trigger = function() return false, false, false end,
 			inject_dynamic = function()
@@ -365,6 +368,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local interceptor
 		local fake_keymap = {
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			classify_trigger = function() return false, false, false end,
 			suppress_rescan = noop,
