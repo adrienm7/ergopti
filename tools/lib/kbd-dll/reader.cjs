@@ -197,9 +197,14 @@ function descriptorTarget(img) {
 /**
  * Reads and checks every table of a layout DLL.
  * @param {Uint8Array} bytes
- * @returns {{machine: string, pointer: number, wow64: boolean, checks: string[], layout: object}}
+ * @param {{trace?: boolean}} [options] - trace: also return every value the
+ *   reader read from the tables, in reading order, each pointer as the order in
+ *   which its target was first named, so two images holding the same tables at
+ *   other addresses give the same trace.
+ * @returns {{machine: string, pointer: number, wow64: boolean, checks: string[], layout: object,
+ *   trace?: Array<number|string>}}
  */
-function readDll(bytes) {
+function readDll(bytes, options = {}) {
 	const img = parsePe(bytes);
 	if (img.entry !== 0) refuse('a layout DLL has no entry point');
 	for (const s of img.sections)
@@ -207,16 +212,40 @@ function readDll(bytes) {
 			refuse('writable section', s.name);
 	const target = descriptorTarget(img);
 	const b = img.b;
-	const u8 = (rva) => b[img.offset(rva, 1)];
-	const u16 = (rva) => b.readUInt16LE(img.offset(rva, 2));
-	const u32 = (rva) => b.readUInt32LE(img.offset(rva, 4));
+	const trace = options.trace ? [] : null;
+	const targets = new Map();
+	let tracing = true;
+	const traced = (value) => {
+		if (trace && tracing) trace.push(value);
+		return value;
+	};
+	const u8 = (rva) => traced(b[img.offset(rva, 1)]);
+	const u16 = (rva) => traced(b.readUInt16LE(img.offset(rva, 2)));
+	const u32 = (rva) => traced(b.readUInt32LE(img.offset(rva, 4)));
 	const tablesRva = target.rva;
 	// A 32-bit image's own pointer width: SysWOW64 tables are 64 bits wide.
-	const width = img.plus ? 8 : u32(tablesRva + 4) === 0 ? 8 : 4;
+	const width = img.plus ? 8 : b.readUInt32LE(img.offset(tablesRva + 4, 4)) === 0 ? 8 : 4;
 	const wow64 = !img.plus && width === 8;
 	const checked = new Set();
 	/** A pointer slot: null, or the RVA it names, after every check. */
 	const pointer = (slot, align, what) => {
+		const rva = slotTarget(slot, align, what);
+		if (trace) {
+			if (rva !== null && !targets.has(rva)) targets.set(rva, targets.size + 1);
+			trace.push(rva === null ? 'null' : `@${targets.get(rva)}`);
+		}
+		return rva;
+	};
+	/** The pointer slot's checked target, read without tracing its address. */
+	const slotTarget = (slot, align, what) => {
+		tracing = false;
+		try {
+			return checkedSlot(slot, align, what);
+		} finally {
+			tracing = true;
+		}
+	};
+	const checkedSlot = (slot, align, what) => {
 		let va;
 		if (width === 8) {
 			const lo = u32(slot);
@@ -441,6 +470,7 @@ function readDll(bytes) {
 		subsystem: img.subsystem,
 		ordinal: target.ordinal,
 		checks: [...checked].sort(),
+		...(trace ? { trace } : {}),
 		layout: {
 			columns,
 			modifiers: bits,

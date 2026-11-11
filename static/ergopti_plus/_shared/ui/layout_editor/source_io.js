@@ -338,6 +338,79 @@ var LayoutSourceIO = (function () {
 		return { filename: `${root}.zip`, mime: 'application/zip', bytes: LayoutZipWriter.pack(files) };
 	}
 
+	/** Base64 of bytes, for the host message that carries the DLL images. */
+	function base64(bytes) {
+		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+		let out = '';
+		for (let i = 0; i < bytes.length; i += 3) {
+			const n = (bytes[i] << 16) | ((bytes[i + 1] || 0) << 8) | (bytes[i + 2] || 0);
+			out += alphabet[(n >> 18) & 63] + alphabet[(n >> 12) & 63];
+			out += i + 1 < bytes.length ? alphabet[(n >> 6) & 63] : '=';
+			out += i + 2 < bytes.length ? alphabet[n & 63] : '=';
+		}
+		return out;
+	}
+
+	/**
+	 * The four Windows keyboard layout DLL images of a structured source (x86,
+	 * wow64, x64, arm64), written in the page by the repository tool's own
+	 * compiler-free writer (_generated/kbd_dll_writer.js, from tools/lib/kbd-dll),
+	 * with what the Windows tables cannot hold.
+	 * @param {object} doc
+	 * @returns {{dllName: string, dlls: Object<string, Uint8Array>, omitted: {path: string, reason: string}[]}}
+	 */
+	function windowsDlls(doc) {
+		if (isPreserved(doc)) throw new SourceIOError('source_preserved', 'imported_keylayout');
+		if (typeof LayoutKbdDll === 'undefined')
+			throw new SourceIOError('kbd_dll_writer_missing', '_generated/kbd_dll_writer.js');
+		let converted;
+		try {
+			converted = LayoutKbdDll.fromSource(doc, { physicalKeys: tables().physicalKeys });
+		} catch (error) {
+			if (!error || typeof error.code !== 'string') throw error;
+			throw new SourceIOError(error.code, error.path || 'exports.windows');
+		}
+		return {
+			dllName: converted.model.dll_name,
+			dlls: LayoutKbdDll.writeDlls(converted.model),
+			omitted: converted.omitted
+		};
+	}
+
+	/**
+	 * The Windows DLL download: one stored ZIP with <dll>/<arch>/<dll>.dll for the
+	 * four images and <dll>/omitted.json listing what the tables leave out.
+	 * @param {object} doc
+	 * @returns {{filename: string, bytes: Uint8Array}}
+	 */
+	function windowsDllArchive(doc) {
+		const built = windowsDlls(doc);
+		const files = Object.entries(built.dlls).map(([arch, bytes]) => ({
+			path: `${built.dllName}/${arch}/${built.dllName}.dll`,
+			bytes
+		}));
+		files.push({
+			path: `${built.dllName}/omitted.json`,
+			text: `${JSON.stringify(built.omitted, null, 2)}\n`,
+			encoding: 'utf8'
+		});
+		return { filename: `${built.dllName}-dll.zip`, bytes: LayoutZipWriter.pack(files) };
+	}
+
+	// The native images a host installs beside the .keylayout, by platform: the
+	// Windows host registers the DLLs (the .keylayout serves its emulation).
+	const NATIVE_IMAGES = Object.freeze({
+		windows: (doc) => {
+			const built = windowsDlls(doc);
+			return {
+				dll_name: built.dllName,
+				dlls: Object.fromEntries(
+					Object.entries(built.dlls).map(([arch, bytes]) => [arch, base64(bytes)])
+				)
+			};
+		}
+	});
+
 	/**
 	 * What the ErgoptiPlus composer host installs: the TOML, the .keylayout
 	 * compiled for the host's OS and, for a structured source, the emulation
@@ -345,13 +418,18 @@ var LayoutSourceIO = (function () {
 	 * composer.lua), which the driver performs for what the .keylayout cannot
 	 * hold (custom modifiers, tap-holds, shortcuts). A preserved import has none.
 	 * @param {object} doc
-	 * @param {'macos'|'linux'} platform
-	 * @returns {{source: string, keylayout: string, emulation?: string}}
+	 * On Windows it also carries the four DLL images (base64 per architecture,
+	 * `dll_name`), which the host registers through its elevated helper.
+	 * @param {'macos'|'linux'|'windows'} platform
+	 * @returns {{source: string, keylayout: string, emulation?: string, dll_name?: string,
+	 *   dlls?: Object<string, string>}}
 	 */
 	function installPayload(doc, platform) {
 		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
 		const payload = { source: serialize(doc), keylayout: compiled.text };
 		if (!isPreserved(doc)) payload.emulation = JSON.stringify(emulationTable(doc, platform));
+		const images = NATIVE_IMAGES[platform];
+		if (images) Object.assign(payload, images(doc));
 		return payload;
 	}
 
@@ -449,15 +527,8 @@ var LayoutSourceIO = (function () {
 		return { keys, deadKeys };
 	}
 
-	function approximateImport(doc) {
-		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
-		const { text, convention } = doc.imported_keylayout;
-		const parsed = LayoutComposer.parseSource(
-			doc.layout.id,
-			text,
-			convention,
-			LAYOUT_COMPOSER_DATA
-		);
+	/** The five character levels of a composer source as source layers and dead keys. */
+	function projectedLayers(parsed) {
 		const converted = composerLevels(
 			parsed,
 			PROJECTED_LAYERS.map((level) => level.composer),
@@ -469,6 +540,20 @@ var LayoutSourceIO = (function () {
 			optional: [],
 			keys: converted.keys[index]
 		}));
+		return { layers, deadKeys: converted.deadKeys };
+	}
+
+	function approximateImport(doc) {
+		if (!isPreserved(doc)) throw new SourceIOError('source_not_imported', 'imported_keylayout');
+		const { text, convention } = doc.imported_keylayout;
+		const parsed = LayoutComposer.parseSource(
+			doc.layout.id,
+			text,
+			convention,
+			LAYOUT_COMPOSER_DATA
+		);
+		const converted = projectedLayers(parsed);
+		const layers = converted.layers;
 		const lost = ['keylayout_original_xml', 'keylayout_sided_modifiers'];
 		if (convention === 'ansi') lost.push('keylayout_ansi_projected_iso');
 		if (parsed.ambiguous.size > 0) lost.push('keylayout_ambiguous_compositions');
@@ -484,6 +569,37 @@ var LayoutSourceIO = (function () {
 			if (own(doc, field)) editable[field] = copy(doc[field]);
 		LayoutSource.validate(editable);
 		return { doc: editable, lost };
+	}
+
+	/**
+	 * A new editable source that starts as another layout: a registry layout
+	 * through the generator's exact importer, else (the importer refuses it, or
+	 * a built-in reference with no .keylayout) its five character levels.
+	 * @param {{id: string, name: string, parsed: object, text?: string, convention?: string}} entry
+	 *   One of fillSources.
+	 * @param {string} id - The new layout's identifier.
+	 * @param {string} name - Its displayed name.
+	 * @returns {{doc: object, lost: string[]}} What the copy could not hold (stable codes).
+	 */
+	function startFrom(entry, id, name) {
+		if (typeof entry.text === 'string') {
+			try {
+				const exact = convertImport(importKeylayout(entry.text, id, entry.convention)).doc;
+				exact.layout = Object.assign({}, exact.layout, { id, name });
+				return { doc: LayoutSource.validate(exact), lost: [] };
+			} catch (error) {
+				if (!(error instanceof LayoutSource.SourceError)) throw error;
+			}
+		}
+		const doc = create(id, name);
+		const converted = projectedLayers(entry.parsed);
+		doc.layers = converted.layers;
+		if (converted.deadKeys.length) doc.dead_keys = converted.deadKeys;
+		const lost = typeof entry.text === 'string' ? ['keylayout_sided_modifiers'] : [];
+		if (entry.convention === 'ansi') lost.push('keylayout_ansi_projected_iso');
+		if (entry.parsed.ambiguous && entry.parsed.ambiguous.size > 0)
+			lost.push('keylayout_ambiguous_compositions');
+		return { doc: LayoutSource.validate(doc), lost };
 	}
 
 	/**
@@ -503,6 +619,8 @@ var LayoutSourceIO = (function () {
 				sources.push({
 					id: entry.id,
 					name: entry.name,
+					text: entry.text,
+					convention: entry.convention,
 					parsed: LayoutComposer.parseSource(
 						entry.id,
 						entry.text,
@@ -676,6 +794,9 @@ var LayoutSourceIO = (function () {
 		convertImport,
 		approximateImport,
 		fillSources,
+		startFrom,
+		windowsDlls,
+		windowsDllArchive,
 		fillLayer,
 		keylayoutFile,
 		macosBundleArchive,

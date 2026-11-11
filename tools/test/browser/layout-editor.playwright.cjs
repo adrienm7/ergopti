@@ -130,7 +130,8 @@ async function exerciseManager(browser, origin) {
 				state,
 				source_editor: true,
 				source_pick: true,
-				nav_apply: true
+				nav_apply: true,
+				emulate: true
 			}),
 		state
 	);
@@ -225,6 +226,49 @@ async function exerciseManager(browser, origin) {
 		window.composerResult({ action: 'composer_save', ok: true, used: true })
 	);
 	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.installed']);
+
+	// « Emulate without installing » stores the source for the driver's emulation alone.
+	assert.equal(await page.textContent('#le-install'), strings['layout_editor.btn.install']);
+	assert.equal(await page.textContent('#le-install-hint'), strings['layout_editor.install_hint']);
+	assert.equal(await page.textContent('#le-emulate-hint'), strings['layout_editor.emulate_hint']);
+	await page.click('#le-emulate');
+	await page.click('#le-confirm-yes');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_emulate'));
+	const emulate = await page.evaluate(() =>
+		window.__posted.find((p) => p.action === 'composer_emulate')
+	);
+	assert.equal(emulate.use, undefined, 'nothing is selected in the system');
+	assert.equal(emulate.source, install.source);
+	assert.equal(emulate.keylayout, install.keylayout);
+	assert.equal(emulate.emulation, install.emulation);
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_emulate', ok: false, code: 'emulate_failed' })
+	);
+	assert.equal(
+		await page.textContent('#le-message'),
+		strings['layout_editor.error.emulate_failed']
+	);
+	await page.click('#le-emulate');
+	await page.click('#le-confirm-yes');
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_emulate', ok: true, used: true })
+	);
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.emulated']);
+
+	// « New » starts blank or from a reference or a catalogue layout of the host.
+	await page.click('#le-new');
+	const starts = await page.$$eval('#le-start [data-start]', (buttons) =>
+		buttons.map((button) => button.dataset.start)
+	);
+	assert.deepEqual(starts, ['blank', 'qwerty', 'azerty', 'ergopti']);
+	await page.click('#le-start [data-start="ergopti"]');
+	if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	assert.equal(await page.inputValue('#le-name'), 'My Ergopti');
+	await page.click('#le-new');
+	await page.click('#le-start [data-start="blank"]');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	assert.equal(await page.inputValue('#le-name'), strings['layout_editor.default_name']);
 	await page.click('#le-close');
 	assert.equal(await page.locator('#layout-view').isVisible(), true);
 	assert.deepEqual(errors, []);
@@ -366,6 +410,21 @@ async function exerciseManager(browser, origin) {
 		await page.click('#le-win-klc-apply');
 		const [klc] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-klc')]);
 		assert.equal(klc.suggestedFilename(), 'kbdergo.klc');
+		// The site says where the Windows DLL and installer come from, and offers no
+		// in-app install or emulation.
+		assert.match(await page.textContent('#le-dll-note'), /node tools\/kbd-dll\.cjs build/);
+		// The four Windows DLLs, written in the page with no compiler.
+		const [dll] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-dll')]);
+		assert.equal(dll.suggestedFilename(), 'kbdergo-dll.zip');
+		const dllZip = fs.readFileSync(await dll.path());
+		assert.deepEqual([...dllZip.subarray(0, 4)], [0x50, 0x4b, 0x03, 0x04], 'a ZIP');
+		for (const arch of ['x86', 'wow64', 'x64', 'arm64'])
+			assert.ok(dllZip.includes(`kbdergo/${arch}/kbdergo.dll`), `${arch} image in the ZIP`);
+		assert.ok(
+			dllZip.includes(Buffer.from('KbdLayerDescriptor')),
+			'the images export KbdLayerDescriptor'
+		);
+		assert.equal(await page.locator('#le-install, #le-emulate').count(), 0);
 		const klcBytes = fs.readFileSync(await klc.path());
 		assert.deepEqual([...klcBytes.subarray(0, 2)], [0xff, 0xfe], 'MSKLC UTF-16LE with a BOM');
 		assert.match(klcBytes.toString('utf16le'), /KBD\tkbdergo\t/);
