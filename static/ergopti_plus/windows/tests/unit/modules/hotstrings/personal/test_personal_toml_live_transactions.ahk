@@ -573,7 +573,7 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 	Assert(InStr(QueueBody, "Request.CompletionFn") > 0,
 		"the gateway must refuse DEFERRED when no terminal callback can report its outcome")
 }
-Test("personal-toml-live-transaction: native and WebView saves share one gateway",
+Test("personal-toml-live-transaction: the WebView save uses the shared gateway",
 	_PTIOCR_AllEditorsUseTheDurableLiveGateway)
 
 ; The refusal toast script must splice the complete JSON literal bare: a second
