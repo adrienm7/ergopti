@@ -91,6 +91,7 @@ single-owner mutex.
 | `quit-refused-during-write`             | Quit during a configuration write                             | `test_quit_admission.ahk`                                               |
 | `ai-agent-unavailable-row`              | AI agent submenu composed-menu qualification (121, 123, 137)  | `test_llm_agent.ahk`                                                    |
 | `autocorrection-family-alone`           | Each common autocorrection family alone (104, 105)            | `test_hotstrings_cache.ahk`, `test_corpus_hotstring_family_samples.ahk` |
+| `hotstring-section-order`               | Hotstring section order: move, restart, reset, a stale menu   | `test_hotstring_dynamic_menu_scope.ahk`, `section_order_vectors.json`   |
 | `gestures-info-row`                     | Tray > Gestures: one « Infos… » row that opens the dialog     | `test_gesture_menu_status.ahk`                                          |
 
 ## What stays manual
