@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems.",
 	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Noch nicht unter Windows: Die Token-für-Token-Anzeige wurde unter Windows noch nicht validiert, daher bleibt diese Option inaktiv.",
-	"platform_reason.layout_editor_host_pending_on_windows": "Noch nicht unter Windows: Das Fenster der Layoutverwaltung unter Windows kann Layoutquellen noch nicht öffnen oder speichern; der Editor bleibt auf der Website verfügbar.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Editor auf der Website unter Windows: Das Fenster der Layoutverwaltung unter Windows hat keinen Editor; Layouts erstellen, bearbeiten und exportieren Sie auf der Ergopti-Website.",
 	"menu.layout.number_row": "Ziffernreihe",
 	"menu.layout.number_row_native": "Native Reihenfolge",
 	"menu.layout.number_row_digits": "Ziffern zuerst",

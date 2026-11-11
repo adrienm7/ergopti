@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
 	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Windows 上暂未提供: 逐个令牌显示尚未在 Windows 上验证，因此此选项保持停用。",
-	"platform_reason.layout_editor_host_pending_on_windows": "Windows 暂不支持：Windows 的布局管理器窗口尚不能打开或保存布局源文件；编辑器仍可在网站上使用。",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Windows 上请用网站编辑器：Windows 的布局管理器窗口没有编辑器；请在 Ergopti 网站上创建、编辑和导出布局。",
 	"menu.layout.number_row": "数字行",
 	"menu.layout.number_row_native": "系统顺序",
 	"menu.layout.number_row_digits": "数字优先",

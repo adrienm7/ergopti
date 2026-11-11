@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "No se pudo cambiar el inicio automático. Revise los ajustes de inicio del sistema.",
 	"onboarding.error.open_failed": "No se pudo abrir el asistente de configuración. Revise los registros e inténtelo de nuevo desde el menú.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Aún no en Windows: la visualización token por token no se ha validado en Windows, por lo que esta opción permanece inactiva.",
-	"platform_reason.layout_editor_host_pending_on_windows": "Aún no en Windows: la ventana del gestor de distribuciones de Windows todavía no puede abrir ni guardar fuentes de distribución; el editor sigue disponible en el sitio web.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Editor en el sitio web en Windows: la ventana del gestor de distribuciones de Windows no tiene editor; cree, modifique y exporte sus distribuciones en el sitio web de Ergopti.",
 	"menu.layout.number_row": "Fila de números",
 	"menu.layout.number_row_native": "Orden nativo",
 	"menu.layout.number_row_digits": "Números primero",

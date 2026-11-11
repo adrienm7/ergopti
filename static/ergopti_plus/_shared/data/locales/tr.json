@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
 	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Henüz Windows'ta yok: belirteç belirteç gösterim Windows'ta doğrulanmadı, bu yüzden bu seçenek devre dışı kalır.",
-	"platform_reason.layout_editor_host_pending_on_windows": "Henüz Windows'ta değil: Windows düzen yöneticisi penceresi henüz düzen kaynaklarını açamıyor veya kaydedemiyor; düzenleyici web sitesinde kullanılabilir.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Windows'ta düzenleyici web sitesinde: Windows düzen yöneticisi penceresinde düzenleyici yoktur; düzenleri Ergopti web sitesinde oluşturun, düzenleyin ve dışa aktarın.",
 	"menu.layout.number_row": "Sayı satırı",
 	"menu.layout.number_row_native": "Sistemin sırası",
 	"menu.layout.number_row_digits": "Önce rakamlar",

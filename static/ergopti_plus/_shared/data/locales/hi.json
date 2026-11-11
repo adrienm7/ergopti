@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "स्वचालित स्टार्टअप नहीं बदला जा सका। सिस्टम की स्टार्टअप सेटिंग जाँचें।",
 	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।",
 	"platform_reason.token_streaming_unvalidated_on_windows": "अभी Windows पर नहीं: टोकन दर टोकन प्रदर्शन Windows पर सत्यापित नहीं हुआ है, इसलिए यह विकल्प निष्क्रिय रहता है।",
-	"platform_reason.layout_editor_host_pending_on_windows": "अभी Windows पर नहीं: Windows की लेआउट प्रबंधक विंडो अभी लेआउट स्रोत खोल या सहेज नहीं सकती; संपादक वेबसाइट पर उपलब्ध रहता है।",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Windows पर संपादक वेबसाइट पर: Windows की लेआउट प्रबंधक विंडो में संपादक नहीं है; लेआउट Ergopti वेबसाइट पर बनाएँ, संपादित करें और निर्यात करें।",
 	"menu.layout.number_row": "अंक पंक्ति",
 	"menu.layout.number_row_native": "सिस्टम का क्रम",
 	"menu.layout.number_row_digits": "अंक पहले",

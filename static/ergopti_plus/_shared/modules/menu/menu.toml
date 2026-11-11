@@ -2160,7 +2160,7 @@ id = "open_layout_editor"
 i18n = "menu.layout.edit"
 platforms = ["hs", "linux"]
 unavailable = "grey"
-reason_key = "platform_reason.layout_editor_host_pending_on_windows"
+reason_key = "platform_reason.layout_editor_is_on_the_website_on_windows"
 
 # The two blocks macOS alone has. It installs a .bundle keyboard layout through
 # TIS — the OS's own input-source mechanism, with a user scope and a system scope

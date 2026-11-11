@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému.",
 	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Zatím ne ve Windows: zobrazování po jednotlivých tokenech nebylo ve Windows ověřeno, proto tato možnost zůstává neaktivní.",
-	"platform_reason.layout_editor_host_pending_on_windows": "Zatím ne ve Windows: okno správce rozložení ve Windows zatím neumí otevírat ani ukládat zdroje rozložení; editor zůstává dostupný na webu.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "Ve Windows editor na webu: okno správce rozložení ve Windows nemá editor; rozložení vytvářejte, upravujte a exportujte na webu Ergopti.",
 	"menu.layout.number_row": "Číselná řada",
 	"menu.layout.number_row_native": "Nativní pořadí",
 	"menu.layout.number_row_digits": "Nejprve číslice",
