@@ -796,6 +796,19 @@ jobs:
         run: |
           bash tools/diagnostics/run_logger_numeric_native.sh "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$ERGOPTI_OLLAMA_BUILD_ROOT"
         timeout-minutes: 5
+      - name: Qualify owned virtual-HID daemon-report XCTest controls
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'runtime') }}
+        shell: bash
+        run: |
+          bash tools/diagnostics/run_daemon_report_native.sh "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$ERGOPTI_OLLAMA_BUILD_ROOT"
+        timeout-minutes: 5
       - name: Retain independent native SDK XCTest diagnostics
         env:
           GOTOOLCHAIN: 'local'
