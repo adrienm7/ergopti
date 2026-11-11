@@ -117,6 +117,7 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 			local actual_i18n = require("infra.i18n")
 			require("infra.locale").set_locale(locale_code)
 			config_i18n.get = actual_i18n.get
+			config_i18n.has = actual_i18n.has
 		end
 		local keys      = assert(Config.load_tap_hold_keys(DATA_DIR .. "tap_hold_keys.json"))
 		local combos    = assert(Config.load_mod_combos(DATA_DIR .. "mod_combos.json"))
