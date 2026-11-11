@@ -359,6 +359,38 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_eq({ trail(out), tap }, { "", nil }, "the release types nothing more")
 	end)
 
+	-- lalt.ahk `SC11D & SC038`: with LAlt tapping Tab and no hold modifier and
+	-- RCtrl tapping the one-shot Shift, LAlt struck under RCtrl types Shift+Tab
+	-- at key-down, with or without a hold layer, and OneShotShiftFix disarms the
+	-- one-shot. Linux typed a plain Tab, or held the layer
+	-- (rctrl-one-shot-lalt-shift-tab).
+	helpers.it("types Shift+Tab for LAlt's Tab under RCtrl's one-shot Shift (rctrl-one-shot-lalt-shift-tab)", function()
+		local one_shot = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 }
+		for _, lalt in ipairs({
+			{ tap_action = "tab", time_activation_seconds = 0.2 },
+			{ tap_action = "tab", hold_layer = "nav", time_activation_seconds = 0.2 },
+		}) do
+			local label = lalt.hold_layer and "LAlt holding the layer" or "LAlt with no hold"
+			local e = engine({ left_alt = lalt, right_ctrl = one_shot })
+			e:process(RCTRL, DOWN, 0)
+			helpers.assert_eq(trail((e:process(ALT, DOWN, 50))), "42↓ 15↓ 15↑ 42↑", label .. ": Shift+Tab at key-down")
+			helpers.assert_eq(trail((e:process(ALT, REPEAT, 550))), "42↓ 15↓ 15↑ 42↑", label .. ": and at each repeat")
+			helpers.assert_nil(e:process(KEY_J, DOWN, 560), label .. ": J under it is J, no layer is held")
+			e:process(KEY_J, UP, 570)
+			helpers.assert_eq({ trail((e:process(ALT, UP, 600))) }, { "" }, label .. ": the release types nothing")
+			e:process(RCTRL, UP, 620)
+			helpers.assert_nil(e:process(KEY_A, DOWN, 650), label .. ": RCtrl used as a chord arms nothing")
+			e:process(KEY_A, UP, 660)
+			-- Controls: without RCtrl the Tab is plain; another RCtrl tap is no combo.
+			e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 }, right_ctrl = one_shot })
+			helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "15↓ 15↑", label .. ": a lone LAlt types Tab")
+		end
+		local e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 },
+			right_ctrl = { tap_action = "tab", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 50))), "15↓ 15↑", "RCtrl tapping Tab is no one-shot: a plain Tab")
+	end)
+
 	-- lshift_lctrl.ahk 3.1: LCtrl taps only when CapsLock and LAlt were up at
 	-- its press (KS_IsUp SC03A and SC038, in its tap-only and its hold
 	-- variants), so CapsLock+LCtrl or LAlt+LCtrl let go quickly runs no tap.
