@@ -1354,7 +1354,7 @@ function M.process_frame(touches, frame_stamp)
 				if gs.lockedDir == nil and gs.candidateFingers == nil then
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local tentative = Geometry.computeDir(dx, dy, gs.maxFingers)
+					local tentative = Geometry.lockDir(dx, dy, gs.maxFingers)
 					if tentative ~= nil then
 						Logger.info(LOG, "LOCKED DIR=%s (dx=%.2f dy=%.2f maxFingers=%d)",
 							tentative, dx, dy, gs.maxFingers)
