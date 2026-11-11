@@ -35,23 +35,35 @@ report as it is.
   « Install and use » sends `composer_save` with `source`, the compiled `.keylayout` for the host's OS and
   `use: true`: the composer host (`_shared/lua/layouts/composer.lua`) stores it, replaces any composition, installs
   it as the `composed` layout and switches to it; its `composerResult` is routed back to the editor.
-- **ErgoptiPlus, Windows (maintainer).** `windows/ui/layout_manager/init.ahk` needs the same two actions in
+  « Fill a layer from a layout » takes the host's `composer_open` sources (its `composerData` is routed to the
+  editor too), so on these hosts the page hides « Compose »: the editor does the composer's job. macOS also sets
+  `source_pick` in `initData`: the editor's « Open » posts `source_pick`, the host opens an `NSOpenPanel` limited
+  to `.toml` and `.keylayout` (`infra/dialog_util.lua`), bounds the file with `SourceStore.read_picked` and answers
+  `window.sourcePicked({filename, text} | {} | {code, detail})`. Linux keeps WebKitGTK's own file chooser.
+- **ErgoptiPlus, Windows (maintainer).** Until then the shared page shows the composer there.
+  `windows/ui/layout_manager/init.ahk` needs `source_open`, `source_save` (and `source_pick` only if WebView2's own
+  file chooser is not enough) in
   `LAYMGR_ACTIONS`, `source_editor: true` in its `initData`, and the store's rules: a plain lowercase file name
   `^[a-z][a-z0-9_]*\.(toml|keylayout)$` of at most `max_name_length` characters, non-empty UTF-8 text of at most
   `max_file_bytes`, written in `layout_sources\` of the driver's configuration folder, the last source name in
   `last_file`, results pushed as `sourceData` / `sourceResult` through the WebView2 `ExecuteScript` path the page
-  already uses. Then drop `windowsPending` in `tools/test/test-layout-manager-page.cjs`.
+  already uses; `windows/ui/layout_manager/composer.ahk` needs to accept `composer_save` with `source` for « Install
+  and use ». Then drop `windowsPending` in `tools/test/test-layout-manager-page.cjs`, and retire the composer
+  section (`layout_composer/composer_page.js` and its markup) once no host shows it.
 
 ## Limits stated to the user
 
 - An imported `.keylayout` stays verbatim (exportable unchanged) until « Convert to an editable source »: the
   generator's importer converts it exactly or refuses it; only after a refusal does the page offer « Convert
   approximately », which lists what it drops (sided modifiers, ANSI described on ISO, ambiguous compositions).
-- The page downloads the source, `layers.toml` and a `.keylayout` per variant (ISO, ANSI) compiled in the browser.
-  The macOS bundle (several files, UTF-16 strings), Linux XKB and Windows KLC come from the repository tool
-  (`npm run layout-source -- export-…`); ErgoptiPlus installs the compiled layout itself. Each report row names its
+- The page downloads the source, `layers.toml`, a `.keylayout` per variant (ISO, ANSI) compiled in the browser and,
+  on the site, the macOS bundle as one stored ZIP (`zip_writer.js`). Linux XKB and Windows KLC run through Lua
+  converters, so they come from the repository tool (`npm run layout-source -- export-…`); ErgoptiPlus installs the
+  compiled layout itself. Each report row names its
   status, reason and the elements the target does not carry.
 - A `layers.toml` binding using `primary` is written per OS on the way back (same effect on every OS, pinned by
   `test-layout-editor-model.cjs`); a sequence of several chords is refused.
-- On macOS, `<input type="file">` in the Hammerspoon webview is not qualified: the editor reopens the last saved
-  source through the host, and opening other files there needs a Mac check.
+- KbdEdit-style editing: drag a key onto another to swap (Ctrl copies), copy and paste a mapping, ISO or ANSI board,
+  locate a character, exact sticker size. There is no Unicode name search: no Unicode names table ships with the
+  page; the palette finds characters by block, glyph or code point.
+- The macOS open panel and the install are not yet checked on a real Mac.
