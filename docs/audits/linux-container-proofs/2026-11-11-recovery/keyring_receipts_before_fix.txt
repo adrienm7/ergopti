@@ -1,0 +1,4 @@
+# The same harness against modules/llm/api_token_store.lua before a6fa8892 (failing checks only)
+  FAIL the dismissal is a failure, not an absent key: absent
+  FAIL a clear on the locked keyring is refused, not reported done: nil
+15 checks, 2 failures
