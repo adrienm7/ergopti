@@ -90,6 +90,38 @@ function bounded(filename) {
 	if (regular(filename).size > MAX_RECEIPT_BYTES) refuse();
 	return fs.readFileSync(filename, 'utf8');
 }
+/**
+ * Names the public cases a refused run finished and the one it was in. Only
+ * the case names leave the private sink: unittest writes each name before the
+ * case runs, so a hang is located without printing any receipt text.
+ * @param {string} filename The public phase's stderr sink.
+ * @returns {string} One diagnostic line.
+ */
+function publicProgress(filename) {
+	let text;
+	try {
+		text = bounded(filename);
+	} catch {
+		return 'public case progress unavailable';
+	}
+	const finished = [];
+	let current = null;
+	for (const line of text.split(/\r?\n/)) {
+		const started =
+			/^(test_[a-z0-9_]+) \(__main__\.[A-Za-z]+(?:\.test_[a-z0-9_]+)?\) \.\.\. ?(.*)$/.exec(line);
+		if (!started || !PUBLIC_CASES.includes(started[1])) continue;
+		if (started[2] === '') current = started[1];
+		else {
+			finished.push(`${started[1]}=${started[2] === 'ok' ? 'ok' : 'not-ok'}`);
+			current = null;
+		}
+	}
+	return (
+		`public cases finished ${finished.length}/${PUBLIC_CASES.length}` +
+		(finished.length ? ` (${finished.join(', ')})` : '') +
+		`; running: ${current || 'none'}`
+	);
+}
 function completed(result) {
 	return !result.error && result.signal == null && result.status === 0;
 }
@@ -710,6 +742,8 @@ async function run({
 				phase +
 				': admission or completed cleanup receipt refused.'
 		);
+		if (phase === 'public30' && work)
+			error('  ' + publicProgress(path.join(work, 'public30.stderr')));
 		return 1;
 	} finally {
 		if (!activeChildren.size) {
@@ -739,6 +773,7 @@ if (require.main === module)
 module.exports = {
 	run,
 	publicReceipt,
+	publicProgress,
 	outputReceipt,
 	phaseReceipt,
 	ownPhase,
