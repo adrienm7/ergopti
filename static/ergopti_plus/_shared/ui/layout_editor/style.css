@@ -155,6 +155,7 @@ body {
 	border-left: 4px solid var(--le-ok);
 }
 
+.le-confirm,
 .le-preserved,
 .le-lost {
 	background: var(--le-surface-2);

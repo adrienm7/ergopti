@@ -184,6 +184,9 @@ var LayoutEditorPage = (function () {
 			locked: new Set(),
 			heldCustom: new Set(),
 			message: null,
+			// A pending question: { text, onYes }. In-page, because a webview
+			// host may not show window.confirm (WKWebView needs a UI delegate).
+			confirm: null,
 			lost: null,
 			dirty: false
 		};
@@ -251,7 +254,7 @@ var LayoutEditorPage = (function () {
 			Promise.resolve(host.saveFile(filename, text, mime)).then(
 				() => {
 					if (/\.toml$/.test(filename) && filename !== 'layers.toml') state.dirty = false;
-					notify('ok', tl('status.saved', { name: filename }));
+					notify('ok', tl(host.savedStatus || 'status.saved', { name: filename }));
 				},
 				(error) => notify('error', problemText(error))
 			);
@@ -278,8 +281,12 @@ var LayoutEditorPage = (function () {
 			}
 		}
 
+		function ask(text, onYes) {
+			state.confirm = { text, onYes };
+			render();
+		}
+
 		function convertImport() {
-			if (!window.confirm(tl('convert_confirm'))) return;
 			try {
 				const projected = LayoutSourceIO.projectImport(doc());
 				state.history.push(projected.doc);
@@ -320,9 +327,12 @@ var LayoutEditorPage = (function () {
 					id: 'le-new',
 					text: tl('btn.new'),
 					onclick: () => {
-						if (state.dirty && !window.confirm(tl('discard_confirm'))) return;
-						replace(LayoutSourceIO.create('my_layout', tl('default_name')));
-						render();
+						const fresh = () => {
+							replace(LayoutSourceIO.create('my_layout', tl('default_name')));
+							render();
+						};
+						if (state.dirty) ask(tl('discard_confirm'), fresh);
+						else fresh();
 					}
 				}),
 				el('button', {
@@ -403,6 +413,32 @@ var LayoutEditorPage = (function () {
 
 		function messageBar() {
 			const parts = [];
+			if (state.confirm) {
+				const question = state.confirm;
+				const answer = (yes) => {
+					state.confirm = null;
+					if (yes) question.onYes();
+					else render();
+				};
+				parts.push(
+					el('div', { class: 'le-confirm', id: 'le-confirm', role: 'alertdialog' }, [
+						el('p', { text: question.text }),
+						el('button', {
+							type: 'button',
+							id: 'le-confirm-yes',
+							class: 'primary',
+							text: tl('btn.confirm'),
+							onclick: () => answer(true)
+						}),
+						el('button', {
+							type: 'button',
+							id: 'le-confirm-no',
+							text: tl('btn.cancel'),
+							onclick: () => answer(false)
+						})
+					])
+				);
+			}
 			if (state.message)
 				parts.push(
 					el('p', {
@@ -420,7 +456,7 @@ var LayoutEditorPage = (function () {
 							type: 'button',
 							id: 'le-convert',
 							text: tl('btn.convert'),
-							onclick: convertImport
+							onclick: () => ask(tl('convert_confirm'), convertImport)
 						})
 					])
 				);
