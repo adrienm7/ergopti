@@ -1,0 +1,377 @@
+// tools/lib/kbd-dll/emit-c.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Keyboard Layout DLL C Emitter
+ * DESCRIPTION:
+ * Writes the C translation unit and the resource script of a Windows keyboard
+ * layout DLL from a checked kbd tables model (model.cjs). The structures are
+ * this project's own definitions of the kbd.h tables, written from Microsoft's
+ * documentation of KBDTABLES and its members (MODIFIERS and VK_TO_BIT,
+ * VK_TO_WCHAR_TABLE and VK_TO_WCHARSn, DEADKEY with DKF_DEAD, LIGATUREn,
+ * VSC_LPWSTR, VSC_VK, fLocaleFlags with KBD_VERSION) and its export,
+ * KbdLayerDescriptor; no WDK header is used.
+ *
+ * FEATURES & RATIONALE:
+ * 1. One source, four images: x86 (32-bit Windows), wow64 (the 32-bit copy a
+ *    64-bit Windows keeps in SysWOW64, whose table pointers are 64 bits wide as
+ *    kbd.h's KBD_LONG_POINTER makes them under BUILD_WOW6432), x64 and arm64.
+ *    A wow64 pointer is a 32-bit pointer followed by a zero word, 8-aligned: the
+ *    64-bit layout, filled by a 32-bit image's relocations.
+ * 2. Every table is const, so it lands in read-only data; static assertions pin
+ *    each structure's size to the layout the reader checks independently.
+ * 3. Deterministic: the same model gives the same text.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const C = require('./constants.cjs');
+const Model = require('./model.cjs');
+
+const ARCHES = Object.freeze(['x86', 'wow64', 'x64', 'arm64']);
+const hex = (n, width = 4) => `0x${n.toString(16).padStart(width, '0')}`;
+
+/** A C array initializer of UTF-16 units ending with a zero unit. */
+function wstring(text) {
+	const units = [];
+	for (let i = 0; i < text.length; i++) units.push(hex(text.charCodeAt(i)));
+	units.push('0x0000');
+	return `{ ${units.join(', ')} }`;
+}
+
+/** The unit a cell stores in its VK_TO_WCHARS slot. */
+function slot(cell) {
+	if (cell === null) return C.WCH.NONE;
+	if (cell.char !== undefined) return cell.char;
+	if (cell.dead !== undefined) return C.WCH.DEAD;
+	return C.WCH.LGTR;
+}
+
+/** The VK_TO_WCHARS rows of the main table: layout keys, then the system keys they leave. */
+function mainRows(model) {
+	const n = model.columns.length;
+	const rows = [];
+	for (const key of model.keys) {
+		rows.push({ vk: key.vk, attr: key.attributes, wch: key.cells.map(slot) });
+		if (key.cells.some((cell) => cell && cell.dead !== undefined))
+			rows.push({
+				vk: C.VK_FOLLOW_ROW,
+				attr: 0,
+				wch: key.cells.map((cell) => (cell && cell.dead !== undefined ? cell.dead : C.WCH.NONE))
+			});
+		if (key.caps_cells) rows.push({ vk: C.VK_FOLLOW_ROW, attr: 0, wch: key.caps_cells.map(slot) });
+	}
+	const defined = new Set(model.keys.map((key) => key.vk));
+	const columnOf = { base: 0, shift: C.MOD_BITS.shift, ctrl: C.MOD_BITS.ctrl };
+	for (const sys of C.SYSTEM_KEYS) {
+		const vk = C.VK[sys.vk];
+		if (defined.has(vk)) continue;
+		const wch = Array(n).fill(C.WCH.NONE);
+		for (const [name, unit] of Object.entries(sys.cells)) {
+			const index = model.columns.indexOf(columnOf[name]);
+			if (index >= 0) wch[index] = unit;
+		}
+		rows.push({ vk, attr: 0, wch });
+	}
+	return rows;
+}
+
+/** The ModNumber array: each modifier-bit combination's column, or SHFT_INVALID. */
+function modNumbers(model) {
+	const names = Model.modifierNames(model);
+	const max = names.reduce((a, name) => a | C.MOD_BITS[name], 0);
+	return Array.from({ length: max + 1 }, (_, bits) => {
+		const index = model.columns.indexOf(bits);
+		return index >= 0 ? index : C.SHFT_INVALID;
+	});
+}
+
+/** The scan-code to virtual-key table with the layout's moves applied. */
+function scanTable(model) {
+	const table = C.DEFAULT_SCANCODES.slice();
+	// A moved character key carries no scan-code flag.
+	for (const entry of model.scancodes || []) table[entry.sc] = entry.vk;
+	return table;
+}
+
+/**
+ * The C source of one layout DLL; KBD_WOW64 selects the SysWOW64 layout.
+ * @param {object} input - A kbd tables model.
+ * @returns {string}
+ */
+function emitC(input) {
+	const model = Model.check(input);
+	const n = model.columns.length;
+	const rows = mainRows(model);
+	const mods = modNumbers(model);
+	const names = Model.modifierNames(model);
+	const ligatures = [];
+	model.keys.forEach((key) =>
+		key.cells.forEach((cell, column) => {
+			if (cell && cell.ligature) ligatures.push({ vk: key.vk, column, units: cell.ligature });
+		})
+	);
+	const lgMax = ligatures.reduce((a, l) => Math.max(a, l.units.length), 0);
+	const deadRows = [];
+	for (const dead of model.dead_keys)
+		for (const rule of dead.rules)
+			deadRows.push({
+				both: ((dead.dead << 16) | rule.base) >>> 0,
+				result: rule.result,
+				flags: rule.dead ? C.DKF_DEAD : 0
+			});
+	const named = model.dead_keys.filter((dead) => dead.name);
+	const out = [];
+	const line = (text = '') => out.push(text);
+	line(
+		`/* ${model.dll_name}.c: generated by tools/kbd-dll.cjs from the kbd tables model; do not edit. */`
+	);
+	line('typedef unsigned char BYTE;');
+	line('typedef unsigned short WORD;');
+	line('typedef unsigned short WCHAR;');
+	line('typedef unsigned int DWORD;');
+	line('#if defined(KBD_WOW64)');
+	line('/* The SysWOW64 image: kbd.h pointers are 64 bits wide (BUILD_WOW6432). */');
+	line('#define KPTR(T) struct { T *p; DWORD hi; } __attribute__((aligned(8)))');
+	line('#define KP(x) { (x), 0 }');
+	line('#define KBD_PTR_SIZE 8');
+	line('#else');
+	line('#define KPTR(T) T *');
+	line('#define KP(x) (x)');
+	line('#define KBD_PTR_SIZE (sizeof(void *))');
+	line('#endif');
+	line('');
+	line('typedef struct { BYTE Vk; BYTE ModBits; } VK_TO_BIT;');
+	line(
+		`typedef struct { KPTR(const VK_TO_BIT) pVkToBit; WORD wMaxModBits; BYTE ModNumber[${mods.length}]; } MODIFIERS;`
+	);
+	line(`typedef struct { BYTE VirtualKey; BYTE Attributes; WCHAR wch[${n}]; } VK_TO_WCHARS_N;`);
+	line('typedef struct { BYTE VirtualKey; BYTE Attributes; WCHAR wch[1]; } VK_TO_WCHARS_1;');
+	line(
+		'typedef struct { KPTR(const void) pVkToWchars; BYTE nModifications; BYTE cbSize; } VK_TO_WCHAR_TABLE;'
+	);
+	line('typedef struct { DWORD dwBoth; WCHAR wchComposed; WORD uFlags; } DEADKEY;');
+	line('typedef struct { BYTE vsc; KPTR(const WCHAR) pwsz; } VSC_LPWSTR;');
+	line('typedef struct { BYTE Vsc; WORD Vk; } VSC_VK;');
+	line('typedef struct { KPTR(const void) p; } DEADNAME;');
+	if (lgMax)
+		line(
+			`typedef struct { BYTE VirtualKey; WORD ModificationNumber; WCHAR wch[${lgMax}]; } LIGATURE_N;`
+		);
+	line('typedef struct {');
+	line('\tKPTR(const MODIFIERS) pCharModifiers;');
+	line('\tKPTR(const VK_TO_WCHAR_TABLE) pVkToWcharTable;');
+	line('\tKPTR(const DEADKEY) pDeadKey;');
+	line('\tKPTR(const VSC_LPWSTR) pKeyNames;');
+	line('\tKPTR(const VSC_LPWSTR) pKeyNamesExt;');
+	line('\tKPTR(const DEADNAME) pKeyNamesDead;');
+	line('\tKPTR(const WORD) pusVSCtoVK;');
+	line('\tBYTE bMaxVSCtoVK;');
+	line('\tKPTR(const VSC_VK) pVSCtoVK_E0;');
+	line('\tKPTR(const VSC_VK) pVSCtoVK_E1;');
+	line('\tDWORD fLocaleFlags;');
+	line('\tBYTE nLgMax;');
+	line('\tBYTE cbLgEntry;');
+	line('\tKPTR(const void) pLigature;');
+	line('\tDWORD dwType;');
+	line('\tDWORD dwSubType;');
+	line('} KBDTABLES;');
+	line('');
+	line('/* The layouts the independent reader (kbd-dll/reader.cjs) expects. */');
+	line('_Static_assert(sizeof(KBDTABLES) == (KBD_PTR_SIZE == 8 ? 104 : 60), "KBDTABLES layout");');
+	line(
+		'_Static_assert(sizeof(VK_TO_WCHAR_TABLE) == (KBD_PTR_SIZE == 8 ? 16 : 8), "VK_TO_WCHAR_TABLE layout");'
+	);
+	line('_Static_assert(sizeof(VSC_LPWSTR) == 2 * KBD_PTR_SIZE, "VSC_LPWSTR layout");');
+	line('_Static_assert(sizeof(DEADKEY) == 8, "DEADKEY layout");');
+	line('_Static_assert(sizeof(VSC_VK) == 4, "VSC_VK layout");');
+	line(`_Static_assert(sizeof(VK_TO_WCHARS_N) == ${2 + 2 * n}, "VK_TO_WCHARS layout");`);
+	if (lgMax) line(`_Static_assert(sizeof(LIGATURE_N) == ${4 + 2 * lgMax}, "LIGATURE layout");`);
+	line('');
+	line('static const VK_TO_BIT aVkToBits[] = {');
+	for (const name of names) line(`\t{ ${hex(C.MOD_VK[name], 2)}, ${hex(C.MOD_BITS[name], 2)} },`);
+	line('\t{ 0, 0 }');
+	line('};');
+	line(
+		`static const MODIFIERS CharModifiers = { KP(aVkToBits), ${mods.length - 1}, { ${mods.map((m) => hex(m, 2)).join(', ')} } };`
+	);
+	line('');
+	line(`static const VK_TO_WCHARS_N aVkToWchMain[] = {`);
+	for (const row of rows)
+		line(
+			`\t{ ${hex(row.vk, 2)}, ${hex(row.attr, 2)}, { ${row.wch.map((u) => hex(u)).join(', ')} } },`
+		);
+	line(`\t{ 0, 0, { ${Array(n).fill('0').join(', ')} } }`);
+	line('};');
+	line('static const VK_TO_WCHARS_1 aVkToWchNumpad[] = {');
+	for (const key of C.NUMPAD_KEYS) line(`\t{ ${hex(C.VK[key.vk], 2)}, 0, { ${hex(key.char)} } },`);
+	line('\t{ 0, 0, { 0 } }');
+	line('};');
+	line('/* The keypad digits come last: VkKeyScan prefers the main keys. */');
+	line('static const VK_TO_WCHAR_TABLE aVkToWcharTable[] = {');
+	line(`\t{ KP(aVkToWchMain), ${n}, sizeof(VK_TO_WCHARS_N) },`);
+	line('\t{ KP(aVkToWchNumpad), 1, sizeof(VK_TO_WCHARS_1) },');
+	line('\t{ KP(0), 0, 0 }');
+	line('};');
+	line('');
+	if (deadRows.length) {
+		line('static const DEADKEY aDeadKey[] = {');
+		for (const row of deadRows)
+			line(`\t{ ${hex(row.both, 8)}, ${hex(row.result)}, ${hex(row.flags)} },`);
+		line('\t{ 0, 0, 0 }');
+		line('};');
+	}
+	const nameTable = (id, list) => {
+		list.forEach((entry, i) => line(`static const WCHAR ${id}_${i}[] = ${wstring(entry.name)};`));
+		line(`static const VSC_LPWSTR ${id}[] = {`);
+		list.forEach((entry, i) => line(`\t{ ${hex(entry.sc, 2)}, KP(${id}_${i}) },`));
+		line('\t{ 0, KP(0) }');
+		line('};');
+	};
+	nameTable('aKeyNames', model.key_names || []);
+	nameTable('aKeyNamesExt', model.key_names_ext || []);
+	if (named.length) {
+		named.forEach((dead, i) =>
+			line(
+				`static const WCHAR aDeadName_${i}[] = ${wstring(String.fromCharCode(dead.dead) + dead.name)};`
+			)
+		);
+		line('static const DEADNAME aKeyNamesDead[] = {');
+		named.forEach((_, i) => line(`\t{ KP(aDeadName_${i}) },`));
+		line('\t{ KP(0) }');
+		line('};');
+	}
+	line('');
+	const scan = scanTable(model);
+	line(`static const WORD ausVSCtoVK[${scan.length}] = {`);
+	for (let i = 0; i < scan.length; i += 8)
+		line(
+			`\t${scan
+				.slice(i, i + 8)
+				.map((v) => hex(v))
+				.join(', ')},`
+		);
+	line('};');
+	line('static const VSC_VK aE0VscToVk[] = {');
+	for (const [sc, vk] of C.DEFAULT_E0) line(`\t{ ${hex(sc, 2)}, ${hex(vk | C.SC_FLAGS.EXT)} },`);
+	line('\t{ 0, 0 }');
+	line('};');
+	line('static const VSC_VK aE1VscToVk[] = {');
+	for (const [sc, vk] of C.DEFAULT_E1) line(`\t{ ${hex(sc, 2)}, ${hex(vk)} },`);
+	line('\t{ 0, 0 }');
+	line('};');
+	if (lgMax) {
+		line('static const LIGATURE_N aLigature[] = {');
+		for (const lig of ligatures) {
+			const units = lig.units.concat(Array(lgMax - lig.units.length).fill(C.WCH.NONE));
+			line(`\t{ ${hex(lig.vk, 2)}, ${lig.column}, { ${units.map((u) => hex(u)).join(', ')} } },`);
+		}
+		line(`\t{ 0, 0, { ${Array(lgMax).fill('0').join(', ')} } }`);
+		line('};');
+	}
+	line('');
+	line('static const KBDTABLES KbdTables = {');
+	line('\tKP(&CharModifiers),');
+	line('\tKP(aVkToWcharTable),');
+	line(`\tKP(${deadRows.length ? 'aDeadKey' : '0'}),`);
+	line('\tKP(aKeyNames),');
+	line('\tKP(aKeyNamesExt),');
+	line(`\tKP(${named.length ? 'aKeyNamesDead' : '0'}),`);
+	line('\tKP(ausVSCtoVK),');
+	line(`\t${scan.length},`);
+	line('\tKP(aE0VscToVk),');
+	line('\tKP(aE1VscToVk),');
+	line(`\t${hex(Model.localeFlags(model), 8)},`);
+	line(`\t${lgMax},`);
+	line(`\t${lgMax ? 'sizeof(LIGATURE_N)' : '0'},`);
+	line(`\tKP(${lgMax ? 'aLigature' : '0'}),`);
+	line(`\t${C.KEYBOARD_TYPE},`);
+	line('\t0');
+	line('};');
+	line('');
+	line('/* The one export (ordinal 1): the system calls it to get the tables. */');
+	line('const KBDTABLES *__stdcall KbdLayerDescriptor(void) { return &KbdTables; }');
+	return `${out.join('\n')}\n`;
+}
+
+/** A resource-script string: printable ASCII kept, everything else escaped. */
+function rcString(text) {
+	let out = '';
+	for (const ch of text) {
+		const code = ch.codePointAt(0);
+		if (code >= 0x20 && code < 0x7f && ch !== '"' && ch !== '\\') out += ch;
+		else
+			for (const unit of String.fromCodePoint(code).split(''))
+				out += `\\x${unit.charCodeAt(0).toString(16).padStart(4, '0')}`;
+	}
+	return `L"${out}"`;
+}
+
+/** The version as four numbers for VERSIONINFO. */
+function versionParts(text) {
+	const parts = String(text || '1.0')
+		.split('.')
+		.map((p) => Number(p));
+	if (parts.some((p) => !Number.isInteger(p) || p < 0 || p > 65535) || parts.length > 4)
+		throw new Model.ModelError('kbd_version_string', 'version_string');
+	while (parts.length < 4) parts.push(0);
+	return parts;
+}
+
+/**
+ * The resource script: the display name string (Layout Display Name points at
+ * it) and a version resource typed as a keyboard driver (VFT_DRV, VFT2_DRV_KEYBOARD).
+ * @param {object} input - A kbd tables model.
+ * @returns {string}
+ */
+function emitRc(input) {
+	const model = Model.check(input);
+	const v = versionParts(model.version_string).join(',');
+	const field = (name, value) => `\t\t\tVALUE "${name}", ${rcString(value)}`;
+	return [
+		`// ${model.dll_name}.rc: generated by tools/kbd-dll.cjs; do not edit.`,
+		'STRINGTABLE',
+		'BEGIN',
+		`\t${C.DISPLAY_NAME_RESOURCE}, ${rcString(model.layout_text)}`,
+		'END',
+		'',
+		'1 VERSIONINFO',
+		`FILEVERSION ${v}`,
+		`PRODUCTVERSION ${v}`,
+		'FILEFLAGSMASK 0x3f',
+		'FILEFLAGS 0x0',
+		'FILEOS 0x40004',
+		'FILETYPE 0x3',
+		'FILESUBTYPE 0x2',
+		'BEGIN',
+		'\tBLOCK "StringFileInfo"',
+		'\tBEGIN',
+		'\t\tBLOCK "040904B0"',
+		'\t\tBEGIN',
+		field('CompanyName', model.company || model.layout_text),
+		field('FileDescription', `${model.layout_text} keyboard layout`),
+		field('FileVersion', model.version_string || '1.0'),
+		field('InternalName', model.dll_name),
+		field('LegalCopyright', model.copyright || ''),
+		field('OriginalFilename', `${model.dll_name}.dll`),
+		field('ProductName', model.layout_text),
+		field('ProductVersion', model.version_string || '1.0'),
+		'\t\tEND',
+		'\tEND',
+		'\tBLOCK "VarFileInfo"',
+		'\tBEGIN',
+		'\t\tVALUE "Translation", 0x409, 1200',
+		'\tEND',
+		'END',
+		''
+	].join('\n');
+}
+
+/** The module definition: KbdLayerDescriptor at ordinal 1, as Windows' own layouts export it. */
+function emitDef(input) {
+	const model = Model.check(input);
+	return `LIBRARY ${model.dll_name}\nEXPORTS\n\tKbdLayerDescriptor @1\n`;
+}
+
+module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers, scanTable };

@@ -37,3 +37,6 @@ PKGBUILD text eol=lf
 *.ini text eol=lf
 *.kbd text eol=lf
 *.tsv text eol=lf
+
+# The official bepo.klc, kept as MSKLC writes it (UTF-16LE, BOM, CRLF).
+tools/test/fixtures/kbd-dll/*.klc binary

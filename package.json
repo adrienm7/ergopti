@@ -714,6 +714,8 @@
 		"test:ollama-termination-owned": "node ./tools/test/test-ollama-termination-owned.cjs",
 		"test:linux-distro-native-prerequisites": "node ./tools/test/test-linux-distro-native-prerequisites.cjs",
 		"layout-source": "node ./tools/layout-source.cjs",
+		"kbd-dll": "node ./tools/kbd-dll.cjs",
+		"test:kbd-dll": "node ./tools/test/test-kbd-dll.cjs",
 		"test:layout-source": "node ./tools/test/test-layout-source.cjs",
 		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
 		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",

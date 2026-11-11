@@ -405,6 +405,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-target-exports.cjs"],
 			"repro": "npm run test:layout-editor-target-exports"
+		},
+		{
+			"id": "kbd-dll",
+			"ordinal": 617,
+			"name": "Windows layout DLLs build from a KLC and read back as their model on every architecture",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-dll.cjs"],
+			"repro": "npm run test:kbd-dll"
 		}
 	]
 }
