@@ -217,6 +217,8 @@ package.preload["platform.tray.appindicator"] = function()
 		set_icon = function() return true end,
 		set_menu = function(items) published_menu = items; return true end,
 		pump = function() return 0 end,
+		-- No GLib context behind this fake: the idle wait polls input alone.
+		wait_companion = function() return nil end,
 		destroy = function() live = false end,
 		is_live = function() return live end,
 	}
