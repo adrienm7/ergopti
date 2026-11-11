@@ -76,6 +76,7 @@ local function with_config_fixture(callback)
 			}
 			package.loaded["infra.i18n"] = {
 				get = function(key) return key end,
+				has = function() return false end,
 			}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.paths"] = {

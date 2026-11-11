@@ -517,6 +517,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
 	loaded["infra.i18n"] = {
 		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
+		-- get answers a key it cannot translate with the key itself, so only a
+		-- key with a format resolves.
+		has             = function(key) return PLACEHOLDER_FORMATS[key] ~= nil end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
 		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,

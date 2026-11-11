@@ -54,6 +54,21 @@ session under bytecode was not run.
    rebuilt by the updater. The receipt's hash time (about 9 s natively on a
    full tree) grows with 8 MB more if it is included.
 
+## macOS (measured 2026-11-11, round 3, off-Mac)
+
+Hammerspoon also compiles every module from source at each boot. Under Lua 5.4.6
+the whole macOS tree (890 files, 14 MB with `_shared/lua`) compiles in 331 ms
+and loads as bytecode (`string.dump`, debug info kept, 9.3 MB) in 38 ms. A
+headless boot's first two require stages (`Path: config dir + paths.toml`, 342
+modules, and `Config-dependent module requires`, 166) cost 287 and 105 ms of
+CPU there, most of it this compile
+(`tests/bench/bench_boot_stages.lua`, `tests/bench/bench_lua_paths.lua
+--only=compile_driver_sources`). Lua 5.4 bytecode is tied to the interpreter's
+minor version and its integer and float sizes, not to the processor, so it
+could be produced once per Hammerspoon build rather than per Mac; the same three
+questions (who compiles, when bytecode is trusted, what a mismatch does) apply
+to the app bundle and its updater.
+
 ## Not proposed
 
 - Lazy requires of the optional modules: the 2026-10-24 measurement found 128
