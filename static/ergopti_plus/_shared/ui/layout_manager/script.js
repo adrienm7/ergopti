@@ -495,11 +495,10 @@ function hostInstall(payload) {
 			return;
 		}
 		_pendingInstall = { resolve: resolve, reject: reject };
-		send('composer_save', undefined, {
-			source: payload.source,
-			keylayout: payload.keylayout,
-			use: true
-		});
+		const message = { source: payload.source, keylayout: payload.keylayout, use: true };
+		// The drivers perform the source's emulation table for what the .keylayout cannot hold.
+		if (payload.emulation !== undefined) message.emulation = payload.emulation;
+		send('composer_save', undefined, message);
 	});
 }
 
