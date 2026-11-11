@@ -468,7 +468,13 @@ const PROGRAMS = {
 		{ proof: { file: DISTRO_PREP, token: ' tar ', scopes: TEST }, probed: true }
 	),
 	localectl: optionalTool('system keyboard layout of systemd-localed'),
-	gsettings: optionalTool('GNOME settings'),
+	gsettings: optionalTool('GNOME settings', DRIVER_HOST),
+	// The desktops the headless layout proofs start
+	// (tests/hardware/run_input_sources_live.sh), which exit 2 without them.
+	'gnome-shell': optionalTool('GNOME Shell of the layout switching proof', HOST),
+	kwin_wayland: optionalTool('KWin Wayland of the layout switching proof', HOST),
+	kwin_x11: optionalTool('KWin X11 of the layout switching proof', HOST),
+	kded6: optionalTool('KDE daemon of the layout switching proof', HOST),
 	xrandr: optionalTool(
 		'action picker window switching, the menu row is disabled with a reason when absent'
 	),

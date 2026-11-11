@@ -136,7 +136,7 @@ gnome)
 	export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME ERGOPTI_LIVE_DESKTOP=gnome
 	;;
 kde)
-	need kwin_wayland
+	need kwin_wayland; need gdbus
 	printf '[Layout]\nLayoutList=us,fr\nUse=true\n' >"${XDG_CONFIG_HOME}/kxkbrc"
 	before="$(echo /tmp/.X11-unix/X*)"
 	XDG_SESSION_TYPE=wayland kwin_wayland --virtual --xwayland --width 1280 --height 800 >"${SCRATCH}/kwin.log" 2>&1 &
@@ -154,7 +154,7 @@ kde)
 	export ERGOPTI_LIVE_ACTIVE_CMD="sh tests/hardware/lib/kde_active_layout.sh"
 	;;
 kde-x11)
-	need Xvfb; need kwin_x11; need kded6
+	need Xvfb; need kwin_x11; need kded6; need gdbus
 	printf '[Layout]\nLayoutList=us,fr\nUse=true\n' >"${XDG_CONFIG_HOME}/kxkbrc"
 	start_xvfb
 	# At login kcminit applies kxkbrc to the server; kded's keyboard module

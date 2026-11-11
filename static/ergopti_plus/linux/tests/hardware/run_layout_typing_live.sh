@@ -74,7 +74,7 @@ PIDS="${PIDS} $!"
 sleep 1
 setxkbmap -layout fr || { echo "ENVIRONMENT: setxkbmap cannot load the fr layout" >&2; exit 2; }
 # A stopped editor is not a crash to recover from: no restore prompt on restart.
-gsettings set org.xfce.mousepad.preferences.file session-restore never 2>/dev/null
+! command -v gsettings >/dev/null 2>&1 || gsettings set org.xfce.mousepad.preferences.file session-restore never 2>/dev/null
 
 luajit tests/hardware/run_layout_typing_live.lua
 STATUS=$?

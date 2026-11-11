@@ -5,6 +5,7 @@
 # session's layouts, in its order) for the layout KWin applies now, read from
 # the compositor through org.kde.KeyboardLayouts.getLayout.
 set -eu
+command -v gdbus >/dev/null 2>&1 || { echo "ENVIRONMENT: gdbus is missing" >&2; exit 2; }
 index="$(gdbus call --session --dest org.kde.keyboard --object-path /Layouts \
 	--method org.kde.KeyboardLayouts.getLayout | sed -n 's/.* \([0-9][0-9]*\),).*/\1/p')"
 # shellcheck disable=SC2086
