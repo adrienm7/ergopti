@@ -45,7 +45,7 @@ local LETTERS = {
 	[36] = "j", [37] = "k", [38] = "l", [44] = "z", [45] = "x", [46] = "c", [47] = "v", [48] = "b",
 	[49] = "n", [50] = "m", [53] = "/",
 }
-local KEY_OF = { [" "] = 57 }
+local KEY_OF = { [" "] = 57, ["\n"] = 28 }
 for code, char in pairs(LETTERS) do KEY_OF[char] = code end
 local KEY_LEFTALT, KEY_1 = 56, 2
 local KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL, KEY_ENTER, KEY_LEFT = 58, 42, 29, 28, 105
@@ -394,6 +394,28 @@ if got == " ADN " then
 	print("  ok   typing \" adn \" on the keyboard reached the desktop as \" ADN \"")
 else
 	failures[#failures + 1] = "expected \" ADN \""
+end
+
+-- Item 50, the cascade (_shared/tests/corpus/hotstrings/cascade_vectors.json,
+-- fb_space_three_arrows_keeps_the_space and fb_enter_keeps_the_end_character,
+-- at the shipped three arrows with Space and Enter not consumed): fb gives
+-- facebook, facebook gives Facebook, and the typed end character lands once
+-- after the final text, as one erase-and-type.
+type_text("fb ")
+local cascade, cascade_trail = read_output(3)
+print(string.format("  the desktop received %q for \"fb \"", cascade))
+if cascade == "Facebook " then
+	print("  ok   \"fb \" cascades to \"Facebook \" through the daemon (item 50)")
+else
+	failures[#failures + 1] = string.format("item 50: \"fb \" gave %q (%s)", cascade, cascade_trail)
+end
+type_text("fb\n")
+cascade, cascade_trail = read_output(3)
+print(string.format("  the desktop received %q for \"fb\" + Enter", cascade))
+if cascade == "Facebook<28>" then
+	print("  ok   \"fb\" + Enter cascades to \"Facebook\" then Enter (item 50)")
+else
+	failures[#failures + 1] = string.format("item 50: \"fb\" + Enter gave %q (%s)", cascade, cascade_trail)
 end
 
 
