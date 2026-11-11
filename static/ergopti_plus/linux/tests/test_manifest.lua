@@ -120,6 +120,7 @@ return {
 	"tests.unit.infra.network.test_curl_identity_exact",
 	"tests.unit.adapters.network.test_system_proxy_exact_identity",
 	"tests.unit.adapters.network.test_system_proxy_probe_policy_limits",
+	"tests.unit.adapters.network.test_pac_runtime",
 	"tests.unit.adapters.network.test_system_proxy_probe_stdout",
 	"tests.unit.adapters.network.test_managed_http_exact_forwarding",
 	"tests.meta.harness.test_managed_http_fixture_import_isolation",

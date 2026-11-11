@@ -27,9 +27,11 @@
 --- 4. An unusable desktop configuration (GIO could not resolve the origin, or
 ---    ran out of time: a PAC it could not fetch or evaluate) sends that origin
 ---    direct, at the closed stages of proxy_policy.json "pac_unavailable_fallback",
----    with one WARNING naming the stage, as macOS does. GIO answers DIRECT for a
----    PAC it could not download; the lookup child then reports that stage
----    (native_pac_download) beside its DIRECT answer, and the same WARNING names it. A relay the user exported
+---    with one WARNING naming the stage, as macOS does. The lookup child
+---    evaluates a GNOME PAC itself, since GIO drops every entry but the first
+---    "METHOD host" one: a PAC it could not download answers DIRECT beside that
+---    stage (native_pac_download), a PAC that fails to run is the
+---    native_pac_evaluation stage, and the same WARNING names each. A relay the user exported
 ---    never reaches the lookup, and a relay the PAC names is kept as named.
 ---    Any other failure or a refused plan refuses the start with a classified
 ---    reason instead of launching a daemon that would fail its first pull.
@@ -67,13 +69,16 @@ M.BYPASS_VARIABLES = { "NO_PROXY", "no_proxy" }
 --- Every variable the stage may set; the composition admits only these.
 M.VARIABLES = { M.VARIABLE, M.BYPASS_VARIABLES[1], M.BYPASS_VARIABLES[2] }
 
---- The closed lookup stage each GIO lookup failure stands for. A PAC GIO could
---- not download is no failure: it answers DIRECT, and the receipt's
---- pac_unavailable names that stage. Failures of Ergopti's own helper process
+--- The closed lookup stage each lookup failure stands for. A PAC the lookup
+--- child could not download is no failure: it answers DIRECT, and the
+--- receipt's pac_unavailable names that stage. A PAC that downloaded but
+--- raised, broke a bound or answered an unsupported entry is the evaluation
+--- stage. Failures of Ergopti's own helper process, and a missing PAC engine,
 --- are not listed and keep refusing.
 M.LOOKUP_STAGES = {
 	["proxy-lookup-failed"] = "native_proxy_lookup",
 	["proxy-lookup-timeout"] = "native_proxy_budget",
+	["proxy-pac-evaluation-failed"] = "native_pac_evaluation",
 }
 
 --- Splits "NAME=value" rows into a name -> value map for the given names.
@@ -403,10 +408,13 @@ function M.new(deps)
 			end
 			step = step + 1
 			local mine = step
+			-- The lookup child downloads and evaluates a desktop PAC itself, under
+			-- the same bound as the whole lookup (timings managed_proxy_lookup_timeout_ms).
+			local timeout = math.ceil(math.min(deps.timeout_ms, remaining))
 			local child, dispatch_error = lookup(origins[index], {
-				owner = owner, timeout_ms = math.ceil(math.min(deps.timeout_ms, remaining)),
+				owner = owner, timeout_ms = timeout,
 				environment_exclusions = route.environment_exclusions,
-				pac_check_timeout_ms = deps.probe_timeout_ms and math.ceil(math.min(deps.probe_timeout_ms, remaining)) or nil,
+				pac_check_timeout_ms = timeout,
 			}, function(receipt) receive(index, receipt) end)
 			if not child then
 				Logger.error(LOG, "Managed Ollama proxy lookup not started: %s", tostring(dispatch_error))

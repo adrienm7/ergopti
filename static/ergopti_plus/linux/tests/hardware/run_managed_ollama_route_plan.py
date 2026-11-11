@@ -6,8 +6,9 @@ The Ollama daemon Ergopti starts reads only HTTPS_PROXY and NO_PROXY, and its
 blob downloads leave the registry for another host. This harness installs the
 driver as the packages lay it out, runs the shipped proxy stage on the module
 path the launcher wrapper exports, from an unrelated working directory, and
-answers its GIO lookups with a real PAC evaluated by the real glib-pacrunner on
-a private D-Bus. Each PAC sends the registry and the blob host a different way.
+answers its lookups with a real desktop PAC (GNOME settings on a private
+D-Bus), which the lookup child downloads and evaluates in the system Duktape
+engine. Each PAC sends the registry and the blob host a different way.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from pathlib import Path
 import select
 import shutil
 import signal
+import socket
 import subprocess
 import tempfile
 import threading
@@ -221,6 +223,13 @@ class InstalledRoutePlan(unittest.TestCase):
         self.assertEqual(result["environment"]["no_proxy"], BLOB_HOST)
 
     def test_same_relay_for_both_hosts_exports_it_once(self):
+        # The blob host's "PROXY A; DIRECT" is walked: a reachable A is kept.
+        host, port = RELAY_A.split(":")
+        live = socket.socket()
+        live.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        live.bind((host, int(port)))
+        live.listen(16)
+        self.addCleanup(live.close)
         result = self.run_stage("same")
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["environment"], {"HTTPS_PROXY": f"http://{RELAY_A}"})
