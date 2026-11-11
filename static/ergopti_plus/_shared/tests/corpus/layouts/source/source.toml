@@ -1,0 +1,171 @@
+# Ergopti layout source fixture (docs/design/layout-source-format.md).
+# It holds what a .keylayout carries natively (layers with left/right and
+# optional modifiers, a ligature, chained dead keys, a dead key pressed inside
+# another, compose identities, a native remap, the ANSI derivation) and records
+# no .keylayout can carry, which every export must list as omitted.
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "source_fixture"
+name = "Source Fixture"
+languages = ["fr"]
+
+[physical]
+base = "iso"
+ansi_extra_key = "Backquote"
+ansi_swaps = [["Backslash", "BracketRight"]]
+
+[[modifiers]]
+id = "kana"
+mode = "locked"
+keys = ["ScrollLock"]
+
+[[layers]]
+id = "base"
+required = []
+optional = []
+
+[layers.keys]
+KeyA = { text = "a" }
+KeyE = { text = "e" }
+KeyO = { text = "o" }
+KeyZ = { text = "z" }
+KeyQ = { text = "ffi" }
+KeyC = { text = "★", compose_as = "j" }
+KeyJ = { text = "j", compose = false }
+BracketLeft = { dead_key = "circumflex" }
+Quote = { dead_key = "diaeresis" }
+IntlBackslash = { text = "<" }
+Backquote = { text = "$" }
+Backslash = { text = "*" }
+BracketRight = { text = "^", compose = false }
+NumpadDecimal = { text = "," }
+KeyX = { disabled = true }
+
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = []
+alternatives = [{ required = ["caps_lock"], optional = [] }]
+
+[layers.keys]
+KeyA = { text = "A" }
+KeyE = { text = "E" }
+KeyO = { text = "O" }
+KeyZ = { text = "Z" }
+KeyQ = { text = "FFI" }
+IntlBackslash = { text = ">" }
+Backquote = { text = "#" }
+
+[[layers]]
+id = "option"
+required = ["alt_right"]
+optional = ["shift"]
+
+[layers.keys]
+KeyA = { text = "æ" }
+KeyE = { dead_key = "greek" }
+
+[[layers]]
+id = "kana"
+required = ["kana"]
+optional = []
+
+[layers.keys]
+KeyA = { text = "あ" }
+
+[[layers]]
+id = "command"
+required = ["meta"]
+optional = ["shift", "caps_lock"]
+
+[layers.keys]
+KeyA = { text = "a" }
+KeyJ = { action = "arrow_left" }
+
+[[dead_keys]]
+id = "circumflex"
+terminator = "^"
+
+[[dead_keys.rules]]
+input = "a"
+text = "â"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ê"
+
+[[dead_keys.rules]]
+input = "j"
+text = "ĵ"
+
+[[dead_keys.rules]]
+input_dead_key = "circumflex"
+text = "^"
+
+[[dead_keys.rules]]
+input_dead_key = "diaeresis"
+next = "circumflex_diaeresis"
+
+[[dead_keys]]
+id = "diaeresis"
+state = "s3_diaeresis"
+terminator = "¨"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ë"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ö"
+
+[[dead_keys]]
+id = "circumflex_diaeresis"
+terminator = "^¨"
+
+[[dead_keys.rules]]
+input = "o"
+text = "ö̂"
+
+[[dead_keys]]
+id = "greek"
+terminator = "µ"
+
+[[dead_keys.rules]]
+input = "a"
+text = "α"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ε"
+
+[remap]
+KeyW = "KeyZ"
+CapsLock = "Escape"
+
+[[shortcuts]]
+key = "KeyA"
+modifiers = ["control"]
+send_key = "KeyB"
+send_modifiers = ["control"]
+
+[[tap_holds]]
+key = "Space"
+tap = { text = " " }
+hold_layer = "command"
+threshold_ms = 180
+
+[exports.macos]
+format = "bundle"
+version = "1.0"
+
+[exports.linux]
+name = "source_fixture"
+description = "Source Fixture"
+
+[exports.windows]
+locale = "fr-FR"
+layout_id = "0000040c"
+dll_name = "kbdsrcfx"

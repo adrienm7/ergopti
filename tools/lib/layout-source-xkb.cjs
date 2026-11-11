@@ -21,7 +21,8 @@ const { loadLayoutSource } = require('./layout-source.cjs');
 /** Compile all artifacts before a caller publishes any output. */
 function exportXkb(document) {
 	const source = loadLayoutSource();
-	const imported = source.conversionSource(document);
+	// The preserved import, or the compiled .keylayout of a structured source.
+	const imported = source.targetKeylayout(document, 'linux');
 	const metadata = document.exports?.linux || {};
 	const id = metadata.name ?? document.layout.id;
 	const description = metadata.description ?? document.layout.name;
@@ -65,6 +66,7 @@ function exportXkb(document) {
 		artifact: 'xkb',
 		reason: 'seven_level_character_projection',
 		blockers: [],
+		omitted: imported.omitted,
 		name: id,
 		description,
 		...output.projection,
