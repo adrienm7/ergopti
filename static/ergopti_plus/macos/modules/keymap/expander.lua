@@ -392,22 +392,6 @@ end
 -- ===================================
 -- ===================================
 
---- Extracts the one codepoint sitting immediately before a candidate trigger —
---- the only piece of left-hand context the word-boundary rule consults.
----
---- The rule itself is NOT here any more. It moved into the shared matcher core
---- (`HotstringCore.decide`), because macOS, Windows and Linux each carried their
---- own version and no two of them ever agreed at once. What stays here is the
---- part that is genuinely macOS's: pulling that codepoint out of a BYTE-string
---- buffer, which is an O(1) offset rather than the array index the core uses.
----
---- @param buffer string The current rolling buffer.
---- @param trigger_start_byte number 1-based byte index where the trigger starts
----   inside `buffer`. Must be >= 1.
---- @return string|nil The preceding codepoint; nil when the trigger starts the
----   buffer, so the caller falls back to `start_is_word_boundary`; an EMPTY
----   string when a character is there but could not be decoded, which the core
----   treats as "does not open a word" exactly as this function always has.
 --- Keeps the expansion that just fired for an immediate Backspace, as Linux
 --- does: that Backspace means « not what I wanted » and brings the trigger back
 --- (M.undo_on_backspace). Only a literal replacement is kept: a token or dynamic
@@ -454,6 +438,22 @@ function M.undo_on_backspace(undo)
 	return true
 end
 
+--- Extracts the one codepoint sitting immediately before a candidate trigger —
+--- the only piece of left-hand context the word-boundary rule consults.
+---
+--- The rule itself is NOT here any more. It moved into the shared matcher core
+--- (`HotstringCore.decide`), because macOS, Windows and Linux each carried their
+--- own version and no two of them ever agreed at once. What stays here is the
+--- part that is genuinely macOS's: pulling that codepoint out of a BYTE-string
+--- buffer, which is an O(1) offset rather than the array index the core uses.
+---
+--- @param buffer string The current rolling buffer.
+--- @param trigger_start_byte number 1-based byte index where the trigger starts
+---   inside `buffer`. Must be >= 1.
+--- @return string|nil The preceding codepoint; nil when the trigger starts the
+---   buffer, so the caller falls back to `start_is_word_boundary`; an EMPTY
+---   string when a character is there but could not be decoded, which the core
+---   treats as "does not open a word" exactly as this function always has.
 local function prev_char_before(buffer, trigger_start_byte)
 	if trigger_start_byte <= 1 then return nil end
 	local before            = buffer:sub(1, trigger_start_byte - 1)
