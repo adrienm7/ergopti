@@ -125,6 +125,7 @@ helpers.describe("a full lift-off still ends the gesture", function()
 		package.loaded["infra.timings"] = nil
 		local _ = helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.timings"] = {
+			count = require("tests.support.registry_count"),
 			sec = function(_, key)
 				if key == "tap_max_ms" then return 0.5
 				elseif key == "finger_confirm_ms" then return 0.05
