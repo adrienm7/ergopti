@@ -2199,8 +2199,8 @@ baseline` line (item 38).
   check, whose failure overrides a pass. No gesture or answer in
   `gesture_seconds` is `needs_person` (`gesture_not_observed_<n>s`,
   `no_answer_<n>s`); a skip is `skipped_by_person`. A menu attest can change
-  the configuration: the guard puts it back and names it. `--unattended`
-  leaves the block out. `tools/dev/field-todo-summary.py` then gives every
+  the configuration: the guard puts it back and names it. No mode leaves
+  the block out: one report does everything. `tools/dev/field-todo-summary.py` then gives every
   TODO « To confirm on the Mac » point its verdict in `todo_summary.md`
   (`data/field_todo_coverage.json`; docs/tooling/macos-field-report-coverage.md).
 - `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
