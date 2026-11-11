@@ -710,7 +710,8 @@
 		"test:linux-distro-native-prerequisites": "node ./tools/test/test-linux-distro-native-prerequisites.cjs",
 		"layout-source": "node ./tools/layout-source.cjs",
 		"test:layout-source": "node ./tools/test/test-layout-source.cjs",
-		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs"
+		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
+		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs"
 	},
 	"type": "module",
 	"imports": {

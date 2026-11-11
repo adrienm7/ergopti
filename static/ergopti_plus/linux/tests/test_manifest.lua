@@ -697,6 +697,7 @@ return {
 	"tests.unit.modules.keymap.test_layout_catalogue",
 	"tests.unit.modules.keymap.test_layout_registry",
 	"tests.unit.modules.keymap.test_keylayout_emulation",
+	"tests.unit.modules.keymap.test_source_emulation",
 	"tests.unit.modules.keymap.test_layout_emulation",
 	"tests.unit.modules.keymap.test_layout_emulation_shortcut_output",
 	"tests.unit.modules.keymap.test_keylayout_parser",
