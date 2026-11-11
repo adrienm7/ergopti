@@ -305,7 +305,15 @@ function M.on_key(detail)
 		return _deps.emit_key(code, held) == true
 	end
 	if decision == Emulation.SHORTCUT then
-		if _deps.emit_shortcut(text, detail.code, mods) == true then return true end
+		if _deps.emit_shortcut(text, detail.code, mods) == true then
+			-- Each auto-repeat presses the chord again, as AHK's ^SCxxx hotkeys
+			-- fire on every repeat (holding Ctrl+z undoes repeatedly).
+			local held = detail.code
+			return true, function(repeat_detail)
+				if type(repeat_detail) ~= "table" or repeat_detail.code ~= held or _session ~= session then return false end
+				return M.on_key(repeat_detail) == true
+			end
+		end
 		Logger.error(LOG, "The emulated shortcut key could not be pressed — the chord keeps its own key.")
 		return false
 	end
