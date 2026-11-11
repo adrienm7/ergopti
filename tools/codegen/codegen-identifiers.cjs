@@ -47,11 +47,13 @@ const GROUPS = [
 	'hosts',
 	'dev_source',
 	'field_report',
-	'bytecode_package'
+	'bytecode_package',
+	'linux_stage'
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
-// AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone.
-const LUA_ONLY_GROUPS = new Set(['bytecode_package']);
+// AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone, and
+// so is the name its atomic-write stages carry (linux/infra/stage_owner.lua).
+const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage']);
 const PROJECTED_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-

@@ -57,4 +57,7 @@ return {
 		end_marker = "end",
 		compiler = "linux/install/compile_bytecode.lua",
 	},
+	linux_stage = {
+		infix = "ergopti",
+	},
 }

@@ -46,8 +46,8 @@ helpers.describe("storage exclusive temporary ownership", function()
 				write(path, original)
 				if alias ~= "dangling" then write(target, foreign) end
 				local Shell = require("adapters.shell_runner")
-				if alias == "regular" then write(path .. ".tmp", foreign)
-				else helpers.assert_true(Shell.run("ln " .. (alias == "hardlink" and "" or "-s ") .. "-- " .. Shell.quote(target) .. " " .. Shell.quote(path .. ".tmp"))) end
+				if alias == "regular" then write(helpers.stage_path(path), foreign)
+				else helpers.assert_true(Shell.run("ln " .. (alias == "hardlink" and "" or "-s ") .. "-- " .. Shell.quote(target) .. " " .. Shell.quote(helpers.stage_path(path)))) end
 				local real_getenv = os.getenv
 				os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
 				local ok, err = xpcall(function()
@@ -63,11 +63,11 @@ helpers.describe("storage exclusive temporary ownership", function()
 					helpers.assert_nil(storage.get("candidate"))
 					helpers.assert_eq(read(path), original)
 					if alias == "dangling" then helpers.assert_nil(io.open(target, "rb"))
-					else helpers.assert_eq(read(target), foreign); helpers.assert_eq(read(path .. ".tmp"), foreign) end
+					else helpers.assert_eq(read(target), foreign); helpers.assert_eq(read(helpers.stage_path(path)), foreign) end
 				end, debug.traceback)
 				os.getenv = real_getenv
 				package.loaded["adapters.storage"] = nil
-				os.remove(path .. ".tmp"); os.remove(path); os.remove(target)
+				os.remove(helpers.stage_path(path)); os.remove(path); os.remove(target)
 				os.remove(root .. "/" .. FOLDER); os.remove(root)
 				helpers.assert_true(ok, tostring(err))
 			end)
@@ -330,7 +330,7 @@ helpers.describe("storage native open receipts", function()
 					if receipt == "throw" then error("native open raised") end
 					return nil, "native open refused", type(receipt) == "number" and receipt or nil
 				end
-				if target == path .. ".tmp" and mode == "wx" then writes = writes + 1 end
+				if target == helpers.stage_path(path) and mode == "wx" then writes = writes + 1 end
 				return real_open(target, mode)
 			end
 			local ok, err = xpcall(function()
@@ -351,7 +351,7 @@ helpers.describe("storage native open receipts", function()
 			local preserved = file:read("*a")
 			assert(file:close())
 			os.remove(path)
-			os.remove(path .. ".tmp")
+			os.remove(helpers.stage_path(path))
 			os.remove(root .. "/" .. FOLDER)
 			os.remove(root)
 			helpers.assert_true(ok, tostring(err))
@@ -436,7 +436,7 @@ helpers.describe("storage durable snapshot ownership", function()
 				os.getenv, os.rename = real_getenv, real_rename
 				package.loaded["adapters.storage"] = nil
 				os.remove(path)
-				os.remove(path .. ".tmp")
+				os.remove(helpers.stage_path(path))
 				os.remove(root .. "/" .. FOLDER)
 				os.remove(root)
 				helpers.assert_true(ok, tostring(err))
@@ -489,7 +489,7 @@ helpers.describe("storage backup open receipts", function()
 				if file then preserved[target] = file:read("*a"); assert(file:close()) end
 				os.remove(target)
 			end
-			os.remove(path .. ".tmp")
+			os.remove(helpers.stage_path(path))
 			os.remove(root .. "/" .. FOLDER)
 			os.remove(root)
 			helpers.assert_true(ok, tostring(err))
@@ -541,7 +541,7 @@ helpers.describe("storage adapter uses the shared JSON codec", function()
 		os.getenv = real_getenv
 		package.loaded["adapters.storage"] = nil
 		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json")
-		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json.tmp")
+		os.remove(helpers.stage_path(temp_root .. "/" .. FOLDER .. "/storage.json"))
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -590,31 +590,31 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 				mkdir = function()
 					Shell._set_runner(function() return false end)
 					io.open = function(path, mode)
-						if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "missing dir" end
+						if path:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") and mode == "wx" then return nil, "missing dir" end
 						return real_open(path, mode)
 					end
 					if native_uv then
 						native_uv.fs_open = function(path, mode, permissions)
-							if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "missing dir" end
+							if path:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") and mode == "wx" then return nil, "missing dir" end
 							return uv_open(path, mode, permissions)
 						end
 					end
 				end,
 				open = function()
 					io.open = function(path, mode)
-						if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "refused" end
+						if path:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") and mode == "wx" then return nil, "refused" end
 						return real_open(path, mode)
 					end
 					if native_uv then
 						native_uv.fs_open = function(path, mode, permissions)
-							if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "refused" end
+							if path:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") and mode == "wx" then return nil, "refused" end
 							return uv_open(path, mode, permissions)
 						end
 					end
 				end,
 				write = function()
 					io.open = function(path, mode)
-						if path:match("storage%.json%.tmp$") and mode == "wx" then
+						if path:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") and mode == "wx" then
 							return { write = function() return nil, "short write" end, close = function() return true end }
 						end
 						return real_open(path, mode)
@@ -623,7 +623,7 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 				end,
 				close = function()
 					io.open = function(path, mode)
-						if path:match("storage%.json%.tmp$") and mode == "wx" then
+						if path:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") and mode == "wx" then
 							return { write = function() return true end, close = function() return nil, "refused" end }
 						end
 						return real_open(path, mode)
@@ -637,7 +637,7 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 				end,
 				rename = function()
 					os.rename = function(from, to)
-						if from:match("storage%.json%.tmp$") then return nil, "refused" end
+						if from:match("storage%.json%.ergopti%-%d+%-%d+%.tmp$") then return nil, "refused" end
 						return real_rename(from, to)
 					end
 				end,
@@ -664,7 +664,7 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 		os.getenv = real_getenv
 		package.loaded["adapters.storage"] = nil
 		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json")
-		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json.tmp")
+		os.remove(helpers.stage_path(temp_root .. "/" .. FOLDER .. "/storage.json"))
 		if not ok then error(err, 0) end
 	end)
 

@@ -13,7 +13,8 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 require("compat.utf8").install()
 local folder, kind, entry = assert(arg[1]), assert(arg[2]), assert(arg[3])
 local path, target = folder .. "/source.toml", folder .. "/target"
-local stage = path .. ".tmp"
+-- The native writer stages under this process's name (CFD-1); stdio keeps `.tmp`.
+local stage = entry == "portable" and path .. ".tmp" or require("infra.stage_owner").stage_path(path)
 local searchpath = package.searchpath
 if entry == "portable" then
 	-- Exercise module absence independently of a native owner which refuses IO.

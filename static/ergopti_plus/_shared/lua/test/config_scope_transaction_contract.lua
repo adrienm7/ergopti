@@ -621,7 +621,10 @@ return function(helpers)
 				}
 				local called, detail = pcall(body, path, backup, boot, options,
 					function() return capture, apply, restore end)
+				-- Linux stages under this process's name (CFD-1), macOS under `.tmp`.
+				local has_owner, StageOwner = pcall(require, "infra.stage_owner")
 				os.remove(backup); os.remove(backup .. ".tmp")
+				if has_owner then os.remove(StageOwner.stage_path(backup)) end
 				if not called then error(detail, 0) end
 			end)
 		end

@@ -5,6 +5,26 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Linux stages are named per process and reaped at start (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (CFD-1): the Linux TOML writer
+(`_shared/lua/toml_codec/writer.lua`, native writer only) and `storage.json`
+stage as `<file>.ergopti-<pid>-<start>.tmp`, `<start>` being the kernel start
+tick of `/proc/<pid>/stat` (field 22) so a reused pid is never the owner
+(`infra/stage_owner.lua`). A stage a kill or a power cut left therefore never
+blocks a later write, and at start the daemon removes, in the folders of
+`config.toml` and `storage.json` (`reap_settings`), every stage of this pattern whose owner is
+gone (no process, a zombie, another start tick) and older than
+`[adapters] stale_temp_age_ms`, as Windows `_TOML_ReapStaleTemps` does. A
+file outside the pattern (an older build's `.tmp`, another program's) is
+never touched and still refuses the exclusive creation of its own name. The
+identity is read at load, before a test or caller can replace `io.open`;
+`tests/helpers.lua` `stage_path` gives tests the same name. macOS needs no
+change: it stages through stdio `"w"`, which overwrites a leftover `.tmp`.
+Other Linux writers that stage `<file>.tmp` themselves (API entries, agent
+learning, tap-hold, app categories) are outside the decision and unchanged.
+Regressions `cfd1-stage-owner`.
+
 ## The Linux application identity is the WM class or app_id (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (ADD-3): Linux names an application
