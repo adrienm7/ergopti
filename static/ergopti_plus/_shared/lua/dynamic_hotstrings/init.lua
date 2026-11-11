@@ -83,6 +83,32 @@ function M.spaced_prefix(spaced, raw_count)
 end
 
 
+-- The French international dialling prefix. A phone number stored as "0750…"
+-- is also wanted as "+3375…", which is the form every non-French form expects.
+local FRANCE_DIAL_PREFIX = "+33"
+M.FRANCE_DIAL_PREFIX = FRANCE_DIAL_PREFIX
+
+--- The "+33" form of a stored French number: a national trunk zero is not
+--- dialled after the country code, every other digit is kept.
+--- @param phone string The number as stored.
+--- @return string
+function M.international_phone(phone)
+	return FRANCE_DIAL_PREFIX .. (phone:sub(1, 1) == "0" and phone:sub(2) or phone)
+end
+
+--- The "+33" trigger standing for the first plain_count characters of a stored
+--- number: the typed country code, then the number without its trunk zero, one
+--- digit shorter when that zero was there, so 0612 and 612 both give +33612
+--- and +336123 for 612345678.
+--- @param phone string The number as stored.
+--- @param plain_count integer Characters of the plain prefix this trigger mirrors.
+--- @return string
+function M.international_prefix(phone, plain_count)
+	local trunk = phone:sub(1, 1) == "0"
+	local national = trunk and phone:sub(2) or phone
+	return FRANCE_DIAL_PREFIX .. TextUtils.utf8_sub(national, 1, plain_count - (trunk and 1 or 0))
+end
+
 --- How many distinct triggers a stored value registers for a prefix length: none
 --- below the threshold, one for the unspaced prefix, two when the spaced prefix
 --- differs from it.

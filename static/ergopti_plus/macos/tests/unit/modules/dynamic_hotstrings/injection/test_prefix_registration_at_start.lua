@@ -72,6 +72,26 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 		helpers.assert_eq(added["+33612"], "+33612345678")
 		helpers.assert_eq(added["0612"], "0612345678")
 	end)
+	-- A number stored without its trunk zero keeps every digit in the short
+	-- +33 trigger, as Linux does: macOS dropped the first one ("+33123" for
+	-- 612345678), a trigger the typed number never reaches (intl-short-trigger).
+	helpers.it("keeps every digit of a number without its zero in the +33 trigger (intl-short-trigger)", function()
+		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
+		local added = {}
+		local km = {
+			add = function(trigger, repl) added[trigger] = repl end,
+			is_section_enabled = function() return true end,
+			set_group_context = function() end, sort_mappings = function() end,
+			register_lua_group = function() end, set_post_load_hook = function() end,
+			register_interceptor = function() end, register_preview_provider = function() end,
+			registry_transaction = function(_, mutation) return mutation() == true end,
+		}
+		RE.inject_data({ phone_number = "612345678" }, "*")
+		RE.start(km)
+		helpers.assert_eq(added["+336123"], "+33612345678", "the typed +33 then the stored digits")
+		helpers.assert_nil(added["+33123"], "no trigger that skips the number's first digit")
+		helpers.assert_eq(added["+3361"], "+33612345678")
+	end)
 
 	helpers.it("registers compact and formatted IBAN prefixes with nonbreaking spaces", function()
 		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
