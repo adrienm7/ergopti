@@ -21,11 +21,11 @@ function healthyUpgrade(sha = 'a'.repeat(40), digest = 'b'.repeat(64)) {
 	return {
 		schema_version: 1,
 		prior_install: {
-			package_sha256: '54be80668a07f160c72bfa9d78d2bb502a0ffa455815a65cc6442f1966a2a7f8',
-			asset_id: 626678404,
-			version: '1.0.0',
-			commit: '5ef675e08d9f75b0902026a21f36782e999b3ac2',
-			bundle_identity: '1.0.0\n5ef675e08d9f75b0902026a21f36782e999b3ac2',
+			package_sha256: '215610d00d74e22985069fa6d8e5c0e8f1da2e945591b351a12fec186ab8c0d4',
+			asset_id: 709707308,
+			version: '1.0.9',
+			commit: 'cb41f5e640de87872d975c2701d2b0f409c9b2b0',
+			bundle_identity: '1.0.9\ncb41f5e640de87872d975c2701d2b0f409c9b2b0',
 			pid: 20,
 			executable: 'C:\\private\\prior\\ErgoptiPlus.exe',
 			created_utc: '2026-10-07T12:00:00.0000000Z',
@@ -33,7 +33,7 @@ function healthyUpgrade(sha = 'a'.repeat(40), digest = 'b'.repeat(64)) {
 			tree_closed: true,
 			native_profile_before_edit: {
 				sha256: '4'.repeat(64),
-				schema_version: 12,
+				schema_version: 20,
 				metrics_enabled: false,
 				metrics_shortcut_typing: 'Ctrl+Alt+M',
 				metrics_shortcut_apps: 'Ctrl+Alt+A',
@@ -47,25 +47,25 @@ function healthyUpgrade(sha = 'a'.repeat(40), digest = 'b'.repeat(64)) {
 				after_sha256: '9'.repeat(64),
 				untouched_before_sha256: '6'.repeat(64),
 				untouched_after_sha256: '6'.repeat(64),
-				profile_schema_version: 12,
+				profile_schema_version: 20,
 				preserved_records: 5,
 				changed: true
 			},
 			saved_profile: {
 				sha256: '9'.repeat(64),
 				preserved_records: 5,
-				schema_version: 12
+				schema_version: 20
 			},
 			extracted_assets: [
 				{
 					path: 'static/ergopti_plus/_shared/core/config_schema/migrations.toml',
-					bytes: 39632,
-					sha256: '9dae9fb9a10ae8ea2b8218fd1152b08acc61f8076e1a59895a048806a556fcd6'
+					bytes: 74264,
+					sha256: '37a89fb1add8e022aee1440147687017c6280023313945c0c9affc3b07f09402'
 				},
 				{
 					path: 'static/ergopti_plus/_shared/data/locales/en.json',
-					bytes: 224077,
-					sha256: '37889fd7fe021c8665c5828824b503f708f6944777d213b46bcfa2efb07f042f'
+					bytes: 299858,
+					sha256: '86baa730998670f61b51712f2ded7f03983697f3452b9e64ea60f597a0028af7'
 				}
 			]
 		},
@@ -429,7 +429,7 @@ function runBoundaryCases(verifyStartup) {
 	assert.equal(refused, 19, 'Every independently authored installed-boundary refusal executes');
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-installed-user-edit-'));
 	const native =
-		'\uFEFF# actual native unrelated source\r\n[_meta]\r\nschema_version = 12\r\n' +
+		'\uFEFF# actual native unrelated source\r\n[_meta]\r\nschema_version = 20\r\n' +
 		'[script]\r\nlocale = "en" # keep verbatim\r\n[metrics]\r\nmetrics_enabled = false\r\n' +
 		'metrics_shortcut_typing = "Ctrl+Alt+M"\r\nmetrics_shortcut_apps = "Ctrl+Alt+A"\r\n' +
 		'future_dashboard = {enabled = false, keep = 9}\r\n' +
@@ -441,7 +441,7 @@ function runBoundaryCases(verifyStartup) {
 		const nativeOutput = path.join(root, 'native.json');
 		const editOutput = path.join(root, 'edit.json');
 		fs.writeFileSync(file, native);
-		const observed = prepareInstalledUserProfile(file, 12, nativeOutput, editOutput);
+		const observed = prepareInstalledUserProfile(file, 20, nativeOutput, editOutput);
 		assert.equal(
 			observed.native_profile_before_edit.source_records_observed,
 			1,
@@ -486,7 +486,7 @@ function runBoundaryCases(verifyStartup) {
 		validate(actualBoundary);
 		const second = prepareInstalledUserProfile(
 			file,
-			12,
+			20,
 			path.join(root, 'second-native.json'),
 			path.join(root, 'second-edit.json')
 		);
@@ -499,7 +499,7 @@ function runBoundaryCases(verifyStartup) {
 		assert.equal(second.installed_user_edit.before_sha256, second.installed_user_edit.after_sha256);
 		const registry = path.join(root, 'prior-registry.toml');
 		const cliFile = path.join(root, 'actual-cli-config.toml');
-		fs.writeFileSync(registry, '[registry]\ncurrent_version = 12\n');
+		fs.writeFileSync(registry, '[registry]\ncurrent_version = 20\n');
 		fs.writeFileSync(cliFile, native);
 		const cli = require('node:child_process').spawnSync(
 			process.execPath,
@@ -540,7 +540,7 @@ function runBoundaryCases(verifyStartup) {
 				() =>
 					prepareInstalledUserProfile(
 						racedFile,
-						12,
+						20,
 						path.join(root, 'raced-native.json'),
 						path.join(root, 'raced-edit.json')
 					),
@@ -556,7 +556,7 @@ function runBoundaryCases(verifyStartup) {
 		);
 		for (const [index, source] of [
 			native.replace('metrics_enabled = false', 'metrics_enabled = 0'),
-			native.replace('schema_version = 12', 'schema_version = 11'),
+			native.replace('schema_version = 20', 'schema_version = 19'),
 			native.replace('Ctrl+Alt+M', 'Ctrl+Alt+Z'),
 			native.replace('keep = 9', 'keep = 10'),
 			native.replace('value = 7', 'value = """\n[metrics]\n"""'),
@@ -566,7 +566,7 @@ function runBoundaryCases(verifyStartup) {
 			assert.throws(() =>
 				prepareInstalledUserProfile(
 					file,
-					12,
+					20,
 					path.join(root, index + '.json'),
 					path.join(root, index + '.edit.json')
 				)
@@ -602,10 +602,10 @@ if (require.main === module) {
 	try {
 		const file = path.join(owned, 'config.toml');
 		const prefix =
-			'[_meta]\nschema_version = 12\n[metrics]\nmetrics_enabled = false\nmetrics_shortcut_typing = "Ctrl+Alt+M"\nmetrics_shortcut_apps = "Ctrl+Alt+A"\n';
+			'[_meta]\nschema_version = 20\n[metrics]\nmetrics_enabled = false\nmetrics_shortcut_typing = "Ctrl+Alt+M"\nmetrics_shortcut_apps = "Ctrl+Alt+A"\n';
 		const valid = 'future_dashboard = { keep = 9, enabled = false }\n';
 		fs.writeFileSync(file, prefix + valid);
-		assert.deepEqual(inspectNativePriorProfile(file, 12).future_dashboard, {
+		assert.deepEqual(inspectNativePriorProfile(file, 20).future_dashboard, {
 			keep: 9,
 			enabled: false
 		});
@@ -616,16 +616,16 @@ if (require.main === module) {
 			valid.replace(' }', ', extra = true }')
 		]) {
 			fs.writeFileSync(file, prefix + changed);
-			assert.throws(() => inspectNativePriorProfile(file, 12), assert.AssertionError);
+			assert.throws(() => inspectNativePriorProfile(file, 20), assert.AssertionError);
 		}
 		// The prior's sparse writer may already have dropped the default false.
 		fs.writeFileSync(file, prefix.replace('metrics_enabled = false\n', '') + valid);
-		assert.equal(inspectNativePriorProfile(file, 12).metrics_enabled, false);
+		assert.equal(inspectNativePriorProfile(file, 20).metrics_enabled, false);
 		fs.writeFileSync(
 			file,
 			prefix.replace('metrics_enabled = false', 'metrics_enabled = true') + valid
 		);
-		assert.throws(() => inspectNativePriorProfile(file, 12), assert.AssertionError);
+		assert.throws(() => inspectNativePriorProfile(file, 20), assert.AssertionError);
 		console.log(
 			'Native prior dashboard own-data equality, four TOML mutations and the sparse default passed (Win32 unexecuted).'
 		);

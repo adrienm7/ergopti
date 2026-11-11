@@ -1,7 +1,7 @@
 # tools/test/fixtures/windows-upgrade-profile.toml
-# The released schema-12 owner has genuine string Metrics shortcut settings.
+# The released schema-20 owner has genuine string Metrics shortcut settings.
 [_meta]
-schema_version = 12
+schema_version = 20
 
 [script]
 locale = "en"

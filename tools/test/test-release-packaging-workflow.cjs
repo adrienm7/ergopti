@@ -1633,11 +1633,11 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 	positive.compiled_upgrade = {
 		schema_version: 1,
 		prior_install: {
-			package_sha256: '54be80668a07f160c72bfa9d78d2bb502a0ffa455815a65cc6442f1966a2a7f8',
-			asset_id: 626678404,
-			version: '1.0.0',
-			commit: '5ef675e08d9f75b0902026a21f36782e999b3ac2',
-			bundle_identity: '1.0.0\n5ef675e08d9f75b0902026a21f36782e999b3ac2',
+			package_sha256: '215610d00d74e22985069fa6d8e5c0e8f1da2e945591b351a12fec186ab8c0d4',
+			asset_id: 709707308,
+			version: '1.0.9',
+			commit: 'cb41f5e640de87872d975c2701d2b0f409c9b2b0',
+			bundle_identity: '1.0.9\ncb41f5e640de87872d975c2701d2b0f409c9b2b0',
 			pid: 20,
 			executable: 'C:\\private\\prior\\ErgoptiPlus.exe',
 			created_utc: '2026-10-07T12:00:00.0000000Z',
@@ -1645,7 +1645,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			tree_closed: true,
 			native_profile_before_edit: {
 				sha256: '4'.repeat(64),
-				schema_version: 12,
+				schema_version: 20,
 				metrics_enabled: false,
 				metrics_shortcut_typing: 'Ctrl+Alt+M',
 				metrics_shortcut_apps: 'Ctrl+Alt+A',
@@ -1659,21 +1659,21 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 				after_sha256: '9'.repeat(64),
 				untouched_before_sha256: '6'.repeat(64),
 				untouched_after_sha256: '6'.repeat(64),
-				profile_schema_version: 12,
+				profile_schema_version: 20,
 				preserved_records: 5,
 				changed: true
 			},
-			saved_profile: { sha256: '9'.repeat(64), preserved_records: 5, schema_version: 12 },
+			saved_profile: { sha256: '9'.repeat(64), preserved_records: 5, schema_version: 20 },
 			extracted_assets: [
 				{
 					path: 'static/ergopti_plus/_shared/core/config_schema/migrations.toml',
-					bytes: 39632,
-					sha256: '9dae9fb9a10ae8ea2b8218fd1152b08acc61f8076e1a59895a048806a556fcd6'
+					bytes: 74264,
+					sha256: '37a89fb1add8e022aee1440147687017c6280023313945c0c9affc3b07f09402'
 				},
 				{
 					path: 'static/ergopti_plus/_shared/data/locales/en.json',
-					bytes: 224077,
-					sha256: '37889fd7fe021c8665c5828824b503f708f6944777d213b46bcfa2efb07f042f'
+					bytes: 299858,
+					sha256: '86baa730998670f61b51712f2ded7f03983697f3452b9e64ea60f597a0028af7'
 				}
 			]
 		},
