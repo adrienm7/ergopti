@@ -3500,8 +3500,9 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	CrashReporter.remove_legacy_dumps()
 	if not privacy_owners.startup_checkpoint() then return end
-	-- UI preparation can outlive an XKB change; resolve again before grabbing.
-	if not keyboard_layout.refresh(opts.keymap) then
+	-- UI preparation can outlive an XKB change; resolve again before grabbing,
+	-- unless the desktop source proves the published layout still current.
+	if not keyboard_layout.refresh_unless_current(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
 	BootProfiler.stage_done("watchers")
