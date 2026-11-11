@@ -19,10 +19,14 @@
 ---    both Plasma session types read: the same layout keeps one id on both. Other Wayland compositors expose no common
 ---    interface to change the active layout, so they list nothing and a switch
 ---    is refused with the reason logged.
---- 2. GNOME switching writes the source first in `mru-sources`, which current
----    GNOME Shell releases read the active source from (desktop_activation.py
----    does the same when it activates an installed layout), then the deprecated
----    `current` index older releases still read. KDE switching asks the daemon
+--- 2. GNOME Shell (checked on 46) reads `mru-sources` only when it starts and
+---    ignores `current`: on a `sources` change it keeps its in-memory recent
+---    list and activates its first entry. Switching therefore writes `sources`
+---    as the target alone, which the shell must activate, waits for the shell
+---    to read it, then writes the user's list back with the target first (as
+---    desktop_activation.py places an installed layout) and `mru-sources` for
+---    the next start. Writes the shell coalesces end on no switch, never on
+---    another layout. KDE switching asks the daemon
 ---    for the layout's index (setLayout), which answers whether it switched.
 ---    X11 switching moves the layout to the first group: setxkbmap keeps the
 ---    components it is not given.
@@ -310,8 +314,9 @@ end
 --- The commands that make one listed id active, in order.
 --- @param listing table Backend reading.
 --- @param id string Target id.
---- @return table|nil steps Array of { program, args, expect? }: a step with
----   `expect` fails unless its trimmed output is exactly that text.
+--- @return table|nil steps Array of { program, args, expect?, undo? }: a step with
+---   `expect` fails unless its trimmed output is exactly that text; a step's
+---   `undo` { program, args } runs when a later step fails.
 --- @return string|nil reason Why no plan exists.
 function M.plan(listing, id)
 	if listing.backend == M.GNOME then
@@ -321,13 +326,21 @@ function M.plan(listing, id)
 		end
 		if index == nil then return nil, "the input source '" .. id .. "' is not configured on this desktop" end
 		local target = listing.sources[index]
-		local mru = { target }
+		local sources, mru = { target }, { target }
+		for _, pair in ipairs(listing.sources) do
+			if M.gnome_id(pair) ~= id then sources[#sources + 1] = pair end
+		end
 		for _, pair in ipairs(listing.mru) do
 			if M.gnome_id(pair) ~= id then mru[#mru + 1] = pair end
 		end
+		local settle = string.format("%.3f", require("infra.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
 		return {
+			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources({ target }) },
+				undo = { program = "gsettings",
+					args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources(listing.sources) } } },
+			{ program = "sleep", args = { settle } },
+			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources(sources) } },
 			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "mru-sources", M.format_gnome_sources(mru) } },
-			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "current", tostring(index - 1) } },
 		}
 	end
 	if listing.backend == M.KDE then
@@ -466,15 +479,29 @@ function M.new(port)
 	end
 
 	--- Runs steps in order; the first failure ends the sequence.
-	local function run_steps(steps, index, on_done)
+	--- A step's `undo` runs when a later step fails, newest first, so a
+	--- partial switch puts back what it changed; the failure names the undo's
+	--- outcome too.
+	local function run_steps(steps, index, on_done, undos)
+		undos = undos or {}
 		local step = steps[index]
 		if step == nil then return on_done(true) end
+		local function fail(reason)
+			local pending = {}
+			for position = #undos, 1, -1 do pending[#pending + 1] = undos[position] end
+			if #pending == 0 then return on_done(false, reason) end
+			run_steps(pending, 1, function(undone, undo_reason)
+				on_done(false, reason .. (undone and " (the earlier change was put back)"
+					or ("; putting the earlier change back failed: " .. tostring(undo_reason))))
+			end)
+		end
 		run(step.program, step.args, function(output, reason)
-			if output == nil then return on_done(false, reason) end
+			if output == nil then return fail(reason) end
 			if step.expect ~= nil and TextUtils.trim(output) ~= step.expect then
-				return on_done(false, step.program .. " refused the switch: " .. TextUtils.trim(output))
+				return fail(step.program .. " refused the switch: " .. TextUtils.trim(output))
 			end
-			run_steps(steps, index + 1, on_done)
+			if step.undo ~= nil then undos[#undos + 1] = step.undo end
+			run_steps(steps, index + 1, on_done, undos)
 		end)
 	end
 

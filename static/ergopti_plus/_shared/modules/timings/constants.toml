@@ -794,6 +794,12 @@ input_source_reselect_settle_ms = 300
 # Linux: adapters/input_source_switch.lua (each gsettings or setxkbmap child).
 input_source_operation_timeout_ms = 10000
 
+# How long GNOME Shell is given to apply an input-source list that holds only
+# the target before the full list is written back: a write it has not yet read
+# is coalesced with the next, and the switch then does not happen.
+# Linux: adapters/input_source_switch.lua (GNOME switch plan).
+gnome_input_source_settle_ms = 500
+
 # Karabiner ready notification debounce delay.
 # HS: platform/remap/ke_lifecycle.lua KARABINER_READY_NOTIFY_DELAY_SEC.
 karabiner_ready_notify_delay_ms = 2500

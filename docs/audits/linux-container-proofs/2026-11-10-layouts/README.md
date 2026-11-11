@@ -58,7 +58,7 @@ From `static/ergopti_plus/linux`:
 
 ## Findings left open
 
-- **GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`.**
+- **Fixed 2026-11-11 in the switch adapter (`input_sources_gnome.txt`, read back from the shell itself; the installer's `apply_gnome` is still open): GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`.**
   On a `sources` change the shell keeps its in-memory MRU list (keyboard.js
   `_updateMruSources`), and a non-interactive activation writes no
   `mru-sources`, so the switch the adapter plans changes nothing on a running

@@ -43,7 +43,9 @@ local function fake_port(backend, answers, deferred)
 			local line = program .. " " .. table.concat(args, " ")
 			calls[#calls + 1] = line
 			local answer = answers[line]
-			if answer == nil and program ~= "gsettings" and program ~= "setxkbmap" then return false end
+			if answer == nil and program ~= "gsettings" and program ~= "setxkbmap" and program ~= "sleep" then
+				return false
+			end
 			local function answer_now()
 				if answer == false then on_done({ ok = false, error = "exit code 1" })
 				else on_done({ ok = true, stdout = answer or "" }) end
@@ -108,21 +110,32 @@ helpers.describe("input source switch: parsers", function()
 end)
 
 helpers.describe("input source switch: plans", function()
-	helpers.it("puts the GNOME target first in the recent sources, then sets its index", function()
+	-- GNOME Shell 46 ignores runtime writes of mru-sources and current and keeps
+	-- its in-memory recent list on a sources change (container proof, 2026-11-10).
+	helpers.it("switches a running GNOME Shell through the target alone, then the list (gnome-runtime-switch)", function()
 		local listing = {
 			backend = Switch.GNOME,
 			sources = Switch.parse_gnome_sources(GNOME_SOURCES),
 			mru = Switch.parse_gnome_sources(GNOME_MRU),
 		}
-		local steps = Switch.plan(listing, "xkb:fr")
-		helpers.assert_eq(#steps, 2)
-		helpers.assert_eq(steps[1].program .. " " .. table.concat(steps[1].args, " "),
-			"gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]")
-		helpers.assert_eq(table.concat(steps[2].args, " "), "set org.gnome.desktop.input-sources current 0")
+		local function lines(steps)
+			local out = {}
+			for index, step in ipairs(steps) do out[index] = step.program .. " " .. table.concat(step.args, " ") end
+			return out
+		end
+		local settle = string.format("%.3f", require("infra.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
+		helpers.assert_eq(lines(Switch.plan(listing, "xkb:fr+ergopti")), {
+			"gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr+ergopti')]",
+			"sleep " .. settle,
+			"gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr+ergopti'), ('xkb', 'fr'), ('ibus', 'mozc-jp')]",
+			"gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr+ergopti'), ('xkb', 'fr')]",
+		})
+		for _, step in ipairs(Switch.plan(listing, "xkb:fr")) do
+			helpers.assert_true(not table.concat(step.args, " "):find(" current ", 1, true), "current is never written")
+		end
 		local ibus = Switch.plan(listing, "ibus:mozc-jp")
-		helpers.assert_eq(ibus[1].args[4], "[('ibus', 'mozc-jp'), ('xkb', 'fr+ergopti'), ('xkb', 'fr')]",
+		helpers.assert_eq(ibus[4].args[4], "[('ibus', 'mozc-jp'), ('xkb', 'fr+ergopti'), ('xkb', 'fr')]",
 			"a source absent from the recent list joins it at the head")
-		helpers.assert_eq(ibus[2].args[4], "2")
 		local none, reason = Switch.plan(listing, "xkb:us")
 		helpers.assert_eq(none, nil)
 		helpers.assert_true(reason:find("not configured", 1, true) ~= nil, reason)
@@ -409,32 +422,45 @@ helpers.describe("input source switch: switcher", function()
 	helpers.it("reads the current sources before every switch and runs the plan in order", function()
 		local answers = gnome_answers()
 		answers["gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]"] = ""
-		answers["gsettings set org.gnome.desktop.input-sources current 0"] = ""
 		local port, calls = fake_port(Switch.GNOME, answers)
 		local switcher = Switch.new(port)
 		local result
 		switcher.select("xkb:fr", function(ok, detail) result = { ok, detail } end)
 		helpers.assert_eq(result[1], true, tostring(result[2]))
-		helpers.assert_eq(#calls, 4)
+		helpers.assert_eq(#calls, 6)
 		helpers.assert_eq(calls[1], "gsettings get org.gnome.desktop.input-sources sources")
-		helpers.assert_eq(calls[4], "gsettings set org.gnome.desktop.input-sources current 0")
+		helpers.assert_eq(calls[3], "gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr')]")
+		helpers.assert_eq(calls[6], "gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]")
 		helpers.assert_true(switcher.is_settled())
 	end)
 
 	helpers.it("stops at the first failed command and reports it", function()
 		local answers = gnome_answers()
-		answers["gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]"] = false
+		answers["gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr')]"] = false
 		local port, calls = fake_port(Switch.GNOME, answers)
 		local result
 		Switch.new(port).select("xkb:fr", function(ok, detail) result = { ok, detail } end)
 		helpers.assert_eq(result[1], false)
 		helpers.assert_true(tostring(result[2]):find("gsettings failed", 1, true) ~= nil, tostring(result[2]))
-		helpers.assert_eq(#calls, 3, "the index is not written after a refused source list")
+		helpers.assert_eq(#calls, 3, "nothing is written after a refused source list")
 	end)
 
-	helpers.it("runs a queued resume after the old GNOME index write fails", function()
+	helpers.it("puts the GNOME list back when a write after the target alone fails (gnome-runtime-switch)", function()
 		local answers = gnome_answers()
-		answers["gsettings set org.gnome.desktop.input-sources current 0"] = false
+		answers["gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr+ergopti'), ('xkb', 'fr'), ('ibus', 'mozc-jp')]"] = false
+		local port, calls = fake_port(Switch.GNOME, answers)
+		local result
+		Switch.new(port).select("xkb:fr+ergopti", function(ok, detail) result = { ok, detail } end)
+		helpers.assert_eq(result[1], false)
+		helpers.assert_true(tostring(result[2]):find("put back", 1, true) ~= nil, tostring(result[2]))
+		helpers.assert_eq(calls[#calls],
+			"gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]",
+			"the undo writes the user's list back")
+	end)
+
+	helpers.it("runs a queued resume after a GNOME write fails", function()
+		local answers = gnome_answers()
+		answers["gsettings set org.gnome.desktop.input-sources sources [('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]"] = false
 		local port, calls, flush = fake_port(Switch.GNOME, answers, true)
 		local switcher, results, settled = Switch.new(port), {}, false
 		switcher.select("xkb:fr", function(ok) results[#results + 1] = { "pause", ok } end)
@@ -442,7 +468,7 @@ helpers.describe("input source switch: switcher", function()
 		switcher.when_settled(function() settled = true end)
 		flush()
 		helpers.assert_eq(results, { { "pause", false }, { "resume", true } })
-		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 1")
+		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr+ergopti'), ('xkb', 'fr')]")
 		helpers.assert_true(settled)
 	end)
 
@@ -464,7 +490,7 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_eq(results[2], "pause=true:nil")
 		helpers.assert_eq(results[3], "last=true:nil")
 		helpers.assert_true(settled, "the listener runs once nothing runs or waits")
-		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
+		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources mru-sources [('ibus', 'mozc-jp'), ('xkb', 'fr+ergopti'), ('xkb', 'fr')]")
 	end)
 
 	helpers.it("waits for a switch started by an earlier settlement listener", function()
@@ -499,8 +525,8 @@ helpers.describe("input source switch: switcher", function()
 		flush()
 		helpers.assert_eq(table.concat(results, ","),
 			"first=true:nil,older=false:superseded by a later switch,newest=true:nil")
-		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
-		helpers.assert_eq(#calls, 8, "the superseded switch must issue no native commands")
+		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources mru-sources [('ibus', 'mozc-jp'), ('xkb', 'fr+ergopti'), ('xkb', 'fr')]")
+		helpers.assert_eq(#calls, 12, "the superseded switch must issue no native commands (two reads and four writes per switch)")
 		helpers.assert_true(switcher.is_settled())
 	end)
 
