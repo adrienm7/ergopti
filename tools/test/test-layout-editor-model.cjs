@@ -29,6 +29,7 @@ const PAGE_SCRIPTS = [
 	'layout_composer/reference_layouts.js',
 	'layout_composer/source_model.js',
 	'layout_composer/source_compiler.js',
+	'layout_composer/source_emulation.js',
 	'layout_editor/_generated/key_tables.js',
 	'layout_editor/zip_writer.js',
 	'layout_editor/toml_prelude.js',
@@ -273,6 +274,9 @@ test('the exact conversion keeps the behaviour and compiles back to the same cha
 		const payload = IO.installPayload(converted.doc, 'linux');
 		assert.equal(IO.parse(payload.source).ok, true);
 		assert.match(payload.keylayout, /<keyboard /);
+		const emulation = JSON.parse(payload.emulation);
+		assert.equal(emulation.platform, 'linux');
+		assert.equal(emulation.layout, converted.doc.layout.id);
 	}
 	refuses(() => IO.convertImport(IO.create('a', 'A')), 'source_not_imported');
 });
@@ -281,6 +285,7 @@ test('a preserved import installs and exports its own XML, only in its own varia
 	const xml = registry('ergopti');
 	const doc = IO.importKeylayout(xml, 'ergopti', 'iso');
 	assert.equal(IO.installPayload(doc, 'macos').keylayout, xml);
+	assert.equal(IO.installPayload(doc, 'macos').emulation, undefined, 'an import has no table');
 	assert.equal(IO.keylayoutFile(doc, 'iso').text, xml);
 	refuses(() => IO.keylayoutFile(doc, 'ansi'), 'source_export_unavailable');
 });
@@ -397,6 +402,102 @@ test('drag and drop swaps two keys, and a copy leaves the source', () => {
 	assert.equal(M.transferMapping(doc, 'base', 'KeyA', 'KeyA', null, false), doc);
 });
 
+test('a letter fills its other case on the case layer, never over a mapping', () => {
+	let doc = IO.create('a', 'A');
+	assert.equal(M.caseLayer(doc, 'base'), null, 'no Shift layer yet');
+	doc = M.addLayer(doc, 'shift', ['shift'], []);
+	assert.equal(M.caseLayer(doc, 'base').id, 'shift');
+	assert.equal(M.caseLayer(doc, 'shift').id, 'base');
+	doc = M.setMappingWithCase(doc, 'base', 'KeyQ', { text: 'é' }, null, false);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyQ', null).mapping.text, 'É');
+	doc = M.setMappingWithCase(doc, 'shift', 'KeyW', { text: 'Ω' }, null, false);
+	assert.equal(M.mappingAt(doc, 'base', 'KeyW', null).mapping.text, 'ω');
+	doc = M.setMapping(doc, 'shift', 'KeyE', { text: '!' }, null);
+	doc = M.setMappingWithCase(doc, 'base', 'KeyE', { text: 'e' }, null, false);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyE', null).mapping.text, '!', 'a mapped partner stays');
+	doc = M.setMappingWithCase(doc, 'base', 'KeyE', { text: 'e' }, null, true);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyE', null).mapping.text, 'E', 'overwrite replaces it');
+	// No one-letter other case: ß (SS), a digit, a ligature.
+	for (const text of ['ß', '1', 'ff'])
+		assert.equal(
+			M.mappingAt(
+				M.setMappingWithCase(doc, 'base', 'KeyR', { text }, null, false),
+				'shift',
+				'KeyR',
+				null
+			),
+			null,
+			text
+		);
+	// A platform override fills the partner's override, not the shared cell.
+	doc = M.setMappingWithCase(doc, 'base', 'KeyT', { text: 'þ' }, 'linux', false);
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyT', 'linux').scope, 'linux');
+	assert.equal(M.mappingAt(doc, 'shift', 'KeyT', null), null);
+});
+
+test('every mapping of a layer moves or copies to another layer at once', () => {
+	let doc = M.addLayer(IO.create('a', 'A'), 'shift', ['shift'], []);
+	doc = M.setMapping(doc, 'base', 'KeyA', { text: 'a' }, null);
+	doc = M.setMapping(doc, 'shift', 'KeyB', { text: 'B' }, null);
+	const moved = M.transferLayer(doc, 'base', 'shift', false);
+	assert.equal(M.mappingAt(moved, 'shift', 'KeyA', null).mapping.text, 'a');
+	assert.equal(M.mappingAt(moved, 'shift', 'KeyB', null).mapping.text, 'B', 'other cells stay');
+	assert.equal(M.mappingAt(moved, 'base', 'KeyA', null), null);
+	const copied = M.transferLayer(doc, 'base', 'shift', true);
+	assert.equal(M.mappingAt(copied, 'base', 'KeyA', null).mapping.text, 'a');
+	refuses(() => M.transferLayer(doc, 'base', 'nowhere', true), 'layer_unknown');
+});
+
+test('the preview types through the web emulation on top of the native layout', () => {
+	const fixture = fs.readFileSync(
+		shared('tests', 'corpus', 'layouts', 'source', 'source.toml'),
+		'utf8'
+	);
+	const doc = IO.parse(fixture).doc;
+	// macOS sees no Scroll Lock press; the emulated Kana key is Insert here.
+	doc.modifiers[0].keys = ['Insert'];
+	const typist = M.previewTypist(doc, 'macos');
+	const presses = [];
+	const add = (entries) => presses.push(...plain(entries));
+	const type = () => M.simulate(doc, presses, null).text;
+	// A native key passes through to the .keylayout typing.
+	add(typist.down('KeyA', [], 0));
+	assert.equal(type(), 'a');
+	// The locked Kana modifier selects its emulated layer, and a second press unlocks it.
+	assert.ok(typist.owns('Insert'));
+	add(typist.down('Insert', [], 10));
+	add(typist.up('Insert', 20));
+	add(typist.down('KeyA', [], 30));
+	add(typist.down('Insert', [], 40));
+	add(typist.up('Insert', 50));
+	assert.equal(type(), 'aあ');
+	// A tap-hold: a quick tap types its tap, a hold reaches its layer.
+	assert.equal(typist.pendingThreshold(), null);
+	add(typist.down('Space', [], 100));
+	assert.equal(typist.pendingThreshold(), 180);
+	add(typist.up('Space', 150));
+	assert.equal(type(), 'aあ ');
+	add(typist.down('Space', [], 200));
+	add(typist.tick(400));
+	add(typist.down('KeyJ', [], 410));
+	add(typist.up('KeyJ', 420));
+	add(typist.up('Space', 430));
+	// The hold reaches the native command layer, which the engine leaves to the
+	// OS layout as the drivers do: the key arrives without the layer's modifier.
+	assert.equal(type(), 'aあ j');
+	// A shortcut sending another chord shows as that chord.
+	add(typist.down('KeyA', ['control_left'], 500));
+	assert.equal(type(), 'aあ j⟨control+KeyB⟩');
+	// Emulated output ends a pending dead key with its terminator.
+	add(typist.down('BracketLeft', [], 600));
+	presses.push({ text: '!' });
+	assert.equal(type(), 'aあ j⟨control+KeyB⟩^!');
+	refuses(
+		() => M.previewTypist(IO.importKeylayout(registry('ergopti'), 'e', 'iso'), 'macos'),
+		'source_imported_preserved'
+	);
+});
+
 test('Windows flags and NLS functions are edited and refused like any record', () => {
 	let doc = IO.create('a', 'A');
 	doc = M.setWindowsFlags(doc, ['kllf_altgr']);
@@ -470,6 +571,21 @@ test('a structured source downloads its macOS bundle as one archive', () => {
 		() => IO.macosBundleArchive(IO.importKeylayout(registry('ergopti'), 'e', 'iso')),
 		'source_export_unavailable'
 	);
+});
+
+test('the macOS download follows the export format drop-down', () => {
+	const converted = IO.convertImport(IO.importKeylayout(registry('ergopti'), 'ergopti', 'iso')).doc;
+	assert.match(IO.macosDownload(converted).filename, /\.bundle\.zip$/, 'bundle by default');
+	const iso = IO.macosDownload(converted, 'iso');
+	const ansi = IO.macosDownload(converted, 'ansi');
+	assert.equal(iso.mime, 'application/xml');
+	assert.equal(iso.text, IO.keylayoutFile(converted, 'iso').text);
+	assert.equal(ansi.text, IO.keylayoutFile(converted, 'ansi').text);
+	assert.notEqual(iso.text, ansi.text);
+	const preserved = IO.importKeylayout(registry('ergopti'), 'e', 'iso');
+	assert.equal(IO.macosDownload(preserved).text, registry('ergopti'), 'an import stays verbatim');
+	refuses(() => IO.macosDownload(preserved, 'bundle'), 'source_export_unavailable');
+	refuses(() => IO.macosDownload(preserved, 'ansi'), 'source_export_unavailable');
 });
 
 test('a layer fills from a reference or a registry layout, dead keys included', () => {
