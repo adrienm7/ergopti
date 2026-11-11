@@ -1,7 +1,5 @@
 ﻿; tests/unit/adapters/input/test_suppressive_capture_settlement.ahk
 
-#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
-
 _SICS_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
@@ -529,19 +527,9 @@ _OSCF_ChildSource() {
 	return SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 		. FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_control_flags_body.ahk")
 }
-; Modes whose oracle needs the original VK_OEM_8 keydown to reach the owned
-; receiver as an ordinary key. The fixture simulates the Kana family; a real
-; Kana layout active on this host keeps that keydown from the receiver.
-global _OSCF_ORDINARY_OEM_MODES := ["kana-released", "kana-held-original"]
-
 _OSCF_Case(Mode) {
-	global _SharedDir, _OSCF_ORDINARY_OEM_MODES
+	global _SharedDir
 	static RetirementDebt := 0
-	for OrdinaryOemMode in _OSCF_ORDINARY_OEM_MODES {
-		if Mode == OrdinaryOemMode
-			TestRequireHostCapability(TestNonKanaLayoutReceipt.Bind(
-				KS_ProbeAltGrLayout(DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))))
-	}
 	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
 	Root := A_Temp . "\ergopti_one_shot_control_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	Script := Root . "\subject.ahk"
