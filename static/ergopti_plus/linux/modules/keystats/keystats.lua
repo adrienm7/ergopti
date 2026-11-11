@@ -836,6 +836,11 @@ function M.init(opts)
 	if registration_ok and registered == true then
 		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
 	end
+	-- awake_ms follows Windows and macOS (keep-awake sessions); earlier
+	-- sampled uptime is cleared and the definition's first date recorded.
+	if migration_ok and migrated == true then
+		migration_ok, migrated = pcall(SqliteWriter.ensure_awake_definition, _device_id, Calendar.capture().date)
+	end
 	local sqlite_ready = migration_ok and migrated == true
 	-- The ledger exporter and the at-rest text migration gate no recording:
 	-- the daemon runs them on its loop's first idle tick (options.defer), off
