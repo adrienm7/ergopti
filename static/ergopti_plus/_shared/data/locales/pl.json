@@ -2611,6 +2611,7 @@
 	"model_browser.install_paused": "Ergopti jest wstrzymane: wznów je, aby zainstalować {name}.",
 	"model_browser.reason_install_ai_on": "Najpierw wyłącz AI: instalacja Ollamy włączy ją ponownie z Ollamą.",
 	"model_browser.hint_api_no_key": "Brak klucza API: dodaj go, aby używać tego modelu.",
+	"model_browser.hint_api_key_reenter": "Brak klucza: ten wpis wrócił z kopii zapasowej bez swojego klucza. Aby go użyć, wpisz jego klucz ponownie przez Klucz API…",
 	"model_browser.hint_api_listing_unavailable": "Lista modeli tego dostawcy nie jest tu dostępna: wyświetlane są znane modele; wpisz inny identyfikator przez Inny model…",
 	"model_browser.hint_api_listing_refused": "Dostawca odmówił wyświetlenia swoich modeli (sprawdź klucz): znane modele lub wpisz inny identyfikator.",
 	"model_browser.hint_api_listing_pending": "Wczytywanie modeli tego dostawcy…",

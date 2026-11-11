@@ -2611,6 +2611,7 @@
 	"model_browser.install_paused": "Ergopti is gepauzeerd: hervat het om {name} te installeren.",
 	"model_browser.reason_install_ai_on": "Zet eerst de AI uit: Ollama installeren zet hem weer aan met Ollama.",
 	"model_browser.hint_api_no_key": "API-sleutel ontbreekt: voeg hem toe om dit model te gebruiken.",
+	"model_browser.hint_api_key_reenter": "Sleutel ontbreekt: deze vermelding kwam zonder sleutel terug uit een back-up. Voer de sleutel opnieuw in met API-sleutel… om haar te gebruiken.",
 	"model_browser.hint_api_listing_unavailable": "De modellenlijst van deze aanbieder is hier niet beschikbaar: de bekende modellen staan erin; typ een andere id met Ander model…",
 	"model_browser.hint_api_listing_refused": "De aanbieder weigerde zijn modellen te tonen (controleer de sleutel): de bekende modellen, of typ een andere id.",
 	"model_browser.hint_api_listing_pending": "Modellen van deze aanbieder laden…",
