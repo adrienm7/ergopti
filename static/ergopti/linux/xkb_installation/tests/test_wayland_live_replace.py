@@ -22,6 +22,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -153,6 +154,13 @@ class WaylandLiveReplaceTests(unittest.TestCase):
         patched = mock.patch.object(desktop_activation, "WAYLAND_READBACK_SECONDS", 3.0)
         patched.start()
         self.addCleanup(patched.stop)
+        # The GNOME Shell of the session: it started before setUp installed ergol.
+        self.shell_started = time.time() - 60
+        shell = mock.patch.object(
+            installer, "process_started_at", side_effect=lambda _name: self.shell_started
+        )
+        shell.start()
+        self.addCleanup(shell.stop)
 
     def tearDown(self) -> None:
         self.path.stop()
@@ -165,6 +173,20 @@ class WaylandLiveReplaceTests(unittest.TestCase):
             "WAYLAND_DISPLAY": "wayland-0",
             "DISPLAY": server.display,
         }
+
+    def login(self) -> None:
+        """Registers both slots, then starts a new GNOME Shell, which reads them."""
+        installer.install(
+            "ergol_live",
+            "ergol",
+            self.source,
+            ["fr"],
+            self.root,
+            self.home,
+            {},
+            source_id="ergol",
+        )
+        self.shell_started = time.time() + 2 * desktop_activation.GNOME_REGISTRY_MARGIN_SECONDS
 
     def gnome(self, key: str) -> list:
         return parse_gsettings_sources((self.store / ("gnome-" + key)).read_text()) or []
@@ -184,6 +206,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
             )
 
     def test_each_build_moves_gnome_to_the_other_slot_and_is_read_back(self) -> None:
+        self.login()
         (self.store / "gnome-sources").write_text("[('xkb', 'us'), ('xkb', 'ergol')]")
         (self.store / "gnome-mru-sources").write_text("[('xkb', 'ergol'), ('xkb', 'us')]")
         with XvfbServer() as server, FakeCompositor(
@@ -216,6 +239,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
             self.assertIn("[9,", text, "the unused copy holds the last build too")
 
     def test_a_compositor_that_does_not_reload_puts_the_setting_back(self) -> None:
+        self.login()
         before = "[('xkb', 'ergol'), ('xkb', 'us')]"
         (self.store / "gnome-sources").write_text(before)
         (self.store / "gnome-mru-sources").write_text(before)
@@ -232,6 +256,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
         self.assertEqual(self.gnome("mru-sources"), parse_gsettings_sources(before))
 
     def test_a_setting_that_does_not_read_back_is_refused_and_restored(self) -> None:
+        self.login()
         before = "[('xkb', 'us')]"
         (self.store / "gnome-sources").write_text(before)
         (self.store / "gnome-mru-sources").write_text(before)
@@ -274,6 +299,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
         self.assertNotIn("ergol_live", installer.read_manifest(self.root))
 
     def test_uninstall_removes_both_copies(self) -> None:
+        self.login()
         (self.store / "gnome-sources").write_text("[('xkb', 'ergol')]")
         (self.store / "gnome-mru-sources").write_text("[('xkb', 'ergol')]")
         with XvfbServer() as server, FakeCompositor(self.store, "gnome", self.root, server.display):
@@ -284,6 +310,90 @@ class WaylandLiveReplaceTests(unittest.TestCase):
             installer.uninstall("ergol", self.root, self.home)
         self.assertEqual(installer.read_manifest(self.root), {})
         self.assertFalse((self.root / "symbols" / "ergol_live").exists())
+
+    def test_a_layout_registered_after_the_shell_started_waits_for_the_next_login(self) -> None:
+        # GNOME Shell 46 reads the user registry once, at login: selecting an
+        # id it never read switched a real session to its "us" fallback and the
+        # read-back then ended not_loaded.
+        before = "[('xkb', 'us'), ('xkb', 'fr')]"
+        (self.store / "gnome-sources").write_text(before)
+        (self.store / "gnome-mru-sources").write_text(before)
+        with XvfbServer() as server, FakeCompositor(
+            self.store, "gnome", self.root, server.display
+        ) as compositor:
+            environ = self.environ(server, "GNOME")
+            report = self.apply(environ)
+            self.assertFalse(report["ok"], report)
+            self.assertEqual(report["code"], desktop_activation.WAYLAND_NEEDS_RELOGIN)
+            self.assertEqual(self.gnome("sources"), parse_gsettings_sources(before))
+            self.assertEqual(self.gnome("mru-sources"), parse_gsettings_sources(before))
+            self.assertEqual(compositor.loads, [])
+            self.assertEqual(sorted(installer.read_manifest(self.root)), ["ergol", "ergol_live"])
+            # The next login reads both slots: each later build alternates live.
+            self.shell_started = time.time() + 2 * desktop_activation.GNOME_REGISTRY_MARGIN_SECONDS
+            for slot in ("ergol", "ergol_live"):
+                report = self.apply(environ)
+                self.assertTrue(report["ok"], report)
+                self.assertEqual(report["slot"], slot)
+
+    def test_gnome_without_a_shell_process_is_refused_before_anything_is_written(self) -> None:
+        (self.store / "gnome-sources").write_text("[('xkb', 'us')]")
+        self.shell_started = None
+        with XvfbServer() as server:
+            report = self.apply(self.environ(server, "GNOME"))
+        self.assertEqual(report["code"], desktop_activation.WAYLAND_SELECT_REFUSED)
+        self.assertEqual(self.gnome("sources"), [("xkb", "us")])
+        self.assertEqual(sorted(installer.read_manifest(self.root)), ["ergol"])
+
+    def test_an_unchanged_registry_keeps_its_date(self) -> None:
+        registry = self.root / "rules" / "evdev.xml"
+        os.utime(registry, (1_000_000, 1_000_000))
+        installer.install("ergol", "ergol", self.source, ["fr"], self.root, self.home, {})
+        self.assertEqual(registry.stat().st_mtime, 1_000_000)
+        installer.install(
+            "ergol_live", "ergol", self.source, ["fr"], self.root, self.home, {}, source_id="ergol"
+        )
+        self.assertNotEqual(registry.stat().st_mtime, 1_000_000)
+
+
+class ShellStartTests(unittest.TestCase):
+    """The start time of a process read from a /proc tree."""
+
+    def setUp(self) -> None:
+        self.proc = Path(tempfile.mkdtemp(prefix="ergopti-proc-"))
+        self.addCleanup(shutil.rmtree, self.proc, True)
+        (self.proc / "stat").write_text("cpu  1 2 3\nbtime 1000\n", encoding="ascii")
+
+    def process(self, pid: int, comm: str, ticks: int) -> None:
+        folder = self.proc / str(pid)
+        folder.mkdir()
+        (folder / "comm").write_text(comm + "\n", encoding="utf-8")
+        fields = ["S"] + ["0"] * 18 + [str(ticks), "0", "0"]
+        (folder / "stat").write_text(
+            "%d (%s) %s\n" % (pid, comm, " ".join(fields)), encoding="utf-8"
+        )
+
+    def test_the_newest_process_of_that_name_is_read(self) -> None:
+        hertz = os.sysconf("SC_CLK_TCK")
+        self.process(10, "gnome-shell", 5 * hertz)
+        self.process(11, "gnome-shell", 9 * hertz)
+        self.process(12, "gnome-shellx", 20 * hertz)
+        (self.proc / "self").mkdir()
+        self.assertEqual(desktop_activation.process_started_at("gnome-shell", self.proc), 1009.0)
+
+    def test_no_such_process_reads_none(self) -> None:
+        self.process(10, "kwin_wayland", 5)
+        self.assertIsNone(desktop_activation.process_started_at("gnome-shell", self.proc))
+
+    def test_a_registry_written_after_the_start_is_unknown_to_the_shell(self) -> None:
+        registry = self.proc / "evdev.xml"
+        registry.write_text("<name>ergol</name>", encoding="utf-8")
+        os.utime(registry, (5000, 5000))
+        knows = desktop_activation.gnome_shell_knows_layout
+        self.assertTrue(knows(registry, "ergol", 5000 + 2))
+        self.assertFalse(knows(registry, "ergol", 5000 + 0.5))
+        self.assertFalse(knows(registry, "ergol_live", 6000))
+        self.assertFalse(knows(self.proc / "missing.xml", "ergol", 6000))
 
 
 if __name__ == "__main__":
