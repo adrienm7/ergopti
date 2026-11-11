@@ -1227,9 +1227,12 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method compiles nothing from the
       include block (an included file that itself includes `%L`), so Bépo's monnaie then cédille types « ⅕ » in
       mousepad while Qt types ₢. Write the rules where GTK 3 reads them, or state the IBus requirement.
-- [ ] **KDE layout id across session types.** `getLayoutsList`'s middle field is Plasma's display label (`''` on
+- [x] **KDE layout id across session types.** `getLayoutsList`'s middle field is Plasma's display label (`''` on
       Wayland, the short name on X11), read as a variant: the same layout is `us` on Wayland and `us(us)` on X11, so a
       stored pause layout does not match on the other session type.
+      Done 2026-11-11: the variants come from kxkbrc (LayoutList, VariantList), read on both session types, and a
+      kxkbrc the daemon disagrees with lists nothing; the middle field is read as the display label. A pause layout
+      stored as `x(x)` on X11 before this no longer matches and is refused with its reason until chosen again.
 
 ## CI acceptance
 
