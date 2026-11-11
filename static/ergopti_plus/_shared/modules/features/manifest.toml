@@ -352,13 +352,11 @@ subsections = ["modes", "sensitivities"]
 
 [sections.gestures.modes]
 description_key = "menu.gestures.modes"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.gesture_modes_and_steps_need_finger_travel"
+platforms = ["ahk", "hs", "linux"]
 
 [sections.gestures.sensitivities]
 description_key = "menu.gestures.sensitivities"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.gesture_modes_and_steps_need_finger_travel"
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -3444,6 +3442,7 @@ description_key = "menu.gestures.tap_5"
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3455,6 +3454,7 @@ description_key = "menu.gestures.modes.swipe_2_left"
 id = "swipe_2_right"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3466,6 +3466,7 @@ description_key = "menu.gestures.modes.swipe_2_right"
 id = "swipe_2_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3477,6 +3478,7 @@ description_key = "menu.gestures.modes.swipe_2_up"
 id = "swipe_2_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3488,6 +3490,7 @@ description_key = "menu.gestures.modes.swipe_2_down"
 id = "swipe_2_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3499,6 +3502,7 @@ description_key = "menu.gestures.modes.swipe_2_left_down"
 id = "swipe_2_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3510,6 +3514,7 @@ description_key = "menu.gestures.modes.swipe_2_left_up"
 id = "swipe_2_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3521,6 +3526,7 @@ description_key = "menu.gestures.modes.swipe_2_right_down"
 id = "swipe_2_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3532,8 +3538,8 @@ description_key = "menu.gestures.modes.swipe_2_right_up"
 # swipe opens or closes one tab, decision of 2026-11-04) ---
 [[features.gestures.modes]]
 id = "swipe_3_left"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3543,8 +3549,8 @@ description_key = "menu.gestures.modes.swipe_3_left"
 
 [[features.gestures.modes]]
 id = "swipe_3_right"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3554,8 +3560,8 @@ description_key = "menu.gestures.modes.swipe_3_right"
 
 [[features.gestures.modes]]
 id = "swipe_3_up"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3565,8 +3571,8 @@ description_key = "menu.gestures.modes.swipe_3_up"
 
 [[features.gestures.modes]]
 id = "swipe_3_down"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3578,6 +3584,7 @@ description_key = "menu.gestures.modes.swipe_3_down"
 id = "swipe_3_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3589,6 +3596,7 @@ description_key = "menu.gestures.modes.swipe_3_left_down"
 id = "swipe_3_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3600,6 +3608,7 @@ description_key = "menu.gestures.modes.swipe_3_left_up"
 id = "swipe_3_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3611,6 +3620,7 @@ description_key = "menu.gestures.modes.swipe_3_right_down"
 id = "swipe_3_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3621,8 +3631,8 @@ description_key = "menu.gestures.modes.swipe_3_right_up"
 # --- 4-finger (all x1) ---
 [[features.gestures.modes]]
 id = "swipe_4_left"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3632,8 +3642,8 @@ description_key = "menu.gestures.modes.swipe_4_left"
 
 [[features.gestures.modes]]
 id = "swipe_4_right"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3643,8 +3653,8 @@ description_key = "menu.gestures.modes.swipe_4_right"
 
 [[features.gestures.modes]]
 id = "swipe_4_up"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3654,8 +3664,8 @@ description_key = "menu.gestures.modes.swipe_4_up"
 
 [[features.gestures.modes]]
 id = "swipe_4_down"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3667,6 +3677,7 @@ description_key = "menu.gestures.modes.swipe_4_down"
 id = "swipe_4_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3678,6 +3689,7 @@ description_key = "menu.gestures.modes.swipe_4_left_down"
 id = "swipe_4_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3689,6 +3701,7 @@ description_key = "menu.gestures.modes.swipe_4_left_up"
 id = "swipe_4_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3700,6 +3713,7 @@ description_key = "menu.gestures.modes.swipe_4_right_down"
 id = "swipe_4_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3712,6 +3726,7 @@ description_key = "menu.gestures.modes.swipe_4_right_up"
 id = "swipe_5_left"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3723,6 +3738,7 @@ description_key = "menu.gestures.modes.swipe_5_left"
 id = "swipe_5_right"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3734,6 +3750,7 @@ description_key = "menu.gestures.modes.swipe_5_right"
 id = "swipe_5_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3745,6 +3762,7 @@ description_key = "menu.gestures.modes.swipe_5_up"
 id = "swipe_5_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3756,6 +3774,7 @@ description_key = "menu.gestures.modes.swipe_5_down"
 id = "swipe_5_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3767,6 +3786,7 @@ description_key = "menu.gestures.modes.swipe_5_left_down"
 id = "swipe_5_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3778,6 +3798,7 @@ description_key = "menu.gestures.modes.swipe_5_left_up"
 id = "swipe_5_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3789,6 +3810,7 @@ description_key = "menu.gestures.modes.swipe_5_right_down"
 id = "swipe_5_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3818,6 +3840,7 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3828,6 +3851,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_left"
 id = "swipe_2_right"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3838,6 +3862,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_right"
 id = "swipe_2_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3848,6 +3873,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_up"
 id = "swipe_2_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3858,6 +3884,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_down"
 id = "swipe_2_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3868,6 +3895,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_left_down"
 id = "swipe_2_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3878,6 +3906,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_left_up"
 id = "swipe_2_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3888,6 +3917,7 @@ description_key = "menu.gestures.sensitivities.swipe_2_right_down"
 id = "swipe_2_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3896,8 +3926,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3906,8 +3936,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3916,8 +3946,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_up"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 25
 recommended = 25
 family = "setting"
@@ -3926,8 +3956,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_down"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 25
 recommended = 25
 family = "setting"
@@ -3938,6 +3968,7 @@ description_key = "menu.gestures.sensitivities.swipe_3_down"
 id = "swipe_3_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3948,6 +3979,7 @@ description_key = "menu.gestures.sensitivities.swipe_3_left_down"
 id = "swipe_3_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3958,6 +3990,7 @@ description_key = "menu.gestures.sensitivities.swipe_3_left_up"
 id = "swipe_3_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3968,6 +4001,7 @@ description_key = "menu.gestures.sensitivities.swipe_3_right_down"
 id = "swipe_3_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3976,8 +4010,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3986,8 +4020,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3996,8 +4030,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_up"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4006,8 +4040,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_down"
-platforms = ["hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4018,6 +4052,7 @@ description_key = "menu.gestures.sensitivities.swipe_4_down"
 id = "swipe_4_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4028,6 +4063,7 @@ description_key = "menu.gestures.sensitivities.swipe_4_left_down"
 id = "swipe_4_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4038,6 +4074,7 @@ description_key = "menu.gestures.sensitivities.swipe_4_left_up"
 id = "swipe_4_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4048,6 +4085,7 @@ description_key = "menu.gestures.sensitivities.swipe_4_right_down"
 id = "swipe_4_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4058,6 +4096,7 @@ description_key = "menu.gestures.sensitivities.swipe_4_right_up"
 id = "swipe_5_left"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4068,6 +4107,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_left"
 id = "swipe_5_right"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4078,6 +4118,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_right"
 id = "swipe_5_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4088,6 +4129,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_up"
 id = "swipe_5_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4098,6 +4140,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_down"
 id = "swipe_5_left_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4108,6 +4151,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_left_down"
 id = "swipe_5_left_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4118,6 +4162,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_left_up"
 id = "swipe_5_right_down"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4128,6 +4173,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_down"
 id = "swipe_5_right_up"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4149,6 +4195,7 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 id = "swipe_3_horiz"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4160,6 +4207,7 @@ description_key = "menu.gestures.modes"
 id = "swipe_4_horiz"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4171,6 +4219,7 @@ description_key = "menu.gestures.modes"
 id = "swipe_5_horiz"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4182,6 +4231,7 @@ description_key = "menu.gestures.modes"
 id = "swipe_3_horiz"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4192,6 +4242,7 @@ description_key = "menu.gestures.sensitivities"
 id = "swipe_4_horiz"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4202,6 +4253,7 @@ description_key = "menu.gestures.sensitivities"
 id = "swipe_5_horiz"
 platforms = ["hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = 3.5
 recommended = 3.5
 family = "setting"

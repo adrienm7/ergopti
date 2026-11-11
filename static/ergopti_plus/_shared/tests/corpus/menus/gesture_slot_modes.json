@@ -1,5 +1,5 @@
 {
-	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Linux follows the fingers too (modules/gestures/incremental_tracker.lua) and renders the same rows; Windows has no per-slot mode capability. Native callbacks remain their existing owner.",
+	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Linux (modules/gestures/incremental_tracker.lua) and Windows (modules/gestures/raw_touchpad.ahk, raw HID digitizer reports) follow the fingers too and render the same rows. Native callbacks remain their existing owner.",
 	"section": "gesture_slot_mode_commands",
 	"rows": [
 		{
@@ -7,8 +7,6 @@
 			"type": "check",
 			"i18n": "menu.gestures.mode_single",
 			"checked_when": ["gesture_mode_is_single"],
-			"platforms": ["hs", "linux"],
-			"unavailable": "hide",
 			"value": "x1"
 		},
 		{
@@ -16,8 +14,6 @@
 			"type": "check",
 			"i18n": "menu.gestures.mode_incremental",
 			"checked_when": ["gesture_mode_is_incremental"],
-			"platforms": ["hs", "linux"],
-			"unavailable": "hide",
 			"value": "incremental"
 		}
 	],
@@ -27,7 +23,7 @@
 		{ "mode": "future_mode", "checked": [false, false] }
 	],
 	"platform_rows": {
-		"ahk": [],
+		"ahk": ["gesture_mode_single", "gesture_mode_incremental"],
 		"hs": ["gesture_mode_single", "gesture_mode_incremental"],
 		"linux": ["gesture_mode_single", "gesture_mode_incremental"]
 	},

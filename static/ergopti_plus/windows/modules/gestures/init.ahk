@@ -116,6 +116,15 @@ global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 #Include actions.ahk
 #Include system_actions.ahk
 
+; Incremental swipes: the shared direction and step rules, the tracker, the
+; Precision Touchpad report parser and the raw input owner that feeds them.
+#Include direction.ahk
+#Include incremental.ahk
+#Include incremental_tracker.ahk
+#Include touchpad_hid.ahk
+#Include %A_LineFile%\..\..\..\adapters\raw_input.ahk
+#Include raw_touchpad.ahk
+
 
 
 
@@ -205,39 +214,53 @@ GestureReleaseOwnedCarrierModifiers(StateReader := GetKeyState, Emitter := SendE
 ; =====================================
 ; =====================================
 
-; Executes the action assigned to a gesture slot.
+; Executes the action assigned to a gesture slot, from the Precision Touchpad
+; settings' shortcut. A swipe the raw touchpad reader already stepped through
+; owns that shortcut (modules/gestures/raw_touchpad.ahk): it is swallowed, or
+; deferred to the touch's end for an incremental slot that has not stepped.
 GestureDispatch(slot) {
+		if RawTouchpadClaimsShortcut(slot) {
+				GestureReleaseOwnedCarrierModifiers()
+				return
+		}
+		GestureRunSlotAction(slot)
+}
+
+; Runs a slot's action once: the shortcut path and each incremental step.
+; @param slot {String} Gesture slot id.
+; @returns {Boolean} Whether the action was started.
+GestureRunSlotAction(slot) {
 		global GestureAssignments, GESTURE_ACTIONS, Features
 
 		; Guard against being called before auto-execute completes (e.g. hotkey fires
 		; during a Reload triggered by enabling metrics)
 		if !IsSet(GestureAssignments) or !IsSet(GESTURE_ACTIONS) or !IsSet(Features)
-				return
+				return false
 
 		if !Features["gestures"]["enabled"] {
-				return
+				return false
 		}
 
 		if !GestureAssignments.Has(slot) {
-				return
+				return false
 		}
 
 		ActionName := GestureAssignments[slot]
 		if (ActionName == "none" or !GESTURE_ACTIONS.Has(ActionName)) {
-				return
+				return false
 		}
 
 		; An AI action is unarmed while the AI is off, as for the keys.
 		if AiActionBlocked(ActionName) {
 				LoggerDebug("gestures", "Gesture {1} -> {2} held back: the AI is off.", slot, ActionName)
-				return
+				return false
 		}
 
 		; Release all modifiers held down by the touchpad shortcut (Ctrl+Win+Shift)
 		; before firing the action — otherwise SendEvent/Send calls inherit the
 		; still-down state and produce wrong combos on every swipe after the first.
 		if !GestureReleaseOwnedCarrierModifiers()
-				return
+				return false
 		LoggerDebug("gestures", "Dispatching gesture: {1} -> {2}.", slot, ActionName)
 
 		; Any tap action (other than the click-toggle itself) must deactivate a held click
@@ -247,15 +270,17 @@ GestureDispatch(slot) {
 				RightReleased := GestureReleaseRightClick()
 				if !LeftReleased or !RightReleased {
 						LoggerError("gestures", "Gesture {1} was refused because a synthetic mouse button release remains pending.", slot)
-						return
+						return false
 				}
 		}
 
 		try {
 		GestureInvokeAction(ActionName, GestureBindingId("gesture", slot))
 				LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
+				return true
 		} catch as e {
 				try LoggerError("gestures", "Gesture {1} action '{2}' threw: {3}.", slot, ActionName, e.Message)
+				return false
 		}
 }
 
@@ -360,5 +385,12 @@ if !IsSet(_AHK_DRY_RUN) {
 ; in this file — including the unprotected CallbackCreate/DllCall — produced no
 ; log line whatsoever, and "gestures failed" was indistinguishable from
 ; "gestures was never reached".
-LoggerSuccess("gestures", "Gestures module initialised — ready (window hook: {1}).",
-		_GestureWinHook ? "active" : "unavailable")
+; The raw touchpad reader makes incremental slots follow the fingers. Not in
+; the headless test runner, which has no touchpad and must not own raw input,
+; and not while gestures are off (switching them reloads the driver).
+_GestureRawTouchpad := false
+if !IsSet(_AHK_DRY_RUN) && Features["gestures"]["enabled"]
+		_GestureRawTouchpad := RawTouchpadStart()
+
+LoggerSuccess("gestures", "Gestures module initialised — ready (window hook: {1}, raw touchpad: {2}).",
+		_GestureWinHook ? "active" : "unavailable", _GestureRawTouchpad ? "active" : "unavailable")

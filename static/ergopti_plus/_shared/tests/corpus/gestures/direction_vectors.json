@@ -20,7 +20,7 @@
 		{ "angle": 90, "travel": "short", "direction": null },
 		{ "angle": 225, "travel": "short", "direction": null }
 	],
-	"boundary_rule": { "minimum": 1, "diagonal_minimum": 1.5 },
+	"boundary_rule": { "minimum": 1, "diagonal_minimum": 1.5, "axis_max_degrees": 25 },
 	"boundary_vectors": [
 		{ "id": "below_minimum", "dx": 0.999, "dy": 0, "direction": null },
 		{ "id": "at_minimum", "dx": 1, "dy": 0, "direction": "right" },

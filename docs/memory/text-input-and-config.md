@@ -438,7 +438,12 @@ a corpus case each named driver replays. Retired keys reported by the explicit
 cleanup remain on disk until that cleanup; boot migrations and ordinary saves
 preserve them (ADR-009's retirement exception). Readers drop the old spelling
 at once. Invalid schema stamps retain strict boot and session-write refusal, and so does
-a stamp below the registry's `oldest_version` (v12, what 1.0.0 wrote). A file
+a stamp below the registry's `oldest_version` (v20, what 1.0.9 wrote; the
+v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8 climb through 1.0.9,
+which the notice names). Raise it only to the schema of a public release that
+still climbs every older public schema, and point the
+`config.read_only.older_schema` bridge and the compiled-upgrade pin
+(`tools/test/fixtures/windows-upgrade-prior.json`) at that release. A file
 with no stamp is treated as current (maintainer decision 2026-11-01, so a
 hand-written file keeps working): no step runs and the next save stamps it.
 Otherwise a writer stamps only a file it creates; an existing file
@@ -453,8 +458,8 @@ An action parameter is keyed by its binding, `keyboard__<slot>__<action>`, in
 each driver's own section: macOS `[gestures.action_parameters]`, Linux
 `[gesture_parameters]` and the still-read `[linux.action_parameters]`. Renaming
 a slot id therefore orphans its parameters unless the same step renames the
-keys too. Schema v15 does it with one section-wide `rename_prefix` per retired
-slot family and section; a prefix op must never let one prefix extend the
+keys too. Schema v15 did it (squashed since) with one section-wide
+`rename_prefix` per retired slot family and section; a prefix op must never let one prefix extend the
 other, and an occupied target refuses the migration rather than dropping a
 value. Action: any later slot or binding-id rename adds the matching
 `rename_prefix` ops, and Windows `config_migrate.ahk` learns a new op kind in
@@ -650,10 +655,9 @@ base64(JSON array) envelope of `_shared/lua/llm/profile_registry_codec.lua`
 (Windows writes the same bytes). macOS keeps the list decoded in its state and
 crosses the disk boundary in `scalar_units` through the KEY_MAP `codec` field,
 so its menus never see the string. Its older `[llm.profiles] user_profiles`
-array reaches the envelope through step `v16_to_v17` of the config registry
-(the `encode_value` op, which all three interpreters know). When the envelope
-already exists the array stays as unknown configuration that the cleanup
-offers. Action: add another
+array reached the envelope through step `v16_to_v17` of the config registry
+(the `encode_value` op, which all three interpreters still know), squashed
+since: a file that old is refused, and 1.0.9 converts it. Action: add another
 encoded preference through a `codec` on its KEY_MAP row, never a nested map.
 
 ## Gestures and keymaps

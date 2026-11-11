@@ -120,7 +120,8 @@ through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
   and `wrap_text_if_selected` stay as fixed switches: ChatGPT needs a per-binding
   URL parameter and a shared `chatgpt_url` retirement, the other two are not
   catalogue actions.
-- Migration: schema v15 (`migrations.toml`, `v14_to_v15`). Every retired slot
+- Migration: schema v15 (`migrations.toml`, `v14_to_v15`, squashed on
+  2026-11-11 with every step below v20). Every retired slot
   id is renamed, each switch becomes its slot and action (`false` becomes
   `none`), and a slot the user set wins over the switch of the same chord. Only
   the closed op set is used. Not converted: the per-slot action parameters
@@ -141,7 +142,8 @@ through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
 
 ## Status after the Windows adoption
 
-- Schema v18 (`v17_to_v18`, Windows only) renames every saved slot by role and
+- Schema v18 (`v17_to_v18`, Windows only; squashed on 2026-11-11 with v19)
+  renames every saved slot by role and
   carries the `keyboard__<slot>__<action>` parameters of `[action_parameters]`
   with `rename_prefix`. Schema v19 (`v18_to_v19`) converts the 16 switches; a
   switch left on becomes its action, off becomes `none`, a slot the user set wins
