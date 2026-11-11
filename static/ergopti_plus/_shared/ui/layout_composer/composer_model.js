@@ -297,6 +297,8 @@ var LayoutComposer = (function () {
 		const body = stripComments(text);
 		const model = {
 			name: '',
+			keyboardId: '',
+			layoutCount: 0,
 			mapSet: '',
 			defaultIndex: 0,
 			selects: [],
@@ -340,6 +342,7 @@ var LayoutComposer = (function () {
 			const attrs = readAttributes(match[3]);
 			if (tag === 'keyboard') {
 				model.name = attrs.name || '';
+				model.keyboardId = attrs.id || '';
 			} else if (tag === 'layout') {
 				layouts.push(attrs);
 			} else if (tag === 'modifierMap') {
@@ -350,11 +353,15 @@ var LayoutComposer = (function () {
 				});
 			} else if (tag === 'keyMapSelect') {
 				if (currentModifierMap !== '') {
-					currentSelect = { index: parseInt(attrs.mapIndex, 10), modifiers: [] };
+					// `keys` keeps the unfolded tokens: the source import tells left from right.
+					currentSelect = { index: parseInt(attrs.mapIndex, 10), modifiers: [], keys: [] };
 					modifierMaps.get(currentModifierMap).selects.push(currentSelect);
 				}
 			} else if (tag === 'modifier') {
-				if (currentSelect) currentSelect.modifiers.push(readModifierKeys(attrs.keys || ''));
+				if (currentSelect) {
+					currentSelect.modifiers.push(readModifierKeys(attrs.keys || ''));
+					currentSelect.keys.push(attrs.keys || '');
+				}
 			} else if (tag === 'keyMapSet') {
 				currentSet = attrs.id;
 				if (!model.keyMapSets.has(currentSet)) model.keyMapSets.set(currentSet, new Map());
@@ -395,6 +402,7 @@ var LayoutComposer = (function () {
 				inTerminators = true;
 			}
 		}
+		model.layoutCount = layouts.length;
 		const first = layouts.find((candidate) => candidate.first === '0');
 		if (!first) throw new ComposerError('keylayout_no_layout');
 		model.mapSet = first.mapSet || '';
@@ -1309,8 +1317,14 @@ var LayoutComposer = (function () {
 		ROW_EDGE_CODES,
 		LEVELS,
 		MAX_OUTPUT_CODE_POINTS,
+		OTHER_KEYS,
+		KEYBOARD_GROUP,
 		ComposerError,
 		parseModel,
+		keyEntry,
+		isPrintable,
+		escapeAttribute,
+		keyboardId,
 		keyMapIndex,
 		resolve,
 		step,
