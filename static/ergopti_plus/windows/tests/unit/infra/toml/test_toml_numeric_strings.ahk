@@ -178,7 +178,7 @@ _TNS_EditorSemanticPreference(Shape) {
 		ConfigurationFile := Path
 		Actual := _EditorPrefGet("default_section", "")
 		AssertTrue(Actual is String)
-		AssertEqual("001", Actual, "the native editor must select the authored section")
+		AssertEqual("001", Actual, "the editor must select the authored section")
 		AssertEqual("1", _EditorPrefGet("close_on_add", "0"))
 		AssertEqual("absent", _EditorPrefGet("missing", "absent"))
 		AssertEqual(Source, FSReadUtf8Exact(Path), "reading preferences must not normalize their source")

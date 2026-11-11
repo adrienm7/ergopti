@@ -213,7 +213,122 @@ assert.deepEqual(
 	[10],
 	'a real registration after the continuation section remains dead'
 );
+// An error message is not a throw witness: Error("") has an empty one. Each
+// seeded violation judges the throw by the message alone and must be reported;
+// each control carries an explicit caught state or a never-empty message.
+const witness = (body) =>
+	context.findMessageWitnesses(ahkFixture, ['Case() {', ...body, '}'].join('\n'));
+for (const [body, reason] of [
+	[
+		['\tX := ""', '\ttry F()', '\tcatch as E', '\t\tX := E.Message', '\tAssertEqual("", X)'],
+		'no-throw by empty message'
+	],
+	[
+		[
+			'\tX := ""',
+			'\ttry {',
+			'\t\tF()',
+			'\t} catch as E {',
+			'\t\tX := E.Message',
+			'\t}',
+			'\tAssert(X == "", "no throw")'
+		],
+		'braced catch on the closing line'
+	],
+	[
+		[
+			'\tX := ""',
+			'\ttry F()',
+			'\tcatch ValueError as E',
+			'\t\tX := E.Message',
+			'\tAssertTrue(X != "", "must raise")'
+		],
+		'must-throw by non-empty message'
+	],
+	[
+		[
+			'\tX := ""',
+			'\ttry F()',
+			'\tcatch as E',
+			'\t\tX := E.Message',
+			'\treturn X != "" ? "" : "accepted"'
+		],
+		'verdict returned to the caller'
+	],
+	[
+		[
+			'\tX := ""',
+			'\ttry F()',
+			'\tcatch as E',
+			'\t\tX := E.Message',
+			'\tAssertEqual(Throws ? "boom" : "", X)'
+		],
+		'ternary empty expectation'
+	],
+	[
+		[
+			'\ttry F()',
+			'\tcatch as E',
+			'\t\tthis.Failure := E.Message',
+			'\tAssertEqual("", Fixture.Failure)'
+		],
+		'property read through another receiver'
+	],
+	[
+		[
+			'\ttry F()',
+			'\tcatch OSError as E {',
+			'\t\tState["read_error"] := E.Message',
+			'\t}',
+			'\twhile Other["read_error"] == ""',
+			'\t\tSleep(10)'
+		],
+		'map member'
+	]
+]) {
+	assert.equal(witness(body).length, 1, `a message-only throw witness must be reported: ${reason}`);
+}
+for (const [body, reason] of [
+	[
+		[
+			'\tCaught := false, X := ""',
+			'\ttry F()',
+			'\tcatch as E {',
+			'\t\tCaught := true',
+			'\t\tX := E.Message',
+			'\t}',
+			'\tAssertFalse(Caught, X)'
+		],
+		'explicit caught state'
+	],
+	[
+		[
+			'\tX := ""',
+			'\ttry F()',
+			'\tcatch as E',
+			'\t\tX := Type(E) . ": " . E.Message',
+			'\tAssertEqual("", X)'
+		],
+		'message that is never empty'
+	],
+	[
+		[
+			'\tX := ""',
+			'\ttry F()',
+			'\tcatch as E',
+			'\t\tX := E.Message',
+			'\tAssertContains(X, "refused")'
+		],
+		'presence assertion fails on an empty message'
+	],
+	[
+		['\tX := ""', '\ttry F()', '\tcatch as E', '\t\tX := E.Message', '\t; AssertEqual("", X)'],
+		'comment is not a verdict'
+	]
+]) {
+	assert.equal(witness(body).length, 0, `a real caught-state witness is not reported: ${reason}`);
+}
 console.log(
 	'false-green pcall rejection: 14 scenarios; AHK mixed quotes: 5 live/dead/nested vectors; ' +
-		'continuation child harness live/dead vectors passed'
+		'continuation child harness live/dead vectors; message witness: 7 seeded violations, 4 controls passed'
 );

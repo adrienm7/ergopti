@@ -382,6 +382,13 @@ IsOnboardingActive() {
 	global _OB_ALTGR_PASSTHROUGH
 	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH
 }
+; The Configuration menu binds the wizard's menu entry by name; a test that
+; builds that menu records a click instead of opening the wizard.
+global _Stub_OnboardingMenuOpens := 0
+Onboarding_ShowFromMenu(*) {
+	global _Stub_OnboardingMenuOpens
+	_Stub_OnboardingMenuOpens += 1
+}
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false

@@ -155,7 +155,7 @@ _SRCL_LaunchPassesOnlyItsStreams(OwnTree) {
 	CapturePath := _FSWL_Path()
 	Canary := _SRCL_OpenCaptureLikeHandle(CanaryPath, SRCL_GENERIC_WRITE, SRCL_CREATE_ALWAYS)
 	Seen := {Created: false, Critical: false, Extended: false, OwnOutput: false,
-		Canary: false, ProbeError: ""}
+		Canary: false, ProbeFailed: false, ProbeError: ""}
 	Observe(Application, Command, Flags, Startup, ProcessInfo) {
 		Seen.Critical := A_IsCritical != 0
 		Seen.Extended := (Flags & SRCL_EXTENDED_STARTUPINFO_PRESENT) != 0
@@ -166,8 +166,12 @@ _SRCL_LaunchPassesOnlyItsStreams(OwnTree) {
 			Child := NumGet(ProcessInfo, 0, "Ptr")
 			Seen.OwnOutput := _SRCL_ChildHolds(Child, NumGet(Startup, A_PtrSize = 8 ? 88 : 60, "Ptr"))
 			Seen.Canary := _SRCL_ChildHolds(Child, Canary)
-		} catch as Err
-			Seen.ProbeError := Err.Message
+		} catch as Err {
+			; The caught state is the verdict: an Error with an empty message
+			; still means the probe did not run.
+			Seen.ProbeFailed := true
+			Seen.ProbeError := Type(Err) . ": " . Err.Message
+		}
 	}
 	Owner := 0
 	PreviousCritical := Critical("Off")
@@ -186,7 +190,7 @@ _SRCL_LaunchPassesOnlyItsStreams(OwnTree) {
 		}
 	}
 	AssertTrue(Seen.Created, "the launch must reach the observed native creator")
-	AssertEqual("", Seen.ProbeError, "the inheritance probe must run")
+	AssertFalse(Seen.ProbeFailed, "the inheritance probe must run: " . Seen.ProbeError)
 	AssertTrue(Seen.OwnOutput,
 		"positive control: the child must hold its own capture handle, or the probe cannot see inheritance")
 	AssertFalse(Seen.Canary,

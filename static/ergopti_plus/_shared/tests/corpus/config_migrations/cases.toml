@@ -125,5 +125,8 @@ cases = [
 	"shipped_cascade_depth_eleven_kept_as_outdated",
 	"shipped_user_profiles_array_becomes_envelope_on_macos",
 	"shipped_user_profiles_envelope_wins_on_macos",
-	"shipped_user_profiles_array_untouched_elsewhere"
+	"shipped_user_profiles_array_untouched_elsewhere",
+	"shipped_section_order_language_key_copied_on_windows",
+	"shipped_section_order_language_key_kept_on_windows",
+	"shipped_section_order_language_key_untouched_on_lua"
 ]

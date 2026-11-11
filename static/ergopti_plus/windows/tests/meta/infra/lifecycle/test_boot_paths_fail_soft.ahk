@@ -55,16 +55,19 @@ _BPF_LockedPathsTomlFallsBack() {
 
 	Lock := FileOpen(Path, _BPF_EXCLUSIVE_LOCK_FLAGS)
 	Assert(Lock != "" and IsObject(Lock), "the test could not take an exclusive lock — it would otherwise assert nothing")
-	Threw := ""
+	; The caught state is the verdict: an Error with an empty message is still a
+	; throw, and a message sentinel alone accepted it.
+	Caught := false, Threw := ""
 	Result := ""
 	try {
 		Result := ReadPathsToml(Path)
 	} catch as Err {
-		Threw := Err.Message
+		Caught := true
+		Threw := Type(Err) . ": " . Err.Message
 	}
 	Lock.Close()
 
-	Assert(Threw == "",
+	Assert(!Caught,
 		"ReadPathsToml must not throw on a locked file. It runs in the auto-execute section with parse-time hotkeys already armed, so an exception here aborts the boot mid-way and leaves a resident driver with a subset of its keys remapped. Got: " . Threw)
 	Assert(Result is Map,
 		"it must still return a Map so the caller's .Has checks keep working")

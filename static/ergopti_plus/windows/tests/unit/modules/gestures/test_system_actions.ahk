@@ -1583,7 +1583,7 @@ Test("system actions: existing folder path does not launch an executable prefix 
 class _OAN_Control extends _OAP_NativeControl {
 	__New() {
 		super.__New()
-		this.LaunchCalls := 0, this.FileProbes := 0, this.LaunchError := ""
+		this.LaunchCalls := 0, this.FileProbes := 0, this.LaunchFailed := false, this.LaunchError := ""
 	}
 	IsExistingFile(Path) {
 		this.FileProbes += 1
@@ -1593,6 +1593,9 @@ class _OAN_Control extends _OAP_NativeControl {
 		this.LaunchCalls += 1
 		try return super.Launch(Target, WorkingDir, Options)
 		catch as Err {
+			; The caught state is the record: a refusal raised with an empty message
+			; is still a native error.
+			this.LaunchFailed := true
 			this.LaunchError := Err.Message
 			throw
 		}
@@ -1634,7 +1637,7 @@ _OAN_OriginalJsonNul(Mode) {
 		_OAP_Join(Control, EventHandle)
 		FileDelete(Receipt)
 		AssertTrue(DllCall("Kernel32\ResetEvent", "Ptr", EventHandle, "Int"))
-		Control.LaunchCalls := 0, Control.FileProbes := 0, Control.LaunchError := ""
+		Control.LaunchCalls := 0, Control.FileProbes := 0, Control.LaunchFailed := false, Control.LaunchError := ""
 		AssertFalse(A_IsSuspended, "the action boundary must be unpaused before a refusal verdict")
 		Before := FSReadBytesStrict(Target)
 		Encoded := JsonStringLiteral(Target)
@@ -1686,7 +1689,7 @@ _OAN_OriginalJsonNul(Mode) {
 			. " app_admitted=" . Admitted . " boundary_refused=" . BoundaryRefused
 			. " file_alias=" . FileAlias . " file_probes=" . Control.FileProbes
 			. " launch_calls=" . Control.LaunchCalls . " launched=" . Launched . " actual_image=" . ActualImage
-			. " native_error=" . (Control.LaunchError != ""))
+			. " native_error=" . Control.LaunchFailed)
 		AssertEqual(ExpectedUnits, StrLen(Value), "a native boundary cannot shorten the producer's original String")
 		AssertEqual(Before.Size, After.Size)
 		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before, "Ptr", After,

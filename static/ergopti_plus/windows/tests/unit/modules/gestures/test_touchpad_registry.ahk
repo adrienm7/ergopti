@@ -415,4 +415,112 @@ _TPR_BothWritersGoThroughTheOwner() {
 Test("touchpad registry: both writers go through the one owner (touchpad-one-owner)",
 	_TPR_BothWritersGoThroughTheOwner)
 
+
+
+
+
+; ===================================
+; ===================================
+; ======= 5/ Isolated Profile =======
+; ===================================
+; ===================================
+
+; The private key file an isolated profile writes, as name => DWORD.
+_TPR_PrivateValues(Path) {
+	Values := Map()
+	if !FileExist(Path)
+		return Values
+	Lines := StrSplit(RTrim(FileRead(Path, "UTF-8"), "`n"), "`n")
+	AssertEqual(TouchpadRegistryPrivateHeader(), Lines[1], "the private key carries its header")
+	AssertEqual("key " . TouchpadRegistryData()["key"], Lines[2], "and names the key it stands for")
+	Index := 3
+	while (Index <= Lines.Length) {
+		Parts := StrSplit(Lines[Index], " ")
+		Values[Parts[1]] := Integer(Parts[3])
+		Index += 1
+	}
+	return Values
+}
+
+; Regression (2026-11-11): the live check clear-restore-categories clicked the
+; Gestures « Tout effacer » of an isolated driver (ERGOPTI_STARTUP_SMOKE_DIR);
+; its fresh profile had no backup, so the owner wrote the Windows factory
+; defaults over the maintainer's own HKCU touchpad values. The recording fakes
+; below stand for the machine's key and device: an isolated profile must reach
+; none of them, whatever port it is given, and write its private key instead.
+_TPR_IsolatedProfileNeverReachesTheMachine() {
+	global _DriverStartupSmokeDir, _TPR_Log, _TPR_Registry, _TPR_Files
+	HadSmoke := IsSet(_DriverStartupSmokeDir), SavedSmoke := HadSmoke ? _DriverStartupSmokeDir : ""
+	Profile := A_Temp . "\ergopti_tpr_isolated_" . DriverPid
+	if DirExist(Profile)
+		DirDelete(Profile, true)
+	Private := Profile . "\touchpad_registry_private.txt"
+	Data := TouchpadRegistryData()
+	Factory := Data["factory_defaults"]
+	Mine := _TPR_UserSettings()
+	_TPR_Reset(_TPR_UserSettings())
+	_DriverStartupSmokeDir := Profile
+	try {
+		; The clear of a fresh isolated profile: no backup, so the factory defaults.
+		AssertEqual("factory_defaults", TouchpadRegistryRestore(0, _TPR_RestoreSeams()),
+			"a fresh isolated profile still restores its touchpad")
+		AssertEqual(0, _TPR_Count("write ") + _TPR_Count("delete "),
+			"an isolated clear never writes or deletes a value of the machine's key")
+		AssertEqual(0, _TPR_Count("restart"), "nor restarts the machine's touchpad")
+		AssertEqual(Mine.Count, _TPR_Registry.Count, "the user's own values are all still there")
+		for Name, Value in Mine
+			AssertEqual(Value, _TPR_Registry.Get(Name, ""), Name . " keeps the user's number")
+		Stored := _TPR_PrivateValues(Private)
+		AssertEqual(Factory.Count, Stored.Count, "the private key holds the factory defaults only")
+		for Name, Value in Factory
+			AssertEqual(Value, Stored.Get(Name, ""), Name . " holds its Windows default in the private key")
+
+		; The tray configuration: backed up and written, from and to the private key.
+		_TPR_Log := []
+		AssertTrue(_TPR_Apply(), "an isolated configuration is written")
+		AssertEqual(0, _TPR_Count("snapshot") + _TPR_Count("write "),
+			"an isolated configuration neither reads nor writes the machine's key")
+		Backup := _TPR_Files[_TPR_Path()]
+		First := Data["values"][1]
+		AssertContains(Backup, First["name"] . " dword " . Factory[First["name"]] . "`n",
+			"the backup records the private key's value, not the machine's")
+		Stored := _TPR_PrivateValues(Private)
+		AssertEqual(Data["values"].Length, Stored.Count, "every generated value lands in the private key")
+		for _, Entry in Data["values"]
+			AssertEqual(Entry["value"], Stored.Get(Entry["name"], ""), Entry["name"] . " is written privately")
+		AssertEqual(1234, _TPR_Registry[First["name"]], "the machine's value is untouched")
+
+		; Every launcher of the elevated device restart asks the owner first.
+		Done := []
+		AssertTrue(TouchpadRegistrySkipsDeviceRestart((Ok) => Done.Push(Ok)),
+			"an isolated profile skips the touchpad device restart")
+		Deadline := A_TickCount + 2000
+		while (Done.Length == 0 && A_TickCount < Deadline)
+			Sleep(10)
+		AssertEqual(1, Done.Length, "the skipped restart still completes")
+		AssertTrue(Done[1], "as a success")
+	} finally {
+		_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
+		if DirExist(Profile)
+			DirDelete(Profile, true)
+	}
+	AssertEqual(HadSmoke && SavedSmoke != "", TouchpadRegistrySkipsDeviceRestart(),
+		"a real profile restarts its touchpad")
+}
+Test("touchpad registry: an isolated profile never writes the machine's key (touchpad-isolated-profile)",
+	_TPR_IsolatedProfileNeverReachesTheMachine)
+
+; Both elevated restart launchers refuse an isolated profile before their Run.
+_TPR_RestartLaunchersSkipAnIsolatedProfile() {
+	for _, Launcher in ["GestureRestartTouchpadDevice", "_Onboarding_StartGestureAuto"] {
+		Body := _DriverFuncBody(Launcher)
+		Assert(Body != "", Launcher . " must exist")
+		SkipAt := InStr(Body, "TouchpadRegistrySkipsDeviceRestart(OnDone)")
+		AssertTrue(SkipAt > 0 && SkipAt < InStr(Body, "Run("),
+			Launcher . " asks the owner before it launches the elevated restart")
+	}
+}
+Test("touchpad registry: no elevated restart from an isolated profile (touchpad-isolated-restart)",
+	_TPR_RestartLaunchersSkipAnIsolatedProfile)
+
 #Include test_gesture_powershell_path_encoding.ahk

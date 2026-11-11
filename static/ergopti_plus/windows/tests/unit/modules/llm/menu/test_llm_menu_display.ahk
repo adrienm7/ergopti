@@ -488,14 +488,17 @@ _LMT_StreamingSparseOwnerRefusal() {
 				_LLM_Engine := Vector["owner"]
 			else
 				_LLM_Engine := unset
-			Failure := ""
+			; The caught state is the verdict: an Error with an empty message is
+			; still an exception, and a message sentinel alone accepted it.
+			Threw := false, Failure := ""
 			Snapshot := 0
 			try {
 				Snapshot := _LLM_Menu_StreamingSnapshot()
 			} catch as Err {
-				Failure := Err.Message
+				Threw := true
+				Failure := Type(Err) . ": " . Err.Message
 			}
-			AssertEqual("", Failure, Vector["id"] . ": a missing runtime owner is a refusal, never an exception")
+			AssertFalse(Threw, Vector["id"] . ": a missing runtime owner is a refusal, never an exception: " . Failure)
 			Assert(Snapshot is Map, Vector["id"] . ": the real owner returns an admission snapshot")
 			AssertTrue(Snapshot["blocked"], Vector["id"] . ": incomplete engine state is unavailable")
 			AssertFalse(LLM_DisplayStreamingReady(Snapshot), Vector["id"] . ": unavailable state cannot enable a shared row")

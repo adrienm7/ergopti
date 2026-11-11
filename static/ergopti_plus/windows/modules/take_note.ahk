@@ -15,9 +15,15 @@ global _TakeNoteNextId := 0
 global _TakeNoteGeneration := 0
 global TAKE_NOTE_POLL_INTERVAL_MS := 50
 global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
-; Notepad window -> the lowercased full path of the note this module opened in
-; it. Notepad titles a document by its file name alone, so two folders' Notes.txt
-; read the same; this binding is what tells their windows apart.
+; The Windows 11 Notepad opens a launched file as a tab of its running window
+; and switches to it a moment later. A selected tab that never changed after
+; the launch is taken for the requested note only once this delay has passed:
+; Notepad then kept it selected because the file was already open in it.
+; "Hwnd|TabId" -> the lowercased full path of the note this module opened in
+; that Notepad document; TabId is the UI Automation runtime id of the selected
+; tab, or "" for the classic one-window-per-document Notepad. Notepad titles a
+; document and names its tab by the file name alone, so two folders' Notes.txt
+; read the same; this binding is what tells their documents apart.
 global _TakeNoteDocumentWindows := Map()
 
 
@@ -97,6 +103,60 @@ class _TakeNoteNative {
 		return 0
 	}
 
+	; The Windows 11 Notepad tab items expose only the file name and its saved
+	; state (« Notes.txt. Non modifié. »), never the full path: the UIA runtime
+	; id of a tab is the only identity that tells two same-named notes apart.
+	; @returns {String|Integer} The UIA runtime id of the selected tab, "" for a
+	;   classic Notepad window without tabs, or 0 while the tab is unknown.
+	static SelectedTab(Hwnd) {
+		; Without the optional vendored UIA library no tab can be read, which
+		; leaves the classic window-level binding (see ErgoptiPlus.ahk).
+		if !IsSet(UIA)
+			return ""
+		try Root := UIA.ElementFromHandle(Hwnd, , false)
+		catch
+			return 0
+		; One provider query: this runs on the driver thread while it polls.
+		try return Root.FindFirst({Type: "TabItem", SelectionItemIsSelected: true}).RuntimeId
+		catch TargetError
+			NoTabSelected := true
+		catch
+			return 0
+		try HasTabs := IsObject(Root.FindFirst({Type: "TabItem"}))
+		catch TargetError
+			HasTabs := false
+		catch
+			return 0
+		if HasTabs
+			return 0
+		; The packaged Notepad always shows its tab strip; an empty tree there
+		; is one that is not built yet, not a classic window.
+		try Image := ProcessGetPath(WinGetPID("ahk_id " . Hwnd))
+		catch
+			return 0
+		return InStr(Image, "\WindowsApps\") ? 0 : ""
+	}
+
+	; Selects the tab whose UIA runtime id is TabId in the Notepad window Hwnd.
+	; @returns {Boolean} false when that tab is no longer open there.
+	static SelectTab(Hwnd, TabId) {
+		if !IsSet(UIA) || !(TabId is String) || TabId == ""
+			return false
+		try Tabs := UIA.ElementFromHandle(Hwnd, , false).FindAll({Type: "TabItem"})
+		catch
+			return false
+		for TabItem in Tabs {
+			try {
+				if TabItem.RuntimeId == TabId {
+					TabItem.SelectionItemPattern.Select()
+					return true
+				}
+			} catch
+				return false
+		}
+		return false
+	}
+
 	static Activate(Hwnd) {
 		return WMActivate(Hwnd)
 	}
@@ -139,22 +199,71 @@ class _TakeNoteNative {
 }
 
 
-; Whether a Notepad window may stand for the note at PathKey: a window this
-; module opened for another folder's note of the same name never does.
-; @param PathKey {String} The job's lowercased full note path.
+_TakeNoteDocumentKey(Hwnd, TabId) => Hwnd . "|" . TabId
+
+; Whether the document a Notepad window shows may stand for the job's note. A
+; document this module opened for another folder's note of the same name never
+; does. An unbound classic window does, as before tabs existed. An unbound tab
+; does only once Notepad answered this job's own launch: it switched to another
+; tab, or kept the same one past [ui] take_note_tab_settle_ms. Restored or foreign
+; tabs carry the same name, and only Notepad maps the launched path to its tab.
+; @param Job {Map} The job; its "tab" records the admitted tab.
 ; @param Hwnd {Integer} A Notepad window whose title names the note's file.
 ; @returns {Boolean}
-_TakeNoteWindowAdmits(PathKey, Hwnd) {
+_TakeNoteWindowAdmits(Job, Hwnd) {
 	global _TakeNoteDocumentWindows
-	return !_TakeNoteDocumentWindows.Has(Hwnd) || _TakeNoteDocumentWindows[Hwnd] == PathKey
+	TabId := Job["ops"].SelectedTab(Hwnd)
+	if !(TabId is String)
+		return false
+	SeenTabs := Job["seen_tabs"]
+	if !SeenTabs.Has(Hwnd)
+		SeenTabs[Hwnd] := {Tab: TabId}
+	FirstSeen := SeenTabs[Hwnd]
+	Key := _TakeNoteDocumentKey(Hwnd, TabId)
+	if _TakeNoteDocumentWindows.Has(Key)
+		Admitted := _TakeNoteDocumentWindows[Key] == Job["path_key"]
+	else if TabId == ""
+		Admitted := true
+	else if !Job["launched"]
+		Admitted := false
+	else if FirstSeen.Tab != TabId
+		Admitted := true
+	else {
+		; The delay counts from the first unchanged sight after the launch, so
+		; a cold Notepad start slower than the delay still gets all of it.
+		Now := Job["ops"].NowTick()
+		if !FirstSeen.HasOwnProp("Since")
+			FirstSeen.Since := Now
+		Admitted := TickExpired64(FirstSeen.Since, TimingsGet("ui", "take_note_tab_settle_ms"), Now)
+	}
+	if Admitted
+		Job["tab"] := TabId
+	return Admitted
 }
 
-; Records that Hwnd shows the note at PathKey, once the job proved it focused.
-_TakeNoteBindWindow(Hwnd, PathKey) {
+; The document this module last bound to the note at PathKey.
+; @returns {Object|0} {Key, Hwnd, Tab}, or 0 when the note has no binding.
+_TakeNoteBoundDocument(PathKey) {
+	global _TakeNoteDocumentWindows
+	for Key, BoundPath in _TakeNoteDocumentWindows {
+		if BoundPath == PathKey {
+			Parts := StrSplit(Key, "|", , 2)
+			return {Key: Key, Hwnd: Integer(Parts[1]), Tab: Parts[2]}
+		}
+	}
+	return 0
+}
+
+; Records that the tab TabId of Hwnd shows the note at PathKey, once the job
+; proved it focused. Notepad holds one document per path, so the note's earlier
+; binding is retired.
+_TakeNoteBindWindow(Hwnd, TabId, PathKey) {
 	global _TakeNoteDocumentWindows
 	if !(_TakeNoteDocumentWindows is Map)
 		throw TypeError("The TakeNote window bindings are not a Map.")
-	_TakeNoteDocumentWindows[Hwnd] := PathKey
+	while IsObject(Previous := _TakeNoteBoundDocument(PathKey))
+		_TakeNoteDocumentWindows.Delete(Previous.Key)
+	_TakeNoteDocumentWindows[_TakeNoteDocumentKey(Hwnd, TabId)] := PathKey
 }
 
 ; Resolve the feature settings once, without performing any OS or file work.
@@ -260,6 +369,9 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 			"append_on_launch", AppendNewlineOnLaunch,
 			"append_newline", false,
 			"waited", "window",
+			"launched", false,
+			"seen_tabs", Map(),
+			"tab", "",
 			"started_tick", StartedTick,
 			"timeout_ms", TAKE_NOTE_LAUNCH_TIMEOUT_MS,
 			"timer", TimerFn,
@@ -384,7 +496,7 @@ _TakeNotePoll(JobId) {
 		Job := _TakeNotePending[JobId]
 	} finally Critical(PreviousCritical)
 	Ops := Job["ops"]
-	Admits := _TakeNoteWindowAdmits.Bind(Job["path_key"])
+	Admits := _TakeNoteWindowAdmits.Bind(Job)
 	try {
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
@@ -398,13 +510,25 @@ _TakeNotePoll(JobId) {
 				throw Error("note file creation was refused")
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
-			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"], Admits) != 0
+			; A tabbed Notepad shows one tab at a time: bring the note's own tab
+			; back before the lookup, which only reads the selected one.
+			Bound := _TakeNoteBoundDocument(Job["path_key"])
+			TabReselected := false
+			if IsObject(Bound) && Bound.Tab != "" {
+				TabReselected := Ops.SelectTab(Bound.Hwnd, Bound.Tab)
+				if _TakeNoteAbortIfUnavailable(JobId, Job)
+					return
+			}
+			WindowAlreadyOpen := TabReselected || Ops.FindWindow(Job["file_name"], Admits) != 0
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
 			Job["append_newline"] := Job["append_on_launch"] and !WindowAlreadyOpen
 			Job["phase"] := "waiting"
-			if !WindowAlreadyOpen and !Ops.Launch(Job["file_path"])
-				throw Error("Notepad launch was refused")
+			if !WindowAlreadyOpen {
+				if !Ops.Launch(Job["file_path"])
+					throw Error("Notepad launch was refused")
+				Job["launched"] := true
+			}
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
 		}
@@ -445,13 +569,21 @@ _TakeNotePoll(JobId) {
 		Exact := Active ? Ops.IsExactWindow(WindowHwnd, Job["file_name"]) : false
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
+		if Exact {
+			; The title names the file only: a switch to another same-named tab
+			; since the lookup keeps it, so the admitted tab is checked again.
+			SelectedTab := Ops.SelectedTab(WindowHwnd)
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
+			Exact := SelectedTab is String && SelectedTab == Job["tab"]
+		}
 		if !Active || !Exact {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
-		_TakeNoteBindWindow(WindowHwnd, Job["path_key"])
+		_TakeNoteBindWindow(WindowHwnd, Job["tab"], Job["path_key"])
 		if Job["append_newline"] and !Ops.SendFinal("^{End}{Enter}")
 			throw Error("final note input was refused")
 		_TakeNoteFinish(JobId, Job)

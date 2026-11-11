@@ -5,4 +5,4 @@ description = "A Windows switch left on becomes its slot and action, one turned 
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 18
-to_version = 20
+to_version = 21

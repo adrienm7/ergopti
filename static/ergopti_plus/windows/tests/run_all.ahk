@@ -39,7 +39,9 @@ SetWorkingDir(A_ScriptDir)
 ;                    a single failing test without the whole suite.
 ;   --module=<group> run only one module group (TEST_MODULE_GROUPS in
 ;                    test_framework.ahk); the CI runs one group per runner.
-;   --list=<file>    run only the tests named in <file>, one per line, in order.
+;   --list=<file>    run only the tests named in <file>, one per line, in
+;                    registry order whatever the file's order; add --reverse
+;                    to replay the predecessors of a reversed run.
 ;   --dump-plan=<f>  append "group<TAB>file<TAB>name" for each selected test.
 ;   --reverse        run the selected tests backwards to expose tests that rely
 ;                    on state an earlier test left behind.
@@ -1096,6 +1098,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/ui/webview/test_webview_range_mount.ahk
 #Include unit/ui/webview/test_webview_profile_ownership.ahk
 #Include unit/ui/webview/test_webview_fit_to_window.ahk
+#Include unit/ui/webview/test_personal_editors_webview_only.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/infra/toml/test_uridecode_literal_unicode.ahk
 #Include meta/ui/webview/test_webview_script_observer.ahk
@@ -1374,6 +1377,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_ahk_brace_balance.ahk
 #Include meta/suite/test_run_all_include_integrity.ahk
 #Include meta/suite/test_runner_only_filter.ahk
+#Include meta/suite/test_host_capability_probes.ahk
 #Include meta/suite/test_runner_failure_ergonomics.ahk
 #Include unit/suite/test_qualification_parser_owner.ahk
 #Include meta/suite/test_ahk_os_purity_ratchet.ahk
@@ -1724,6 +1728,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_keystats_aggregation.ahk
 #Include meta/corpus/test_corpus_keystats_session_events.ahk
 #Include meta/corpus/test_corpus_keystats_correction_erased.ahk
+#Include meta/corpus/test_corpus_keystats_metrics_maintenance.ahk
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
 #Include meta/corpus/test_corpus_healthcheck_snapshot.ahk
@@ -1967,6 +1972,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/tooltip/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/infra/logger/test_error_net_guarded_send.ahk
 #Include meta/infra/logger/test_error_net_dedup_throttle.ahk
+#Include meta/infra/logger/test_error_net_smoke_fatal_stderr.ahk
 #Include unit/infra/logger/test_error_report_dedup_ownership.ahk
 #Include meta/infra/logger/test_error_net_uia_orphan_suppress.ahk
 #Include meta/adapters/crash_report/test_deferred_crash_report_catch.ahk
@@ -2127,7 +2133,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_byref_call_sites.ahk
 #Include meta/adapters/uia/test_uia_probe_bounded.ahk
 #Include meta/ui/healthcheck/test_healthcheck_collectors_guarded.ahk
-#Include meta/modules/hotstrings/personal/test_personal_editor_section_guard.ahk
 #Include meta/modules/gestures/test_gestures_init_lifecycle_pair.ahk
 #Include meta/infra/config/persistence/test_paths_file_single_writer.ahk
 #Include meta/modules/updater/test_changelog_fetch_status_logged.ahk

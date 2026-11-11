@@ -27,13 +27,12 @@ Gui_Create(Options := "", Title := "") {
 	global _PTSO
 	Window := Gui(Options, Title)
 	_PTSO.Windows.Push(Window), _PTSO.Hwnds.Push(Window.Hwnd)
-	; Every acquired HWND is owned even on an unexpected fallback. These three
-	; success modes do not qualify the native fallback's preceding data path;
-	; a prerequisite failure there remains a failure, not a business receipt.
+	; Every acquired HWND is owned even on an unexpected extra window. The editor
+	; has no native form: any window beyond the web host is a failure.
 	Limit := InStr(_PTSO.Mode, "reopen") ? 2 : 1
 	if _PTSO.Windows.Length > Limit {
 		_PTSO.FallbackAttempts += 1
-		throw Error("Business oracle: a retired web opening attempted native fallback.")
+		throw Error("Business oracle: a retired web opening constructed another window.")
 	}
 	return Window
 }
@@ -163,7 +162,6 @@ _PTSO_FilesUnchanged() {
 _PTSO_Observe() {
 	global _PTSO, _HsEdWeb_Gui, _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
 	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	global _PersonalEditorSessionEpoch
 	FileAppend("RECEIPT personal-toml-startup mode=" . _PTSO.Mode
 		. " windows=" . _PTSO.Windows.Length . " controllers=" . _PTSO.Controllers.Length
 		. " boundary_failure=" . IsObject(_PTSO.Failure) . " fallback_attempts=" . _PTSO.FallbackAttempts . " close_sent=" . _PTSO.CloseSent . " old_closed=" . _PTSO.Controllers[1].Closed
@@ -172,22 +170,21 @@ _PTSO_Observe() {
 		. " reset=" . _HsEdWeb_ResetDone . " epoch=" . _HsEdWeb_SessionEpoch
 		. " has_controller=" . IsSet(_HsEdWeb_Controller) . " has_view=" . IsSet(_HsEdWeb_WebView)
 		. " has_message=" . IsSet(_HsEdWeb_MsgSub) . " has_navigation=" . IsSet(_HsEdWeb_NavSub)
-		. " native_epoch=" . _PersonalEditorSessionEpoch . " files_unchanged=" . _PTSO_FilesUnchanged()
+		. " files_unchanged=" . _PTSO_FilesUnchanged()
 		. " gui=" . IsObject(_HsEdWeb_Gui) . "`n", "*", "UTF-8")
 }
 
 _PTSO_Check() {
 	global _PTSO, _HsEdWeb_Gui, _HsEdWeb_ResetDone
 	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	global _PersonalEditorSessionEpoch, _PersonalEditorGui
-	_PTSO_Require(_PersonalEditorSessionEpoch == 0 && !IsObject(_PersonalEditorGui),
-		"The web startup controls do not admit a native fallback window.")
+	_PTSO_Require(_PTSO.FallbackAttempts == 0,
+		"The web startup controls never construct a window beyond the web host.")
 	_PTSO_Require(_PTSO_FilesUnchanged(), "No startup or Close path may mutate the private source/preferences.")
 	if IsObject(_PTSO.Failure)
 		throw _PTSO.Failure
 	if _PTSO.Mode == "current" {
 		_PTSO_Require(_PTSO.Controllers.Length == 1 && _PTSO.Windows.Length == 1,
-			"The current positive must open exactly one web personal editor without native fallback.")
+			"The current positive must open exactly one web personal editor.")
 		_PTSO_Require(_HsEdWeb_Controller == _PTSO.Controllers[1]
 			&& _HsEdWeb_WebView == _PTSO.Controllers[1].CoreWebView2
 			&& _PTSO.Controllers[1].CoreWebView2.Subscriptions == 2,
@@ -201,7 +198,7 @@ _PTSO_Check() {
 	} else {
 		Reopened := InStr(_PTSO.Mode, "reopen") != 0
 		_PTSO_Require(_PTSO.CloseSent == 1 && _PTSO.Windows.Length == (Reopened ? 2 : 1),
-			"A consumed Close must never reopen the legacy native fallback.")
+			"A consumed Close must never reopen another window.")
 		_PTSO_Require(_PTSO.Controllers[1].Closed == 1,
 			"A controller returned after its native window closed must retire exactly once.")
 		_PTSO_Require(_PTSO.Controllers[1].CoreWebView2.Subscriptions == 0
@@ -262,11 +259,11 @@ _PTSO_Main() {
 		Observed := true
 		_PTSO_Check()
 	} catch as Failure {
-		; An unexpected boundary failure may lead the old frame to fallback. Keep
-		; that earlier transport/prerequisite failure above the fallback oracle.
+		; An unexpected boundary failure may lead the old frame to refuse. Keep
+		; that earlier transport/prerequisite failure above the window oracle.
 		Primary := IsObject(_PTSO.Failure) ? _PTSO.Failure : Failure
 	} finally {
-		; Preserve a forbidden fallback attempt as a business observation before
+		; Preserve a forbidden extra window as a business observation before
 		; any safety cleanup changes the subject's published resource counters.
 		if !Observed && _PTSO.Controllers.Length > 0 {
 			try _PTSO_Observe()

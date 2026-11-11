@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Personal-information persistence transaction regression
 ; DESCRIPTION:
-; Drives the real personal_info.toml gateway and both save callbacks through
+; Drives the real personal_info.toml gateway and the WebView save callback through
 ; injected stage/replace/UI seams. The tests pin global terminal admission,
 ; detached RAM publication, final authorization after a yielded stage, strict
 ; adapter statuses, malformed WebView payload rejection and failure feedback.
@@ -23,20 +23,6 @@ global _PIPT20260813_Content := ""
 global _PIPT20260813_Events := []
 global _PIPT20260813_ObservedLive := []
 global _PIPT20260813_CriticalStates := []
-
-class _PIPT20260813_Edit {
-	__New(Text) {
-		this.Text := Text
-	}
-}
-
-class _PIPT20260813_Gui {
-	Destroyed := 0
-
-	Destroy() {
-		this.Destroyed += 1
-	}
-}
 
 _PIPT20260813_Reset() {
 	global _PIPT20260813_WriterCalls, _PIPT20260813_ReplaceCalls
@@ -121,14 +107,6 @@ _PIPT20260813_Reload() {
 	global PersonalInformation
 	_PIPT20260813_ReloadCalls += 1
 	_PIPT20260813_RecordCritical("reload")
-	_PIPT20260813_ObservedLive.Push(PersonalInformation["first_name"])
-	return true
-}
-
-_PIPT20260813_Confirm(Message) {
-	global _PIPT20260813_ConfirmCalls, _PIPT20260813_ObservedLive
-	global PersonalInformation
-	_PIPT20260813_ConfirmCalls += 1
 	_PIPT20260813_ObservedLive.Push(PersonalInformation["first_name"])
 	return true
 }
@@ -297,29 +275,25 @@ _PIPT20260813_MalformedPayload() {
 Test("personal-info-global-barrier-20260813: unknown and non-string WebView fields are side-effect free",
 	_PIPT20260813_MalformedPayload)
 
-_PIPT20260813_NativeFailureBody(Path) {
+_PIPT20260813_WebFailureBody(Path) {
 	global _PIPT20260813_NotifyCalls, _PIPT20260813_ReloadCalls
 	global PersonalInformation
-	GuiObj := _PIPT20260813_Gui()
-	Edits := Map("first_name", _PIPT20260813_Edit("New"))
-	Result := ProcessUserInput(GuiObj, Edits,
+	Result := _PiEdWeb_Save(Map("first_name", "New"),
 		_PIPT20260813_WriteFalse, _PIPT20260813_ReplaceSuccess,
 		_PIPT20260813_Delete, 0, _PIPT20260813_Notify,
-		_PIPT20260813_Reload, _PIPT20260813_Confirm)
+		_PIPT20260813_Reload)
 	AssertFalse(Result)
 	AssertEqual("Old", PersonalInformation["first_name"])
-	AssertEqual(0, GuiObj.Destroyed,
-		"failed persistence must keep the only copy of the typed values visible")
 	AssertEqual(1, _PIPT20260813_NotifyCalls,
-		"the native callback must surface persistence failure exactly once")
+		"the WebView callback must surface persistence failure exactly once")
 	AssertEqual(0, _PIPT20260813_ReloadCalls)
 }
 
-_PIPT20260813_NativeFailure() {
-	_PIPT20260813_WithState(_PIPT20260813_NativeFailureBody)
+_PIPT20260813_WebFailure() {
+	_PIPT20260813_WithState(_PIPT20260813_WebFailureBody)
 }
-Test("personal-info-global-barrier-20260813: native failure keeps editor open, reports once and never reloads",
-	_PIPT20260813_NativeFailure)
+Test("personal-info-global-barrier-20260813: WebView failure reports once and never reloads",
+	_PIPT20260813_WebFailure)
 
 _PIPT20260813_WebSuccessBody(Path) {
 	global _PIPT20260813_ReloadCalls, _PIPT20260813_NotifyCalls

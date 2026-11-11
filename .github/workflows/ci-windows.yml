@@ -646,8 +646,29 @@ jobs:
                   $stdout -cnotmatch '(?m)^RESULT passed=35 failed=0 skipped=0\r?$') {
                   throw 'Exact native file component acceptance refused; raw evidence retained.'
               }
+              # The bootstrap fixture holds the only native reuse and runtime-receipt
+              # retirement cases; it runs on the same pinned portable archive.
+              $bootstrapOut = Join-Path $evidence 'bootstrap.stdout'
+              $bootstrapErr = Join-Path $evidence 'bootstrap.stderr'
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ps1" 1> $bootstrapOut 2> $bootstrapErr
+              $bootstrapExit = $LASTEXITCODE
+              $bootstrapStdout = [IO.File]::ReadAllText($bootstrapOut)
+              $bootstrapStderr = [IO.File]::ReadAllText($bootstrapErr)
+              Write-Host $bootstrapStdout
+              $bootstrapRoot = [regex]::Match($bootstrapStdout, '(?m)^Evidence root: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              if ((Split-Path $bootstrapRoot -Parent) -cne [Environment]::GetFolderPath('LocalApplicationData') -or
+                  (Split-Path $bootstrapRoot -Leaf) -cnotmatch '^ergopti-bootstrap-test-[0-9a-f]{32}$' -or
+                  -not (Test-Path -LiteralPath $bootstrapRoot -PathType Container)) {
+                  throw 'Native managed bootstrap evidence root binding refused.'
+              }
+              if ($bootstrapExit -ne 0 -or $bootstrapStderr.Length -ne 0 -or
+                  @($bootstrapStdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 9 -or
+                  $bootstrapStdout -cnotmatch '(?m)^RESULT passed=9 failed=0 skipped=0\r?$') {
+                  throw 'Exact native managed bootstrap acceptance refused; raw evidence retained.'
+              }
               [ordered]@{ schema = 1; source_sha = '${{ github.sha }}'; native_exit = $nativeExit;
                   passed = 35; failed = 0; skipped = 0; native_file_component = $true;
+                  bootstrap_exit = $bootstrapExit; bootstrap_passed = 9;
                   acquisition_qualified = $false; runtime_executed = $false } |
                   ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding utf8
           } finally { $env:PSModulePath = $oldModulePath }
