@@ -561,7 +561,9 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 		local real_getenv = os.getenv
 		local real_open = io.open
 		local real_rename = os.rename
-		local native_uv = _VERSION ~= "Lua 5.1" and require("luv") or nil
+		-- The adapter stages through libuv wherever it loads (CFL-003).
+		local has_uv, loaded_uv = pcall(require, "luv")
+		local native_uv = has_uv and loaded_uv or nil
 		local uv_open = native_uv and native_uv.fs_open
 		local uv_write = native_uv and native_uv.fs_write
 		local uv_close = native_uv and native_uv.fs_close
