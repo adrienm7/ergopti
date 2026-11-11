@@ -36,6 +36,9 @@ end
 
 local M = {}
 
+-- The class and title bounds every focus worker shares.
+local Focus = require("adapters.compositor_focus")
+
 -- The global this worker binds, and the version whose events it implements.
 M.INFO_INTERFACE = "zcosmic_toplevel_info_v1"
 M.HANDLE_INTERFACE = "zcosmic_toplevel_handle_v1"
@@ -50,8 +53,6 @@ M.HANDLE_EVENTS = { "closed", "done", "title", "app_id", "output_enter", "output
 
 local PR_SET_PDEATHSIG = 1
 local SIGKILL = 9
-local MAX_CLASS_BYTES = 256
-local MAX_TITLE_BYTES = 2048
 
 
 
@@ -114,13 +115,13 @@ function M.new_tracker()
 
 	--- Records a pending title, refusing an oversized one as malformed.
 	function tracker.title(key, value)
-		assert(type(value) == "string" and #value <= MAX_TITLE_BYTES, "toplevel title exceeds its bound")
+		assert(type(value) == "string" and #value <= Focus.MAX_TITLE_BYTES, "toplevel title exceeds its bound")
 		pending(key).title = value
 	end
 
 	--- Records a pending app_id.
 	function tracker.app_id(key, value)
-		assert(type(value) == "string" and #value <= MAX_CLASS_BYTES, "toplevel app_id exceeds its bound")
+		assert(type(value) == "string" and #value <= Focus.MAX_CLASS_BYTES, "toplevel app_id exceeds its bound")
 		pending(key).app_id = value
 	end
 

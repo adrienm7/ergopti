@@ -37,8 +37,6 @@ local G_DBUS_CALL_FLAGS_NO_AUTO_START = 1
 local PR_SET_PDEATHSIG = 1
 local SIGKILL = 9
 local LIVENESS_INTERVAL_MS = 1000
-local MAX_CLASS_BYTES = 256
-local MAX_TITLE_BYTES = 2048
 local MAX_ID_BYTES = 128
 local KWIN_SCRIPT_ID = "ergopti-focus"
 
@@ -65,7 +63,8 @@ function M.activation_record(class, title, pid, id)
 	for _, value in ipairs({ class, title, pid, id }) do
 		if type(value) ~= "string" or value:find("\0", 1, true) then return nil, "malformed argument" end
 	end
-	if #class > MAX_CLASS_BYTES or #title > MAX_TITLE_BYTES or #id > MAX_ID_BYTES then
+	local Focus = require("adapters.compositor_focus")
+	if #class > Focus.MAX_CLASS_BYTES or #title > Focus.MAX_TITLE_BYTES or #id > MAX_ID_BYTES then
 		return nil, "oversized argument"
 	end
 	if id == "" or not id:match("^[%w{}%-_]+$") then return nil, "malformed window id" end

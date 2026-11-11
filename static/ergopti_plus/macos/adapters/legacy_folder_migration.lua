@@ -32,6 +32,7 @@ local M = {}
 
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
+local NativePath = require("native_path")
 
 local LOG = "legacy_folder_migration"
 
@@ -165,7 +166,7 @@ end
 
 --- The old application folder name, the last name of the old logs default.
 local function legacy_logs_name()
-	return AppDirs.migration.macos.legacy_logs_relative:match("([^/]+)$")
+	return NativePath.basename(AppDirs.migration.macos.legacy_logs_relative)
 end
 
 --- The custom logs folder paths.toml names in place of the old folder name:
@@ -181,8 +182,8 @@ function M.custom_legacy_logs(home, value)
 	if type(value) ~= "string" then return nil end
 	local folder = value:gsub("/+$", "")
 	if folder:sub(1, 2) == "~/" then folder = home .. folder:sub(2) end
-	if folder:match("([^/]+)$") == AppDirs.macos.folder_name then folder = folder:match("^(.*)/[^/]+$") or "" end
-	if folder:sub(1, 1) ~= "/" or folder:match("([^/]+)$") ~= legacy_logs_name() then return nil end
+	if NativePath.basename(folder) == AppDirs.macos.folder_name then folder = NativePath.dirname(folder) or "" end
+	if folder:sub(1, 1) ~= "/" or NativePath.basename(folder) ~= legacy_logs_name() then return nil end
 	if folder == home .. "/" .. AppDirs.migration.macos.legacy_logs_relative then return nil end
 	return folder
 end
@@ -196,7 +197,7 @@ end
 --- @return table step Merge step of the shared core.
 function M.custom_logs_step(home, custom)
 	local name = AppDirs.macos.folder_name
-	local renamed = custom:match("^(.*)/[^/]+$") .. "/" .. name
+	local renamed = NativePath.dirname(custom) .. "/" .. name
 	return { from_dir = custom .. "/" .. name, to_dir = renamed,
 		backup_dir = home .. "/" .. AppDirs.macos.support_relative .. "/" .. AppDirs.migration.backup_folder
 			.. "/custom-logs" .. custom .. "/" .. name }

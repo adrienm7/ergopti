@@ -31,6 +31,10 @@ M.SERVICES = { gnome = "org.gnome.Shell", kde = "org.kde.KWin" }
 -- Each family's reporter, for the log, and the families without a bus name:
 -- cosmic-comp answers its own Wayland protocol, read by its own worker.
 M.REPORTERS = { gnome = "GNOME Shell", kde = "KWin", cosmic = "cosmic-comp" }
+-- Bounds of one reported window's class and title, for every worker: an
+-- oversized one is refused, never truncated into a different identity.
+M.MAX_CLASS_BYTES = 256
+M.MAX_TITLE_BYTES = 2048
 -- Bounds every synchronous bus call the worker makes.
 M.CALL_TIMEOUT_MS = 500
 
