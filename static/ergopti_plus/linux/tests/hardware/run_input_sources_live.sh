@@ -110,13 +110,20 @@ gnome)
 	sleep 1
 	gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('xkb', 'fr')]"
 	gsettings set org.gnome.desktop.input-sources mru-sources "[('xkb', 'us'), ('xkb', 'fr')]"
-	before="$(echo /tmp/.X11-unix/X*)"
-	# ERGOPTI_LIVE_GNOME_UNSAFE=1 lets a diagnostic ask the shell its own view (Eval).
-	unsafe=""
-	[ -n "${ERGOPTI_LIVE_GNOME_UNSAFE:-}" ] && unsafe="--unsafe-mode"
-	XDG_SESSION_TYPE=wayland gnome-shell ${unsafe} --headless --wayland --virtual-monitor 1280x800 >"${SCRATCH}/shell.log" 2>&1 &
+	# --unsafe-mode: the shell's own current source is read back through Eval
+	# (lib/gnome_active_layout.sh); a headless XWayland may lag its group.
+	XDG_SESSION_TYPE=wayland gnome-shell --unsafe-mode --headless --wayland --virtual-monitor 1280x800 \
+		>"${SCRATCH}/shell.log" 2>&1 &
 	PIDS="${PIDS} $!"
-	await_xwayland "${before}"
+	# mutter names its XWayland display; a stale socket of an earlier server can
+	# carry the same number, so the socket folder alone does not tell.
+	for _ in $(seq 1 100); do
+		number="$(sed -n 's/.*Using public X11 display :\([0-9][0-9]*\).*/\1/p' "${SCRATCH}/shell.log" | head -1)"
+		[ -n "${number}" ] && break
+		sleep 0.1
+	done
+	[ -n "${number}" ] || { echo "ENVIRONMENT: no XWayland appeared" >&2; exit 2; }
+	export DISPLAY=":${number}"
 	for _ in $(seq 1 100); do
 		XAUTHORITY="$(ls "${XDG_RUNTIME_DIR}"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)"
 		[ -n "${XAUTHORITY}" ] && break
@@ -133,7 +140,8 @@ gnome)
 	echo "key 42 1" >&8
 	echo "key 42 0" >&8
 	sleep 1
-	export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME ERGOPTI_LIVE_DESKTOP=gnome
+	export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME ERGOPTI_LIVE_DESKTOP=gnome ERGOPTI_LIVE_GNOME_UNSAFE=1
+	export ERGOPTI_LIVE_ACTIVE_CMD="sh tests/hardware/lib/gnome_active_layout.sh" ERGOPTI_LIVE_SIGNATURES="us=q fr=a"
 	;;
 kde)
 	need kwin_wayland

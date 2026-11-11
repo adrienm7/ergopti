@@ -1030,10 +1030,12 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       `tests/fixtures/touchpad_record_three_finger_alps.yml` (a trace written in `libinput record` format, not a
       physical capture: HARDWARE.md section 13 still welcomes one) through the binary evdev reader,
       `start_reading`, the decoder and the dispatch.
-- [ ] Layout switching (branch `layout/system-switch-parity`, 2026-11-06): on GNOME Wayland, KDE Plasma 6 Wayland,
+- [x] Layout switching (branch `layout/system-switch-parity`, 2026-11-06): on GNOME Wayland, KDE Plasma 6 Wayland,
       Container proof 2026-11-10 (`tests/hardware/run_input_sources_live.sh`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): KDE Plasma 6.6.4
       Wayland and X11, openbox X11 and sway pass (`getLayoutsList` answers `a(sss)` on both Plasma sessions); GNOME
       Shell 46 fails, the switch changes nothing on a running shell (Linux remaining work). Left: GNOME only.
+      Done 2026-11-11: GNOME Shell 46 Wayland passes too with the new switch sequence, read back from the shell's own
+      current source (`input_sources_gnome.txt`); KDE ids are the same on both session types.
       KDE Plasma X11 and another X11 desktop with two layouts, Layout > « Input sources » lists them (GNOME and KDE
       tick the active one, X11 ticks none) and picking one switches the desktop. On KDE, the keyboard daemon's
       `org.kde.KeyboardLayouts.getLayoutsList` (through `gdbus call`) answers the `a(sss)` shape the adapter parses
@@ -1221,10 +1223,13 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 - [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
-      writes no `mru-sources`. Writing `sources` as `[target]`, `[target, other]`, then the user's list switches a
-      running shell, but only once the shell processed each write: wait on the session keymap (XWayland group) between
-      writes. The same holds for `apply-wayland`, and the shell lists no id it does not know from the system rules.
-      [Proof and mechanism](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
+      writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
+      2026-11-11 overnight, to review by the maintainer: the switch writes `sources` as the target alone, waits
+      `gnome_input_source_settle_ms`, writes the list back with the target first (as the installer already places an
+      activated layout) and `mru-sources`; a failure after the first write puts the list back, coalesced writes end on
+      no switch, never another layout. Left: the installer's `apply_gnome` (desktop_activation.py, W1 to W3) still
+      writes the list with the layout first, which a running shell ignores; it needs the same sequence and a Python
+      reader of the shared settle constant. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
 - [x] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method ignores an `include` of
       another file and aborts (« buffer overflow detected ») on a large set of multi-character outputs (Bépo has
       21,742). Done 2026-11-11, decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: the
