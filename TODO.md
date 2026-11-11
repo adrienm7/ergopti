@@ -1059,7 +1059,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted. 2026-11-11: GNOME W1 to W3 hold
       after one login (`user_layout_wayland_gnome.txt`, Bépo: the slot loads with `ERGOPTI_SEVEN_LEVEL`, the
       digits-first build under the other slot replaces it with no restart); a layout first registered during the
-      session answers `needs_relogin` and leaves the setting alone. KDE (not re-run with Bépo) and W4 still open.
+      session answers `needs_relogin` and leaves the setting alone. KDE (not re-run with Bépo) still open. W4
+      answered (`run_x11_reapply_live.sh`, `x11_reapply_*.txt`): GNOME Shell 46 and Plasma 6.6.4 under X11 put their
+      own layouts back when a keyboard appears (GNOME also on an input-sources setting change), never on a switch.
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
 - [x] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running". Container proof (2026-11-10, 6b42166666): `linux/tests/desktop/run_linux_dev_mode.sh`, the real runner, `launch.sh`, daemon and tray (read through `sni_host.py`) on Xvfb with a real `systemd --user`. The keyboard node is a FIFO with `evdev_fifo_shim.c` because this kernel has no evdev or uinput, and the installed unit runs a stand-in. A second `--tray` run prints the held-lock message and exits 0, as `launch.sh` intends (receipt `tests/desktop/receipts/linux_dev_mode.txt`).
@@ -1249,6 +1251,9 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### Linux (container proofs of 2026-11-10)
 
+- [ ] Linux X11 on GNOME and KDE: re-apply the user-tree layout (apply-x11) after the desktop puts its own layouts
+      back (W4: a keyboard hotplug, a GNOME input-sources setting change); today the loaded layout is lost until the
+      next apply. Found by the 2026-11-11 container proof.
 - [ ] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
