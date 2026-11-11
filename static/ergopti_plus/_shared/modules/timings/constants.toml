@@ -746,6 +746,12 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: how long TakeNote waits on a Notepad tab it has not bound before it
+# accepts it as the note it launched (Windows 11 tabbed Notepad, where a file
+# already open there stays selected instead of opening a new tab).
+# AHK: modules/take_note.ahk.
+take_note_tab_settle_ms = 1000
+
 # Linux X11: a layout loaded live from the user tree is put back when GNOME or
 # Plasma replaces it (a new keyboard, a GNOME input-sources change). A burst of
 # keymap events settles this long before one read of the server keymap; at
