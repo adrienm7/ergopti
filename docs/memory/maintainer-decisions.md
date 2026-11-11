@@ -5,6 +5,20 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A superseded site deployment stays red (2026-11-11)
+
+Decided by the coordinator on 2026-11-11, to review by the maintainer.
+
+- A `main` push whose site deployment is overtaken by a newer push keeps
+  failing with "target branch no longer names the admitted source"
+  (`tools/ci/site-deploy-admission.cjs`, `SupersededSource`). The red job is
+  true: that source was never deployed, and the newer push deploys its own.
+- No admitted skip output is added: the closed publication chain of
+  `test-ci-pipeline-wiring` forbids conditional jobs and steps, and a quiet
+  skip (bc14746520, reverted) would let a real admission failure read green.
+  Action: when a deploy fails with that message, check that the newer `main`
+  push deployed, then ignore the red one.
+
 ## Linux PAC lists and the managed-Ollama data folder (2026-11-10)
 
 - Linux evaluates the PAC itself: GIO (GNOME) keeps only the first entry of

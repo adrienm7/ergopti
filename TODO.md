@@ -1397,10 +1397,12 @@ Each closes on a named green hosted or native run, recorded here.
       `architecture=arm64 classes=4 passed=33/33` (Managed Ollama, Apple silicon); its macOS Verdict is green.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
       (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
-- [ ] **Deploy site after a superseded push.** A `main` push that a newer one passes before its site deploys fails
+- [x] **Deploy site after a superseded push.** A `main` push that a newer one passes before its site deploys fails
       red ("target branch no longer names the admitted source"). The quiet skip (bc14746520) was reverted: the closed
       publication chain of `test-ci-pipeline-wiring` forbids conditional jobs and steps. Decide whether that contract
       may allow one admitted skip output, or keep the refusal visible.
+      Kept visible, no code change: decided by the coordinator on 2026-11-11, to review by the maintainer
+      (`docs/memory/maintainer-decisions.md`, « A superseded site deployment stays red »).
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
 - [ ] **Native Windows TLS fixture.** `X509Store.Add` on the CurrentUser root store blocks on the Windows security
       warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
