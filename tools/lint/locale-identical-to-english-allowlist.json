@@ -1368,6 +1368,31 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["de"]
 		},
+		"layout_editor.names.placeholder": {
+			"reason": "file-name-or-token",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_editor.palette.block.latin1": {
 			"reason": "brand-or-feature-name",
 			"locales": ["da", "de", "fr", "no", "sv", "tr"]
