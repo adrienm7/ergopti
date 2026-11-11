@@ -106,7 +106,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.key_down(e, key_code)",
-			"sha256": "cf8df28953ed8efe08b167d6c310e8136c875f05fe7f1b9c223386dbaa43cf9c"
+			"sha256": "85c525f297d98db42ca451ae661889628bfc7bc62586d04e6cd4bd5ba4b0614a"
 		},
 		{
 			"id": "linux-layout-emulation",
