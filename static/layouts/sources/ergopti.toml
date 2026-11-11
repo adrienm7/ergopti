@@ -1,7 +1,8 @@
 # Ergopti v2.2.2, the layout source of the KbdEdit layout (docs/design/layout-source-format.md).
 # Imported from KbdEdit's macOS export static/ergopti/macos/raw_kbdedit_keylayouts/Ergopti_v2.2.2_v0.keylayout,
 # which numbers its keys the ANSI way (code 50 is the key left of 1) and writes the Windows Kana
-# level on Command: here it is the built-in kana level again.
+# level on Command: here it is the built-in kana level again, Caps Lock leaving it as it is
+# (as Ergopti's macOS layout and Windows' Kana columns do).
 # tools/test/test-layout-sources.cjs proves it compiles back to that export, every key, level and
 # dead-key state, with Kana on the Option level macOS gives it.
 # The Linux and Windows metadata were decided by the coordinator on 2026-11-11, to review by the maintainer.
@@ -789,7 +790,7 @@ compose = false
 [[layers]]
 id = "kana"
 required = [ "kana" ]
-optional = []
+optional = [ "caps_lock" ]
 
 [layers.keys.KeyA]
 text = "<"
@@ -948,7 +949,7 @@ compose = false
 [[layers]]
 id = "shift_kana"
 required = [ "kana", "shift" ]
-optional = []
+optional = [ "caps_lock" ]
 
 [layers.keys.KeyA]
 text = "≤"

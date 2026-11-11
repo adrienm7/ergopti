@@ -51,7 +51,11 @@ JSON, `format = "ergopti-kbd-tables"`, `version = 1`. Characters are UTF-16 code
 layer per column (`alt_right` for AltGr, `kana` for Kana), Caps Lock attributes as `keys.<code>.caps_lock` and
 `caps_altgr`, moved virtual keys as `virtual_key`, key names on their physical key (or `windows.key_names` for scan
 codes the registry has no key for) and the version texts in `exports.windows`; `fromSource` reads a source back,
-a Caps Lock layer of the base or Shift column becoming CAPLOK or SGCAPS, the Kana level the KBDKANA column held by
+Caps Lock layers read per column pair (a column and its Shift): unchanged, swapped (CAPLOK for the base pair,
+CAPLOKALTGR for the AltGr pair), or any other change, the Kana columns included (kbd.h has no Caps Lock attribute
+for Kana), held by a Caps Lock row (SGCAPS) for every column; a Caps Lock row cannot hold a dead key or a ligature,
+nor sit beside a dead key, and such a source is refused. That SGCAPS rows apply to the Kana columns is to confirm
+on Windows. The Kana level the KBDKANA column held by
 `windows.kana_key` (Right Alt by default, through `VK_OEM_8`: decided by the coordinator on 2026-11-11, to review by
 the maintainer), and lists what Windows has no key or column for. `tools/test/test-layout-sources.cjs` proves
 `static/layouts/sources/bepo.toml` gives back the official `bepo.klc` table for table and that the four DLLs of
