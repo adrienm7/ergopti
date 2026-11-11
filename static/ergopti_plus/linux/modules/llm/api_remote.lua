@@ -456,11 +456,15 @@ local function refresh_access(provider, entry, on_done)
 					Monotonic.now_sec())
 				if token then
 					slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+					slot.failure_status = nil
 					Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", provider.id,
 						math.floor(token.expires_at - Monotonic.now_sec()))
 					return settle(true, nil)
 				end
 				slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+				-- The exchange's own HTTP status, for the requests it fails (access_failure).
+				local status = tonumber(result.status)
+				slot.failure_status = status and status ~= 200 and { status = status, reason = why } or nil
 				Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
 				return settle(false, why)
 			end
@@ -492,6 +496,24 @@ end
 --- @param provider table
 --- @param entry table
 --- @return string|nil token, string|nil reason
+--- The failure a request reports when its entry's exchange was refused: the
+--- exchange's HTTP status first, as Windows carries it
+--- (_LLMRemote_AccessFailInfo), so llm.failure_class tells a refused key from
+--- a transient refusal and the retry policy never resends a refused key.
+--- @param entry table
+--- @param reason string The exchange's reason.
+--- @return string failure
+local function access_failure(entry, reason)
+	local slot = access_slot(entry)
+	-- Bound to the reason it came with: a later failure of another kind
+	-- replaces slot.failure and is not given this status.
+	local http = slot.failure_status
+	if http and reason == http.reason and reason == slot.failure then
+		return "HTTP " .. tostring(http.status) .. ": " .. reason
+	end
+	return reason
+end
+
 local function access_token(provider, entry)
 	local slot = access_slot(entry)
 	local now = Monotonic.now_sec()
@@ -556,7 +578,7 @@ local function with_access(entry, owned, send, refuse)
 	M.prepare_access(entry, function(ok, reason)
 		settled = true
 		if not owned() then return end
-		if ok then result = send() else result = refuse(reason or "the access token could not be fetched") end
+		if ok then result = send() else result = refuse(access_failure(entry, reason or "the access token could not be fetched")) end
 	end)
 	if settled then return result end
 	return nil
@@ -598,7 +620,7 @@ function M.endpoint(entry, model)
 	if provider.auth then
 		-- The stored key is exchanged for the short-lived token the requests carry
 		local access, access_reason = access_token(provider, entry)
-		if not access then return nil, access_reason end
+		if not access then return nil, access_failure(entry, access_reason) end
 		token = access
 	end
 
