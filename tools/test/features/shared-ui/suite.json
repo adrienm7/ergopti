@@ -392,11 +392,35 @@
 		},
 		{
 			"id": "layout-sources",
-			"ordinal": 617,
+			"ordinal": 618,
 			"name": "kept layout sources reproduce the layouts they were made from, Kana level included",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-sources.cjs"],
 			"repro": "npm run test:layout-sources"
+		},
+		{
+			"id": "layout-editor-target-exports",
+			"ordinal": 619,
+			"name": "layout editor page writes the tool's XKB and KLC bytes through fengari and the shared adapters",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-target-exports.cjs"],
+			"repro": "npm run test:layout-editor-target-exports"
+		},
+		{
+			"id": "kbd-dll",
+			"ordinal": 620,
+			"name": "Windows layout DLLs build from a KLC and read back as their model on every architecture",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-dll.cjs"],
+			"repro": "npm run test:kbd-dll"
+		},
+		{
+			"id": "kbd-installer",
+			"ordinal": 621,
+			"name": "keyboard layout installer holds the verified DLLs and registers and unregisters the layout",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-installer.cjs"],
+			"repro": "npm run test:kbd-installer"
 		}
 	]
 }

@@ -142,3 +142,99 @@ if package.config:sub(1, 1) == "/" and pcall(require, "ffi") then
 		end)
 	end)
 end
+
+helpers.describe("evdev_reader: the wait companion", function()
+	helpers.it("opens and finishes the companion around a wait, with its records", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = waiting_backend(false)
+		local seen
+		backend.poll_many = function(_, _, _, extra, extra_count)
+			seen = { extra = extra, count = extra_count }
+			return false
+		end
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		local calls = {}
+		local records = { "glib records" }
+		local companion = {
+			begin = function() calls[#calls + 1] = "begin"; return records, 2 end,
+			finish = function() calls[#calls + 1] = "finish" end,
+		}
+		helpers.assert_eq(reader.wait_any_readable(8, companion), false)
+		helpers.assert_eq(calls, { "begin", "finish" })
+		helpers.assert_true(rawequal(seen.extra, records), "the companion's own records are polled")
+		helpers.assert_eq(seen.count, 2)
+		helpers.assert_eq(reader.wait_any_readable(8), false)
+		helpers.assert_eq(#calls, 2, "a wait without a companion opens none")
+		reader._reset_backend()
+	end)
+
+	helpers.it("retires a companion whose begin raises, after letting it finish", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, waits = waiting_backend(true)
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		local begins, finishes = 0, 0
+		local companion = {
+			begin = function() begins = begins + 1; error("prepare refused") end,
+			finish = function() finishes = finishes + 1 end,
+		}
+		helpers.assert_eq(reader.wait_any_readable(8, companion), true, "the input wait still runs")
+		helpers.assert_eq(reader.wait_any_readable(8, companion), true)
+		helpers.assert_eq(begins, 1, "a raising companion is retired after one report")
+		helpers.assert_eq(finishes, 1, "a half-opened begin is still finished")
+		helpers.assert_eq(#waits, 2)
+		reader._reset_backend()
+	end)
+
+	helpers.it("refuses a companion without begin and finish", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		reader._set_backend(waiting_backend(true))
+		reader.open("/dev/input/event3")
+		helpers.assert_throws(function() reader.wait_any_readable(8, { begin = function() end }) end)
+		helpers.assert_throws(function() reader.wait_any_readable(8, "glib") end)
+		reader._reset_backend()
+	end)
+end)
+
+-- The tray's GLib descriptors through the real poll(2): before the companion a
+-- D-Bus request to the tray waited out the idle wait's timeout (8 ms per
+-- dbusmenu call, measured 26 ms per submenu open), because only the input
+-- descriptors were polled.
+if package.config:sub(1, 1) == "/" and pcall(require, "ffi") then
+	helpers.describe("evdev_reader: the wait companion on a real descriptor", function()
+		helpers.it("wakes at once when only the companion's descriptor is readable", function()
+			local ffi = require("ffi")
+			local luv = require("luv")
+			local reader = helpers.load_module("adapters.evdev_reader")
+			local function fifo()
+				local path = os.tmpname()
+				os.remove(path)
+				local made = os.execute("mkfifo '" .. path .. "'")
+				helpers.assert_true(made == true or made == 0, "mkfifo failed")
+				return path
+			end
+			local keyboard, glib = fifo(), fifo()
+			helpers.assert_true(reader.use_ffi_backend())
+			helpers.assert_true(reader.open(keyboard, reader.KEYBOARD))
+			local glib_fd = luv.fs_open(glib, "r+", 438)
+			helpers.assert_type(glib_fd, "number")
+			local records = ffi.new("struct pollfd[1]")
+			records[0].fd, records[0].events = glib_fd, 1 -- POLLIN
+			local finished = false
+			local companion = { begin = function() return records, 1 end, finish = function() finished = true end }
+			luv.fs_write(glib_fd, "x")
+			local started = luv.hrtime()
+			helpers.assert_eq(reader.wait_any_readable(2000, companion), true,
+				"the companion's descriptor wakes the wait")
+			helpers.assert_true((luv.hrtime() - started) / 1e6 < 1500, "the wait did not return at once")
+			helpers.assert_true(records[0].revents ~= 0, "the companion gets its descriptor's readiness back")
+			helpers.assert_true(finished)
+			luv.fs_close(glib_fd)
+			reader.close(reader.KEYBOARD)
+			reader._reset_backend()
+			os.remove(keyboard)
+			os.remove(glib)
+		end)
+	end)
+end

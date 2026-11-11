@@ -59,11 +59,11 @@ end
 
 --- Collects the segment names a driver emits, with the file of the first emission.
 --- @param root string Absolute driver root.
---- @param call_pattern string Lua pattern with one capture: the segment name.
+--- @param call_patterns table Lua patterns, each with one capture: the segment name.
 --- @param directory table|nil Native directory port supplied by the driver.
 --- @return table emitted name -> relative path
 --- @return number sites Call sites parsed.
-local function emitted_segments(root, call_pattern, directory)
+local function emitted_segments(root, call_patterns, directory)
 	local emitted, sites = {}, 0
 	for _, path in ipairs(production_files(root, directory)) do
 		local handle = assert(io.open(path, "rb"))
@@ -71,9 +71,11 @@ local function emitted_segments(root, call_pattern, directory)
 		handle:close()
 		for line in source:gmatch("[^\n]+") do
 			if not line:match("^%s*%-%-") then
-				for name in line:gmatch(call_pattern) do
-					sites = sites + 1
-					emitted[name] = emitted[name] or path:sub(#root + 2)
+				for _, call_pattern in ipairs(call_patterns) do
+					for name in line:gmatch(call_pattern) do
+						sites = sites + 1
+						emitted[name] = emitted[name] or path:sub(#root + 2)
+					end
 				end
 			end
 		end
@@ -84,7 +86,8 @@ end
 --- Registers the inventory tests of one driver.
 --- @param helpers table The runner's test helpers.
 --- @param options table { driver = "macos"|"linux", root = absolute driver root,
----   call_pattern = pattern capturing the segment name of one emission,
+---   call_patterns = patterns, each capturing the segment name of one emission
+---   form (a span closed by span(), by done(), a recorded duration),
 ---   directory = optional native directory port,
 ---   timed_only = optional set of emitted names that are deliberately not
 ---   segments (a timed wait or a background build) }.
@@ -92,7 +95,8 @@ function M.register(helpers, options)
 	local declared = Inventory.for_driver(options.driver)
 	local timed_only = options.timed_only or {}
 	assert(type(options.default_slow_ms) == "number", "the contract needs the registry's hotpath_slow_ms")
-	local emitted, sites = emitted_segments(options.root, options.call_pattern, options.directory)
+	assert(type(options.call_patterns) == "table" and #options.call_patterns > 0, "the contract needs its emission patterns")
+	local emitted, sites = emitted_segments(options.root, options.call_patterns, options.directory)
 
 	helpers.describe("hot-path segment inventory: " .. options.driver, function()
 		helpers.it("parses the driver's emissions", function()

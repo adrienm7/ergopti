@@ -482,16 +482,15 @@ test('the preview types through the web emulation on top of the native layout', 
 	add(typist.down('KeyJ', [], 410));
 	add(typist.up('KeyJ', 420));
 	add(typist.up('Space', 430));
-	// The hold reaches the native command layer, which the engine leaves to the
-	// OS layout as the drivers do: the key arrives without the layer's modifier.
-	assert.equal(type(), 'aあ j');
+	// The hold reaches the native command layer: the key goes out with Command.
+	assert.equal(type(), 'aあ ⟨meta+KeyJ⟩');
 	// A shortcut sending another chord shows as that chord.
 	add(typist.down('KeyA', ['control_left'], 500));
-	assert.equal(type(), 'aあ j⟨control+KeyB⟩');
+	assert.equal(type(), 'aあ ⟨meta+KeyJ⟩⟨control+KeyB⟩');
 	// Emulated output ends a pending dead key with its terminator.
 	add(typist.down('BracketLeft', [], 600));
 	presses.push({ text: '!' });
-	assert.equal(type(), 'aあ j⟨control+KeyB⟩^!');
+	assert.equal(type(), 'aあ ⟨meta+KeyJ⟩⟨control+KeyB⟩^!');
 	refuses(
 		() => M.previewTypist(IO.importKeylayout(registry('ergopti'), 'e', 'iso'), 'macos'),
 		'source_imported_preserved'

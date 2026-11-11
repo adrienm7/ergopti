@@ -170,7 +170,8 @@ var LayoutSourceIO = (function () {
 	/**
 	 * Per-target support: the format owner's report, with the compiler's own
 	 * macOS and driver rows for a structured source, as tools/lib/layout-source-report.cjs
-	 * builds them. Linux XKB and Windows KLC run as Node/Lua tooling only.
+	 * builds them. The Linux XKB and Windows KLC rows stay the format owner's
+	 * until a download runs their converters (xkbArchive, klcFile).
 	 */
 	function capabilities(doc) {
 		const report = LayoutSource.capabilities(doc);
@@ -233,6 +234,84 @@ var LayoutSourceIO = (function () {
 		const { files } = LayoutSourceCompiler.exportMacos(doc, tables(), 'bundle');
 		const root = files[0].path.split('/')[0];
 		return { filename: `${root}.zip`, bytes: LayoutZipWriter.pack(files) };
+	}
+
+	/**
+	 * Runs a target export step, its refusal turned into this module's error.
+	 * @param {function(): *} step
+	 */
+	function targetStep(step) {
+		try {
+			return step();
+		} catch (error) {
+			if (error && error.name === 'TargetExportError')
+				throw new SourceIOError('target_export_refused', error.message);
+			throw error;
+		}
+	}
+
+	/**
+	 * The Linux XKB files of a source as one stored ZIP archive, written by the
+	 * shared target export and the shared Lua converter the repository tool
+	 * runs (`export-xkb`), so the files are byte for byte the tool's.
+	 * @param {object} doc
+	 * @param {{lua: {call: function}, keysyms: object, template: string, types: string}} assets
+	 *   A LayoutLuaRunner and key_sym.json, xkb_symbols.txt, xkb_types.txt.
+	 * @returns {{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}}
+	 */
+	function xkbArchive(doc, assets) {
+		const imported = LayoutSourceCompiler.targetKeylayout(doc, tables(), 'linux');
+		const request = targetStep(() =>
+			LayoutTargetExport.xkbRequest(doc, imported, {
+				keycodes: tables().macKeycodes,
+				keysyms: assets.keysyms,
+				template: assets.template,
+				types: assets.types
+			})
+		);
+		const output = assets.lua.call('xkb', request.input);
+		const { report, files } = targetStep(() =>
+			LayoutTargetExport.xkbFiles(imported, request, output, assets.types)
+		);
+		const root = `${request.id}_xkb`;
+		return {
+			filename: `${root}.zip`,
+			bytes: LayoutZipWriter.pack(
+				files.map((file) => ({ path: `${root}/${file.path}`, text: file.text, encoding: 'utf8' }))
+			),
+			files,
+			report
+		};
+	}
+
+	/**
+	 * The Windows .klc of a source in MSKLC bytes (UTF-16LE, BOM, CRLF), written
+	 * by the shared target export with the repository tool's KLC generator
+	 * (`export-klc`), so the bytes are the tool's.
+	 * @param {object} doc
+	 * @param {{lua: {call: function}, generator: object}} assets
+	 *   A LayoutLuaRunner and LayoutKlcGenerator.
+	 * @returns {{filename: string, bytes: Uint8Array, report: object}}
+	 */
+	function klcFile(doc, assets) {
+		const imported = LayoutSourceCompiler.targetKeylayout(doc, tables(), 'windows');
+		const metadata = targetStep(() => LayoutTargetExport.klcMetadata(doc));
+		const read = assets.lua.call('read', { xml: imported.text });
+		if (!read.ok) throw new SourceIOError('target_export_refused', read.reason);
+		const exported = targetStep(() =>
+			LayoutTargetExport.klcExport(
+				doc,
+				imported,
+				read.canonical,
+				{ keycodes: tables().macKeycodes, physicalKeys: tables().physicalKeys },
+				assets.generator
+			)
+		);
+		return {
+			filename: `${metadata.dll_name}.klc`,
+			bytes: LayoutTargetExport.encodeKlc(exported.klc),
+			report: exported.report
+		};
 	}
 
 	/**
@@ -601,6 +680,8 @@ var LayoutSourceIO = (function () {
 		keylayoutFile,
 		macosBundleArchive,
 		macosDownload,
+		xkbArchive,
+		klcFile,
 		installPayload,
 		emulationTable,
 		withNavLayer,

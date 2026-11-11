@@ -38,7 +38,8 @@ function loadLayoutSource() {
 		'composer_model.js',
 		'source_model.js',
 		'source_compiler.js',
-		'source_emulation.js'
+		'source_emulation.js',
+		'target_export.js'
 	]) {
 		const filename = path.join(shared('ui', 'layout_composer'), file);
 		vm.runInContext(fs.readFileSync(filename, 'utf8'), context, { filename });
@@ -47,11 +48,13 @@ function loadLayoutSource() {
 	const compiler = vm.runInContext('LayoutSourceCompiler', context);
 	const composer = vm.runInContext('LayoutComposer', context);
 	const emulation = vm.runInContext('LayoutSourceEmulation', context);
+	const targetExport = vm.runInContext('LayoutTargetExport', context);
 	const tables = keyTables();
 	return {
 		...model,
 		composer,
 		emulation,
+		targetExport,
 		tables,
 		read: (text) => model.read(text, codec),
 		write: (source) => model.write(source, codec),

@@ -34,15 +34,20 @@ const TYPES = {
 	'.json': 'application/json'
 };
 
-/** Serves the shared tree read-only on loopback. */
+// The XKB converter data the site serves beside the shared tree, at the URL the
+// standalone host computes from the page (../../../../ergopti/linux/...).
+const XKB_DATA_URL = '/ergopti/linux/xkb_generation/data/';
+const XKB_DATA = path.join(ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
+
+/** Serves the shared tree and the XKB converter data read-only on loopback. */
 function serve() {
 	const server = http.createServer((request, response) => {
-		const file = path.resolve(shared(), new URL(request.url, 'http://localhost').pathname.slice(1));
-		if (
-			!file.startsWith(shared() + path.sep) ||
-			!fs.existsSync(file) ||
-			!fs.statSync(file).isFile()
-		) {
+		const pathname = new URL(request.url, 'http://localhost').pathname;
+		const [root, relative] = pathname.startsWith(XKB_DATA_URL)
+			? [XKB_DATA, pathname.slice(XKB_DATA_URL.length)]
+			: [shared(), pathname.slice(1)];
+		const file = path.resolve(root, relative);
+		if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
 			response.writeHead(404);
 			response.end();
 			return;
@@ -343,6 +348,28 @@ async function exerciseManager(browser, origin) {
 				.toString('latin1'),
 			'PK'
 		);
+
+		// Linux XKB and Windows KLC download from the shared converters run in the page.
+		const [xkb] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-xkb')]);
+		assert.equal(xkb.suggestedFilename(), 'ergopti_xkb.zip');
+		const xkbBytes = fs.readFileSync(await xkb.path());
+		assert.equal(xkbBytes.subarray(0, 2).toString('latin1'), 'PK');
+		for (const name of ['ergopti.xkb', 'ergopti.XCompose', 'xkb_types.txt', 'export.json'])
+			assert(xkbBytes.includes(`ergopti_xkb/${name}`), `the XKB archive holds ${name}`);
+		// The KLC needs its Windows metadata first: the refusal says so.
+		await page.click('#le-export-klc');
+		await page.waitForSelector('.le-message.error');
+		await page.click('#le-windows summary');
+		await page.fill('#le-win-locale', 'fr-FR');
+		await page.fill('#le-win-layout-id', '0000040c');
+		await page.fill('#le-win-dll-name', 'kbdergo');
+		await page.click('#le-win-klc-apply');
+		const [klc] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-klc')]);
+		assert.equal(klc.suggestedFilename(), 'kbdergo.klc');
+		const klcBytes = fs.readFileSync(await klc.path());
+		assert.deepEqual([...klcBytes.subarray(0, 2)], [0xff, 0xfe], 'MSKLC UTF-16LE with a BOM');
+		assert.match(klcBytes.toString('utf16le'), /KBD\tkbdergo\t/);
+		await page.click('#le-undo');
 
 		// Drag and drop swaps two keys; copy and paste repeats one.
 		const legendOf = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
