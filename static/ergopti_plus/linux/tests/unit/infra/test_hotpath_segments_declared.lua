@@ -12,18 +12,20 @@
 local helpers = require("tests.helpers")
 
 -- Spans that are timed for the interval summary but are not hot-path segments:
--- the idle wait is long by design, the periodic tick, the tray and the keystats
--- flush run off the keystroke.
+-- the idle wait is long by design, the periodic tick, the tray, the keystats
+-- flush, a layout switch and a catalogue reload run off the keystroke, and a
+-- key's age from its kernel stamp includes the loop's queueing by design.
 local TIMED_ONLY = {
 	["loop.idle"] = true, ["loop.periodic"] = true,
-	["keystats.flush"] = true, ["tray.build"] = true, ["tray.open"] = true,
+	["keystats.flush"] = true, ["tray.build"] = true, ["tray.open"] = true, ["tray.fill"] = true,
+	["input.latency"] = true, ["layout.switch"] = true, ["config.reload"] = true,
 }
 
 require("test.hotpath_segments_contract").register(helpers, {
 	driver = "linux",
 	directory = require("infra.native_directory"),
 	root = helpers.driver_root(),
-	call_pattern = 'Perf%.span%(%s*"([^"]+)"',
+	call_patterns = { 'Perf%.span%(%s*"([^"]+)"', 'Perf%.done%(%s*"([^"]+)"', 'Perf%.record_age%(%s*"([^"]+)"' },
 	timed_only = TIMED_ONLY,
 	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
 })

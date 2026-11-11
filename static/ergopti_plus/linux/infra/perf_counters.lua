@@ -32,6 +32,13 @@
 ---    frame and span() closes it, so a segment is judged on its own time and a
 ---    slow one is reported with the declared segment around it. A dispatch slow
 ---    only because of a slow expansion yields one line, for the expansion.
+--- 7. Paired debug lines for the paths a person waits on (trace() / done()): a
+---    tray branch filled, a layout applied, a catalogue reloaded, an expansion
+---    typed. At DEBUG each writes "[TRACE] [Span] <name>…" and "[DONE] [Span]
+---    <name> done in N ms", the macOS driver's tag and names, so a verbose
+---    field log shows each occurrence; below DEBUG they cost one level read and
+---    the span's aggregate is all that remains. Per-keystroke spans stay
+---    aggregate-only: a pair per key would double a verbose log.
 --- ==============================================================================
 
 local M = {}
@@ -44,6 +51,10 @@ local LOG = "PerfCounters"
 -- Tag of the slow-segment WARNING, shared with the Windows and macOS drivers so
 -- one search finds the line on every OS.
 local HOTPATH_LOG = "HotPath"
+-- Tag of the paired trace()/done() lines, the same on macOS.
+local SPAN_LOG = "Span"
+-- The core's DEBUG level: trace/done lines below it are dropped by the core.
+local DEBUG_LEVEL = 10
 
 -- Milliseconds between two summary lines.
 M.FLUSH_INTERVAL_MS = 60000
@@ -58,7 +69,7 @@ local COUNTER_NAMES = {
 	"output.uinput_writes", "output.uinput_events", "shell.spawns",
 	"hotstring.matches", "hotstring.expansions",
 	"keystats.ingests", "keystats.flushes",
-	"tray.builds", "tray.opens", "tray.rows",
+	"tray.builds", "tray.opens", "tray.rows", "tray.fills",
 }
 
 -- Every span (a duration with its count, total and maximum), by name.
@@ -68,7 +79,12 @@ local SPAN_NAMES = {
 	"output.uinput_write",
 	"hotstring.match", "hotstring.expand",
 	"keystats.ingest", "keystats.flush",
-	"tray.build", "tray.open",
+	"tray.build", "tray.open", "tray.fill",
+	-- A key's kernel stamp to its forwarded write: the latency a user feels,
+	-- queueing in the loop included. Wall clock on both ends (evdev stamps on
+	-- CLOCK_REALTIME), so it is aggregated, never judged as a segment.
+	"input.latency",
+	"layout.switch", "config.reload",
 }
 
 local _counts, _totals = {}, {}                 -- name -> interval / lifetime count
@@ -164,6 +180,73 @@ function M.span(name, started)
 	_span_sum[name] = _span_sum[name] + elapsed
 	if elapsed > _span_max[name] then _span_max[name] = elapsed end
 	if slow then _span_slow[name] = _span_slow[name] + 1 end
+	return elapsed
+end
+
+--- Records a duration measured outside clock()/span(), such as a key's age from
+--- its kernel stamp. It takes no part in nesting and is never a slow segment.
+--- @param name string A declared span.
+--- @param elapsed_ms number
+function M.record(name, elapsed_ms)
+	local n = _span_n[name]
+	if n == nil then error("unknown perf span '" .. tostring(name) .. "'", 2) end
+	if type(elapsed_ms) ~= "number" or elapsed_ms ~= elapsed_ms then
+		error("perf span '" .. name .. "' recorded without a duration", 2)
+	end
+	_span_n[name] = n + 1
+	_span_sum[name] = _span_sum[name] + elapsed_ms
+	if elapsed_ms > _span_max[name] then _span_max[name] = elapsed_ms end
+end
+
+-- luv.gettimeofday, bound at the first record_age(); false without luv.
+local _gettimeofday = nil
+
+--- Records the age of an event from its kernel stamp (evdev stamps on
+--- CLOCK_REALTIME unless EVIOCSCLOCKID changed it, which this driver never
+--- does). An age below zero means the wall clock was stepped in between; that
+--- sample measures nothing and is dropped. Without luv there is no
+--- sub-second wall clock and nothing is recorded.
+--- @param name string A declared span.
+--- @param stamp_us number The event's kernel stamp in microseconds.
+function M.record_age(name, stamp_us)
+	if _gettimeofday == nil then
+		local ok, luv = pcall(require, "luv")
+		_gettimeofday = ok and type(luv) == "table" and luv.gettimeofday or false
+	end
+	if not _gettimeofday then return end
+	local seconds, microseconds = _gettimeofday()
+	local age_ms = ((seconds * 1000000 + microseconds) - stamp_us) / 1000
+	if age_ms >= 0 then M.record(name, age_ms) end
+end
+
+--- Whether the core writes DEBUG lines now.
+--- @return boolean
+local function debug_on()
+	local level = Logger.get_level
+	return type(level) == "function" and (tonumber(level()) or DEBUG_LEVEL + 1) <= DEBUG_LEVEL
+end
+
+--- Opens a span that a person waits on, with its paired TRACE line at DEBUG.
+--- Close it with done(), on every path.
+--- @param name string A declared span.
+--- @return number The stamp to pass to done().
+function M.trace(name)
+	if _span_n[name] == nil then error("unknown perf span '" .. tostring(name) .. "'", 2) end
+	if debug_on() then Logger.trace(SPAN_LOG, "%s…", name) end
+	return M.clock()
+end
+
+--- Closes a span opened with trace(), with its paired DONE line at DEBUG.
+--- @param name string The span trace() opened.
+--- @param started number The stamp trace() returned.
+--- @param detail string|nil A short count summary: names and numbers only.
+--- @return number elapsed_ms
+function M.done(name, started, detail)
+	local elapsed = M.span(name, started)
+	if debug_on() then
+		Logger.done(SPAN_LOG, "%s done in %.2f ms%s.", name, elapsed,
+			(type(detail) == "string" and detail ~= "") and (" (" .. detail .. ")") or "")
+	end
 	return elapsed
 end
 

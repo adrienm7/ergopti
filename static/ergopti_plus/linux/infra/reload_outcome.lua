@@ -31,17 +31,22 @@ local LOG = "infra.reload_outcome"
 --- @return number|nil count Active mapping count when reloaded.
 function M.run(reload)
 	assert(type(reload) == "function", "a reload function is required")
+	local Perf = require("infra.perf_counters")
+	local started = Perf.trace("config.reload")
 	local ok, count, published, refusal = pcall(reload)
 	if not ok then
+		Perf.done("config.reload", started, "failed")
 		Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
 		return false, "failed"
 	end
 	if published ~= true then
+		Perf.done("config.reload", started, "refused")
 		Logger.warn(LOG, "Hotstrings reload refused (%s); the previous catalogue stays active.",
 			tostring(refusal or "no reason given"))
 		return false, "refused"
 	end
-	Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
+	local elapsed_ms = Perf.done("config.reload", started, string.format("%d mapping(s)", count or 0))
+	Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active in %.0f ms.", count or 0, elapsed_ms)
 	return true, nil, count
 end
 

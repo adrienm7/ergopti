@@ -1021,6 +1021,10 @@ local function _forward_raw(ev, source)
 	end
 	if receipt.ok then
 		if ev.value == InputEvent.VALUE_UP then _output_owners[key] = nil end
+		-- A press only, so a tap counts once: its kernel stamp to its write.
+		if ev.value == InputEvent.VALUE_DOWN and type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then
+			Perf.record_age("input.latency", ev.timestamp_us)
+		end
 		return true, receipt
 	end
 	_forwarded_down[key] = prior

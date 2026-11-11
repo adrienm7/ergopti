@@ -401,6 +401,7 @@ return {
 	"tests.unit.adapters.runtime.test_event_loop_adapter",
 	"tests.unit.adapters.runtime.test_event_loop_idle_wait",
 	"tests.unit.infra.test_perf_counters",
+	"tests.unit.infra.test_perf_spans",
 	"tests.unit.infra.test_hotpath_segments_declared",
 	"tests.unit.ui.hotstrings_config.test_color_palette",
 	"tests.unit.infra.test_phase_stats",

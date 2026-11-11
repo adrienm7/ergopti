@@ -631,7 +631,8 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	Perf.count("hotstring.expansions")
-	local transaction_started = Perf.clock()
+	local transaction_started = Perf.trace("hotstring.expand")
+	local transaction_events = 0
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
@@ -644,6 +645,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
 			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
 			Perf.count("output.uinput_events")
+			transaction_events = transaction_events + 1
 			local write_started = Perf.clock()
 			local accepted = native_tx.emit(code, value, phase)
 			Perf.span("output.uinput_write", write_started)
@@ -682,7 +684,9 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
-	Perf.span("hotstring.expand", transaction_started)
+	-- The operation and its event count only: never the text.
+	Perf.done("hotstring.expand", transaction_started,
+		string.format("%s, %d event(s)%s", label, transaction_events, result.ok and "" or ", failed"))
 	if not result.ok then result.error = private_failure(result.error, is_private) end
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
 		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end

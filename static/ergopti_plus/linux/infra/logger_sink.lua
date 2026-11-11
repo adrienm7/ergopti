@@ -226,6 +226,39 @@ local function today()
 	return os.date("%Y-%m-%d")
 end
 
+-- The "YYYY-MM-DD HH:MM:SS" face of the last second a line was stamped in, so
+-- a burst of lines formats the calendar once instead of once per line.
+local _stamp_second, _stamp_face = nil, nil
+
+--- Builds a line timestamp with its milliseconds from the wall clock (luv's
+--- gettimeofday), the format the macOS and Windows drivers already write. The
+--- core's own default writes ":000", which left every Linux field log unable
+--- to say how far apart two lines of the same second are.
+--- @param gettimeofday function luv.gettimeofday, returning seconds and microseconds.
+--- @return function timestamp() → "YYYY-MM-DD HH:MM:SS:mmm".
+local function millisecond_timestamp(gettimeofday)
+	return function()
+		local seconds, microseconds = gettimeofday()
+		if seconds ~= _stamp_second then
+			_stamp_second, _stamp_face = seconds, os.date("%Y-%m-%d %H:%M:%S", seconds)
+		end
+		return string.format("%s:%03d", _stamp_face, math.floor(microseconds / 1000))
+	end
+end
+
+--- The timestamp provider install() gives the core, or nil without luv: the
+--- core's second-resolution default then stays, as the coarse monotonic clock
+--- does (infra/monotonic.lua) on the same runtime.
+--- @param gettimeofday function|nil A wall clock answering seconds, microseconds
+---   (tests); luv's when absent.
+--- @return function|nil
+function M.timestamp_provider(gettimeofday)
+	if gettimeofday then return millisecond_timestamp(gettimeofday) end
+	local ok, luv = pcall(require, "luv")
+	if not ok or type(luv) ~= "table" or type(luv.gettimeofday) ~= "function" then return nil end
+	return millisecond_timestamp(luv.gettimeofday)
+end
+
 --- Absolute path of the file the driver is writing to right now.
 ---
 --- Exposed because the "open today's log" action needs it and the three pieces
@@ -558,6 +591,9 @@ function M.install(logger, opts)
 	end
 
 	logger.set_sink(sink)
+	-- Milliseconds on every line, unless a caller (a test) already owns the clock face.
+	local stamp = logger.timestamp_fn == logger.default_timestamp and M.timestamp_provider() or nil
+	if stamp then logger.timestamp_fn = stamp end
 	-- Armed here, behind the _installed guard, so a repeated install() stays the
 	-- no-op it is documented to be instead of tripping the core's refusal of a
 	-- second arming.
@@ -671,6 +707,9 @@ function M.uninstall(logger)
 	end
 	if type(logger) == "table" and type(logger.disable_repeat_collapsing) == "function" then
 		logger.disable_repeat_collapsing()
+	end
+	if type(logger) == "table" and type(logger.default_timestamp) == "function" then
+		logger.timestamp_fn = logger.default_timestamp
 	end
 	close_handles()
 	close_topical()

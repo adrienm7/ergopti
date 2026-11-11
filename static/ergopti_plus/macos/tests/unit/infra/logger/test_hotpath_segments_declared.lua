@@ -14,6 +14,6 @@ local helpers = require("tests.helpers")
 require("test.hotpath_segments_contract").register(helpers, {
 	driver = "macos",
 	root = helpers.driver_root(),
-	call_pattern = 'HotPath%.log_if_slow%(%s*"([^"]+)"',
+	call_patterns = { 'HotPath%.log_if_slow%(%s*"([^"]+)"', 'HotPath%.done%(%s*"([^"]+)"' },
 	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
 })
