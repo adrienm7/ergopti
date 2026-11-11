@@ -2157,7 +2157,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_walker_batch_critical.ahk
 #Include meta/modules/keystats/ergonomics/test_walker_pure_fns_match_shared_core.ahk
 #Include meta/modules/keystats/test_keystats_critical_restore.ahk
-#Include meta/modules/keystats/context/test_async_password_detect_suspend_guard.ahk
 #Include meta/modules/keystats/context/test_sensors_warmup_distinct_callback.ahk
 #Include meta/modules/keystats/context/test_kltopo_seen_hwnds_cap.ahk
 #Include meta/platform/remap/layers/test_remapped_list_unconditional.ahk
