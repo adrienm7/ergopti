@@ -389,9 +389,10 @@ Answers from the container proofs of 2026-11-11
 - W4: yes on both. GNOME Shell 46 (`--x11`) and Plasma 6.6.4 (kded's keyboard
   module) put their own layout list back when a keyboard appears, and GNOME
   also on any input-sources setting change; a layout switch keeps the loaded
-  keymap (`run_x11_reapply_live.sh`). The daemon must re-apply the user-tree
-  layout after those events, or X11 on these desktops falls back to the
-  system install.
+  keymap (`run_x11_reapply_live.sh`). The daemon re-applies the user-tree
+  layout after those events (`modules/keymap/x11_layout_reapply.lua`: an X11
+  keymap watch worker, one read per settled burst, at most three re-applies
+  a minute, then it stops for the session with a warning).
 
 A small shell probe for W1 to W3 will ship with slice 3 (it prints the
 compiled keysyms through `xkbcli` or the ctypes call used here and the

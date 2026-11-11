@@ -231,6 +231,7 @@ return {
 	"tests.unit.adapters.layout.test_keyboard_layout_xkb_keymap_parsing",
 	"tests.unit.adapters.layout.test_keyboard_layout_terminal_plan_observation",
 	"tests.unit.modules.keymap.test_number_row_live",
+	"tests.unit.modules.keymap.test_x11_layout_reapply",
 	"tests.unit.modules.keymap.test_number_row_policy",
 	"tests.unit.modules.keymap.test_direct_access_digits_native_only",
 	"tests.unit.modules.keymap.test_layout_rows_policy",
