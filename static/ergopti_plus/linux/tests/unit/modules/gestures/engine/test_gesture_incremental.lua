@@ -165,6 +165,22 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		helpers.assert_eq(count(up, M.emit_combo_for("tab_next")), steps, "right_up: the same travel, the same steps")
 	end)
 
+	-- A slow diagonal sits a few frames in the band where the classifier names
+	-- the dominant straight axis; the tracker re-classified each frame and
+	-- restarted its count whenever the name turned diagonal, so it never
+	-- stepped while moving (GSL-001, diagonal-decided-axis).
+	helpers.it("incremental: a slow or drifting diagonal steps while moving (diagonal-decided-axis)", function()
+		local slow, drift = {}, {}
+		for i = 1, 40 do slow[#slow + 1] = { 0.4 * i, -0.4 * i } end
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		for label, points in pairs({ slow = slow, drift = drift }) do
+			local pressed, M = pump({ swipe_3_right_up = "tab_next", swipe_3_right = "tab_prev" },
+				{ swipe_3_right_up = "incremental", swipe_3_right = "incremental" }, touch_events(points), UNITS)
+			helpers.assert_true(count(pressed, M.emit_combo_for("tab_next")) >= 4, label .. ": right_up steps")
+			helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 0, label .. ": never the straight slot")
+		end
+	end)
+
 	helpers.it("incremental: the sensitivity sets the step, within the shared range", function()
 		local saved = package.loaded[MANAGER]
 		local M = helpers.load_module(MANAGER)

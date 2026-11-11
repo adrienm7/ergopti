@@ -65,8 +65,12 @@ function M.new(opts)
 		end
 		if state.dead then return end
 		local rx, ry = x - state.ox, y - state.oy
-		local direction = Direction.classify(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
-		if not direction then return end
+		-- Only a decided axis counts: in the diagonal sector below the diagonal
+		-- minimum the classifier names the dominant straight axis, and the
+		-- name turning diagonal a frame later restarted the count each time.
+		local axis = Direction.decided_axis(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
+		if not axis then return end
+		local direction = Direction.name(axis, rx, ry)
 		local slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
 		local answering = opts.slot_of(slot, progress.fingers, direction)
 		if opts.mode_of(answering) ~= "incremental" then return end

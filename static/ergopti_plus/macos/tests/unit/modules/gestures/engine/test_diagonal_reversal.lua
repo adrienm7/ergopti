@@ -107,6 +107,18 @@ helpers.describe("gestures/engine.lua: diagonal travel and reversal (diagonal-ax
 		helpers.assert_true(count(fired, "tab_prev") >= 1, "the way back is a reversal onto left_down")
 		helpers.assert_eq(fired[1], "tab_next", "forward first")
 	end)
+
+	-- A slow diagonal locked on the dominant straight axis its first small move
+	-- named, then dropped the whole swipe at commit as « not the locked
+	-- direction » (GSM-001, diagonal-decided-axis).
+	helpers.it("locks a slow diagonal on its diagonal (diagonal-decided-axis)", function()
+		local path = {}
+		for i = 1, 20 do path[#path + 1] = { 0.8 * i, -0.8 * i + ((i % 2 == 0) and 0.05 or -0.05) } end
+		local fired = run(path, { swipe_3_right_up = "app_expose" })
+		helpers.assert_true(count(fired, "app_expose") >= 4, "the right_up slot steps (" .. #fired .. ")")
+		fired = run(path, { swipe_3_right_up = "app_expose", swipe_3_up = "tab_prev", swipe_3_right = "tab_next" })
+		helpers.assert_eq(count(fired, "tab_prev") + count(fired, "tab_next"), 0, "never a straight slot")
+	end)
 end)
 
 return true

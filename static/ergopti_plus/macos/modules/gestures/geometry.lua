@@ -219,4 +219,18 @@ function M.computeDir(dx, dy, mf)
 	return Direction.axis(dx, dy, min, diag_min)
 end
 
+--- The direction a moving swipe locks on. A swipe of three fingers or more in
+--- the diagonal sector waits for the diagonal minimum (Direction.decided_axis)
+--- instead of locking the dominant straight axis computeDir names there, which
+--- dropped a slow diagonal at its end as « not the locked direction ». A pair
+--- keeps computeDir: its lock is what makes it a scroll at once.
+--- @param dx number X delta.
+--- @param dy number Y delta.
+--- @param mf number Amount of fingers.
+--- @return string|nil Direction string, nil while undecided.
+function M.lockDir(dx, dy, mf)
+	if mf == 2 then return M.computeDir(dx, dy, mf) end
+	return Direction.decided_axis(dx, dy, M.SWIPE_MIN, M.SWIPE_MIN * Direction.DIAGONAL_MINIMUM_FACTOR)
+end
+
 return M

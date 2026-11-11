@@ -75,12 +75,37 @@ function M.axis(dx, dy, minimum, diagonal_minimum)
 	local dist = adx + ady
 	if dist < minimum then return nil end
 
+	local decided = M.decided_axis(dx, dy, minimum, diagonal_minimum)
+	if decided then return decided end
+	-- Not enough travel for a diagonal: the dominant axis wins.
+	return (adx >= ady) and "horiz" or "vert"
+end
+
+--- The axis a swipe has already committed to, for a live lock: as M.axis, but
+--- nil while a swipe in the diagonal sector has not travelled the diagonal
+--- minimum. M.axis names the dominant straight axis there, which a finished
+--- short swipe wants and a swipe still moving does not: locked on it, a slow
+--- diagonal was counted on the wrong slot or dropped at its end, and a
+--- tracker that re-classified each frame restarted every time the name
+--- turned diagonal.
+--- @param dx number Horizontal displacement, positive rightward.
+--- @param dy number Vertical displacement, positive downward.
+--- @param minimum number Least Manhattan travel that is a swipe at all.
+--- @param diagonal_minimum number Least Manhattan travel that may be a diagonal.
+--- @return string|nil axis "horiz", "vert" or "diag"; nil while undecided.
+function M.decided_axis(dx, dy, minimum, diagonal_minimum)
+	assert(type(dx) == "number" and type(dy) == "number", "a displacement needs numeric dx and dy")
+	assert(type(minimum) == "number" and minimum > 0, "the swipe minimum must be a positive number")
+	assert(type(diagonal_minimum) == "number" and diagonal_minimum >= minimum,
+		"the diagonal minimum must be a number no smaller than the swipe minimum")
+	local adx, ady = math.abs(dx), math.abs(dy)
+	local dist = adx + ady
+	if dist < minimum then return nil end
 	local angle = math.deg(atan2(ady, adx))
 	if angle >= 90 - M.AXIS_MAX_DEGREES then return "vert" end
 	if angle <= M.AXIS_MAX_DEGREES then return "horiz" end
 	if dist >= diagonal_minimum then return "diag" end
-	-- Not enough travel for a diagonal: the dominant axis wins.
-	return (adx >= ady) and "horiz" or "vert"
+	return nil
 end
 
 --- Names the direction of a displacement already classified on an axis.

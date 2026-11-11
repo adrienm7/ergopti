@@ -65,8 +65,7 @@ local function play(ga, fingers, dx, dy)
 		clock = clock + FRAME_DT_SEC
 	end
 	for _ = 1, 10 do frame(0, 0) end
-	-- Few, large steps: a slow diagonal would lock its first small move to the
-	-- dominant axis, which is the engine's existing behaviour for every slot.
+	-- Few, large steps; a slow diagonal is pinned by test_diagonal_reversal.lua.
 	local steps = 8
 	for i = 1, steps do frame(dx * i / steps, dy * i / steps) end
 	Engine.process_frame({})
