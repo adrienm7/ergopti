@@ -153,6 +153,23 @@ helpers.describe("TokenCrypto async task ownership", function()
 		end)
 	end)
 
+	-- An item the Keychain no longer holds (a restored backup's entry) is its
+	-- own launcher exit, read as "absent"; any other failure stays a Keychain
+	-- error (macos-api-key-restored-missing).
+	helpers.it("reads the launcher's absent-item exit as reason absent, and no other exit", function()
+		for _, case in ipairs({ { code = 69, reason = "absent" }, { code = 70, reason = "security_failed" } }) do
+			with_crypto_fixture({}, function(TokenCrypto, fixture)
+				local results = {}
+				TokenCrypto.decrypt_async("keychain:restored", function(...) results[#results + 1] = table.pack(...) end)
+				helpers.assert_eq(TokenCrypto.ABSENT_EXIT_CODE, 69)
+				fixture.done(case.code, "", "")
+				helpers.assert_eq(#results, 1)
+				helpers.assert_eq(results[1][1], false)
+				helpers.assert_eq(results[1][3], case.reason, "exit " .. case.code)
+			end)
+		end
+	end)
+
 	helpers.it("reports start refusal exactly once and never waits for a callback", function()
 		with_crypto_fixture({ start_succeeds = false }, function(TokenCrypto, fixture)
 			local calls, reason = 0, nil

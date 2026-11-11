@@ -174,7 +174,8 @@ helpers.describe("Access-token providers: the key is exchanged, never sent", fun
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			local endpoint, reason = remote.endpoint(ENTRY, ENTRY.model)
 			helpers.assert_nil(endpoint)
-			helpers.assert_eq(reason, "the token exchange answered HTTP 400")
+			-- The request carries the exchange's status first (access_failure).
+			helpers.assert_eq(reason, "HTTP 400: the token exchange answered HTTP 400")
 			helpers.assert_eq(#calls, 1, "no second exchange at once")
 			clock.now = clock.now + 61
 			remote.endpoint(ENTRY, ENTRY.model)
@@ -419,8 +420,29 @@ helpers.describe("Access-token providers: the first request waits for the token 
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			helpers.assert_eq(#calls, 1, "no completion")
 			helpers.assert_eq(result[1], "")
-			helpers.assert_eq(result[2], "the token exchange answered HTTP 400")
+			helpers.assert_eq(result[2], "HTTP 400: the token exchange answered HTTP 400")
 		end)
+	end)
+
+	-- Windows carries the exchange's status into the request failure
+	-- (_LLMRemote_AccessFailInfo), so a refused key is never retried; the Lua
+	-- failure was the bare reason, which the shared classifier cannot read, and
+	-- the engine spent its whole retry budget (AIS-001, access-refusal-status).
+	helpers.it("a refused exchange fails the chat as a refused credential (access-refusal-status)", function()
+		local FailureClass = require("llm.failure_class")
+		for _, status in ipairs({ 401, 403 }) do
+			with_remote(function(remote, calls)
+				local result
+				remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
+				answer(calls, 1, status, { errorMessage = "no" })
+				helpers.assert_eq(result[2], "HTTP " .. status .. ": the token exchange answered HTTP " .. status)
+				helpers.assert_true(FailureClass.is_authentication_failure(result[2]), "never retried")
+				result = nil
+				remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
+				helpers.assert_eq(#calls, 1, "the pause asks nothing")
+				helpers.assert_true(FailureClass.is_authentication_failure(result[2]), "nor within the pause")
+			end)
+		end
 	end)
 
 	helpers.it("the model listing waits for the token too (access-token-lease)", function()

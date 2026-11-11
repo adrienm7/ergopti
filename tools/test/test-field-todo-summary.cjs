@@ -221,7 +221,12 @@ check('a Linux report reads the field run and the collector steps of its own cov
 	assert.match(byId.physical_acceptance.evidence.join(' '), /polkit_agent=fail:1/);
 	assert.equal(byId.layout_emulation_w1_w4.verdict, 'needs_person');
 	assert.equal(byId.owned_gtk_host.verdict, 'not_run');
-	assert.equal(byId.physical_shortcut_delivery.verdict, 'not_testable');
+	// Testable since the maintainer turned delivery on: absent from this run, never a pass
+	assert.equal(byId.physical_shortcut_delivery.verdict, 'not_run');
+	assert.match(
+		byId.physical_shortcut_delivery.evidence[0],
+		/linux_physical_shortcut:absent_from_run/
+	);
 	assert(
 		fs
 			.readFileSync(path.join(folder, 'todo_summary.md'), 'utf8')

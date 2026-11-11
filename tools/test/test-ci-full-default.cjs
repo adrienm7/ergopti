@@ -951,8 +951,10 @@ check(
 		// 212: the WebKit reload-signal, GTK privacy owner, AI destination and
 		// clipboard owner receipts, the real keyring proof, the live desktop actions
 		// proof and the Wayland clipboard owner receipt (each with its install step)
-		// joined the desktop-webview shard.
-		assert.equal(Scoped.contract.slots.length, 212);
+		// joined the desktop-webview shard; 213: the live layout source install joined
+		// the input-display shard; 214: the layout editor's WebView install joined
+		// desktop-webview.
+		assert.equal(Scoped.contract.slots.length, 214);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(

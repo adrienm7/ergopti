@@ -252,6 +252,43 @@ helpers.describe("Linux metrics ledger export", function()
 		helpers.assert_eq(reopened:status().rebuilding, false)
 	end)
 
+	it("linux-ledger-meta-once: a fresh process reads its recorded position in one query", function()
+		-- Each sqlite3 query is a process (about 4 ms at boot); the four meta
+		-- keys used to be four get_meta calls on the boot path.
+		local dir = temp_dir()
+		local db = dir .. "/metrics.sqlite"
+		local store = new_store(db)
+		insert_rows(db, 1, "2026-11-05")
+		local first = make_ledger(dir, store)
+		assert(first:prepare())
+		run_to_idle(first)
+		local counted, meta_reads, queries = {}, 0, 0
+		for name, fn in pairs(store) do counted[name] = fn end
+		counted.get_meta = function(...) meta_reads = meta_reads + 1; return store.get_meta(...) end
+		counted.query_rows = function(...) queries = queries + 1; return store.query_rows(...) end
+		local reopened = make_ledger(dir, counted)
+		assert(reopened:prepare())
+		helpers.assert_eq(reopened:status().rebuilding, false, "the recorded position was read back")
+		helpers.assert_eq(meta_reads, 0)
+		helpers.assert_eq(queries, 1)
+	end)
+
+	it("linux-ledger-meta-decode: values survive the line framing and junk is counted", function()
+		local Json = require("json")
+		local recorded, malformed = Ledger.decode_meta({
+			Json.encode(Ledger.META.date) .. "\t" .. Json.encode("2026-11-05"),
+			Json.encode(Ledger.META.device) .. "\t" .. Json.encode("dev\0ice\nx"),
+			Json.encode("unrelated_key") .. "\t" .. Json.encode("v"),
+			"not a row",
+		})
+		helpers.assert_eq(recorded.date, "2026-11-05")
+		helpers.assert_eq(recorded.device, "dev\0ice\nx")
+		helpers.assert_eq(malformed, 2)
+		helpers.assert_eq(next((Ledger.decode_meta(nil))), nil, "a refused query records nothing")
+		local _, broken = Ledger.decode_meta(true)
+		helpers.assert_eq(broken, 1, "an answer that is not a list of lines is malformed, never iterated")
+	end)
+
 	it("linux-ledger-divergence: a size other than the recorded one regenerates the whole file", function()
 		local dir = temp_dir()
 		local db = dir .. "/metrics.sqlite"

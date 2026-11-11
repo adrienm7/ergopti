@@ -118,10 +118,12 @@ function M.begin()
 	_origin_ms = Monotonic.now_ms()
 	_cpu_origin_ms = _cpu_ms()
 	_load_ms = M.process_age_ms()
+	-- The marker line the field log analyser and macOS share, left as it is.
+	Logger.info(LOG, "Boot timing started.")
 	if _load_ms then
-		Logger.info(LOG, "Boot timing started, %.0f ms after the process (runtime start and module loading).", _load_ms)
+		Logger.info(LOG, "Process age at boot timing: %.0f ms (runtime start and module loading).", _load_ms)
 	else
-		Logger.info(LOG, "Boot timing started; the process age was unreadable.")
+		Logger.warn(LOG, "Process age at boot timing unreadable from /proc; the load phase is not measured.")
 	end
 end
 
