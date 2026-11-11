@@ -1598,13 +1598,16 @@ function M.record_network_event(kind, fields)
 	if not may_record() then return end
 	local allowed = require("keystats.network_transitions").KINDS[kind]
 	assert(allowed, "not an events_network kind: " .. tostring(kind))
+	-- Windows' KL_AppendLog refuses every entry while the focused app is
+	-- filtered, connectivity included: the row would name that app.
+	local app = M.last_app() or "unknown"
+	if M.is_unrecorded_app(app) then return end
 	fields = type(fields) == "table" and fields or {}
 	local clock = observe_calendar()
 	local meta = {}
 	for _, name in ipairs(allowed) do meta[name] = fields[name] end
 	_raw_pending.network[#_raw_pending.network + 1] = {
-		ts = clock.ts, date = clock.date, kind = kind,
-		app = dashboard_app_name(M.last_app() or "unknown"), meta = meta,
+		ts = clock.ts, date = clock.date, kind = kind, app = dashboard_app_name(app), meta = meta,
 	}
 end
 
