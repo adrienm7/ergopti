@@ -20,6 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
+
 
 
 
@@ -686,6 +688,7 @@ _KLT_PendingDisabledRowCase() {
 		Hkl := GetForegroundKeyboardLayout()
 		Plain := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, false, false)
 		Shifted := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, true, false)
+		TestRequireHostCapability(TestSc012NotOReceipt.Bind(Plain))
 		Assert(Plain.Count == 1 && Plain.Text != "o", "the proof needs an OS layout whose SC012 is not o")
 		Circumflex := KLE_Compositions["s1_circumflex"]
 		Assert(Circumflex.Has(Plain.Text) && Circumflex.Has(Shifted.Text),
