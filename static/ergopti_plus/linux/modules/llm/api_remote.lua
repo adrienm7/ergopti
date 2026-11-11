@@ -1141,7 +1141,16 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 	Logger.info(LOG, "Creating the Backboard assistant for this key.")
 	-- fail() logs the reason with the request it fails.
 	post_json(scope, epoch, creation.url, endpoint.headers, creation.body, function(detail, receipt)
-		fail("the Backboard assistant could not be created: " .. detail, receipt)
+		-- The creation's HTTP status stays first, as the request's own failure
+		-- reads, so llm.failure_class tells a refused key (never retried).
+		local status_prefix, rest = tostring(detail):match("^(HTTP %d%d%d)(.*)$")
+		if status_prefix then
+			local cause = rest:gsub("^:?%s*", "")
+			fail(status_prefix .. ": the Backboard assistant could not be created" .. (cause ~= "" and (": " .. cause) or ""),
+				receipt)
+		else
+			fail("the Backboard assistant could not be created: " .. detail, receipt)
+		end
 	end, function(root)
 		if authorized and not authorized() then return end
 		local assistant_id = Formats.backboard_assistant_id(root)
