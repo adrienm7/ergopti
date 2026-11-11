@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Palette Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Choisissez une source de disposition Ergopti (.toml) ou une disposition macOS (.keylayout).",
+	"layout_editor.pick_title": "Ouvrir une disposition",
 	"layout_editor.preserved_note": "Ce .keylayout est conservé exactement tel qu’importé, afin de pouvoir être exporté inchangé. Convertissez-le pour modifier ses touches.",
 	"layout_editor.preview.pending": "Touche morte {id} en attente de la touche suivante.",
 	"layout_editor.preview.placeholder": "Tapez ici avec votre clavier",

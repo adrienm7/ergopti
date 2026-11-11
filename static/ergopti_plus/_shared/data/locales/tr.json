@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode paleti",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Bir Ergopti düzen kaynağı (.toml) veya bir macOS düzeni (.keylayout) seçin.",
+	"layout_editor.pick_title": "Bir düzen aç",
 	"layout_editor.preserved_note": "Bu .keylayout tam olarak içe aktarıldığı gibi korunur, böylece değiştirilmeden dışa aktarılabilir. Tuşlarını düzenlemek için dönüştürün.",
 	"layout_editor.preview.pending": "{id} ölü tuşu bir sonraki tuşu bekliyor.",
 	"layout_editor.preview.placeholder": "Klavyenizle buraya yazın",

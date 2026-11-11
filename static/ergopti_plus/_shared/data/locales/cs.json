@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Paleta Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Vyberte zdroj rozložení Ergopti (.toml) nebo rozložení macOS (.keylayout).",
+	"layout_editor.pick_title": "Otevřít rozložení",
 	"layout_editor.preserved_note": "Tento .keylayout je zachován přesně tak, jak byl importován, aby jej bylo možné exportovat beze změn. Chcete-li upravit jeho klávesy, převeďte jej.",
 	"layout_editor.preview.pending": "Mrtvá klávesa {id} čeká na další klávesu.",
 	"layout_editor.preview.placeholder": "Pište sem na své klávesnici",

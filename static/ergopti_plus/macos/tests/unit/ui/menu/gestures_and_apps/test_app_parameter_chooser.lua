@@ -156,4 +156,22 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 		helpers.assert_nil(tostring(err):find("private native failure payload", 1, true), "native error details stay private")
 	end)
 
+	helpers.it("opens one layout source or .keylayout for the layout editor and reports native failure", function()
+		local Dialog = helpers.load_with_stubs("infra.dialog_util")
+		local script = Dialog.layout_source_picker_script("Choose a file", "Open a layout")
+		helpers.assert_true(script:find([[setAllowedFileTypes:{"toml", "keylayout"}]], 1, true) ~= nil, script)
+		helpers.assert_true(script:find("setCanChooseDirectories:false", 1, true) ~= nil, script)
+		helpers.assert_true(script:find("setAllowsMultipleSelection:false", 1, true) ~= nil, script)
+		local failing = helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function()
+			return false, nil, "private native failure payload"
+		end } })
+		local ok, err = pcall(failing.choose_layout_source, "Choose a file", "Open a layout")
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("the native open panel failed", 1, true) ~= nil)
+		local cancelled = helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function()
+			return true, nil, ""
+		end } })
+		helpers.assert_nil(cancelled.choose_layout_source("Choose a file", "Open a layout"), "a cancel opens nothing")
+	end)
+
 end)

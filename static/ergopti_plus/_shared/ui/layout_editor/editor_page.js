@@ -266,6 +266,16 @@ var LayoutEditorPage = (function () {
 			notify('ok', tl('status.opened', { name }));
 		}
 
+		/** Opens a file through the host's native panel (macOS), where the webview shows none. */
+		function pickWithHost() {
+			Promise.resolve(host.pickFile()).then(
+				(picked) => {
+					if (picked && typeof picked.text === 'string') openText(picked.filename, picked.text);
+				},
+				(error) => notify('error', problemText(error))
+			);
+		}
+
 		function readFile(input, onText) {
 			const file = input.files && input.files[0];
 			if (!file) return;
@@ -379,7 +389,7 @@ var LayoutEditorPage = (function () {
 					type: 'button',
 					id: 'le-open',
 					text: tl('btn.open'),
-					onclick: () => fileInput.click()
+					onclick: () => (host.pickFile ? pickWithHost() : fileInput.click())
 				}),
 				el('label', { class: 'le-inline' }, [
 					tl('import_convention'),

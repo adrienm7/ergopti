@@ -34,7 +34,8 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'composer_save',
 	'composer_remove',
 	'source_open',
-	'source_save'
+	'source_save',
+	'source_pick'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -444,6 +445,7 @@ window.initData = function (data) {
 	const editor = data.source_editor === true;
 	document.getElementById('btn-editor').hidden = !editor;
 	document.getElementById('btn-compose').hidden = editor;
+	_hostPicks = data.source_pick === true;
 	window.updateState(data.state);
 };
 
@@ -459,6 +461,9 @@ let _editor = null;
 let _pendingSave = null;
 let _pendingInstall = null;
 let _pendingSources = null;
+let _pendingPick = null;
+// Whether the host opens files in a native panel (macOS), from initData.
+let _hostPicks = false;
 
 /** Shows the editor or the layout list. */
 function showEditor(visible) {
@@ -539,6 +544,32 @@ function routeComposerResults() {
 	};
 }
 
+/** Opens a file in the host's native panel; settles on sourcePicked. */
+function hostPick() {
+	return new Promise(function (resolve, reject) {
+		if (_pendingPick) {
+			reject({ code: 'save_busy', path: 'source_pick' });
+			return;
+		}
+		_pendingPick = { resolve: resolve, reject: reject };
+		send('source_pick');
+	});
+}
+
+/**
+ * Called by the host with the picked file: { filename, text }, {} when the
+ * user cancelled, or { code, detail } when the host refused the file.
+ * @param {Object} data
+ */
+window.sourcePicked = function (data) {
+	const pending = _pendingPick;
+	_pendingPick = null;
+	if (!pending) return;
+	if (data && typeof data.code === 'string')
+		pending.reject({ code: data.code, path: data.detail || '' });
+	else pending.resolve(data && typeof data.text === 'string' ? data : null);
+};
+
 /**
  * Called by the host with the last saved source: { text, filename, folder }.
  * @param {Object} data
@@ -555,6 +586,7 @@ window.sourceData = function (data) {
 		saveFile: hostSave,
 		install: hostInstall,
 		loadSources: hostSources,
+		pickFile: _hostPicks ? hostPick : null,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,

@@ -125,6 +125,17 @@ helpers.describe("layout editor source store", function()
 		helpers.assert_true(#logs == 1)
 	end)
 
+	helpers.it("reads a picked file of any name within the type, size and UTF-8 bounds", function()
+		local files = { ["/u/My Layout.TOML"] = "a = 1\n", ["/u/x.sh"] = "x", ["/u/latin.keylayout"] = "caf\233" }
+		local read = function(path) return files[path] end
+		local picked = SourceStore.read_picked(settings(), "/u/My Layout.TOML", read)
+		helpers.assert_eq(picked.filename, "My Layout.TOML")
+		helpers.assert_eq(picked.text, "a = 1\n")
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/x.sh", read).code, SourceStore.FAILURE_INVALID)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/latin.keylayout", read).code, SourceStore.FAILURE_INVALID)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/missing.toml", read).code, SourceStore.FAILURE_INVALID)
+	end)
+
 	helpers.it("accepts multi-byte UTF-8 and refuses overlong forms", function()
 		helpers.assert_true(SourceStore.is_utf8("ffi🦆 ễ"))
 		helpers.assert_true(not SourceStore.is_utf8("\192\175"))
@@ -180,6 +191,28 @@ helpers.describe("layout manager bridge routes the layout editor", function()
 		helpers.assert_eq(pushes[2].name, "sourceResult")
 		helpers.assert_eq(pushes[2].payload.ok, true)
 		helpers.assert_eq(bridge.on_message({ action = "source_save", filename = "b.toml" }), false)
+	end)
+
+	helpers.it("picks files through the host only when it offers a native panel", function()
+		local bridge, pushes = controller(true)
+		helpers.assert_eq(bridge.on_message({ action = "source_pick" }), false, "the page picks files itself")
+		bridge.on_message({ action = "ready" })
+		helpers.assert_eq(pushes[1].payload.source_pick, false)
+		local picked = {}
+		local with_panel = ManagerBridge.new({
+			registry = { snapshot = function() return { installed = {} } end, refresh = function() end },
+			push = function(name, payload) picked[#picked + 1] = { name = name, payload = payload } end,
+			strings = function() return {} end,
+			log = function() end,
+			open_url = function() end,
+			close = function() end,
+			pick_source = function(on_done) on_done({ filename = "a.toml", text = "x" }) end,
+		})
+		helpers.assert_true(with_panel.on_message({ action = "source_pick" }))
+		helpers.assert_eq(picked[1].name, "sourcePicked")
+		helpers.assert_eq(picked[1].payload.filename, "a.toml")
+		with_panel.on_message({ action = "ready" })
+		helpers.assert_eq(picked[2].payload.source_pick, true)
 	end)
 
 	helpers.it("forwards both operations through the Linux bridge to its registry", function()

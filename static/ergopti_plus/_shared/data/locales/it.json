@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Tavolozza Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Scegli una sorgente di layout Ergopti (.toml) o un layout macOS (.keylayout).",
+	"layout_editor.pick_title": "Apri un layout",
 	"layout_editor.preserved_note": "Questo .keylayout è conservato esattamente come importato, così può essere esportato invariato. Convertilo per modificarne i tasti.",
 	"layout_editor.preview.pending": "Tasto morto {id} in attesa del tasto successivo.",
 	"layout_editor.preview.placeholder": "Digita qui con la tua tastiera",

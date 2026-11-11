@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode-palett",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Välj en Ergopti-layoutkälla (.toml) eller en macOS-layout (.keylayout).",
+	"layout_editor.pick_title": "Öppna en layout",
 	"layout_editor.preserved_note": "Denna .keylayout behålls exakt som den importerades, så den kan exporteras oförändrad. Konvertera den för att redigera dess tangenter.",
 	"layout_editor.preview.pending": "Död tangent {id} väntar på nästa tangent.",
 	"layout_editor.preview.placeholder": "Skriv här med ditt tangentbord",

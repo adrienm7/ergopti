@@ -127,6 +127,27 @@ function M.check(settings, payload)
 	return true, nil
 end
 
+--- Reads a file the user picked in a native panel for the editor to open.
+--- The name may be any the user chose; the type, size and encoding are bounded.
+--- @param settings table From M.settings.
+--- @param path string The chosen file.
+--- @param read function read(path) -> text|nil.
+--- @return table { filename, text } or { code, detail } when refused.
+function M.read_picked(settings, path, read)
+	local name = type(path) == "string" and path:match("([^/]+)$") or nil
+	local extension = name and name:match("%.([A-Za-z]+)$")
+	if not extension or not EXTENSIONS[extension:lower()] then
+		return { code = M.FAILURE_INVALID, detail = "the file type is not one the editor opens" }
+	end
+	local text = read(path)
+	if type(text) ~= "string" then return { code = M.FAILURE_INVALID, detail = "the file is unreadable" } end
+	if #text > settings.max_file_bytes then
+		return { code = M.FAILURE_INVALID, detail = "the file is larger than its bound" }
+	end
+	if not M.is_utf8(text) then return { code = M.FAILURE_INVALID, detail = "the file is not UTF-8 text" } end
+	return { filename = name, text = text }
+end
+
 --- Whether a saved file is a layout source the editor reopens.
 --- @param name string
 --- @return boolean

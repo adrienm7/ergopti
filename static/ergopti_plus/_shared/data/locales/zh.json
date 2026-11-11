@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode 字符面板",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "选择 Ergopti 布局源文件（.toml）或 macOS 布局（.keylayout）。",
+	"layout_editor.pick_title": "打开布局",
 	"layout_editor.preserved_note": "此 .keylayout 按导入时的原样保留，因此可以原样导出。要编辑其按键，请先转换。",
 	"layout_editor.preview.pending": "死键 {id} 正在等待下一个键。",
 	"layout_editor.preview.placeholder": "用你的键盘在此输入",

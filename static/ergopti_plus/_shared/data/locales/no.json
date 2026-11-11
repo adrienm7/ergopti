@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode-palett",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Velg en Ergopti-oppsettkilde (.toml) eller et macOS-oppsett (.keylayout).",
+	"layout_editor.pick_title": "Åpne et oppsett",
 	"layout_editor.preserved_note": "Denne .keylayout beholdes nøyaktig slik den ble importert, så den kan eksporteres uendret. Konverter den for å redigere tastene.",
 	"layout_editor.preview.pending": "Død tast {id} venter på neste tast.",
 	"layout_editor.preview.placeholder": "Skriv her med tastaturet ditt",

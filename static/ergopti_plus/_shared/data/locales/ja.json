@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Unicode パレット",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Ergopti 配列ソース（.toml）または macOS 配列（.keylayout）を選択してください。",
+	"layout_editor.pick_title": "配列を開く",
 	"layout_editor.preserved_note": "この .keylayout は読み込んだとおりに保持されているため、変更なしでエクスポートできます。キーを編集するには変換してください。",
 	"layout_editor.preview.pending": "デッドキー {id} が次のキーを待っています。",
 	"layout_editor.preview.placeholder": "キーボードでここに入力してください",

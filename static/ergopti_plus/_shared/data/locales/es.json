@@ -456,6 +456,8 @@
 	"layout_editor.palette.title": "Paleta Unicode",
 	"layout_editor.physical.ansi": "ANSI",
 	"layout_editor.physical.iso": "ISO",
+	"layout_editor.pick_message": "Elige una fuente de distribución Ergopti (.toml) o una distribución de macOS (.keylayout).",
+	"layout_editor.pick_title": "Abrir una distribución",
 	"layout_editor.preserved_note": "Este .keylayout se conserva tal como se importó, para poder exportarlo sin cambios. Conviértelo para editar sus teclas.",
 	"layout_editor.preview.pending": "Tecla muerta {id} a la espera de la siguiente tecla.",
 	"layout_editor.preview.placeholder": "Escribe aquí con tu teclado",
