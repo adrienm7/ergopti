@@ -954,6 +954,21 @@ _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 	return ""
 }
 
+; Words why a version classification refuses the file, shared by the migration
+; and the boot that refuses from its prepared classification.
+ConfigMigrateVersionRefusalDetail(Status, Version, Registry) {
+	switch Status {
+		case "newer":
+			return "the file declares schema v" . Version . ", newer than this build's v" . Registry["current"]
+		case "invalid":
+			return "[_meta] schema_version is not a positive integer"
+		case "unsupported":
+			return "no migration path from schema v" . Version
+				. ": the oldest this build migrates is v" . Registry["oldest"]
+	}
+	throw ValueError("'" . Status . "' is not a version refusal")
+}
+
 ; Migrates FilePath for the Windows driver. Returns Map("status", "read_only",
 ; "from", "to", "backup", "detail"); status is "absent", "current",
 ; "migrated", "newer", "invalid", "unsupported" or "failed", and only
@@ -1026,14 +1041,8 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 				try LoggerSuccess("ConfigMigrate", "'{1}' is at schema v{2}; nothing to migrate.",
 					FilePath, Registry["current"])
 				return Result
-			case "newer":
-				return Refuse("newer", "the file declares schema v" . Version
-					. ", newer than this build's v" . Registry["current"])
-			case "invalid":
-				return Refuse("invalid", "[_meta] schema_version is not a positive integer")
-			case "unsupported":
-				return Refuse("unsupported", "no migration path from schema v" . Version
-					. ": the oldest this build migrates is v" . Registry["oldest"])
+			case "newer", "invalid", "unsupported":
+				return Refuse(Outcome, ConfigMigrateVersionRefusalDetail(Outcome, Version, Registry))
 		}
 
 		ConfigMigrateClassify(Before, Registry, &LegacyVersion)
@@ -1648,6 +1657,15 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			Row.phase := "refused"
 			Detail := "the original native source classification remains refused for this session"
 			TOML_RefuseWrites(FilePath, Detail)
+			; The migration is never run on this source, so its refusal ERROR is
+			; logged here, as the macOS and Linux boots log theirs.
+			try {
+				Native.classify.Call(Native.decode.Call(Row.image.source), Row.registry_shadow, &RefusedVersion)
+				Reason := ConfigMigrateVersionRefusalDetail(Row.classification, RefusedVersion, Row.registry_shadow)
+			} catch as Err
+				Reason := "the prepared classification could not be read again: " . Err.Message
+			try LoggerError("ConfigMigrate", "Config migration of '{1}' refused ({2}): {3}. The file is "
+				. "left untouched and this session will not write it.", FilePath, Row.classification, Reason)
 			return PreserveVariantRefusal(Map("status", Row.classification, "read_only", 1, "from", "", "to", Row.registry_shadow["current"],
 				"backup", "", "detail", Detail))
 		}
