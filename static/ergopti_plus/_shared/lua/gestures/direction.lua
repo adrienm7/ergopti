@@ -108,6 +108,29 @@ function M.classify(dx, dy, minimum, diagonal_minimum)
 	return axis and M.name(axis, dx, dy) or nil
 end
 
+-- Unit vector of each direction's own axis. Both diagonals of one axis share
+-- it, so a swipe and its reversal are signed against the same vector.
+local INV_SQRT2 = 1 / math.sqrt(2)
+local AXIS_VECTORS = {
+	right = { 1, 0 }, left = { 1, 0 }, down = { 0, 1 }, up = { 0, 1 },
+	right_down = { INV_SQRT2, INV_SQRT2 }, left_up = { INV_SQRT2, INV_SQRT2 },
+	right_up = { INV_SQRT2, -INV_SQRT2 }, left_down = { INV_SQRT2, -INV_SQRT2 },
+}
+
+--- Signed travel of a displacement along a direction's own axis: its
+--- projection on that axis, positive rightward, downward, toward right_down or
+--- toward right_up. Signing a diagonal by dx + dy left the right_up/left_down
+--- axis to noise, since dx + dy is about zero along it.
+--- @param name string Direction name from M.name or M.classify.
+--- @param dx number Horizontal displacement, positive rightward.
+--- @param dy number Vertical displacement, positive downward.
+--- @return number travel
+function M.along(name, dx, dy)
+	local vector = AXIS_VECTORS[name]
+	assert(vector, "unknown swipe direction: " .. tostring(name))
+	return dx * vector[1] + dy * vector[2]
+end
+
 --- The configuration slot of a swipe.
 --- @param fingers number Finger count of the gesture.
 --- @param name string Direction name from M.name or M.classify.

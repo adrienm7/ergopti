@@ -72,15 +72,9 @@ function M.new(opts)
 		if opts.mode_of(answering) ~= "incremental" then return end
 		local step = opts.step_of(answering)
 
-		local horizontal = direction == "left" or direction == "right"
-		local vertical = direction == "up" or direction == "down"
-		local function along(dx, dy)
-			if horizontal then return dx end
-			if vertical then return dy end
-			-- A diagonal travels along its 45 degree axis, signed as the macOS
-			-- engine signs it.
-			return ((dx + dy > 0) and 1 or -1) * math.sqrt(dx * dx + dy * dy)
-		end
+		-- Travel along the direction's own axis, a diagonal's included (shared
+		-- with the macOS engine).
+		local function along(dx, dy) return Direction.along(direction, dx, dy) end
 
 		if state.sign and state.lx then
 			local back = along(x - state.lx, y - state.ly)
