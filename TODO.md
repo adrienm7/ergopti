@@ -1380,6 +1380,35 @@ between workers) green alone. All live checks pass, typed by the harness.
       kxkbrc the daemon disagrees with lists nothing; the middle field is read as the display label. A pause layout
       stored as `x(x)` on X11 before this no longer matches and is refused with its reason until chosen again.
 
+### Linux performance (2026-11-11, branch `claude/ergopti-todo-linux-perf`)
+
+Measured with `tools/bench/linux-session-bench.py` (real daemon, Xvfb session over the kernel model; report in
+`docs/audits/performance/linux/2026_11_11/report.md`). Budgets and the reuse rules below were decided by the
+coordinator on 2026-11-11, to review by the maintainer.
+
+- [x] Tray: the idle wait polls the GLib main context with the input sources (submenu re-open 26 → 3.5 ms, root
+      15–17 → 3–4 ms, every submenu's first open 300 → 116 ms).
+- [x] Typing an expansion: the per-press layout proof reuses the keymap text between XKB keymap notifications
+      (probe read 0.83 → 0.16 ms, about 1.1 → 0.45 ms per typed character).
+- [x] Boot: the second pre-grab layout resolve is skipped when the X11 source proves the first still current
+      (watchers stage 63 → 12 ms); Wayland and `--keymap` still resolve twice.
+- [x] First key: the shortcut assignments load on the loop's first idle tick, not inside the first key's dispatch.
+- [x] Instrumentation: millisecond log timestamps, a `load=` phase and `callbacks`/`watchers` stages in the boot
+      summary, the last counter interval at exit, paired `[Span]` DEBUG lines for `tray.fill`, `layout.switch`,
+      `config.reload`, `hotstring.expand` (macOS mirrors `hotstring.expand`), `input.latency` (kernel stamp to
+      forwarded write). `run_perf_budget_container.py` joins the container proofs.
+- [ ] Startup compile: 126 of about 180 ms before the boot clock is LuaJIT compiling 6.5 MB of source; a precompiled
+      bytecode package needs the maintainer's staleness decision (memory: project-linux-startup-cost-is-compilation).
+- [ ] Keystats boot stage: 60 ms (first boot 200 ms) waiting on the sqlite3 child's round trips, 6 ms of CPU.
+- [ ] The first layout resolve forks `xkbcomp` (about 30 ms) although the X11 probe can serialize the same keymap
+      in 0.6 ms; needs a proof that `infra/xkb_keymap` parses libxkbcommon's serialization.
+- [ ] The 20 ms pause between an expansion's erase and its text blocks the loop (`INTER_PHASE_DELAY_MS`); a timer
+      continuation would free the loop but changes the injector's transaction shape.
+- [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
+      `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
+      millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
+      `input.latency`; a `load` phase before `BootProfiler` starts; the last interval summary at exit.
+
 ## CI acceptance
 
 Each closes on a named green hosted or native run, recorded here.
