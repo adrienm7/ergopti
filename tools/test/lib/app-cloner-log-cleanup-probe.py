@@ -49,6 +49,11 @@ def retire_group(group, deadline):
             os.killpg(group, 0)
         except ProcessLookupError:
             return True
+        except PermissionError:
+            # XNU answers EPERM, not ESRCH, while the group's last members are
+            # zombies launchd has not reaped yet. Only a later ESRCH proves
+            # closure; a refusal lasting to the deadline stays unknown.
+            pass
         time.sleep(0.01)
     return False
 
