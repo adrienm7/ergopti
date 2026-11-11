@@ -349,6 +349,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source.cjs"],
 			"repro": "npm run test:layout-source"
+		},
+		{
+			"id": "layout-source-compiler",
+			"ordinal": 609,
+			"name": "layout source compiler round-trips the registry and generates bundle, XKB and KLC",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-source-compiler.cjs"],
+			"repro": "npm run test:layout-source-compiler"
 		}
 	]
 }
