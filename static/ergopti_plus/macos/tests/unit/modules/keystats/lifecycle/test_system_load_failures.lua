@@ -17,7 +17,7 @@ local function complete_sample(status, stdout)
 	local names = {
 		"infra.logger", "infra.timings", "adapters.task_lifecycle",
 		"adapters.timer_scheduler", "modules.keystats.log_manager",
-		"modules.keystats.watchers",
+		"modules.keystats.network_watcher", "modules.keystats.watchers",
 	}
 	local saved, saved_hs = {}, _G.hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -40,6 +40,10 @@ local function complete_sample(status, stdout)
 		log_system_event = function(kind, data)
 			fixture.events[#fixture.events + 1] = { kind = kind, data = data }
 		end,
+	}
+	-- The connectivity watcher shares the hardware lifecycle; its probes are not under test.
+	package.loaded["modules.keystats.network_watcher"] = {
+		start = function() return true end, stop = noop, tick = noop, is_running = function() return false end,
 	}
 	_G.hs = { timer = { absoluteTime = function() return 1000000000 end } }
 	local ok, err = xpcall(function()
