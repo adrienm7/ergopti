@@ -95,6 +95,19 @@ local_server_detection_max_age_ms = 30000
 # HS: api_token_crypto.lua OPERATION_TIMEOUT_SEC.
 keychain_operation_timeout_ms = 10000
 
+# Linux: the background move of a plaintext API key to the secret service
+# (decided by the maintainer on 2026-11-11: it never blocks the daemon). Probe:
+# deadline of the D-Bus read of the keyring's Locked property. Store: deadline
+# of one secret-tool store or clear, killed when it passes (a prompt nobody
+# answers). Retry: delay before the next attempt, doubled after each failure
+# other than a locked keyring up to retry_max (a locked keyring is probed again
+# after retry, since the probe never prompts).
+# LX: modules/llm/api_key_migration.lua.
+api_key_migration_probe_timeout_ms = 5000
+api_key_migration_store_timeout_ms = 20000
+api_key_migration_retry_ms = 60000
+api_key_migration_retry_max_ms = 1800000
+
 # Hard ceiling for dependency bootstrap installation and daemon polling.
 # AHK: ollama_deps_checker.ahk LLM_DEPS_POLL_TIMEOUT_MS.
 # HS: mlx_deps_checker.lua / ollama_deps_checker.lua BOOTSTRAP_TIMEOUT_SEC.

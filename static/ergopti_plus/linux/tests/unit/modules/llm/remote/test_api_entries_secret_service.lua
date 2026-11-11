@@ -123,14 +123,6 @@ helpers.describe("api_entries: keys live in the desktop secret service", functio
 		Fake.uninstall()
 	end)
 
-	helpers.it("the daemon migrates plaintext keys once at boot (linux-api-key-secret-service)", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
-		local source = fh:read("*a")
-		fh:close()
-		helpers.assert_true(source:find("pcall(entries.migrate_plaintext)", 1, true) ~= nil,
-			"the boot runs the migration, and a failure there never stops the boot")
-	end)
-
 	helpers.it("moves a plaintext key of an earlier build to the service once (linux-api-key-secret-service)", function()
 		local fake = Fake.install()
 		write_file(LEGACY)
@@ -148,6 +140,30 @@ helpers.describe("api_entries: keys live in the desktop secret service", functio
 		for index = calls + 1, #fake.calls do
 			helpers.assert_true(fake.calls[index]:match("^lookup ") ~= nil, "a second load stores nothing")
 		end
+		Fake.uninstall()
+	end)
+
+	helpers.it("publishes the references the background move stored, and refuses a changed entry (linux-api-key-background-migration)", function()
+		local fake = Fake.install()
+		write_file(LEGACY)
+		local entries = fresh(true)
+		local keys = entries.plaintext_keys()
+		helpers.assert_eq(#keys, 1)
+		helpers.assert_eq(keys[1].id, "cerebras-1")
+		local published, reason, uncertain = entries.publish_migrated({ ["cerebras-1"] = "secret-service:cerebras-1#a" },
+			{ ["cerebras-1"] = "csk-OTHERKEY" })
+		helpers.assert_eq(published, false, "a key that is not the entry's is never published")
+		helpers.assert_true(tostring(reason):find("changed", 1, true) ~= nil, tostring(reason))
+		helpers.assert_eq(uncertain, nil)
+		helpers.assert_eq(file_text(), LEGACY)
+		fake.items["cerebras-1#a"] = "csk-PLAINCANARY"
+		helpers.assert_eq(entries.publish_migrated({ ["cerebras-1"] = "secret-service:cerebras-1#a" },
+			{ ["cerebras-1"] = "csk-PLAINCANARY" }), true)
+		helpers.assert_eq(Fake.count(fake), 1, "the publication stores nothing itself")
+		helpers.assert_eq(stored().entries[1].token, "secret-service:cerebras-1#a")
+		helpers.assert_eq(file_text():find("PLAINCANARY", 1, true), nil)
+		helpers.assert_eq(#entries.plaintext_keys(), 0)
+		helpers.assert_eq(fresh(true).active().token, "csk-PLAINCANARY", "the reference reads back")
 		Fake.uninstall()
 	end)
 

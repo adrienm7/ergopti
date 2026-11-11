@@ -39,16 +39,16 @@ PIDS="$!"
 export DISPLAY=:58
 eval "$(dbus-launch --sh-syntax)"
 PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
-# The daemon moves the fixture's plaintext API key to the secret service at
-# boot. With a display and no unlocked keyring, gnome-keyring answers that
-# store with a prompt nobody here can dismiss, and the boot never reaches its
-# output keyboard. Where the service is installed, a throwaway login keyring
-# is unlocked first, as a desktop session does at login; its daemon leaves
-# with the bus.
-if command -v gnome-keyring-daemon >/dev/null 2>&1; then
-	KEYRING_DATA="$(mktemp -d)"
-	eval "$(printf '%s' 'ergopti-live' | XDG_DATA_HOME="${KEYRING_DATA}" gnome-keyring-daemon --unlock --components=secrets 2>/dev/null)"
-fi
+# The daemon moves the fixture's plaintext API key to the secret service in
+# the background. A locked keyring once held the boot before its output
+# keyboard opened: secret-tool store waited on a prompt nobody here can
+# dismiss (cbbf7766). The daemon below runs with a secret-tool that blocks the
+# same way (decided by the maintainer on 2026-11-11: that must never delay
+# input readiness); run_daemon_live.lua checks the daemon is ready meanwhile.
+SECRET_TOOL_SHIM="$(mktemp -d)"
+export ERGOPTI_LIVE_SECRET_TOOL_MARKER="${SECRET_TOOL_SHIM}/blocked"
+printf '#!/bin/sh\n: > "%s"\nexec sleep 600\n' "${ERGOPTI_LIVE_SECRET_TOOL_MARKER}" > "${SECRET_TOOL_SHIM}/secret-tool"
+chmod 700 "${SECRET_TOOL_SHIM}/secret-tool"
 "${BUS_LAUNCHER}" --launch-immediately >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
@@ -154,7 +154,7 @@ if ! kill -0 "${EDITOR_PID}" 2>/dev/null; then
 	kill ${PIDS} "${HOST}" 2>/dev/null
 	exit 2
 fi
-luajit tests/hardware/run_daemon_live.lua
+PATH="${SECRET_TOOL_SHIM}:${PATH}" luajit tests/hardware/run_daemon_live.lua
 TYPED=$?
 wait "${HOST}"
 TRAY=$?
