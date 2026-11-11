@@ -67,6 +67,8 @@ function M.start(opts)
 	Logger.start(LOG, "Starting window topology and capture-application presence…")
 	local ports = opts.ports or default_ports()
 	local function emit(kind, fields)
+		-- Windows' KL_AppendLog refuses every entry while the context is filtered.
+		if opts.private() then return end
 		local entry = { type = kind, app = opts.app() or "Unknown" }
 		for key, value in pairs(fields) do if key ~= "app" then entry[key] = value end end
 		opts.append(entry)

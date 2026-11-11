@@ -56,7 +56,7 @@ end
 -- ==============================
 
 --- Starts recording.
---- @param opts table { append fun(entry), app fun():string, ports table|nil }
+--- @param opts table { append fun(entry), app fun():string, private fun():boolean, ports table|nil }
 ---   ports { watch_reachability, probe_vpn, now_ms } default to adapters.network_info and the timer adapter.
 --- @return boolean started
 function M.start(opts)
@@ -64,8 +64,8 @@ function M.start(opts)
 		Logger.warn(LOG, "start() called while running — ignoring duplicate call.")
 		return false
 	end
-	assert(type(opts) == "table" and type(opts.append) == "function" and type(opts.app) == "function",
-		"the network watcher needs a recorder and an app")
+	assert(type(opts) == "table" and type(opts.append) == "function" and type(opts.app) == "function"
+		and type(opts.private) == "function", "the network watcher needs a recorder, an app and a privacy predicate")
 	Logger.start(LOG, "Starting connectivity transitions…")
 	local ports = opts.ports or default_ports()
 	local session = { reachability = "unknown" }
@@ -76,6 +76,8 @@ function M.start(opts)
 		record = function(kind, fields)
 			-- A tunnel read started before stop() answers into a closed session.
 			if _session ~= session then return end
+			-- Windows' KL_AppendLog refuses every entry while the context is filtered.
+			if opts.private() then return end
 			local entry = { type = kind, app = opts.app() or "Unknown" }
 			for _, key in ipairs(Transitions.KINDS[kind]) do entry[key] = fields[key] end
 			opts.append(entry)

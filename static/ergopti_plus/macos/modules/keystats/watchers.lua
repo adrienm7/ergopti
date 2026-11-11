@@ -53,6 +53,7 @@ local SYSTEM_LOAD_POLL_INTERVAL_MS = Timings.ms("keystats", "system_load_poll_ms
 local CONTEXT_REFRESH_DELAY_SEC = 0.05
 
 -- Injected shared state and the pause predicate, both wired in M.init().
+local PrivacyContext = require("modules.keystats.privacy_context")
 local _state     = nil
 local _is_paused = nil
 
@@ -858,18 +859,22 @@ function M.init_hardware_watchers()
 	end
 
 	_hardware_watchers_enabled = true
+	-- The whole privacy context (private window, secure field, system-auth
+	-- prompt, disabled app, metrics pause), as every other keystats sink.
+	local function logging_refused() return not PrivacyContext.allows_logging(_state) end
 	if not TopologyWatcher.is_running() then
 		TopologyWatcher.start({
 			-- Late-bound: the log manager owns its own initialisation.
 			append = function(entry) return LogManager.append_log(entry) end,
 			app = function() return _state.session_app_name end,
-			private = function() return _state.is_private_window == true end,
+			private = logging_refused,
 		})
 	end
 	if not NetworkWatcher.is_running() then
 		local started, reason = xpcall(NetworkWatcher.start, debug.traceback, {
 			append = function(entry) return LogManager.append_log(entry) end,
 			app = function() return _state.session_app_name end,
+			private = logging_refused,
 		})
 		if not started then Logger.error(LOG, "Connectivity transitions did not start: %s.", tostring(reason)) end
 	end
