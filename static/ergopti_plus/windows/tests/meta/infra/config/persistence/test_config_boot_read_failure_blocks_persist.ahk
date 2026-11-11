@@ -283,13 +283,18 @@ _CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal := false) {
 		AssertEqual(0, _ConfigFullSaveCoordinator().requested_generation)
 		AssertFalse(_ConfigFullSaveHasPending())
 		_ConfigBootReadFailed := true
+		; The caught state is the verdict: an Error with an empty message is still
+		; a throw, and a message sentinel alone accepted it.
+		Caught  := false
 		Threw   := ""
 		Refused := ""
 		try Refused := SaveFullConfig()
-		catch as e
-			Threw := e.Message
+		catch as e {
+			Caught := true
+			Threw := Type(e) . ": " . e.Message
+		}
 		After := FileRead(Target, "UTF-8")
-		Assert(Threw == "",
+		Assert(!Caught,
 			"SaveFullConfig must DECLINE cleanly, not throw: it runs from a boot timer where an exception is invisible. Got: " . Threw)
 		Assert(Refused == false,
 			"SaveFullConfig must return false when it refuses, so the refusal is distinguishable from the !_DriverReady deferral (which returns nothing) and from a save that ran")
