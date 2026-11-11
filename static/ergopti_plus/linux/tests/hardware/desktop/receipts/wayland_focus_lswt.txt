@@ -1,10 +1,10 @@
 # Wayland focus through the foreign-toplevel listing, container proof (2026-11-10)
 
-Command: TMPDIR=/tmp bash static/ergopti_plus/linux/tests/desktop/run_wayland_sessions.sh
+Command: TMPDIR=/tmp bash static/ergopti_plus/linux/tests/hardware/desktop/run_wayland_sessions.sh
 Base: origin/dev 1d5fe5941e. Ubuntu 24.04.5 container, root, headless, no /dev/dri.
 Compositors: labwc 0.7.1 (headless, zwlr_foreign_toplevel_manager_v1 version 3) with two
 foot 1.16.2 windows; KWin 5.27.11 --virtual; GNOME Shell 46.0 headless.
-SUBSTITUTE: `lswt` on the PATH is tests/desktop/foreign_toplevel_probe.c, which prints
+SUBSTITUTE: `lswt` on the PATH is tests/hardware/desktop/foreign_toplevel_probe.c, which prints
 lswt 2.x's JSON shape from the compositor's own protocol events (the activated flag
 is labwc's answer) and asks labwc to activate a window. lswt is not packaged by
 Ubuntu 24.04 and git.sr.ht is refused by the container proxy (403).

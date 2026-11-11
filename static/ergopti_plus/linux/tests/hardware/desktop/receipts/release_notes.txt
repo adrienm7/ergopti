@@ -1,5 +1,5 @@
 Update-check release notes pane (PAR-52), container proof (2026-11-10)
-Command: bash tests/desktop/run_release_notes.sh   (exit 0)
+Command: bash tests/hardware/desktop/run_release_notes.sh   (exit 0)
 Host: Ubuntu 24.04 container, Xvfb; openbox 3.6.1 and GNOME Shell 46.0 Wayland (nested);
 GTK 3.24.41, WebKit2GTK 4.1 2.52.6, LuaJIT 2.1.
 Path: ui/update_check/bridge.lua open() over modules/updater/manager.lua check_for_updates

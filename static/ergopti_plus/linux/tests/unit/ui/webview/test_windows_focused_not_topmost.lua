@@ -11,7 +11,7 @@
 --- to keep it above (set_keep_above, a floating type hint, stick). On Wayland
 --- a re-open maps the window anew before present(): a mapped window's
 --- present() without an activation token left a covered page covered on
---- GNOME Shell (tests/desktop/run_window_toggle.sh).
+--- GNOME Shell (tests/hardware/desktop/run_window_toggle.sh).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

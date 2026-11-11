@@ -1,4 +1,4 @@
---- tests/desktop/run_wayland_desktop_changes.lua
+--- tests/hardware/desktop/run_wayland_desktop_changes.lua
 
 --- ==============================================================================
 --- MODULE: Wayland Desktop Changes Against A Real Compositor

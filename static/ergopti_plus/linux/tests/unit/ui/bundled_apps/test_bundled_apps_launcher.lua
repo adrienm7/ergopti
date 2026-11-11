@@ -53,7 +53,7 @@ helpers.describe("Linux bundled apps launcher", function()
 
 	-- The daemon keeps its module paths in package.path and exports no
 	-- LUA_PATH: a tray-started app without them could not load a module
-	-- (tests/desktop/run_encryptor.sh found Encryptor dead on a launch.sh run).
+	-- (tests/hardware/desktop/run_encryptor.sh found Encryptor dead on a launch.sh run).
 	helpers.it("bundled apps: the tray's child gets the daemon's module paths and runtime", function()
 		local deps, state = fake_deps()
 		helpers.assert_true(Apps.launch(Apps.APPS[2], deps))

@@ -1,5 +1,5 @@
 Window-toggle actions, container proof (2026-11-10)
-Command: bash tests/desktop/run_window_toggle.sh   (exit 0)
+Command: bash tests/hardware/desktop/run_window_toggle.sh   (exit 0)
 Host: Ubuntu 24.04 container, Xvfb; GNOME Shell 46.0 (--nested --wayland --no-x11,
 overview closed), openbox 3.6.1, xfwm4 4.18; GTK 3.24.41, WebKit2GTK 4.1 2.52.6, LuaJIT 2.1.
 Path: modules/gestures/manager.lua execute_action -> ui/webview_manager.lua toggle(),

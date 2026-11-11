@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# static/ergopti_plus/linux/tests/desktop/run_update_restart_watcher.sh
+# static/ergopti_plus/linux/tests/hardware/desktop/run_update_restart_watcher.sh
 #
 # The update restart watcher of modules/updater/restarter.lua, end to end, under
 # a REAL systemd user manager and from a terminal (the detached relay). Each
@@ -31,8 +31,8 @@
 # Exit 0 = every scenario passed; 1 = a failure; 2 = no environment.
 
 set -u
-DRIVER="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 2
-SELF="${DRIVER}/tests/desktop/run_update_restart_watcher.sh"
+DRIVER="$(cd "$(dirname "$0")/../../.." && pwd -P)" || exit 2
+SELF="${DRIVER}/tests/hardware/desktop/run_update_restart_watcher.sh"
 MANAGER=/usr/lib/systemd/systemd
 UNIT=ergopti-hotstrings.service
 need() {
@@ -84,7 +84,7 @@ make_tree() {
 			cd '${DRIVER}' || exit 1
 			LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 			export LUA_PATH
-			exec luajit tests/desktop/update_watch_daemon.lua '${name}' '${ROOT}' '${RUNS}' '${LOG}' '${kind}'
+			exec luajit tests/hardware/desktop/update_watch_daemon.lua '${name}' '${ROOT}' '${RUNS}' '${LOG}' '${kind}'
 		LAUNCHER
 	fi
 	chmod +x "${dir}/bin/ergopti"

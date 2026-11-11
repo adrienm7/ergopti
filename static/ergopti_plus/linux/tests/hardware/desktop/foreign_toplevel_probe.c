@@ -1,4 +1,4 @@
-/* tests/desktop/foreign_toplevel_probe.c
+/* tests/hardware/desktop/foreign_toplevel_probe.c
  *
  * A private wlr-foreign-toplevel-management client standing in for lswt 2.x,
  * which Ubuntu 24.04 does not package. `-j` prints the listing in lswt 2.x's

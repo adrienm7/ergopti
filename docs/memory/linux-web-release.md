@@ -44,7 +44,7 @@ and client before they report: the call then read as refused although the job
 ran, which disarmed the update watcher (seen about one run in five under a real
 user manager). Those calls carry `OWN_UNIT_JOB_PREFIX` (`trap '' TERM;`).
 Action: any new command that stops or restarts the daemon's own unit takes the
-prefix. `tests/desktop/run_update_restart_watcher.sh` runs a real
+prefix. `tests/hardware/desktop/run_update_restart_watcher.sh` runs a real
 `systemd --user` in a container by mounting a tmpfs on `/run/systemd` and
 creating `system/` there (sd_booted) in a private mount namespace.
 
