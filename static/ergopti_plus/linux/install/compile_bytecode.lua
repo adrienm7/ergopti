@@ -31,14 +31,14 @@ if resolved == nil then refuse("root_unresolved") end
 local root = ffi.string(resolved)
 ffi.C.free(resolved)
 
-local package_owner = loadfile(root .. "/linux/infra/bytecode_package.lua")
-if not package_owner then refuse("owner_missing") end
-local BytecodePackage = package_owner()
 
 -- The tree's own shared helpers, through the tree's own roots.
 package.path = root .. "/linux/?.lua;" .. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;"
 	.. package.path
 local quote = require("text_utils").shell_quote
+local package_owner = loadfile(root .. "/linux/infra/bytecode_package.lua")
+if not package_owner then refuse("owner_missing") end
+local BytecodePackage = package_owner()
 
 -- One sha256sum run hashes every source; NUL-separated names never meet a
 -- shell. LuaJIT does not report a pipe's exit status, so the pipeline prints it.
