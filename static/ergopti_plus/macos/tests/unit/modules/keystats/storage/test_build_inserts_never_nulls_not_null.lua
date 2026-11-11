@@ -42,6 +42,7 @@ local EVENT_TYPES = {
 	"clipboard_copy", "clipboard_paste", "paste_burst",
 	"window_move", "window_resize", "window_state_change", "monitor_focus_change",
 	"screen_recording_start", "screen_recording_end",
+	"internet_up", "internet_down", "vpn_connected", "vpn_disconnected",
 }
 
 -- Timestamp shape the builders slice for the denormalised `date` column.
