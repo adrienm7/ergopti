@@ -300,7 +300,8 @@ function oldestVersion() {
 }
 
 /**
- * The HKCU touchpad values, so a check that clicks Restore proves it left them alone.
+ * The machine's HKCU touchpad values, read only: an isolated driver must never
+ * change them (on 2026-11-11 a Gestures Clear all reset them to the factory values).
  * @returns {string}
  */
 function touchpadRegistry() {
@@ -310,6 +311,53 @@ function touchpadRegistry() {
 		{ encoding: 'utf8', windowsHide: true }
 	);
 	return out.stdout || '';
+}
+
+/**
+ * The private touchpad key an isolated driver writes instead of the machine's
+ * (TouchpadRegistryPrivatePath in modules/gestures/touchpad_registry.ahk).
+ * @param {object} session The session.
+ * @returns {Map<string, number>|null} name => DWORD, or null when the driver wrote none.
+ */
+function privateTouchpadKey(session) {
+	const file = path.join(session.root, 'touchpad_registry_private.txt');
+	if (!fs.existsSync(file)) return null;
+	const lines = fs.readFileSync(file, 'utf8').replace(/^﻿/, '').split('\n').filter(Boolean);
+	if (lines[0] !== 'ergopti-touchpad-private-key 1')
+		throw new Error(`${file} does not start with the private key header`);
+	return new Map(
+		lines.slice(2).map((line) => {
+			const [name, , value] = line.split(' ');
+			return [name, Number(value)];
+		})
+	);
+}
+
+/**
+ * The Windows factory touchpad values, which a Clear all writes without a backup.
+ * @returns {Map<string, number>}
+ */
+function touchpadFactoryDefaults() {
+	const { buildContract, SOURCE } = require('../codegen/codegen-touchpad-registry.cjs');
+	const contract = buildContract(require('smol-toml').parse(fs.readFileSync(SOURCE, 'utf8')));
+	return new Map(contract.factoryDefaults.map((entry) => [entry.name, entry.value]));
+}
+
+/**
+ * Says how a private touchpad key differs from the factory values, or '' when it holds them.
+ * @param {Map<string, number>|null} key privateTouchpadKey().
+ * @param {string} after What the driver had just done.
+ * @returns {string}
+ */
+function touchpadFactoryProblem(key, after) {
+	if (!key) return `${after} wrote no private touchpad key`;
+	const factory = touchpadFactoryDefaults();
+	const wrong = [...new Set([...factory.keys(), ...key.keys()])].filter(
+		(name) => key.get(name) !== factory.get(name)
+	);
+	return wrong.length > 0
+		? `${after} left the private touchpad key off its factory values: ${wrong.join(', ')}`
+		: '';
 }
 
 // What Clear all and Restore recommended must leave alone in every category.
@@ -1209,6 +1257,13 @@ const CHECKS = [
 					problems
 				);
 				pid = r2.pid;
+				if (name === 'Gestures') {
+					// A fresh profile has no backup: the clear wrote the factory values to
+					// the private key. Removed, so the global clear must write them again.
+					const problem = touchpadFactoryProblem(privateTouchpadKey(session), 'the Gestures Clear');
+					if (problem) problems.push(problem);
+					fs.rmSync(path.join(session.root, 'touchpad_registry_private.txt'), { force: true });
+				}
 				// A restore never turns the AI preview back on: that consent is the
 				// user's (restore_exclude, pinned by test_config_scope_manifest.ahk).
 				const drift = live
@@ -1249,6 +1304,11 @@ const CHECKS = [
 				problems
 			);
 			report.push(`global ${allClear.changed}/${allRestore.changed}`);
+			const touchpadProblem = touchpadFactoryProblem(
+				privateTouchpadKey(session),
+				'the global Clear'
+			);
+			if (touchpadProblem) problems.push(touchpadProblem);
 			if (allClear.changed === 0 || allRestore.changed === 0)
 				problems.push('the global Clear or Restore changed nothing');
 			const now = configBytes(session, 'hotstrings/personal_hotstrings.toml');
@@ -1257,8 +1317,13 @@ const CHECKS = [
 			await session.restart();
 			if (!configBytes(session, 'autohotkey/config.toml').equals(settledConfig))
 				problems.push('a restart rewrote the configuration');
+			// The outcome is judged on the private key above; this only catches a leak.
 			if (touchpadRegistry() !== registryBefore)
-				problems.push('the touchpad registry values changed');
+				problems.push("the isolated driver changed the machine's touchpad registry values");
+			if (
+				session.logLines('Isolated profile: the touchpad values go to the private key').length === 0
+			)
+				problems.push('the driver never said its touchpad writes went to the private key');
 			const errors = session.loggedErrors();
 			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
 			if (problems.length > 0) return fail(problems.join('; '));
