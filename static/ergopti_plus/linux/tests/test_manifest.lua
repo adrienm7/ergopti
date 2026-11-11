@@ -731,6 +731,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_entries",
 	"tests.unit.modules.llm.remote.test_api_entries_retired_provider",
 	"tests.unit.modules.llm.remote.test_api_entries_secret_service",
+	"tests.unit.modules.llm.remote.test_api_key_migration",
 	"tests.unit.modules.llm.remote.test_local_server_auth_policy",
 	"tests.unit.modules.llm.remote.test_local_server_ports",
 	"tests.unit.modules.llm.remote.test_local_server_fingerprint",

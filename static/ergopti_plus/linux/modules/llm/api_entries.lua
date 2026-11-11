@@ -22,10 +22,12 @@
 ---    whole, never written in plaintext. A changed key gets a new revision and
 ---    the old one is deleted only once the file names the new one, so a failed
 ---    save never leaves the file naming a key it did not publish.
---- 6. A key an earlier build wrote in plaintext is moved to the service by
----    migrate_plaintext(), which the daemon runs once at boot, or by the next
----    save. A load alone never rewrites the file. Without a service the key
----    stays as it was, and the migration logs why.
+--- 6. A key an earlier build wrote in plaintext is moved to the service in the
+---    background by modules/llm/api_key_migration.lua, which the daemon starts
+---    after boot and which retries until the keyring is unlocked, or by the
+---    next save (migrate_plaintext() is that synchronous move). A load alone
+---    never rewrites the file. Until a move succeeds the key stays as it was,
+---    and the migration logs why.
 --- 4. `label` stays required, so this file still loads in the builds before
 ---    2026-10; it holds the automatic name the tray writes and no build after
 ---    them reads it: every tray names an entry after its provider and model.
@@ -332,8 +334,11 @@ end
 --- @param admit function|nil Exact live runtime admission.
 --- @param publication table|nil Private reservation and rename acknowledgement.
 --- @param quiet boolean|nil Defers logging until tentative RAM is restored.
+--- @param prestored table|nil Entry id to { reference, token } the background
+---   migration already stored; those keys are not stored again, and a failed
+---   publication leaves their deletion to the migration.
 --- @return boolean
-local function persist(admit, publication, quiet)
+local function persist(admit, publication, quiet, prestored)
 	local current = state()
 	-- The reason belongs to this attempt only: a caller reads it right after.
 	current.store_refusal = nil
@@ -357,6 +362,8 @@ local function persist(admit, publication, quiet)
 			held[entry.id] = false
 		elseif secret and secret.token == entry.token then
 			held[entry.id] = secret
+		elseif prestored and prestored[entry.id] and prestored[entry.id].token == entry.token then
+			held[entry.id] = prestored[entry.id]
 		else
 			local reference, reason = TokenStore.store(entry.id, entry.token)
 			if not reference then store_refusal = reason; break end
@@ -444,6 +451,48 @@ function M.migrate_plaintext()
 	Logger.error(LOG, "%d API key(s) stay in plaintext in '%s' until a desktop secret service is available.",
 		count, M.path())
 	return false
+end
+
+--- The keys an earlier build wrote in plaintext, for the background
+--- migration (modules/llm/api_key_migration.lua) to store asynchronously.
+--- @return table keys List of { id, token }, in the user's order.
+function M.plaintext_keys()
+	local current = state()
+	local keys = {}
+	if current.plaintext == 0 then return keys end
+	for _, entry in ipairs(current.entries) do
+		if entry.token ~= "" and not current.secrets[entry.id] then
+			keys[#keys + 1] = { id = entry.id, token = entry.token }
+		end
+	end
+	return keys
+end
+
+--- Publishes the file with the references the background migration stored,
+--- without calling the secret service. Refused when an entry changed since
+--- those keys were read, or a key is still missing: the caller deletes what
+--- it stored and tries again.
+--- @param stored table Entry id to reference, one per plaintext_keys() row.
+--- @param tokens table Entry id to the key stored under that reference.
+--- @return boolean published, string|nil reason
+--- @return boolean uncertain True when an unacknowledged rename may have
+---   published the references: the caller must then keep their keys.
+function M.publish_migrated(stored, tokens)
+	local current = state()
+	if current.plaintext == 0 then return false, "no plaintext key is left to move" end
+	if current.publishing then return false, "API entries are already publishing" end
+	local prestored = {}
+	for _, entry in ipairs(current.entries) do
+		if entry.token ~= "" and not current.secrets[entry.id] then
+			local reference = stored[entry.id]
+			if type(reference) ~= "string" or tokens[entry.id] ~= entry.token then
+				return false, "entry '" .. entry.id .. "' changed while its key was being moved"
+			end
+			prestored[entry.id] = { reference = reference, token = entry.token }
+		end
+	end
+	if persist(nil, nil, false, prestored) then return true end
+	return false, current.store_refusal or "the API entries file could not be published", current.publishing == true
 end
 
 --- Why the last save was refused by the secret service, or nil.
