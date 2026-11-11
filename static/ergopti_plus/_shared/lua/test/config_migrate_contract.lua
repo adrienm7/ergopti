@@ -455,6 +455,23 @@ local function register_boot(h, driver)
 			end)
 		end)
 
+		-- Every boot of an up-to-date file built a migration plan (a decode and a
+		-- record scan of the whole file) only to replace its outcome.
+		h.it("boots a current stamped file without building a migration plan", function()
+			local current = "[_meta]\nschema_version = 3\n\n[gestures]\nspace_wrap = false\n"
+			with_config(current, function(path)
+				local plan, plans = Engine.plan, 0
+				Engine.plan = function(...) plans = plans + 1; return plan(...) end
+				local ok, result = pcall(Engine.run, { path = path, driver = driver,
+					registry = registry_from(squashed), stamp = STAMP, logger = (recording_logger()) })
+				Engine.plan = plan
+				h.assert_true(ok, tostring(result))
+				h.assert_eq(result.status, "current", tostring(result.detail))
+				h.assert_eq(plans, 0, "a current document needs no plan")
+				h.assert_eq(read_bytes(path), current, "nothing was written")
+			end)
+		end)
+
 		h.it("still refuses a stamped old file while no stamp is current", function()
 			local plan = Engine.plan("[_meta]\nschema_version = 1\n", registry_from(squashed), driver)
 			h.assert_eq(plan.outcome, "unsupported")
