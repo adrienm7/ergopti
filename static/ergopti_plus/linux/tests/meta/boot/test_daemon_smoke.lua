@@ -909,7 +909,11 @@ for _, result in ipairs({ true, false }) do
     local notices = {}
     local env = setmetatable({
       BootProfiler = { stage = function() end, stage_done = function() end },
-      keystats = { init = function() return result end },
+      keystats = { init = function(opts)
+        helpers.assert_type(opts.defer, "function", "the background tasks wait for the event loop")
+        return result
+      end },
+      event_loop = { defer = function() return true end },
       RuntimeGuard = { optional_require = function() return { get = function(key) return key end } end },
       notifier = { send = function(message, opts) notices[#notices + 1] = { message, opts.level }; return true end },
     }, { __index = _G })

@@ -79,6 +79,8 @@ local function load_fixture(options)
 	local defaults = make_defaults()
 	-- The engine reads its enable switch from these defaults when it loads.
 	if options.llm_enabled == false then defaults.llm_enabled = false end
+	-- Token-by-token rows of every prediction slot, as the streaming menu sets.
+	if options.streaming_multi == true then defaults.llm_streaming_multi = true end
 	local core = {
 		DEFAULT_STATE = defaults,
 		get_current_model = function() return "test-model" end,

@@ -2377,6 +2377,11 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					do_next()
 				end,
 				function(failure)
+					-- The handler shows a stream's rows until told otherwise: withdraw
+					-- the failed one, or Tab types it while the retry runs (AIM-001).
+					if variant_partial then
+						ApiCommon.protected_call(on_partial, "on_partial", false, stream_identity)
+					end
 					-- A refused key is refused again: neither a retry nor another variant.
 					if ApiCommon.is_authentication_failure(failure) then
 						Logger.warn(LOG, "[%s] Variant %d/%d stopped: the credential was refused (no retry).",

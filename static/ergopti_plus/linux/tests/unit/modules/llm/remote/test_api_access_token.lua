@@ -174,6 +174,7 @@ helpers.describe("Access-token providers: the key is exchanged, never sent", fun
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			local endpoint, reason = remote.endpoint(ENTRY, ENTRY.model)
 			helpers.assert_nil(endpoint)
+			-- The request carries the exchange's status first (access_failure).
 			helpers.assert_eq(reason,
 				"HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found")
 			helpers.assert_eq(#calls, 1, "no second exchange at once")

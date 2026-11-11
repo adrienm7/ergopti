@@ -159,13 +159,16 @@ local function scenario(options, body)
 			RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false }, Logger = logger,
 			input_capture_gate = gate, MagicKeySource = { on_key = function() return false end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
-			wrap_on_type = { on_key = function() return false end }, consume_bound_chord = function() return false end,
+			wrap_on_type = { on_key = function() return false end, end_selection_window = function() return true end },
+			consume_bound_chord = options.consume_bound_chord or function() return false end,
 			keyboard_shortcuts = { collision_identity = keyboard_identity, chord_name = function() return nil end,
 				dispatch = function()
 					if options.restart_prediction then return prediction.trigger_now() end
 					return false
 				end },
 		}, { __index = _G })
+		-- Main requires the emulation per key; a case may stand in for it.
+		if options.emulation then package.loaded["modules.keymap.layout_emulation"] = options.emulation end
 		local callbacks = main_callbacks(environment)
 		local overlay = { show = function(rows)
 			state.offers = rows; state.overlay_showing = #rows > 0; return true
@@ -408,6 +411,39 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 			helpers.assert_true(s.control("1", 2))
 			helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.text, "hello" .. RESPONSE)
 			helpers.assert_eq(s.outputs, 1); helpers.assert_eq(s.prediction.has_suggestions(), false)
+		end)
+	end)
+
+	-- The layout emulation types every key it maps in the key's place. It once
+	-- ran first, so an emulated digit never reached the shown offer and a bound
+	-- keyboard slot never fired: Windows runs the slot first and macOS lets the
+	-- digit accept (ILL-001, ILL-002, emulation-consume-order).
+	local function emulating_everything(calls)
+		return { on_key = function(detail) calls[#calls + 1] = detail.key; return true end }
+	end
+
+	helpers.it("lets the validation digit accept the offer under the layout emulation (emulation-consume-order)", function()
+		local emulated = {}
+		scenario({ emulation = emulating_everything(emulated) }, function(s)
+			s.type("hello"); s.scheduler.test.advance(.5); s.respond(1, RESPONSE)
+			helpers.assert_true(s.control("1", 2), "the digit is the offer's")
+			helpers.assert_eq(s.text, "hello" .. RESPONSE)
+			helpers.assert_eq(emulated, {}, "the emulation never typed the digit")
+		end)
+	end)
+
+	helpers.it("fires a bound keyboard slot before the layout emulation (emulation-consume-order)", function()
+		local emulated, bound = {}, {}
+		local function consume_bound_chord(detail)
+			if detail.key == "u" and detail.mods.ctrl then bound[#bound + 1] = detail.key; return true end
+			return false
+		end
+		scenario({ emulation = emulating_everything(emulated), consume_bound_chord = consume_bound_chord }, function(s)
+			helpers.assert_eq(s.callbacks.consume({ code = 22, key = "u", mods = { ctrl = true } }), true)
+			helpers.assert_eq(bound, { "u" }, "the slot ran")
+			helpers.assert_eq(emulated, {}, "and the emulation never saw its chord")
+			helpers.assert_eq(s.callbacks.consume({ code = 30, key = "a", mods = {} }), true)
+			helpers.assert_eq(emulated, { "a" }, "an unbound key is still emulated")
 		end)
 	end)
 
@@ -677,7 +713,7 @@ do
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
 			local injector = put("modules.hotstrings.injector", {
 			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,
-			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes,
+			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes, set_erase_pacing = yes,
 			  inject = function(deletes, text, _, _, publication)
 			    assert(publication.current() and publication.cached(), "real Main must admit original field")
 			    state.output = state.output + 1

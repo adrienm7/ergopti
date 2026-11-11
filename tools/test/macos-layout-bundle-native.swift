@@ -61,8 +61,9 @@ func installedSource(_ identifier: String, _ name: String) -> (TISInputSource, S
 	return nil
 }
 
-/// Types one sequence of presses, carrying the dead-key state between them.
-func type(_ data: CFData, _ presses: [Press]) -> String {
+/// Types one sequence of presses, carrying the dead-key state between them. The
+/// keyboard type is 0, the one the compiled `<layout first="0" last="0">` names.
+func type(_ data: CFData, _ presses: [Press], keyboardType: UInt32 = 0) -> String {
 	guard let bytes = CFDataGetBytePtr(data) else { return "<no layout bytes>" }
 	return bytes.withMemoryRebound(to: UCKeyboardLayout.self, capacity: 1) { layout in
 		var deadKeyState: UInt32 = 0
@@ -72,7 +73,7 @@ func type(_ data: CFData, _ presses: [Press]) -> String {
 			var units = [UniChar](repeating: 0, count: 16)
 			let status = UCKeyTranslate(
 				layout, press.code, UInt16(kUCKeyActionDown), press.modifiers,
-				UInt32(LMGetKbdType()), 0, &deadKeyState, units.count, &length, &units)
+				keyboardType, 0, &deadKeyState, units.count, &length, &units)
 			if status != noErr { return "<UCKeyTranslate \(status)>" }
 			typed += String(utf16CodeUnits: units, count: length)
 		}
@@ -103,14 +104,17 @@ for (identifier, name) in zip(plan.sources, plan.names) {
 		continue
 	}
 	let (source, matched) = found
-	let icon = property(source, kTISPropertyIconImageURL) as? URL
+	// A keyboard layout's icon comes as an IconRef; an image URL only for some sources.
+	let iconURL = property(source, kTISPropertyIconImageURL) as? URL
+	let iconRef = TISGetInputSourceProperty(source, kTISPropertyIconRef)
+	let icon: String? = iconURL?.lastPathComponent ?? (iconRef != nil ? "IconRef" : nil)
 	let data = property(source, kTISPropertyUnicodeKeyLayoutData)
 	sources.append([
 		"id": identifier,
 		"listed_id": (property(source, kTISPropertyInputSourceID) as? String) ?? "",
 		"matched_by": matched,
 		"name": (property(source, kTISPropertyLocalizedName) as? String) ?? "",
-		"icon": icon?.lastPathComponent ?? "",
+		"icon": icon ?? "",
 		"layout_bytes": data.map { CFDataGetLength(($0 as! CFData)) } ?? 0,
 	])
 	if icon == nil { failures.append("\(identifier) has no icon") }
@@ -135,6 +139,19 @@ for vector in plan.vectors {
 		failures.append("\(vector.variant) \(vector.name): typed \(typed.debugDescription), expected \(vector.expected.debugDescription)")
 	}
 }
+// Diagnostics, not assertions: the two keys Apple numbers apart, typed with the
+// runner's own keyboard type and with the ANSI, ISO and JIS ones.
+var byType: [String: [String: String]] = [:]
+for (identifier, data) in layouts {
+	var row: [String: String] = [:]
+	for kbdType in [UInt32(LMGetKbdType()), 0, 40, 41, 42] {
+		for code: UInt16 in [10, 50] {
+			row["type \(kbdType) code \(code)"] = type(data, [Press(code: code, modifiers: 0)], keyboardType: kbdType)
+		}
+	}
+	byType[identifier] = row
+}
+receipt["iso_ansi_keys_by_keyboard_type"] = byType
 receipt["vectors"] = plan.vectors.count
 receipt["typed"] = typedCount
 receipt["keyboard_type"] = Int(LMGetKbdType())

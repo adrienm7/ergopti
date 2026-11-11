@@ -842,7 +842,15 @@ function M.init(opts)
 		migration_ok, migrated = pcall(SqliteWriter.ensure_awake_definition, _device_id, Calendar.capture().date)
 	end
 	local sqlite_ready = migration_ok and migrated == true
-	if sqlite_ready and identity then LedgerSetup.start(identity, options.metrics_dir) end
+	-- The ledger exporter and the at-rest text migration gate no recording:
+	-- the daemon runs them on its loop's first idle tick (options.defer), off
+	-- the boot path, since each sqlite3 query is a process of its own (about
+	-- 4 ms). Without a defer port (tests, tools) they run at the end of init.
+	local after_admission = {}
+	if sqlite_ready and identity then
+		local metrics_dir = options.metrics_dir
+		after_admission[#after_admission + 1] = function() LedgerSetup.start(identity, metrics_dir) end
+	end
 	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
 	_storage_blocked = not sqlite_ready and not sqlite_unavailable
 	if sqlite_ready then
@@ -901,9 +909,11 @@ function M.init(opts)
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
 	if sqlite_available() then
-		TextMigration.resume(
-			_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
-			_device_id)
+		local mode = _encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT
+		local device = _device_id
+		after_admission[#after_admission + 1] = function()
+			if sqlite_available() then TextMigration.resume(mode, device) end
+		end
 	end
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
@@ -934,6 +944,13 @@ function M.init(opts)
 
 	Logger.success(LOG, "Keystats initialised (log_dir=%s, password_apps=%d).",
 		_log_dir, #_password_apps)
+	-- A later init or a stop between now and the deferred tick retires these.
+	local generation = _flush_generation
+	local function run_after_admission()
+		if generation ~= _flush_generation or not _sqlite_admitted then return end
+		for _, task in ipairs(after_admission) do task() end
+	end
+	if type(options.defer) == "function" then options.defer(run_after_admission) else run_after_admission() end
 	return not _storage_blocked
 end
 

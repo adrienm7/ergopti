@@ -230,9 +230,11 @@ helpers.describe("Backboard: an assistant per key, then one message per request"
 			remote.chat(BACKBOARD, nil, MESSAGES, {}, nil, function(_, err) err1 = err end)
 			calls[1].callback({ ok = false, status = 401, body = "", error_body = '{"message":"Invalid API key"}' })
 			helpers.assert_eq(#calls, 1, "no message without an assistant")
-			helpers.assert_true(err1:find("HTTP 401: Invalid API key", 1, true) ~= nil, err1)
-			-- The provider's own text may echo the key: the log withholds it.
-			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: details withheld."), 1)
+			-- The creation's status stays first: a refused key is never retried.
+			helpers.assert_true(err1:find("HTTP 401: the Backboard assistant could not be created: Invalid API key", 1, true)
+				~= nil, err1)
+			-- The provider's own text may echo the key: the log names the status only.
+			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: HTTP 401."), 1)
 			for _, line in ipairs(logs) do
 				helpers.assert_true(not line.text:find("Invalid API key", 1, true), "never the backend text: " .. line.text)
 			end

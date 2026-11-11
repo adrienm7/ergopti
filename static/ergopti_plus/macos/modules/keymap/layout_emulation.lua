@@ -363,7 +363,11 @@ function M.key_down(e, key_code)
 	end
 	if decision == Emulation.SHORTCUT then
 		local target = _deps.keycode_for_char(text)
-		if type(target) == "number" then e:setKeyCode(target) end
+		-- The release goes out on the key code the press went out on (key_up).
+		if type(target) == "number" then
+			e:setKeyCode(target)
+			if target ~= key_code then _rewritten[key_code] = target end
+		end
 		if next(_virtual) ~= nil then e:setFlags(flags) end
 		return false
 	end
@@ -401,6 +405,26 @@ local function shared_json(rel, lossless)
 	return _json_cache[rel]
 end
 
+-- The US positions of the shortcut characters, by their mac_keycodes.json name.
+local US_KEY_NAMES = { ["."] = "Period", [","] = "Comma", ["/"] = "Slash", [";"] = "Semicolon" }
+
+--- The key code a character has on the US layout, where macOS resolves a
+--- Command shortcut when the input source has no key for it (a non-Latin
+--- source): letters, digits and the usual marks; nil for any other.
+--- @param char string One character.
+--- @param keycodes table mac_keycodes.json.
+--- @return integer|nil key_code
+function M.us_keycode(char, keycodes)
+	local name = US_KEY_NAMES[char]
+	if not name and char:match("^%a$") then name = "Key" .. char:upper() end
+	if not name and char:match("^%d$") then name = "Digit" .. char end
+	if not name then return nil end
+	for _, key in ipairs(keycodes.keys) do
+		if key.code == name and type(key.mac) == "number" then return key.mac end
+	end
+	return nil
+end
+
 --- Initializes the module with the driver's collaborators and loads the layout.
 --- @param ports table { is_paused, magic_code }
 --- @return boolean ok M.reload's answer.
@@ -429,7 +453,10 @@ function M.start(ports)
 		keyboard_type = Geometry.event_type,
 		physical_code = Geometry.physical_code,
 		-- The key the selected input source types a character with.
-		keycode_for_char = function(char) return hs.keycodes.map[char] end,
+		-- On the US position when the source has none (a non-Latin source).
+		keycode_for_char = function(char)
+			return hs.keycodes.map[char] or M.us_keycode(char, shared_json("modules/layouts/mac_keycodes.json", false))
+		end,
 		magic_code = ports.magic_code,
 		is_active = function() return not ports.is_paused() end,
 		autorepeat = function(e)

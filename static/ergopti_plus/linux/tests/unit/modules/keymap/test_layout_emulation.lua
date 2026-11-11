@@ -115,6 +115,42 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not press(M, KEY_F1, { ctrl = true }), "a key outside the layout passes")
 	end)
 
+	-- A chord of two modifiers sends the key of the layout's character, as a
+	-- single-modifier chord does, the held modifiers kept (ILD-1, decided by the
+	-- maintainer on 2026-11-11: the logical key everywhere; two-modifier-chord).
+	helpers.it("sends the layout's key for a chord of two modifiers (two-modifier-chord)", function()
+		local sent = {}
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true }, {
+			emit_shortcut = function(char, _, mods)
+				local names = {}
+				for name, held in pairs(mods) do if held then names[#names + 1] = name end end
+				table.sort(names)
+				sent[#sent + 1] = char .. ":" .. table.concat(names, "+")
+				return true
+			end,
+		})
+		M.reload()
+		helpers.assert_true(press(M, KEY_Q, { ctrl = true, shift = true }), "Ctrl+Shift+key is replaced")
+		helpers.assert_true(press(M, KEY_Q, { ctrl = true, alt = true }), "Ctrl+Alt+key is replaced")
+		helpers.assert_eq(sent, { "z:ctrl+shift", "z:alt+ctrl" }, "Ergopti's z with the held modifiers")
+	end)
+
+	-- AHK's ^SCxxx hotkeys fire on every auto-repeat and macOS rewrites each
+	-- repeated key-down; Linux consumed the chord with no repeat callback, so
+	-- the hook swallowed every repeat: holding Ctrl+z undid once (ILL-004,
+	-- emulation-shortcut-repeat).
+	helpers.it("repeats an emulated chord while its key is held (emulation-shortcut-repeat)", function()
+		local M, record = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		M.reload()
+		local consumed, repeat_callback = M.on_key({ code = KEY_Q, mods = { ctrl = true }, char = "q" })
+		helpers.assert_true(consumed, "the chord is the emulation's")
+		helpers.assert_type(repeat_callback, "function", "and so are its repeats")
+		helpers.assert_true(repeat_callback({ code = KEY_Q, mods = { ctrl = true }, char = "q" }), "a repeat presses it again")
+		helpers.assert_eq(record.shortcuts, { "z", "z" })
+		helpers.assert_true(not repeat_callback({ code = KEY_D, mods = { ctrl = true }, char = "d" }),
+			"another key's repeat is not its own")
+	end)
+
 	helpers.it("lets the physical magic key, a pause and a failed typing through", function()
 		local M, record = fixture({ emulated_layout = "ergopti_plus", ergopti_base = true })
 		M.reload()

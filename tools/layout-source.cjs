@@ -190,6 +190,21 @@ function main(args) {
 		});
 		return;
 	}
+	// What the editor's « Install and use » sends the ErgoptiPlus composer host
+	// (LayoutSourceIO.installPayload): the source, its .keylayout and emulation table.
+	if (command === 'install-payload' && values.length === 3) {
+		const [input, platform, output] = values;
+		if (platform !== 'macos' && platform !== 'linux')
+			throw new Error('install-payload: the platform is macos or linux');
+		const document = source.read(readText(input));
+		const payload = {
+			source: source.write(document),
+			keylayout: source.targetKeylayout(document, platform).text,
+			emulation: JSON.stringify(source.compileEmulation(document, { platform }))
+		};
+		fs.writeFileSync(output, `${JSON.stringify(payload)}\n`, { encoding: 'utf8', flag: 'wx' });
+		return;
+	}
 	if (command === 'export-keylayout' && values.length === 2) {
 		const [input, output] = values;
 		const xml = source.exportKeylayout(source.read(readText(input)));
@@ -219,7 +234,7 @@ function main(args) {
 		return;
 	}
 	throw new Error(
-		'Usage: layout-source.cjs import <id> <iso|ansi> <input.keylayout> <output.toml> | import-structured <id> <iso|ansi> <input.keylayout> <output.toml> | export-macos <source.toml> <new-output-directory> [bundle|iso|ansi] | export-all <source.toml> <new-output-directory> | export-emulation <source.toml> <output.json> | validate <source.toml> | report <source.toml> | export-keylayout <source.toml> <output.keylayout> | export-xkb <source.toml> <new-output-directory> | export-klc <source.toml> <new-output-directory>'
+		'Usage: layout-source.cjs import <id> <iso|ansi> <input.keylayout> <output.toml> | import-structured <id> <iso|ansi> <input.keylayout> <output.toml> | export-macos <source.toml> <new-output-directory> [bundle|iso|ansi] | export-all <source.toml> <new-output-directory> | export-emulation <source.toml> <output.json> | install-payload <source.toml> <macos|linux> <output.json> | validate <source.toml> | report <source.toml> | export-keylayout <source.toml> <output.keylayout> | export-xkb <source.toml> <new-output-directory> | export-klc <source.toml> <new-output-directory>'
 	);
 }
 
