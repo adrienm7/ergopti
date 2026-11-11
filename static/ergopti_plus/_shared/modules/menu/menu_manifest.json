@@ -2411,6 +2411,17 @@
 			"i18n": "menu.layout.manage"
 		},
 		{
+			"type": "command",
+			"id": "layout_editor",
+			"i18n": "menu.layout.edit",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.layout_editor_host_pending_on_windows"
+		},
+		{
 			"type": "list",
 			"id": "layout_bundle",
 			"status_rows": {

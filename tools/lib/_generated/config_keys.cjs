@@ -426,6 +426,7 @@ module.exports = Object.freeze({
 		KEY_COMBINATIONS_TOGGLE: "key_combinations_toggle",
 		KEY_COMBINATION_CLEAR: "key_combination_clear",
 		KEY_HISTORY: "key_history",
+		LAYOUT_EDITOR: "layout_editor",
 		LAYOUT_ENABLE_VARIANT: "layout_enable_variant",
 		LAYOUT_INSTALL: "layout_install",
 		LAYOUT_MANAGER: "layout_manager",
