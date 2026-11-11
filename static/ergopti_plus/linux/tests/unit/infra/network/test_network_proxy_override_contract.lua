@@ -67,8 +67,28 @@ helpers.it("proxy edit refuses a source changed during staged publication", func
                 end,
             }
         end
+        -- The adapter stages through libuv wherever it loads (CFL-003): the
+        -- intervening write lands at that staging file's close the same way.
+        local has_uv, uv = pcall(require, "luv")
+        local uv_open, uv_close, staged_fd = has_uv and uv.fs_open, has_uv and uv.fs_close, nil
+        if has_uv then
+            uv.fs_open = function(name, mode, permissions)
+                local fd, err = uv_open(name, mode, permissions)
+                if name == path .. ".tmp" and mode == "wx" then staged_fd = fd end
+                return fd, err
+            end
+            uv.fs_close = function(fd)
+                local closed, err = uv_close(fd)
+                if fd == staged_fd then
+                    write(path, '{"network.proxy_override":"http://external.invalid:8080","other":2}')
+                    replaced = true
+                end
+                return closed, err
+            end
+        end
         local ok, result = pcall(storage.commit_string_edit, receipt, "http://dialog.invalid:8080")
         io.open = original
+        if has_uv then uv.fs_open, uv.fs_close = uv_open, uv_close end
         helpers.assert_true(ok); helpers.assert_true(replaced); helpers.assert_eq(result, false)
         helpers.assert_eq(read_file(path), '{"network.proxy_override":"http://external.invalid:8080","other":2}')
     end)
