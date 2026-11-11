@@ -1,5 +1,5 @@
 [_meta]
-schema_version = 20
+schema_version = 21
 
 [shortcuts.keyboard]
 primary_a = "copy"

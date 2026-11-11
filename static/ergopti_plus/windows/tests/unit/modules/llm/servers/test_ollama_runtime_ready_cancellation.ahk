@@ -15,7 +15,9 @@ class _ORRC_Fixture {
 		this.ClockCalls := 0
 		this.TimerCalls := 0
 		this.TimerResult := false
-		this.TimerFailure := ""
+		; The caught state is the verdict: an Error with an empty message is still
+		; a failed cancellation, and the message alone read it as none.
+		this.TimerFailed := false, this.TimerFailure := ""
 		this.TimerRecordRetired := false
 		this.CancelTimer := ObjBindMethod(this, "Cancel")
 		this.Runtime.Owner.Options["clock"] := ObjBindMethod(this, "Clock")
@@ -56,7 +58,8 @@ class _ORRC_Fixture {
 			this.TimerResult := this.Bootstrap.Flow.Cancel()
 			this.TimerRecordRetired := !(this.Runtime.Owner.Record is Map)
 		} catch as Err {
-			this.TimerFailure := Err.Message
+			this.TimerFailed := true
+			this.TimerFailure := Type(Err) . ": " . Err.Message
 		}
 	}
 	Close() {
@@ -79,14 +82,16 @@ _ORRC_TimerCancellation(Phase) {
 	try {
 		F.Start()
 		Critical("Off")
-		Failure := "", Result := "unreturned"
+		Escaped := false, Failure := "", Result := "unreturned"
 		try Result := F.Runtime.Owner.ObserveReady()
-		catch as Err
-			Failure := Err.Message
-		AssertEqual("", F.TimerFailure, "the real cancellation callback must complete normally")
+		catch as Err {
+			Escaped := true
+			Failure := Type(Err) . ": " . Err.Message
+		}
+		AssertFalse(F.TimerFailed, "the real cancellation callback must complete normally: " . F.TimerFailure)
 		AssertEqual(1, F.TimerCalls, "the cancellation must occur in a real timer thread")
 		AssertTrue(F.TimerResult && F.TimerRecordRetired, "strict physical retirement precedes readiness continuation")
-		AssertEqual("", Failure, "retirement during the clock must not dereference a retired task or record")
+		AssertFalse(Escaped, "retirement during the clock must not dereference a retired task or record: " . Failure)
 		AssertFalse(Result, "cancelled readiness must be refused after the scheduler boundary")
 		AssertTrue(F.Bootstrap.Flow.Cancelled)
 		AssertFalse(F.Bootstrap.Flow.ServerReady, "cancelled readiness cannot publish server metadata")

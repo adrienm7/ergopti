@@ -268,6 +268,30 @@ _LiveConfirm(Seen, Hwnd) {
 }
 
 /**
+ * Clicks a row that must open a message box of this process, reports its
+ * caption and every text it shows, and presses its first button. No dialog is
+ * an error. Arguments: the caption pattern, then the row's path.
+ */
+LiveCmdClickReadDialog(Args) {
+	Pattern := Args[1]
+	Path := Args.Clone()
+	Path.RemoveAt(1)
+	Row := LiveRowByPath(Path)
+	Seen := {Title: "", Text: ""}
+	State := LiveDriveWindow(() => LiveDialogMatching(Pattern), _LiveReadDialog.Bind(Seen), 15000)
+	LiveClickRow(Row)
+	LiveAwaitDrive(State, "the dialog of '" . Row.Caption . "'")
+	LivePump(300)
+	return "title=" . LiveOneLine(Seen.Title) . " text=" . LiveOneLine(Seen.Text)
+}
+
+_LiveReadDialog(Seen, Hwnd) {
+	Seen.Title := WinGetTitle("ahk_id " . Hwnd)
+	Seen.Text := WinGetText("ahk_id " . Hwnd)
+	LiveClickDialogButton("Button1", Hwnd)
+}
+
+/**
  * Opens the unused-settings window and the API endpoint dialog for real and
  * reports the caption the operating system holds for each.
  */
@@ -352,6 +376,29 @@ LiveCmdEditSelect(Args) {
 LiveCmdHotstringBuffer(Args) {
 	global HSE_Buffer
 	return "buffer=" . HSE_Buffer
+}
+
+/**
+ * What the hotstring preview offers for the text typed so far, as JSON: the
+ * engine buffer, the rows the preview computes now (one per completion key, the
+ * end character and the magic key) and the rows the bubble last painted.
+ */
+LiveCmdPreviewState(Args) {
+	global HSE_Buffer, _PrefixVisibleFireDecisions
+	Computed := ""
+	for Candidate in _PrefixCollectCandidates()
+		Computed .= (Computed == "" ? "" : ",") . _LivePreviewRow(Candidate.Completion, Candidate.Output)
+	Visible := ""
+	for Decision in _PrefixVisibleFireDecisions
+		Visible .= (Visible == "" ? "" : ",") . _LivePreviewRow(
+			Decision.HasOwnProp("Completion") ? Decision.Completion : "", _PrefixDecisionDisplayText(Decision))
+	return '{"buffer":' . JsonStringLiteral(HSE_Buffer) . ',"computed":[' . Computed
+		. '],"visible":[' . Visible . ']}'
+}
+
+_LivePreviewRow(Completion, Output) {
+	return '{"completion":' . JsonStringLiteral(String(Completion)) . ',"output":'
+		. JsonStringLiteral(String(Output)) . '}'
 }
 
 /** Turns CapsWord on or off as its trigger does, and reports whether it is on. */
@@ -666,6 +713,21 @@ LiveCmdLayoutRow(Args) {
 	return Text
 }
 
+/**
+ * What keys type at the base level on the foreground layout, from the system's
+ * own table: the expectation for a key the driver leaves to the system.
+ * Arguments: the scan codes in hexadecimal. A dead key is reported as "dead".
+ */
+LiveCmdForegroundChars(Args) {
+	Hkl := GetForegroundKeyboardLayout()
+	Text := ""
+	for Code in Args {
+		Char := _LiveLayoutChar(Integer("0x" . Code), false, Hkl, &Dead)
+		Text .= (A_Index > 1 ? " " : "") . (Dead ? "dead" : Char == "" ? "none" : Char)
+	}
+	return "hkl=" . Format("{:X}", Hkl) . " chars=" . Text
+}
+
 /** The delay a hotstring family resolves to. Arguments: the category, the section ("" for none). */
 LiveCmdHotstringDelay(Args) {
 	Resolved := HotstringsResolve(Args[1], Args.Length >= 2 ? Args[2] : "")
@@ -698,6 +760,7 @@ LiveRegister("add_delimiter", LiveCmdAddDelimiter)
 LiveRegister("keyboard_layouts", LiveCmdKeyboardLayouts)
 LiveRegister("edit_layout", LiveCmdEditLayout)
 LiveRegister("layout_row", LiveCmdLayoutRow)
+LiveRegister("foreground_chars", LiveCmdForegroundChars)
 LiveRegister("hold_log_flush", LiveCmdHoldLogFlush)
 LiveRegister("info", LiveCmdInfo)
 LiveRegister("tree", LiveCmdTree)
@@ -706,6 +769,7 @@ LiveRegister("click", LiveCmdClick)
 LiveRegister("rowinfo", LiveCmdRowInfo)
 LiveRegister("click_repeat", LiveCmdClickRepeat)
 LiveRegister("click_confirming", LiveCmdClickConfirming)
+LiveRegister("click_read_dialog", LiveCmdClickReadDialog)
 LiveRegister("reload_request_during_reload", LiveCmdReloadRequestDuringReload)
 LiveRegister("pump", LiveCmdPump)
 LiveRegister("answer_inputbox", LiveCmdAnswerInputBox)
@@ -716,6 +780,7 @@ LiveRegister("edit_clear", LiveCmdEditClear)
 LiveRegister("edit_select", LiveCmdEditSelect)
 LiveRegister("hse_buffer", LiveCmdHotstringBuffer)
 LiveRegister("hse_reset", LiveCmdHotstringReset)
+LiveRegister("preview_state", LiveCmdPreviewState)
 LiveRegister("capsword_toggle", LiveCmdCapsWordToggle)
 LiveRegister("capsword_state", LiveCmdCapsWordState)
 LiveRegister("edit_close", LiveCmdEditClose)

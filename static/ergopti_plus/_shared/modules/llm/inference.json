@@ -22,6 +22,11 @@
 		"retry_extra_tokens": 5
 	},
 
+	"token_exchange": {
+		"_comment": "Longest message a refusing token service may carry into a refusal, in UTF-8 bytes: enough for an OAuth or IAM sentence, never a whole error page (AID-2, 2026-11-11). The Lua twin keeps the same number as api_token_exchange.MAX_SERVICE_MESSAGE_BYTES.",
+		"max_service_message_bytes": 200
+	},
+
 	"profile_recommendation": {
 		"_comment": "Model capability thresholds used to choose the shared raw/basic/advanced/batch_advanced prompt profile. Effective MoE parameters (active, then total) are measured in billions.",
 		"advanced_min_parameters_b": 2,

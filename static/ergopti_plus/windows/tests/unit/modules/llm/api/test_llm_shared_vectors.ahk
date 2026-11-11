@@ -120,7 +120,7 @@ _LSV_Register() {
 		Test("llm shared vectors: cost " . Vector["id"], _LSV_Cost.Bind(Vector, Usage["model_prices"]))
 	Test("llm shared vectors: the price table admits finite nonnegative rows only", _LSV_PriceAdmission)
 	Auth := _LSV_AuthCorpus()
-	if Auth["vectors"].Length != 16
+	if Auth["vectors"].Length != 20
 		throw Error("The authentication failure corpus requires explicit review.")
 	for Vector in Auth["vectors"]
 		Test("llm shared vectors: authentication failure " . Vector["name"], _LSV_AuthFailure.Bind(Vector))

@@ -533,6 +533,54 @@ _HSDT_ParameterFrameCaptionAuthority() {
 Test("hotstrings parameter frames: every caption field is current and malformed maps refuse",
 	_HSDT_ParameterFrameCaptionAuthority)
 
+_HSDT_MarkerRows(Id, *) {
+	return [Map("label", Id)]
+}
+
+; Replays one corpus frame order through the real template: each list row is a
+; marker naming its provider, so the result spells the order Windows draws. A
+; declared group draws its own translated caption instead.
+_HSDT_ReplayFrameOrder(Section, Orders, Expected) {
+	Providers := Map()
+	for _, Ids in Orders
+		for Id in Ids
+			if Id != "separator"
+				Providers[Id] := _HSDT_MarkerRows.Bind(Id)
+	Rows := MenuRenderer_TemplateRows(Section, Map(), Map(), Providers)
+	AssertTrue(Rows is Array, Section . ": the real template accepts every corpus provider")
+	AssertEqual(Expected.Length, Rows.Length, Section . ": Windows draws the corpus rows only")
+	for Index, Id in Expected {
+		Item := Id == "separator" ? false : _MR_FindItemById(Section, Id)
+		Want := Item is Map && _MR_Get(Item, "type") == "group" ? t(Item["i18n"]) : Id
+		AssertEqual(Want, Rows[Index].Get("separator", false) ? "separator" : Rows[Index]["label"],
+			Section . ": row " . Index)
+	}
+}
+
+; The shared corpus orders the delay and preview frames per driver, lists the
+; word-expander frame, the delay caption keys and the three parent captions.
+_HSDT_ParameterFramesCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\hotstrings_parameter_frames.json"))
+	_HSDT_ReplayFrameOrder("hotstrings_delays_frame", Corpus["delays"], Corpus["delays"]["ahk"])
+	_HSDT_ReplayFrameOrder("hotstrings_preview_frame", Corpus["preview"], Corpus["preview"]["ahk"])
+	_HSDT_ReplayFrameOrder("hotstrings_word_expander_frame", Map("all", Corpus["word"]), Corpus["word"])
+	Captions := _HS_ParameterDelayCaptions()
+	AssertTrue(Captions is Map, "the real delay caption reader accepts the shared map")
+	AssertEqual(Corpus["captions"].Count, Captions.Count, "one caption key per corpus delay")
+	for Field, Key in Corpus["captions"]
+		AssertEqual(Key, Captions[Field], "the " . Field . " delay caption key")
+	for Kind, Key in Corpus["parents"] {
+		Section := "hotstrings_" . Kind . "_parent"
+		Rows := MenuRenderer_TemplateRows(Section, Map(), Map("parameter_parent_ready", (*) => true),
+			Map("parameter_" . Kind . "_children", [Map("label", "child")]))
+		AssertTrue(Rows is Array && Rows.Length == 1, Section . ": the real parent template returns one row")
+		AssertEqual(t(Key), Rows[1]["label"], Section . ": the corpus parent caption")
+	}
+}
+Test("hotstrings parameter frames: Windows draws the corpus orders and parent captions (hotstrings-parameter-frames)",
+	_HSDT_ParameterFramesCorpus)
+
 _HSDT_ParameterFrameNativeMenuContract() {
 	Root := _MR_GetManifestRoot()
 	Saved := _HSDT_SaveState()

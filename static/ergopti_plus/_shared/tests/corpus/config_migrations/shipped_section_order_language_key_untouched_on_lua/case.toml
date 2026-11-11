@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_section_order_language_key_untouched_on_lua/case.toml
+
+[case]
+description = "macOS and Linux always keyed a language category by its group id: their neutral order is not copied and the file only moves its stamp."
+drivers = ["hs", "linux"]
+outcome = "migrated"
+from_version = 20
+to_version = 21

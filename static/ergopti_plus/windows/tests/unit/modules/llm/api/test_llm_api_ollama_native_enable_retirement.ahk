@@ -33,8 +33,10 @@ _OllamaNativeEnable_ObserveRead(State, Self, Args*) {
 			State["locked_path"] := Args[3]
 		} catch OSError as Err {
 			; The main test must report a failed observation instead of hiding
-			; an exception in an asynchronous native timer callback.
-			State["read_error"] := Err.Message
+			; an exception in an asynchronous native timer callback. The caught
+			; state is the verdict: an OSError with an empty message still failed.
+			State["read_failed"] := true
+			State["read_error"] := Type(Err) . ": " . Err.Message
 		}
 	} else
 		Self.DefineProp("Call", {Call: _OllamaNativeEnable_ObserveRead.Bind(State)})
@@ -62,7 +64,7 @@ _OllamaNativeEnable_Body(Status, Counter, CancelDuringDebt, State) {
 	ReadyPath := Directory . "\port.txt", TranscriptPath := Directory . "\receipt.jsonl"
 	PeerOwner := 0, ProcessOwner := 0
 	NativeState := Map("launches", 0, "native_owner", 0, "counter", Counter,
-		"lock", 0, "locked_path", "", "read_error", "")
+		"lock", 0, "locked_path", "", "read_failed", false, "read_error", "")
 	RunFn := _LLM_CurlArtifactRun
 	HadRunCall := RunFn.HasOwnProp("Call")
 	SavedRunCall := HadRunCall ? RunFn.GetOwnPropDesc("Call") : 0
@@ -108,10 +110,10 @@ _OllamaNativeEnable_Body(Status, Counter, CancelDuringDebt, State) {
 		AssertEqual(0, State["probes"], "the old fixture probe cannot synthesize transport or callback delivery")
 		if CancelDuringDebt {
 			Started := A_TickCount
-			while !_OllamaNativeEnable_LockedDebt(NativeState["locked_path"]) && NativeState["read_error"] == ""
+			while !_OllamaNativeEnable_LockedDebt(NativeState["locked_path"]) && !NativeState["read_failed"]
 					&& TickElapsed(Started) < 10000
 				Sleep(10)
-			AssertEqual("", NativeState["read_error"], "the genuine native lock observation must succeed")
+			AssertFalse(NativeState["read_failed"], "the genuine native lock observation must succeed: " . NativeState["read_error"])
 			AssertTrue(IsObject(NativeState["lock"]), "the actual private response must remain exclusively open")
 			AssertTrue(_OllamaNativeEnable_LockedDebt(NativeState["locked_path"]),
 				"real native deletion refusal must retain the exact locked artifact in canonical cleanup debt")

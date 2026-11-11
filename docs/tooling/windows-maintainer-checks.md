@@ -91,6 +91,13 @@ single-owner mutex.
 | `quit-refused-during-write`             | Quit during a configuration write                             | `test_quit_admission.ahk`                                               |
 | `ai-agent-unavailable-row`              | AI agent submenu composed-menu qualification (121, 123, 137)  | `test_llm_agent.ahk`                                                    |
 | `autocorrection-family-alone`           | Each common autocorrection family alone (104, 105)            | `test_hotstrings_cache.ahk`, `test_corpus_hotstring_family_samples.ahk` |
+| `hotstring-section-order`               | Hotstring section order: move, restart, reset, a stale menu   | `test_hotstring_dynamic_menu_scope.ahk`, `section_order_vectors.json`   |
+| `layout-emulation-row`                  | Layout emulation row: the list, the tick, None, a missing id  | `test_layout_manager_host.ahk`                                          |
+| `gestures-info-row`                     | Tray > Gestures: one « Infos… » row that opens the dialog     | `test_gesture_menu_status.ahk`                                          |
+| `hotstring-preview-boundaries`          | Hotstring preview boundaries: punctuation, delimiter, ★       | `preview-word-opening`, `boundary-cache`                                |
+| `asa-space-fast`                        | `asa` then Space fast, 20 times                               | `test_text_carrier_avoids_held_key.lua` (macOS)                         |
+| `personal-priority-and-left`            | Personal `sru` at priority 100; a hotstring with `{left}`     | `final_result_vectors.json`                                             |
+| `cascade-fb-item-50`                    | Item 50: `fb` at 1, 2 and 3 arrows, consumed and not          | `cascade_vectors.json`, `test_hotstring_cascade.ahk`                    |
 
 ## What stays manual
 

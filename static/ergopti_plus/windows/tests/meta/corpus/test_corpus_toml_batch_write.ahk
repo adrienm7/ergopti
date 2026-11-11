@@ -60,7 +60,9 @@ _CTBW_TypedCorpus() {
 ; Returns "" when the writer agrees with the vector, else the first difference.
 _CTBW_Difference(Vector, Typed) {
 	Expect := Vector["expect"]
-	Refused := ""
+	; The caught state is the verdict: an Error with an empty message is still a
+	; refusal, and a message sentinel read it as an accepted batch.
+	Refused := false, Refusal := ""
 	Content := ""
 	try {
 		Rows := _TCV_Rows(Vector["rows"], Typed["rows"])
@@ -69,12 +71,13 @@ _CTBW_Difference(Vector, Typed) {
 			: TOML_BuildConfigDocumentCandidate(Vector["source"], Rows, [])
 		Content := Candidate["content"]
 	} catch Error as Err {
-		Refused := Err.Message
+		Refused := true
+		Refusal := Type(Err) . ": " . Err.Message
 	}
 	if !Expect["ok"]
-		return Refused != "" ? "" : "the batch must be refused, the writer accepted it"
-	if (Refused != "")
-		return "the batch must be accepted, the writer refused: " . Refused
+		return Refused ? "" : "the batch must be refused, the writer accepted it"
+	if Refused
+		return "the batch must be accepted, the writer refused: " . Refusal
 	return _TCV_CandidateDifference(Content, Vector["source"], Expect, Typed["expect"])
 }
 

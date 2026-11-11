@@ -330,11 +330,12 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 #Include *i vendor/UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor/ (source: https://github.com/Descolada/UIA-v2)
 BootProfile_Stamp("UIA include initialised")
-; *i = no error if the file isn't found. UIA is only used by WrapTextIfSelected
-; (a Shift/AltGr shortcut that wraps the selection with the typed symbol). If
-; that feature is disabled in your INI and you want to trim boot time / memory,
-; you can safely delete ``vendor\UIA.ahk``: WrapTextIfSelected falls back to
-; a plain SendNewResult via ``isSet(UIA)`` at the call site (see modules/keymap/layout.ahk).
+; *i = no error if the file isn't found. UIA is used by WrapTextIfSelected
+; (a Shift/AltGr shortcut that wraps the selection with the typed symbol) and by
+; TakeNote to tell the Windows 11 Notepad tabs apart. If you want to trim boot
+; time / memory, you can delete ``vendor\UIA.ahk``: WrapTextIfSelected falls
+; back to a plain SendNewResult via ``isSet(UIA)`` at the call site (see
+; modules/keymap/layout.ahk), and TakeNote binds a note to a whole Notepad window.
 ; AHK v2 resolves #Include at parse time, so there is no true runtime lazy-load.
 
 ; The global error net itself is armed far above, before Bundle_Init()'s

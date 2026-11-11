@@ -261,6 +261,20 @@ WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
 	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB
 }
 
+/**
+ * Refuses a WebView-only window that could not open: logs the reason at ERROR
+ * and tells the user, once per refused request, that WebView2 is required.
+ * The personal editors have no native form (maintainer decision 2026-11-11).
+ * @param {String} Surface English name of the window, for the log.
+ * @param {String} Reason What failed, for the log.
+ * @returns {Boolean} Always false: nothing opened.
+ */
+WebView_RefuseUnavailable(Surface, Reason) {
+	try LoggerError("WebView", "The {1} cannot open: WebView2 is required ({2}).", Surface, Reason)
+	Ui_MsgBox(t("webview.required"), t("common.error_title"), "Iconx")
+	return false
+}
+
 
 
 
