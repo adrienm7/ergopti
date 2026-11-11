@@ -13,7 +13,8 @@ const root = path.resolve(__dirname, '../..');
 // Each floor is the workflow's exact count of signed acquisitions, so dropping any
 // one of them fails (ci-linux.yml 45 -> 46: the container proofs of 2026-11-10).
 const scopes = new Map([
-	['ci-linux.yml', 46],
+	// 47: the real keyring proof's install step (run_keyring_receipts.sh).
+	['ci-linux.yml', 47],
 	['ci-macos.yml', 3],
 	['ci-common.yml', 2],
 	['linux-layout.yml', 2]
