@@ -1001,6 +1001,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install a layout source and load it into a real X server",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Restart the daemon through the local reload control",
 			"protocol": 10
 		},
