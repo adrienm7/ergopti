@@ -233,8 +233,8 @@ helpers.describe("Backboard: an assistant per key, then one message per request"
 			-- The creation's status stays first: a refused key is never retried.
 			helpers.assert_true(err1:find("HTTP 401: the Backboard assistant could not be created: Invalid API key", 1, true)
 				~= nil, err1)
-			-- The provider's own text may echo the key: the log withholds it.
-			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: details withheld."), 1)
+			-- The provider's own text may echo the key: the log names the status only.
+			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: HTTP 401."), 1)
 			for _, line in ipairs(logs) do
 				helpers.assert_true(not line.text:find("Invalid API key", 1, true), "never the backend text: " .. line.text)
 			end
