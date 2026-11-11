@@ -156,6 +156,7 @@ function plan(document, report) {
 	}
 	return {
 		sources: report.variants.map((variant) => variant.inputSource),
+		names: report.variants.map((variant) => variant.display),
 		vectors
 	};
 }
