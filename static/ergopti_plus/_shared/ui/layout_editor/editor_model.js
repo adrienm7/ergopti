@@ -319,6 +319,62 @@ var LayoutEditorModel = (function () {
 		return next;
 	}
 
+	/**
+	 * The layer holding the other case of a layer: the same selector with Shift
+	 * added or removed, or null when the source has none.
+	 */
+	function caseLayer(doc, layerId) {
+		const layer = doc.layers[layerIndex(doc, layerId)];
+		const shifted = layer.required.includes('shift');
+		const wanted = shifted
+			? layer.required.filter((token) => token !== 'shift')
+			: layer.required.concat('shift');
+		const same = (a, b) => a.length === b.length && a.every((token) => b.includes(token));
+		const partner = doc.layers.find(
+			(entry) =>
+				entry.id !== layerId &&
+				same(entry.required, wanted) &&
+				same(
+					entry.optional.filter((t) => t !== 'shift'),
+					layer.optional.filter((t) => t !== 'shift')
+				)
+		);
+		return partner ? { id: partner.id, upper: !shifted } : null;
+	}
+
+	/**
+	 * KbdEdit's automatic case mapping: sets a mapping and, when it types one
+	 * letter with a one-letter other case, fills that case on the case layer.
+	 * A non-empty partner cell is kept unless `overwrite` is set.
+	 * @returns {object} The edited document.
+	 */
+	function setMappingWithCase(doc, layerId, code, mapping, platform, overwrite) {
+		let next = setMapping(doc, layerId, code, mapping, platform);
+		const text = mapping && typeof mapping.text === 'string' ? mapping.text : null;
+		const partner = text && [...text].length === 1 ? caseLayer(next, layerId) : null;
+		if (!partner) return next;
+		const other = partner.upper ? text.toUpperCase() : text.toLowerCase();
+		if (other === text || [...other].length !== 1) return next;
+		const existing = mappingAt(next, partner.id, code, platform);
+		if (existing && existing.scope === (platform || 'all') && !overwrite) return next;
+		next = setMapping(next, partner.id, code, { text: other }, platform);
+		return next;
+	}
+
+	/**
+	 * KbdEdit's « move all keys »: every shared mapping of a layer goes to
+	 * another layer, replacing its cells; `keep` copies instead of moving.
+	 */
+	function transferLayer(doc, from, to, keep) {
+		if (from === to) return doc;
+		const next = editable(doc);
+		const source = next.layers[layerIndex(next, from)];
+		const target = next.layers[layerIndex(next, to)];
+		Object.assign(target.keys, copy(source.keys));
+		if (!keep) source.keys = {};
+		return commit(next);
+	}
+
 	/** Replaces the Windows layout flags (KLLF and similar identifiers). */
 	function setWindowsFlags(doc, flags) {
 		const next = editable(doc);
@@ -500,6 +556,9 @@ var LayoutEditorModel = (function () {
 		setLayout,
 		setExport,
 		transferMapping,
+		caseLayer,
+		setMappingWithCase,
+		transferLayer,
 		setWindowsFlags,
 		setNls,
 		removeNls,

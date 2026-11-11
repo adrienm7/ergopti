@@ -104,6 +104,19 @@ var LayoutEditorPage = (function () {
 	}
 
 	/** A visible rendering of typed text: controls and spaces get a symbol. */
+	/** A labelled checkbox that reports its state without redrawing the page. */
+	function checkbox(id, label, checked, onchange) {
+		return el('label', { class: 'le-check' }, [
+			el('input', {
+				type: 'checkbox',
+				id,
+				checked,
+				onchange: (event) => onchange(event.target.checked)
+			}),
+			label
+		]);
+	}
+
 	function visible(text) {
 		if (text === '') return '∅';
 		if (text === ' ') return '␣';
@@ -206,6 +219,14 @@ var LayoutEditorPage = (function () {
 			clipboard: null,
 			// Sticker size: null fits the page, a number is the key size in millimetres.
 			stickerMm: null,
+			// Layers printed on each sticker (null: the four usual levels the source has),
+			// and whether a Shift legend that is only the capital is hidden.
+			stickerLayers: null,
+			stickerHideCase: false,
+			// KbdEdit's automatic case mapping: a letter fills its other case on the
+			// Shift partner layer, keeping a mapped cell unless overwrite is set.
+			autoCase: true,
+			caseOverwrite: false,
 			// Layouts a layer can be filled from (null until asked), and whether the
 			// host's registry list failed (the built-in references remain).
 			fillSources: null,
@@ -456,6 +477,7 @@ var LayoutEditorPage = (function () {
 						}
 					})
 				]),
+				LayoutSourceIO.isPreserved(doc()) ? null : stickerOptions(),
 				el('label', { class: 'le-inline' }, [
 					tl('board.label'),
 					select(
@@ -656,6 +678,36 @@ var LayoutEditorPage = (function () {
 						})
 					: null
 			]);
+			const others = LayoutEditorModel.layers(doc()).filter((layer) => layer.id !== state.layer);
+			const moveTarget = select(
+				others.map((layer) => [layer.id, layer.id]),
+				others.length ? others[0].id : '',
+				() => {},
+				{ id: 'le-move-target' }
+			);
+			const moveAll = (keep) => () => {
+				const from = state.layer;
+				apply((d) => LayoutEditorModel.transferLayer(d, from, moveTarget.value, keep));
+			};
+			const moveForm =
+				state.layer && others.length
+					? el('details', { class: 'le-add', id: 'le-move-all' }, [
+							el('summary', { text: tl('layer.move_all') }),
+							el('label', { class: 'le-inline' }, [tl('layer.move_target'), moveTarget]),
+							el('button', {
+								type: 'button',
+								id: 'le-move-layer',
+								text: tl('btn.move'),
+								onclick: moveAll(false)
+							}),
+							el('button', {
+								type: 'button',
+								id: 'le-copy-layer',
+								text: tl('btn.copy'),
+								onclick: moveAll(true)
+							})
+						])
+					: null;
 			const scope = select(
 				[['', tl('scope.all')]].concat(
 					LayoutEditorModel.PLATFORMS.map((p) => [p, tl(`scope.${p}`)])
@@ -682,7 +734,8 @@ var LayoutEditorPage = (function () {
 					}),
 					tl('numpad')
 				]),
-				LayoutSourceIO.isPreserved(doc()) ? null : addForm
+				LayoutSourceIO.isPreserved(doc()) ? null : addForm,
+				LayoutSourceIO.isPreserved(doc()) ? null : moveForm
 			]);
 		}
 
@@ -896,6 +949,14 @@ var LayoutEditorPage = (function () {
 				}),
 				kindSelect,
 				area,
+				el('div', { class: 'le-checks' }, [
+					checkbox('le-auto-case', tl('case.auto'), state.autoCase, (on) => {
+						state.autoCase = on;
+					}),
+					checkbox('le-case-overwrite', tl('case.overwrite'), state.caseOverwrite, (on) => {
+						state.caseOverwrite = on;
+					})
+				]),
 				el('button', {
 					type: 'button',
 					id: 'le-apply',
@@ -903,7 +964,22 @@ var LayoutEditorPage = (function () {
 					text: tl('btn.apply'),
 					onclick: () =>
 						apply((d) =>
-							LayoutEditorModel.setMapping(d, state.layer, code, built(), state.platform || null)
+							state.autoCase
+								? LayoutEditorModel.setMappingWithCase(
+										d,
+										state.layer,
+										code,
+										built(),
+										state.platform || null,
+										state.caseOverwrite
+									)
+								: LayoutEditorModel.setMapping(
+										d,
+										state.layer,
+										code,
+										built(),
+										state.platform || null
+									)
 						)
 				}),
 				el('button', {
@@ -1812,9 +1888,54 @@ var LayoutEditorPage = (function () {
 		// ======= 13/ Stickers =======
 		// ============================
 
-		/** Printable key caps: one sticker per key with its four character levels. */
+		/** The layers each sticker prints, in source order. */
+		function stickerLevels() {
+			const ids = (doc().layers || []).map((layer) => layer.id);
+			return state.stickerLayers === null
+				? STICKER_LAYERS.filter((id) => ids.includes(id))
+				: ids.filter((id) => state.stickerLayers.includes(id));
+		}
+
+		/** A legend the sticker leaves out: a Shift level that is only the capital of the base. */
+		function caseDuplicate(layerId, code) {
+			if (!state.stickerHideCase) return false;
+			const partner = LayoutEditorModel.caseLayer(doc(), layerId);
+			if (!partner || partner.upper) return false;
+			const own = LayoutEditorModel.mappingAt(doc(), layerId, code, null);
+			const base = LayoutEditorModel.mappingAt(doc(), partner.id, code, null);
+			const text = (found) =>
+				found && typeof found.mapping.text === 'string' ? found.mapping.text : null;
+			return text(own) !== null && text(base) !== null && text(own) === text(base).toUpperCase();
+		}
+
+		/** Which layers the stickers print, and whether capitals are hidden. */
+		function stickerOptions() {
+			const chosen = stickerLevels();
+			return el('details', { class: 'le-add', id: 'le-sticker-levels' }, [
+				el('summary', { text: tl('sticker.levels') }),
+				el(
+					'div',
+					{ class: 'le-checks' },
+					(doc().layers || []).map((layer) =>
+						checkbox(`le-sticker-layer-${layer.id}`, layer.id, chosen.includes(layer.id), (on) => {
+							const next = new Set(stickerLevels());
+							if (on) next.add(layer.id);
+							else next.delete(layer.id);
+							state.stickerLayers = [...next];
+							render();
+						})
+					)
+				),
+				checkbox('le-sticker-hide-case', tl('sticker.hide_case'), state.stickerHideCase, (on) => {
+					state.stickerHideCase = on;
+					render();
+				})
+			]);
+		}
+
+		/** Printable key caps: one sticker per key with its chosen character levels. */
 		function stickers() {
-			const levels = STICKER_LAYERS.filter((id) => (doc().layers || []).some((l) => l.id === id));
+			const levels = stickerLevels();
 			const keys = data.keys.filter((k) => k.kind === 'key' && k.character);
 			return el(
 				'section',
@@ -1834,7 +1955,8 @@ var LayoutEditorPage = (function () {
 									const found = LayoutEditorModel.mappingAt(doc(), layerId, key.code, null);
 									return el('span', {
 										class: `le-sticker-${layerId}`,
-										text: found ? legend(found.mapping, doc()) : ''
+										text:
+											found && !caseDuplicate(layerId, key.code) ? legend(found.mapping, doc()) : ''
 									});
 								})
 							)
