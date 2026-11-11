@@ -3406,6 +3406,42 @@ jobs:
           fi
         timeout-minutes: 20
 
+      - name: Install prerequisites for API keys in a real locked and unlocked keyring
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gnome-keyring libsecret-tools libglib2.0-bin openbox xdotool dbus-x11 xvfb
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # The API keys go to the desktop secret service: a real gnome-keyring,
+      # locked and unlocked, its unlock prompt answered and dismissed through
+      # the real prompter window. A dismissed prompt and a clear on a locked
+      # keyring both exit 1 silently, as an absent key does.
+      - name: API keys in a real locked and unlocked keyring
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          bash static/ergopti_plus/linux/tests/hardware/run_keyring_receipts.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
