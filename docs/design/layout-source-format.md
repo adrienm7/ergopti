@@ -18,9 +18,9 @@ bundle, and reports per record what each target leaves out. The Linux XKB and
 Windows KLC exports read that same compiled `.keylayout` through their existing
 converters, so every target consumes one compilation. It is a pure classic
 script: pages, the app webviews and the Node tools load it after
-`composer_model.js` and `source_model.js` and pass it the key tables. The unified
-editor (still to be built from the composer, navigation layer editor and layout
-manager) consumes this model; it adds no second format. The target remains
+`composer_model.js` and `source_model.js` and pass it the key tables. The [unified
+layout editor](layout-editor.md) consumes this model through
+`layout_editor/source_io.js`; it adds no second format. The target remains
 [KbdEdit parity](layout-generator-kbdedit-parity.md).
 
 ## Commands available now
