@@ -1306,20 +1306,24 @@ between workers) green alone. All live checks pass, typed by the harness.
       boots beside a blocking secret-tool. macOS has no such boot step (Keychain calls are owned async tasks with a
       10 s deadline and the load is deferred off the boot path). Windows counterpart for the maintainer: DPAPI has
       no prompt and no service to wait on; check that no boot path calls a credential store that can block.
-- [ ] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
+- [x] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
       Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the core keyboard changes (the daemon's
       virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
-      notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group change, so after one switch
-      `KeyboardLayout.is_ready()` stays false and every replacement takes the clipboard route. Reproduce: drop the XTEST
-      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Kept as is, decided by the
-      coordinator on 2026-11-11 overnight, to review by the maintainer: no proof can re-validate the receipt today. The
-      first proof, `keyboard_hook.refresh_capture`, requires the previous receipt to still be current before it dumps
-      the keymap again, and a typing request may renew only across a group change
-      (`test_keyboard_layout_terminal_plan_observation.lua`, "an equal-group source replacement does not renew an old
-      plan"). A fix needs a new capture re-acquisition owned by the hook, off the input path, that dumps the server
-      keymap and rebuilds capture and inverse together as at startup. The clipboard route then also fails while the
-      clipboard has no owner (a fresh session): `xclip -o` exits 1 as for a read error, and the snapshot refuses to
-      borrow what it cannot restore. Wayland and macOS have no slave switch.
+      notify and `adapters/xkb_capture.lua` renewed a revoked inverse only for a group change, so after one switch
+      `KeyboardLayout.is_ready()` stayed false and every replacement took the clipboard route. Decided by the
+      maintainer on 2026-11-11: after a same-group notify, re-read the keymap and renew the receipt when it is
+      identical. Done: `xkb_capture.inverse_retarget` renews an equal group too, since the fresh inverse is only
+      issued after `source_group` dumps the server keymap and the probe refuses it unless it equals the capture's
+      map (`native-keymap-unacknowledged`), so a keymap that really differs keeps the receipt revoked; a fresh
+      receipt is minted, the old plans stay retired; `KeyboardLayout.is_ready()` goes through the same renewal.
+      Reproduced with the recipe (the XTEST warm-up dropped from `tests/hardware/container_session.py`, now for
+      good): `run_ai_inline_container.py` gains « the prediction was typed through the layout, not pasted », which
+      fails on the baseline (the prediction is pasted) and passes with the fix; the physical-shortcut, navigation
+      pointer and X11 tap-copy proofs still pass without the warm-up. Unit: the equal-group and unacknowledged-map
+      cases of `test_keyboard_layout_terminal_plan_observation.lua` and `test_keyboard_layout_xkb_keymap_parsing.lua`
+      now pin the renewal and the kept revocation. The clipboard route's own failure while the clipboard has no
+      owner (`xclip -o` exits 1 as for a read error) is unchanged and stays open. Wayland and macOS have no slave
+      switch; Windows has no XKB.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).

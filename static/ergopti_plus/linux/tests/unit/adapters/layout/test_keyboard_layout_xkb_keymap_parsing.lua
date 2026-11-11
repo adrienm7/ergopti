@@ -664,23 +664,31 @@ end)
 
 
 helpers.describe("keyboard_layout: automatic X11 acknowledgement cohort", function()
-	helpers.it("refuses an equal-group native source epoch replacement", function()
+	-- Decided by the maintainer on 2026-11-11: the same group with a re-read
+	-- keymap equal to the capture's map renews; a map the probe does not
+	-- acknowledge (one that really differs) keeps the receipt revoked.
+	helpers.it("renews an equal-group native source epoch replacement with an acknowledged map", function()
 		cohort_fixture(function(_, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
+				local _, _, old = layout.plan("z")
 				state.native_generation = 8
-				helpers.assert_eq(layout.is_ready(), false)
-				helpers.assert_nil(layout.resolve("z"))
-				helpers.assert_nil(layout.plan("z"))
+				helpers.assert_eq(layout.is_ready(), true)
+				helpers.assert_eq(layout.resolve("z").keycode, 44)
+				helpers.assert_eq(layout.plan_current(old), false, "the old receipt is never revived")
 			end)
 		end)
 	end)
-	helpers.it("never revives after native keymap acknowledgement is lost", function()
+	helpers.it("stays revoked while the native keymap is not acknowledged, and renews fresh once it is", function()
 		cohort_fixture(function(_, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
-				state.acknowledged = false
-				helpers.assert_eq(layout.is_ready(), false)
+				local _, _, old = layout.plan("z")
+				state.acknowledged = false; state.native_generation = 8
+				helpers.assert_eq(layout.is_ready(), false, "a different keymap keeps the layout revoked")
+				helpers.assert_nil(layout.resolve("z"))
+				helpers.assert_nil(layout.plan("z"))
 				state.acknowledged = true
-				helpers.assert_eq(layout.is_ready(), false)
+				helpers.assert_eq(layout.is_ready(), true, "an identical keymap renews through a fresh receipt")
+				helpers.assert_eq(layout.plan_current(old), false, "the old receipt is never revived")
 			end)
 		end)
 	end)

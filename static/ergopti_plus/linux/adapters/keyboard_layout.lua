@@ -165,8 +165,11 @@ local function publish(built, receipt)
 end
 
 
--- Only new typing requests may renew a different native X11 group. Existing
--- plan checks, readiness and explicit overrides keep their old refusal contract.
+-- New typing requests and readiness may renew the inverse after a native X11
+-- source change: a different group, or the same group with an identical
+-- server keymap (a slave-keyboard switch's new-keyboard notify, decided by the
+-- maintainer on 2026-11-11). Existing plan checks and explicit overrides keep
+-- their old refusal contract.
 local typing_lookup = false
 local function typing_cohort()
 	if typing_lookup then return nil end
@@ -533,7 +536,7 @@ end
 --- True when a layout table is loaded.
 --- @return boolean
 function M.is_ready()
-	return current_cohort() ~= nil
+	return current_cohort() ~= nil or typing_cohort() ~= nil
 end
 
 --- Resolves one character to the keystroke that produces it.

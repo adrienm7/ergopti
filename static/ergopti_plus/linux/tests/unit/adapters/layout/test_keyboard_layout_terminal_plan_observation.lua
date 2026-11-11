@@ -129,8 +129,11 @@ helpers.describe("keyboard_layout: automatic different-group inverse renewal", f
 		cohort_fixture(function(capture, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
 				helpers.assert_eq(layout.resolve("z").keycode, 44)
+				local _, _, old = layout.plan("z")
 				capture.process(99, 1); state.native_generation = 8
-				helpers.assert_eq(layout.is_ready(), false, "old cohort is retired before any new request")
+				-- Readiness renews too since 2026-11-11, through a fresh receipt.
+				helpers.assert_eq(layout.is_ready(), true, "readiness renews on the observed new group")
+				helpers.assert_eq(layout.plan_current(old), false, "the old plan stays retired")
 				local next_step = layout.resolve("z")
 				helpers.assert_true(type(next_step) == "table")
 				helpers.assert_eq(next_step.keycode, 21); helpers.assert_eq(next_step.mods, {})
@@ -166,14 +169,23 @@ helpers.describe("keyboard_layout: automatic different-group inverse renewal", f
 			helpers.assert_nil(layout.resolve("z")); helpers.assert_nil(layout.plan("z"))
 		end)
 	end)
-	helpers.it("an equal-group source replacement does not renew an old plan", function()
+	-- Decided by the maintainer on 2026-11-11: an equal-group native source
+	-- change whose server keymap is re-read equal to the capture's map (Xorg's
+	-- new-keyboard notify on a slave switch) renews through a fresh receipt;
+	-- the old plan is never revived.
+	helpers.it("an equal-group source change with an acknowledged map renews a fresh plan, never the old one", function()
 		cohort_fixture(function(_, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
+				local _, _, old = layout.plan("z")
 				state.native_generation = 8
 				local enumerations = 0
 				state.on_inverse = function() enumerations = enumerations + 1 end
-				helpers.assert_nil(layout.resolve("z")); helpers.assert_nil(layout.plan("z"))
-				helpers.assert_eq(enumerations, 0)
+				local steps, _, fresh = layout.plan("z")
+				helpers.assert_eq(steps[1].keycode, 44, "the same group types the same key")
+				helpers.assert_eq(enumerations, 1, "the inverse was enumerated again")
+				helpers.assert_true(fresh ~= old and layout.plan_current(fresh))
+				helpers.assert_eq(layout.plan_current(old), false)
+				helpers.assert_eq(layout.is_ready(), true)
 			end)
 		end)
 	end)
@@ -205,7 +217,7 @@ helpers.describe("keyboard_layout: automatic different-group inverse renewal", f
 		cohort_fixture(function(capture, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
 				capture.process(99, 1); state.native_generation = 8
-				state.on_inverse = function() state.native_generation = 9 end
+				state.on_inverse = function() state.native_generation = state.native_generation + 1 end
 				helpers.assert_nil(layout.resolve("z")); helpers.assert_eq(layout.is_ready(), false)
 			end)
 		end)
