@@ -5,6 +5,34 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## One configuration layout on every OS for tap-holds (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
+and the overnight Linux `[mod_combos]` move: one home per manifest path on
+every OS. `config.toml` holds every `[[features.*]]` row and the settings of
+the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
+`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
+symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
+`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
+`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
+`inherit_defaults`, the global delay `time_activation_seconds`,
+`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
+section (`_shared/tap_hold/SCHEMA.md`).
+
+- One migration step moves the old homes: `v21_to_v22` of
+  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
+  macOS and Linux (Windows already kept these rows in `config.toml`). The
+  boot names the driver's `tap_hold.toml` (macOS first carries an old
+  `config_karabiner.toml` over into it); the engine copies the values into
+  `config.toml` where it holds none, after its byte-exact backup, and the
+  driver then deletes the moved values from `tap_hold.toml`, after a backup
+  of that file. The config stamp makes it run once; a value left in
+  `tap_hold.toml` by a crash between the two writes is never read and is
+  warned as outdated.
+- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
+  the two files each driver writes; each suite pins its own and reads the
+  others'. Do not move a manifest row back into `tap_hold.toml`.
+
 ## Windows swipes step with the fingers through raw HID reports (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: Windows gets the incremental touchpad
@@ -356,14 +384,11 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
 
 ## Tap-hold settings, minimum tap, tap-to-click and Linux proof (2026-11-10)
 
-- One home for the tap-hold settings on every OS: a shared `tap_hold.toml`
-  holds the keys, the global and sticky delays, the lone-tap window and the
-  modifier combinations (`mod_combos`); `config.toml` keeps the
-  `[[features.*]]` rows; the macOS-only Karabiner integration is its own
-  section of that file. Each driver migrates its old files once
-  (macOS `config_karabiner.toml`, Linux `config.toml` `mod_combos`, Windows
-  `config.toml` tap-hold keys), and a cross-driver test writes the file on one
-  driver and reads it on the other two.
+- One home for the tap-hold settings on every OS. Settled on 2026-11-11 (the
+  entry at the top of this page): the shared `tap_hold.toml` holds the keys,
+  the global delay and the macOS-only Karabiner section; `config.toml` keeps
+  every `[[features.*]]` row, the sticky delay, the lone-tap window and the
+  modifier combinations (`mod_combos`).
 - The minimum tap duration applies to every tap that waits for its release,
   the Linux rule, on the three drivers; Windows stops limiting it to LShift,
   LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
