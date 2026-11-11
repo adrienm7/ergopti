@@ -30,6 +30,7 @@ enum LauncherTimings {
 	static let fileLockRetry = RegistryDuration(section: "launcher", key: "file_lock_retry_ms", milliseconds: 1)
 	static let instanceLockRetry = RegistryDuration(section: "launcher", key: "instance_lock_retry_ms", milliseconds: 100)
 	static let staleRuntimePoll = RegistryDuration(section: "launcher", key: "stale_runtime_poll_ms", milliseconds: 100)
+	static let quitHandshakeMargin = RegistryDuration(section: "launcher", key: "quit_handshake_margin_ms", milliseconds: 2000)
 	static let guardianArmPoll = RegistryDuration(section: "launcher", key: "guardian_arm_poll_ms", milliseconds: 10)
 	static let guardianSingletonRetry = RegistryDuration(section: "launcher", key: "guardian_singleton_retry_ms", milliseconds: 10)
 	static let leaseChildPoll = RegistryDuration(section: "launcher", key: "lease_child_poll_ms", milliseconds: 50)

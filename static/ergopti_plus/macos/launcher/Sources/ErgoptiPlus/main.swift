@@ -585,6 +585,19 @@ func seedEmbeddedHammerspoonConfig(initLuaPath: String) {
 	CFPreferencesSynchronize(appId, user, host)
 }
 
+/// Asks the embedded runtime with this process id for its controlled exit
+/// (infra/launcher_guard.lua listens for it); the object names the runtime so
+/// another copy's runtime ignores it.
+/// - Parameter runtimePid: Process id of this launcher's embedded runtime.
+func postEmbeddedRuntimeQuitRequest(_ runtimePid: pid_t) {
+	DistributedNotificationCenter.default().postNotificationName(
+		NSNotification.Name(Identifiers.MacosNotifications.launcherQuitRequest),
+		object: String(runtimePid),
+		userInfo: nil,
+		deliverImmediately: true
+	)
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var hsApplication: NSRunningApplication?
@@ -625,6 +638,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	/// Seeds MJConfigFile; only the sole launcher calls it, before each runtime launch.
 	private let hammerspoonConfigSeeder: (String) -> Void
 	private var applicationIsTerminating = false
+	/// True while a quit from outside waits for the runtime's controlled exit.
+	private var quitHandshakePending = false
+	/// Asks the embedded runtime, by its process id, for its controlled exit.
+	private let quitRequestPoster: (pid_t) -> Void
+	/// Answers a deferred `applicationShouldTerminate`.
+	private let terminationReplier: (Bool) -> Void
 	// Monotonic origin of this launcher's startup trail.
 	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
 
@@ -646,6 +665,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - instanceLock: Per-user lock that makes this process the sole launcher.
 	///   - runningApplicationsReader: Lists running applications by bundle identifier.
 	///   - hammerspoonConfigSeeder: Points the embedded runtime at this launcher's init.lua.
+	///   - quitRequestPoster: Asks the embedded runtime for its controlled exit.
+	///   - terminationReplier: Answers a quit deferred for that exit.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -674,7 +695,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		runningApplicationsReader: @escaping (String) -> [NSRunningApplication] = {
 			NSRunningApplication.runningApplications(withBundleIdentifier: $0)
 		},
-		hammerspoonConfigSeeder: @escaping (String) -> Void = { seedEmbeddedHammerspoonConfig(initLuaPath: $0) }
+		hammerspoonConfigSeeder: @escaping (String) -> Void = { seedEmbeddedHammerspoonConfig(initLuaPath: $0) },
+		quitRequestPoster: @escaping (pid_t) -> Void = postEmbeddedRuntimeQuitRequest,
+		terminationReplier: @escaping (Bool) -> Void = { NSApp.reply(toApplicationShouldTerminate: $0) }
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -687,6 +710,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.instanceLock = instanceLock
 		self.runningApplicationsReader = runningApplicationsReader
 		self.hammerspoonConfigSeeder = hammerspoonConfigSeeder
+		self.quitRequestPoster = quitRequestPoster
+		self.terminationReplier = terminationReplier
 		super.init()
 	}
 
@@ -898,6 +923,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePoll.seconds) { [weak self] in
 			self?.waitForStaleRuntimes(stale, deadline: deadline, then: proceed)
 		}
+	}
+
+	/// Defers a quit from outside (Sparkle's relaunch, a logout, osascript) until
+	/// the booted runtime has run its controlled exit: a plain terminate ran only
+	/// its inert shutdown callback, left the LLM helpers and the detached MLX
+	/// server running and lost its shutdown log (MLC-002). Its own deadline
+	/// ([ui] user_quit_deadline_ms) plus a margin bounds the wait.
+	func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+		if quitHandshakePending { return .terminateLater }
+		guard hsBootstrapReady, let application = hsApplication, !application.isTerminated else {
+			return .terminateNow
+		}
+		return beginQuitHandshake(runtimePid: application.processIdentifier)
+	}
+
+	/// Asks the booted runtime for its controlled exit and defers the quit until
+	/// it exits or its bound passes.
+	/// - Parameter runtimePid: Process id of the booted embedded runtime.
+	/// - Returns: `.terminateLater`, answered through the termination replier.
+	func beginQuitHandshake(runtimePid: pid_t) -> NSApplication.TerminateReply {
+		if quitHandshakePending { return .terminateLater }
+		quitHandshakePending = true
+		applicationIsTerminating = true
+		LauncherLog.write(
+			"quit requested from outside; asking embedded Hammerspoon pid \(runtimePid) for its controlled exit"
+		)
+		quitRequestPoster(runtimePid)
+		let bound = LauncherTimings.userQuitDeadline.seconds + LauncherTimings.quitHandshakeMargin.seconds
+		DispatchQueue.main.asyncAfter(deadline: .now() + bound) { [weak self] in
+			guard let self, self.quitHandshakePending else { return }
+			LauncherLog.write("embedded Hammerspoon did not finish its controlled exit in time; quitting anyway")
+			self.finishQuitHandshake()
+		}
+		return .terminateLater
+	}
+
+	/// Answers the deferred quit once, after the runtime exited or its bound passed.
+	private func finishQuitHandshake() {
+		guard quitHandshakePending else { return }
+		quitHandshakePending = false
+		terminationReplier(true)
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {
@@ -1183,6 +1249,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// The child is gone; a bootstrap retry below holds the activity again.
 		childActivity.release()
 		guard !applicationIsTerminating else {
+			// A quit from outside waited for this exit: answer it now.
+			if quitHandshakePending {
+				LauncherLog.write("embedded Hammerspoon finished its controlled exit; quitting")
+				finishQuitHandshake()
+				return
+			}
 			applicationTerminator(self)
 			return
 		}
