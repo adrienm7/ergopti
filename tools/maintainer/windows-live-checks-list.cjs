@@ -161,6 +161,81 @@ function closeExplorerWindows(folder) {
 /** The count of driver processes of a session, successors included. */
 const driverCount = (session) => session.processes().length;
 
+/**
+ * The shipped English locale, which names every row of an English driver.
+ * @returns {Object<string, string>}
+ */
+function englishLocale() {
+	return JSON.parse(
+		fs.readFileSync(
+			path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+			'utf8'
+		)
+	);
+}
+
+/** A literal text as a regular expression that matches only it. */
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Collapses every run of white space, so a dialog's line breaks compare as spaces. */
+const squash = (text) => text.replace(/\s+/g, ' ').trim();
+
+/**
+ * Finds a rule in a shipped hotstring file, so a check typing it says when the
+ * data it relies on moved instead of failing on the driver.
+ * @param {string} relative Path under _shared/modules/hotstrings.
+ * @param {string} trigger The rule's trigger.
+ * @returns {{section: string, line: string}|null}
+ */
+function shippedRule(relative, trigger) {
+	const file = path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'hotstrings');
+	let section = '';
+	for (const line of fs.readFileSync(path.join(file, relative), 'utf8').split(/\r?\n/)) {
+		const header = /^\[\[([a-z0-9_]+)\]\]/.exec(line);
+		if (header) section = header[1];
+		else if (line.startsWith(`${JSON.stringify(trigger)} = {`)) return { section, line };
+	}
+	return null;
+}
+
+/**
+ * Types a script into a fresh typing target and reads back what it holds.
+ * No hse_reset: it makes the word start unknown, and word-start rules refuse.
+ * @param {object} session The session.
+ * @param {string[][]} steps Typist lines after the common head.
+ * @param {number} [gap] Milliseconds after each key.
+ * @returns {Promise<string>} The target's text, line breaks as backslash-n.
+ */
+async function typeInto(session, steps, gap = 120) {
+	await session.run('edit_open');
+	session.type([
+		['mode', 'event'],
+		['level', '100'],
+		['gap', String(gap)],
+		...steps,
+		['wait', '900']
+	]);
+	const value = (await session.run('edit_value')).replace(/^value=/, '');
+	await session.run('edit_close');
+	return value;
+}
+
+/**
+ * Reads the `rows` command's answer as rows.
+ * @param {string} answer "A > B > C  [checked]  [disabled] | ..." as LiveCmdRows writes it.
+ * @returns {{path: string[], checked: boolean, disabled: boolean}[]}
+ */
+function parseRows(answer) {
+	return answer
+		.split(' | ')
+		.filter(Boolean)
+		.map((line) => ({
+			path: line.replace(/ {2}\[(checked|disabled)\]/g, '').split(' > '),
+			checked: line.includes('  [checked]'),
+			disabled: line.includes('  [disabled]')
+		}));
+}
+
 /** Parses "key=value" pairs out of a command's detail line. */
 function fields(detail) {
 	const found = {};
@@ -225,7 +300,8 @@ function oldestVersion() {
 }
 
 /**
- * The HKCU touchpad values, so a check that clicks Restore proves it left them alone.
+ * The machine's HKCU touchpad values, read only: an isolated driver must never
+ * change them (on 2026-11-11 a Gestures Clear all reset them to the factory values).
  * @returns {string}
  */
 function touchpadRegistry() {
@@ -237,6 +313,53 @@ function touchpadRegistry() {
 	return out.stdout || '';
 }
 
+/**
+ * The private touchpad key an isolated driver writes instead of the machine's
+ * (TouchpadRegistryPrivatePath in modules/gestures/touchpad_registry.ahk).
+ * @param {object} session The session.
+ * @returns {Map<string, number>|null} name => DWORD, or null when the driver wrote none.
+ */
+function privateTouchpadKey(session) {
+	const file = path.join(session.root, 'touchpad_registry_private.txt');
+	if (!fs.existsSync(file)) return null;
+	const lines = fs.readFileSync(file, 'utf8').replace(/^﻿/, '').split('\n').filter(Boolean);
+	if (lines[0] !== 'ergopti-touchpad-private-key 1')
+		throw new Error(`${file} does not start with the private key header`);
+	return new Map(
+		lines.slice(2).map((line) => {
+			const [name, , value] = line.split(' ');
+			return [name, Number(value)];
+		})
+	);
+}
+
+/**
+ * The Windows factory touchpad values, which a Clear all writes without a backup.
+ * @returns {Map<string, number>}
+ */
+function touchpadFactoryDefaults() {
+	const { buildContract, SOURCE } = require('../codegen/codegen-touchpad-registry.cjs');
+	const contract = buildContract(require('smol-toml').parse(fs.readFileSync(SOURCE, 'utf8')));
+	return new Map(contract.factoryDefaults.map((entry) => [entry.name, entry.value]));
+}
+
+/**
+ * Says how a private touchpad key differs from the factory values, or '' when it holds them.
+ * @param {Map<string, number>|null} key privateTouchpadKey().
+ * @param {string} after What the driver had just done.
+ * @returns {string}
+ */
+function touchpadFactoryProblem(key, after) {
+	if (!key) return `${after} wrote no private touchpad key`;
+	const factory = touchpadFactoryDefaults();
+	const wrong = [...new Set([...factory.keys(), ...key.keys()])].filter(
+		(name) => key.get(name) !== factory.get(name)
+	);
+	return wrong.length > 0
+		? `${after} left the private touchpad key off its factory values: ${wrong.join(', ')}`
+		: '';
+}
+
 // What Clear all and Restore recommended must leave alone in every category.
 const SENTINELS_TOML = [
 	'# a comment the user wrote',
@@ -246,6 +369,27 @@ const SENTINELS_TOML = [
 	"trigger_shortcut = '^!a'",
 	''
 ].join('\n');
+
+/**
+ * Ticks a category's enable row when it reads off. Since 77f417280e an off category
+ * greys every other row of its menu (menu.category_off_reason), its Restore and
+ * Clear included, and a fresh profile starts with the categories off.
+ * @param {object} session The session.
+ * @param {number} pid The serving driver.
+ * @param {string} menu The category submenu's click specifier ('re:Shortcuts$').
+ * @param {string} enable The enable row's English caption, unique in the tray.
+ * @param {string} [dialog] A confirmation the switch shows ('.' for none).
+ * @returns {Promise<number>} The driver serving afterwards.
+ */
+async function ensureCategoryOn(session, pid, menu, enable, dialog = '.') {
+	const rows = (await session.run('rows', [`^${enable}`])).split(' | ').filter(Boolean);
+	if (rows.length !== 1) throw new Error(`${rows.length} "${enable}" rows in the tray`);
+	if (rows[0].includes('[checked]')) return pid;
+	await session.run('click_confirming', [dialog, menu, `re:^${enable}`], 180000, {
+		followReload: true
+	});
+	return (await session.quiesce(pid)).pid;
+}
 
 /**
  * Clicks one Clear or Restore row and judges what any scoped change must respect.
@@ -420,7 +564,7 @@ const CHECKS = [
 		title: 'Shortcuts > a modifier group > Clear all, then Restore: only that group changes',
 		async run(context) {
 			const { session, pid: first } = await bootEnglish(context, 'group');
-			let pid = first;
+			let pid = await ensureCategoryOn(session, first, 're:Shortcuts$', 'Enable shortcuts');
 			await session.run('click', ['re:Shortcuts$', 're:Restore recommended']);
 			pid = (await session.quiesce(pid)).pid;
 			const recommended = live.configSnapshot(session);
@@ -647,8 +791,20 @@ const CHECKS = [
 					if (closeWindowsSearch()) {
 						seen.push(`${item.name}: Windows Search opened, the driver did not take Win+S`);
 					} else if (!found) {
-						const logged = session.logLines('[Search]').slice(-3).join(' | ');
-						seen.push(`${item.name}: no log line "${item.expect}" (Search log: ${logged})`);
+						// A press that never reaches Search ends in the selection capture
+						// ([hotstring_engine]) or in the Win broker, so name every owner.
+						const logged = session
+							.logLines('')
+							.filter(
+								(line) =>
+									!before.has(line) &&
+									/\[(Search|hotstring_engine|KeyboardShortcuts|MagicEditor|gestures)\]/.test(line)
+							)
+							.slice(-6)
+							.join(' | ');
+						seen.push(
+							`${item.name}: no log line "${item.expect}" (Win+S log since the press: ${logged || 'none'})`
+						);
 					}
 				}
 			} finally {
@@ -827,8 +983,20 @@ const CHECKS = [
 		title: 'A key-combination pair assignment is saved and still shown after the reload',
 		async run(context) {
 			const { session, pid: first } = await bootEnglish(context, 'pairsave');
-			const row = ['^Escape \\+ Tab : ', 'Escape'];
+			// Since c0a80da57f a pair row joins its pair and its action through
+			// common.label_value ("{1}: {2}" in English), not a hardcoded " : ".
+			const locale = JSON.parse(
+				fs.readFileSync(
+					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					'utf8'
+				)
+			);
+			const pair = `${locale['key_name.escape']} + ${locale['key_name.tab']}`;
+			const head = locale['common.label_value'].split('{2}')[0].replace('{1}', pair);
+			const row = [`^${escapeRegExp(head)}`, locale['key_name.escape']];
 			const before = await session.run('rows', row);
+			if (before.split(' | ').filter(Boolean).length !== 1)
+				return fail(`not one pair row matches "${row[0]}" before the assignment: "${before}"`);
 			await session.run('pair_assign', ['escape', 'tab', 'tap', 'caps_word'], 180000, {
 				followReload: true
 			});
@@ -1051,26 +1219,51 @@ const CHECKS = [
 			const report = [];
 			// Each row's own namespace; category_enabled is the master switch it may set.
 			const categories = [
-				['Tap-Holds', 're:Tap-Holds$', /^(tap_hold|category_enabled|shortcuts\.key_combinations)/],
-				['Shortcuts', 're:Shortcuts$', /^(shortcuts|category_enabled|gestures\.action_parameters)/],
-				['Gestures', 're:Gestures$', /^(gestures|category_enabled)/],
-				['Keyboard layout', 're:Keyboard layout$', /^(layout|category_enabled)/],
-				['Hotstrings', 're:Hotstrings \\(', /^(hotstrings|category_enabled)/]
+				[
+					'Tap-Holds',
+					're:Tap-Holds$',
+					/^(tap_hold|category_enabled|shortcuts\.key_combinations)/,
+					'Enable tap-holds'
+				],
+				[
+					'Shortcuts',
+					're:Shortcuts$',
+					/^(shortcuts|category_enabled|gestures\.action_parameters)/,
+					'Enable shortcuts'
+				],
+				['Gestures', 're:Gestures$', /^(gestures|category_enabled)/, 'Enable gestures'],
+				[
+					'Keyboard layout',
+					're:Keyboard layout$',
+					/^(layout|category_enabled)/,
+					'Enable the layout'
+				],
+				['Hotstrings', 're:Hotstrings \\(', /^(hotstrings|category_enabled)/, 'Enable hotstrings']
 			];
-			for (const [name, menu, scope] of categories) {
+			for (const [name, menu, scope, enable] of categories) {
 				const restore = [menu, 're:Restore recommended'];
 				const clear = [menu, 're:Clear all'];
+				// An off category greys its Restore and Clear: switch it on first, and
+				// again after Clear all, which may set its switch back to the default.
+				pid = await ensureCategoryOn(session, pid, menu, enable);
 				const r1 = await clickScoped(session, pid, restore, `${name} Restore`, scope, problems);
 				const c = await clickScoped(session, r1.pid, clear, `${name} Clear`, scope, problems);
 				const r2 = await clickScoped(
 					session,
-					c.pid,
+					await ensureCategoryOn(session, c.pid, menu, enable),
 					restore,
 					`${name} Restore again`,
 					scope,
 					problems
 				);
 				pid = r2.pid;
+				if (name === 'Gestures') {
+					// A fresh profile has no backup: the clear wrote the factory values to
+					// the private key. Removed, so the global clear must write them again.
+					const problem = touchpadFactoryProblem(privateTouchpadKey(session), 'the Gestures Clear');
+					if (problem) problems.push(problem);
+					fs.rmSync(path.join(session.root, 'touchpad_registry_private.txt'), { force: true });
+				}
 				// A restore never turns the AI preview back on: that consent is the
 				// user's (restore_exclude, pinned by test_config_scope_manifest.ahk).
 				const drift = live
@@ -1085,7 +1278,7 @@ const CHECKS = [
 			}
 			const metrics = await clickScoped(
 				session,
-				pid,
+				await ensureCategoryOn(session, pid, 're:Metrics$', 'Enable metrics', 'Security Warning'),
 				['re:Metrics$', 're:Restore recommended'],
 				'Metrics Restore',
 				/^(metrics|keystats|category_enabled)/,
@@ -1111,6 +1304,11 @@ const CHECKS = [
 				problems
 			);
 			report.push(`global ${allClear.changed}/${allRestore.changed}`);
+			const touchpadProblem = touchpadFactoryProblem(
+				privateTouchpadKey(session),
+				'the global Clear'
+			);
+			if (touchpadProblem) problems.push(touchpadProblem);
 			if (allClear.changed === 0 || allRestore.changed === 0)
 				problems.push('the global Clear or Restore changed nothing');
 			const now = configBytes(session, 'hotstrings/personal_hotstrings.toml');
@@ -1119,8 +1317,13 @@ const CHECKS = [
 			await session.restart();
 			if (!configBytes(session, 'autohotkey/config.toml').equals(settledConfig))
 				problems.push('a restart rewrote the configuration');
+			// The outcome is judged on the private key above; this only catches a leak.
 			if (touchpadRegistry() !== registryBefore)
-				problems.push('the touchpad registry values changed');
+				problems.push("the isolated driver changed the machine's touchpad registry values");
+			if (
+				session.logLines('Isolated profile: the touchpad values go to the private key').length === 0
+			)
+				problems.push('the driver never said its touchpad writes went to the private key');
 			const errors = session.loggedErrors();
 			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
 			if (problems.length > 0) return fail(problems.join('; '));
@@ -1195,9 +1398,11 @@ const CHECKS = [
 		// 2026): a restore has nothing to write and a clear leaves the declared delay.
 		title: 'Hotstring delays: the declared 0.5 s after Restore recommended and after Clear all',
 		async run(context) {
-			const { session, pid: first } = await bootEnglish(context, 'delays');
+			const { session, pid: booted } = await bootEnglish(context, 'delays');
 			const problems = [];
 			const menu = 're:Hotstrings \\(';
+			// An off category greys its Restore and Clear (77f417280e).
+			const first = await ensureCategoryOn(session, booted, menu, 'Enable hotstrings');
 			const families = ['names', 'abbreviations', 'technical_terms'];
 			const judge = async (label, delay, override) => {
 				for (const family of families) {
@@ -1216,9 +1421,21 @@ const CHECKS = [
 			});
 			pid = (await session.quiesce(pid)).pid;
 			await judge('after Clear', 0.5, '0');
+			pid = await ensureCategoryOn(session, pid, menu, 'Enable hotstrings');
 			const rows = await session.run('rows', ['Autocorrection delay', 'Delays and colours']);
-			if (!/Autocorrection delay : 500 ms \(default\)/.test(rows))
-				problems.push(`after Clear the row reads: ${rows}`);
+			// Since c0a80da57f a row joins its label and value through
+			// common.label_value ("{1}: {2}" in English), not a hardcoded " : ".
+			const locale = JSON.parse(
+				fs.readFileSync(
+					path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json'),
+					'utf8'
+				)
+			);
+			const shown = locale['common.label_value']
+				.replace('{1}', 'Autocorrection delay')
+				.replace('{2}', '500 ms (default)');
+			if (!rows.includes(shown))
+				problems.push(`after Clear the row reads: ${rows}; expected "${shown}"`);
 			await session.restart();
 			await judge('after Clear and a restart', 0.5, '0');
 			const errors = session.loggedErrors();
@@ -1480,28 +1697,33 @@ const CHECKS = [
 	},
 	{
 		id: 'test-prediction-ai-off',
-		title: 'AI > Test a prediction, with the AI off: refused, says why, sends nothing',
+		// Since 77f417280e (maintainer rule for 1.0.9) an off category greys every row
+		// of its menu but its enable row, Test a prediction included, with
+		// menu.category_off_reason: the row cannot be clicked, so it says why itself.
+		title: 'AI > Test a prediction, with the AI off: greyed, says why, sends nothing',
 		async run(context) {
 			const { session } = await bootEnglish(context, 'testpred');
 			const before = fields(await session.run('ai_state'));
 			if (before.enabled !== '0') return notExecuted('the AI is on in a default configuration');
 			const started = session.logLines('Test prediction #').length;
-			const state = await session.run('click_read_notice', [
-				're:Artificial Intelligence$',
-				're:^Test a prediction'
-			]);
-			const expected = (await session.run('translate', ['llm.manual_prediction.disabled'])).replace(
-				/^text=/,
-				''
-			);
-			if (!state.includes(expected))
-				return fail(`the notice reads: ${state}; expected "${expected}"`);
+			const reason = (await session.run('translate', ['menu.category_off_reason']))
+				.replace(/^text=/, '')
+				.split(':')[0];
+			const row = (await session.run('rows', ['^Test a prediction', 'Artificial Intelligence']))
+				.split(' | ')
+				.filter(Boolean);
+			if (row.length !== 1)
+				return fail(`the AI submenu holds ${row.length} Test a prediction rows`);
+			const problems = [];
+			if (!row[0].includes('[disabled]')) problems.push(`the row is enabled: ${row[0]}`);
+			if (!row[0].includes(reason)) problems.push(`the row does not say "${reason}": ${row[0]}`);
 			if (session.logLines('Test prediction #').length !== started)
-				return fail('a test prediction was sent');
-			if ((await session.run('dialogs')) !== 'dialogs=') return fail('a dialog opened');
+				problems.push('a test prediction was sent');
+			if ((await session.run('dialogs')) !== 'dialogs=') problems.push('a dialog opened');
 			if (session.loggedErrors().length > 0)
-				return fail(`the log holds an error: ${session.loggedErrors()[0]}`);
-			return pass(`refused with the notice "${expected}", nothing sent, no dialog`);
+				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`greyed with "${reason}", nothing sent, no dialog`);
 		}
 	},
 	{
@@ -1694,6 +1916,592 @@ const CHECKS = [
 			return pass(
 				`refused after ${deadline} ms with a notice, the driver kept serving; a later Quit and a Quit that waited both exit 0`
 			);
+		}
+	},
+	{
+		id: 'hotstring-section-order',
+		title:
+			'Hotstring section order: Move down through the tray, kept over a restart, Restore default, a stale menu refused',
+		async run(context) {
+			const locale = englishLocale();
+			const order = locale['menu.hotstrings.section_order'];
+			const up = locale['menu.hotstrings.move_up'];
+			const down = locale['menu.hotstrings.move_down'];
+			const reset = locale['hs_config.btn_reset_default'];
+			const { session, pid: booted } = await bootEnglish(context, 'order');
+			// A first boot saves its full state late: that save would make the menu stale.
+			let pid = (await session.quiesce(booted, { quietMs: 8000 })).pid;
+			pid = await ensureCategoryOn(session, pid, 're:Hotstrings \\(', 'Enable hotstrings');
+			pid = (await session.quiesce(pid, { quietMs: 8000 })).pid;
+			// One Move up row per section of every category's order submenu, in menu order.
+			const moves = async (caption) =>
+				parseRows(
+					await session.run('rows', [`^${escapeRegExp(caption)}$`, ` > ${escapeRegExp(order)} > `])
+				);
+			const categoryOf = (row) => row.path.slice(0, row.path.indexOf(order) + 1);
+			const downs = await moves(down);
+			const first = downs.find((row) => !row.disabled);
+			if (!first)
+				return fail(`no enabled "${down}" row under any "${order}" submenu (${downs.length} rows)`);
+			const prefix = categoryOf(first);
+			const sameCategory = (row) => categoryOf(row).join(' > ') === prefix.join(' > ');
+			const sections = async () =>
+				(await moves(up)).filter(sameCategory).map((row) => row.path[prefix.length]);
+			const where = prefix.slice(0, -1).join(' > ');
+			const moveDown = (label) =>
+				session.run('click', [...prefix, label, down], 180000, { followReload: true });
+			const overrides = (snapshot) =>
+				Object.entries(snapshot).filter(([key]) => key.startsWith('hotstrings.order_overrides.'));
+			const problems = [];
+
+			const initial = await sections();
+			const label = first.path[prefix.length];
+			const at = initial.indexOf(label);
+			if (at < 0 || at + 1 >= initial.length)
+				return fail(`${where}: "${label}" has no section below it in ${initial.join(', ')}`);
+			const expected = [...initial];
+			[expected[at], expected[at + 1]] = [expected[at + 1], expected[at]];
+			const beforeMove = live.configSnapshot(session);
+			await moveDown(label);
+			pid = (await session.quiesce(pid)).pid;
+			const moved = await sections();
+			if (moved.join('|') !== expected.join('|'))
+				problems.push(`after Move down the order reads ${moved.join(', ')}`);
+			const afterMove = live.configSnapshot(session);
+			const changed = live.diffSnapshots(beforeMove, afterMove).map((change) => change.key);
+			const stored = overrides(afterMove);
+			if (stored.length !== 1 || !Array.isArray(JSON.parse(stored[0][1])))
+				problems.push(`the move stored ${stored.length} order lists: ${changed.join(', ')}`);
+			const stray = changed.filter((key) => !key.startsWith('hotstrings.order_overrides.'));
+			if (stray.length > 0) problems.push(`the move changed ${stray.join(', ')}`);
+
+			// Each boot may save late too: the menu is walked, and so built, after that.
+			const settle = async () => {
+				const served = Number(/pid=(\d+)/.exec(await session.run('info'))[1]);
+				return (await session.quiesce(served, { quietMs: 8000 })).pid;
+			};
+			await session.restart();
+			pid = await settle();
+			const restarted = await sections();
+			if (restarted.join('|') !== expected.join('|'))
+				problems.push(`after a restart the order reads ${restarted.join(', ')}`);
+			if (JSON.stringify(overrides(live.configSnapshot(session))) !== JSON.stringify(stored))
+				problems.push('a restart changed the stored order');
+
+			await session.run('click', [...prefix, reset], 180000, { followReload: true });
+			pid = (await session.quiesce(pid)).pid;
+			const restored = await sections();
+			if (restored.join('|') !== initial.join('|'))
+				problems.push(`after ${reset} the order reads ${restored.join(', ')}`);
+			if (overrides(live.configSnapshot(session)).length !== 0)
+				problems.push(`${reset} left an order list in the configuration`);
+
+			// The rows just walked built the menu over the file as it is now: an edit made
+			// outside the driver afterwards makes that menu stale.
+			const file = path.join(session.config, 'autohotkey', 'config.toml');
+			fs.appendFileSync(file, '\n[zz_live_external]\nedited = true\n');
+			const external = fs.readFileSync(file);
+			const logged = new Set(session.logLines(''));
+			await moveDown(label);
+			pid = (await session.quiesce(pid)).pid;
+			if (!fs.readFileSync(file).equals(external))
+				problems.push('the stale menu wrote over the external edit');
+			if (
+				(await waitForLog(
+					session,
+					'Could not persist the hotstring section order',
+					logged,
+					8000
+				)) === null
+			)
+				problems.push('the stale menu click was not logged as refused');
+			const dialogs = await session.run('dialogs');
+			if (dialogs !== 'dialogs=') problems.push(`a dialog is on screen: ${dialogs}`);
+
+			// A fresh menu over the edited file moves again and keeps the edit.
+			await session.restart();
+			pid = await settle();
+			await moveDown(label);
+			pid = (await session.quiesce(pid)).pid;
+			const fresh = live.configSnapshot(session);
+			if (overrides(fresh).length !== 1) problems.push('a fresh menu did not store the move');
+			if (fresh['zz_live_external.edited'] !== 'true')
+				problems.push('the fresh move lost the external edit');
+			// The refusal itself logs two errors: the writer's and the commit's.
+			const errors = session
+				.loggedErrors()
+				.filter(
+					(line) =>
+						!line.includes('Could not persist the hotstring section order') &&
+						!line.includes('the source changed during candidate preparation')
+				);
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(`${where}: ${problems.join('; ')}`);
+			return pass(
+				`${where}: "${label}" moved down (${initial.join(', ')} -> ${moved.join(', ')}), kept over a restart, reset, refused over an external edit, moved again once the menu was fresh`
+			);
+		}
+	},
+	{
+		id: 'layout-emulation-row',
+		title:
+			'Keyboard layout > Layout to emulate: lists None, Ergopti, Ergopti➕ and the registry; a choice restarts on it; None types the system layout; a missing stored layout stays named',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const locale = englishLocale();
+			// The submenu row shows the choice in force: « Layout to emulate: Ergopti ».
+			const head = locale['common.label_value']
+				.split('{2}')[0]
+				.replace('{1}', locale['menu.layout.emulated_layout']);
+			const menu = ['re:Keyboard layout$', `re:^${escapeRegExp(head)}`];
+			const none = locale['onboarding.layout.emulated_none'];
+			const builtIn = [
+				none,
+				locale['onboarding.layout.emulated_ergopti'],
+				locale['onboarding.layout.emulated_ergopti_plus']
+			];
+			const { layouts } = JSON.parse(
+				fs.readFileSync(path.join(live.ROOT, 'static', 'layouts', 'registry', 'index.json'), 'utf8')
+			);
+			const registry = layouts
+				.filter((layout) => layout.id !== 'ergopti' && layout.id !== 'ergopti_plus')
+				.map((layout) => layout.name || layout.id);
+			const { levels } = JSON.parse(
+				fs.readFileSync(
+					path.join(live.WINDOWS, 'tests', 'fixtures', 'ergopti_emulation_golden.json'),
+					'utf8'
+				)
+			);
+			const codes = ['10', '11', '12', '13'];
+			const ergoptiText = codes.map((code) => levels.base[`SC0${code}`].text).join('');
+			const choices = async (session) =>
+				parseRows(
+					await session.run('rows', [
+						'.',
+						`> ${escapeRegExp(locale['menu.layout.emulated_layout'])}`
+					])
+				).filter((row) => row.path.length === 3);
+			// The menu keeps « Ergopti » and « Ergopti➕ » two native items by suffixing
+			// zero-width spaces to the later one (_MR_NativeDistinctRows): the user
+			// reads the caption without them, and a click must accept them.
+			const shown = (caption) => caption.replace(/\u200B+$/, '');
+			const choiceRow = (caption) => `re:^${escapeRegExp(caption)}(?:\\x{200B})*$`;
+			const ticked = (rows) =>
+				rows
+					.filter((row) => row.checked)
+					.map((row) => shown(row.path[2]))
+					.join(', ');
+			const typeRow = async (session) => {
+				await session.run('edit_open');
+				session.type([
+					['mode', 'event'],
+					['level', '100'],
+					['gap', '80'],
+					...codes.map((code) => ['key', `{Blind}{SC0${code}}`]),
+					['wait', '500']
+				]);
+				const typed = (await session.run('edit_value')).replace(/^value=/, '');
+				const system = fields(await session.run('foreground_chars', codes));
+				await session.run('edit_close');
+				return { typed, system: system.chars.split(' ').join(''), hkl: system.hkl };
+			};
+			const problems = [];
+			const { session, pid: booted } = await bootEnglish(
+				context,
+				'emulation',
+				'[category_enabled]\nlayout = true\n'
+			);
+			let pid = (await session.quiesce(booted, { quietMs: 8000 })).pid;
+			const listed = await choices(session);
+			const captions = listed.map((row) => shown(row.path[2]));
+			if (captions.slice(0, 3).join('|') !== builtIn.join('|'))
+				problems.push(`the list starts ${captions.slice(0, 3).join(', ')}`);
+			const missing = registry.filter((name) => !captions.slice(3).includes(name));
+			if (missing.length > 0)
+				problems.push(`the registry layouts ${missing.join(', ')} are not listed`);
+			if (ticked(listed) !== none) problems.push(`a fresh profile ticks "${ticked(listed)}"`);
+
+			const choose = async (caption) => {
+				const answer = fields(
+					await session.run('click_confirming', ['.', ...menu, choiceRow(caption)], 180000, {
+						followReload: true
+					})
+				);
+				if (answer.dialog && answer.dialog !== 'none')
+					problems.push(`choosing ${caption} showed the dialog "${answer.dialog}"`);
+				const settled = await session.quiesce(pid, { quietMs: 4000 });
+				if (!settled.reloaded) problems.push(`choosing ${caption} did not restart the driver`);
+				pid = settled.pid;
+				const rows = await choices(session);
+				if (ticked(rows) !== caption)
+					problems.push(`after choosing ${caption} the tick is on "${ticked(rows)}"`);
+				return live.effectiveConfig(session);
+			};
+			let config = await choose(builtIn[1]);
+			if (
+				config[KEY.LAYOUT_ERGOPTI_BASE] !== 'true' ||
+				config[KEY.LAYOUT_ERGOPTI_VARIANT] !== '"ergopti"'
+			)
+				problems.push(
+					`Ergopti stored base ${config[KEY.LAYOUT_ERGOPTI_BASE]}, variant ${config[KEY.LAYOUT_ERGOPTI_VARIANT]}`
+				);
+			const emulated = await typeRow(session);
+			if (emulated.typed !== ergoptiText)
+				problems.push(
+					`with Ergopti the top row typed "${emulated.typed}", "${ergoptiText}" expected`
+				);
+			config = await choose(builtIn[2]);
+			if (config[KEY.LAYOUT_ERGOPTI_VARIANT] !== '"ergopti_plus"')
+				problems.push(`Ergopti➕ stored the variant ${config[KEY.LAYOUT_ERGOPTI_VARIANT]}`);
+			config = await choose(none);
+			if (
+				config[KEY.LAYOUT_ERGOPTI_BASE] !== 'false' ||
+				config[KEY.LAYOUT_EMULATED_LAYOUT] !== '""'
+			)
+				problems.push(
+					`None stored base ${config[KEY.LAYOUT_ERGOPTI_BASE]}, emulated ${config[KEY.LAYOUT_EMULATED_LAYOUT]}`
+				);
+			const native = await typeRow(session);
+			if (native.system.includes('dead') || native.system.includes('none'))
+				problems.push(
+					`the system layout ${native.hkl} has a dead or empty key there: ${native.system}`
+				);
+			else if (native.typed !== native.system)
+				problems.push(
+					`with None the top row typed "${native.typed}", the system layout ${native.hkl} types "${native.system}"`
+				);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			await session.stop();
+
+			// A stored id that is neither built in nor installed keeps its own row, ticked.
+			const absent = 'zz_live_absent';
+			const stale = await bootEnglish(
+				context,
+				'absent',
+				`[category_enabled]\nlayout = true\n[layout]\nemulated_layout = "${absent}"\n`
+			);
+			await stale.session.quiesce(stale.pid, { quietMs: 8000 });
+			const kept = await choices(stale.session);
+			if (ticked(kept) !== absent)
+				problems.push(`an absent stored layout ticks "${ticked(kept)}", "${absent}" expected`);
+			if (!kept.some((row) => row.path[1].endsWith(absent)))
+				problems.push(`the submenu does not name ${absent}: ${kept[0]?.path[1]}`);
+			if (live.configSnapshot(stale.session)[KEY.LAYOUT_EMULATED_LAYOUT] !== `"${absent}"`)
+				problems.push('the boot dropped the absent stored layout');
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(
+				`${captions.length} choices (${captions.join(', ')}); Ergopti typed "${emulated.typed}", None typed "${native.typed}" like ${native.hkl}; ${absent} stays named and ticked`
+			);
+		}
+	},
+	{
+		id: 'hotstring-preview-boundaries',
+		title:
+			'Hotstring preview: after punctuation, with a custom delimiter and a changed magic key, the bubble and the expansion agree',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const asa = shippedRule('autocorrection.toml', 'asa');
+			const cest = shippedRule('french/magickey.toml', 'c★');
+			if (!asa || !cest)
+				return notExecuted('the shipped data no longer holds asa -> ASA and c★ -> c’est');
+			const magic = '¤';
+			const { session } = await bootEnglish(
+				context,
+				'preview',
+				[
+					'[category_enabled]',
+					'hotstrings = true',
+					'autocorrection = true',
+					'french_magickey = true',
+					'[hotstrings]',
+					`trigger_char = "${magic}"`,
+					// No delay: a bubble whose window ran out is not painted.
+					`[hotstrings.autocorrection.${asa.section}]`,
+					'enabled = true',
+					'time_activation_seconds = 0',
+					`[hotstrings.french_magickey.${cest.section}]`,
+					'enabled = true',
+					'time_activation_seconds = 0',
+					'[[hotstrings.terminators]]',
+					'key = "custom_section"',
+					'char = "§"',
+					'label = "Section"',
+					'consume = false',
+					''
+				].join('\n')
+			);
+			await session.run('pump', ['3000']);
+			const cases = [
+				{ name: 'a parenthesis before the word', word: '(asa', end: ' ', expected: '(ASA ' },
+				{ name: 'the custom delimiter §', word: 'asa', end: '§', expected: 'ASA§' },
+				{ name: `the magic key changed to ${magic}`, word: 'c', end: magic, expected: 'c’est' }
+			];
+			const problems = [];
+			const seen = [];
+			for (const item of cases) {
+				await session.run('edit_open');
+				session.type([
+					['mode', 'event'],
+					['level', '100'],
+					['gap', '120'],
+					['text', item.word],
+					['wait', '900']
+				]);
+				const preview = JSON.parse(await session.run('preview_state'));
+				// The bubble asks the end character and the magic key; a delimiter
+				// other than the first is answered by the end-character row.
+				const kind = item.end === magic ? magic : null;
+				const pick = (rows) =>
+					rows.find((row) => (kind ? row.completion === kind : row.completion !== magic));
+				const computed = pick(preview.computed);
+				const painted = pick(preview.visible);
+				session.type([
+					['mode', 'event'],
+					['level', '100'],
+					['gap', '120'],
+					item.end === ' ' ? ['key', '{SC039}'] : ['text', item.end],
+					['wait', '900']
+				]);
+				const typed = (await session.run('edit_value')).replace(/^value=/, '');
+				await session.run('edit_close');
+				if (typed !== item.expected)
+					problems.push(`${item.name}: typed "${typed}", "${item.expected}" expected`);
+				if (!computed)
+					problems.push(
+						`${item.name}: no preview row after "${item.word}" (buffer "${preview.buffer}")`
+					);
+				else if (!typed.includes(computed.output))
+					problems.push(
+						`${item.name}: the preview offered "${computed.output}", the key typed "${typed}"`
+					);
+				if (computed && (!painted || painted.output !== computed.output))
+					problems.push(
+						`${item.name}: the bubble painted ${painted ? `"${painted.output}"` : 'nothing'}, the preview computed "${computed.output}"`
+					);
+				if (preview.computed.some((row) => row.completion === '★'))
+					problems.push(`${item.name}: a row still answers the old magic key ★`);
+				seen.push(`${item.name}: "${computed?.output}" -> "${typed}"`);
+			}
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(seen.join('; '));
+		}
+	},
+	{
+		id: 'asa-space-fast',
+		title: '`asa` then Space fast, Space down before the last a is up, 20 times: always ASA',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const rule = shippedRule('autocorrection.toml', 'asa');
+			if (!rule || !/output = "ASA"/.test(rule.line))
+				return notExecuted('the shipped autocorrection data no longer holds asa -> ASA');
+			const { session } = await bootEnglish(
+				context,
+				'asa',
+				`[category_enabled]\nhotstrings = true\nautocorrection = true\n[hotstrings.autocorrection.${rule.section}]\nenabled = true\n`
+			);
+			await session.run('pump', ['3000']);
+			const word = [
+				['key', '{Blind}a'],
+				['key', '{Blind}s'],
+				['key', '{Blind}{a down}'],
+				['key', '{Blind}{SC039 down}'],
+				['key', '{Blind}{a up}'],
+				['key', '{Blind}{SC039 up}']
+			];
+			const times = 20;
+			const typed = await typeInto(session, Array.from({ length: times }, () => word).flat(), 15);
+			const words = typed.split(' ').slice(0, -1);
+			const wrong = words.filter((one) => one !== 'ASA');
+			const problems = [];
+			if (typed !== 'ASA '.repeat(times))
+				problems.push(
+					`${words.length} words, ${wrong.length} not ASA (${[...new Set(wrong)].join(', ')}): "${typed}"`
+				);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`${times} fast asa + Space typed ${times} ASA (section ${rule.section})`);
+		}
+	},
+	{
+		id: 'personal-priority-and-left',
+		title:
+			'A personal sru -> SRU at priority 100 beats the bundled sru -> sur; a personal {Left} moves the caret',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const bundled = shippedRule('french/autocorrection.toml', 'sru');
+			if (!bundled || !/output = "sur"/.test(bundled.line))
+				return notExecuted('the shipped French autocorrection no longer holds sru -> sur');
+			const toml = [
+				'[category_enabled]',
+				'hotstrings = true',
+				'french_autocorrection = true',
+				`[hotstrings.french_autocorrection.${bundled.section}]`,
+				'enabled = true',
+				'[hotstrings.personal.live]',
+				'enabled = true',
+				'time_activation_seconds = 0',
+				''
+			].join('\n');
+			const problems = [];
+			// Without the personal file the bundled correction fires: the win below is the priority's.
+			const control = await bootEnglish(context, 'bundled', toml);
+			await control.session.run('pump', ['3000']);
+			const alone = await typeInto(control.session, [
+				['text', 'sru'],
+				['key', '{SC039}']
+			]);
+			if (alone !== 'sur ')
+				problems.push(`with no personal rule sru typed "${alone}", "sur " expected`);
+			await control.session.stop();
+
+			const session = context.newSession('personal');
+			session.seed('autohotkey/config.toml', ENGLISH + toml);
+			session.seed(
+				'hotstrings/personal_hotstrings.toml',
+				[
+					'[[live]]',
+					'"sru" = { output = "SRU", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true, priority = 100 }',
+					'"zqpar" = { output = "(){Left}", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }',
+					''
+				].join('\n')
+			);
+			await session.start();
+			await session.run('pump', ['3000']);
+			const won = await typeInto(session, [
+				['text', 'sru'],
+				['key', '{SC039}']
+			]);
+			if (won !== 'SRU ')
+				problems.push(`with the personal rule sru typed "${won}", "SRU " expected`);
+			// The caret is judged by where the next character lands.
+			const caret = await typeInto(session, [
+				['text', 'zqpar'],
+				['wait', '600'],
+				['text', 'X']
+			]);
+			if (caret !== '(X)') problems.push(`zqpar then X typed "${caret}", "(X)" expected`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`bundled alone "${alone}", personal priority 100 "${won}", {Left} "${caret}"`);
+		}
+	},
+	{
+		id: 'cascade-fb-item-50',
+		title:
+			'Item 50: fb + Space, Enter and ★ with the abbreviation and brand rules, at 1, 2 and 3 arrows, consumed and not',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const brand = shippedRule('autocorrection.toml', 'facebook');
+			if (!brand || !/output = "Facebook"/.test(brand.line))
+				return notExecuted('the shipped autocorrection no longer holds facebook -> Facebook');
+			// No shipped end-character rule types fb -> facebook: the abbreviation is personal.
+			const personal =
+				'[[live]]\n"fb" = { output = "facebook", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n';
+			const ends = [
+				{ name: 'Space', step: ['key', '{SC039}'], char: ' ' },
+				{ name: 'Enter', step: ['key', '{SC01C}'], char: '\\n' },
+				{ name: '★', step: ['text', '★'], char: '★' }
+			];
+			const problems = [];
+			const seen = [];
+			for (const arrows of [1, 2, 3]) {
+				for (const consumed of [false, true]) {
+					const session = context.newSession(`fb-${arrows}-${consumed ? 'c' : 'k'}`);
+					session.seed(
+						'autohotkey/config.toml',
+						ENGLISH +
+							[
+								'[category_enabled]',
+								'hotstrings = true',
+								'autocorrection = true',
+								'[hotstrings]',
+								`cascade_max_arrows = ${arrows}`,
+								`[hotstrings.autocorrection.${brand.section}]`,
+								'enabled = true',
+								'time_activation_seconds = 0',
+								'[hotstrings.personal.live]',
+								'enabled = true',
+								'time_activation_seconds = 0',
+								'[hotstrings.terminator_consume]',
+								`space = ${consumed}`,
+								`enter = ${consumed}`,
+								`star = ${consumed}`,
+								''
+							].join('\n')
+					);
+					session.seed('hotstrings/personal_hotstrings.toml', personal);
+					await session.start();
+					await session.run('pump', ['3000']);
+					// One arrow is the abbreviation alone; a second carries it to the brand.
+					const word = arrows === 1 ? 'facebook' : 'Facebook';
+					for (const end of ends) {
+						const expected = word + (consumed ? '' : end.char);
+						const typed = await typeInto(session, [['text', 'fb'], end.step]);
+						const label = `${arrows} arrow(s), ${consumed ? 'consumed' : 'kept'}, ${end.name}`;
+						if (typed !== expected) problems.push(`${label}: "${typed}", "${expected}" expected`);
+						seen.push(`${label}="${typed}"`);
+					}
+					const errors = session.loggedErrors();
+					if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+					await session.stop();
+				}
+			}
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(seen.join(', '));
+		}
+	},
+	{
+		id: 'gestures-info-row',
+		title: 'Tray > Gestures: exactly one "Info…" row, which opens its explanation',
+		async run(context) {
+			const locale = englishLocale();
+			const caption = locale['menu.gestures.recommended_info'];
+			const { session, pid: booted } = await bootEnglish(context, 'gesinfo');
+			// An off category greys its rows and suffixes them « — Category off » (77f417280e).
+			const infoRows = async () =>
+				parseRows(await session.run('rows', [`^${escapeRegExp(caption)}( — |$)`])).filter(
+					(row) => row.path.length === 2 && /Gestures$/.test(row.path[0])
+				);
+			let rows = await infoRows();
+			if (rows.length === 1 && rows[0].disabled) {
+				await ensureCategoryOn(session, booted, 're:Gestures$', 'Enable gestures');
+				rows = await infoRows();
+			}
+			if (rows.length !== 1)
+				return fail(
+					`${rows.length} "${caption}" rows in the Gestures menu: ${rows.map((r) => r.path.join(' > ')).join(' | ')}`
+				);
+			const [row] = rows;
+			if (row.disabled || row.path[1] !== caption)
+				return fail(
+					`with the gestures on the row reads "${row.path[1]}", disabled: ${row.disabled}`
+				);
+			const title = locale['menu.gestures.notify_title'];
+			const seen = fields(
+				await session.run('click_read_dialog', [escapeRegExp(title), ...row.path])
+			);
+			const problems = [];
+			if (!seen.title.includes(title))
+				problems.push(`the dialog is titled "${seen.title}", "${title}" expected`);
+			const reason = squash(locale['menu.gestures.recommended_reason_windows']);
+			if (!squash(seen.text).includes(reason))
+				problems.push(`the dialog shows "${seen.text}", not the Windows reason`);
+			const dialogs = await session.run('dialogs');
+			if (dialogs !== 'dialogs=') problems.push(`a dialog stays open after OK: ${dialogs}`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`one "${caption}" row; it opened "${seen.title}" with the Windows reason`);
 		}
 	}
 ];

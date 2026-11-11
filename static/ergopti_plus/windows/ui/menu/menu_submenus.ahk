@@ -103,8 +103,7 @@ InitSubMenus() {
 		}
 		PerfStage_End("Menu.cat.rows", _perfCat, Rows.Length)
 		_perfRender := PerfStage_Begin()
-		SplitPath(TomlPath, , , , &CategoryId)
-		Rows := _HS_OrderRows(CategoryId, Rows)
+		Rows := _HS_OrderRows(V1Cat, Rows)
 		_HS_CategoryMenu(V1Cat, TomlPath, Rows, , Target)
 		PerfStage_End("Menu.cat.render", _perfRender, Rows.Length)
 	}
@@ -252,7 +251,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset, TargetMenu := unset) {
 				"action", PersonalInformationEditor))
 		}
 	}
-	Rows := _HS_OrderRows("dynamichotstrings", Rows)
+	Rows := _HS_OrderRows("DynamicHotstrings", Rows)
 	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
 		(_Targets, Enabled) => _HS_SelectionNotice(GetCategoryTitle("DynamicHotstrings"), Enabled,
 			ToggleDynamicAllSections(Enabled, Options)), IsSet(TargetMenu) ? TargetMenu : unset)

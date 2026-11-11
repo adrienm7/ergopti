@@ -32,6 +32,14 @@ class _TakeNoteFakeOps {
 	static last_target := 0
 	static last_send := ""
 	static replacement_title_after_activate := ""
+	; A modelled Windows 11 Notepad: a window whose Tabs map a tab id to its
+	; file path. A launched file becomes (or reselects) one of its tabs, as the
+	; real Notepad does, after launch_switch_delay deferred callbacks.
+	static tabbed_window := 0
+	static launch_switch_delay := 0
+	static pending_switches := []
+	static next_tab := 0
+	static last_send_tab := ""
 
 	static Reset(NowTick := 100) {
 		_TakeNoteFakeOps.now_tick := NowTick
@@ -55,6 +63,68 @@ class _TakeNoteFakeOps {
 		_TakeNoteFakeOps.last_target := 0
 		_TakeNoteFakeOps.last_send := ""
 		_TakeNoteFakeOps.replacement_title_after_activate := ""
+		_TakeNoteFakeOps.tabbed_window := 0
+		_TakeNoteFakeOps.launch_switch_delay := 0
+		_TakeNoteFakeOps.pending_switches := []
+		_TakeNoteFakeOps.next_tab := 0
+		_TakeNoteFakeOps.last_send_tab := ""
+	}
+
+	; Shows the tab TabId of a modelled tabbed window, titled as Notepad does.
+	static ShowTab(Window, TabId) {
+		SplitPath(Window.Tabs[TabId], &FileName)
+		Window.Tab := TabId
+		Window.Title := FileName . " " . Chr(0x2013) . " Bloc-notes"
+	}
+
+	; Notepad keeps one tab per path: a launched path reselects its open tab.
+	static OpenTab(Path) {
+		Window := _TakeNoteFakeOps.tabbed_window
+		if !IsObject(_TakeNoteFakeOps.FindModelWindow(Window.Hwnd))
+			_TakeNoteFakeOps.windows.Push(Window)
+		for TabId, TabPath in Window.Tabs {
+			if StrLower(TabPath) == StrLower(Path) {
+				_TakeNoteFakeOps.ShowTab(Window, TabId)
+				return
+			}
+		}
+		TabId := "tab-" . ++_TakeNoteFakeOps.next_tab
+		Window.Tabs[TabId] := Path
+		_TakeNoteFakeOps.ShowTab(Window, TabId)
+	}
+
+	static AdvanceTabs() {
+		Remaining := []
+		for Pending in _TakeNoteFakeOps.pending_switches {
+			if --Pending.Delay <= 0
+				_TakeNoteFakeOps.OpenTab(Pending.Path)
+			else
+				Remaining.Push(Pending)
+		}
+		_TakeNoteFakeOps.pending_switches := Remaining
+	}
+
+	static FindModelWindow(Hwnd) {
+		for Candidate in _TakeNoteFakeOps.windows {
+			if Candidate.Hwnd == Hwnd
+				return Candidate
+		}
+		return 0
+	}
+
+	static SelectedTab(Hwnd) {
+		_TakeNoteFakeOps.calls.Push("selected-tab")
+		Window := _TakeNoteFakeOps.FindModelWindow(Hwnd)
+		return IsObject(Window) && Window.HasProp("Tabs") ? Window.Tab : ""
+	}
+
+	static SelectTab(Hwnd, TabId) {
+		_TakeNoteFakeOps.calls.Push("select-tab:" . TabId)
+		Window := _TakeNoteFakeOps.FindModelWindow(Hwnd)
+		if !IsObject(Window) || !Window.HasProp("Tabs") || !Window.Tabs.Has(TabId)
+			return false
+		_TakeNoteFakeOps.ShowTab(Window, TabId)
+		return true
 	}
 
 	static NowTick() {
@@ -79,6 +149,13 @@ class _TakeNoteFakeOps {
 	static Launch(Path) {
 		_TakeNoteFakeOps.calls.Push("launch:" . Path)
 		_TakeNoteFakeOps.launch_count += 1
+		if IsObject(_TakeNoteFakeOps.tabbed_window) {
+			if _TakeNoteFakeOps.launch_switch_delay > 0
+				_TakeNoteFakeOps.pending_switches.Push(
+					{ Path: Path, Delay: _TakeNoteFakeOps.launch_switch_delay })
+			else
+				_TakeNoteFakeOps.OpenTab(Path)
+		}
 		if _TakeNoteFakeOps.suspend_after_launch {
 			_TakeNoteFakeOps.window_exists := true
 			_TakeNoteFakeOps.suspended := true
@@ -161,6 +238,7 @@ class _TakeNoteFakeOps {
 
 	static SendFinal(Keys) {
 		_TakeNoteFakeOps.last_send := Keys
+		_TakeNoteFakeOps.last_send_tab := _TakeNoteFakeOps.SelectedTab(_TakeNoteFakeOps.last_target)
 		_TakeNoteFakeOps.calls.Push("send-final")
 		_TakeNoteFakeOps.send_count += 1
 		return true
@@ -188,6 +266,7 @@ class _TakeNoteFakeOps {
 		Assert(_TakeNoteFakeOps.timers.Length > 0,
 			"the fake timer queue must contain a deferred note callback")
 		Callback := _TakeNoteFakeOps.timers.RemoveAt(1)
+		_TakeNoteFakeOps.AdvanceTabs()
 		Callback.Call()
 	}
 }
@@ -339,6 +418,88 @@ _TNAJ_SameNameInAnotherFolderLaunchesItsOwnWindow() {
 Test("take note async: a same-named note in another folder gets its own window "
 	. "(takenote-native-document-owner)",
 	_TNAJ_SameNameInAnotherFolderLaunchesItsOwnWindow)
+
+; A modelled Windows 11 Notepad window, already showing a restored tab of a
+; same-named note from a folder this module never opened.
+_TNAJ_TabbedNotepad(Tabs, Selected) {
+	Window := { Hwnd: 707, Title: "", Tabs: Tabs, Tab: "" }
+	_TakeNoteFakeOps.ShowTab(Window, Selected)
+	_TakeNoteFakeOps.windows := [Window]
+	_TakeNoteFakeOps.tabbed_window := Window
+	return Window
+}
+
+; The Windows 11 Notepad opens a second Notes.txt as a tab of its one window.
+; The window-only binding waited for a new window that never came, then typed
+; into whichever same-named tab was selected (takenote-notepad-tabs).
+_TNAJ_TabbedNotepadSelectsTheRequestedTab() {
+	global _TakeNotePending
+	_TNAJ_Reset()
+	_TakeNoteFakeOps.file_exists := true
+	_TakeNoteFakeOps.launch_switch_delay := 1
+	Window := _TNAJ_TabbedNotepad(Map("tab-0", "C:\Old\Notes.txt"), "tab-0")
+
+	First := TakeNoteRequest(false, "C:\A", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(1, _TakeNoteFakeOps.launch_count,
+		"a restored same-named tab cannot stand for the note: Notepad must open it")
+	AssertEqual(0, _TakeNoteFakeOps.send_count,
+		"the restored tab still selected before Notepad switches receives nothing")
+	AssertTrue(_TakeNotePending.Has(First))
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(First))
+	AssertEqual("C:\A\Notes.txt", Window.Tabs[_TakeNoteFakeOps.last_send_tab],
+		"the launch newline goes to the tab Notepad opened for C:\A")
+
+	Second := TakeNoteRequest(false, "C:\B", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(2, _TakeNoteFakeOps.launch_count, "the tab bound to C:\A cannot stand for C:\B")
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(Second),
+		"the C:\B note opened as a tab of the same window completes without a new window")
+	AssertEqual(0, _TakeNoteFakeOps.warning_count)
+	AssertEqual(2, _TakeNoteFakeOps.send_count)
+	AssertEqual("C:\B\Notes.txt", Window.Tabs[_TakeNoteFakeOps.last_send_tab])
+
+	Again := TakeNoteRequest(false, "C:\A", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(Again))
+	AssertEqual(2, _TakeNoteFakeOps.launch_count, "the note's open tab is selected again, not relaunched")
+	AssertEqual("C:\A\Notes.txt", Window.Tabs[Window.Tab],
+		"the focused window shows the C:\A tab, not the C:\B one selected before")
+	AssertEqual(707, _TakeNoteFakeOps.last_target)
+	AssertEqual(2, _TakeNoteFakeOps.send_count, "an already-open note gets no launch newline")
+}
+Test("take note async: a tabbed Notepad selects the tab of the exact note path "
+	. "(takenote-notepad-tabs)",
+	_TNAJ_TabbedNotepadSelectsTheRequestedTab)
+
+; After a restart the bindings are gone while the note may already be the
+; selected tab: Notepad then keeps that tab, which is accepted once it settled.
+_TNAJ_TabbedNotepadKeepsAnAlreadySelectedNote() {
+	global _TakeNotePending, TAKE_NOTE_POLL_INTERVAL_MS
+	SettleMs := TimingsGet("ui", "take_note_tab_settle_ms")
+	_TNAJ_Reset()
+	_TakeNoteFakeOps.file_exists := true
+	Window := _TNAJ_TabbedNotepad(Map("tab-7", "C:\A\Notes.txt"), "tab-7")
+	JobId := TakeNoteRequest(false, "C:\A", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	SettleStart := _TakeNoteFakeOps.now_tick
+	while _TakeNotePending.Has(JobId) && _TakeNoteFakeOps.now_tick - SettleStart < 2 * SettleMs {
+		AssertEqual(0, _TakeNoteFakeOps.send_count, "an unchanged tab is not taken before it settled")
+		_TakeNoteFakeOps.now_tick += TAKE_NOTE_POLL_INTERVAL_MS
+		_TakeNoteFakeOps.RunNext()
+	}
+	AssertFalse(_TakeNotePending.Has(JobId), "the tab Notepad kept for the launched path is accepted")
+	AssertTrue(_TakeNoteFakeOps.now_tick - SettleStart >= SettleMs,
+		"the unchanged tab was accepted only after the settle delay")
+	AssertEqual(1, _TakeNoteFakeOps.launch_count)
+	AssertEqual(1, Window.Tabs.Count, "Notepad reselects the open path instead of a duplicate tab")
+	AssertEqual("tab-7", _TakeNoteFakeOps.last_send_tab)
+}
+Test("take note async: a tabbed Notepad keeps the note tab it already showed "
+	. "(takenote-notepad-tabs)",
+	_TNAJ_TabbedNotepadKeepsAnAlreadySelectedNote)
 
 _TNAJ_ExactTitleIsRevalidatedAfterActivation() {
 	global _TakeNotePending

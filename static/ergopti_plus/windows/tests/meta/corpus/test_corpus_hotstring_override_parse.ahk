@@ -106,11 +106,13 @@ _COP_ParseBytes(Content) {
 
 _COP_ReplayVector(Vector) {
 	if (Vector.Has("error") && Vector["error"]) {
-		Refused := ""
+		; The caught state is the verdict: a ValueError with an empty message is
+		; still a raise, and a message sentinel read it as an accepted parse.
+		Refused := false
 		try _COP_ParseBytes(Vector["content"])
-		catch ValueError as Err
-			Refused := Err.Message
-		AssertTrue(Refused != "", Vector["name"] . ": invalid TOML must raise")
+		catch ValueError
+			Refused := true
+		AssertTrue(Refused, Vector["name"] . ": invalid TOML must raise")
 		return
 	}
 	AssertEqual(_COP_SpellExpected(Vector["expect"]), _COP_SpellParsed(_COP_ParseBytes(Vector["content"])), Vector["name"])

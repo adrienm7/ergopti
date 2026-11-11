@@ -76,11 +76,15 @@ _PIU_UnreadableReadBlocksTheWrite() {
 	Lock := FileOpen(Path, _PIU_EXCLUSIVE_LOCK_FLAGS)
 	Assert(IsObject(Lock),
 		"the test could not take an exclusive lock — it would otherwise assert nothing")
-	Threw := ""
+	; The caught state is the verdict: an Error with an empty message is still a
+	; throw, and a message sentinel alone accepted it (2026-10-28 audit, remaining
+	; finding 8, personal-info lead).
+	Caught := false, Threw := ""
 	try {
 		ReadPersonalInfoToml(Path)
 	} catch as Err {
-		Threw := Err.Message
+		Caught := true
+		Threw := Type(Err) . ": " . Err.Message
 	}
 	Flagged := _PIU_IsFlagged(Path)
 	; Release the lock BEFORE the save: that is the real sequence. The lock is
@@ -103,7 +107,7 @@ _PIU_UnreadableReadBlocksTheWrite() {
 	PersonalInformationLetters := SavedLetters
 	_ReadPersonalInfoTomlCache := SavedCache
 
-	Assert(Threw == "",
+	Assert(!Caught,
 		"ReadPersonalInfoToml must not throw on a locked file — it runs from the boot sequence, where an exception is an aborted boot. Got: " . Threw)
 	Assert(Flagged,
 		"a personal_info.toml that exists but cannot be read must be flagged unreadable. The placeholder identity left in memory is byte-for-byte what a user who never filled the form produces, and WritePersonalInfoToml serialises exactly that over the file")
