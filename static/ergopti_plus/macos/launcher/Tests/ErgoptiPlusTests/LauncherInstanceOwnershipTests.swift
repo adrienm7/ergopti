@@ -81,6 +81,39 @@ final class LauncherInstanceOwnershipTests: XCTestCase {
 		first.release()
 	}
 
+	/// A second launch restarts the running app, as Windows' #SingleInstance Force
+	/// does: it asks the running launcher to quit once and takes the lock that
+	/// launcher releases (MLC-003, decided by the maintainer on 2026-11-11).
+	@MainActor
+	func testASecondLauncherAsksTheRunningOneToQuitAndTakesOver() {
+		let first = LauncherInstanceLock(path: lockPath)
+		XCTAssertEqual(first.acquire(), .acquired)
+		var asked = 0
+		let tookOver = expectation(description: "the second launcher holds the lock")
+		let second = LauncherInstanceLock(path: lockPath)
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { XCTFail("unexpected fatal: \($0)") },
+			applicationTerminator: { _ in XCTFail("a restart does not hand over to the old launcher") },
+			loggerWorkerFactory: { nil },
+			instanceLock: second,
+			runningApplicationsReader: { _ in [] },
+			hammerspoonConfigSeeder: { _ in },
+			launcherQuitRequester: {
+				asked += 1
+				// The running launcher's controlled exit ends with its lock released.
+				DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { first.release() }
+				return 1
+			}
+		)
+		delegate.acquireSoleLauncherOwnership(attempt: 0) { tookOver.fulfill() }
+		wait(for: [tookOver], timeout: 10)
+		XCTAssertEqual(asked, 1, "the running launcher is asked to quit once")
+		XCTAssertTrue(second.isHeld)
+		second.release()
+	}
+
 	func testADuplicateAcquireOnTheSameOwnerIsRefused() {
 		let lock = LauncherInstanceLock(path: lockPath)
 		XCTAssertEqual(lock.acquire(), .acquired)
