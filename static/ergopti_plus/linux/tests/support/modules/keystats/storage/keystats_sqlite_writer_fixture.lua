@@ -14,9 +14,12 @@ local it = require("tests.support.metrics_preferences_fixture").it
 
 local sw     = helpers.load_module("modules.keystats.sqlite_writer")
 
---- Recognizes the mandatory additive initializer separately from target faults.
+--- Recognizes the mandatory additive initializers separately from target
+--- faults: the media schema, and the probe for raw tables lacking the UTC
+--- offset column (KMD-1), which an empty answer settles (none lacks it).
 --- A real CLI first-open control below checks that this DDL actually commits.
 local function is_media_schema_startup(command)
+	if command:find("pragma_table_info", 1, true) and command:find("utc_offset_min", 1, true) then return true end
 	return command:find("CREATE TABLE IF NOT EXISTS ngram_media_keys", 1, true)
 		and command:find("CREATE TABLE IF NOT EXISTS agg_app_day_media_hold", 1, true)
 		and command:find("COMMIT;", 1, true)
