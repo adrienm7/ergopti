@@ -1036,6 +1036,62 @@ for (const kind of [
 	}
 }
 
+// A reinstall removes the files the previous version owned and this one no
+// longer ships (install-reinstall-retired-files). install.sh extracts over the
+// old tree, so they stayed behind unowned: the tree then failed its own receipt
+// (Ownership.verify) and, once it was <root>.old, the next update could not
+// retire it. A retired file the user changed is kept, as uninstall keeps it.
+{
+	const retired = ['linux/retired/old_module.lua', '_shared/retired/old_data.json'];
+	const edited = 'linux/retired/edited.lua';
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const library = path.join(home, '.local/lib/ergopti');
+			const rows = [];
+			for (const relative of [...retired, edited]) {
+				const file = path.join(library, relative);
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+				fs.writeFileSync(file, `shipped by the previous version: ${relative}\n`);
+				const digest = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+				rows.push(`${digest}\t${relative}`);
+			}
+			fs.appendFileSync(path.join(library, edited), 'a line the user added\n');
+			fs.writeFileSync(path.join(library, '.ergopti-owned-files'), `${rows.join('\n')}\n`);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const library = path.join(run.home, '.local/lib/ergopti');
+		for (const relative of retired)
+			assert.equal(
+				fs.existsSync(path.join(library, relative)),
+				false,
+				`retired and unchanged: ${relative}`
+			);
+		assert.ok(fs.existsSync(path.join(library, edited)), 'a retired file the user changed is kept');
+		const receipt = fs.readFileSync(path.join(library, '.ergopti-owned-files'), 'utf8');
+		verifyOwnership(run, receipt, path.join(run.home, '.local'), false);
+		const owned = new Set(receipt.split('\n').map((row) => row.split('\t')[1]));
+		const unowned = [];
+		const walk = (relative) => {
+			for (const entry of fs.readdirSync(path.join(library, relative), { withFileTypes: true })) {
+				const child = `${relative}/${entry.name}`;
+				if (entry.isDirectory()) walk(child);
+				else if (!owned.has(child) && child !== edited) unowned.push(child);
+			}
+		};
+		walk('linux');
+		walk('_shared');
+		assert.deepEqual(unowned, [], 'every payload file of the reinstalled tree is in its receipt');
+	} catch (error) {
+		errors.push(`install-reinstall-retired-files: ${error.message}`);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // Reinstalling over this prefix's own launcher remains supported.
 {
 	const run = runInstaller({
