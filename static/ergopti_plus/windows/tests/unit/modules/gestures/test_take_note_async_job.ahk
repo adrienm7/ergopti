@@ -477,20 +477,21 @@ Test("take note async: a tabbed Notepad selects the tab of the exact note path "
 ; After a restart the bindings are gone while the note may already be the
 ; selected tab: Notepad then keeps that tab, which is accepted once it settled.
 _TNAJ_TabbedNotepadKeepsAnAlreadySelectedNote() {
-	global _TakeNotePending, TAKE_NOTE_TAB_SETTLE_MS, TAKE_NOTE_POLL_INTERVAL_MS
+	global _TakeNotePending, TAKE_NOTE_POLL_INTERVAL_MS
+	SettleMs := TimingsGet("ui", "take_note_tab_settle_ms")
 	_TNAJ_Reset()
 	_TakeNoteFakeOps.file_exists := true
 	Window := _TNAJ_TabbedNotepad(Map("tab-7", "C:\A\Notes.txt"), "tab-7")
 	JobId := TakeNoteRequest(false, "C:\A", true, _TakeNoteFakeOps)
 	_TakeNoteFakeOps.RunNext()
 	SettleStart := _TakeNoteFakeOps.now_tick
-	while _TakeNotePending.Has(JobId) && _TakeNoteFakeOps.now_tick - SettleStart < 2 * TAKE_NOTE_TAB_SETTLE_MS {
+	while _TakeNotePending.Has(JobId) && _TakeNoteFakeOps.now_tick - SettleStart < 2 * SettleMs {
 		AssertEqual(0, _TakeNoteFakeOps.send_count, "an unchanged tab is not taken before it settled")
 		_TakeNoteFakeOps.now_tick += TAKE_NOTE_POLL_INTERVAL_MS
 		_TakeNoteFakeOps.RunNext()
 	}
 	AssertFalse(_TakeNotePending.Has(JobId), "the tab Notepad kept for the launched path is accepted")
-	AssertTrue(_TakeNoteFakeOps.now_tick - SettleStart >= TAKE_NOTE_TAB_SETTLE_MS,
+	AssertTrue(_TakeNoteFakeOps.now_tick - SettleStart >= SettleMs,
 		"the unchanged tab was accepted only after the settle delay")
 	AssertEqual(1, _TakeNoteFakeOps.launch_count)
 	AssertEqual(1, Window.Tabs.Count, "Notepad reselects the open path instead of a duplicate tab")

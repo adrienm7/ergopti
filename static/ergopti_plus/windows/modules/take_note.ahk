@@ -19,7 +19,6 @@ global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
 ; and switches to it a moment later. A selected tab that never changed after
 ; the launch is taken for the requested note only once this delay has passed:
 ; Notepad then kept it selected because the file was already open in it.
-global TAKE_NOTE_TAB_SETTLE_MS := 1000
 ; "Hwnd|TabId" -> the lowercased full path of the note this module opened in
 ; that Notepad document; TabId is the UI Automation runtime id of the selected
 ; tab, or "" for the classic one-window-per-document Notepad. Notepad titles a
@@ -206,13 +205,13 @@ _TakeNoteDocumentKey(Hwnd, TabId) => Hwnd . "|" . TabId
 ; document this module opened for another folder's note of the same name never
 ; does. An unbound classic window does, as before tabs existed. An unbound tab
 ; does only once Notepad answered this job's own launch: it switched to another
-; tab, or kept the same one past TAKE_NOTE_TAB_SETTLE_MS. Restored or foreign
+; tab, or kept the same one past [ui] take_note_tab_settle_ms. Restored or foreign
 ; tabs carry the same name, and only Notepad maps the launched path to its tab.
 ; @param Job {Map} The job; its "tab" records the admitted tab.
 ; @param Hwnd {Integer} A Notepad window whose title names the note's file.
 ; @returns {Boolean}
 _TakeNoteWindowAdmits(Job, Hwnd) {
-	global _TakeNoteDocumentWindows, TAKE_NOTE_TAB_SETTLE_MS
+	global _TakeNoteDocumentWindows
 	TabId := Job["ops"].SelectedTab(Hwnd)
 	if !(TabId is String)
 		return false
@@ -235,7 +234,7 @@ _TakeNoteWindowAdmits(Job, Hwnd) {
 		Now := Job["ops"].NowTick()
 		if !FirstSeen.HasOwnProp("Since")
 			FirstSeen.Since := Now
-		Admitted := TickExpired64(FirstSeen.Since, TAKE_NOTE_TAB_SETTLE_MS, Now)
+		Admitted := TickExpired64(FirstSeen.Since, TimingsGet("ui", "take_note_tab_settle_ms"), Now)
 	}
 	if Admitted
 		Job["tab"] := TabId
