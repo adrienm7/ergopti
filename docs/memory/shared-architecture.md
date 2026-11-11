@@ -910,11 +910,14 @@ A dashboard Purge is one `events_system` row (`action = 'metrics_purge'`) the
 owning writer appends to its ledger; `_shared/data/db/purge_schema.sql` (run
 after `schema.sql` and `media_schema.sql` on every open, and before each
 Windows incremental tail) deletes older raw and derived rows and ignores any
-older raw row inserted later, so every replay order converges. Linux stamps raw
-`ts` in UTC while macOS and Windows stamp local time with milliseconds, so the
-tombstone carries `metadata_json.utc` and the triggers compare a `linux`
-device's rows with it. A new raw `events_*` table needs its guard trigger
-regenerated in that file.
+older raw row inserted later, so every replay order converges. Every row now
+stores `ts` in UTC with its `utc_offset_min` (KMD-1, `maintainer-decisions.md`);
+the tombstone carries the same UTC instant, milliseconds kept, in
+`metadata_json.utc`, and the triggers compare a row with an offset (or an older
+`linux` row) with it and an older macOS or Windows row with the tombstone's
+local time. A store opened before the column gains it and drops these triggers
+first (`utc_offset_column.lua`, Windows `KLR_EnsureUtcOffsetColumn`). A new raw
+`events_*` table needs its guard trigger regenerated in that file.
 
 ## Logging and observability
 
