@@ -472,6 +472,21 @@ test('a structured source downloads its macOS bundle as one archive', () => {
 	);
 });
 
+test('the macOS download follows the export format drop-down', () => {
+	const converted = IO.convertImport(IO.importKeylayout(registry('ergopti'), 'ergopti', 'iso')).doc;
+	assert.match(IO.macosDownload(converted).filename, /\.bundle\.zip$/, 'bundle by default');
+	const iso = IO.macosDownload(converted, 'iso');
+	const ansi = IO.macosDownload(converted, 'ansi');
+	assert.equal(iso.mime, 'application/xml');
+	assert.equal(iso.text, IO.keylayoutFile(converted, 'iso').text);
+	assert.equal(ansi.text, IO.keylayoutFile(converted, 'ansi').text);
+	assert.notEqual(iso.text, ansi.text);
+	const preserved = IO.importKeylayout(registry('ergopti'), 'e', 'iso');
+	assert.equal(IO.macosDownload(preserved).text, registry('ergopti'), 'an import stays verbatim');
+	refuses(() => IO.macosDownload(preserved, 'bundle'), 'source_export_unavailable');
+	refuses(() => IO.macosDownload(preserved, 'ansi'), 'source_export_unavailable');
+});
+
 test('a layer fills from a reference or a registry layout, dead keys included', () => {
 	const sources = IO.fillSources([
 		{ id: 'ergopti', name: 'Ergopti', convention: 'iso', text: registry('ergopti') },
