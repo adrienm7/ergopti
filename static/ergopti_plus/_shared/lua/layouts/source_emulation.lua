@@ -30,6 +30,7 @@
 ---    undeclared layer or modifier, raises at compile time, never on a key.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
 local M = {}
 
 M.FORMAT = "ergopti-layout-emulation"
@@ -244,10 +245,7 @@ local function pressed_ids(session, held)
 	for _, id in ipairs(M.REPORTED) do
 		if type(held) == "table" and held[id] == true then pressed[#pressed + 1] = id end
 	end
-	local customs = {}
-	for id in pairs(session.active) do customs[#customs + 1] = id end
-	table.sort(customs)
-	for _, id in ipairs(customs) do pressed[#pressed + 1] = id end
+	for _, id in ipairs(TableUtil.sorted_keys(session.active)) do pressed[#pressed + 1] = id end
 	return pressed
 end
 
