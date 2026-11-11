@@ -571,10 +571,15 @@ for _HSCS_OrderVectorValue in JsonParse(FileRead(_SharedDir . "\tests\corpus\hot
 ; Every menu category keeps its own stored order. French autocorrection loads
 ; from french\autocorrection.toml, yet its order is not the neutral category's
 ; list: both drivers in Lua key it by its group id, and so must the tray.
+; The categories come from their declarations (the manifest groups and the
+; language packs), the sources _HS_RegisterLanguageMenuCategories reads, not
+; from _FLAT_HOTSTRING_V1_CATS, which only a tray build fills.
 _HSCS_OrderMenuCategories() {
 	Names := ["DynamicHotstrings"]
-	for Name in _FLAT_HOTSTRING_V1_CATS
-		Names.Push(Name)
+	Groups := MenuManifest_LoadHotstringGroups()
+	for Categories in [Groups.standard, Groups.ergopti]
+		for Name in Categories
+			Names.Push(Name)
 	for _, Pack in HotstringsLanguageCategories() {
 		for _, Cat in Pack["categories"]
 			Names.Push(Cat["v1"])
