@@ -11,8 +11,9 @@ const browsers = require('../ci/install-playwright.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
-	// 46: the real keyring proof's install step (run_keyring_receipts.sh).
-	['ci-linux.yml', 46],
+	// 47: the install steps of the real keyring proof (run_keyring_receipts.sh)
+	// and of the live desktop actions proof (run_desktop_actions_live.sh).
+	['ci-linux.yml', 47],
 	['ci-macos.yml', 3],
 	['ci-common.yml', 2],
 	['linux-layout.yml', 2]
