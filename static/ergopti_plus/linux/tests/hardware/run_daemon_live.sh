@@ -39,6 +39,16 @@ PIDS="$!"
 export DISPLAY=:58
 eval "$(dbus-launch --sh-syntax)"
 PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
+# The daemon moves the fixture's plaintext API key to the secret service at
+# boot. With a display and no unlocked keyring, gnome-keyring answers that
+# store with a prompt nobody here can dismiss, and the boot never reaches its
+# output keyboard. Where the service is installed, a throwaway login keyring
+# is unlocked first, as a desktop session does at login; its daemon leaves
+# with the bus.
+if command -v gnome-keyring-daemon >/dev/null 2>&1; then
+	KEYRING_DATA="$(mktemp -d)"
+	eval "$(printf '%s' 'ergopti-live' | XDG_DATA_HOME="${KEYRING_DATA}" gnome-keyring-daemon --unlock --components=secrets 2>/dev/null)"
+fi
 "${BUS_LAUNCHER}" --launch-immediately >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
