@@ -286,10 +286,34 @@ test('the repository tool writes the payload « Install and use » sends', () =>
 	const { spawnSync } = require('node:child_process');
 	const file = path.join(ROOT, 'static', 'layouts', 'sources', 'ergopti.toml');
 	const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'install-payload-')), 'payload.json');
+	// The Linux E2E rows run the tool with no node_modules: any npm package it
+	// loads is refused here, as it is missing there.
+	const guard = path.join(path.dirname(out), 'no-packages.cjs');
+	fs.writeFileSync(
+		guard,
+		[
+			"const Module = require('node:module');",
+			'const resolve = Module._resolveFilename;',
+			'Module._resolveFilename = function (request, ...rest) {',
+			'\tif (!/^[./]/.test(request) && !Module.isBuiltin(request))',
+			'\t\tthrow new Error(`npm package ${request} is not installed in the E2E rows`);',
+			'\treturn resolve.call(this, request, ...rest);',
+			'};',
+			''
+		].join('\n')
+	);
 	try {
 		const run = spawnSync(
 			process.execPath,
-			[path.join(ROOT, 'tools', 'layout-source.cjs'), 'install-payload', file, 'linux', out],
+			[
+				'--require',
+				guard,
+				path.join(ROOT, 'tools', 'layout-source.cjs'),
+				'install-payload',
+				file,
+				'linux',
+				out
+			],
 			{ encoding: 'utf8' }
 		);
 		assert.equal(run.status, 0, run.stderr);
