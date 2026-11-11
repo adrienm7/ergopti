@@ -2637,6 +2637,7 @@
 	"model_browser.install_paused": "Ergopti가 일시 중지되었습니다. {name}을(를) 설치하려면 다시 시작하세요.",
 	"model_browser.reason_install_ai_on": "먼저 AI를 끄세요. Ollama를 설치하면 Ollama로 다시 켜집니다.",
 	"model_browser.hint_api_no_key": "API 키가 없습니다. 이 모델을 쓰려면 추가하세요.",
+	"model_browser.hint_api_key_reenter": "키 없음: 이 항목은 키 없이 백업에서 복원되었습니다. 사용하려면 API 키…에서 키를 다시 입력하세요.",
 	"model_browser.hint_api_listing_unavailable": "이 공급자의 모델 목록은 여기서 사용할 수 없습니다. 알려진 모델이 표시됩니다. 다른 ID는 '다른 모델…'로 입력하세요.",
 	"model_browser.hint_api_listing_refused": "공급자가 모델 목록 제공을 거부했습니다(키를 확인하세요). 알려진 모델을 사용하거나 다른 ID를 입력하세요.",
 	"model_browser.hint_api_listing_pending": "이 공급자의 모델을 불러오는 중…",

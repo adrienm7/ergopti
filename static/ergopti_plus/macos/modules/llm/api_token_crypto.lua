@@ -23,6 +23,9 @@ local OPERATION_TIMEOUT_SEC = Timings.sec("llm", "keychain_operation_timeout_ms"
 local TOKEN_WRITE_FLAG  = "--keychain-token-write"
 local TOKEN_READ_FLAG   = "--keychain-token-read"
 local TOKEN_DELETE_FLAG = "--keychain-token-delete"
+-- The launcher's exit for a read of an item the Keychain does not hold
+-- (KeychainTokenWorkerExit.itemNotFound); pinned by test_api_token_absent_read.
+M.ABSENT_EXIT_CODE = 69
 
 
 
@@ -377,6 +380,13 @@ function M.decrypt_async(stored, callback)
 		local cleartext = type(stdout) == "string" and (stdout:gsub("\n+$", "")) or ""
 		if completed == true and exit_code == 0 and cleartext ~= "" then
 			invoke_guarded("Keychain token read result", callback, true, cleartext, nil)
+			return
+		end
+		if completed == true and exit_code == M.ABSENT_EXIT_CODE then
+			-- Not a failure of the Keychain: the item is gone, as for an entry
+			-- restored from a backup taken before its key was deleted.
+			Logger.warn(LOG, "Keychain holds no key for entry '%s'; it needs its key again.", tostring(entry_id))
+			invoke_guarded("Keychain token read result", callback, false, nil, "absent")
 			return
 		end
 		Logger.error(LOG, "Keychain token read failed for entry '%s' (reason=%s, rc=%s): %s",

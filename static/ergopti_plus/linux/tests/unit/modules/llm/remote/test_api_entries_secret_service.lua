@@ -167,6 +167,41 @@ helpers.describe("api_entries: keys live in the desktop secret service", functio
 		Fake.uninstall()
 	end)
 
+	helpers.it("lists an entry restored without its key as needing it again, and keeps its reference (linux-api-key-restored-missing)", function()
+		-- A pre-install backup names a key its entry's deletion removed from the service.
+		local fake = Fake.install()
+		write_file('{"version":1,"active_id":"cerebras-1","entries":[{"id":"cerebras-1","provider":"cerebras",'
+			.. '"label":"cerebras/qwen","token":"secret-service:cerebras-1#gone","model":"","base_url":""}]}')
+		local entries = fresh(true)
+		helpers.assert_eq(#entries.list(), 1, "the restored entry is listed, not left out as outdated")
+		helpers.assert_eq(entries.key_missing("cerebras-1"), true, "it needs its key re-entered")
+		helpers.assert_eq(entries.get("cerebras-1").token, "")
+		helpers.assert_eq(entries.set_model("cerebras-1", "other-model"), true)
+		helpers.assert_eq(stored().entries[1].token, "secret-service:cerebras-1#gone",
+			"a save keeps the reference until a new key replaces it")
+		helpers.assert_eq(Fake.count(fake), 0, "no empty key is stored")
+		helpers.assert_eq(entries.set_token("cerebras-1", "csk-REENTERED"), true)
+		helpers.assert_eq(entries.key_missing("cerebras-1"), false)
+		local reference = stored().entries[1].token
+		helpers.assert_true(reference:match(REFERENCE) ~= nil and reference ~= "secret-service:cerebras-1#gone", reference)
+		helpers.assert_eq(file_text():find("REENTERED", 1, true), nil, "the new key is not in the file")
+		helpers.assert_eq(fresh(true).active().token, "csk-REENTERED", "the new key reads back")
+		helpers.assert_eq(entries.remove("cerebras-1"), true)
+		helpers.assert_eq(Fake.count(fake), 0, "removing the entry still deletes its key")
+		Fake.uninstall()
+	end)
+
+	helpers.it("a key the service cannot read for another reason is not taken for a missing one (linux-api-key-restored-missing)", function()
+		local fake = Fake.install()
+		fake.lookup_refusal = "the keyring is locked, or its unlock prompt was dismissed"
+		write_file('{"version":1,"active_id":"cerebras-1","entries":[{"id":"cerebras-1","provider":"cerebras",'
+			.. '"label":"cerebras/qwen","token":"secret-service:cerebras-1#locked","model":"","base_url":""}]}')
+		local entries = fresh(true)
+		helpers.assert_eq(#entries.list(), 0, "kept as written: the key is still in the service")
+		helpers.assert_eq(entries.key_missing("cerebras-1"), false)
+		Fake.uninstall()
+	end)
+
 	helpers.it("leaves a plaintext file as it was when no service is available (linux-api-key-secret-service)", function()
 		local fake = Fake.install()
 		fake.unavailable_reason = "secret-tool is not installed"

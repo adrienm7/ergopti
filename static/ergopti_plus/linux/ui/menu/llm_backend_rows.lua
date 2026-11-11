@@ -450,8 +450,42 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 	local function queue(row)
 		if row.alternative or row.typed then later[#later + 1] = row else push(row) end
 	end
+	--- The row of an entry restored without its key: greyed, saying the key
+	--- must be entered again, with that action and the removal.
+	--- @param entry table
+	--- @param label string
+	local function key_missing_row(entry, label)
+		push({ name = label, provider = entry.provider, installed = true, available = false,
+			hint_key = "model_browser.hint_api_key_reenter", actions = {
+				{ id = "set_key", text = tr("menu.llm.local_servers.api_key"), run = function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					local token = dialogs.prompt(label, tr("menu.llm.api_prompt_token"), "", true)
+					if type(token) ~= "string" or token == "" or not page_owned()
+						or not entry_retained(entries, entry) then return false end
+					if entries.set_token(entry.id, token) ~= true then
+						save_failed(dialogs, entries, tr("common.error_title"))
+						return false
+					end
+					changed()
+					return true
+				end },
+				{ id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
+					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					if entries.remove(entry.id) ~= true then return report_save_failure() end
+					changed()
+					return true
+				end },
+			} })
+	end
 	for _, entry in ipairs(list) do
 		local label = names[entry.id]
+		if type(entries.key_missing) == "function" and entries.key_missing(entry.id) then
+			key_missing_row(entry, label)
+			goto continue
+		end
 		local chat = remote.serves(entry.provider, "chat")
 		local is_active = chat and active ~= nil and entry.id == active.id
 		local actions = {}
@@ -544,6 +578,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				end } },
 			})
 		end
+		::continue::
 	end
 	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do

@@ -280,6 +280,10 @@ local function api_rows(ctx, collected)
 		for _, item in ipairs(plan.models) do
 			local model = item.model
 			local actions = { { id = "other_model", text = i18n.get("model_browser.api_other_model") } }
+			if e.key_absent then
+				-- Restored without its Keychain key: the one way back is a new key.
+				actions = { { id = "set_key", text = i18n.get("menu.llm.local_servers.api_key") } }
+			end
 			if e.active and model == e.model then
 				actions[#actions + 1] = { id = "test", text = i18n.get("menu.llm.api_test_entry") }
 				actions[#actions + 1] = { id = "remove", text = i18n.get("menu.llm.api_remove_entry") }
@@ -287,7 +291,9 @@ local function api_rows(ctx, collected)
 			local row = {
 				name = prefix .. "/" .. model .. suffix, runtime_name = model, provider = prefix, installed = true,
 				entry_id = e.id, model = model, available = not e.key_missing, actions = actions,
-				hint_key = e.key_missing and "model_browser.hint_api_no_key" or nil,
+				key_absent = e.key_absent or nil,
+				hint_key = e.key_absent and "model_browser.hint_api_key_reenter"
+					or e.key_missing and "model_browser.hint_api_no_key" or nil,
 			}
 			if model == e.model then push(row) else later[#later + 1] = row end
 		end
@@ -572,6 +578,21 @@ local function prompt_api_model(ctx, row)
 	return require("ui.menu.menu_llm.api_panel").set_entry_model(ctx, row.entry_id, text) == true
 end
 
+--- Asks for the key of an entry restored without its Keychain item.
+--- @param ctx table Menu context.
+--- @param row table The entry's page row.
+--- @return boolean staged
+local function prompt_api_key(ctx, row)
+	local ok_label = i18n.get("button.ok")
+	local ok, a, b = pcall(dialog.text_prompt, row.provider, i18n.get("menu.llm.api_prompt_token"),
+		"", ok_label, i18n.get("button.cancel"), true)
+	if not ok then return false end
+	local button, text = a, b
+	if a ~= ok_label and a ~= i18n.get("button.cancel") then button, text = b, a end
+	if button ~= ok_label or type(text) ~= "string" or text == "" then return false end
+	return require("ui.menu.menu_llm.api_panel").set_entry_token(ctx, row.entry_id, text) == true
+end
+
 --- Runs a local backend's owned-runtime install for its "Install" button;
 --- the page shows it running, then the outcome on the refresh that settles it.
 local function install_runtime(ctx, backend, probes)
@@ -725,6 +746,9 @@ function M.handle_action(ctx, body, probes, collected)
 		if row_backend == nil or row_backend.available ~= true then return false end
 		if body.id == "set_key" and row.local_server then
 			return require("ui.menu.menu_llm.local_server_panel").prompt_key(collected.local_ctx, row.local_server) == true
+		end
+		if body.id == "set_key" and row.entry_id and row.key_absent then
+			return prompt_api_key(ctx, row)
 		end
 		if not row.entry_id or (row.available == false and not row.typed) then return false end
 		if body.id == "other_model" then return prompt_api_model(ctx, row) end

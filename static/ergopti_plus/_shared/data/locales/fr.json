@@ -2259,6 +2259,7 @@
 	"model_browser.install_paused": "Ergopti est en pause : reprenez-le pour installer {name}.",
 	"model_browser.reason_install_ai_on": "Désactivez d'abord l'IA : installer Ollama la réactive avec Ollama.",
 	"model_browser.hint_api_no_key": "Clé d'API manquante : ajoutez-la pour utiliser ce modèle.",
+	"model_browser.hint_api_key_reenter": "Clé manquante : cette entrée est revenue d’une sauvegarde sans sa clé. Saisissez de nouveau sa clé avec Clé API… pour l’utiliser.",
 	"model_browser.hint_api_listing_unavailable": "La liste des modèles de ce fournisseur n'est pas disponible ici : ses modèles connus sont listés ; saisissez un autre identifiant avec Autre modèle…",
 	"model_browser.hint_api_listing_refused": "Le fournisseur a refusé de lister ses modèles (vérifiez la clé) : ses modèles connus, ou saisissez un autre identifiant.",
 	"model_browser.hint_api_listing_pending": "Chargement des modèles de ce fournisseur…",

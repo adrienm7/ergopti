@@ -362,12 +362,37 @@ function M.is_local_server(provider_id)
 		and AuthPolicy.token_allowed(provider_id, "", LocalServers.SERVERS)
 end
 
+-- Keychain references a read found absent: an entry restored from a backup
+-- taken before its key was deleted with it (decided by the maintainer on
+-- 2026-11-11: deleting an entry keeps deleting its Keychain item, and the
+-- restored entry asks for its key again). Cleared when its token changes.
+local _absent_references = {}
+
+--- Remembers that the Keychain holds no key for a stored reference.
+--- @param stored string The entry's token field.
+--- @param reason any The read's refusal reason.
+local function note_absent(stored, reason)
+	if reason == "absent" and type(stored) == "string" and stored ~= "" and not _absent_references[stored] then
+		_absent_references[stored] = true
+		Logger.warn(LOG, "An API entry's Keychain key is absent; the entry asks for its key again.")
+	end
+end
+
+--- Whether an entry's stored key reference was read absent from the Keychain.
+--- @param entry table API entry.
+--- @return boolean absent
+function M.entry_key_absent(entry)
+	return type(entry) == "table" and type(entry.token) == "string" and _absent_references[entry.token] == true
+end
+
 --- Tells whether an entry cannot be sent without a key: every provider needs
---- one except a local server, which takes one only when the user gave it.
+--- one except a local server, which takes one only when the user gave it, and
+--- an entry whose Keychain key is absent.
 --- @param entry table API entry.
 --- @return boolean missing
 local function key_missing(entry)
 	if type(entry) ~= "table" then return true end
+	if M.entry_key_absent(entry) then return true end
 	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
 	return not AuthPolicy.entry_token_allowed(entry.provider, entry.token, entry.base_url, servers)
 end
@@ -891,6 +916,12 @@ function M.set_entries(entries)
 	for _, e in ipairs(entries) do
 		if type(e) == "table" then table.insert(_entries, e) end
 	end
+	-- An absent reference no entry still names is forgotten: a new key replaced it.
+	local named = {}
+	for _, e in ipairs(_entries) do if type(e.token) == "string" then named[e.token] = true end end
+	for stored in pairs(_absent_references) do
+		if not named[stored] then _absent_references[stored] = nil end
+	end
 	Logger.debug(LOG, "API entries set (%d entry/entries).", #_entries)
 	finish_listing(retired_listing, false, "stale_identity")
 	schedule_access_prewarm()
@@ -1271,6 +1302,7 @@ function M.resolve_active_entry(callback)
 		elseif ok == true and type(cleartext) == "string" and cleartext ~= "" then
 			_token_cache[cache_key] = cleartext
 		else
+			note_absent(record.stored, reason)
 			ok, cleartext, reason = false, nil, reason or "decrypt_failed"
 		end
 		for _, pending_waiter in ipairs(record.waiters) do
@@ -3034,6 +3066,7 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 	end
 	TokenCrypto.decrypt_async(stored_token, function(decrypted, token, token_reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			note_absent(stored_token, token_reason)
 			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
 				label, provider_id, tostring(entry.id), tostring(token_reason))
 			fail("missing_token")
@@ -3366,6 +3399,7 @@ local function test_decisions(entry, provider, on_ok, on_fail)
 	if type(stored) ~= "string" or stored == "" then return fail("missing_token") end
 	TokenCrypto.decrypt_async(stored, function(decrypted, token, reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			note_absent(stored, reason)
 			fail("missing_token: " .. tostring(reason))
 			return
 		end

@@ -24,6 +24,9 @@ enum KeychainTokenWorkerExit: Int32 {
 	case success = 0
 	case invalidArguments = 64
 	case inputFailure = 65
+	// A read of an item the Keychain does not hold: a restored entry whose key
+	// was deleted with it, which the driver then asks for again.
+	case itemNotFound = 69
 	case keychainFailure = 70
 	case outputFailure = 74
 }
@@ -165,6 +168,7 @@ enum KeychainTokenWorker {
 
 		case .read(let account):
 			let (status, secret) = store.read(account: account)
+			if status == errSecItemNotFound { return KeychainTokenWorkerExit.itemNotFound.rawValue }
 			guard status == errSecSuccess, let secret, !secret.isEmpty else {
 				return KeychainTokenWorkerExit.keychainFailure.rawValue
 			}

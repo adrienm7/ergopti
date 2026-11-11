@@ -2637,6 +2637,7 @@
 	"model_browser.install_paused": "Ergopti מושהה: חדש אותו כדי להתקין את {name}.",
 	"model_browser.reason_install_ai_on": "כבו קודם את הבינה המלאכותית: התקנת Ollama מפעילה אותה מחדש עם Ollama.",
 	"model_browser.hint_api_no_key": "מפתח API חסר: הוסיפו אותו כדי להשתמש במודל זה.",
+	"model_browser.hint_api_key_reenter": "המפתח חסר: הרשומה הזו חזרה מגיבוי בלי המפתח שלה. הזן שוב את המפתח שלה דרך מפתח API… כדי להשתמש בה.",
 	"model_browser.hint_api_listing_unavailable": "רשימת המודלים של ספק זה אינה זמינה כאן: מוצגים המודלים המוכרים; הקלידו מזהה אחר דרך „מודל אחר…”.",
 	"model_browser.hint_api_listing_refused": "הספק סירב להציג את המודלים שלו (בדקו את המפתח): המודלים המוכרים, או הקלידו מזהה אחר.",
 	"model_browser.hint_api_listing_pending": "טוען את המודלים של ספק זה…",

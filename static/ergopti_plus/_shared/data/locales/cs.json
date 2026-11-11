@@ -2637,6 +2637,7 @@
 	"model_browser.install_paused": "Ergopti je pozastaveno: pro instalaci {name} ho obnovte.",
 	"model_browser.reason_install_ai_on": "Nejprve vypněte AI: instalace Ollamy ji znovu zapne s Ollamou.",
 	"model_browser.hint_api_no_key": "Chybí klíč API: přidejte ho, abyste mohli tento model použít.",
+	"model_browser.hint_api_key_reenter": "Chybí klíč: tato položka se vrátila ze zálohy bez svého klíče. Chcete-li ji použít, zadejte její klíč znovu pomocí Klíč API…",
 	"model_browser.hint_api_listing_unavailable": "Seznam modelů tohoto poskytovatele zde není k dispozici: zobrazují se známé modely; jiné ID zadejte přes Jiný model…",
 	"model_browser.hint_api_listing_refused": "Poskytovatel odmítl vypsat své modely (zkontrolujte klíč): známé modely, nebo zadejte jiné ID.",
 	"model_browser.hint_api_listing_pending": "Načítání modelů tohoto poskytovatele…",

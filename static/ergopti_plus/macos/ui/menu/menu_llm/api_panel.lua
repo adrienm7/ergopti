@@ -484,6 +484,7 @@ function M.build(ctx)
 				collect.entries[#collect.entries + 1] = {
 					id = e.id, name = names[e.id], provider = e.provider, model = tostring(e.model or ""),
 					active = e.id == active_id, key_missing = api_remote.entry_key_missing(e),
+					key_absent = type(api_remote.entry_key_absent) == "function" and api_remote.entry_key_absent(e) or false,
 				}
 			end
 		end
@@ -1042,6 +1043,62 @@ function M.set_entry_model(ctx, entry_id, model)
 		state.llm_model = previous_model
 		notify_persistence_failure("Remote API model change")
 		pcall_log("update_menu(set_model rollback)", update_menu)
+	end)
+	return true
+end
+
+--- Gives an entry a new key: the entry restored from a backup without its
+--- Keychain item asks for it (model selector page, « API key… »). The key
+--- goes to the Keychain through persist_api_entries, never to settings.
+--- @param ctx table Menu context.
+--- @param entry_id string
+--- @param token string The new key, non-empty.
+--- @return boolean staged Whether the change was staged for persistence.
+function M.set_entry_token(ctx, entry_id, token)
+	local update_menu, WarmupCtrl = ctx.update_menu, ctx.WarmupCtrl
+	if type(token) ~= "string" or token == "" then
+		Logger.warn(LOG, "API entry key change refused: the key is empty.")
+		return false
+	end
+	if type(ctx.is_paused) ~= "function" then return false end
+	local ok_pause, paused = pcall(ctx.is_paused)
+	if not ok_pause or paused ~= false or _mutation_owner ~= nil then return false end
+	local api_remote = llm_mod.api_remote
+	local previous_entries = api_remote.get_entries() or {}
+	local changed, found = {}, false
+	for _, e in ipairs(previous_entries) do
+		if e.id == entry_id then
+			local copy = {}
+			for k, v in pairs(e) do copy[k] = v end
+			copy.token = token
+			changed[#changed + 1] = copy
+			found = true
+		else
+			changed[#changed + 1] = e
+		end
+	end
+	if not found then
+		Logger.warn(LOG, "API entry key change refused: entry '%s' is gone.", tostring(entry_id))
+		return false
+	end
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	api_remote.set_entries(changed)
+	Logger.info(LOG, "API entry key change staged (entry=%s).", tostring(entry_id))
+	persist_entries("persist_api_entries(set_token)", function(persisted, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if persisted == true or durable == true then
+			if persisted ~= true then
+				Logger.error(LOG, "Remote API key change committed with cleanup debt: %s", tostring(reason))
+			end
+			WarmupCtrl.warmup("api_set_token")
+			pcall_log("update_menu(set_token)", update_menu)
+			return
+		end
+		api_remote.set_entries(previous_entries)
+		notify_persistence_failure("Remote API key change")
+		pcall_log("update_menu(set_token rollback)", update_menu)
 	end)
 	return true
 end
