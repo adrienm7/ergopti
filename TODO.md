@@ -1220,13 +1220,25 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### All drivers
 
-- [ ] **Linux PAC lists through GIO (found 2026-11-10).** On GNOME, GIO keeps only the first entry of a PAC answer
+- [x] **Linux PAC lists through GIO (found 2026-11-10).** On GNOME, GIO keeps only the first entry of a PAC answer
       (`PROXY a; DIRECT` reaches the driver as `a`), so the managed Ollama stage's browser-style walk cannot fall
       back to DIRECT when that relay is down (docs/memory `project-linux-gio-hides-pac-failures`). Decide whether to
-      evaluate the PAC another way or document it.
-- [ ] **Linux managed Ollama under umask 0002 (found 2026-11-10).** The install resolver refuses a group-writable
+      evaluate the PAC another way or document it. Done 2026-11-11: libproxy 0.5's parser keeps only the
+      `METHOD host` entries, so the lookup child skips GIO for a GNOME PAC, downloads it and runs it in the system Duktape with
+      the shared `pac_helpers.js` (`platform/network/pac_runtime.lua`, heap and query caps of `native_pac`, the
+      child's deadline); the walk then reaches DIRECT or the next relay. Container proof
+      `run_owned_ollama_container.py`: a dead first relay then DIRECT pulls direct, then a live relay pulls through it
+      (`PacEngine` runs the engine cases). Managed HTTP downloads still take GIO's list: follow-up below.
+- [x] **Linux managed Ollama under umask 0002 (found 2026-11-10).** The install resolver refuses a group-writable
       ancestor (`install_ancestor_writable_by_others`), and a user-private-group umask 0002 makes `~/.local/share`
       group-writable when an application creates it so: decide whether a private group's write bit is acceptable.
+      Done 2026-11-11: admitted only when the group is the user's private group (same name and primary gid, no other
+      member listed or primary: `infra/user_private_group.lua`, NSS); another shared group, an unknown group and a
+      world-writable folder are still refused, and the gid is part of the captured identity. macOS keeps refusing
+      (`ManagedBootstrapDownload.swift`): its accounts share `staff`, with no private group by default.
+- [ ] **Linux managed HTTP downloads behind a PAC list.** `infra/managed_http.lua` still takes GIO's answer, which
+      drops DIRECT (`PROXY a; DIRECT` fails when `a` is down); pass `pac_check_timeout_ms` so the lookup child
+      evaluates the PAC and the proxy-connect failover can reach DIRECT.
 - [x] **Test parity (audit item 14), Linux and macOS.** Closed on 10 November (39b12ae7): the tar feeder tests
       already load `infra.archive_tar_feeder` by module; five more Linux copies resolve their file from the module name
       (ratchet 7 files, 13 reads); every remaining Linux and macOS pin is documented as legitimate in its ratchet header
