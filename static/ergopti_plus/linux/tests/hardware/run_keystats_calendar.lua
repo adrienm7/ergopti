@@ -229,7 +229,9 @@ scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 	shell.exec_line = function(command)
 		if command:find("power_supply", 1, true) then return "50" end
 		if command:find("nmcli", 1, true) then return network end
-		if command:find("loginctl", 1, true) then return "no" end
+		-- A locked session: its time is the elapsed-time witness, since unlocked
+		-- time is no field of its own (awake_ms is keep-awake time, KMD-3).
+		if command:find("loginctl", 1, true) then return "yes" end
 		if command:find("pactl", 1, true) then return "Mute: no" end
 		return ""
 	end
@@ -246,11 +248,11 @@ scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 		network = "network-three"
 		sample()
 		system.acknowledge(prefix)
-		equal(system.snapshot().values["2026-10-25"].awake_ms, 60000)
+		equal(system.snapshot().values["2026-10-25"].locked_ms, 60000)
 		advance(30000)
 		sample()
 		Fixture.flush(k)
-		equal(rows("SELECT date,awake_ms,battery_count,wifi_changes FROM agg_system_day ORDER BY date;"),
+		equal(rows("SELECT date,locked_ms,battery_count,wifi_changes FROM agg_system_day ORDER BY date;"),
 			{ "2026-10-25|60000|2|1", "2026-10-26|30000|2|1" })
 		-- system_load samples the host's /proc: the calendar contract is about transitions.
 		equal(rows("SELECT date,action FROM events_system WHERE action<>'system_load' ORDER BY id;"),

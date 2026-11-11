@@ -54,6 +54,7 @@ local AFTER_FRAMES = 10
 local function gesture_with_confirmed_drop()
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["infra.timings"] = {
+		count = require("tests.support.registry_count"),
 		sec = function(_, key)
 			-- tap_max_ms is generous on purpose: confirming the drop legitimately
 			-- costs more than a production tap window, and the gesture must still

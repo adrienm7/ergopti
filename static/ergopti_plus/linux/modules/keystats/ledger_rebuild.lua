@@ -20,7 +20,11 @@
 ---    sees a half-rebuilt device.
 --- 3. A row is bucketed by the hour of its own timestamp (shared
 ---    walker.timestamp_slot), as the macOS replay does: a replayed row carries
----    no per-keystroke clock.
+---    no per-keystroke clock. The hour, a night wake and a switch's day are
+---    read in the local time its user lived: its UTC ts plus its recorded
+---    utc_offset_min (keystats.local_time, maintainer decision KMD-1). A Linux
+---    row recorded before the column held UTC and is read with this device's
+---    current offset, which the log notes; a macOS or Windows one held local time.
 --- 4. Refusals are loud. A typing row whose events cannot be read (another
 ---    machine's encrypted text, a malformed array) refuses the whole rebuild,
 ---    as on macOS: certifying a partial walk would show wrong totals forever.
@@ -34,6 +38,8 @@ local AggregateWalker = require("modules.keystats.aggregate_walker")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 
 local Helpers = require("keystats.aggregator_helpers")
+local LocalTime = require("keystats.local_time")
+local Logger = require("logger.shim")
 
 local SEPARATOR = "\1"
 
@@ -161,7 +167,18 @@ function M.walk_device(opts)
 	local store, device_id, decrypt = opts.store, opts.device_id, opts.decrypt
 	local batch = require("keystats.aggregator_helpers").new_batch()
 	local contexts = {}
-	for _, row in ipairs(read_rows(store, "events_typing", { "ts", "date", "app", "layout", "events_json" }, device_id)) do
+	local os_rows = store.query_rows(string.format("SELECT hex(os) FROM devices WHERE device_id='%s';",
+		SqliteCommand.escape_literal(device_id)))
+	if os_rows == nil or #os_rows ~= 1 then error("cannot read the imported device's OS", 0) end
+	local legacy_utc = unhex(os_rows[1]) == "linux"
+	local current_offset, legacy_rows = LocalTime.offset_at(os.time()), 0
+	--- The local time a row's user lived (keystats.local_time).
+	local function lived(row)
+		local offset = row.utc_offset_min ~= "" and tonumber(row.utc_offset_min) or nil
+		if offset == nil and legacy_utc then legacy_rows = legacy_rows + 1 end
+		return LocalTime.local_ts(row.ts, offset, legacy_utc, current_offset)
+	end
+	for _, row in ipairs(read_rows(store, "events_typing", { "ts", "date", "app", "layout", "events_json", "utc_offset_min" }, device_id)) do
 		local plaintext = decrypt(row.events_json)
 		if type(plaintext) ~= "string" or (plaintext == "" and row.events_json ~= "") then
 			error("typing event decryption failed", 0)
@@ -172,7 +189,7 @@ function M.walk_device(opts)
 			contexts[row.app] = contexts[row.app] or {}
 			AggregateWalker.walk(events, date, row.app, batch, {
 				layout = row.layout ~= "" and row.layout or nil, physical_layout = row.layout,
-				foreign = true, slot = SharedWalker.timestamp_slot(row.ts),
+				foreign = true, slot = SharedWalker.timestamp_slot(lived(row)),
 			}, contexts[row.app])
 		end
 	end
@@ -184,33 +201,40 @@ function M.walk_device(opts)
 	for _, name in ipairs({ "max_keystroke_delay_ms", "think_pause_ms", "burst_gap_ms", "session_gap_ms",
 		"auto_repeat_max_delay_ms" }) do timings[name] = Timings.ms("keystats", name) end
 	local Walker = SharedWalker.new({ timings = timings, finger_of = function() return nil end })
-	for _, row in ipairs(read_rows(store, "events_app_switch", { "ts", "prev_app", "next_app", "duration_ms" }, device_id)) do
-		Walker.walk_app_switch(batch, { timestamp = row.ts, prev_app = row.prev_app ~= "" and row.prev_app or nil,
+	for _, row in ipairs(read_rows(store, "events_app_switch", { "ts", "prev_app", "next_app", "duration_ms", "utc_offset_min" }, device_id)) do
+		Walker.walk_app_switch(batch, { timestamp = lived(row), prev_app = row.prev_app ~= "" and row.prev_app or nil,
 			next_app = row.next_app ~= "" and row.next_app or nil, duration_ms = tonumber(row.duration_ms) or 0 })
 	end
-	for _, row in ipairs(read_rows(store, "events_window_switch", { "ts", "app", "prev_title", "duration_ms" }, device_id)) do
-		Walker.walk_window_switch(batch, { timestamp = row.ts, app = row.app ~= "" and row.app or nil,
+	for _, row in ipairs(read_rows(store, "events_window_switch", { "ts", "app", "prev_title", "duration_ms", "utc_offset_min" }, device_id)) do
+		Walker.walk_window_switch(batch, { timestamp = lived(row), app = row.app ~= "" and row.app or nil,
 			prev_title = row.prev_title, duration_ms = tonumber(row.duration_ms) or 0 })
 	end
-	for _, row in ipairs(read_rows(store, "events_system", { "ts", "date", "action", "metadata_json" }, device_id)) do
+	for _, row in ipairs(read_rows(store, "events_system", { "ts", "date", "action", "metadata_json", "utc_offset_min" }, device_id)) do
 		local ok, meta = pcall(Json.decode, row.metadata_json ~= "" and row.metadata_json or "{}")
 		if not ok or type(meta) ~= "table" then meta = {} end
-		-- The date column is the device's own local day on every OS; a Linux
-		-- device stamps ts in UTC, a day away around midnight.
-		local date = row.date:match("^%d%d%d%d%-%d%d%-%d%d$") and row.date or row.ts:sub(1, 10)
-		walk_system(batch, date, row.action, meta, row.ts)
+		-- The date column is the device's own local day on every OS; ts is UTC
+		-- on Linux and on every row with an offset, a day away around midnight.
+		local at = lived(row)
+		local date = row.date:match("^%d%d%d%d%-%d%d%-%d%d$") and row.date or at:sub(1, 10)
+		walk_system(batch, date, row.action, meta, at)
 	end
 	-- Windows records its Wi-Fi changes as network_change rows (its own rebuild
 	-- counts them with the legacy wifi_change rows above).
 	local NetworkTransitions = require("keystats.network_transitions")
-	for _, row in ipairs(read_rows(store, "events_network", { "ts", "date", "kind", "meta_json" }, device_id)) do
+	for _, row in ipairs(read_rows(store, "events_network", { "ts", "date", "kind", "meta_json", "utc_offset_min" }, device_id)) do
 		if row.kind == "network_change" then
 			local ok, meta = pcall(Json.decode, row.meta_json ~= "" and row.meta_json or "{}")
 			if ok and NetworkTransitions.is_wifi_change(meta) then
-				local date = row.date:match("^%d%d%d%d%-%d%d%-%d%d$") and row.date or row.ts:sub(1, 10)
-				walk_system(batch, date, "wifi_change", {}, row.ts)
+				local at = lived(row)
+				local date = row.date:match("^%d%d%d%d%-%d%d%-%d%d$") and row.date or at:sub(1, 10)
+				walk_system(batch, date, "wifi_change", {}, at)
 			end
 		end
+	end
+	if legacy_rows > 0 then
+		Logger.info("keystats.ledger_rebuild",
+			"%d row(s) of Linux device %s predate the UTC offset column; read with this device's offset (%+d min).",
+			legacy_rows, device_id, current_offset)
 	end
 	return batch
 end

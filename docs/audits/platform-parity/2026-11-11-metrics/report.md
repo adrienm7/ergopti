@@ -39,13 +39,31 @@ network stage after the system one.
   Windows (`keystats_walker_events.ahk`) rebuilds also take the day from `ts`:
   an imported Linux device's night wakes and hourly heatmap shift by its UTC
   offset. No row carries that offset; a fix needs a recorded offset or local
-  `ts` on Linux, a cross-device contract decision.
+  `ts` on Linux, a cross-device contract decision. Decided by the maintainer on 2026-11-11:
+  every row stores `ts` in UTC and `utc_offset_min` (nullable column with a
+  migration); hours, night wakes and days use the recorded offset, an older
+  Linux row the reading device's current offset (logged). Done on Linux and
+  macOS (writers, migration, purge triggers, the Linux ledger rebuild and the
+  macOS raw rebuild; `linux-utc-offset`, `linux-import-utc-offset`,
+  `utc-offset-rows`). **Windows counterpart (maintainer):** see the decision
+  entry in `docs/memory/maintainer-decisions.md` (cache migration before
+  `KLR_LoadPurgeSchema`, UTC `ts` and the offset in the `keystats_sql.ahk`
+  writers and the tombstone, `keystats_walker_events.ahk` readers); an
+  existing Windows cache refuses raw INSERTs until it migrates.
 - **KMD-2, excluded-app scope for telemetry that is not typing.** The fixes
-  above follow Windows (refuse the row). Whether connectivity should instead
-  be kept with a neutral app label is open.
+  above follow Windows (refuse the row). Decided by the maintainer on
+  2026-11-11: refused on every OS, no neutral label. Verified on dev: Linux
+  d379d11a (network; topology and capture already refused, now pinned by
+  `linux-topology-excluded-app`), macOS ed0d90e9 (`macos-network-private`,
+  `macos-topology-private`); Windows already refuses in `KL_AppendLog`.
+  Closed.
 - **KMD-3, Linux `awake_ms`.** Sampled unlocked uptime on Linux, keep-awake
   sessions on Windows and macOS (raised by the 2026-11-04 deep review, no TODO
-  item).
+  item). Decided by the maintainer on 2026-11-11: Linux follows Windows and
+  macOS. A finished keep-awake session is the day's `awake_ms` and a
+  `passive_period` row of kind `awake`; old Linux days are cleared once and
+  marked (`meta.linux_awake_ms_definition`, `linux_awake_ms_since`; regressions
+  `linux-awake-definition`). No Windows change.
 
 ## Refuted
 
@@ -57,9 +75,9 @@ invalidation; shared-schema tables refused on import.
 
 ## Remaining work
 
-- **macOS:** an imported Linux sibling's system rows take their day from `ts`
-  (`aggregator/events.lua`), the KML-004 part fixed on Linux; it rides on
-  KMD-1.
+- **macOS:** an imported Linux sibling's system rows took their day from `ts`
+  (`aggregator/events.lua`); the raw rebuild now feeds the lived local time
+  (KMD-1), so their day is the sibling's own.
 - **Windows (report only):** the same for `keystats_walker_events.ahk`, and
   Windows' reader of a Linux ledger stays unverified.
 - **Not checked:** whether Windows typed text carries a raw CR for Enter (how
