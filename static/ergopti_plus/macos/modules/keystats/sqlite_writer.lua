@@ -35,6 +35,7 @@ local Paths  = require("infra.paths")
 local Queries = require("keystats.queries")
 local WindowTopology = require("keystats.window_topology")
 local CapturePresence = require("keystats.capture_presence")
+local NetworkTransitions = require("keystats.network_transitions")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keystats.text_cipher")
@@ -685,9 +686,9 @@ function _builders.clipboard(e, id)
 	})
 end
 
---- Persists a window-topology or capture-presence entry as the Windows
+--- Persists a window-topology, capture-presence or connectivity entry as the Windows
 --- generic (kind, app, meta_json) row of its table.
---- @param statement string "events.window_topo" or "events.av".
+--- @param statement string "events.window_topo", "events.av" or "events.network".
 --- @param e table Admitted entry.
 --- @param id number Allocated event identity.
 --- @return string
@@ -780,6 +781,8 @@ function M.build_inserts(entry)
 		return { _builders.kind_meta("events.window_topo", entry, _alloc_event_id()) }
 	elseif CapturePresence.KINDS[t] then
 		return { _builders.kind_meta("events.av", entry, _alloc_event_id()) }
+	elseif NetworkTransitions.KINDS[t] then
+		return { _builders.kind_meta("events.network", entry, _alloc_event_id()) }
 	elseif t == "hotstring" then
 		return { _builders.hotstring(entry, _alloc_event_id(), "fired") }
 	elseif t == "hotstring_suggested" then

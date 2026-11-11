@@ -23,6 +23,12 @@
 ---    kick off an async refresh via adapters.shell_runner (mirrors the
 ---    read_layout_async() cached-async pattern in platform/remap/watchers.lua)
 ---    so the NEXT call reflects reality without ever blocking the caller.
+--- 5. Connectivity transitions (keystats events_network) read two tri-state
+---    probes that need no permission: SCNetworkReachability resolving the
+---    Windows NCSI host through the system resolver, scheduled on the run loop
+---    so its answer arrives by callback, and the asynchronous ifconfig read of
+---    the tunnel interfaces (utun, ipsec, ppp). A probe that cannot answer is
+---    "unknown", never "down".
 --- ==============================================================================
 
 local M = {}
@@ -63,7 +69,21 @@ local function sha256_hex(s)
 	return digest
 end
 
---- Returns whether an ifconfig snapshot contains an up utun interface carrying
+--- Interface names macOS gives VPN tunnels: Network Extension and WireGuard
+--- (utun), the legacy IPsec client (ipsec) and L2TP/PPTP (ppp).
+local TUNNEL_INTERFACE_PATTERNS = { "^utun%d+$", "^ipsec%d+$", "^ppp%d+$" }
+
+--- Whether an interface name is a tunnel kind.
+--- @param name string Interface name.
+--- @return boolean
+local function is_tunnel_interface(name)
+	for _, pattern in ipairs(TUNNEL_INTERFACE_PATTERNS) do
+		if name:match(pattern) then return true end
+	end
+	return false
+end
+
+--- Returns whether an ifconfig snapshot contains an up tunnel interface carrying
 --- a non-link-local address in that interface's own block. macOS keeps
 --- baseline utun devices around without an active VPN, so the interface name
 --- alone is not evidence of a live tunnel.
@@ -72,15 +92,15 @@ end
 local function has_active_vpn_interface(stdout)
 	if type(stdout) ~= "string" then return false end
 
-	local current_utun_is_up = false
+	local current_tunnel_is_up = false
 	for raw_line in (stdout .. "\n"):gmatch("(.-)\n") do
 		local line = raw_line:gsub("\r$", "")
 		local interface = line:match("^([^%s:]+):")
 		if interface then
 			local flags = line:match("flags=[^<]*<([^>]*)>") or ""
-			current_utun_is_up = interface:match("^utun%d+$") ~= nil
+			current_tunnel_is_up = is_tunnel_interface(interface)
 				and ("," .. flags .. ","):find(",UP,", 1, true) ~= nil
-		elseif current_utun_is_up then
+		elseif current_tunnel_is_up then
 			local ipv4 = line:match("^%s*inet%s+([%d%.]+)")
 			if ipv4 and not ipv4:match("^169%.254%.") then return true end
 
@@ -234,6 +254,67 @@ end
 function M.isVpnActive()
 	_refresh_vpn_active()
 	return _cached_vpn_active == true
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Connectivity Probes ==========
+-- =========================================
+-- =========================================
+
+-- Reachability targets kept alive while watched: a collected target stops calling back.
+local _reachability_watches = {}
+
+--- Classifies SCNetworkReachability flags: reachable without first having to
+--- establish a connection is "up", anything else is "down".
+--- @param flags number|nil Reachability flags.
+--- @return string status "up", "down" or "unknown".
+function M.classify_reachability_flags(flags)
+	if math.type(flags) ~= "integer" then return "unknown" end
+	local names = hs.network.reachability.flags
+	local reachable = (flags & names.reachable) ~= 0
+	local needs_connection = (flags & names.connectionRequired) ~= 0
+	return (reachable and not needs_connection) and "up" or "down"
+end
+
+--- Watches a host's reachability; the system resolves it off the run loop and
+--- calls back on each change of flags.
+--- @param host string Host name to resolve.
+--- @param on_status fun(status) Receives "up", "down" or "unknown".
+--- @return table watch { stop }
+function M.watch_host_reachability(host, on_status)
+	assert(type(host) == "string" and host ~= "" and type(on_status) == "function",
+		"a reachability watch needs a host and a callback")
+	local target = assert(hs.network.reachability.forHostName(host), "no reachability target for " .. host)
+	target:setCallback(function(_, flags) on_status(M.classify_reachability_flags(flags)) end)
+	assert(target:start(), "the reachability target for " .. host .. " did not start")
+	_reachability_watches[target] = true
+	local watch = {}
+	function watch.stop()
+		if not _reachability_watches[target] then return end
+		_reachability_watches[target] = nil
+		target:stop()
+	end
+	return watch
+end
+
+--- Reads the tunnel interfaces asynchronously.
+--- @param answer fun(status) Receives "up" when a tunnel carries an address,
+---   "down" when none does, "unknown" when ifconfig failed.
+--- @return boolean started False when the subprocess could not start.
+function M.probe_vpn_status(answer)
+	assert(type(answer) == "function", "the VPN probe needs a callback")
+	local handle = ShellRunner.spawn(IFCONFIG_BIN, {}, function(exit_code, stdout, _stderr)
+		if exit_code ~= 0 or type(stdout) ~= "string" then
+			answer("unknown")
+			return
+		end
+		answer(has_active_vpn_interface(stdout) and "up" or "down")
+	end)
+	return handle.start() == true
 end
 
 return M

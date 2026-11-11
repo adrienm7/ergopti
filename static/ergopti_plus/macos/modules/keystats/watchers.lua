@@ -62,6 +62,8 @@ local LogManager = require("modules.keystats.log_manager")
 -- Window topology and capture presence ride the hardware lifecycle and the
 -- maintenance tick: it starts and stops with the hardware watchers.
 local TopologyWatcher = require("modules.keystats.topology_watcher")
+-- Internet and VPN transitions follow the same lifecycle and tick.
+local NetworkWatcher = require("modules.keystats.network_watcher")
 
 -- Hardware watcher handles owned exclusively by this module
 local _wifi_watcher         = nil
@@ -343,6 +345,8 @@ function M.perform_maintenance()
 	if hardware_callback_allowed(_hardware_generation) then
 		local ticked, reason = xpcall(TopologyWatcher.tick, debug.traceback)
 		if not ticked then Logger.error(LOG, "Window topology tick failed: %s.", tostring(reason)) end
+		local sampled, failure = xpcall(NetworkWatcher.tick, debug.traceback)
+		if not sampled then Logger.error(LOG, "Connectivity tick failed: %s.", tostring(failure)) end
 	end
 end
 
@@ -862,6 +866,13 @@ function M.init_hardware_watchers()
 			private = function() return _state.is_private_window == true end,
 		})
 	end
+	if not NetworkWatcher.is_running() then
+		local started, reason = xpcall(NetworkWatcher.start, debug.traceback, {
+			append = function(entry) return LogManager.append_log(entry) end,
+			app = function() return _state.session_app_name end,
+		})
+		if not started then Logger.error(LOG, "Connectivity transitions did not start: %s.", tostring(reason)) end
+	end
 	Logger.debug(LOG, "Hardware watcher transaction committed.")
 	return true
 end
@@ -882,6 +893,7 @@ function M.stop_hardware_watchers()
 	_state.last_mouse_pos = nil
 	-- An open capture interval ends with the collector, as on Windows.
 	TopologyWatcher.stop()
+	NetworkWatcher.stop()
 	local timers_stopped = cancel_context_refresh_timers()
 	local watchers_stopped = cleanup_hardware_resources()
 	local settled = timers_stopped and watchers_stopped
