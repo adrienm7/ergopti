@@ -23,6 +23,8 @@
 
 local M = {}
 
+local NativePath = require("native_path")
+
 M.FAILURE_INVALID = "source_invalid_file"
 M.FAILURE_WRITE   = "write_failed"
 
@@ -134,7 +136,7 @@ end
 --- @param read function read(path) -> text|nil.
 --- @return table { filename, text } or { code, detail } when refused.
 function M.read_picked(settings, path, read)
-	local name = type(path) == "string" and path:match("([^/]+)$") or nil
+	local name = type(path) == "string" and NativePath.basename(path) or nil
 	local extension = name and name:match("%.([A-Za-z]+)$")
 	if not extension or not EXTENSIONS[extension:lower()] then
 		return { code = M.FAILURE_INVALID, detail = "the file type is not one the editor opens" }
