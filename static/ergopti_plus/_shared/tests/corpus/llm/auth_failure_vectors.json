@@ -53,6 +53,29 @@
 			"failure": { "status": 400, "message": "max_tokens is too large" },
 			"authentication": false
 		},
+		{
+			"name": "token exchange 400 as a request failure",
+			"failure": "HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found",
+			"authentication": true
+		},
+		{
+			"name": "token exchange 400 reason only",
+			"failure": {
+				"reason": "access_token_unavailable",
+				"message": "the token exchange answered HTTP 400"
+			},
+			"authentication": true
+		},
+		{
+			"name": "token exchange 429",
+			"failure": "HTTP 429: the token exchange answered HTTP 429: rate limited",
+			"authentication": false
+		},
+		{
+			"name": "token exchange 500",
+			"failure": "the token exchange answered HTTP 500",
+			"authentication": false
+		},
 		{ "name": "empty reply", "failure": "empty reply", "authentication": false },
 		{
 			"name": "timeout reason",
