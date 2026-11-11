@@ -520,7 +520,8 @@ const PROGRAMS = {
 	qdbus6: optionalTool('KDE workspace switching, the first present of several binaries'),
 	hyprctl: optionalTool('Hyprland window identity'),
 	xinput: optionalTool(
-		'the X11 tap-to-click setting of a touchpad; without it the taps are named not measured'
+		'the X11 tap-to-click setting of a touchpad (without it the taps are named not measured) and the X11 re-apply proof',
+		DRIVER_HOST
 	),
 	swaymsg: optionalTool('Sway window identity', DRIVER_HOST),
 	niri: optionalTool('Niri window identity'),
