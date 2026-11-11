@@ -251,6 +251,27 @@ helpers.describe("clipboard snapshot restorability", function()
 				end
 			end, targets, { available = true, bytes = { ["text/html"] = html, ["image/png"] = png } })
 		end)
+		-- A screenshot copied alone offers no text: xclip's text read fails though
+		-- the clipboard has an owner, and every borrower refused, an emoji
+		-- hotstring included. Windows saves it with ClipboardAll; the owner's own
+		-- formats now decide (CBL-001, clipboard-image-only).
+		helpers.it("multi-format restore: " .. owner .. " borrows an image-only clipboard (clipboard-image-only)", function()
+			local png = "\137PNG\0\1EP79_PRIVATE_IMAGE_ONLY"
+			with_snapshot("", function(_, s)
+				helpers.assert_eq(s.invoke(owner), true, "an owner offering no text is not a failed read")
+				helpers.assert_eq(#s.owner_writes, 1, "the image goes back through the multi-format owner")
+				local restored = {}
+				for _, target in ipairs(s.owner_writes[1]) do restored[#restored + 1] = { target.name, target.data } end
+				helpers.assert_eq(restored, { { "image/png", png } })
+			end, "TARGETS\nTIMESTAMP\nimage/png\n", { available = true, bytes = { ["image/png"] = png } },
+				{ owned = true })
+		end)
+		helpers.it("multi-format restore: " .. owner .. " refuses an image-only clipboard with no owner to restore it (clipboard-image-only)", function()
+			with_snapshot("", function(_, s)
+				helpers.assert_eq(s.invoke(owner), false)
+				helpers.assert_eq({ #s.writes, #s.owner_writes }, { 0, 0 }, "refused before the clipboard changes")
+			end, "TARGETS\nTIMESTAMP\nimage/png\n", nil, { owned = true })
+		end)
 		helpers.it("multi-format restore: " .. owner .. " refuses when one advertised format cannot be read", function()
 			local targets = "TARGETS\nUTF8_STRING\ntext/html\nimage/png\n"
 			with_snapshot("EP79_PRIVATE_RICH_TEXT", function(_, s)
