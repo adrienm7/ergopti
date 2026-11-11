@@ -1727,6 +1727,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_keystats_aggregation.ahk
 #Include meta/corpus/test_corpus_keystats_session_events.ahk
 #Include meta/corpus/test_corpus_keystats_correction_erased.ahk
+#Include meta/corpus/test_corpus_keystats_metrics_maintenance.ahk
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
 #Include meta/corpus/test_corpus_healthcheck_snapshot.ahk
