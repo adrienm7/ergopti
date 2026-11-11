@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "Middle click",
 	"menu.caps_word.pointer.other_buttons": "Other mouse buttons",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Not on Windows: the system keeps touchpad gestures to itself and passes no touch on to Ergopti. Two-finger scrolling still counts as scrolling.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves.",
 	"platform_reason.hotstrings_master_is_macos_engine": "macOS only under this name: it is the master switch of the macOS typing engine, which the driver starts and stops. Windows keeps its master as the hotstrings gate of category_enabled, and Linux switches its hotstring groups one by one.",
 	"platform_reason.category_gates_are_windows": "Windows only: Windows keeps one master gate per category, in front of the category’s own switches. macOS keeps its hotstrings master as hotstrings.enabled, and Linux switches its hotstring groups one by one.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "This shortcut belongs to the system that binds it: each driver offers its actions on the chords its own system leaves free (Windows key combinations on Windows, Ctrl and Cmd on macOS, keyboard slots on Linux) and stores the choice under its own name.",

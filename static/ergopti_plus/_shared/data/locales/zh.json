@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "中键单击",
 	"menu.caps_word.pointer.other_buttons": "其他鼠标按键",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Windows 上没有：系统自行处理触控板手势，不会把任何触摸传给 Ergopti。双指滚动仍算作滚动。",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Windows 上不可用：Windows 只在手势完成后，才从触控板设置中把整个手势交给驱动程序，因此手指移动时滑动无法逐步重复。macOS 和 Linux 会自行跟踪手指。",
 	"platform_reason.hotstrings_master_is_macos_engine": "以此名称仅限 macOS：它是 macOS 输入引擎的总开关，由驱动启动和停止。Windows 将总开关保存为 category_enabled 中的 hotstrings 开关，Linux 则逐个启用其 hotstring 组。",
 	"platform_reason.category_gates_are_windows": "仅限 Windows：Windows 在每个类别自身的开关之前为每个类别保留一个总开关。macOS 将 hotstrings 总开关保存为 hotstrings.enabled，Linux 则逐个启用其 hotstring 组。",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "此快捷键属于绑定它的系统：每个驱动把自己的操作放在其系统留空的组合上（Windows 上是 Windows 键组合，macOS 上是 Ctrl 和 Cmd，Linux 上是键盘槽位），并以自己的名称保存选择。",

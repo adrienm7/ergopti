@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "Midterklik",
 	"menu.caps_word.pointer.other_buttons": "Andre museknapper",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Ikke på Windows: systemet beholder pegefeltets bevægelser selv og sender ingen berøring videre til Ergopti. Rulning med to fingre tæller stadig som rulning.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Ikke på Windows: Windows giver driveren hver gestus færdig, først når den er afsluttet, fra sine touchpad-indstillinger, så et stryg kan ikke gentages trin for trin, mens fingrene bevæger sig. macOS og Linux følger selv fingrene.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Kun macOS under dette navn: det er hovedkontakten til macOS’ skrivemotor, som driveren starter og stopper. Windows har sin hovedkontakt som hotstrings-porten i category_enabled, og Linux slår sine hotstring-grupper til én ad gangen.",
 	"platform_reason.category_gates_are_windows": "Kun Windows: Windows har én hovedport pr. kategori foran kategoriens egne kontakter. macOS har sin hovedkontakt for hotstrings som hotstrings.enabled, og Linux slår sine hotstring-grupper til én ad gangen.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Denne genvej tilhører det system, der binder den: hver driver tilbyder sine handlinger på de kombinationer, dens eget system lader være frie (Windows-tastkombinationer på Windows, Ctrl og Cmd på macOS, tastaturpladser på Linux), og gemmer valget under sit eget navn.",

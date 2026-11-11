@@ -2945,42 +2945,32 @@ type = "check"
 id = "gesture_mode_single"
 i18n = "menu.gestures.mode_single"
 checked_when = ["gesture_mode_is_single"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_slot_mode_commands]]
 type = "check"
 id = "gesture_mode_incremental"
 i18n = "menu.gestures.mode_incremental"
 checked_when = ["gesture_mode_is_incremental"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "section_header"
 id = "gesture_sensitivity_heading"
 i18n = "menu.gestures.sensitivity_label"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "label"
 id = "gesture_sensitivity_hint"
 i18n = "menu.gestures.sensitivity_hint"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "---"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_change_action]]
 type = "command"
 id = "gesture_slot_change_action"
 i18n = "menu.gestures.change_action"
 disabled_when = ["gesture_slot_choice_ready"]
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 [[menu.tap_holds_menu]]
@@ -3388,13 +3378,15 @@ platforms = ["hs"]
 unavailable = "hide"
 
 # Fixed swipe child presentation only; native payloads remain actual child owners.
+# Windows renders it too since its raw touchpad reader follows the fingers
+# (modules/gestures/raw_touchpad.ahk); Linux draws its slot rows itself.
 [[menu.gesture_swipe_slot_menu]]
 type = "include"
 section = "gesture_change_action"
 
 [[menu.gesture_swipe_slot_menu]]
 type = "---"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 [[menu.gesture_swipe_slot_menu]]
@@ -3402,7 +3394,7 @@ type = "group"
 id = "gesture_mode_options"
 i18n = "menu.gestures.mode_current"
 caption_getter = "gesture_mode_current_label"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 [[menu.gesture_swipe_slot_menu]]
@@ -3411,7 +3403,7 @@ id = "gesture_sensitivity_options"
 i18n = "menu.gestures.sensitivity_current"
 caption_getter = "gesture_sensitivity_current_label"
 disabled_when = ["gesture_mode_incremental_ready"]
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 # The fixed separator after each native About version/build identity row.

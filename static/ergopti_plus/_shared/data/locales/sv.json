@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "Mittenklick",
 	"menu.caps_word.pointer.other_buttons": "Andra musknappar",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Inte på Windows: systemet behåller styrplattans gester själv och skickar ingen beröring vidare till Ergopti. Rullning med två fingrar räknas fortfarande som rullning.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Inte på Windows: Windows lämnar varje gest färdig till drivrutinen, först när den är klar, från sina styrplatteinställningar, så ett svep kan inte upprepas steg för steg medan fingrarna rör sig. macOS och Linux följer fingrarna själva.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Endast macOS under detta namn: det är huvudbrytaren för macOS skrivmotor, som drivrutinen startar och stoppar. Windows har sin huvudbrytare som hotstrings-grind i category_enabled, och Linux slår på sina hotstring-grupper en i taget.",
 	"platform_reason.category_gates_are_windows": "Endast Windows: Windows har en huvudgrind per kategori framför kategorins egna brytare. macOS har sin hotstrings-huvudbrytare som hotstrings.enabled, och Linux slår på sina hotstring-grupper en i taget.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Den här genvägen tillhör systemet som binder den: varje drivrutin erbjuder sina åtgärder på de kombinationer som dess eget system lämnar lediga (Windows-tangentkombinationer i Windows, Ctrl och Cmd i macOS, tangentbordsplatser i Linux) och sparar valet under sitt eget namn.",

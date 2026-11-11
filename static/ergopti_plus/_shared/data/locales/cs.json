@@ -4334,7 +4334,6 @@
 	"menu.caps_word.pointer.middle_click": "Prostřední kliknutí",
 	"menu.caps_word.pointer.other_buttons": "Ostatní tlačítka myši",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Ne na Windows: systém si gesta touchpadu ponechává a Ergopti nepředává žádný dotyk. Posouvání dvěma prsty se stále počítá jako posouvání.",
-	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Ne ve Windows: Windows předává ovladači každé gesto hotové, až když skončí, ze svého nastavení touchpadu, takže tah se nemůže opakovat krok za krokem, dokud se prsty pohybují. macOS a Linux sledují prsty samy.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Jen macOS pod tímto názvem: je to hlavní vypínač psacího jádra macOS, které ovladač spouští a zastavuje. Windows má svůj hlavní vypínač jako bránu hotstrings v category_enabled a Linux zapíná své skupiny hotstringů jednu po druhé.",
 	"platform_reason.category_gates_are_windows": "Jen Windows: Windows má pro každou kategorii jednu hlavní bránu před vlastními vypínači kategorie. macOS drží hlavní vypínač hotstringů jako hotstrings.enabled a Linux zapíná své skupiny hotstringů jednu po druhé.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Tato zkratka patří systému, který ji váže: každý ovladač nabízí své akce na kombinacích, které jeho systém nechává volné (kombinace s klávesou Windows ve Windows, Ctrl a Cmd v macOS, sloty klávesnice v Linuxu), a volbu ukládá pod vlastním názvem.",
