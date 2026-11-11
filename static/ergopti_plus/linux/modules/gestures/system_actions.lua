@@ -48,6 +48,7 @@ local FileSelection = require("file_selection")
 local Timings = require("infra.timings")
 
 local LOG = "modules.gestures.system_actions"
+local EEXIST = 17 -- Linux exclusive-create collision receipt.
 
 local quote = ShellRunner.quote
 
@@ -318,10 +319,12 @@ function M.create_new_text_file(folder, write_new)
 	for attempt = 1, M.NEW_FILE_NAME_ATTEMPTS do
 		local name = attempt == 1 and base or (base .. " " .. attempt)
 		local path = prefix .. name .. M.NEW_FILE_EXTENSION
-		local created, reason = write_new(path, "")
+		-- write_new hands back the exclusive create's errno: only a name already
+		-- taken moves on to the next candidate.
+		local created, errno = write_new(path, "")
 		if created then return path end
-		if reason ~= 17 and reason ~= "EEXIST" then
-			Logger.error(LOG, "A new text file could not be created in the folder (%s).", tostring(reason))
+		if errno ~= EEXIST and errno ~= "EEXIST" then
+			Logger.error(LOG, "A new text file could not be created in the folder (%s).", tostring(errno))
 			return nil
 		end
 	end
