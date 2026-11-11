@@ -637,6 +637,7 @@ return {
 	"tests.unit.modules.hotstrings.catalogue.test_hotstrings_scope_overrides",
 	"tests.unit.modules.hotstrings.catalogue.test_hotstring_override_parser",
 	"tests.unit.modules.hotstrings.injector.test_injector_caps_lock",
+	"tests.unit.modules.hotstrings.injector.test_injector_erase_pacing",
 	"tests.unit.modules.hotstrings.injector.test_injector_held_terminator",
 	"tests.unit.modules.hotstrings.injector.test_injector_fast_channel",
 	"tests.unit.modules.hotstrings.injector.test_injector_untypable_text",
