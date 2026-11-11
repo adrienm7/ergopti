@@ -132,8 +132,11 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 	helpers.it("linux-keep-awake: real child holds until its daemon-owned pipe closes", function()
 		local uv = require("luv")
 		local Process = require("adapters.owned_process")
-		local operation, input, active = nil, nil, false
+		local operation, input, active, sessions = nil, nil, false, {}
 		local owner = KeepAwake.new({
+			-- Its own sink: the metrics sampler is process-wide, and a session
+			-- credited there would outlive this case (KMD-3).
+			record_session = function(duration_ms) sessions[#sessions + 1] = duration_ms; return true end,
 			has_command = function() return true end,
 			start = function(_, args, options, callback)
 				input = options.stdin_owner
@@ -158,6 +161,7 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		await(function() return not operation or operation:is_settled() end)
 		uv.run("nowait")
 		if not ok then error(err, 0) end
+		helpers.assert_eq(#sessions, 1, "the released real session is credited once")
 	end)
 
 	helpers.it("linux-keep-awake: the action is offered through the actual catalogue handler", function()
