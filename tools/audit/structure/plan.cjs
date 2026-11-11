@@ -18,6 +18,7 @@
  * USAGE:
  *   node tools/audit/structure/plan.cjs            print the summary
  *   node tools/audit/structure/plan.cjs --write    rewrite docs/design/structure-plan/
+ *   node tools/audit/structure/plan.cjs --map-all  print the move map of every file
  * ==============================================================================
  */
 
@@ -487,8 +488,27 @@ function write(rel, text) {
 	console.log(`wrote ${rel}`);
 }
 
+/** The rows of the move map, optionally with the files that stay. */
+function moveMapRows(files, map, plan, all) {
+	const rows = ['old\tnew\tstep'];
+	const stepOf = new Map();
+	for (const s of plan) for (const [o] of s.moves) stepOf.set(o, s.id);
+	for (const f of [...files].sort()) {
+		const t = map.get(f);
+		if (t === f && !all) continue;
+		rows.push(
+			`${PREFIX}${f}\t${t === f ? '=' : t === null ? '(retired)' : PREFIX + t}\t${stepOf.get(f) || '-'}`
+		);
+	}
+	return rows;
+}
+
 function main() {
 	const { files, map } = moveMap();
+	if (process.argv.includes('--map-all')) {
+		process.stdout.write(moveMapRows(files, map, steps(map), true).join('\n') + '\n');
+		return;
+	}
 	const before = Census.measure(files);
 	const after = Census.measure([...map.values()].filter(Boolean));
 	const plan = steps(map);
@@ -567,16 +587,9 @@ function main() {
 				.join('\n')
 		].join('\n')
 	);
-	const tsv = ['old\tnew\tstep'];
-	const stepOf = new Map();
-	for (const s of plan) for (const [o] of s.moves) stepOf.set(o, s.id);
-	for (const f of [...files].sort()) {
-		const t = map.get(f);
-		tsv.push(
-			`${PREFIX}${f}\t${t === f ? '=' : t === null ? '(retired)' : PREFIX + t}\t${stepOf.get(f) || '-'}`
-		);
-	}
-	write(`${OUT_DIR}/move-map.tsv`, tsv.join('\n'));
+	// Moved and retired files only: every other tracked file stays where it
+	// is, and `--map-all` prints the full list with `=` for those.
+	write(`${OUT_DIR}/move-map.tsv`, moveMapRows(files, map, plan, false).join('\n'));
 	// One row per rewritten token: the files that carry it are counted per
 	// category rather than listed, which apply-step.cjs recomputes anyway.
 	const tokens = new Map();
