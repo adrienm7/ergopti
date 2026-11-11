@@ -141,6 +141,9 @@ SFD_Stop(*) {
 AltGrFamilyStopFollowing(*) {
 	return true
 }
+LayoutRegistryWatch_Stop(*) {
+	return true
+}
 MenuPopulation_Shutdown(*) {
 	return true
 }
