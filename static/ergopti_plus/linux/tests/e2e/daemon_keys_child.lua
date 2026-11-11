@@ -48,7 +48,7 @@ require("tests.win_compat").install()
 -- the desktop's PRIMARY selection, focused field and action side effects.
 local TAP_WRAP = os.getenv("ERGOPTI_E2E_TAP_WRAP") or "none"
 local selection = { primary = "", reads = 0, attempts = 0, queued = 0, executed = 0, focused = false }
-local selection_config = nil
+local selection_config, selection_folder = nil, nil
 -- ERGOPTI_E2E_DYNAMIC=dates: the same private config with the built-in date
 -- rules switched on in the file, as a user's config.toml would hold them.
 local DYNAMIC = os.getenv("ERGOPTI_E2E_DYNAMIC") or "none"
@@ -69,7 +69,12 @@ if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" then
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
 	local original = Paths.config
-	selection_config = os.tmpname()
+	-- Named config.toml in a folder of its own: the tap-hold import checks the
+	-- file it reads [mod_combos] from is the driver's config.toml by name.
+	selection_folder = os.tmpname()
+	os.remove(selection_folder)
+	assert(os.execute("mkdir -p '" .. selection_folder .. "'"), "the private config folder could not be created")
+	selection_config = selection_folder .. "/config.toml"
 	local template = assert(io.open("_generated/config_template.toml", "rb"))
 	local content = template:read("*a")
 	if DYNAMIC == "dates" then content = with_date_rules(content) end
@@ -700,6 +705,7 @@ assert(main_ok, main_error)
 if selection_config then
 	os.remove(selection_config)
 	os.remove(selection_config .. ".tmp")
+	os.remove(selection_folder)
 end
 
 -- A screen receipt is useful only after Main and native owners exit cleanly.
