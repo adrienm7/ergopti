@@ -238,7 +238,8 @@ function toSource(model, options) {
 
 /** The column mask of a layer selector, or null when Windows has no such column. */
 function selectorMask(selector, altgr) {
-	if (selector.optional.length) return null;
+	// An optional Caps Lock keeps the column as it is with Caps Lock on.
+	if (selector.optional.some((id) => id !== 'caps_lock')) return null;
 	let mask = 0;
 	for (const id of selector.required) {
 		if (id === 'shift') mask |= C.MOD_BITS.shift;
@@ -278,7 +279,7 @@ function fromSource(source) {
 			{ required: layer.required.filter((id) => id !== 'caps_lock'), optional: layer.optional },
 			altgr
 		);
-		if (mask === 0 || mask === C.MOD_BITS.shift) capsLayers.set(mask, layer);
+		if (mask !== null) capsLayers.set(mask, layer);
 	}
 	const capsLayerIds = new Set([...capsLayers.values()].map((layer) => layer.id));
 	for (const layer of source.layers) {
@@ -339,16 +340,38 @@ function fromSource(source) {
 		if (capsLayers.size) {
 			const cellAt = (mask) => (columns.includes(mask) ? cells[columns.indexOf(mask)] : null);
 			const capsAt = (mask) => (capsLayers.has(mask) ? cellOf(capsLayers.get(mask)) : cellAt(mask));
-			const [base, shift] = [cellAt(0), cellAt(C.MOD_BITS.shift)];
-			const [capsBase, capsShift] = [capsAt(0), capsAt(C.MOD_BITS.shift)];
-			if (same(capsBase, shift) && same(capsShift, base) && !same(base, shift))
-				attributes |= C.ATTRIBUTES.caplok;
-			else if (!same(capsBase, base) || !same(capsShift, shift)) {
-				attributes |= C.ATTRIBUTES.sgcaps;
-				capsCells = cells.map((cell, column) =>
-					columns[column] === 0 ? capsBase : columns[column] === C.MOD_BITS.shift ? capsShift : cell
+			// Each pair of a column and its Shift: unchanged, swapped (CAPLOK for the
+			// base pair, CAPLOKALTGR for the AltGr pair), or anything else, which only
+			// a Caps Lock row (SGCAPS) holds: Kana has no Caps Lock attribute of its own.
+			const swapped = (low) => {
+				const high = low | C.MOD_BITS.shift;
+				return (
+					same(capsAt(low), cellAt(high)) &&
+					same(capsAt(high), cellAt(low)) &&
+					!same(cellAt(low), cellAt(high))
 				);
-			}
+			};
+			const unchanged = (mask) => same(capsAt(mask), cellAt(mask));
+			const pairs = [...new Set(columns.map((mask) => mask & ~C.MOD_BITS.shift))];
+			const kinds = pairs.map((low) =>
+				unchanged(low) && unchanged(low | C.MOD_BITS.shift)
+					? 'same'
+					: swapped(low) && (low === 0 || (altgr && low === ALTGR))
+						? 'swap'
+						: 'row'
+			);
+			if (kinds.includes('row')) {
+				attributes |= C.ATTRIBUTES.sgcaps;
+				capsCells = columns.map((mask) => capsAt(mask));
+				if (capsCells.some((cell) => cell && (own(cell, 'dead') || own(cell, 'ligature'))))
+					fail('source_caps_lock_row_dead_or_ligature', `keys.${code}`);
+				if (cells.some((cell) => cell && own(cell, 'dead')))
+					fail('source_caps_lock_row_beside_dead_key', `keys.${code}`);
+			} else
+				pairs.forEach((low, i) => {
+					if (kinds[i] !== 'swap') return;
+					attributes |= low === 0 ? C.ATTRIBUTES.caplok : C.ATTRIBUTES.caplokaltgr;
+				});
 		}
 		if (fields.caps_lock === 'shift') attributes |= C.ATTRIBUTES.caplok;
 		if (fields.caps_lock === 'separate') fail('source_sgcaps_unsupported', `keys.${code}`);
