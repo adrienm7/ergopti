@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "d8241a4ddf455c1f0b80b101e3a52aba03c47758faff624fca1bf0fb8950811f"
+			"sha256": "98783b31f0c658d711667bc443b3b9f2bed746454cf2550f540cbc9fb313103b"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -85,7 +85,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
 			"symbol": "local function resolve_press(keycode)",
-			"sha256": "6f54f1a7c6032507c7c6d7c5e4a6f5042c84e470a5de37c937e4258cf5db0735"
+			"sha256": "26a47e161486ead4174cf343e1a70bdc62c26e0250cfb307eafce063618e7a25"
 		},
 		{
 			"id": "linux-dead-consume",
