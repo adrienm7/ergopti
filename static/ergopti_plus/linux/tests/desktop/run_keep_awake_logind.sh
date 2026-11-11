@@ -14,9 +14,16 @@ set -u
 cd "$(dirname "$0")/../.." || exit 2
 export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 LOGIND=/usr/lib/systemd/systemd-logind
-for tool in Xvfb openbox sway dbus-daemon systemd-inhibit luajit busctl; do
-	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
-done
+need() {
+	command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }
+}
+need Xvfb
+need openbox
+need sway
+need dbus-daemon
+need systemd-inhibit
+need luajit
+need busctl
 [ -x "${LOGIND}" ] || { echo "ENVIRONMENT: ${LOGIND} is missing" >&2; exit 2; }
 PIDS=""
 cleanup() { for pid in ${PIDS}; do kill "${pid}" 2>/dev/null; done; }

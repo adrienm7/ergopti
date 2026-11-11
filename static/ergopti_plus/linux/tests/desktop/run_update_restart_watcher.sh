@@ -35,9 +35,16 @@ DRIVER="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 2
 SELF="${DRIVER}/tests/desktop/run_update_restart_watcher.sh"
 MANAGER=/usr/lib/systemd/systemd
 UNIT=ergopti-hotstrings.service
-for tool in unshare luajit systemctl systemd-run; do
-	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
-done
+need() {
+	command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }
+}
+need unshare
+need luajit
+need systemctl
+need systemd-run
+need pkill
+need setsid
+need awk
 [ -x "${MANAGER}" ] || { echo "ENVIRONMENT: ${MANAGER} is missing" >&2; exit 2; }
 if [ "${ERGOPTI_WATCH_NAMESPACE:-}" != 1 ]; then
 	exec env ERGOPTI_WATCH_NAMESPACE=1 unshare -m bash "${SELF}" "$@"
