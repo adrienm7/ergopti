@@ -39,6 +39,9 @@ const COLUMN_IDS = [
 ];
 const ALTGR = C.MOD_BITS.ctrl | C.MOD_BITS.alt;
 const DEFAULT_KANA_KEY = 'AltRight';
+// The private-use characters a dead key without a one-character identity gets.
+const PRIVATE_DEAD_FIRST = 0xe000;
+const PRIVATE_DEAD_LAST = 0xf8ff;
 
 /** A stable refusal of this conversion. */
 class SourceMappingError extends Error {
@@ -238,14 +241,15 @@ function toSource(model, options) {
 
 /** The column mask of a layer selector, or null when Windows has no such column. */
 function selectorMask(selector, altgr) {
-	// An optional Caps Lock keeps the column as it is with Caps Lock on.
-	if (selector.optional.some((id) => id !== 'caps_lock')) return null;
+	// Optional modifiers make no column of their own: the column is the same with
+	// them held (Caps Lock, or Command, which Windows has no character level for).
 	let mask = 0;
 	for (const id of selector.required) {
 		if (id === 'shift') mask |= C.MOD_BITS.shift;
 		else if (id === 'control') mask |= C.MOD_BITS.ctrl;
 		else if (id === 'kana') mask |= C.MOD_BITS.kana;
-		else if (id === 'alt_right' && altgr) mask |= ALTGR;
+		// Option is AltGr on Windows, as the XKB and KLC converters read it.
+		else if ((id === 'alt_right' || id === 'alt') && altgr) mask |= ALTGR;
 		else return null;
 	}
 	return mask;
@@ -265,7 +269,9 @@ function fromSource(source) {
 	if (!windows) fail('source_windows_metadata', 'exports.windows');
 	const altgr =
 		((source.windows && source.windows.flags) || []).includes('altgr') ||
-		source.layers.some((layer) => layer.required.includes('alt_right'));
+		source.layers.some(
+			(layer) => layer.required.includes('alt_right') || layer.required.includes('alt')
+		);
 	const { byCode } = scanTable();
 	const omitted = [];
 	const columns = [];
@@ -274,7 +280,7 @@ function fromSource(source) {
 	// SGCAPS row, as kbd.h holds Caps Lock: an attribute, not a column.
 	const capsLayers = new Map();
 	for (const layer of source.layers) {
-		if (!layer.required.includes('caps_lock') || (layer.alternatives || []).length) continue;
+		if (!layer.required.includes('caps_lock')) continue;
 		const mask = selectorMask(
 			{ required: layer.required.filter((id) => id !== 'caps_lock'), optional: layer.optional },
 			altgr
@@ -285,7 +291,14 @@ function fromSource(source) {
 	for (const layer of source.layers) {
 		if (capsLayerIds.has(layer.id)) continue;
 		const mask = selectorMask(layer, altgr);
-		if (mask === null || (layer.alternatives || []).length) {
+		(layer.alternatives || []).forEach((alternative, i) => {
+			if (selectorMask(alternative, altgr) !== mask)
+				omitted.push({
+					path: `layers.${layer.id}.alternatives[${i}]`,
+					reason: 'alternative_selector_not_on_windows'
+				});
+		});
+		if (mask === null) {
 			omitted.push({ path: `layers.${layer.id}`, reason: 'no_windows_column' });
 			continue;
 		}
@@ -294,11 +307,27 @@ function fromSource(source) {
 		columnLayers.push(layer);
 	}
 	if (columns[0] !== 0) fail('source_base_column', 'layers');
+	// A Windows dead key is one character. One whose terminator is not a single
+	// unit, or is another dead key's, gets a private-use character, as KbdEdit's
+	// chained dead characters do (U+E000 up); a chain still works, but a key with
+	// no rule after it types that private character, which `omitted` says.
 	const deadUnit = new Map();
+	const takenUnits = new Set();
 	for (const dead of source.dead_keys || []) {
 		const units = unitsOf(dead.terminator);
-		if (units.length !== 1) fail('source_dead_terminator_unit', `dead_keys.${dead.id}`);
-		deadUnit.set(dead.id, units[0]);
+		if (units.length === 1 && !takenUnits.has(units[0])) {
+			deadUnit.set(dead.id, units[0]);
+			takenUnits.add(units[0]);
+		}
+	}
+	let privateUnit = PRIVATE_DEAD_FIRST;
+	for (const dead of source.dead_keys || []) {
+		if (deadUnit.has(dead.id)) continue;
+		while (takenUnits.has(privateUnit)) privateUnit++;
+		if (privateUnit > PRIVATE_DEAD_LAST) fail('source_dead_private_units', `dead_keys.${dead.id}`);
+		deadUnit.set(dead.id, privateUnit);
+		takenUnits.add(privateUnit);
+		omitted.push({ path: `dead_keys.${dead.id}.terminator`, reason: 'dead_key_private_character' });
 	}
 	const codes = new Set(
 		columnLayers.concat([...capsLayers.values()]).flatMap((layer) => Object.keys(layer.keys))
@@ -404,23 +433,37 @@ function fromSource(source) {
 		const rules = [];
 		const seen = new Map();
 		for (const rule of dead.rules) {
+			const label = own(rule, 'input') ? rule.input : `@${rule.input_dead_key}`;
+			const at = `dead_keys.${dead.id}.rules[${label}]`;
 			const base = own(rule, 'input') ? unitsOf(rule.input) : [deadUnit.get(rule.input_dead_key)];
-			if (base.length !== 1) fail('source_dead_input_unit', `dead_keys.${dead.id}`);
+			// DEADKEY entries pair one character with one character (kbd.h).
+			if (base.length !== 1) {
+				omitted.push({ path: at, reason: 'dead_input_not_one_unit' });
+				continue;
+			}
 			const entry = own(rule, 'next')
 				? { base: base[0], result: deadUnit.get(rule.next), dead: true }
 				: { base: base[0], result: unitsOf(rule.text) };
 			if (!entry.dead) {
-				if (entry.result.length !== 1) fail('source_dead_result_unit', `dead_keys.${dead.id}`);
+				if (entry.result.length !== 1) {
+					omitted.push({ path: at, reason: 'dead_result_not_one_unit' });
+					continue;
+				}
 				entry.result = entry.result[0];
 			}
 			const key = entry.base;
 			if (seen.has(key)) {
 				if (JSON.stringify(seen.get(key)) !== JSON.stringify(entry))
-					fail('source_dead_input_conflict', `dead_keys.${dead.id}`);
+					omitted.push({ path: at, reason: 'dead_input_conflict' });
 				continue;
 			}
 			seen.set(key, entry);
 			rules.push(entry);
+		}
+		// Windows needs one entry: Space then types the terminator's first character.
+		if (!rules.length) {
+			rules.push({ base: 0x20, result: unitsOf(dead.terminator)[0] });
+			omitted.push({ path: `dead_keys.${dead.id}`, reason: 'dead_key_without_windows_rule' });
 		}
 		return Object.assign(
 			{ dead: deadUnit.get(dead.id) },
