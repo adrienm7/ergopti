@@ -637,6 +637,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let runningApplicationsReader: (String) -> [NSRunningApplication]
 	/// Seeds MJConfigFile; only the sole launcher calls it, before each runtime launch.
 	private let hammerspoonConfigSeeder: (String) -> Void
+	/// Asks every other running launcher to quit; returns how many were asked.
+	private let launcherQuitRequester: () -> Int
 	private var applicationIsTerminating = false
 	/// True while a quit from outside waits for the runtime's controlled exit.
 	private var quitHandshakePending = false
@@ -667,6 +669,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - hammerspoonConfigSeeder: Points the embedded runtime at this launcher's init.lua.
 	///   - quitRequestPoster: Asks the embedded runtime for its controlled exit.
 	///   - terminationReplier: Answers a quit deferred for that exit.
+	///   - launcherQuitRequester: Asks the running launcher to quit for a restart;
+	///     nil terminates every other running launcher found by bundle identifier.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -697,7 +701,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		},
 		hammerspoonConfigSeeder: @escaping (String) -> Void = { seedEmbeddedHammerspoonConfig(initLuaPath: $0) },
 		quitRequestPoster: @escaping (pid_t) -> Void = postEmbeddedRuntimeQuitRequest,
-		terminationReplier: @escaping (Bool) -> Void = { NSApp.reply(toApplicationShouldTerminate: $0) }
+		terminationReplier: @escaping (Bool) -> Void = { NSApp.reply(toApplicationShouldTerminate: $0) },
+		launcherQuitRequester: (() -> Int)? = nil
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -712,6 +717,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.hammerspoonConfigSeeder = hammerspoonConfigSeeder
 		self.quitRequestPoster = quitRequestPoster
 		self.terminationReplier = terminationReplier
+		self.launcherQuitRequester = launcherQuitRequester ?? {
+			let ownPid = ProcessInfo.processInfo.processIdentifier
+			let others = runningApplicationsReader(kErgoptiBundleId).filter { $0.processIdentifier != ownPid }
+			for other in others { _ = other.terminate() }
+			return others.count
+		}
 		super.init()
 	}
 
@@ -734,16 +745,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	/// - Parameters:
 	///   - attempt: Retries already spent on a held lock.
 	///   - proceed: Continues startup once the lock is held.
+	///   - takingOver: Whether the running launcher was asked to quit for this one.
 	@MainActor
-	private func acquireSoleLauncherOwnership(attempt: Int, then proceed: @escaping @MainActor () -> Void) {
+	func acquireSoleLauncherOwnership(
+		attempt: Int,
+		takingOver: Bool = false,
+		then proceed: @escaping @MainActor () -> Void
+	) {
 		switch instanceLock.acquire() {
 		case .acquired:
 			LauncherLog.write("launcher stage: sole-launcher lock held at \(instanceLock.path)")
 			proceed()
-		case .heldByAnotherLauncher where attempt < kLauncherLockRetryAttempts:
+		case .heldByAnotherLauncher
+			where attempt < (takingOver ? kLauncherTakeoverRetryAttempts : kLauncherLockRetryAttempts):
+			// A second launch restarts the running app, as Windows'
+			// #SingleInstance Force does (MLC-003, decided by the maintainer on
+			// 2026-11-11): the running launcher is asked to quit, which runs its
+			// runtime's controlled exit, and this one takes the lock it releases.
+			var takeover = takingOver
+			if attempt == 0 && !takingOver {
+				let asked = launcherQuitRequester()
+				if asked > 0 {
+					LauncherLog.write("another ErgoptiPlus launcher runs; asked it to quit so this launch restarts the app")
+					takeover = true
+				}
+			}
 			Task { @MainActor [weak self] in
 				try? await Task.sleep(nanoseconds: LauncherTimings.instanceLockRetry.nanoseconds)
-				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, then: proceed)
+				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, takingOver: takeover, then: proceed)
 			}
 		case .heldByAnotherLauncher:
 			// A second launcher would start a second embedded runtime beside the first
