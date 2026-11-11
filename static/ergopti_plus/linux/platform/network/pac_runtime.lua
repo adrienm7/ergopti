@@ -32,6 +32,7 @@ local M = {}
 
 -- The engine SONAME is the one the native runtime catalogue ships.
 local Catalogue = require("_generated.native_runtime")
+local TextUtils = require("text_utils")
 
 -- The loaded engine and its declared ABI, once per module instance.
 local _engine = nil
@@ -226,7 +227,7 @@ function M.parse_answer(answer, max_selections)
 	-- A browser ignores one trailing separator ("PROXY a; DIRECT;").
 	if #entries > 1 and entries[#entries]:match("^%s*$") then entries[#entries] = nil end
 	for _, raw in ipairs(entries) do
-		local entry = raw:match("^%s*(.-)%s*$")
+		local entry = TextUtils.trim(raw)
 		if entry:upper() == "DIRECT" then
 			proxies[#proxies + 1] = "direct://"
 		else
