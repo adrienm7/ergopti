@@ -171,29 +171,52 @@ _TestStartupCommandBinding(Body, Name) {
 	Assert(Position > 0, Name . " must resolve the complete runtime launch command")
 	Assert(!RegExMatch(Code, Pattern, , Position + Binding.Len), Name . " has one command resolution")
 	Assert(!RegExMatch(Code, "i)\bif\s+Updater_IsLocalSource\s*\("), Name . " must not refuse the source command")
+	; The user's Startup folder reaches an owner only through the isolated-profile
+	; ports: an isolated driver must take its private folder (2026-11-11).
+	_TestStartupRequireCommandCall(Body,
+		"i)\bStartup\s*:=\s*_StartAtLoginIsolate\s*\(\s*\{\s*Folder\s*:\s*A_Startup\s*,"
+		. "\s*Approval\s*:\s*_StartupReadApproval\s*\}" . (Name == "StartAtLoginToggle"
+			? "\s*,\s*true\s*\)" : "\s*\)"), 1,
+		Name . " must take its Startup folder from the isolated-profile ports")
+	_TestStartupRequireCommandCall(Body, "i)\bA_Startup\b", 1,
+		Name . " must name the user's Startup folder only as the real port")
 	if Name == "StartAtLoginEnabled" {
 		_TestStartupRequireCommandCall(Body,
-			"i)StartupFolderEnabled\s*\(\s*A_Startup\s*,\s*Command\s*\)", 1,
+			"i)StartupFolderEnabled\s*\(\s*Startup\.Folder\s*,\s*Command\s*,\s*Startup\.Approval\s*\)", 1,
 			"getter must check discovered startup commands")
+	} else if Name == "StartAtLoginCommandAvailable" {
+		_TestStartupRequireCommandCall(Body,
+			"i)StartupOtherSourceConfigured\s*\(\s*Startup\.Folder\s*,\s*Command\s*,\s*Startup\.Approval\s*\)", 1,
+			"availability must read the conflicts of the same folder")
 	} else {
 		_TestStartupRequireCommandCall(Body,
-			"i)SetStartupFolder\s*\(\s*true\s*,\s*A_Startup\s*,\s*Command\s*\)", 1,
+			"i)StartupOtherSourceConfigured\s*\(\s*Startup\.Folder\s*,\s*Command\s*,\s*Startup\.Approval\s*\)", 1,
+			"toggle must refuse the conflicts of the folder it changes")
+		_TestStartupRequireCommandCall(Body,
+			"i)SetStartupFolder\s*\(\s*true\s*,\s*Startup\.Folder\s*,\s*Command\s*\)", 1,
 			"toggle enable must pass the complete command")
 		_TestStartupRequireCommandCall(Body,
-			"i)SetStartupFolder\s*\(\s*!Enabled\s*,\s*A_Startup\s*,\s*Command\s*\)", 1,
+			"i)SetStartupFolder\s*\(\s*!Enabled\s*,\s*Startup\.Folder\s*,\s*Command\s*\)", 1,
 			"toggle final mutation must pass the complete command")
 		_TestStartupRequireCommandCall(Body,
-			"i)StartupFolderEnabled\s*\(\s*A_Startup\s*,\s*Command\s*\)", 1,
+			"i)StartupFolderEnabled\s*\(\s*Startup\.Folder\s*,\s*Command\s*,\s*Startup\.Approval\s*\)", 1,
 			"toggle must preserve approval admission after enabling")
 	}
 }
 
 _TestStartupRuntimeBinding() {
 	Getter := _DriverFuncBody("StartAtLoginEnabled")
-	Toggle := _DriverFuncBody("ToggleStartAtLogin")
-	Assert(Getter != "" && Toggle != "", "both runtime startup owners must exist")
+	Available := _DriverFuncBody("StartAtLoginCommandAvailable")
+	Toggle := _DriverFuncBody("StartAtLoginToggle")
+	Assert(Getter != "" && Available != "" && Toggle != "", "every runtime startup owner must exist")
 	_TestStartupCommandBinding(Getter, "StartAtLoginEnabled")
-	_TestStartupCommandBinding(Toggle, "ToggleStartAtLogin")
+	_TestStartupCommandBinding(Available, "StartAtLoginCommandAvailable")
+	_TestStartupCommandBinding(Toggle, "StartAtLoginToggle")
+	EntryBody := _DriverFuncBody("ToggleStartAtLogin")
+	Entry := _DriverMaskNonCode(&EntryBody)
+	Assert(RegExMatch(Entry, "i)\breturn\s+StartAtLoginToggle\s*\(\s*\)")
+		&& !RegExMatch(Entry, "i)\bA_Startup\b|\bSetStartupFolder\b"),
+		"the menu command must be the real toggle with its real tray rebuild and dialog")
 }
 Test("Startup: getter and toggle share source launch ownership (source-login-startup)", _TestStartupRuntimeBinding)
 
@@ -384,8 +407,17 @@ _TestStartupBindingControls() {
 	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body, Binding, "; " . Binding), "StartAtLoginEnabled"))
 	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body, Binding, "'" . Binding . "'"), "StartAtLoginEnabled"))
 	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body, Binding, Binding . Chr(10) . Binding), "StartAtLoginEnabled"))
-	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body, "StartupFolderEnabled(A_Startup, Command)",
-		"StartupFolderEnabled(A_Startup, OtherCommand)"), "StartAtLoginEnabled"))
+	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body,
+		"StartupFolderEnabled(Startup.Folder, Command, Startup.Approval)",
+		"StartupFolderEnabled(Startup.Folder, OtherCommand, Startup.Approval)"), "StartAtLoginEnabled"))
+	; The original bypass: the user's Startup folder passed straight to the owner.
+	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body,
+		"StartupFolderEnabled(Startup.Folder, Command, Startup.Approval)",
+		"StartupFolderEnabled(A_Startup, Command)"), "StartAtLoginEnabled"))
+	Ports := "_StartAtLoginIsolate({Folder: A_Startup, Approval: _StartupReadApproval})"
+	Assert(InStr(Body, Ports, true), "actual getter isolation is the mutation subject")
+	_TestStartupBindingRefused(_TestStartupCommandBinding.Bind(StrReplace(Body, Ports,
+		"{Folder: A_Startup, Approval: _StartupReadApproval}"), "StartAtLoginEnabled"))
 }
 Test("Startup: real runtime binding refuses missing and decoy commands (source-login-startup)", _TestStartupBindingControls)
 
@@ -416,3 +448,67 @@ _TestStartupDirectoryAdapter() {
 		"directory adapter validates the actual directory before resolution")
 }
 Test("Startup: directory resolution uses the actual filesystem adapter (source-login-startup)", _TestStartupDirectoryAdapter)
+
+; Read only: the names and times of the user's Startup folder shortcuts.
+_TestStartupFolderReceipt(Folder) {
+	Receipt := ""
+	for Link in FSListDirectoryStrict(Folder)
+		Receipt .= Link . "|" . FileGetTime(Link, "M") . "`n"
+	return Receipt
+}
+
+; Regression (2026-11-11): APPDATA is not redirected for an isolated driver (a
+; startup smoke or a live check, ERGOPTI_STARTUP_SMOKE_DIR), so its « Lancer au
+; démarrage » toggle added or removed the user's own login shortcut in
+; A_Startup. The test toggles only once the owner has proved that it resolves
+; the private folder and that every runtime owner binds through it, so it never
+; reaches the user's Startup folder even on a regressed owner.
+_TestStartupIsolatedProfile() {
+	global _DriverStartupSmokeDir
+	HadSmoke := IsSet(_DriverStartupSmokeDir), SavedSmoke := HadSmoke ? _DriverStartupSmokeDir : ""
+	Profile := A_Temp . "\ergopti-startup-isolated-" . DllCall("GetCurrentProcessId")
+		. "-" . A_TickCount . "-" . Random(100000, 999999)
+	FSCreateDirectoryExclusiveStrict(Profile)
+	Private := Profile . "\startup_private"
+	RealBefore := _TestStartupFolderReceipt(A_Startup)
+	try {
+		_DriverStartupSmokeDir := ""
+		Real := _StartAtLoginIsolate({Folder: A_Startup, Approval: _StartupReadApproval})
+		AssertEqual(A_Startup, Real.Folder, "a real profile keeps the user's Startup folder")
+		AssertTrue(Real.Approval == _StartupReadApproval, "and Windows' approval")
+
+		_DriverStartupSmokeDir := Profile
+		Ports := _StartAtLoginIsolate({Folder: A_Startup, Approval: _StartupReadApproval})
+		AssertEqual(Private, Ports.Folder, "an isolated profile takes its private folder")
+		AssertTrue(Ports.Approval != _StartupReadApproval, "and never reads Windows' approval")
+		_TestStartupRuntimeBinding()
+
+		AssertFalse(StartAtLoginEnabled(), "a fresh isolated profile starts at no login")
+		AssertTrue(StartAtLoginCommandAvailable(), "and has no conflicting command")
+		AssertFalse(DirExist(Private), "a read creates no folder")
+		Rebuilt := [], Notices := []
+		Rebuild := () => Rebuilt.Push(1)
+		Notice := (*) => Notices.Push(1)
+		AssertTrue(StartAtLoginToggle(Rebuild, Notice), "an isolated toggle turns login startup on")
+		AssertEqual(0, Notices.Length, "without a failure dialog")
+		AssertEqual(1, Rebuilt.Length, "and rebuilds the menu once")
+		AssertTrue(StartAtLoginEnabled(), "the isolated profile now starts at login")
+		Command := StartupLaunchCommand(Updater_IsLocalSource(), A_ScriptFullPath, A_AhkPath)
+		Owned := StartupOwnedShortcuts(Private, Command)
+		AssertEqual(1, Owned.Length, "its shortcut is in the private folder")
+		AssertEqual("ErgoptiPlus.lnk", Owned[1]["name"], "under the canonical name")
+		AssertEqual(RealBefore, _TestStartupFolderReceipt(A_Startup), "the user's Startup folder is untouched")
+
+		AssertTrue(StartAtLoginToggle(Rebuild, Notice), "an isolated toggle turns login startup off")
+		AssertEqual(0, Notices.Length, "without a failure dialog")
+		AssertFalse(StartAtLoginEnabled(), "the isolated profile no longer starts at login")
+		AssertEqual(0, StartupOwnedShortcuts(Private, Command).Length, "its private shortcut is removed")
+	} finally {
+		_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
+		; Exclusive creation above acquired this exact root; it holds only the private folder.
+		DirDelete(Profile, true)
+	}
+	AssertEqual(RealBefore, _TestStartupFolderReceipt(A_Startup), "the user's Startup folder is untouched")
+}
+Test("Startup: an isolated profile never writes the user's Startup folder (login-startup-isolated-profile)",
+	_TestStartupIsolatedProfile)

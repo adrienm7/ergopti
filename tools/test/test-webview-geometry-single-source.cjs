@@ -289,6 +289,15 @@ const MACOS_EXCLUSIONS = {
 // literal `w<W> h<H>` (Show/placeholder) and `NAME_WIDTH := <W>` globals. The
 // value is always interpolated from the manifest so this cannot pass on drift.
 const WINDOWS_APPS = {
+	physical_shortcuts: {
+		file: 'ui/physical_shortcuts/host.ahk',
+		// The WebViewHost base sizes the window from the manifest entry.
+		checks: () => [
+			/class PhysicalShortcutsWindow extends WebViewHost/,
+			/static APP_ID\s*:=\s*"physical_shortcuts"/,
+			/Host\.AppId\s*:=\s*PhysicalShortcutsHost\.APP_ID/
+		]
+	},
 	config_cleanup: {
 		file: 'ui/config_cleanup/init.ahk',
 		checks: () => [
@@ -392,9 +401,6 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
-	physical_shortcuts:
-		'no Windows editor host yet — the shared menu keeps this row grey with ' +
-		'physical_shortcuts.windows_unavailable; the explicit unsupported contract below guards this exclusion',
 	permission_dialog:
 		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
 		'Privacy & Security), which Windows does not have',
@@ -409,52 +415,59 @@ const WINDOWS_EXCLUSIONS = {
 		'token_prompt above. Linux has no equivalent and needs a webview to ask at all'
 };
 
-// This new app has no Windows geometry owner. Its exclusion is conditional on
-// the actual shared menu refusing Windows and explaining why, rather than an
-// exemption for every future app without a native host. A Windows port must add
-// its geometry owner above and retire this exact exclusion.
-function unsupportedPhysicalEditor(row) {
+// Every driver hosts the physical shortcut editor now. Windows refuses the
+// editor through its row, not through a platform restriction: the row is
+// greyed by its ready getter and names the unqualified delivery.
+function sharedPhysicalEditor(row) {
 	return (
 		row?.type === 'command' &&
 		row.id === 'physical_shortcuts_editor' &&
 		row.i18n === 'physical_shortcuts.window_title' &&
-		JSON.stringify(row.platforms) === JSON.stringify(['hs', 'linux']) &&
-		row.unavailable === 'grey' &&
-		row.reason_key === 'physical_shortcuts.windows_unavailable' &&
+		row.platforms === undefined &&
+		row.reason_key === undefined &&
 		JSON.stringify(row.disabled_when) === JSON.stringify(['physical_shortcuts_editor_ready']) &&
-		row.disabled_reason_key === 'physical_shortcuts.window_unavailable'
+		row.disabled_reason_key === 'physical_shortcuts.window_unavailable' &&
+		JSON.stringify(row.disabled_reasons) ===
+			JSON.stringify([
+				{
+					when: 'physical_shortcuts_delivery_unqualified',
+					reason_key: 'physical_shortcuts.delivery_unqualified'
+				}
+			])
 	);
 }
 
-const unsupportedFixture = {
+const sharedFixture = {
 	type: 'command',
 	id: 'physical_shortcuts_editor',
 	i18n: 'physical_shortcuts.window_title',
-	platforms: ['hs', 'linux'],
-	unavailable: 'grey',
-	reason_key: 'physical_shortcuts.windows_unavailable',
 	disabled_when: ['physical_shortcuts_editor_ready'],
-	disabled_reason_key: 'physical_shortcuts.window_unavailable'
+	disabled_reason_key: 'physical_shortcuts.window_unavailable',
+	disabled_reasons: [
+		{
+			when: 'physical_shortcuts_delivery_unqualified',
+			reason_key: 'physical_shortcuts.delivery_unqualified'
+		}
+	]
 };
-assert.equal(unsupportedPhysicalEditor(unsupportedFixture), true);
+assert.equal(sharedPhysicalEditor(sharedFixture), true);
 for (const [field, value] of [
 	['type', 'dynamic'],
 	['id', 'another_editor'],
 	['i18n', 'another.title'],
-	['platforms', ['ahk', 'hs', 'linux']],
-	['platforms', undefined],
-	['unavailable', 'hide'],
+	['platforms', ['hs', 'linux']],
 	['reason_key', 'another.reason'],
 	['disabled_when', []],
-	['disabled_reason_key', undefined]
+	['disabled_reason_key', undefined],
+	['disabled_reasons', undefined]
 ]) {
 	assert.equal(
-		unsupportedPhysicalEditor({ ...unsupportedFixture, [field]: value }),
+		sharedPhysicalEditor({ ...sharedFixture, [field]: value }),
 		false,
-		`unsupported physical editor fixture: ${field}`
+		`shared physical editor fixture: ${field}`
 	);
 }
-assert.equal(unsupportedPhysicalEditor(undefined), false);
+assert.equal(sharedPhysicalEditor(undefined), false);
 
 // The menu rows live in the tray-menu source, beside the generated manifest.
 const canonicalMenu = require('../lib/menu-source.cjs').readMenuTables(parseToml);
@@ -468,28 +481,24 @@ for (const [name, menu] of [
 	const rows = menu.shortcuts_menu.filter((row) => row.id === 'physical_shortcuts_editor');
 	assert.equal(rows.length, 1, `${name}: exactly one physical shortcut editor row`);
 	assert.equal(
-		unsupportedPhysicalEditor(rows[0]),
+		sharedPhysicalEditor(rows[0]),
 		true,
-		`${name}: Windows physical editor geometry exclusion requires its grey unsupported contract`
+		`${name}: the physical editor row is shared and names its unqualified delivery`
 	);
 }
 const localeDirectory = path.join(ROOT, SP, '_shared/data/locales');
 const localeFiles = fs.readdirSync(localeDirectory).filter((name) => name.endsWith('.json'));
-assert.equal(
-	localeFiles.length,
-	21,
-	'unsupported physical editor reasons must cover all 21 locales'
-);
+assert.equal(localeFiles.length, 21, 'physical editor reasons must cover all 21 locales');
 for (const name of localeFiles) {
 	const locale = JSON.parse(fs.readFileSync(path.join(localeDirectory, name), 'utf8'));
 	for (const key of [
-		unsupportedFixture.i18n,
-		unsupportedFixture.reason_key,
-		unsupportedFixture.disabled_reason_key
+		sharedFixture.i18n,
+		sharedFixture.disabled_reason_key,
+		sharedFixture.disabled_reasons[0].reason_key
 	]) {
 		assert.ok(
 			typeof locale[key] === 'string' && locale[key].trim().length > 0,
-			`${name}: unsupported physical editor needs a translated ${key}`
+			`${name}: the physical editor needs a translated ${key}`
 		);
 	}
 }

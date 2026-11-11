@@ -263,6 +263,20 @@ The uppercase form of comma/apostrophe/period variants uses the configured
 non-breaking-space prefix, never a plain ASCII space; the prefix is part of
 matching semantics and protects emoticons such as `:D`.
 
+### project-hotstring-deferred-rank
+
+Equal-length, equal-priority collisions fall back to the registration sequence
+(`Spec.Seq`, `_HSE_Beats`), never to the insertion time. Windows registers the
+emoji and symbol sections after ready, in Critical slices of
+`[hotstrings] deferred_registration_slice_ms`, through `HSE_DeferRegistration`,
+which reserves their sequence block at the boot position: the dynamic hotstrings,
+the repeat key and the personal files registered after them keep losing the
+ties they lose inline. Action: anything else moved after ready must reserve its
+block the same way, and a registry clear drops the block, so a pending job stops
+instead of registering into the new registry; `(hotstring-deferred-rank)` pins
+both. The prefix catalogue is built from the cache, not the registry, so it is
+complete before the rows land.
+
 ### project-hotstring-live-rebuild
 
 Section and category toggles rebuild the custom hotstring registry in-process.

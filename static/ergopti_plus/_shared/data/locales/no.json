@@ -4264,7 +4264,6 @@
 	"physical_shortcuts.save_failed": "Snarveien kunne ikke lagres. Prøv igjen.",
 	"physical_shortcuts.saved_reopen": "Lagret. Åpne dette vinduet på nytt for å fortsette.",
 	"physical_shortcuts.position_unavailable": "Denne tastposisjonen er ikke tilgjengelig her.",
-	"physical_shortcuts.windows_unavailable": "Ikke tilgjengelig på Windows ennå: Windows har ennå ingen vert for fysiske snarveier, verken redigereren eller utførelsen av en handling knyttet til en fysisk tast. Fysiske snarveier virker på macOS og Linux.",
 	"physical_shortcuts.collision": "Denne tastekombinasjonen er allerede i bruk. Velg en annen.",
 	"physical_shortcuts.delivery_unqualified": "Ikke tilgjengelig ennå: Ergopti kan ennå ikke trygt kjøre en handling knyttet til en fysisk tast på dette systemet. De navngitte snarveiene fortsetter å virke.",
 	"physical_shortcuts.window_unavailable": "Dette vinduet er ikke tilgjengelig: Prøv å åpne det igjen.",

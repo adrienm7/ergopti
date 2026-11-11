@@ -4449,7 +4449,7 @@ jobs:
           export LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;"
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          xvfb-run -a -s "-noreset" luajit tests/hardware/run_layout_editor_webview.lua ../../../static/layouts/sources/ergopti.toml
+          dbus-run-session -- xvfb-run -a -s "-noreset" luajit tests/hardware/run_layout_editor_webview.lua ../../../static/layouts/sources/ergopti.toml
           else
               exit 1
           fi

@@ -713,6 +713,13 @@ complex_key_delay_multiplier = 2
 # bonus is dropped so it cannot stretch an expansion on an unrelated key.
 complex_key_carry_ms = 300
 
+# Windows: the emoji and symbol sections register after ready, at their boot
+# rank, in slices of this length; the keyboard waits at most one slice. A gap
+# between two slices lets the input queued meanwhile run.
+# AHK: infra/hotstrings/hotstring_engine_main.ahk HSE_DeferredRegistrationSlice.
+deferred_registration_slice_ms = 25
+deferred_registration_gap_ms = 15
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Ergonomics warnings
@@ -1178,6 +1185,11 @@ input_probe_step_ms = 10
 input_probe_settle_ms = 40
 # Windows: an updater completion run off the current thread.
 updater_callback_defer_ms = 50
+# Windows: the poll of the keyboard-layout registry watch's change events
+# (RegNotifyChangeKeyValue): a change of the installed layouts is captured
+# within this delay rather than at the next one-second layout poll.
+# AHK: modules/keymap/layout_registry_watch.ahk.
+layout_registry_watch_poll_ms = 100
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).

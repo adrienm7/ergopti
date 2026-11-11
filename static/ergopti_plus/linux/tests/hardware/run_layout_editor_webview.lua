@@ -17,7 +17,7 @@
 --- text output) types the source's characters for physical key presses.
 --- Exit 0 = every check held, 1 = a failure, 2 = the machine cannot host it (no
 --- display, WebKit or lgi).
---- USAGE: xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
+--- USAGE: dbus-run-session -- xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
 --- ==============================================================================
 
 local ffi = require("ffi")

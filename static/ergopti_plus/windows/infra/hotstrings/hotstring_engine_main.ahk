@@ -189,6 +189,19 @@ global HSE_DisabledGroups := Map()
 ; when length and group_order are equal (stable sort tiebreaker).
 global HSE_SeqCounter := 0
 
+; Sequence numbers kept at one registration position for specs registered later
+; (HSE_SeqReserve), so a deferred section keeps the collision tie-break it would
+; have had inline. 0 when no block is reserved; HSE_RegistryClear drops it.
+global HSE_SeqReservation := 0
+
+; Width of a reserved block. The sequence is only ever compared, so the width
+; costs nothing; it bounds the specs one deferred job may register (the bundled
+; emoji and symbol sections register about 1,600 rows), and an overflow throws.
+global HSE_SEQ_RESERVED_BLOCK := 1 << 20
+
+; The job HSE_DeferRegistration queued, until its last slice or a cancel; 0 otherwise.
+global HSE_DeferredRegistration := 0
+
 ; Monotonic identity of the active registry projection. Unlike HSE_SeqCounter,
 ; this value is never reset: a tooltip decision captured before a clear/reload
 ; must not become current again merely because the rebuilt registry reused the
@@ -437,7 +450,16 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 		if (Trigger == "") {
 				return
 		}
-		RegistrationSeq := ++HSE_SeqCounter
+		global HSE_SeqReservation
+		; Inside an open reservation (a deferred slice, which holds Critical) the
+		; spec takes the next number of the block kept at its boot position.
+		if (HSE_SeqReservation and HSE_SeqReservation.Open) {
+				if (HSE_SeqReservation.Next > HSE_SeqReservation.Last)
+						throw Error("The reserved hotstring sequence block is exhausted.")
+				RegistrationSeq := HSE_SeqReservation.Next++
+		} else {
+				RegistrationSeq := ++HSE_SeqCounter
+		}
 		; Resolve the group used by HSE_EnableGroup / HSE_DisableGroup for live,
 		; reload-free section toggling. An explicit Meta "group" always wins; when
 		; absent we derive "<category>.<section>" from the dispatch metadata so every
@@ -578,7 +600,7 @@ HSE_RegistryClear() {
 		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
 		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
 		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
-		global HSE_RegistryGeneration
+		global HSE_RegistryGeneration, HSE_SeqReservation
 		PreviousCritical := Critical("On")
 		try {
 				HSE_RegistryByLastChar := Map()
@@ -594,11 +616,204 @@ HSE_RegistryClear() {
 				HSE_RegistryByGroup := Map()
 				HSE_DisabledGroups := Map()
 				HSE_SeqCounter := 0
+				; A block reserved in the cleared registry has no position left in
+				; the next one: its pending owner sees it gone and stops.
+				HSE_SeqReservation := 0
 				HSE_RegistryGeneration += 1
 		} finally {
 				Critical(PreviousCritical)
 		}
 		HSE_InvalidateRegistryProjection(true)
+}
+
+; Keep a block of sequence numbers at the current registration position, for
+; specs that will be registered later but must rank as if registered now: the
+; collision tie-break falls back to the sequence, so a section registered after
+; ready would otherwise lose every tie it wins at boot. Specs registered while
+; the block is open (HSE_SeqReservationOpen) take its numbers; every other
+; registration continues after it. One block at a time.
+; @return {Object} The reservation, to open, close and release.
+HSE_SeqReserve() {
+		global HSE_SeqCounter, HSE_SeqReservation, HSE_SEQ_RESERVED_BLOCK
+		PreviousCritical := Critical("On")
+		try {
+				if HSE_SeqReservation
+						throw Error("A hotstring sequence block is already reserved.")
+				Reservation := { Next: HSE_SeqCounter + 1, Last: HSE_SeqCounter + HSE_SEQ_RESERVED_BLOCK, Open: false }
+				HSE_SeqCounter += HSE_SEQ_RESERVED_BLOCK
+				HSE_SeqReservation := Reservation
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return Reservation
+}
+
+; Whether Reservation is still the registry's reserved block: false once it was
+; released or a registry clear dropped it.
+HSE_SeqReservationCurrent(Reservation) {
+		global HSE_SeqReservation
+		return IsObject(Reservation) and HSE_SeqReservation == Reservation
+}
+
+; Route the next registrations to the block. The caller holds Critical from
+; here to HSE_SeqReservationClose, so no other thread registers meanwhile.
+HSE_SeqReservationOpen(Reservation) {
+		if !A_IsCritical
+				throw Error("A reserved hotstring sequence block opens only under Critical.")
+		if !HSE_SeqReservationCurrent(Reservation)
+				throw Error("The hotstring sequence block is no longer reserved.")
+		Reservation.Open := true
+}
+
+HSE_SeqReservationClose(Reservation) {
+		Reservation.Open := false
+}
+
+; Give the block back once its specs are registered or its job is cancelled.
+; A block a registry clear already dropped is left alone.
+HSE_SeqRelease(Reservation) {
+		global HSE_SeqReservation
+		Reservation.Open := false
+		if HSE_SeqReservationCurrent(Reservation)
+				HSE_SeqReservation := 0
+}
+
+; Queue sections for registration after ready, ranked at the current position:
+; their sequence block is reserved now, so every later registration (the dynamic
+; hotstrings, the repeat key, personal files) still loses the ties it loses when
+; the sections register inline. Each step is { Rows: Array, Register: Func(Rows) },
+; whose registrar takes any run of the rows. Nothing registers before
+; HSE_DeferredRegistrationStart.
+; @param {String} Name What the logs call the job.
+; @param {Array} Steps The sections, in their inline registration order.
+HSE_DeferRegistration(Name, Steps) {
+		global HSE_DeferredRegistration
+		if HSE_DeferredRegistration
+				throw Error("A deferred hotstring registration is already pending.")
+		RowCount := 0
+		for Step in Steps
+				RowCount += Step.Rows.Length
+		HSE_DeferredRegistration := { Name: Name, Steps: Steps, Reservation: HSE_SeqReserve(),
+			StepIndex: 1, RowIndex: 1, RowCount: RowCount, Slices: 0, BusyMs: 0.0, Started: 0 }
+		LoggerInfo("Hotstrings", "{1}: {2} row(s) in {3} section(s) deferred after ready at their boot rank.",
+			Name, RowCount, Steps.Length)
+}
+
+; Whether a deferred registration is still waiting for its slices.
+HSE_DeferredRegistrationPending() {
+		global HSE_DeferredRegistration
+		return HSE_DeferredRegistration ? true : false
+}
+
+; Begin the slices; called once the driver is ready.
+HSE_DeferredRegistrationStart() {
+		global HSE_DeferredRegistration
+		if !HSE_DeferredRegistration
+				return false
+		if HSE_DeferredRegistration.Started
+				throw Error("The deferred hotstring registration has already started.")
+		HSE_DeferredRegistration.Started := A_TickCount
+		LoggerStart("Hotstrings", "{1}: registering in slices…", HSE_DeferredRegistration.Name)
+		SetTimer(HSE_DeferredRegistrationSlice, -1)
+		return true
+}
+
+; Drop the pending job: a full rebuild registers those sections inline.
+HSE_DeferredRegistrationCancel() {
+		global HSE_DeferredRegistration
+		SetTimer(HSE_DeferredRegistrationSlice, 0)
+		Job := HSE_DeferredRegistration
+		if !Job
+				return false
+		HSE_DeferredRegistration := 0
+		HSE_SeqRelease(Job.Reservation)
+		if Job.Started
+				LoggerWarn("Hotstrings", "{1}: cancelled after {2} of {3} row(s); a full registration replaces it.",
+					Job.Name, _HSE_DeferredRowsDone(Job), Job.RowCount)
+		else
+				LoggerInfo("Hotstrings", "{1}: cancelled before its first slice; a full registration replaces it.", Job.Name)
+		return true
+}
+
+; One slice: register rows until the slice budget is spent, under Critical so no
+; other thread registers while the reserved block is open; the keyboard waits at
+; most one slice. Registration goes on while paused: it changes no output, and
+; the pause must not leave the registry short on resume.
+; @param {Number} BudgetMs The slice length; the timing registry's by default.
+HSE_DeferredRegistrationSlice(BudgetMs := "") {
+		global HSE_DeferredRegistration
+		; Rows registered between two reads of the clock: one run costs well under a
+		; millisecond, so the slice ends within a run of its budget.
+		static RUN_ROWS := 32
+		Job := HSE_DeferredRegistration
+		if !Job
+				return false
+		if !HSE_SeqReservationCurrent(Job.Reservation) {
+				; A registry clear dropped the block: the rows have no rank left to take.
+				HSE_DeferredRegistration := 0
+				LoggerWarn("Hotstrings", "{1}: stopped, the registry was cleared after {2} of {3} row(s).",
+					Job.Name, _HSE_DeferredRowsDone(Job), Job.RowCount)
+				return false
+		}
+		Budget := (BudgetMs != "") ? BudgetMs : TimingsGet("hotstrings", "deferred_registration_slice_ms")
+		Frequency := PerfClockFrequency()
+		Started := PerfClockTicks()
+		Deadline := Started + Budget * Frequency / 1000
+		PreviousCritical := Critical("On")
+		try {
+				HSE_SeqReservationOpen(Job.Reservation)
+				try {
+						while (Job.StepIndex <= Job.Steps.Length) {
+								Step := Job.Steps[Job.StepIndex]
+								Last := Min(Job.RowIndex + RUN_ROWS - 1, Step.Rows.Length)
+								Run := []
+								loop (Last - Job.RowIndex + 1)
+										Run.Push(Step.Rows[Job.RowIndex + A_Index - 1])
+								if Run.Length
+										Step.Register.Call(Run)
+								Job.RowIndex := Last + 1
+								if (Job.RowIndex > Step.Rows.Length) {
+										Job.StepIndex += 1
+										Job.RowIndex := 1
+								}
+								if (PerfClockTicks() >= Deadline)
+										break
+						}
+				} finally {
+						HSE_SeqReservationClose(Job.Reservation)
+				}
+		} catch as Err {
+				HSE_DeferredRegistration := 0
+				HSE_SeqRelease(Job.Reservation)
+				LoggerError("Hotstrings", "{1}: registration failed after {2} of {3} row(s): {4}",
+					Job.Name, _HSE_DeferredRowsDone(Job), Job.RowCount, Err.Message)
+				return false
+		} finally {
+				Critical(PreviousCritical)
+		}
+		Job.Slices += 1
+		Job.BusyMs += (PerfClockTicks() - Started) * 1000 / Frequency
+		if (Job.StepIndex <= Job.Steps.Length) {
+				SetTimer(HSE_DeferredRegistrationSlice, -TimingsGet("hotstrings", "deferred_registration_gap_ms"))
+				return true
+		}
+		HSE_DeferredRegistration := 0
+		HSE_SeqRelease(Job.Reservation)
+		LoggerSuccess("Hotstrings", "{1}: {2} row(s) registered in {3} slice(s), {4} ms of work over {5} ms.",
+			Job.Name, Job.RowCount, Job.Slices, Round(Job.BusyMs), Job.Started ? TickElapsed(Job.Started) : 0)
+		return true
+}
+
+; The rows a job registered so far.
+_HSE_DeferredRowsDone(Job) {
+		Done := 0
+		for Index, Step in Job.Steps {
+				if (Index < Job.StepIndex)
+						Done += Step.Rows.Length
+				else if (Index == Job.StepIndex)
+						Done += Job.RowIndex - 1
+		}
+		return Done
 }
 
 ; Return all active mappings whose trigger ends with TailChar, sorted

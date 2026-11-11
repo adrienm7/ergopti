@@ -404,18 +404,6 @@
 		}
 	},
 	{
-		"path": "shortcuts_menu.physical_shortcuts_editor",
-		"visibility": "grey",
-		"labels": { "fr": "Raccourcis physiques", "en": "Physical shortcuts" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Not yet on Windows: Windows has no physical shortcut host yet, neither the editor nor the delivery of an action bound to a physical key. Physical shortcuts work on macOS and Linux.",
-				"fr": "Pas encore sur Windows : Windows n’a pas encore d’hôte pour les raccourcis physiques, ni l’éditeur ni le lancement d’une action liée à une touche physique. Les raccourcis physiques fonctionnent sur macOS et Linux."
-			}
-		}
-	},
-	{
 		"path": "shortcuts_menu.personal_shortcuts",
 		"visibility": "hide",
 		"labels": { "fr": "personal_shortcuts", "en": "personal_shortcuts" },

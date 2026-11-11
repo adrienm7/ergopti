@@ -1251,7 +1251,9 @@ local function _complete_background_check(ok, available, release, generation)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 		ok and "success" or "failure", state.failures)
-	if not available or not release then return end
+	-- A failed check still hands back the release already known; as on
+	-- Windows, only a successful check announces one (UPL-001).
+	if not ok or not available or not release then return end
 	if Version.normalize_tag(release.tag) == Version.normalize_tag(state.last_notified_tag or "") then
 		Logger.info(LOG, "Background check result: %s available, already notified.", release.tag)
 		return

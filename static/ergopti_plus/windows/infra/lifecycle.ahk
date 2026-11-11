@@ -1552,6 +1552,13 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "AltGr family foreground hook teardown failed: {1}.",
 				Err.Message)
 		}
+		try {
+			if !LayoutRegistryWatch_Stop()
+				LoggerError("Lifecycle", "Keyboard layout registry watch teardown failed.")
+		} catch as Err {
+			try LoggerError("Lifecycle", "Keyboard layout registry watch teardown failed: {1}.",
+				Err.Message)
+		}
 		try LLM_NavEventOwner_Stop(false, true)
 		try TooltipReleaseRenderResources()
 		try MenuPopulation_Shutdown()

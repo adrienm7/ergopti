@@ -97,14 +97,22 @@ if (($body.Split(@($nativeLookup), [StringSplitOptions]::None)).Count -ne 2) {
 $body = $body.Replace($nativeLookup, '$script:StartupCensusFolder')
 if (-not $body.StartsWith('{') -or -not $body.EndsWith('}')) { throw 'Unexpected callback AST delimiters' }
 $actualUnregister = [ScriptBlock]::Create($body.Substring(1, $body.Length - 2))
+# A private stand-in for the Recycle Bin: the fake recycle renames the quarantined
+# file into it under a shell-like $R name, and the real identity search reads it.
+$fakeBin = Join-Path (Split-Path $target) 'fake-bin'
+[void][IO.Directory]::CreateDirectory($fakeBin)
+$binRecycle = { param($Path) [IO.File]::Move($Path, (Join-Path $fakeBin ('$R' + [guid]::NewGuid().ToString('N') + '.exe'))) }
+$binLocate = { param($Item, $Identity) Find-ErgoptiRecycledIdentity $fakeBin $Identity }
+$quarantineName = '^' + [regex]::Escape((Split-Path $target)) + '\\\\\\.ergopti-uninstall-[0-9a-f]{32}\\.exe$'
 $script:censusRecycled = @()
-$censusRecycle = { param($Path) $script:censusRecycled += $Path }
-if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $censusRecycle $actualUnregister)) {
+$censusRecycle = { param($Path) $script:censusRecycled += $Path; & $binRecycle $Path }
+if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $censusRecycle $actualUnregister $binLocate)) {
  throw 'The actual removal transaction refused the confirmed census fixture'
 }
-if ($script:censusRecycled.Count -ne 1 -or $script:censusRecycled[0] -ne $target) {
+if ($script:censusRecycled.Count -ne 1 -or $script:censusRecycled[0] -notmatch $quarantineName -or (Test-Path -LiteralPath $target)) {
  throw 'The startup cleanup exceeded the exact executable removal authority'
 }
+[IO.File]::WriteAllText($target, 'original')
 foreach ($ownedPath in @($manualPaths) + @($canonicalPath)) {
  if (Test-Path -LiteralPath $ownedPath) { throw 'An exact owned startup command survived executable removal' }
 }
@@ -114,15 +122,17 @@ if (-not (Test-Path -LiteralPath $foreignPath) -or -not (Test-Path -LiteralPath 
 $missingStartup = Join-Path (Split-Path $target) 'missing-startup'
 $script:absentStartupRecycled = 0
 $absentStartupUnregister = { param($Path) Remove-ErgoptiStartupShortcuts $Path $missingStartup }
-if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } { $script:absentStartupRecycled++ } $absentStartupUnregister)) {
+$countedRecycle = { param($Path) $script:absentStartupRecycled++; & $binRecycle $Path }
+if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $countedRecycle $absentStartupUnregister $binLocate)) {
  throw 'A missing Startup folder must not refuse executable removal'
 }
 if ($script:absentStartupRecycled -ne 1 -or (Test-Path -LiteralPath $missingStartup)) {
  throw 'Missing Startup cleanup must recycle only the executable without creating the folder'
 }
+[IO.File]::WriteAllText($target, 'original')
 Remove-ErgoptiStartupShortcuts $target ''
 $script:recycled = @()
-$recycle = { param($Path) $script:recycled += $Path }
+$recycle = { param($Path) $script:recycled += $Path; & $binRecycle $Path }
 $failed = $false
 [IO.File]::WriteAllText($target, 'replacement before worker startup')
 try { Invoke-ErgoptiRemoval $target $hash { throw 'Changed image reached READY' } { $true } $recycle } catch {
@@ -151,13 +161,89 @@ $swap = {
  [IO.File]::WriteAllText($Path, 'foreign replacement')
 }
 $scriptRecycledText = $null
-$readRecycle = { param($Path) $script:scriptRecycledText = [IO.File]::ReadAllText($Path) }
-if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $readRecycle $swap)) { throw 'Pinned removal refused' }
+$readRecycle = { param($Path) $script:scriptRecycledText = [IO.File]::ReadAllText($Path); & $binRecycle $Path }
+if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $readRecycle $swap $binLocate)) { throw 'Pinned removal refused' }
 if ($script:scriptRecycledText -ne 'original' -or (Test-Path -LiteralPath $moved)) {
  throw 'The unregister step could swap the confirmed image before its recycle'
 }
-if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $recycle)) { throw 'Confirmed removal refused' }
-if ($script:recycled.Count -ne 1 -or $script:recycled[0] -ne $target) { throw 'Removal authority exceeded its exact target' }
+[IO.File]::WriteAllText($target, 'original')
+if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } $recycle {} $binLocate)) { throw 'Confirmed removal refused' }
+if ($script:recycled.Count -ne 1 -or $script:recycled[0] -notmatch $quarantineName) { throw 'Removal authority exceeded its exact target' }
+# Finding 3 of the 28 October audit: Windows cannot recycle a pinned file, so
+# the pin ends before the recycle, and a program racing that window swapped the
+# image the recycle selected; the removal returned success with the foreign
+# file in the Recycle Bin. The race lands inside the recycle step itself: the
+# removal must refuse, and the confirmed image must be left intact.
+[IO.File]::WriteAllText($target, 'original')
+$stolen = "$target.stolen"
+$racingRecycle = {
+ param($Path)
+ [IO.File]::Move($Path, $stolen)
+ [IO.File]::WriteAllText($Path, 'foreign replacement')
+ & $binRecycle $Path
+}
+$failed = $false
+try { Invoke-ErgoptiRemoval $target $hash { $true } { $true } $racingRecycle {} $binLocate } catch {
+ if ($_.Exception.Message -ne 'The recycled file is not the confirmed executable; check the Recycle Bin.') { throw }
+ $failed = $true
+}
+if (-not $failed) { throw 'A replacement recycled in the unpinned window was reported as the removal' }
+if ([IO.File]::ReadAllText($stolen) -ne 'original') { throw 'The racing program lost the confirmed image' }
+Remove-Item -LiteralPath $stolen
+# The same race just after the pin ends, before the quarantine rename: the
+# foreign file keeps its name and nothing reaches the Recycle Bin.
+[IO.File]::WriteAllText($target, 'original')
+$binBefore = @(Get-ChildItem -LiteralPath $fakeBin -Force).Count
+$racingRelease = {
+ param($Path)
+ [IO.File]::Move($Path, $stolen)
+ [IO.File]::WriteAllText($Path, 'foreign replacement')
+}
+$failed = $false
+try { Invoke-ErgoptiRemoval $target $hash { $true } { $true } $recycle {} $binLocate $racingRelease } catch {
+ if ($_.Exception.Message -ne 'The executable was replaced before its quarantine; nothing was recycled.') { throw }
+ $failed = $true
+}
+if (-not $failed) { throw 'A replacement renamed in the unpinned window reached the recycle' }
+if (@(Get-ChildItem -LiteralPath $fakeBin -Force).Count -ne $binBefore -or $script:recycled.Count -ne 1) {
+ throw 'A replacement renamed in the unpinned window was recycled'
+}
+if ([IO.File]::ReadAllText($target) -ne 'foreign replacement' -or [IO.File]::ReadAllText($stolen) -ne 'original') {
+ throw 'The refused quarantine did not hand both files their names back'
+}
+Remove-Item -LiteralPath $stolen
+[IO.File]::WriteAllText($target, 'original')
+# The actual recycle callback and the default Recycle Bin search, on the real
+# Recycle Bin: it receives only this test's own temporary file, which the test
+# then removes from the Bin by the identity the removal proved.
+$recycleAssignments = @($workerAst.FindAll({
+ param($node)
+ $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+  $node.Left -is [Management.Automation.Language.VariableExpressionAst] -and
+  $node.Left.VariablePath.UserPath -eq 'recycle'
+}, $true))
+if ($recycleAssignments.Count -ne 1) { throw 'The actual recycle assignment is not unique' }
+$recycleBody = $recycleAssignments[0].Right.Extent.Text
+if (-not $recycleBody.StartsWith('{') -or -not $recycleBody.EndsWith('}')) { throw 'Unexpected recycle AST delimiters' }
+$actualRecycle = [ScriptBlock]::Create($recycleBody.Substring(1, $recycleBody.Length - 2))
+Add-Type -AssemblyName Microsoft.VisualBasic
+$realTarget = Join-Path (Split-Path $target) 'real-recycle-fixture.exe'
+[IO.File]::WriteAllText($realTarget, 'ergopti uninstall test fixture ' + [guid]::NewGuid().ToString('N'))
+$realHash = Get-ErgoptiExecutableHash $realTarget
+$realAnchor = Open-ErgoptiFileAnchor $realTarget
+try {
+ $realIdentity = Get-ErgoptiFileIdentity $realAnchor
+ if (-not (Invoke-ErgoptiRemoval $realTarget $realHash { $true } { $true } $actualRecycle)) { throw 'The real recycle was refused' }
+ $realBin = Get-ErgoptiRecycleBinFolder $realTarget
+ $recycledEntry = Find-ErgoptiRecycledIdentity $realBin $realIdentity
+} finally { $realAnchor.Dispose() }
+if ($null -eq $recycledEntry -or (Test-Path -LiteralPath $realTarget)) { throw 'The confirmed fixture is not in the Recycle Bin' }
+$recordEntry = Join-Path $realBin ('$I' + (Split-Path $recycledEntry -Leaf).Substring(2))
+$record = [IO.File]::ReadAllBytes($recordEntry)
+if (-not [Text.Encoding]::Unicode.GetString($record, 28, $record.Length - 28).StartsWith((Split-Path $realTarget -Parent) + '\\.ergopti-uninstall-')) {
+ throw 'The Recycle Bin record does not name the quarantined fixture'
+}
+Remove-Item -LiteralPath $recycledEntry, $recordEntry -Force
 $checkout = Join-Path (Split-Path $target) '.git'
 [IO.File]::WriteAllText($checkout, 'gitdir: another-worktree')
 $failed = $false
@@ -167,7 +253,7 @@ try { Invoke-ErgoptiRemoval $target $hash { throw 'Checkout reached authorizatio
 }
 if (-not $failed -or $script:recycled.Count -ne 1) { throw 'Source checkout was not preserved' }
 if ([IO.File]::ReadAllText($target) -ne 'original') { throw 'The test touched the recycle boundary' }
-Write-Output '[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable.'
+Write-Output '[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable, and recycles that exact file (the real Recycle Bin received only this test''s own temporary fixture, removed afterwards).'
 `
 	);
 	const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {

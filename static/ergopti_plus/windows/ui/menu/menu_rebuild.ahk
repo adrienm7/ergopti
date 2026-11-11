@@ -778,7 +778,9 @@ _RebuildHotstringsLiveOnce() {
 	}
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	try {
-		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
+		; A boot's emoji/symbol slices still pending would register into the
+		; cleared registry: the inline pass below replaces them.
+		HSE_DeferredRegistrationCancel()
 		; HSE_RebuildInProgress is the fence: HSE_FindMatchAtEnd returns no match while
 		; it is set, so an InputHook OnChar can never observe the empty or
 		; partially-populated registry — keystrokes simply pass through unexpanded for

@@ -4264,7 +4264,6 @@
 	"physical_shortcuts.save_failed": "Не вдалося зберегти комбінацію клавіш. Спробуйте ще раз.",
 	"physical_shortcuts.saved_reopen": "Збережено. Відкрийте це вікно знову, щоб продовжити.",
 	"physical_shortcuts.position_unavailable": "Це розташування клавіші тут недоступне.",
-	"physical_shortcuts.windows_unavailable": "Поки недоступно у Windows: У Windows поки немає хоста для фізичних комбінацій клавіш — ні редактора, ні запуску дії, призначеної фізичній клавіші. Фізичні комбінації працюють у macOS і Linux.",
 	"physical_shortcuts.collision": "Ця комбінація клавіш уже використовується. Виберіть іншу.",
 	"physical_shortcuts.delivery_unqualified": "Поки недоступно: Ergopti поки не може безпечно запускати дію, прив’язану до фізичної клавіші, у цій системі. Іменовані скорочення й далі працюють.",
 	"physical_shortcuts.window_unavailable": "Це вікно недоступне: Спробуйте відкрити його знову.",

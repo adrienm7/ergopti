@@ -217,6 +217,12 @@ local TEXT_EQUIVALENT_TARGETS = {
 	["TEXT"] = true, ["COMPOUND_TEXT"] = true, ["text/plain"] = true,
 }
 
+-- ICCCM bookkeeping an owner answers itself; it carries no saved payload.
+local BOOKKEEPING_TARGETS = {
+	["TARGETS"] = true, ["TIMESTAMP"] = true, ["MULTIPLE"] = true, ["SAVE_TARGETS"] = true,
+	["DELETE"] = true, ["INSERT_SELECTION"] = true, ["INSERT_PROPERTY"] = true,
+}
+
 --- Whether one advertised target is the restored text or bookkeeping.
 --- @param target string One line of the type listing.
 --- @return boolean
@@ -231,23 +237,20 @@ end
 --- @param selected_backend table
 --- @return boolean ok False when the formats could not be enumerated.
 --- @return table lost Advertised formats other than the text.
+--- @return boolean offers_text Whether a text format is advertised at all.
 local function formats_lost_by_text_restore(selected_backend)
-	if not selected_backend.list_types then return false, {} end
+	if not selected_backend.list_types then return false, {}, false end
 	local ok, listing = Shell.exec_checked(selected_backend.list_types)
-	if not ok then return false, {} end
-	local lost = {}
+	if not ok then return false, {}, false end
+	local lost, offers_text = {}, false
 	for line in listing:gmatch("[^\r\n]+") do
 		local target = require("text_utils").trim(line)
-		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target end
+		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target
+		elseif target ~= "" and not BOOKKEEPING_TARGETS[target] then offers_text = true end
 	end
-	return true, lost
+	return true, lost, offers_text
 end
 
--- ICCCM bookkeeping an owner answers itself; it carries no saved payload.
-local BOOKKEEPING_TARGETS = {
-	["TARGETS"] = true, ["TIMESTAMP"] = true, ["MULTIPLE"] = true, ["SAVE_TARGETS"] = true,
-	["DELETE"] = true, ["INSERT_SELECTION"] = true, ["INSERT_PROPERTY"] = true,
-}
 
 -- Bytes a multi-format snapshot may hold in all; a larger clipboard (a raw
 -- screenshot in several encodings) is refused rather than held in memory.
@@ -294,14 +297,21 @@ end
 --- @return string|nil reason
 local function read_restorable_snapshot(selected_backend)
 	local ok, contents, reason = read_backend_checked(selected_backend)
+	local text_withheld = false
 	if not ok then
 		-- A clipboard nobody owns (nothing copied yet this session, or its owner
 		-- quit) makes xclip and wl-paste fail as a broken read does. It is an
 		-- empty clipboard, restored as one; any other failure still refuses.
-		if selected_backend.owned and selected_backend.owned() == false then return true, { text = "" }, nil end
-		return false, nil, reason
+		local owned = selected_backend.owned and selected_backend.owned()
+		if owned == false then return true, { text = "" }, nil end
+		if owned ~= true then return false, nil, reason end
+		-- An owner offering no text (a screenshot copied alone) fails the text
+		-- read too: its own formats are saved whole, as Windows' ClipboardAll
+		-- saves them (CBL-001). A text format that fails to read still refuses.
+		text_withheld, contents = true, ""
 	end
-	local listed, lost = formats_lost_by_text_restore(selected_backend)
+	local listed, lost, offers_text = formats_lost_by_text_restore(selected_backend)
+	if text_withheld and (not listed or offers_text or #lost == 0) then return false, nil, reason end
 	if not listed then
 		-- xsel cannot ask for TARGETS: nothing proves the text is all there is.
 		Logger.warn(LOG, "Clipboard formats cannot be listed via %s; borrowing refused (install %s).",
