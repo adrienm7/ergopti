@@ -390,18 +390,14 @@ local _private_window = false
 -- has no business running once per keystroke.
 local _secure_field = false
 
--- Password managers and credential UIs (case-insensitive substring match on
--- appId). Gated by metrics.secure_filter_enabled.
---
--- NOTE: intentionally distinct from the AT-SPI adapter's
--- secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, smaller list e.g.
--- keepassxc). The adapter is consulted IN ADDITION to this list, never instead
--- of it: it matches exactly, so delegating would NARROW coverage and leak
--- keystrokes. The broad coverage is locked by the "coverage must never narrow"
--- guard in tests/unit/modules/keystats/core/test_keystats.lua.
-local _SECURE_APPS = {
-	"1password", "bitwarden", "keepass", "lastpass",
-}
+-- Password managers and credential UIs: the Linux fragments of the shared list
+-- (_shared/data/secure_apps.json), the one macOS and Windows read, matched as
+-- case-insensitive substrings of the appId. Gated here by
+-- metrics.secure_filter_enabled for recording; the whole-application gate of
+-- text automation is is_context_protected, which no metrics switch turns off
+-- (ADD-1, decided by the maintainer on 2026-11-11). The "coverage must never
+-- narrow" guard in tests/unit/modules/keystats/core/test_keystats.lua locks it.
+local _SECURE_APPS = require("secure_apps").linux_fragments()
 
 -- OS-level authentication prompts. Gated by metrics.system_auth_filter_enabled,
 -- matching the "system_auth" category of the shared no-persist corpus.
@@ -2143,6 +2139,10 @@ end
 --- @param title string Exact current native frame title.
 --- @return boolean protected
 function M.is_context_protected(app_id, title)
+	-- A password manager is a secure field as a whole, as on macOS and Windows,
+	-- whatever the metrics filters say: the verdict also gates hotstrings, AI
+	-- requests and clipboard borrowers through the focus guard (ADD-1).
+	if require("secure_apps").is_secure_app("linux", app_id) then return true end
 	return M.is_password_app(app_id) or (_private_filter_enabled and PrivateWindow.matches(title))
 end
 
