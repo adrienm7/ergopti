@@ -2219,6 +2219,72 @@ const CHECKS = [
 		}
 	},
 	{
+		id: 'cascade-fb-item-50',
+		title:
+			'Item 50: fb + Space, Enter and ★ with the abbreviation and brand rules, at 1, 2 and 3 arrows, consumed and not',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const brand = shippedRule('autocorrection.toml', 'facebook');
+			if (!brand || !/output = "Facebook"/.test(brand.line))
+				return notExecuted('the shipped autocorrection no longer holds facebook -> Facebook');
+			// No shipped end-character rule types fb -> facebook: the abbreviation is personal.
+			const personal =
+				'[[live]]\n"fb" = { output = "facebook", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n';
+			const ends = [
+				{ name: 'Space', step: ['key', '{SC039}'], char: ' ' },
+				{ name: 'Enter', step: ['key', '{SC01C}'], char: '\\n' },
+				{ name: '★', step: ['text', '★'], char: '★' }
+			];
+			const problems = [];
+			const seen = [];
+			for (const arrows of [1, 2, 3]) {
+				for (const consumed of [false, true]) {
+					const session = context.newSession(`fb-${arrows}-${consumed ? 'c' : 'k'}`);
+					session.seed(
+						'autohotkey/config.toml',
+						ENGLISH +
+							[
+								'[category_enabled]',
+								'hotstrings = true',
+								'autocorrection = true',
+								'[hotstrings]',
+								`cascade_max_arrows = ${arrows}`,
+								`[hotstrings.autocorrection.${brand.section}]`,
+								'enabled = true',
+								'time_activation_seconds = 0',
+								'[hotstrings.personal.live]',
+								'enabled = true',
+								'time_activation_seconds = 0',
+								'[hotstrings.terminator_consume]',
+								`space = ${consumed}`,
+								`enter = ${consumed}`,
+								`star = ${consumed}`,
+								''
+							].join('\n')
+					);
+					session.seed('hotstrings/personal_hotstrings.toml', personal);
+					await session.start();
+					await session.run('pump', ['3000']);
+					// One arrow is the abbreviation alone; a second carries it to the brand.
+					const word = arrows === 1 ? 'facebook' : 'Facebook';
+					for (const end of ends) {
+						const expected = word + (consumed ? '' : end.char);
+						const typed = await typeInto(session, [['text', 'fb'], end.step]);
+						const label = `${arrows} arrow(s), ${consumed ? 'consumed' : 'kept'}, ${end.name}`;
+						if (typed !== expected) problems.push(`${label}: "${typed}", "${expected}" expected`);
+						seen.push(`${label}="${typed}"`);
+					}
+					const errors = session.loggedErrors();
+					if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+					await session.stop();
+				}
+			}
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(seen.join(', '));
+		}
+	},
+	{
 		id: 'gestures-info-row',
 		title: 'Tray > Gestures: exactly one "Info…" row, which opens its explanation',
 		async run(context) {

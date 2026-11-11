@@ -96,6 +96,7 @@ single-owner mutex.
 | `gestures-info-row`                     | Tray > Gestures: one « Infos… » row that opens the dialog     | `test_gesture_menu_status.ahk`                                          |
 | `asa-space-fast`                        | `asa` then Space fast, 20 times                               | `test_text_carrier_avoids_held_key.lua` (macOS)                         |
 | `personal-priority-and-left`            | Personal `sru` at priority 100; a hotstring with `{left}`     | `final_result_vectors.json`                                             |
+| `cascade-fb-item-50`                    | Item 50: `fb` at 1, 2 and 3 arrows, consumed and not          | `cascade_vectors.json`, `test_hotstring_cascade.ahk`                    |
 
 ## What stays manual
 
