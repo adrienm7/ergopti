@@ -390,6 +390,7 @@
 	"layout_editor.error.toml_syntax": "Файл не є коректним TOML.",
 	"layout_editor.export.bundle": "Завантажити пакет macOS (ZIP)",
 	"layout_editor.export.bundle_note": "Розпакуйте пакет macOS у ~/Library/Keyboard Layouts, а потім додайте розкладку в системних налаштуваннях; ErgoptiPlus встановлює її безпосередньо.",
+	"layout_editor.export.windows_dll_note": "Windows: файл .klc завантажується тут; драйвер клавіатури (DLL) і його інсталятор (.exe) збираються з вихідного файлу інструментом репозиторію (node tools/kbd-dll.cjs build), а не на сторінці.",
 	"layout_editor.export.keylayout_ansi": "Завантажити .keylayout (ANSI)",
 	"layout_editor.export.keylayout_iso": "Завантажити .keylayout (ISO)",
 	"layout_editor.export.klc": "Завантажити .klc для Windows",

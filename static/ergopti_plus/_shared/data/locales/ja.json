@@ -390,6 +390,7 @@
 	"layout_editor.error.toml_syntax": "このファイルは有効な TOML ではありません。",
 	"layout_editor.export.bundle": "macOS のバンドルをダウンロード（ZIP）",
 	"layout_editor.export.bundle_note": "macOS のバンドルを ~/Library/Keyboard Layouts に展開し、システム設定で配列を追加します。ErgoptiPlus なら直接インストールします。",
+	"layout_editor.export.windows_dll_note": "Windows：.klc はここからダウンロードできます。キーボード DLL とそのインストーラー（.exe）は、ページ内ではなくリポジトリのツール（node tools/kbd-dll.cjs build）でソースからビルドします。",
 	"layout_editor.export.keylayout_ansi": ".keylayout をダウンロード（ANSI）",
 	"layout_editor.export.keylayout_iso": ".keylayout をダウンロード（ISO）",
 	"layout_editor.export.klc": "Windows 用 .klc をダウンロード",
