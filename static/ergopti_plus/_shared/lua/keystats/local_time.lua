@@ -23,8 +23,11 @@
 
 local M = {}
 
--- The widest offset a row may carry, in minutes (ISO 8601 allows +-18:00)
-M.MAX_OFFSET_MIN = 1080
+-- The widest offset a row may carry, in minutes: what the host clock can
+-- report. A POSIX TZ allows hours 0-24 and minutes 0-59 (TZ=OWN-24 is +24:00),
+-- so the bound is 24:59; ISO 8601's +-18:00 refused every row written under
+-- such a zone and the flush lost them all. schema.sql spells the same bound.
+M.MAX_OFFSET_MIN = 1499
 
 local TIMESTAMP = "^(%d%d%d%d)%-(%d%d)%-(%d%d)[ T](%d%d):(%d%d):(%d%d)(.*)$"
 local SECONDS_PER_DAY = 86400

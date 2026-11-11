@@ -753,7 +753,7 @@ local helpers = {
  assert_eq = function(value, expected, detail) assert(value == expected, detail) end,
 }
 local options = { driver = "macos", root = arg[2],
- call_pattern = 'HotPath%.log_if_slow%(%s*"([^"]+)"',
+ call_patterns = { 'HotPath%.log_if_slow%(%s*"([^"]+)"' },
  default_slow_ms = assert(registry.logger.hotpath_slow_ms),
 }
 contract.register(helpers, options)

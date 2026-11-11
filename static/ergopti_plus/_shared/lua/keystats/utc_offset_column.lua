@@ -16,9 +16,11 @@ local M = {}
 
 M.COLUMN = "utc_offset_min"
 
--- The column's definition, as schema.sql spells it
+-- The column's definition, as schema.sql spells it, bounded by the widest
+-- offset the host clock can report (local_time.MAX_OFFSET_MIN)
+local MAX_OFFSET_MIN = require("keystats.local_time").MAX_OFFSET_MIN
 M.DEFINITION = "INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer'"
-	.. " AND utc_offset_min BETWEEN -1080 AND 1080))"
+	.. " AND utc_offset_min BETWEEN -" .. MAX_OFFSET_MIN .. " AND " .. MAX_OFFSET_MIN .. "))"
 
 -- Every raw table of schema.sql, in its order
 M.TABLES = {

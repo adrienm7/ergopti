@@ -881,6 +881,13 @@ end
 ---   told, when the request was refused for one.
 function M.predict(context, output_context, override, automatic)
 	if _runtime_closed or _scope_owner then return false end
+	-- The secure-field gate comes before any work, the settings reads and the
+	-- retirement of a changed request included: a gate consulted after the
+	-- request is not a gate.
+	if _is_secure_context() then
+		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
+		return false
+	end
 	local RequestSettings = require("llm.request_settings")
 	--- What a prediction is sent with: the backend and, under the API backend,
 	--- the active entry's id, provider, model, endpoint and key; under Ollama
@@ -909,10 +916,6 @@ function M.predict(context, output_context, override, automatic)
 	end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
-	if _is_secure_context() then
-		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
-		return false
-	end
 	-- The applications the user switched the trigger off in (llm.trigger.disabled_apps)
 	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil, automatic) then
 		Logger.debug(LOG, "Prediction suppressed: the application is excluded.")

@@ -269,6 +269,8 @@ if MENU_ROWS_FILE then
 				return true
 			end,
 			pump = function() return 0 end,
+			-- No GLib context behind this fake: the idle wait polls input alone.
+			wait_companion = function() return nil end,
 			destroy = function() live = false end,
 			is_live = function() return live end,
 		}
