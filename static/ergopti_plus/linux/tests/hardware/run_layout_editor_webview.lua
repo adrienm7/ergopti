@@ -11,6 +11,10 @@
 --- it and installs it as the `composed` layout. Then the layout manager loads it
 --- into the server and xkbcomp reads it back: base, Shift and the Kana level on
 --- AltGr, ê on the ISO key. Typing is the server's keymap, read key by key.
+--- Before that, « Emulate without installing »: nothing is installed, the
+--- composed layout becomes the emulated one, and the daemon's layout emulation
+--- (modules/keymap/layout_emulation.lua, its production collaborators but the
+--- text output) types the source's characters for physical key presses.
 --- Exit 0 = every check held, 1 = a failure, 2 = the machine cannot host it (no
 --- display, WebKit or lgi).
 --- USAGE: xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
@@ -156,11 +160,54 @@ local function run()
 		.. "); 'opened'")
 	check(wait_for(webview, "document.getElementById('le-name') && document.getElementById('le-name').value.length"),
 		"the source opens in the editor")
+	local Registry = require("modules.keymap.layout_registry")
+	local function message_text() return eval_sync(webview, "(document.getElementById('le-message') || {}).textContent") end
+	local function settled_after(previous)
+		return wait_for(webview, "(document.getElementById('le-message') || {}).className === 'le-message ok'"
+			.. " && document.getElementById('le-message').textContent !== " .. Json.encode(previous))
+	end
+
+	-- « Emulate without installing »: stored for the emulation alone, nothing installed.
+	if not check(wait_for(webview, "document.getElementById('le-emulate')"), "the host offers « Emulate without installing »") then
+		return 1
+	end
+	local before_emulate = message_text()
+	eval_sync(webview, "document.getElementById('le-emulate').click(); 'emulate'")
+	check(wait_for(webview, "document.getElementById('le-confirm-yes')"), "the page asks to confirm the emulation")
+	eval_sync(webview, "document.getElementById('le-confirm-yes').click(); 'yes'")
+	check(settled_after(before_emulate), "the host emulates it and the page says so: " .. tostring(message_text()))
+	local composer = assert(Registry.composer_settings())
+	local composer_folder = require("infra.config_paths").get_config_dir() .. "/" .. composer.folder .. "/"
+	check(read(composer_folder .. composer.keylayout_file) ~= nil, "the compiled layout is kept in the composer folder")
+	check((Registry.snapshot().installed or {})[composer.id] == nil, "nothing is installed in the system")
+	local emulated = require("infra.layout_emulation_preferences").settings()
+	check(emulated.id == composer.id and emulated.base == true, "the composed layout is the emulated one: "
+		.. tostring(emulated.id))
+	-- The daemon's emulation with its production collaborators, the typed text recorded.
+	local LayoutEmulation = require("modules.keymap.layout_emulation")
+	local typed = {}
+	local deps = LayoutEmulation.production_deps({ injector = {}, is_paused = function() return false end,
+		dispatch_char = function() end, magic_evdev = function() return nil end, dry_run = false })
+	deps.type_text = function(text) typed[#typed + 1] = text return true end
+	deps.caps_locked = function() return false end
+	LayoutEmulation.init(deps)
+	check(LayoutEmulation.reload() == true and LayoutEmulation.status().active == true,
+		"the layout emulation loads the composed layout from the composer folder: "
+		.. tostring(LayoutEmulation.status().error))
+	local keys = deps.registry().keys
+	for _, case in ipairs({ { "KeyA", "a" }, { "IntlBackslash", "ê" }, { "Backquote", "$" } }) do
+		typed = {}
+		LayoutEmulation.on_key({ code = keys[case[1]].evdev, mods = {} })
+		check(table.concat(typed) == case[2], case[1] .. " types " .. case[2] .. " through the emulation: "
+			.. table.concat(typed))
+	end
+	LayoutEmulation._reset_for_test()
+
 	eval_sync(webview, "document.getElementById('le-install').click(); 'install'")
 	if not check(wait_for(webview, "document.getElementById('le-confirm-yes')"), "the page asks to confirm") then
 		return 1
 	end
-	local opened_text = eval_sync(webview, "(document.getElementById('le-message') || {}).textContent")
+	local opened_text = message_text()
 	-- No session type while installing: the layout manager installs into the user
 	-- tree from a Wayland or unknown session, as the number-row live probe does.
 	setenv("XDG_SESSION_TYPE", nil)
@@ -179,7 +226,6 @@ local function run()
 	end
 
 	-- What the daemon stored from the page's own message.
-	local Registry = require("modules.keymap.layout_registry")
 	local settings = assert(Registry.composer_settings())
 	local folder = require("infra.config_paths").get_config_dir() .. "/" .. settings.folder .. "/"
 	local stored = read(folder .. settings.source_file)
