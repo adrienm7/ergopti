@@ -223,19 +223,34 @@ end
 --- @param version number The registry's current version.
 --- @param stampless_current boolean|nil Whether a file with no stamp is current.
 --- @return boolean
+-- The last strict judgement, keyed by every input it depends on. A boot judged
+-- the same bytes four times (run, its plan, the fresh re-read, admission) and a
+-- save up to four more; the strict decode is pure, so equal inputs give the same
+-- answer and the memo can never be stale.
+local _current_memo = { content = nil, version = nil, stampless = nil, answer = nil }
+
 local function current_schema(source, version, stampless_current)
 	if type(source) ~= "table" then return false end
 	if source.status == "absent" then return true end
 	if source.status ~= "ok" or type(source.content) ~= "string" then return false end
-	local called, document, shapes = pcall(canonical_decode, source.content)
-	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return false end
-	local meta = document._meta
-	if stampless_current == true and (meta == nil
-		or type(meta) == "table" and shapes.arrays[meta] ~= true and meta.schema_version == nil) then
-		return true
+	local memo = _current_memo
+	if memo.content == source.content and memo.version == version and memo.stampless == stampless_current then
+		return memo.answer
 	end
-	return type(meta) == "table" and shapes.arrays[meta] ~= true
-		and is_version(meta.schema_version) and meta.schema_version == version
+	local answer = false
+	local called, document, shapes = pcall(canonical_decode, source.content)
+	if called and type(document) == "table" and type(shapes) == "table" then
+		local meta = document._meta
+		if stampless_current == true and (meta == nil
+			or type(meta) == "table" and shapes.arrays[meta] ~= true and meta.schema_version == nil) then
+			answer = true
+		else
+			answer = type(meta) == "table" and shapes.arrays[meta] ~= true
+				and is_version(meta.schema_version) and meta.schema_version == version
+		end
+	end
+	_current_memo = { content = source.content, version = version, stampless = stampless_current, answer = answer }
+	return answer
 end
 
 local function native_ports_live(record)
@@ -1519,16 +1534,19 @@ function M.run(opts)
 		return refuse_version("newer", "canonical schema v" .. version_text(version)
 			.. " is newer than this build's v" .. version_text(registry.current))
 	end
-	local plan = M.plan(source, registry, opts.driver, opts.context)
-	if version ~= nil and version ~= registry.current and plan.version ~= version then
-		return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
-	end
 	-- The strict canonical document, not the flat migration operation model,
-	-- owns current-schema admission for inline/dotted/quoted metadata.
+	-- owns current-schema admission for inline/dotted/quoted metadata. A current
+	-- document needs no plan: its outcome was replaced by this one, and building
+	-- it decoded and scanned the file again on every boot.
+	local plan
 	if current_schema({ status = "ok", content = source }, registry.current, record.stampless_current) then
 		plan = { outcome = "current", version = registry.current, candidate = source }
-	elseif plan.outcome == "current" then
-		return refuse("invalid", "canonical schema metadata is not current")
+	else
+		plan = M.plan(source, registry, opts.driver, opts.context)
+		if version ~= nil and version ~= registry.current and plan.version ~= version then
+			return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
+		end
+		if plan.outcome == "current" then return refuse("invalid", "canonical schema metadata is not current") end
 	end
 	result.from = plan.version
 	if plan.outcome == "current" then
