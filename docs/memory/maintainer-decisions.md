@@ -5,6 +5,27 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Windows uninstall recycles the exact checked file (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (finding 3 of
+`docs/audits/windows-2026-10-28`): the portable uninstall worker
+(`windows/vendor/ergopti_uninstall.ps1`) must recycle the very executable it
+checked, not whatever holds its name once the pin is released (Windows cannot
+recycle a pinned file). `Invoke-ErgoptiRemoval` reads the volume serial and
+file index under the pin, keeps an attribute-only anchor handle open (it blocks
+nothing and keeps the file index from being reused), renames the file to an
+unguessable `.ergopti-uninstall-<guid>.exe` in the same directory, checks that
+name's identity, recycles it, then requires the same identity among the
+Recycle Bin's `$R` entries. A replacement before the rename gets its name back
+and nothing is recycled; one inside the recycle fails the uninstall with an
+error, never a success. Permanent deletion stays out of the contract. Windows
+PowerShell 5.1 has no public identity reader and the bundled scripts may not
+declare P/Invoke (`tools/ci/windows-exe-av-surface.json`), so the identity is
+read through PowerShell's own `GetFileInformationByHandle` wrapper; do not
+replace it with `Add-Type`. Linux and macOS remove their installed trees
+through their own owners (`uninstall.sh`, `UninstallWorker.swift`); this
+pinned-image race is specific to the portable Windows executable.
+
 ## The Windows personal editors are WebView only (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: on Windows the personal hotstrings

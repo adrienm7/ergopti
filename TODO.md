@@ -1253,6 +1253,10 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **Older findings.** The seven "Remaining findings" of
   [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
   first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
+  - [x] Finding 3, uninstall recycles a foreign replacement (2026-11-11): `Invoke-ErgoptiRemoval` follows the pinned
+        file's volume serial and file index through a private quarantine name into the Recycle Bin; a swap in the
+        unpinned window refuses instead of reporting success (`test-windows-uninstall.cjs`, under Windows PowerShell
+        5.1; the real Recycle Bin receives only the test's own fixture, removed afterwards).
 - **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad titles a window « Notes.txt – Bloc-notes » with
   an en dash; the matcher read only « - » and never found the window (fixed, `takenote-title-separator`). Left: by
   default it opens a second file as a tab of the open window, so a same-named note of another folder shares one
