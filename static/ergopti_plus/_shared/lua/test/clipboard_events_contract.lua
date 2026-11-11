@@ -23,7 +23,8 @@ end
 function M.register(helpers)
 	local ClipboardEvents = require("keystats.clipboard_events")
 	local Paths = require("infra.paths")
-	local WINDOW_MS = 10000
+	local Timings = require("infra.timings")
+	local paste_window_ms = Timings.ms("keystats", "paste_burst_window_ms")
 
 	helpers.describe("clipboard copy/paste bursts (clipboard-events)", function()
 		helpers.it("clipboard-chords: the Windows paste pair, copy keys, nothing under another modifier", function()
@@ -46,27 +47,27 @@ function M.register(helpers)
 		end)
 
 		helpers.it("clipboard-burst: the fifth paste within the window is a burst and empties the ring", function()
-			local tracker = ClipboardEvents.new({ window_ms = WINDOW_MS })
+			local tracker = ClipboardEvents.new({ window_ms = paste_window_ms })
 			for index = 1, 4 do
 				helpers.assert_eq(#tracker.paste(index * 1000, "kate"), 1, "paste " .. index .. " alone")
 			end
 			local rows = tracker.paste(5000, "kate")
-			helpers.assert_eq(rows[2], { kind = "paste_burst", meta = { count = 5, window_ms = WINDOW_MS } })
+			helpers.assert_eq(rows[2], { kind = "paste_burst", meta = { count = 5, window_ms = paste_window_ms } })
 			helpers.assert_eq(#tracker.paste(5100, "kate"), 1, "the ring restarts after a burst")
 		end)
 
 		helpers.it("clipboard-burst-window: a paste older than the window leaves the ring, the edge stays", function()
-			local tracker = ClipboardEvents.new({ window_ms = WINDOW_MS })
+			local tracker = ClipboardEvents.new({ window_ms = paste_window_ms })
 			tracker.paste(0, "kate")
 			for at = 20000, 23000, 1000 do tracker.paste(at, "kate") end
 			helpers.assert_eq(#tracker.paste(30000, "kate"), 2, "20000 is exactly one window before 30000")
-			local stale = ClipboardEvents.new({ window_ms = WINDOW_MS })
+			local stale = ClipboardEvents.new({ window_ms = paste_window_ms })
 			for at = 0, 3000, 1000 do stale.paste(at, "kate") end
 			helpers.assert_eq(#stale.paste(10001, "kate"), 1, "0 is past the window")
 		end)
 
 		helpers.it("clipboard-provenance: a paste carries the last copy, a refused copy clears it", function()
-			local tracker = ClipboardEvents.new({ window_ms = WINDOW_MS })
+			local tracker = ClipboardEvents.new({ window_ms = paste_window_ms })
 			helpers.assert_eq(tracker.paste(100, "kate")[1].meta, { copy_lag_ms = -1, source_app = "" })
 			helpers.assert_eq(tracker.copy(1000, "firefox"),
 				{ { kind = "clipboard_copy", meta = { content_type = ClipboardEvents.CONTENT_UNKNOWN } } })
