@@ -35,6 +35,28 @@ return function(helpers)
 			helpers.assert_eq(pcall(Roi.trigger_index, { { trigger = "bad\255" } }), false)
 		end)
 
+		-- A registry rebuild indexes every trigger (4 300 at boot); decoding each
+		-- character through the pure-Lua compat.utf8 cost 55 ms per rebuild.
+		helpers.it("indexes ASCII triggers without the pure-Lua UTF-8 decoder", function()
+			local Utf8 = require("compat.utf8")
+			local calls = { len = 0, codes = 0, char = 0 }
+			local saved = {}
+			for name in pairs(calls) do
+				saved[name] = Utf8[name]
+				Utf8[name] = function(...) calls[name] = calls[name] + 1; return saved[name](...) end
+			end
+			local ok, index = pcall(Roi.trigger_index, { { trigger = "BTW" }, { trigger = "jsp" }, { trigger = "Écôle" },
+				{ trigger = "x😀" } })
+			for name, fn in pairs(saved) do Utf8[name] = fn end
+			helpers.assert_true(ok, tostring(index))
+			helpers.assert_eq(calls.codes + calls.char, 0, "no trigger is decoded character by character")
+			helpers.assert_eq(calls.len, 2, "only the two non-ASCII triggers are validated")
+			helpers.assert_true(Roi.known_trigger(index, "btw"))
+			helpers.assert_true(Roi.known_trigger(index, "écôle"))
+			helpers.assert_eq(Roi.utf16_length("x😀"), 3)
+			helpers.assert_eq(Roi.utf16_length("Écôle"), 5)
+		end)
+
 		helpers.it("replays the qualified native Windows lowercase corpus through all ROI text keys", function()
 			local path = require("infra.paths").shared("tests/corpus/keystats/roi_lowercase_vectors.json")
 			local handle = assert(io.open(path, "rb"))
