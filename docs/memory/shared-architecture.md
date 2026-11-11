@@ -10,6 +10,19 @@
 adapters and runtime orchestration while consuming shared schemas, constants,
 and generated data. Bypassing the shared source creates silent drift.
 
+### project-structure-plan-owns-the-tree-shape
+
+The target tree of every driver and of `_shared` is computed, not typed:
+`tools/audit/structure/rules.cjs` maps each tracked file to its place (one
+domain vocabulary for `infra`, `adapters` and `_shared/lua`, the `ui/` groups,
+the sub-module splits), and `docs/design/structure-plan.md` explains the
+choices. Until its phase 2 lands, a new driver folder or file takes the name
+those rules give it, and `test-structure-folder-bounds.cjs` (2..20 entries per
+folder, 40 in tests, layer folders on every driver) and
+`test-shared-literal-inventory.cjs` (hand-typed values per driver and kind)
+may only go down. Move files with `tools/audit/structure/apply-step.cjs`, never
+by hand: it rewrites the Lua names, `#Include` lines and repository paths.
+
 ### project-the-tap-hold-file-is-one-layout-translated-at-the-boundary
 
 `tap_hold.toml` has one layout on every OS (`_shared/tap_hold/SCHEMA.md`):
