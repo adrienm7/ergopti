@@ -6,3 +6,12 @@
   ok   W4: a new keyboard makes the desktop put its own layouts back (pc+us+fr:2+us:3+inet(evdev))
   ok   W4: an input-sources setting change does too (pc+us+fr:2+us:3+inet(evdev)+compose(ralt))
 === 6 check(s), 0 failure(s) ===
+=== the daemon keeps Bépo against GNOME under X11 ===
+  ok   Bépo is installed by the layout manager (ok)
+  ok   the layout manager loads it into the server (pc+bepo+inet(evdev)+compose(ralt))
+  ok   the daemon watches the X11 keymap (watching)
+  ok   the daemon sees the desktop put its own layouts back and loads Bépo again (1 re-apply)
+  ok   the server holds Bépo again with no other call (pc+bepo+inet(evdev)+compose(ralt))
+  ok   one re-apply, not a loop (1)
+  ok   the watch goes on after the re-apply
+=== 7 check(s), 0 failure(s) ===

@@ -733,6 +733,21 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
 	end)
 
+	helpers.it("keeps a layout loaded on X11 against the desktop, only once it is loaded (layout-rows-live)", function()
+		-- GNOME and Plasma under X11 put their own layouts back on a new keyboard (W4).
+		local LayoutRegistry, deps = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local kept = {}
+		deps.keep_x11_layout = function(id) kept[#kept + 1] = id end
+		helpers.assert_true(run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end).ok)
+		helpers.assert_eq(kept, { "ergol" })
+		local Refused, refused_deps = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, OK_RUN })
+		local refused_kept = {}
+		refused_deps.keep_x11_layout = function(id) refused_kept[#refused_kept + 1] = id end
+		local failed = run(function(done) Refused.apply_rows(nil, ROWS, done, refused_deps) end)
+		helpers.assert_eq(failed.ok, false)
+		helpers.assert_eq(refused_kept, {}, "a layout the server does not hold is not kept")
+	end)
+
 	helpers.it("refuses a session that cannot load a user layout live before anything is written (layout-rows-live)", function()
 		for _, case in ipairs({ { "wayland", "sway" }, { "wayland", "hyprland" }, { "wayland", "" }, { "tty", "gnome" },
 			{ "", "kde" } }) do
