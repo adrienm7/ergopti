@@ -191,12 +191,13 @@ helpers.describe("shared engine: the cascade and Backspace undo", function()
 			and result.terminator or "")
 	end
 
-	--- The screen after the daemon's Undo: erase what was typed back, type the trigger.
+	--- The screen after the daemon's Undo: erase what was typed back, type the
+	--- trigger as it was typed. The end character is not typed back, as on
+	--- Windows and macOS (decision of 2026-11-06).
 	local function undo(screen, result)
 		local typed_back = result.replacement .. (result.end_char and not result.consume_terminator
 			and result.terminator or "")
-		return screen:sub(1, #screen - #typed_back) .. result.trigger
-			.. (result.end_char and not result.consume_terminator and result.terminator or "")
+		return screen:sub(1, #screen - #typed_back) .. result.typed_trigger
 	end
 
 	helpers.it("cascade, an Undo restores what was typed, not a half-way text", function()
@@ -231,7 +232,20 @@ helpers.describe("shared engine: the cascade and Backspace undo", function()
 		local result = engine:on_char(" ", options)
 		local screen = inject("ab ", result)
 		helpers.assert_eq("ef ", screen)
-		helpers.assert_eq("ab ", undo(screen, result), "the typed trigger and its space")
+		helpers.assert_eq("ab", undo(screen, result), "the typed trigger, without its space")
+	end)
+
+	helpers.it("an Undo types the trigger with the casing the user typed (undo-typed-casing)", function()
+		local engine = engine_with({
+			{ trigger = "adn", replacement = "and", auto_expand = false },
+		})
+		local options = {}
+		for ch in ("Adn"):gmatch(".") do engine:on_char(ch, options) end
+		options.is_terminator = true
+		local result = engine:on_char(" ", options)
+		helpers.assert_eq("And", result.replacement)
+		helpers.assert_eq("Adn", result.typed_trigger, "the erased text, as typed")
+		helpers.assert_eq("Adn", undo(inject("Adn ", result), result))
 	end)
 
 end)

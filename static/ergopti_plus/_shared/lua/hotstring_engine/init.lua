@@ -1033,6 +1033,7 @@ function M.new()
 			-- restore the text that was really erased.
 			local typed_end = original_len - (first.end_char and 1 or 0)
 			net_trigger = table.concat(_buf_cps, "", stable + 1, typed_end)
+			first.typed_trigger = net_trigger
 		end
 		first.trigger = net_trigger
 		first.replacement = net_replacement
@@ -1109,8 +1110,15 @@ function M.new()
 		-- logger's default level makes a debug line an always-on one.
 		Logger.debug(LOG, "Match: trigger of %d char(s), backspaces=%d end_char=%s.",
 			tlen, bc, tostring(via_end_char))
+		-- The trigger as it stands in the buffer: the first `tlen` codepoints of
+		-- what the edit erases. A conform rule stores `adn` and fires on `Adn`;
+		-- an Undo types this text back, as Windows (the buffer) and macOS (the
+		-- matched text) do, never the stored spelling.
+		local erase_start = #_buf_cps - bc + 1
+		local typed_trigger = table.concat(_buf_cps, "", erase_start, erase_start + tlen - 1)
 		local result = {
 			trigger            = mapping.trigger,
+			typed_trigger      = typed_trigger,
 			-- The EFFECTIVE replacement, which in conform mode carries the casing the
 			-- user typed rather than the casing stored at registration. Returning the
 			-- stored one would make every conform entry emit lowercase.

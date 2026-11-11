@@ -1603,6 +1603,7 @@ local function main()
 			if repeated then
 				result = {
 					trigger         = MagicKey.get(),
+					typed_trigger   = MagicKey.get(),
 					replacement     = repeated.replacement,
 					backspace_count = repeated.backspace_count,
 					group           = require("config_keys").COMMAND.REPEAT_KEY,
@@ -1670,7 +1671,8 @@ local function main()
 					-- Undo erases what it typed, counted back from the caret: a pressed
 					-- key has moved the caret, so that count would delete the wrong text.
 					_undoable = not parsed_output and {
-						trigger     = result.trigger,
+						-- What the user typed, casing included, not the stored trigger.
+						trigger     = result.typed_trigger,
 						replacement = result.replacement,
 						is_private  = result.is_private,
 						destination = destination,
