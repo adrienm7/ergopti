@@ -1319,7 +1319,8 @@ Each closes on a named green hosted or native run, recorded here.
       answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
       New 2026-11-11: Install-and-launch `symlink_logs_dir` failed once in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482167) with "Quit did
       not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
-      0.3–0.4 s in every other row; the failed job is re-running to separate a flake from a regression.
+      0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
+      42929436137 is green (job 130295941982); keep it listed until it stays green.
 
 ## Maintainer decisions pending
 
