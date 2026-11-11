@@ -29,8 +29,12 @@ local ok, failure = xpcall(function()
 			assert(not writer.is_available(), "an actual directory must refuse database admission")
 			local system = require("modules.keystats.system_metrics")
 			assert(system.sample())
+			local started = uv.hrtime()
 			uv.sleep(system._sample_interval_ms() + 100)
 			local current = assert(system.sample())
+			-- Unlocked time is no field of its own (awake_ms is keep-awake time,
+			-- KMD-3): the genuine elapsed interval is credited as one session.
+			assert(system.record_awake_session((uv.hrtime() - started) / 1e6))
 			local before, total = system.snapshot().values, 0
 			for _, day in pairs(before) do total = total + day.awake_ms + day.locked_ms + day.sleep_ms end
 			assert(total >= system._sample_interval_ms(), "the fixture must capture genuine elapsed machine time")
@@ -39,6 +43,9 @@ local ok, failure = xpcall(function()
 			local hostname = assert(uv.os_gethostname()):gsub("%s+", "")
 			local device = "linux-" .. hostname
 			assert(writer.register_device(device, hostname, "linux", "", hostname))
+			-- A store already on the keep-awake definition: its baseline is no
+			-- sampled uptime for the KMD-3 migration to clear.
+			assert(writer.ensure_awake_definition(device, current.date))
 			local baseline = 4000
 			assert(writer.upsert_system_day(device, { date = current.date, awake_ms = baseline }))
 			writer.close_db()
