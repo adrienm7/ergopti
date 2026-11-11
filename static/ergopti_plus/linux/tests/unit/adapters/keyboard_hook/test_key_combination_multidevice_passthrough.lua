@@ -28,19 +28,24 @@ local function with_manager(route, body)
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
 			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
 	end
-	local config_path, tap_path = os.tmpname(), os.tmpname()
+	-- config.toml and tap_hold.toml share their folder, as infra/config_paths.lua places them.
+	local folder = os.tmpname(); os.remove(folder)
+	assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
+	local config_path, tap_path = folder .. "/config.toml", folder .. "/tap_hold.toml"
 	local manager
 	local ok, detail = pcall(function()
 		local text = '[shortcuts]\nenabled = true\n'
+		-- The third slot lives in tap_hold.toml, beside the tap-hold keys.
+		local tap_text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
 		if route == "tap" or route == "hold" then
 			text = text .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "script_reload"\n'
 			if route == "hold" then text = text .. '[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "ctrl"\n' end
 		elseif route == "chord" then
-			text = text .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
+			tap_text = tap_text .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
 				.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "script_reload"\n'
 		end
 		write(config_path, text)
-		write(tap_path, '[tap_hold]\nenabled = true\ninherit_defaults = false\n')
+		write(tap_path, tap_text)
 		local paths = require("infra.config_paths")
 		local original = paths.config
 		paths.config = function(name)
@@ -71,7 +76,10 @@ local function with_manager(route, body)
 			helpers.assert_eq(snapshot.combinations.has_bindings(), route ~= "none")
 			helpers.assert_eq(type(snapshot.engine.has_combinations) == "function", route ~= "none")
 			s.rows = {}
-			function s.withdraw_binding() write(config_path, text:gsub('"script_reload"', '"none"')) end
+			function s.withdraw_binding()
+				write(config_path, (text:gsub('"script_reload"', '"none"')))
+				write(tap_path, (tap_text:gsub('"script_reload"', '"none"')))
+			end
 			function s.select(ids)
 				package.loaded["modules.hotstrings.device_finder"].find_devices = function()
 					local selected = {}; for _, id in ipairs(ids) do selected[#selected + 1] = s.paths[id] end
@@ -85,7 +93,7 @@ local function with_manager(route, body)
 		end)
 	end)
 	if manager then pcall(manager._reset_for_test) end
-	os.remove(config_path); os.remove(tap_path)
+	os.remove(config_path); os.remove(tap_path); os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(saved) do package.loaded[name] = value end
 	if not ok then error(detail, 0) end

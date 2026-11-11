@@ -1158,6 +1158,9 @@ local function main()
 	-- tap_hold.toml is versioned like config.toml: migrated before the engine reads it.
 	require("platform.remap.tap_hold_writer").migrate_file(
 		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
+	-- Then the key combinations config.toml kept until 1.0.9 move into it, once.
+	require("platform.remap.tap_hold_writer").import_config_combos(require("infra.config_paths").config("config.toml"),
+		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
 	local TapHold = require("platform.remap.tap_hold_manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
