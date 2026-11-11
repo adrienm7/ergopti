@@ -452,25 +452,38 @@ end
 --- Resolves the slot a classified swipe runs. The explicit direction slot wins;
 --- a straight left or right swipe whose own slot is unbound runs the horizontal
 --- axis slot of its finger count, so one gesture never runs two actions. This is
---- the rule Linux applies (maintainer decision of 2026-11-06). Diagonals and
---- vertical swipes have no axis slot.
+--- the rule Linux applies (maintainer decision of 2026-11-06). Vertical swipes
+--- have no axis slot. A diagonal whose own slot is unbound runs the slot of its
+--- dominant straight direction (and that one's axis slot), as Linux does; a
+--- bound diagonal keeps its own (maintainer decision of 2026-11-11).
 --- @param mf number Finger count.
 --- @param dir string Axis the swipe travelled on: "horiz", "vert" or "diag".
 --- @param dx number Horizontal displacement.
 --- @param dy number Vertical displacement.
 --- @return string|nil slot The slot to fire, or the unbound direction slot.
+--- @return string axis The axis the slot answers on, the dominant one for a fallen-back diagonal.
 local function resolveSwipeSlot(mf, dir, dx, dy)
 	local slot = Geometry.slotForDir(mf, dir, dx, dy)
 	local action = slot and _state.ga[slot]
-	if action and action ~= "none" then return slot end
-	if dir ~= "horiz" then return slot end
+	if action and action ~= "none" then return slot, dir end
+	if dir == "diag" then
+		local straight = math.abs(dx) >= math.abs(dy) and "horiz" or "vert"
+		local answer, answer_axis = resolveSwipeSlot(mf, straight, dx, dy)
+		local answer_action = answer and _state.ga[answer]
+		if answer_action and answer_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: its dominant direction %s answers.", tostring(slot), answer)
+			return answer, answer_axis
+		end
+		return slot, dir
+	end
+	if dir ~= "horiz" then return slot, dir end
 	local axis_slot = AXIS_SLOT_HORIZ[math.min(mf, 5)]
 	local axis_action = axis_slot and _state.ga[axis_slot]
 	if axis_action and axis_action ~= "none" then
 		Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", tostring(slot), axis_slot)
-		return axis_slot
+		return axis_slot, dir
 	end
-	return slot
+	return slot, dir
 end
 
 --- Calls one action dispatcher and preserves its exact boolean contract.
@@ -817,7 +830,9 @@ local function commitGesture(now)
 		return
 	end
 
-	local slot = resolveSwipeSlot(mf, dir, dx, dy)
+	local slot
+	-- An unbound diagonal's dominant slot answers along its own straight axis.
+	slot, dir = resolveSwipeSlot(mf, dir, dx, dy)
 	Logger.debug(LOG, "commitGesture: slotForDir(%d, %s, %.2f, %.2f) → %s", mf, dir, dx, dy, tostring(slot))
 	if not slot or _state.ga[slot] == "none" then
 		Logger.debug(LOG, "commitGesture: slot=%s action=%s — skip",
@@ -1369,7 +1384,8 @@ function M.process_frame(touches, frame_stamp)
 					local axis = gs.lockedDir
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local slot = resolveSwipeSlot(gs.maxFingers, axis, dx, dy)
+					local slot
+					slot, axis = resolveSwipeSlot(gs.maxFingers, axis, dx, dy)
 
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
 						triggerLiveAxisIfNeeded(slot, pos, now, axis)

@@ -36,8 +36,10 @@ M.REVERSE_FLOOR_MM = 1.0
 
 --- Creates a tracker.
 --- @param opts table { units_x, units_y (device units per mm), mode_of(slot), step_of(slot),
----   slot_of(slot, fingers, direction) -> the slot whose mode and step apply (an axis slot
----   answering for an unbound direction one), fire(slot, fingers, direction, count) -> fired count }
+---   slot_of(slot, fingers, direction, dominant) -> the slot whose mode and step apply (an
+---   axis slot answering for an unbound direction one, a straight slot for an unbound
+---   diagonal given its dominant direction) and the direction it answers for,
+---   fire(slot, fingers, direction, count) -> fired count }
 --- @return table tracker
 function M.new(opts)
 	assert(type(opts) == "table", "incremental tracker needs its options")
@@ -72,7 +74,15 @@ function M.new(opts)
 		if not axis then return end
 		local direction = Direction.name(axis, rx, ry)
 		local slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
-		local answering = opts.slot_of(slot, progress.fingers, direction)
+		local answering, answering_direction = opts.slot_of(slot, progress.fingers, direction,
+			axis == "diag" and Direction.dominant(rx, ry) or nil)
+		assert(type(answering_direction) == "string", "slot_of must name the direction that answers")
+		if answering_direction ~= direction then
+			-- An unbound diagonal stands in for its dominant straight direction:
+			-- it counts and fires along that one, as its completed form would.
+			direction = answering_direction
+			slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
+		end
 		if opts.mode_of(answering) ~= "incremental" then return end
 		local step = opts.step_of(answering)
 

@@ -181,6 +181,27 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		end
 	end)
 
+	-- Decided by the maintainer on 2026-11-11 (reverses part of the GSL-001
+	-- change): an unbound diagonal falls back to its dominant straight slot,
+	-- live and completed; a bound diagonal still wins inside the band.
+	helpers.it("incremental: a drifting diagonal with its slot unbound steps the dominant slot (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		local pressed, M = pump({ swipe_3_right = "tab_prev" }, { swipe_3_right = "incremental" }, touch_events(drift), UNITS)
+		helpers.assert_true(count(pressed, M.emit_combo_for("tab_prev")) >= 4, "the straight right slot steps")
+	end)
+
+	helpers.it("x1: a completed diagonal with its slot unbound runs the dominant slot once (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		local pressed, M = pump({ swipe_3_right = "tab_prev" }, { swipe_3_right = "x1" }, touch_events(drift), UNITS)
+		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 1, "the straight right slot fires once")
+		local steep = {}
+		for i = 1, 40 do steep[#steep + 1] = { 0.25 * i, -0.5 * i } end
+		local up_pressed, up = pump({ swipe_3_up = "tab_prev" }, { swipe_3_up = "x1" }, touch_events(steep), UNITS)
+		helpers.assert_eq(count(up_pressed, up.emit_combo_for("tab_prev")), 1, "a steeper drift falls back to up")
+	end)
+
 	helpers.it("incremental: the sensitivity sets the step, within the shared range", function()
 		local saved = package.loaded[MANAGER]
 		local M = helpers.load_module(MANAGER)

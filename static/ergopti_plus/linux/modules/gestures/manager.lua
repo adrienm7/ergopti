@@ -2212,8 +2212,9 @@ local function new_incremental(units_x, units_y)
 		mode_of = M.get_mode, step_of = M.get_sensitivity,
 		-- The mode and step are the answering slot's: an axis slot standing in
 		-- for an unbound direction slot keeps its own x1 or incremental.
-		slot_of = function(slot, fingers, direction)
-			return (answering_slot(slot, fingers, direction, false))
+		slot_of = function(slot, fingers, direction, dominant)
+			local answer, _, answer_direction = answering_slot(slot, fingers, direction, false, dominant)
+			return answer, answer_direction
 		end,
 		-- Each step runs the slot exactly as a completed swipe would, through
 		-- the same pause, click-fence and axis-slot rules.
@@ -2276,19 +2277,32 @@ end
 --- (modules/gestures/incremental_tracker.lua), each step through this rule,
 --- and the tracker takes its mode and step from the same answer, as macOS
 --- takes them from resolveSwipeSlot's.
+---
+--- A diagonal whose own slot is unbound runs the slot of its dominant straight
+--- direction (and that one's axis slot), as macOS does; a bound diagonal keeps
+--- its own (maintainer decision of 11 November 2026).
 --- @param slot string The gesture's own slot.
---- @return string slot, string|nil action
-answering_slot = function(slot, fingers, direction, tap)
+--- @param dominant string|nil A diagonal's dominant straight direction.
+--- @return string slot, string|nil action, string direction The direction that answers.
+answering_slot = function(slot, fingers, direction, tap, dominant)
 	local action = _actions[slot]
+	if (not action or action == "none") and not tap and dominant and direction:find("_", 1, true) then
+		local straight = string.format("swipe_%d_%s", math.min(fingers, 5), dominant)
+		local answer, answer_action, answer_direction = answering_slot(straight, fingers, dominant, false, nil)
+		if answer_action and answer_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: its dominant direction %s answers.", slot, answer)
+			return answer, answer_action, answer_direction
+		end
+	end
 	if (not action or action == "none") and not tap and (direction == "left" or direction == "right") then
 		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(fingers, 5)]
 		local axis_action = axis_slot and _actions[axis_slot]
 		if axis_action and axis_action ~= "none" then
 			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
-			return axis_slot, axis_action
+			return axis_slot, axis_action, direction
 		end
 	end
-	return slot, action
+	return slot, action, direction
 end
 
 --- Runs the action bound to a gesture the decoder has already classified.
@@ -2312,7 +2326,7 @@ function M.dispatch_gesture(gesture)
 	end
 
 	local action
-	slot, action = answering_slot(slot, gesture.fingers, gesture.direction, gesture.tap)
+	slot, action = answering_slot(slot, gesture.fingers, gesture.direction, gesture.tap, gesture.dominant)
 	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is

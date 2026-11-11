@@ -119,6 +119,19 @@ helpers.describe("gestures/engine.lua: diagonal travel and reversal (diagonal-ax
 		fired = run(path, { swipe_3_right_up = "app_expose", swipe_3_up = "tab_prev", swipe_3_right = "tab_next" })
 		helpers.assert_eq(count(fired, "tab_prev") + count(fired, "tab_next"), 0, "never a straight slot")
 	end)
+
+	-- Decided by the maintainer on 2026-11-11 (reverses part of the GSM-001
+	-- change): a drifting diagonal whose slot is unbound runs its dominant
+	-- straight slot; a bound diagonal still wins inside the diagonal band.
+	helpers.it("runs the dominant straight slot of a drifting diagonal left unbound (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 20 do drift[#drift + 1] = { 1.0 * i, -0.5 * i } end
+		local fired = run(drift, { swipe_3_right = "tab_next" })
+		helpers.assert_true(count(fired, "tab_next") >= 4, "the straight right slot steps (" .. #fired .. ")")
+		fired = run(drift, { swipe_3_right_up = "app_expose", swipe_3_right = "tab_next" })
+		helpers.assert_true(count(fired, "app_expose") >= 4, "a bound right_up keeps the drift")
+		helpers.assert_eq(count(fired, "tab_next"), 0, "and the straight slot never fires beside it")
+	end)
 end)
 
 return true

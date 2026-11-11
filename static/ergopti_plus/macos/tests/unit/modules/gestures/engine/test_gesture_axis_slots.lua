@@ -110,7 +110,13 @@ helpers.describe("gestures.engine: horizontal axis slots", function()
 	helpers.it("vertical swipes and other finger counts do not run an axis slot", function()
 		eq(0, #play({ swipe_3_horiz = "word_next" }, 3, 0, 20), "vertical")
 		eq(0, #play({ swipe_3_horiz = "word_next" }, 4, 20, 0), "4 fingers")
-		eq(0, #play({ swipe_3_horiz = "word_next" }, 3, 20, 20), "diagonal")
+	end)
+
+	-- Decided by the maintainer on 2026-11-11: an unbound diagonal runs its
+	-- dominant straight slot and that slot's own fallback, as on Linux.
+	helpers.it("an unbound diagonal reaches the axis slot through its dominant direction (diagonal-unbound-fallback)", function()
+		eq(1, #play({ swipe_3_horiz = "word_next" }, 3, 20, 20), "a 45 degree tie is horizontal")
+		eq(0, #play({ swipe_3_horiz = "word_next" }, 3, 12, 20), "a mostly vertical diagonal has no horizontal slot")
 	end)
 
 	helpers.it("nothing fires when neither slot is bound", function()
