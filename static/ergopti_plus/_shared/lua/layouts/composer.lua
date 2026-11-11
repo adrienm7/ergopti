@@ -26,6 +26,11 @@
 ---    in place of a composition: the TOML is stored, and the .keylayout the shared
 ---    source compiler built from it is installed and emulated the same way. One
 ---    composed layout exists at a time, so saving one form removes the other.
+--- 6. A source can also be stored for the layout emulation alone (store): the
+---    source, its compiled .keylayout (keylayout_file) and its emulation table
+---    are written to the composer folder and nothing is installed in the
+---    system, so emulating needs no admin and no input source; the emulation
+---    reads that copy (read_composed) while the composed layout is not installed.
 --- ==============================================================================
 
 local Registry = require("layouts.registry")
@@ -61,7 +66,7 @@ local CONVENTIONS = { iso = true, ansi = true }
 --- Validates the [composer] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/modules/layouts/defaults.json.
 --- @return table|nil settings { id, folder, declaration_file, max_declaration_bytes, source_file,
----   max_source_bytes, emulation_file, max_emulation_bytes, family }
+---   max_source_bytes, emulation_file, max_emulation_bytes, keylayout_file, family }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local composer = type(layout_defaults) == "table" and layout_defaults.composer or nil
@@ -83,6 +88,11 @@ function M.settings(layout_defaults)
 		or composer.emulation_file == composer.declaration_file or composer.emulation_file == composer.source_file then
 		return nil, "the composer emulation file is not a plain file name distinct from the other two"
 	end
+	local named = { [composer.declaration_file] = true, [composer.source_file] = true, [composer.emulation_file] = true }
+	if type(composer.keylayout_file) ~= "string" or not composer.keylayout_file:match("^[A-Za-z0-9._-]+%.keylayout$")
+		or named[composer.keylayout_file] then
+		return nil, "the composer keylayout file is not a plain .keylayout file name distinct from the other three"
+	end
 	for _, field in ipairs({ "max_declaration_bytes", "max_source_bytes", "max_emulation_bytes" }) do
 		local bound = composer[field]
 		if type(bound) ~= "number" or bound <= 0 or bound % 1 ~= 0 then
@@ -98,6 +108,7 @@ function M.settings(layout_defaults)
 		max_source_bytes = composer.max_source_bytes,
 		emulation_file = composer.emulation_file,
 		max_emulation_bytes = composer.max_emulation_bytes,
+		keylayout_file = composer.keylayout_file,
 		family = composer.family,
 	}, nil
 end
@@ -273,6 +284,28 @@ function M.read_emulation(settings, config_dir, ports)
 	return table_, nil
 end
 
+--- The composed layout stored for the emulation alone (operations.store): the
+--- stored source's compiled .keylayout and its keycode convention, checked again
+--- as a save checks them, since the files may have been edited by hand.
+--- @param settings table From M.settings.
+--- @param config_dir string The configuration folder, with a trailing slash.
+--- @param max_file_bytes number The registry's bound of one layout file.
+--- @param ports table { exists(path), read(path), decode_toml(text) }
+--- @return table|nil composed { text, convention } nil when none is stored.
+--- @return string|nil error Why a stored copy cannot be read.
+function M.read_composed(settings, config_dir, max_file_bytes, ports)
+	local folder = config_dir .. settings.folder .. "/"
+	local keylayout_path, source_path = folder .. settings.keylayout_file, folder .. settings.source_file
+	if not ports.exists(keylayout_path) then return nil, nil end
+	local text, source = ports.read(keylayout_path), ports.exists(source_path) and ports.read(source_path) or nil
+	if type(text) ~= "string" or type(source) ~= "string" then
+		return nil, "the stored composed layout " .. keylayout_path .. " or its source is unreadable"
+	end
+	local checked, _, detail = M.check_source(settings, max_file_bytes, source, text, ports.decode_toml)
+	if not checked then return nil, "the stored composed layout is refused: " .. tostring(detail) end
+	return { text = text, convention = checked.convention }, nil
+end
+
 --- The installed record's entry of a composition.
 --- @param settings table
 --- @param checked table From M.check.
@@ -408,6 +441,10 @@ function M.new(env)
 		return env.config_dir .. settings.folder .. "/" .. settings.emulation_file
 	end
 
+	local function keylayout_copy_path()
+		return env.config_dir .. settings.folder .. "/" .. settings.keylayout_file
+	end
+
 	--- A stored file within its bound, "unreadable" when it is not, nil when absent.
 	local function stored(path, bound, what)
 		if not env.exists(path) then return nil end
@@ -529,11 +566,57 @@ function M.new(env)
 		end)
 	end
 
+	--- Stores a layout source for the layout emulation alone: the source, its
+	--- compiled .keylayout and its emulation table go to the composer folder and
+	--- nothing is installed in the system (no admin, no input source). The
+	--- emulation reads that copy while the composed layout is not installed.
+	--- @param payload table { source, keylayout [, emulation] }
+	--- @param on_done function on_done(ok, code, detail, id)
+	function operations.store(payload, on_done)
+		local checked, code, detail
+		if payload.declaration ~= nil or payload.source == nil then
+			checked, code, detail = nil, M.FAILURE_INVALID, "the emulation alone stores a layout source"
+		else
+			checked, code, detail = M.check_source(settings, env.max_file_bytes, payload.source, payload.keylayout,
+				env.decode_toml)
+			if checked and payload.emulation ~= nil then
+				local emulation_ok, emulation_code, emulation_detail = M.check_emulation(settings, payload.emulation,
+					payload.source, env.platform, env.decode_json, env.decode_toml)
+				if not emulation_ok then checked, code, detail = nil, emulation_code, emulation_detail end
+			end
+		end
+		if not checked then
+			env.log("error", "The layout source to emulate was refused: %s.", tostring(detail))
+			on_done(false, code, detail)
+			return
+		end
+		local writes = { { source_path(), payload.source }, { keylayout_copy_path(), payload.keylayout } }
+		if payload.emulation ~= nil then writes[#writes + 1] = { emulation_path(), payload.emulation } end
+		for _, write in ipairs(writes) do
+			local written, write_err = env.write(write[1], write[2])
+			if not written then
+				env.log("error", "The layout source to emulate could not be stored: %s.", tostring(write_err))
+				on_done(false, M.FAILURE_WRITE, tostring(write_err))
+				return
+			end
+		end
+		local stale = { declaration_path() }
+		if payload.emulation == nil then stale[#stale + 1] = emulation_path() end
+		for _, path in ipairs(stale) do
+			if env.exists(path) and not env.delete(path) then
+				env.log("error", "The replaced composition %s could not be deleted.", path)
+				on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
+				return
+			end
+		end
+		on_done(true, nil, nil, settings.id)
+	end
+
 	--- Removes the composition: the installed layout, then its declaration.
 	--- @param on_done function on_done(ok, code, detail)
 	function operations.remove(on_done)
 		local function delete_declaration()
-			for _, path in ipairs({ declaration_path(), source_path(), emulation_path() }) do
+			for _, path in ipairs({ declaration_path(), source_path(), emulation_path(), keylayout_copy_path() }) do
 				if env.exists(path) and not env.delete(path) then
 					on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
 					return

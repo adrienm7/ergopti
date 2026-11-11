@@ -25,7 +25,13 @@
 --- 4. The editor applies a source's navigation layer with nav_save {text}: the
 ---    host's apply_nav runs the navigation layer editor's own save (validation
 ---    on every OS, exact-byte publish, regeneration) and answers navResult.
---- 5. PURE Lua: the driver injects the layout registry client, the push to the
+--- 5. « Emulate without installing » (composer_emulate {source, keylayout
+---    [, emulation]}): the registry stores the source for the layout emulation
+---    alone, then the host's emulate port makes the composed layout the
+---    emulated one and reloads the engine. Nothing is installed in the system.
+--- 6. A menu row opens the window straight on the editor (controller.open_editor):
+---    the page receives sourceData as if its « Editor » button had asked.
+--- 7. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -44,6 +50,7 @@ M.ACTIONS = {
 	composer_open = true,
 	composer_save = true,
 	composer_remove = true,
+	composer_emulate = true,
 	source_open = true,
 	source_save = true,
 	source_pick = true,
@@ -138,6 +145,7 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		operation(report)
 		return true
 	end
+	if action == "composer_emulate" then return M.handle_emulate(deps, payload, report) end
 	-- A save carries a composition (declaration) or an Ergopti layout source, with its layout.
 	local declaration = type(payload.declaration) == "string"
 	local source = type(payload.source) == "string"
@@ -157,6 +165,46 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		keylayout = payload.keylayout,
 		use = payload.use == true,
 	}, report)
+	return true
+end
+
+--- Whether this host emulates a layout source without installing it.
+--- @param deps table
+--- @return boolean
+local function offers_emulate(deps)
+	return type(deps.emulate) == "function" and type(deps.registry.composer_emulate) == "function"
+end
+
+--- « Emulate without installing »: stores the source for the emulation alone,
+--- then turns the emulation onto it. report(ok, code, detail, used).
+--- @param deps table
+--- @param payload table { source, keylayout [, emulation] }
+--- @param report function
+--- @return boolean handled
+function M.handle_emulate(deps, payload, report)
+	if not offers_emulate(deps) then
+		deps.log("warn", "Refused a layout emulation without install: this host does not offer it.")
+		return false
+	end
+	if type(payload.source) ~= "string" or type(payload.keylayout) ~= "string"
+		or (payload.emulation ~= nil and type(payload.emulation) ~= "string") or payload.declaration ~= nil then
+		deps.log("warn", "Refused a layout emulation without its source and compiled layout as text.")
+		return false
+	end
+	deps.registry.composer_emulate({ source = payload.source, keylayout = payload.keylayout,
+		emulation = payload.emulation }, function(ok, code, detail, id)
+		if not ok then
+			report(false, code, detail, false)
+			return
+		end
+		deps.emulate(id, function(emulated, emulate_code, emulate_detail)
+			if not emulated then
+				report(false, emulate_code or "emulate_failed", emulate_detail, false)
+				return
+			end
+			report(true, nil, nil, true)
+		end)
+	end)
 	return true
 end
 
@@ -210,14 +258,19 @@ end
 ---   layout editor built from its navigation layer, through the driver's
 ---   navigation layer editor save; on_done({saved, applied, errors}). Without it
 ---   nav_save is refused.
+--- deps.emulate(id, on_done) optionally makes the composed layout id the emulated
+---   layout and reloads the layout emulation; on_done(ok, code, detail). With
+---   registry.composer_emulate it offers composer_emulate (« Emulate without
+---   installing »); without them composer_emulate is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
 --- deps.log(level, message, ...) logs through the driver's logger.
 --- @param deps table
---- @return table controller { on_message(payload) -> handled }
+--- @return table controller { on_message(payload) -> handled, open_editor() -> boolean }
 function M.new(deps)
 	local controller = { result = nil }
+	local page_ready, editor_wanted = false, false
 
 	local function push_state()
 		return deps.push("updateState", M.page_state(deps.registry.snapshot(), controller.result))
@@ -254,12 +307,18 @@ function M.new(deps)
 		local action, id = payload.action, payload.id
 		if action == "ready" then
 			controller.result = nil
+			page_ready = true
 			deps.push("initData", { strings = deps.strings(),
 				state = M.page_state(deps.registry.snapshot(), nil),
 				source_editor = offers_source(deps.registry),
 				source_pick = type(deps.pick_source) == "function",
-				nav_apply = type(deps.apply_nav) == "function" })
+				nav_apply = type(deps.apply_nav) == "function",
+				emulate = offers_emulate(deps) })
 			deps.registry.refresh(function() push_state() end)
+			if editor_wanted then
+				editor_wanted = false
+				M.handle_source(deps, "source_open", {})
+			end
 			return true
 		end
 		if action == "refresh" then
@@ -270,7 +329,8 @@ function M.new(deps)
 			deps.close()
 			return true
 		end
-		if action == "composer_open" or action == "composer_save" or action == "composer_remove" then
+		if action == "composer_open" or action == "composer_save" or action == "composer_remove"
+			or action == "composer_emulate" then
 			return M.handle_composer(deps, controller, action, payload, push_state)
 		end
 		if action == "source_open" or action == "source_save" then
@@ -334,6 +394,20 @@ function M.new(deps)
 			deps.registry.select(id, operation_done(id, action))
 		end
 		push_state()
+		return true
+	end
+
+	--- Shows the editor, as the page's « Editor » button does: at once when the
+	--- page is ready, else as soon as it says so. A host without the editor's
+	--- file operations refuses.
+	--- @return boolean accepted
+	function controller.open_editor()
+		if not offers_source(deps.registry) then
+			deps.log("warn", "Refused to open the layout editor: this host has no source operations.")
+			return false
+		end
+		if page_ready then return M.handle_source(deps, "source_open", {}) end
+		editor_wanted = true
 		return true
 	end
 

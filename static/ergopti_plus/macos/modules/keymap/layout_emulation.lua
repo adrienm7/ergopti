@@ -446,7 +446,8 @@ function M.start(ports)
 				read_installed = function(layout_id) return Registry.read_local_copy(layout_id) end,
 				shipped = function(layout_id) return Registry.shipped_layout(layout_id) end,
 				composer_id = composer and composer.id or nil,
-				read_emulation = function() return Registry.composer_emulation() end })
+				read_emulation = function() return Registry.composer_emulation() end,
+				read_composed = function() return Registry.composer_copy() end })
 		end,
 		keycodes = function() return shared_json("modules/layouts/mac_keycodes.json", false) end,
 		registry = function() return shared_json("data/keycodes/physical_keys.json", true) end,

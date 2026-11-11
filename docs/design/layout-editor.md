@@ -38,6 +38,17 @@ report as it is.
   source's `emulation` table for that OS (`LayoutSourceIO.emulationTable`; none for a preserved import) and
   `use: true`: the composer host (`_shared/lua/layouts/composer.lua`) stores it, replaces any composition, installs
   it as the `composed` layout and switches to it; its `composerResult` is routed back to the editor.
+  « Emulate without installing » (shown when `initData` carries `emulate: true`) sends
+  `{action: "composer_emulate", source, keylayout [, emulation]}`: the composer's `store` keeps the source, its
+  compiled `.keylayout` (`keylayout_file`) and its emulation table in `layout_composer/` and installs nothing; the
+  host's `emulate` port then makes `composed` the emulated layout as « Layout to emulate » stores it
+  (`infra/layout_emulation_preferences.lua` `choose`) and reloads the layout emulation, which reads that copy
+  (`layouts/emulation_settings.lua` `source`, `read_composed`) while the composed layout is not installed. No
+  admin right, no input source; the layout types over the system one while ErgoptiPlus runs. Failures come back as
+  `composerResult {action: "composer_emulate", ok: false, code}` with `emulate_not_saved` or `emulate_failed`.
+  macOS binds the port from the menu (`ui/layout_manager` `set_emulation_applier`, it holds the preferences
+  state); Linux binds it in `ui/layout_manager/bridge.lua`. Decided by the coordinator on 2026-11-11, to review by
+  the maintainer.
   « Fill a layer from a layout » takes the host's `composer_open` sources (its `composerData` is routed to the
   editor too), so on these hosts the page hides « Compose »: the editor does the composer's job. macOS also sets
   `source_pick` in `initData`: the editor's « Open » posts `source_pick`, the host opens an `NSOpenPanel` limited
