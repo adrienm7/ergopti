@@ -413,6 +413,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-dll.cjs"],
 			"repro": "npm run test:kbd-dll"
+		},
+		{
+			"id": "kbd-installer",
+			"ordinal": 618,
+			"name": "keyboard layout installer holds the verified DLLs and registers and unregisters the layout",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-installer.cjs"],
+			"repro": "npm run test:kbd-installer"
 		}
 	]
 }

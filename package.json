@@ -725,7 +725,8 @@
 		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",
 		"test:macos-layout-bundle-plan": "node ./tools/test/test-macos-layout-bundle-plan.cjs",
 		"test:layout-extension-payload": "node ./tools/test/test-layout-extension-payload.cjs",
-		"test:layout-sources": "node ./tools/test/test-layout-sources.cjs"
+		"test:layout-sources": "node ./tools/test/test-layout-sources.cjs",
+		"test:kbd-installer": "node ./tools/test/test-kbd-installer.cjs"
 	},
 	"type": "module",
 	"imports": {
