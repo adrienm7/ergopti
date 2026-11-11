@@ -77,6 +77,7 @@ helpers.describe("linux accented-letter shortcuts (linux-accented-shortcuts)", f
 		local queued, pressed, active = {}, {}, true
 		local options = {
 			active = function() return active end,
+			emulating = function() return false end,
 			defer = function(fn) queued[#queued + 1] = fn return true end,
 			press = function(combo) pressed[#pressed + 1] = combo return true end,
 		}
@@ -99,6 +100,7 @@ helpers.describe("linux accented-letter shortcuts (linux-accented-shortcuts)", f
 		local queued, pressed, active = {}, {}, true
 		local options = {
 			active = function() return active end,
+			emulating = function() return false end,
 			defer = function(fn) queued[#queued + 1] = fn return true end,
 			press = function(combo) pressed[#pressed + 1] = combo return true end,
 		}
@@ -115,6 +117,30 @@ helpers.describe("linux accented-letter shortcuts (linux-accented-shortcuts)", f
 		active = false
 		helpers.assert_eq(repeat_callback({ code = 8, value = 2, mods = { ctrl = true } }), false,
 			"paused mid-hold: the repeats go to the application")
+	end)
+
+	-- Windows registers these chords only when the Ergopti base layer is not
+	-- emulated: the emulation decides a chord on its own keys. Linux ran them
+	-- before the emulation, so Ctrl on the system layout's é became Ctrl+C in
+	-- place of the emulated letter's chord (SCL-002, accented-under-emulation).
+	helpers.it("accented-shortcut: the layout emulation owns its chords (accented-under-emulation)", function()
+		local Accented = fresh()
+		local queued, emulating = {}, true
+		local options = {
+			active = function() return true end,
+			emulating = function() return emulating end,
+			defer = function(fn) queued[#queued + 1] = fn return true end,
+			press = function() return true end,
+		}
+		for key, port in pairs(ports()) do options[key] = port end
+		helpers.assert_eq(Accented.on_key({ code = 3, value = 1, mods = { ctrl = true } }, options), false,
+			"emulated: the emulation decides Ctrl+key")
+		helpers.assert_eq(#queued, 0)
+		emulating = false
+		helpers.assert_eq(Accented.on_key({ code = 3, value = 1, mods = { ctrl = true } }, options), true)
+		options.emulating = nil
+		helpers.assert_throws(function() Accented.on_key({ code = 3, value = 1, mods = { ctrl = true } }, options) end,
+			"a caller that cannot say whether the emulation runs is refused")
 	end)
 
 	helpers.it("accented-shortcut: the settings are config.toml's, over the manifest defaults", function()

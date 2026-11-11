@@ -2642,12 +2642,14 @@ local function main()
 		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots.
+		-- under the Shortcuts master like the keyboard slots, and only while no
+		-- layout is emulated, as on Windows.
 		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
+			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
 		})
