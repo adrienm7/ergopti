@@ -260,6 +260,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/klc_generator.js']
 	},
 	{
+		script: 'codegen/codegen-layout-editor-kbd-dll-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/kbd_dll_writer.js']
+	},
+	{
 		script: 'codegen/codegen-layout-composer-corpus.cjs',
 		outputs: ['static/ergopti_plus/_shared/tests/corpus/layouts/composer/composed.keylayout']
 	},

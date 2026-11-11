@@ -2279,6 +2279,28 @@ var LayoutEditorPage = (function () {
 							}
 						})
 					);
+			// The four Windows DLL images, written in the page (no compiler).
+			if (host.saveBinary && !LayoutSourceIO.isPreserved(doc()))
+				buttons.push(
+					el('button', {
+						type: 'button',
+						id: 'le-export-dll',
+						text: tl('export.dll'),
+						onclick: () => {
+							let file;
+							try {
+								file = LayoutSourceIO.windowsDllArchive(doc());
+							} catch (error) {
+								notify('error', problemText(error));
+								return;
+							}
+							Promise.resolve(host.saveBinary(file.filename, file.bytes, 'application/zip')).then(
+								() => notify('ok', tl('status.saved', { name: file.filename })),
+								(error) => notify('error', problemText(error))
+							);
+						}
+					})
+				);
 			// The two ways ErgoptiPlus uses a layout, each said in one line.
 			if (host.install) buttons.push(installButton(report));
 			if (host.emulate) buttons.push(emulateButton(report));

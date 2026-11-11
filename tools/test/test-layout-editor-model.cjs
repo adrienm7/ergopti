@@ -34,6 +34,7 @@ const PAGE_SCRIPTS = [
 	'layout_editor/zip_writer.js',
 	'layout_editor/toml_prelude.js',
 	'vendor/smol-toml.js',
+	'layout_editor/_generated/kbd_dll_writer.js',
 	'layout_editor/source_io.js',
 	'layout_editor/editor_model.js'
 ];
@@ -709,6 +710,57 @@ test('a new layout starts blank or as a copy of a reference or a registry layout
 		// It compiles for the drivers like any source.
 		assert.match(IO.installPayload(started.doc, 'linux').keylayout, /<keyboard /);
 	}
+});
+
+test('the page writes the Windows DLLs the repository tool writes, and the Windows host gets them', () => {
+	const PeWriter = require('../lib/kbd-dll/pe-writer.cjs');
+	const KbdSource = require('../lib/kbd-dll/source.cjs');
+	const { readDll } = require('../lib/kbd-dll/reader.cjs');
+	const { compareLayout } = require('../lib/kbd-dll/compare.cjs');
+	const text = fs.readFileSync(
+		path.join(ROOT, 'static', 'layouts', 'sources', 'ergopti.toml'),
+		'utf8'
+	);
+	const doc = IO.parse(text).doc;
+	const page = IO.windowsDlls(doc);
+	const tool = KbdSource.fromSource(plain(doc));
+	assert.equal(page.dllName, tool.model.dll_name);
+	assert.deepEqual(plain(page.omitted), tool.omitted, 'the same omissions as the tool');
+	const written = PeWriter.writeDlls(tool.model);
+	assert.deepEqual(Object.keys(page.dlls), ['x86', 'wow64', 'x64', 'arm64']);
+	for (const [arch, bytes] of Object.entries(page.dlls)) {
+		assert.ok(Buffer.from(bytes).equals(Buffer.from(written[arch])), `${arch}: the tool's bytes`);
+		assert.deepEqual(
+			compareLayout(tool.model, readDll(bytes).layout),
+			[],
+			`${arch} reads back as its model`
+		);
+	}
+	// The download: the four images and what the tables leave out.
+	const archive = IO.windowsDllArchive(doc);
+	assert.equal(archive.filename, `${page.dllName}-dll.zip`);
+	const zipText = Buffer.from(archive.bytes).toString('latin1');
+	for (const arch of Object.keys(page.dlls))
+		assert.ok(
+			zipText.includes(`${page.dllName}/${arch}/${page.dllName}.dll`),
+			`${arch} in the ZIP`
+		);
+	assert.ok(zipText.includes(`${page.dllName}/omitted.json`));
+	const x64At = Buffer.from(archive.bytes).indexOf(Buffer.from(page.dlls.x64));
+	assert.ok(x64At > 0, 'the image is stored byte for byte');
+	// composer_save on Windows carries every image, base64.
+	const payload = IO.installPayload(doc, 'windows');
+	assert.equal(payload.dll_name, page.dllName);
+	for (const [arch, bytes] of Object.entries(page.dlls))
+		assert.ok(
+			Buffer.from(payload.dlls[arch], 'base64').equals(Buffer.from(bytes)),
+			`${arch} base64`
+		);
+	assert.equal(IO.installPayload(doc, 'linux').dlls, undefined, 'only the Windows host gets DLLs');
+	refuses(
+		() => IO.windowsDlls(IO.importKeylayout(registry('ergopti'), 'e', 'iso')),
+		'source_preserved'
+	);
 });
 
 function LayoutSourceIO_preserved(doc) {
