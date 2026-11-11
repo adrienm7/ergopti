@@ -267,7 +267,13 @@ const BASELINE_SHARED = 39;
 //   the elevated installer of that DLL. macOS and Linux install the .keylayout
 //   and XKB files themselves and build no keyboard DLL, so counterpart
 //   folders there would hold nothing.
-const BASELINE_UNION = 65;
+//   65 -> 68 on 2026-11-11 (coordinator, overnight; to review by the maintainer) -
+//   linux/desktop_focus with its gnome and kwin children: the GNOME Shell
+//   extension and the KWin script the installer places so the daemon can read
+//   the focused window under Wayland, where no client may ask the compositor.
+//   Windows and macOS read focus through their own native APIs and install no
+//   desktop-shell code, so counterpart folders there would hold nothing.
+const BASELINE_UNION = 68;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //
