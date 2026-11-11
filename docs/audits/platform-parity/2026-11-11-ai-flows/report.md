@@ -31,10 +31,11 @@ only the request it fails carries the status.
 
 ## Decisions pending (behaviour left unchanged)
 
-- **AID-1, macOS's inner quick retry.** It runs outside `max_attempts`: one
-  prediction at multiplier 2 sends four requests on macOS when every attempt
-  fails, two on Windows and Linux (left « intent unresolved » by the deep
-  macOS review, untracked until now).
+- **AID-1, macOS's inner quick retry.** It ran outside `max_attempts`: one
+  prediction at multiplier 2 sent four requests on macOS when every attempt
+  failed, two on Windows and Linux. Decided by the maintainer on 2026-11-11:
+  the quick retry spends an attempt; macOS now sends two
+  (`test_sequential_retry_request_fence.lua`).
 - **AID-2, a token exchange answering 400 (`invalid_grant`).** Windows marks it
   `key_refused` but its classifier ignores the flag: retried on all three.
 - **AID-3, a settings change while a request is in flight.** Windows retires

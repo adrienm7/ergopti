@@ -5,6 +5,15 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The macOS quick retry spends the attempt budget (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (AID-1): the quick retry of a failed
+prediction variant on macOS (`api_ollama`, `api_mlx_fetch`, `api_remote`
+`fetch_sequential`) is one of the `max_attempts` attempts, as on Windows and
+Linux (`Inference.max_attempts`). One prediction at multiplier 2 sends at most
+two requests, never four. The retry keeps its extra tokens and warmer
+temperature; it is simply counted.
+
 ## X11 same-group XKB notify renews the layout receipt (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: after an XKB new-keyboard notify that
