@@ -21,6 +21,7 @@
 # ==============================================================================
 
 DESKTOP_DRIVER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
+. "$(dirname "${BASH_SOURCE[0]}")/system_bus.sh"
 
 # Runs "$@" inside the named session; prints nothing of its own on success.
 desktop_session_run() {
@@ -37,6 +38,11 @@ desktop_session_run() {
 	for tool in ${tools}; do
 		command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; return 2; }
 	done
+	local logind=""
+	if [ "${kind}" = gnome-wayland ]; then
+		system_logind_ensure || return 2
+		logind="${SYSTEM_LOGIND_PID}"
+	fi
 	local runtime
 	runtime="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-desktop-XXXXXX")" || return 2
 	chmod 700 "${runtime}"
@@ -81,8 +87,8 @@ desktop_session_run() {
 		' desktop-session "${kind}" "$@"
 	)
 	local status=$?
-	kill "${xvfb}" 2>/dev/null
-	wait "${xvfb}" 2>/dev/null
+	kill "${xvfb}" ${logind} 2>/dev/null
+	wait "${xvfb}" ${logind} 2>/dev/null
 	rm -rf "${runtime}"
 	return "${status}"
 }
