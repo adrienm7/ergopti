@@ -4273,7 +4273,7 @@
 	"physical_shortcuts.save_failed": "Kortkommandot kunde inte sparas. Försök igen.",
 	"physical_shortcuts.saved_reopen": "Sparat. Öppna detta fönster igen för att fortsätta.",
 	"physical_shortcuts.position_unavailable": "Denna tangentposition är inte tillgänglig här.",
-	"physical_shortcuts.windows_unavailable": "Ännu inte för Windows: Redigeraren för fysiska kortkommandon är ännu inte tillgänglig i Windows.",
+	"physical_shortcuts.windows_unavailable": "Ännu inte för Windows: Windows har ännu ingen värd för fysiska kortkommandon, varken redigeraren eller körningen av en åtgärd kopplad till en fysisk tangent. Fysiska kortkommandon fungerar i macOS och Linux.",
 	"physical_shortcuts.collision": "Denna tangentkombination används redan. Välj en annan.",
 	"physical_shortcuts.delivery_unqualified": "Inte tillgängligt än: Ergopti kan ännu inte säkert köra en åtgärd som är kopplad till en fysisk tangent på det här systemet. De namngivna kortkommandona fungerar fortfarande.",
 	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen.",

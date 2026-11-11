@@ -736,7 +736,10 @@ helpers.describe("parameter transaction physical boundary", function()
 				helpers.assert_eq(provider.configuration_domain(spec.binding), "keyboard", "the genuine provider recognizes this physical registry slot")
 				helpers.assert_type(gestures.action_parameter_update(spec.binding, selected.action or "run_program", selected.scalar), "table",
 					"the actual central parameter constructor accepts this binding and scalar")
-				helpers.assert_eq(provider.physical_delivery_available(), false, "public physical delivery remains genuinely unavailable")
+				-- The production getter answers true since 2026-11-11 (LIN-004); the
+				-- transaction's refusal of an unqualified delivery is what this pins.
+				helpers.assert_eq(provider.physical_delivery_available(), true, "the production getter")
+				provider.physical_delivery_available = function() return false end
 				local prior_parameters = gestures.get_all_action_parameters()
 				local stopped, original_stop = 0, gestures.stop_programs
 				gestures.stop_programs = function() stopped = stopped + 1; return original_stop() end

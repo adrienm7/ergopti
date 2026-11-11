@@ -4273,7 +4273,7 @@
 	"physical_shortcuts.save_failed": "לא ניתן לשמור את הקיצור. נסו שוב.",
 	"physical_shortcuts.saved_reopen": "נשמר. פתחו מחדש את החלון כדי להמשיך.",
 	"physical_shortcuts.position_unavailable": "מיקום המקש הזה אינו זמין כאן.",
-	"physical_shortcuts.windows_unavailable": "עדיין לא זמין ב־Windows: עורך קיצורי המקשים הפיזיים עדיין אינו זמין ב־Windows.",
+	"physical_shortcuts.windows_unavailable": "עדיין לא זמין ב־Windows: ל־Windows עדיין אין מארח לקיצורי מקשים פיזיים, לא העורך ולא הפעלת פעולה המשויכת למקש פיזי. קיצורי מקשים פיזיים פועלים ב־macOS וב־Linux.",
 	"physical_shortcuts.collision": "צירוף המקשים הזה כבר בשימוש. בחרו צירוף אחר.",
 	"physical_shortcuts.delivery_unqualified": "עדיין לא זמין: Ergopti עדיין אינו יכול להפעיל בבטחה פעולה המקושרת למקש פיזי במערכת זו. הקיצורים בעלי השם ממשיכים לפעול.",
 	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש.",
