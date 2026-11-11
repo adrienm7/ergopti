@@ -28,7 +28,7 @@ local function with_gesture(mode, conflict, scenario)
 		NativeFixture(function(picker, native)
 			local result = table.pack(xpcall(function()
 				local controls = { mode = mode, assigned = "none", disk = "none", saves = 0,
-					commits = 0, rollbacks = 0, updates = 0, conflicts = 0, notices = {}, queue = {} }
+					commits = 0, rollbacks = 0, updates = 0, conflicts = 0, notices = {}, queue = {}, name_reads = 0 }
 				local state = { gestures = true, action = "none" }
 				local logger = package.loaded["infra.logger"]
 				package.loaded["logger.shim"] = logger
@@ -52,7 +52,7 @@ local function with_gesture(mode, conflict, scenario)
 					-- A changed click binding is held until publication settles.
 					begin_click_binding_change = function(slot) return { slot = slot } end,
 					finish_click_binding_change = function() return true end,
-					get_sg_names = function() return { "none", "lookup" } end,
+					get_sg_names = function() controls.name_reads = controls.name_reads + 1; return { "none", "lookup" } end,
 					get_action_label = function(value) return value end,
 					get_action_parameter_spec = function() return nil end,
 					on_action_changed = function()
@@ -96,11 +96,14 @@ local function with_gesture(mode, conflict, scenario)
 				helpers.assert_type(provider, "function")
 				local rows = provider()
 				helpers.assert_eq(#rows, 1)
+				-- Every rebuild translated the whole action catalogue once per slot.
+				helpers.assert_eq(controls.name_reads, 0, "building a slot row reads no picker names")
 				rows[1].items[1].action()
 				helpers.assert_eq(#native.views, 0, "the menu defers native presentation")
 				helpers.assert_eq(#controls.queue, 1)
 				table.remove(controls.queue, 1)()
 				helpers.assert_eq(#native.views, 1, "the real menu must open the real shared picker")
+				helpers.assert_eq(controls.name_reads, 1, "the picker reads its names once, when it opens")
 				local view, controller = native.views[1], native.controllers[1]
 				local dispatch = native.callback_refs[controller]
 				helpers.assert_type(dispatch, "function")

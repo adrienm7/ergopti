@@ -346,7 +346,11 @@ function M.build(ctx)
 				and gestures.get_action_parameter_spec(current) or nil, parameter)
 		end
 
-		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+		-- The picker's names are read when it opens: building them for every slot
+		-- on every rebuild translated the whole catalogue once per slot.
+		local function names()
+			return type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+		end
 
 		-- A slot whose macOS gesture is on is greyed with a short suffix and the
 		-- engine holds it back (never a double action); the Infos dialog says
@@ -408,7 +412,7 @@ function M.build(ctx)
 				-- A refused schedule is reported; an accepted one only opens the
 				-- picker later, so it is not a publication receipt.
 				if DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
-					function() open_action_chooser(slot, names, current) end,
+					function() open_action_chooser(slot, names(), current) end,
 					"menu_gestures.action_chooser") ~= true then return false end
 			end,
 		}
