@@ -2277,6 +2277,27 @@ jobs:
             ${{ runner.temp }}/dev-release-qualification/macos-shortcuts-discovery.json
           if-no-files-found: error
 
+      # The layout source generator's macOS bundle, installed for real: macOS
+      # registers and lists both variants with their icon, and UCKeyTranslate on
+      # the layout data it read types the source's own vectors. Selection needs
+      # a logout and stays a maintainer check.
+      - name: Receive the generated layout bundle natively
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          node tools/test/macos-layout-bundle-native.cjs --native "$RUNNER_TEMP/layout-bundle-native"
+        timeout-minutes: 5
+
+      - name: Retain the generated layout bundle receipt
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: layout-bundle-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/layout-bundle-native
+          if-no-files-found: error
+
       # Build republishes these two receipts as release assets, byte for byte,
       # after admitting them: they record the deferral this cell actually
       # applied, so Build never derives a second disposition of its own.

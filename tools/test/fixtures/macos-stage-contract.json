@@ -649,6 +649,17 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 				},
 				{
+					"name": "Receive the generated layout bundle natively",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}",
+					"timeout-minutes": 5,
+					"shell": "bash"
+				},
+				{
+					"name": "Retain the generated layout bundle receipt",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
+				},
+				{
 					"name": "Hand the source-bound native qualification receipts to Build",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
