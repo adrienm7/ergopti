@@ -62,6 +62,8 @@ function newPathToken(row, movedRepo) {
 		if (r.lead === '' && !rel.startsWith('.') && row.old.startsWith('./')) rel = `./${rel}`;
 		out = r.lead + rel;
 	}
+	// A token spelled with a leading slash (DIR .. "/adapters/x.lua") keeps it.
+	if (row.old.startsWith('/') && !out.startsWith('/')) out = `/${out}`;
 	return backslash ? out.replace(/\//g, '\\') : out;
 }
 
@@ -137,12 +139,14 @@ function main() {
 			`  ${dirty.length} touched path(s) have local changes:\n    ${dirty.join('\n    ')}`
 		);
 	const after = [...stepMap.values()].filter(Boolean);
-	const before = new Set(Plan.luaCollisions([...map.keys()]).map((c) => c.file));
+	const before = new Set(Plan.luaCollisions([...map.keys()], false).map((c) => c.file));
 	const created = Plan.luaCollisions(after).filter(
 		(c) =>
 			!before.has(c.file) &&
 			(movedRepo.has(PREFIX + c.file) ||
-				[...movedRepo.values()].some((t) => Plan.luaModuleName(t.slice(PREFIX.length)) === c.name))
+				[...movedRepo.values()].some(
+					(t) => Plan.luaModuleName(t.slice(PREFIX.length), true) === c.name
+				))
 	);
 	for (const c of created)
 		console.log(
