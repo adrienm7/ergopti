@@ -18,6 +18,7 @@
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../../_shared/modules/llm/display_policy.ahk
+#Include prediction_ports.ahk
 
 
 

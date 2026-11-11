@@ -643,7 +643,7 @@ _LCO_SelectedTextInput(Action, Phase, Withdraw) {
 			_LTR_Run(_LPP_Menu(), _LTN_Screen("merci pour ton aide"), "fr", Body)
 	}
 	Body(Calls, Lines, Sent) {
-		global _LLM_Engine_RemoteTransport, _LLM_Bridge_Active, _LLM_Bridge_ReadLiveFocus
+		global _LLM_Bridge_Active, _LLM_Bridge_ReadLiveFocus
 		global _LLM_AcceptInProgress, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
 		global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
 		SavedPresentation := [_LLM_Bridge_ReadLiveFocus, _LLM_AcceptInProgress,
@@ -666,7 +666,7 @@ _LCO_SelectedTextInput(Action, Phase, Withdraw) {
 			_Stub_LlmTooltipLoading := false
 			_Stub_LlmTooltipText := ""
 			_Stub_LlmPresentedRecord := 0
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			AssertTrue(_LLM_Bridge_Active, "the actual input callback must run with its prediction feed enabled")
 			; Start distinct intent through the real owner, without zeroing its
 			; monotonic counter or borrowing a preceding key's peer callback.

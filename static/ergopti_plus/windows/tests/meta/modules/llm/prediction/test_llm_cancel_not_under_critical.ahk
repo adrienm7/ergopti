@@ -185,14 +185,18 @@ Test("LLM: every curl poll cancel and trim path owns an exact process handle "
 
 ; test_llm_input_cancels_generation pins these three names at the call site, so
 ; the refactor had to happen INSIDE the helpers. Restate it here so a future
-; rename cannot quietly break that pairing.
+; rename cannot quietly break that pairing. The remote helper is reached through
+; the engine's HttpClient port, whose default owner calls it.
 _LCNC_EngineStillCallsTheHelpers() {
 	Body := _DriverFuncBody("LLM_Engine_CancelInflight")
 	Assert(Body != "", "LLM_Engine_CancelInflight() must exist in the driver source")
-	for _, Name in ["LLM_OllamaCancelStreams(", "LLM_OllamaCancelAllAsync(", "LLM_RemoteCancelAllAsync("] {
+	for _, Name in ["LLM_OllamaCancelStreams(", "LLM_OllamaCancelAllAsync(", '_LLM_Engine_Port("http").Cancel('] {
 		Assert(InStr(Body, Name) > 0,
 			"LLM_Engine_CancelInflight must still call " . Name . " - the deferral belongs inside the helpers, so these call sites are unchanged")
 	}
+	Ports := _DriverDirConcat("modules/llm")
+	Assert(InStr(Ports, "return LLM_RemoteCancelAllAsync(SpareKind)") > 0,
+		"the default HttpClient port must cancel through LLM_RemoteCancelAllAsync")
 }
 Test("LLM: the engine still cancels through the same three helpers (llm-cancel-under-critical)",
 	_LCNC_EngineStillCallsTheHelpers)

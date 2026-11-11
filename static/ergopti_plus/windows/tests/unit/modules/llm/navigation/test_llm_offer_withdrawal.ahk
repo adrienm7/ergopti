@@ -190,7 +190,7 @@ _OWU_Protocol(Reset) {
 		_LTR_Run(_LPP_Menu(), _LTN_Screen("merci pour ton aide"), "fr", Body)
 	}
 	Body(Calls, Lines, Sent) {
-		global _LLM_Engine_RemoteTransport, _LLM_Bridge_Active
+		global _LLM_Bridge_Active
 		global _LLM_Bridge_ReadLiveFocus, _LLM_AcceptInProgress
 		global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerRecords
 		global _TooltipActiveSurface, _TooltipGeneration, _LLM_TooltipMetricQueue
@@ -229,7 +229,7 @@ _OWU_Protocol(Reset) {
 				Fn.DefineProp("Call", {Call: Callback})
 				Installed.Push(Fn)
 			}
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			AssertFalse(SavedClaim, "the fixture cannot adopt another acceptance")
 			_LLM_Bridge_ReadLiveFocus := () => Map("hwnd", 7, "control", 9)
 			AssertTrue(_LLM_Bridge_Active, "the actual prediction feed is enabled for the input callback")

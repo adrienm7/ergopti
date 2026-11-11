@@ -28,23 +28,6 @@
 ; budget identically.
 global LLM_PRED_TOKEN_OVERHEAD := 5
 
-; Network boundary of the remote backend: the function a request hands its
-; prompt to (LLM_RemoteGenerate_Async's signature). 0 selects the real curl
-; transport; the test suite installs a recorder here to capture the outgoing
-; request and answer it without a network, everything else staying real.
-global _LLM_Engine_RemoteTransport := 0
-
-/**
- * Returns the remote transport the next request dispatches through.
- * @returns {Func} LLM_RemoteGenerate_Async, or the installed test transport.
- */
-_LLM_Engine_ResolveRemoteTransport() {
-	global _LLM_Engine_RemoteTransport
-	if HasMethod(_LLM_Engine_RemoteTransport, "Call")
-		return _LLM_Engine_RemoteTransport
-	return LLM_RemoteGenerate_Async
-}
-
 /**
  * Validates the prompt override a request may carry: the profile a
  * llm_prompt_prediction binding names, and its own prediction count.
@@ -404,7 +387,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 			LLM_OllamaScheduleWarmupRetry(_LLM_Engine["model"])
 		retry_ms := Max(500, Min(_LLM_Engine[ConfigLeaf.DEBOUNCE_MS], 2000))
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
-		SetTimer(_LLM_Engine["pending_timer"], -retry_ms)
+		_LLM_Engine_Port("timer").After(_LLM_Engine["pending_timer"], retry_ms)
 		_LLM_Engine["timer_active"] := true
 		return
 	}
@@ -528,7 +511,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		; request-id check, but without this its curl child and the temp files
 		; carrying the typed context survive until the poll tick reaps them.
 		try LLM_OllamaCancelAllAsync()
-		try LLM_RemoteCancelAllAsync()
+		try _LLM_Engine_Port("http").Cancel("")
 		_LLM_Engine_PerformancePath(this_request_id, "exact_cache")
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true,
 			this_request_id, request_semantic_signature)
@@ -568,7 +551,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 			; no stale response clobbers the cache hit render and no orphaned curl
 			; child keeps a PII temp file alive.
 			try LLM_OllamaCancelAllAsync()
-			try LLM_RemoteCancelAllAsync()
+			try _LLM_Engine_Port("http").Cancel("")
 			_LLM_Engine_PerformancePath(this_request_id, "prefix_cache")
 			LLM_Engine_OnResults(sliced, ctx, 1, true, this_request_id,
 				request_semantic_signature)
@@ -591,7 +574,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
-		SetTimer(_LLM_Engine["pending_timer"], -remaining)
+		_LLM_Engine_Port("timer").After(_LLM_Engine["pending_timer"], remaining)
 		_LLM_Engine["timer_active"] := true
 		return
 	}
@@ -605,7 +588,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	}
 	try LLM_OllamaCancelStreams()
 
-	try LLM_Tooltip_SetChainStart()
+	try _LLM_Engine_Port("tooltip").MarkChainStart()
 
 	; Resolve profile and build the system prompt. If the user has
 	; configured a per-app override for the focused window, that wins
@@ -664,9 +647,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
 		provider_id := (entry is Map) ? entry.Get("Provider", "") : (entry.HasOwnProp("Provider") ? entry.Provider : "")
-		remote_transport := _LLM_Engine_ResolveRemoteTransport()
+		http_client := _LLM_Engine_Port("http")
 		dispatch_fn := (temp, on_succ, on_fail, tokens := 0) =>
-			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, tokens || call_tokens, "", 0, request_current)
+			http_client.Post(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, tokens || call_tokens, "", 0, request_current)
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -784,15 +767,16 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 				profile_label := prof["label"]
 		}
 	}
-	info_model := ""
+	info_parts := []
 	if (_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR])
-		info_model := _LLM_Engine_BuildInfoBarText(
+		info_parts := _LLM_Engine_InfoBarParts(
 			_LLM_Engine.Has("model") ? _LLM_Engine["model"] : "",
 			_LLM_Engine_ResolveBackendLabel(),
 			profile_label)
-	LLM_Tooltip_SetDisplayOpts(Map(
+	_LLM_Engine_Port("tooltip").SetDisplayOpts(Map(
 		ConfigLeaf.SHOW_INFO_BAR, !!(_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR]),
-		"info_model", info_model,
+		"info_parts", info_parts,
+		"info_model", _LLM_Engine_JoinInfoBarParts(info_parts),
 		"slot_count", Max(1, Integer(slotCount)),
 		ConfigLeaf.NAV_MODIFIERS, _LLM_Engine.Has(ConfigLeaf.NAV_MODIFIERS) ? _LLM_Engine[ConfigLeaf.NAV_MODIFIERS] : "",
 		ConfigLeaf.PRED_INDENT, _LLM_Engine.Has(ConfigLeaf.PRED_INDENT) ? Integer(_LLM_Engine[ConfigLeaf.PRED_INDENT]) : 0,
@@ -814,8 +798,8 @@ _LLM_Engine_ShowLoadingTooltip() {
 	; churn that made suggestions feel like they "n'ont pas le temps d'apparaître":
 	; the prediction flashed, then the next keystroke's request blanked it back to
 	; a spinner. Loading-over-loading still repaints (IsLoading → not a prediction).
-	if (IsSet(LLM_Tooltip_IsVisible) and LLM_Tooltip_IsVisible()
-			and IsSet(LLM_Tooltip_IsLoading) and !LLM_Tooltip_IsLoading())
+	Renderer := _LLM_Engine_Port("tooltip")
+	if (Renderer.IsVisible() and !Renderer.IsLoading())
 		return
 	RequestId := _LLM_Engine.Get("request_id", 0)
 	; A hotstring tooltip wins over the spinner on the shared surface
@@ -831,7 +815,7 @@ _LLM_Engine_ShowLoadingTooltip() {
 		"render_guard", _LLM_Engine_RenderIdentityIsCurrent.Bind(
 			RequestId, SemanticSignature)
 	)
-	try LLM_Tooltip_ShowLoading(Meta)
+	try Renderer.ShowLoading(Meta)
 }
 
 ; Single-shot batch dispatch: one async request, the model returns N
@@ -1222,7 +1206,7 @@ _LLM_Engine_FinalizeRequest(state) {
 		return
 	if (state["slots"].Length == 0) {
 		; Capture the presentation before logging can admit another request.
-		Origin := LLM_Tooltip_GetPresentedToken()
+		Origin := _LLM_Engine_Port("tooltip").PresentedToken()
 		if !_LLM_Engine_IsCurrent(state)
 			return
 		; Every variant failed — log a single ``llm_generation_failed`` so
@@ -1235,7 +1219,7 @@ _LLM_Engine_FinalizeRequest(state) {
 		; The request check rejects a logger reentry; the exact presentation
 		; fence also protects a replacement admitted inside the hide path.
 		if (_LLM_Engine_IsCurrent(state) and IsObject(Origin))
-			try LLM_Tooltip_HideExact(Origin)
+			try _LLM_Engine_Port("tooltip").Hide(Origin)
 		try {
 			app_name := ""
 			try app_name := WIGetFocused()["appId"]
@@ -1571,7 +1555,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; order paid one full tooltip rebuild for the prediction and a second one whose
 	; only purpose was to print the duration onto it.
 	if is_final
-		try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
+		try _LLM_Engine_Port("tooltip").MarkChainTiming(A_TickCount)
 	RenderAcceptSource := _LLM_Engine_RequestAcceptSourceForRender(request_id)
 	PresentationMeta := Map(
 		"offer_id", request_id,
@@ -1588,7 +1572,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; acceptance target and lifecycle metrics as one owner. A refused/stale render
 	; therefore cannot emit llm_suggested or replace the source of visible A.
 	RenderStarted := HotPath_Now()
-	RenderReceipt := LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)
+	RenderReceipt := _LLM_Engine_Port("tooltip").Show(display_slots, active, is_final, PresentationMeta)
 	HotPath_LogIfSlow("LLM.Render", RenderStarted, "final=" . (is_final ? "true" : "false"))
 	_LLM_Engine_PerformanceRender(request_id, RenderReceipt, is_final)
 }
@@ -1794,13 +1778,31 @@ LLM_InfoBar_Parts(Spec) {
 	return Parts.Length ? Parts : 0
 }
 
-_LLM_Engine_BuildInfoBarText(modelName, backend := "", profileName := "") {
+/**
+ * The info bar pieces of a prediction: LLM_InfoBar_Parts with a model required.
+ * @param {String} modelName The model that answers.
+ * @param {String} backend The backend label, "" for none.
+ * @param {String} profileName The prompt's label, shortened by LLM_InfoBar_Parts.
+ * @returns {Array} The pieces, empty when nothing is to be shown.
+ */
+_LLM_Engine_InfoBarParts(modelName, backend := "", profileName := "") {
 	Parts := LLM_InfoBar_Parts(Map("model", modelName, "backend", backend,
 		"profile_label", profileName, "require_model", true))
-	if !(Parts is Array)
-		return ""
+	return (Parts is Array) ? Parts : []
+}
+
+/**
+ * Joins info bar pieces the way the Windows tooltip prints them.
+ * @param {Array} Parts From _LLM_Engine_InfoBarParts.
+ * @returns {String}
+ */
+_LLM_Engine_JoinInfoBarParts(Parts) {
 	out := ""
 	for i, p in Parts
 		out .= (i = 1) ? p : " — " . p
 	return out
+}
+
+_LLM_Engine_BuildInfoBarText(modelName, backend := "", profileName := "") {
+	return _LLM_Engine_JoinInfoBarParts(_LLM_Engine_InfoBarParts(modelName, backend, profileName))
 }

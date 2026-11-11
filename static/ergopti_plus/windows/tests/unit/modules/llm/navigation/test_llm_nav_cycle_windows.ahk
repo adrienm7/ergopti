@@ -483,7 +483,7 @@ _LNCW_ForwardedCaretInput(Key, ShouldReset, Route) {
 		_LPP_Run(_LPP_Menu(), LPP_BUFFER, Body)
 	}
 	Body(Calls, Lines) {
-		global _LLM_Engine_RemoteTransport, _LLM_Engine, _LLM_Remote_Async, _PrefixInputHook
+		global _LLM_Engine, _LLM_Remote_Async, _PrefixInputHook
 		SavedHooks := [HookDispatcher._ih, _PrefixInputHook]
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
 		SavedPresentation := [_Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord]
@@ -495,7 +495,7 @@ _LNCW_ForwardedCaretInput(Key, ShouldReset, Route) {
 			_Stub_LlmTooltipLoading := false
 			_Stub_LlmTooltipText := ""
 			_Stub_LlmPresentedRecord := 0
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			if Route == "dispatcher" {
 				HookDispatcher._ih := InputHook("V I1 L0")
 				_PrefixInputHook := 0

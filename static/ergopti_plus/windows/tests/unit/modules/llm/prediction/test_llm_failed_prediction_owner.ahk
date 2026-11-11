@@ -134,7 +134,7 @@ _LFO_Exercise(State) {
 }
 
 _LFO_Case(Mode) {
-	global _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport, _LLM_Live
+	global _LLM_Engine, _LLM_Menu, _LLM_Live
 	global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Ollama_Async
 	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Pending, _LLM_Bridge_PrefixObserver
 	global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
@@ -145,7 +145,7 @@ _LFO_Case(Mode) {
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
 	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
-	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Engine_RemoteTransport", "_LLM_Live",
+	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Live",
 		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
 		"_LLM_Ollama_ActiveStreams", "_LLM_Ollama_Pending", "_LLM_Bridge_PrefixObserver",
 		"_Stub_LlmTooltipCalls", "_Stub_LlmTooltipVisible", "_Stub_LlmTooltipLoading",
@@ -164,6 +164,7 @@ _LFO_Case(Mode) {
 	State := {Mode: Mode, Calls: [], AId: 0, BId: 0, Timer: 0, TimerCalls: 0,
 		Done: false, Failure: 0, FailedLines: 0, Armed: false, FloorMs: 0, BRecord: 0, BText: ""}
 	Primary := 0, PrivateEngineOwned := false
+	SavedHttp := 0, HttpInstalled := false
 	try {
 		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
 		_ResetLogger()
@@ -183,7 +184,8 @@ _LFO_Case(Mode) {
 		_Stub_LlmLogCalls := [], _Stub_LlmLogFailedCalls := [], _Stub_LlmSuggestedCalls := []
 		_LLM_ProfilesCache := unset, _LLM_COMMON_INFERENCE := unset, _LLM_COMMON_INFERENCE_RAW := unset
 		Store.Ctx := "", Store.ByText := Map()
-		_LLM_Engine_RemoteTransport := _LFO_Transport.Bind(State)
+		SavedHttp := LLM_Engine_SetPort("http", _LPP_RecordingHttp(_LFO_Transport.Bind(State)))
+		HttpInstalled := true
 		_LOGGER_TEST_SINK := _LFO_Log.Bind(State)
 		Critical("Off")
 		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", 1, "show_info_bar", false))
@@ -212,6 +214,8 @@ _LFO_Case(Mode) {
 			State.BRecord := 0
 			Store.Ctx := SavedCtx, Store.ByText := SavedDisplays
 			_TLOG_RestoreLoggerState(SavedLogger)
+			if HttpInstalled
+				LLM_Engine_SetPort("http", SavedHttp)
 			for Name, Item in Saved
 				%Name% := Item.Present ? Item.Value : unset
 		} finally Critical(PreviousCritical)
@@ -335,7 +339,7 @@ _LSP_Exercise(State) {
     AssertEqual(State.BRoles, State.ReplayRoles, "a superseded parser cannot erase the current result's typed/corrected/next projection")
 }
 _LSP_Case(Mode) {
-	global _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport, _LLM_Live
+	global _LLM_Engine, _LLM_Menu, _LLM_Live
 	global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Ollama_Async
 	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Pending, _LLM_Bridge_PrefixObserver
 	global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
@@ -346,7 +350,7 @@ _LSP_Case(Mode) {
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
 	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
-	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Engine_RemoteTransport", "_LLM_Live",
+	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Live",
 		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
 		"_LLM_Ollama_ActiveStreams", "_LLM_Ollama_Pending", "_LLM_Bridge_PrefixObserver",
 		"_Stub_LlmTooltipCalls", "_Stub_LlmTooltipVisible", "_Stub_LlmTooltipLoading",
@@ -365,6 +369,7 @@ _LSP_Case(Mode) {
 	State := {Mode: Mode, Calls: [], AId: 0, BId: 0, Timer: 0, TimerCalls: 0,
 		Done: false, Failure: 0, FailedLines: 0, Armed: false, FloorMs: 0, BRecord: 0, BText: ""}
 	Primary := 0, PrivateEngineOwned := false
+	SavedHttp := 0, HttpInstalled := false
 	try {
 		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
 		_ResetLogger()
@@ -384,7 +389,8 @@ _LSP_Case(Mode) {
 		_Stub_LlmLogCalls := [], _Stub_LlmLogFailedCalls := [], _Stub_LlmSuggestedCalls := []
 		_LLM_ProfilesCache := unset, _LLM_COMMON_INFERENCE := unset, _LLM_COMMON_INFERENCE_RAW := unset
 		Store.Ctx := "", Store.ByText := Map()
-		_LLM_Engine_RemoteTransport := _LFO_Transport.Bind(State)
+		SavedHttp := LLM_Engine_SetPort("http", _LPP_RecordingHttp(_LFO_Transport.Bind(State)))
+		HttpInstalled := true
 		_LOGGER_TEST_SINK := _LSP_Log.Bind(State)
 		Critical("Off")
 		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", 1, "show_info_bar", false))
@@ -415,6 +421,8 @@ _LSP_Case(Mode) {
 			State.BRecord := 0
 			Store.Ctx := SavedCtx, Store.ByText := SavedDisplays
 			_TLOG_RestoreLoggerState(SavedLogger)
+			if HttpInstalled
+				LLM_Engine_SetPort("http", SavedHttp)
 			for Name, Item in Saved
 				%Name% := Item.Present ? Item.Value : unset
 		} finally Critical(PreviousCritical)
@@ -494,7 +502,7 @@ _RUAG_Exercise(State) {
     }
 }
 _RUAG_Case(Mode) {
-	global _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport, _LLM_Live, LLM_REMOTE_MODEL_PRICES
+	global _LLM_Engine, _LLM_Menu, _LLM_Live, LLM_REMOTE_MODEL_PRICES
 	global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Ollama_Async
 	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Pending, _LLM_Bridge_PrefixObserver
 	global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
@@ -505,7 +513,7 @@ _RUAG_Case(Mode) {
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
 	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
-	Names := ["LLM_REMOTE_MODEL_PRICES", "_LLM_Engine", "_LLM_Menu", "_LLM_Engine_RemoteTransport", "_LLM_Live",
+	Names := ["LLM_REMOTE_MODEL_PRICES", "_LLM_Engine", "_LLM_Menu", "_LLM_Live",
 		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
 		"_LLM_Ollama_ActiveStreams", "_LLM_Ollama_Pending", "_LLM_Bridge_PrefixObserver",
 		"_Stub_LlmTooltipCalls", "_Stub_LlmTooltipVisible", "_Stub_LlmTooltipLoading",
@@ -524,6 +532,7 @@ _RUAG_Case(Mode) {
 	State := {Mode: Mode, Calls: [], AId: 0, BId: 0, Timer: 0, TimerCalls: 0,
 		Done: false, Failure: 0, FailedLines: 0, Armed: false, FloorMs: 0, BRecord: 0, BText: ""}
 	Primary := 0, PrivateEngineOwned := false
+	SavedHttp := 0, HttpInstalled := false
 	try {
 		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
 		_ResetLogger()
@@ -543,7 +552,8 @@ _RUAG_Case(Mode) {
 		_Stub_LlmLogCalls := [], _Stub_LlmLogFailedCalls := [], _Stub_LlmSuggestedCalls := []
 		_LLM_ProfilesCache := unset, _LLM_COMMON_INFERENCE := unset, _LLM_COMMON_INFERENCE_RAW := unset
 		Store.Ctx := "", Store.ByText := Map()
-		_LLM_Engine_RemoteTransport := _LFO_Transport.Bind(State)
+		SavedHttp := LLM_Engine_SetPort("http", _LPP_RecordingHttp(_LFO_Transport.Bind(State)))
+		HttpInstalled := true
 		_LOGGER_TEST_SINK := 0
 		Critical("Off")
 		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", (Mode == "ordinary-two" || Mode == "cost-two") ? 2 : 3, "show_info_bar", false))
@@ -572,6 +582,8 @@ _RUAG_Case(Mode) {
 			State.BRecord := 0
 			Store.Ctx := SavedCtx, Store.ByText := SavedDisplays
 			_TLOG_RestoreLoggerState(SavedLogger)
+			if HttpInstalled
+				LLM_Engine_SetPort("http", SavedHttp)
 			for Name, Item in Saved
 				%Name% := Item.Present ? Item.Value : unset
 		} finally Critical(PreviousCritical)
@@ -795,7 +807,7 @@ _LDP_DrainDebt() {
     AssertEqual(0, Remaining.Length, "new cases cannot hide exact native retirement debt")
 }
 _LDP_Native(Mode, Calls, Lines) {
-    global _DriverDir, _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport
+    global _DriverDir, _LLM_Engine, _LLM_Menu
     global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
     global _LLM_Bridge_AgentBuffer, _LLM_Bridge_LastLogTick, _LLM_Bridge_PrefixObserver
     global _LLM_Agent_Generation, _LLM_Agent_Auto, _PrefixInputHook, HSE_Buffer, _PrefixBuffer
@@ -906,7 +918,7 @@ _LDP_Native(Mode, Calls, Lines) {
         _Stub_LlmTooltipText := "", _Stub_LlmPresentedRecord := 0
         _LLM_Bridge_PrefixObserver := 0, HSE_Buffer := "", _PrefixBuffer := ""
         _LLM_Agent_Auto := Map("timer", 0, "offer", "", "triaged", Map(), "order", [])
-        _LLM_Engine_RemoteTransport := 0
+        LLM_Engine_SetPort("http", 0)
         LLM_Engine_Init(Map("backend", "api", "api_entries", [Entry], "api_entry_id", "source-owned",
             "profile_id", "basic", "n_predictions", 1, "disabled_apps", PasswordProbe ? [] : [AApp],
             "disable_password_fields", true,

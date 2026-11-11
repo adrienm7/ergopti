@@ -216,7 +216,7 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 		return false
 	; PREFIX and TAIL are both the text to rewrite: a selection has no context
 	if (Backend == "api")
-		_LLM_Engine_ResolveRemoteTransport().Call(Entry, SystemPrompt, Source, Temperature,
+		_LLM_Engine_Port("http").Post(Entry, SystemPrompt, Source, Temperature,
 			OnSuccess, OnFail, Source, MaxTokens, "", 0, _LLM_Tone_OutputCurrent.Bind(Generation, Focus, AuxGeneration, PhysicalGeneration))
 	else
 		LLM_OllamaGenerate_Async(LLM_ResolveOllamaTag(_LLM_Engine["model"]), SystemPrompt, Source,

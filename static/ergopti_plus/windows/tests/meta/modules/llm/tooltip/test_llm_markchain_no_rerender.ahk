@@ -100,10 +100,10 @@ _LMNR_FreezePrecedesFinalRender() {
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults() must exist in the driver source")
 
-	FreezePos := InStr(Body, "LLM_Tooltip_MarkChainTimingOnly(")
-	ShowPos := InStr(Body, "LLM_Tooltip_Show(display_slots")
+	FreezePos := InStr(Body, '_LLM_Engine_Port("tooltip").MarkChainTiming(')
+	ShowPos := InStr(Body, '_LLM_Engine_Port("tooltip").Show(display_slots')
 	Assert(FreezePos > 0,
-		"the final-prediction path must freeze the chain timings via LLM_Tooltip_MarkChainTimingOnly")
+		"the final-prediction path must freeze the chain timings through the TooltipRenderer port")
 	Assert(ShowPos > 0, "the final-prediction path must still render the slots")
 	Assert(FreezePos < ShowPos,
 		"the timings must be frozen BEFORE the final render -- the info bar reads TtftMs/TtltMs while it builds, so freezing afterwards is what forced a second full rebuild")
