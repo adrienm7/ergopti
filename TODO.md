@@ -1386,12 +1386,15 @@ Each closes on a named green hosted or native run, recorded here.
       model loading on macOS (Linux done).
       macOS part on hosted CI: the macOS Unit lots (menu_llm, ui) that hold the composed-menu and provider-order tests
       are green in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); a composed menu shown by an installed driver needs a real Mac. Windows part is the maintainer's.
-- [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture receipts; daemon-report
+- [x] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture receipts; daemon-report
       allocation failures on Intel and Apple silicon.
       2026-11-11 [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137): the number-row Carbon cohort compiles and passes with its receipts on Intel (Native XCTest)
       and Apple silicon (Managed Ollama cells). The daemon-report classes (`OwnedVirtualHIDDaemonReport*Tests`) pass
-      only in the Apple silicon full suite: no Intel cell selects them, so the Intel half stays open until the Intel
-      XCTest cell enrolls those classes.
+      only in the Apple silicon full suite: no Intel cell selected them. Done 2026-11-11: 801f81c4 runs the four
+      classes in both managed-ollama-native cells. Run
+      [42956274784](https://github.com/adrienm7/ergopti/actions/runs/42956274784) reports
+      `architecture=amd64 classes=4 passed=33/33` (Native XCTest, Intel) and
+      `architecture=arm64 classes=4 passed=33/33` (Managed Ollama, Apple silicon); its macOS Verdict is green.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
       (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
 - [ ] **Deploy site after a superseded push.** A `main` push that a newer one passes before its site deploys fails
