@@ -4250,7 +4250,7 @@
 	"physical_shortcuts.save_failed": "Zkratku se nepodařilo uložit. Zkuste to znovu.",
 	"physical_shortcuts.saved_reopen": "Uloženo. Pro pokračování znovu otevřete toto okno.",
 	"physical_shortcuts.position_unavailable": "Tato pozice klávesy zde není dostupná.",
-	"physical_shortcuts.windows_unavailable": "Ve Windows zatím nedostupné: Editor fyzických zkratek zatím není dostupný ve Windows.",
+	"physical_shortcuts.windows_unavailable": "Ve Windows zatím nedostupné: Windows zatím nemá hostitele fyzických zkratek, ani editor, ani spuštění akce přiřazené fyzické klávese. Fyzické zkratky fungují v macOS a Linuxu.",
 	"physical_shortcuts.collision": "Tato kombinace kláves se již používá. Vyberte jinou.",
 	"physical_shortcuts.delivery_unqualified": "Zatím nedostupné: Ergopti zatím na tomto systému nedokáže bezpečně spustit akci přiřazenou fyzické klávese. Pojmenované zkratky fungují dál.",
 	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít.",

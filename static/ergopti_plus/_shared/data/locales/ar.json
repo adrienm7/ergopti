@@ -4250,7 +4250,7 @@
 	"physical_shortcuts.save_failed": "تعذر حفظ هذا الاختصار. حاول مجددًا.",
 	"physical_shortcuts.saved_reopen": "تم الحفظ. أعد فتح هذه النافذة للمتابعة.",
 	"physical_shortcuts.position_unavailable": "موضع المفتاح هذا غير متاح هنا.",
-	"physical_shortcuts.windows_unavailable": "غير متاح بعد على Windows: محرر اختصارات المفاتيح الفعلية غير متاح بعد على Windows.",
+	"physical_shortcuts.windows_unavailable": "غير متاح بعد على Windows: لا يملك Windows بعد مضيفًا لاختصارات المفاتيح الفعلية، لا المحرر ولا تشغيل إجراء مرتبط بمفتاح فعلي. تعمل اختصارات المفاتيح الفعلية على macOS وLinux.",
 	"physical_shortcuts.collision": "تركيبة المفاتيح هذه مستخدمة بالفعل. اختر تركيبة أخرى.",
 	"physical_shortcuts.delivery_unqualified": "غير متاح بعد: لا يستطيع Ergopti بعد تشغيل إجراء مرتبط بمفتاح فعلي بأمان على هذا النظام. تستمر الاختصارات المسماة في العمل.",
 	"physical_shortcuts.window_unavailable": "هذه النافذة غير متاحة: حاول فتحها مجددًا.",

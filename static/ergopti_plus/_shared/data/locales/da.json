@@ -4250,7 +4250,7 @@
 	"physical_shortcuts.save_failed": "Genvejen kunne ikke gemmes. Prøv igen.",
 	"physical_shortcuts.saved_reopen": "Gemt. Åbn dette vindue igen for at fortsætte.",
 	"physical_shortcuts.position_unavailable": "Denne tastposition er ikke tilgængelig her.",
-	"physical_shortcuts.windows_unavailable": "Endnu ikke på Windows: Editoren til fysiske genveje er endnu ikke tilgængelig på Windows.",
+	"physical_shortcuts.windows_unavailable": "Endnu ikke på Windows: Windows har endnu ingen vært for fysiske genveje, hverken editoren eller udførelsen af en handling knyttet til en fysisk tast. Fysiske genveje virker på macOS og Linux.",
 	"physical_shortcuts.collision": "Denne tastkombination er allerede i brug. Vælg en anden.",
 	"physical_shortcuts.delivery_unqualified": "Endnu ikke tilgængelig: Ergopti kan endnu ikke sikkert køre en handling, der er knyttet til en fysisk tast, på dette system. De navngivne genveje virker fortsat.",
 	"physical_shortcuts.window_unavailable": "Dette vindue er ikke tilgængeligt: Prøv at åbne det igen.",
