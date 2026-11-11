@@ -47,6 +47,7 @@ graph TD
         LINUX_clipboard_owner_worker["ClipboardOwnerWorker.lua"]
         LINUX_compositor_focus["CompositorFocus.lua"]
         LINUX_compositor_focus_worker["CompositorFocusWorker.lua"]
+        LINUX_cosmic_toplevel_worker["CosmicToplevelWorker.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_curl_http_client["CurlHttpClient.lua"]
         LINUX_desktop_opener["DesktopOpener.lua"]
