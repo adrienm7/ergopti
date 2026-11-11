@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/shipped_released_v12_refused/case.toml
+
+[case]
+description = "A file ErgoptiPlus 1.0.0 to 1.0.6 stamped v12 is below the squashed registry's oldest version: it is refused, never written, and 1.0.9 is the bridge that climbs it."
+drivers = ["ahk", "hs", "linux"]
+outcome = "unsupported"

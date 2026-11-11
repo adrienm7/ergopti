@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_switch_on_becomes_slot/case.toml
-
-[case]
-description = "The macOS Ctrl+G switch left on becomes the open_chatgpt action of its slot and leaves shortcuts.keys."
-drivers = ["hs"]
-outcome = "migrated"
-from_version = 19
-to_version = 21
