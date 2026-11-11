@@ -76,7 +76,9 @@ helpers.describe("Linux bundled apps launcher", function()
 			.. " -e " .. quote(code) .. " 2>&1"))
 		local command = pipe:read("*a")
 		pipe:close()
-		helpers.assert_contains(command, quote(root .. "/ui/dialog_host.lua"))
+		-- The host is named by its module, so a move of the file does not break this.
+		local host = assert(package.searchpath("ui.dialog_host", root .. "/?.lua"), "dialog host module")
+		helpers.assert_contains(command, quote(host))
 	end)
 
 	helpers.it("bundled apps: writes the Encryptor drop target with its file field code", function()
