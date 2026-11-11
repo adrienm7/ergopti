@@ -37,6 +37,16 @@ to read, or no owner able to restore the formats, still refuses before the
 clipboard changes. On Wayland, `wl-paste` falls back to an offered type, so
 the case did not arise there.
 
+## Decided
+
+- **ADD-2, restoring an empty clipboard** (decided by the maintainer on
+  2026-11-11): a Linux borrow of a clipboard nobody owned gives it back
+  unowned, as macOS clears its pasteboard (`clipboard.lua` snapshot
+  `unowned`, `x11_selection_stamp.disown`, `wl-copy --clear`), no longer as
+  an owned empty string. Regressions `clipboard-unowned-empty`, updated
+  deliberately. Windows: no change (an empty `ClipboardAll` empties the
+  clipboard).
+
 ## Decisions pending (behaviour left unchanged)
 
 - **ADD-1, password-manager applications.** macOS treats every field of a
@@ -48,10 +58,6 @@ the case did not arise there.
   « consulted in addition » is not true; the three lists also differ.
   Recommendation: make the app-wide gate the contract on the three drivers,
   from one shared list.
-- **ADD-2, restoring an empty clipboard.** Linux restores a clipboard nobody
-  owned as an owned empty string (pinned, `clipboard-unowned-empty`); macOS
-  clears the pasteboard and Windows restores an empty `ClipboardAll`.
-  Clipboard managers record the empty entry on Linux.
 - **ADD-3, the Linux application identity.** X11 reports `/proc/<pid>/comm`,
   which the kernel cuts to 15 bytes (`window_info.lua`); Wayland reports the
   `app_id` or window class. An exclusion list built under one session type

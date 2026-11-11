@@ -596,3 +596,44 @@ helpers.describe("asynchronous native selected-range transactions", function()
 		end)
 	end)
 end)
+
+-- ADD-2 (decided by the maintainer on 2026-11-11): a Wayland clipboard that
+-- held nothing is cleared after the borrow, as macOS clears its pasteboard,
+-- instead of being left to Ergopti as an owned empty entry.
+helpers.describe("clipboard borrow of an empty Wayland clipboard (clipboard-unowned-empty)", function()
+	helpers.it("clears the clipboard instead of writing an empty string back (clipboard-unowned-empty)", function()
+		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local empty, clears = true, 0
+			local listing_owner = shell.exec_checked
+			function shell.exec_checked(command)
+				if command:find("Nothing is copied", 1, true) then return empty end
+				if command:find("wl-copy --clear", 1, true) then
+					clears, empty = clears + 1, true
+					return true
+				end
+				if empty and command:find("wl-paste --no-newline 2>/dev/null", 1, true) then
+					shell.reads[#shell.reads + 1] = command
+					return false, "", "exit 1"
+				end
+				return listing_owner(command)
+			end
+			local real_run = shell.run
+			function shell.run()
+				empty = false
+				return real_run()
+			end
+			local real_emit = emit
+			local function copy(combo)
+				if combo == "ctrl+c" then empty = false end
+				return real_emit(combo)
+			end
+			local ok, selected = clipboard.read_selection(copy, sleep_ms)
+			helpers.assert_true(ok, "an empty clipboard must still be borrowed")
+			helpers.assert_eq(selected, "selected")
+			helpers.assert_eq(clears, 1, "the empty clipboard must be given back empty")
+			for _, write in ipairs(shell.writes) do
+				helpers.assert_true(write.text ~= "", "an owned empty string was written back")
+			end
+		end)
+	end)
+end)

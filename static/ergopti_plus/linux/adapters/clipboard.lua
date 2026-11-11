@@ -121,6 +121,10 @@ local function backend()
 					if empty then return false end
 					return nil
 				end,
+				-- Gives an empty clipboard back empty, not as an owned "" entry.
+				clear = function()
+					return Shell.exec_checked(string.format("timeout %d wl-copy --clear", IO_TIMEOUT_S)) == true
+				end,
 				-- One advertised type's exact bytes, for a multi-format snapshot.
 				read_target = function(target)
 					return string.format("timeout %d wl-paste --no-newline --type %s 2>/dev/null", IO_TIMEOUT_S,
@@ -144,6 +148,8 @@ local function backend()
 					"timeout %d xclip -selection clipboard -t TARGETS -o 2>/dev/null", IO_TIMEOUT_S),
 				-- xclip exits 1 on an ownerless clipboard and on a failed read alike.
 				owned = function() return (require("adapters.x11_selection_stamp").owned()) end,
+				-- Gives an unowned clipboard back unowned, not as an owned "" entry.
+				clear = function() return (require("adapters.x11_selection_stamp").disown()) == true end,
 				read_target = function(target)
 					return string.format("timeout %d xclip -selection clipboard -t %s -o 2>/dev/null", IO_TIMEOUT_S,
 						Shell.quote(target))
@@ -301,9 +307,14 @@ local function read_restorable_snapshot(selected_backend)
 	if not ok then
 		-- A clipboard nobody owns (nothing copied yet this session, or its owner
 		-- quit) makes xclip and wl-paste fail as a broken read does. It is an
-		-- empty clipboard, restored as one; any other failure still refuses.
+		-- empty clipboard, given back unowned as macOS clears its pasteboard,
+		-- so a clipboard manager records no empty entry (ADD-2, decided by the
+		-- maintainer on 2026-11-11); any other failure still refuses.
 		local owned = selected_backend.owned and selected_backend.owned()
-		if owned == false then return true, { text = "" }, nil end
+		if owned == false then
+			if type(selected_backend.clear) ~= "function" then return false, nil, reason end
+			return true, { text = "", unowned = true }, nil
+		end
 		if owned ~= true then return false, nil, reason end
 		-- An owner offering no text (a screenshot copied alone) fails the text
 		-- read too: its own formats are saved whole, as Windows' ClipboardAll
@@ -341,6 +352,7 @@ end
 --- @param snapshot table From read_restorable_snapshot.
 --- @return boolean
 local function restore_snapshot(selected_backend, snapshot)
+	if snapshot.unowned then return selected_backend.clear() == true end
 	if snapshot.targets then return require("adapters.clipboard_owner").write(snapshot.targets) end
 	return write_backend_checked(selected_backend, snapshot.text)
 end
@@ -674,9 +686,9 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 		return admitted(admission)
 	end)
 
-	-- Restored even when it was empty: writing "" back is what leaves the
-	-- clipboard as the user left it, and skipping the restore on an empty save
-	-- would leave our replacement sitting there.
+	-- Restored even when it was empty: an owned "" is written back and an
+	-- unowned clipboard is cleared, which leaves it as the user left it;
+	-- skipping the restore would leave our replacement sitting there.
 	local held = holds_pasted_text(b, text)
 	if held == nil or (held and not restore_snapshot(b, saved)) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")

@@ -19,7 +19,8 @@
 ---    timeout, polling without blocking, then the read is "unreadable".
 --- 3. No owner, no stamp: a clipboard nobody owns answers 0, which a later
 ---    copy moves, as an owner's renewed timestamp does. M.owned answers the
----    owner question alone, for the clipboard borrower.
+---    owner question alone, for the clipboard borrower, and M.disown gives an
+---    unowned clipboard back as it was found.
 --- ==============================================================================
 
 local M = {}
@@ -50,6 +51,7 @@ local DECLARATIONS = {
 		.. " unsigned long);",
 	"int XFlush(struct _XDisplay *);",
 	"unsigned long XGetSelectionOwner(struct _XDisplay *, unsigned long);",
+	"int XSetSelectionOwner(struct _XDisplay *, unsigned long, unsigned long, unsigned long);",
 	"typedef union { long pad[24]; } ErgoptiSelectionStampEvent;",
 	"typedef struct { int type; unsigned long serial; int send_event; void *display; unsigned long requestor,"
 		.. " selection, target, property, time; } ErgoptiSelectionStampNotify;",
@@ -123,6 +125,27 @@ function M.owned()
 	local owner = x11.XGetSelectionOwner(display, x11.XInternAtom(display, "CLIPBOARD", 0))
 	x11.XCloseDisplay(display)
 	return owner ~= NONE
+end
+
+--- Leaves the CLIPBOARD selection without an owner, as it was before a
+--- borrow found it unowned: the ICCCM way to empty it, which macOS
+--- (clearContents) matches. The owner Ergopti's writer started receives
+--- SelectionClear and exits; nothing records an empty entry (ADD-2).
+--- @return boolean cleared true once the server reports no owner.
+--- @return string|nil reason "unsupported" without libX11 or a display, "owned" when an owner remains.
+function M.disown()
+	local native, reason = bind()
+	if not native then return false, reason end
+	local x11 = native.x11
+	local display = x11.XOpenDisplay(nil)
+	if display == nil then return false, "unsupported" end
+	local clipboard = x11.XInternAtom(display, "CLIPBOARD", 0)
+	x11.XSetSelectionOwner(display, clipboard, NONE, CURRENT_TIME)
+	x11.XFlush(display)
+	local owner = x11.XGetSelectionOwner(display, clipboard)
+	x11.XCloseDisplay(display)
+	if owner ~= NONE then return false, "owned" end
+	return true
 end
 
 --- The CLIPBOARD owner's TIMESTAMP.
