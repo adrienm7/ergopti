@@ -401,7 +401,9 @@ key. A tap-hold follows the shared tap-hold catalogue's typing rule (as macOS
 resolves it): a press under the pending key before its threshold types the tap
 first, a press after it or the threshold passing (`tick`) starts the hold of the
 layer or modifier (a built-in one the driver applies to the keys under it), and a
-release before the threshold types the tap. No keystroke is held back or
+release before the threshold types the tap. A hold reaching a native layer sends
+each key it does not map with the held modifiers and those its first selector
+requires, since no modifier the user holds selects that layer on the OS. No keystroke is held back or
 reordered (decided by the coordinator on 2026-11-11 overnight, to review by the
 maintainer: the release-order rule of Windows and Linux would need the drivers
 to delay and replay keys).

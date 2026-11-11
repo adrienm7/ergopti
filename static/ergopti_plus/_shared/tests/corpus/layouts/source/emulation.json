@@ -196,6 +196,14 @@
 				},
 				"hold_modifier": "roya",
 				"threshold_ms": 150
+			},
+			{
+				"key": "Quote",
+				"tap": {
+					"text": "'"
+				},
+				"hold_layer": "shift",
+				"threshold_ms": 180
 			}
 		],
 		"remaps": [
@@ -440,6 +448,14 @@
 				},
 				"hold_modifier": "roya",
 				"threshold_ms": 150
+			},
+			{
+				"key": "Quote",
+				"tap": {
+					"text": "'"
+				},
+				"hold_layer": "shift",
+				"threshold_ms": 180
 			}
 		],
 		"remaps": [
@@ -684,6 +700,14 @@
 				},
 				"hold_modifier": "roya",
 				"threshold_ms": 150
+			},
+			{
+				"key": "Quote",
+				"tap": {
+					"text": "'"
+				},
+				"hold_layer": "shift",
+				"threshold_ms": 180
 			}
 		],
 		"remaps": [

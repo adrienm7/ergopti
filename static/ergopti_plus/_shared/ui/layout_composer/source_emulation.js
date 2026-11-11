@@ -319,6 +319,16 @@ var LayoutSourceEmulation = (function () {
 			perform(layer.keys.get(code), actions);
 			return { consumed: true, actions };
 		}
+		// A hold reaching a native layer: no modifier selects it on the OS, so the
+		// key goes out with the modifiers of the layer's first selector.
+		if (layer.native && session.hold && session.hold.entry.holdLayer === layer.id) {
+			const sent = new Set(heldModifiers(held).concat(layer.selectors[0].required));
+			const modifiers = REPORTED.filter((id) => sent.has(id)).concat(
+				[...sent].filter((id) => !REPORTED.includes(id))
+			);
+			actions.push({ type: 'key', key: code, modifiers });
+			return { consumed: true, actions };
+		}
 		// An emulated layer has no keyMap for the OS to fall back on.
 		return { consumed: !layer.native, actions };
 	}
