@@ -4427,6 +4427,30 @@ jobs:
           fi
         timeout-minutes: 5
 
+      # The layout editor as the user meets it: the layout manager's real WebKit
+      # window, « Editor », a source opened, « Install and use »; the page compiles
+      # it and the composer host installs it, then the server's keymap is read back.
+      - name: Install a layout source from the editor in the daemon's WebView
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends x11-xkb-utils
+          export LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;"
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a -s "-noreset" luajit tests/hardware/run_layout_editor_webview.lua ../../../static/layouts/sources/ergopti.toml
+          else
+              exit 1
+          fi
+        timeout-minutes: 8
+
       # JavaScriptCore suspends threads for its collector with SIGUSR1 unless
       # JSC_SIGNAL_FOR_GC names another signal; the reload request rings SIGUSR1,
       # and a daemon with a WebView open died with SIGSEGV.

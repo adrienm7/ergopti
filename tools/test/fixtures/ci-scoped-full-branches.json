@@ -1367,6 +1367,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install a layout source from the editor in the daemon's WebView",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "The reload signal survives an in-process WebView",
 			"protocol": 10
 		},
