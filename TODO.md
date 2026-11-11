@@ -1327,7 +1327,9 @@ between workers) green alone. All live checks pass, typed by the harness.
       pointer and X11 tap-copy proofs still pass without the warm-up. Unit: the equal-group and unacknowledged-map
       cases of `test_keyboard_layout_terminal_plan_observation.lua` and `test_keyboard_layout_xkb_keymap_parsing.lua`
       now pin the renewal and the kept revocation. The clipboard route's own failure while the clipboard has no
-      owner (`xclip -o` exits 1 as for a read error) is unchanged and stays open. Wayland and macOS have no slave
+      owner (`xclip -o` exits 1 as for a read error) is fixed too: 4265e802 asks libX11 for the CLIPBOARD owner
+      (`x11_selection_stamp.owned`) and borrows an ownerless clipboard as empty (`clipboard-unowned-empty`); checked
+      live on 2026-11-11 on a fresh Xvfb, where `clipboard.paste_text` succeeds with nobody owning the clipboard. Wayland and macOS have no slave
       switch; Windows has no XKB.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
