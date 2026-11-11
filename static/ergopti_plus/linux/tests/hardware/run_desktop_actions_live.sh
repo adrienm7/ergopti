@@ -6,7 +6,8 @@
 # trash), GSettings on its keyfile backend, and a throwaway HOME.
 #
 # Needs Xvfb, openbox, dbus-run-session, gio with GVfs, gsettings with the
-# GNOME desktop schemas, xdotool, luajit with luv and lgi (the dialog host).
+# GNOME desktop schemas, xdotool, xrandr, luajit with luv and lgi (the dialog
+# host).
 # Exit 0 = every check held; 1 = a failure; 2 = no environment.
 
 set -u
@@ -23,6 +24,8 @@ need dbus-run-session
 need gio
 need gsettings
 need xdotool
+# center_mouse reads the monitors through RandR (modules/gestures/pointer_warp.lua).
+need xrandr
 need luajit
 export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 # lua-lgi installs for the distro's Lua, not for LuaJIT.

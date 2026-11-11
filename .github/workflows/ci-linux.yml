@@ -3454,7 +3454,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gvfs gvfs-daemons gsettings-desktop-schemas libglib2.0-bin openbox xdotool dbus-x11 xvfb luajit lua-luv lua-lgi gir1.2-gtk-3.0
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gvfs gvfs-daemons gsettings-desktop-schemas libglib2.0-bin openbox xdotool dbus-x11 xvfb luajit lua-luv lua-lgi gir1.2-gtk-3.0 x11-xserver-utils
           else
               exit 1
           fi
