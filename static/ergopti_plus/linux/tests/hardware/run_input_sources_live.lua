@@ -167,6 +167,11 @@ local function pick(id)
 	if not check(row ~= nil and type(row.action) == "function", "the row of " .. id .. " can be chosen") then return end
 	row.action()
 	settle(switcher)
+	if desktop_active() ~= signature_of[id] and os.getenv("ERGOPTI_LIVE_GNOME_UNSAFE") then
+		print("diagnostic: shell view " .. capture("gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell"
+			.. " --method org.gnome.Shell.Eval 'const m = Main.panel.statusArea.keyboard._inputSourceManager;"
+			.. " JSON.stringify({current: m.currentSource && m.currentSource.id, mru: m._mruSources.map(s => s.id)})'"))
+	end
 	check(desktop_active() == signature_of[id], "choosing " .. id .. " switches the desktop to it (<AD01> types "
 		.. desktop_active() .. ", " .. id .. " types " .. signature_of[id] .. ")")
 end

@@ -6,12 +6,12 @@
   ok   gnome ticks exactly one row
   ok   the ticked row is the layout the desktop types with (q / q)
   ok   the row of xkb:fr can be chosen
-  FAIL choosing xkb:fr switches the desktop to it (<AD01> types q, xkb:fr types a)
+  ok   choosing xkb:fr switches the desktop to it (<AD01> types a, xkb:fr types a)
   ok   the row of xkb:us can be chosen
   ok   choosing xkb:us switches the desktop to it (<AD01> types q, xkb:us types q)
   ok   the row of xkb:us can be chosen
   ok   choosing xkb:us switches the desktop to it (<AD01> types q, xkb:us types q)
-  FAIL a running start selects the resume layout xkb:fr (desktop reads q)
+  ok   a running start selects the resume layout xkb:fr (desktop reads a)
   ok   a start after a paused reload keeps the pause layout xkb:us (desktop reads q)
-  FAIL resuming selects xkb:fr (<AD01> types q)
-=== 15 check(s), 3 failure(s) ===
+  ok   resuming selects xkb:fr (<AD01> types a)
+=== 15 check(s), 0 failure(s) ===
