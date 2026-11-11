@@ -330,6 +330,7 @@ return {
 	"tests.unit.modules.llm.runtime.test_runtime_source",
 	"tests.unit.modules.llm.runtime.test_runtime_source_snapshot",
 	"tests.unit.modules.llm.ollama.test_ollama_install_resolver",
+	"tests.unit.infra.test_user_private_group",
 	"tests.unit.modules.llm.ollama.test_ollama_install_authorization",
 	"tests.unit.modules.llm.ollama.test_ollama_archive_installer",
 	"tests.unit.modules.llm.ollama.test_ollama_install_files",

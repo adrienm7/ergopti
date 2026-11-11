@@ -7,6 +7,14 @@
 --- Rejects symlinks, traversal, other users' mutable ancestors and unsafe write
 --- permissions. Preparation creates only admitted missing private directories.
 --- No subprocess, daemon, download, preference write or guessed HOME is used.
+---
+--- WRITE PERMISSIONS:
+--- An ancestor writable by others is always refused. One writable by its group
+--- is admitted only when that group is the user's own private group (same name
+--- and primary gid as the user, no other member: infra/user_private_group.lua):
+--- under the Debian/Ubuntu/Fedora umask 0002 an application creates
+--- ~/.local/share that way, and only the user can write it. Any other shared
+--- group is refused. The folders this resolver creates stay owner-only.
 --- ==============================================================================
 
 local M = {}
@@ -23,20 +31,27 @@ end
 
 local function snapshot(value)
 	if type(value) ~= "table" or value.type ~= "directory" or type(value.uid) ~= "number"
-		or type(value.mode) ~= "number" or type(value.dev) ~= "number" or type(value.ino) ~= "number" then return nil end
-	return { uid = value.uid, mode = value.mode, dev = value.dev, ino = value.ino, type = value.type }
+		or (value.gid ~= nil and type(value.gid) ~= "number") or type(value.mode) ~= "number"
+		or type(value.dev) ~= "number" or type(value.ino) ~= "number" then return nil end
+	return { uid = value.uid, gid = value.gid, mode = value.mode, dev = value.dev, ino = value.ino, type = value.type }
 end
 
 local function same(first, second)
 	if not first or not second then return false end
-	for _, field in ipairs({ "uid", "mode", "dev", "ino", "type" }) do
+	for _, field in ipairs({ "uid", "gid", "mode", "dev", "ino", "type" }) do
 		if first[field] ~= second[field] then return false end
 	end
 	return true
 end
 
+local function group_writable(mode) return math.floor(mode / 16) % 2 == 1 end
+local function world_writable(mode) return math.floor(mode / 2) % 2 == 1 end
+
+--- The owner-only rule of the folders this resolver creates itself.
+--- @param mode number
+--- @return boolean
 local function safe_write_mode(mode)
-	return math.floor(mode / 16) % 2 == 0 and math.floor(mode / 2) % 2 == 0
+	return not group_writable(mode) and not world_writable(mode)
 end
 
 local function ancestors(path)
@@ -65,7 +80,9 @@ local function catalogue()
 end
 
 --- Captures a read-only per-user plan and its actual native identity receipts.
---- @param options table|nil { native, catalogue, app_dirs, environment }.
+--- @param options table|nil { native, catalogue, app_dirs, environment, private_group }:
+---   private_group(gid) -> boolean tells the user's private group (default
+---   infra/user_private_group.lua, from the system account databases).
 --- @return table|nil resolver
 --- @return string|nil reason
 function M.new(options)
@@ -107,6 +124,25 @@ function M.new(options)
 	end
 	local plan, plan_reason = Policy.posix_plan(environment, app_dirs, asset)
 	if not plan then return nil, plan_reason end
+	local private_group = options.private_group
+	if private_group == nil then private_group = require("infra.user_private_group").is_current_user_private end
+	if type(private_group) ~= "function" then return nil, "native_install_resolver_unavailable" end
+	local private_answers = {}
+
+	--- An ancestor's write bits: never others, its group only when private.
+	--- @param identity table snapshot()
+	--- @return boolean
+	local function admitted_write_mode(identity)
+		if world_writable(identity.mode) then return false end
+		if not group_writable(identity.mode) then return true end
+		-- A group bit whose group is unknown cannot be judged: refused.
+		if type(identity.gid) ~= "number" then return false end
+		if private_answers[identity.gid] == nil then
+			local called, private = pcall(private_group, identity.gid)
+			private_answers[identity.gid] = called and private == true
+		end
+		return private_answers[identity.gid]
+	end
 	local receipts, prepared, preparing = {}, false, false
 	local resolver = {}
 
@@ -125,7 +161,7 @@ function M.new(options)
 		if value then
 			if missing then return nil, "install_ancestor_substituted" end
 			if value.uid ~= uid and value.uid ~= 0 then return nil, "install_ancestor_foreign_owner" end
-			if not safe_write_mode(value.mode) then return nil, "install_ancestor_writable_by_others" end
+			if not admitted_write_mode(value) then return nil, "install_ancestor_writable_by_others" end
 			if path == plan.data_root or path:sub(1, #plan.data_root + 1) == plan.data_root .. "/" then
 				if value.uid ~= uid then return nil, "install_parent_not_owned" end
 			end
