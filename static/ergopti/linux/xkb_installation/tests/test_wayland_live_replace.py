@@ -180,7 +180,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
     def apply(self, environ: dict) -> dict:
         with mock.patch.dict(os.environ, environ):
             return installer.apply_wayland(
-                "ergol", "ergol", self.source, ["fr"], self.root, self.home, environ
+                "ergol", "ergol", self.source, ["fr"], self.root, self.home, 1, environ
             )
 
     def test_each_build_moves_gnome_to_the_other_slot_and_is_read_back(self) -> None:
@@ -201,7 +201,14 @@ class WaylandLiveReplaceTests(unittest.TestCase):
                 )
                 self.assertEqual(self.gnome("sources"), [("xkb", slot), ("xkb", "us")])
                 self.assertEqual(self.gnome("mru-sources")[0], ("xkb", slot))
-            self.assertEqual(compositor.loads, list(expected_slots))
+            # GNOME gets the slot alone, then the merged list: the same first source
+        # twice, which this polling compositor may see as one load or two.
+        distinct = [
+            slot
+            for index, slot in enumerate(compositor.loads)
+            if index == 0 or compositor.loads[index - 1] != slot
+        ]
+        self.assertEqual(distinct, list(expected_slots))
         manifest = installer.read_manifest(self.root)
         self.assertEqual(sorted(manifest), ["ergol", "ergol_live"], "two copies at most")
         for slot in ("ergol", "ergol_live"):

@@ -557,6 +557,23 @@ class X11LiveReplaceTests(unittest.TestCase):
             )
         )
 
+    def test_a_compositor_keymap_names_no_layout_and_is_read_by_content(self) -> None:
+        """gnome-unnamed-keymap: mutter gives XWayland an "(unnamed)" symbols section,
+        so the group was never found by name and every GNOME live apply ended
+        not_loaded and rolled back."""
+        held = 'xkb_symbols "(unnamed)" {\n key <AE01> { symbols[Group1]= [ 1, exclam ], symbols[Group2]= [ ampersand, 1 ] };'
+        expected = 'xkb_symbols "pc+ergol+inet(evdev)" {\n key <AE01> { type= "T", symbols[Group1]= [ ampersand, 1 ] };'
+        self.assertEqual(desktop_activation.keymap_held_group(held, expected, "ergol"), 2)
+        self.assertTrue(desktop_activation.keymap_carries_layout(held, expected, "ergol"))
+        other = expected.replace("ampersand", "7")
+        self.assertIsNone(desktop_activation.keymap_held_group(held, other, "ergol"))
+        self.assertFalse(desktop_activation.keymap_carries_layout(held, other, "ergol"))
+        named_elsewhere = held.replace("(unnamed)", "pc+us+fr:2+inet(evdev)")
+        self.assertIsNone(
+            desktop_activation.keymap_held_group(named_elsewhere, expected, "ergol"),
+            "a keymap that names its layouts is read by name only",
+        )
+
     def test_an_uninstalled_layout_is_refused_before_any_tool_runs(self) -> None:
         with self.assertRaises(installer.InstallError) as refusal:
             installer.apply_x11("ergolx", self.root, {"XDG_SESSION_TYPE": "x11"})

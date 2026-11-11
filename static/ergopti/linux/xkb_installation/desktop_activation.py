@@ -968,21 +968,49 @@ def keymap_group_symbols(keymap: str, key: str, group: int) -> list[str]:
     return [part.strip() for part in bare[-1].split(",") if part.strip()] if bare else []
 
 
+def _group_matches(held: str, held_group: int, expected: str, expected_group: int) -> bool:
+    for key in ROW_PROBE_KEYS:
+        wanted = keymap_group_symbols(expected, key, expected_group)
+        if keymap_group_symbols(held, key, held_group) != wanted:
+            return False
+    return True
+
+
+def keymap_is_unnamed(keymap: str) -> bool:
+    """Whether a server keymap names no layouts: a compositor's upload (mutter
+    gives XWayland an "(unnamed)" symbols section), read by content instead."""
+    match = _SYMBOLS_NAME.search(keymap or "")
+    return match is not None and match.group(1) == "(unnamed)"
+
+
+def keymap_held_group(held: str, expected: str, layout: str) -> int | None:
+    """The group of ``held`` that holds ``layout``: by the symbols section's
+    layout names, or, in an unnamed keymap, the first group typing the probe
+    keys exactly as ``expected`` does."""
+    named = keymap_layout_group(held, layout)
+    if named is not None or not keymap_is_unnamed(held):
+        return named
+    expected_group = keymap_layout_group(expected, layout)
+    if expected_group is None:
+        return None
+    groups = [int(number) for number in re.findall(r"symbols\[[Gg]roup(\d+)\]", held)] or [1]
+    for group in range(1, max(groups) + 1):
+        if _group_matches(held, group, expected, expected_group):
+            return group
+    return None
+
+
 def keymap_carries_layout(held: str, expected: str, layout: str) -> bool:
     """Whether the keymap ``held`` by a server types ``layout`` as compiled in ``expected``.
 
     Both are printed by ``xkbcomp``, so keysym names are spelled the same way;
     the layout may sit in another group of ``held`` (a desktop with several
     input sources)."""
-    held_group = keymap_layout_group(held, layout)
+    held_group = keymap_held_group(held, expected, layout)
     expected_group = keymap_layout_group(expected, layout)
     if held_group is None or expected_group is None:
         return False
-    for key in ROW_PROBE_KEYS:
-        wanted = keymap_group_symbols(expected, key, expected_group)
-        if keymap_group_symbols(held, key, held_group) != wanted:
-            return False
-    return True
+    return _group_matches(held, held_group, expected, expected_group)
 
 
 def apply_x11_user_tree(
@@ -1117,7 +1145,20 @@ def read_desktop_selection(desktop: str, slots: tuple[str, str]) -> DesktopSelec
     return _read_kde_selection(slots)
 
 
-def _gnome_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
+def _gnome_select(
+    slot: str, slots: tuple[str, str], selection: DesktopSelection, settle_s: float
+) -> bool:
+    """Writes the slot as the only source, waits, then the merged lists.
+
+    A running GNOME Shell (checked on 46) reads mru-sources only when it
+    starts and keeps its in-memory recent list on a sources change, so a list
+    with the slot first leaves the old layout active. The slot alone is a list
+    the shell must activate; ``settle_s`` gives it the time to read that write
+    before the merged list follows (the daemon passes the shared
+    gnome_input_source_settle_ms)."""
+    if not _gnome_set(GNOME_KEY, [("xkb", slot)], "GNOME : disposition " + slot + " seule"):
+        return False
+    time.sleep(settle_s)
     for key in (GNOME_KEY, GNOME_MRU_KEY):
         current = parse_gsettings_sources(selection.values[key]) or []
         wanted = [("xkb", slot)] + [
@@ -1192,7 +1233,7 @@ def wait_for_xwayland_keymap(spec: LayoutSpec, tree_root: Path, display: str) ->
     deadline = time.monotonic() + WAYLAND_READBACK_SECONDS
     while True:
         held = x11_loaded_keymap(display) or ""
-        if keymap_layout_group(held, spec.layout) is None:
+        if keymap_held_group(held, expected, spec.layout) is None:
             code = WAYLAND_NOT_LOADED
         elif keymap_carries_layout(held, expected, spec.layout):
             return WAYLAND_APPLIED
@@ -1218,6 +1259,7 @@ def select_live_slot(
     slots: tuple[str, str],
     selection: DesktopSelection,
     tree_root: Path,
+    gnome_settle_s: float,
     environ: dict[str, str] | None = None,
 ) -> tuple[bool, str]:
     """Selects ``slot`` through the desktop setting and proves it through XWayland.
@@ -1228,8 +1270,11 @@ def select_live_slot(
     if refusal is not None:
         return False, refusal
     display = (os.environ if environ is None else environ)["DISPLAY"]
-    select = _gnome_select if selection.desktop == "gnome" else _kde_select
-    if not select(slot, slots, selection):
+    if selection.desktop == "gnome":
+        selected = _gnome_select(slot, slots, selection, gnome_settle_s)
+    else:
+        selected = _kde_select(slot, slots, selection)
+    if not selected:
         restore_desktop_selection(selection)
         return False, WAYLAND_SELECT_REFUSED
     code = wait_for_xwayland_keymap(LayoutSpec(slot), tree_root, display)

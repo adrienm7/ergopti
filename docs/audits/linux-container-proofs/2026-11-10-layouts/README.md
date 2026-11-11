@@ -67,7 +67,7 @@ From `static/ergopti_plus/linux`:
   the shell activate the target and keeps the list, but only when the shell
   has processed each write; a gsettings client gets no acknowledgement, so the
   fix needs the session keymap (XWayland) as the acknowledgement.
-- **GNOME Shell lists no user-tree layout.** With `sources = [('xkb', 'bepo')]`
+- **Corrected 2026-11-11: GNOME Shell does list a user-tree layout** once its `rules/evdev.xml` is in `~/.config/xkb` (`bepo` became current with the new switch sequence; the earlier reading was taken too soon). The original note read: With `sources = [('xkb', 'bepo')]`
   and Bépo only in `~/.config/xkb`, mutter's XWayland keymap is Bépo with
   `ERGOPTI_SEVEN_LEVEL`, while the shell's InputSourceManager falls back to
   `us` (GnomeXkbInfo does not know the id).

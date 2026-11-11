@@ -1246,7 +1246,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       activated layout) and `mru-sources`; a failure after the first write puts the list back, coalesced writes end on
       no switch, never another layout. Left: the installer's `apply_gnome` (desktop_activation.py, W1 to W3) still
       writes the list with the layout first, which a running shell ignores; it needs the same sequence and a Python
-      reader of the shared settle constant. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
+      reader of the shared settle constant. 2026-11-11: the installer's live selection (`_gnome_select`, apply-wayland)
+      now writes the slot alone first and waits the settle time the daemon passes (`--gnome-settle-ms` from the shared
+      registry), and its XWayland read-back finds the layout by content in mutter's « (unnamed) » keymap (before, it
+      looked only for the layout's name, which mutter never writes, so every GNOME apply ended `not_loaded`). Still
+      `not_loaded` on GNOME 46 headless with both in place: one more cause is not found yet. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
 - [x] **GTK 3 Compose from the managed `~/.XCompose`.** GTK 3.24's built-in input method ignores an `include` of
       another file and aborts (« buffer overflow detected ») on a large set of multi-character outputs (Bépo has
       21,742). Done 2026-11-11, decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: the
