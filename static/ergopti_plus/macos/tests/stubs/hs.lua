@@ -1499,6 +1499,23 @@ M.webview = {
 	},
 }
 M.distributednotifications = { new = function() return { start = function() end, stop = function() end } end }
+-- SCNetworkReachability: a target is scheduled by start() and answers through
+-- its callback (target, flags); it never answers here, as before a resolution.
+M.network = {
+	reachability = {
+		flags = {
+			transientConnection = 1, reachable = 2, connectionRequired = 4, connectionOnTraffic = 8,
+			interventionRequired = 16, connectionOnDemand = 32, isLocalAddress = 65536, isDirect = 131072,
+		},
+		forHostName = function(_)
+			local target = {}
+			function target:setCallback(_) return self end
+			function target:start() return self end
+			function target:stop() return self end
+			return target
+		end,
+	},
+}
 M.alert = setmetatable({
 	show = function() return "uuid" end,
 	closeAll = function() end,
