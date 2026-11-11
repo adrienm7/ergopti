@@ -154,6 +154,43 @@ _CMJ_VersionRefusalReadsOnlyCapturedImage() {
 }
 Test("config journal: invalid boot reads only its genuine captured image", _CMJ_VersionRefusalReadsOnlyCapturedImage)
 
+; The boot refuses these files from its prepared classification without running
+; the migration, whose Refuse logged the only ERROR: the refusal went unlogged.
+_CMJ_VersionRefusalIsLogged(Status, Metadata, Expected) {
+	global _LOGGER_TEST_SINK
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Original := Metadata . '`n[script]`nlocale = "en"`n'
+	Logs := [], PreviousSink := _LOGGER_TEST_SINK
+	try {
+		AssertTrue(FSWriteDurable(Path, Original))
+		_LoggerFlushRepeats(true)
+		LoggerSetTestSink((Line) => Logs.Push(Line))
+		AssertEqual(Status, ConfigMigrateBoot(Path)["status"])
+		_LoggerFlushRepeats(true)
+		LoggerSetTestSink(PreviousSink)
+		Refusals := []
+		for Line in Logs
+			if InStr(Line, "[ERROR]") && InStr(Line, "refused (" . Status . "): " . Expected)
+				Refusals.Push(Line)
+		AssertEqual(1, Refusals.Length, "the boot logs one ERROR naming the " . Status . " refusal")
+		AssertTrue(FSUtf8ExactMatches(Path, Original), "the refused file stays byte for byte")
+	} finally {
+		LoggerSetTestSink(PreviousSink)
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: a too-old boot logs its refusal (too-old-config-refused)",
+	_CMJ_VersionRefusalIsLogged.Bind("unsupported",
+		'[_meta]`nschema_version = ' . (ConfigMigrateShippedRegistry()["oldest"] - 1),
+		"no migration path from schema v" . (ConfigMigrateShippedRegistry()["oldest"] - 1)))
+Test("config journal: a newer-schema boot logs its refusal",
+	_CMJ_VersionRefusalIsLogged.Bind("newer",
+		'[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1),
+		"the file declares schema v" . (ConfigMigrateCurrentVersion() + 1)))
+Test("config journal: an invalid-schema boot logs its refusal",
+	_CMJ_VersionRefusalIsLogged.Bind("invalid", '[_meta]`nschema_version = "invalid"',
+		"[_meta] schema_version is not a positive integer"))
+
 _CMJ_DefaultRegistryMutationRefuses() {
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
 	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
