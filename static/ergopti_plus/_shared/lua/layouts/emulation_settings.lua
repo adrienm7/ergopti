@@ -156,12 +156,15 @@ function M.operations(values, sparse_operation)
 end
 
 --- The .keylayout a driver emulates for a registry id: the installed copy when
---- the layout manager installed it (it may be newer than the app), else the copy
---- the app ships. A layout neither installed nor shipped cannot be emulated.
+--- the layout manager installed it (it may be newer than the app), the composer
+--- folder's copy of a source stored for the emulation alone, else the copy the
+--- app ships. A layout neither installed nor shipped cannot be emulated.
 --- @param id string Registry id.
 --- @param ports table { installed = id -> installed entry, read_installed = function(id) -> text|nil, err,
 ---   shipped = function(id) -> { entry, text }|nil, err, composer_id = string|nil,
----   read_emulation = function() -> decoded emulation table|nil, err (the composed layout's) }
+---   read_emulation = function() -> decoded emulation table|nil, err (the composed layout's),
+---   read_composed = function() -> { text, convention }|nil, err (the composed layout stored for
+---   the emulation alone, read while it is not installed) }
 --- @return table|nil source { id, text, convention, composer, emulation }
 --- @return string|nil err Why it cannot be read.
 function M.source(id, ports)
@@ -180,6 +183,21 @@ function M.source(id, ports)
 			result.emulation = table_
 		end
 		return result, nil
+	end
+	-- A source stored for the emulation alone is not installed: its copy lives in
+	-- the composer folder (layouts/composer.lua store).
+	if composer and type(ports.read_composed) == "function" then
+		local composed, composed_err = ports.read_composed()
+		if composed_err ~= nil then return nil, composed_err end
+		if composed ~= nil then
+			local result = { id = id, text = composed.text, convention = composed.convention, composer = true }
+			if type(ports.read_emulation) == "function" then
+				local table_, emulation_err = ports.read_emulation()
+				if emulation_err ~= nil then return nil, emulation_err end
+				result.emulation = table_
+			end
+			return result, nil
+		end
 	end
 	local shipped, err = ports.shipped(id)
 	if type(shipped) ~= "table" then return nil, err or ("the layout " .. id .. " is neither installed nor shipped") end

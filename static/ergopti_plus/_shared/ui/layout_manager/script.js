@@ -33,6 +33,7 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'composer_open',
 	'composer_save',
 	'composer_remove',
+	'composer_emulate',
 	'source_open',
 	'source_save',
 	'source_pick',
@@ -448,6 +449,7 @@ window.initData = function (data) {
 	document.getElementById('btn-compose').hidden = editor;
 	_hostPicks = data.source_pick === true;
 	_hostAppliesNav = data.nav_apply === true;
+	_hostEmulates = data.emulate === true;
 	window.updateState(data.state);
 };
 
@@ -469,6 +471,8 @@ let _pendingNav = null;
 let _hostAppliesNav = false;
 // Whether the host opens files in a native panel (macOS), from initData.
 let _hostPicks = false;
+// Whether the host emulates a source without installing it (composer_emulate), from initData.
+let _hostEmulates = false;
 
 /** Shows the editor or the layout list. */
 function showEditor(visible) {
@@ -499,11 +503,29 @@ function hostInstall(payload) {
 			reject({ code: 'save_busy', path: 'composer_save' });
 			return;
 		}
-		_pendingInstall = { resolve: resolve, reject: reject };
+		_pendingInstall = { resolve: resolve, reject: reject, action: 'composer_save' };
 		const message = { source: payload.source, keylayout: payload.keylayout, use: true };
 		// The drivers perform the source's emulation table for what the .keylayout cannot hold.
 		if (payload.emulation !== undefined) message.emulation = payload.emulation;
 		send('composer_save', undefined, message);
+	});
+}
+
+/**
+ * « Emulate without installing »: stores the editor's source for the driver's
+ * layout emulation alone (composer_emulate) and turns the emulation onto it;
+ * settles on the composerResult that answers it.
+ */
+function hostEmulate(payload) {
+	return new Promise(function (resolve, reject) {
+		if (_pendingInstall || _pendingSave) {
+			reject({ code: 'save_busy', path: 'composer_emulate' });
+			return;
+		}
+		_pendingInstall = { resolve: resolve, reject: reject, action: 'composer_emulate' };
+		const message = { source: payload.source, keylayout: payload.keylayout };
+		if (payload.emulation !== undefined) message.emulation = payload.emulation;
+		send('composer_emulate', undefined, message);
 	});
 }
 
@@ -537,7 +559,7 @@ function routeComposerResults() {
 	const composerResult = window.composerResult;
 	window.composerResult = function (result) {
 		const pending = _pendingInstall;
-		if (!pending || !result || result.action !== 'composer_save') {
+		if (!pending || !result || result.action !== pending.action) {
 			if (typeof composerResult === 'function') composerResult(result);
 			return;
 		}
@@ -622,6 +644,7 @@ window.sourceData = function (data) {
 	_editor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
 		saveFile: hostSave,
 		install: hostInstall,
+		emulate: _hostEmulates ? hostEmulate : null,
 		loadSources: hostSources,
 		pickFile: _hostPicks ? hostPick : null,
 		applyNav: _hostAppliesNav ? hostApplyNav : null,

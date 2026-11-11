@@ -88,7 +88,8 @@ function M.register(helpers)
 		local DEFAULTS = { composer = { id = "composed", folder = "layout_composer",
 			declaration_file = "composition.json", max_declaration_bytes = 8192,
 			source_file = "layout_source.toml", max_source_bytes = 262144,
-			emulation_file = "layout_source_emulation.json", max_emulation_bytes = 262144, family = "composed" } }
+			emulation_file = "layout_source_emulation.json", max_emulation_bytes = 262144,
+			keylayout_file = "layout_source.keylayout", family = "composed" } }
 
 		--- A copy of the defaults with one composer field changed.
 		local function with(field, value)
@@ -108,6 +109,8 @@ function M.register(helpers)
 				{ with("source_file", "../x.toml") }, { with("max_source_bytes", 0) },
 				{ with("emulation_file", "../x.json") }, { with("emulation_file", "layout_source.toml") },
 				{ with("emulation_file", "composition.json") }, { with("max_emulation_bytes", 0) },
+				{ with("keylayout_file", nil) }, { with("keylayout_file", "../x.keylayout") },
+				{ with("keylayout_file", "layout_source.toml") }, { with("keylayout_file", "composition.json") },
 			}) do
 				local value, err = Composer.settings(bad[1])
 				helpers.assert_nil(value)
@@ -181,6 +184,77 @@ function M.register(helpers)
 			helpers.assert_eq(entry.platforms, { "linux" })
 			helpers.assert_eq(entry.sha256, string.rep("0", 64))
 			helpers.assert_eq(entry.version, Composer.RECORD_VERSION)
+		end)
+
+		-- A layout source stored for the emulation alone (« Emulate without installing »).
+		local Toml = require("toml_codec")
+		local Settings = require("layouts.emulation_settings")
+		local SOURCE = 'format = "ergopti-layout"\nversion = 1\n[layout]\nid = "mine"\nname = "Mine"\n'
+		local function store_env(files)
+			local logs = {}
+			local env = {
+				settings = settings, max_file_bytes = 100000, platform = "linux", config_dir = "/cfg/",
+				decode_json = Json.decode, decode_toml = Toml.decode,
+				exists = function(path) return files[path] ~= nil end,
+				read = function(path) return files[path] end,
+				write = function(path, text) files[path] = text return true end,
+				delete = function(path) files[path] = nil return true end,
+				install = function() error("the emulation alone must not install anything") end,
+				select = function() error("the emulation alone must not select an input source") end,
+				log = function(level, message, ...) logs[#logs + 1] = level .. ": " .. string.format(message, ...) end,
+			}
+			return Composer.new(env), logs
+		end
+
+		helpers.it("(shared-helpers-contract) stores a source to emulate without installing it", function()
+			local files = { ["/cfg/layout_composer/composition.json"] = "{}" }
+			local operations = store_env(files)
+			local result
+			operations.store({ source = SOURCE, keylayout = keylayout("mine", "x") },
+				function(ok, code, detail, id) result = { ok = ok, code = code, detail = detail, id = id } end)
+			helpers.assert_eq(result, { ok = true, id = "composed" })
+			helpers.assert_eq(files["/cfg/layout_composer/layout_source.toml"], SOURCE)
+			helpers.assert_eq(files["/cfg/layout_composer/layout_source.keylayout"], keylayout("mine", "x"))
+			helpers.assert_nil(files["/cfg/layout_composer/composition.json"], "one composed layout at a time")
+			local composed, err = Composer.read_composed(settings, "/cfg/", 100000,
+				{ exists = function(path) return files[path] ~= nil end, read = function(path) return files[path] end,
+					decode_toml = Toml.decode })
+			helpers.assert_nil(err)
+			helpers.assert_eq(composed, { text = keylayout("mine", "x"), convention = "iso" })
+		end)
+
+		helpers.it("(shared-helpers-contract) refuses to emulate what is not a source the composer accepts", function()
+			for _, case in ipairs({
+				{ "a composition", { declaration = declaration(), keylayout = keylayout("My Layout", "composed") } },
+				{ "a layout of another name", { source = SOURCE, keylayout = keylayout("other", "x") } },
+				{ "an emulation table of another platform", { source = SOURCE, keylayout = keylayout("mine", "x"),
+					emulation = Json.encode({ layout = "mine", platform = "macos", keys = {} }) } },
+			}) do
+				local files = {}
+				local operations = store_env(files)
+				local result
+				operations.store(case[2], function(ok, code) result = { ok = ok, code = code } end)
+				helpers.assert_eq(result, { ok = false, code = Composer.FAILURE_INVALID }, case[1])
+				helpers.assert_eq(next(files), nil, case[1] .. ": nothing is written")
+			end
+		end)
+
+		helpers.it("(shared-helpers-contract) the emulation reads the stored copy while the composed layout is not installed", function()
+			local ports = { installed = {}, composer_id = "composed",
+				read_installed = function() error("nothing is installed") end,
+				shipped = function() return nil, "not shipped" end,
+				read_composed = function() return { text = "<stored/>", convention = "ansi" }, nil end,
+				read_emulation = function() return { layout = "mine" }, nil end }
+			local source = Settings.source("composed", ports)
+			helpers.assert_eq(source, { id = "composed", text = "<stored/>", convention = "ansi", composer = true,
+				emulation = { layout = "mine" } })
+			ports.read_composed = function() return nil, nil end
+			local none, err = Settings.source("composed", ports)
+			helpers.assert_nil(none)
+			helpers.assert_eq(err, "not shipped", "neither installed, stored nor shipped")
+			ports.installed = { composed = { keycode_convention = "iso" } }
+			ports.read_installed = function() return "<installed/>" end
+			helpers.assert_eq(Settings.source("composed", ports).text, "<installed/>", "an installed copy comes first")
 		end)
 	end)
 end
