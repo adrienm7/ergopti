@@ -33,6 +33,8 @@ local M = {}
 
 local KeyCombinations = require("tap_hold.key_combinations")
 
+--- The file's name in a driver's configuration folder (shared_file.toml [layout]).
+M.FILE_NAME = "tap_hold.toml"
 --- The sections the file holds (shared_file.toml [layout]).
 M.TAP_HOLD = "tap_hold"
 M.COMBOS = "mod_combos"
@@ -82,7 +84,8 @@ local OPAQUE = {}
 --- @return table spec `{ order = { names }, rank = { name = index }, hs_names, hs_hold_actions }`.
 function M.parse_spec(decoded)
 	local layout = type(decoded) == "table" and decoded.layout
-	if type(layout) ~= "table" or layout.tap_hold_section ~= M.TAP_HOLD or layout.combos_section ~= M.COMBOS
+	if type(layout) ~= "table" or layout.file_name ~= M.FILE_NAME
+		or layout.tap_hold_section ~= M.TAP_HOLD or layout.combos_section ~= M.COMBOS
 		or layout.karabiner_section ~= M.KARABINER or layout.meta_section ~= M.META then
 		error("shared tap-hold file spec: [layout] does not name the sections this reader writes", 0)
 	end
