@@ -685,6 +685,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_shortcuts.ahk
 #Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
+#Include unit/modules/shortcuts/test_keepawake_pause_gate.ahk
 #Include unit/suite/test_runner_shard.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
