@@ -31,7 +31,7 @@ def batch(number, offset, ending):
         "BEGIN TRANSACTION;\n"
     )
     rows = "".join(
-        "INSERT OR IGNORE INTO events_system VALUES "
+        "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES "
         f"('{DEVICE}',{event},'{DATE} 12:00:00','{DATE}','wake',"
         f'\'{{"pad":"{"x" * 1000}"}}\');\n'
         for event in range(number * ROWS_PER_BATCH, (number + 1) * ROWS_PER_BATCH)
@@ -109,7 +109,7 @@ class StartupReplayTests(unittest.TestCase):
             outbox = (
                 f"-- === ingest batch {DATE} 12:00:00.000 (offset {ROWS} -> {ROWS + 1}, 1 entry(ies)) ===\n"
                 "BEGIN TRANSACTION;\n"
-                f"INSERT OR IGNORE INTO events_system VALUES ('{DEVICE}',{ROWS},"
+                f"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('{DEVICE}',{ROWS},"
                 f"'{DATE} 12:00:00','{DATE}','wake','{{}}');\nCOMMIT;\n"
             )
             with sqlite3.connect(Path(temporary) / "cache.sqlite") as database:

@@ -33,8 +33,9 @@ local function child()
  local aggregator = helpers.load_with_stubs('modules.keystats.aggregator', { sqlite3 = sqlite, json = json })
  aggregator.init({ device_id = 'device' }); package.loaded['modules.keystats.aggregator'] = aggregator
  local typing = { type = 'typing', timestamp = '2026-11-06 09:00:00.000', app = 'Editor', text = 'a', events = { { 'a', 100, {} } } }
+ -- The tombstone's UTC instant is its local time's, as metrics_maintenance renders it (KMD-1).
  local tombstone = { type = 'system_event', action = 'metrics_purge', timestamp = '2026-11-06 10:00:00.000',
-  utc = '2026-11-06 09:00:00' }
+  utc = (require('keystats.local_time').from_local('2026-11-06 10:00:00.000')) }
  local batches, offset = { { { entry = typing } }, { { entry = tombstone } } }, 0
  package.loaded['modules.keystats.rotation'] = { get_date = function() return '2026-11-06' end,
   get_offset = function() return offset end, set_offset = function(n) offset = n end,

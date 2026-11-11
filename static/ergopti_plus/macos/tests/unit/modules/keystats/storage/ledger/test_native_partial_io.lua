@@ -33,9 +33,9 @@ with tempfile.TemporaryDirectory(prefix="ergopti-ledger-partial-") as temporary:
     cache=folder/"ergopti_metrics/device";cache.mkdir(parents=True)
     ledger=device/"data.sql";database=cache/"db.sqlite"
     prefix="-- canonical existing prefix\nBEGIN TRANSACTION;\n"
-    prefix+="INSERT OR IGNORE INTO events_system VALUES ('device',0,'2026-10-19 12:00:00','2026-10-19','sleep','{}');\nCOMMIT;\n"
+    prefix+="INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('device',0,'2026-10-19 12:00:00','2026-10-19','sleep','{}');\nCOMMIT;\n"
     batch="\n-- === ingest batch 2026-10-20 12:00:00.000 (offset 0 -> 123, 100 entry(ies)) ===\nBEGIN TRANSACTION;\n"
-    batch+="".join("INSERT OR IGNORE INTO events_system VALUES ('device',%d,'2026-10-20 12:00:00','2026-10-20','wake','{\"pad\":\"%s\"}');\n"%(i,"x"*80) for i in range(1,101))+"COMMIT;\n"
+    batch+="".join("INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('device',%d,'2026-10-20 12:00:00','2026-10-20','wake','{\"pad\":\"%s\"}');\n"%(i,"x"*80) for i in range(1,101))+"COMMIT;\n"
     ledger.write_text(prefix)
     (device/"device.json").write_text(json.dumps({"device_id":"device","host_signature":"fixture-host-identity"}))
     with sqlite3.connect(database) as db:

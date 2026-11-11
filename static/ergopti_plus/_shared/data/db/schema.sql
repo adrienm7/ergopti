@@ -66,6 +66,16 @@ CREATE TABLE IF NOT EXISTS devices (
 -- Per-device autoincrement: the `id` column is unique per `device_id`. The
 -- ingest pipeline assigns IDs sequentially while reading today.log so the
 -- generated INSERTs are deterministic.
+--
+-- Time (maintainer decision KMD-1 of 2026-11-11): `ts` is the row's instant in
+-- UTC and `utc_offset_min` the local UTC offset, in minutes, in force when it
+-- was recorded; `date` is the local day. Hour-of-day, night wakes and a day
+-- read from `ts` use ts + utc_offset_min, the local time the user lived
+-- (_shared/lua/keystats/local_time.lua). A row recorded before the column
+-- existed has NULL: its Linux `ts` held UTC and is read with the reading
+-- device's current offset, a macOS or Windows `ts` held local time. Each
+-- driver adds the column to an older store on open (the last column of the
+-- table there and here).
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS events_typing (
@@ -92,6 +102,7 @@ CREATE TABLE IF NOT EXISTS events_typing (
 	text               TEXT NOT NULL,
 	rich_text          TEXT,
 	events_json        TEXT NOT NULL,                 -- compact JSON of the per-keystroke array
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_typing_date_app    ON events_typing(date, app);
@@ -109,6 +120,7 @@ CREATE TABLE IF NOT EXISTS events_app_switch (
 	prev_app    TEXT,
 	next_app    TEXT,
 	duration_ms INTEGER NOT NULL,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_app_switch_date ON events_app_switch(date);
@@ -122,6 +134,7 @@ CREATE TABLE IF NOT EXISTS events_window_switch (
 	prev_title  TEXT,
 	next_title  TEXT,
 	duration_ms INTEGER NOT NULL,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 
@@ -132,6 +145,7 @@ CREATE TABLE IF NOT EXISTS events_shortcut (
 	date      TEXT NOT NULL,
 	app       TEXT NOT NULL,
 	key       TEXT NOT NULL,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_shortcut_date_app ON events_shortcut(date, app);
@@ -143,6 +157,7 @@ CREATE TABLE IF NOT EXISTS events_system (
 	date          TEXT NOT NULL,
 	action        TEXT NOT NULL,                     -- sleep|wake|lock|unlock|wifi_change|power_change|audio_change|space_change|system_load
 	metadata_json TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_system_date_action ON events_system(date, action);
@@ -158,6 +173,7 @@ CREATE TABLE IF NOT EXISTS events_hotstring (
 	replacement      TEXT NOT NULL,
 	h_type           TEXT,
 	net_saved_chars  INTEGER,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_hotstring_date_kind ON events_hotstring(date, kind);
@@ -182,6 +198,7 @@ CREATE TABLE IF NOT EXISTS events_llm (
 	completion_tokens    INTEGER,
 	total_tokens         INTEGER,
 	est_cost_usd         REAL,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_llm_date_kind ON events_llm(date, kind);
@@ -193,6 +210,7 @@ CREATE TABLE IF NOT EXISTS events_session (
 	date        TEXT NOT NULL,
 	kind        TEXT NOT NULL CHECK (kind IN ('session_start','session_end','idle_start','idle_end')),
 	duration_ms INTEGER,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 
@@ -204,6 +222,7 @@ CREATE TABLE IF NOT EXISTS events_mouse (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_mouse_date ON events_mouse(date);
@@ -216,6 +235,7 @@ CREATE TABLE IF NOT EXISTS events_ergo (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_ergo_date ON events_ergo(date);
@@ -228,6 +248,7 @@ CREATE TABLE IF NOT EXISTS events_window_topo (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_window_topo_date ON events_window_topo(date);
@@ -246,6 +267,7 @@ CREATE TABLE IF NOT EXISTS events_av (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_av_date ON events_av(date);
@@ -258,6 +280,7 @@ CREATE TABLE IF NOT EXISTS events_network (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_network_date ON events_network(date);
@@ -270,6 +293,7 @@ CREATE TABLE IF NOT EXISTS events_clipboard (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_clipboard_date ON events_clipboard(date);
@@ -282,6 +306,7 @@ CREATE TABLE IF NOT EXISTS events_roi (
 	kind        TEXT NOT NULL,
 	app         TEXT NOT NULL,
 	meta_json   TEXT,
+	utc_offset_min INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer' AND utc_offset_min BETWEEN -1080 AND 1080)),
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_roi_date ON events_roi(date);

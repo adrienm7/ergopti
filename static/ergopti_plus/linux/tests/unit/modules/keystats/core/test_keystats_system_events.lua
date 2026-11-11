@@ -182,6 +182,85 @@ helpers.describe("keystats system events: the writer", function()
 	end)
 end)
 
+-- KMD-1 (decided by the maintainer on 2026-11-11): a raw row stores its UTC
+-- instant and the local offset it was recorded at; an older store gains the
+-- column on open, and the purge compares each row in its own clock.
+helpers.describe("keystats system events: the UTC offset column", function()
+	local has_sqlite = os.execute("command -v sqlite3 >/dev/null 2>&1")
+	local function with_store(prepare, body)
+		if not (has_sqlite == true or has_sqlite == 0) then return end
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			assert(os.execute("mkdir -p '" .. dir .. "'"))
+			if prepare then prepare(dir .. "/metrics.sqlite") end
+			helpers.assert_true(writer.open_db(dir .. "/metrics.sqlite"))
+			body(writer)
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end
+
+	it("linux-utc-offset: a stored row carries the offset of its UTC instant", function()
+		with_store(nil, function(writer)
+			local LocalTime = require("keystats.local_time")
+			helpers.assert_true(writer.insert_system_events("owned-device", {
+				{ ts = "2026-07-01 12:00:00", date = "2026-07-01", action = "lock" },
+				{ ts = "2026-01-01 12:00:00", date = "2026-01-01", action = "unlock" },
+			}))
+			helpers.assert_eq(writer.query_rows("SELECT utc_offset_min FROM events_system ORDER BY id;"), {
+				tostring(LocalTime.offset_of_utc("2026-07-01 12:00:00")),
+				tostring(LocalTime.offset_of_utc("2026-01-01 12:00:00")) })
+		end)
+	end)
+
+	it("linux-utc-offset: a store created before the column gains it, with the current purge triggers", function()
+		local function older_store(path)
+			local Paths = require("infra.paths")
+			local file = assert(io.open(Paths.shared("data/db/schema.sql"), "r"))
+			local schema = file:read("*a"):gsub("\n\tutc_offset_min INTEGER[^\n]*", "")
+			file:close()
+			local pipe = assert(io.popen("sqlite3 '" .. path .. "' >/dev/null", "w"))
+			-- A trigger of the same name written before the column, which the
+			-- shared purge schema (CREATE TRIGGER IF NOT EXISTS) would keep.
+			pipe:write(schema .. "\nCREATE TRIGGER metrics_purge_guard_typing BEFORE INSERT ON events_typing "
+				.. "WHEN NEW.ts <= '0' BEGIN SELECT RAISE(IGNORE); END;\n")
+			pipe:close()
+		end
+		with_store(older_store, function(writer)
+			local UtcOffsetColumn = require("keystats.utc_offset_column")
+			local rows = writer.query_rows("SELECT count(*) FROM pragma_table_info('events_system') WHERE name='utc_offset_min';")
+			helpers.assert_eq(rows, { "1" })
+			for _, name in ipairs(UtcOffsetColumn.TABLES) do
+				helpers.assert_eq(writer.query_rows("SELECT count(*) FROM pragma_table_info('" .. name
+					.. "') WHERE name='utc_offset_min';"), { "1" }, name)
+			end
+			helpers.assert_eq(writer.query_rows("SELECT instr(sql, 'utc_offset_min') > 0 FROM sqlite_master "
+				.. "WHERE name='metrics_purge_guard_typing';"), { "1" }, "the guard is the current one")
+		end)
+	end)
+
+	it("linux-utc-offset: a purge compares a row with an offset in UTC, an older macOS row in local time", function()
+		with_store(nil, function(writer)
+			helpers.assert_true(writer.query_rows(table.concat({
+				"INSERT INTO devices (device_id, name, os, host_signature, created_at, updated_at) VALUES "
+					.. "('mac', 'Mac', 'darwin', 's', 'x', 'x');",
+				-- A macOS tombstone of before the column: 10:00 local, 09:00 UTC
+				"INSERT INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('mac', 1, "
+					.. "'2026-11-05 10:00:00.000', '2026-11-05', 'metrics_purge', '{\"utc\":\"2026-11-05 09:00:00.000\"}');",
+				"INSERT INTO events_system (device_id, id, ts, date, action, utc_offset_min) VALUES "
+					.. "('mac', 2, '2026-11-05 09:30:00.000', '2026-11-05', 'lock', 60), "
+					.. "('mac', 3, '2026-11-05 08:30:00.000', '2026-11-05', 'lock', 60), "
+					.. "('mac', 4, '2026-11-05 09:30:00.000', '2026-11-05', 'lock', NULL);",
+			}, "\n")) ~= nil)
+			helpers.assert_eq(writer.query_rows("SELECT id FROM events_system WHERE action='lock' ORDER BY id;"), { "2" },
+				"09:30 UTC follows the 09:00 UTC purge; 08:30 UTC and an older 09:30 local precede it")
+		end)
+	end)
+end)
+
 -- KMD-3 (decided by the maintainer on 2026-11-11): the days this device
 -- recorded with sampled uptime are cleared once, with the definition and its
 -- first date recorded, so they are never added to keep-awake time.

@@ -35,6 +35,7 @@
 local M = {}
 
 local NetworkTransitions = require("keystats.network_transitions")
+local LocalTime = require("keystats.local_time")
 local hs      = hs
 local fs      = require("hs.fs")
 local NativePath = require("native_path")
@@ -1732,6 +1733,18 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 			return true
 		end
 		local quoted_device = _sq(replay_device_id)
+		-- A row's hour, night wake and day are read in the local time its user
+		-- lived: its UTC ts plus its recorded offset (keystats.local_time,
+		-- maintainer decision KMD-1). A Linux row recorded before the column held
+		-- UTC and is read with this Mac's current offset, which the log notes.
+		local device_os
+		for row in db:nrows("SELECT os FROM devices WHERE device_id=" .. quoted_device) do device_os = row.os end
+		local legacy_utc, current_offset, legacy_rows = device_os == "linux", LocalTime.offset_at(os.time()), 0
+		local function lived(row)
+			local offset = math.tointeger(row.utc_offset_min)
+			if offset == nil and legacy_utc then legacy_rows = legacy_rows + 1 end
+			return LocalTime.local_ts(row.ts, offset, legacy_utc, current_offset)
+		end
 		local ok, replay_err = pcall(function()
 			local cutoffs = boundary_maps[replay_device_id]
 			local first_segment = start ~= nil and start.stage == "typing" and start.segment or 1
@@ -1742,7 +1755,7 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 					local range = previous ~= nil and (" AND id>" .. tostring(previous)) or ""
 					if upper ~= nil then range = range .. " AND id<=" .. tostring(upper) end
 					range = range .. after_resume_point("typing", segment)
-					for row in db:nrows("SELECT ts, app, title, layout, events_json, id FROM events_typing WHERE device_id="
+					for row in db:nrows("SELECT ts, app, title, layout, events_json, id, utc_offset_min FROM events_typing WHERE device_id="
 						.. quoted_device .. range .. " ORDER BY ts, id") do
 						local decrypt_ok, plaintext = pcall(TextCipher.decrypt, row.events_json)
 						if not decrypt_ok or type(plaintext) ~= "string" then error("typing event decryption failed", 0) end
@@ -1763,7 +1776,7 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 						for index = 1, count do
 							if events[index] == nil then error("typing event shape refused", 0) end
 						end
-						Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
+						Aggregator.walk_typing({ timestamp=lived(row), app=row.app, title=row.title, layout=row.layout, events=events })
 						plaintext = nil
 						reached("typing", segment, row)
 						if not walked() then error("typing aggregate flush failed") end
@@ -1783,27 +1796,27 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 				end
 			end
 			if due("app_switch") then
-				for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms, id FROM events_app_switch WHERE device_id=" .. quoted_device .. after_resume_point("app_switch", 1) .. " ORDER BY ts, id") do
-					Aggregator.walk_app_switch({ timestamp=row.ts, prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
+				for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms, id, utc_offset_min FROM events_app_switch WHERE device_id=" .. quoted_device .. after_resume_point("app_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_app_switch({ timestamp=lived(row), prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
 					reached("app_switch", 1, row)
 					if not walked() then error("app-switch aggregate flush failed") end
 				end
 			end
 			if due("window_switch") then
-				for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms, id FROM events_window_switch WHERE device_id=" .. quoted_device .. after_resume_point("window_switch", 1) .. " ORDER BY ts, id") do
-					Aggregator.walk_window_switch({ timestamp=row.ts, app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
+				for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms, id, utc_offset_min FROM events_window_switch WHERE device_id=" .. quoted_device .. after_resume_point("window_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_window_switch({ timestamp=lived(row), app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
 					reached("window_switch", 1, row)
 					if not walked() then error("window-switch aggregate flush failed") end
 				end
 			end
 			if due("system") then
-				for row in db:nrows("SELECT ts, action, metadata_json, id FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
+				for row in db:nrows("SELECT ts, action, metadata_json, id, utc_offset_min FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
 					local entry = {}
 					local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
 					if decoded_ok and type(metadata) == "table" then
 						for key, value in pairs(metadata) do entry[key] = value end
 					end
-					entry.timestamp, entry.action = row.ts, row.action
+					entry.timestamp, entry.action = lived(row), row.action
 					Aggregator.walk_system_event(entry)
 					reached("system", 1, row)
 					if not walked() then error("system aggregate flush failed") end
@@ -1812,11 +1825,11 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 			-- Windows records its Wi-Fi changes as network_change rows; its own
 			-- rebuild counts the transitions among them with the rows above.
 			if due("network") then
-				for row in db:nrows("SELECT ts, kind, meta_json, id FROM events_network WHERE device_id=" .. quoted_device .. after_resume_point("network", 1) .. " ORDER BY ts, id") do
+				for row in db:nrows("SELECT ts, kind, meta_json, id, utc_offset_min FROM events_network WHERE device_id=" .. quoted_device .. after_resume_point("network", 1) .. " ORDER BY ts, id") do
 					if row.kind == "network_change" then
 						local decoded_ok, metadata = pcall(json.decode, row.meta_json or "{}")
 						if decoded_ok and NetworkTransitions.is_wifi_change(metadata) then
-							Aggregator.walk_system_event({ timestamp = row.ts, action = "wifi_change" })
+							Aggregator.walk_system_event({ timestamp = lived(row), action = "wifi_change" })
 						end
 					end
 					reached("network", 1, row)
@@ -1824,6 +1837,10 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 				end
 			end
 			if not flush_if_needed(true) then error("final aggregate flush failed") end
+			if legacy_rows > 0 then
+				Logger.info(LOG, "%d row(s) of Linux device %s predate the UTC offset column; read with this Mac's offset (%+d min).",
+					legacy_rows, tostring(replay_device_id), current_offset)
+			end
 		end)
 		if not ok then
 			Aggregator.set_device_id(_device_id)

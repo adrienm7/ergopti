@@ -3719,6 +3719,9 @@ function _maintenance.advance()
 		end
 		local Maintenance = require("keystats.metrics_maintenance")
 		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)
+		-- Linux rows stamp ts in UTC; the writer stores the offset of that
+		-- instant, from which the purge reads the tombstone's local time (KMD-1).
+		request.tombstone.ts = request.tombstone.metadata.utc
 		_pending_system_events[#_pending_system_events + 1] = request.tombstone
 		flush_dispatch()
 	end)

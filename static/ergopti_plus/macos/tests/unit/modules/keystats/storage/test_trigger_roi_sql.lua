@@ -33,9 +33,11 @@ helpers.describe("trigger ROI SQLite events", function()
 					end
 					local encoded = Json.encode(meta)
 					helpers.assert_eq(Json.decode(encoded), meta)
+					-- Stored in UTC with the offset in force then (KMD-1).
+					local utc, offset = require("keystats.local_time").from_local(event.timestamp)
 					local expected = Queries.render("events.roi", "native", {
-						device_id = "nil", id = index, ts = event.timestamp, date = "2026-11-07",
-						kind = event.type, app = event.app, meta_json = encoded,
+						device_id = "nil", id = index, ts = utc, date = "2026-11-07",
+						kind = event.type, app = event.app, meta_json = encoded, utc_offset_min = offset,
 					})
 					helpers.assert_eq(writer.build_inserts(event), { expected })
 				end
