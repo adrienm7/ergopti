@@ -180,7 +180,8 @@ const SWIFT_ENUM = {
 	field_report: 'FieldReport',
 	macos_notifications: 'MacosNotifications'
 };
-for (const group of SWIFT_GROUPS) if (!SWIFT_ENUM[group]) fail(`group "${group}" has no Swift enum name.`);
+for (const group of SWIFT_GROUPS)
+	if (!SWIFT_ENUM[group]) fail(`group "${group}" has no Swift enum name.`);
 const camel = (key) => key.replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
 const swift = `${BANNER('//')}
 
