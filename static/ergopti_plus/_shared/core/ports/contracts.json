@@ -940,6 +940,7 @@
 			"interleaved",
 			"key_delay",
 			"ledger_size",
+			"load",
 			"lost",
 			"lua",
 			"mode",
