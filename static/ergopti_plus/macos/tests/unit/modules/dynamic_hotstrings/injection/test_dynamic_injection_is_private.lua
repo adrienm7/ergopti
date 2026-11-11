@@ -88,6 +88,7 @@ helpers.describe("personal_info: the @-tag expansion reaches inject_dynamic mark
 		local interceptor
 		local fake_km = {
 			register_interceptor      = function(fn) interceptor = fn end,
+			dynamic_rule_within_delay      = function() return true end,
 			register_preview_provider = function() end,
 			inject_dynamic = function(...)
 				captured.n         = select("#", ...)
@@ -153,6 +154,7 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 			register_lua_group        = function() end,
 			set_post_load_hook        = function() end,
 			register_interceptor      = function(fn) interceptor = fn end,
+			dynamic_rule_within_delay      = function() return true end,
 			register_preview_provider = function() end,
 			registry_transaction      = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function(...)
