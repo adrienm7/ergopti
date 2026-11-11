@@ -267,6 +267,69 @@ helpers.describe("keymap: the hotstring cascade", function()
 		helpers.assert_true(not log.transactions[1].is_private, "and the transaction stays the first one's")
 	end)
 
+	-- The link is the typed matcher's winner, never a lower candidate reached by
+	-- skipping it: Windows (HSE_FindMatchAtEnd, then _HSE_IsCascadeLink) and the
+	-- shared engine (select_match, then the private/key refusal) stop the chain
+	-- when the winner cannot be a link. macOS filtered the bucket on "is a link"
+	-- before matching, so the longer private `xcd` was stepped over and the
+	-- shorter `cd` fired, a rule a typed `xcd` would never reach.
+	helpers.it("a private winner ends the chain instead of yielding to a shorter link (cascade-link-is-the-winner)", function()
+		local state, expander, log = fresh_engine({
+			{ "ab", "cd" },
+			{ "xcd", "P", { is_private = true } },
+			{ "cd", "ef" },
+		}, 3)
+		state.buffer = "x"
+		type_string(state, expander, "ab")
+		helpers.assert_eq("xcd", state.buffer, "the private winner stops the chain")
+		helpers.assert_eq(1, #log.transactions)
+		helpers.assert_eq("cd", log.transactions[1].typed, "only the first expansion is typed")
+	end)
+
+	helpers.it("a key-output winner ends the chain instead of yielding to a shorter link (cascade-link-is-the-winner)", function()
+		local state, expander = fresh_engine({
+			{ "ab", "cd" },
+			{ "xcd", "Q{Left}" },
+			{ "cd", "ef" },
+		}, 3)
+		state.buffer = "x"
+		type_string(state, expander, "ab")
+		helpers.assert_eq("xcd", state.buffer, "a key output is no link and masks the shorter rule")
+	end)
+
+	helpers.it("a final no-op winner ends the chain (cascade-link-is-the-winner)", function()
+		local state, expander = fresh_engine({
+			{ "ab", "cd" },
+			{ "xcd", "xcd", { final_result = true } },
+			{ "cd", "ef" },
+		}, 3)
+		state.buffer = "x"
+		type_string(state, expander, "ab")
+		helpers.assert_eq("xcd", state.buffer, "a final entry that changes nothing masks the lower link")
+	end)
+
+	helpers.it("a final end-character entry of higher priority holds an auto link back (cascade-link-is-the-winner)", function()
+		local state, expander = fresh_engine({
+			{ "ab", "cd" },
+			{ "cd", "CD", { auto_expand = false, final_result = true, priority = 5 } },
+			{ "cd", "ef", { priority = 1 } },
+		}, 3)
+		state.buffer = ""
+		type_string(state, expander, "ab")
+		helpers.assert_eq("cd", state.buffer, "the auto link waits, as a typed cd would")
+	end)
+
+	helpers.it("a final end-character entry of lower priority leaves the auto link alone (cascade-link-is-the-winner)", function()
+		local state, expander = fresh_engine({
+			{ "ab", "cd" },
+			{ "cd", "CD", { auto_expand = false, final_result = true, priority = 1 } },
+			{ "cd", "ef", { priority = 5 } },
+		}, 3)
+		state.buffer = ""
+		type_string(state, expander, "ab")
+		helpers.assert_eq("ef", state.buffer, "the control: priority decides, as on a typed cd")
+	end)
+
 	helpers.it("a private first hotstring starts no chain", function()
 		local state, expander = fresh_engine({
 			{ "ab", "cd", { is_private = true } },

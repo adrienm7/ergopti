@@ -32,7 +32,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 					"symbol": "function M.try_repeat_feature",
-					"sha256": "9e65c105587d836960da6534021d6e6a88f7e6acb9fa06bd29ab343738902afe"
+					"sha256": "333801081620d8cce9bc13076d68e8849380374a00121286f41845afdc6cc1e2"
 				}
 			],
 			"linux": [
@@ -132,7 +132,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 					"symbol": "function M.try_repeat_feature",
-					"sha256": "9e65c105587d836960da6534021d6e6a88f7e6acb9fa06bd29ab343738902afe"
+					"sha256": "333801081620d8cce9bc13076d68e8849380374a00121286f41845afdc6cc1e2"
 				},
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",

@@ -910,6 +910,29 @@ end
 -- ===============================
 -- ===============================
 
+--- Whether a final end-character entry holds an immediate candidate back: the
+--- immediate one would fire on the last letter, before the end character the
+--- final entry of strictly higher priority is waiting for. The shared engine's
+--- final_end_outranks applies the same rule.
+--- @param m table The immediate mapping.
+--- @param buffer string The buffer it matched against.
+--- @return boolean
+local function final_end_outranks(m, buffer)
+	local ok, off = pcall(utf8.offset, buffer, -1)
+	if not ok or not off then return false end
+	local bucket = _registry.mappings_for_tail(buffer:sub(off):lower())
+	if not bucket then return false end
+	local own_priority = m.priority or 0
+	for _, candidate in ipairs(bucket) do
+		if not candidate.auto and candidate.final_result and mapping_group_active(candidate)
+			and candidate.tlen >= m.tlen and (candidate.priority or 0) > own_priority then
+			local eff_plain, _, _, is_noop = M.would_fire(candidate, buffer)
+			if eff_plain or is_noop then return true end
+		end
+	end
+	return false
+end
+
 --- The identity of a rule for the same-spec guard: the same trigger (case aside,
 --- so the lower, Title and UPPER registrations of one rule are one spec) and the
 --- same completion kind are one spec, whichever source registered it.
@@ -958,52 +981,70 @@ end
 --- auto mapping on the last codepoint, an end-character mapping when a
 --- terminator is still waiting to be replayed, and a STRICTLY longer end-character
 --- trigger beats an auto one (the order keymap/init.lua applies).
+---
+--- The link is that winner or nothing. A winner that cannot be a link (private,
+--- a key output), a final entry that changes nothing and an auto winner a final
+--- end-character entry holds back all end the chain, exactly as Windows
+--- (HSE_FindMatchAtEnd, then _HSE_IsCascadeLink) and the shared engine
+--- (select_match, then its refusals) end it. Filtering the bucket on "is a link"
+--- before matching stepped over such a winner and fired a lower rule that the
+--- same typed text could never reach.
 --- @param vbuf string The buffer the previous step produced.
 --- @param tail string|nil The terminator carried at the end of `vbuf`.
 --- @param stable_bytes number Length of the untouched typed prefix.
 --- @return table|nil step { mapping, start, text, is_end }
 local function pick_cascade_step(vbuf, tail, stable_bytes)
 	local auto_step = nil
+	-- Length of an auto final entry that changed nothing: it wins with no edit,
+	-- so only a strictly longer end-character trigger can still beat it.
+	local auto_noop_len = nil
 	local last = last_cp_start(vbuf)
 	if last then
 		-- The reference character is the one before the expander (0 = none).
 		local reference = last > 1 and last_cp_start(vbuf:sub(1, last - 1)) or 0
 		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
 		for _, m in ipairs(bucket or {}) do
-			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
-				local eff_plain, typed = M.would_fire(m, vbuf)
+			if m.auto and cascade_step_allowed(m, reference, stable_bytes) then
+				local eff_plain, typed, _, is_noop = M.would_fire(m, vbuf)
 				if eff_plain then
 					auto_step = { mapping = m, start = #vbuf - #typed + 1, text = eff_plain }
+					break
+				end
+				if is_noop and m.final_result then
+					auto_noop_len = m.tlen
 					break
 				end
 			end
 		end
 	end
+	if auto_step and final_end_outranks(auto_step.mapping, vbuf) then auto_step = nil end
 
 	local end_step = nil
 	if tail and _registry.is_terminator(tail) then
 		local body = vbuf:sub(1, #vbuf - #tail)
 		local prev = last_cp_start(body)
+		local min_len = auto_step and auto_step.mapping.tlen or auto_noop_len or 0
 		if prev then
 			local bucket = _registry.mappings_for_tail(body:sub(prev))
 			for _, m in ipairs(bucket or {}) do
-				if not m.auto and is_cascade_link(m) and (not auto_step or m.tlen > auto_step.mapping.tlen)
-					and cascade_step_allowed(m, prev, stable_bytes) then
+				if not m.auto and m.tlen > min_len and cascade_step_allowed(m, prev, stable_bytes) then
 					local match = resolve_terminator_match(m, vbuf, tail, false)
 					if match and match.eff_plain then
 						end_step = { mapping = m, start = match.buf_start, text = match.eff_plain,
 							is_end = true }
 						break
 					end
+					-- A final entry that changes nothing masks the lower candidates.
+					if match and match.is_noop and m.final_result then return nil end
 				end
 			end
 		end
 	end
-	if end_step then return end_step end
 	-- A step that would swallow the end character ends the chain: the character
 	-- the user typed always lands after the final text.
-	if tail then return nil end
-	return auto_step
+	local winner = end_step or (not tail and auto_step) or nil
+	if winner and not is_cascade_link(winner.mapping) then return nil end
+	return winner
 end
 
 --- Lets the text an expansion produced complete further hotstrings, until the
@@ -1071,33 +1112,6 @@ local function plan_cascade(buffer, first, start_byte, repl, tail, consume_tail)
 		final_result = net.final_result,
 		steps        = net.steps,
 	}
-end
-
-
-
-
-
---- Whether a final end-character entry holds an immediate candidate back: the
---- immediate one would fire on the last letter, before the end character the
---- final entry of strictly higher priority is waiting for. The shared engine's
---- final_end_outranks applies the same rule.
---- @param m table The immediate mapping.
---- @param buffer string The buffer it matched against.
---- @return boolean
-local function final_end_outranks(m, buffer)
-	local ok, off = pcall(utf8.offset, buffer, -1)
-	if not ok or not off then return false end
-	local bucket = _registry.mappings_for_tail(buffer:sub(off):lower())
-	if not bucket then return false end
-	local own_priority = m.priority or 0
-	for _, candidate in ipairs(bucket) do
-		if not candidate.auto and candidate.final_result and mapping_group_active(candidate)
-			and candidate.tlen >= m.tlen and (candidate.priority or 0) > own_priority then
-			local eff_plain, _, _, is_noop = M.would_fire(candidate, buffer)
-			if eff_plain or is_noop then return true end
-		end
-	end
-	return false
 end
 
 --- Commits one automatic mapping against either the live buffer or an exact
