@@ -847,12 +847,16 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > "$evidence/tested-sha.txt"
           export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"
           export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          # The text-input agents bracket the selecting cohort so a refused
+          # selection receipt names whether com.apple.tsm.uiserver's owner ran.
+          bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" before
           set +e
           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
             --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
             --filter '(^|[.])NumberRowSourceProbeTests([/.]|$)' 2>&1 | tee "$transcript"
           number_row_statuses=("${PIPESTATUS[@]}")
           set -e
+          bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" after
           test "${#number_row_statuses[@]}" -eq 2
           set +e
           python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \
@@ -917,6 +921,7 @@ jobs:
             ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log
             ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json
             ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt
+            ${{ runner.temp }}/number-row-source-evidence/text-input-agents.txt
             ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift
             ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json
