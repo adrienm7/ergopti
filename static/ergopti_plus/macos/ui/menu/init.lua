@@ -28,6 +28,7 @@ local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
 local RefreshScope  = require("ui.menu.refresh_scope")
+local BranchRows    = require("ui.menu.branch_rows")
 local QuitAdmission = require("quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
@@ -97,8 +98,12 @@ local function safe_require(module_id, label)
 	return mod_or_err
 end
 
+-- A refresh asked from one branch's clicks rebuilds that branch's rows alone
+-- (ui.menu.branch_rows); the builder reads the menu modules through it.
+local _branch_rows = BranchRows.new()
+
 -- Load isolated sub-menu builders safely
-local menu_mods = {
+local menu_mods = _branch_rows.wrap({
 	gestures        = safe_require("ui.menu.menu_gestures",        "gestures menu"),
 	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
@@ -108,7 +113,7 @@ local menu_mods = {
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
-}
+})
 
 -- Load core modules
 local core_mods = {
@@ -271,7 +276,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		now = os.time,
 		around_click = function(path, run)
-			local previous = _refresh_scope.enter_click(Builder.branch_local_refresh_of(path[1]))
+			local previous = _refresh_scope.enter_click(_branch_rows.branch_of(path[1]))
 			local results = table.pack(pcall(run))
 			_refresh_scope.leave_click(previous)
 			if not results[1] then error(results[2], 0) end
@@ -1723,13 +1728,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return " Slowest: " .. table.concat(parts, ", ") .. "."
 	end
 
-	--- @param only_branch string|nil The one top-level branch to rebuild; nil rebuilds all.
-	local function rebuild_menu_cache(only_branch)
+	local function rebuild_menu_cache()
 		require("ui.menu.start_at_login").request("status", function()
 			if type(updateMenu) == "function" then updateMenu() end
 		end)
 		local t0 = hs.timer.secondsSinceEpoch()
-		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions, { only_branch = only_branch })
+		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
 		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000
 		if ok_b and type(items) == "table" then
 			click_gate.wrap(items)
@@ -1746,8 +1750,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
-			PhaseStats.add(only_branch and "menu.rebuild_branch" or "menu.rebuild", elapsed_ms * 1e6)
-			if only_branch then Logger.debug(LOG, "Menu refresh rebuilt the '%s' branch alone.", only_branch) end
+			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
 				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
 			require("perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
@@ -1784,8 +1787,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		ctx.paused = core_mods.shortcuts_mod
 			and type(core_mods.shortcuts_mod.is_paused) == "function"
 			and core_mods.shortcuts_mod.is_paused() or false
+		-- A scope of one branch lets the build reuse every other branch's rows.
 		local scope = _refresh_scope.take()
-		rebuild_menu_cache(scope ~= RefreshScope.ALL and scope or nil)
+		if scope ~= nil and scope ~= RefreshScope.ALL then _branch_rows.request(scope) end
+		local rebuilt, reason = pcall(rebuild_menu_cache)
+		_branch_rows.settle()
+		if not rebuilt then error(reason, 0) end
 	end
 	schedule_menu_refresh = function()
 		PhaseStats.count("menu.refresh_requested")

@@ -486,95 +486,125 @@ helpers.describe("actual canonical Layout parent receives its completed module (
 	end)
 end))
 
---- Runs checks over the real tray modules before the tray is built.
---- @param run fun(builder, mods, ctx, actions) The checks.
-local function with_real_modules(run)
+--- Runs checks over the real tray modules, read through the branch decorator.
+--- @param run fun(builder, rows, mods, ctx, actions) The checks.
+local function with_branch_rows(run)
 	build_tray(function(_, mods, ctx)
 		local actions = setmetatable({}, { __index = function() return function() end end })
-		run(package.loaded["ui.menu.builder"], mods, ctx, actions)
+		package.loaded["ui.menu.branch_rows"] = nil
+		local rows = require("ui.menu.branch_rows").new()
+		run(package.loaded["ui.menu.builder"], rows, rows.wrap(mods), ctx, actions)
 	end)
 end
 
+--- Builds the tree with one branch asked to rebuild alone.
+--- @return table rendered
+local function branch_build(builder, rows, mods, ctx, actions, key)
+	rows.request(key)
+	local rendered = builder.generate(ctx, mods, actions)
+	rows.settle()
+	return rendered
+end
+
 --- The visible shape of a rendered tree: titles, ticks, greying, nesting.
---- @param rows table Rendered rows.
+--- @param rendered table Rendered rows.
 --- @return table shape
-local function shape(rows)
+local function shape(rendered)
 	local out = {}
-	for index, row in ipairs(rows or {}) do
+	for index, row in ipairs(rendered or {}) do
 		out[index] = { row.title, row.checked == true, row.disabled == true, row.menu and shape(row.menu) or false }
 	end
 	return out
 end
 
---- Wraps the named menu modules' build to count their calls.
---- @param mods table Menu modules.
+--- Counts the calls of the original menu modules' build behind the decorator.
+--- @param originals table Original menu modules.
 --- @param keys table Module keys.
 --- @return table counts, function restore
-local function count_builds(mods, keys)
-	local counts, originals = {}, {}
+local function count_builds(originals, keys)
+	local counts, builds = {}, {}
 	for _, key in ipairs(keys) do
-		counts[key], originals[key] = 0, mods[key].build
-		mods[key].build = function(...) counts[key] = counts[key] + 1; return originals[key](...) end
+		counts[key], builds[key] = 0, originals[key].build
+		originals[key].build = function(...) counts[key] = counts[key] + 1; return builds[key](...) end
 	end
-	return counts, function() for key, build in pairs(originals) do mods[key].build = build end end
+	return counts, function() for key, build in pairs(builds) do originals[key].build = build end end
 end
 
 helpers.describe("the real macOS tray: a toggle rebuilds its own branch alone", LayoutFixture.scoped(function()
 	helpers.it("(menu-branch-refresh) rebuilds only the asked branch and renders the full tree's rows", function()
-		with_real_modules(function(builder, mods, ctx, actions)
+		build_tray(function(_, originals, ctx)
+			local counts, restore = count_builds(originals, { "tap_holds", "gestures", "shortcuts", "keystats" })
+			package.loaded["ui.menu.branch_rows"] = nil
+			local rows = require("ui.menu.branch_rows").new()
+			local mods = rows.wrap(originals)
+			local builder = package.loaded["ui.menu.builder"]
+			local actions = setmetatable({}, { __index = function() return function() end end })
 			local full = builder.generate(ctx, mods, actions)
-			local counts, restore = count_builds(mods, { "tap_holds", "gestures", "shortcuts", "keyboard_layout" })
-			local branch = builder.generate(ctx, mods, actions, { only_branch = "tap_holds" })
+			local branch = branch_build(builder, rows, mods, ctx, actions, "tap_holds")
 			restore()
-			helpers.assert_eq(counts, { tap_holds = 1, gestures = 0, shortcuts = 0, keyboard_layout = 0 })
+			helpers.assert_eq(counts, { tap_holds = 2, gestures = 1, shortcuts = 1, keystats = 1 })
 			helpers.assert_eq(shape(branch), shape(full), "the reused branches render as a full rebuild does")
+			full = builder.generate(ctx, mods, actions)
+			helpers.assert_eq(shape(full), shape(branch), "a settled request leaves the next build full")
 		end)
 	end)
 
 	helpers.it("(menu-branch-refresh) a new state in the rebuilt branch reaches the tree", function()
-		with_real_modules(function(builder, mods, ctx, actions)
+		build_tray(function(_, originals, ctx)
+			local before = originals.gestures.build
+			package.loaded["ui.menu.branch_rows"] = nil
+			local rows = require("ui.menu.branch_rows").new()
+			local mods = rows.wrap(originals)
+			local builder = package.loaded["ui.menu.builder"]
+			local actions = setmetatable({}, { __index = function() return function() end end })
 			builder.generate(ctx, mods, actions)
-			local before = mods.gestures.build
-			mods.gestures.build = function(...)
+			originals.gestures.build = function(...)
 				local row = before(...)
 				row.label = "Gestures, rebuilt"
 				return row
 			end
-			local branch = builder.generate(ctx, mods, actions, { only_branch = "gestures" })
-			mods.gestures.build = before
+			mods = rows.wrap(originals)
+			local branch = branch_build(builder, rows, mods, ctx, actions, "gestures")
+			originals.gestures.build = before
 			local seen = false
 			for _, row in ipairs(branch) do seen = seen or row.title == "Gestures, rebuilt" end
 			helpers.assert_true(seen, "the rebuilt branch is the one the tree shows")
 		end)
 	end)
 
-	helpers.it("(menu-branch-refresh-refused) a pause flip, a global branch or no earlier build rebuilds all", function()
-		with_real_modules(function(builder, mods, ctx, actions)
-			local counts, restore = count_builds(mods, { "tap_holds", "gestures" })
-			builder.generate(ctx, mods, actions, { only_branch = "tap_holds" })
-			helpers.assert_eq(counts.gestures, 1, "no complete build yet: everything is built")
-			builder.generate(ctx, mods, actions, { only_branch = "keyboard_layout" })
-			helpers.assert_eq(counts.gestures, 2, "the keyboard layout reaches other branches")
+	helpers.it("(menu-branch-refresh-refused) a pause flip, no earlier build or a global branch rebuilds all", function()
+		build_tray(function(_, originals, ctx)
+			local counts, restore = count_builds(originals, { "tap_holds", "gestures" })
+			package.loaded["ui.menu.branch_rows"] = nil
+			local BranchRows = require("ui.menu.branch_rows")
+			local rows = BranchRows.new()
+			local mods = rows.wrap(originals)
+			local builder = package.loaded["ui.menu.builder"]
+			local actions = setmetatable({}, { __index = function() return function() end end })
+			branch_build(builder, rows, mods, ctx, actions, "tap_holds")
+			helpers.assert_eq(counts.gestures, 1, "no earlier build: everything is built")
 			ctx.paused = true
-			builder.generate(ctx, mods, actions, { only_branch = "tap_holds" })
-			helpers.assert_eq(counts.gestures, 3, "a pause flip greys every feature branch")
+			branch_build(builder, rows, mods, ctx, actions, "tap_holds")
+			helpers.assert_eq(counts.gestures, 2, "a pause flip greys every feature branch")
 			ctx.paused = nil
 			restore()
+			helpers.assert_eq(pcall(rows.request, "keyboard_layout"), false, "a layout choice reaches every branch")
+			helpers.assert_nil(BranchRows.BRANCH_LOCAL.llm)
 		end)
 	end)
 
 	helpers.it("(menu-branch-refresh) names the branch of a top-level title, none for a global one", function()
-		with_real_modules(function(builder, mods, ctx, actions)
+		with_branch_rows(function(builder, rows, mods, ctx, actions)
 			local menu = builder.generate(ctx, mods, actions)
 			local found = {}
 			for _, row in ipairs(menu) do
-				if type(row.title) == "string" then found[row.title] = builder.branch_local_refresh_of(row.title) end
+				if type(row.title) == "string" then found[row.title] = rows.branch_of(row.title) end
 			end
 			helpers.assert_eq(found["menu.tapholds.title"], "tap_holds")
 			helpers.assert_eq(found["menu.gestures.title"], "gestures")
 			helpers.assert_nil(found["menu.global.language"], "a language choice reaches every branch")
 			helpers.assert_nil(found["menu.layout.title"], "a layout choice reaches every branch")
-			helpers.assert_nil(builder.branch_local_refresh_of(nil))
+			helpers.assert_nil(rows.branch_of(nil))
 		end)
 	end)
 end))

@@ -15,7 +15,7 @@
 --- 2. One scope per pending refresh: take() hands the scope to the refresh and
 ---    resets it, so the next request starts narrow again.
 --- 3. No OS call and no menubar knowledge: the menu owner says which branch a
----    click belongs to (ui.menu.builder.branch_local_refresh_of).
+---    click belongs to (ui.menu.branch_rows.branch_of).
 --- ==============================================================================
 
 local M = {}
