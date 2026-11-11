@@ -481,4 +481,39 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		Store._set_tool_for_test(nil)
 		Fake.uninstall()
 	end)
+
+	-- Measured on a real gnome-keyring (tests/hardware/run_keyring_receipts.sh):
+	-- a lookup whose unlock prompt is dismissed and a clear on a locked keyring
+	-- both exit 1 with nothing on stderr, as an absent item does, and the clear
+	-- removes nothing. `search` without --unlock prompts for nothing and still
+	-- lists a locked item, so it tells the cases apart.
+	helpers.it("secret-tool-locked-keyring: a locked item is neither absent nor cleared", function()
+		local dir = os.tmpname(); os.remove(dir); assert(os.execute("mkdir -p '" .. dir .. "'"))
+		local tool = dir .. "/secret-tool"
+		local script = assert(io.open(tool, "w"))
+		script:write("#!/bin/sh\ncase \"$1\" in\n"
+			.. "  lookup|clear) exit 1 ;;\n"
+			.. "  search) [ \"$5\" = present#r ] && printf '[/1]\\nlabel = key\\n'; exit 0 ;;\n"
+			.. "esac\nexit 2\n")
+		script:close(); os.execute("chmod +x '" .. tool .. "'")
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local ok, err = pcall(function()
+			local present, gone = "secret-service:present#r", "secret-service:gone#r"
+			local tokens, reasons = Store.lookup_many({ present, gone })
+			helpers.assert_nil(tokens[present], "a locked item yields no key")
+			helpers.assert_true(reasons[present] ~= "absent" and tostring(reasons[present]):find("locked", 1, true) ~= nil,
+				"a locked or dismissed item is not reported absent: " .. tostring(reasons[present]))
+			helpers.assert_eq(reasons[gone], "absent", "an item the service does not list stays absent")
+			local cleared, why = Store.clear(present)
+			helpers.assert_eq(cleared, false, "a clear that left the item in place is not a success")
+			helpers.assert_true(tostring(why):find("locked", 1, true) ~= nil, tostring(why))
+			helpers.assert_eq(Store.clear(gone), true, "clearing an absent item succeeds")
+		end)
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
+	end)
 end)

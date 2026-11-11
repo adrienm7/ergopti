@@ -17,7 +17,10 @@
 --- 3. Each call runs through ui/modal.lua: a locked keyring asks for its
 ---    password in a desktop prompt, which needs the keyboard the daemon grabs.
 --- 4. secret-tool exits 1 both for an absent item and for a failed service;
----    only a failure writes a message, so stderr tells the two apart.
+---    a failure usually writes a message. A dismissed unlock prompt and a clear
+---    on a locked keyring exit 1 silently too (measured on gnome-keyring), so a
+---    silent 1 is confirmed with `search`, which never prompts and still lists
+---    a locked item: listed means locked, not absent, and not cleared.
 --- 5. Items carry two attributes, the application name of
 ---    _shared/data/identifiers.json and "<entry id>#<revision>", so `secret-tool
 ---    search application ErgoptiPlus` lists every key this driver stored. Each
@@ -169,6 +172,19 @@ function SECRET_TOOL.store(name, token)
 	return false, failure_reason(stderr, status)
 end
 
+--- Whether the service still lists the item, without asking to unlock it.
+--- @param name string
+--- @return boolean|nil listed, string|nil reason
+local function listed(name)
+	local status, output, stderr = run_tool({
+		"search", APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
+	})
+	if status ~= 0 then return nil, failure_reason(stderr, status) end
+	return output:find("^%[/") ~= nil or output:find("\n%[/") ~= nil
+end
+
+local LOCKED = "the keyring is locked, or its unlock prompt was dismissed"
+
 --- @param name string
 --- @return string|nil token, string|nil reason ("absent" when no item matches)
 function SECRET_TOOL.lookup(name)
@@ -176,7 +192,11 @@ function SECRET_TOOL.lookup(name)
 		"lookup", APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
 	})
 	if status == 0 and output ~= "" then return output end
-	if status == 1 and stderr == "" then return nil, "absent" end
+	if status == 1 and stderr == "" then
+		local present, reason = listed(name)
+		if present == nil then return nil, reason end
+		return nil, present and LOCKED or "absent"
+	end
 	return nil, failure_reason(stderr, status)
 end
 
@@ -186,8 +206,15 @@ function SECRET_TOOL.clear(name)
 	local status, _, stderr = run_tool({
 		"clear", APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
 	})
-	-- Nothing matched: the key is already gone, which is what was asked.
-	if status == 0 or (status == 1 and stderr == "") then return true end
+	if status == 0 then return true end
+	if status == 1 and stderr == "" then
+		-- Nothing matched, or a locked keyring refused silently: only a search
+		-- that no longer lists the item makes this the success asked for.
+		local present, reason = listed(name)
+		if present == nil then return false, reason end
+		if present then return false, LOCKED .. "; the key stays in the secret service" end
+		return true
+	end
 	return false, failure_reason(stderr, status)
 end
 
