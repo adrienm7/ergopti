@@ -152,6 +152,17 @@ excluded from the ownership receipt, admitted by name
 (`OWNERSHIP_DERIVED_TREE`) and removed whole by uninstall. Do not ship
 bytecode built on a CI runner.
 
+## The AI menu lists no model; the model browser page selects (2026-10-27)
+
+Decided by the maintainer on 2026-10-27 and built in e55038c902 on the three
+drivers: the tray draws one button, the backend's emoji then the model, which
+opens the model browser page; the Backend chooser, the model list, the API
+entries, the provider Add rows and the custom-model dialog left the tray. Do
+not bring tray model rows back. The menu vectors that described them
+(backend, model header, hardware, catalogue, readout and complete-model frames,
+and the Windows backend and model-health captions) were retired with no
+consumer left on 2026-11-11.
+
 ## X11 same-group XKB notify renews the layout receipt (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: after an XKB new-keyboard notify that
