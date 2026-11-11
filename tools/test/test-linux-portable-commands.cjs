@@ -441,7 +441,7 @@ const PROGRAMS = {
 	),
 	'wl-paste': why(
 		`clipboard on Wayland; declared optional dependency: ${DEB_RECIPE} Recommends, probed before use`,
-		DRIVER,
+		DRIVER_HOST,
 		{
 			proof: { file: DEB_RECIPE, token: 'Recommends:.*\\bwl-clipboard\\b' },
 			probed: true
@@ -614,6 +614,21 @@ const PROGRAMS = {
 	strace: inUbuntuJob('strace', 'syscall tracer'),
 	zstd: inUbuntuJob('zstd', 'archive tool'),
 	sway: inUbuntuJob('\\bsway\\b', 'Wayland compositor'),
+	// The kernel model and compositor clients of the container proofs
+	// (tests/hardware/run_container_proofs.sh, container_session.py).
+	gcc: inUbuntuJob(
+		'\\bgcc\\b',
+		"compiler of the container proofs' kernel model and Wayland bridge"
+	),
+	'wayland-scanner': inUbuntuJob('\\blibwayland-dev\\b', 'Wayland protocol code generator'),
+	xdpyinfo: inUbuntuJob('x11-utils', 'X server readiness probe'),
+	unshare: why(
+		'util-linux, preinstalled on the Ubuntu runner; the container proofs isolate their mounts',
+		HOST,
+		{
+			proof: { file: CI_LINUX, token: 'sudo unshare --mount' }
+		}
+	),
 	pulseaudio: inUbuntuJob('pulseaudio', 'sound server'),
 	lua: inUbuntuJob('lua5\\.4', 'Lua interpreter'),
 	'lua5.4': inUbuntuJob('lua5\\.4', 'Lua interpreter'),

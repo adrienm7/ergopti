@@ -19,6 +19,7 @@ shipped tap-hold preset, whose left Shift tapped is copy:
 Exit 0 = every assertion held; 1 = a failure; 2 = no environment.
 """
 
+import shutil
 import subprocess
 import sys
 import time
@@ -98,6 +99,9 @@ def checked_copy(session, label):
 
 
 def proof_sway():
+    for tool in ("wl-copy", "wl-paste"):
+        if not shutil.which(tool):
+            raise SystemExit("ENVIRONMENT: " + tool + " is missing")
     session = start("sway")
     try:
         subprocess.run(["wl-copy", "--clear"], env=session.env, check=False)
