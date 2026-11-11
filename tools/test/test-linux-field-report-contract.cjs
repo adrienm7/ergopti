@@ -402,9 +402,10 @@ function read(folder, name) {
 					coverage.points.map((point) => point.id)
 				);
 				assert.match(result.stdout, /TODO « To confirm on Linux », one verdict per point/);
+				assert.match(result.stdout, /needs_person +physical_shortcut_delivery/);
 				assert.match(
 					result.stdout,
-					/not_testable +physical_shortcut_delivery +\(not field-testable: /
+					/👉 GUIDED linux_physical_shortcut \(up to 1 s\): In « Raccourcis physiques »/
 				);
 				assert.doesNotMatch(
 					read(folder, dayLog),
