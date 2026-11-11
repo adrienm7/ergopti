@@ -4,9 +4,11 @@
  * ==============================================================================
  * MODULE: Ergopti Layout Source XKB Export
  * DESCRIPTION:
- * Compiles an admitted imported source through the shared Lua converter. Assets
- * and source travel as explicit input; the API returns artifacts without writing
- * files or installing anything. Its report describes document-specific losses.
+ * Compiles a source through the shared Lua export adapter
+ * (_shared/lua/layouts/source_export.lua) and the shared target export
+ * (_shared/ui/layout_composer/target_export.js), the same two steps the layout
+ * editor page runs. Assets and source travel as explicit input; the API returns
+ * artifacts without writing files or installing anything.
  * ==============================================================================
  */
 
@@ -18,77 +20,76 @@ const { spawnSync } = require('node:child_process');
 const { REPO_ROOT, shared } = require('./paths.cjs');
 const { loadLayoutSource } = require('./layout-source.cjs');
 
+/** A value built in the source model's context, as plain data of this realm. */
+const plain = (value) => JSON.parse(JSON.stringify(value));
+
+/**
+ * Run the shared Lua export adapter (source_export.lua) on one step's input.
+ * @param {'read'|'xkb'} step
+ * @param {object} input
+ * @param {string} label - Prefix of a runtime failure's message.
+ */
+function runLua(step, input, label) {
+	const result = spawnSync(
+		'lua',
+		[path.join(__dirname, 'layout_source_export.lua'), shared(), step],
+		{
+			encoding: 'utf8',
+			input: JSON.stringify(input),
+			timeout: 30000,
+			maxBuffer: 16 * 1024 * 1024
+		}
+	);
+	if (result.error) throw new Error(`${label}: ${result.error.message}`);
+	if (result.status !== 0) throw new Error(`${label}: ${result.stderr.trim()}`);
+	return JSON.parse(result.stdout);
+}
+
+/** The converter assets the XKB export reads, from their owners. */
+function xkbAssets() {
+	const data = path.join(REPO_ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
+	return {
+		keycodes: JSON.parse(
+			fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')
+		),
+		keysyms: JSON.parse(fs.readFileSync(path.join(data, 'key_sym.json'), 'utf8')),
+		template: fs.readFileSync(path.join(data, 'xkb_symbols.txt'), 'utf8'),
+		types: fs.readFileSync(path.join(data, 'xkb_types.txt'), 'utf8')
+	};
+}
+
+/**
+ * Rethrow a shared-module refusal as an Error of this realm with its details.
+ * @param {Function} step
+ */
+function admitted(step) {
+	try {
+		return step();
+	} catch (error) {
+		if (error && error.name === 'TargetExportError') {
+			const local = new Error(error.message);
+			if (error.details !== undefined) local.details = plain(error.details);
+			throw local;
+		}
+		throw error;
+	}
+}
+
 /** Compile all artifacts before a caller publishes any output. */
 function exportXkb(document) {
 	const source = loadLayoutSource();
 	// The preserved import, or the compiled .keylayout of a structured source.
 	const imported = source.targetKeylayout(document, 'linux');
-	const metadata = document.exports?.linux || {};
-	const id = metadata.name ?? document.layout.id;
-	const description = metadata.description ?? document.layout.name;
-	if (!/^[a-z][a-z0-9_]*$/.test(id))
-		throw new Error('exports.linux.name must be a source identifier');
-	// The existing converter interpolates this into an XKB quoted string.
-	if (/["\\\u0000-\u001f\u007f-\u009f]/u.test(description))
-		throw new Error('exports.linux.description contains an unsupported XKB string character');
-	const data = path.join(REPO_ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
-	const keysyms = JSON.parse(fs.readFileSync(path.join(data, 'key_sym.json'), 'utf8'));
-	const types = fs.readFileSync(path.join(data, 'xkb_types.txt'), 'utf8');
-	const result = spawnSync('lua', [path.join(__dirname, 'layout_source_xkb.lua'), shared()], {
-		encoding: 'utf8',
-		input: JSON.stringify({
-			xml: imported.text,
-			convention: imported.convention,
-			layout_id: id,
-			display_name: description,
-			keycodes: JSON.parse(
-				fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')
-			),
-			keysyms: keysyms.keysyms,
-			locale_extended_prefixes: keysyms.locale_extended_prefixes,
-			template: fs.readFileSync(path.join(data, 'xkb_symbols.txt'), 'utf8'),
-			types
-		}),
-		timeout: 30000,
-		maxBuffer: 16 * 1024 * 1024
-	});
-	if (result.error) throw new Error(`xkb_runtime: ${result.error.message}`);
-	if (result.status !== 0) throw new Error(`xkb_runtime: ${result.stderr.trim()}`);
-	const output = JSON.parse(result.stdout);
-	if (!output.ok) {
-		const error = new Error(output.reason);
-		error.details = output;
-		throw error;
-	}
-	const report = {
-		target: 'linux',
-		status: 'partial',
-		artifact: 'xkb',
-		reason: 'seven_level_character_projection',
-		blockers: [],
-		omitted: imported.omitted,
-		name: id,
-		description,
-		...output.projection,
-		system_key_codes: output.system_key_codes,
-		limitations: [
-			'Only the character-key table is generated; listed system/keypad codes keep their installed behavior.',
-			'Option maps to AltGr; Linux Alt, Control and Super use the Command shortcut level.',
-			'Listed empty cells emit NoSymbol and may inherit XKB symbols; source key disabling is not compiled.',
-			'Listed unbound character actions use the converter Unicode keysym fallback, without a physical source action binding.',
-			'XCompose requires client support and the exported Compose file; native macOS dead-key fallback and cancellation are not certified.',
-			'Registry-specific keysym hints, driver features and installation are outside this source export.'
-		]
-	};
+	const assets = xkbAssets();
+	const request = admitted(() => source.targetExport.xkbRequest(document, imported, assets));
+	const output = runLua('xkb', request.input, 'xkb_runtime');
+	const { report, files } = admitted(() =>
+		source.targetExport.xkbFiles(imported, request, output, assets.types)
+	);
 	return {
-		report,
-		files: new Map([
-			[`${id}.xkb`, output.symbols],
-			[`${id}.XCompose`, output.compose],
-			['xkb_types.txt', types],
-			['export.json', `${JSON.stringify(report, null, 2)}\n`]
-		])
+		report: plain(report),
+		files: new Map(files.map((file) => [file.path, file.text]))
 	};
 }
 
-module.exports = { exportXkb };
+module.exports = { exportXkb, runLua, admitted, plain };
