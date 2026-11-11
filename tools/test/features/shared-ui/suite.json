@@ -373,6 +373,30 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-emulation.cjs"],
 			"repro": "npm run test:layout-source-emulation"
+		},
+		{
+			"id": "macos-layout-bundle-plan",
+			"ordinal": 615,
+			"name": "macOS bundle native check types source vectors that match the compiled cells",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-layout-bundle-plan.cjs"],
+			"repro": "npm run test:macos-layout-bundle-plan"
+		},
+		{
+			"id": "layout-editor-unicode-names",
+			"ordinal": 616,
+			"name": "layout editor Unicode names table decodes every name and answers wildcard searches",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-unicode-names.cjs"],
+			"repro": "npm run test:layout-editor-unicode-names"
+		},
+		{
+			"id": "layout-sources",
+			"ordinal": 617,
+			"name": "kept layout sources reproduce the layouts they were made from, Kana level included",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-sources.cjs"],
+			"repro": "npm run test:layout-sources"
 		}
 	]
 }

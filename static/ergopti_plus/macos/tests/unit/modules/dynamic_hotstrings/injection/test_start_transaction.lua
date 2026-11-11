@@ -57,6 +57,7 @@ local function load_fixture(failure_mode)
 			state.providers[#state.providers + 1] = callback
 		end,
 		inject_dynamic = function() return true end,
+		dynamic_rule_within_delay = function() return true end,
 	}
 
 	package.loaded["modules.dynamic_hotstrings"] = nil

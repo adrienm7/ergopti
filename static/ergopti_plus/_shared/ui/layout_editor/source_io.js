@@ -236,15 +236,55 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
-	 * What the ErgoptiPlus composer host installs: the TOML and the .keylayout
-	 * compiled for the host's OS (composer_save with `source`, composer.lua).
+	 * The macOS download the export drop-down chooses (`exports.macos.format`,
+	 * `bundle` by default): the bundle as one ZIP, or the single .keylayout of
+	 * ISO or ANSI, zipped only when an icon file travels beside it. A preserved
+	 * import downloads unchanged, as its own variant only.
+	 * @param {object} doc
+	 * @param {'bundle'|'iso'|'ansi'} [format] - Defaults to the source's choice.
+	 * @returns {{filename: string, mime: string, text?: string, bytes?: Uint8Array}}
+	 */
+	function macosDownload(doc, format) {
+		if (isPreserved(doc)) {
+			const variant = format || doc.imported_keylayout.convention;
+			if (variant === 'bundle')
+				throw new SourceIOError('source_export_unavailable', 'imported_keylayout');
+			const file = keylayoutFile(doc, variant);
+			return { filename: file.filename, mime: 'application/xml', text: file.text };
+		}
+		const { files } = LayoutSourceCompiler.exportMacos(doc, tables(), format);
+		if (files.length === 1 && files[0].encoding === 'utf8')
+			return { filename: files[0].path, mime: 'application/xml', text: files[0].text };
+		const root = files[0].path.split('/')[0].replace(/\.keylayout$/, '');
+		return { filename: `${root}.zip`, mime: 'application/zip', bytes: LayoutZipWriter.pack(files) };
+	}
+
+	/**
+	 * What the ErgoptiPlus composer host installs: the TOML, the .keylayout
+	 * compiled for the host's OS and, for a structured source, the emulation
+	 * table of that OS (composer_save with `source` and `emulation`,
+	 * composer.lua), which the driver performs for what the .keylayout cannot
+	 * hold (custom modifiers, tap-holds, shortcuts). A preserved import has none.
 	 * @param {object} doc
 	 * @param {'macos'|'linux'} platform
-	 * @returns {{source: string, keylayout: string}}
+	 * @returns {{source: string, keylayout: string, emulation?: string}}
 	 */
 	function installPayload(doc, platform) {
 		const compiled = LayoutSourceCompiler.targetKeylayout(doc, tables(), platform);
-		return { source: serialize(doc), keylayout: compiled.text };
+		const payload = { source: serialize(doc), keylayout: compiled.text };
+		if (!isPreserved(doc)) payload.emulation = JSON.stringify(emulationTable(doc, platform));
+		return payload;
+	}
+
+	/**
+	 * The emulation table of a structured source for one OS: what the drivers
+	 * and the page preview perform on top of the compiled .keylayout.
+	 * @param {object} doc
+	 * @param {'macos'|'linux'|'windows'} platform
+	 * @returns {object}
+	 */
+	function emulationTable(doc, platform) {
+		return LayoutSourceCompiler.compileEmulation(doc, tables(), { platform });
 	}
 
 	/** An identifier the format accepts, derived from free text. */
@@ -560,7 +600,9 @@ var LayoutSourceIO = (function () {
 		fillLayer,
 		keylayoutFile,
 		macosBundleArchive,
+		macosDownload,
 		installPayload,
+		emulationTable,
 		withNavLayer,
 		navLayerFile
 	};

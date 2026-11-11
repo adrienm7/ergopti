@@ -42,6 +42,7 @@ local function make_fake_km(group_enabled)
 		set_post_load_hook        = function() end,
 		-- register_interceptor is called as _km.register_interceptor(fn) — one arg
 		register_interceptor      = function(fn) captured_interceptor = fn end,
+		dynamic_rule_within_delay      = function() return true end,
 		register_preview_provider = function(fn) captured_preview_provider = fn end,
 		registry_transaction      = function(_, mutation) return mutation() == true end,
 		inject_dynamic            = function() error("inject_dynamic must NOT be called when group disabled") end,

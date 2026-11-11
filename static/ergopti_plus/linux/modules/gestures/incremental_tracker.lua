@@ -65,22 +65,20 @@ function M.new(opts)
 		end
 		if state.dead then return end
 		local rx, ry = x - state.ox, y - state.oy
-		local direction = Direction.classify(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
-		if not direction then return end
+		-- Only a decided axis counts: in the diagonal sector below the diagonal
+		-- minimum the classifier names the dominant straight axis, and the
+		-- name turning diagonal a frame later restarted the count each time.
+		local axis = Direction.decided_axis(rx, ry, M.SWIPE_MIN_MM, M.SWIPE_MIN_MM * Direction.DIAGONAL_MINIMUM_FACTOR)
+		if not axis then return end
+		local direction = Direction.name(axis, rx, ry)
 		local slot = string.format("swipe_%d_%s", math.min(progress.fingers, 5), direction)
 		local answering = opts.slot_of(slot, progress.fingers, direction)
 		if opts.mode_of(answering) ~= "incremental" then return end
 		local step = opts.step_of(answering)
 
-		local horizontal = direction == "left" or direction == "right"
-		local vertical = direction == "up" or direction == "down"
-		local function along(dx, dy)
-			if horizontal then return dx end
-			if vertical then return dy end
-			-- A diagonal travels along its 45 degree axis, signed as the macOS
-			-- engine signs it.
-			return ((dx + dy > 0) and 1 or -1) * math.sqrt(dx * dx + dy * dy)
-		end
+		-- Travel along the direction's own axis, a diagonal's included (shared
+		-- with the macOS engine).
+		local function along(dx, dy) return Direction.along(direction, dx, dy) end
 
 		if state.sign and state.lx then
 			local back = along(x - state.lx, y - state.ly)

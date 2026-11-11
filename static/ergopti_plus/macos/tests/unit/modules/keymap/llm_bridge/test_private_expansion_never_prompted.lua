@@ -163,6 +163,7 @@ local function build_world()
 		register_lua_group = function() end,
 		set_post_load_hook = function() end,
 		register_interceptor = function() end,
+		dynamic_rule_within_delay = function() return true end,
 		register_preview_provider = function() end,
 		registry_transaction = function(_, mutation) return mutation() == true end,
 	})

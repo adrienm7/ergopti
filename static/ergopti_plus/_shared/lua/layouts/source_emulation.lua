@@ -152,7 +152,11 @@ function M.compile(table_)
 			model.modifier_keys[key] = { id = modifier.id, mode = modifier.mode }
 		end
 	end
-	local function known(id) return REPORTED[id] == true or model.custom[id] ~= nil or SIDED[family(id)] == true end
+	-- Kana is a built-in no driver reports: the targets compile its layers to
+	-- their native Option/AltGr level, so a selector naming it never matches here.
+	local function known(id)
+		return REPORTED[id] == true or id == "kana" or model.custom[id] ~= nil or SIDED[family(id)] == true
+	end
 	for index, layer in ipairs(table_.layers or {}) do
 		if type(layer.id) ~= "string" or type(layer.selectors) ~= "table" or type(layer.keys) ~= "table" then
 			error("The emulation table holds a malformed layer.")
