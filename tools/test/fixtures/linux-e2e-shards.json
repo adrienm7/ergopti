@@ -39,6 +39,7 @@
 			"The container proofs",
 			"Install prerequisites for Load the number-row options into a real X server",
 			"Load the number-row options into a real X server",
+			"Install a layout source and load it into a real X server",
 			"Restart the daemon through the local reload control",
 			"Run the field checks without a click",
 			"A virtual touchpad, described by the kernel and read back",
@@ -365,6 +366,9 @@
 		],
 		"The container proofs": ["Install prerequisites for The container proofs"],
 		"Load the number-row options into a real X server": [
+			"Install prerequisites for Load the number-row options into a real X server"
+		],
+		"Install a layout source and load it into a real X server": [
 			"Install prerequisites for Load the number-row options into a real X server"
 		],
 		"The tray binding names libraries and symbols that exist": [
