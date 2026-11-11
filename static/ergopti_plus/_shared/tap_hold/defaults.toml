@@ -434,7 +434,7 @@ lcmd_lctrl = { combo = "none", tap = "none", hold = "none" }
 lcmd_lopt = { combo = "none", tap = "none", hold = "none" }
 lcmd_space = { combo = "none", tap = "none", hold = "none" }
 # lcmd + rcmd: canonical half of the (lcmd, rcmd) pair.
-#   combo : symmetric chord — fires opt_backspace regardless of press order.
+#   combo : "none"; rcmd_lcmd below taps the word-level backward delete.
 #   tap   : "none" here. When lcmd is first (layer active) + rcmd pressed,
 #           the navigation layer's MetaRight binding in layers.toml takes over
 #           (Ergopti's preset: Escape on a tap, Option+Shift while held).
@@ -461,18 +461,11 @@ space_ret = { combo = "none", tap = "none", hold = "none" }
 space_bsp = { combo = "none", tap = "none", hold = "none" }
 # Cmd droit — non-canonical half of each pair (symmetric mode shares the chord
 # with the canonical half; this entry still drives the per-direction tap/hold).
-# Slot order: { combo, tap, hold }.
-#   rcmd + caps : CapsWord (combo = tap); tap fires on each press of caps
-#                 while rcmd is held, so it stays valid even if the 100 ms
-#                 simultaneous window is missed.
-#   rcmd + fn   : toggle CapsLock (combo = tap), same rationale.
-#   rcmd + lopt : word-level forward delete (combo = tap), using opt variant
-#                 to avoid conflict with Hammerspoon cmd+delete shortcut.
-#                 With no hold, the tap goes out at key down and repeats
-#                 while lopt is held.
-#   rcmd + lcmd : word-level backward delete (combo = tap), typed once on a
-#                 quick release; hold = option+shift modifier so the combined
-#                 hold works as a shift+option accelerator (no layer activation).
+# Slot order: { combo, tap, hold }. No row combines or holds anything; two tap:
+#   rcmd + caps : word-level forward delete (option variant, clear of the
+#                 Hammerspoon cmd+delete shortcut). With no hold, the tap goes
+#                 out at key down and repeats while caps is held.
+#   rcmd + lcmd : word-level backward delete, sent the same way.
 rcmd_esc = { combo = "none", tap = "none", hold = "none" }
 rcmd_tab = { combo = "none", tap = "none", hold = "none" }
 rcmd_caps = { combo = "none", tap = "opt_delete_fwd", hold = "none" }
