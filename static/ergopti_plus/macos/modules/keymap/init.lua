@@ -684,12 +684,18 @@ function M.observe_tap_hold_signal(signal, flags)
 		end
 		CoreState.tap_hold_modifier_hand = hand
 	elseif signal == ControlSentinels.TAP_HOLD_COMMAND then
-		if CoreState.tap_hold_resets_word == true then
+		local resets = CoreState.tap_hold_resets_word == true
+		if resets then
 			CoreState.buffer = ""
 			CoreState.start_is_word_boundary = true
 			CoreState.start_is_line_start = false
 		end
 		CoreState.tap_hold_command_pending = true
+		-- One line per marker, written after the eventtap returns, which the
+		-- field run counts: the tagged F20 reached Ergopti before its chord.
+		SyntheticInput.defer_after_callback("tap-hold marker log", function()
+			Logger.debug(LOG, "Tap-hold command marker received (word reset: %s).", resets and "yes" or "no")
+		end)
 	elseif signal == ControlSentinels.NAV_LAYER_ENTERED then
 		CoreState.nav_layer_active = true
 	elseif signal == ControlSentinels.NAV_LAYER_EXITED then

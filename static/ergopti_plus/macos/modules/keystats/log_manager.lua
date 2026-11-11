@@ -34,6 +34,7 @@
 
 local M = {}
 
+local NetworkTransitions = require("keystats.network_transitions")
 local hs      = hs
 local fs      = require("hs.fs")
 local NativePath = require("native_path")
@@ -1256,7 +1257,7 @@ local LEDGER_REPLAY_PROGRESS_BYTES = 32 * 1024 * 1024
 local RECOVERY_PROGRESS_KEY = "aggregate_recovery_progress"
 
 --- Order of a rebuild's stages inside one device partition.
-local RECOVERY_STAGE_RANK = { clear = 0, typing = 1, app_switch = 2, window_switch = 3, system = 4 }
+local RECOVERY_STAGE_RANK = { clear = 0, typing = 1, app_switch = 2, window_switch = 3, system = 4, network = 5 }
 
 --- Reads the pending replay state, or nil when no replay is pending.
 ---@param db userdata
@@ -1795,16 +1796,32 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 					if not walked() then error("window-switch aggregate flush failed") end
 				end
 			end
-			for row in db:nrows("SELECT ts, action, metadata_json, id FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
-				local entry = {}
-				local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
-				if decoded_ok and type(metadata) == "table" then
-					for key, value in pairs(metadata) do entry[key] = value end
+			if due("system") then
+				for row in db:nrows("SELECT ts, action, metadata_json, id FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
+					local entry = {}
+					local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
+					if decoded_ok and type(metadata) == "table" then
+						for key, value in pairs(metadata) do entry[key] = value end
+					end
+					entry.timestamp, entry.action = row.ts, row.action
+					Aggregator.walk_system_event(entry)
+					reached("system", 1, row)
+					if not walked() then error("system aggregate flush failed") end
 				end
-				entry.timestamp, entry.action = row.ts, row.action
-				Aggregator.walk_system_event(entry)
-				reached("system", 1, row)
-				if not walked() then error("system aggregate flush failed") end
+			end
+			-- Windows records its Wi-Fi changes as network_change rows; its own
+			-- rebuild counts the transitions among them with the rows above.
+			if due("network") then
+				for row in db:nrows("SELECT ts, kind, meta_json, id FROM events_network WHERE device_id=" .. quoted_device .. after_resume_point("network", 1) .. " ORDER BY ts, id") do
+					if row.kind == "network_change" then
+						local decoded_ok, metadata = pcall(json.decode, row.meta_json or "{}")
+						if decoded_ok and NetworkTransitions.is_wifi_change(metadata) then
+							Aggregator.walk_system_event({ timestamp = row.ts, action = "wifi_change" })
+						end
+					end
+					reached("network", 1, row)
+					if not walked() then error("network aggregate flush failed") end
+				end
 			end
 			if not flush_if_needed(true) then error("final aggregate flush failed") end
 		end)

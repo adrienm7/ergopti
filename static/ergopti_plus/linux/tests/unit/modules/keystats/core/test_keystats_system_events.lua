@@ -109,6 +109,22 @@ helpers.describe("keystats system events: the recorder", function()
 		end)
 	end)
 
+	-- KL_AppendLog refuses every entry while the focused app is filtered:
+	-- Linux stored the transition with the excluded app's name, and the device
+	-- ledger exported it (KML-003, linux-network-excluded-app).
+	it("linux-network-excluded-app: no transition is stored under an excluded app", function()
+		with_recorder({}, function(keystats, writer)
+			keystats.set_disabled_apps({ "org.example.excluded" })
+			keystats.on_app_focus("org.example.excluded", 1000)
+			keystats.record_network_event("internet_down")
+			keystats.on_app_focus("org.example.editor", 2000)
+			keystats.record_network_event("internet_up")
+			keystats.flush()
+			helpers.assert_eq(#writer.network_events, 1, "only the transition under a recorded app")
+			helpers.assert_eq(writer.network_events[1].row.kind, "internet_up")
+		end)
+	end)
+
 	it("drops the transitions seen while recording is forbidden", function()		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
 			keystats.set_enabled(false)
 			keystats.flush()

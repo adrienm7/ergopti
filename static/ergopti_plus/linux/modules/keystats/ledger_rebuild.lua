@@ -195,7 +195,22 @@ function M.walk_device(opts)
 	for _, row in ipairs(read_rows(store, "events_system", { "ts", "date", "action", "metadata_json" }, device_id)) do
 		local ok, meta = pcall(Json.decode, row.metadata_json ~= "" and row.metadata_json or "{}")
 		if not ok or type(meta) ~= "table" then meta = {} end
-		walk_system(batch, row.ts:sub(1, 10), row.action, meta, row.ts)
+		-- The date column is the device's own local day on every OS; a Linux
+		-- device stamps ts in UTC, a day away around midnight.
+		local date = row.date:match("^%d%d%d%d%-%d%d%-%d%d$") and row.date or row.ts:sub(1, 10)
+		walk_system(batch, date, row.action, meta, row.ts)
+	end
+	-- Windows records its Wi-Fi changes as network_change rows (its own rebuild
+	-- counts them with the legacy wifi_change rows above).
+	local NetworkTransitions = require("keystats.network_transitions")
+	for _, row in ipairs(read_rows(store, "events_network", { "ts", "date", "kind", "meta_json" }, device_id)) do
+		if row.kind == "network_change" then
+			local ok, meta = pcall(Json.decode, row.meta_json ~= "" and row.meta_json or "{}")
+			if ok and NetworkTransitions.is_wifi_change(meta) then
+				local date = row.date:match("^%d%d%d%d%-%d%d%-%d%d$") and row.date or row.ts:sub(1, 10)
+				walk_system(batch, date, "wifi_change", {}, row.ts)
+			end
+		end
 	end
 	return batch
 end

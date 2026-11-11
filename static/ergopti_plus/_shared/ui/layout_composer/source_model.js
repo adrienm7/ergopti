@@ -56,6 +56,9 @@ var LayoutSource = (function () {
 		{ target: 'driver_windows', artifact: 'emulation' },
 		{ target: 'web', artifact: 'emulation' }
 	];
+	// Export fields holding a table of LCID (4 hex digits) -> text instead of a
+	// string: the Windows version resource's per-language texts.
+	const EXPORT_TABLES = { windows: ['descriptions', 'language_names'] };
 	const EXPORT_METADATA = {
 		windows: [
 			'locale',
@@ -559,15 +562,14 @@ var LayoutSource = (function () {
 				if (own(source.exports, target)) {
 					record(source.exports[target], fields, [], `exports.${target}`);
 					for (const [key, value] of Object.entries(source.exports[target])) {
-						// The Windows version resource's per-language texts: LCID (4 hex digits) -> text.
-						if (target === 'windows' && (key === 'descriptions' || key === 'language_names')) {
+						if ((EXPORT_TABLES[target] || []).includes(key)) {
 							requireValue(
 								value && typeof value === 'object' && !Array.isArray(value),
-								`exports.windows.${key}`
+								`exports.${target}.${key}`
 							);
 							for (const [lang, text] of Object.entries(value)) {
-								requireValue(/^[0-9a-f]{4}$/.test(lang), `exports.windows.${key}.${lang}`);
-								string(text, `exports.windows.${key}.${lang}`);
+								requireValue(/^[0-9a-f]{4}$/.test(lang), `exports.${target}.${key}.${lang}`);
+								string(text, `exports.${target}.${key}.${lang}`);
 							}
 						} else string(value, `exports.${target}.${key}`);
 					}
