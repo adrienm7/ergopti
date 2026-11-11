@@ -668,8 +668,20 @@ const CHECKS = [
 					if (closeWindowsSearch()) {
 						seen.push(`${item.name}: Windows Search opened, the driver did not take Win+S`);
 					} else if (!found) {
-						const logged = session.logLines('[Search]').slice(-3).join(' | ');
-						seen.push(`${item.name}: no log line "${item.expect}" (Search log: ${logged})`);
+						// A press that never reaches Search ends in the selection capture
+						// ([hotstring_engine]) or in the Win broker, so name every owner.
+						const logged = session
+							.logLines('')
+							.filter(
+								(line) =>
+									!before.has(line) &&
+									/\[(Search|hotstring_engine|KeyboardShortcuts|MagicEditor|gestures)\]/.test(line)
+							)
+							.slice(-6)
+							.join(' | ');
+						seen.push(
+							`${item.name}: no log line "${item.expect}" (Win+S log since the press: ${logged || 'none'})`
+						);
 					}
 				}
 			} finally {
