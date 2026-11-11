@@ -16,6 +16,8 @@
 
 set -u
 cd "$(dirname "$0")/../../.." || exit 2
+command -v xdotool >/dev/null 2>&1 || { echo "ENVIRONMENT: xdotool is missing" >&2; exit 2; }
+command -v pgrep >/dev/null 2>&1 || { echo "ENVIRONMENT: pgrep is missing" >&2; exit 2; }
 . tests/hardware/desktop/desktop_session.sh
 desktop_session_start "${ERGOPTI_DESKTOP_DISPLAY:-71}"
 trap desktop_session_stop EXIT
@@ -45,6 +47,23 @@ tray_session() {
 	for _ in $(seq 300); do [ -f "${STATE}/ready" ] && break; sleep 0.1; done
 	if [ -n "${EXTERNAL_EDIT:-}" ]; then printf '%s' "${EXTERNAL_EDIT}" >> "${CONFIG}"; fi
 	touch "${STATE}/go"
+	# A refused write opens the modal error dialog the tray waits on: record that
+	# it appeared, then dismiss it as a user would, so the tray can answer.
+	if [ -n "${EXPECT_ERROR_DIALOG:-}" ]; then
+		# xdotool's name search cannot match the title's em dash, so the dialog
+		# host is found by its command line and its title read back.
+		local dialog="" pid=""
+		for _ in $(seq 200); do
+			pid="$(pgrep -f "dialog_host.lua --error" | head -n 1)"
+			[ -n "${pid}" ] && dialog="$(xdotool search --onlyvisible --pid "${pid}" 2>/dev/null | head -n 1)"
+			[ -n "${dialog}" ] && break
+			sleep 0.1
+		done
+		if [ -n "${dialog}" ] && [ "$(xdotool getwindowname "${dialog}")" = "ErgoptiPlus — Erreur" ]; then
+			touch "${STATE}/error_dialog"
+			xdotool windowactivate --sync "${dialog}" key Escape
+		fi
+	fi
 	wait "${panel}"
 	local status=$?
 	touch "${STATE}/stop"
@@ -104,8 +123,10 @@ check $? "a second move is saved before the stale-menu case"
 EXTERNAL_EDIT=$'\n[external]\nedited = "while the menu was open" # kept\n'
 cp "${CONFIG}" "${DESKTOP_HOME}/expected.toml"
 printf '%s' "${EXTERNAL_EDIT}" >> "${DESKTOP_HOME}/expected.toml"
-EXTERNAL_EDIT="${EXTERNAL_EDIT}" tray_session --click "${ORDER} > abbreviations > Descendre"
+EXPECT_ERROR_DIALOG=1 EXTERNAL_EDIT="${EXTERNAL_EDIT}" tray_session --click "${ORDER} > abbreviations > Descendre"
 check $? "the menu built before the external edit is clicked"
+[ -f "${STATE}/error_dialog" ]
+check $? "the refusal opens the « ErgoptiPlus — Erreur » dialog"
 [ "$(sha256sum < "${DESKTOP_HOME}/expected.toml")" = "$(sha256sum < "${CONFIG}")" ]
 check $? "config.toml still holds the external edit, byte for byte"
 [ "$(saved_order)" = "abbreviations|names|technical_terms" ]
