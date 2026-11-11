@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT ağ modülü kaynaktan derlendi.
 build_luv.recipe_required=Yerel luv derlemesi kaynak tarifini gerektirir.
 install.already_installed={1} — zaten yüklü
 install.archive_digest_unavailable=tutulan tanımlayıcılı güncellemeler gerçek bir OpenSSL3 çalışma zamanı gerektirir; yetenek kullanılamaz durumda kalıyor.
+install.bytecode_skipped=Önceden derlenmiş modüller oluşturulamadı — Ergopti kaynak koddan, biraz daha yavaş başlıyor.
 install.capability_verified={1} — yetenek doğrulandı
 install.command_still_missing={1} yüklendi, ancak '{2}' hâlâ bulunamıyor.
 install.daemon_manual=Daemon'u elle başlatmak için:

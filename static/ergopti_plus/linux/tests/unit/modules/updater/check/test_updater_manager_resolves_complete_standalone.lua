@@ -562,6 +562,32 @@ helpers.describe("installer-backup-ownership native receipts", function()
 		if not ok then error(failure, 0) end
 	end)
 
+	-- The bytecode package is compiled after the receipt (infra/bytecode_package.lua):
+	-- an update must still rotate a backup that carries one.
+	helpers.it("(installer-backup-ownership) admits the derived bytecode tree by name, never as a link", function()
+		local installer = helpers.load_module("modules.updater.installer")
+		local owner = helpers.load_module("modules.updater.ownership_receipt")
+		local fixture = NativeFixture.create(installer)
+		local backup = fixture.installed .. ".old"
+		local ok, failure = pcall(function()
+			receipt(fixture); clone_backup(fixture)
+			assert(uv.fs_mkdir(backup .. "/.bytecode", 493))
+			NativeFixture.write(backup .. "/.bytecode/bundle", "derived bytes\n")
+			local identity, detail = owner.verify(backup, fixture.installed)
+			helpers.assert_true(type(identity) == "string", "a real derived tree is admitted: " .. tostring(detail))
+			assert(uv.fs_unlink(backup .. "/.bytecode/bundle"))
+			assert(uv.fs_rmdir(backup .. "/.bytecode"))
+			assert(uv.fs_symlink(fixture.installed .. "/linux", backup .. "/.bytecode"))
+			helpers.assert_nil(owner.verify(backup, fixture.installed), "a link named like the derived tree is refused")
+			assert(uv.fs_unlink(backup .. "/.bytecode"))
+			assert(uv.fs_mkdir(backup .. "/linux/.bytecode", 493))
+			NativeFixture.write(backup .. "/linux/.bytecode/bundle", "misplaced\n")
+			helpers.assert_nil(owner.verify(backup, fixture.installed), "only the root's derived tree is admitted")
+		end)
+		NativeFixture.remove(fixture.root)
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("(installer-backup-ownership) first and second native updates rotate only complete unchanged receipts", function()
 		local installer = helpers.load_module("modules.updater.installer")
 		local fixture = NativeFixture.create(installer)

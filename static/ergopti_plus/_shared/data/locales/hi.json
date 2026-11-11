@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti शुरू नहीं हो सकता: {1} एक प्रकाशित नेटिव मॉड्यूल नहीं है।",
 	"linux_shell.install.already_installed": "{1} — पहले से इंस्टॉल है",
 	"linux_shell.install.archive_digest_unavailable": "बनाए रखे गए डिस्क्रिप्टर वाले अपडेट के लिए वास्तविक OpenSSL3 रनटाइम आवश्यक है; क्षमता अनुपलब्ध रहती है।",
+	"linux_shell.install.bytecode_skipped": "पूर्व-संकलित मॉड्यूल नहीं बनाए जा सके — Ergopti स्रोत कोड से, थोड़ा धीमे शुरू होता है।",
 	"linux_shell.install.capability_verified": "{1} — क्षमता सत्यापित",
 	"linux_shell.install.command_still_missing": "{1} इंस्टॉल हो गया, लेकिन '{2}' अभी भी नहीं मिला।",
 	"linux_shell.install.daemon_manual": "डेमॉन को मैन्युअल रूप से शुरू करने के लिए:",

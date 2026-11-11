@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti kan inte starta: {1} är inte en publicerad inbyggd modul.",
 	"linux_shell.install.already_installed": "{1} — redan installerat",
 	"linux_shell.install.archive_digest_unavailable": "uppdateringar med kvarhållen deskriptor kräver en verklig OpenSSL3-körtid; funktionen förblir otillgänglig.",
+	"linux_shell.install.bytecode_skipped": "De förkompilerade modulerna kunde inte skapas — Ergopti startar från källkoden, lite långsammare.",
 	"linux_shell.install.capability_verified": "{1} — funktion verifierad",
 	"linux_shell.install.command_still_missing": "{1} installerades, men '{2}' hittas fortfarande inte.",
 	"linux_shell.install.daemon_manual": "Så startar du daemonen manuellt:",

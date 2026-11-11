@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti 无法启动：{1} 不是已发布的原生模块。",
 	"linux_shell.install.already_installed": "{1} — 已安装",
 	"linux_shell.install.archive_digest_unavailable": "保留描述符的更新需要真实的 OpenSSL3 运行时；该功能仍不可用。",
+	"linux_shell.install.bytecode_skipped": "无法生成预编译模块 — Ergopti 将从源代码启动，速度稍慢。",
 	"linux_shell.install.capability_verified": "{1} — 功能已验证",
 	"linux_shell.install.command_still_missing": "已安装 {1}，但仍找不到 '{2}'。",
 	"linux_shell.install.daemon_manual": "要手动启动守护进程：",

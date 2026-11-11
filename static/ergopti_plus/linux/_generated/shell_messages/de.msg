@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT-Netzwerkmodul aus dem Quellcode gebaut.
 build_luv.recipe_required=Der native luv-Build benötigt sein Quellrezept.
 install.already_installed={1} — bereits installiert
 install.archive_digest_unavailable=Aktualisierungen mit gehaltenem Dateideskriptor erfordern eine echte OpenSSL3-Laufzeit; die Funktion bleibt nicht verfügbar.
+install.bytecode_skipped=Die vorkompilierten Module konnten nicht erstellt werden — Ergopti startet aus dem Quellcode, etwas langsamer.
 install.capability_verified={1} — Funktion bestätigt
 install.command_still_missing={1} wurde installiert, aber '{2}' ist weiterhin nicht auffindbar.
 install.daemon_manual=So starten Sie den Daemon manuell:

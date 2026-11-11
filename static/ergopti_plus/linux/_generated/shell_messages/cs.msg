@@ -5,6 +5,7 @@ build_luv.module_generated=Síťový modul LuaJIT sestaven ze zdrojových kódů
 build_luv.recipe_required=Nativní sestavení luv vyžaduje svůj zdrojový recept.
 install.already_installed={1} — již nainstalováno
 install.archive_digest_unavailable=aktualizace s ponechaným deskriptorem vyžadují skutečné běhové prostředí OpenSSL3; funkce zůstává nedostupná.
+install.bytecode_skipped=Předkompilované moduly se nepodařilo vytvořit — Ergopti se spouští ze zdrojového kódu, o něco pomaleji.
 install.capability_verified={1} — funkce ověřena
 install.command_still_missing={1} byl nainstalován, ale '{2}' stále nelze najít.
 install.daemon_manual=Službu ručně spustíte příkazem:

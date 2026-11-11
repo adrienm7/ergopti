@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "לא ניתן להפעיל את Ergopti: ‏{1} אינו מודול מקורי שפורסם.",
 	"linux_shell.install.already_installed": "{1} — כבר מותקן",
 	"linux_shell.install.archive_digest_unavailable": "עדכונים עם מתאר שמור דורשים סביבת OpenSSL3 אמיתית; היכולת נשארת לא זמינה.",
+	"linux_shell.install.bytecode_skipped": "לא ניתן היה ליצור את המודולים המהודרים מראש — Ergopti מופעל מקוד המקור, מעט לאט יותר.",
 	"linux_shell.install.capability_verified": "{1} — היכולת אומתה",
 	"linux_shell.install.command_still_missing": "{1} הותקן, אבל '{2}' עדיין לא נמצא.",
 	"linux_shell.install.daemon_manual": "כדי להפעיל את השירות ידנית:",

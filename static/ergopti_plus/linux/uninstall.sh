@@ -13,6 +13,8 @@ source "$SCRIPT_DIR/install/desktop_entry.sh"
 source "$SCRIPT_DIR/install/messages.sh"
 PREFIX="${HOME:+${HOME}/.local}"
 source "$SCRIPT_DIR/install/config_home.sh"
+# shellcheck source=install/ownership_schema.sh
+source "$SCRIPT_DIR/install/ownership_schema.sh"
 ergopti_resolve_config_home CONFIG_ROOT
 PACKAGE_NAME=ergopti
 CONFIRMED=false
@@ -520,6 +522,10 @@ fi
 bash "$LIBRARY/linux/install/compositor_focus.sh" remove || true
 UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
+# The bytecode package is derived from the payload, never listed in the
+# receipt: removed whole, and only as the real directory the schema names.
+bytecode_tree="$LIBRARY/${OWNERSHIP_DERIVED_TREE:?}"
+if [ -d "$bytecode_tree" ] && [ ! -L "$bytecode_tree" ]; then rm -rf -- "$bytecode_tree"; fi
 rm -- "$MANIFEST"
 UNINSTALL_REMOVAL_COMMITTED=true
 finish_uninstall

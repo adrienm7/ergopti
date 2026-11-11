@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT networking module built from source.
 build_luv.recipe_required=The native luv build needs its source recipe.
 install.already_installed={1} — already installed
 install.archive_digest_unavailable=retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable.
+install.bytecode_skipped=Precompiled modules could not be built — Ergopti starts from source, a little slower.
 install.capability_verified={1} — capability verified
 install.command_still_missing={1} was installed, but '{2}' is still not found.
 install.daemon_manual=To start the daemon manually:

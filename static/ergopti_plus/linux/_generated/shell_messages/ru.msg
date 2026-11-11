@@ -5,6 +5,7 @@ build_luv.module_generated=Сетевой модуль LuaJIT собран из 
 build_luv.recipe_required=Для нативной сборки luv нужен её исходный рецепт.
 install.already_installed={1} — уже установлено
 install.archive_digest_unavailable=обновления с сохранённым дескриптором требуют настоящей среды OpenSSL3; возможность остаётся недоступной.
+install.bytecode_skipped=Не удалось создать предкомпилированные модули — Ergopti запускается из исходного кода, немного медленнее.
 install.capability_verified={1} — возможность проверена
 install.command_still_missing={1} установлен, но '{2}' по-прежнему не найден.
 install.daemon_manual=Чтобы запустить службу вручную:

@@ -5,6 +5,7 @@ build_luv.module_generated=تم بناء وحدة الشبكة لـ LuaJIT من 
 build_luv.recipe_required=يتطلب البناء الأصلي لـ luv وصفة المصدر الخاصة به.
 install.already_installed={1} — مثبّت بالفعل
 install.archive_digest_unavailable=تتطلب التحديثات ذات الواصف المحتفَظ به بيئة OpenSSL3 فعلية؛ تبقى القدرة غير متاحة.
+install.bytecode_skipped=تعذّر إنشاء الوحدات المُصرَّفة مسبقًا — يبدأ Ergopti من الشيفرة المصدرية، أبطأ قليلًا.
 install.capability_verified={1} — تم التحقق من القدرة
 install.command_still_missing=ثُبّت {1}، لكن '{2}' ما زال غير موجود.
 install.daemon_manual=لتشغيل الخدمة يدويًا:

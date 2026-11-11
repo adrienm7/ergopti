@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti kan ikke starte: {1} er ikke et publiceret nativt modul.",
 	"linux_shell.install.already_installed": "{1} — allerede installeret",
 	"linux_shell.install.archive_digest_unavailable": "opdateringer med fastholdt deskriptor kræver en egentlig OpenSSL3-runtime; funktionen forbliver utilgængelig.",
+	"linux_shell.install.bytecode_skipped": "De forudkompilerede moduler kunne ikke oprettes — Ergopti starter fra kildekoden, lidt langsommere.",
 	"linux_shell.install.capability_verified": "{1} — funktion bekræftet",
 	"linux_shell.install.command_still_missing": "{1} blev installeret, men '{2}' findes stadig ikke.",
 	"linux_shell.install.daemon_manual": "Sådan starter du dæmonen manuelt:",

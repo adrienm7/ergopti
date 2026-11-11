@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT-netwerkmodule uit de broncode gebouwd.
 build_luv.recipe_required=De native luv-build heeft zijn bronrecept nodig.
 install.already_installed={1} — al geïnstalleerd
 install.archive_digest_unavailable=updates met vastgehouden descriptor vereisen een echte OpenSSL3-runtime; de functie blijft niet beschikbaar.
+install.bytecode_skipped=De voorgecompileerde modules konden niet worden gemaakt — Ergopti start vanuit de broncode, iets trager.
 install.capability_verified={1} — functie gecontroleerd
 install.command_still_missing={1} is geïnstalleerd, maar '{2}' is nog steeds niet te vinden.
 install.daemon_manual=Om de daemon handmatig te starten:

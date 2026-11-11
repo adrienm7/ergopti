@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT 네트워킹 모듈을 소스에서 빌드했�
 build_luv.recipe_required=luv 네이티브 빌드에는 소스 레시피가 필요합니다.
 install.already_installed={1} — 이미 설치됨
 install.archive_digest_unavailable=유지된 디스크립터 업데이트에는 실제 OpenSSL3 런타임이 필요합니다. 이 기능은 계속 사용할 수 없습니다.
+install.bytecode_skipped=미리 컴파일된 모듈을 만들 수 없습니다 — Ergopti가 소스에서 시작하므로 조금 느려집니다.
 install.capability_verified={1} — 기능 확인됨
 install.command_still_missing={1}을(를) 설치했지만 '{2}'을(를) 여전히 찾을 수 없습니다.
 install.daemon_manual=데몬을 직접 시작하려면:

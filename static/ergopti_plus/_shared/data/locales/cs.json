@@ -1335,6 +1335,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti nelze spustit: {1} není publikovaný nativní modul.",
 	"linux_shell.install.already_installed": "{1} — již nainstalováno",
 	"linux_shell.install.archive_digest_unavailable": "aktualizace s ponechaným deskriptorem vyžadují skutečné běhové prostředí OpenSSL3; funkce zůstává nedostupná.",
+	"linux_shell.install.bytecode_skipped": "Předkompilované moduly se nepodařilo vytvořit — Ergopti se spouští ze zdrojového kódu, o něco pomaleji.",
 	"linux_shell.install.capability_verified": "{1} — funkce ověřena",
 	"linux_shell.install.command_still_missing": "{1} byl nainstalován, ale '{2}' stále nelze najít.",
 	"linux_shell.install.daemon_manual": "Službu ručně spustíte příkazem:",

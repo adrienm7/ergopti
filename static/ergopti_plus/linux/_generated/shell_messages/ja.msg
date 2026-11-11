@@ -5,6 +5,7 @@ build_luv.module_generated=LuaJIT ネットワークモジュールをソース�
 build_luv.recipe_required=luv のネイティブビルドにはソースレシピが必要です。
 install.already_installed={1} — インストール済み
 install.archive_digest_unavailable=保持したディスクリプターによる更新には実際の OpenSSL3 ランタイムが必要です。この機能は利用できないままです。
+install.bytecode_skipped=プリコンパイル済みモジュールを作成できませんでした — Ergopti はソースから起動するため、少し遅くなります。
 install.capability_verified={1} — 機能を確認済み
 install.command_still_missing={1} をインストールしましたが、'{2}' がまだ見つかりません。
 install.daemon_manual=デーモンを手動で起動するには:
