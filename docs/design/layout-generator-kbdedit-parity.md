@@ -33,10 +33,49 @@ multi-character results, ligatures, numpad and media keys, physical remapping, t
 (blocks and code-point entry), printable stickers (four levels per key), a live typing preview and undo/redo.
 Added the same night: drag and drop between keys (swap, Ctrl copies), copy/paste of a mapping, ISO/ANSI board,
 locating a character, exact sticker size, Caps Lock + AltGr, Windows virtual keys, layout flags and NLS
-functions, compiled `.keylayout` and bundle exports, and filling a layer from another layout. Still open against
-this inventory: Unicode name search and the character magnifier (no Unicode names table ships with the page),
-auto case mapping, sticker per-block visibility, keyboard types beyond ISO/ANSI, XKB/KLC exports in the browser
+functions, compiled `.keylayout` and bundle exports, and filling a layer from another layout. Unicode 17.0 name
+search (words, `*` and `?` wildcards, glyph, `U+XXXX`, aliases, adjustable cap of 1000) and the character
+magnifier (glyph, code points, names, block, Copy) on hovered keys, palette cells and results. Still open against
+this inventory: auto case mapping, sticker per-block visibility, keyboard types beyond ISO/ANSI, XKB/KLC exports in the browser
 and the Windows DLL.
+
+## Capability checklist (2026-11-11)
+
+Each capability of the inventory below, checked against the unified editor and the generator. « Editor » names the
+element of `layout_editor/editor_page.js` that offers it; « Windows » marks what only the maintainer's Windows host
+or build can deliver.
+
+| KbdEdit capability                                                  | Ergopti status                                                                                                                                                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extra modifier levels (Kana, Roya, Loya, more than 15 positions)    | Done: `kana` is a built-in level (KBDKANA in the DLL, Option on macOS, AltGr on XKB), user modifiers held or locked (`le-modifiers`), any number of layers; the compiler reports per target what it emulates. |
+| Active/unused combinations, reorder, remove with confirmation       | Done: layer tabs, add/remove layer (refused while referenced).                                                                                                                                                |
+| Uses AltGr, SHIFTLOCK, LRM-RLM, KANALOK flags                       | Done: Windows layout flags (`le-win-flags`), Caps Lock + AltGr per key (`le-caps-altgr`); applied by the KLC generator (Windows DLL: maintainer).                                                             |
+| Low-level VK / scan-code remapping, disable a key                   | Done: physical remap (`le-remap`), disabled mapping, Windows virtual key per key.                                                                                                                             |
+| Drag and drop swap, Ctrl+drop copy, clipboard copy/paste            | Done: board drag and drop, `le-copy` / `le-paste`, Ctrl+C/V on a key.                                                                                                                                         |
+| Move all keys between modifier positions                            | Done (2026-11-11): « Move every key of this layer » (`le-move-all`), move or copy.                                                                                                                            |
+| Shortcuts bound to another key than the typed character             | Done: shortcuts sending another chord (`le-shortcut`), emulated by the drivers.                                                                                                                               |
+| Physical key names                                                  | Done: key name per key (`le-key-name`).                                                                                                                                                                       |
+| Caps Lock modes (unaffected, as Shift, separate SGCAPS)             | Done: per-key Caps mode and its layers (`le-caps`).                                                                                                                                                           |
+| CAPLOKALTGR                                                         | Done: per-key Caps Lock + AltGr.                                                                                                                                                                              |
+| Dead keys, chained dead keys, terminators, rename, delete           | Done: dead-key panel (`le-dead-keys`), chains through `next`, multi-character results (beyond KbdEdit's single BMP character).                                                                                |
+| Compose emulation                                                   | Done: chained dead keys, and the Linux XCompose export.                                                                                                                                                       |
+| Import dead tables from another layout                              | Done: fill a layer from a catalogue or registry layout, dead keys included (`le-fill`).                                                                                                                       |
+| Ligatures (multi-character output)                                  | Done: any text on a key, no 9-character limit.                                                                                                                                                                |
+| Numpad, media keys, mouse-key VKs                                   | Done for numpad and media keys (board numpad toggle, media chips); mouse keys are not a layout feature on macOS/Linux and stay Windows-native.                                                                |
+| NLS special functions, alternative VK                               | Done: NLS entries (`le-nls-*`); compiled into the Windows KLC/DLL only (Windows: maintainer).                                                                                                                 |
+| .klc import, .kbe                                                   | `.keylayout` imports losslessly; KLC import is not offered (Windows-only format; the source TOML replaces KBE).                                                                                               |
+| .keylayout import (bundle or file) and export                       | Done: exact import, bundle/ISO/ANSI export following the macOS drop-down (`le-macos-format`), native load checked on a CI Mac.                                                                                |
+| DLL build, registration, installer package, language bar            | Done (2026-11-11): `npm run kbd-dll` builds the x86/x64/ARM64/WOW64 DLLs and the unsigned NSIS installer (registration, input profile, clean uninstall) on any OS; native check on Windows (maintainer).      |
+| Auto-map upper/lower case, overwrite option                         | Done (2026-11-11): « Fill the other case on the Shift layer » and « Replace a mapping already there » (`le-auto-case`, `le-case-overwrite`).                                                                  |
+| Locate a character                                                  | Done: `le-locate`.                                                                                                                                                                                            |
+| Unicode palette, subranges, jump by code                            | Done: palette blocks, glyph and code-point entry.                                                                                                                                                             |
+| Unicode search by name with wildcards, character magnifier          | Done (2026-11-11): name search with `*` and `?`, glyph or code point, result cap; magnifier with glyph, code points, name, block and Copy.                                                                    |
+| Sticker map: per-level visibility, hide case duplicates, exact size | Done (2026-11-11): « Levels on the stickers » and « Hide a Shift legend that is only the capital » (`le-sticker-levels`); fit or exact size in mm.                                                            |
+| Live preview, clickable keys, lock lights                           | Done: typing preview with held modifiers and dead keys.                                                                                                                                                       |
+| Undo/redo                                                           | Done: unlimited snapshots (`le-undo`, `le-redo`).                                                                                                                                                             |
+| Keyboard types ISO, ANSI                                            | Done: board form selector and both compiled variants.                                                                                                                                                         |
+| Keyboard types JIS 109, ABNT, Typematrix                            | Deferred (decided by the coordinator on 2026-11-11, to review): their keys would enter `physical_keys.json`, which the Windows driver parses at boot.                                                         |
+| Login screen, UAC, Windows upgrade restore                          | Windows only; not applicable on macOS and Linux.                                                                                                                                                              |
 
 ## KbdEdit capability inventory
 

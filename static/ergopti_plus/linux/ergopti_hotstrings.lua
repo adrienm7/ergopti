@@ -510,6 +510,13 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "API key migration",
+			stop = function()
+				local migration = package.loaded["modules.llm.api_key_migration"]
+				return not migration or migration.shutdown() == true
+			end,
+		},
+		{
 			-- The runtime stop above already ended the chain; this releases its ports.
 			name = "LLM model warmup",
 			stop = function() return require("modules.llm.warmup").shutdown() end,
@@ -1892,6 +1899,8 @@ local function main()
 	local function handle_physical(scancode, _key_name, _char, value, source)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		TapHold.observe_copy_activity()
+		-- Any key press ends a gesture's click hold, as on Windows.
+		if gestures then gestures.release_clicks_on_activity() end
 		capture_owned_scancodes[scancode] = nil
 		local allowed = not secure_focus_guard.blocks_text()
 		physical_privacy_admission = { code = scancode, allowed = allowed }
@@ -2055,14 +2064,18 @@ local function main()
 			require("modules.llm.warmup").schedule("startup")
 		end
 		-- API keys an earlier build wrote in plaintext move to the desktop secret
-		-- service once, here: a load never rewrites the file, and waiting for the
-		-- next save would keep them in plaintext while nothing changes.
-		-- A failure here costs the migration, never the boot.
-		local entries_loaded, entries = pcall(require, "modules.llm.api_entries")
-		local migration_ran, failure = entries_loaded, entries
-		if entries_loaded then migration_ran, failure = pcall(entries.migrate_plaintext) end
-		if not migration_ran then
-			Logger.error(LOG, "Plaintext API keys were not migrated: %s", tostring(failure))
+		-- service in the background: a load never rewrites the file, and waiting
+		-- for the next save would keep them in plaintext while nothing changes.
+		-- The boot only arms the move; a locked keyring never delays input
+		-- readiness (decided by the maintainer on 2026-11-11), and a failure
+		-- here costs the migration, never the boot.
+		local migration_loaded, migration = pcall(require, "modules.llm.api_key_migration")
+		local migration_armed, failure = migration_loaded, migration
+		if migration_loaded then
+			migration_armed, failure = pcall(function() return migration.init() and migration.start() end)
+		end
+		if not migration_armed or failure ~= true then
+			Logger.error(LOG, "The background move of plaintext API keys was not armed: %s", tostring(failure))
 		end
 	end
 

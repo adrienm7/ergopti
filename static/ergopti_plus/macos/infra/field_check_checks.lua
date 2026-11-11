@@ -954,6 +954,8 @@ M.checks = {
 	apple_shortcuts = require("infra.field_check_apple_shortcuts").apple_shortcuts,
 	tap_hold_thresholds = require("infra.field_check_tap_hold_thresholds").tap_hold_thresholds,
 	tap_copy = require("infra.field_check_tap_copy").tap_copy,
+	raw_telemetry = require("infra.field_check_raw_telemetry").raw_telemetry,
+	physical_shortcuts = require("infra.field_check_physical_shortcuts").physical_shortcuts,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

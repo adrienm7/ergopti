@@ -6,7 +6,7 @@
 		"platform": "macos",
 		"modifiers": [
 			{
-				"id": "kana",
+				"id": "kana_lock",
 				"mode": "locked",
 				"keys": []
 			}
@@ -62,7 +62,7 @@
 				"selectors": [
 					{
 						"required": [
-							"kana"
+							"kana_lock"
 						],
 						"optional": []
 					}
@@ -116,7 +116,7 @@
 		"remaps": [],
 		"not_emulated": [
 			{
-				"path": "modifiers.kana.keys[0]",
+				"path": "modifiers.kana_lock.keys[0]",
 				"reason": "physical_key_not_emulated"
 			},
 			{
@@ -136,7 +136,7 @@
 		"platform": "linux",
 		"modifiers": [
 			{
-				"id": "kana",
+				"id": "kana_lock",
 				"mode": "locked",
 				"keys": []
 			}
@@ -192,7 +192,7 @@
 				"selectors": [
 					{
 						"required": [
-							"kana"
+							"kana_lock"
 						],
 						"optional": []
 					}
@@ -246,7 +246,7 @@
 		"remaps": [],
 		"not_emulated": [
 			{
-				"path": "modifiers.kana.keys[0]",
+				"path": "modifiers.kana_lock.keys[0]",
 				"reason": "physical_key_not_emulated"
 			},
 			{
@@ -266,7 +266,7 @@
 		"platform": "windows",
 		"modifiers": [
 			{
-				"id": "kana",
+				"id": "kana_lock",
 				"mode": "locked",
 				"keys": []
 			}
@@ -322,7 +322,7 @@
 				"selectors": [
 					{
 						"required": [
-							"kana"
+							"kana_lock"
 						],
 						"optional": []
 					}
@@ -376,7 +376,7 @@
 		"remaps": [],
 		"not_emulated": [
 			{
-				"path": "modifiers.kana.keys[0]",
+				"path": "modifiers.kana_lock.keys[0]",
 				"reason": "physical_key_not_emulated"
 			},
 			{

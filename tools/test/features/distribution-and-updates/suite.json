@@ -666,6 +666,22 @@
 			"args": ["tools/test/test-linux-compositor-focus-install.cjs"],
 			"repro": "npm run test:linux-compositor-focus-install",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-field-todo-summary",
+			"ordinal": 612,
+			"name": "one macOS field report gives every TODO « To confirm on the Mac » point its verdict, and says why a point cannot be tested",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-todo-summary.cjs"],
+			"repro": "npm run test:field-todo-summary"
+		},
+		{
+			"id": "js-field-guided",
+			"ordinal": 613,
+			"name": "a field report's collector-side probes and guided steps observe counts, name what they could not read and never pass without a gesture",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-guided.cjs"],
+			"repro": "npm run test:field-guided"
 		}
 	]
 }

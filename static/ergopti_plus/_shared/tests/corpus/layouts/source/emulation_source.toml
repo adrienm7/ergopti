@@ -22,7 +22,7 @@ mode = "held"
 keys = ["IntlBackslash"]
 
 [[modifiers]]
-id = "kana"
+id = "kana_lock"
 mode = "locked"
 keys = ["Insert", "ScrollLock"]
 
@@ -65,7 +65,7 @@ KeyE = { dead_key = "acute" }
 
 [[layers]]
 id = "kana"
-required = ["kana"]
+required = ["kana_lock"]
 optional = ["caps_lock"]
 
 [layers.keys]
@@ -85,7 +85,7 @@ KeyL = { key = "ArrowRight" }
 
 [[layers]]
 id = "right_kana"
-required = ["shift_right", "kana"]
+required = ["shift_right", "kana_lock"]
 optional = []
 
 [layers.keys]
@@ -140,3 +140,10 @@ key = "Backslash"
 tap = { dead_key = "acute" }
 hold_modifier = "control"
 threshold_ms = 150
+
+# A hold reaching a native layer: the engine sends the key with that layer's modifiers.
+[[tap_holds]]
+key = "Quote"
+tap = { text = "'" }
+hold_layer = "shift"
+threshold_ms = 180

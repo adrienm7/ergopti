@@ -26,6 +26,15 @@
 ---    search application ErgoptiPlus` lists every key this driver stored. Each
 ---    store is a new revision: a changed key never overwrites the one the file
 ---    still names until the file is published.
+--- 6. The background calls (store_async, clear_async, probe_lock_async) never
+---    block the event loop: each runs as an owned child process group with a
+---    deadline, killed when it passes, and needs no keyboard hand-over since
+---    the loop keeps delivering keys meanwhile. The key reaches secret-tool's
+---    standard input through a shell builtin from the child's own environment,
+---    readable only by its owner (/proc/<pid>/environ is mode 0400), never
+---    through an argument. probe_lock_async reads the default collection's
+---    Locked property over D-Bus, which never prompts, so a background retry
+---    does not open an unlock prompt behind the user's back.
 --- ==============================================================================
 
 local M = {}
@@ -335,8 +344,180 @@ function M.clear(reference)
 	return true
 end
 
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Background Calls =============
+-- =========================================
+-- =========================================
+
+local SECRET_INPUT_VARIABLE = "ERGOPTI_SECRET_TOOL_INPUT"
+-- `$0` is the tool and `$@` its arguments: the key never enters the argv.
+local FEED_SCRIPT = 'printf \'%s\' "$' .. SECRET_INPUT_VARIABLE .. '" | "$0" "$@"'
+local _async_sequence = 0
+-- The asynchronous process starter a test installed, or nil.
+local _start_override = nil
+-- The D-Bus query tool a test installed, or nil for gdbus.
+local _probe_tool_override = nil
+
+--- The daemon's environment as "NAME=value" rows, without the key variable.
+--- @return table|nil rows
+local function environment_rows()
+	local loaded, uv = pcall(require, "luv")
+	if not loaded or type(uv) ~= "table" or type(uv.os_environ) ~= "function" then return nil end
+	local called, values = pcall(uv.os_environ)
+	if not called or type(values) ~= "table" then return nil end
+	local rows = {}
+	for key, value in pairs(values) do
+		if type(key) == "string" and type(value) == "string" and not key:find("=", 1, true)
+			and not key:find("\0", 1, true) and not value:find("\0", 1, true) and key ~= SECRET_INPUT_VARIABLE then
+			rows[#rows + 1] = key .. "=" .. value
+		end
+	end
+	table.sort(rows)
+	return rows
+end
+
+--- Runs one program as an owned child with a deadline and calls back once.
+--- @param program string
+--- @param args table
+--- @param env table|nil "NAME=value" rows, nil to inherit.
+--- @param timeout_ms number
+--- @param callback function Receives (status|nil, stdout, stderr, reason|nil).
+--- @return table|nil operation Its cancel() kills the child's process group.
+local function run_async(program, args, env, timeout_ms, callback)
+	_async_sequence = _async_sequence + 1
+	local start = _start_override or require("adapters.owned_process").start
+	local called, operation = pcall(start, program, args, {
+		owner = "api_token_store:" .. _async_sequence, timeout_ms = timeout_ms, env = env,
+	}, function(result)
+		if type(result) ~= "table" then callback(nil, "", "", "no process result") return end
+		local reason = result.error
+		if reason == require("adapter_errors").PROCESS_EXITED_UNSUCCESSFULLY then reason = nil end
+		callback(reason == nil and result.exit_code or nil, result.stdout or "", result.stderr or "", reason)
+	end)
+	if not called or type(operation) ~= "table" then
+		callback(nil, "", "", "the process could not start: " .. tostring(operation))
+		return nil
+	end
+	-- A refused start settles through the same callback.
+	return operation
+end
+
+--- Stores a key without blocking the event loop, under a new revision.
+--- A store that passes its deadline is killed and refused; the reference is
+--- only ever returned for a store secret-tool acknowledged.
+--- @param entry_id string
+--- @param token string A non-empty key.
+--- @param timeout_ms number Deadline of the store.
+--- @param callback function Receives (reference|nil, reason|nil).
+--- @return table|nil operation The running child, for cancel().
+function M.store_async(entry_id, token, timeout_ms, callback)
+	assert(type(callback) == "function", "store_async(): a callback is required")
+	if type(entry_id) ~= "string" or entry_id == "" or type(token) ~= "string" or token == "" then
+		callback(nil, "an entry id and a key are required")
+		return
+	end
+	if #token > SECRET_TOOL_INPUT_BYTES then callback(nil, "API key exceeds secret-tool input capacity") return end
+	local unavailable = backend().unavailable()
+	if unavailable then callback(nil, unavailable) return end
+	local suffix = revision()
+	if not suffix then callback(nil, "secure random revision unavailable") return end
+	local name = entry_id .. "#" .. suffix
+	if _backend then
+		-- A test backend answers at once, as the fake service holds no prompt.
+		local ok, reason = _backend.store(name, token)
+		if ok == true then callback(M.REFERENCE_PREFIX .. name) else callback(nil, tostring(reason)) end
+		return
+	end
+	local env = environment_rows()
+	if not env then callback(nil, "the process environment is unreadable") return end
+	env[#env + 1] = SECRET_INPUT_VARIABLE .. "=" .. token
+	return run_async("sh", {
+		"-c", FEED_SCRIPT, _tool_override or TOOL, "store",
+		"--label=" .. Identifiers.app.name .. " API key " .. name,
+		APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
+	}, env, timeout_ms, function(status, _, stderr, reason)
+		if status == 0 then
+			Logger.info(LOG, "API key stored in the secret service as '%s'.", name)
+			callback(M.REFERENCE_PREFIX .. name)
+			return
+		end
+		callback(nil, reason or failure_reason(stderr, status))
+	end)
+end
+
+--- Deletes the key a reference names without blocking the event loop.
+--- @param reference string
+--- @param timeout_ms number
+--- @param callback function Receives (ok, reason|nil).
+--- @return table|nil operation The running child, for cancel().
+function M.clear_async(reference, timeout_ms, callback)
+	assert(type(callback) == "function", "clear_async(): a callback is required")
+	if not M.is_reference(reference) then callback(false, "a secret-service reference is required") return end
+	local name = name_of(reference)
+	local unavailable = backend().unavailable()
+	if unavailable then callback(false, unavailable) return end
+	if _backend then
+		local ok, reason = _backend.clear(name)
+		callback(ok == true, ok == true and nil or tostring(reason))
+		return
+	end
+	return run_async(_tool_override or TOOL, {
+		"clear", APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
+	}, nil, timeout_ms, function(status, _, stderr, reason)
+		if status == 0 then
+			Logger.info(LOG, "API key '%s' deleted from the secret service.", name)
+			callback(true)
+			return
+		end
+		callback(false, reason or failure_reason(stderr, status))
+	end)
+end
+
+--- Reads whether the default collection is locked, without ever prompting.
+--- "unknown" when D-Bus cannot say (no gdbus, no service, no default
+--- collection yet): a store may then be tried under its own deadline.
+--- @param timeout_ms number
+--- @param callback function Receives ("locked"|"unlocked"|"unknown", reason|nil).
+--- @return table|nil operation The running child, for cancel().
+function M.probe_lock_async(timeout_ms, callback)
+	assert(type(callback) == "function", "probe_lock_async(): a callback is required")
+	if _backend then
+		local locked = type(_backend.locked) == "function" and _backend.locked() or nil
+		callback(locked == true and "locked" or locked == false and "unlocked" or "unknown")
+		return
+	end
+	local tool = _probe_tool_override or "gdbus"
+	if not ShellRunner.has_command(tool, true) then callback("unknown", "gdbus is not installed") return end
+	return run_async(tool, {
+		"call", "--session", "--dest", "org.freedesktop.secrets",
+		"--object-path", "/org/freedesktop/secrets/aliases/default",
+		"--method", "org.freedesktop.DBus.Properties.Get", "org.freedesktop.Secret.Collection", "Locked",
+	}, nil, timeout_ms, function(status, output, stderr, reason)
+		if status == 0 and output:find("<true>", 1, true) then callback("locked") return end
+		if status == 0 and output:find("<false>", 1, true) then callback("unlocked") return end
+		callback("unknown", reason or failure_reason(stderr, status))
+	end)
+end
+
+--- Replaces the asynchronous process starter (tests). nil restores it.
+--- @param start function|nil OwnedProcess.start's signature.
+function M._set_async_start_for_test(start)
+	_start_override = start
+end
+
+--- Runs a stand-in for gdbus (tests). nil restores gdbus.
+--- @param path string|nil An executable path.
+function M._set_probe_tool_for_test(path)
+	_probe_tool_override = path
+end
+
 --- Replaces the backend (tests): { unavailable(), store(name, token),
---- lookup(name), clear(name) } with secret-tool's results. nil restores it.
+--- lookup(name), clear(name), locked()? } with secret-tool's results. nil restores it.
 --- @param fake table|nil
 function M._set_backend_for_test(fake)
 	_backend = fake

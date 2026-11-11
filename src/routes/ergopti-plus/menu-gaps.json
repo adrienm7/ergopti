@@ -410,8 +410,8 @@
 		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Not yet on Windows: The physical shortcut editor is not yet available on Windows.",
-				"fr": "Pas encore sur Windows : L’éditeur de raccourcis physiques n’est pas encore disponible sur Windows."
+				"en": "Not yet on Windows: Windows has no physical shortcut host yet, neither the editor nor the delivery of an action bound to a physical key. Physical shortcuts work on macOS and Linux.",
+				"fr": "Pas encore sur Windows : Windows n’a pas encore d’hôte pour les raccourcis physiques, ni l’éditeur ni le lancement d’une action liée à une touche physique. Les raccourcis physiques fonctionnent sur macOS et Linux."
 			}
 		}
 	},

@@ -578,7 +578,7 @@ return {
 	"tests.unit.modules.gestures.actions.test_take_note",
 	"tests.unit.modules.gestures.actions.test_keep_awake",
 	"tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts",
-	"tests.unit.ui.editors.physical.test_physical_delivery_unqualified",
+	"tests.unit.ui.editors.physical.test_physical_delivery_available",
 	"tests.unit.infra.test_features_manifest_projection",
 	"tests.unit.modules.updater.vectors.test_update_channels_vectors",
 	"tests.unit.modules.updater.check.test_update_check_feedback",
@@ -732,6 +732,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_entries",
 	"tests.unit.modules.llm.remote.test_api_entries_retired_provider",
 	"tests.unit.modules.llm.remote.test_api_entries_secret_service",
+	"tests.unit.modules.llm.remote.test_api_key_migration",
 	"tests.unit.modules.llm.remote.test_local_server_auth_policy",
 	"tests.unit.modules.llm.remote.test_local_server_ports",
 	"tests.unit.modules.llm.remote.test_local_server_fingerprint",
@@ -935,4 +936,5 @@ return {
 	"tests.meta.harness.test_module_groups",
 	"tests.meta.harness.test_native_child_cpath",
 	"tests.meta.harness.test_os_execute_status",
+	"tests.unit.infra.control.test_field_todo_coverage",
 }
