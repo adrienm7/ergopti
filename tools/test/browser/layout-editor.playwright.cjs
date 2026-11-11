@@ -56,10 +56,12 @@ function serve() {
 }
 
 async function open(browser, origin, lang) {
-	const page = await browser.newPage({
+	const context = await browser.newContext({
 		acceptDownloads: true,
 		viewport: { width: 1280, height: 900 }
 	});
+	await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('request', (request) => {
@@ -129,6 +131,13 @@ async function exerciseManager(browser, origin) {
 	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');
 	assert.equal(await page.locator('#layout-view').isVisible(), false);
+	// The inline host lists the names table: the magnifier names a character at once.
+	assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'object');
+	await page.click('#le-board [data-code="KeyQ"]');
+	await page.selectOption('#le-kind', 'text');
+	await page.click('.le-palette summary');
+	await page.hover('#le-palette .le-glyph[title="U+00E9"]');
+	assert.match(await page.textContent('#le-magnifier-rows'), /LATIN SMALL LETTER E WITH ACUTE/);
 	await page.click('#le-save');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_save'));
 	const posted = await page.evaluate(() => window.__posted.find((p) => p.action === 'source_save'));
@@ -200,6 +209,45 @@ async function exerciseManager(browser, origin) {
 		await page.fill('#le-text', 'æ');
 		await page.click('#le-apply');
 		assert.equal(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), 'æ');
+
+		// The name search loads the names table lazily, then maps a result to the key.
+		assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'undefined');
+		await page.click('#le-board [data-code="KeyW"]');
+		await page.selectOption('#le-kind', 'text');
+		await page.click('.le-palette summary');
+		await page.fill('#le-name-search', 'e*acute');
+		await page.fill('#le-name-limit', '3');
+		await page.press('#le-name-search', 'Enter');
+		await page.waitForSelector('#le-name-results [data-point="U+00E9"]');
+		assert.equal(await page.locator('#le-name-results .le-glyph').count(), 3);
+		assert.match(await page.textContent('#le-name-count'), /3/);
+		await page.hover('#le-name-results [data-point="U+00E9"]');
+		assert.equal(await page.textContent('#le-magnifier-glyph'), 'é');
+		assert.match(
+			await page.textContent('#le-magnifier-rows'),
+			/U\+00E9 LATIN SMALL LETTER E WITH ACUTE · Latin-1 Supplement/
+		);
+		await page.click('#le-name-results [data-point="U+00E9"]');
+		assert.equal(await page.inputValue('#le-text'), 'é');
+		await page.click('#le-apply');
+		assert.equal(await page.textContent('#le-board [data-code="KeyW"] .le-legend'), 'é');
+		// A rendered page keeps the palette open with its last answer.
+		assert.equal(await page.locator('#le-name-results [data-point="U+00E9"]').count(), 1);
+		// Dropping a result on another key maps that key to the character (the two are
+		// far apart on the page, so the drag events carry one DataTransfer directly).
+		const transfer = await page.evaluateHandle(() => new DataTransfer());
+		await page.dispatchEvent('#le-name-results [data-point="U+00C9"]', 'dragstart', {
+			dataTransfer: transfer
+		});
+		await page.dispatchEvent('#le-board [data-code="KeyE"]', 'drop', { dataTransfer: transfer });
+		assert.equal(await page.textContent('#le-board [data-code="KeyE"] .le-legend'), 'É');
+		// Hovering a key magnifies its legend; Copy puts it on the clipboard.
+		await page.hover('#le-board [data-code="KeyE"]');
+		assert.equal(await page.textContent('#le-magnifier-glyph'), 'É');
+		await page.click('#le-magnifier-copy');
+		assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'É');
+		await page.click('#le-undo');
+		await page.click('#le-undo');
 
 		// A dead key with a rule types its composition in the preview.
 		await page.click('#le-dead-keys summary');
