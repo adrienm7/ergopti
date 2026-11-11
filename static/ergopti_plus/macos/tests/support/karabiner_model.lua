@@ -682,11 +682,17 @@ function Engine:up(key_code, within_timeout)
 	end
 end
 
---- Presses and quickly releases one key alone: a tap.
+--- How long a quick tap holds its key: the shared tap minimum
+--- (tap_hold.tap_min_duration_ms), the shortest press every driver types as a
+--- tap; a shorter one is a bounce the generated rules drop.
+M.TAP_MS = require("infra.timings").ms("tap_hold", "tap_min_duration_ms")
+
+--- Presses and quickly releases one key alone: a tap held for M.TAP_MS.
 --- @param key_code string Physical key.
 --- @return table|nil manipulator The manipulator that took it.
 function Engine:tap(key_code)
 	local manipulator = self:down(key_code)
+	self:advance(M.TAP_MS)
 	self:up(key_code, true)
 	return manipulator
 end
