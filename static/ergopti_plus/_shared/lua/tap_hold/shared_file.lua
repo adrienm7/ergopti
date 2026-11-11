@@ -31,22 +31,25 @@
 
 local M = {}
 
+local ConfigKeys = require("config_keys")
 local KeyCombinations = require("tap_hold.key_combinations")
+
+local LEAF = ConfigKeys.LEAF
 
 --- The sections the file holds (shared_file.toml [layout]).
 M.TAP_HOLD = "tap_hold"
-M.COMBOS = "mod_combos"
+M.COMBOS = LEAF.MOD_COMBOS
 M.KARABINER = "karabiner"
 M.META = "_meta"
 
 -- The model's own section names (macos/platform/remap/config.lua).
-local MODEL_TAP_HOLDS = "tap_holds"
-local MODEL_COMBOS = "mod_combos"
+local MODEL_TAP_HOLDS = LEAF.TAP_HOLDS
+local MODEL_COMBOS = LEAF.MOD_COMBOS
 local MODEL_KARABINER = "karabiner"
 
 -- The section leaves whose name and value are the same in the file and in the model.
-local SAME_TAP_HOLD_LEAVES = { "enabled", "sticky_timeout_ms", "lone_modifier_tap_max_ms" }
-local SAME_COMBO_LEAVES = { "enabled", "simultaneous_threshold_ms", "symmetric" }
+local SAME_TAP_HOLD_LEAVES = { "enabled", LEAF.STICKY_TIMEOUT_MS, LEAF.LONE_MODIFIER_TAP_MAX_MS }
+local SAME_COMBO_LEAVES = { "enabled", LEAF.SIMULTANEOUS_THRESHOLD_MS, "symmetric" }
 local COMBO_SLOTS = { "combo", "tap", "hold" }
 local HOLD_FIELDS = { "hold_modifier", "hold_layer", "hold_action" }
 local NONE = "none"
@@ -580,10 +583,10 @@ function M.file_segments(segments, ctx)
 		if out[2] == "config" then
 			out[2] = "keys"
 			if out[3] ~= nil then out[3] = ctx.key_of_hs[out[3]] or out[3] end
-			local field = { tap = "tap_action", hold = "hold_modifier", timeout_ms = "time_activation_seconds" }
+			local field = { tap = "tap_action", hold = "hold_modifier", timeout_ms = LEAF.TIME_ACTIVATION_SECONDS }
 			if out[4] ~= nil then out[4] = field[out[4]] or out[4] end
 		elseif out[2] == "timeout_ms" then
-			out[2] = "time_activation_seconds"
+			out[2] = LEAF.TIME_ACTIVATION_SECONDS
 		end
 	elseif section == MODEL_COMBOS and out[2] == "config" and out[3] ~= nil then
 		out[3] = ctx.pair_of_combo[out[3]] or out[3]
