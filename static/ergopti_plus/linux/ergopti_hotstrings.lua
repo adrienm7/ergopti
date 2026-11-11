@@ -1143,6 +1143,9 @@ local function main()
 	end
 	Logger.info(LOG, "Using device: %s.", device)
 	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
+	-- 8.5 to 8.8 had no stage: the boot summary left their time between two
+	-- stages, unattributed (about 170 ms in a measured X11 session).
+	BootProfiler.stage("callbacks")
 
 	-- Focused app id, cached off the input path by the process_lifecycle
 	-- onFocusChange callback (see 8.12). Declared BEFORE on_char so on_char
@@ -2714,6 +2717,7 @@ local function main()
 	end
 
 
+	BootProfiler.stage_done("callbacks")
 	-- 8.9) Start the tray menu if requested.
 	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
@@ -2775,6 +2779,7 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
+					local switch_started = require("infra.perf_counters").trace("layout.switch")
 					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
 					local function selected_map_current()
 						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
@@ -2786,6 +2791,7 @@ local function main()
 						return selected_map_current() and set_layout(new_layout) == true
 							and selected_map_current() and refresh(selected_keymap) == true
 					end, selected_map_current) then
+						require("infra.perf_counters").done("layout.switch", switch_started, "refused")
 						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
 						return
 					end
@@ -2801,7 +2807,8 @@ local function main()
 					-- So the tick moves to the row the user just chose. Without it the
 					-- menu still marks the old layout and the change reads as ignored.
 					if rebuild_tray_menu then rebuild_tray_menu() end
-					Logger.success(LOG, "Layout '%s' applied.", tostring(new_layout))
+					Logger.success(LOG, "Layout '%s' applied in %.0f ms.", tostring(new_layout),
+						require("infra.perf_counters").done("layout.switch", switch_started))
 				end,
 		keystats     = keystats,
 		llm           = prediction_engine,
@@ -3239,6 +3246,8 @@ local function main()
 	if not opts.dry_run then require("infra.personal_shortcuts").load() end
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
+	-- The snapshot, the watchers and the loop's setup, unattributed before.
+	BootProfiler.stage("watchers")
 
 	-- Discover environment facts while the desktop still owns the keyboard.
 	-- Only cached metadata formatting/logging may follow the ready announcement.
@@ -3508,6 +3517,7 @@ local function main()
 	if not keyboard_layout.refresh(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	BootProfiler.stage_done("watchers")
 	if not privacy_owners.startup_checkpoint() then return end
 	-- Retain the selected inverse publisher before any source-acquisition callback.
 	local capture_layout = keyboard_layout
@@ -3688,6 +3698,8 @@ local function main()
 	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
+	-- The interval since the last summary, which a short session never reached.
+	require("infra.perf_counters").flush_now()
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end

@@ -29,7 +29,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "b6660b1e420c9975814058dffc45d3dd0a765adeb0d6ff94a3bdabb1e4e9ec1d"
+			"sha256": "9ecd01ce264d372db5b07583eb7d6f4e87267e8c6130f1f84853896f97a442e3"
 		},
 		{
 			"id": "macos-control",
@@ -43,7 +43,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.undo_on_backspace",
-			"sha256": "b6660b1e420c9975814058dffc45d3dd0a765adeb0d6ff94a3bdabb1e4e9ec1d"
+			"sha256": "9ecd01ce264d372db5b07583eb7d6f4e87267e8c6130f1f84853896f97a442e3"
 		},
 		{
 			"id": "linux-repeat",
@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "1252f51dcb962710985252f77ec8bc86106d0710d0019a240471296573d6e01f"
+			"sha256": "4b5fb1931ec43d78158005f2bf6392078c99947d228480608f23e6a9abf49c6b"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -92,7 +92,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
-			"sha256": "b3e2861b67c0c7ac4840e617d7e212c84f1c884532f012b491f4ceeb030ece6f"
+			"sha256": "714a8991f27e899ce696afed5a492b71da7d0c38c2e54fbb2476af9bd11d4f02"
 		},
 		{
 			"id": "windows-layout-emulation",
