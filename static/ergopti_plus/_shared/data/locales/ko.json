@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "소스에 출처를 알 수 없는 네이티브 모듈 폴더가 있습니다.",
 	"linux_shell.install.xdg_autostart": "XDG 자동 시작: {1}",
 	"linux_shell.launch.already_running": "Ergopti+가 이 세션에서 이미 실행 중입니다({1} 사용 중). 이번 실행은 거부되었습니다.",
+	"linux_shell.launch.restarting": "Ergopti+가 이 세션에서 이미 실행 중입니다. 종료를 요청한 다음 다시 시작합니다.",
 	"linux_shell.launch.authorization_failed": "입력 접근 권한 승인이 취소되었거나 실패했습니다.",
 	"linux_shell.launch.groups_unavailable": "세션이 설정된 입력 그룹을 얻지 못했습니다.",
 	"linux_shell.launch.session_lock_invalid": "세션 잠금 폴더는 절대 경로여야 합니다.",

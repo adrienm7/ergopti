@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "O código-fonte contém uma pasta de módulos nativos de origem desconhecida.",
 	"linux_shell.install.xdg_autostart": "início automático XDG: {1}",
 	"linux_shell.launch.already_running": "O Ergopti+ já está em execução nesta sessão ({1} está ocupado); esta inicialização foi recusada.",
+	"linux_shell.launch.restarting": "O Ergopti+ já está em execução nesta sessão; é-lhe pedido que termine e depois é reiniciado.",
 	"linux_shell.launch.authorization_failed": "A autorização de acesso à entrada foi cancelada ou falhou.",
 	"linux_shell.launch.groups_unavailable": "A sessão não conseguiu obter os seus grupos de entrada configurados.",
 	"linux_shell.launch.session_lock_invalid": "A pasta de bloqueio da sessão deve ser um caminho absoluto.",

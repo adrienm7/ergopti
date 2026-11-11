@@ -85,6 +85,7 @@ install.xdg_autostart=automatické spuštění XDG: {1}
 launch.already_running=Ergopti+ již v této relaci běží ({1} je obsazen); toto spuštění bylo odmítnuto.
 launch.authorization_failed=Autorizace přístupu ke vstupu byla zrušena nebo selhala.
 launch.groups_unavailable=Relace nemohla získat své nakonfigurované vstupní skupiny.
+launch.restarting=Ergopti+ už v této relaci běží; bude požádán o ukončení a poté znovu spuštěn.
 launch.session_lock_invalid=Adresář zámku relace musí být absolutní cesta.
 launcher.dependencies_installed=Závislosti nainstalovány.
 launcher.driver_missing=Chyba: adresář ovladače pro Linux nebyl nalezen: {1}
