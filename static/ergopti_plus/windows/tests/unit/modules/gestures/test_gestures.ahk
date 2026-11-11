@@ -255,15 +255,17 @@ TestGestures_ToggleUIRejectsLiveActivationRefusal() {
 	Exists := _GTUI_ResultSequence([true, true])
 	Open := _GTUI_CallRecorder()
 	Activate := _GTUI_CallRecorder(false)
-	Message := ""
+	; The caught state is the verdict: a refusal raised with an empty message
+	; still surfaces, and a message sentinel read it as swallowed.
+	Surfaced := false
 	try {
 		_GestureGenericToggleUIWith(
 			(*) => 123, Open, (*) => true, Exists, (*) => 456, Activate)
-	} catch as Err {
-		Message := Err.Message
+	} catch {
+		Surfaced := true
 	}
 
-	AssertTrue(Message != "", "a live activation refusal must surface as an error")
+	AssertTrue(Surfaced, "a live activation refusal must surface as an error")
 	AssertEqual(1, Activate.calls, "the live window must receive one activation attempt")
 	AssertEqual(2, Exists.calls, "the refusal must be classified against current existence")
 	AssertEqual(0, Open.calls, "a still-live window must not be duplicated")
