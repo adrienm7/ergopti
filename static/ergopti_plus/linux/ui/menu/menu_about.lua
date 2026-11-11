@@ -172,16 +172,14 @@ local function _about_update_rows(ctx)
 			-- Without a window (no WebKitGTK, no display) the answer is announced
 			-- by a notification instead
 			Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
-			up.check_for_updates(nil, function(available, release, err)
-				if available and release then
-					Logger.info(LOG, "Update available: %s.", release.tag)
-				elseif err then
-					Logger.warn(LOG, "Update check failed: %s.", tostring(err))
-				else
-					Logger.info(LOG, "No update available (current: %s).", up.current_version())
-				end
+			up.check_for_updates(nil, function(_, _, err, result)
+				if err then Logger.warn(LOG, "Update check failed: %s.", tostring(err)) end
+				Logger.info(LOG, "Update check answered: %s (current: %s).",
+					tostring(type(result) == "table" and result.state), up.current_version())
+				-- The structured answer the window would show: each outcome keeps its
+				-- own sentence (modules/updater/check_notice.lua).
 				if type(ctx.on_update_checked) == "function" then
-					ctx.on_update_checked(available, release, err)
+					ctx.on_update_checked(result)
 				end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			end)
