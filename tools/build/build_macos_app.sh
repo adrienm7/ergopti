@@ -514,6 +514,19 @@ bundle_layout_registry() {
 	[ -f "$dest_dir/index.json" ] || fail "Keyboard-layout registry was not packaged at $dest_dir"
 }
 
+# The shipped Ergopti pack (its suffixes, magic-key replacement, rolls and
+# reductions) lives in the registry as files its manifest binds; the driver
+# refuses a pack with a bound file missing, so the app would boot without them.
+# The check reads the bindings from the source manifests and requires every
+# bound file in the packaged registry with its source bytes.
+verify_layout_extension_payload() {
+	local static_root="$1"
+	log "Verifying the layout extension hotstring payload"
+	python3 "$REPO_ROOT/tools/build/check_layout_extension_payload.py" \
+		"$REPO_ROOT/static/layouts/registry" "$static_root/layouts/registry" \
+		|| fail "The packaged layout registry lacks a bound extension hotstring file"
+}
+
 # Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon and stage
 # the driver payload under Resources/static/. The embedded Hammerspoon's
 # bundle id is rewritten so its preferences land under our id.
@@ -587,6 +600,7 @@ assemble_app() {
 
 	bundle_keyboard_layout "$static_root"
 	bundle_layout_registry "$static_root"
+	verify_layout_extension_payload "$static_root"
 }
 
 
