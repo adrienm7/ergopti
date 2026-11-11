@@ -475,6 +475,25 @@ end
 -- word-only cases first type a real separator and retain it in the independent
 -- screen oracle; an empty modeled field never grants the engine that knowledge.
 local DAEMON_SCENARIOS = {
+	-- Item 50: fb gives facebook, facebook gives Facebook, as one edit; the
+	-- expectations are _shared/tests/corpus/hotstrings/cascade_vectors.json's
+	-- fb_* vectors. cascade = "<arrows>[,consume]" sets the private config.
+	{ name = "item 50: fb + Space at three arrows cascades and keeps the Space", keys = " fb ", screen = " Facebook ",
+		cascade = "3" },
+	{ name = "item 50: fb + Space at two arrows cascades", keys = " fb ", screen = " Facebook ", cascade = "2" },
+	{ name = "item 50: fb + Space at one arrow is a single expansion", keys = " fb ", screen = " facebook ",
+		cascade = "1" },
+	{ name = "item 50: fb + consumed Space cascades and swallows it once", keys = " fb ", screen = " Facebook",
+		cascade = "3,consume" },
+	{ name = "item 50: fb + consumed Space at one arrow", keys = " fb ", screen = " facebook", cascade = "1,consume" },
+	{ name = "item 50: fb + Enter at three arrows keeps the Enter", keys = " fb{ENTER}", screen = " Facebook\n",
+		cascade = "3" },
+	{ name = "item 50: fb + consumed Enter cascades and swallows it", keys = " fb{ENTER}", screen = " Facebook",
+		cascade = "3,consume" },
+	{ name = "item 50: fb + Enter at one arrow", keys = " fb{ENTER}", screen = " facebook\n", cascade = "1" },
+	{ name = "item 50: fb + the magic key cascades and swallows it", keys = " fb★", screen = " Facebook", cascade = "2" },
+	{ name = "item 50: fb + the magic key at one arrow", keys = " fb★", screen = " facebook", cascade = "1" },
+	{ name = "item 50: fb + the magic key at three arrows", keys = " fb★", screen = " Facebook", cascade = "3" },
 	{ name = "an end-char trigger expands and keeps its terminator", keys = " adn ", screen = " ADN " },
 	{ name = "Enter is a terminator", keys = " adn{ENTER}", screen = " ADN\n" },
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
@@ -715,6 +734,7 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
+			env[#env + 1] = { "ERGOPTI_E2E_CASCADE", scenario.cascade or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
