@@ -2188,7 +2188,14 @@ baseline` line (item 38).
   toggle lines), `log_hotstring_expansions` (auto and terminator expansions)
   `log_boot_completions`, `log_api_key_absent` (« Keychain holds no key for
   entry … ») and `log_api_key_reentered` (« API entry key change staged ») are
-  counts the guided steps watch rise and the
+  counts, as are the event lines added for the guided steps on 2026-11-11 (one
+  per event): `log_gesture_swipe_dispatches` (« Gesture dispatched:
+  slot=swipe_3… », DEBUG), `log_scope_commits` (« Scope <scope> <mode>
+  committed »), `log_tap_hold_word_resets` (« Tap-hold command marker received
+  (word reset: yes) », logged after the eventtap returns), `log_layout_emulations_on`,
+  `log_number_row_applies` and `log_pages_dark` / `log_pages_light` (« Webview
+  '…' rendered in the <appearance> appearance », DEBUG, from
+  `hs.host.interfaceStyle()` at the first load). The guided steps watch them rise and the
   TODO summary bounds (`min` 4 boots for the production profile).
 - `field_raw_telemetry` runs after `field_ai_local`: one read-only, lock-free
   `sqlite3` query names the `events_window_topo`, `events_av` and

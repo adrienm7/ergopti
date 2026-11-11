@@ -169,7 +169,8 @@
 					"step": "guided_taphold_word_reset"
 				}
 			],
-			"condition": "Karabiner-Elements delivering the tagged F20 and the untagged application key."
+			"condition": "Karabiner-Elements delivering the tagged F20 and the untagged application key.",
+			"not_testable": "That the user's own Cmd+C keeps the word, that no F20 or context-menu key reaches TextEdit or a Finder rename, and the Caps Lock hold cases are seen on screen."
 		},
 		{
 			"id": "ai_inline_autotype",
@@ -206,7 +207,8 @@
 				{
 					"step": "guided_number_row"
 				}
-			]
+			],
+			"not_testable": "The symbols typed after the reload are read on screen: the log withholds typed text."
 		},
 		{
 			"id": "owned_ollama_pulls",
@@ -472,7 +474,8 @@
 				{
 					"step": "guided_layout_emulation"
 				}
-			]
+			],
+			"not_testable": "The characters typed (Option levels, the dead ^, Cmd+Z, a row switched off, an Option chord in Terminal, the password-field limit) are read on screen: the log withholds typed text."
 		},
 		{
 			"id": "hotstrings_asa",
@@ -524,7 +527,8 @@
 					"step": "guided_swipe_tabs"
 				}
 			],
-			"condition": "No explicit [gestures.sensitivities] swipe_3 value."
+			"condition": "No explicit [gestures.sensitivities] swipe_3 value.",
+			"not_testable": "Whether each swipe switched exactly one tab and the two-finger scrolls switched none is seen on screen: the log names the dispatch, not the tab."
 		},
 		{
 			"id": "ctrl_capslock",
@@ -615,7 +619,8 @@
 				{
 					"step": "guided_menus"
 				}
-			]
+			],
+			"not_testable": "The row labels, their order, the tap delay row and the pickers are read on screen; « Retirer les anciennes règles » needs an upgrade; Login Items' single Ergopti is field_login_items."
 		},
 		{
 			"id": "typing",
@@ -659,7 +664,8 @@
 				{
 					"step": "guided_pages_light_dark"
 				}
-			]
+			],
+			"not_testable": "Whether each page looks right in both appearances, App Cloner's errors, held menu clicks replayed and a quit while busy ending both processes in 10 s are seen by the person."
 		},
 		{
 			"id": "issue_100_99",
