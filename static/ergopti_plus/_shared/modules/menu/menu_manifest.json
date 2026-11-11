@@ -2419,7 +2419,7 @@
 				"linux"
 			],
 			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_editor_host_pending_on_windows"
+			"reason_key": "platform_reason.layout_editor_is_on_the_website_on_windows"
 		},
 		{
 			"type": "list",

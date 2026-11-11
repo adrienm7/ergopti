@@ -641,8 +641,8 @@
 		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Not on Windows yet: the Windows layout manager window cannot open or save layout sources yet; the editor stays available on the website.",
-				"fr": "Pas encore sous Windows : la fenêtre du gestionnaire de dispositions de Windows ne sait pas encore ouvrir ni enregistrer les sources de disposition ; l'éditeur reste disponible sur le site."
+				"en": "Editor on the website on Windows: the Windows layout manager window has no layout editor; create, edit and export layouts on the Ergopti website.",
+				"fr": "Éditeur sur le site sous Windows : la fenêtre du gestionnaire de dispositions de Windows n'a pas d'éditeur ; créez, modifiez et exportez vos dispositions sur le site Ergopti."
 			}
 		}
 	},

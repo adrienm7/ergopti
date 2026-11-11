@@ -137,6 +137,7 @@ local CANONICAL_LAYOUT_MENU = {
 	"section_header:menu.layout.header_custom",
 	"list:custom_layouts",
 	"command:layout_manager",
+	"command:open_layout_editor",
 	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
 	-- keyboard layout through the OS's input-source mechanism and draws a
 	-- menubar icon; neither concept exists on the other two drivers.

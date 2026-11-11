@@ -4150,7 +4150,7 @@
 	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu.",
 	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Jeszcze nie w Windows: wyświetlanie token po tokenie nie zostało zweryfikowane w Windows, więc ta opcja pozostaje nieaktywna.",
-	"platform_reason.layout_editor_host_pending_on_windows": "Jeszcze nie w Windows: okno menedżera układów w Windows nie potrafi jeszcze otwierać ani zapisywać źródeł układów; edytor pozostaje dostępny w witrynie.",
+	"platform_reason.layout_editor_is_on_the_website_on_windows": "W Windows edytor w witrynie: okno menedżera układów w Windows nie ma edytora; twórz, edytuj i eksportuj układy w witrynie Ergopti.",
 	"menu.layout.number_row": "Rząd cyfr",
 	"menu.layout.number_row_native": "Kolejność systemowa",
 	"menu.layout.number_row_digits": "Najpierw cyfry",
