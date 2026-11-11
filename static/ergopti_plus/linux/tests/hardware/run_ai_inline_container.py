@@ -25,7 +25,7 @@ import time
 import container_session as cs
 
 KEYBOARD = "Ergopti Proof Keyboard"
-KEY_TAB, KEY_SPACE, KEY_SLASH = 15, 57, 53
+KEY_TAB, KEY_SPACE, KEY_SLASH, KEY_LEFTCTRL = 15, 57, 53, 29
 LETTERS = {
     c: k
     for k, c in zip(
@@ -154,6 +154,16 @@ def proof():
         )
         cs.check(
             not any(row.startswith("K %d " % KEY_TAB) for row in rows), "no Tab left the daemon"
+        )
+        # Typed key by key through the layout, not pasted: the user typed no
+        # "q", and a revoked layout receipt sends every replacement to the
+        # clipboard route instead (Ctrl+V). The session's first daemon key
+        # switches the X server's source slave, whose same-group XKB notify
+        # once revoked the receipt for good (TODO.md, decided by the maintainer
+        # on 2026-11-11: renew it when the re-read keymap is identical).
+        cs.check(
+            "K %d 1" % LETTERS["q"] in rows and "K %d 1" % KEY_LEFTCTRL not in rows,
+            "the prediction was typed through the layout, not pasted",
         )
 
         # 2/ A password field.
