@@ -932,6 +932,21 @@
 		},
 		{
 			"os": "linux",
+			"tool": "`gio`",
+			"programs": ["gio"],
+			"used_for": "Empty-trash gesture without GVfs, checked against the home trash afterwards (`linux/modules/gestures/system_actions.lua` `EMPTY_TRASH`)",
+			"today": "Host (GLib's command-line tools)",
+			"current_class": "OPT",
+			"version_needed": "any",
+			"if_missing": "Empty-trash gesture reports a failure",
+			"pin_possible": "No (ships with GLib)",
+			"decision": "OPT",
+			"decision_text": "OPT",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "linux",
 			"tool": "`gdbus` (AT-SPI bus)",
 			"programs": ["gdbus"],
 			"used_for": "Caret position for the tooltip (`linux/ui/tooltip/preview.lua:164`; package `at-spi2-core`)",
