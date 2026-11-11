@@ -42,6 +42,10 @@ local MAX_TITLE_BYTES = 2048
 local MAX_ID_BYTES = 128
 local KWIN_SCRIPT_ID = "ergopti-focus"
 
+-- Exposed so the shipped desktop files are checked against the values this
+-- worker serves rather than against a copy of its text.
+M.KWIN_SCRIPT_ID = KWIN_SCRIPT_ID
+
 
 
 
@@ -95,6 +99,7 @@ local INTROSPECTION = [[
   </interface>
 </node>
 ]]
+M.INTROSPECTION = INTROSPECTION
 
 --- Serves the bus name until the parent, the bus or stdout goes away.
 --- @param service string org.gnome.Shell or org.kde.KWin.

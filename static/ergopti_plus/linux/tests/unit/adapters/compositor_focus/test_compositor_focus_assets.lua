@@ -33,8 +33,8 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 			helpers.assert_eq(constant(text, "INTERFACE"), Focus.INTERFACE, path)
 			helpers.assert_true(text:find("'Activated'", 1, true) ~= nil and text:find("'Cleared'", 1, true) ~= nil, path)
 		end
-		local worker = read("adapters/compositor_focus_worker.lua")
-		helpers.assert_true(worker:find('<interface name="' .. Focus.INTERFACE .. '">', 1, true) ~= nil,
+		local Worker = helpers.load_module("adapters.compositor_focus_worker")
+		helpers.assert_true(Worker.INTROSPECTION:find('<interface name="' .. Focus.INTERFACE .. '">', 1, true) ~= nil,
 			"the worker exports the interface the desktops call")
 	end)
 
@@ -45,7 +45,7 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 		local installer = read("install/compositor_focus.sh")
 		helpers.assert_eq(installer:match('\nGNOME_FOCUS_UUID="([^"]+)"'), gnome.uuid)
 		helpers.assert_eq(installer:match('\nKWIN_FOCUS_ID="([^"]+)"'), kwin.KPlugin.Id)
-		helpers.assert_eq(read("adapters/compositor_focus_worker.lua"):match('KWIN_SCRIPT_ID = "([^"]+)"'), kwin.KPlugin.Id)
+		helpers.assert_eq(helpers.load_module("adapters.compositor_focus_worker").KWIN_SCRIPT_ID, kwin.KPlugin.Id)
 		helpers.assert_eq(kwin["X-Plasma-MainScript"], "code/main.js")
 		helpers.assert_eq(kwin.KPackageStructure, "KWin/Script")
 		-- GNOME refuses to load an extension that does not list the running
