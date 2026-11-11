@@ -46,6 +46,7 @@ local function load_coordinator(options)
 	local initialized = coordinator.init({
 		capture_publication_admission = options.capture_publication_admission,
 		record_stage = options.record_stage,
+		report_update_quit = options.report_update_quit,
 		request_lease = function(reason, callback)
 			calls.lease_requests = calls.lease_requests + 1
 			calls.reason = reason
@@ -196,6 +197,19 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_nil(calls.watchdog_callback)
 		helpers.assert_eq(calls.teardowns, 0)
 		helpers.assert_eq(calls.fatal_exits, 0)
+	end)
+
+	helpers.it("(update-quit-kept) an admitted user exit tells a waiting release swap first", function()
+		-- The swap's wait is this boot: without the report it reopened the previous app.
+		local reports = {}
+		local coordinator, calls = load_coordinator({ report_update_quit = function(reason)
+			reports[#reports + 1] = { reason = reason }
+			error("controlled swap report failure")
+		end })
+		helpers.assert_true(coordinator.request_user_exit("menu_quit"), "a failed report never blocks the exit")
+		helpers.assert_eq(#reports, 1)
+		helpers.assert_eq(reports[1].reason, "menu_quit")
+		helpers.assert_eq(calls.lease_requests, 1, "the exit still runs")
 	end)
 
 	helpers.it("retains the same admitted token across delayed reload and quit upgrade", function()

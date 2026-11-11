@@ -79,6 +79,8 @@ assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native re
 --- once its boot reports ready (the Windows swap's boot-ready and probation):
 --- a build that never reports within the wait, or exits during the probation,
 --- is stopped and moved aside, and the previous app is put back and opened.
+--- The wait is the new build's boot, so a user's Quit lands there: the boot
+--- writes `quit` to the token, and the swap keeps the build and opens nothing.
 --- Arguments: launcher pid, installed app, verified app, previous-app path.
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
@@ -146,10 +148,17 @@ M.SWAP_SCRIPT = table.concat({
 	'		/bin/sleep 0.1',
 	'	done',
 	'	successor=$(/bin/cat "$ready_dir/ready")',
-	'	/bin/rm -rf "$ready_dir"',
-	'	case "$successor" in ""|*[!0-9]*) successor=; failure="an invalid boot report"; return 1 ;; esac',
+	'	# A Quit is no failed start: the boot writes quit (infra/updater_boot_ready.lua)',
+	'	if [ "$successor" = quit ]; then /bin/rm -rf "$ready_dir"; successor=; kept="before it reported ready"; return 1; fi',
+	'	case "$successor" in ""|*[!0-9]*) /bin/rm -rf "$ready_dir"; successor=; failure="an invalid boot report"; return 1 ;; esac',
 	'	/bin/sleep 0.75',
-	'	/bin/kill -0 "$successor" 2>/dev/null || { failure="it quit during the probation"; return 1; }',
+	'	if ! /bin/kill -0 "$successor" 2>/dev/null; then',
+	'		[ "$(/bin/cat "$ready_dir/ready" 2>/dev/null)" = quit ] && kept="during its probation"',
+	'		/bin/rm -rf "$ready_dir"',
+	'		[ -n "$kept" ] && return 1',
+	'		failure="it quit during the probation"; return 1',
+	'	fi',
+	'	/bin/rm -rf "$ready_dir"',
 	'	return 0',
 	'}',
 	'# Successor boot-ready receiving ends',
@@ -160,8 +169,9 @@ M.SWAP_SCRIPT = table.concat({
 	'		/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
 	'		exit 0',
 	'	fi',
-	'	successor=; failure=',
+	'	successor=; failure=; kept=',
 	'	if open_until_ready; then echo "The installed app reported a healthy start."; exit 0; fi',
+	'	if [ -n "$kept" ]; then echo "The installed app was quit $kept: it stays installed and nothing is opened."; exit 0; fi',
 	'	stop_successor "$successor"',
 	'	failed_app="$app.failed-$$"',
 	'	if [ -e "$failed_app" ] || [ -L "$failed_app" ]; then',

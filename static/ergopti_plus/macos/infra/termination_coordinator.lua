@@ -840,6 +840,10 @@ function M.init(deps)
 		Logger.error(LOG, "M.init(): optional record_stage must be a function.")
 		return false
 	end
+	if deps.report_update_quit ~= nil and type(deps.report_update_quit) ~= "function" then
+		Logger.error(LOG, "M.init(): optional report_update_quit must be a function.")
+		return false
+	end
 	if NumberPolicy.timer_delay_ms(deps.user_exit_deadline_seconds) == nil or deps.user_exit_deadline_seconds <= 0 then
 		Logger.error(LOG, "M.init(): user_exit_deadline_seconds must be a positive number.")
 		return false
@@ -981,6 +985,14 @@ function M.request_user_exit(reason)
 	if admitted ~= true then return false end
 	pcall(Logger.info, LOG, "User exit '%s' requested; hard deadline %.1f s.",
 		reason, _deps.user_exit_deadline_seconds)
+	-- A release swap waiting for this boot keeps the update instead of opening
+	-- the previous app (infra/updater_boot_ready.lua); a failure never blocks the exit.
+	if _deps.report_update_quit then
+		local reported, report_err = pcall(_deps.report_update_quit, reason)
+		if not reported then
+			pcall(Logger.error, LOG, "The release swap could not be told of the user exit: %s", tostring(report_err))
+		end
+	end
 	return EmergencyExit.request({
 		reason = reason,
 		deadline_seconds = _deps.user_exit_deadline_seconds,

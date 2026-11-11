@@ -50,6 +50,22 @@ helpers.describe("updater boot ready (release-successor-boot-ready)", function()
 		end)
 	end)
 
+	helpers.it("(update-quit-kept) a user exit writes the quit report once, even after the ready report", function()
+		with_reporter(function(Ready, dir, env)
+			local deps = { getenv = function(name) return env[name] end }
+			helpers.assert_eq(Ready.report("boot complete", deps), true)
+			helpers.assert_eq(Ready.report_quit("menu_quit", deps), true, "a Quit in the probation still counts")
+			helpers.assert_eq(read(dir .. "/ready"), Ready.QUIT_REPORT .. "\n")
+			helpers.assert_nil(read(dir .. "/ready.tmp"), "no temporary file is left behind")
+			helpers.assert_eq(Ready.report_quit("menu_quit", deps), false, "one Quit report per boot")
+			Ready.reset_for_tests()
+			env.ERGOPTI_UPDATER_BOOT_READY = "/tmp/elsewhere/ready"
+			helpers.assert_eq(Ready.report_quit("menu_quit", deps), false, "a foreign token is never written")
+			env.ERGOPTI_UPDATER_BOOT_READY = nil
+			helpers.assert_eq(Ready.report_quit("menu_quit", deps), false, "no swap, no report")
+		end)
+	end)
+
 	helpers.it("publishes through a rename, so the swap never reads a partial pid", function()
 		with_reporter(function(Ready, dir, env)
 			local renames = {}
@@ -99,6 +115,19 @@ helpers.describe("updater boot ready (release-successor-boot-ready)", function()
 		helpers.assert_true(unit:find('report("waiting for Accessibility")', 1, true) ~= nil,
 			"a new signature's Accessibility wait is a healthy start")
 		helpers.assert_true(unit:find('report("onboarding")', 1, true) ~= nil, "onboarding is a healthy start")
+	end)
+
+	helpers.it("(update-quit-kept) every user quit of the boot reports to the release swap", function()
+		local unit, err = helpers.read_driver_unit("Boot.complete()")
+		helpers.assert_true(unit ~= nil, tostring(err))
+		-- Menu Quit, the Quit action and uninstall go through request_user_exit.
+		helpers.assert_true(unit:find("report_update_quit = function(reason)\n"
+			.. '\t\t\t\treturn require("infra.updater_boot_ready").report_quit(reason)', 1, true) ~= nil,
+			"the termination coordinator reports a user exit")
+		local shutdown_at = unit:find("local function shutdown_all_resources", 1, true)
+		helpers.assert_true(shutdown_at ~= nil and unit:find(
+			'require("infra.updater_boot_ready").report_quit("hammerspoon_quit")', shutdown_at, true) ~= nil,
+			"quitting the launcher or Hammerspoon reports too")
 	end)
 
 	helpers.it("refuses to report without the launcher pid", function()
