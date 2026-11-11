@@ -90,6 +90,12 @@ local COLOR_SCHEME = "org.gnome.desktop.interface color-scheme"
 M.MINIMIZE_ALL = 'wmctrl -l 2>/dev/null | while read -r win desk _; do'
 	.. ' [ "$desk" = "-1" ] || xdotool windowminimize "$win"; done'
 
+--- empty_trash: GVfs empties every trash; without GVfs, `gio trash --empty`
+--- exits 0 and empties nothing (measured on Ubuntu 24.04), which read as done.
+--- The home trash of the XDG trash specification must then be empty.
+M.EMPTY_TRASH = 'gio trash --empty && { t="${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files";'
+	.. ' [ ! -d "$t" ] || [ -z "$(ls -A "$t")" ]; }'
+
 --- The mount points that make a disk the running system's own, which
 --- eject_all_disks never powers off even when it is hot-pluggable (a live or
 --- installed-to-USB system).
@@ -125,7 +131,7 @@ M.COMMANDS = {
 		.. " *) false;; esac",
 
 	mic_mute_toggle = "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
-	empty_trash = "gio trash --empty",
+	empty_trash = M.EMPTY_TRASH,
 	minimize_all = M.MINIMIZE_ALL,
 	eject_all_disks = M.EJECT_ALL_DISKS,
 	quit_frontmost_app = window_signal("TERM"),

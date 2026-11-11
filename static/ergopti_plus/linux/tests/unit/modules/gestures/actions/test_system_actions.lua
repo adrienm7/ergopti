@@ -277,9 +277,37 @@ helpers.describe("Linux system actions", function()
 			local command = unwrap(run[1])
 			helpers.assert_true(command:sub(1, #head) == head,
 				"the question comes first, with Cancel focused: " .. command)
-			local chained = " && { gio trash --empty; }"
+			local chained = " && { " .. require("modules.gestures.system_actions").EMPTY_TRASH .. "; }"
 			helpers.assert_eq(command:sub(-#chained), chained, "the trash is emptied only on Continue")
 		end)
+	end)
+
+	-- Measured on Ubuntu 24.04 (tests/hardware/run_desktop_actions_live.lua):
+	-- without GVfs, `gio trash --empty` exits 0 and leaves the trash full, so
+	-- the action reported success for nothing. It now fails unless the home
+	-- trash (XDG trash specification) is empty afterwards.
+	helpers.it("empty_trash fails when the trash is still full afterwards (system-actions-empty-trash)", function()
+		local SystemActions = require("modules.gestures.system_actions")
+		local dir = os.tmpname(); os.remove(dir)
+		assert(os.execute("mkdir -p '" .. dir .. "/bin' '" .. dir .. "/data/Trash/files'"))
+		local function run(gio_body, trashed)
+			local gio = assert(io.open(dir .. "/bin/gio", "w")); gio:write("#!/bin/sh\n", gio_body, "\n"); gio:close()
+			os.execute("chmod +x '" .. dir .. "/bin/gio'; rm -rf '" .. dir .. "/data/Trash/files'; mkdir -p '"
+				.. dir .. "/data/Trash/files'")
+			if trashed then local fh = assert(io.open(dir .. "/data/Trash/files/" .. trashed, "w")); fh:write("x"); fh:close() end
+			local status = os.execute("PATH='" .. dir .. "/bin':\"$PATH\" XDG_DATA_HOME='" .. dir .. "/data' sh -c "
+				.. require("text_utils").shell_quote(SystemActions.EMPTY_TRASH))
+			return status == true or status == 0
+		end
+		local ok, err = pcall(function()
+			helpers.assert_eq(run("exit 0", "kept.txt"), false, "a no-op empty that leaves a file reports failure")
+			helpers.assert_eq(run("exit 0", ".hidden"), false, "a hidden file left in the trash counts")
+			helpers.assert_eq(run("rm -f \"$XDG_DATA_HOME\"/Trash/files/*; exit 0", "gone.txt"), true,
+				"an empty that empties the trash succeeds")
+			helpers.assert_eq(run("exit 1", nil), false, "gio's own failure still fails")
+		end)
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
 	end)
 
 	-- On GNOME and KDE none of the clients exists: the chain was backgrounded
