@@ -86,7 +86,8 @@ function M.register(helpers)
 	helpers.describe("layout composer store (shared-helpers-contract)", function()
 		-- A fixture: the shipped cap lives in _shared/modules/layouts/defaults.json
 		local DEFAULTS = { composer = { id = "composed", folder = "layout_composer",
-			declaration_file = "composition.json", max_declaration_bytes = 8192, family = "composed" } }
+			declaration_file = "composition.json", max_declaration_bytes = 8192,
+			source_file = "layout_source.toml", max_source_bytes = 262144, family = "composed" } }
 
 		--- A copy of the defaults with one composer field changed.
 		local function with(field, value)
@@ -103,6 +104,7 @@ function M.register(helpers)
 				{ with("id", "Not An Id") }, { with("family", 3) }, { with("folder", "a/b") },
 				{ with("declaration_file", "../x.json") }, { with("max_declaration_bytes", 0) },
 				{ with("max_declaration_bytes", 1.5) }, { with("max_declaration_bytes", "9") },
+				{ with("source_file", "../x.toml") }, { with("max_source_bytes", 0) },
 			}) do
 				local value, err = Composer.settings(bad[1])
 				helpers.assert_nil(value)
