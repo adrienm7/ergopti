@@ -18,7 +18,9 @@
 ---    their threshold (a layer, a one-shot Shift) never take the window; each
 ---    driver decides which of its keys are such a modifier key.
 --- 3. The tap minimum (tap_hold.tap_min_duration_ms) bounds the other side on
----    Windows and Linux; Karabiner has no minimum for a tap.
+---    the three drivers; on macOS Karabiner's to_if_alone has no minimum, so the
+---    generator gates each tap on a delayed action (platform/remap/generator.lua
+---    apply_tap_minimum).
 --- 4. One rule for the Lua drivers; the Windows driver ports it in AHK
 ---    (platform/remap/constants.ahk TapHoldTapWindowSec).
 --- ==============================================================================

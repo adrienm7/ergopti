@@ -55,12 +55,6 @@
 			],
 			"expected": {
 				"strokes": []
-			},
-			"divergences": {
-				"macos": {
-					"strokes": ["enter"],
-					"reason": "Karabiner's to_if_alone has no minimum duration and the generator sets none, so a 20 ms bounce types the tap; Windows and Linux read tap_min_duration_ms. Not documented."
-				}
 			}
 		},
 		{
@@ -627,12 +621,6 @@
 			],
 			"expected": {
 				"strokes": []
-			},
-			"divergences": {
-				"macos": {
-					"strokes": ["enter"],
-					"reason": "Karabiner's to_if_alone has no minimum duration: a to_if_held_down at the minimum would release the hold the key took at key-down, so a 20 ms bounce types the tap."
-				}
 			}
 		}
 	]

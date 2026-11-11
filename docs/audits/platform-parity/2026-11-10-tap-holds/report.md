@@ -58,13 +58,16 @@ OS, `lua/tap_hold`, the keymap areas it reads).
 
 ## Remaining work
 
-- **macOS, minimum tap (decided 2026-11-10, not implemented):** every tap that
-  waits for its release must respect `tap_hold.tap_min_duration_ms`. The
-  generated rules use `to_if_alone`, which has a maximum
-  (`basic.to_if_alone_timeout_milliseconds`) and no minimum, and Karabiner
-  does not re-process its own output, so a delayed-action variable cannot
-  gate the tap; it needs a new mechanism qualified on a Mac
-  (`_shared/lua/tap_hold/lone_tap.lua` point 3 records the limit).
+- **macOS, minimum tap (decided 2026-11-10, implemented 2026-11-11):** every
+  tap that waits for its release respects `tap_hold.tap_min_duration_ms`.
+  `to_if_alone` has only a maximum and Karabiner does not re-process its own
+  output, but v16 evaluates a to-event's own `conditions` when it posts it
+  (`event_sender.hpp` `filter_and_replace_events`): the generator
+  (`apply_tap_minimum`) clears a lease-scoped `ke_held_<key>_tap_min` at
+  key-down, a `to_delayed_action` raises it after the minimum, and every tap
+  event requires it. Rollover keys keep no minimum, as the Linux roll keys.
+  Proven on the model (`test_generator_tap_minimum.lua`, the corpus vectors
+  lost their macOS divergence); native timing stays on the Mac checklist.
 - **Windows (maintainer's change):** extend the minimum tap beyond LShift,
   LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
 

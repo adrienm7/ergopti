@@ -1126,6 +1126,58 @@ local function marked_hold(key_code, events, marked)
 	return copy
 end
 
+--- Returns the variable a key's tap-minimum timer raises to 1 once the key has
+--- been down for tap_hold.tap_min_duration_ms.
+--- @param key_code string Physical key.
+--- @return string name Runtime logical name, generation-scoped at deploy.
+local function tap_min_var_name(key_code)
+	return held_var_name(key_code) .. "_tap_min"
+end
+
+--- Makes every release-judged tap of a rule respect the minimum tap duration
+--- (tap_hold.tap_min_duration_ms), the rule Windows and Linux apply.
+---
+--- Karabiner's to_if_alone has a maximum and no minimum, and its own output is
+--- never fed back to the rules. What v16 does offer is a condition on each
+--- to-event, evaluated when the event is posted (event_sender.hpp
+--- filter_and_replace_events), and a delayed action timed from the key-down
+--- (to_delayed_action.hpp). The key-down clears the key's tap-minimum variable,
+--- the delayed action raises it once the minimum has elapsed, and every tap
+--- event requires it: a release sooner than the minimum posts no tap, and the
+--- hold taken at key-down is released as before. The variable is a ke_held_
+--- name, so the deploy scopes it to the lease generation like every other.
+---
+--- A rollover key already times its tap with to_delayed_action and is judged
+--- as the Linux roll keys are, with no minimum: it is left as is.
+--- @param rule table Karabiner rule; its manipulators are updated in place.
+--- @param tap_min_ms number Minimum tap duration in milliseconds.
+local function apply_tap_minimum(rule, tap_min_ms)
+	assert(type(tap_min_ms) == "number" and tap_min_ms > 0 and tap_min_ms % 1 == 0,
+		"tap_hold.tap_min_duration_ms must be a positive whole number of milliseconds")
+	for _, manipulator in ipairs(rule.manipulators) do
+		local key_code = type(manipulator.from) == "table" and manipulator.from.key_code
+		if type(manipulator.to_if_alone) == "table" and #manipulator.to_if_alone > 0
+			and manipulator.to_delayed_action == nil and type(key_code) == "string" then
+			local name = tap_min_var_name(key_code)
+			local to = { set_var_event(name, 0) }
+			for _, event in ipairs(manipulator.to or {}) do to[#to + 1] = event end
+			manipulator.to = to
+			local taps = {}
+			for index, event in ipairs(manipulator.to_if_alone) do
+				local gated = deep_copy(event)
+				gated.conditions = gated.conditions or {}
+				gated.conditions[#gated.conditions + 1] = { type = "variable_if", name = name, value = 1 }
+				taps[index] = gated
+			end
+			manipulator.to_if_alone = taps
+			manipulator.to_delayed_action = { to_if_invoked = { set_var_event(name, 1) } }
+			manipulator.parameters = manipulator.parameters or {}
+			manipulator.parameters["basic.to_delayed_action_delay_milliseconds"] = tap_min_ms
+		end
+	end
+	return rule
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -1843,6 +1895,7 @@ local function combination_rules_without_tap_holds(combo_builds, dropped_keys, k
 		local held = build.k1 and held_of[build.k1]
 		local rebuilt = build_combo_rules(build.combo_def, build.tap_action, build.hold_action,
 			build.combo_action, held and held_flag_keys(held), combo_symmetric, held_of)
+		for _, rule in ipairs(rebuilt) do apply_tap_minimum(rule, Defaults.tap_min_duration_ms) end
 		if #build.rules == 0 then
 			-- A combo with no rule has neither a tap/hold slot nor a chord its
 			-- first key's hold could make redundant: native keys add nothing.
@@ -2217,6 +2270,7 @@ function M.build_karabiner_json(
 		deployed_tap_timeouts[key_def.id] = deployed_ms or state.tap_hold_timeout_ms
 		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, deployed_ms)
 		if rule then
+			apply_tap_minimum(rule, Defaults.tap_min_duration_ms)
 			all_rules[#all_rules + 1] = rule
 			-- Historical ownership evidence must retain the pre-timer graph.
 			legacy_tap_hold_rules[rule] = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms, false)
@@ -2251,6 +2305,10 @@ function M.build_karabiner_json(
 	for _, paused_rule in ipairs(build_raw_paused_script_control_rules()) do
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
 	end
+	-- The combinations' tap minimum comes after the capture: older releases
+	-- deployed these rules without it (the tap-hold rules' historical graph is
+	-- built apart, by build_tap_hold_rule's historical reconstruction).
+	for rule in pairs(key_combination_rules) do apply_tap_minimum(rule, Defaults.tap_min_duration_ms) end
 
 	-- Only a script chord that runs an action keeps its sentinel rule: an
 	-- unassigned slot, or every slot while the chords' switch is off, leaves

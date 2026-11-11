@@ -352,6 +352,8 @@ helpers.with_fresh_modules({
 						key_code .. " must preserve its Windows-equivalent down behavior")
 					helpers.assert_true(engine:held()[held_key] == true,
 						key_code .. " must retain its exact native modifier or repeating tap")
+					-- A quick release, held for the tap minimum a bounce falls short of.
+					engine:advance(KarabinerModel.TAP_MS)
 					engine:up(key_code, within_timeout)
 					local expected = held_key
 					if native_tap_only[key_code] and within_timeout then expected = expected .. ",delete_forward" end
@@ -977,6 +979,7 @@ helpers.with_fresh_modules({
 											context .. ": the hold must keep " .. held .. " (pressed: "
 												.. names(engine:pressed()) .. ")")
 									end
+									engine:advance(KarabinerModel.TAP_MS)
 									engine:up(key_code, true)
 									helpers.assert_eq(table.concat(triggers_posted(engine), "|"), expected_flags(action, state),
 										context .. ": the tap must send the trigger with its own modifiers only")

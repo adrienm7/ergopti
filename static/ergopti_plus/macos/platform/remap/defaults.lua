@@ -122,6 +122,10 @@ D.tap_hold_timeout_ms        = require("infra.timings").ms("tap_hold", "default_
 -- (tap_hold.one_shot_shift_timeout_ms), the one Windows and Linux read, so the
 -- three drivers cancel a one-shot Shift after the same time (PAR-15).
 D.sticky_timeout_ms          = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
+-- Minimum tap duration: a release sooner than this is a bounce, not a tap. The
+-- timing registry's tap_hold.tap_min_duration_ms, which Windows and Linux read
+-- too; the generator gates every release-judged tap with it.
+D.tap_min_duration_ms        = require("infra.timings").ms("tap_hold", "tap_min_duration_ms")
 D.simultaneous_threshold_ms  = timeouts.simultaneous_threshold_ms  -- Combo activation window
 D.combo_symmetric            = timeouts.combo_symmetric            -- A+B == B+A for the chord slot
 
