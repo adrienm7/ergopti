@@ -434,12 +434,26 @@ UnescapeTomlString(s) {
 ; =======================================================
 ; =======================================================
 
-; Register every hotstring of a given [[section]] defined inside a TOML file
-; located under ..\hotstrings\<CategoryName>.toml (relative to the script).
-; Hotstrings flagged as commented-out in TOML (line starting with "#") are
-; skipped, mirroring AHK source lines starting with ";".
-LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
-		global ScriptInformation, _GENERATED_HOTSTRINGS, _SharedDir
+; The rows of a section served by the bundled cache, with the registrar that
+; registers any run of them exactly as LoadHotstringsSection would, so a deferred
+; caller can register the section in slices. 0 when the section takes another
+; path (a layout-bound file, a cache miss): the caller loads it whole.
+; @return {Object|Integer} { Rows: Array, Register: Func(Rows) } or 0.
+HotstringsSectionCachedRows(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
+		global _HS_CACHE_ROWS
+		Admitted := _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig)
+		if !Admitted.Cached or !_HS_CACHE_ROWS.Has(Admitted.LoaderKey)
+				return 0
+		LoaderKey := Admitted.LoaderKey, Config := Admitted.Config, Priority := Admitted.Priority
+		return { Rows: _HS_CACHE_ROWS[LoaderKey],
+			Register: (Rows) => _HsCacheRegisterRows(LoaderKey, Rows, Config, ExtraOptions, Priority) }
+}
+
+; The admission, delay and priority cascade every section load shares, and the
+; path it takes: the bundled cache, or a TOML file.
+; @return {Object} { Config, Priority, LoaderKey, BoundPath, Cached }
+_HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
+		global _GENERATED_HOTSTRINGS
 
 		; Accept either shape transparently
 		if (IsObject(FeatureConfig) and Type(FeatureConfig) == "Map") {
@@ -484,10 +498,27 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 		; magic key's repeat corrections on Ergopti) loads from the extension's file
 		; and never from the cache, which only compiles the bundled folder.
 		BoundPath := HotstringsBoundTomlPath(CategoryName, SectionName)
-		if (BoundPath == ""
-		and IsSet(_GENERATED_HOTSTRINGS)
-		and StrLower(CategoryName) != "personal"
-		and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
+		Cached := (BoundPath == ""
+			and IsSet(_GENERATED_HOTSTRINGS)
+			and StrLower(CategoryName) != "personal"
+			and _GENERATED_HOTSTRINGS.Has(LoaderKey))
+		return { Config: FeatureConfig, Priority: ResolvedPriority, LoaderKey: LoaderKey,
+			BoundPath: BoundPath, Cached: Cached }
+}
+
+; Register every hotstring of a given [[section]] defined inside a TOML file
+; located under ..\hotstrings\<CategoryName>.toml (relative to the script).
+; Hotstrings flagged as commented-out in TOML (line starting with "#") are
+; skipped, mirroring AHK source lines starting with ";".
+LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
+		global ScriptInformation, _GENERATED_HOTSTRINGS, _SharedDir
+
+		Admitted := _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig)
+		FeatureConfig := Admitted.Config
+		ResolvedPriority := Admitted.Priority
+		LoaderKey := Admitted.LoaderKey
+		BoundPath := Admitted.BoundPath
+		if Admitted.Cached {
 				try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
 						HotstringCategoryLogName(CategoryName), SectionName)
 				GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
@@ -501,7 +532,6 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 						HotstringCategoryLogName(CategoryName), SectionName)
 				return
 		}
-
 		if (BoundPath != "") {
 				FilePath := BoundPath
 		} else if (StrLower(CategoryName) == "personal"

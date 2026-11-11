@@ -5,6 +5,28 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Windows physical shortcut host is built, delivery refused (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: Windows gets the host and the editor
+of the physical shortcuts, as macOS and Linux have them, while delivery stays
+refused. The production getter `PhysicalShortcutDeliveryAvailable`
+(`windows/ui/physical_shortcuts/host.ahk`, the Windows
+`physical_delivery_available`) answers false until the maintainer qualifies
+it on real hardware; only the maintainer turns it true.
+
+- Chain: the shared page `_shared/ui/physical_shortcuts/` in a WebView2 host
+  (WebView only, no native form), the menu port `PhysicalEditorMenu` and the
+  scope `PhysicalShortcutsScope`. While the getter answers false the editor
+  stays closed with no scope captured, the refusal is told once and the shared
+  row greys with `physical_shortcuts.delivery_unqualified`; the row no longer
+  carries a Windows platform restriction.
+- Even with the getter true, `PhysicalShortcutsScope.Edit` refuses every
+  mapping until a Windows collision owner exists. Key capture is
+  `KHCapturePosition` (`adapters/keyboard_hook.ahk`).
+- Pinned by `tests/unit/ui/physical_shortcuts/test_physical_shortcut_host.ahk`
+  on the real chain. Do not turn the getter true, or drop the collision
+  refusal, without the maintainer's hardware qualification (TODO.md).
+
 ## A Windows layout registry change is captured at once (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: a change of the Windows keyboard-layout
@@ -256,8 +278,8 @@ editor save still passes the source, collision and output-custody checks
 (`physical_match`/`physical_admitted` on Linux, `physical_admission` on macOS,
 `shortcuts.physical_availability`), and a getter answering false greys the
 editor row with `physical_shortcuts.delivery_unqualified`. Tests pin the true
-answer and drive each refusal under an explicit false answer. Windows has no
-host (no editor, no delivery); its menu reason says so. The Mac field report
+answer and drive each refusal under an explicit false answer. Windows has its
+host since the decision above, its delivery refused. The Mac field report
 validates the macOS side.
 
 ## A superseded site deployment stays red (2026-11-11)
