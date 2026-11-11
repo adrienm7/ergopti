@@ -42,6 +42,19 @@
 #     install included (field_owned_install: the macOS administrator prompt and
 #     the driver approval are the only human steps, and the terminal says so)
 #
+# The guided steps: the steps field_run.json declares with kind "guided" need
+# one gesture of the person at the Mac (Wi-Fi off and on, a window moved,
+# Ctrl+Caps Lock pressed, a menu row looked at). The app publishes the gesture
+# in its prompt file; this terminal prints it once, rings, and, when it is a
+# terminal, takes y (it worked), n (it did not) or s (skip) followed by Enter
+# and writes the answer file. An observed step needs no answer: the app sees
+# the gesture in its own state or log. No gesture within the step's bound is
+# needs_person, never a pass.
+#
+# The TODO summary: tools/dev/field-todo-summary.py maps every point of
+# TODO.md « To confirm on the Mac » to its verdict in todo_summary.md and
+# todo_summary.json (static/ergopti_plus/macos/data/field_todo_coverage.json).
+#
 # By default the field run tests the branch itself: the developer app of this
 # clone, which any tester builds, with no release and no certificate. The
 # owned Karabiner runtime installs only under the stable certificate the CI
@@ -257,6 +270,16 @@ finalize() {
 	# replacement text: the personal file itself never travels.
 	step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \
 		"${PERSONAL_HOTSTRINGS}" "${REPO_ROOT}/${BUNDLED_HOTSTRINGS}"
+	# One verdict per TODO « To confirm on the Mac » point, from the results and
+	# steps.txt above; printed here so the terminal ends on what to tick.
+	local summary_flags=()
+	"${installed}" && summary_flags+=(--installed)
+	step todo_summary python3 "${REPO_ROOT}/tools/dev/field-todo-summary.py" --report "${out}" \
+		${summary_flags[@]+"${summary_flags[@]}"}
+	if [ -f "${out}/todo_summary.txt" ]; then
+		log "TODO « To confirm on the Mac », one verdict per point (todo_summary.md):"
+		sed 's/^/[field-report]   /' "${out}/todo_summary.txt"
+	fi
 	# Last: it also reads the check verdicts the steps above wrote.
 	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
 
@@ -460,10 +483,58 @@ wait_for_acceptance() {
 	return 0
 }
 
+# The guided step this terminal last announced: each prompt is printed once.
+guided_announced=""
+
+# Waits one poll. While a guided step's prompt is published, prints it once
+# and, on a terminal, takes the person's answer during that poll and writes
+# the answer file the step reads (y pass, n fail, s skip; an observed step
+# takes s only, since it sees the gesture by itself).
+guided_poll() {
+	local prompt="${run_folder}/${guided_prompt_name}" prompt_step mode gesture seconds key answer=""
+	if [ -f "${prompt}" ] && prompt_step="$(plutil -extract step raw -o - "${prompt}" 2>/dev/null)"; then
+		case "${prompt_step}" in ''|*[!a-z0-9_]*) sleep "${FIELD_RUN_POLL_SECONDS}"; return 0 ;; esac
+		mode="$(plutil -extract mode raw -o - "${prompt}" 2>/dev/null)"
+		if [ "${prompt_step}" != "${guided_announced}" ]; then
+			guided_announced="${prompt_step}"
+			gesture="$(plutil -extract gesture raw -o - "${prompt}" 2>/dev/null)"
+			seconds="$(plutil -extract seconds raw -o - "${prompt}" 2>/dev/null)"
+			printf '\a'
+			log "  👉 GUIDED ${prompt_step} (up to ${seconds} s): ${gesture}"
+			if [ "${mode}" = attest ]; then
+				log "     Then type y (it worked), n (it did not) or s (skip), and Enter."
+			else
+				log "     The run sees it by itself; type s and Enter to skip it."
+			fi
+		fi
+		if [ -t 0 ]; then
+			if read -r -t "${FIELD_RUN_POLL_SECONDS}" key; then
+				case "${key}" in
+					y|Y) [ "${mode}" = attest ] && answer=pass ;;
+					n|N) [ "${mode}" = attest ] && answer=fail ;;
+					s|S) answer=skip ;;
+				esac
+				if [ -z "${answer}" ]; then
+					log "     Not an answer for ${prompt_step}: type $([ "${mode}" = attest ] && printf 'y, n or s' || printf 's')."
+				else
+					printf '{"step":"%s","answer":"%s"}\n' "${prompt_step}" "${answer}" \
+						> "${run_folder}/.${guided_answer_name}.tmp" \
+						&& mv -f "${run_folder}/.${guided_answer_name}.tmp" "${run_folder}/${guided_answer_name}" \
+						&& log "     Recorded ${answer} for ${prompt_step}."
+				fi
+			fi
+			return 0
+		fi
+	fi
+	sleep "${FIELD_RUN_POLL_SECONDS}"
+}
+
 # Opens the developer app, sends the request, waits for done and copies it.
 run_field_run() {
-	local request_name accepted_name done_name refused_name deadline_seconds
+	local request_name accepted_name done_name refused_name deadline_seconds guided_prompt_name guided_answer_name
 	[ -n "${run_folder}" ] || { log "Cannot read ${FIELD_RUN_SPEC}."; return 1; }
+	guided_prompt_name="$(spec_value guided.prompt)"
+	guided_answer_name="$(spec_value guided.answer)"
 	ready_file="${run_folder}/$(spec_value files.ready)"
 	request_name="$(spec_value files.request)"
 	refused_name="$(spec_value files.refused)"
@@ -581,6 +652,11 @@ print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_
 			|| { log "Cannot read the steps of ${FIELD_RUN_SPEC}."; return 1; }
 		log "Developer app of this branch: the Karabiner runtime install steps are left out; --installed runs them on the signed dev prerelease."
 	fi
+	# One report does everything (decided by the coordinator on 2026-11-11, to
+	# review by the maintainer): the guided steps always run, with no mode that
+	# leaves them out.
+	log "Stay at the Mac: the guided steps print a gesture here (👉 GUIDED), each waits for it, and the attested"
+	log "ones take y, n or s then Enter. Nothing done in time is recorded needs_person, never a pass."
 	log "Developer app ready (pid ${pid}); requesting the field run within ${deadline_seconds} s."
 	log "The run is working now: do not reload or quit Ergopti; each step prints its verdict here."
 
@@ -625,9 +701,10 @@ print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_
 		# A download can stay silent for minutes: say the run is still alive
 		if [ $((now - last_note)) -ge 60 ]; then
 			last_note="${now}"
-			log "  field run still running, $((now - sent_at)) s since the request..."
+			[ -f "${run_folder}/${guided_prompt_name}" ] \
+				|| log "  field run still running, $((now - sent_at)) s since the request..."
 		fi
-		sleep "${FIELD_RUN_POLL_SECONDS}"
+		guided_poll
 	done
 	report_new_results
 	copy_field_run_results || { log "Cannot copy the field run results."; return 1; }

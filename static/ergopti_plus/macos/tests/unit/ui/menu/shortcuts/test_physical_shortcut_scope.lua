@@ -236,7 +236,7 @@ helpers.describe("Mac unqualified physical delivery admission",function()
  helpers.it("(partial-physical-admission) refuses physical output from an unqualified native owner",function()
   local initial=source:gsub('foreign = 17','physical_none_KeyJ="send_text", foreign = 17')
   Fixture.run(function(f)
-   helpers.assert_eq(f.controls.native_delivery_available(),false)
+   helpers.assert_eq(f.controls.native_delivery_available(),true,'the production getter')
    f.controls.delivery_available=false
    helpers.assert_eq(f.owner.physical_delivery_available(),false)
    helpers.assert_eq(f.controls.physical_input(),false)

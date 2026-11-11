@@ -184,6 +184,7 @@
 		"test:field-log-scrub": "node ./tools/test/test-field-log-scrub.cjs",
 		"test:field-report-redact": "node ./tools/test/test-field-report-redact.cjs",
 		"test:field-log-analyse": "node ./tools/test/test-field-log-analyse.cjs",
+		"test:field-todo-summary": "node ./tools/test/test-field-todo-summary.cjs",
 		"test:field-run-protocol": "node ./tools/test/test-field-run-protocol.cjs",
 		"test:feature-requirements": "node ./tools/test/test-feature-requirements.cjs",
 		"test:windows-field-report-contract": "node ./tools/test/test-windows-field-report-contract.cjs",
@@ -333,6 +334,7 @@
 		"codegen:action-catalogue": "node ./tools/codegen/codegen-action-catalogue.cjs",
 		"codegen:config-schema-metrics": "node ./tools/codegen/codegen-config-schema-metrics.cjs",
 		"codegen:unicode-case": "node ./tools/codegen/codegen-unicode-case.cjs",
+		"codegen:unicode-names": "node ./tools/codegen/codegen-unicode-names.cjs",
 		"codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",
 		"codegen:update-channels": "node ./tools/codegen/codegen-update-channels.cjs",
 		"codegen:update-schedule": "node ./tools/codegen/codegen-update-schedule.cjs",
@@ -713,9 +715,12 @@
 		"test:layout-source": "node ./tools/test/test-layout-source.cjs",
 		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
 		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",
+		"test:layout-editor-unicode-names": "node ./tools/test/test-layout-editor-unicode-names.cjs",
 		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs",
 		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",
-		"test:layout-extension-payload": "node ./tools/test/test-layout-extension-payload.cjs"
+		"test:macos-layout-bundle-plan": "node ./tools/test/test-macos-layout-bundle-plan.cjs",
+		"test:layout-extension-payload": "node ./tools/test/test-layout-extension-payload.cjs",
+		"test:layout-sources": "node ./tools/test/test-layout-sources.cjs"
 	},
 	"type": "module",
 	"imports": {

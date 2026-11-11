@@ -248,6 +248,28 @@ if not ready then
 	os.exit(1)
 end
 print("  ok   the daemon reported itself ready")
+-- The plaintext API key's move runs in the background against a secret-tool
+-- that blocks (run_daemon_live.sh): readiness never waited on it.
+local marker = os.getenv("ERGOPTI_LIVE_SECRET_TOOL_MARKER")
+if marker then
+	local moving = await(function()
+		local fh = io.open(log, "r")
+		if not fh then return nil end
+		local text = fh:read("*a")
+		fh:close()
+		local blocked = io.open(marker, "r")
+		if blocked then blocked:close() end
+		return (text:find("plaintext API key(s) to the desktop secret service in the background", 1, true)
+			and (blocked or text:find("the keyring is locked", 1, true))) and true or nil
+	end, 20)
+	if not moving then
+		dump_log()
+		stop_daemon()
+		print("  FAIL the background API key move did not run beside a ready daemon")
+		os.exit(1)
+	end
+	print("  ok   the daemon is ready while the API key move waits on a blocked secret service")
+end
 -- The secure-field probe settles after the first focus answer.
 sleep(1.5)
 

@@ -6,7 +6,8 @@
 --- The field run's count of the day-log lines several Mac checks are read from
 --- (TODO, To confirm on the Mac): the gesture timing error a reload must not
 --- bring back (L46), the window toggles that must log no error, the starts a
---- hotstring reload rolled back, the three-finger candidates a gate rejected,
+--- hotstring reload rolled back, a keystats day rotation that stalled, a model
+--- blob whose digest did not match, the three-finger candidates a gate rejected,
 --- the synthetic text moved off a held key (`asa` typed fast) and the pending
 --- predictions a user activity cancelled. A person reading the report then
 --- knows which of those happened today without opening the log.
@@ -51,6 +52,10 @@ M.ERROR_SIGNALS = {
 	{ step = "log_window_toggle_errors", name = "window_toggle" },
 	-- modules/dynamic_hotstrings: a personal or dynamic start rolled back.
 	{ step = "log_start_rollbacks", name = "start_rollback" },
+	-- modules/keystats: a day rollover that skipped or stalled its rotation.
+	{ step = "log_keystats_rotation_warnings", name = "rotation_warning" },
+	-- ui/menu/menu_llm/models_manager_ollama.lua: a pull that failed its digest check.
+	{ step = "log_digest_mismatches", name = "digest_mismatch" },
 }
 
 -- POSIX awk only: macOS ships the BWK awk.
@@ -63,6 +68,8 @@ function top(names,   name, best, best_n) {
 /\[ERROR\] \[gestures\] Touch frame from device=.* has no capture timestamp/ { capture_stamp++ }
 /\[ERROR\] \[window_toggle\] / { window_toggle++ }
 /\[ERROR\] \[[^]]*\] .*(start rolled back after|publication transaction rolled back)/ { start_rollback++ }
+/\[WARNING\] \[[^]]*\] (Midnight rotation stalled|day_rollover: today\.log not fully drained)/ { rotation_warning++ }
+/\[(ERROR|WARNING)\] \[[^]]*\] .*(failed its digest check|digest_mismatch)/ { digest_mismatch++ }
 match($0, /Three-finger candidate rejected by [A-Za-z_][A-Za-z0-9_]*/) {
 	rejections++; gate[substr($0, RSTART + 35, RLENGTH - 35)]++
 }
@@ -72,6 +79,7 @@ match($0, /User activity \([A-Za-z_][A-Za-z0-9_]*\)/) {
 }
 END {
 	printf "capture_stamp %d\nwindow_toggle %d\nstart_rollback %d\n", capture_stamp, window_toggle, start_rollback
+	printf "rotation_warning %d\ndigest_mismatch %d\n", rotation_warning, digest_mismatch
 	printf "rejections %d %s\nheld_key %d\ncancels %d %s\n", rejections, top(gate), held_key, cancels, top(reason)
 }
 ]=]

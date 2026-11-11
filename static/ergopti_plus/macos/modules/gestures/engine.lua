@@ -18,6 +18,7 @@ local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
 local ContactJoin = require("gestures.contact_join")
+local Direction = require("gestures.direction")
 local FrameClock = require("modules.gestures.frame_clock")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
@@ -417,23 +418,35 @@ local function signedDist(pos)
 	return pos.x - gs.startPos.x
 end
 
+--- The direction a diagonal slot names (swipe_3_right_up gives right_up).
+--- @param slot string Resolved swipe slot.
+--- @return string name
+local function slotDiagonal(slot)
+	local name = type(slot) == "string" and slot:match("^swipe_%d+_(%a+_%a+)$") or nil
+	assert(name, "a diagonal swipe needs a diagonal slot, got " .. tostring(slot))
+	return name
+end
+
+--- Signed travel of a displacement along an axis ('horiz'|'vert'|'diag'); a
+--- diagonal is projected on its slot's own axis (shared with Linux), which
+--- signing it by dx + dy left to noise along right_up and left_down.
+--- @param dx number Horizontal displacement.
+--- @param dy number Vertical displacement.
+--- @param axis string Axis name.
+--- @param slot string Resolved swipe slot; read for a diagonal only.
+local function alongAxis(dx, dy, axis, slot)
+	if axis == "horiz" then return dx end
+	if axis == "vert" then return dy end
+	return Direction.along(slotDiagonal(slot), dx, dy)
+end
+
 --- Compute signed distance along a given axis ('horiz'|'vert'|'diag').
 --- @param pos table Position table.
 --- @param axis string Axis name.
-local function signedDistAxis(pos, axis)
+--- @param slot string Resolved swipe slot; read for a diagonal only.
+local function signedDistAxis(pos, axis, slot)
 	if not gs.startPos then return 0 end
-	if axis == "horiz" then
-		return pos.x - gs.startPos.x
-	elseif axis == "vert" then
-		return pos.y - gs.startPos.y
-	else
-		-- For diagonal, use Euclidean distance to represent true travel
-		local dx = pos.x - gs.startPos.x
-		local dy = pos.y - gs.startPos.y
-		local dist = math.sqrt(dx*dx + dy*dy)
-		local sign = (dx + dy > 0) and 1 or -1
-		return sign * dist
-	end
+	return alongAxis(pos.x - gs.startPos.x, pos.y - gs.startPos.y, axis, slot)
 end
 
 --- Resolves the slot a classified swipe runs. The explicit direction slot wins;
@@ -600,19 +613,8 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		-- to come all the way back through the original origin. This makes reverse
 		-- swipes feel as responsive as fresh ones.
 		if gs.liveAxisSign and gs.lastFirePos then
-			local local_delta
-			if axis == "horiz" then
-				local_delta = pos.x - gs.lastFirePos.x
-			elseif axis == "vert" then
-				local_delta = pos.y - gs.lastFirePos.y
-			else
-				-- Diagonal: project movement along the 45° diagonal signed direction
-				-- (same convention as signedDistAxis) so reversal detection is axis-aware.
-				local ddx = pos.x - gs.lastFirePos.x
-				local ddy = pos.y - gs.lastFirePos.y
-				local mag = math.sqrt(ddx*ddx + ddy*ddy)
-				local_delta = ((ddx + ddy > 0) and 1 or -1) * mag
-			end
+			-- Same projection as signedDistAxis, so reversal detection is axis-aware.
+			local local_delta = alongAxis(pos.x - gs.lastFirePos.x, pos.y - gs.lastFirePos.y, axis, slot)
 			local local_sign = (local_delta > 0) and 1 or (local_delta < 0 and -1 or 0)
 			local reverse_min = Geometry.incrementalReverseMin(sensitivity, LIVE_AXIS_MIN)
 			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= reverse_min then
@@ -631,7 +633,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 			end
 		end
 
-		local sd = signedDistAxis(pos, axis)
+		local sd = signedDistAxis(pos, axis, slot)
 		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 
@@ -659,7 +661,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	end
 
 	-- x1 mode
-	local sd = signedDistAxis(pos, axis)
+	local sd = signedDistAxis(pos, axis, slot)
 	if math.abs(sd) < LIVE_AXIS_MIN then return end
 
 	local sign = (sd > 0) and 1 or -1
@@ -832,7 +834,7 @@ local function commitGesture(now)
 	Logger.debug(LOG, "commitGesture: slot=%s action=%s mode=%s sensitivity=%.2f", slot, action, mode, sensitivity)
 
 	if mode == "incremental" then
-		local sd = signedDistAxis(gs.endPos, dir)
+		local sd = signedDistAxis(gs.endPos, dir, slot)
 		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 		if diff > 0 and not incrementalCountAdmitted(diff, slot) then return end
@@ -850,7 +852,7 @@ local function commitGesture(now)
 		end
 	else
 		-- x1 mode
-		local sd = signedDistAxis(gs.endPos, dir)
+		local sd = signedDistAxis(gs.endPos, dir, slot)
 		local sign = (sd > 0) and 1 or (sd < 0 and -1 or 0)
 		Logger.info(LOG, "commitGesture x1: dir=%s slot=%s sd=%.2f sign=%d prevLiveSlot=%s prevLiveSign=%s SWIPE_MIN=%.2f",
 			dir, slot, sd, sign, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign), SWIPE_MIN)
@@ -1352,7 +1354,7 @@ function M.process_frame(touches, frame_stamp)
 				if gs.lockedDir == nil and gs.candidateFingers == nil then
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local tentative = Geometry.computeDir(dx, dy, gs.maxFingers)
+					local tentative = Geometry.lockDir(dx, dy, gs.maxFingers)
 					if tentative ~= nil then
 						Logger.info(LOG, "LOCKED DIR=%s (dx=%.2f dy=%.2f maxFingers=%d)",
 							tentative, dx, dy, gs.maxFingers)

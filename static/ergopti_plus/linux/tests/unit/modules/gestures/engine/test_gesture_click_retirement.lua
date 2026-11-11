@@ -82,6 +82,35 @@ local function holds(manager, state)
 	helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3" })
 end
 helpers.describe("gesture click retirement", function()
+	-- click.ahk: an InputHook started with the hold releases it at the next
+	-- key-down (GestureOnKeyDown). Linux kept the button down until the next
+	-- toggle, a pause or a disable (GSL-002, click-hold-key-release).
+	helpers.it("releases both held buttons at the next key press (click-hold-key-release)", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.release_clicks_on_activity(), "nothing held: nothing to do")
+			helpers.assert_eq(edges(state), {}, "and no native helper runs for it")
+			holds(manager, state)
+			manager.release_clicks_on_activity()
+			state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3", "mouseup:1", "mouseup:3" })
+			manager.execute_action("left_click_toggle", "left")
+			state.harvest()
+			helpers.assert_eq(edges(state)[5], "mousedown:1", "a released hold can be taken again")
+		end)
+	end)
+
+	-- The daemon's physical key observer is the caller, ahead of the privacy
+	-- gate: a key typed in a secure field ends the hold too.
+	helpers.it("wires every physical key press to the click release (click-hold-key-release)", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = file:read("*a")
+		file:close()
+		local start = assert(source:find("local function handle_physical(", 1, true), "the physical key observer")
+		local gate = assert(source:find("secure_focus_guard.blocks_text()", start, true), "its privacy gate")
+		local call = source:find("gestures.release_clicks_on_activity()", start, true)
+		helpers.assert_true(call ~= nil and call < gate, "the release runs before the privacy gate")
+	end)
+
 	helpers.it("releases a toggled button when its gesture binding is removed", function()
 		with_manager(function(manager, state)
 			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))

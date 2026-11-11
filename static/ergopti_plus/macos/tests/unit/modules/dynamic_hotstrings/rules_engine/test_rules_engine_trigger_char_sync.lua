@@ -98,6 +98,7 @@ local function make_fake_keymap(custom_trigger)
 		-- interceptor's trigger-char gate, not the registered mappings themselves.
 		add                       = function() end,
 		register_interceptor      = function(fn) captured_interceptor = fn end,
+		dynamic_rule_within_delay      = function() return true end,
 		register_preview_provider = function() end,
 		registry_transaction      = function(_, mutation) return mutation() == true end,
 		get_interceptor           = function() return captured_interceptor end,

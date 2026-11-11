@@ -22,7 +22,10 @@
 --- 3. The unified layout editor mounted in the page opens and saves its files
 ---    through source_open and source_save (layouts/source_store.lua bounds
 ---    them); initData says whether this host offers them.
---- 4. PURE Lua: the driver injects the layout registry client, the push to the
+--- 4. The editor applies a source's navigation layer with nav_save {text}: the
+---    host's apply_nav runs the navigation layer editor's own save (validation
+---    on every OS, exact-byte publish, regeneration) and answers navResult.
+--- 5. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -44,6 +47,7 @@ M.ACTIONS = {
 	source_open = true,
 	source_save = true,
 	source_pick = true,
+	nav_save = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -202,6 +206,10 @@ end
 --- deps.pick_source(on_done) optionally opens a native file panel for the
 ---   layout editor and answers {filename, text} or {} when cancelled, or
 ---   {code, detail} on a refusal (macOS); without it source_pick is refused.
+--- deps.apply_nav(text, on_done) optionally saves and applies a layers.toml the
+---   layout editor built from its navigation layer, through the driver's
+---   navigation layer editor save; on_done({saved, applied, errors}). Without it
+---   nav_save is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -249,7 +257,8 @@ function M.new(deps)
 			deps.push("initData", { strings = deps.strings(),
 				state = M.page_state(deps.registry.snapshot(), nil),
 				source_editor = offers_source(deps.registry),
-				source_pick = type(deps.pick_source) == "function" })
+				source_pick = type(deps.pick_source) == "function",
+				nav_apply = type(deps.apply_nav) == "function" })
 			deps.registry.refresh(function() push_state() end)
 			return true
 		end
@@ -273,6 +282,22 @@ function M.new(deps)
 				return false
 			end
 			deps.pick_source(function(data) deps.push("sourcePicked", data) end)
+			return true
+		end
+		if action == "nav_save" then
+			if type(deps.apply_nav) ~= "function" then
+				deps.log("warn", "Refused a navigation layer save: this host does not apply it from the layout editor.")
+				return false
+			end
+			if type(payload.text) ~= "string" then
+				deps.log("warn", "Refused a navigation layer save without its layers.toml text.")
+				return false
+			end
+			deps.apply_nav(payload.text, function(result)
+				result = type(result) == "table" and result or {}
+				deps.push("navResult", { saved = result.saved == true, applied = result.applied == true,
+					errors = type(result.errors) == "table" and result.errors or {} })
+			end)
 			return true
 		end
 		if type(id) ~= "string" or not id:match(ID_PATTERN) then

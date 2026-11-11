@@ -739,12 +739,12 @@ check('the three hosts accept exactly the actions the page sends', () => {
 	const ahkBlock = /global LAYMGR_ACTIONS := Map\(([\s\S]*?)\)\n/.exec(ahk);
 	assert.ok(ahkBlock, 'the Windows host declares no LAYMGR_ACTIONS');
 	const ahkActions = [...ahkBlock[1].matchAll(/"([a-z_]+)", true/g)].map((m) => m[1]).sort();
-	// The layout editor's file actions are wired on macOS and Linux; the Windows
+	// The layout editor's file and navigation layer actions are wired on macOS and Linux; the Windows
 	// host (WebView2, the maintainer's) does not offer them yet, so its initData
 	// sends no source_editor and the page hides the editor button there. Decided
 	// by the coordinator on 2026-11-11 overnight, to review by the maintainer.
 	// Once Windows accepts them, this list must be emptied.
-	const windowsPending = ['source_open', 'source_save', 'source_pick'];
+	const windowsPending = ['source_open', 'source_save', 'source_pick', 'nav_save'];
 	for (const action of windowsPending)
 		assert.ok(
 			!ahkActions.includes(action),
