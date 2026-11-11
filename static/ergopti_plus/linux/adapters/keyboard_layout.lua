@@ -73,6 +73,8 @@ local LOG = "adapters.keyboard_layout"
 local WAYLAND_DUMP = "xkbcli dump-keymap-wayland 2>/dev/null"
 local X11_DUMP     = "xkbcli dump-keymap-x11 2>/dev/null"
 local X11_FALLBACK = "xkbcomp -xkb \"$DISPLAY\" - 2>/dev/null"
+-- The log name of the in-process X11 dump (adapters/xkb_source_probe.dump_keymap).
+local NATIVE_X11_DUMP = "libxkbcommon-x11 (in process)"
 
 -- Where each desktop keeps the layout names, read in this order. GNOME's most
 -- recently used source is the active one; `sources` is only its fallback when
@@ -272,6 +274,16 @@ end
 --- @return string|nil The keymap text, or nil when nothing could produce one.
 --- @return string|nil The command that produced it, for the log.
 local function dump_keymap()
+	-- X11 first in process: the source probe serializes the server keymap
+	-- through libxkbcommon-x11, the text `xkbcli dump-keymap-x11` prints,
+	-- without forking a dump tool (about 40 ms a resolve through xkbcomp,
+	-- which Ubuntu 24.04's libxkbcommon 1.6 left as the only X11 dump). The
+	-- commands below remain the route when the native libraries are absent.
+	if DisplayServer.is_x11() then
+		local text, reason = require("adapters.xkb_source_probe").dump_keymap()
+		if text and text:find("xkb_keymap", 1, true) then return text, NATIVE_X11_DUMP end
+		Logger.debug(LOG, "In-process X11 keymap dump unavailable (%s); trying the dump tools.", tostring(reason))
+	end
 	local candidates = {}
 	if DisplayServer.is_wayland() then
 		candidates[#candidates + 1] = WAYLAND_DUMP

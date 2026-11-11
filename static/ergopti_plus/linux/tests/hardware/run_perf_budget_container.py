@@ -5,9 +5,10 @@
 Two checks, each able to fail on the code before the 2026-11-11 performance
 pass:
 
-1. run_xkb_source_read_cost.lua under Xvfb: a layout proof of an unchanged
-   keymap no longer downloads it (median below its budget), and setxkbmap still
-   invalidates what it reuses.
+1. Under Xvfb, run_xkb_source_read_cost.lua (a layout proof of an unchanged
+   keymap no longer downloads it, and setxkbmap still invalidates what it
+   reuses) and run_keymap_native_dump.lua (a resolve serializes the keymap in
+   process instead of forking xkbcomp, parsed alike on five layouts).
 2. tools/bench/linux-session-bench.py --budgets, reduced: spawn to ready, key
    press to output, tap-hold release to tap, typing per replacement character,
    and tray submenu and root re-opens, each against its budget.
@@ -39,12 +40,21 @@ def source_read_cost():
         )
         if not ready:
             raise RuntimeError("ENVIRONMENT: Xvfb did not start")
-        result = subprocess.run(
-            ["luajit", "tests/hardware/run_xkb_source_read_cost.lua"], cwd=cs.DRIVER, env=env
-        )
-        if result.returncode == 2:
-            raise RuntimeError("ENVIRONMENT: the X11 source probe cannot run here")
-        cs.check(result.returncode == 0, "an unchanged keymap is proven without its download")
+        for probe, claim in (
+            ("run_xkb_source_read_cost.lua", "an unchanged keymap is proven without its download"),
+            (
+                "run_keymap_native_dump.lua",
+                "a resolve serializes the keymap without forking xkbcomp",
+            ),
+        ):
+            result = subprocess.run(
+                ["luajit", "tests/hardware/" + probe],
+                cwd=cs.DRIVER,
+                env=dict(env, XDG_SESSION_TYPE="x11"),
+            )
+            if result.returncode == 2:
+                raise RuntimeError("ENVIRONMENT: %s cannot run here" % probe)
+            cs.check(result.returncode == 0, claim)
     finally:
         server.terminate()
         server.wait(10)
