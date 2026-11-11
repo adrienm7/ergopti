@@ -1,0 +1,26 @@
+<!-- _shared/ui/layout_editor/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="layout_editor.title"></title>
+		<link rel="stylesheet" href="../theme.css" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../layer_editor/_generated/layer_data.js"></script>
+		<script src="../layout_composer/_generated/composer_data.js"></script>
+		<script src="../layer_editor/layer_model.js"></script>
+		<script src="../layout_composer/composer_model.js"></script>
+		<script src="../layout_composer/source_model.js"></script>
+		<script src="toml_prelude.js"></script>
+		<script src="../vendor/smol-toml.js"></script>
+		<script src="source_io.js"></script>
+		<script src="editor_model.js"></script>
+		<script src="editor_page.js"></script>
+	</head>
+	<body>
+		<main id="layout-editor" class="layout-editor"></main>
+		<script src="standalone.js"></script>
+	</body>
+</html>

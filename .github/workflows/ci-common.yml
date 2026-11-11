@@ -344,6 +344,9 @@ jobs:
       - name: Test shared layout composer rendering
         run: npm run test:browser:layout-composer
 
+      - name: Test shared layout editor page
+        run: npm run test:browser:layout-editor
+
       - name: Test shared prompt editor initialization
         run: npm run test:browser:prompt-editor-initialization
 

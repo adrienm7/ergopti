@@ -357,6 +357,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-compiler.cjs"],
 			"repro": "npm run test:layout-source-compiler"
+		},
+		{
+			"id": "layout-editor-model",
+			"ordinal": 610,
+			"name": "unified layout editor reads, edits and writes the layout source through one module",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-model.cjs"],
+			"repro": "npm run test:layout-editor-model"
 		}
 	]
 }

@@ -1,0 +1,376 @@
+/* _shared/ui/layout_editor/style.css */
+
+/* =========================================================================== */
+/* Layout Editor — the unified editor of the Ergopti layout source: toolbar,   */
+/* layer tabs, the physical board, the key inspector, panels, live preview,   */
+/* export report and printable stickers. Light and dark through theme.css.    */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Tokens & Base ====== */
+/* =============================== */
+/* =============================== */
+
+.layout-editor,
+.layout-editor *,
+.layout-editor *::before,
+.layout-editor *::after {
+	box-sizing: border-box;
+}
+
+.layout-editor {
+	--le-bg: var(--theme-bg);
+	--le-surface: var(--theme-surface);
+	--le-surface-2: var(--theme-surface-2);
+	--le-border: var(--theme-grey-ccc);
+	--le-text: var(--theme-text);
+	--le-sub: var(--theme-sub);
+	--le-accent: var(--theme-accent);
+	--le-accent-soft: var(--theme-accent-soft);
+	--le-danger: var(--theme-danger);
+	--le-ok: var(--theme-green);
+	--le-radius: 8px;
+	background: var(--le-bg);
+	color: var(--le-text);
+	font:
+		14px/1.4 system-ui,
+		sans-serif;
+	max-width: 100%;
+	padding: 16px;
+}
+
+body {
+	background: var(--theme-bg);
+	margin: 0;
+}
+
+.layout-editor h1 {
+	font-size: 1.4em;
+	margin: 0 0 4px;
+}
+
+.layout-editor h2 {
+	font-size: 1.1em;
+	margin: 12px 0 6px;
+}
+
+.layout-editor h3 {
+	font-size: 1em;
+	margin: 0 0 6px;
+}
+
+.layout-editor button,
+.layout-editor select,
+.layout-editor input {
+	background: var(--le-surface);
+	border: 1px solid var(--le-border);
+	border-radius: 6px;
+	color: inherit;
+	font: inherit;
+	padding: 4px 8px;
+}
+
+.layout-editor button {
+	cursor: pointer;
+}
+
+.layout-editor button:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+.layout-editor button.primary {
+	background: var(--le-accent);
+	border-color: var(--le-accent);
+	color: var(--theme-surface);
+}
+
+.layout-editor button.danger {
+	border-color: var(--le-danger);
+	color: var(--le-danger);
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 2/ Layout ============= */
+/* =============================== */
+/* =============================== */
+
+.le-subtitle,
+.le-note {
+	color: var(--le-sub);
+	margin: 0 0 6px;
+}
+
+.le-toolbar,
+.le-layers,
+.le-meta,
+.le-buttons,
+.le-checks,
+.le-tabs,
+.le-media {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 8px 0;
+}
+
+.le-sep {
+	flex: 0 0 12px;
+}
+
+.le-inline,
+.le-check {
+	align-items: center;
+	display: inline-flex;
+	gap: 4px;
+}
+
+.le-field {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: 6px;
+}
+
+.le-meta .le-field {
+	min-width: 180px;
+}
+
+.le-message {
+	border-radius: var(--le-radius);
+	margin: 6px 0;
+	padding: 6px 10px;
+}
+
+.le-message.error {
+	background: var(--le-surface-2);
+	border-left: 4px solid var(--le-danger);
+}
+
+.le-message.ok {
+	background: var(--le-surface-2);
+	border-left: 4px solid var(--le-ok);
+}
+
+.le-preserved,
+.le-lost {
+	background: var(--le-surface-2);
+	border: 1px solid var(--le-border);
+	border-radius: var(--le-radius);
+	margin: 6px 0;
+	padding: 8px 12px;
+}
+
+.le-tab.active {
+	background: var(--le-accent-soft);
+	border-color: var(--le-accent);
+}
+
+.le-main {
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}
+
+.le-board-wrap {
+	flex: 1 1 640px;
+	min-width: 0;
+}
+
+.le-board-scroll {
+	overflow-x: auto;
+	padding-bottom: 6px;
+}
+
+.le-inspector {
+	background: var(--le-surface-2);
+	border: 1px solid var(--le-border);
+	border-radius: var(--le-radius);
+	flex: 0 1 340px;
+	padding: 10px;
+}
+
+.le-group {
+	border-top: 1px solid var(--le-border);
+	margin-top: 8px;
+	padding-top: 8px;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 3/ Board ============== */
+/* =============================== */
+/* =============================== */
+
+.le-board {
+	position: relative;
+}
+
+.le-key {
+	align-items: flex-start;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	overflow: hidden;
+	padding: 2px 4px;
+	position: absolute;
+}
+
+.le-key.mapped {
+	background: var(--le-accent-soft);
+}
+
+.le-key.platform {
+	border-color: var(--le-accent);
+	border-style: dashed;
+}
+
+.le-key.remapped {
+	outline: 2px dotted var(--le-sub);
+}
+
+.le-key.selected,
+.le-chip.selected {
+	border: 2px solid var(--le-accent);
+}
+
+.le-legend {
+	font-size: 1.15em;
+	white-space: nowrap;
+}
+
+.le-code {
+	color: var(--le-sub);
+	font-size: 0.65em;
+	white-space: nowrap;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 4/ Panels ============= */
+/* =============================== */
+/* =============================== */
+
+.le-panels {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin: 12px 0;
+}
+
+.le-panel,
+.le-add,
+.le-palette {
+	border: 1px solid var(--le-border);
+	border-radius: var(--le-radius);
+	padding: 6px 10px;
+}
+
+.le-panel {
+	flex: 1 1 320px;
+}
+
+.le-palette-grid {
+	display: grid;
+	gap: 2px;
+	grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+	margin-top: 6px;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.le-glyph {
+	padding: 2px;
+}
+
+.le-list {
+	padding-left: 18px;
+}
+
+.le-rules td {
+	padding: 2px 8px;
+}
+
+.le-preview-output {
+	background: var(--le-surface-2);
+	border-radius: var(--le-radius);
+	display: block;
+	margin: 6px 0;
+	min-height: 2em;
+	padding: 6px;
+	white-space: pre-wrap;
+}
+
+.le-report td {
+	padding: 3px 10px 3px 0;
+}
+
+.le-status.native {
+	color: var(--le-ok);
+}
+
+.le-status.unavailable {
+	color: var(--le-sub);
+}
+
+.le-cli {
+	background: var(--le-surface-2);
+	border-radius: 6px;
+	display: block;
+	overflow-x: auto;
+	padding: 4px 8px;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 5/ Stickers =========== */
+/* =============================== */
+/* =============================== */
+
+.le-stickers {
+	display: none;
+}
+
+@media print {
+	.layout-editor > :not(.le-stickers) {
+		display: none;
+	}
+
+	.le-stickers {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2mm;
+	}
+
+	.le-sticker {
+		border: 0.2mm solid var(--theme-grey-999);
+		break-inside: avoid;
+		display: grid;
+		font-size: 9pt;
+		grid-template-columns: 1fr 1fr;
+		height: 14mm;
+		padding: 0.5mm 1mm;
+		width: 14mm;
+	}
+
+	/* Shift top left, base bottom left, AltGr levels on the right. */
+	.le-sticker-shift {
+		grid-area: 1 / 1;
+	}
+
+	.le-sticker-base {
+		grid-area: 2 / 1;
+	}
+
+	.le-sticker-shift_altgr {
+		grid-area: 1 / 2;
+	}
+
+	.le-sticker-altgr {
+		grid-area: 2 / 2;
+	}
+}
