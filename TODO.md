@@ -140,6 +140,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Progress (11 November 2026, [input/layout campaign](docs/audits/platform-parity/2026-11-11-input-layout/report.md)): module taken: remaining input/layout engine joins. Fixed: a moved macOS Cmd chord is released on its own key code (ILM-001), an emulated shortcut falls back to its character's US key under a non-Latin layout on Linux and macOS (ILL-003, ILM-002), an emulated Linux chord repeats while held (ILL-004). Fixed (order decided by the coordinator on 2026-11-11, to review by the maintainer): a bound shortcut slot and the prediction's digit run before the Linux layout emulation (ILL-001, ILL-002); open: the slot still matches the system layout's key, not the emulated letter. ILD-1 decided by the maintainer on 2026-11-11 (a two-modifier chord sends the logical key everywhere): macOS and Linux pinned, Windows counterpart in the report. Decision pending: ILD-2 (Ctrl+AltGr). Left: a tap-hold modifier's repeat over a passed key on Linux, native receiving unqualified.
       Progress (11 November 2026, [shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md)): census 377 areas (47 changed areas under modules campaigned since); module taken: keyboard shortcuts and text actions. Fixed on Linux: a held accented shortcut repeats like Windows (SCL-001), the accented shortcuts stand aside while a layout is emulated (SCL-002). Decisions pending: SCD-1 to 3 (script actions on slots while paused, accented chords of two modifiers, a Ctrl slot under AltGr). Next module: the updater. Left: macOS `bindings.lua` and Linux `key_combinations.lua` in depth, native receiving unqualified.
       Progress (11 November 2026, [updater campaign](docs/audits/platform-parity/2026-11-11-updater/report.md)): module taken: the updater, from the census. Fixed on Linux: a failed background check announces no release (UPL-001), the notification of a manual check without its window words each outcome (UPL-002), a release read from the public feed says it cannot be installed yet (UPL-003). Decision pending: UPD-1 (a proxy or captive-portal answer, a 304 with no cached page). Windows, report only: UPW-005 (the signing policy compared case-insensitively). Left: the macOS manual check without its window, native receiving unqualified.
+      Progress (11 November 2026, [adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md)): areas taken: the Lua drivers' `adapters/` and `infra/` (clipboard, privacy, focus identity). Fixed on Linux: an X11 clipboard holding only an image is borrowed and restored whole (CBL-001). Decisions pending: ADD-1 to 3 (password-manager applications gated on macOS only, restoring an empty clipboard, the Linux application identity by session type). Left: configuration, lifecycle, notification and network adapters in depth, native receiving unqualified.
 
 ## Dead-key composition parity follow-up
 
@@ -1010,8 +1011,11 @@ Account and tester actions (maintainer, from the PC):
       AltGr press: it unblocks the `left_ctrl` + `alt_gr` pair and the terminal recipe alias.
 - [ ] Sticky keys, `run_command` in a console, `open_path` through both pickers, the vision backend list, and a real
       vLLM on port 8000.
-- [ ] Decide: squash the old steps of `migrations.toml` (recommended, it would cut most remaining config test time) and
-      whether a registry change seen only at the sweep's next capture is acceptable.
+- [ ] Decide: squash the old steps of `migrations.toml` (recommended, it would cut most remaining config test time).
+- [x] Decide whether a registry change seen only at the sweep's next capture is acceptable. Decided 2026-11-11: no.
+      `modules/keymap/layout_registry_watch.ahk` arms RegNotifyChangeKeyValue on `HKCU\Keyboard Layout` and the
+      installed layouts key, polls its events every 100 ms and runs the layout poll's capture
+      (`CheckKeyboardLayoutChange`) at once; the one-second poll stays the backstop (`test_layout_registry_watch.ahk`).
 - [ ] Review the machine translations of 1 November (curl, proxy, token exchange, WebView2, chord and case-twin keys).
 - [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, type, pause, and during
       the spinner move the mouse by a few pixels, turn the wheel, use a precision-touchpad scroll, Alt+Tab, press
@@ -1222,7 +1226,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       `layout_source_emulation.json` (replay `emulation_vectors.json`); `menu_init.ahk` binds
       `MenuCommand.OPEN_LAYOUT_EDITOR` and the `open_layout_editor` row loses its Windows grey reason. Then empty `windowsPending`
       in `test-layout-manager-page.cjs`.
-- [ ] **KMD-1 on AHK (blocking: Windows metrics stop writing on an existing cache since dev `bffd1929`).** Decided by the
+- [x] **KMD-1 on AHK (blocking: Windows metrics stop writing on an existing cache since dev `bffd1929`).** Decided by the
       maintainer on 2026-11-11: rows store `ts` in UTC and `utc_offset_min`. `windows/_generated/keystats_queries.ahk` was
       regenerated by its codegen, so its raw INSERTs already name the column. Left: `keystats_reader_db.ahk` adds the column
       to every raw table and drops the 16 `metrics_purge_*` triggers before `KLR_LoadPurgeSchema` (same statements as
@@ -1253,6 +1257,10 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **Older findings.** The seven "Remaining findings" of
   [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
   first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
+  - [x] Finding 3, uninstall recycles a foreign replacement (2026-11-11): `Invoke-ErgoptiRemoval` follows the pinned
+        file's volume serial and file index through a private quarantine name into the Recycle Bin; a swap in the
+        unpinned window refuses instead of reporting success (`test-windows-uninstall.cjs`, under Windows PowerShell
+        5.1; the real Recycle Bin receives only the test's own fixture, removed afterwards).
 - **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad titles a window « Notes.txt – Bloc-notes » with
   an en dash; the matcher read only « - » and never found the window (fixed, `takenote-title-separator`). Left: by
   default it opens a second file as a tab of the open window, so a same-named note of another folder shares one

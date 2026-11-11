@@ -5,6 +5,43 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## A Windows layout registry change is captured at once (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: a change of the Windows keyboard-layout
+registry must be seen immediately, not only at the one-second layout poll's
+next capture. `modules/keymap/layout_registry_watch.ahk` arms
+`RegNotifyChangeKeyValue` (subtree, names and values) on `HKCU\Keyboard Layout`
+and `KLS_LAYOUTS_KEY`, one auto-reset event each. AutoHotkey has one thread and
+a thread-pool wait would call back on another, so the driver polls the events
+with a zero timeout every `[adapters] layout_registry_watch_poll_ms` (100 ms),
+arms a signaled key again, then runs `CheckKeyboardLayoutChange` at once. The
+entry starts it after the poll's timer and `Ergopti_OnShutdown` stops it; a
+second start throws and a refused start closes what it opened. The poll stays
+the backstop: do not remove it, and do not lengthen the event poll to the
+poll's second. macOS and Linux have no such registry; their own layout owners
+are outside this decision.
+
+## The Windows uninstall recycles the exact checked file (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (finding 3 of
+`docs/audits/windows-2026-10-28`): the portable uninstall worker
+(`windows/vendor/ergopti_uninstall.ps1`) must recycle the very executable it
+checked, not whatever holds its name once the pin is released (Windows cannot
+recycle a pinned file). `Invoke-ErgoptiRemoval` reads the volume serial and
+file index under the pin, keeps an attribute-only anchor handle open (it blocks
+nothing and keeps the file index from being reused), renames the file to an
+unguessable `.ergopti-uninstall-<guid>.exe` in the same directory, checks that
+name's identity, recycles it, then requires the same identity among the
+Recycle Bin's `$R` entries. A replacement before the rename gets its name back
+and nothing is recycled; one inside the recycle fails the uninstall with an
+error, never a success. Permanent deletion stays out of the contract. Windows
+PowerShell 5.1 has no public identity reader and the bundled scripts may not
+declare P/Invoke (`tools/ci/windows-exe-av-surface.json`), so the identity is
+read through PowerShell's own `GetFileInformationByHandle` wrapper; do not
+replace it with `Add-Type`. Linux and macOS remove their installed trees
+through their own owners (`uninstall.sh`, `UninstallWorker.swift`); this
+pinned-image race is specific to the portable Windows executable.
+
 ## The Windows personal editors are WebView only (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: on Windows the personal hotstrings
