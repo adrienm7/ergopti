@@ -346,6 +346,7 @@
 		"codegen:layer-editor-data:js": "node ./tools/codegen/codegen-layer-editor-data-js.cjs",
 		"codegen:layout-composer-data:js": "node ./tools/codegen/codegen-layout-composer-data-js.cjs",
 		"codegen:layout-editor-klc:js": "node ./tools/codegen/codegen-layout-editor-klc-js.cjs",
+		"codegen:layout-editor-kbd-dll:js": "node ./tools/codegen/codegen-layout-editor-kbd-dll-js.cjs",
 		"codegen:layout-editor-tables:js": "node ./tools/codegen/codegen-layout-editor-tables-js.cjs",
 		"codegen:layout-composer-corpus": "node ./tools/codegen/codegen-layout-composer-corpus.cjs",
 		"codegen:layout-composer-check": "node ./tools/codegen/codegen-layout-composer-check.cjs",
