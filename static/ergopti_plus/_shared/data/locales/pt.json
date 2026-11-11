@@ -4284,7 +4284,7 @@
 	"physical_shortcuts.save_failed": "Não foi possível guardar este atalho. Tente novamente.",
 	"physical_shortcuts.saved_reopen": "Guardado. Reabra esta janela para continuar.",
 	"physical_shortcuts.position_unavailable": "Esta posição de tecla não está disponível aqui.",
-	"physical_shortcuts.windows_unavailable": "Ainda indisponível no Windows: O editor de atalhos físicos ainda não está disponível no Windows.",
+	"physical_shortcuts.windows_unavailable": "Ainda indisponível no Windows: O Windows ainda não tem anfitrião para os atalhos físicos, nem o editor nem a execução de uma ação associada a uma tecla física. Os atalhos físicos funcionam no macOS e no Linux.",
 	"physical_shortcuts.collision": "Esta combinação de teclas já está em uso. Escolha outra.",
 	"physical_shortcuts.delivery_unqualified": "Ainda não disponível: o Ergopti ainda não consegue executar com segurança uma ação associada a uma tecla física neste sistema. Os atalhos com nome continuam a funcionar.",
 	"physical_shortcuts.window_unavailable": "Esta janela está indisponível: Tente reabri-la.",

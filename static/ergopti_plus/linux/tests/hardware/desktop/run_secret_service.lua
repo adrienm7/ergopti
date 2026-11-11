@@ -12,9 +12,11 @@
 ---   the keyring password into that prompt on the session keyboard. The file
 ---   must then hold a reference, the service the key.
 --- * migrate: the launcher locks the keyring again, this phase appends an
----   entry an earlier build wrote in plaintext; migrate_plaintext(), as the daemon runs
----   it at boot, must open the prompt again, move that key to the service and
----   rewrite the file without it, while the first entry's key still loads.
+---   entry an earlier build wrote in plaintext; migrate_plaintext(), the
+---   synchronous move a save runs (the daemon's boot moves it in the background
+---   instead, modules/llm/api_key_migration.lua), must open the prompt again,
+---   move that key to the service and rewrite the file without it, while the
+---   first entry's key still loads.
 ---
 --- Exit 0 = every check held. 1 = a failure. 2 = no environment.
 --- ==============================================================================
