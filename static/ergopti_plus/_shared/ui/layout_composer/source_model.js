@@ -56,8 +56,19 @@ var LayoutSource = (function () {
 		{ target: 'driver_windows', artifact: 'emulation' },
 		{ target: 'web', artifact: 'emulation' }
 	];
+	// Export fields holding a table of LCID (4 hex digits) -> text instead of a
+	// string: the Windows version resource's per-language texts.
+	const EXPORT_TABLES = { windows: ['descriptions', 'language_names'] };
 	const EXPORT_METADATA = {
-		windows: ['locale', 'layout_id', 'dll_name'],
+		windows: [
+			'locale',
+			'layout_id',
+			'dll_name',
+			'copyright',
+			'company',
+			'descriptions',
+			'language_names'
+		],
 		linux: ['name', 'description']
 	};
 	const EDITS = [
@@ -468,8 +479,23 @@ var LayoutSource = (function () {
 				(entry) => entry.key
 			);
 		if (own(source, 'windows')) {
-			record(source.windows, ['flags', 'nls'], [], 'windows');
+			record(source.windows, ['flags', 'nls', 'key_names', 'kana_key'], [], 'windows');
+			// The physical key that holds the Kana level on Windows (Right Alt by default).
+			if (own(source.windows, 'kana_key')) keyCode(source.windows.kana_key, 'windows.kana_key');
 			if (own(source.windows, 'flags')) list(source.windows.flags, 'windows.flags', identifier);
+			// The key names of scan codes no physical key of the registry names
+			// (F13 to F24, Pause, Sys Req…), keyed sc_<hex> or e0_<hex> for an extended one.
+			if (own(source.windows, 'key_names')) {
+				const names = source.windows.key_names;
+				requireValue(
+					names && typeof names === 'object' && !Array.isArray(names),
+					'windows.key_names'
+				);
+				for (const [scan, name] of Object.entries(names)) {
+					requireValue(/^(sc|e0)_[0-9a-f]{2}$/.test(scan), `windows.key_names.${scan}`);
+					string(name, `windows.key_names.${scan}`);
+				}
+			}
 			if (own(source.windows, 'nls'))
 				list(
 					source.windows.nls,
@@ -535,8 +561,18 @@ var LayoutSource = (function () {
 			for (const [target, fields] of Object.entries(EXPORT_METADATA))
 				if (own(source.exports, target)) {
 					record(source.exports[target], fields, [], `exports.${target}`);
-					for (const [key, value] of Object.entries(source.exports[target]))
-						string(value, `exports.${target}.${key}`);
+					for (const [key, value] of Object.entries(source.exports[target])) {
+						if ((EXPORT_TABLES[target] || []).includes(key)) {
+							requireValue(
+								value && typeof value === 'object' && !Array.isArray(value),
+								`exports.${target}.${key}`
+							);
+							for (const [lang, text] of Object.entries(value)) {
+								requireValue(/^[0-9a-f]{4}$/.test(lang), `exports.${target}.${key}.${lang}`);
+								string(text, `exports.${target}.${key}.${lang}`);
+							}
+						} else string(value, `exports.${target}.${key}`);
+					}
 				}
 		}
 		return source;

@@ -332,14 +332,11 @@ class Session:
         self.spawn(["openbox"])
         time.sleep(1)
         self.xtest = Xtest(display)
-        # One key from the XTEST slave before the daemon starts, so the server's
-        # core keyboard already follows the device that carries the daemon's
-        # output, as it does on a desktop whose keyboard the daemon grabbed once
-        # its first key went out. A switch of source slave during the run sends
-        # an XKB new-keyboard notify, which revokes the daemon's layout receipt
-        # for good today (TODO.md, "Linux X11: a same-group XKB notify").
-        self.xtest.deliver("K 42 1")
-        self.xtest.deliver("K 42 0")
+        # No key is sent before the daemon starts: its first key switches the
+        # server's source slave, as on a desktop, and the XKB new-keyboard notify
+        # that follows must leave the daemon's layout ready (the receipt is
+        # renewed when the re-read keymap is identical; decided by the
+        # maintainer on 2026-11-11). run_ai_inline_container.py checks it.
 
         def pump():
             with open(self.desktop_fifo, "r") as fifo:

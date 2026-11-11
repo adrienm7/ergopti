@@ -1010,6 +1010,18 @@ function M.new()
 				deliveries = counts.deliveries,
 			}
 		end,
+		physical_shortcut_facts = function()
+			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local bound = 0
+			for _, entry in ipairs(Shortcuts.physical_assignments()) do
+				if entry.action ~= nil and entry.action ~= "none" then bound = bound + 1 end
+			end
+			-- The hook module holds the process counts even before its first owner starts
+			local counts = require("adapters.physical_shortcut_hook").counts()
+			return { available = Shortcuts.physical_delivery_available() == true, bound = bound,
+				suppressed = counts.suppressed, delivered = counts.delivered,
+				unacknowledged = counts.unacknowledged, dropped = counts.dropped }
+		end,
 		hotstring_candidates = hotstring_candidates,
 		prediction_readiness = prediction_readiness,
 		layout_rows_env = layout_rows_env,

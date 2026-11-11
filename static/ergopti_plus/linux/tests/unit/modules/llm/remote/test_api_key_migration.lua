@@ -98,12 +98,19 @@ end
 local function fresh()
 	os.execute("rm -rf '" .. DIR .. "' && mkdir -p '" .. DIR .. "'")
 	write(PATH, LEGACY)
+	-- An earlier suite module may leave a stand-in provider catalogue or entries
+	-- owner behind; the real ones classify this file's entry.
+	for _, name in ipairs({ "modules.llm.api_remote", "modules.llm.local_server_catalogue",
+		"llm.provider_config_policy", "llm.local_server_auth" }) do
+		package.loaded[name] = nil
+	end
 	local store = helpers.load_module("modules.llm.api_token_store")
 	package.loaded["modules.llm.api_token_store"] = store
 	store._set_tool_for_test(TOOL)
 	store._set_probe_tool_for_test(PROBE)
 	local entries = helpers.load_module("modules.llm.api_entries")
 	entries._set_path_for_test(PATH)
+	helpers.assert_eq(#entries.plaintext_keys(), 1, "the fixture's plaintext entry loads")
 	local migration = helpers.load_module("modules.llm.api_key_migration")
 	helpers.assert_eq(migration.init({ entries = entries, store = store,
 		timings = { probe_ms = 2000, store_ms = 400, retry_ms = 150, retry_max_ms = 300 } }), true)
@@ -172,7 +179,11 @@ helpers.describe("api_key_migration: a locked keyring never delays input readine
 			working_tool()
 			probe("(<true>,)")
 			helpers.assert_eq(migration.start(), true)
-			run_loop(1000, function() return read(DIR .. "/argv") ~= nil end)
+			-- start() arms the first attempt in "waiting"; see it run, then let the
+			-- probe child settle on its own time under a loaded suite.
+			run_loop(2000, function() return migration.status() == "running" end)
+			helpers.assert_eq(migration.status(), "running", "the first attempt started")
+			run_loop(8000, function() return migration.status() == "waiting" or read(DIR .. "/argv") ~= nil end)
 			helpers.assert_eq(read(DIR .. "/argv"), nil, "nothing is stored while the keyring is locked")
 			helpers.assert_eq(migration.status(), "waiting")
 			helpers.assert_eq(read(PATH), LEGACY)

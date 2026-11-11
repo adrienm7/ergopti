@@ -5,6 +5,27 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## X11 same-group XKB notify renews the layout receipt (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: after an XKB new-keyboard notify that
+keeps the group (Xorg switching the slave keyboard feeding the core
+keyboard), the Linux driver re-reads the server keymap and, when it is
+identical to the capture's map, renews the layout receipt instead of leaving
+`KeyboardLayout.is_ready()` false. A keymap that really differs keeps the
+receipt revoked. The renewal mints a fresh receipt through
+`xkb_capture.inverse_retarget`; old plans are never revived.
+
+## A restored API entry without its key asks for it again (2026-11-11)
+
+Decided by the maintainer on 2026-11-11: deleting an API entry keeps
+deleting its Keychain item (macOS) or secret-service item (Linux), even when
+a retained backup still names it. An entry restored from such a backup is
+listed, greyed, with `model_browser.hint_api_key_reenter` and an « API key… »
+action that stores a new key. macOS tells the absent item apart through the
+launcher's `itemNotFound` exit (69); Linux through secret-tool's silent exit 1
+confirmed by `search`. A locked or refused read is never taken for an absent
+key. Do not keep Keychain items alive for backups.
+
 ## Linux API key migration never blocks the daemon (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: the boot-time move of a plaintext API

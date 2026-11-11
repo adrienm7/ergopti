@@ -24,6 +24,11 @@
 ---    trigger match inside a keystroke is one line for the match, in keydown.
 --- 5. Names and numbers only: the WARNING carries segment names and durations,
 ---    never the typed character or the buffer.
+--- 6. Paired debug lines for the paths a person waits on (trace() / done()): at
+---    DEBUG an expansion writes "[TRACE] [Span] hotstring.expand…" and "[DONE]
+---    [Span] hotstring.expand done in N ms", the Linux driver's tag and names
+---    (linux/infra/perf_counters.lua), so one search reads both field logs.
+---    Below DEBUG they cost one level read.
 --- ==============================================================================
 
 local M = {}
@@ -34,6 +39,8 @@ local PhaseStats = require("infra.phase_stats")
 local Segments = require("hotpath_segments")
 local Timings = require("infra.timings")
 local LOG    = "HotPath"
+-- Tag of the paired trace()/done() lines, the same on Linux.
+local SPAN_LOG = "Span"
 
 -- Phase name of each label, built once so a keystroke never concatenates.
 local _phase_names = {}
@@ -139,6 +146,36 @@ function M.log_if_slow(label, start_ns)
 	end
 	PhaseStats.add(phase, now_ns - start_ns)
 	return (_nesting.close(label, start_ns / NS_PER_MS, now_ns / NS_PER_MS))
+end
+
+--- Whether the logger writes DEBUG lines now.
+--- @return boolean
+local function debug_on()
+	return Logger.current_level <= Logger.LEVELS.DEBUG
+end
+
+--- Opens a segment a person waits on, with its paired TRACE line at DEBUG.
+--- Close it with done(), on every path.
+--- @param label string Declared hot-path segment name.
+--- @return number Raw nanosecond timestamp; pass to M.done.
+function M.trace(label)
+	if debug_on() then Logger.trace(SPAN_LOG, "%s…", label) end
+	return M.now()
+end
+
+--- Closes a segment opened with trace() (judged as log_if_slow judges it), with
+--- its paired DONE line at DEBUG.
+--- @param label string The segment trace() opened.
+--- @param start_ns number The stamp trace() returned.
+--- @param detail string|nil A short count summary: names and numbers only.
+--- @return number elapsed_ms
+function M.done(label, start_ns, detail)
+	local elapsed_ms = M.log_if_slow(label, start_ns)
+	if debug_on() then
+		Logger.done(SPAN_LOG, "%s done in %.2f ms%s.", label, elapsed_ms,
+			(type(detail) == "string" and detail ~= "") and (" (" .. detail .. ")") or "")
+	end
+	return elapsed_ms
 end
 
 --- Forgets every open frame and the rate limiter. Tests only.
