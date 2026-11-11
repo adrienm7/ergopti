@@ -11,7 +11,8 @@
 # Needs root (mounts), gcc, luajit with lua-luv and lua-lgi, Xvfb, openbox,
 # dbus-launch, at-spi2-core, mousepad, xclip, sway, mutter, wl-clipboard,
 # wayland-scanner, libwayland-dev, libxkbcommon-dev, libxkbcommon-tools,
-# libxkbcommon-x11-0, python3 with Gtk 3 and Atspi. PYTHON overrides python3.
+# libxkbcommon-x11-0, libayatana-appindicator3, python3 with Gtk 3 and Atspi.
+# PYTHON overrides python3.
 # Exit 0 = every proof held; 1 = a failure; 2 = no environment.
 
 set -u
@@ -21,6 +22,10 @@ PYTHON="${PYTHON:-python3}"
 for tool in unshare gcc luajit Xvfb openbox dbus-launch mousepad xclip sway mutter wl-paste wayland-scanner pkg-config xkbcli; do
 	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
+# The latency budgets boot the daemon with its tray (run_perf_budget_container.py),
+# which refuses to start without the indicator library.
+"${PYTHON}" -c 'import ctypes.util, sys; sys.exit(not ctypes.util.find_library("ayatana-appindicator3"))' \
+	|| { echo "ENVIRONMENT: libayatana-appindicator3 is missing" >&2; exit 2; }
 "${PYTHON}" -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("Atspi", "2.0")' 2>/dev/null \
 	|| { echo "ENVIRONMENT: ${PYTHON} has no Gtk 3 / Atspi bindings" >&2; exit 2; }
 status=0
