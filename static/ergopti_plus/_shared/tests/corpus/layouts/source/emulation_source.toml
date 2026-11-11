@@ -140,3 +140,10 @@ key = "Backslash"
 tap = { dead_key = "acute" }
 hold_modifier = "control"
 threshold_ms = 150
+
+# A hold reaching a native layer: the engine sends the key with that layer's modifiers.
+[[tap_holds]]
+key = "Quote"
+tap = { text = "'" }
+hold_layer = "shift"
+threshold_ms = 180
