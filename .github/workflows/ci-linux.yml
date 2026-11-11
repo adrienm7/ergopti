@@ -3247,6 +3247,8 @@ jobs:
       # GNOME Shell and KWin report the focused window to a session-bus name the
       # daemon's worker owns; this runs that worker on a real dbus-daemon, the
       # test standing in for the Shell (admission, refusals, single owner).
+      # COSMIC's worker then reads zcosmic_toplevel_info_v1 through the real
+      # libwayland-client from a protocol fake standing in for cosmic-comp.
       - name: The compositor focus worker admits only the desktop on a real session bus
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
@@ -3259,6 +3261,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           timeout 60 dbus-run-session -- luajit tests/hardware/run_compositor_focus_bus.lua
+          timeout 60 luajit tests/hardware/run_cosmic_toplevel_fake.lua
           else
               exit 1
           fi

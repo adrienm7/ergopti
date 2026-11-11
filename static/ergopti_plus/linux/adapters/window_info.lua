@@ -392,7 +392,10 @@ local function focused_wlr_toplevel()
 	return info, native_identity("wlr-toplevel", focused.identifier, nil), nil
 end
 
---- Reads the focus GNOME Shell or KWin last pushed to the daemon.
+-- The identity prefix of each compositor focus family.
+local COMPOSITOR_SERVERS = { gnome = "gnome", kde = "kwin", cosmic = "cosmic" }
+
+--- Reads the focus GNOME Shell, KWin or cosmic-comp last pushed to the daemon.
 --- @return table|nil info, string|nil identity, number|nil pid
 local function focused_compositor()
 	local window = _compositor_focus.snapshot()
@@ -404,7 +407,7 @@ local function focused_compositor()
 	-- process (the poll runs four times a second).
 	info.appId = window.class
 	if info.appId == "" and window.pid then info.appId = _read_proc_comm(window.pid) end
-	local server = _compositor_focus.family() == "gnome" and "gnome" or "kwin"
+	local server = assert(COMPOSITOR_SERVERS[_compositor_focus.family()], "compositor focus family without an identity prefix")
 	return info, native_identity(server, window.id, window.pid), window.pid
 end
 
@@ -480,8 +483,9 @@ function M.use_native_x11()
 	return bound
 end
 
---- Starts the GNOME Shell or KWin focus source for this daemon, once. Only a
---- Wayland GNOME or KDE session has one; elsewhere nothing starts.
+--- Starts the GNOME Shell, KWin or cosmic-comp focus source for this daemon,
+--- once. Only a Wayland GNOME, KDE or COSMIC session has one; elsewhere
+--- nothing starts.
 --- @param options table|nil Extra compositor_focus.new options (test seams).
 --- @return boolean started
 function M.start_compositor_focus(options)
