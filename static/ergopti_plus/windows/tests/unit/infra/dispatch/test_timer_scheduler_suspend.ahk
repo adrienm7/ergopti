@@ -10,7 +10,7 @@
 ; and the timer fired indefinitely.
 ;
 ; APPROACH:
-; Keep the logical handle and source invariants. Cancellation cases also use
+; Observe logical handle state and real suspended delivery. Cancellation cases use
 ; actual native delivery to prove arming, observe exact cancellation requests,
 ; and watch the same callback after its due time. An independent native
 ; heartbeat proves that this observation window really pumps timers.
@@ -241,28 +241,120 @@ Test("TimerScheduler/suspend F25 -- cancelAll cancels handles that carry Requeue
 
 ; =====================================================================
 ; =====================================================================
-; ======= 3/ Source-structure guard (static assertions) ===============
+; ======= 3/ Delivery while the driver is suspended ===================
 ; =====================================================================
 ; =====================================================================
 
-; Verify that the fix is present in the adapter source by reading the file
-; and asserting the key identifiers exist. This is a canary that fails if
-; someone removes the RequeuedFn tracking without updating the tests.
-; The read used to be wrapped in a try that turned an unreadable source into
-; AssertTrue(true) — so a renamed or moved adapter did not fail this canary, it
-; silenced it. A structural guard that cannot find the structure has to say so.
-; _DriverDirConcat throws when the directory holds no .ahk file, which is both
-; the read and the proof that the read found something.
-_TSSuspTest_SourceContainsRequeuedFnWrite() {
-	src := _DriverDirConcat("adapters")
-	; The suspend branch must store the closure in BoundHandle["RequeuedFn"].
-	AssertTrue(InStr(src, "RequeuedFn") > 0,
-		"adapter source must contain RequeuedFn tracking (F25 fix absent)")
-	; TimerCancel must read RequeuedFn and pass it to SetTimer.
-	AssertTrue(InStr(src, 'Handle.Has("RequeuedFn")') > 0,
-		"TimerCancel must check Handle.Has(RequeuedFn) (F25 cancel path absent)")
+; Native Suspend() disarms hotkeys only: a SetTimer callback still runs while
+; the user believes the driver is paused. These cases suspend this process for
+; real and deliver the exact wrapper the native timer would call, so they
+; observe whether the user callback ran instead of reading the wrapper's text
+; (timer-scheduler-no-pause-guard, timer-scheduler-oneshot-suspend, F25).
+
+_TSSuspTest_CountCall(Ledger) {
+	Ledger.Calls += 1
 }
-Test("TimerScheduler/suspend F25 -- adapter source contains RequeuedFn fix (structural guard)", _TSSuspTest_SourceContainsRequeuedFnWrite)
+
+_TSSuspTest_ThrowingOneShot() {
+	throw Error("oneshot-probe-boom")
+}
+
+; A one-shot delivered while suspended must neither run nor be lost: it stays
+; owned, its re-queue is reachable for cancellation, and it runs exactly once
+; when delivered after the driver resumes.
+_TSSuspTest_SuspendedOneShotDefersThenRunsOnce() {
+	_TS_ResetRegistry()
+	Ledger := {Calls: 0}
+	PreviousSuspend := A_IsSuspended
+	H := TimerAfter(10, _TSSuspTest_CountCall.Bind(Ledger))
+	Primary := H["Fn"]
+	Armed := [Primary]
+	try {
+		; The test delivers every wrapper itself; no native copy may fire later.
+		_TimerAdapterCancelNative(Primary)
+		Suspend(true)
+		Primary.Call()
+		AssertEqual(0, Ledger.Calls, "a one-shot delivered while suspended must not run its callback")
+		AssertFalse(H["Fired"], "a one-shot delivered while suspended must stay live instead of being lost")
+		AssertEqual(1, TimerActiveCount(), "the deferred one-shot must remain owned by the registry")
+		Assert(H.Has("RequeuedFn") && HasMethod(H["RequeuedFn"], "Call"),
+			"the re-queued delivery must be reachable from the handle so cancel() can retire it")
+		FirstRequeue := H["RequeuedFn"]
+		Armed.Push(FirstRequeue)
+		_TimerAdapterCancelNative(FirstRequeue)
+		FirstRequeue.Call()
+		AssertEqual(0, Ledger.Calls, "a re-queue delivered while still suspended must defer again")
+		SecondRequeue := H.Get("RequeuedFn", 0)
+		Assert(HasMethod(SecondRequeue, "Call") && SecondRequeue != FirstRequeue,
+			"a second suspended delivery must hand ownership to a fresh re-queue")
+		Armed.Push(SecondRequeue)
+		_TimerAdapterCancelNative(SecondRequeue)
+
+		Suspend(false)
+		SecondRequeue.Call()
+		AssertEqual(1, Ledger.Calls, "the deferred one-shot must run once the driver resumes")
+		AssertTrue(H["Fired"], "the delivered one-shot must retire its handle")
+		AssertEqual(0, TimerActiveCount(), "the delivered one-shot must leave the registry")
+		for Callback in Armed
+			Callback.Call()
+		AssertEqual(1, Ledger.Calls, "stale primary and re-queue deliveries must not run the callback twice")
+	} finally {
+		Suspend(PreviousSuspend)
+		for Callback in Armed
+			_TimerAdapterCancelNative(Callback)
+		TimerCancel(H)
+	}
+}
+Test("TimerScheduler/suspend -- a one-shot delivered while suspended defers and later runs once (timer-scheduler-oneshot-suspend)",
+	_TSSuspTest_SuspendedOneShotDefersThenRunsOnce)
+
+; A repeating tick delivered while suspended is skipped; the next tick after
+; resume runs, so the guard cannot be satisfied by a wrapper that never calls.
+_TSSuspTest_SuspendedRepeatingTickIsSkipped() {
+	_TS_ResetRegistry()
+	Ledger := {Calls: 0}
+	PreviousSuspend := A_IsSuspended
+	H := TimerEvery(3600, _TSSuspTest_CountCall.Bind(Ledger))
+	try {
+		Suspend(true)
+		H["Fn"].Call()
+		AssertEqual(0, Ledger.Calls, "a repeating tick delivered while suspended must not run its callback")
+		AssertFalse(H["Fired"], "a skipped tick must keep the repeating timer live")
+		Suspend(false)
+		H["Fn"].Call()
+		AssertEqual(1, Ledger.Calls, "the next tick after resume must run the callback")
+	} finally {
+		Suspend(PreviousSuspend)
+		TimerCancel(H)
+	}
+}
+Test("TimerScheduler/suspend -- a repeating tick delivered while suspended is skipped (timer-scheduler-no-pause-guard)",
+	_TSSuspTest_SuspendedRepeatingTickIsSkipped)
+
+; An isolated one-shot exception must leave an ERROR line, which reaches the
+; errors sink a user attaches to a report (timer-callback-errors-to-outputdebug).
+_TSSuspTest_ThrowingOneShotIsLoggedAtError() {
+	global _LOGGER_TEST_SINK
+	_TS_ResetRegistry()
+	Seen := []
+	Prev := IsSet(_LOGGER_TEST_SINK) ? _LOGGER_TEST_SINK : 0
+	_LOGGER_TEST_SINK := (Line) => Seen.Push(Line)
+	try {
+		H := TimerAfter(10, _TSSuspTest_ThrowingOneShot)
+		_TSTest_DeliverOneShot(H)
+	} finally {
+		_LOGGER_TEST_SINK := Prev
+	}
+	Found := ""
+	for _, Line in Seen {
+		if InStr(Line, "oneshot-probe-boom")
+			Found := Line
+	}
+	Assert(Found != "", "a throwing one-shot callback must be logged, not swallowed")
+	AssertContains(Found, "ERROR", "the throwing one-shot must be logged at ERROR")
+}
+Test("TimerScheduler/suspend -- a throwing one-shot callback is logged at ERROR (timer-callback-errors-to-outputdebug)",
+	_TSSuspTest_ThrowingOneShotIsLoggedAtError)
 
 ; A reset must physically and logically retire its owner before the next case.
 Test("TimerScheduler/suspend F25 -- fixture reset retires native requeue ownership (timer-fixture-native-requeue-cleanup)",

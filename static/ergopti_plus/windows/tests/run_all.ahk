@@ -1523,7 +1523,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_mouse_hotkey_clobber.ahk
 #Include meta/modules/gestures/test_mouse_suspend_guard.ahk
 #Include meta/modules/keystats/test_scroll_flush_fn_cleared_on_stop.ahk
-#Include meta/infra/dispatch/test_timer_scheduler_pause_guard.ahk
 #Include meta/modules/keystats/test_keystats_watchers_pause_guard.ahk
 #Include unit/modules/keystats/test_keystats_session_privacy_transaction.ahk
 #Include unit/modules/keystats/test_keystats_session_close_retry.ahk
