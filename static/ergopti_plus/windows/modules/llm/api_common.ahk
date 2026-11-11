@@ -262,7 +262,10 @@ global LLM_AUTH_PHRASES := [
 	"invalid api key", "invalid_api_key", "incorrect api key", "api key not valid",
 	"api key is invalid", "api key is missing", "invalid x-api-key", "invalid authentication",
 	"authentication_error", "authentication failed", "unauthorized", "missing api key",
-	"no api key", "api key is missing or invalid", "invalid token", "permission_denied"
+	"no api key", "api key is missing or invalid", "invalid token", "permission_denied",
+	; A token exchange answering HTTP 400 (OAuth invalid_grant, an unknown IAM key)
+	; refuses the same credential again (AID-2, 2026-11-11).
+	"the token exchange answered http 400"
 ]
 
 /**

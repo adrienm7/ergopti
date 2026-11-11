@@ -327,6 +327,45 @@ _LLM_TokenExchange_FillKey(Key, Fields, Placeholder) {
 }
 
 /**
+ * The message a refusing token service gives, in the field its error format
+ * uses (OAuth error_description and error, IAM errorMessage, Google's
+ * error.message), flattened to one line and cut on a whole character at the
+ * token_exchange.max_service_message_bytes of _shared/modules/llm/inference.json.
+ * @param {Any} Decoded The decoded JSON body.
+ * @returns {String} The message, "" when the service gives none.
+ */
+_LLM_TokenExchange_ServiceMessage(Decoded) {
+	if !(Decoded is Map)
+		return ""
+	Nested := Decoded.Get("error", "")
+	Nested := Nested is Map ? Nested.Get("message", "") : ""
+	for Candidate in [Decoded.Get("error_description", ""), Decoded.Get("errorMessage", ""), Nested,
+			Decoded.Get("message", ""), Decoded.Get("error", "")] {
+		if !(Candidate is String)
+			continue
+		Line := Trim(RegExReplace(RegExReplace(Candidate, "[[:cntrl:]]", " "), "\s+", " "))
+		if (Line == "")
+			continue
+		Limit := _LLM_Common_Cfg("token_exchange", "max_service_message_bytes")
+		if (StrPut(Line, "UTF-8") - 1 <= Limit)
+			return Line
+		; The longest prefix within the bound that does not split a surrogate pair.
+		Low := 0, High := StrLen(Line)
+		while (Low < High) {
+			Middle := (Low + High + 1) // 2
+			if (StrPut(SubStr(Line, 1, Middle), "UTF-8") - 1 <= Limit)
+				Low := Middle
+			else
+				High := Middle - 1
+		}
+		if (Low > 0 && Ord(SubStr(Line, Low, 1)) >= 0xD800 && Ord(SubStr(Line, Low, 1)) <= 0xDBFF)
+			Low -= 1
+		return SubStr(Line, 1, Low)
+	}
+	return ""
+}
+
+/**
  * Reads the answer of an exchange.
  * @param {Map} Auth The parsed block.
  * @param {Any} Status The HTTP status.
@@ -339,7 +378,12 @@ LLM_TokenExchange_Read(Auth, Status, Decoded, Now, &Refusal := "") {
 	global LLM_TOKEN_EXCHANGE_MIN_EXPIRES_SECONDS, LLM_TOKEN_EXCHANGE_MAX_EXPIRES_SECONDS
 	Refusal := ""
 	if (Status != 200) {
+		; The service's own sentence explains the refusal better than its status
+		; (AID-2, 2026-11-11); the Lua twin is api_token_exchange.read.
 		Refusal := "the token exchange answered HTTP " . String(Status)
+		Message := _LLM_TokenExchange_ServiceMessage(Decoded)
+		if (Message != "")
+			Refusal .= ": " . Message
 		return ""
 	}
 	if !(Decoded is Map) {
