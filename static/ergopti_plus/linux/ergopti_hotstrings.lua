@@ -2862,19 +2862,14 @@ local function main()
 			end,
 			-- A check asked from the tray: its answer is told, and the menu redrawn
 			-- so an install row appears for a found release.
-			on_update_checked = function(available, release, err)
+			on_update_checked = function(result)
 				if notifier and ok_i18n and i18n_mod then
-					local body
-					if available and release then
-						body = i18n_mod.get("updater.tray_new_version_body")
-							:gsub("{1}", (tostring(release.tag):gsub("%%", "%%%%")))
-					elseif err then
-						body = i18n_mod.get("updater.no_connection")
-					else
-						body = i18n_mod.get("updater.up_to_date")
-							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
-					end
-					notifier.send(body, { title = i18n_mod.get("updater.window_title"), level = "info" })
+					local body = require("modules.updater.check_notice").body(result, i18n_mod.get, function(id)
+						local channel = updater.CHANNELS.channel(id)
+						return channel and i18n_mod.get(channel.label_key) or tostring(id)
+					end)
+					notifier.send(body, { title = i18n_mod.get("updater.window_title"),
+						level = result.state == "error" and "warning" or "info" })
 				end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
@@ -3237,14 +3232,10 @@ local function main()
 			-- notified here since the updater existed and the strings are already
 			-- translated into all twenty-one locales; this driver wrote a log line
 			-- nobody reads and left the news in the tray label.
-			--
-			-- The tag lands on the REPLACEMENT side of gsub, where "%" is special:
-			-- a release tagged "v2.1%-rc1" would raise inside the notification and
-			-- take the menu rebuild below with it.
+			-- A release read from the public feed says it cannot be installed yet.
 			local accepted = false
 			if notifier and ok_i18n and i18n_mod then
-				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
-				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
+				local body = require("modules.updater.check_notice").release_body(release, i18n_mod.get)
 				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",
