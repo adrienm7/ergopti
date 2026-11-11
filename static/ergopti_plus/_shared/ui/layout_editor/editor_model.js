@@ -452,6 +452,14 @@ var LayoutEditorModel = (function () {
 		let text = '';
 		let pending = null;
 		for (const press of presses) {
+			// What the web emulation typed or sent ends a pending dead key, as a
+			// driver's posted output does.
+			if (own(press, 'text') || own(press, 'label')) {
+				if (pending) text += pending.terminator;
+				pending = null;
+				text += own(press, 'text') ? press.text : `⟨${press.label}⟩`;
+				continue;
+			}
 			const layerId = layerFor(doc, press.held);
 			const found = layerId ? mappingAt(doc, layerId, press.code, platform) : null;
 			if (!found) continue;
@@ -481,6 +489,74 @@ var LayoutEditorModel = (function () {
 			text += mapping.text;
 		}
 		return { text, pending: pending ? pending.id : null };
+	}
+
+	// The sided ids a page reports, folded onto the modifiers the emulation names.
+	const EMULATION_BUILTINS = {
+		shift: 'shift',
+		shift_left: 'shift',
+		shift_right: 'shift',
+		control: 'control',
+		control_left: 'control',
+		control_right: 'control',
+		alt: 'alt',
+		alt_left: 'alt',
+		alt_right: 'alt_right',
+		meta: 'meta',
+		meta_left: 'meta',
+		meta_right: 'meta',
+		caps_lock: 'caps_lock'
+	};
+	// Modifiers a sent key keeps as a shortcut chord rather than typing a character.
+	const CHORD_MODIFIERS = new Set(['control', 'alt', 'meta']);
+
+	/**
+	 * The preview's typist: the source's emulation table for one OS, performed
+	 * by the shared web engine (LayoutSourceEmulation) on top of the native
+	 * typing `simulate` replays, as the ErgoptiPlus drivers perform it on top of
+	 * the installed .keylayout. Each call returns the entries the preview appends:
+	 * a native press `{code, held}`, an emulated `{text}`, or a shortcut `{label}`.
+	 * @param {object} doc - A structured source.
+	 * @param {'macos'|'linux'|'windows'} platform
+	 */
+	function previewTypist(doc, platform) {
+		const session = LayoutSourceEmulation.newSession(
+			LayoutSourceEmulation.compile(LayoutSourceIO.emulationTable(doc, platform))
+		);
+		// Built-in modifiers a tap-hold holds for the user.
+		const holding = new Set();
+		const builtins = (held) => {
+			const ids = new Set(holding);
+			for (const id of held) if (own(EMULATION_BUILTINS, id)) ids.add(EMULATION_BUILTINS[id]);
+			return [...ids];
+		};
+		const entries = (actions, held) => {
+			const out = [];
+			for (const action of actions) {
+				if (action.type === 'text') out.push({ text: action.text });
+				else if (action.type === 'modifier') {
+					if (action.down) holding.add(action.id);
+					else holding.delete(action.id);
+				} else if (action.modifiers.some((id) => CHORD_MODIFIERS.has(id)))
+					out.push({ label: action.modifiers.concat(action.key).join('+') });
+				else out.push({ code: action.key, held: action.modifiers.concat([...holding]) });
+			}
+			return out;
+		};
+		return {
+			/** Whether the emulation owns this key (a custom modifier or a tap-hold). */
+			owns: (code) => session.model.modifierKeys.has(code) || session.model.tapHolds.has(code),
+			down(code, held, now) {
+				const result = LayoutSourceEmulation.press(session, code, builtins(held), now);
+				const out = entries(result.actions, held);
+				if (!result.consumed) out.push({ code, held: held.concat([...holding]) });
+				return out;
+			},
+			up: (code, now) => entries(LayoutSourceEmulation.release(session, code, now).actions, []),
+			tick: (now) => entries(LayoutSourceEmulation.tick(session, now), []),
+			/** Milliseconds until a pending tap-hold becomes a hold, or null. */
+			pendingThreshold: () => (session.pending ? session.pending.entry.threshold : null)
+		};
 	}
 
 	/** The kind of a mapping (text, dead_key, action, key or disabled). */
@@ -564,6 +640,7 @@ var LayoutEditorModel = (function () {
 		removeNls,
 		layerFor,
 		simulate,
+		previewTypist,
 		kindOf,
 		createHistory
 	};

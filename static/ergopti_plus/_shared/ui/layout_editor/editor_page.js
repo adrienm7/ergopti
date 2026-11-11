@@ -58,6 +58,11 @@ var LayoutEditorPage = (function () {
 		MetaRight: 'meta_right'
 	};
 	const TAP_HOLD_THRESHOLD_STEP = 10;
+	// The OS whose emulation table the preview performs when neither the scope
+	// nor the host names one (the website): macOS, whose .keylayout holds the
+	// fewest records, so the preview shows every emulated one. Decided by the
+	// coordinator on 2026-11-11, to review by the maintainer.
+	const PREVIEW_PLATFORM = 'macos';
 	// Exact sticker sizes the print accepts, in millimetres (keycaps are about 18 mm).
 	const STICKER_MIN_MM = 8;
 	// The levels of another layout a layer can be filled from (the composer's levels).
@@ -215,6 +220,8 @@ var LayoutEditorPage = (function () {
 			presses: [],
 			locked: new Set(),
 			heldCustom: new Set(),
+			// The preview's web emulation and the source and OS it was built for.
+			typist: null,
 			message: null,
 			// A pending question: { text, onYes }. In-page, because a webview
 			// host may not show window.confirm (WKWebView needs a UI delegate).
@@ -1895,6 +1902,33 @@ var LayoutEditorPage = (function () {
 			return (doc().modifiers || []).find((m) => m.keys.includes(code));
 		}
 
+		/**
+		 * The web emulation the preview types through, rebuilt when the source or
+		 * the OS changes; null for a preserved import or a refused table (the
+		 * preview then types the source's layers directly).
+		 */
+		function typist() {
+			const platform = state.platform || host.platform || PREVIEW_PLATFORM;
+			if (state.typist && state.typist.doc === doc() && state.typist.platform === platform)
+				return state.typist.engine;
+			let engine = null;
+			if (!LayoutSourceIO.isPreserved(doc()))
+				try {
+					engine = LayoutEditorModel.previewTypist(doc(), platform);
+				} catch (error) {
+					// The report row of this OS says why its emulation is refused.
+				}
+			state.typist = { doc: doc(), platform, engine };
+			return engine;
+		}
+
+		/** The held modifiers of a press, Caps Lock included when it is on. */
+		function pressHeld(event) {
+			const held = heldModifiers(event);
+			if (event.getModifierState && event.getModifierState('CapsLock')) held.push('caps_lock');
+			return held;
+		}
+
 		function preview() {
 			const result = LayoutSourceIO.isPreserved(doc())
 				? { text: '', pending: null }
@@ -1904,13 +1938,27 @@ var LayoutEditorPage = (function () {
 				id: 'le-preview-output',
 				text: result.text
 			});
+			const typed = (entries) => {
+				if (!entries.length) return;
+				state.presses.push(...entries);
+				renderPreviewOnly();
+			};
 			const pad = el('input', {
 				type: 'text',
 				id: 'le-preview-input',
 				placeholder: tl('preview.placeholder'),
 				onkeydown: (event) => {
-					const modifier = customModifier(event.code);
 					event.preventDefault();
+					const engine = typist();
+					if (engine && engine.owns(event.code)) {
+						typed(engine.down(event.code, pressHeld(event), event.timeStamp));
+						const threshold = engine.pendingThreshold();
+						// The hold starts at its threshold even when no other key comes.
+						if (threshold !== null)
+							setTimeout(() => typed(engine.tick(performance.now())), threshold);
+						return;
+					}
+					const modifier = engine ? null : customModifier(event.code);
 					if (modifier) {
 						if (modifier.mode === 'locked') {
 							if (state.locked.has(modifier.id)) state.locked.delete(modifier.id);
@@ -1922,11 +1970,16 @@ var LayoutEditorPage = (function () {
 						state.heldSides.add(SIDED_MODIFIERS[event.code]);
 						return;
 					}
-					state.presses.push({ code: event.code, held: heldModifiers(event) });
-					renderPreviewOnly();
+					if (engine) typed(engine.down(event.code, pressHeld(event), event.timeStamp));
+					else typed([{ code: event.code, held: heldModifiers(event) }]);
 				},
 				onkeyup: (event) => {
 					state.heldSides.delete(SIDED_MODIFIERS[event.code]);
+					const engine = typist();
+					if (engine) {
+						typed(engine.up(event.code, event.timeStamp));
+						return;
+					}
 					const modifier = customModifier(event.code);
 					if (modifier && modifier.mode === 'held') state.heldCustom.delete(modifier.id);
 				}
@@ -1944,6 +1997,7 @@ var LayoutEditorPage = (function () {
 					text: tl('btn.clear'),
 					onclick: () => {
 						state.presses = [];
+						state.typist = null;
 						render();
 					}
 				})

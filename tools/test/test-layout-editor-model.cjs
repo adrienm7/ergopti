@@ -29,6 +29,7 @@ const PAGE_SCRIPTS = [
 	'layout_composer/reference_layouts.js',
 	'layout_composer/source_model.js',
 	'layout_composer/source_compiler.js',
+	'layout_composer/source_emulation.js',
 	'layout_editor/_generated/key_tables.js',
 	'layout_editor/zip_writer.js',
 	'layout_editor/toml_prelude.js',
@@ -445,6 +446,56 @@ test('every mapping of a layer moves or copies to another layer at once', () => 
 	const copied = M.transferLayer(doc, 'base', 'shift', true);
 	assert.equal(M.mappingAt(copied, 'base', 'KeyA', null).mapping.text, 'a');
 	refuses(() => M.transferLayer(doc, 'base', 'nowhere', true), 'layer_unknown');
+});
+
+test('the preview types through the web emulation on top of the native layout', () => {
+	const fixture = fs.readFileSync(
+		shared('tests', 'corpus', 'layouts', 'source', 'source.toml'),
+		'utf8'
+	);
+	const doc = IO.parse(fixture).doc;
+	// macOS sees no Scroll Lock press; the emulated Kana key is Insert here.
+	doc.modifiers[0].keys = ['Insert'];
+	const typist = M.previewTypist(doc, 'macos');
+	const presses = [];
+	const add = (entries) => presses.push(...plain(entries));
+	const type = () => M.simulate(doc, presses, null).text;
+	// A native key passes through to the .keylayout typing.
+	add(typist.down('KeyA', [], 0));
+	assert.equal(type(), 'a');
+	// The locked Kana modifier selects its emulated layer, and a second press unlocks it.
+	assert.ok(typist.owns('Insert'));
+	add(typist.down('Insert', [], 10));
+	add(typist.up('Insert', 20));
+	add(typist.down('KeyA', [], 30));
+	add(typist.down('Insert', [], 40));
+	add(typist.up('Insert', 50));
+	assert.equal(type(), 'aあ');
+	// A tap-hold: a quick tap types its tap, a hold reaches its layer.
+	assert.equal(typist.pendingThreshold(), null);
+	add(typist.down('Space', [], 100));
+	assert.equal(typist.pendingThreshold(), 180);
+	add(typist.up('Space', 150));
+	assert.equal(type(), 'aあ ');
+	add(typist.down('Space', [], 200));
+	add(typist.tick(400));
+	add(typist.down('KeyJ', [], 410));
+	add(typist.up('KeyJ', 420));
+	add(typist.up('Space', 430));
+	// The hold reaches the native command layer, which the engine leaves to the
+	// OS layout as the drivers do: the key arrives without the layer's modifier.
+	assert.equal(type(), 'aあ j');
+	// A shortcut sending another chord shows as that chord.
+	add(typist.down('KeyA', ['control_left'], 500));
+	assert.equal(type(), 'aあ j⟨control+KeyB⟩');
+	// Emulated output ends a pending dead key with its terminator.
+	add(typist.down('BracketLeft', [], 600));
+	presses.push({ text: '!' });
+	assert.equal(type(), 'aあ j⟨control+KeyB⟩^!');
+	refuses(
+		() => M.previewTypist(IO.importKeylayout(registry('ergopti'), 'e', 'iso'), 'macos'),
+		'source_imported_preserved'
+	);
 });
 
 test('Windows flags and NLS functions are edited and refused like any record', () => {
