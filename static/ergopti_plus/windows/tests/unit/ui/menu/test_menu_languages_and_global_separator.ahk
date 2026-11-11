@@ -165,8 +165,11 @@ _MLG_CheckConfigurationCorpus(Code, Expected) {
 	try {
 		Labels := _MLG_NativeLabels(Built)
 		AssertEqual(Expected["children"].Length, Labels.Length, Code . ": one native row per corpus row")
+		; The corpus holds the visible caption; a native menu stores each literal
+		; "&" doubled (manifest_menu.ahk), the renderer's own encoding.
 		for Position, Caption in Expected["children"]
-			AssertEqual(Caption == "-" ? "" : Caption, Labels[Position], Code . ": Configuration row " . Position)
+			AssertEqual(Caption == "-" ? "" : StrReplace(Caption, "&", "&&"), Labels[Position],
+				Code . ": Configuration row " . Position)
 	} finally _CTC_ReleaseMenu(Built)
 }
 Test("menu layout: the Configuration parent and rows keep their corpus captions (configuration-parent)",
