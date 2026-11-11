@@ -1211,6 +1211,17 @@ migrate_canonical_packs \
 # Exclude the canonical generated backend from the source copy. Checkout-local
 # fixture .so bytes can never be staged even briefly; only the freshly compiled
 # output (or release-bundle artifact) below supplies this exact destination.
+# A bytecode package compiled from the previous payload must not outlive it:
+# removed before the copy, rebuilt from the new payload once its receipt exists.
+# The schema names it; an empty name must never widen this to the library.
+# shellcheck source=install/ownership_schema.sh
+source "${SRC_DRIVER}/install/ownership_schema.sh"
+BYTECODE_TREE="${LIB_DIR}/${OWNERSHIP_DERIVED_TREE:?}"
+if [ -L "$BYTECODE_TREE" ] || { [ -e "$BYTECODE_TREE" ] && [ ! -d "$BYTECODE_TREE" ]; }; then
+	printf '[install] code=invalid-derived-tree path=%q\n' "$BYTECODE_TREE" >&2
+	exit 1
+fi
+rm -rf -- "$BYTECODE_TREE"
 # The previous receipt, held until the new one exists: see
 # prune_retired_payload below.
 PRIOR_RECEIPT_ROWS=()
@@ -1341,6 +1352,12 @@ prune_retired_payload() {
 	done
 }
 prune_retired_payload "${LIB_DIR}/.ergopti-owned-files" || exit 1
+
+# The bytecode package (infra/bytecode_package.lua), compiled after the receipt
+# by the luajit the daemon runs; without it the daemon starts from source.
+if ! luajit "${LIB_DIR}/linux/install/compile_bytecode.lua" "${LIB_DIR}" >/dev/null; then
+	ergopti_msg_with "  ⚠  " install.bytecode_skipped
+fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 LAUNCHER_TMP="$(mktemp "${BIN_DIR}/.ergopti-launcher.XXXXXX")"

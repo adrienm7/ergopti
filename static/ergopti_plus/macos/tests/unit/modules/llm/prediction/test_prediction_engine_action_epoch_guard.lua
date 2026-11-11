@@ -73,6 +73,7 @@ local function load_fixture(streaming)
 		DEFAULT_STATE = DEFAULTS,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
+		request_settings = function() return { backend = "ollama", model = "test-model" } end,
 		get_active_profile = function() return { label = "Test" } end,
 		is_backend_ready = function() return true end,
 		set_runtime_llm_enabled = function() end,

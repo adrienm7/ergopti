@@ -13,7 +13,7 @@ local Crypto = require("adapters.crypto")
 local NativePath = require("native_path")
 local MAX_SAFE_INTEGER = 2 ^ 53 - 1 -- Exact numeric range shared by LuaJIT metadata.
 local SCHEMA_KEYS = { MANIFEST = true, HEX_LENGTH = true, DRIVER_TREE = true, SHARED_TREE = true,
-	LAUNCHER = true, EXTERNAL_RECORDS = true, DRIVER_SENTINEL = true, SHARED_SENTINEL = true }
+	LAUNCHER = true, EXTERNAL_RECORDS = true, DRIVER_SENTINEL = true, SHARED_SENTINEL = true, DERIVED_TREE = true }
 
 local function relative_path(path)
 	if type(path) ~= "string" or path == "" or path:find("[%z\r\n\t\\]")
@@ -41,12 +41,15 @@ function M.read_schema(current)
 	local length = tonumber(schema.HEX_LENGTH)
 	if not length or length <= 0 or length % 1 ~= 0 then return nil, "ownership digest length is invalid" end
 	schema.hex_length = length
-	for _, key in ipairs({ "MANIFEST", "DRIVER_TREE", "SHARED_TREE" }) do
+	for _, key in ipairs({ "MANIFEST", "DRIVER_TREE", "SHARED_TREE", "DERIVED_TREE" }) do
 		if not schema[key]:match("^[%w_.-]+$") or schema[key] == "." or schema[key] == ".." then
 			return nil, "ownership schema component is invalid"
 		end
 	end
-	if schema.DRIVER_TREE == schema.SHARED_TREE then return nil, "ownership tree roots overlap" end
+	if schema.DRIVER_TREE == schema.SHARED_TREE or schema.DERIVED_TREE == schema.DRIVER_TREE
+		or schema.DERIVED_TREE == schema.SHARED_TREE or schema.DERIVED_TREE == schema.MANIFEST then
+		return nil, "ownership tree roots overlap"
+	end
 	for _, key in ipairs({ "LAUNCHER", "DRIVER_SENTINEL", "SHARED_SENTINEL" }) do
 		if not relative_path(schema[key]) then return nil, "ownership schema path is invalid" end
 	end
@@ -175,6 +178,10 @@ function M.verify(root, current)
 				local content = read_checked(native, full)
 				if content == nil or Crypto.sha256(content) ~= record.files[child] then return nil end
 				seen[child] = true
+			elseif child == schema.DERIVED_TREE then
+				-- Compiled from the verified payload after the receipt was written:
+				-- a real directory is admitted by name, its bytes are not owned.
+				if not snapshot(native, full, "directory") then return nil end
 			elseif record.directories[child] then
 				if not walk(full, child) then return nil end
 			elseif payload_tree and snapshot(native, full, "directory") then

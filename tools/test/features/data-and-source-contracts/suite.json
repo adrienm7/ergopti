@@ -641,6 +641,22 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-html-scan.cjs"],
 			"repro": "npm run test:html-scan"
+		},
+		{
+			"id": "js-0507",
+			"ordinal": 622,
+			"name": "structure folder bounds (Rule B: 2..20 entries per folder, mismatched driver folders, ratcheted)",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-folder-bounds.cjs"],
+			"repro": "node tools/audit/structure/census.cjs"
+		},
+		{
+			"id": "js-0508",
+			"ordinal": 623,
+			"name": "shared literal inventory (Rule A: hand-typed driver values that belong in _shared, ratcheted)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-literal-inventory.cjs"],
+			"repro": "node tools/audit/shared-literal-inventory.cjs"
 		}
 	]
 }
