@@ -308,8 +308,15 @@ _KLUOR_MigrationMatchesSharedLua() {
 	}
 	AssertEqual(_KLUOR_Join(LuaTables, ","), _KLUOR_Join(KLR_UtcOffsetShape()["tables"], ","),
 		"the raw tables are the Lua module's, in its order")
-	AssertTrue(RegExMatch(Lua, 's)M\.DEFINITION = "(.*?)"\s*\.\.\s*"(.*?)"', &Definition) > 0)
-	AssertEqual(Definition[1] . Definition[2], KLR_UtcOffsetShape()["definition"], "the column definition is the Lua module's")
+	; 9359288f59 builds the Lua definition from local_time.MAX_OFFSET_MIN; the
+	; Windows one must spell the same CHECK with the same bound.
+	LocalTime := FileRead(_SharedDir . "\lua\keystats\local_time.lua", "UTF-8")
+	AssertTrue(RegExMatch(LocalTime, "m)^M\.MAX_OFFSET_MIN = (\d+)$", &Bound) > 0, "local_time declares its widest offset")
+	Expected := "INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer'"
+		. " AND utc_offset_min BETWEEN -" . Bound[1] . " AND " . Bound[1] . "))"
+	AssertTrue(InStr(Lua, 'BETWEEN -" .. MAX_OFFSET_MIN .. " AND " .. MAX_OFFSET_MIN') > 0,
+		"the Lua module bounds its CHECK by MAX_OFFSET_MIN")
+	AssertEqual(Expected, KLR_UtcOffsetShape()["definition"], "the column definition is the Lua module's")
 
 	Purge := FileRead(_SharedDir . "\data\db\purge_schema.sql", "UTF-8")
 	Statements := KLR_UtcOffsetStatements(["events_av", "events_typing"], Purge)
