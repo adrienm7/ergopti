@@ -1081,12 +1081,9 @@ end
 --- @return table|nil composed { text, convention } nil when none is stored.
 --- @return string|nil error
 function M.composer_copy(deps)
-	local settings, settings_err = M.composer_settings()
-	if not settings then return nil, settings_err end
 	local resolved, deps_err = resolve_deps(deps)
 	if not resolved then return nil, deps_err end
-	return Composer.read_composed(settings, resolved.config_dir or ConfigPaths.get_config_dir(), resolved.settings.max_file_bytes,
-		{ exists = resolved.exists, read = resolved.read, decode_toml = TomlCodec.decode })
+	return Composer.registry_copy((M.composer_settings()), resolved.config_dir or ConfigPaths.get_config_dir(), resolved, TomlCodec.decode)
 end
 
 --- The text of an installed layout's copy, for the Debug check of the composer.
