@@ -1376,6 +1376,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_ahk_brace_balance.ahk
 #Include meta/suite/test_run_all_include_integrity.ahk
 #Include meta/suite/test_runner_only_filter.ahk
+#Include meta/suite/test_host_capability_probes.ahk
 #Include meta/suite/test_runner_failure_ergonomics.ahk
 #Include unit/suite/test_qualification_parser_owner.ahk
 #Include meta/suite/test_ahk_os_purity_ratchet.ahk
