@@ -8,16 +8,33 @@
 ; reports the feature "absent" ends the case as NOT EXECUTED; "present" and
 ; "unknown" both run it, so a failure on a capable or unobservable host stays a
 ; failure and a case can never turn green by skipping.
+; Hosted CI provisions every declared capability (Kana install, en-US layout,
+; symlink privilege), so on GitHub Actions an "absent" receipt is a failure:
+; a lane can never skip a case its runner was supposed to provide for.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
+; Whether this process runs on a GitHub Actions runner, the one context that
+; must never report a case as not executed for a missing capability.
+; @return {Boolean}
+TestHostIsHostedCi() => StrCompare(EnvGet("GITHUB_ACTIONS"), "true", true) == 0
+
 ; Ends the current case as NOT EXECUTED when its probe positively reports the
-; capability absent.
+; capability absent on a developer machine; fails it on hosted CI.
 ; @param ProbeFn {Func} Returns a Map with "state" ("present", "absent" or
 ;                       "unknown"), "name" and "why".
-TestRequireHostCapability(ProbeFn) {
+; @param HostedCi {Boolean} Test seam; TestHostIsHostedCi() when omitted.
+TestRequireHostCapability(ProbeFn, HostedCi := unset) {
 	Receipt := ProbeFn.Call()
-	if Receipt["state"] == "absent"
-		TestNotExecuted("host capability " . Receipt["name"] . " is absent: " . Receipt["why"])
+	State := Receipt["state"]
+	if !(State == "present" || State == "absent" || State == "unknown")
+		throw ValueError("A host capability receipt state must be present, absent or unknown: " . State)
+	if State != "absent"
+		return
+	if !IsSet(HostedCi)
+		HostedCi := TestHostIsHostedCi()
+	if HostedCi
+		throw Error("hosted CI must provide host capability " . Receipt["name"] . ", which is absent: " . Receipt["why"])
+	TestNotExecuted("host capability " . Receipt["name"] . " is absent: " . Receipt["why"])
 }
