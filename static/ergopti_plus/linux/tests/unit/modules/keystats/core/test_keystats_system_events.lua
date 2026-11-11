@@ -216,6 +216,50 @@ helpers.describe("keystats system events: the UTC offset column", function()
 		end)
 	end)
 
+	-- A POSIX TZ reaches +-24:59 (the E2E clock runs TZ=OWN-24, +24:00); a
+	-- column bounded at ISO 8601's +-18:00 refused every row of such a flush.
+	it("linux-utc-offset-bound: a row keeps the widest offset the host clock can report", function()
+		with_store(nil, function(writer)
+			local LocalTime = require("keystats.local_time")
+			helpers.assert_eq(LocalTime.MAX_OFFSET_MIN, 24 * 60 + 59)
+			local real = LocalTime.offset_of_utc
+			local offsets = { 1440, LocalTime.MAX_OFFSET_MIN, -LocalTime.MAX_OFFSET_MIN }
+			local next_offset = 0
+			LocalTime.offset_of_utc = function()
+				next_offset = next_offset + 1
+				return offsets[next_offset]
+			end
+			local ok, stored = pcall(writer.insert_system_events, "owned-device", {
+				{ ts = "2026-07-01 12:00:00", date = "2026-07-02", action = "lock" },
+				{ ts = "2026-07-01 12:01:00", date = "2026-07-02", action = "unlock" },
+				{ ts = "2026-07-01 12:02:00", date = "2026-06-30", action = "lock" },
+			})
+			LocalTime.offset_of_utc = real
+			helpers.assert_true(ok and stored, "every row of a +24:00 or -24:59 zone is stored")
+			helpers.assert_eq(writer.query_rows("SELECT utc_offset_min FROM events_system ORDER BY id;"),
+				{ "1440", "1499", "-1499" })
+		end)
+	end)
+
+	it("linux-utc-offset-bound: schema.sql and the store migration spell the clock's bound", function()
+		local LocalTime = require("keystats.local_time")
+		local UtcOffsetColumn = require("keystats.utc_offset_column")
+		local bound = "BETWEEN -" .. LocalTime.MAX_OFFSET_MIN .. " AND " .. LocalTime.MAX_OFFSET_MIN
+		local file = assert(io.open(require("infra.paths").shared("data/db/schema.sql"), "r"))
+		local schema = file:read("*a")
+		file:close()
+		local columns, bounded = 0, 0
+		for line in schema:gmatch("[^\n]+") do
+			if line:match("^%s*utc_offset_min INTEGER") then
+				columns = columns + 1
+				if line:find(bound, 1, true) then bounded = bounded + 1 end
+			end
+		end
+		helpers.assert_eq(columns, #UtcOffsetColumn.TABLES)
+		helpers.assert_eq(bounded, columns, "every raw table bounds the offset like local_time")
+		helpers.assert_true(UtcOffsetColumn.DEFINITION:find(bound, 1, true) ~= nil)
+	end)
+
 	it("linux-utc-offset: a store created before the column gains it, with the current purge triggers", function()
 		local function older_store(path)
 			local Paths = require("infra.paths")
