@@ -49,7 +49,11 @@ network stage after the system one.
   Closed.
 - **KMD-3, Linux `awake_ms`.** Sampled unlocked uptime on Linux, keep-awake
   sessions on Windows and macOS (raised by the 2026-11-04 deep review, no TODO
-  item).
+  item). Decided by the maintainer on 2026-11-11: Linux follows Windows and
+  macOS. A finished keep-awake session is the day's `awake_ms` and a
+  `passive_period` row of kind `awake`; old Linux days are cleared once and
+  marked (`meta.linux_awake_ms_definition`, `linux_awake_ms_since`; regressions
+  `linux-awake-definition`). No Windows change.
 
 ## Refuted
 

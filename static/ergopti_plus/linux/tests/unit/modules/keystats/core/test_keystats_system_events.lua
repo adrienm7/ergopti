@@ -30,6 +30,7 @@ local function with_recorder(transitions, script)
 	local fake_writer = setmetatable({
 		open_db = function() return true end,
 		ensure_token_encoding = function() return true end,
+		ensure_awake_definition = function() return true end,
 		register_device = function() return true end,
 		read_open_walk = function() return nil, true end,
 		upsert_open_walk = function() return true end,
@@ -174,6 +175,40 @@ helpers.describe("keystats system events: the writer", function()
 			local rows = assert(writer.query_rows(
 				"SELECT action,ifnull(metadata_json,'NULL') FROM events_system ORDER BY id;"))
 			helpers.assert_eq(rows, { "lock|NULL", 'wake|{"asleep_ms":90000}' })
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+end)
+
+-- KMD-3 (decided by the maintainer on 2026-11-11): the days this device
+-- recorded with sampled uptime are cleared once, with the definition and its
+-- first date recorded, so they are never added to keep-awake time.
+helpers.describe("keystats system events: the awake_ms definition", function()
+	it("linux-awake-definition: clears the sampled days once and marks the definition", function()
+		local has_sqlite = os.execute("command -v sqlite3 >/dev/null 2>&1")
+		if not (has_sqlite == true or has_sqlite == 0) then return end
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			helpers.assert_true(writer.open_db(dir .. "/metrics.sqlite"))
+			helpers.assert_true(writer.query_rows("INSERT INTO agg_system_day (device_id, date, awake_ms, locked_ms) "
+				.. "VALUES ('this-device','2026-11-10',3600000,60000),('other-device','2026-11-10',1200,0);") ~= nil)
+			helpers.assert_true(writer.ensure_awake_definition("this-device", "2026-11-11"))
+			helpers.assert_eq(writer.query_rows("SELECT device_id,awake_ms,locked_ms FROM agg_system_day ORDER BY device_id;"),
+				{ "other-device|1200|0", "this-device|0|60000" }, "only this device's sampled uptime goes")
+			helpers.assert_eq(writer.get_meta(writer.AWAKE_DEFINITION.key), "keep_awake_sessions")
+			helpers.assert_eq(writer.get_meta(writer.AWAKE_DEFINITION.since_key), "2026-11-11")
+			helpers.assert_true(writer.query_rows("UPDATE agg_system_day SET awake_ms = 5000 WHERE device_id='this-device';") ~= nil)
+			helpers.assert_true(writer.ensure_awake_definition("this-device", "2026-11-12"))
+			helpers.assert_eq(writer.query_rows("SELECT awake_ms FROM agg_system_day WHERE device_id='this-device';"), { "5000" },
+				"a store already moved keeps its keep-awake time")
+			helpers.assert_eq(writer.get_meta(writer.AWAKE_DEFINITION.since_key), "2026-11-11")
+			helpers.assert_true(writer.set_meta(writer.AWAKE_DEFINITION.key, "something-else"))
+			helpers.assert_eq(writer.ensure_awake_definition("this-device", "2026-11-12"), false,
+				"an unknown definition is refused, not overwritten")
 		end, debug.traceback)
 		writer.close_db()
 		os.execute("rm -rf '" .. dir .. "'")

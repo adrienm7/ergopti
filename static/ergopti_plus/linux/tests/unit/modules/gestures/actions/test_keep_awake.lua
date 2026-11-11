@@ -14,7 +14,7 @@ local KeepAwake = require("modules.keep_awake")
 --- A controlled process and scheduler with independently delivered settlement.
 --- @return table fixture
 local function fixture()
-	local f = { notices = {}, launches = 0, running = true, settled = false, present = true }
+	local f = { notices = {}, launches = 0, running = true, settled = false, present = true, now = 0, sessions = {} }
 	local op = { started = true }
 	function op:is_running() return f.running end
 	function op:is_settled() return f.settled end
@@ -37,6 +37,8 @@ local function fixture()
 			cancel = function() return not f.refuse_timer end,
 		},
 		notify = function(key) f.notices[#f.notices + 1] = key end,
+		now_ms = function() return f.now end,
+		record_session = function(duration_ms) f.sessions[#f.sessions + 1] = duration_ms; return true end,
 	})
 	function f.finish() f.settled, f.running = true, false; f.on_settled() end
 	return f
@@ -64,6 +66,26 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		helpers.assert_eq(f.owner.is_active(), false)
 		helpers.assert_eq(f.notices[2], "shortcuts.keep_awake_off")
 		helpers.assert_true(f.owner.stop())
+	end)
+
+	-- KMD-3 (decided by the maintainer on 2026-11-11): a finished session is the
+	-- day's awake_ms, as on Windows and macOS; an unconfirmed one credits nothing.
+	helpers.it("linux-awake-definition: a released session credits its confirmed time", function()
+		local f = fixture()
+		f.now = 1000
+		helpers.assert_true(f.owner.toggle())
+		f.now = 4000
+		f.options.on_output("ERGOPTI_INHIBITED\n", "stdout")
+		f.now = 64000
+		f.owner.toggle()
+		helpers.assert_eq(f.sessions, {}, "nothing is credited before native retirement")
+		f.finish()
+		helpers.assert_eq(f.sessions, { 60000 }, "from the confirmed inhibition to the release")
+		local refused = fixture()
+		helpers.assert_true(refused.owner.toggle())
+		refused.owner.toggle()
+		refused.finish()
+		helpers.assert_eq(refused.sessions, {}, "a session never confirmed is no keep-awake time")
 	end)
 
 	helpers.it("linux-keep-awake: missing tool or refused acquisition never reports active", function()

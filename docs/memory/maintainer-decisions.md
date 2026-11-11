@@ -5,6 +5,22 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Linux awake_ms is keep-awake time (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (KMD-3): Linux `awake_ms` is the time
+of finished keep-awake sessions, as Windows (`KLR_RebuildAggregates`, the
+`passive_period` kind `awake` rows) and macOS (`aggregator/events.lua`)
+define it. `modules/keep_awake.lua` credits a session from its confirmed
+inhibition to its native release through
+`system_metrics.record_awake_session`, which adds the day's `awake_ms` and a
+`passive_period` row; the sampler no longer credits unlocked uptime to any
+field. Old Linux days held sampled uptime: `sqlite_writer.ensure_awake_definition`
+clears this device's `agg_system_day.awake_ms` once (a rebuild from raw rows
+gives the same 0) and records `meta.linux_awake_ms_definition` and the first
+date it holds for, `meta.linux_awake_ms_since`, so the two periods are never
+added (clearing rather than keeping the old values: decided by the
+coordinator on 2026-11-11, to review by the maintainer).
+
 ## Non-typing metrics rows follow the excluded-app rule (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (KMD-2): rows that do not come from

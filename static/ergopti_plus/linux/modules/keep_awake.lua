@@ -52,6 +52,11 @@ function M.new(ports)
 	local notify = ports.notify or function(key)
 		require("adapters.application_notifier").send(i18n.get(key))
 	end
+	local now_ms = ports.now_ms or require("infra.monotonic").now_ms
+	-- A finished session is the day's awake_ms, as on Windows and macOS (KMD-3).
+	local record_session = ports.record_session or function(duration_ms)
+		return require("modules.keystats.system_metrics").record_awake_session(duration_ms)
+	end
 	local current
 	local owner = {}
 	local listeners = {}
@@ -60,7 +65,13 @@ function M.new(ports)
 		if session.timer and scheduler.cancel(session.timer) ~= true then return false end
 		current = nil
 		Logger.info(LOG, "Session idle inhibitor released.")
-		if session.active then notify("shortcuts.keep_awake_off") end
+		if session.active then
+			notify("shortcuts.keep_awake_off")
+			local recorded, credited = pcall(record_session, math.max(0, now_ms() - session.active_since_ms))
+			if not recorded or credited ~= true then
+				Logger.warn(LOG, "The keep-awake session was not credited to the metrics: %s.", tostring(credited))
+			end
+		end
 		local ready = listeners
 		listeners = {}
 		for _, fn in ipairs(ready) do fn() end
@@ -116,7 +127,7 @@ function M.new(ports)
 				if current ~= session or session.stopping or kind ~= "stdout" or session.active then return end
 				session.output = (session.output .. chunk):sub(1, #READY)
 				if session.output == READY then
-					session.active = true
+					session.active, session.active_since_ms = true, now_ms()
 					Logger.info(LOG, "Session idle inhibitor acquired.")
 					notify("shortcuts.keep_awake_inhibitor_on")
 				end

@@ -544,6 +544,52 @@ function M.ensure_token_encoding()
 	return true
 end
 
+--- The meta keys of the awake_ms definition (maintainer decision KMD-3 of
+--- 11 November 2026): awake_ms is the time of finished keep-awake sessions, as
+--- on Windows and macOS, no longer sampled unlocked uptime.
+M.AWAKE_DEFINITION = { key = "linux_awake_ms_definition", value = "keep_awake_sessions",
+	since_key = "linux_awake_ms_since" }
+
+--- Moves a store's awake_ms to the keep-awake definition, once. The days this
+--- device recorded before hold sampled unlocked uptime, which no other driver
+--- measures and no rebuild reproduces (every rebuild sums the keep-awake
+--- passive periods): they are set to what a rebuild gives, 0, in the same
+--- transaction that records the definition and the first local date it holds
+--- for, so a reader tells the two periods apart and never adds them.
+--- @param device_id string This device's id.
+--- @param today string The local date, "YYYY-MM-DD".
+--- @return boolean True once the store holds the current definition.
+function M.ensure_awake_definition(device_id, today)
+	assert(type(device_id) == "string" and device_id ~= "", "the awake_ms migration needs the device id")
+	assert(type(today) == "string" and today:match("^%d%d%d%d%-%d%d%-%d%d$"), "the awake_ms migration needs the local date")
+	local definition = M.AWAKE_DEFINITION
+	local recorded = _query_output(string.format("SELECT 'definition:' || hex(CAST(value AS BLOB)) FROM meta WHERE key='%s';",
+		definition.key))
+	if recorded == nil then
+		Logger.error(LOG, "Cannot read the awake_ms definition of the metrics store.")
+		return false
+	end
+	local expected = definition.value:gsub(".", function(ch) return string.format("%02X", ch:byte()) end)
+	if recorded == "definition:" .. expected .. "\n" then return true end
+	if recorded ~= "" then
+		Logger.error(LOG, "The metrics store names an unknown awake_ms definition.")
+		return false
+	end
+	local quoted = device_id:gsub("'", "''")
+	local batch = table.concat({
+		string.format("UPDATE agg_system_day SET awake_ms = 0 WHERE device_id = '%s';", quoted),
+		string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s','%s');", definition.key, definition.value),
+		string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s','%s');", definition.since_key, today),
+	}, "\n")
+	if not _exec_raw_batch(batch) then
+		Logger.error(LOG, "The awake_ms migration was refused; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store moved to the keep-awake awake_ms definition (from %s; earlier sampled uptime cleared).",
+		today)
+	return true
+end
+
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
