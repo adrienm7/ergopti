@@ -1025,6 +1025,9 @@ local function main()
 		storage  = require("adapters.storage"),
 		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
 	})
+	-- The exclusion lists name applications by WM class now, not by the X11
+	-- process name (ADD-3): converted once, before any list owner reads them.
+	require("infra.app_identity_migration").run()
 
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()

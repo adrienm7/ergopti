@@ -312,6 +312,7 @@ return {
 	"tests.unit.infra.lifecycle.test_native_timer",
 	"tests.unit.infra.preferences.test_llm_preferences",
 	"tests.unit.infra.preferences.test_llm_preference_snapshot",
+	"tests.unit.infra.preferences.test_app_identity_migration",
 	"tests.unit.infra.scope.test_llm_scope",
 	"tests.unit.modules.gestures.actions.test_brightness_actions",
 	"tests.unit.modules.llm.runtime.test_enable_admission_policy",

@@ -13,7 +13,8 @@
 --- 1. Same answers as xdotool. The active window is the root window's
 ---    _NET_ACTIVE_WINDOW (the EWMH property xdotool reads), the title is
 ---    _NET_WM_NAME with WM_NAME as the fallback, and the owner is _NET_WM_PID.
----    An empty title is "no answer", as an empty xdotool line was.
+---    An empty title is "no answer", as an empty xdotool line was. The
+---    application identity is the WM_CLASS class (window_class), as on Wayland.
 --- 2. libxcb, not Xlib. A dead X server makes Xlib call exit() from an IO error
 ---    handler, which would take the keyboard grab's owner down with it; libxcb
 ---    reports the broken connection and lets the caller carry on.
@@ -33,7 +34,7 @@ local Monotonic = require("infra.monotonic")
 local LOG = "adapters.x11_focus"
 
 -- Predefined core atoms (X11 protocol appendix B), so no intern round trip.
-local ATOM_ATOM, ATOM_STRING, ATOM_WINDOW, ATOM_CARDINAL, ATOM_WM_NAME = 4, 31, 33, 6, 39
+local ATOM_ATOM, ATOM_STRING, ATOM_WINDOW, ATOM_CARDINAL, ATOM_WM_NAME, ATOM_WM_CLASS = 4, 31, 33, 6, 39, 67
 
 -- Most _NET_WM_STATE atoms one window's state reads.
 local MAX_STATE_ATOMS = 32
@@ -141,6 +142,21 @@ local function window_title(window)
 	return first_line(reply.bytes)
 end
 
+--- Reads a window's application class: the second string of WM_CLASS (ICCCM
+--- "instance\0Class\0"), the identity sway reports as window_properties.class
+--- and the desktop compositors as their WM class (ADD-3).
+--- @param window integer
+--- @return string|nil class nil when the window states none.
+local function window_class(window)
+	-- Two short names: the title's bound is ample.
+	local reply = _transport.property(window, ATOM_WM_CLASS, ATOM_STRING, MAX_TITLE_LONGS)
+	if not reply or reply.format ~= 8 or #reply.bytes == 0 then return nil end
+	local instance, class = reply.bytes:match("^([^%z]*)%z([^%z]*)")
+	local name = (class ~= nil and class ~= "") and class or instance
+	if name == nil or name == "" then return nil end
+	return latin1_to_utf8(name)
+end
+
 --- Reads a window's owning process id.
 --- @param window integer
 --- @return string|nil pid Decimal text, as xdotool prints it.
@@ -231,6 +247,18 @@ function M.query()
 	local title = window_title(window)
 	if title == nil then return nil end
 	return tostring(window), title, window_pid(window)
+end
+
+--- The application class of a window the caller already identified.
+--- @param window string|number Decimal window id, as query() returns it.
+--- @return string|nil class nil when the window states none or the server cannot answer.
+function M.window_class(window)
+	if not _transport then return nil end
+	local id = tonumber(window)
+	if not id or id == 0 then return nil end
+	local connected = ensure_connected()
+	if not connected then return nil end
+	return window_class(id)
 end
 
 --- The index of the current virtual desktop, the root window's EWMH
@@ -342,7 +370,8 @@ function M.clients()
 	for offset = 1, #reply.bytes - 3, 4 do
 		local id = u32(reply.bytes:sub(offset, offset + 3))
 		if id ~= nil and id ~= 0 then
-			windows[#windows + 1] = { id = id, title = window_title(id) or "", pid = tonumber(window_pid(id)) }
+			windows[#windows + 1] = { id = id, title = window_title(id) or "", pid = tonumber(window_pid(id)),
+				class = window_class(id) }
 		end
 	end
 	return windows
