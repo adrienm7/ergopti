@@ -100,6 +100,14 @@ the real color-scheme key, and two overlapping toggles end where they started.
 Without GVfs, `gio trash --empty` exits 0 and empties nothing, which the action
 reported as done; it now fails unless the home trash is empty (3da58645).
 
+## The clipboard over the Wayland data-control protocol
+
+`tests/hardware/run_clipboard_owner_wayland.sh`: sway 1.9 on its headless
+backend, wl-clipboard: `clipboard_owner_wayland.txt`, the text, HTML and
+300 kB binary targets served by the clipboard owner and read back byte for
+byte, as on X11 (the closing `Broken pipe` is the harness's own wl-copy stopped
+by the wrapper).
+
 ## Limits
 
 - The install is driven by a tar-backed archive factory, not the authenticated
