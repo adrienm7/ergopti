@@ -1094,7 +1094,8 @@ local function main()
 
 	-- 8.3) Initialise the full keystats.
 	BootProfiler.stage("keystats")
-	local metrics_initialized = keystats.init({})
+	-- Its background tasks (ledger export, text migration) wait for the loop.
+	local metrics_initialized = keystats.init({ defer = event_loop.defer })
 	if metrics_initialized == false and notifier then
 		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
 		if notice_i18n then
