@@ -74,12 +74,15 @@ local ABORT_WAIT_SEC = 30
 
 --- Creates the gate for one menubar.
 --- @param deps table terminal_pending, is_reloading, stale, refresh, current_items,
----   store {get, set, delete}, schedule(sec, fn), notify_lost and now functions.
+---   store {get, set, delete}, schedule(sec, fn), notify_lost, now and
+---   around_click(path, run) functions; around_click runs a row action clicked
+---   on the current tree, so its owner knows which row the work it asks for
+---   comes from.
 --- @return table gate
 function M.new(deps)
 	assert(type(deps) == "table", "click gate dependencies are required")
 	for _, name in ipairs({ "terminal_pending", "is_reloading", "stale", "refresh", "current_items",
-		"schedule", "notify_lost", "now" }) do
+		"schedule", "notify_lost", "now", "around_click" }) do
 		assert(type(deps[name]) == "function", "click gate port missing: " .. name)
 	end
 	local store = deps.store
@@ -192,6 +195,12 @@ function M.new(deps)
 		arm_poll()
 	end
 
+	--- Runs a row action clicked on the current tree inside its owner's scope.
+	local function run_clicked(path, action, ...)
+		local args = table.pack(...)
+		return deps.around_click(path, function() return action(table.unpack(args, 1, args.n)) end)
+	end
+
 	--- Dispatches one click made on a gated row.
 	local function dispatch(path, checked, action, joins_reload, bypasses_reload, ...)
 		local click = { path = path, desired = ClickIntent.desired(checked),
@@ -221,7 +230,7 @@ function M.new(deps)
 			Logger.warn(LOG, "Menu tree could not be refreshed for a click on '%s'; it runs as clicked.",
 				ClickIntent.describe(path))
 		end
-		return action(...)
+		return run_clicked(path, action, ...)
 	end
 
 	--- Puts every row action of a generated tree behind the gate, in place.

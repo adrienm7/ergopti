@@ -108,6 +108,21 @@ local _top_level_cache = nil
 local _top_level_separator_receiver = nil
 local _language_packs_cache    = nil
 
+-- Top-level branches whose rows read only their own module's state, so a click
+-- in one of them changes no other branch: a refresh it asks for may rebuild that
+-- branch alone (generate's `only_branch`). Every other branch, among them the
+-- language, configuration, keyboard layout and AI rows whose choices reach the
+-- whole tray, is rebuilt with all the others.
+local BRANCH_LOCAL_REFRESH = {
+	hotstrings = true, metrics = true, shortcuts = true, tap_holds = true,
+	gestures = true, apps = true, debug = true,
+}
+
+-- The rows each top-level builder returned in the last complete build, the
+-- pause state and top-level declaration they were built under, and the branch
+-- each top-level row title belongs to. nil until a build completes.
+local _branch_cache = nil
+
 --- Returns the parsed menu_manifest.json root.
 ---
 --- ONE READER, NOT THREE. This used to be a second open/read/hs.json.decode with
@@ -584,6 +599,16 @@ function M.get_last_item_timings()
 	return _last_item_timings
 end
 
+--- Returns the top-level branch a click on this top-level row title belongs to,
+--- when a refresh it asks for may rebuild that branch alone.
+--- @param title string|nil Title of the clicked row's top-level ancestor.
+--- @return string|nil id Branch id, nil when the whole tray must be rebuilt.
+function M.branch_local_refresh_of(title)
+	if _branch_cache == nil or type(title) ~= "string" then return nil end
+	local id = _branch_cache.titles[title]
+	return (type(id) == "string" and BRANCH_LOCAL_REFRESH[id] == true) and id or nil
+end
+
 --- Returns the phase name `menu_item.<id>` of a top-level row.
 --- @param id string Top-level id declared by the manifest.
 --- @return string
@@ -603,12 +628,32 @@ end
 --- array and dispatches each id to its builder. The feature rows used to be a
 --- fixed sequence of calls here, ahead of a tail read from the manifest, so the
 --- declared order reached only half of the tray.
+--- A refresh asked by a click in one branch may pass `opts.only_branch`: that
+--- branch is rebuilt and every other one reuses the rows of the last complete
+--- build. Each reused row is still rendered, gated and badged afresh. The reuse
+--- is refused, and everything rebuilt, before a first build, after a pause flip
+--- or a changed top-level declaration, and for a branch outside
+--- BRANCH_LOCAL_REFRESH.
 --- @param ctx table The global UI context.
 --- @param menu_mods table The loaded menu submodules.
 --- @param actions table Callbacks for global system actions.
+--- @param opts table|nil { only_branch = string|nil }.
 --- @return table The assembled menu structure.
-function M.generate(ctx, menu_mods, actions)
+function M.generate(ctx, menu_mods, actions, opts)
 	if not separator_facade_current() then return {} end
+	local only_branch = type(opts) == "table" and opts.only_branch or nil
+	local top_level = load_top_level()
+	local paused = ctx.paused == true
+	local reuse = type(only_branch) == "string" and BRANCH_LOCAL_REFRESH[only_branch] == true
+		and _branch_cache ~= nil and _branch_cache.paused == paused
+		and rawequal(_branch_cache.top_level, top_level)
+	if only_branch ~= nil and not reuse then
+		Logger.debug(LOG, "Branch '%s' alone cannot be rebuilt; the whole tree is.", tostring(only_branch))
+	end
+	-- A build that does not complete leaves no reusable rows behind.
+	local previous_branches = _branch_cache
+	_branch_cache = nil
+	local built_branches, titles = {}, {}
 	--- Runs one component builder and returns what it built as a list of rows.
 	--- @param label string Component name for the log.
 	--- @param fn function Builder.
@@ -854,7 +899,7 @@ function M.generate(ctx, menu_mods, actions)
 
 	local items = {}
 	local item_timings = {}
-	for _, entry in ipairs(load_top_level()) do
+	for _, entry in ipairs(top_level) do
 		if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 		local id = entry.id
 		if id == "---" then
@@ -868,11 +913,16 @@ function M.generate(ctx, menu_mods, actions)
 			-- A declared row this driver has no builder for is a row the user was
 			-- promised and will not see.
 			Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+		elseif reuse and id ~= only_branch and previous_branches.rows[id] ~= nil then
+			built_branches[id] = previous_branches.rows[id]
 		else
 			local item_started = PhaseStats.now()
-			local children = builders[id]() or {}
+			built_branches[id] = builders[id]() or {}
 			local item_ms = PhaseStats.stop(phase_name(id), item_started)
 			item_timings[#item_timings + 1] = { id = id, ms = item_ms }
+		end
+		if built_branches[id] ~= nil then
+			local children = built_branches[id]
 			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 			for _, row in ipairs(children) do
 				-- « Pause = tout éteint »: every row the manifest marks as a feature
@@ -888,6 +938,10 @@ function M.generate(ctx, menu_mods, actions)
 					row.action = nil
 					row.fn = nil
 				end
+				-- The click gate names a click by its rendered titles; a title two
+				-- branches share belongs to neither.
+				local title = type(row) == "table" and (row.label or row.title) or nil
+				if type(title) == "string" then titles[title] = titles[title] == nil and id or false end
 				table.insert(items, row)
 			end
 		end
@@ -941,6 +995,7 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 	if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
+	_branch_cache = { rows = built_branches, titles = titles, paused = paused, top_level = top_level }
 	return rendered
 end
 
