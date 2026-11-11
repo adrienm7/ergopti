@@ -73,6 +73,33 @@ helpers.describe("macOS window topology: the watcher", function()
 		Watcher.stop()
 	end)
 
+	-- The capture scan wrote its rows whatever the context (KMM-002,
+	-- macos-topology-private).
+	helpers.it("macos-topology-private: a capture start seen while logging is refused is not recorded", function()
+		local Watcher, entries, control = scripted()
+		control.private(true)
+		control.ids({ "us.zoom.xos" })
+		control.scan()
+		helpers.assert_eq(#entries, 0)
+		Watcher.stop()
+	end)
+
+	-- watchers.lua handed the watchers only the private-window flag, so a
+	-- disabled app, a secure field or a system-auth prompt was recorded.
+	helpers.it("macos-topology-private: the watchers ask the whole privacy context", function()
+		local file = assert(io.open(helpers.driver_root() .. "modules/keystats/watchers.lua", "rb"))
+		local source = file:read("*a")
+		file:close()
+		local topology = assert(source:find("TopologyWatcher.start({", 1, true))
+		local network = assert(source:find("NetworkWatcher.start", 1, true))
+		for _, start in ipairs({ topology, network }) do
+			local block = source:sub(start, (source:find("})", start, true)))
+			helpers.assert_true(block:find("private = logging_refused", 1, true) ~= nil,
+				"each watcher takes the privacy context's verdict")
+		end
+		helpers.assert_true(source:find("PrivacyContext.allows_logging(_state)", 1, true) ~= nil)
+	end)
+
 	helpers.it("macos-capture-presence: bundle ids open and close the interval, stop closes it too", function()
 		local Watcher, entries, control = scripted()
 		control.ids({ "com.apple.Safari", "us.zoom.xos" })
