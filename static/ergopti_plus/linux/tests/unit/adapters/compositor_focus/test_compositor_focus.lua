@@ -56,11 +56,12 @@ local FOCUS = '{"kind":"focus","class":"org.gnome.Nautilus","title":"Documents",
 -- =================================
 
 helpers.describe("compositor_focus: admission", function()
-	helpers.it("(wayland-desktop-focus) names GNOME and KDE from XDG_CURRENT_DESKTOP only", function()
+	helpers.it("(wayland-desktop-focus) names GNOME, KDE and COSMIC from XDG_CURRENT_DESKTOP only", function()
 		local Focus = helpers.load_module("adapters.compositor_focus")
 		helpers.assert_eq(Focus.desktop_family("ubuntu:GNOME"), "gnome")
 		helpers.assert_eq(Focus.desktop_family("KDE"), "kde")
-		helpers.assert_eq(Focus.desktop_family("COSMIC"), nil)
+		helpers.assert_eq(Focus.desktop_family("COSMIC"), "cosmic")
+		helpers.assert_eq(Focus.desktop_family("pop:COSMIC"), "cosmic")
 		helpers.assert_eq(Focus.desktop_family("gnome-flashback:gnome-classic"), nil,
 			"a token that only contains gnome is another session")
 		helpers.assert_eq(Focus.desktop_family(""), nil)
@@ -80,6 +81,51 @@ helpers.describe("compositor_focus: admission", function()
 			helpers.assert_eq(Worker.activation_record(case[1], case[2], case[3], case[4]), nil,
 				"refused: " .. table.concat(case, "|"))
 		end
+	end)
+end)
+
+
+
+
+helpers.describe("compositor_focus: COSMIC toplevel tracker", function()
+	local Worker = helpers.load_module("adapters.cosmic_toplevel_worker")
+	local ACTIVATED = Worker.STATE_ACTIVATED
+
+	helpers.it("(wayland-desktop-focus) commits on done and names the single activated window", function()
+		local tracker = Worker.new_tracker()
+		tracker.add("a")
+		tracker.title("a", "notes")
+		tracker.app_id("a", "com.system76.CosmicEdit")
+		tracker.state("a", { ACTIVATED })
+		local record = tracker.done("a")
+		helpers.assert_eq(record, { kind = "focus", class = "com.system76.CosmicEdit", title = "notes", id = "cosmic-1" })
+		tracker.title("a", "notes*")
+		helpers.assert_eq(tracker.current().title, "notes", "a pending title is not the window's until done")
+		helpers.assert_eq(tracker.done("a").title, "notes*")
+		helpers.assert_eq(tracker.done("a"), nil, "an unchanged focus prints nothing")
+	end)
+
+	helpers.it("(wayland-desktop-focus) none or two activated windows, and a close, are judged fail-closed", function()
+		local tracker = Worker.new_tracker()
+		tracker.add("a"); tracker.state("a", { ACTIVATED }); tracker.done("a")
+		tracker.add("b"); tracker.state("b", { 0, ACTIVATED })
+		helpers.assert_eq(tracker.done("b"), { kind = "clear" }, "two activated windows are unknown")
+		tracker.state("a", { 1 })
+		helpers.assert_eq(tracker.done("a").id, "cosmic-2")
+		helpers.assert_eq(tracker.closed("b"), { kind = "clear" }, "no activated window is unknown")
+		helpers.assert_eq(pcall(tracker.done, "b"), false, "an event for a closed handle is a protocol failure")
+		helpers.assert_eq(pcall(tracker.add, "a"), false, "a handle announced twice is a protocol failure")
+		helpers.assert_eq(pcall(tracker.title, "a", string.rep("t", 2049)), false, "an oversized title is refused")
+	end)
+
+	helpers.it("(wayland-desktop-focus) the COSMIC worker command names its own worker and the Wayland library", function()
+		local Focus = helpers.load_module("adapters.compositor_focus")
+		local start, process = fake_process()
+		local source = Focus.new({ family = "cosmic", start_process = start })
+		helpers.assert_true(source.start())
+		helpers.assert_true(process.arguments[1]:find("/adapters/cosmic_toplevel_worker.lua$") ~= nil)
+		helpers.assert_eq(process.arguments[2], require("_generated.native_runtime").optional.wayland_client)
+		source.stop()
 	end)
 end)
 
@@ -241,7 +287,22 @@ helpers.describe("compositor_focus: window_info join", function()
 		helpers.assert_true(ok, tostring(failure))
 	end)
 
-	for _, case in ipairs({ { "x11", "GNOME" }, { "wayland", "COSMIC" }, { "wayland", "sway" } }) do
+	helpers.it("(wayland-desktop-focus) COSMIC answers from its toplevel worker, without a process id", function()
+		local window_info, commands, restore = wayland_window_info("COSMIC")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			helpers.assert_true(window_info.start_compositor_focus({ start_process = start,
+				command = function() return "luajit", {}, "/" end }))
+			process.say('{"kind":"ready"}\n{"kind":"focus","class":"com.system76.CosmicTerm","title":"~","id":"cosmic-2"}\n')
+			helpers.assert_eq(window_info.getFocused().appId, "com.system76.CosmicTerm")
+			helpers.assert_eq(window_info.focused_identity(), "cosmic::cosmic-2")
+			helpers.assert_eq(commands, {}, "no lswt probe either")
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	for _, case in ipairs({ { "x11", "GNOME" }, { "x11", "COSMIC" }, { "wayland", "sway" } }) do
 		helpers.it("(wayland-desktop-focus) starts nothing on " .. case[1] .. " " .. case[2], function()
 			local display = helpers.load_module("infra.display_server")
 			display._set_for_test(case[1], case[2])
