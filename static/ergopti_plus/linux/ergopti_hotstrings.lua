@@ -2613,8 +2613,10 @@ local function main()
 	end
 	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
-	-- it, so the application never sees a chord Ergopti runs. It comes last: an
-	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- it, so the application never sees a chord Ergopti runs. An offered
+	-- prediction's own digit chord is contextual and outranks a binding; both run
+	-- before the layout emulation, as Windows runs a slot before its layout chord
+	-- and macOS lets the digit accept (ILL-001, ILL-002).
 	-- The press is recorded for the metrics exactly as the control callback
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
@@ -2648,21 +2650,35 @@ local function main()
 		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots.
-		if require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+		-- under the Shortcuts master like the keyboard slots, and only while no
+		-- layout is emulated, as on Windows.
+		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
+			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
-		}) then return true end
+		})
+		if accented then
+			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
+		end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.
 			-- Retire its old PRIMARY window before the deferred action can run.
 			wrap_on_type.end_selection_window()
 			return true
 		end
+		if prediction_engine
+			and type(prediction_engine.handle_shortcut) == "function"
+			and prediction_engine.handle_shortcut(detail) == true then
+			return true
+		end
+		-- A key the tooltip did not own is user activity: a pending prediction
+		-- stops before the typing path arms the next pause.
+		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
+		if consume_bound_chord(detail) then return true end
 		-- The layout emulation, after the actions the user bound on a key.
 		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
@@ -2674,16 +2690,7 @@ local function main()
 			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
 				release_callback = emulated_release }
 		end
-		if wrap_on_type.on_key(detail) then return true end
-		if prediction_engine
-			and type(prediction_engine.handle_shortcut) == "function"
-			and prediction_engine.handle_shortcut(detail) == true then
-			return true
-		end
-		-- A key the tooltip did not own is user activity: a pending prediction
-		-- stops before the typing path arms the next pause.
-		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
-		return consume_bound_chord(detail)
+		return wrap_on_type.on_key(detail) == true
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
 	local hold_token = keystats.hold_accounting_token
