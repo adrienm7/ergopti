@@ -315,6 +315,32 @@ function DEFAULT_OPS.smoke(wrapper)
 	return run_command(shell_quote(wrapper) .. " --help >/dev/null 2>&1")
 end
 
+-- The compiler the activated release ships (infra/bytecode_package.lua).
+local BYTECODE_COMPILER = "/linux/install/compile_bytecode.lua"
+
+--- The interpreter running this daemon, which is the one the installed
+--- launcher starts: bytecode is only valid for the luajit that compiled it.
+--- @return string|nil path
+local function running_interpreter()
+	local ffi = require("ffi")
+	pcall(ffi.cdef, "long readlink(const char *, char *, size_t);")
+	local size = 4096
+	local buffer = ffi.new("char[?]", size)
+	local length = tonumber(ffi.C.readlink("/proc/self/exe", buffer, size))
+	if not length or length <= 0 or length >= size then return nil end
+	return ffi.string(buffer, length)
+end
+
+--- Compiles the activated installation's bytecode package.
+--- @param root string Activated installation root.
+--- @return boolean success
+function DEFAULT_OPS.compile_bytecode(root)
+	local interpreter = running_interpreter()
+	if not interpreter then return false end
+	return run_command(shell_quote(interpreter) .. " " .. shell_quote(root .. BYTECODE_COMPILER)
+		.. " " .. shell_quote(root) .. " >/dev/null 2>&1")
+end
+
 M.DEFAULT_OPS = DEFAULT_OPS
 
 -- =========================================
@@ -499,11 +525,17 @@ local function install_transaction(options, owned_current)
 			.. "; staging retained at " .. work_dir
 	end
 
+	-- Compiled into the verified, activated root: a staged tree's chunks would
+	-- name the staging path, and the receipt verifier of the release that
+	-- staged it may predate the derived tree. A failure costs boot time only:
+	-- the daemon loads from source and says so.
+	local compiled = ops.compile_bytecode(context.install_root)
 	local work_removed = cleanup_work(work_dir, context.parent, ops)
 	local archive_removed = ops.remove_file(options.archive_path)
 	if not work_removed or not archive_removed then
 		return true, "update installed but temporary cleanup was incomplete"
 	end
+	if not compiled then return true, "update installed but its bytecode package was not compiled" end
 	return true
 end
 

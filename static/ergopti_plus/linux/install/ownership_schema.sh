@@ -9,3 +9,6 @@ OWNERSHIP_LAUNCHER='bin/ergopti-hotstrings'
 OWNERSHIP_EXTERNAL_RECORDS='wrapper unit autostart'
 OWNERSHIP_DRIVER_SENTINEL='ergopti_hotstrings.lua'
 OWNERSHIP_SHARED_SENTINEL='data/locales/en.json'
+# Derived from the payload after the receipt is written (the bytecode package,
+# infra/bytecode_package.lua): never listed, admitted by name, removed whole.
+OWNERSHIP_DERIVED_TREE='.bytecode'

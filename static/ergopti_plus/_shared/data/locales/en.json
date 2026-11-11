@@ -1330,6 +1330,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti cannot start: {1} is not a published native module.",
 	"linux_shell.install.already_installed": "{1} — already installed",
 	"linux_shell.install.archive_digest_unavailable": "retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable.",
+	"linux_shell.install.bytecode_skipped": "Precompiled modules could not be built — Ergopti starts from source, a little slower.",
 	"linux_shell.install.capability_verified": "{1} — capability verified",
 	"linux_shell.install.command_still_missing": "{1} was installed, but '{2}' is still not found.",
 	"linux_shell.install.daemon_manual": "To start the daemon manually:",

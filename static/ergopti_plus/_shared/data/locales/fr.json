@@ -1330,6 +1330,7 @@
 	"linux_shell.native_modules.module_unpublished": "Ergopti ne peut pas démarrer : {1} n’est pas un module natif publié.",
 	"linux_shell.install.already_installed": "{1} — déjà installé",
 	"linux_shell.install.archive_digest_unavailable": "les mises à jour à descripteur conservé exigent un vrai environnement OpenSSL3 ; la capacité reste indisponible.",
+	"linux_shell.install.bytecode_skipped": "Les modules précompilés n'ont pas pu être créés — Ergopti démarre depuis les sources, un peu plus lentement.",
 	"linux_shell.install.capability_verified": "{1} — capacité vérifiée",
 	"linux_shell.install.command_still_missing": "{1} a été installé, mais '{2}' reste introuvable.",
 	"linux_shell.install.daemon_manual": "Pour démarrer le daemon manuellement :",
