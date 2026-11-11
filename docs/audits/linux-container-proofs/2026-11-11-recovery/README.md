@@ -90,6 +90,16 @@ before a6fa8892 fails two checks: a dismissed unlock prompt read as an absent
 key, and a clear on the locked keyring (which removes nothing and raises no
 prompt) read as done, so a removed entry's key stayed in the keyring unlogged.
 
+## Desktop actions executed for real (3da58645)
+
+`tests/hardware/run_desktop_actions_live.sh` (Xvfb, openbox, GVfs, keyfile
+GSettings): `desktop_actions_live.txt`, 11/11. empty_trash with its owned
+question cancelled keeps the trash and confirmed empties a real gio trash;
+center_mouse puts the X pointer at the monitor centre; toggle_dark_mode flips
+the real color-scheme key, and two overlapping toggles end where they started.
+Without GVfs, `gio trash --empty` exits 0 and empties nothing, which the action
+reported as done; it now fails unless the home trash is empty (3da58645).
+
 ## Limits
 
 - The install is driven by a tar-backed archive factory, not the authenticated

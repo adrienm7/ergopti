@@ -1,0 +1,12 @@
+  ok   three files are in the real trash
+  ok   the trash folder holds them
+  ok   empty_trash is dispatched, its question cancelled
+  ok   a cancelled question leaves the trash as it was
+  ok   empty_trash is dispatched, its question confirmed
+  ok   the trash is empty afterwards
+  ok   center_mouse is dispatched
+  ok   the X pointer sits at the monitor centre: X=640 Y=512 SCREEN=0 WINDOW=543 
+  ok   toggle_dark_mode is dispatched
+  ok   the real key reads prefer-dark: 'prefer-dark'
+  ok   two overlapping toggles end where they started: 'prefer-dark'
+11 checks, 0 failures
