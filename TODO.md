@@ -1072,8 +1072,13 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted. 2026-11-11: GNOME W1 to W3 hold
       after one login (`user_layout_wayland_gnome.txt`, Bépo: the slot loads with `ERGOPTI_SEVEN_LEVEL`, the
       digits-first build under the other slot replaces it with no restart); a layout first registered during the
-      session answers `needs_relogin` and leaves the setting alone. KDE (not re-run with Bépo) and W4 still open.
+      session answers `needs_relogin` and leaves the setting alone. KDE (not re-run with Bépo) still open. W4
+      answered (`run_x11_reapply_live.sh`, `x11_reapply_*.txt`): GNOME Shell 46 and Plasma 6.6.4 under X11 put their
+      own layouts back when a keyboard appears (GNOME also on an input-sources setting change), never on a switch.
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
+- [ ] Linux X11 on GNOME and KDE: re-apply the user-tree layout (apply-x11) after the desktop puts its own layouts
+      back (W4: a keyboard hotplug, a GNOME input-sources setting change); today the loaded layout is lost until the
+      next apply. Found by the 2026-11-11 container proof.
 - [ ] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
       and the tray's Reload restart the daemon, a second run reports "already running".
 - [ ] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane

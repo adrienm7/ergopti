@@ -1,0 +1,7 @@
+=== W4: does kde under X11 re-apply its own layout? ===
+  ok   Bépo is installed in the user tree
+  ok   apply-x11 loads it into the server (pc+bepo+inet(evdev))
+  ok   with no desktop event the server keeps it (pc+bepo+inet(evdev))
+  ok   a layout switch of the desktop keeps it (pc+bepo+inet(evdev))
+  ok   W4: a new keyboard makes the desktop put its own layouts back (pc+us+fr:2+inet(evdev))
+=== 5 check(s), 0 failure(s) ===

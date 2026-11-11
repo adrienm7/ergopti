@@ -326,7 +326,7 @@ Implemented (30 October), the Linux slices 3, 4 and the Linux half of 6:
   manager's whole chain on Xvfb, and the global scope composed with the real
   producers) and `test_wayland_live_replace.py` (the installer against Xvfb as
   XWayland with file-backed `gsettings`/kconfig tools and a stand-in compositor).
-  W1 to W4 still need GNOME and KDE.
+  W1 to W4 on real desktops: see the answers below the W table.
 
 Proposed Linux sequence (same invariant as macOS; the implementation above
 replaces the counter of steps 1 and 4 with the two slots):
@@ -376,6 +376,22 @@ To verify on a real desktop (no GNOME or KDE is available on this host):
 | W2  | After changing `sources` to a new id, does the new keymap type at once in already-open applications?                                                                                                                                    |
 | W3  | Does rewriting the file under the same id plus re-setting the same value leave the old keymap (the claim behind versioning)?                                                                                                            |
 | W4  | On GNOME or KDE under X11, does the settings daemon re-apply the layout on device hotplug or layout switch and drop the xkbcomp-loaded keymap? Then the daemon must re-apply or X11 on those desktops falls back to the system install. |
+
+Answers from the container proofs of 2026-11-11
+([receipts](../audits/linux-container-proofs/2026-11-10-layouts/README.md)):
+
+- W1 to W3 on GNOME Shell 46: yes, once the shell has read the slots. The shell
+  reads `~/.config/xkb/rules/evdev.xml` only when it starts, so a slot
+  registered during the session is unknown to it; `apply-wayland` answers
+  `needs_relogin` for it and registers both slots, and after the next login
+  each build alternates live (`run_user_layout_wayland_live.lua`). KWin 6:
+  still inconclusive (headless XWayland read-back).
+- W4: yes on both. GNOME Shell 46 (`--x11`) and Plasma 6.6.4 (kded's keyboard
+  module) put their own layout list back when a keyboard appears, and GNOME
+  also on any input-sources setting change; a layout switch keeps the loaded
+  keymap (`run_x11_reapply_live.sh`). The daemon must re-apply the user-tree
+  layout after those events, or X11 on these desktops falls back to the
+  system install.
 
 A small shell probe for W1 to W3 will ship with slice 3 (it prints the
 compiled keysyms through `xkbcli` or the ctypes call used here and the
