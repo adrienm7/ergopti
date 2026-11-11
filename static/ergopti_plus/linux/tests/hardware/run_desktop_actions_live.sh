@@ -10,6 +10,9 @@
 # Exit 0 = every check held; 1 = a failure; 2 = no environment.
 
 set -u
+# The inner session re-runs this script after the cd below: name it absolutely,
+# since the caller may have given a path relative to another directory.
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" || exit 2
 cd "$(dirname "$0")/../.." || exit 2
 need() {
 	command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }
@@ -36,7 +39,7 @@ if [ "${1:-}" != "--inside" ]; then
 	mkdir -p "${WORK}/run" && chmod 700 "${WORK}/run"
 	DISPLAY="${DISPLAY_NUMBER}" HOME="${WORK}" XDG_DATA_HOME="${WORK}/.local/share" \
 		XDG_CONFIG_HOME="${WORK}/.config" XDG_RUNTIME_DIR="${WORK}/run" GSETTINGS_BACKEND=keyfile \
-		dbus-run-session -- bash "$0" --inside
+		dbus-run-session -- bash "$SELF" --inside
 	STATUS=$?
 	kill "${XVFB}" 2>/dev/null
 	exit "${STATUS}"
