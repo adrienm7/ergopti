@@ -363,7 +363,11 @@ function M.key_down(e, key_code)
 	end
 	if decision == Emulation.SHORTCUT then
 		local target = _deps.keycode_for_char(text)
-		if type(target) == "number" then e:setKeyCode(target) end
+		-- The release goes out on the key code the press went out on (key_up).
+		if type(target) == "number" then
+			e:setKeyCode(target)
+			if target ~= key_code then _rewritten[key_code] = target end
+		end
 		if next(_virtual) ~= nil then e:setFlags(flags) end
 		return false
 	end
