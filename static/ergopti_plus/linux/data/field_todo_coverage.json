@@ -103,7 +103,10 @@
 					"step": "linux_prediction_activity"
 				},
 				{
-					"step": "linux_prediction_hands"
+					"step": "linux_prediction_window_switch"
+				},
+				{
+					"step": "linux_prediction_keep"
 				}
 			],
 			"condition": "A slow local model; a mouse, a wheel and a touchpad."

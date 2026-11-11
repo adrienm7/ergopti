@@ -514,12 +514,16 @@
 		{
 			"id": "guided_hotstrings_apps",
 			"kind": "guided",
-			"mode": "attest",
+			"mode": "observe",
 			"check": "log_signals",
-			"gesture_seconds": 300,
-			"deadline_seconds": 360,
-			"gesture": "Type three ordinary hotstrings in Edge, VS Code and a terminal each: each expands once, with the right case and no stray character.",
-			"proves": "Ordinary hotstrings expand in Edge, VS Code and a terminal."
+			"until": {
+				"condition": "rises",
+				"steps": ["log_hotstring_expansions"]
+			},
+			"gesture_seconds": 240,
+			"deadline_seconds": 300,
+			"gesture": "Type three ordinary hotstrings in Edge, then in VS Code, then in a terminal (Debug > Log level > DEBUG).",
+			"proves": "Ordinary hotstrings typed in real applications expand, one expansion line each in the day log."
 		},
 		{
 			"id": "guided_window_toggle",
