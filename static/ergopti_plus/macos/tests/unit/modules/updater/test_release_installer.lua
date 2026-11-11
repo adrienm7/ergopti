@@ -405,11 +405,14 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local opened = dir .. "/opened"
 		local reported = dir .. "/successor_pid"
 		if opts.successor_pid then write(reported, opts.successor_pid) end
+		if opts.quit_later then write(dir .. "/quit_later", "") end
 		local open = fake(dir, "open", table.concat({
 			'if [ "$1" = --env ]; then',
 			'	echo "ready $4" >> ' .. quote(opened),
 			'	token=${2#ERGOPTI_UPDATER_BOOT_READY=}',
 			'	if [ -f ' .. quote(reported) .. ' ]; then cp ' .. quote(reported) .. ' "$token.tmp" && mv "$token.tmp" "$token"; fi',
+			-- A Quit during the probation: the boot rewrites its token with quit.
+			'	if [ -f ' .. quote(dir .. "/quit_later") .. ' ]; then (sleep 0.2; echo quit > "$token.tmp" && mv "$token.tmp" "$token") & fi',
 			'else',
 			'	echo "$2" >> ' .. quote(opened),
 			'fi',
@@ -515,6 +518,23 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		helpers.assert_eq(result.app, "installed")
 		helpers.assert_eq(result.failed, "chosen")
 		helpers.assert_contains(result.output, "quit during the probation")
+	end)
+
+	helpers.it("(update-quit-kept) keeps the chosen app and opens nothing when it is quit before its report", function()
+		local result = swap({ ready_capable = true, successor_pid = "quit" })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen", "the update stays installed")
+		helpers.assert_eq(result.previous, "installed")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n", "the previous app is not opened")
+		helpers.assert_contains(result.output, "quit before it reported ready")
+	end)
+
+	helpers.it("(update-quit-kept) keeps the chosen app when it is quit during the probation", function()
+		local result = swap({ ready_capable = true, successor_pid = "999999999", quit_later = true })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen", "the update stays installed")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n", "the previous app is not opened")
+		helpers.assert_contains(result.output, "quit during its probation")
 	end)
 
 	helpers.it("refuses an invalid boot report like a missing one", function()

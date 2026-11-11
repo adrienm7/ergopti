@@ -231,7 +231,7 @@ local function with_menu_fixture(options, callback)
 		initial_settings = nil,
 		files = {
 			["/virtual/config.toml"] = "feature = true\n",
-			["/virtual/config_karabiner.toml"] = "tap = old\n",
+			["/virtual/tap_hold.toml"] = "tap = old\n",
 		},
 		initial_files = nil,
 		karabiner_state = { profile = "old", tap = "escape", hold = "left_control" },
@@ -354,7 +354,7 @@ local function with_menu_fixture(options, callback)
 		is_initialized = function() return true end,
 		get = function(key)
 			if key == "ConfigTomlPath" then return "/virtual/config.toml" end
-			if key == "KarabinerConfigPath" then return "/virtual/config_karabiner.toml" end
+			if key == "TapHoldConfigPath" then return "/virtual/tap_hold.toml" end
 			return "/virtual/unused"
 		end,
 		get_config_dir = function() return "/virtual" end,

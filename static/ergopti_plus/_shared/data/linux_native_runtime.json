@@ -124,6 +124,7 @@
 			"at-spi2-core",
 			"glib-networking",
 			"libproxy",
+			"duktape",
 			"dconf",
 			"openssl"
 		]
@@ -143,6 +144,7 @@
 			"glib": "libglib-2.0.so.0"
 		},
 		"proxy_schema": "org.gnome.system.proxy",
+		"pac_engine": "libduktape.so.207",
 		"providers": {
 			"apt": ["glib-networking", "gsettings-desktop-schemas", "lua-luv"],
 			"dnf": null,

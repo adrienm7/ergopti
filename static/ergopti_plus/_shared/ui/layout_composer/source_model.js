@@ -24,6 +24,9 @@ var LayoutSource = (function () {
 	const VERSION = 1;
 	const ID = /^[a-z][a-z0-9_]*$/;
 	const KEY = /^[A-Z][A-Za-z0-9]*$/;
+	const CONTROL = /[\u0000-\u001F\u007F-\u009F]/;
+	// A bundle resource stem: no path separator, quote, backslash or leading dot.
+	const FILE_NAME = /^[^./\\"][^/\\"]*$/;
 	const BUILTIN_MODIFIERS = [
 		'shift',
 		'shift_left',
@@ -64,6 +67,16 @@ var LayoutSource = (function () {
 		// config-key-literal-ok: field of the versioned layout format, not application config.
 		'tap_holds',
 		'windows'
+	];
+	// The ISO key left of Z, and where the ANSI derivation moves it by default.
+	const ISO_EXTRA_KEY = 'IntlBackslash';
+	const ANSI_EXTRA_KEY = 'Backquote';
+	const MACOS_EXPORT_STRINGS = [
+		'internal_name',
+		'ansi_internal_name',
+		'ansi_display_name',
+		'input_source_id',
+		'version'
 	];
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 	const table = (value) => Object.prototype.toString.call(value) === '[object Object]';
@@ -133,7 +146,12 @@ var LayoutSource = (function () {
 
 	/** Validate a text, dead-state, action, physical chord or disabled mapping. */
 	function mapping(value, path, deadKeys, modifiers) {
-		record(value, ['text', 'dead_key', 'action', 'key', 'modifiers', 'disabled'], [], path);
+		record(
+			value,
+			['text', 'compose', 'compose_as', 'dead_key', 'action', 'key', 'modifiers', 'disabled'],
+			[],
+			path
+		);
 		const kinds = ['text', 'dead_key', 'action', 'key', 'disabled'].filter((kind) =>
 			own(value, kind)
 		);
@@ -143,10 +161,31 @@ var LayoutSource = (function () {
 		if (own(value, 'action')) identifier(value.action, `${path}.action`);
 		if (own(value, 'key')) keyCode(value.key, `${path}.key`);
 		if (own(value, 'disabled')) requireValue(value.disabled === true, `${path}.disabled`);
+		// A text's dead-key identity: compose = false types it outside every dead key,
+		// compose_as names the rule input it answers to when that differs from the text.
+		if (own(value, 'compose')) {
+			requireValue(own(value, 'text'), `${path}.compose`);
+			requireValue(typeof value.compose === 'boolean', `${path}.compose`);
+		}
+		if (own(value, 'compose_as')) {
+			requireValue(own(value, 'text') && value.compose !== false, `${path}.compose_as`);
+			string(value.compose_as, `${path}.compose_as`);
+		}
 		if (own(value, 'modifiers')) {
 			requireValue(own(value, 'key'), `${path}.modifiers`);
 			list(value.modifiers, `${path}.modifiers`, (id, at) => reference(id, modifiers, at));
 		}
+	}
+
+	/** Check one modifier combination: required and optional modifiers never overlap. */
+	function selector(value, path, modifiers) {
+		const required = list(value.required, `${path}.required`, (id, where) =>
+			reference(id, modifiers, where)
+		);
+		list(value.optional, `${path}.optional`, (id, where) => {
+			reference(id, modifiers, where);
+			requireValue(!required.has(id), where, 'source_modifier_overlap');
+		});
 	}
 
 	/** Read an imported document through the existing composer, never a second parser. */
@@ -188,10 +227,27 @@ var LayoutSource = (function () {
 		for (const field of ['description', 'author'])
 			if (own(source.layout, field)) string(source.layout[field], `layout.${field}`, true);
 		if (own(source.layout, 'languages')) list(source.layout.languages, 'layout.languages', string);
-		record(source.physical, ['base', 'ansi_extra_key'], ['base'], 'physical');
+		record(source.physical, ['base', 'ansi_extra_key', 'ansi_swaps'], ['base'], 'physical');
 		requireValue(['iso', 'ansi'].includes(source.physical.base), 'physical.base');
 		if (own(source.physical, 'ansi_extra_key'))
 			keyCode(source.physical.ansi_extra_key, 'physical.ansi_extra_key');
+		if (own(source.physical, 'ansi_swaps')) {
+			// Each position moves once: a key in two pairs would make the derivation order-dependent.
+			const moved = new Set([ISO_EXTRA_KEY, source.physical.ansi_extra_key || ANSI_EXTRA_KEY]);
+			list(
+				source.physical.ansi_swaps,
+				'physical.ansi_swaps',
+				(pair, at) => {
+					requireValue(Array.isArray(pair) && pair.length === 2, at);
+					pair.forEach((key, index) => {
+						keyCode(key, `${at}[${index}]`);
+						requireValue(!moved.has(key), `${at}[${index}]`, 'source_duplicate');
+						moved.add(key);
+					});
+				},
+				(pair) => pair.join(':')
+			);
+		}
 		if (own(source, 'imported_keylayout')) {
 			record(
 				source.imported_keylayout,
@@ -225,14 +281,29 @@ var LayoutSource = (function () {
 				(entry) => entry.id
 			);
 		const deadKeys = new Set();
+		const states = new Set();
 		if (own(source, 'dead_keys'))
 			list(
 				source.dead_keys,
 				'dead_keys',
 				(entry, at) => {
-					record(entry, ['id', 'name', 'terminator', 'rules'], ['id', 'terminator', 'rules'], at);
+					record(
+						entry,
+						['id', 'name', 'state', 'action_id', 'terminator', 'rules'],
+						['id', 'terminator', 'rules'],
+						at
+					);
 					identifier(entry.id, `${at}.id`);
 					if (own(entry, 'name')) string(entry.name, `${at}.name`);
+					// The .keylayout state and action names, kept when an import's differ from the id.
+					for (const field of ['state', 'action_id'])
+						if (own(entry, field)) {
+							string(entry[field], `${at}.${field}`);
+							requireValue(!CONTROL.test(entry[field]), `${at}.${field}`);
+						}
+					const state = own(entry, 'state') ? entry.state : entry.id;
+					requireValue(state !== 'none' && !states.has(state), `${at}.state`, 'source_duplicate');
+					states.add(state);
 					string(entry.terminator, `${at}.terminator`, true);
 					deadKeys.add(entry.id);
 				},
@@ -243,13 +314,16 @@ var LayoutSource = (function () {
 				entry.rules,
 				`dead_keys[${index}].rules`,
 				(rule, at) => {
-					record(rule, ['input', 'text', 'next'], ['input'], at);
-					string(rule.input, `${at}.input`);
+					record(rule, ['input', 'input_dead_key', 'text', 'next'], [], at);
+					// The typed text a rule answers to, or the dead key pressed while this one is pending.
+					requireValue(own(rule, 'input') !== own(rule, 'input_dead_key'), at);
+					if (own(rule, 'input')) string(rule.input, `${at}.input`);
+					else reference(rule.input_dead_key, deadKeys, `${at}.input_dead_key`);
 					requireValue(own(rule, 'text') || own(rule, 'next'), at);
 					if (own(rule, 'text')) string(rule.text, `${at}.text`, true);
 					if (own(rule, 'next')) reference(rule.next, deadKeys, `${at}.next`);
 				},
-				(rule) => rule.input
+				(rule) => (own(rule, 'input') ? `text:${rule.input}` : `dead:${rule.input_dead_key}`)
 			);
 		const layers = new Set();
 		if (own(source, 'layers'))
@@ -259,19 +333,19 @@ var LayoutSource = (function () {
 				(entry, at) => {
 					record(
 						entry,
-						['id', 'required', 'optional', 'keys', 'platform_keys'],
+						['id', 'required', 'optional', 'alternatives', 'keys', 'platform_keys'],
 						['id', 'required', 'optional', 'keys'],
 						at
 					);
 					identifier(entry.id, `${at}.id`);
 					layers.add(entry.id);
-					const required = list(entry.required, `${at}.required`, (id, where) =>
-						reference(id, modifiers, where)
-					);
-					list(entry.optional, `${at}.optional`, (id, where) => {
-						reference(id, modifiers, where);
-						requireValue(!required.has(id), where, 'source_modifier_overlap');
-					});
+					selector(entry, at, modifiers);
+					// Further modifier combinations that select the same layer (one keyMapSelect).
+					if (own(entry, 'alternatives'))
+						list(entry.alternatives, `${at}.alternatives`, (alternative, where) => {
+							record(alternative, ['required', 'optional'], ['required', 'optional'], where);
+							selector(alternative, where, modifiers);
+						});
 					requireValue(table(entry.keys), `${at}.keys`);
 					for (const [key, value] of Object.entries(entry.keys)) {
 						keyCode(key, `${at}.keys.${key}`);
@@ -416,11 +490,26 @@ var LayoutSource = (function () {
 		if (own(source, 'exports')) {
 			record(source.exports, ['macos', 'windows', 'linux'], [], 'exports');
 			if (own(source.exports, 'macos')) {
-				record(source.exports.macos, ['format'], ['format'], 'exports.macos');
-				requireValue(
-					['bundle', 'iso', 'ansi'].includes(source.exports.macos.format),
-					'exports.macos.format'
+				const macos = source.exports.macos;
+				record(
+					macos,
+					['format', ...MACOS_EXPORT_STRINGS, 'keyboard_id', 'ansi_keyboard_id'],
+					['format'],
+					'exports.macos'
 				);
+				requireValue(['bundle', 'iso', 'ansi'].includes(macos.format), 'exports.macos.format');
+				for (const field of MACOS_EXPORT_STRINGS)
+					if (own(macos, field)) {
+						string(macos[field], `exports.macos.${field}`);
+						requireValue(!CONTROL.test(macos[field]), `exports.macos.${field}`);
+					}
+				// The internal name is the .keylayout file name, its KLInfo key and its strings key.
+				for (const field of ['internal_name', 'ansi_internal_name'])
+					if (own(macos, field))
+						requireValue(FILE_NAME.test(macos[field]), `exports.macos.${field}`);
+				for (const field of ['keyboard_id', 'ansi_keyboard_id'])
+					if (own(macos, field))
+						requireValue(Number.isSafeInteger(macos[field]), `exports.macos.${field}`);
 			}
 			for (const [target, fields] of Object.entries(EXPORT_METADATA))
 				if (own(source.exports, target)) {
@@ -518,6 +607,9 @@ var LayoutSource = (function () {
 	return {
 		FORMAT,
 		VERSION,
+		ISO_EXTRA_KEY,
+		ANSI_EXTRA_KEY,
+		BUILTIN_MODIFIERS,
 		SourceError,
 		validate,
 		importKeylayout,

@@ -147,6 +147,17 @@
 				<span class="title" style="margin-top:3px;">Benchmarks</span>
 			</a>
 			<a
+				href="editeur"
+				onclick={closeMenu}
+				aria-label="Accéder à l’éditeur de disposition"
+				aria-current={isCurrent('/editeur') ? 'page' : undefined}
+			>
+				<i class="icon-keyboard-duotone" style="margin-right:7px;">
+					<span class="path1"></span><span class="path2"></span>
+				</i>
+				<span class="title">Éditeur</span>
+			</a>
+			<a
 				href="utilisation"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Utilisation"

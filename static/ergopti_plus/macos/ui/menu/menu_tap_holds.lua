@@ -283,7 +283,7 @@ local _scope_generation = 0
 local function run_scope(karabiner, mode, update_menu, scope)
 	scope = scope or ConfigKeys.KEY.TAP_HOLDS
 	_scope_generation = _scope_generation + 1
-	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. "." .. scope .. "-"
+	local backup_path = require("infra.config_paths").get("TapHoldConfigPath") .. "." .. scope .. "-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
 	return run_bulk_menu_command(
 		karabiner,
@@ -1130,12 +1130,13 @@ end
 --- the tap-holds were simply off, with nothing saying why.
 -- Literal template names, so the menu parity gate sees each publication.
 local NOT_INSTALLED = function() return ManifestMenu.template_rows("tap_hold_owned_not_installed_rows", {}) end
+local SERVICE_STOPPED = function() return ManifestMenu.template_rows("tap_hold_owned_service_stopped_rows", {}) end
 local CLOSE_FAILED = function() return ManifestMenu.template_rows("tap_hold_owned_close_failed_rows", {}) end
 local BLOCK_ROWS = {
 	virtual_hid_incompatible = function() return ManifestMenu.template_rows("tap_hold_vhid_incompatible_rows", {}) end,
 	virtual_hid_not_active = function() return ManifestMenu.template_rows("tap_hold_vhid_not_active_rows", {}) end,
 	runtime_not_installed = NOT_INSTALLED,
-	runtime_job_not_loaded = NOT_INSTALLED,
+	runtime_job_not_loaded = SERVICE_STOPPED,
 	virtual_hid_absent = NOT_INSTALLED,
 	other_karabiner_running = function() return ManifestMenu.template_rows("tap_hold_owned_other_running_rows", {}) end,
 	close_other_unsupported = CLOSE_FAILED,
@@ -1193,6 +1194,22 @@ local function owned_runtime_block_rows(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The owned runtime install could not be shown: %s.", tostring(shown))
+					return false
+				end
+				return shown == true
+			end,
+		}) or {}) do rows[#rows + 1] = row end
+	end
+	if rows_fn == SERVICE_STOPPED and type(karabiner.repair_owned_runtime) == "function" then
+		-- « Réparer le service » (MRT-004): the row opens a confirmation, never the repair itself.
+		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_owned_repair_rows", {
+			[ConfigKeys.COMMAND.TAP_HOLD_OWNED_REPAIR] = function()
+				Logger.info(LOG, "Showing the owned runtime service repair from the Tap-Holds menu.")
+				local shown_ok, shown = xpcall(function()
+					return require("ui.owned_runtime_install").open_repair(karabiner)
+				end, debug.traceback)
+				if not shown_ok then
+					Logger.error(LOG, "The owned runtime service repair could not be shown: %s.", tostring(shown))
 					return false
 				end
 				return shown == true

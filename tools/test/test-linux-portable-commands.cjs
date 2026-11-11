@@ -58,9 +58,10 @@
  *
  * SCOPES. A launch is judged where its file runs: "driver" (a user's machine:
  * driver, installer, launcher), "test" (the distribution containers, which hold
- * only the CI image preparation) or "host" (tests/hardware and the other files that
- * only the Ubuntu runners execute). An entry lists the scopes it is valid for, and
- * a machine-checked proof must back each of them: a file proof this gate reads
+ * only the CI image preparation) or "host" (tests/hardware, its container
+ * desktop proofs under tests/hardware/desktop, and the other files that only the
+ * Ubuntu runners or a prepared container execute). An entry lists the scopes it
+ * is valid for, and a machine-checked proof must back each of them: a file proof this gate reads
  * (an install by CI, a declared dependency, the container entry point of every
  * image), bound to the scopes it covers, or a probe of the program in every file
  * of the probed scopes that launches it, host scripts included. No program
@@ -441,7 +442,7 @@ const PROGRAMS = {
 	),
 	'wl-paste': why(
 		`clipboard on Wayland; declared optional dependency: ${DEB_RECIPE} Recommends, probed before use`,
-		DRIVER,
+		DRIVER_HOST,
 		{
 			proof: { file: DEB_RECIPE, token: 'Recommends:.*\\bwl-clipboard\\b' },
 			probed: true
@@ -461,14 +462,20 @@ const PROGRAMS = {
 	nmcli: optionalTool('network metric'),
 	iwgetid: optionalTool('Wi-Fi metric'),
 	'gnome-extensions': optionalTool('AppIndicator extension on GNOME'),
-	loginctl: optionalTool('logind sessions'),
+	loginctl: optionalTool('logind sessions; the live proof host enables lingering', DRIVER_HOST),
 	tar: why(
 		`the installer probes it and refuses clearly when absent; the archive tests probe it, installed by CI: ${DISTRO_PREP}`,
 		ALL,
 		{ proof: { file: DISTRO_PREP, token: ' tar ', scopes: TEST }, probed: true }
 	),
 	localectl: optionalTool('system keyboard layout of systemd-localed'),
-	gsettings: optionalTool('GNOME settings'),
+	gsettings: optionalTool('GNOME settings', DRIVER_HOST),
+	// The desktops the headless layout proofs start
+	// (tests/hardware/run_input_sources_live.sh), which exit 2 without them.
+	'gnome-shell': optionalTool('GNOME Shell of the layout switching proof', HOST),
+	kwin_wayland: optionalTool('KWin Wayland of the layout switching proof', HOST),
+	kwin_x11: optionalTool('KWin X11 of the layout switching proof', HOST),
+	kded6: optionalTool('KDE daemon of the layout switching proof', HOST),
 	xrandr: optionalTool(
 		'action picker window switching, the menu row is disabled with a reason when absent'
 	),
@@ -503,17 +510,21 @@ const PROGRAMS = {
 	'lxqt-config': optionalTool(
 		'opens the system settings, the first of several applications that is present'
 	),
-	qdbus: optionalTool('KDE workspace switching, the first present of several binaries'),
+	qdbus: optionalTool(
+		'KDE workspace switching, the first present of several binaries',
+		DRIVER_HOST
+	),
 	'qdbus-qt5': optionalTool('KDE workspace switching, the first present of several binaries'),
 	'qdbus-qt6': optionalTool('KDE workspace switching, the first present of several binaries'),
 	qdbus6: optionalTool('KDE workspace switching, the first present of several binaries'),
 	hyprctl: optionalTool('Hyprland window identity'),
 	xinput: optionalTool(
-		'the X11 tap-to-click setting of a touchpad; without it the taps are named not measured'
+		'the X11 tap-to-click setting of a touchpad (without it the taps are named not measured) and the X11 re-apply proof',
+		DRIVER_HOST
 	),
 	swaymsg: optionalTool('Sway window identity', DRIVER_HOST),
 	niri: optionalTool('Niri window identity'),
-	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)'),
+	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)', DRIVER_HOST),
 	'update-desktop-database': optionalTool('desktop menu cache refresh after an App Cloner clone'),
 	'xdg-mime': why(
 		`queries the daily note's text editor; supplied by xdg-utils, installed with xdg-open by install.sh and declared by ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
@@ -543,6 +554,13 @@ const PROGRAMS = {
 	),
 	// The driver reads /proc instead; the hardware lanes probe procps first.
 	ps: optionalTool('procps process listing of the hardware lanes', HOST),
+	// The live proof host of tests/hardware/run_phys_vm.sh: a QEMU VM reached over ssh.
+	'qemu-system-x86_64': optionalTool('the live proof VM; the runner exits 2 without it', HOST),
+	'qemu-img': optionalTool('the live proof VM disk; the runner exits 2 without it', HOST),
+	'cloud-localds': optionalTool('the live proof VM seed; the runner exits 2 without it', HOST),
+	ssh: optionalTool('the live proof VM console; the runner exits 2 without it', HOST),
+	scp: optionalTool('the live proof VM file copies; the runner exits 2 without it', HOST),
+	'ssh-keygen': optionalTool('the live proof VM key; the runner exits 2 without it', HOST),
 	// The Ubuntu runner image ships iproute2 for the host proof (run_local_servers_container.py).
 	ss: why(
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
@@ -556,7 +574,7 @@ const PROGRAMS = {
 		proof: { file: INSTALLER, token: '\\|\\| echo "dev"' }
 	}),
 	// Package managers: each distribution's own, reached through the detection of install.sh.
-	'apt-get': packageManager('the Debian package manager', DRIVER_TEST),
+	'apt-get': packageManager('the Debian package manager', ALL),
 	'apt-cache': packageManager('the Debian package database', DRIVER_TEST),
 	'dpkg-query': why('the Debian package database, probed by uninstall.sh', DRIVER, {
 		probed: true
@@ -608,6 +626,40 @@ const PROGRAMS = {
 	strace: inUbuntuJob('strace', 'syscall tracer'),
 	zstd: inUbuntuJob('zstd', 'archive tool'),
 	sway: inUbuntuJob('\\bsway\\b', 'Wayland compositor'),
+	// The kernel model and compositor clients of the container proofs
+	// (tests/hardware/run_container_proofs.sh, container_session.py).
+	gcc: inUbuntuJob(
+		'\\bgcc\\b',
+		"compiler of the container proofs' kernel model and Wayland bridge"
+	),
+	'wayland-scanner': inUbuntuJob('\\blibwayland-dev\\b', 'Wayland protocol code generator'),
+	xdpyinfo: inUbuntuJob('x11-utils', 'X server readiness probe'),
+	unshare: why(
+		'util-linux, preinstalled on the Ubuntu runner; the container proofs isolate their mounts',
+		HOST,
+		{
+			proof: { file: CI_LINUX, token: 'sudo unshare --mount' }
+		}
+	),
+	// The headless desktop proofs (tests/hardware/desktop) run in a prepared container,
+	// never on CI: each probes these with command -v and exits 2 without them.
+	labwc: packageManager('Wayland compositor of the container desktop proofs', HOST),
+	foot: packageManager('Wayland terminal window of the container desktop proofs', HOST),
+	kwin_wayland: packageManager('KWin compositor of the container desktop proofs', HOST),
+	'gnome-shell': packageManager('GNOME Shell compositor of the container desktop proofs', HOST),
+	busctl: packageManager("reads logind's inhibitor list in the container desktop proofs", HOST),
+	'systemd-inhibit': packageManager(
+		"lists logind's inhibitors in the container desktop proofs",
+		HOST
+	),
+	'/usr/lib/systemd/systemd': packageManager(
+		'the user manager of the container desktop proofs',
+		HOST
+	),
+	'systemd-run': packageManager('starts the update watcher of the container desktop proofs', HOST),
+	setsid: packageManager('detaches the relay of the container desktop proofs', HOST),
+	pgrep: packageManager('finds the daemons of the container desktop proofs', HOST),
+	awk: packageManager('reads the process table in the container desktop proofs', HOST),
 	pulseaudio: inUbuntuJob('pulseaudio', 'sound server'),
 	lua: inUbuntuJob('lua5\\.4', 'Lua interpreter'),
 	'lua5.4': inUbuntuJob('lua5\\.4', 'Lua interpreter'),

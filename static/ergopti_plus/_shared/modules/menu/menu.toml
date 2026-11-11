@@ -1421,7 +1421,7 @@ id = "extensions_shortcuts"
 
 # The « Combinaisons de touches » group under Shortcuts. Its first row is its
 # own switch, the only one the combinations follow on every OS: macOS
-# persists it as [mod_combos] enabled in config_karabiner.toml, Windows as
+# persists it as [mod_combos] enabled in tap_hold.toml, Windows as
 # [category_enabled] key_combinations; absent, it is on.
 # Complete per-key menus reuse the head and expose the existing native timing owner.
 [[menu.tap_hold_karabiner_off_rows]]
@@ -1520,6 +1520,23 @@ unavailable = "hide"
 type = "command"
 id = "tap_hold_owned_install"
 i18n = "menu.tapholds.owned_install"
+platforms = ["hs"]
+unavailable = "hide"
+
+# An already published runtime whose service is not loaded (MRT-004): the
+# first install refuses an existing runtime by design, so this block offers
+# « Réparer le service », a confirmation, then the administrator prompt.
+[[menu.tap_hold_owned_service_stopped_rows]]
+type = "label"
+id = "tap_hold_owned_service_stopped"
+i18n = "menu.tapholds.owned_service_stopped"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_owned_repair_rows]]
+type = "command"
+id = "tap_hold_owned_repair"
+i18n = "menu.tapholds.owned_repair"
 platforms = ["hs"]
 unavailable = "hide"
 

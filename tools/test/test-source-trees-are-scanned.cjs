@@ -51,7 +51,9 @@ const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui'];
 // `bin` and `native` hold code in another language/toolchain entirely
 // (AppleScript bundles, Swift/C packages, shell entry points), which is why no
 // Lua/AHK scanner should reach them. Their dedicated build gates remain
-// responsible for their source.
+// responsible for their source. Linux `desktop_focus` is the same case: the
+// GNOME Shell extension and KWin script (JavaScript run by the compositor) the
+// installer copies for Wayland focus, checked by the compositor focus install and asset tests.
 const NON_SOURCE = new Set([
 	'tests',
 	'data',
@@ -67,6 +69,7 @@ const NON_SOURCE = new Set([
 	'bin',
 	'install',
 	'native',
+	'desktop_focus',
 	'__pycache__',
 	'.pytest_cache',
 	'.venv'

@@ -25,6 +25,53 @@ unit (the service's cgroup would kill it), the token goes through
 back. A tree without the reporter file is only started; the rollback start is
 not watched. Moves are `mv -T -n` plus an existence check, not renameat2.
 
+The watcher's wait is the updated daemon's boot, so a user's Quit lands in
+that daemon, not the old one (a relay restart has already requested the old
+one's shutdown; under the unit systemd TERMs it at once). Every user Quit
+(`infra/quit_request.lua`, both degraded trays) first writes `quit` to the
+token (`report_quit`), and the watcher then keeps the update and starts
+nothing. macOS does the same (`infra/updater_boot_ready.lua` `report_quit`, called
+by `TerminationCoordinator.request_user_exit` and the non-reload
+`hs.shutdownCallback`; `release_installer.lua` keeps the build on `quit`).
+Action: a new Quit path calls `report_quit`. systemd expands `$$`
+(and `${NAME}`) in a unit's command line, so the transient watcher's command
+goes through `systemd_watch_command`, which doubles every `$`. Action: any
+new `systemd-run` command escapes `$` the same way.
+
+A `systemctl --user --no-block restart|stop` of the daemon's own unit runs
+inside that unit's cgroup, so systemd's TERM of the cgroup can kill the shell
+and client before they report: the call then read as refused although the job
+ran, which disarmed the update watcher (seen about one run in five under a real
+user manager). Those calls carry `OWN_UNIT_JOB_PREFIX` (`trap '' TERM;`).
+Action: any new command that stops or restarts the daemon's own unit takes the
+prefix. `tests/hardware/desktop/run_update_restart_watcher.sh` runs a real
+`systemd --user` in a container by mounting a tmpfs on `/run/systemd` and
+creating `system/` there (sd_booted) in a private mount namespace.
+
+### project-linux-the-install-path-runs-no-synchronous-child
+
+The async installer (`Installer.install_owned`) runs on the daemon's event loop
+while the keyboard is grabbed. Every child on its path is an owned ProgramRunner
+child that re-admits the install deadline (`start_owned_child`): the updated
+wrapper's `--help` smoke (LUR-001) and the previous tree's
+`install/ownership.sh`, which hashes the whole payload (9 s natively on a real
+installed tree, found by `tests/hardware/phys_live_guest.sh`). What stays
+synchronous is in-process: `Ownership.verify` (about 0.25 s per call natively,
+three calls per install) and the moves. A new child on this path goes through
+`start_owned_child`, never `os.execute`; test it from a timer inside a running
+loop, because a child run before `uv.run` hides any stall.
+
+### project-linux-live-proof-host
+
+The cloud sandbox kernel has no uinput, no KVM and no systemd PID 1, so a
+systemd Docker container cannot host the live daemon either.
+`tests/hardware/run_phys_vm.sh` boots an Ubuntu cloud VM under QEMU (TCG without
+`/dev/kvm`, about 20 times slower: the first install takes about 25 minutes)
+and runs `phys_live_guest.sh` there. A loopback `HTTPS_PROXY` becomes
+`10.0.2.2` in the guest, and its apt sources must use https because the agent
+proxy refuses plain http with 405. On a GitHub-hosted Ubuntu runner the guest
+script runs directly as root.
+
 ### project-linux-device-descriptors-are-close-on-exec
 
 `EVIOCGRAB` and a uinput device belong to the open file, not to the daemon: the
@@ -57,6 +104,37 @@ variables" at load): new hook state goes into an existing table such as
 `_clipboard`), and `ergopti_hotstrings.lua`'s `main` is at the 60-upvalue
 ceiling: a new top-level local it reads breaks the load, so `require` inside
 the closure instead.
+
+A pointer's custody in a source transaction is its descriptor's open
+lifetime (the Reader's `same_open`), never its input generation: the layer's
+`ungrab` and a `SYN_DROPPED` renumber the slot, and judging the mouse by the
+generation once stopped the hook at the next device watchdog tick after the
+first wheel or button binding (`_source_recovery.member_custody`).
+
+### project-linux-container-proofs-model-the-kernel-at-libc
+
+A container kernel has no uinput: `tests/hardware/run_container_proofs.sh`
+runs the unchanged daemon with `virtual_kernel_preload.c` in `LD_PRELOAD`,
+FIFOs as `/dev/input/eventN` and a bind-mounted `/proc/bus/input/devices` in a
+private mount namespace. The model sits at libc because the hook's managed
+capture admits only the Reader's production FFI backend: a Lua `_set_backend`
+fake is refused ("original Reader authority is unavailable"), and swapping a
+Reader export breaks the hook's cold-construction pin. The shim must also catch
+libuv's `syscall(SYS_close)` and `syscall(SYS_statx)`, and drop `LD_PRELOAD`
+for the daemon's children. The AT-SPI client binds to the first bus it meets,
+so a multi-session proof reads AT-SPI in a child process. Locally, `python3`
+may lack gi: run with `PYTHON=python3.12`.
+
+### project-linux-x11-slave-switch-revokes-the-layout
+
+Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the
+core keyboard changes (XTEST, the daemon's virtual keyboard after a physical
+one). `adapters/xkb_source_probe.lua` bumps its source generation on every such
+notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group
+change, so after one switch `KeyboardLayout.is_ready()` stays false and every
+replacement takes the clipboard route. Xvfb fed by uinput never shows it (it
+reads no evdev); the container proofs show it with XTest and warm the XTEST
+slave before the daemon starts.
 
 ### project-linux-touchpad-gestures-share-the-touches-with-the-desktop
 
@@ -160,7 +238,7 @@ Alpine; LuaJIT needs `lua51-*` (Arch), `luajit-*` (openSUSE), `lua5.1-*`
 (Alpine, Fedora). Fedora has no LuaJIT lgi, so its WebKit windows cannot open
 (declared in the `first-install-distros` matrix). GNOME shows no tray icon
 without an AppIndicator extension. Action: prove installer changes with
-`tests/distro/run_in_docker.sh <image>` and the first-install matrix.
+`tests/hardware/run_in_docker.sh <image>` and the first-install matrix.
 
 ### project-linux-tap-holds-run-in-the-daemon
 
@@ -327,6 +405,21 @@ in some tab. Action: keep `adapters/file_manager_folder.lua` refusing every
 other owner, and prove a new file manager with
 `tests/hardware/run_file_manager_folder.sh`.
 
+### project-linux-key-combinations-two-files
+
+The Linux combinations owner (`modules/shortcuts/key_combinations.lua`) reads
+its pair taps, holds and switch from `config.toml` and `[mod_combos]` from the
+`tap_hold.toml` beside it, the shared file (`_shared/tap_hold/SCHEMA.md`).
+Every source receipt, guard and lease check carries a nested `chord` frame for
+the second file; compare frames with `same_source_frame`, never by path and
+content alone. The scopes publish `mod_combos.*` rows through the transaction's
+`companions` port (`_shared/lua/config_scope_transaction.lua`), prepared by
+`tap_hold_writer.prepare_combo_rows`: a companion is always read, published and
+backed up only when its candidate changes it. A test fixture that stubs
+`ConfigPaths.config` or a file port must keep `tap_hold.toml` beside
+`config.toml` and give the port a conditional remover, or the inverse of a
+publication that created the file cannot run.
+
 ## Linux native boundaries
 
 ### project-linux-absence-needs-enoent
@@ -362,6 +455,18 @@ predicate, and describe foreign error objects with `ErrorDescription`, never
 `nanosleep` after EINTR. libuv reports exit status and termination signal
 separately; a signal is a failure (SIGTERM is status 143), and ESRCH on a
 process group means already gone.
+
+### project-linux-webkit-takes-sigusr1
+
+WebKitGTK's JavaScriptCore suspends threads for its collector with SIGUSR1 and
+installs its handler over the daemon's ("Overriding existing handler for
+signal 10"), so the reload request (SIGUSR1) killed a daemon with a WebView
+open, SIGSEGV. `infra/signal_handlers.lua` `reserve_webkit_gc_signal()` sets
+`JSC_SIGNAL_FOR_GC=12` (SIGUSR2) at the top of `ergopti_hotstrings.lua`, before
+anything loads WebKit; verify with the process `SigCgt` mask
+(`tests/hardware/run_webkit_gc_signal.lua`). JSC still prints "invalid option:
+JSC*SIGNAL_FOR_GC=12": its option parser reads every `JSC*\*` variable, while
+WTF honours this one. A new signal the daemon handles must not be 12.
 
 ### project-linux-a-corrupt-store-moves-aside-without-replacing
 
@@ -486,16 +591,22 @@ native `getcwd` rather than `$PWD`, and the at-rest key falls back to
 ### project-linux-gio-hides-pac-failures
 
 GProxyResolverGnome (glib-networking 2.80, libproxy 0.5.4) answers
-`direct://` with no error for a PAC it could not download, and keeps only the
-first entry of a PAC answer (`PROXY a; DIRECT` reaches the driver as `a`
-alone, while libproxy's own `PX_FORCE_CONFIG` path returns both). So a lookup
-error never stands for an unreachable PAC on GNOME: a caller that must tell
-the two apart passes `pac_check_timeout_ms` to `adapters/system_proxy.lua`,
-and the lookup child downloads the GSettings `autoconfig-url` itself and
-reports `pac_unavailable = "native_pac_download"` beside the DIRECT answer.
-A PAC fallback walk cannot reach an entry GIO dropped. Container proofs of
-the managed runtime run as a normal user under `umask 022`: the resolver
-refuses group-writable ancestors and root-owned trees.
+`direct://` with no error for a PAC it could not download, and libproxy's
+answer parser keeps only the `METHOD host` entries of a PAC answer:
+`PROXY a; DIRECT` reaches GIO as `a` alone (both PROXY entries of
+`PROXY a; PROXY b` survive). So GIO can never stand for a PAC on GNOME: a
+caller that walks the list or must tell an unreachable PAC from DIRECT passes
+`pac_check_timeout_ms` to `adapters/system_proxy.lua`, and the lookup child
+skips GIO, downloads the GSettings `autoconfig-url` itself and evaluates it in
+the system Duktape (`platform/network/pac_runtime.lua`, SONAME in
+`linux_native_runtime.json` `network_runtime.pac_engine`) with the shared
+`pac_helpers.js`. A PAC it could not download answers DIRECT with
+`pac_unavailable = "native_pac_download"`; one that raises or breaks a bound is
+`proxy-pac-evaluation-failed` (stage `native_pac_evaluation`). The system
+engine has no execution-timeout hook: only the child's deadline bounds a
+script, so never run it in the daemon. Container proofs of the managed
+runtime run as a normal user; the resolver refuses root-owned trees and a
+group-writable ancestor unless its group is the user's private group.
 
 ### project-linux-ci-runner-prerequisites
 

@@ -55,7 +55,7 @@ helpers.describe("config watcher: a file the driver wrote is not a source edit",
 		end, {
 			base_dir = "/tmp/base",
 			ignored_dirs = { "/tmp/base/cache" },
-			self_written_files = { "/tmp/base/config/config.toml", "/tmp/base/config/config_karabiner.toml" },
+			self_written_files = { "/tmp/base/config/config.toml", "/tmp/base/config/tap_hold.toml" },
 		})
 	end
 
@@ -77,7 +77,7 @@ helpers.describe("config watcher: a file the driver wrote is not a source edit",
 
 	helpers.it("ignores the Karabiner config, rewritten on every regenerate", function()
 		with_watcher(function(w)
-			local hit = w.changed({ "/tmp/base/config/config_karabiner.toml" })
+			local hit = w.changed({ "/tmp/base/config/tap_hold.toml" })
 			helpers.assert_true(not hit,
 				"the Karabiner config is rewritten by the driver on every regenerate")
 		end)
@@ -121,7 +121,7 @@ helpers.describe("config watcher: init.lua supplies the self-written list", func
 		helpers.assert_true(call:find('MenuPaths.get("ConfigTomlPath")', 1, true) ~= nil,
 			"the config watcher must be told about config.toml — the file it rewrites on "
 				.. "every persisted preference change")
-		helpers.assert_true(call:find('MenuPaths.get("KarabinerConfigPath")', 1, true) ~= nil,
+		helpers.assert_true(call:find('MenuPaths.get("TapHoldConfigPath")', 1, true) ~= nil,
 			"and about the Karabiner config, rewritten on every regenerate")
 	end)
 

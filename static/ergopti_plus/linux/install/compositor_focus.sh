@@ -223,7 +223,7 @@ _remove_kwin() {
 case "${1:-}" in
 	install)
 		driver_root="${2:-}"
-		[ -d "$driver_root/desktop_focus" ] || { printf '%s\n' "[compositor_focus] code=no-source" >&2; exit 2; }
+		[ -d "$driver_root/desktop_focus" ] || { printf '[compositor_focus] code=no-source\n' >&2; exit 2; }
 		[[ "$DATA_HOME" == /* ]] || exit 0
 		[ -e /.flatpak-info ] && exit 0
 		if _desktop_is gnome; then _install_gnome "$driver_root"; fi
@@ -235,7 +235,9 @@ case "${1:-}" in
 		_remove_kwin
 		;;
 	*)
-		printf '%s\n' "usage: compositor_focus.sh install <driver-root> | remove" >&2
+		# Only install.sh, launch.sh and uninstall.sh call this helper: a wrong verb is
+		# their bug, reported as a record, not as a sentence for the user.
+		printf '[compositor_focus] code=usage\n' >&2
 		exit 2
 		;;
 esac

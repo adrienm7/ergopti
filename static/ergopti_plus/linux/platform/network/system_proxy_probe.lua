@@ -15,16 +15,23 @@ end
 --- and its retirement; the grabbed-keyboard process never calls GIO directly.
 --- GIO/libproxy acknowledges selection, not successful PAC retrieval or
 --- evaluation: a native DIRECT selection preserves that explicit limitation.
---- A caller that passes pac_check_timeout_ms learns when that DIRECT answer
---- stands for a GNOME-configured PAC the helper itself could not download.
+--- A caller that passes pac_check_timeout_ms gets a GNOME-configured PAC
+--- evaluated here instead: GIO and libproxy 0.5 keep only the "METHOD host"
+--- entries of a PAC answer ("PROXY a; DIRECT" reached the caller as `a`), so
+--- the helper downloads the PAC itself (direct, bounded by that timeout) and
+--- runs it in the system Duktape engine (platform/network/pac_runtime.lua),
+--- returning the complete ordered list. A PAC it could not download answers
+--- DIRECT with pac_unavailable = "native_pac_download"; a PAC that fails to
+--- evaluate is a proxy-pac-evaluation-failed refusal.
 --- ==============================================================================
 
 local shared_root = arg[1]
 if type(shared_root) ~= "string" or shared_root == "" then os.exit(2) end
 if literal_driver then
-	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "/lua", ".lua" } })
+	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "/lua", ".lua" },
+		{ shared_root .. "/lua", "/init.lua" } })
 else
-	package.path = shared_root .. "/lua/?.lua;" .. package.path
+	package.path = shared_root .. "/lua/?.lua;" .. shared_root .. "/lua/?/init.lua;" .. package.path
 end
 local Json = require("json")
 
@@ -49,9 +56,12 @@ end
 -- the parent's actual helper-exit ACK is the later kernel retirement boundary.
 local identity_owners = {}
 local NativeRuntime
+local PacRuntime
 if driver_root then
 	local loaded, module = pcall(require, "platform.network.native_proxy_runtime")
 	if loaded then NativeRuntime = module end
+	local pac_loaded, pac_module = pcall(require, "platform.network.pac_runtime")
+	if pac_loaded then PacRuntime = pac_module end
 end
 
 --- Emits one machine receipt without native diagnostic text or request bytes.
@@ -87,10 +97,127 @@ local function policy_limits()
 	return { max_selections = policy.max_selections, max_proxy_bytes = policy.max_proxy_bytes }
 end
 
+--- Reads one bounded shared file through the regular-file owner.
+--- @param relative string Path below the shared root.
+--- @param limit number Largest admitted size in bytes.
+--- @return string|nil bytes
+local function shared_file(relative, limit)
+	local loaded, reader = pcall(require, "infra.regular_file_reader")
+	if not loaded or type(reader) ~= "table" or type(reader.open_source) ~= "function" then return nil end
+	local file = reader.open_source(shared_root .. "/" .. relative)
+	if not file then return nil end
+	local read_ok, bytes = pcall(file.read, file, limit + 1)
+	local close_ok, closed = pcall(file.close, file)
+	if not read_ok or not close_ok or not closed or type(bytes) ~= "string" or #bytes > limit then return nil end
+	return bytes
+end
+
+--- The PAC bounds of the shared proxy policy (native_pac, redirects).
+--- @return table|nil limits
+local function pac_limits()
+	local bytes = shared_file("modules/network/proxy_policy.json", 32768)
+	local decoded, policy = pcall(Json.decode, bytes or "")
+	if not decoded or type(policy) ~= "table" or type(policy.native_pac) ~= "table"
+		or type(policy.redirects) ~= "table" then return nil end
+	local limits = {
+		max_script_bytes = policy.native_pac.max_script_bytes, max_heap_bytes = policy.native_pac.max_heap_bytes,
+		max_native_queries = policy.native_pac.max_native_queries, max_output_bytes = policy.max_proxy_bytes,
+		max_selections = policy.max_selections, max_redirects = policy.redirects.max_hops,
+	}
+	for _, value in pairs(limits) do
+		if type(value) ~= "number" or value < 1 or value % 1 ~= 0 then return nil end
+	end
+	return limits
+end
+
+--- Downloads the configured PAC once with the owned curl, without a proxy, as
+--- libproxy does, following at most the policy's redirects and never from
+--- https down to http. The address goes through curl's stdin config, never
+--- argv. The outer helper deadline owns this process; the native loop retains
+--- it until exit.
+--- @param url string The PAC address of the desktop settings.
+--- @param timeout_ms number Bound of the download.
+--- @param limits table pac_limits().
+--- @return string|nil body The response body of an HTTP 200, else nil.
+local function pac_download(url, timeout_ms, limits)
+	local loaded, uv = pcall(require, "luv")
+	if not loaded then return nil end
+	local stdin, stdout = uv.new_pipe(false), uv.new_pipe(false)
+	if not stdin or not stdout then
+		if stdin then uv.close(stdin) end
+		if stdout then uv.close(stdout) end
+		uv.run()
+		return nil
+	end
+	local secure = url:lower():match("^https://") ~= nil
+	local code, chunks, bytes, overflow = nil, {}, 0, false
+	-- The status follows the body as three digits ("000" when none came).
+	local process, pid = uv.spawn(require("infra.owned_programs").resolve("curl"), {
+		args = { "--disable", "--silent", "--noproxy", "*", "--location",
+			"--max-redirs", tostring(limits.max_redirects), "--proto", "=http,https",
+			"--proto-redir", secure and "=https" or "=http,https",
+			"--max-filesize", tostring(limits.max_script_bytes),
+			"--max-time", string.format("%.3f", timeout_ms / 1000),
+			"--write-out", "%{http_code}", "--config", "-" },
+		stdio = { stdin, stdout, nil },
+	}, function(exit_code, signal)
+		code = signal == 0 and exit_code or -1
+	end)
+	if not process then uv.close(stdin); uv.close(stdout); uv.run(); return nil end
+	uv.read_start(stdout, function(native_error, chunk)
+		if native_error or not chunk then uv.close(stdout); return end
+		bytes = bytes + #chunk
+		if bytes > limits.max_script_bytes + 3 then
+			overflow = true
+			uv.kill(pid, "sigkill")
+			uv.close(stdout)
+			return
+		end
+		chunks[#chunks + 1] = chunk
+	end)
+	local quoted = url:gsub("\\", "\\\\"):gsub('"', '\\"')
+	uv.write(stdin, 'url = "' .. quoted .. '"\n', function() uv.close(stdin) end)
+	uv.run()
+	uv.close(process)
+	uv.run()
+	local output = table.concat(chunks)
+	if code ~= 0 or overflow or #output < 3 or output:sub(-3) ~= "200" then return nil end
+	return output:sub(1, -4)
+end
+
+--- Evaluates the GNOME-configured PAC for one destination.
+--- @param url string Destination URL.
+--- @param pac_url string PAC address of the desktop settings.
+--- @param timeout_ms number Bound of the PAC download.
+--- @param backend string Observed resolver type.
+--- @return table receipt
+local function pac_lookup(url, pac_url, timeout_ms, backend)
+	local limits = pac_limits()
+	local helpers = limits and shared_file("modules/network/pac_helpers.js", limits.max_script_bytes)
+	local judged, PacCheck = pcall(require, "network.pac_check")
+	if not limits or not helpers or not judged or not PacRuntime then
+		return { ok = false, error = "proxy-policy-unavailable", backend = backend }
+	end
+	local body = pac_download(pac_url, timeout_ms, limits)
+	local script = body and PacCheck.decode(body)
+	if not script then
+		return {
+			ok = true, proxies = { "direct://" }, backend = backend, acknowledgement = "native-selection",
+			failure_provenance = "unavailable", pac_unavailable = "native_pac_download",
+		}
+	end
+	local proxies, refusal = PacRuntime.evaluate(script, helpers, url, limits)
+	if not proxies then return { ok = false, error = refusal, backend = backend } end
+	return {
+		ok = true, proxies = proxies, backend = backend, acknowledgement = "native-selection",
+		failure_provenance = "unavailable",
+	}
+end
+
 --- Performs the actual system lookup and frees every native result allocation.
 --- @param url string
 --- @return table
-local function lookup(url, exclusions)
+local function lookup(url, exclusions, pac_timeout_ms)
 	local limits = policy_limits()
 	if not limits then return { ok = false, error = "proxy-policy-unavailable" } end
 	local native = native_backend()
@@ -108,6 +235,16 @@ local function lookup(url, exclusions)
 	end
 	local resolver, backend, refusal = NativeRuntime.default_resolver(native)
 	if not resolver then return { ok = false, error = refusal, backend = backend } end
+	-- GProxyResolverGnome keeps only the "METHOD host" entries of a PAC answer
+	-- and answers DIRECT, with no error, for a PAC it could not download (glib-
+	-- networking 2.80, libproxy 0.5): a caller that asked gets the configured
+	-- PAC evaluated here, complete, and is told when it could not be
+	-- downloaded, so it walks the list and logs the unusable PAC as macOS and
+	-- Windows do. Other backends name no PAC address this helper can read.
+	if pac_timeout_ms and backend == "GProxyResolverGnome" then
+		local pac_url = NativeRuntime.configured_pac_url(native)
+		if pac_url then return pac_lookup(url, pac_url, pac_timeout_ms, backend) end
+	end
 	local error_slot = ffi.new("ErgoptiProxyError *[1]")
 	local proxies = native.gio.g_proxy_resolver_lookup(resolver, url, nil, error_slot)
 	local native_error = error_slot[0]
@@ -256,35 +393,6 @@ local function curl_capabilities()
 	}
 end
 
---- Downloads the configured PAC once with the owned curl, without a proxy, as
---- libproxy does, to tell a PAC it could not fetch from one that said DIRECT.
---- The address goes through curl's stdin config, never argv. The outer helper
---- deadline owns this process; the native loop retains it until exit.
---- @param url string The PAC address of the desktop settings.
---- @param timeout_ms number Bound of the download.
---- @return boolean downloaded
-local function pac_downloadable(url, timeout_ms)
-	local loaded, uv = pcall(require, "luv")
-	if not loaded then return false end
-	local stdin = uv.new_pipe(false)
-	if not stdin then return false end
-	local code
-	local process = uv.spawn(require("infra.owned_programs").resolve("curl"), {
-		args = { "--disable", "--silent", "--fail", "--noproxy", "*", "--output", "/dev/null",
-			"--max-time", string.format("%.3f", timeout_ms / 1000), "--config", "-" },
-		stdio = { stdin, nil, nil },
-	}, function(exit_code, signal)
-		code = signal == 0 and exit_code or -1
-	end)
-	if not process then uv.close(stdin); uv.run(); return false end
-	local quoted = url:gsub("\\", "\\\\"):gsub('"', '\\"')
-	uv.write(stdin, 'url = "' .. quoted .. '"\n', function() uv.close(stdin) end)
-	uv.run()
-	uv.close(process)
-	uv.run()
-	return code == 0
-end
-
 -- Bounded stdin keeps the destination and any signed query out of argv, logs
 -- and temporary files. The HTTP owner admits schemes before this native seam.
 local bytes = io.stdin:read(65537)
@@ -294,18 +402,14 @@ if not decoded or type(request) ~= "table" or type(request.url) ~= "string"
 	emit({ ok = false, error = "proxy-request-invalid" })
 	os.exit(0)
 end
-local succeeded, receipt = pcall(lookup, request.url, request.environment_exclusions)
--- GProxyResolverGnome answers DIRECT, with no error, for a PAC libproxy could
--- not download (glib-networking 2.80, libproxy 0.5): a caller that asked is
--- told, so it can log the unusable PAC as macOS and Windows do. Other backends
--- name no PAC address this helper can read and are left as they answered.
+-- A caller that passes pac_check_timeout_ms bounds the PAC download with it;
+-- the parent adapter admits it against timings adapters.proxy_pac_download_max_ms.
 local pac_check_ms = request.pac_check_timeout_ms
-if succeeded and receipt.ok and type(pac_check_ms) == "number" and pac_check_ms >= 1 and pac_check_ms <= 60000
-	and receipt.backend == "GProxyResolverGnome" and #receipt.proxies == 1 and receipt.proxies[1] == "direct://" then
-	local native = native_backend()
-	local read, pac_url = pcall(function() return native and NativeRuntime.configured_pac_url(native) end)
-	if read and pac_url and not pac_downloadable(pac_url, pac_check_ms) then receipt.pac_unavailable = "native_pac_download" end
+if pac_check_ms ~= nil and (type(pac_check_ms) ~= "number" or pac_check_ms < 1 or pac_check_ms % 1 ~= 0) then
+	emit({ ok = false, error = "proxy-request-invalid" })
+	os.exit(0)
 end
+local succeeded, receipt = pcall(lookup, request.url, request.environment_exclusions, pac_check_ms)
 if succeeded and request.probe_curl == true then
 	local probed, capabilities = pcall(curl_capabilities)
 	receipt.curl_capabilities = probed and capabilities or { proxy_used = false }

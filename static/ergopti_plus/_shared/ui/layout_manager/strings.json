@@ -2,6 +2,7 @@
 	"_comment": "Every locale key the layout manager page shows (index.html data-i18n, script.js). The three hosts send exactly these strings with initData; tools/test/test-layout-manager-page.cjs keeps this list equal to what the page uses.",
 	"keys": [
 		"layout_manager.window_title",
+		"layout_editor.open_from_manager",
 		"layout_manager.subtitle",
 		"layout_manager.btn_refresh",
 		"layout_manager.btn_close",

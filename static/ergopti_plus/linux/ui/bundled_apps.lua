@@ -18,6 +18,9 @@
 ---    same program. The entry is rewritten at each opening, because the
 ---    interpreter and module paths it records move with an update (an AppImage
 ---    mounts at a new path on every run).
+--- 3. One environment for both starts (app_environment): the tray's child and
+---    the desktop entry's launcher get the daemon's module paths and private
+---    runtime, which the daemon holds in package.path, not in its environment.
 --- ==============================================================================
 
 local M = {}
@@ -48,10 +51,15 @@ local DEFAULT_DEPS = {
 	text = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
 	data_home = function() return require("infra.config_paths").data_home() end,
-	spawn = function(executable, args, on_exit)
+	-- `environment` overrides the daemon's own variables of the same name.
+	spawn = function(executable, args, environment, on_exit)
 		local uv = require("luv")
+		local merged, env = {}, {}
+		for name, value in pairs(uv.os_environ()) do merged[name] = value end
+		for _, pair in ipairs(environment) do merged[pair[1]] = pair[2] end
+		for name, value in pairs(merged) do env[#env + 1] = name .. "=" .. value end
 		local handle
-		handle = uv.spawn(executable, { args = args, detached = true, stdio = { nil, nil, nil } }, function(code)
+		handle = uv.spawn(executable, { args = args, env = env, detached = true, stdio = { nil, nil, nil } }, function(code)
 			M._children[handle] = nil
 			if handle and not handle:is_closing() then handle:close() end
 			on_exit(code)
@@ -98,6 +106,23 @@ local function app_words(app, deps)
 	return words
 end
 
+--- The environment an app needs beyond the daemon's own: the daemon's module
+--- paths and private runtime, as ordered { name, value } pairs. The daemon
+--- sets its package.path itself (ergopti_hotstrings.lua) and exports no
+--- LUA_PATH, so an app started without these could not load one module of
+--- its own (tests/hardware/desktop/run_encryptor.sh).
+--- @param deps table
+--- @return table pairs
+function M.app_environment(deps)
+	local pairs_list = { { "LUA_PATH", package.path }, { "LUA_CPATH", package.cpath } }
+	for _, name in ipairs({ "ERGOPTI_RUNTIME_PREFIX", "ERGOPTI_LITERAL_DRIVER_ROOT", "ERGOPTI_LITERAL_SHARED_ROOT",
+		"ERGOPTI_LITERAL_DIRECT", "ERGOPTI_LITERAL_NATIVE_MODULES" }) do
+		local value = deps.getenv(name)
+		if value and value ~= "" then pairs_list[#pairs_list + 1] = { name, value } end
+	end
+	return pairs_list
+end
+
 --- The sh launcher a desktop entry runs: the daemon's interpreter, module
 --- paths and private runtime, then the app with the files it is given.
 --- @param executable string
@@ -106,12 +131,8 @@ end
 --- @return string text
 function M.launcher_text(executable, words, deps)
 	local lines = { "#!/bin/sh", "# Ergopti bundled app launcher, rewritten each time the tray opens the app." }
-	lines[#lines + 1] = "export LUA_PATH=" .. quote(package.path)
-	lines[#lines + 1] = "export LUA_CPATH=" .. quote(package.cpath)
-	for _, name in ipairs({ "ERGOPTI_RUNTIME_PREFIX", "ERGOPTI_LITERAL_DRIVER_ROOT", "ERGOPTI_LITERAL_SHARED_ROOT",
-		"ERGOPTI_LITERAL_DIRECT", "ERGOPTI_LITERAL_NATIVE_MODULES" }) do
-		local value = deps.getenv(name)
-		if value and value ~= "" then lines[#lines + 1] = "export " .. name .. "=" .. quote(value) end
+	for _, pair in ipairs(M.app_environment(deps)) do
+		lines[#lines + 1] = "export " .. pair[1] .. "=" .. quote(pair[2])
 	end
 	local exec = "exec " .. quote(executable)
 	for _, word in ipairs(words) do exec = exec .. " " .. quote(word) end
@@ -157,7 +178,7 @@ function M.launch(app, deps)
 		Logger.warn(LOG, "The desktop entry of '%s' could not be written.", app.name)
 	end
 	Logger.start(LOG, "Opening bundled app '%s'…", app.name)
-	local started = deps.spawn(executable, words, function(code)
+	local started = deps.spawn(executable, words, M.app_environment(deps), function(code)
 		if code ~= 0 then Logger.error(LOG, "Bundled app '%s' exited %s.", app.name, tostring(code)) end
 	end)
 	if not started then

@@ -244,6 +244,32 @@ helpers.describe("managed_http: actual public ownership sequencing", function()
 		helpers.assert_eq(results[1].body, "accepted")
 	end)
 
+	-- (linux-pac-evaluation) GIO drops the DIRECT entries of a PAC answer, so the
+	-- lookup child must be asked to evaluate a desktop PAC itself.
+	helpers.it("asks the lookup child to evaluate the PAC within the remaining budget", function()
+		local coordinator, state = fresh()
+		start(coordinator)
+		helpers.assert_eq(state.proxy[1].options.pac_check_timeout_ms, 1000)
+		local long_coordinator, long_state = fresh()
+		start(long_coordinator, { timeout_ms = 600000 })
+		helpers.assert_eq(long_state.proxy[1].options.pac_check_timeout_ms,
+			require("infra.timings").ms("adapters", "proxy_pac_download_max_ms"))
+	end)
+
+	helpers.it("walks a dead first relay of the evaluated PAC on to DIRECT", function()
+		local coordinator, state = fresh()
+		local operation, results = start(coordinator)
+		local receipt = selection()
+		receipt.proxies = { "http://first.invalid:81", "direct://" }
+		state.proxy[1].ack(receipt)
+		helpers.assert_eq(state.curls[1].options.proxy_selection.proxy, "http://first.invalid:81")
+		state.curls[1].ack(refused_proxy())
+		helpers.assert_eq(state.curls[2].options.proxy_selection.mode, "direct")
+		state.curls[2].ack({ ok = true, status = 200, body = "accepted" })
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(results[1].body, "accepted")
+	end)
+
 	helpers.it("queues a boolean successor without starting it before exact predecessor retirement", function()
 		local coordinator, state = fresh()
 		state.environment.HTTPS_PROXY = "http://environment.invalid:81"

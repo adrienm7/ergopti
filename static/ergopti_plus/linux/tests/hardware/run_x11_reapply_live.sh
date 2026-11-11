@@ -31,7 +31,7 @@ case "${DESKTOP}" in gnome | kde) ;; *)
 esac
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "ENVIRONMENT: $1 is missing" >&2; exit 2; }; }
-for tool in Xvfb xkbcomp setxkbmap xinput dbus-launch gdbus python3; do need "${tool}"; done
+need Xvfb; need xkbcomp; need setxkbmap; need xinput; need dbus-launch; need gdbus; need python3
 
 INSTALLER_DIR="$(cd ../../ergopti/linux/xkb_installation && pwd)"
 SCRATCH="$(mktemp -d /tmp/ergopti-x11-reapply-XXXXXX)"

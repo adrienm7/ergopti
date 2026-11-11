@@ -1,11 +1,11 @@
 --- tests/unit/platform/remap/config/test_config_corrupt_toml_write_guard.lua
 
 --- ==============================================================================
---- MODULE: config_karabiner.toml Corruption Guard — Write Path
+--- MODULE: tap_hold.toml Corruption Guard — Write Path
 --- DESCRIPTION:
 --- Regression guard for the half of the corruption fix that was missing: the
 --- READ path already falls back to defaults without touching an unparseable
---- config_karabiner.toml, but save_user_config() overwrote it anyway, so the
+--- tap_hold.toml, but save_user_config() overwrote it anyway, so the
 --- next setter the user touched (a tap action, a timeout, the on/off toggle)
 --- destroyed the still-repairable file. Losing the data on the WRITE path made
 --- the read-path refusal pointless.
@@ -236,7 +236,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		helpers.assert_eq(saved, true, "a first-launch save must succeed")
 		helpers.assert_true(write_assertion,
 			"first-launch publication must carry a proven-absent source precondition")
-		helpers.assert_true(payload ~= nil and payload:find("[tap_holds", 1, true) ~= nil,
+		helpers.assert_true(payload ~= nil and payload:find("[tap_hold", 1, true) ~= nil,
 			"the encoded TOML must reach the atomic adapter on first launch")
 	end)
 

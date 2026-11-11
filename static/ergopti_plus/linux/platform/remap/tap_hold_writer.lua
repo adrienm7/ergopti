@@ -45,13 +45,14 @@ local Shapes = require("platform.remap.tap_hold_shapes")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Migration = require("platform.remap.tap_hold_migration")
 local Paths = require("infra.paths")
+local NativePath = require("native_path")
 local ConfigKeys = require("config_keys")
 local LoneTap = require("tap_hold.lone_tap")
 
 local LOG = "platform.remap.tap_hold_writer"
 
 --- The user file's name in the configuration folder.
-M.FILE_NAME = "tap_hold.toml"
+M.FILE_NAME = require("tap_hold.shared_file").FILE_NAME
 
 -- The Windows loader's bound for time_activation_seconds.
 local MAX_THRESHOLD_SECONDS = 10
@@ -60,12 +61,19 @@ local MAX_THRESHOLD_SECONDS = 10
 -- only ever written when the user sets it: no key ships one.
 local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", ConfigKeys.LEAF.TIME_ACTIVATION_SECONDS }
 
+-- The macOS-only hold of the shared file (_shared/tap_hold/SCHEMA.md): a hold
+-- chosen here replaces it, so every driver holds what the user just chose.
+local FOREIGN_HOLD_FIELD = "hold_action"
+
 -- The [tap_hold] field of the lone modifier tap window (the loader's).
 local LONE_TAP_FIELD = require("platform.remap.tap_hold_loader").LONE_TAP_FIELD
 
 -- The manifest rows under tap_holds that tap_hold.toml's [tap_hold] owns.
 local SCOPE_ROW_FIELDS = { enabled = true, [LONE_TAP_FIELD] = true }
 local ONE_SHOT_TIMEOUT_FIELD = require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_FIELD
+
+-- The key combinations' section of the shared file (_shared/tap_hold/SCHEMA.md).
+local COMBOS_SECTION = ConfigKeys.KEY.MOD_COMBOS
 
 local HEADER = {
 	"# tap_hold.toml — written by the Ergopti+ tray menu.",
@@ -112,10 +120,11 @@ end
 --- Copies a file's bytes to a new backup beside it, then reads them back.
 --- @param path string The file being replaced.
 --- @param text string Its bytes.
+--- @param label string|nil What the backup is for, in its name; the [tap_holds] section by default.
 --- @return string|nil backup The backup path, nil when it could not be made.
-local function back_up(path, text)
+local function back_up(path, text, label)
 	_backup_sequence = _backup_sequence + 1
-	local backup = string.format("%s.tap_holds-%s-%d.bak", path, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
+	local backup = string.format("%s.%s-%s-%d.bak", path, label or ConfigKeys.KEY.TAP_HOLDS, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
 	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, backup, "wx")
 	if not opened or not fh then return nil end
 	if type(remove_owned) ~= "function" or type(current_image) ~= "function" then
@@ -420,6 +429,7 @@ local function clear_owned_keys(tap_hold, preset, shapes)
 		local entry = tap_hold.keys[key_id]
 		if Shapes.is_table(entry, shapes) then
 			for _, field in ipairs(OWNED_KEY_FIELDS) do entry[field] = nil end
+			entry[FOREIGN_HOLD_FIELD] = nil
 			if next(entry) == nil then tap_hold.keys[key_id] = nil end
 		end
 	end
@@ -507,6 +517,7 @@ function M.set_hold(key_id, kind, id)
 	local in_force, saved = save_and_reload(key_id .. " hold = " .. kind .. ":" .. canonical, function(document, shapes)
 		local entry = key_entry(document, key_id, shapes)
 		entry.hold_modifier, entry.hold_layer, entry.enabled = nil, nil, nil
+		entry[FOREIGN_HOLD_FIELD] = nil
 		if kind == "layer" then
 			entry.hold_layer = canonical
 		elseif kind == "modifier" then
@@ -538,6 +549,7 @@ function M.set_native(key_id)
 	return commit(key_id .. " native", function(document, shapes)
 		local entry = key_entry(document, key_id, shapes)
 		entry.tap_action, entry.hold_modifier, entry.hold_layer, entry.enabled = "", "", nil, nil
+		entry[FOREIGN_HOLD_FIELD] = nil
 	end)
 end
 
@@ -830,6 +842,199 @@ function M.migrate_file(path)
 	Logger.success(LOG, "Migrated '%s' from schema v%s to v%s; backup at '%s'.", path, tostring(detail),
 		tostring(Migration.registry().current), backup)
 	return "migrated", backup
+end
+
+--- The rows a key-combination scope publishes in tap_hold.toml, prepared as
+--- one line-preserving candidate (_shared/tap_hold/SCHEMA.md: `[mod_combos]`
+--- lives in this file on every driver). Only `[mod_combos]` leaves are
+--- accepted. The file is versioned first, as every write of this writer: a
+--- file this build cannot version is refused, an older one is migrated in the
+--- same candidate, a new one is stamped. Nothing is written here; the scope
+--- transaction backs the file up, publishes it and owns its inverse.
+--- @param path string The user's tap_hold.toml.
+--- @param rows table Dense set/delete rows under `mod_combos`.
+--- @param files table|nil Classified file adapter of the transaction.
+--- @return boolean prepared
+--- @return string|nil detail Why the rows were refused.
+--- @return string|nil candidate The complete candidate bytes.
+--- @return table|nil source The exact source `{ status, content }` it was prepared from.
+function M.prepare_combo_rows(path, rows, files)
+	if type(path) ~= "string" or path == "" or type(rows) ~= "table" then
+		return false, "key-combination rows need tap_hold.toml and a row array"
+	end
+	for _, row in ipairs(rows) do
+		local section = type(row) == "table" and row.section or nil
+		if type(section) ~= "string" or (section ~= COMBOS_SECTION and section:sub(1, #COMBOS_SECTION + 1) ~= COMBOS_SECTION .. ".") then
+			return false, "tap_hold.toml accepts only [" .. COMBOS_SECTION .. "] rows from a key-combination scope"
+		end
+	end
+	local text, status, detail = TomlWriter.read_classified(path, files)
+	if status ~= "ok" and status ~= "absent" then return false, "tap_hold.toml is unreadable: " .. tostring(detail) end
+	local source = { status = status, content = status == "ok" and text or nil }
+	local base, stamp = text or "", nil
+	if status == "ok" then
+		local document, shapes = TomlCodec.decode_with_shapes(text)
+		if type(document) ~= "table" then return false, "tap_hold.toml does not parse; it is never overwritten" end
+		local outcome, version, operations = Migration.file_operations(document, shapes, retired_delays())
+		if outcome == "newer" then
+			return false, "tap_hold.toml was saved by a newer build (schema v" .. tostring(version) .. ")"
+		end
+		if outcome == "invalid" then return false, "tap_hold.toml has an unusable version stamp: " .. tostring(version) end
+		if outcome == "migrated" then
+			local plan = require("config_migrate").plan_operations(text, operations)
+			if plan.outcome ~= "migrated" then
+				return false, "tap_hold.toml cannot be migrated in place: " .. tostring(plan.detail or plan.outcome)
+			end
+			base = plan.candidate
+		end
+	else
+		stamp = { section = Migration.META_SECTION, key = Migration.VERSION_KEY, value = Migration.registry().current }
+	end
+	if #rows == 0 then return true, nil, base, source end
+	-- The batch editor reads its source through the adapter: it is handed the
+	-- versioned bytes, and the caller keeps the exact source it was read from.
+	local versioned = {
+		read_with_status = function(target)
+			if target ~= path then return nil, "error", "tap_hold.toml preparation reads only its own file" end
+			if status == "absent" then return nil, "absent" end
+			return base, "ok"
+		end,
+	}
+	local function render(batch)
+		local prepared, why, candidate = TomlWriter.prepare_batch(path, batch, versioned,
+			status == "ok" and { status = "ok", content = base } or { status = "absent" })
+		if prepared ~= true or type(candidate) ~= "string" then return nil, "tap_hold.toml rows refused: " .. tostring(why) end
+		return candidate
+	end
+	local candidate, why = render(rows)
+	if not candidate then return false, why end
+	-- Rows that leave an absent file empty (a clear's sparse deletes) create no
+	-- file; a file they do create carries the version stamp.
+	if stamp and candidate ~= "" then
+		local batch = {}
+		for index, row in ipairs(rows) do batch[index] = row end
+		batch[#batch + 1] = stamp
+		candidate, why = render(batch)
+		if not candidate then return false, why end
+	end
+	if type(TomlCodec.decode(candidate)) ~= "table" then return false, "tap_hold.toml candidate does not parse" end
+	return true, nil, candidate, source
+end
+
+--- Whether a TOML value equals another, arrays and inline tables included.
+--- @param left any
+--- @param right any
+--- @return boolean
+local function same_value(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then return left == right end
+	for key, value in pairs(left) do if not same_value(value, right[key]) then return false end end
+	for key in pairs(right) do if left[key] == nil then return false end end
+	return true
+end
+
+--- The leaf a `{ section, key }` row names in a decoded document, or nil.
+--- @param document table
+--- @param row table
+--- @return any
+local function leaf(document, row)
+	local node = document
+	for _, segment in ipairs(require("toml_codec.key_path").parse(row.section, true) or {}) do
+		if type(node) ~= "table" then return nil end
+		node = node[segment]
+	end
+	if type(node) ~= "table" then return nil end
+	return node[row.key]
+end
+
+--- Carries config.toml's `[mod_combos]` over to tap_hold.toml once, at boot,
+--- after migrate_file() versioned tap_hold.toml (migrations.toml
+--- `[legacy_imports.linux]`, translation `config_section`). The section moves
+--- as it is. Both files get a byte-exact backup first; tap_hold.toml is
+--- published first, then the section is deleted from config.toml line by line.
+--- A crash between the two leaves both copies equal: the next boot finds them
+--- equal and only deletes the old one. When tap_hold.toml already holds a
+--- different `[mod_combos]`, the shared file wins and config.toml is left as
+--- it is (ERROR logged: its copy is not read).
+--- @param config_path string The user's config.toml.
+--- @param path string The user's tap_hold.toml.
+--- @return string status "none" (no section, or an empty one), "imported", "completed"
+---   (an interrupted import finished), "kept" (tap_hold.toml wins) or "failed".
+--- @return string|nil detail Why it failed or was kept.
+function M.import_config_combos(config_path, path)
+	if type(config_path) ~= "string" or config_path == "" or type(path) ~= "string" or path == "" then
+		error("the key-combination import requires both paths", 2)
+	end
+	local spec = Migration.registry().legacy_imports.linux
+	if type(spec) ~= "table" or spec.translate ~= "config_section" or spec.section ~= COMBOS_SECTION
+		or NativePath.basename(config_path) ~= spec.source then
+		error("migrations.toml [legacy_imports.linux] does not move config.toml's [" .. COMBOS_SECTION .. "]", 0)
+	end
+	local text, status, detail = TomlWriter.read_classified(config_path)
+	if status == "absent" then return "none" end
+	if status ~= "ok" then
+		Logger.error(LOG, "'%s' is unreadable (%s) — its key combinations are not carried over.", config_path, tostring(detail))
+		return "failed", tostring(detail)
+	end
+	local document, shapes = TomlCodec.decode_with_shapes(text)
+	if type(document) ~= "table" then
+		Logger.error(LOG, "'%s' does not parse — its key combinations are not carried over.", config_path)
+		return "failed", "malformed"
+	end
+	local rows, deletes, why = require("tap_hold.migrate").from_config_section(document, spec.section,
+		function(value) return Shapes.is_table(value, shapes) end)
+	if why then
+		Logger.error(LOG, "'%s' cannot carry its key combinations over: %s.", config_path, why)
+		return "failed", why
+	end
+	-- An empty [mod_combos] carries nothing and is never read: it stays as it is.
+	if rows == nil or #rows == 0 then return "none" end
+	Logger.start(LOG, "Carrying the key combinations of '%s' over to '%s'…", config_path, path)
+	local current, read_err, current_text = read_document(path)
+	if not current then
+		Logger.error(LOG, "'%s' is %s — the key combinations stay in '%s'.", path, tostring(read_err), config_path)
+		return "failed", tostring(read_err)
+	end
+	local copied = true
+	for _, row in ipairs(rows) do
+		if not same_value(leaf(current, row), row.value) then copied = false end
+	end
+	local outcome = copied and "completed" or "imported"
+	if not copied then
+		if current[COMBOS_SECTION] ~= nil then
+			Logger.error(LOG, "'%s' already holds its own [%s]: it wins, and the copy left in '%s' is not read.",
+				path, COMBOS_SECTION, config_path)
+			return "kept", "tap_hold.toml already holds its own key combinations"
+		end
+		local prepared, refusal, candidate, source = M.prepare_combo_rows(path, rows)
+		if prepared ~= true then
+			Logger.error(LOG, "The key combinations of '%s' cannot be written to '%s' (%s).", config_path, path, tostring(refusal))
+			return "failed", tostring(refusal)
+		end
+		if source.status == "ok" and not back_up(path, current_text, COMBOS_SECTION) then
+			Logger.error(LOG, "'%s' could not be backed up — the key combinations stay in '%s'.", path, config_path)
+			return "failed", "'" .. path .. "' could not be backed up"
+		end
+		local published, publish_err = TomlWriter.publish_if_unchanged(path, candidate, nil, source)
+		if published ~= true then
+			Logger.error(LOG, "'%s' could not be published (%s) — the key combinations stay in '%s'.",
+				path, tostring(publish_err), config_path)
+			return "failed", tostring(publish_err)
+		end
+	end
+	local plan = require("config_migrate").plan_operations(text, deletes)
+	local backup = plan.outcome == "migrated" and back_up(config_path, text, COMBOS_SECTION) or nil
+	local removed, remove_err = false, plan.detail or plan.outcome
+	if backup then
+		removed, remove_err = TomlWriter.publish_if_unchanged(config_path, plan.candidate, nil, { status = "ok", content = text })
+	end
+	if removed ~= true then
+		-- tap_hold.toml holds the same section: the next boot only retries this delete.
+		Logger.error(LOG, "[%s] could not be removed from '%s' (%s); it is not read, and the next start retries.",
+			COMBOS_SECTION, config_path, tostring(remove_err or "backup refused"))
+		return "failed", tostring(remove_err or "backup refused")
+	end
+	Logger.success(LOG, "Key combinations carried over to '%s'; '%s' backed up at '%s'.", path, config_path, backup)
+	return outcome
 end
 
 --- Whether the user's file names this key.

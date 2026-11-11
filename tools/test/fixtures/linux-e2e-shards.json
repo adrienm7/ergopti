@@ -35,6 +35,8 @@
 			"Qualify actual cursor-display window switching",
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
 			"Detect and read the keymap on a real X11 and a real Wayland",
+			"Install prerequisites for The container proofs",
+			"The container proofs",
 			"Install prerequisites for Load the number-row options into a real X server",
 			"Load the number-row options into a real X server",
 			"Restart the daemon through the local reload control",
@@ -68,6 +70,7 @@
 			"Preserve literal desktop notification text",
 			"The webview push reaches a real WebKit page",
 			"A page's own request is answered in real WebKit",
+			"The reload signal survives an in-process WebView",
 			"Typing NONE clears actual WebKit rows and retains ALL controls",
 			"Install prerequisites for The release list window lists GitHub's releases in real WebKit",
 			"The release list window lists GitHub's releases in real WebKit",
@@ -309,6 +312,7 @@
 		],
 		"The webview push reaches a real WebKit page": ["Install WebKit2GTK and lgi"],
 		"A page's own request is answered in real WebKit": ["Install WebKit2GTK and lgi"],
+		"The reload signal survives an in-process WebView": ["Install WebKit2GTK and lgi"],
 		"Typing NONE clears actual WebKit rows and retains ALL controls": [
 			"Install WebKit2GTK and lgi"
 		],
@@ -350,6 +354,7 @@
 		"Detect and read the keymap on a real X11 and a real Wayland": [
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland"
 		],
+		"The container proofs": ["Install prerequisites for The container proofs"],
 		"Load the number-row options into a real X server": [
 			"Install prerequisites for Load the number-row options into a real X server"
 		],

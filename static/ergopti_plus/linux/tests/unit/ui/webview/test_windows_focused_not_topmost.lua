@@ -8,7 +8,10 @@
 --- user opens afterwards. Drives the real GTK constructor and the real re-open
 --- path against a recording Gtk.Window: the window is a TOPLEVEL, present()
 --- raises it on open and on re-open, and nothing ever asks the window manager
---- to keep it above (set_keep_above, a floating type hint, stick).
+--- to keep it above (set_keep_above, a floating type hint, stick). On Wayland
+--- a re-open maps the window anew before present(): a mapped window's
+--- present() without an activation token left a covered page covered on
+--- GNOME Shell (tests/hardware/desktop/run_window_toggle.sh).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -18,8 +21,10 @@ local ON_TOP_METHODS = { "set_keep_above", "set_type_hint", "stick", "set_transi
 
 --- Runs one scenario with the real webview manager over a recording GTK.
 --- @param scenario function(manager, windows) Behavioural assertions.
-local function with_gtk(scenario)
+--- @param session string|nil The display server kind; X11 when nil.
+local function with_gtk(scenario, session)
 	local names = { "lgi", "ui.webview_manager", "infra.i18n", "adapters.event_loop" }
+	local DisplayServer = require("infra.display_server")
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, failure = xpcall(function()
@@ -33,6 +38,7 @@ local function with_gtk(scenario)
 						return function(_, ...)
 							self.calls[#self.calls + 1] = { name = key, args = { ... } }
 							if key == "show_all" then rawset(self, "visible", true) end
+							if key == "hide" then rawset(self, "visible", false) end
 						end
 					end })
 					windows[#windows + 1] = window
@@ -66,8 +72,10 @@ local function with_gtk(scenario)
 		package.loaded["ui.webview_manager"] = nil
 		local manager = require("ui.webview_manager")
 		manager.init()
+		DisplayServer._set_for_test(session or DisplayServer.X11, "")
 		scenario(manager, windows)
 	end, debug.traceback)
+	DisplayServer._set_for_test(nil, nil)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(failure, 0) end
 end
@@ -125,6 +133,19 @@ helpers.describe("ui-focus-not-topmost: GTK windows (Linux)", function()
 			helpers.assert_eq(count(window, "show_all"), 1, "a visible window is not mapped twice")
 			assert_never_on_top(window)
 		end)
+	end)
+
+	helpers.it("maps a covered Wayland window anew before raising it (ui-focus-not-topmost)", function()
+		with_gtk(function(manager, windows)
+			create(manager, "healthcheck")
+			manager._focus_gtk_window("healthcheck")
+			local window = windows[1]
+			helpers.assert_eq(count(window, "hide"), 1, "the mapped window is unmapped once")
+			helpers.assert_eq(count(window, "show_all"), 2, "then mapped again, so GNOME focuses it")
+			helpers.assert_eq(count(window, "present"), 2)
+			helpers.assert_eq(window.calls[#window.calls].name, "present", "present() comes after the new map")
+			assert_never_on_top(window)
+		end, "wayland")
 	end)
 
 	helpers.it("shows the error window without taking the keyboard or staying above (ui-focus-not-topmost)",

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.remap_transaction_fixture")
 
 local KEY, COMBO = "left_shift", "left_shift+right_shift"
-local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
+local SOURCE = '[tap_hold]\nenabled = false\n[future]\nkeep = true\n'
 -- The configuration folder of this fixture's private disk, without layers.toml.
 local CONFIG_DIR = "/remap"
 local LAYERS = CONFIG_DIR .. "/layers.toml"
@@ -23,7 +23,7 @@ local LAYERS = CONFIG_DIR .. "/layers.toml"
 local function scoped_remap(fixture)
 	local remap, calls = fixture.load_enabled_remap()
 	local Config = package.loaded["platform.remap.config"]
-	local disk = { files = { ["/remap/config_karabiner.toml"] = SOURCE }, expected = {}, regenerations = 0 }
+	local disk = { files = { ["/remap/tap_hold.toml"] = SOURCE }, expected = {}, regenerations = 0 }
 	local neutral_combo = { tap = "none", hold = "none", combo = "none" }
 	Config.build_default_state = function()
 		return { tap_holds_enabled = false, tap_hold_config = { [KEY] = { tap = "none", hold = "none" } },
@@ -41,8 +41,8 @@ local function scoped_remap(fixture)
 		return save(state, path, overwrite, expected)
 	end
 	package.loaded["infra.config_paths"].get = function(key)
-		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-		return "/remap/config_karabiner.toml"
+		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/tap_hold.toml"
 	end
 	package.loaded["infra.config_paths"].get_config_dir = function() return CONFIG_DIR end
 	local files = require("adapters.file_system")

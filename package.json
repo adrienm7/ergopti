@@ -339,6 +339,7 @@
 		"codegen:touchpad-registry": "node ./tools/codegen/codegen-touchpad-registry.cjs",
 		"codegen:layer-editor-data:js": "node ./tools/codegen/codegen-layer-editor-data-js.cjs",
 		"codegen:layout-composer-data:js": "node ./tools/codegen/codegen-layout-composer-data-js.cjs",
+		"codegen:layout-editor-tables:js": "node ./tools/codegen/codegen-layout-editor-tables-js.cjs",
 		"codegen:layout-composer-corpus": "node ./tools/codegen/codegen-layout-composer-corpus.cjs",
 		"codegen:layout-composer-check": "node ./tools/codegen/codegen-layout-composer-check.cjs",
 		"codegen:onboarding-catalogue": "node ./tools/codegen/codegen-onboarding-catalogue.cjs",
@@ -709,7 +710,10 @@
 		"test:ollama-termination-owned": "node ./tools/test/test-ollama-termination-owned.cjs",
 		"test:linux-distro-native-prerequisites": "node ./tools/test/test-linux-distro-native-prerequisites.cjs",
 		"layout-source": "node ./tools/layout-source.cjs",
-		"test:layout-source": "node ./tools/test/test-layout-source.cjs"
+		"test:layout-source": "node ./tools/test/test-layout-source.cjs",
+		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
+		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",
+		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs"
 	},
 	"type": "module",
 	"imports": {

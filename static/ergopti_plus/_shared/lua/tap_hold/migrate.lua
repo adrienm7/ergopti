@@ -21,6 +21,10 @@
 ---    for the caller to refuse, never rewritten.
 --- 4. Pure and idempotent: replaying a step on its own output changes nothing,
 ---    so a crash between two writers never leaves a half-migrated file.
+--- 5. Also validates `[legacy_imports]`, the old files each driver carries over
+---    once into the shared tap_hold.toml, and owns the closed translation of a
+---    section another file kept (`config_section`); the driver performs the
+---    import.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +36,17 @@ M.META_SECTION = "_meta"
 M.VERSION_KEY = "schema_version"
 
 local OPS = { drop_retired_values = true, delete = true }
+
+-- The driver columns a legacy import may name, and the closed set of
+-- translations (_shared/tap_hold/migrations.toml section 2).
+local KNOWN_PLATFORMS = { ahk = true, hs = true, linux = true }
+-- Each translation names the fields its entry carries besides source and translate.
+local TRANSLATIONS = {
+	-- An old file renamed with `retired_suffix` once tap_hold.toml holds it.
+	karabiner = { retired_suffix = true },
+	-- A `section` another file kept, moved as it is, then deleted from that file.
+	config_section = { section = true },
+}
 
 
 
@@ -105,7 +120,85 @@ function M.parse_registry(decoded)
 	if expected ~= meta.current_version then
 		error("tap-hold migration registry: the steps stop at version " .. expected, 0)
 	end
-	return { current = meta.current_version, unstamped = meta.unstamped_version, steps = steps }
+	return { current = meta.current_version, unstamped = meta.unstamped_version, steps = steps,
+		legacy_imports = M.parse_legacy_imports(decoded.legacy_imports) }
+end
+
+--- Validates `[legacy_imports]`: per driver column, the old file carried over
+--- once into the shared tap_hold.toml.
+--- @param declared table|nil Decoded `[legacy_imports]`.
+--- @return table imports Driver column -> `{ source, translate, retired_suffix }`.
+function M.parse_legacy_imports(declared)
+	if declared == nil then return {} end
+	if type(declared) ~= "table" then error("tap-hold migration registry: [legacy_imports] is not a table", 0) end
+	local imports = {}
+	for platform, entry in pairs(declared) do
+		local where = "tap-hold migration registry: [legacy_imports." .. tostring(platform) .. "]"
+		if not KNOWN_PLATFORMS[platform] then error(where .. " names no driver column", 0) end
+		if type(entry) ~= "table" or type(entry.source) ~= "string" or not entry.source:match("^[%w_%-]+%.toml$") then
+			error(where .. " needs a source file name beside tap_hold.toml", 0)
+		end
+		local fields = TRANSLATIONS[entry.translate]
+		if not fields then error(where .. " names no known translation", 0) end
+		if fields.retired_suffix and (type(entry.retired_suffix) ~= "string" or not entry.retired_suffix:match("^%.[%w_%-]+$")) then
+			error(where .. " needs a retired_suffix such as \".migrated\"", 0)
+		end
+		if fields.section and not is_path(entry.section) then error(where .. " needs the section it moves", 0) end
+		for field in pairs(entry) do
+			if field ~= "source" and field ~= "translate" and not fields[field] then
+				error(where .. " has an unknown field '" .. tostring(field) .. "'", 0)
+			end
+		end
+		imports[platform] = { source = entry.source, translate = entry.translate, retired_suffix = entry.retired_suffix,
+			section = entry.section }
+	end
+	return imports
+end
+
+--- The `config_section` translation: every leaf of `section` in a decoded
+--- document, as the set rows that write it into tap_hold.toml and the delete
+--- ops that remove it from its old file. The section moves as it is, unknown
+--- fields included, so nothing the user or another build wrote is lost.
+--- @param document table Decoded old file, NOT edited.
+--- @param section string Dotted section path, from the registry.
+--- @param is_table function(value) -> boolean Whether a value is a TOML table.
+--- @return table|nil rows Dense `{ section, key, value }` rows, sorted; nil when
+---   the document has no such section.
+--- @return table|nil deletes The matching `{ op = "delete", section, key }` ops.
+--- @return string|nil detail Why the section cannot be moved (not a table).
+function M.from_config_section(document, section, is_table)
+	if type(document) ~= "table" or not is_path(section) or type(is_table) ~= "function" then
+		error("config_section translation needs a document, a section path and a table test", 0)
+	end
+	local node = document
+	for segment in section:gmatch("[^%.]+") do
+		if node == nil then break end
+		if not is_table(node) then return nil, nil, "a parent of [" .. section .. "] is not a table" end
+		node = node[segment]
+	end
+	if node == nil then return nil end
+	if not is_table(node) then return nil, nil, "[" .. section .. "] is not a table" end
+	local KeyPath = require("toml_codec.key_path")
+	local rows, deletes = {}, {}
+	local function walk(tbl, segments)
+		for _, key in ipairs(TableUtil.sorted_keys(tbl)) do
+			local value = tbl[key]
+			if is_table(value) then
+				local child = {}
+				for index, segment in ipairs(segments) do child[index] = segment end
+				child[#child + 1] = key
+				walk(value, child)
+			else
+				local path = KeyPath.render(segments)
+				rows[#rows + 1] = { section = path, key = key, value = TableUtil.deep_copy(value) }
+				deletes[#deletes + 1] = { op = "delete", section = path, key = key }
+			end
+		end
+	end
+	local root = {}
+	for segment in section:gmatch("[^%.]+") do root[#root + 1] = segment end
+	walk(node, root)
+	return rows, deletes
 end
 
 --- Reads and validates the registry file.

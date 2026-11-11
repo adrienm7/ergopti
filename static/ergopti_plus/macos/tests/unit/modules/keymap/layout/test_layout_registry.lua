@@ -1220,3 +1220,23 @@ helpers.describe("layout composer (macOS): a layout macOS turns on at the next l
 			"the boot after the login selects it")
 	end)
 end)
+
+helpers.describe("layout editor files (macOS): the registry stores what the editor saves", function()
+	helpers.it("saves a source in the store folder and reopens it as the last one", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		local saved
+		helpers.assert_true(LayoutRegistry.source_save({ filename = "mine.toml", text = "a = 1\n" },
+			function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[2]) .. " " .. tostring(saved[3]))
+		helpers.assert_eq(state.files["/cfg/layout_sources/mine.toml"], "a = 1\n")
+		local opened
+		helpers.assert_true(LayoutRegistry.source_open(function(data) opened = data end, deps))
+		helpers.assert_eq(opened.filename, "mine.toml")
+		helpers.assert_eq(opened.text, "a = 1\n")
+		local refused
+		LayoutRegistry.source_save({ filename = "../escape.toml", text = "x" }, function(...) refused = { ... } end, deps)
+		helpers.assert_eq(refused[1], false)
+		helpers.assert_eq(refused[2], "source_invalid_file")
+	end)
+end)

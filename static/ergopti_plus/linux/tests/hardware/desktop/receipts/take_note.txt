@@ -1,0 +1,33 @@
+# static/ergopti_plus/linux/tests/hardware/desktop/receipts/take_note.txt
+#
+# Container proof receipt (maintainer decision 2026-11-10: a container proof
+# closes a Linux check).
+# Command: bash static/ergopti_plus/linux/tests/hardware/desktop/run_take_note.sh
+# Run: 2026-11-10, base origin/dev 1d5fe5941e, Ubuntu 24.04.5 LTS container.
+# Packages: xvfb 2:21.1.12-1ubuntu1.9; openbox 3.6.1-12build5; luajit 2.1.0+git20231223.c525bcb+dfsg-1ubuntu0.1; xdg-utils 1.1.3-4.1ubuntu3; libgtk-3-bin 3.24.41-4ubuntu1.3; libnotify-bin 0.8.3-1build2; python3-gi 3.48.2-1
+# Exit status: 0
+# Found by this proof: before the fix, the last case (an absent note, created
+# empty) never reached the editor. xdg-open typed the empty file
+# inode/x-empty (gio: application/x-zerosize) and opened it in the container's
+# web browser; the driver now launches the registered text/plain handler by its
+# desktop-file id with gtk-launch (regression: tests/unit/modules/gestures/
+# actions/test_take_note.lua, "an empty note opens in the registered editor").
+
+=== daily notes through the registered text editor (display :72) ===
+--- 1. no text/plain handler ---
+  PASS the action runs
+  PASS the desktop's notification server receives one notice
+  PASS it is the specific refusal, titled as an error: « Aucun éditeur de texte n’est associé aux fichiers texte. Choisissez un éditeur par défaut dans les paramètres du bureau, puis réessayez. »
+  PASS no note file was created
+  PASS the log names the missing handler
+--- 2. a registered text editor ---
+  PASS the action runs
+  PASS the registered editor is started
+  PASS it is handed today's note: Notes_10_11_2026.txt
+  PASS the existing note keeps every byte, at open time and after
+  PASS the log says the note was opened
+  PASS a second use opens the editor again
+  PASS on the same, unchanged note
+  PASS an absent note is created empty and opened
+  PASS no notice was shown for the successful opens
+=== every check held ===

@@ -1,13 +1,15 @@
 --- adapters/compositor_focus.lua
 
 --- ==============================================================================
---- MODULE: Compositor Focus Source (Linux, GNOME and KDE Wayland)
+--- MODULE: Compositor Focus Source (Linux, GNOME, KDE and COSMIC Wayland)
 --- DESCRIPTION:
---- Keeps the focused window GNOME Shell and KWin push to the daemon, so
---- adapters/window_info answers the four-times-a-second focus poll from memory.
---- The Ergopti GNOME Shell extension and KWin script (linux/desktop_focus/)
---- call the session-bus name below; adapters/compositor_focus_worker owns it in
---- a resident child and prints one JSON line per admitted call.
+--- Keeps the focused window GNOME Shell, KWin and cosmic-comp push to the
+--- daemon, so adapters/window_info answers the four-times-a-second focus poll
+--- from memory. The Ergopti GNOME Shell extension and KWin script
+--- (linux/desktop_focus/) call the session-bus name below, which
+--- adapters/compositor_focus_worker owns in a resident child; under COSMIC,
+--- adapters/cosmic_toplevel_worker reads the compositor's toplevel-info
+--- protocol instead. Both print one JSON line per change, in the same records.
 ---
 --- FEATURES & RATIONALE:
 --- 1. No fork per poll: one worker per daemon run, its lines read by the event
@@ -26,6 +28,13 @@ M.OBJECT_PATH = "/org/ergopti/Focus"
 M.INTERFACE = "org.ergopti.Focus1"
 -- The desktop service whose current owner alone may report focus.
 M.SERVICES = { gnome = "org.gnome.Shell", kde = "org.kde.KWin" }
+-- Each family's reporter, for the log, and the families without a bus name:
+-- cosmic-comp answers its own Wayland protocol, read by its own worker.
+M.REPORTERS = { gnome = "GNOME Shell", kde = "KWin", cosmic = "cosmic-comp" }
+-- Bounds of one reported window's class and title, for every worker: an
+-- oversized one is refused, never truncated into a different identity.
+M.MAX_CLASS_BYTES = 256
+M.MAX_TITLE_BYTES = 2048
 -- Bounds every synchronous bus call the worker makes.
 M.CALL_TIMEOUT_MS = 500
 
@@ -46,12 +55,13 @@ local MAX_LINE_BYTES = 8192
 --- Names the desktop family whose shell can report focus, from the
 --- XDG_CURRENT_DESKTOP value (lowercased, colon-separated).
 --- @param desktop string
---- @return string|nil "gnome", "kde" or nil
+--- @return string|nil "gnome", "kde", "cosmic" or nil
 function M.desktop_family(desktop)
 	if type(desktop) ~= "string" then return nil end
 	for token in desktop:lower():gmatch("[^:]+") do
 		if token == "gnome" then return "gnome" end
 		if token == "kde" then return "kde" end
+		if token == "cosmic" then return "cosmic" end
 	end
 	return nil
 end
@@ -96,13 +106,13 @@ end
 -- =====================================
 
 --- Creates the focus source for one desktop family.
---- @param options table { family = "gnome"|"kde", start_process?, command?, decode? }
+--- @param options table { family = "gnome"|"kde"|"cosmic", start_process?, command?, decode? }
 --- @return table source
 function M.new(options)
-	assert(type(options) == "table" and M.SERVICES[options.family], "compositor focus needs a GNOME or KDE family")
+	assert(type(options) == "table" and M.REPORTERS[options.family], "compositor focus needs a GNOME, KDE or COSMIC family")
 	local Logger = require("logger.shim")
 	local family = options.family
-	local service = M.SERVICES[family]
+	local reporter = M.REPORTERS[family]
 	local start_process = options.start_process or function(...) return require("adapters.owned_process").start(...) end
 	local decode = options.decode or function(line) return require("json").decode(line) end
 	local command = options.command or function()
@@ -110,8 +120,13 @@ function M.new(options)
 		local Paths = require("infra.paths")
 		local executable = assert(uv.exepath(), "native interpreter identity unavailable")
 		local shared_lua = assert(Paths.shared("lua"), "shared Lua library unavailable")
+		if family == "cosmic" then
+			local soname = assert(require("_generated.native_runtime").optional.wayland_client, "libwayland-client unnamed")
+			return executable, { Paths.driver_root() .. "/adapters/cosmic_toplevel_worker.lua",
+				soname, tostring(uv.os_getpid()), shared_lua }, Paths.driver_root()
+		end
 		return executable, { Paths.driver_root() .. "/adapters/compositor_focus_worker.lua",
-			service, tostring(uv.os_getpid()), shared_lua }, Paths.driver_root()
+			M.SERVICES[family], tostring(uv.os_getpid()), shared_lua }, Paths.driver_root()
 	end
 
 	local source = {}
@@ -124,7 +139,7 @@ function M.new(options)
 		if status == "failed" or status == "stopped" then return end
 		status, current, pending = "failed", nil, ""
 		Logger.warn(LOG, "%s focus reports unavailable (%s) — per-application rules are inactive for this session.",
-			family == "gnome" and "GNOME Shell" or "KWin", reason)
+			reporter, reason)
 		-- A refused dispatch hands back no running process to cancel.
 		if operation and type(operation.is_running) == "function" and operation:is_running() then operation:cancel() end
 	end
@@ -136,7 +151,8 @@ function M.new(options)
 		if kind == "ready" then
 			if status ~= "starting" then fail("duplicate worker readiness"); return end
 			status = "ready"
-			Logger.info(LOG, "Listening for %s focus reports on %s.", family == "gnome" and "GNOME Shell" or "KWin", M.BUS_NAME)
+			Logger.info(LOG, "Listening for %s focus reports on %s.", reporter,
+				family == "cosmic" and "zcosmic_toplevel_info_v1" or M.BUS_NAME)
 			return
 		end
 		if status ~= "ready" then fail("focus report before readiness"); return end

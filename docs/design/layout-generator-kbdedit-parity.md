@@ -24,6 +24,17 @@ release 26.10.0), or better, in a modern, free, online interface that also runs 
 - **Clean-room.** Take ideas from KbdEdit and kalamine, never their code; write each generator from the formats'
   own documentation.
 
+## Editor status (2026-11-11)
+
+The [unified layout editor](layout-editor.md) covers, on the site and in the macOS and Linux layout manager:
+extra modifier levels (user modifiers, held or locked, and layers that require them), shortcuts sending another
+chord, per-key Caps Lock modes (unaffected, Shift, separate layers), dead keys with chains, terminators and
+multi-character results, ligatures, numpad and media keys, physical remapping, tap-holds, a Unicode palette
+(blocks and code-point entry), printable stickers (four levels per key), a live typing preview and undo/redo.
+Still open against this inventory: drag and drop, clipboard and auto case mapping between keys, Unicode name
+search and magnifier, sticker layout options (exact key size, per-block visibility), NLS functions, Windows flags
+and virtual-key editing, keyboard types beyond ISO/ANSI, and every compiled export of edited layouts (generator).
+
 ## KbdEdit capability inventory
 
 Paraphrased from the KbdEdit manual and release notes. « (premium) » marks features that KbdEdit sells only in its

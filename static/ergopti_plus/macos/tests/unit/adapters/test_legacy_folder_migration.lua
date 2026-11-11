@@ -233,6 +233,54 @@ helpers.describe("macOS legacy folder migration", function()
 		helpers.assert_true(warned, "the backup is logged as a warning")
 	end)
 
+	-- The Mac of the 2026-11-05 field report: a custom LogsDirPath ending in the
+	-- old folder name, so the logger wrote into its Ergopti subfolder.
+	helpers.it("renames a custom logs folder named like the old default and moves its logs (legacy-folder-migration-macos-custom-logs)",
+		function()
+		local legacy_name = AppDirs.migration.macos.legacy_logs_relative:match("([^/]+)$")
+		local app = AppDirs.macos.folder_name
+		for _, spelling in ipairs({ "/Volumes/Data/Logs/" .. legacy_name .. "/", "~/Documents/" .. legacy_name,
+			"/Volumes/Data/" .. legacy_name .. "/" .. app .. "/" }) do
+			local custom = spelling:gsub("/$", ""):gsub("/" .. app .. "$", ""):gsub("^~", HOME)
+			local parent = custom:match("^(.*)/[^/]+$")
+			local text = 'ConfigDirPath = ""\nLogsDirPath = "' .. spelling .. '"\n'
+			local files = { [NEW .. "/paths.toml"] = text }
+			local ports, snapshot = ports_with_files({
+				NEW .. "/paths.toml",
+				custom .. "/" .. app .. "/ErgoptiPlus_2026-11-05.log",
+				custom .. "/notes.txt",
+			}, files)
+			local logger = { info = function() end, warn = function() end }
+			local report = Migration.run(logger, { home = HOME, ports = ports })
+			local after = " " .. table.concat(snapshot(), " ") .. " "
+			helpers.assert_eq(report.paths_file, "rewritten", spelling)
+			local renamed = spelling:gsub("/$", ""):gsub("/" .. app .. "$", ""):gsub("[^/]+$", app)
+				.. (spelling:sub(-1) == "/" and "/" or "")
+			helpers.assert_eq(files[NEW .. "/paths.toml"], 'ConfigDirPath = ""\nLogsDirPath = "' .. renamed .. '"\n')
+			helpers.assert_eq(files[NEW .. "/paths.toml" .. AppDirs.migration.backup_suffix], text)
+			helpers.assert_true(after:find(" " .. parent .. "/" .. app .. "/ErgoptiPlus_2026-11-05.log ", 1, true) ~= nil,
+				"the logs follow the renamed folder: " .. after)
+			helpers.assert_true(after:find(" " .. custom .. "/notes.txt ", 1, true) ~= nil,
+				"the user's own files in the old-named folder stay")
+		end
+	end)
+
+	helpers.it("keeps any other custom logs folder (legacy-folder-migration-macos-custom-kept)", function()
+		local legacy_name = AppDirs.migration.macos.legacy_logs_relative:match("([^/]+)$")
+		for _, value in ipairs({ "/Volumes/Data/Logs", "/Volumes/Data/" .. legacy_name .. "_old",
+			"/Volumes/Data/" .. legacy_name .. "/sub", "/Volumes/Data/my" .. legacy_name, "" }) do
+			helpers.assert_nil(Migration.custom_legacy_logs(HOME, value), value)
+			local text = 'LogsDirPath = "' .. value .. '"\n'
+			local files = { [NEW .. "/paths.toml"] = text }
+			local ports = ports_with_files({ NEW .. "/paths.toml" }, files)
+			local report = Migration.run({ info = function() end, warn = function() end }, { home = HOME, ports = ports })
+			helpers.assert_eq(report.paths_file, "unchanged", value)
+			helpers.assert_eq(files[NEW .. "/paths.toml"], text)
+		end
+		-- The old default itself is the default rule's, not a custom folder.
+		helpers.assert_nil(Migration.custom_legacy_logs(HOME, "~/" .. AppDirs.migration.macos.legacy_logs_relative))
+	end)
+
 	helpers.it("keeps a file or folder published after the check, on real folders (legacy-folder-migration-macos-race)",
 		function()
 		local dir = scratch()

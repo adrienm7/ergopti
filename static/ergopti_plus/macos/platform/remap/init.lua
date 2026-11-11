@@ -10,7 +10,7 @@
 --- FEATURES & RATIONALE:
 --- 1. CapsWord Watcher: Detects trackpad scroll/gesture events and deactivates
 ---    CapsWord so the user never gets stuck in caps mode after using the trackpad.
---- 2. User Config: config_karabiner.toml is the single runtime truth.
+--- 2. User Config: the shared tap_hold.toml is the single runtime truth.
 ---    On first launch it is created from defaults; after that it is the full
 ---    persisted state — defaults are never recomputed at runtime except when
 ---    the user explicitly clicks "Reset to defaults".
@@ -122,13 +122,13 @@ local KARABINER_KE_TILDE_PATH = require("platform.remap.ke_paths").config_file_f
 -- reference it after init() has run; nil before init().
 local KARABINER_OUT = nil
 
--- The user-editable Karabiner config lives under the user's resolved
--- config dir (paths.toml override honoured) at:
---     <config_dir>/hammerspoon/config_karabiner.toml
+-- The user-editable remap settings live in the shared tap_hold.toml under the
+-- user's resolved config dir (paths.toml override honoured) at:
+--     <config_dir>/hammerspoon/tap_hold.toml
 -- Resolution is deferred to MenuPaths so a relocated config follows.
 local function resolve_user_config()
 	local MenuPaths = require("infra.config_paths")
-	return MenuPaths.get("KarabinerConfigPath")
+	return MenuPaths.get("TapHoldConfigPath")
 end
 local ACTIONS_FILE    = _DATA_DIR .. "actions.json"
 local TAP_HOLD_FILE   = _DATA_DIR .. "tap_hold_keys.json"
@@ -5227,12 +5227,18 @@ function M.update_virtual_hid_driver(on_done)
 	return true
 end
 
---- The owner's reasons a first install resolves: no runtime files, a job
---- missing, or no VirtualHIDDevice driver at all.
+--- The owner's reasons a first install resolves: no runtime files, or no
+--- VirtualHIDDevice driver at all. A published runtime whose job is not
+--- loaded is the service repair's (MRT-004): the first install refuses an
+--- existing runtime by design.
 M.OWNED_INSTALL_REASONS = {
 	runtime_not_installed = true,
-	runtime_job_not_loaded = true,
 	virtual_hid_absent = true,
+}
+
+--- The owner's reasons the service repair resolves (MRT-004).
+M.OWNED_REPAIR_REASONS = {
+	runtime_job_not_loaded = true,
 }
 
 --- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
@@ -5249,6 +5255,23 @@ function M.install_owned_runtime(on_done)
 		return false
 	end
 	require("adapters.runtime_owner_ports").install_runtime(on_done)
+	return true
+end
+
+--- Restarts the services of the installed owned runtime after the user
+--- confirmed it (« Réparer le service », MRT-004). The caller reloads after
+--- telling the user, so the next owner admits the runtime or names what still
+--- blocks it (ui/owned_runtime_install.lua).
+--- @param on_done function fn(ok, reason|nil, detail|nil) called once.
+--- @return boolean started False when the owned runtime is not blocked by a stopped service.
+function M.repair_owned_runtime(on_done)
+	assert(type(on_done) == "function", "repair_owned_runtime(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table" or not M.OWNED_REPAIR_REASONS[status.reason] then
+		Logger.error(LOG, "Owned runtime service repair refused: the runtime is not blocked by a stopped service.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").repair_runtime(on_done)
 	return true
 end
 
@@ -5395,11 +5418,11 @@ local function apply_recommended_bindings(candidate, bindings)
 	end
 end
 
---- The first-run wizard's view of a config_karabiner.toml: the Tap-Holds switch
+--- The first-run wizard's view of a tap_hold.toml: the Tap-Holds switch
 --- in force and each key it configures, as the recommendation or as the user's
 --- own setting. A key it leaves unbound is absent, so the wizard may import it;
 --- it never imports over another one.
---- @param path string The config_karabiner.toml of the folder being set up.
+--- @param path string The tap_hold.toml of the folder being set up.
 --- @return table|nil report `{ enabled = boolean, keys = { [id] = "recommended"|"customised" } }`
 --- @return string|nil err Why the file could not be read.
 function M.recommended_key_report(path)
@@ -5447,7 +5470,7 @@ function M.import_recommended_keys(request, on_done)
 	end, on_done, nil, request.backup_path)
 end
 
---- Saves the same import to a config_karabiner.toml the running bridge does
+--- Saves the same import to a tap_hold.toml the running bridge does
 --- not own: before M.init() (the first-run wizard reloads before the bridge
 --- starts) or for the folder a wizard moves the configuration to. Nothing is
 --- live to publish or deploy there; the next M.init() reads the file. The file
@@ -5515,7 +5538,7 @@ function M.save_recommended_keys(request)
 	return true
 end
 
---- Copies exactly the settings persisted in config_karabiner.toml.
+--- Copies exactly the settings persisted in tap_hold.toml.
 --- Runtime handles and watcher capabilities from `_state` are deliberately
 --- excluded, so the snapshot can be retained by a parent transaction.
 --- @param source table Live or previously captured settings.
@@ -6014,7 +6037,7 @@ end
 local REMAP_SCOPE_SECTIONS = { tap_holds = require("config_keys").KEY.TAP_HOLDS, shortcuts = require("config_keys").KEY.MOD_COMBOS, key_combinations = require("config_keys").KEY.MOD_COMBOS }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
---- verified backup of config_karabiner.toml, a save that only replaces those
+--- verified backup of tap_hold.toml, a save that only replaces those
 --- backed-up bytes, and the Karabiner terminal before success. « recommended »
 --- writes the shipped preset, « clear » the neutral none/none; the timings are
 --- parameters whose default is the recommendation. The master comes from the
@@ -7055,6 +7078,16 @@ function M.init(file_system)
 		return false
 	end
 
+	-- An old config_karabiner.toml is carried over into tap_hold.toml once, before
+	-- the first read; one that cannot be is refused like a corrupt file.
+	local imported, import_outcome = timed("import_legacy_tap_hold_file", function()
+		return require("platform.remap.tap_hold_file").import_legacy(resolve_user_config(), FileSystem)
+	end)
+	if not imported then
+		Logger.error(LOG, "Karabiner bridge initialization refused: the old remap settings could not be carried over (%s).",
+			tostring(import_outcome))
+		return false
+	end
 	local user_cfg, user_config_status = timed("load_user_config", function()
 		return Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 	end)
@@ -7064,7 +7097,7 @@ function M.init(file_system)
 	end
 	local first_launch = user_config_status == "absent"
 
-	-- The runtime this boot targets: owned unless config_karabiner.toml keeps
+	-- The runtime this boot targets: owned unless tap_hold.toml keeps
 	-- the shared one by hand. The command line tool every variable writer spells
 	-- is chosen here, once, and an owned boot writes its own complete file.
 	local runtime = user_cfg.runtime or Config.RUNTIME_DEFAULT

@@ -416,13 +416,13 @@ local function add_row(lib, node, item, owned)
 	if row.kind == "separator" then
 		row.widget = lib.gtk.gtk_separator_menu_item_new()
 	else
-		row.title = tostring(item.title or "")
+		row.label = tostring(item.title or "")
 		if row.kind == "check" then
-			row.widget = lib.gtk.gtk_check_menu_item_new_with_label(row.title)
+			row.widget = lib.gtk.gtk_check_menu_item_new_with_label(row.label)
 			row.checked = item.checked == true
 			lib.gtk.gtk_check_menu_item_set_active(row.widget, row.checked and 1 or 0)
 		else
-			row.widget = lib.gtk.gtk_menu_item_new_with_label(row.title)
+			row.widget = lib.gtk.gtk_menu_item_new_with_label(row.label)
 		end
 	end
 	if row.has_sub then
@@ -471,7 +471,7 @@ local function same_shape(node, items)
 	for index, item in ipairs(items) do
 		local row = node.rows[index]
 		if row.kind ~= row_kind(item) or row.has_sub ~= has_submenu(item) then return false end
-		if row.kind ~= "separator" and row.title ~= tostring(item.title or "") then return false end
+		if row.kind ~= "separator" and row.label ~= tostring(item.title or "") then return false end
 	end
 	return true
 end

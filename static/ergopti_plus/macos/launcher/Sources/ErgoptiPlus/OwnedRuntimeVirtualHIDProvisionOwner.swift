@@ -16,16 +16,18 @@ enum OwnedRuntimeVirtualHIDProvisionOwner {
 	private static let unknownService: Int32 = 113
 
 	/// Writes and bootstraps the owned daemon job once pqrs' daemon program is installed.
-	static func provision(within core: OwnedRuntimeCoreProvisionOwner) throws {
+	/// - Parameter adoptExisting: A service repair (MRT-004): a job launchd already runs is left as it is, and the
+	///   exact owned plist already on disk is bootstrapped instead of being refused.
+	static func provision(within core: OwnedRuntimeCoreProvisionOwner, adoptExisting: Bool = false) throws {
 		guard !Thread.isMainThread, getuid() == 0, geteuid() == 0 else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		try core.verifyForPlistCustody()
 		guard daemonInstalled() else {
 			OwnedRuntimeInstallTrail.note("vhid-daemon-absent"); throw OwnedRuntimeInstallFailure.traced(.source)
 		}
-		guard try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", target]).status == unknownService else {
-			throw OwnedRuntimeInstallFailure.traced(.destination)
-		}
-		let custody = try OwnedRuntimeCorePlistCustody.createProductionVirtualHID(owner: core, bytes: try jobBytes())
+		let observed = try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", target]).status
+		if adoptExisting && observed == 0 { OwnedRuntimeInstallTrail.note("vhid-already-loaded"); return }
+		guard observed == unknownService else { throw OwnedRuntimeInstallFailure.traced(.destination) }
+		let custody = try OwnedRuntimeCorePlistCustody.createProductionVirtualHID(owner: core, bytes: try jobBytes(), adoptExisting: adoptExisting)
 		try custody.prepare()
 		let bootstrap = try OwnedRuntimeCoreLaunchctl.run(arguments: ["bootstrap", "system", plistPath])
 		guard bootstrap.status == 0 else {

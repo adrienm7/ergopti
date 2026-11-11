@@ -32,6 +32,7 @@ local M = {}
 
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
+local NativePath = require("native_path")
 
 local LOG = "legacy_folder_migration"
 
@@ -163,11 +164,53 @@ function M.plan(home)
 	return plan, support
 end
 
---- The paths.toml rewrites of one home folder: each key's old default, in its
---- absolute and its home-relative spelling, becomes the new default.
+--- The old application folder name, the last name of the old logs default.
+local function legacy_logs_name()
+	return NativePath.basename(AppDirs.migration.macos.legacy_logs_relative)
+end
+
+--- The custom logs folder paths.toml names in place of the old folder name:
+--- a LogsDirPath whose last name is exactly the old default's, or that
+--- folder's Ergopti subfolder as config_paths saves it (any parent but the old
+--- default itself), absolute or home-relative. Any other custom folder is not
+--- the migration's (decided by the coordinator on 2026-11-11 overnight, to
+--- review by the maintainer).
 --- @param home string Absolute home folder, without a trailing slash.
+--- @param value string|nil The LogsDirPath value.
+--- @return string|nil folder The old-named folder, absolute, without a trailing slash.
+function M.custom_legacy_logs(home, value)
+	if type(value) ~= "string" then return nil end
+	local folder = value:gsub("/+$", "")
+	if folder:sub(1, 2) == "~/" then folder = home .. folder:sub(2) end
+	if NativePath.basename(folder) == AppDirs.macos.folder_name then folder = NativePath.dirname(folder) or "" end
+	if folder:sub(1, 1) ~= "/" or NativePath.basename(folder) ~= legacy_logs_name() then return nil end
+	if folder == home .. "/" .. AppDirs.migration.macos.legacy_logs_relative then return nil end
+	return folder
+end
+
+--- The merge of a custom old-named logs folder: the logger wrote into its
+--- application-named subfolder (a folder not named after the application gets
+--- one), whose entries move to the renamed folder, which is named after it.
+--- Entries of the custom folder itself are the user's and stay.
+--- @param home string Absolute home folder, without a trailing slash.
+--- @param custom string Folder from custom_legacy_logs.
+--- @return table step Merge step of the shared core.
+function M.custom_logs_step(home, custom)
+	local name = AppDirs.macos.folder_name
+	local renamed = NativePath.dirname(custom) .. "/" .. name
+	return { from_dir = custom .. "/" .. name, to_dir = renamed,
+		backup_dir = home .. "/" .. AppDirs.macos.support_relative .. "/" .. AppDirs.migration.backup_folder
+			.. "/custom-logs" .. custom .. "/" .. name }
+end
+
+--- The paths.toml rewrites of one home folder: each key's old default, in its
+--- absolute and its home-relative spelling, becomes the new default, and a
+--- custom logs folder named like the old default becomes its parent's folder
+--- named after the application.
+--- @param home string Absolute home folder, without a trailing slash.
+--- @param custom string|nil Folder from custom_legacy_logs, when paths.toml names one.
 --- @return table rewrites
-function M.rewrites(home)
+function M.rewrites(home, custom)
 	local legacy = AppDirs.migration.macos
 	-- The configuration folder moves in one rename, so a locator that cannot
 	-- follow it gets it back; the logs folder merges entry by entry and only
@@ -181,6 +224,9 @@ function M.rewrites(home)
 			old = { home .. "/" .. legacy.legacy_logs_relative, "~/" .. legacy.legacy_logs_relative },
 			new = home .. "/" .. AppDirs.macos.relative,
 			source = home .. "/" .. legacy.legacy_logs_relative },
+		custom and { key = AppDirs.override_key, old = {},
+			renamed = { from = legacy_logs_name(), to = AppDirs.macos.folder_name },
+			source = M.custom_logs_step(home, custom).from_dir } or nil,
 	}
 end
 
@@ -196,8 +242,17 @@ function M.run(logger, options)
 	local ports = options.ports or M.native_ports()
 	local plan = M.plan(home)
 	local report = Core.apply(plan, ports)
-	Core.publish_paths_file(home .. "/" .. AppDirs.config.macos_paths_file, M.rewrites(home),
-		AppDirs.migration.backup_suffix, report, ports)
+	local paths_file = home .. "/" .. AppDirs.config.macos_paths_file
+	local text = ports.exists(paths_file) and ports.read(paths_file) or nil
+	local custom = type(text) == "string" and M.custom_legacy_logs(home, Core.paths_value(text, AppDirs.override_key))
+		or nil
+	if custom then
+		local custom_report = Core.apply({ M.custom_logs_step(home, custom) }, ports)
+		for kind, rows in pairs(custom_report) do
+			for _, row in ipairs(rows) do report[kind][#report[kind] + 1] = row end
+		end
+	end
+	Core.publish_paths_file(paths_file, M.rewrites(home, custom), AppDirs.migration.backup_suffix, report, ports)
 	Core.log_report(logger, LOG, report)
 	return report
 end

@@ -181,7 +181,7 @@ helpers.describe("menu: reset_all_defaults really resets", function()
 			"factory reset must retain exact inverse evidence instead of unlinking files")
 		helpers.assert_true(src:find('MenuPaths.get("ConfigTomlPath")', 1, true) ~= nil,
 			"config.toml must be one recoverable reset path")
-		helpers.assert_true(src:find('MenuPaths.get("KarabinerConfigPath")', 1, true) ~= nil,
+		helpers.assert_true(src:find('MenuPaths.get("TapHoldConfigPath")', 1, true) ~= nil,
 			"the Karabiner config must be one recoverable reset path")
 		helpers.assert_true(
 			src:find('TerminationCoordinator.request_reload_owned(', 1, true) ~= nil,

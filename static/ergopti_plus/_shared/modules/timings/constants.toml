@@ -1128,6 +1128,10 @@ prediction_display_ms = 2000
 http_managed_wait_poll_ms = 10
 # Windows: the delay before a closed WebView profile folder is removed.
 webview_profile_cleanup_ms = 1000
+# Longest download of a desktop PAC the Linux lookup child evaluates itself
+# (GIO drops its DIRECT entries); a caller's own bound below it wins.
+# LX: adapters/system_proxy.lua, infra/managed_http.lua.
+proxy_pac_download_max_ms = 60000
 # Windows: the input probe's gap between sends, and its settle before reading.
 input_probe_step_ms = 10
 input_probe_settle_ms = 40

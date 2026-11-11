@@ -99,28 +99,39 @@ function M.judge(status, body, transport_error)
 		return "error", type(transport_error) == "string" and transport_error ~= ""
 			and ("PAC download failed: " .. transport_error) or "PAC download failed"
 	end
-	if type(body) ~= "string" or body == "" then return "error", "PAC is empty" end
+	local text, reason = M.decode(body)
+	if not text then return "error", reason end
+	local utf16 = body:sub(1, 2) == "\255\254" or body:sub(1, 2) == "\254\255"
+	return "ok", string.format("HTTP 200, %d bytes, %s, FindProxyForURL found", #body, utf16 and "UTF-16" or "UTF-8")
+end
+
+--- Decodes the body of a PAC download to the UTF-8 script an engine runs,
+--- with the bounds and encodings the managed download admits.
+--- @param body string|nil Response body of an HTTP 200.
+--- @return string|nil script
+--- @return string|nil reason Detail without any URL.
+function M.decode(body)
+	if type(body) ~= "string" or body == "" then return nil, "PAC is empty" end
 	local bytes = #body
 	if bytes > M.MAX_BYTES then
-		return "error", string.format("PAC is %d bytes, over the %d byte limit", bytes, M.MAX_BYTES)
+		return nil, string.format("PAC is %d bytes, over the %d byte limit", bytes, M.MAX_BYTES)
 	end
-	local utf16 = body:sub(1, 2) == "\255\254" or body:sub(1, 2) == "\254\255"
 	local text, reason
-	if utf16 then
+	if body:sub(1, 2) == "\255\254" or body:sub(1, 2) == "\254\255" then
 		text, reason = decode_utf16(body:sub(3), body:byte(1) == 254)
-		if not text then return "error", reason end
+		if not text then return nil, reason end
 	else
 		text = body:sub(1, 3) == "\239\187\191" and body:sub(4) or body
 		if not valid_utf8(text) then
-			return "error", "PAC is not UTF-8 (the managed download refuses it)"
+			return nil, "PAC is not UTF-8 (the managed download refuses it)"
 		end
 	end
-	if text == "" then return "error", "PAC is empty" end
-	if text:find("\0", 1, true) then return "error", "PAC contains a null character" end
+	if text == "" then return nil, "PAC is empty" end
+	if text:find("\0", 1, true) then return nil, "PAC contains a null character" end
 	if not text:find("FindProxyForURL", 1, true) then
-		return "error", "PAC does not define FindProxyForURL"
+		return nil, "PAC does not define FindProxyForURL"
 	end
-	return "ok", string.format("HTTP 200, %d bytes, %s, FindProxyForURL found", bytes, utf16 and "UTF-16" or "UTF-8")
+	return text
 end
 
 --- Appends to a PAC failure detail what a driver whose downloads fall back to

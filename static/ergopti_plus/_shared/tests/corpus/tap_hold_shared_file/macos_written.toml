@@ -1,0 +1,62 @@
+# Hammerspoon configuration — auto-generated. Hand-edits are
+# preserved across saves provided the file remains valid TOML.
+
+
+
+
+
+[_meta]
+schema_version = 1
+
+
+
+
+
+[karabiner]
+integration_enabled = false
+
+
+
+
+
+[mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = true
+
+
+
+[mod_combos.config.escape_then_tab]
+combo = "copy"
+
+
+
+
+
+[tap_hold]
+enabled = true
+lone_modifier_tap_max_ms = 0
+sticky_timeout_ms = 1500
+time_activation_seconds = 0.25
+
+
+
+[tap_hold.keys.caps_lock]
+hold_modifier = "ctrl"
+tap_action = "backspace"
+
+
+
+[tap_hold.keys.left_ctrl]
+hold_modifier = "shift+cmd"
+
+
+
+[tap_hold.keys.left_shift]
+hold_modifier = "shift"
+tap_action = "copy"
+time_activation_seconds = 0.3
+
+
+
+[tap_hold.keys.tab]
+hold_layer = "nav"

@@ -305,6 +305,22 @@ helpers.describe("CapsWord watcher: a typed delimiter ends CapsWord only when ch
 		assert_logged(h, "delimiter typed")
 	end)
 
+	helpers.it("a second CapsWord action ends it at once and unlocks CapsLock", function()
+		-- The Mac check « a second CapsWord gesture or shortcut switches CapsWord
+		-- off and unlocks CapsLock » (TODO, To confirm on the Mac): gestures and
+		-- keyboard shortcuts both run the catalogue action, which ends a running
+		-- CapsWord through this one entry.
+		local h = fresh_harness()
+		helpers.assert_eq(h.watchers.deactivate_capsword_by_action(), true, "the watcher owns the CapsWord listener")
+		helpers.assert_eq(h.capslock, {}, "nothing is unlocked while CapsWord is off")
+		activate(h)
+		key(h, "a")
+		helpers.assert_eq(h.watchers.deactivate_capsword_by_action(), true)
+		helpers.assert_eq(#h.writers, 1, "the action ends the running CapsWord")
+		helpers.assert_eq(h.capslock, { false }, "CapsLock goes off at once, before the next letter")
+		assert_logged(h, "switched off by its action")
+	end)
+
 	helpers.it("an unchecked Space leaves CapsWord on", function()
 		local h = fresh_harness({ caps_word_terminators = { "tab", "enter" } })
 		activate(h)

@@ -298,13 +298,21 @@ function M.with_manager_session(options, body)
 		local function write(path, text)
 			local file = assert(io.open(path, "w")); assert(file:write(text)); assert(file:close())
 		end
+		-- `s.chord_bytes` is the `[mod_combos]` part of tap_hold.toml, where the
+		-- combinations' third slots live; `s.bytes` stays config.toml.
+		local function tap_text()
+			local text = require("tests.support.tap_hold_fixture").with_preset(options.tap_hold_text or "")
+			return s.chord_bytes and text .. "\n" .. s.chord_bytes or text
+		end
 		write(source_path, s.bytes)
-		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(options.tap_hold_text or ""))
+		write(tap_path, tap_text())
 		ConfigPaths.config = function(name) return name == "config.toml" and source_path or original_route(name) end
 		Files.read_with_status = function(path)
 			if path == source_path then
 				if options.on_guard then options.on_guard(s) end
 				write(source_path, s.bytes)
+			elseif path == tap_path and s.chord_bytes ~= nil then
+				write(tap_path, tap_text())
 			end
 			return original_read(path)
 		end

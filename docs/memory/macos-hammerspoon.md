@@ -1016,7 +1016,7 @@ signed installer helper.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 
-`[karabiner] integration_enabled` in `config_karabiner.toml` is read before
+`[karabiner] integration_enabled` in `tap_hold.toml` is read before
 any token, lease worker, or guardian registration, at boot and on toggle. Never
 read the older `[karabiner] enabled`: builds before 2026-09-22 wrote `false`
 there on first launch without asking. The launcher never registers the guardian
@@ -1302,6 +1302,22 @@ held before a key never cancels its `to_if_alone`, but any later key_down
 does, so a key or combo with a tap and no hold sends its tap as `to`. Action:
 prove a generator rule change through the model, extending the model from the
 source.
+
+### project-karabiner-tap-minimum-gates-each-tap-event
+
+`to_if_alone` has a maximum and no minimum, and Karabiner never feeds its own
+output back to the rules, but v16.3.0 evaluates each to-event's own
+`conditions` against the live variables when it posts it
+(`event_sender.hpp` `filter_and_replace_events`, also on `to_if_alone` at
+key-up). The tap minimum uses it: the key-down clears a `ke_held_<key>_tap_min`
+variable, a `to_delayed_action` timed by `tap_hold.tap_min_duration_ms` raises
+it, and every tap event requires it (`generator.lua` `apply_tap_minimum`). The
+delayed action is cancelled by any later key-down, never by its own key-up
+(`basic.hpp` calls `cancel` for key-downs only), so a late raise after a
+bounce is harmless: the next press clears it first. Keep the name a `ke_held_`
+logical name inside a `name` field, which the deploy scopes to the lease;
+an `expression_if` string would carry a bare, unscoped name. Rollover keys,
+which already own the delayed action, keep no minimum, as the Linux roll keys.
 
 ### project-karabiner-tap-decisions-are-only-visible-as-events
 
@@ -2054,7 +2070,7 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   `immutable=1` so the ingest never meets a lock; an issue counts only when a
   second scan sees it, and damage names the issue line count only; a running
   cache rebuild is held for the scans (`keystats_writes=rebuild_held`). The parsed
-  files are `config.toml`, `config_karabiner.toml`, personal hotstrings and
+  files are `config.toml`, `tap_hold.toml`, personal hotstrings and
   personal info, with the driver's TOML reader. The logs probe file is removed
   at once. `keystats_cache_place` is `caches`, `legacy_left` or
   `outside_caches` (cache under `~/Library/Caches/Ergopti/metrics`, no
@@ -2154,6 +2170,16 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   `log_lease_bound_failures` and `log_layout_change_before_baseline` fail on a
   `Lease-bound input startup failed` or `Layout … detected change before its
 baseline` line (item 38).
+- `field_log_signals` runs after `field_slow_lines`, one `awk` pass over
+  today's log that prints counts and enumerated names only.
+  `log_capture_stamp_errors` (the gestures « has no capture timestamp »
+  ERROR, L46), `log_window_toggle_errors` (any `window_toggle` ERROR) and
+  `log_start_rollbacks` (a dynamic or personal hotstring start or publication
+  rolled back) fail on any line. `log_three_finger_rejections` (count and most
+  frequent gate), `log_held_key_moves` (« Synthetic text moved off a held
+  key ») and `log_prediction_activity_cancels` (count and most frequent
+  activity) are information; the last two kinds are DEBUG lines, so a 0 at a
+  higher log level says nothing.
 - `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
   first so a regressed guard cannot freeze the app, checks `followed_mode`
   gives `named_pipe` and `exists` sees it, and removes the folder.

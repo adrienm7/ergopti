@@ -58,11 +58,12 @@ KbdEdit's special functions and Windows flags, export settings, nor Ergopti's ow
 layers). The `.keylayout` stays a first-class format: imported without loss and exported. No custom element goes
 into an exported `.keylayout`, since macOS may refuse to load it.
 
-- [ ] **The TOML format.** Specify it (schema, version field, comments allowed): layers and modifiers including
+- [x] **The TOML format.** Specify it (schema, version field, comments allowed): layers and modifiers including
       user-defined ones, held or locked, per-key Caps Lock mode, dead keys with chaining and multi-character
       results, ligatures, physical remapping, per-modifier alternative keys, key names, ISO base and ANSI rule,
       export metadata. Lossless round trip `.keylayout` → TOML → `.keylayout` for everything the `.keylayout` holds.
-      Foundation implemented: [TOML v1 interchange](docs/design/layout-source-format.md), strict structural validation and `tools/layout-source.cjs` preserve imported XML exactly, including unmodelled constructs. Edited mappings and new layouts still need compilers; the source model is not yet the unified editor or a driver input.
+      Foundation implemented: [TOML v1 interchange](docs/design/layout-source-format.md), strict structural validation and `tools/layout-source.cjs` preserve imported XML exactly, including unmodelled constructs.
+      Done (2026-11-11): structured records gained selector `alternatives`, compose identities (`compose = false`, `compose_as`), dead-key `state`/`action_id` names, `input_dead_key` rules, `physical.ansi_swaps` and the bundle metadata of `exports.macos`; `import-structured` turns a `.keylayout` into editable records. Round trip: preserved imports byte for byte; structured `ergopti`, `ergopti_ansi`, `ergopti_plus`, `ergopti_plus_ansi` compile back to the same behaviour state by state, with byte-identical XKB and KLC (`npm run test:layout-source-compiler`); fixture `_shared/tests/corpus/layouts/source/`. Bépo (several hardware layouts) and Ergo-L (a printable key at an unnamed macOS code) are refused with stable codes, not approximated. Structured import keeping action/state names and modifier tokens instead of normalizing them: decided by the coordinator on 2026-11-11 overnight, to review by the maintainer.
 - [ ] **One generator, every target.** From the TOML, generate the macOS bundle, the Linux XKB files, the Windows
       `.klc` plus the keyboard DLL and its unsigned installer, the AutoHotkey emulation tables, the Hammerspoon and
       Linux emulation tables, and the web emulation used by the site and the composer. Each export reports per
@@ -73,31 +74,39 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       installer from `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
       Linux milestone implemented: `tools/layout-source.cjs export-xkb` exports admitted unchanged imports into a new directory with XKB symbols/types, XCompose and `export.json`. Its report names actual modifier/output losses and always marks this projection partial; unsupported constructs refuse before writing. macOS bundles, edited mappings and native driver loading remain open.
       Windows milestone implemented: `tools/layout-source.cjs export-klc` reuses the existing Windows generator for admitted unchanged imports and writes a UTF-16LE `.klc` plus `export.json` into a new directory. The report names Ctrl/Command, system-key and virtual-key limits; unsupported Caps/dead-key/Unicode constructs refuse before writing. Native DLL compilation, installation and loading remain open.
+      Generator implemented (2026-11-11): `_shared/ui/layout_composer/source_compiler.js` is the one compiler (page, webviews and Node load it); `export-all` writes the macOS bundle (ISO + ANSI), Linux XKB and Windows KLC of a structured source into a new build directory (`build/layout-source/<id>`, never the driver tree) with a per-record report of what each target omits and why. Linux and Windows consume the compiled `.keylayout` through their existing converters (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: one intermediate form instead of per-target compilers; `alt_right` folds onto AltGr there, other sided modifiers drop their layer, a disabled character key becomes an empty cell). Left: the keyboard DLL and unsigned installer from the generated KLC (Windows, maintainer), AutoHotkey/Hammerspoon/Linux emulation tables and the web emulation generated from the source, emulation of the records no `.keylayout` carries (custom modifiers, tap-holds, shortcuts), and a golden-vector test per remaining target.
 - [ ] **Two uses of one source.** (1) The TOML source generates a standalone installable layout per OS that never
       assumes ErgoptiPlus is installed: it carries as many features as that OS expresses natively (macOS bundle,
       Linux XKB with its extra levels and dead keys, Windows DLL and installer), and the export says what was left
       out and why. (2) ErgoptiPlus loads the TOML source itself, not a per-OS file: it detects the OS, enables
       every feature that OS allows, natively or by emulation, and says which ones it cannot offer.
+      Progress (2026-11-11): (1) macOS bundle and Linux XKB are generated from the source by `export-all`, each with what it left out. (2) macOS and Linux: the layout composer host (`_shared/lua/layouts/composer.lua`, both drivers) accepts `composer_save` with an Ergopti `source` in place of a composition, stores the TOML (`layout_source.toml`) and installs/emulates its compiled `.keylayout` as the `composed` layout; the CLI report's `driver_macos`/`driver_linux` list what the drivers cannot offer (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: the page compiles with the shared JS compiler, the host never recompiles). Left: the page side of the save (unified editor item), driver emulation of custom modifiers, tap-holds and shortcuts from the source, the Windows DLL/installer. Windows counterpart (maintainer): `windows/ui/layout_manager/composer.ahk` accepts `source` + `keylayout` like `composer.lua` (`source_file`, `max_source_bytes` in `_shared/modules/layouts/defaults.json`; one form at a time), `export-all`'s `windows/` KLC feeds the keyboard DLL build and installer, and `layout_system_install` offers it.
 - [ ] **macOS export: bundle by default, ISO and ANSI.** A macOS layout can be one `.keylayout` file, but the
       default export is a `.bundle` holding both physical variants, ISO and ANSI (as `Ergopti_v2.2.0.bundle` does
       today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default), « ISO only » or « ANSI only », the
       last two giving a single `.keylayout`. Decided 2026-11-06: the user edits the ISO layout; the ANSI variant is
       derived by a fixed rule that moves the extra ISO key, and the editor can change where that key goes.
+      Generator done (2026-11-11): `export-macos <source> <dir> [bundle|iso|ansi]` (bundle by default) writes `Info.plist`, `version.plist`, both `.keylayout` and UTF-16LE `InfoPlist.strings` keyed by the internal name. The rule swaps `IntlBackslash` with `physical.ansi_extra_key` (default `Backquote`), then each `physical.ansi_swaps` pair; Ergopti's `[["Backslash", "BracketRight"]]` reproduces the registry ANSI files exactly (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: extra swaps are declared per layout, not fixed). Left: the export dialog's drop-down (editor/UI item), icons, and native loading proof on a Mac.
 - [ ] **KbdEdit parity, or better.** The editor offers every KbdEdit capability (extra modifier levels such as Kana,
       Ctrl/Alt shortcuts that send another key than the typed character, Caps Lock modes, chained dead keys and
       compose, ligatures, numpad and media keys, key remapping, sticker printing, Unicode palette, live preview),
       for free and on all three OS. Inventory and design:
       [layout-generator-kbdedit-parity.md](docs/design/layout-generator-kbdedit-parity.md).
+      Data model (2026-11-11): the format carries every modifier level the editor needs: built-in left/right/either modifiers, Caps/Num/Scroll Lock, user-defined held or locked modifiers (Kana, Roya, Loya), several selectors per layer, per-OS key overrides, shortcuts sending another key, tap-hold layers, per-key Caps Lock modes and Windows flags; the compiler reports per target which ones it cannot express. Left: the editor capabilities themselves (editor/UI items).
+      Progress (2026-11-11, [layout editor](docs/design/layout-editor.md)): the unified editor offers extra modifier levels (held or locked user modifiers and their layers), shortcuts sending another chord, Caps Lock modes, chained dead keys with terminators and multi-character results, ligatures, numpad and media keys, remapping, tap-holds, Unicode palette, printable stickers, live preview and undo/redo, on the site and in the macOS and Linux layout manager. Left: the « Still open » list of the parity doc's editor status (drag and drop, clipboard, Unicode name search, sticker sizing, NLS/flags/virtual keys, keyboard types). Edited layouts compile in the page through the shared generator (`.keylayout` ISO and ANSI).
 - [ ] **One layout editor, not three.** Decided 2026-11-06: the generator's editor is built by unifying the editors
       that already exist, never as a new parallel one: the navigation layer editor (`_shared/ui/layer_editor`, whose
       model already reads and writes a TOML file with per-OS sections), the per-layer layout composer
       (`_shared/ui/layout_composer`, which compiles a `.keylayout`) and the layout manager window that hosts it
       (`_shared/ui/layout_manager`). One shared model and one page edit every layer, the navigation layer included,
       and save the Ergopti TOML source; improve the navigation layer editor's UI on the way and retire the duplicates.
+      Progress (2026-11-11): one shared model and page (`_shared/ui/layout_editor`) edit every layer of the TOML source; `source_io.js` is the only format reader/writer; a `.keylayout` imports verbatim and converts to editable layers on request through the generator's exact importer (an approximate composer-reader conversion is offered only after its refusal, with what it drops); the navigation layer converts both ways with `layers.toml` (same binding on every OS, pinned by `test-layout-editor-model.cjs`); the layout manager window hosts it. The editor is mounted in the existing layout manager window instead of a new app window (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer). Left: move the composer's « compose layers from reference layouts » into the editor and retire its section (edited layouts already compile and install through its host), and retire the navigation layer editor once the drivers read the source's `nav` layer.
 - [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout, opens or saves the
       Ergopti TOML, imports a `.keylayout`, and downloads every generated target.
+      Progress (2026-11-11): the « Éditeur » tab (`src/routes/editeur`) frames the shared page: open/save the TOML, import a `.keylayout`, download the source, `layers.toml` and the `.keylayout` of each variant (the import unchanged, or compiled in the browser), with the per-target report. Left: downloads of the bundle, XKB, KLC and DLL targets, which the generator produces only as Node/Lua tooling today.
 - [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
       Linux. It installs or emulates the result and switches to it from the menu.
+      Progress (2026-11-11): macOS and Linux open the editor from the layout manager window and save its files through the host (`layouts/source_store.lua`, `layout_sources/` of the configuration folder). Windows: the WebView2 host needs `source_open`/`source_save` and `source_editor` in `windows/ui/layout_manager/init.ahk` as described in [layout-editor.md](docs/design/layout-editor.md#hosts); the page hides the button there meanwhile (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer). « Install and use » sends the source and its compiled `.keylayout` through the composer host, which installs it as the composed layout and switches to it (macOS defers to the next login when it must). Left: a native check of that install on a Mac and a Linux desktop, the Windows host (`windows/ui/layout_manager/composer.ahk` accepts no source yet), and macOS file picking in the Hammerspoon webview.
 
 ## Parity audit pause and resumption
 
@@ -107,6 +116,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 - [ ] **[CODE] Parity audit continuation:** on resumption, reconcile current source areas with the linked coverage register, then deepen tap-holds/chords/layers as one bounded module across Windows/macOS/Linux/shared before moving to another. Keep native receiving and implementation of existing finding IDs separate; do not restart completed focused campaigns without source drift or a new hypothesis.
       Progress (10 November 2026, [tap-hold campaign](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): census reconciled (375 areas, 12 new and 206 changed since the last pinned census, still to review outside tap-holds). Fixed on Linux/shared: LAlt's Tab tap with no hold is tap-only (THL-001), the Alt-Tab and RCtrl Tab taps keep their strict threshold (THL-002), a pair starts from the earliest held first key (THL-003), a pair's release tap respects the decided tap minimum (THL-004), chord defaults pinned across drivers (THS-001). Decisions pending: THD-1, THD-3, THD-4 (pair tap and the layer, layer-hold pair activity, macOS thumb Backspace under modifiers) and THD-2's lone window. Minimum tap (decided 2026-11-10): Linux complete; macOS needs a Karabiner mechanism qualified on a Mac (`to_if_alone` has no minimum); Windows is the maintainer's change. Left: the report's Linux and macOS remaining rows; native receiving unqualified. Next module after this one: hotstring cascade.
+      macOS minimum tap (11 November 2026): done in the generator. Each release-judged tap, a pair's included, is gated on a lease-scoped variable a `to_delayed_action` raises after `tap_hold.tap_min_duration_ms` (Karabiner v16 evaluates a to-event's own conditions when it posts it); the rollover keys keep no minimum, as the Linux roll keys. Generator test `test_generator_tap_minimum.lua`, corpus vectors without their macOS divergence; native timing under « To confirm on the Mac ».
 
 ## Dead-key composition parity follow-up
 
@@ -189,7 +199,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [x] **Linux:** correct stale platform-reason translations after checking all consumers and all locales: `platform_reason.llm_configuration_surface_is_not_on_linux` contradicts the Linux model/profile/generation providers, and `platform_reason.metrics_extras_are_not_on_linux` contradicts the exclusion handler. Avoid treating these stale strings as proof of missing functionality. Done: the generation-submenu reason now names Linux's inline rows (new key, 21 locales); the unconsumed exclusion-list refusal is removed.
 - [x] **Linux:** add user management of wrap-symbol pairs (custom add/delete, enable/disable and bulk actions): the existing menu only invokes the shared fixed pairs. Inspect `linux/ui/menu/menu_shortcuts.lua` and the Windows/macOS wrap menu owners. Done (aligned on Windows/macOS): the Linux wrap submenu draws the shared controls (check/uncheck all, restore, one group per catalogue family with its own check/uncheck all, custom add/delete) and stores the choices in config.toml `shortcuts.wrap_symbols` through the shared `menu/wrap_preferences` planner, macOS's store; the shortcuts manager wraps only with the active pairs. The former click-to-wrap rows are replaced by these toggles (the `wrap_selection` action stays bindable).
 - [x] **Linux Wayland:** investigate supported compositor interfaces for focused-application identity on GNOME, KDE, COSMIC and Weston; the current adapter cannot supply it there, limiting per-application rules. Preserve unknown/fail-closed behavior where no safe interface exists. Done (6 November 2026): every wlr-foreign-toplevel compositor (labwc, Wayfire, river and the other wlroots ones) now answers through `lswt -j` in `linux/adapters/window_info.lua`, after sway, Hyprland and niri; a listing without activation state, with none or with two activated toplevels stays unknown. Findings for the others: GNOME admits `org.gnome.Shell.Introspect` to allow-listed senders only and removed Shell.Eval, so only an Ergopti Shell extension could ask; KWin answers only a loaded script, which must call back a D-Bus name the daemon owns; COSMIC's `zcosmic_toplevel_info_v1` needs a native Wayland client (ext-foreign-toplevel-list carries no activation); Weston has no such protocol. They stay unknown, fail-closed.
-- [ ] **Linux Wayland:** focused-application identity on GNOME, KDE and COSMIC, from the findings above: an Ergopti GNOME Shell extension exposing the focused window's WM class, title and pid on the session bus (installed and enabled by the installer), a persistent KWin script calling back a session-bus name the daemon owns on `workspace.windowActivated`, and a native `zcosmic_toplevel_info_v1` client for COSMIC. Each needs its desktop to be qualified on real hardware. Code done for GNOME and KDE (10 November 2026): the GNOME Shell extension (`linux/desktop_focus/gnome/`, `focus@ergopti.fr`, GNOME 45 and later) and the KWin script (`linux/desktop_focus/kwin/`, Plasma 5 and 6) call `org.ergopti.Focus1.Activated(class, title, pid, id)` on the session-bus name `org.ergopti.Focus`, owned by a resident worker (`linux/adapters/compositor_focus_worker.lua`, libgio) that admits only the current owner of `org.gnome.Shell` or `org.kde.KWin`; the daemon reads its lines (`linux/adapters/compositor_focus.lua`) and `window_info` answers the 4×/s poll from memory, no fork, unknown before the first report, after a malformed one or once the worker exits. `install/compositor_focus.sh` installs and enables them for the running desktop (once: an update keeps a user's off switch; GNOME for the next login when the Shell refuses), run by install.sh and by launch.sh at every start (so .deb, .rpm and AppImage users get them too; Flatpak's private data folder cannot), removed by uninstall.sh. Tests: `test_compositor_focus.lua`, `test_compositor_focus_assets.lua`, `tools/test/test-linux-compositor-focus-install.cjs`, and the worker on a real dbus-daemon (`tests/hardware/run_compositor_focus_bus.lua`). Left: COSMIC (a `zcosmic_toplevel_info_v1` client means hand-built libwayland-client interface tables over FFI that nothing here can run against without cosmic-comp; it stays unknown), and the real-desktop check under « To confirm on Linux ».
+- [ ] **Linux Wayland:** focused-application identity on GNOME, KDE and COSMIC, from the findings above: an Ergopti GNOME Shell extension exposing the focused window's WM class, title and pid on the session bus (installed and enabled by the installer), a persistent KWin script calling back a session-bus name the daemon owns on `workspace.windowActivated`, and a native `zcosmic_toplevel_info_v1` client for COSMIC. Each needs its desktop to be qualified on real hardware. Code done for GNOME and KDE (10 November 2026): the GNOME Shell extension (`linux/desktop_focus/gnome/`, `focus@ergopti.fr`, GNOME 45 and later) and the KWin script (`linux/desktop_focus/kwin/`, Plasma 5 and 6) call `org.ergopti.Focus1.Activated(class, title, pid, id)` on the session-bus name `org.ergopti.Focus`, owned by a resident worker (`linux/adapters/compositor_focus_worker.lua`, libgio) that admits only the current owner of `org.gnome.Shell` or `org.kde.KWin`; the daemon reads its lines (`linux/adapters/compositor_focus.lua`) and `window_info` answers the 4×/s poll from memory, no fork, unknown before the first report, after a malformed one or once the worker exits. `install/compositor_focus.sh` installs and enables them for the running desktop (once: an update keeps a user's off switch; GNOME for the next login when the Shell refuses), run by install.sh and by launch.sh at every start (so .deb, .rpm and AppImage users get them too; Flatpak's private data folder cannot), removed by uninstall.sh. Tests: `test_compositor_focus.lua`, `test_compositor_focus_assets.lua`, `tools/test/test-linux-compositor-focus-install.cjs`, and the worker on a real dbus-daemon (`tests/hardware/run_compositor_focus_bus.lua`). Left: COSMIC (a `zcosmic_toplevel_info_v1` client means hand-built libwayland-client interface tables over FFI that nothing here can run against without cosmic-comp; it stays unknown), and the real-desktop check under « To confirm on Linux ». COSMIC code done (11 November 2026): `linux/adapters/cosmic_toplevel_worker.lua` binds `zcosmic_toplevel_info_v1` version 1 through libwayland-client with hand-built interface tables (the clipboard owner's pattern), commits each window on `done` and prints the single activated window as a focus record (app_id as class, no pid; none or two activated is a clear, `finished` ends the worker); `compositor_focus` starts it for `XDG_CURRENT_DESKTOP` COSMIC and `window_info` answers from memory as for GNOME and KDE (identity `cosmic::<id>`). Proved through the real libwayland-client against a LuaJIT protocol fake (`tests/hardware/run_cosmic_toplevel_fake.lua`, 7 receipts, run in the compositor-focus CI step) plus the tracker unit tests; version 1 (rather than v2 and later, which announce windows through ext-foreign-toplevel-list) decided by the coordinator on 2026-11-11 overnight, to review by the maintainer. Left: a real cosmic-comp run (it may only offer the later versions' announcement) under « To confirm on Linux ».
 - [x] **Linux:** investigate a safe copy-confirmation mechanism on Wayland and X11 without xclip; tap-hold copy currently sends the keys without the retry/confirmation used when a clipboard change counter is available. Done (aligned on Windows/macOS): X11 without xclip reads the CLIPBOARD owner's ICCCM TIMESTAMP through libX11 (`linux/adapters/x11_selection_stamp.lua`, proven on Xvfb by `tests/hardware/run_x11_selection_stamp.lua` in CI); Wayland counts the selection changes of a `wl-paste --watch` child the tap-hold manager owns (`linux/adapters/wayland_selection_counter.lua`, the offered content drained to /dev/null). Both feed the same check, retry and warning as xclip. A compositor without data-control (GNOME) makes `wl-paste --watch` exit, so there the copy stays unchecked, said once in the log; no client-side counter exists there.
 - [x] **Linux:** investigate `open_personal_shortcuts`: the action opens `personal_shortcuts.toml`, but the menu and loader describe keyboard slots stored in `config.toml`, and no production reader of that file was found. Route it to the actual owner or remove the misleading action after runtime verification. Decided 2026-11-06 (align on the most complete OS): Windows (`GestureEditPersonalShortcuts`, the programmable personal `.ahk`) and macOS (`PersonalShortcutsLuaPath`) open the driver's programmable personal source, the default of `script_altgr_delete`; Linux follows by opening its own programmable source, or the action is retired there with a reason. Done (aligned on Windows/macOS): the action opens `personal_shortcuts.lua` in the configuration folder, created from a commented template when absent (exclusive create, never overwritten), and the daemon runs it once at the end of its services in a protected call (`linux/infra/personal_shortcuts.lua`), as macOS runs its file with dofile; the dead `personal_shortcuts.toml` target is gone. Linux offers no hotkey API to that file: bindings stay in config.toml.
 - [x] **Linux:** evaluate accented-key shortcut remapping on layouts where those keys are not shortcut letters (`platform_reason.accented_shortcuts_are_windows`). Done (aligned on Windows): `linux/modules/shortcuts/accented_shortcuts.lua` turns Ctrl, Alt or Super (Shift riding along) on a key whose plain press types è, ê, é or à in the loaded keymap into the chord on the chosen letter, from the keyboard hook's consumption callback under the Shortcuts master; AltGr is left alone and a digit-row key stays a digit while the row types digits first. The four `shortcuts.<letter>` settings and the « Raccourcis sur les lettres accentuées » letter pickers of the layout menu are declared for `linux`; the reason now names macOS alone (`platform_reason.accented_shortcuts_need_a_layout_file_on_macos`, 21 locales).
@@ -329,7 +339,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [x] **[CODE] MRT-001:** Approval-watch deadline counts polling intervals rather than elapsed time. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the watch takes a monotonic `now` port and checks one absolute deadline before each look and each result.
 - [x] **[CODE] MRT-002:** Refused command watchdog leaves pending installation without its local deadline. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Already fixed by b4335a81ec (refused deadline retires the exact child; case `field-command-timer-refusal`).
 - [x] **[CODE] MRT-003:** Malformed cached receipt is accepted by Lua but permanently refused by the Swift install source. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the Lua cache requires the exact `digest\n` bytes the Swift source requires, so a damaged receipt is refetched.
-- [ ] **[CODE] MRT-004:** Advertised reinstall route always refuses an already published runtime needing service recovery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Decided 2026-11-06: a localized « Réparer le service » action backed by a new authenticated helper role ([maintainer decision](docs/memory/maintainer-decisions.md)). Open: the role must adopt an existing exact Core/VirtualHIDDevice plist and settle the first-start `core.json` fence, which today's provision owners refuse; it needs a Swift build and native macOS qualification. Windows and Linux have no installed privileged remap service.
+- [x] **[CODE] MRT-004:** Advertised reinstall route always refuses an already published runtime needing service recovery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Decided 2026-11-06: a localized « Réparer le service » action backed by a new authenticated helper role ([maintainer decision](docs/memory/maintainer-decisions.md)). Windows and Linux have no installed privileged remap service.
+      Done in code (11 November 2026): `runtime_job_not_loaded` shows « Réparer le service… » (21 locales) instead of the first install; the launcher role `--request-owned-runtime-repair` stages the same verified helper, whose `--owned-repair-service` role (`OwnedRuntimeServiceRepairEntry`) takes the standalone provision authority (root, staged signature, exclusive lifecycle lock, no install journal, installed Runtime byte-identical to its payload), adopts only an exact root-owned 0644 Core/VirtualHIDDevice plist (ledger state `adopted`, given back on rollback), starts what is not loaded and leaves a loaded job alone. The `core.json` fence is kept unchanged (Core starts only while the system `core.json` is absent, which Ergopti never writes; a present one is never moved or removed): decided by the coordinator on 2026-11-11 overnight, to review by the maintainer. XCTest `OwnedRuntimeServiceRepairTests`, Lua `test_runtime_service_repair.lua`. The helper ships in the runtime build: a runtime rebuild and its manifest pin are the maintainer's release step; the Mac line below keeps only the native administrator-prompt flow.
 - [x] **[CODE] MRT-006:** False native System Settings opener result is accepted without failure diagnostics. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the watch keeps the native boolean and logs a false/nil opening as a refusal.
 
 ### macos-webview
@@ -353,7 +364,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### Qualification and policy follow-up
 
-- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries.
+- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain.
 - [x] **[POLICY] macOS local crash reports:** clarify raw local error/stack retention versus the existing no-PII comment; Windows explicitly keeps full local crash detail and Linux redacts before persistence. Shared exported diagnostics and day logs pass the canary control. No network disclosure or mandatory identical local retention policy is established. Done: decided 2026-11-06 (see maintainer-decisions): macOS redacts the whole report through the logger redactor before opening it and refuses the report if the redactor cannot answer, as Linux does; test crash-redaction.
 - [x] **[COVERAGE] Windows managed-runtime fixture:** update or retire the unregistered legacy direct-child bootstrap fixture; the registered current fixture correctly uses the nested managed path. Do not treat the old fixture as a product install failure. Partly done: the fixture now nests its root like the registered one (source guard in `test-windows-managed-bootstrap.cjs`); it holds the only reuse and runtime-receipt retirement cases, so registering it in `ci-windows.yml` remains, after a first native Windows run (hardware only, listed under « To confirm on the Windows PC »). Moved 2026-11-06: the code part is done (85fa0cfee, nested root guarded by `test-windows-managed-bootstrap.cjs`, re-run green); registering it in `ci-windows.yml` needs that first native run and lives under « To confirm on the Windows PC ».
 
@@ -389,7 +400,8 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 
 - [ ] **[PHYS-W]:** receive the recovery audit scenarios on isolated Windows: actual AHK migration, DirMove/ACL refusal, old-locator transition recovery and native swap/boot-ready events. Private shared-Lua/PowerShell fixtures do not close Win32 qualification.
 - [ ] **[PHYS-M]:** receive the recovery audit scenarios on isolated macOS: Darwin migration/permission/rename contracts, selected-profile restart adoption and Versions ARMED/refused-exit reconciliation. Linux physical ports do not close Hammerspoon/APFS qualification.
-- [ ] **[PHYS-L]:** receive the recovery audit scenarios in an isolated real standalone installation: owned smoke deadline and responsive input/event loop, actual systemd/relay restart and successor observation. Disposable filesystem fixtures do not close live daemon qualification.
+- [x] **[PHYS-L]:** receive the recovery audit scenarios in an isolated real standalone installation: owned smoke deadline and responsive input/event loop, actual systemd/relay restart and successor observation. Disposable filesystem fixtures do not close live daemon qualification. Done 2026-11-11 (container proof, [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)): `tests/hardware/phys_live_guest.sh` in an Ubuntu 24.04 VM (real kernel, uinput, systemd 255 user manager; `run_phys_vm.sh`) after the real install.sh, 25/25 checks: the reload under the unit restarts through the user manager and the successor completes it, the relay successor completes it outside the unit, the installed async installer cuts a hung `--help` smoke at its deadline and restores the tree while the daemon re-emits 300/300 grabbed keys. It found and fixed two defects: the ownership owner ran synchronously on the event loop (85093f81) and a reload with a WebView open crashed the daemon, WebKit holding SIGUSR1 (44b2e10f).
+- [ ] **[CODE] Linux reinstall leaves unowned files:** `install.sh` extracts over an existing `~/.local/lib/ergopti` (`tar -xf`, `cp -r`) and never removes files the previous version owned but the new one dropped, so a reinstalled tree fails `Ownership.verify` against its own receipt (4 leftover files after moving 4 test scripts, seen by `tests/hardware/phys_smoke_deadline.lua`). Once that tree becomes `<root>.old`, the next update refuses ("previous backup could not be retired") until the user deletes it. Fix direction: remove previously owned files whose bytes still match the old receipt, as uninstall does; regression through the install sandbox test.
 
 ### Capability parity review
 
@@ -492,7 +504,7 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
       the next runtime rebuild. The launcher role asks for an AppleScript administrator prompt, which a hosted runner
       cannot answer, so driving the acceptance through it is a Mac check under « To confirm on the Mac ».
 - [x] **Field checks report a missing owned runtime as broken config.** With the owned runtime selected but not admitted, nothing is generated: `field_tap_hold_thresholds` fails `unreadable` on the never-created `karabiner.json` (`adapters/field_check_ports.lua:121-149`), and `field_tap_copy` counts the nil deployed timeout as short (`infra/field_check_tap_copy.lua:72-74`). Both should report `skip:runtime_not_admitted`. Done: already fixed on the base by b1e99eb01b (thresholds skip `owned_runtime_not_ready`, tap copy skips `not_deployed`).
-- [ ] **Field run follow-ups from the 2026-11-05 report (30 pass, 12 fail).**
+- [x] **Field run follow-ups from the 2026-11-05 report (30 pass, 12 fail).**
   - `field_lease` runs before `field_owned_install` in `data/field_run.json`: move it after `owned_install_reload`, and report `cli_present`, `guardian_state` and `cli_version` as `skip:owned_runtime_not_admitted` without the 30 s guardian wait when the owned runtime is not admitted (`infra/field_check_checks.lua:129-171`). Its `config_present` reads the shared `~/.config/karabiner/karabiner.json` instead of `KePaths.config_file_for(KePaths.selected_runtime())`. Done (0dc5c48479).
   - `field_owned_runtime` fails `capture_unloaded` on every owned boot: `runtime_owner_ports.new()` loads `physical_capture` eagerly (`adapters/runtime_owner_ports.lua:294`). Make that check info now that owned is the default, or the require lazy. Done: now an info step (89e046e0ed); a lazy require cannot hold once the owned capture runs.
   - `field_owned_start` fails `user_karabiner_closed` when the runtime is not ready; leaving the user's Karabiner-Elements running is then correct (`infra/field_check_owned_activation.lua:88-95`): `skip:runtime_not_ready`. Done (d05e9b9dbe).
@@ -501,10 +513,10 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
   - `key_accounting` fails `window_unfocused` intermittently: the first key asks `hs.window.focusedWindow()` once, 0.6 s after the scratch window shows, and a 523 ms main-thread hold made it miss (`adapters/field_probe_ports.lua:711-714, 799`). Wait for the window's own focus report, and give the two refusal sites distinct tokens. Done: Accessibility is asked only after the window's own focus report, refusals `window_unfocused` / `focus_unreported` / `ax_window_mismatch` (a7143d5ac6).
   - `diagnostics` fails `phase_a_budget` at 5.2 ms against 5 ms: phase A's permissions section calls `hs.accessibilityState` and `screenRecordingState` live (`ui/healthcheck/helpers.lua:436-461`), which breaks the schema's rule that phase A reads memory only. Cache both from the boot and screen-capture reads, or make them a probe; keep the 5 ms budget. Done: phase A reads the cached last live answers, unknown before the first read (c94c7dfe2a, 23ee43ba52).
   - The managed Ollama daemon still fails at the native guardian (`platform/suspended_image_owner.py`, `V1 REFUSED <errno>`); the next report names the errno (`cleanup_guardian_refused`) and the installed app's strict signature (`app_signature` step). Done earlier: `cleanup_guardian_refused` and the `app_signature` step exist.
-  - **A resting thumb turns a 2-finger swipe into a 3-finger one** (20:06, `tab_close` fired; also a held `tap_3` left click at 20:04). The join gate accepts a third contact after 20 ms with no spatial check (`modules/gestures/engine.lua:1193, 1204-1228`, cohesion `:301-321`); that contact sat about 60 units from the pair. Log each contact's position and `majorAxis` when a count is accepted, calibrate a max finger gap from the next report, then refuse a far or oversized contact at both join paths and at the 3-finger tap commit, with the three cases of the field report as regression tests. Logging done: both join paths log each contact's position and major axis (`Geometry.describeContacts`). Open: the refusal needs the next field report's positions to calibrate; Linux's `mt_decoder` join has no spatial check either and takes the same rule then.
+  - **A resting thumb turns a 2-finger swipe into a 3-finger one** (20:06, `tab_close` fired; also a held `tap_3` left click at 20:04). The join gate accepts a third contact after 20 ms with no spatial check (`modules/gestures/engine.lua:1193, 1204-1228`, cohesion `:301-321`); that contact sat about 60 units from the pair. Log each contact's position and `majorAxis` when a count is accepted, calibrate a max finger gap from the next report, then refuse a far or oversized contact at both join paths and at the 3-finger tap commit, with the three cases of the field report as regression tests. Logging done: both join paths log each contact's position and major axis (`Geometry.describeContacts`). Open: the refusal needs the next field report's positions to calibrate; Linux's `mt_decoder` join has no spatial check either and takes the same rule then. Done 2026-11-11 without calibration: one shared rule (`_shared/lua/gestures/contact_join.lua`) refuses a third contact farther than 35 mm (`MAX_FINGER_GAP_MM`) from the nearest other or whose major axis exceeds 1.5 times the largest other (`MAX_MAJOR_RATIO`), from finger geometry (fingertips of one hand 18-22 mm apart, under 30 mm spread; the field thumb about 60 mm away); macOS asks it at both join paths and at the 3-finger tap commit, Linux's `mt_decoder` before a count of three becomes the gesture's (millimetres from the pad's resolution, libinput's assumed size without one; ABS_MT_TOUCH_MAJOR read for the size rule). Four and five fingers are not judged. Regressions `test_resting_thumb_join` on both drivers (20:06 far thumb on a swipe, 20:04 held tap_3, oversized thumb; a real hand still joins). Bounds decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: tighten them from the positions the next Mac field report logs.
   - After "Restore recommended", show the Trackpad settings dialog when a recommended slot is still claimed by macOS (`ui/menu/menu_gestures.lua:420`); the restore never touches macOS settings. Add a read-only `defaults read` of the Trackpad and Dock gesture keys to the Mac field report. Done (70ff74f1c6, a42c702a85; the Dock read covers only the gesture switches).
   - The tap commit skips the macOS conflict gate (HS-011 / MG002, `modules/gestures/engine.lua:708`). Done with HS-011.
-  - The Mac's LogsDirPath still ends in the old `ergopti_plus` folder, so logs land in `…/ergopti_plus/Ergopti/`; the migration only rewrites old default folders. Open: needs the real value from the Mac and a decision on renaming a custom folder named like the old app folder.
+  - The Mac's LogsDirPath still ends in the old `ergopti_plus` folder, so logs land in `…/ergopti_plus/Ergopti/`; the migration only rewrites old default folders. Open: needs the real value from the Mac and a decision on renaming a custom folder named like the old app folder. Done 2026-11-11 (decided by the coordinator overnight, to review by the maintainer): a custom logs folder whose last name is exactly the old folder name, or its `Ergopti` subfolder as config_paths saves it, becomes the same parent's `Ergopti`; the logs of its `Ergopti` subfolder merge there (backup under the support root's before-folder-migration/custom-logs), the user's own entries stay, any other custom folder is kept. macOS rewrites LogsDirPath after the paths.toml backup (`adapters/legacy_folder_migration.lua`, shared `renamed` rule of `_shared/lua/legacy_folder_migration.lua`); Linux renames `paths.logs_dir` the same way (`infra/legacy_folder_migration.lua`). Tests `legacy-folder-migration-macos-custom-logs`/`-custom-kept` and the Linux pair. Windows counterpart (`infra/legacy_folder_migration.ahk`, LogsDirPath) left to the maintainer; the shared vectors are unchanged so the AHK replay stays green.
 
 ### Linux
 
@@ -648,23 +660,39 @@ three-OS CI is green on the final source. See the handoff above for the current 
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
 - [ ] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
-      did, Cmd versus Ctrl aside. Today the tap-hold settings live in three shapes: Windows `config.toml` plus
-      `tap_hold.toml`, macOS `config_karabiner.toml` (keys, global delay, sticky delay, key combinations, and now
-      `tap_holds.lone_modifier_tap_max_ms`), Linux `tap_hold.toml` (keys, switch, and the lone tap window) plus
-      `config.toml` (`mod_combos`). Pick one home per manifest path (the manifest's `config.toml` for every
-      `[[features.*]]` row, one shared tap-hold file for the keys), move each driver's reader and writer to it,
-      with one migration of the old files, and a cross-driver test that writes a file on one driver and reads it on
-      the other two.
-      Not started (survey of 6 November). Readers and writers today: macOS `platform/remap/config.lua`
-      (`load_user_config` / `save_user_config` of `config_karabiner.toml`, plus the integration section and the
-      Karabiner generator reading it), Linux `platform/remap/tap_hold_loader.lua` / `tap_hold_writer.lua` (sections
-      `[tap_hold]` and `[tap_hold.keys.<id>]`, switch and lone tap window there, `mod_combos` in `config.toml`),
-      Windows `platform/remap/tap_hold_loader.ahk` / `tap_hold_writer.ahk` / `tap_hold_migration.ahk` plus
-      `config.toml`. The shared pieces to build on: `_shared/tap_hold/defaults.toml` (key ids already shared),
-      `_shared/lua/tap_hold/migrate.lua` with `_shared/tap_hold/migrations.toml` (versioned, Lua only; Windows has its
-      own port). Needs a decision on the shared file name and on what stays macOS-only (Karabiner integration
-      section), then one owner per path, the Windows reader/writer moved (AHK, not runnable in the container), and the
-      cross-driver write-on-one/read-on-the-other-two test.
+      did, Cmd versus Ctrl aside. Decided 2026-11-10: one shared `tap_hold.toml` (keys, global and sticky delays,
+      lone-tap window, `mod_combos`; macOS-only `[karabiner]` section), `config.toml` keeps the `[[features.*]]` rows.
+      Done on macOS and in the shared pieces: the layout is specified in `_shared/tap_hold/SCHEMA.md`,
+      `_shared/tap_hold/shared_file.toml` and `_shared/core/config_schema/tap_hold.schema.json`; macOS reads and writes
+      `hammerspoon/tap_hold.toml` through `platform/remap/tap_hold_file.lua` and `_shared/lua/tap_hold/shared_file.lua`
+      (catalogue key ids, `<first>_then_<second>` pairs, seconds, `+`-joined holds, only changed leaves written) and
+      carries an old `config_karabiner.toml` over once (`migrations.toml` `[legacy_imports.hs]`, renamed
+      `.migrated`); Linux leaves another driver's keys alone and names a macOS `hold_action` once. The cross-driver
+      corpus `_shared/tests/corpus/tap_hold_shared_file/` pins each Lua writer's file byte for byte and what each
+      reader reads from both (`expected.toml`, contract `_shared/lua/test/tap_hold_shared_file_contract.lua`).
+      Left: Windows (maintainer), below; Linux and macOS are done.
+  - [x] **Linux `[mod_combos]` in `tap_hold.toml`.** Decided by the coordinator on 2026-11-11 overnight, to review by
+        the maintainer: the `[[features.mod_combos]]` rows keep their manifest declaration and are stored in
+        `tap_hold.toml`, as on macOS. `modules/shortcuts/key_combinations.lua` reads the taps, holds and switch from
+        `config.toml` and `[mod_combos]` from `tap_hold.toml` only, every receipt and lease check covering both files;
+        `infra/key_combinations_scope.lua` and `infra/shortcuts_scope.lua` publish `mod_combos.*` rows through the
+        transaction's new `companions` port, prepared by `tap_hold_writer.prepare_combo_rows` (versioned, stamped,
+        line-preserving), with its own backup and inverse. The boot moves `config.toml` `[mod_combos]` once
+        (`tap_hold_writer.import_config_combos`, `[legacy_imports.linux]`, translation `config_section` in
+        `migrate.lua`): both files backed up, `tap_hold.toml` published first, a crash between the writes finished
+        at the next start, a different `[mod_combos]` already in `tap_hold.toml` wins. `expected.toml` pins what
+        Linux reads of both corpus files' `[mod_combos]`.
+  - [ ] **Windows shared `tap_hold.toml` (maintainer).** `tap_hold_loader.ahk` / `tap_hold_writer.ahk` read and write
+        the shared layout: catalogue ids, `[mod_combos]` in `tap_hold.toml` (the combinations' reader and writer move
+        there, `config.toml` keeps the pair taps, holds and `[category_enabled] key_combinations`), ignore
+        `[karabiner]`, `hold_action`, `cmd`/`fn` with one warning, write `_meta.schema_version`. A
+        `[legacy_imports.ahk]` entry with `translate = "config_section"` and `section = "mod_combos"` moves
+        `config.toml` `[mod_combos]` the way Linux does (both backed up, `tap_hold.toml` first, equal copies only
+        delete the old one, a different shared copy wins), beside the Windows `config.toml` tap-hold keys' own
+        import. `tap_hold_migration.ahk` accepts the `[legacy_imports]` table of `migrations.toml` and validates it
+        like `migrate.parse_legacy_imports` (per translation: `retired_suffix` for `karabiner`, `section` for
+        `config_section`). The AHK suite reads both corpus files with `[reads.<file>.ahk]` added to `expected.toml`,
+        `mod_combos` included.
 - [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
@@ -717,13 +745,14 @@ three-OS CI is green on the final source. See the handoff above for the current 
 
 ## To confirm on the Mac
 
-- [ ] Hotstring section order: move a section up/down, reopen and restart to prove persistence, reset the order, and refuse a stale menu after config changes.
-- [ ] WPM: a pointer move after the last physical keystroke hides the widget unless a preview or drag is active; overlapping source holds show AI before hotstrings before autocorrection, and pause/restart removes old holds.
+- [x] Hotstring section order: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_section_order_round_trip` chains the menu, `Preferences.save` and `Preferences.load` (move, restart, stale menu after a reload refused, reset), with `test_section_order` and `test_hotstring_bulk_checkboxes`. The round trip found the reset kept the old order in `config.toml` (fixed: a reset commits an empty order).
+- [x] WPM: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_wpm_widget_mouse_throttle` (pointer hides, preview and drag keep it), `test_wpm_activity` (AI before hotstrings before autocorrection with overlapping holds; reset, stop/start and the new metrics-pause case leave no hold).
 
-- [ ] PAC route lists: use a real PAC with a dead relay followed by DIRECT or a live relay; preserve ordered selection, the shared timeout and refusal after expiry. Native XCTest milestone: `ManagedProxyRouteWorkerTests` compiled and passed all 23 cases on macOS 26 in [CI run 42374265115](https://github.com/adrienm7/ergopti/actions/runs/42374265115/job/128410747338), source `07dda15c1`, including the native TCP listener probe. The injected route-list cases do not close application receiving with a real PAC.
-- [ ] Personal aliases: configure cased Unicode aliases, type and erase a combo one scalar at a time, and confirm preview and expansion agree in native applications.
+- [ ] PAC route lists with a real PAC (dead relay then DIRECT or a live relay): field report: `field_network` (`route_lookup`) and `field_pac_fallback` on a network with a PAC. Native XCTest milestone: `ManagedProxyRouteWorkerTests` compiled and passed all 23 cases on macOS 26 in [CI run 42374265115](https://github.com/adrienm7/ergopti/actions/runs/42374265115/job/128410747338), source `07dda15c1`, including the native TCP listener probe; the injected route-list cases do not close application receiving with a real PAC.
+- [x] Personal aliases: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_personal_info_combo_matches_buffer` types a cased Unicode combo, erases it one scalar at a time and checks at every length that the preview names exactly what the expansion types, then that erasing past the last scalar ends it; delivery into a native app is the field report's `hotstring_roundtrip`.
 
-- [ ] **MRT-004 « Réparer le service »:** decided 2026-11-06, not built: a new authenticated helper role that adopts an existing exact Core/VirtualHIDDevice plist and settles the first-start `core.json` fence; needs a Swift build and native macOS qualification, then i18n in the 21 locales.
+- [ ] Minimum tap: with CapsLock set to Enter on tap and Ctrl on hold, a bounce of about 20 ms types nothing and leaves no Ctrl held, a 60 ms tap types Enter, and Space still types at once in fast typing (owned runtime `to_delayed_action` timing, generator `apply_tap_minimum`).
+- [ ] **MRT-004 « Réparer le service »:** after the runtime rebuild that ships the repair role, unload the owned Core job (`sudo launchctl bootout system/com.ergoptiplus.runtime.core`), reload: the Tap-Holds menu says the service is stopped and offers « Réparer le service… »; confirm, enter the administrator password, and the answer is `service-repaired-observed`, the Core runs again from the adopted plist and the tap-holds work after the reload. Repeat with the VirtualHIDDevice job unloaded.
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
 `bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in
@@ -739,35 +768,19 @@ Field run, no person needed (read the next report):
       `menu_item.shortcuts` / `menu_keyboard_layout.sources` phases, `diagnostics` phase A under 5 ms, `idle_cost`
       below 8 %, and `granite4:350m-h` pulled with no `digest_mismatch`. A remaining one is a code entry with its
       report lines.
-- [ ] Release swap boot-ready: install a chosen release from the Versions window; `swap.log` ends with « reported a
-      healthy start ». Then a chosen build that cannot boot (rename its `init.lua` in the staged app before the quit)
-      is moved to `ErgoptiPlus.app.failed-<pid>` within 60 s and the previous app opens (exit 9).
-- [ ] Two copies and one Accessibility switch: with a local `build/macos` copy registered beside the `/Applications`
-      prerelease, an untrusted boot logs the other copy, does not run `tccutil reset`, and the dialog names
-      `…/build/macos/ErgoptiPlus.app`; once that copy is trashed and the switch turned on, the boot resumes.
-- [ ] Owned runtime install through the launcher: after the next runtime rebuild, Tap-Holds > install the owned
-      runtime (the `--request-owned-runtime-install` role, its administrator prompt answered) installs and reports
-      `files-published-services-observed-staging-retired`, and the helper's report path admits its one SHA-256 code
-      directory (no `helper_signature` or report refusal in the launcher log).
-- [ ] Managed Ollama 0.40.6: rebuild the managed runtime (`tools/build/build-macos-managed-ollama.py`, Go and macOS
-      cells), then `field_ai_local` pulls a model behind a PAC-only or explicit proxy with no direct route, and the
-      native receiver passes with its registry at 8.8.8.8.
-- [ ] Physical shortcut delivery: the same proof as on Linux (source suppressed once, no other owner acts, output reaches the focused app) under Karabiner and the keymap tap, before `keyboard_shortcuts.physical_delivery_available` may turn true; meanwhile the « Raccourcis physiques » row is greyed with « Pas encore disponible ».
+- [x] Release swap boot-ready: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_release_installer` « the replacement script under /bin/sh » keeps a chosen app whose boot reports ready (« reported a healthy start »), and moves one that never reports to `ErgoptiPlus.app.failed-<pid>`, reopens the previous one and exits 9.
+- [ ] Two copies and one Accessibility switch: field report: `field_login_items` (each copy and whose it is) and `field_permissions` (`accessibility`, bundle identity), run once with a `build/macos` copy registered beside the `/Applications` prerelease: no `tccutil reset`, the dialog names `…/build/macos/ErgoptiPlus.app`, the boot resumes once that copy is trashed and the switch on.
+- [ ] Owned runtime install through the launcher (after the next runtime rebuild): field report: `field_owned_install` then `owned_install_reload` (`files-published-services-observed-staging-retired`, no `helper_signature` or report refusal); the administrator prompt is its one human step.
+- [ ] Managed Ollama 0.40.6 (rebuild with `tools/build/build-macos-managed-ollama.py` first): field report: `field_ai_local` behind a PAC-only or explicit proxy with no direct route, and `field_network_hosts` (the registry).
+- [ ] Physical shortcut delivery: the greyed « Raccourcis physiques » row with « Pas encore disponible » is closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) (`test_physical_shortcuts_row_unqualified`, `test_physical_delivery_unqualified`). The delivery itself (source suppressed once, no other owner acts, output reaches the focused app under Karabiner and the keymap tap) is code work, not a confirmation: `keyboard_shortcuts.physical_delivery_available` stays false until it is built and qualified.
 - [ ] Tap-hold word reset: with « Un tap ou un hold sur une touche tap-hold commence un nouveau mot » on and « Un raccourci clavier commence un nouveau mot » off, a tap-hold copy (Cmd+C tap) between two words makes the next word-start hotstring fire, the user's own Cmd+C does not, and no F20 reaches TextEdit or a Finder rename; switching the option off keeps the word. Karabiner-Elements must deliver the tagged F20 before the chord. Then with Caps Lock (or another tap-hold key) held as Ctrl or Cmd: a shortcut struck under it follows the same option, the user's own Cmd+C afterwards follows « Un raccourci clavier commence un nouveau mot », Ctrl held by hand before the key still reaches the tap (Ctrl+Enter), and no context-menu key reaches TextEdit or a Finder rename (Karabiner-Elements must deliver the untagged `application` key before the hold's modifier).
-- [ ] AI inline auto-type: switch on « Inline auto-type » in the trigger menu; a finished prediction is typed into a
-      text editor without Tab, a correction that rewrites typed words stays in the bubble.
-- [ ] Backup of the API entries: add a remote API entry, install a release from the Versions window, delete the entry,
-      then restore the pre-install backup: the entry comes back after the reload and its key still works from the
-      Keychain.
-- [ ] Onboarding number-row order: with an Ergopti layout of ours selected, the wizard offers the order; Finish with «
-      symbols » types symbols on the number row after the reload. With a system layout it is greyed with its reason.
-- [ ] Navigation layer repeat count: bind `Digit3 = "repeat_count:3"`; under the layer, `3` then `arrow_up` moves up
-      three lines, the next `arrow_up` one, and releasing the layer after `3` forgets the count.
-- [ ] Owned Ollama starts and pulls: `field_ai_local` ready daemon and a done pull (6170813ea9, 6335790e5a,
-      894585a213, b71b4a67db, 4545f672d1, 721074f21d).
-- [ ] Test models: one complete Ollama and MLX test-model download on a connection that does not count (e8ff7479e1).
-- [ ] Timed reload: `driver_reload` passes and `reload.request_to_boot` is under 4000 ms (b12a654d79, 02c58f8a94,
-      c366dd1c5b, c0ba1d98bb, 8121349ee7, e6426e2ec5).
+- [ ] AI inline auto-type: the engine (typed without Tab, a correction with deletions stays in the bubble) is `test_prediction_inline_autotype`; the typing into a real editor with a model is field report: `prediction_tooltip` with « Inline auto-type » on.
+- [ ] Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`), but « its key still works » cannot hold today: deleting the entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), and the backup keeps only the `keychain:<account>` reference. Waits on « Maintainer decisions pending ».
+- [ ] Onboarding number-row order: the offer, the greyed reason with a system layout and the live apply before the reload are `test_onboarding_number_row` and `test_number_row_live`; the symbols typed after the reload are field report: `field_layout_rows` (a layout build read back) plus one person typing the row.
+- [x] Navigation layer repeat count: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_nav_layer_rule` replays `Digit3 = "repeat_count:3"` then `arrow_up` with Karabiner's matching (three up arrows, then one, nothing after re-entry) and `test_generator_layers` proves the count reset on layer entry.
+- [ ] Owned Ollama starts and pulls: field report: `field_ai_local` (ready daemon) and `ollama_model` (a done pull) (6170813ea9, 6335790e5a, 894585a213, b71b4a67db, 4545f672d1, 721074f21d).
+- [ ] Test models: field report: `ollama_model` and `mlx_model` (one complete download each) on a connection that does not count (e8ff7479e1).
+- [ ] Timed reload: field report: `driver_reload` passes with its `reload_ms` under 4000 ms (b12a654d79, 02c58f8a94, c366dd1c5b, c0ba1d98bb, 8121349ee7, e6426e2ec5).
 - [ ] Remap guardian: `field_login_items` `developer_adhoc_reregistered` on a Mac that holds an earlier build's
       Background Items record, no `ErgoptiPlus` codesigning kill in `field_app_health`, `guardian_state` ready with
       `guardian_wait` under 10 s, and the same on an Intel Mac (2be257c9f5). Hosted CI proves the ad hoc installed-app
@@ -779,36 +792,21 @@ Field run, no person needed (read the next report):
       (`slow_ingest_*`, `worst_hold_site`), healthcheck and ignored-window probe (`slow_diagnostics_collector`,
       `slow_ignored_window_*`), one-off holds (`worst_hold_site`), `keystats_start_ms` under 100 ms. Each names the
       stage to bound next.
-- [ ] L24 key events: re-read `key_event_health` totals once the holds are gone (82c220c089); key-ups lost without a
-      hold point at the Karabiner virtual HID path.
-- [ ] L32 memory: read `memory_footprint_mb`, `memory_region_1..5` and `lua_heap_mb` in `field_app_health`
-      (cce99afbc7, 58961fd2b2, f7faaa0558).
-- [ ] L42 off the company network: `03_field_network` passes with `pac_download info:unreachable_direct`,
-      `pac_script skip:not_fetched`, `route_lookup pass:selected:direct` (5d93e78e90, 1dfaec8298, ec15345d22,
-      8fedb505dd).
-- [ ] L43: `04_field_toolchain` `karabiner_signature` reads `info strict_only:finder_detritus` (cc172a504d,
-      58fd867081).
-- [ ] 116: `field_toolchain` third-party report (timer, Shortcuts, Homebrew, Karabiner signature, Gatekeeper).
-- [ ] Composer (L52): `06_field_composer` passes after a single re-read.
-- [ ] Keystats cache: `field_storage` `keystats_cache_place` is `caches`.
-- [ ] Karabiner lease 117/140: `lease_failure_kinds` and `memory_free_percent` (25411ee080, 380ad99aa8); a low free
-      percentage next to PONG/READY kinds confirms starvation.
-- [ ] Lease deploy write: `deploy_write_verdict` is `keep`; `shrink` means code to write (make the 743 KB file
-      smaller).
-- [ ] Owned Karabiner runtime: `field_owned_runtime`, then on an owned boot `field_owned_start` and
-      `field_owned_pause`; the next run's `field_owned_start` proves close-on-resume.
-- [ ] Layout rows: `field_layout_rows` answers M4 to M6 (91725b18f7, fc5d3a11df, aaf3518af7); on `select_refused` or
-      `requires_logout` the live path needs the design note's in-bundle route.
-- [ ] Apple Shortcuts (106) and the new actions (`run_command`, `open_path`, `run_apple_shortcut`, on dev, not
-      field-verified): `field_apple_shortcuts` `field_test_run`. First create a no-op shortcut named
-      `Ergopti Field Test` in Shortcuts.
-- [ ] PAC unusable on a network whose PAC is unreachable: `field_pac_fallback` `direct_worked` for an Ollama pull and
-      the MLX install.
-- [ ] Ollama behind a real PAC: `field_ollama_blob_host` and Debug > Test network.
-- [ ] Log-only checks of the 2026-10-30 report, each failing by name in `field_slow_lines`: no
-      `log_shortcuts_still_unregistered` after a rebind retry (else rebinding needs the `hs.keycodes.map`
-      notification); no `log_keystats_database_locked` (8084562373); no `log_lease_bound_failures` nor
-      `log_layout_change_before_baseline` (item 38).
+- [ ] L24 key events: field report: `field_lease` (`key_event_health` totals) once the holds are gone (82c220c089); key-ups lost without a hold point at the Karabiner virtual HID path.
+- [ ] L32 memory: field report: `field_app_health` (`memory_footprint_mb`, `memory_region_1..5`, `lua_heap_mb`) (cce99afbc7, 58961fd2b2, f7faaa0558).
+- [ ] L42 off the company network: field report: `field_network` with `pac_download info:unreachable_direct`, `pac_script skip:not_fetched`, `route_lookup pass:selected:direct` (5d93e78e90, 1dfaec8298, ec15345d22, 8fedb505dd).
+- [ ] L43: field report: `field_toolchain` `karabiner_signature` reads `info strict_only:finder_detritus` (cc172a504d, 58fd867081).
+- [ ] 116: field report: `field_toolchain` (timer, Shortcuts, Homebrew, Karabiner signature, Gatekeeper).
+- [ ] Composer (L52): field report: `field_composer` passes after a single re-read.
+- [ ] Keystats cache: field report: `field_storage` `keystats_cache_place` is `caches`.
+- [ ] Karabiner lease 117/140: field report: `field_lease` `lease_failure_kinds` and `memory_free_percent` (25411ee080, 380ad99aa8); a low free percentage next to PONG/READY kinds confirms starvation.
+- [ ] Lease deploy write: field report: `field_lease` `deploy_write_verdict` is `keep`; `shrink` means code to write (make the 743 KB file smaller).
+- [ ] Owned Karabiner runtime: field report: `field_owned_runtime`, then on an owned boot `field_owned_start` and `field_owned_pause`; the next run's `field_owned_start` proves close-on-resume.
+- [ ] Layout rows: field report: `field_layout_rows` answers M4 to M6 (91725b18f7, fc5d3a11df, aaf3518af7); a failed `rows_build` or `rows_replace` means the live path needs the design note's in-bundle route.
+- [ ] Apple Shortcuts (106) and the actions `run_command`, `open_path`, `run_apple_shortcut`: field report: `field_apple_shortcuts` `field_test_run` (create once a no-op shortcut named `Ergopti Field Test` in Shortcuts).
+- [ ] PAC unusable on a network whose PAC is unreachable: field report: `field_pac_fallback` `direct_worked` for an Ollama pull and the MLX install.
+- [ ] Ollama behind a real PAC: field report: `field_ollama_blob_host` and `field_network` (the Debug > Test network chain).
+- [ ] Log-only checks of the 2026-10-30 report: field report: `field_slow_lines` `log_shortcuts_still_unregistered` after a rebind retry (else rebinding needs the `hs.keycodes.map` notification), `log_keystats_database_locked` (8084562373), `log_lease_bound_failures` and `log_layout_change_before_baseline` (item 38).
 
 Hands needed:
 
@@ -818,32 +816,17 @@ Hands needed:
       off types French; a hotstring fires on emulated text. Check that a key the French layout makes dead (`^`)
       types its emulated character, that the cleared Option flag does not break an Option chord in Terminal, and
       note the password-field limit (Secure Event Input: the system layout types).
-- [ ] Hotstrings (asa): `asa` + Space fast twenty times, also holding `a`: always `ASA`, with
-      `Synthetic text moved off a held key` in the day log; ordinary hotstrings in Edge, VS Code and a terminal.
-- [ ] oMLX on port 8181 is found in API mode with no `ps` deadlock (`field_local_servers` names it).
-- [ ] Gestures: one « Infos… » row that opens the dialog; `tap_3` recommends left click.
-- [ ] L46 with no explicit `[gestures.sensitivities]` swipe_3 value (6d3aa65273; `field_gesture_frames`): minutes of
-      two-finger scrolls switch no tab; deliberate vertical three-finger swipes (slow, flick, staggered, after a
-      scroll, finger resting, ten half a second apart) each switch exactly one tab, past 29 units two; a miss logs
-      `Three-finger candidate rejected by <gate>`; no `has no capture timestamp` ERROR after a reload.
-- [ ] Ctrl+Caps Lock: type it during a session before the field run; `field_capslock_chord` `never_delivered` drops
-      the slot's macOS recommendation with a reason (ea02cf7000).
-- [ ] Dropped letters: a day of typing in Safari, TextEdit, Terminal, VS Code and an Electron app, then the field
-      report (`swallowed_keys`); Debug > Report a bug right when a letter disappears.
-- [ ] Production profile: the same working day feeds `field_boot_cost`, `field_idle_cost` and `field_slow_lines`;
-      also three cold starts and one after a login (`Boot complete in`, `Boot CPU`).
-- [ ] Event taps refused, personal hotstring reload rolled back, MLX POST routes 404 after a repair, screenshot
-      without an image: read the named step or `accessibility_trusted` on the next occurrence.
-- [ ] Native ownership contracts with Xcode.app: the launcher XCTest suite, the FSEvents start refusal
-      (`macos/infra/file_watchers.lua`), POSIX filesystem capability and ServiceManagement boundaries (hosted CI, run
-      41257389239: Launcher XCTest on macOS 26, Native XCTest on macOS 15 Intel, Build and all five Install-and-launch
-      rows green for the owned-runtimes Swift and the guardian fixes; a local `swift test` run on full Xcode.app
-      remains).
-- [ ] Schema v15 and v20 (PAR-41): an old `config.toml` with parameterised slots keeps every action under its role
-      id; a v19 file with `ctrl_g = true` opens the ChatGPT URL on Ctrl+G and loses `ctrl_g`, `false` leaves the
-      slot empty; old `[llm.profiles] user_profiles` still show (PAR-40).
-- [ ] Ten window-toggle actions bound to shortcuts: open, raise when covered, close when frontmost, restore when
-      minimised; `open_model_browser` right after a reload and with the AI off logs no `window_toggle` ERROR.
+- [ ] Hotstrings (asa): the carrier types the whole `ASA` while the trigger's `a` is held (`test_text_carrier_avoids_held_key`); on the Mac: field report: `field_log_signals` `log_held_key_moves` after a person types `asa` + Space fast twenty times, also holding `a`, and `hotstring_roundtrip`; ordinary hotstrings in Edge, VS Code and a terminal stay hands.
+- [ ] oMLX on port 8181: field report: `field_local_servers` names it in API mode (`server_<id>` `up:...`), with no `ps` deadlock.
+- [x] Gestures: one « Infos… » row that opens the dialog, `tap_3` recommending left click: closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) (`test_menu_gestures_handlers_match_manifest` en and fr, `test_default_gestures_are_manifest`).
+- [ ] L46 with no explicit `[gestures.sensitivities]` swipe_3 value (6d3aa65273): field report: `field_gesture_frames`, and `field_log_signals` `log_capture_stamp_errors` (no `has no capture timestamp` ERROR after a reload) and `log_three_finger_rejections` (`<n>:<gate>`). The swipes themselves (minutes of two-finger scrolls switch no tab; deliberate vertical three-finger swipes — slow, flick, staggered, after a scroll, finger resting, ten half a second apart — each switch exactly one tab, past 29 units two) stay hands.
+- [ ] Ctrl+Caps Lock: field report: `field_capslock_chord` (`never_delivered` drops the slot's macOS recommendation with a reason, ea02cf7000), after a person types it once during the session.
+- [ ] Dropped letters: field report: `field_lease` `swallowed_keys` and `key_accounting` after a day of typing in Safari, TextEdit, Terminal, VS Code and an Electron app; Debug > Report a bug right when a letter disappears.
+- [ ] Production profile: field report: `field_boot_cost`, `field_idle_cost` and `field_slow_lines` after a working day, plus three cold starts and one after a login (`Boot complete in`, `Boot CPU`).
+- [ ] Event taps refused, personal hotstring reload rolled back, MLX POST routes 404 after a repair, screenshot without an image: field report: `field_event_taps`, `field_permissions` (`accessibility`) and `field_log_signals` `log_start_rollbacks` on the next occurrence.
+- [x] Native ownership contracts with Xcode.app: closed on the macOS lane (run 41257389239, and the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778)): Launcher XCTest on macOS 26, Native XCTest on macOS 15 Intel, Build and all five Install-and-launch rows for the owned-runtimes Swift and the guardian fixes; the FSEvents start refusal and POSIX filesystem capability run in the Lua unit lots. A local `swift test` on full Xcode.app adds nothing the hosted cells do not run.
+- [x] Schema v15 and v20 (PAR-41): closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778): `test_keyboard_slot_migration`, `test_config_migrate` (`shipped_keyboard_slot_parameters_on_macos`, `shipped_hs_ctrl_g_*`, `shipped_user_profiles_*`), `test_migrated_config_keeps_bindings` (`ctrl_g = true` binds Ctrl+G once, `false` leaves `none`), `test_apps_layer_actions` (`open_chatgpt` opens the configured URL) and `test_preferences_user_profiles_storage` (PAR-40).
+- [ ] Ten window-toggle actions bound to shortcuts: open, raise when covered and close when focused are `test_window_toggle` (all ten pages); on the Mac: field report: `field_log_signals` `log_window_toggle_errors` after `open_model_browser` right after a reload and with the AI off, and a person checks restore when minimised.
 - [ ] Menus: Clear and Restore per category and global; Shortcuts group restore and clear; tap delay row and « Use
       global delay (…) »; tap and hold pickers; « Combinaisons de touches »; row order unchanged (PAR-76 R18);
       « Retirer les anciennes règles » on an upgrade (43); Login Items show one Ergopti (24).
@@ -869,17 +852,9 @@ Hands needed:
 - [ ] VirtualHIDDevice offer (3ebab93a17): on a Mac whose active driver is older than 8.5.0, Tap-holds > update row,
       admin prompt, installer, forceActivate; the report names the new version and the remap reloads; cancelling the
       prompt reports `cancelled` and changes nothing.
-- [ ] Run the field report once: its `scpt_recompile` step rebuilds `Encryptor.app/.../main.scpt` from its updated
-      `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
-- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): on a real Mac, during the spinner and over
-      a shown prediction, a pointer move, a trackpad scroll, a pinch or swipe gesture, Cmd+Tab, a click in
-      another app and F5 each cancel and hide; Tab, Shift+Tab, the arrows and the validation digits still act on
-      it; a resting hand keeps it. Check that mouseMoved now in the keymap mouse tap adds no visible pointer lag
-      (Debug log `User activity (mouseMoved)` appears once per cancellation, not per event).
-- [ ] Branch `wave3/input-policies` (2026-11-06): a second CapsWord gesture or shortcut switches CapsWord off and
-      unlocks CapsLock; the CapsWord delimiter menu shows « ★ » after the magic key is renamed. Native one-shot Shift:
-      modifier-map, dead-key and IME handling of the captured key; CapsWord key/control payload receiving
-      (moved from the one-shot and CapsWord parity follow-ups).
+- [ ] Run the field report once: field report: `scpt_recompile` rebuilds `Encryptor.app/.../main.scpt` from its updated `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
+- [ ] Predictions stop on activity: the cancellations (pointer, scroll, gestures, a key the tooltip did not consume) and Tab, Shift+Tab, arrows and digits acting on it are `test_mouse_tap_pointer_activity`, `test_prediction_cancelled_by_user_activity` and `test_llm_tooltip_chords_consumed`; on the Mac: field report: `field_log_signals` `log_prediction_activity_cancels` (one `User activity (mouseMoved)` per cancellation, at DEBUG). A person still checks Cmd+Tab, a click in another app, F5 and that mouseMoved in the keymap mouse tap adds no visible pointer lag.
+- [ ] Branch `wave3/input-policies` (2026-11-06): CapsWord closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) (`test_watchers_capsword_auto_off` « a second CapsWord action ends it at once and unlocks CapsLock », `test_karabiner_actions_reachable`, `test_menu_caps_word` « ★ » after the rename). Native one-shot Shift (modifier-map, dead-key and IME handling of the captured key) and CapsWord key/control payload receiving stay hands (moved from the one-shot and CapsWord parity follow-ups).
 
 ## To confirm on the Windows PC
 
@@ -996,33 +971,44 @@ Account and tester actions (maintainer, from the PC):
 ## To confirm on Linux
 
 - [ ] Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
-- [ ] Hotstring section order: move/reset sections through the tray, restart, and verify persistence plus refusal of a stale menu after external config changes.
-- [ ] WPM: verify pointer-before-key and key-before-pointer ordering on a real desktop, preview/drag visibility, AI > hotstring > autocorrection holds, and no retained colour after disable/re-enable.
+- [x] Hotstring section order: move/reset sections through the tray, restart, and verify persistence plus refusal of a stale menu after external config changes. Container proof 2026-11-10 (318b803d42): `linux/tests/hardware/desktop/run_hotstring_section_order.sh` (receipt `…/desktop/receipts/hotstring_section_order.txt`, 16/16): the real catalogue, menu builder and libayatana tray clicked over D-Bus moves and resets Autocorrection's sections, a new tray process draws the saved order (first row's « Monter » greyed), and a menu built before an external config.toml edit refuses the write with the « ErgoptiPlus — Erreur » dialog and keeps the edit byte for byte. The daemon process itself needs an evdev keyboard the container lacks.
+- [x] WPM: verify pointer-before-key and key-before-pointer ordering on a real desktop, preview/drag visibility, AI > hotstring > autocorrection holds, and no retained colour after disable/re-enable. Container proof 2026-11-10 (6de85913ce): `linux/tests/hardware/desktop/run_wpm_ordering.sh` (receipt `…/desktop/receipts/wpm_ordering.txt`, 24/24) on Xvfb/openbox with the real collector, SQLite owner, GTK surface, cairo pixels and an xdotool drag; key and pointer events enter at the daemon's callbacks (`keystats.on_keydown`, `wpm_widget.observe_pointer`) since the container has no /dev/input.
 
-- [ ] Daily notes: `take_note` opens the current daily file with the registered text editor without replacing its contents; an absent text handler shows the specific refusal.
-- [ ] Keep awake: `activity_simulation` prevents idle sleep in real X11 and Wayland sessions and releases the logind inhibitor on toggle-off, pause, quit and daemon termination.
+- [x] Daily notes: `take_note` opens the current daily file with the registered text editor without replacing its contents; an absent text handler shows the specific refusal. Container proof 2026-11-10 (1063eb1210): `linux/tests/hardware/desktop/run_take_note.sh` (receipt `…/desktop/receipts/take_note.txt`, 14/14). It found that xdg-open sent the day's first, empty note to a browser (inode/x-empty); fixed in 5daee2f534 by launching the registered handler with gtk-launch (regression in `test_take_note.lua`).
+- [x] Keep awake: `activity_simulation` prevents idle sleep in real X11 and Wayland sessions and releases the logind inhibitor on toggle-off, pause, quit and daemon termination. Container proof (2026-11-10, 491e6bdf1b): `linux/tests/hardware/desktop/run_keep_awake_logind.sh` against a real systemd-logind 255 on a private system bus, under Xvfb+openbox and headless sway; logind's inhibitor list shows the hold, then the release on toggle-off, pause, quit (`stop_programs`) and SIGKILL of the holding daemon (receipt `tests/hardware/desktop/receipts/keep_awake_logind.txt`).
 
 No machine is available. First `bash tools/dev/collect-linux-field-report.sh` on a real desktop: the field run
 without a click (53c1766514), the report marks, and `driver_reload` (one daemon restart under a real user manager).
 
-- [ ] Update restart watcher: install an update in a standalone install under the systemd unit and from a terminal
+- [x] Update restart watcher: install an update in a standalone install under the systemd unit and from a terminal
       (relay); `…update-watch.log` beside the settings reads « reported a healthy start ». With a new tree whose
-      `bin/` launcher exits at once, the tree moves to `<root>.failed-<pid>` within 60 s, `<root>.old` is back and the
-      previous daemon runs; a Quit during the wait leaves the update installed and nothing restarted.
+      `bin/` launcher exits at once, the tree moves to `<root>.failed-<pid>` 61–62 s after the restart (the 60 s boot-ready wait plus the watcher's own stop and moves), `<root>.old` is back and the
+      previous daemon runs; a Quit during the wait leaves the update installed and nothing restarted. Container proof (2026-11-10, 606134cc5f, 1a2ad3f33f): `linux/tests/hardware/desktop/run_update_restart_watcher.sh`, real `systemd --user` 255 with the repository unit plus the relay, all six scenarios pass. The Quit goes through the real tray Quit (`infra/quit_request.lua`) in the updated daemon before its ready report, since that daemon owns the wait. The proof found and fixed three bugs: the restart client killed by systemd's TERM disarmed the watcher (e641dba16c); a Quit rolled the update back and restarted the previous daemon (b54f180f80); and under systemd the moved tree was named `<root>.failed-$` (677d82c8c6). Receipt `tests/hardware/desktop/receipts/update_restart_watcher.txt`.
 - [x] Layout emulation (2026-11-06): with an AZERTY (fr) XKB layout, choose Keyboard layout > Layout to emulate >
       Done (container proof, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): `tests/hardware/run_layout_typing_live.sh` types the 30 hand-read
       `keylayout_vectors.json` vectors of Ergopti, Ergopti➕ and Ergo-L over AZERTY into mousepad (GTK) and kwrite (Qt),
       read back through AT-SPI, with Ctrl+c and Ctrl+z on the Command level, a row switched off and the AZERTY-dead `^`
       key; fixes a1a8cf98, f7541d24, 0601d1a8.
-- [ ] Bundled apps (`wave3/app-cloner-encryptor`): Applications > Encryptor opens a file chooser and writes
-- [ ] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
-      uinput without Tab, and nothing is typed into a password field.
-- [ ] Navigation layer mouse buttons and repeat counts: with `MouseMiddle = "escape"` and the recommended number row,
+- [x] Bundled apps (`wave3/app-cloner-encryptor`): Applications > Encryptor opens a file chooser and writes `<file>.enc`, which openssl decrypts to the same bytes; its desktop entry (`ergopti-encryptor.desktop`, application/octet-stream) decrypts a dropped `.enc` back in place. Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_encryptor.sh`, 13/13 five runs in a row (`receipts/encryptor.txt`); it found the tray child started without module paths (`install/launch.sh` exports no `LUA_PATH`) and dialogs refused under a relative module path, both fixed (8f20149749).
+- [x] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
+      uinput without Tab, and nothing is typed into a password field. Container proof (2026-11-10):
+      `tests/hardware/run_ai_inline_container.py` (11 assertions, receipt `docs/audits/linux/2026-11-10-container-proofs`) types the inline prediction into
+      mousepad on Xvfb, read back over AT-SPI, with no Tab, and a GTK password field gets no request and no text. The
+      X11 session warms its XTEST keyboard first: a slave switch revokes the layout receipt (item under "Remaining
+      code work").
+- [x] Navigation layer mouse buttons and repeat counts: with `MouseMiddle = "escape"` and the recommended number row,
       a real mouse's middle click under the layer types Escape and never clicks, and `3` then `arrow_up` moves up
-      three lines.
+      three lines. Container proof (2026-11-10): `tests/hardware/run_nav_pointer_container.py` (21 assertions,
+      receipt `docs/audits/linux/2026-11-10-container-proofs`) in mousepad on Xvfb; a leaked click would paste a PRIMARY marker. It found and fixed a stopped
+      daemon: the next device watchdog tick after the layer gave the mouse back refused the source cohort.
 - [ ] Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
       grab, injection and hotplug (30); real kernel capture (93: ordered pairs need Xorg or a compositor on real
-      evdev nodes).
+      evdev nodes). Container pass (2026-11-10): not closable in the cloud container, whose kernel has no uinput or
+      evdev (`mknod /dev/uinput` opens with `ENODEV`) and no systemd PID 1, so a real-node grab, the polkit agent,
+      the user-manager autostart and real kernel capture cannot run there; the grab and injection on a real kernel
+      already run on CI (`run_grab_race.lua`, `run_daemon_live.sh`). The X11 and Wayland halves of the grabbed input
+      path now run on the kernel model (`tests/hardware/run_container_proofs.sh`). Left for a runner with uinput:
+      sway or Xorg reading the daemon's real virtual keyboard (93); wizard (7) and the magic key (30) not attempted.
 - [x] Gestures: a three-finger pad and one `libinput record` from a real touchpad (d627f511fc, 1870e62e1a,
       `linux/HARDWARE.md` section 13); a two-finger scroll with a thumb resting reports two fingers, a brisk
       three-finger tap still reports `tap_3`. Container proof (2026-11-10): `container-proof-gestures` in
@@ -1048,10 +1034,11 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       `touchpad_record_axis_swipes_elan.yml`); it found the incremental tracker taking the unbound
       `swipe_3_left`'s default incremental mode, so the axis slot ran about once per 3.5 mm; it now takes the
       answering slot's mode, as macOS does.
-- [ ] Navigation layer wheel bindings with a real mouse (ea4b3fa600).
-- [ ] Wayland desktop changes: on sway, Hyprland and KDE Plasma 6 Wayland, switch workspaces a few times (each at least 1 s apart); Metrics shows the desktop-change count rising by one per switch, and GNOME Wayland still shows « — » with its reason.
-- [ ] Secret service: add a key with the keyring locked, the unlock prompt takes the keyboard under the grab; restart
-      and check the plaintext `api_keys.json` migration (e93a4f7368, 939c0f60).
+- [x] Navigation layer wheel bindings with a real mouse (ea4b3fa600). Container proof (2026-11-10): the wheel phase
+      of `tests/hardware/run_nav_pointer_container.py`: a notch under the layer is the volume key and never scrolls,
+      outside it the mouse is not grabbed (receipt `docs/audits/linux/2026-11-10-container-proofs`).
+- [x] Wayland desktop changes: on sway, Hyprland and KDE Plasma 6 Wayland, switch workspaces a few times (each at least 1 s apart); Metrics shows the desktop-change count rising by one per switch, and GNOME Wayland still shows « — » with its reason. Container proof (2026-11-10, e15b6aac0a, `linux/tests/hardware/desktop/run_wayland_sessions.sh`, receipt `tests/hardware/desktop/receipts/wayland_desktop_changes.txt`): on headless sway 1.9 and KWin 5.27 (`--virtual`), `current_workspace_source` → `system_metrics` counts 4 switches made through `workspace_switcher.switch` one by one (a round trip inside the 1 s reuse window is missed, as documented); GNOME Shell 46 headless answers `unsupported` and the metric names `desktop_changes_need_workspace_interface`. Not emulable here: Hyprland and Plasma 6 are not packaged by Ubuntu 24.04 and their upstreams are unreachable from the container; KWin 5.27 answers the same `currentDesktop`/`setCurrentDesktop` D-Bus calls the module uses.
+- [x] Secret service: with gnome-keyring locked, adding a key opens GNOME's « Unlock Login Keyring » prompt inside `keyboard_hook.while_released`; the file keeps a secret-service reference, and after a restart `migrate_plaintext` moves a plaintext `api_keys.json` entry (e93a4f7368, 939c0f60). Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_secret_service.sh`, 5/5 then 6/6 after the restart (`receipts/secret_service.txt`). Not emulable here: that `while_released` ungrabs a real keyboard so the prompt gets the keys, because the container has no /dev/input or /dev/uinput nodes and Xvfb takes its keys from XTEST, not evdev; it rides on the evdev grab of « Physical acceptance ».
 - [x] Owned Ollama: with `ollama serve` on 11434, enabling the AI starts Ergopti's on 11435 (32fa07be7f). Container
       proof 2026-11-10 (`static/ergopti_plus/linux/tests/hardware/run_owned_ollama_container.py`, CI `network-ai`): an Ollama stand-in speaking its HTTP
       API on 11434 and an `ollama` on PATH are never contacted or run; the menu's enable starts the managed binary
@@ -1076,23 +1063,32 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       answered (`run_x11_reapply_live.sh`, `x11_reapply_*.txt`): GNOME Shell 46 and Plasma 6.6.4 under X11 put their
       own layouts back when a keyboard appears (GNOME also on an input-sources setting change), never on a switch.
       (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
-- [ ] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
-      and the tray's Reload restart the daemon, a second run reports "already running".
-- [ ] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane
-      (PAR-52); tap delay row and every tray dialog in the owned GTK host (ca680655d7), group restore and clear, open target, Backspace word start.
-- [ ] Wayland focus through lswt: on labwc or Wayfire with lswt 2.x, `lswt -j` marks the focused window `activated`
-      and per-application rules follow it; GNOME, KDE and COSMIC log the single "no focused-window query" line.
+- [x] Developer mode with the package installed: `run-linux-dev.sh` stops the unit, the tray appears, a saved `.lua`
+      and the tray's Reload restart the daemon, a second run reports "already running". Container proof (2026-11-10, d5f6f8119c): `linux/tests/hardware/desktop/run_linux_dev_mode.sh`, the real runner, `launch.sh`, daemon and tray (read through `sni_host.py`) on Xvfb with a real `systemd --user`. The keyboard node is a FIFO with `evdev_fifo_shim.c` because this kernel has no evdev or uinput, and the installed unit runs a stand-in. A second `--tray` run prints the held-lock message and exits 0, as `launch.sh` intends (receipt `tests/hardware/desktop/receipts/linux_dev_mode.txt`).
+- [x] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane (PAR-52). Container proof (2026-11-10, 8c79047664): `linux/tests/hardware/desktop/run_window_toggle.sh` on openbox, xfwm4 and GNOME Shell 46 Wayland, 50/50 checks each (receipt `tests/hardware/desktop/receipts/window_toggle.txt`); it found GNOME Wayland leaving a covered page covered (no activation token, so `present()` cannot raise), fixed by mapping the window again before `present()` (5a303edcf3). Release notes: `tests/hardware/desktop/run_release_notes.sh` on X11 and GNOME Wayland, changelog shown without the download table, only the repository link opens (`receipts/release_notes.txt`).
+- [ ] Owned GTK host (split from the window-toggle line): tap delay row and every tray dialog (ca680655d7), group restore and clear, open target, Backspace word start.
+- [x] Wayland focus through lswt: on labwc or Wayfire with lswt 2.x, `lswt -j` marks the focused window `activated` and per-application rules follow it; GNOME, KDE and COSMIC log the single "no focused-window query" line. Container proof (2026-11-10, e15b6aac0a, `linux/tests/hardware/desktop/run_wayland_sessions.sh`, receipt `tests/hardware/desktop/receipts/wayland_focus_lswt.txt`): on headless labwc 0.7.1 (`zwlr_foreign_toplevel_manager_v1` v3) with two foot windows, `window_info` reports the activated toplevel and `process_lifecycle.onFocusChange` follows 3 activations; GNOME Shell 46 and KWin 5.27 answer unknown 5 times with one "No focused-window query" line. Substitute: lswt is not packaged by Ubuntu 24.04 and git.sr.ht is refused by the proxy, so `tests/hardware/desktop/foreign_toplevel_probe.c` stands in on the PATH, printing lswt 2.x's JSON from labwc's own protocol events. Not emulable here: the real lswt binary's output; Wayfire will not start without a DRM render node (the container has no `/dev/dri`); COSMIC is not packaged by Ubuntu 24.04.
 - [ ] Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
       suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
       output reaches the focused window under the grab; only that evidence may turn
-      `keyboard_shortcuts.physical_delivery_available` true.
+      `keyboard_shortcuts.physical_delivery_available` true. Delivery proven on the kernel model (2026-11-11):
+      `tests/hardware/run_physical_shortcut_container.py` (11 assertions; only its daemon process answers the getter
+      true) shows a bound key suppressed exactly once, also held with autorepeat, its action reaching mousepad, and a
+      single owner against a hotstring (the slot runs, `xz` never expands), a tap-hold key (Tab keeps its tap), the
+      layer (Alt+K keeps ArrowLeft) and the magic key (the slot runs, no ★). The getter stays false, decided by the
+      coordinator on 2026-11-11 overnight, to review by the maintainer: it also opens the editor, whose Linux physical
+      capture is not proven. Left: prove the editor's capture and save (the picker window), then turn the getter true
+      and update its pinned refusals (`test_physical_delivery_unqualified.lua`, `test_picker_refusal.lua`, the menu's
+      `physical_shortcuts.delivery_unqualified` row) and the inventories.
 - [x] Accented shortcuts: on AZERTY with « é → C » on, Ctrl+é copies in a GTK and a Qt editor, AltGr+é still types
       Done (container proof, `tests/hardware/run_layout_typing_live.sh`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Ctrl+é copies in mousepad
       and kwrite, AltGr+é types AZERTY's level 3, Ctrl+2 with digits first stays Ctrl+KEY_2 on the wire.
       what the layout gives, and Ctrl+2 (é) stays Ctrl+2 while the number row types digits first.
-- [ ] Tap-hold copy check on Wayland: on KDE or sway with wl-clipboard, a tap-hold copy in an editor sends no retry
+- [x] Tap-hold copy check on Wayland: on KDE or sway with wl-clipboard, a tap-hold copy in an editor sends no retry
       and no warning, and a copy with nothing selected warns once; on GNOME the log says the watch ended and the
-      copy goes unchecked. On X11 with xclip removed, the same copy is checked through libX11.
+      copy goes unchecked. On X11 with xclip removed, the same copy is checked through libX11. Container proof
+      (2026-11-10): `tests/hardware/run_tap_copy_container.py` (23 assertions, receipt `docs/audits/linux/2026-11-10-container-proofs`) on sway headless with
+      mousepad, mutter 46 headless (GNOME's compositor) and Xvfb with xclip hidden.
 - [x] Some `local_servers.json` servers installed: the detection names them. Container proof 2026-11-10
       (`static/ergopti_plus/linux/tests/hardware/run_local_servers_container.py`, CI `network-ai`): stand-ins under the servers' own names and flags;
       the sweep names llama.cpp and vLLM (port from the command line), Lemonade (`~/.config/lemonade/config.json`)
@@ -1162,8 +1158,8 @@ between workers) green alone. All live checks pass, typed by the harness.
   (shipped recommended preset, 6 rounds): layout actions 1.1-1.8 ms, build 27-40 ms, merge 9-30 ms, encode 11-44 ms
   (258617 bytes); so the field 230 ms in `karabiner.layout_actions` is native, not the Lua loop. Next: split that
   phase on the Mac (`Layout.keyboard_form()` registry snapshot vs the 548 `hs.keycodes.map` lookups) before touching
-  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed.
-- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. Check the maintainer's machines against `docs/tooling/one-folder-name-handoff.md`; remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31).
+  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed. Done 2026-11-11: `Config.resolve_layout_actions` times that phase's two halves apart (`karabiner.layout_actions.keyboard_form`, the registry snapshot, and `karabiner.layout_actions.key_codes`, the 548 lookups; regression in `test_actions_not_rebuilt_per_layout`), so the next Mac field report's phase lines and slow-callback attributions name the half to move. Left: read that report, then decide.
+- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. Check the maintainer's machines against `docs/tooling/one-folder-name-handoff.md`; remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31). Checked 2026-11-11: no code step is left here. The runtime folder rename is the maintainer's release step: it changes the compiled runtime, so it needs a rebuilt and republished pinned remap runtime (`vendor/remap-runtime/manifest.json`), which agents do not touch; removing the migration waits for the maintainer's machine checks.
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November, all on `dev`:
   - Done: the owned runtime is the default (`RUNTIME_DEFAULT = "owned"`, the two Configuration rows and
@@ -1176,7 +1172,7 @@ between workers) green alone. All live checks pass, typed by the harness.
   - Decided: field-tested on the CI-signed dev build, never the ad hoc developer app; no Developer ID for now (item
     below).
   - Next: the maintainer's WP9 pass (handoff checklist) once a signed dev build is authorized, then the shared-mode
-    deletion. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
+    deletion. Checked 2026-11-11: both steps are the maintainer's (a signed dev build and a physical Mac); no code step precedes them. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
     the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** With the self-signed CI certificate the
   install takes one administrator prompt (the root Core and pqrs' daemon are LaunchDaemons bootstrapped by the
@@ -1191,20 +1187,35 @@ between workers) green alone. All live checks pass, typed by the harness.
   design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1
   November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
   under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
-  existing clones keep /usr/bin/python3 until re-cloned).
+  existing clones keep /usr/bin/python3 until re-cloned). Checked 2026-11-11: the managed-daemon relay row stays blocked on that design note (who launches the relay, how its refusal receipt reaches the Swift owner), a maintainer decision; no code step is open before it.
 - **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
   PAR-15 is confirmed by the next field run's result);
   the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
 
 ### All drivers
 
-- [ ] **Linux PAC lists through GIO (found 2026-11-10).** On GNOME, GIO keeps only the first entry of a PAC answer
+- [x] **Linux PAC lists through GIO (found 2026-11-10).** On GNOME, GIO keeps only the first entry of a PAC answer
       (`PROXY a; DIRECT` reaches the driver as `a`), so the managed Ollama stage's browser-style walk cannot fall
       back to DIRECT when that relay is down (docs/memory `project-linux-gio-hides-pac-failures`). Decide whether to
-      evaluate the PAC another way or document it.
-- [ ] **Linux managed Ollama under umask 0002 (found 2026-11-10).** The install resolver refuses a group-writable
+      evaluate the PAC another way or document it. Done 2026-11-11: libproxy 0.5's parser keeps only the
+      `METHOD host` entries, so the lookup child skips GIO for a GNOME PAC, downloads it and runs it in the system Duktape with
+      the shared `pac_helpers.js` (`platform/network/pac_runtime.lua`, heap and query caps of `native_pac`, the
+      child's deadline); the walk then reaches DIRECT or the next relay. Container proof
+      `run_owned_ollama_container.py`: a dead first relay then DIRECT pulls direct, then a live relay pulls through it
+      (`PacEngine` runs the engine cases). Managed HTTP downloads still take GIO's list: follow-up below.
+- [x] **Linux managed Ollama under umask 0002 (found 2026-11-10).** The install resolver refuses a group-writable
       ancestor (`install_ancestor_writable_by_others`), and a user-private-group umask 0002 makes `~/.local/share`
       group-writable when an application creates it so: decide whether a private group's write bit is acceptable.
+      Done 2026-11-11: admitted only when the group is the user's private group (same name and primary gid, no other
+      member listed or primary: `infra/user_private_group.lua`, NSS); another shared group, an unknown group and a
+      world-writable folder are still refused, and the gid is part of the captured identity. macOS keeps refusing
+      (`ManagedBootstrapDownload.swift`): its accounts share `staff`, with no private group by default.
+- [x] **Linux managed HTTP downloads behind a PAC list.** `infra/managed_http.lua` still takes GIO's answer, which
+      drops DIRECT (`PROXY a; DIRECT` fails when `a` is down); pass `pac_check_timeout_ms` so the lookup child
+      evaluates the PAC and the proxy-connect failover can reach DIRECT. Done 2026-11-11: the request's remaining
+      budget, capped by timings `adapters.proxy_pac_download_max_ms`, bounds the PAC download; the failover still
+      needs a curl that reports `proxy_used` (8.7+), as before. Native proof `run_managed_http_native.py`
+      `test_actual_pac_dead_relay_then_direct_reaches_origin` (CI network-ai, the pinned validation curl).
 - [x] **Test parity (audit item 14), Linux and macOS.** Closed on 10 November (39b12ae7): the tar feeder tests
       already load `infra.archive_tar_feeder` by module; five more Linux copies resolve their file from the module name
       (ratchet 7 files, 13 reads); every remaining Linux and macOS pin is documented as legitimate in its ratchet header
@@ -1220,6 +1231,20 @@ between workers) green alone. All live checks pass, typed by the harness.
   ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
   `test-linux-field-report-contract` (setup error), `test-menu-manifest` in a worktree (a `node_modules` junction
   copy fails with `EPERM`). Make each one pass locally or skip with a stated reason.
+- [ ] **Linux X11: a same-group XKB notify revokes the layout for good.** Found by the 2026-11-10 container proofs:
+      Xorg sends an XKB new-keyboard notify each time the slave keyboard feeding the core keyboard changes (the daemon's
+      virtual keyboard after the physical one, XTEST), `adapters/xkb_source_probe.lua` bumps its generation on every
+      notify and `adapters/xkb_capture.lua` renews a revoked inverse only for a group change, so after one switch
+      `KeyboardLayout.is_ready()` stays false and every replacement takes the clipboard route. Reproduce: drop the XTEST
+      warm-up in `tests/hardware/container_session.py` and run `run_ai_inline_container.py`. Kept as is, decided by the
+      coordinator on 2026-11-11 overnight, to review by the maintainer: no proof can re-validate the receipt today. The
+      first proof, `keyboard_hook.refresh_capture`, requires the previous receipt to still be current before it dumps
+      the keymap again, and a typing request may renew only across a group change
+      (`test_keyboard_layout_terminal_plan_observation.lua`, "an equal-group source replacement does not renew an old
+      plan"). A fix needs a new capture re-acquisition owned by the hook, off the input path, that dumps the server
+      keymap and rebuilds capture and inverse together as at startup. The clipboard route then also fails while the
+      clipboard has no owner (a fresh session): `xclip -o` exits 1 as for a read error, and the snapshot refuses to
+      borrow what it cannot restore. Wayland and macOS have no slave switch.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
@@ -1319,3 +1344,8 @@ Each closes on a named green hosted or native run, recorded here.
       `_shared/data/db/purge_schema.sql`; writers `request_metrics_maintenance` (Linux keystats, macOS `log_manager`) and
       `KL_RunMetricsMaintenance` (Windows); the Windows path is checked by source contracts only and still wants a live
       Windows run.
+- [ ] An API entry restored from a pre-install backup comes back without its key (found 2026-11-10 closing « Backup
+      of the API entries »): deleting an entry deletes its Keychain item (`modules/llm/init.lua` `delete_entry_ids`
+      → `retry_pending_api_token_deletes`) and the backup holds only the `keychain:<account>` reference. Choose:
+      keep a deleted entry's Keychain item while a retained backup still references it (the restore then works), or
+      keep deleting it and have the restored entry ask for its key again (the Mac line then reads so).

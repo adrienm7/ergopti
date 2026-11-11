@@ -54,8 +54,22 @@ helpers.describe("Linux daily notes (linux-take-note)", function()
 			helpers.assert_true(Files.append(path, "Private note\n"))
 			helpers.assert_true(handler({ run_background = launch }))
 			helpers.assert_eq(Files.read(path), "Private note\n")
-			helpers.assert_eq(launches, { "xdg-open " .. Shell.quote(path), "xdg-open " .. Shell.quote(path) })
+			local editor = "gtk-launch -- " .. Shell.quote("org.gnome.TextEditor.desktop") .. " " .. Shell.quote(path)
+			helpers.assert_eq(launches, { editor, editor })
 		end, "org.gnome.TextEditor.desktop\n")
+	end)
+
+	-- xdg-open and gio choose by content, and the day's first note is empty:
+	-- inode/x-empty went to a browser on generic desktops, application/x-zerosize
+	-- to nothing under gio. The registered editor is launched by its id instead.
+	helpers.it("linux-take-note: an empty note opens in the registered editor, never a content-sniffing opener", function()
+		fixture(function(path, launches, _, launch)
+			helpers.assert_true(require("modules.take_note").open(launch))
+			helpers.assert_eq(Files.read(path), "")
+			helpers.assert_eq(#launches, 1)
+			helpers.assert_eq(launches[1]:match("^xdg%-open ") or launches[1]:match("^gio open "), nil)
+			helpers.assert_eq(launches[1], "gtk-launch -- " .. Shell.quote("mousepad.desktop") .. " " .. Shell.quote(path))
+		end, "  mousepad.desktop  \n")
 	end)
 
 	helpers.it("linux-take-note: absent text handler reports the reason without creating a file", function()

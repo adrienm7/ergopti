@@ -19,7 +19,10 @@
 ---    { platform, shortcut_menu_path, index, source, error, installed, provided,
 ---      builtin, active, busy, result, record_error }, so the page decides the
 ---    rows once.
---- 3. PURE Lua: the driver injects the layout registry client, the push to the
+--- 3. The unified layout editor mounted in the page opens and saves its files
+---    through source_open and source_save (layouts/source_store.lua bounds
+---    them); initData says whether this host offers them.
+--- 4. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -38,6 +41,8 @@ M.ACTIONS = {
 	composer_open = true,
 	composer_save = true,
 	composer_remove = true,
+	source_open = true,
+	source_save = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -128,11 +133,52 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		operation(report)
 		return true
 	end
-	if type(payload.declaration) ~= "string" or type(payload.keylayout) ~= "string" then
-		deps.log("warn", "Refused a layout composer save without its declaration and layout.")
+	-- A save carries a composition (declaration) or an Ergopti layout source, with its layout.
+	local declaration = type(payload.declaration) == "string"
+	local source = type(payload.source) == "string"
+	if declaration == source or type(payload.keylayout) ~= "string" then
+		deps.log("warn", "Refused a layout composer save without exactly one of a declaration or a source, and its layout.")
 		return false
 	end
-	operation({ declaration = payload.declaration, keylayout = payload.keylayout, use = payload.use == true }, report)
+	operation({
+		declaration = declaration and payload.declaration or nil,
+		source = source and payload.source or nil,
+		keylayout = payload.keylayout,
+		use = payload.use == true,
+	}, report)
+	return true
+end
+
+--- Whether the registry offers the layout editor's file operations.
+--- @param registry table
+--- @return boolean
+local function offers_source(registry)
+	return type(registry.source_open) == "function" and type(registry.source_save) == "function"
+end
+
+--- Handles the layout editor's two file messages.
+--- @param deps table The controller's collaborators.
+--- @param action string "source_open" or "source_save".
+--- @param payload table
+--- @return boolean handled
+function M.handle_source(deps, action, payload)
+	local registry = deps.registry
+	if not offers_source(registry) then
+		deps.log("warn", "Refused a layout editor message: the registry has no source operations.")
+		return false
+	end
+	if action == "source_open" then
+		registry.source_open(function(data) deps.push("sourceData", data) end)
+		return true
+	end
+	if type(payload.filename) ~= "string" or type(payload.text) ~= "string" then
+		deps.log("warn", "Refused a layout editor save without its file name and text.")
+		return false
+	end
+	registry.source_save({ filename = payload.filename, text = payload.text }, function(ok, code, detail, filename)
+		deps.push("sourceResult", { ok = ok == true, code = code, detail = detail and tostring(detail),
+			filename = filename })
+	end)
 	return true
 end
 
@@ -143,6 +189,9 @@ end
 ---   composer_open(on_done), composer_save(payload, on_done) and
 ---   composer_remove(on_done) (_shared/lua/layouts/composer.lua); a registry
 ---   without them refuses the three composer messages.
+--- deps.registry may offer the layout editor's source_open(on_done) and
+---   source_save(payload, on_done) (_shared/lua/layouts/source_store.lua); a
+---   registry without them refuses source_open and source_save.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -188,7 +237,8 @@ function M.new(deps)
 		if action == "ready" then
 			controller.result = nil
 			deps.push("initData", { strings = deps.strings(),
-				state = M.page_state(deps.registry.snapshot(), nil) })
+				state = M.page_state(deps.registry.snapshot(), nil),
+				source_editor = offers_source(deps.registry) })
 			deps.registry.refresh(function() push_state() end)
 			return true
 		end
@@ -202,6 +252,9 @@ function M.new(deps)
 		end
 		if action == "composer_open" or action == "composer_save" or action == "composer_remove" then
 			return M.handle_composer(deps, controller, action, payload, push_state)
+		end
+		if action == "source_open" or action == "source_save" then
+			return M.handle_source(deps, action, payload)
 		end
 		if type(id) ~= "string" or not id:match(ID_PATTERN) then
 			deps.log("warn", "Refused a layout manager '%s' without a valid layout id.", action)

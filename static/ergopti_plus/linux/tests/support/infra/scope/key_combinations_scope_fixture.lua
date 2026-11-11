@@ -16,7 +16,13 @@ local Codec = require("toml_codec")
 
 local Scope = require("infra.key_combinations_scope")
 
+-- Resolved before any case stubs the tap-hold loader the writer reads its fields from.
+local prepare_chord_rows = require("platform.remap.tap_hold_writer").prepare_combo_rows
+
 local path, backup = "/controlled/config.toml", "/controlled/combination.bak"
+
+-- `[mod_combos]` lives in the shared tap_hold.toml beside config.toml.
+local chord_path, chord_backup = "/controlled/tap_hold.toml", "/controlled/combination_tap_hold.bak"
 
 local pair, binding = "caps_lock_then_tab", "combination__caps_lock_then_tab"
 
@@ -57,6 +63,15 @@ local function with_owner(body, managed, public_chords)
 				if target == path then state.publications = state.publications + 1 end
 				return true
 			end,
+			-- The inverse of a publication that created tap_hold.toml removes it.
+			remove_if_unchanged = function(target, expected)
+				local current = state.bytes[target]
+				if current == nil or expected.status ~= "ok" or current ~= expected.content then
+					return false, "Controlled removal conflict"
+				end
+				state.bytes[target] = nil
+				return true
+			end,
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
@@ -66,7 +81,7 @@ local function with_owner(body, managed, public_chords)
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
 			package.loaded["adapters.file_system"]=files
-			package.loaded["infra.config_paths"]={config=function() return path end}
+			package.loaded["infra.config_paths"]={config=function(name) return name=="tap_hold.toml" and "/controlled/tap_hold.toml" or path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.native then
 					state.retired=state.native:release_all()
@@ -102,7 +117,8 @@ local function with_owner(body, managed, public_chords)
 		helpers.assert_true(gestures.apply_parameter_configuration(initial,{[parameter]="https://old.example"}))
 		helpers.assert_true(gestures.release_parameter_configuration(initial))
 		state.gestures, state.files = gestures, files
-		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
+		state.scope = Scope.new({path=path,backup_path=backup,chord_path=chord_path,chord_backup_path=chord_backup,
+			prepare_chord_rows=prepare_chord_rows,files=files,combinations=state.pairs,parameters=gestures,
 			manifest=public_chords==true and require("infra.manifest_reader") or {scope_plan=function(scope, mode)
 				helpers.assert_eq(scope,"shortcuts");helpers.assert_eq(mode,"clear");return {presets={},operations={}}
 			end},is_paused=function() return state.paused end})
@@ -116,14 +132,15 @@ end
 local function failed(value) helpers.assert_eq(value,false) end
 
 local function next_scope(s,expected,manifest,tag)
-	return Scope.new({path=path,backup_path=backup..(tag or ".next"),files=s.files,combinations=s.pairs,parameters=s.gestures,
+	return Scope.new({path=path,backup_path=backup..(tag or ".next"),chord_path=chord_path,
+		chord_backup_path=chord_backup..(tag or ".next"),prepare_chord_rows=prepare_chord_rows,files=s.files,combinations=s.pairs,parameters=s.gestures,
 		manifest=manifest or require("infra.manifest_reader"),is_paused=function() return s.paused end,expected_source=expected})
 end
 
 local function with_menu(body, public_chords)
 	with_owner(function(s)
 		package.loaded["adapters.file_system"]=s.files
-		package.loaded["infra.config_paths"]={config=function() return path end}
+		package.loaded["infra.config_paths"]={config=function(name) return name=="tap_hold.toml" and "/controlled/tap_hold.toml" or path end}
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
 		local renderer=require("infra.manifest_menu")
@@ -173,11 +190,12 @@ local function with_public_owner(body)
  return with_owner(body,false,true)
 end
 
-local function seed_public(s,text)
+--- Seeds config.toml and, when given, the `[mod_combos]` of tap_hold.toml.
+local function seed_public(s,text,chord_text)
  local token={}
  helpers.assert_true(s.pairs.acquire_configuration(token))
- s.bytes[path]=text
- helpers.assert_true(s.pairs.apply_configuration(token,s.pairs.configuration_candidate(Codec.decode(text),true)))
+ s.bytes[path],s.bytes[chord_path]=text,chord_text
+ helpers.assert_true(s.pairs.apply_configuration(token,s.pairs.configuration_candidate(Codec.decode(text),true,Codec.decode(chord_text or ""))))
  helpers.assert_true(s.pairs.release_configuration(token))
 end
 
@@ -188,6 +206,8 @@ return {
 	Scope = Scope,
 	path = path,
 	backup = backup,
+	chord_path = chord_path,
+	chord_backup = chord_backup,
 	pair = pair,
 	binding = binding,
 	parameter = parameter,

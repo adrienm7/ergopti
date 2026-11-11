@@ -1,0 +1,35 @@
+# _shared/tests/corpus/tap_hold_shared_file/macos_legacy.toml
+# A macOS config_karabiner.toml from before the shared tap_hold.toml: the
+# import of _shared/tap_hold/migrations.toml [legacy_imports.hs] turns it into
+# exactly the content of macos_written.toml.
+
+[karabiner]
+integration_enabled = false
+
+[tap_holds]
+enabled = true
+timeout_ms = 250
+sticky_timeout_ms = 1500
+lone_modifier_tap_max_ms = 0
+
+[tap_holds.config.caps_lock]
+tap = "backspace"
+hold = "ctrl"
+
+[tap_holds.config.left_shift]
+tap = "copy"
+hold = "shift"
+timeout_ms = 300
+
+[tap_holds.config.tab]
+hold = "layer"
+
+[tap_holds.config.left_control]
+hold = "cmd_shift"
+
+[mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = true
+
+[mod_combos.config.esc_tab]
+combo = "copy"

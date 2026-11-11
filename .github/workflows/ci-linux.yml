@@ -3013,6 +3013,48 @@ jobs:
           fi
         timeout-minutes: 6
 
+      - name: Install prerequisites for The container proofs
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc pkg-config luajit lua-luv lua-lgi \
+            xvfb x11-utils x11-xkb-utils openbox dbus-x11 at-spi2-core mousepad xclip libxtst6 libx11-xcb1 libxkbcommon-x11-0 \
+            sway mutter wl-clipboard libwayland-dev libxkbcommon-dev libxkbcommon-tools python3-gi gir1.2-gtk-3.0 gir1.2-atspi-2.0
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # The "To confirm on Linux" checks a container closes (maintainer decision
+      # of 2026-11-10): the real daemon over the kernel model, a real X server and
+      # two real Wayland compositors (sway with data-control, mutter without),
+      # real editors read back through AT-SPI or the clipboard. The navigation
+      # proof is also the regression of a mouse given back by the layer stopping
+      # the hook at the next device watchdog tick.
+      - name: The container proofs
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo env PATH="$PATH" bash tests/hardware/run_container_proofs.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 15
+
       - name: Install prerequisites for Load the number-row options into a real X server
         if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
@@ -3205,6 +3247,8 @@ jobs:
       # GNOME Shell and KWin report the focused window to a session-bus name the
       # daemon's worker owns; this runs that worker on a real dbus-daemon, the
       # test standing in for the Shell (admission, refusals, single owner).
+      # COSMIC's worker then reads zcosmic_toplevel_info_v1 through the real
+      # libwayland-client from a protocol fake standing in for cosmic-comp.
       - name: The compositor focus worker admits only the desktop on a real session bus
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
@@ -3217,6 +3261,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           timeout 60 dbus-run-session -- luajit tests/hardware/run_compositor_focus_bus.lua
+          timeout 60 luajit tests/hardware/run_cosmic_toplevel_fake.lua
           else
               exit 1
           fi
@@ -3608,8 +3653,9 @@ jobs:
               exit 1
           fi
         timeout-minutes: 3
-      # Enabling the AI beside a system Ollama starts Ergopti's own on its port, and a
-      # PAC GIO cannot download warns, then the pull goes direct (Ollama stand-in).
+      # Enabling the AI beside a system Ollama starts Ergopti's own on its port; a PAC
+      # the lookup child cannot download warns, then the pull goes direct; a dead first
+      # PAC relay walks on to DIRECT or a live relay (Ollama stand-in, system Duktape).
       - name: Qualify the owned Ollama start and PAC-unreachable pull
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
@@ -4189,6 +4235,29 @@ jobs:
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
+      # JavaScriptCore suspends threads for its collector with SIGUSR1 unless
+      # JSC_SIGNAL_FOR_GC names another signal; the reload request rings SIGUSR1,
+      # and a daemon with a WebView open died with SIGSEGV.
+      - name: The reload signal survives an in-process WebView
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_webkit_gc_signal.lua
           else
               exit 1
           fi

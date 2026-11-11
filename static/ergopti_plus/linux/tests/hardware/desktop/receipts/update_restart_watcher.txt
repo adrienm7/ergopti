@@ -1,0 +1,66 @@
+# Receipt: update restart watcher, real systemd user manager and terminal relay (2026-11-10)
+# Proof: tests/hardware/desktop/run_update_restart_watcher.sh, as root on Ubuntu 24.04 (kernel 6.18.44), base
+# 6e36ba7249 with the Quit and $-escaping fixes. Real: modules/updater/restarter.lua,
+# infra/updater_boot_ready.lua, infra/quit_request.lua, the watcher shell, systemd --user 255 with the
+# repository unit; the trees and launchers are scratch files.
+#
+# Before the fixes, on 6e36ba7249, the same quit scenario (a Quit admitted by infra/quit_request.lua in
+# the updated daemon before its ready report) ended in a rollback in both modes about 61 s later:
+#   relay:   "The updated daemon did not start (no boot report): the previous installation is back and
+#            the new one is at <root>.failed-8065." and the previous daemon was started again;
+#   systemd: the same, with the tree moved to "<root>.failed-$" (systemd had turned `$$` into `$`),
+#            and the unit active again on the previous daemon.
+systemd --user: systemd 255 (255.4-1ubuntu8.18), state running
+relay healthy
+  ok   the restarter took the relay route
+  ok   the new daemon started
+  ok   the watch log reads « reported a healthy start »
+  ok   the new tree stays installed
+  ok   no tree was moved aside
+relay broken
+  ok   the restarter took the relay route
+  ok   the new tree moved to <root>.failed-<pid>
+  ok   its name ends in the watcher's pid (ergopti.failed-10360)
+  info rollback after 62 s
+  ok   the rollback came within the 60 s boot-ready wait plus the watcher's own steps
+  ok   <root>.old is back at <root>
+  ok   the previous daemon runs again
+  ok   the watch log names the failure
+relay quit
+  ok   the restarter took the relay route
+  ok   the updated daemon started under the watcher
+  ok   its tray Quit was admitted by infra/quit_request.lua
+  ok   the watch log reads « quit before it reported ready »
+  info watcher settled 1 s after the restart
+  ok   no daemon was started again
+  ok   no update watcher is left
+  ok   the update stays installed
+systemd healthy
+  ok   the daemon runs inside the unit's cgroup
+  ok   the restarter took the systemd route
+  ok   the new daemon started
+  ok   the watch log reads « reported a healthy start »
+  ok   the new tree stays installed
+  ok   no tree was moved aside
+systemd broken
+  ok   the daemon runs inside the unit's cgroup
+  ok   the restarter took the systemd route
+  ok   the new tree moved to <root>.failed-<pid>
+  ok   its name ends in the watcher's pid (ergopti.failed-26633)
+  info rollback after 61 s
+  ok   the rollback came within the 60 s boot-ready wait plus the watcher's own steps
+  ok   <root>.old is back at <root>
+  ok   the previous daemon runs again
+  ok   the watch log names the failure
+systemd quit
+  ok   the daemon runs inside the unit's cgroup
+  ok   the restarter took the systemd route
+  ok   the updated daemon started under the watcher
+  ok   its tray Quit was admitted by infra/quit_request.lua
+  ok   the watch log reads « quit before it reported ready »
+  info watcher settled 2 s after the restart
+  ok   no daemon was started again
+  ok   no update watcher is left
+  ok   the update stays installed
+  ok   the unit is stopped
+rc=0

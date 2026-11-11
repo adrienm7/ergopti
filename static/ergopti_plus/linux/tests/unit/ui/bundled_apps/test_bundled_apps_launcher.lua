@@ -23,7 +23,10 @@ local function fake_deps(overrides)
 		text = function(key) return "[" .. key .. "]" end,
 		getenv = function(name) return ({ ERGOPTI_RUNTIME_PREFIX = "/opt/runtime" })[name] end,
 		data_home = function() return "/home/u/.local/share" end,
-		spawn = function(executable, args) state.spawned[#state.spawned + 1] = { executable, args }; return true end,
+		spawn = function(executable, args, environment)
+			state.spawned[#state.spawned + 1] = { executable, args, environment }
+			return true
+		end,
 		write_file = function(path, text) state.files[path] = text; return true end,
 	}
 	for key, value in pairs(overrides or {}) do deps[key] = value end
@@ -46,6 +49,36 @@ helpers.describe("Linux bundled apps launcher", function()
 		helpers.assert_eq(table.concat(call[2], " "),
 			"/opt/ergopti/linux/apps/app_cloner.lua --locales-dir /opt/ergopti/_shared/data/locales --locale fr")
 		helpers.assert_nil(next(state.files))
+	end)
+
+	-- The daemon keeps its module paths in package.path and exports no
+	-- LUA_PATH: a tray-started app without them could not load a module
+	-- (tests/hardware/desktop/run_encryptor.sh found Encryptor dead on a launch.sh run).
+	helpers.it("bundled apps: the tray's child gets the daemon's module paths and runtime", function()
+		local deps, state = fake_deps()
+		helpers.assert_true(Apps.launch(Apps.APPS[2], deps))
+		local environment = {}
+		for _, pair in ipairs(state.spawned[1][3]) do environment[pair[1]] = pair[2] end
+		helpers.assert_eq(environment.LUA_PATH, package.path)
+		helpers.assert_eq(environment.LUA_CPATH, package.cpath)
+		helpers.assert_eq(environment.ERGOPTI_RUNTIME_PREFIX, "/opt/runtime")
+		local launcher = state.files["/home/u/.local/share/ergopti/apps/ergopti-encryptor.sh"]
+		helpers.assert_contains(launcher, "export LUA_PATH=" .. quote(package.path) .. "\n")
+	end)
+
+	-- Under a relative package.path this module's source path is relative, and
+	-- the dialog command used to refuse every dialog for want of a driver root.
+	helpers.it("bundled apps: an app dialog opens under a relative module path", function()
+		local root = require("infra.paths").driver_root()
+		local code = 'package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"'
+			.. ' .. package.path; io.write(require("ui.native_dialog").command())'
+		local pipe = assert(io.popen("cd " .. quote(root) .. " && " .. quote(require("luv").exepath())
+			.. " -e " .. quote(code) .. " 2>&1"))
+		local command = pipe:read("*a")
+		pipe:close()
+		-- The host is named by its module, so a move of the file does not break this.
+		local host = assert(package.searchpath("ui.dialog_host", root .. "/?.lua"), "dialog host module")
+		helpers.assert_contains(command, quote(host))
 	end)
 
 	helpers.it("bundled apps: writes the Encryptor drop target with its file field code", function()

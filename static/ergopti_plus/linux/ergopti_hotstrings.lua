@@ -125,6 +125,13 @@ else
 	               package.path
 end
 
+-- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
+-- the reload request's signal, and a reload with a WebView open crashed us.
+do
+	local reserved, reserve_error = require("infra.signal_handlers").reserve_webkit_gc_signal()
+	if not reserved then error(reserve_error, 0) end
+end
+
 --- Prints the CLI usage. Deliberately ENGLISH, not translated.
 ---
 --- This runs before the session lock, the logger and i18n.init() — which cannot move
@@ -857,6 +864,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 	writer_active = function() return require("infra.scope_registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
+	report_update_quit = function() require("infra.updater_boot_ready").report_quit("the tray Quit") end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
 	end,
@@ -1156,6 +1164,9 @@ local function main()
 	-- whose closure reads it.
 	-- tap_hold.toml is versioned like config.toml: migrated before the engine reads it.
 	require("platform.remap.tap_hold_writer").migrate_file(
+		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
+	-- Then the key combinations config.toml kept until 1.0.9 move into it, once.
+	require("platform.remap.tap_hold_writer").import_config_combos(require("infra.config_paths").config("config.toml"),
 		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
 	local TapHold = require("platform.remap.tap_hold_manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
@@ -2931,7 +2942,13 @@ local function main()
 				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))
 			end
 			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
-				function() shutdown.request("degraded tray quit") end)
+				function()
+					-- A failed watcher report never keeps the daemon from quitting.
+					if not pcall(require("infra.updater_boot_ready").report_quit, "the degraded tray Quit") then
+						Logger.error(LOG, "The update watcher could not be told of the Quit.")
+					end
+					shutdown.request("degraded tray quit")
+				end)
 		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but the tray adapter could not load.")

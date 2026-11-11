@@ -17,6 +17,7 @@ return {
 			glib = "libglib-2.0.so.0",
 		},
 		proxy_schema = "org.gnome.system.proxy",
+		pac_engine = "libduktape.so.207",
 	},
 	archive_digest_runtime = {
 		schema_version = 1,

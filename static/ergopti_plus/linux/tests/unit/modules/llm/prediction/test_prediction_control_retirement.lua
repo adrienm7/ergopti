@@ -657,7 +657,7 @@ do
 			  return ok, result
 			end })
 			put("infra.input_access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
-			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes })
+			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
 			put("infra.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
@@ -665,7 +665,7 @@ do
 			put("modules.hotstrings.hotstrings_config", config)
 			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end,
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
-			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
+			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop, import_config_combos = noop })
 			-- Gesture/action sources have no configured bindings in this scope.
 			put("modules.hotstrings.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
 			put("modules.hotstrings.repeat_key", { is_enabled = no })

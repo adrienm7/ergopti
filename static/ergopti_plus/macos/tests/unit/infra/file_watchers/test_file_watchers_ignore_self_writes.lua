@@ -13,7 +13,7 @@
 --- matched every `*.toml`. save_prefs — which every single menu toggle calls —
 --- therefore looked exactly like a user hand-editing a hotstring file, and the
 --- settle timer reloaded the session it had just been asked to change.
---- config_karabiner.toml is the same story on every layout change.
+--- tap_hold.toml is the same story on every layout change.
 ---
 --- WHY IT WAS SILENT: a reload looks like the driver working. The notification
 --- says the config changed, which is true; nothing indicates the change was our
@@ -47,13 +47,13 @@ helpers.describe("file_watchers: a write the session made itself does not reload
 		end)
 	end)
 
-	helpers.it("ignores config_karabiner.toml, regenerated on every layout change", function()
+	helpers.it("ignores tap_hold.toml, regenerated on every layout change", function()
 		Fixture.with_watchers(function(w)
 
 			w.fire(KARABINER_TOML)
 
 			helpers.assert_true(w.scheduled() == nil,
-				"the driver regenerates config_karabiner.toml itself whenever the layout changes — "
+				"the driver regenerates tap_hold.toml itself whenever the layout changes — "
 					.. "the same self-trigger, on a file written far more often")
 			helpers.assert_eq(w.reloads(), 0, "and must not reload")
 

@@ -29,6 +29,7 @@ local M = {}
 local Logger = require("logger.shim")
 local NativePath = require("native_path")
 local Monotonic = require("infra.monotonic")
+local DisplayServer = require("infra.display_server")
 local LOG = "ui.webview_manager"
 
 -- Windows that open by themselves while the user may be typing: shown
@@ -1386,9 +1387,19 @@ end
 --- it with present() unless it must leave the keyboard where the user types.
 --- It never sets keep-above or a floating type hint: an Ergopti window is
 --- focused, never kept above the windows the user opens afterwards.
+---
+--- On Wayland a window already mapped is unmapped and mapped again first.
+--- There present() can only raise a window with an activation token taken
+--- from an input event on one of the client's own surfaces, and the daemon
+--- reads the keyboard from evdev, so it has none: GNOME Shell only marked the
+--- covered page as demanding attention, and the toggle's next press found it
+--- still covered (tests/hardware/desktop/run_window_toggle.sh). A window mapped anew
+--- is focused as any new window is; GTK keeps its WebKit view, its page and
+--- its size, so the page is raised, not reopened.
 --- @param window userdata The Gtk.Window.
 --- @param take_focus boolean False for a window that must not take the keyboard.
 function M._present_gtk_window(window, take_focus)
+	if window.visible and take_focus and DisplayServer.is_wayland() then window:hide() end
 	if not window.visible then window:show_all() end
 	if take_focus then window:present() end
 end

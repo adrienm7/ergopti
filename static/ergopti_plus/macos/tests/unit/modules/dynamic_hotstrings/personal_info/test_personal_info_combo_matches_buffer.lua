@@ -189,3 +189,58 @@ helpers.describe("personal_info Unicode aliases", function()
 		end)
 	end
 end)
+
+helpers.describe("personal_info Unicode aliases: preview and expansion agree while erasing", function()
+	-- The Mac check « Personal aliases » (TODO, To confirm on the Mac): a cased
+	-- Unicode combo typed, then erased one scalar at a time, previews at every
+	-- length exactly the fields its expansion types, and erasing past the last
+	-- scalar ends the combo so neither previews nor expands.
+	local source = '[info]\ncity = "Lyon"\nfirst_name = "Marie"\n[letters]\n'
+		.. '"é" = "city"\n"ü" = "first_name"\n"𐐨" = "city"\n'
+	local typed = { "É", "Ü", "𐐀" }
+	local fields = { "Lyon", "Marie", "Lyon" }
+
+	--- Types "@" and the cased combo, then Backspace until `kept` scalars remain.
+	--- @param kept integer
+	--- @return function interceptor, table rec, string buffer
+	local function erase_to(kept)
+		local interceptor, rec = boot(source)
+		local buffer = ""
+		for _, character in ipairs({ "@", typed[1], typed[2], typed[3] }) do
+			interceptor(key(character), buffer)
+			buffer = buffer .. character
+		end
+		for _ = #typed, kept + 1, -1 do
+			local backspace = key("")
+			backspace.getKeyCode = function() return 51 end
+			interceptor(backspace, buffer)
+			buffer = buffer:sub(1, utf8.offset(buffer, -1) - 1)
+		end
+		return interceptor, rec, buffer
+	end
+
+	for kept = #typed, 1, -1 do
+		helpers.it("personal-unicode-alias: " .. kept .. " scalar(s) left preview what they expand", function()
+			local interceptor, rec, buffer = erase_to(kept)
+			local expected = {}
+			for index = 1, kept do expected[index] = fields[index] end
+			helpers.assert_eq(rec.preview(buffer), table.concat(expected, " ⇥ "),
+				"the preview names each field the remaining combo resolves to")
+			helpers.assert_eq(interceptor(key(TRIGGER), buffer), "consume")
+			helpers.assert_eq(#rec.injects, 1)
+			helpers.assert_eq(rec.injects[1].deletes, kept + 1, "the sentinel and the remaining scalars")
+			helpers.assert_eq(rec.injects[1].text, table.concat(expected), "the expansion types what was previewed")
+		end)
+	end
+
+	helpers.it("personal-unicode-alias: erasing past the last scalar ends the combo", function()
+		local interceptor, rec, buffer = erase_to(0)
+		helpers.assert_eq(buffer, "@")
+		local backspace = key("")
+		backspace.getKeyCode = function() return 51 end
+		interceptor(backspace, buffer)
+		helpers.assert_nil(rec.preview(""), "nothing previews once the sentinel is erased")
+		helpers.assert_nil(interceptor(key(TRIGGER), ""), "the trigger falls through")
+		helpers.assert_eq(#rec.injects, 0)
+	end)
+end)

@@ -28,6 +28,13 @@
 			"version": "2.2.0",
 			"source": "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js",
 			"sha256": "e4a088e5bab93be6ee47c939eeb9ebaa80e0b39156d4bdfd1af9c844be81b6c4"
+		},
+		{
+			"file": "smol-toml.js",
+			"package": "smol-toml",
+			"version": "1.9.1",
+			"source": "https://cdn.jsdelivr.net/npm/smol-toml@1.9.1/dist/index.cjs",
+			"sha256": "f9029370259e9a43a2f3e64fa1d39e72f3598188380ace83a0abb8261fa33555"
 		}
 	]
 }

@@ -19,13 +19,17 @@ local SOURCE = '[other]\nvalue = 17\n[tap_holds]\nfuture = "keep"\n'
 	.. '[mod_combos.config.future_combo]\ncombo = "future"\n'
 
 --- Runs the actual codec and writer over a captured conditional publication.
---- @param source string Configuration bytes.
+--- @param source string Configuration, in the Karabiner model layout.
 --- @param body function Assertions receiving save, state and captured bytes.
 local function with_source(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.toml.codec", "toml_codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.toml.codec", "toml_codec" }, function()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local files = require("adapters.file_system")
-		local codec = require("infra.toml.codec")
+		-- The source is stated in the Karabiner model; the file holds its
+		-- shared tap_hold.toml text, read back through the same translation.
+		local Text = require("tests.support.tap_hold_file_text")
+		source = Text.file(source)
+		local codec = { decode = Text.model }
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged
 		local captured = { writes = 0 }
 		files.read_with_status = function() return source, "ok" end

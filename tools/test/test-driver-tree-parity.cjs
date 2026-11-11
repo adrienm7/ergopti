@@ -267,7 +267,13 @@ const BASELINE_SHARED = 39;
 //   the elevated installer of that DLL. macOS and Linux install the .keylayout
 //   and XKB files themselves and build no keyboard DLL, so counterpart
 //   folders there would hold nothing.
-const BASELINE_UNION = 65;
+//   65 -> 68 on 2026-11-11 (coordinator, overnight; to review by the maintainer) -
+//   linux/desktop_focus with its gnome and kwin children: the GNOME Shell
+//   extension and the KWin script the installer places so the daemon can read
+//   the focused window under Wayland, where no client may ask the compositor.
+//   Windows and macOS read focus through their own native APIs and install no
+//   desktop-shell code, so counterpart folders there would hold nothing.
+const BASELINE_UNION = 68;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //
@@ -302,7 +308,8 @@ const testsShared = [...testsUnion]
 // Measured 2026-10-30. Raise the first and lower the second as the trees converge;
 // never the other way to make a change pass.
 const BASELINE_TESTS_SHARED = 11;
-const BASELINE_TESTS_UNION = 62;
+// 62 -> 63 on 2026-11-11: the Linux container desktop proofs (tests/hardware/desktop).
+const BASELINE_TESTS_UNION = 63;
 
 if (testsShared.length < BASELINE_TESTS_SHARED) {
 	errors.push(

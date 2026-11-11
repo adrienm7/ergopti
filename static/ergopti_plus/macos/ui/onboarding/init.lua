@@ -17,13 +17,13 @@
 ---    catalogue and they reach config.toml in one versioned batch_write, then
 ---    hs.reload() starts every module from the file. The Tap-Holds page's
 ---    checked keys go to the remap owner, which imports their recommendation
----    into config_karabiner.toml and switches the Tap-Holds on there. A key
+---    into tap_hold.toml and switches the Tap-Holds on there. A key
 ---    whose recommended hold enters the navigation layer brings Ergopti's
 ---    recommended layer along when the folder has no layers.toml of its own.
 --- 4. Re-run shows the values in force: the page receives the configured value
 ---    of every wizard path, for the folder it opens on and for any folder the
 ---    user picks, the tap-hold keys and switch included, which the remap owner
----    reports from that folder's config_karabiner.toml.
+---    reports from that folder's tap_hold.toml.
 --- ==============================================================================
 
 local M = {}
@@ -90,7 +90,7 @@ local function publication_owner()
 	return _publication
 end
 
--- Keeps each tap-hold import's backup of config_karabiner.toml unique.
+-- Keeps each tap-hold import's backup of tap_hold.toml unique.
 local _backup_sequence = 0
 
 -- WebView + usercontent bridge state (singleton)
@@ -259,12 +259,12 @@ function M.config_values(decoded, mark)
 	return Answers.current_values(catalogue(), decoded, mark)
 end
 
---- The config_karabiner.toml beside a config.toml: the remap settings of the
+--- The tap_hold.toml beside a config.toml: the remap settings of the
 --- same configuration folder, named as the path resolver names them.
 --- @param config_path string Absolute config.toml path.
 --- @return string
 local function remap_settings_beside(config_path)
-	local name = NativePath.basename(require("infra.config_paths").get("KarabinerConfigPath"))
+	local name = NativePath.basename(require("infra.config_paths").get("TapHoldConfigPath"))
 	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
 	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
 	return folder .. "/" .. name
@@ -686,7 +686,7 @@ local function import_tap_holds(keys, moved, on_done)
 		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
 		return
 	end
-	local ok_path, path = pcall(require("infra.config_paths").get, "KarabinerConfigPath")
+	local ok_path, path = pcall(require("infra.config_paths").get, "TapHoldConfigPath")
 	if not ok_path then
 		on_done(false, "the remap settings file cannot be resolved: " .. tostring(path))
 		return
@@ -927,7 +927,7 @@ local function commit_owned(answers, publication)
 	-- The layer the imported keys enter is written first, so a live bridge's
 	-- regeneration already deploys it; a refused key import takes it back.
 	local layer, layer_failed
-	-- The answers are saved: a refused import leaves config_karabiner.toml as
+	-- The answers are saved: a refused import leaves tap_hold.toml as
 	-- it was, says so, and the reload still applies the rest. A bridge that
 	-- never answers cannot hold the reload back past the timeout either.
 	local settled = false

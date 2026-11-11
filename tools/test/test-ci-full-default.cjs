@@ -948,7 +948,8 @@ check(
 			'swift_root_suite'
 		])
 			assert.equal(full.includes(removed), false, removed);
-		assert.equal(Scoped.contract.slots.length, 200);
+		// 203: the WebKit reload-signal receipt joined the desktop-webview shard.
+		assert.equal(Scoped.contract.slots.length, 203);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(

@@ -11,6 +11,7 @@
 
 local M = {}
 local ExactIdentity = require("infra.curl_identity")
+local Timings = require("infra.timings")
 
 --- Constructs one initialized native coordinator against explicit owners.
 --- @param dependencies table { policy, proxy, curl, clock, deadline, environment, report }
@@ -740,8 +741,12 @@ function M.new(dependencies)
 			record.constructing = false
 			finish(record, refusal("cancelled")); return operation
 		end
+		-- The lookup child evaluates a desktop PAC itself (GIO drops its DIRECT
+		-- entries) within this request's remaining budget, so the curl failover
+		-- walks the PAC's complete ordered list.
 		local called, child, lookup_error = pcall(dependencies.proxy.lookup_owned, record.url, {
 			owner = record.owner, timeout_ms = math.ceil(budget), probe_curl = true,
+			pac_check_timeout_ms = math.ceil(math.min(budget, Timings.ms("adapters", "proxy_pac_download_max_ms"))),
 			logical_cancel = record.options.owned_api == false,
 			on_native_terminal = function(result)
 				if owned[record.owner] ~= record or record.generation ~= generation then return end
