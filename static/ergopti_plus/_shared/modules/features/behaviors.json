@@ -39,6 +39,13 @@
 			"sha256": "21eb83190bf6cd55e012e75fd02af46463f17473ceb5ff391e5ecc02413c2d13"
 		},
 		{
+			"id": "macos-undo",
+			"platform": "macos",
+			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"symbol": "function M.undo_on_backspace",
+			"sha256": "333801081620d8cce9bc13076d68e8849380374a00121286f41845afdc6cc1e2"
+		},
+		{
 			"id": "linux-repeat",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
@@ -126,7 +133,7 @@
 				},
 				"linux": {
 					"declared": true,
-					"note_key": "inventory.behavior.repeat_linux",
+					"note_key": "inventory.behavior.repeat_condition",
 					"owners": ["linux-repeat", "linux-control"]
 				}
 			}
@@ -141,9 +148,9 @@
 					"owners": ["windows-control", "windows-undo"]
 				},
 				"macos": {
-					"declared": false,
-					"note_key": "inventory.behavior.backspace_other",
-					"owners": ["macos-control"]
+					"declared": true,
+					"note_key": "inventory.behavior.backspace_linux",
+					"owners": ["macos-control", "macos-undo"]
 				},
 				"linux": {
 					"declared": true,
@@ -167,8 +174,8 @@
 					"owners": ["macos-repeat", "macos-control"]
 				},
 				"linux": {
-					"declared": false,
-					"note_key": "inventory.behavior.repeat_window_untimed",
+					"declared": true,
+					"note_key": "inventory.behavior.repeat_window_macos",
 					"owners": ["linux-repeat", "linux-control"]
 				}
 			}
