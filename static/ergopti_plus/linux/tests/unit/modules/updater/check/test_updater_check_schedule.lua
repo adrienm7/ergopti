@@ -266,6 +266,21 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		end)
 	end)
 
+	-- A failed check hands back the release a manual check already found; it
+	-- was announced, the log reading « failure » then « New release ». Windows
+	-- records the failure and shows nothing until a successful check (UPL-001,
+	-- failed-check-no-announcement).
+	helpers.it("a failed check announces nothing, even with a release known (failed-check-no-announcement)", function()
+		with_manager({ now = T0, record = { seed = SEED, last_check_at = T0 - 2 * 86400 } }, function(ctx)
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			ctx.dispatches[1](true, { tag = "v1.4.0" }, "offline")
+			helpers.assert_eq(#ctx.available, 0, "no notification from a failed check")
+			helpers.assert_eq(record(ctx).failures, 1, "the failure is counted")
+			helpers.assert_nil(record(ctx).last_notified_tag, "and the release stays to announce")
+		end)
+	end)
+
 	helpers.it("a release is announced once, across restarts", function()
 		local previous = { seed = SEED, last_check_at = T0 - 2 * 86400, last_notified_tag = "v1.3.0" }
 		with_manager({ now = T0, record = previous }, function(ctx)
