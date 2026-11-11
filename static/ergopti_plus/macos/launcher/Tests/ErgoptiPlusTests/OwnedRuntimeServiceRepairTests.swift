@@ -44,7 +44,7 @@ final class OwnedRuntimeServiceRepairTests: XCTestCase {
 	}
 
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
-	private let plistName = "com.ergoptiplus.runtime.core.plist"
+	private let plistName = Identifiers.ServiceLabels.macosCore + ".plist"
 	private let ledgerName = ".runtime-service-journal"
 
 	private func writePlist(_ bytes: Data, in parent: URL, mode: Int = 0o644) throws -> URL {

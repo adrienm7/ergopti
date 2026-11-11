@@ -41,9 +41,18 @@ local REASON = require("platform.remap.runtime_install").REASON
 -- =====================================
 
 -- The two offers: their facade operation, their texts and their log wording.
+-- Each key is spelt whole, so the translation audit sees every one in use.
 local OFFERS = {
-	install = { operation = "install_owned_runtime", texts = "karabiner.owned_install", name = "install" },
-	repair = { operation = "repair_owned_runtime", texts = "karabiner.owned_repair", name = "service repair" },
+	install = { operation = "install_owned_runtime", name = "install", texts = {
+		title = "karabiner.owned_install.title", body = "karabiner.owned_install.body",
+		confirm = "karabiner.owned_install.confirm", done = "karabiner.owned_install.done",
+		failed = "karabiner.owned_install.failed",
+	} },
+	repair = { operation = "repair_owned_runtime", name = "service repair", texts = {
+		title = "karabiner.owned_repair.title", body = "karabiner.owned_repair.body",
+		confirm = "karabiner.owned_repair.confirm", done = "karabiner.owned_repair.done",
+		failed = "karabiner.owned_repair.failed",
+	} },
 }
 
 --- Checks the remap facade before any side effect.
@@ -64,10 +73,10 @@ end
 --- @return boolean scheduled
 local function report(offer, ok, reason, detail, reload)
 	if not ok and reason == REASON.CANCELLED then return false end
-	local message = ok and i18n.get(offer.texts .. ".done")
-		or i18n.format(offer.texts .. ".failed", tostring(detail or reason))
+	local message = ok and i18n.get(offer.texts.done)
+		or i18n.format(offer.texts.failed, tostring(detail or reason))
 	local committed = require("infra.deferred_work").after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get(offer.texts .. ".title"), message,
+		require("infra.dialog_util").block_alert(i18n.get(offer.texts.title), message,
 			i18n.get("common.ok"))
 		if ok then reload() end
 	end, "owned_runtime_install.report")
@@ -86,9 +95,9 @@ end
 local function open_offer(offer, remap, reload)
 	validate(remap, offer)
 	reload = reload or function() hs.reload() end
-	local confirm = i18n.get(offer.texts .. ".confirm")
-	local clicked = require("infra.dialog_util").block_alert(i18n.get(offer.texts .. ".title"),
-		i18n.get(offer.texts .. ".body"), confirm, i18n.get("common.later"), "informational")
+	local confirm = i18n.get(offer.texts.confirm)
+	local clicked = require("infra.dialog_util").block_alert(i18n.get(offer.texts.title),
+		i18n.get(offer.texts.body), confirm, i18n.get("common.later"), "informational")
 	if clicked ~= confirm then
 		Logger.info(LOG, "Owned runtime %s postponed.", offer.name)
 		return false
