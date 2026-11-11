@@ -1152,6 +1152,27 @@ end
 --- @param groups integer Number of groups in that loaded native keymap.
 --- @return table|nil receipt { group, generation, backend, observed_current }.
 --- @return string|nil reason Native qualification refusal.
+--- The core keyboard's keymap text from the server, reused while no keymap
+--- notification was drained since it was downloaded (see _downloaded).
+--- @return string|nil text, string|nil reason
+local function download_keymap(native, connection)
+	if _downloaded.connection == connection and _downloaded.events == _keymap_events and _downloaded.text then
+		return _downloaded.text
+	end
+	local events = _keymap_events
+	local device = native.xkb11.xkb_x11_get_core_keyboard_device_id(connection.xcb)
+	if device < 0 then return nil, "native-keyboard-unavailable" end
+	local keymap = native.xkb11.xkb_x11_keymap_new_from_device(connection.context, connection.xcb, device, 0)
+	if keymap == nil then return nil, "native-keymap-unavailable" end
+	local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
+	local text = bytes ~= nil and native.ffi.string(bytes) or nil
+	if bytes ~= nil then native.ffi.C.free(bytes) end
+	native.xkb.xkb_keymap_unref(keymap)
+	if text == nil then return nil, "native-keymap-identity-unavailable" end
+	_downloaded.connection, _downloaded.events, _downloaded.text = connection, events, text
+	return text
+end
+
 local function read(expected, groups, require_locked, require_input)
 	assert(type(expected) == "string" and expected ~= "", "the acknowledged keymap identity is required")
 	assert(type(groups) == "number" and groups >= 1 and groups % 1 == 0, "the native group count is required")
@@ -1170,24 +1191,11 @@ local function read(expected, groups, require_locked, require_input)
 	if not drained then return nil, drain_reason end
 	local before, after = native.ffi.new("ErgoptiXkbState[1]"), native.ffi.new("ErgoptiXkbState[1]")
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, before) ~= 0 then return nil, "native-group-unavailable" end
-	local actual
 	-- The drain above synchronized with the server: a keymap change made before
 	-- it has been counted, and one made after it is counted by the drain below,
 	-- which then reports the race exactly as a fresh download would.
-	if _downloaded.connection == connection and _downloaded.events == _keymap_events and _downloaded.text then
-		actual = _downloaded.text
-	else
-		local events = _keymap_events
-		local device = native.xkb11.xkb_x11_get_core_keyboard_device_id(connection.xcb)
-		if device < 0 then return nil, "native-keyboard-unavailable" end
-		local keymap = native.xkb11.xkb_x11_keymap_new_from_device(connection.context, connection.xcb, device, 0)
-		if keymap == nil then return nil, "native-keymap-unavailable" end
-		local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
-		actual = bytes ~= nil and native.ffi.string(bytes) or nil
-		if bytes ~= nil then native.ffi.C.free(bytes) end
-		native.xkb.xkb_keymap_unref(keymap)
-		if actual ~= nil then _downloaded.connection, _downloaded.events, _downloaded.text = connection, events, actual end
-	end
+	local actual, download_reason = download_keymap(native, connection)
+	if actual == nil and download_reason ~= "native-keymap-identity-unavailable" then return nil, download_reason end
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, after) ~= 0 then return nil, "native-group-unavailable" end
 	local group = tonumber(after[0].group)
 	local locked = tonumber(after[0].locked_mods)
@@ -1467,6 +1475,25 @@ end
 
 --- Existing group/keymap receipt retains its generation semantics across locks.
 function M.read(expected, groups) return read(expected, groups, false) end
+
+--- The server's core keyboard keymap as libxkbcommon serializes it, through
+--- this module's own connection: the text `xkbcli dump-keymap-x11` prints,
+--- without its fork (about 40 ms a resolve through xkbcomp before). The text
+--- is the probe's identity source, so the first read() after it reuses it.
+--- @return string|nil text, string|nil reason
+function M.dump_keymap()
+	local display_name = os.getenv("DISPLAY")
+	if not display_name or display_name == "" then return nil, "native-display-unavailable" end
+	if DisplayServer.is_wayland() then return nil, "native-wayland-seat-unqualified" end
+	local native, reason = bind()
+	if not native then return nil, reason end
+	local connection
+	connection, reason = connect(native, display_name)
+	if not connection then return nil, reason end
+	local drained, drain_reason = drain(native, connection)
+	if not drained then return nil, drain_reason end
+	return download_keymap(native, connection)
+end
 
 --- Detached native locked-modifier receipt. Locked XKB event epochs reject
 --- away-and-back races without treating ordinary key transitions as rebinds.
