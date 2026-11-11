@@ -3633,6 +3633,16 @@ local function main()
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
+	-- The first key used to load the shortcut assignments (a config read and a
+	-- TOML decode, about 8 ms in a measured X11 session) inside its own
+	-- dispatch. They load once per process either way; the loop's first idle
+	-- tick takes them now, after the ready announcement.
+	event_loop.defer(function()
+		local loaded, failure = pcall(require("modules.shortcuts.keyboard_shortcuts").get_assignments)
+		if not loaded then
+			Logger.error(LOG, "Shortcut assignments could not be loaded before the first key: %s.", tostring(failure))
+		end
+	end)
 
 	event_loop.run({
 		onIdle = function()
