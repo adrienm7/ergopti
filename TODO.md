@@ -1056,7 +1056,12 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       (`pac-download-direct`). A PAC that says DIRECT warns nothing; a dead relay as the last entry fails the pull.
 - [ ] Item 50 cascade and the composed layout typed on a physical keyboard.
       Not attempted in the 2026-11-10 container pass; the emulation proof above can type the composer's
-      `composed.keylayout` once it is the emulated layout.
+      `composed.keylayout` once it is the emulated layout. 2026-11-11, the cascade through the daemon's real main()
+      (`tests/e2e/run_e2e.lua`, scripted keyboard, uinput into a model field; the container kernel has no evdev or
+      uinput): `fb` + Space, Enter and ★ at 1, 2 and 3 arrows, Space and Enter consumed and not, give the
+      `cascade_vectors.json` fb_* texts (11 scenarios, neutral and recommended presets). The same Space and Enter
+      cases are typed on a uinput keyboard in `run_daemon_live.lua` (CI native lane, not run here). Left: the
+      physical keyboard and the composed layout.
 - [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
       Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
       46 `apply-wayland` ends `not_loaded` and rolls back (the shell lists no user-tree id, mutter still compiles it);

@@ -64,7 +64,27 @@ local function with_date_rules(content)
 	end
 	return content
 end
-if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" then
+-- ERGOPTI_E2E_CASCADE=<arrows>[,consume] (item 50): the same private config
+-- with hotstrings.cascade_max_arrows set, and with "consume" the Space and Enter
+-- delimiters consumed (hotstrings.terminator_consume), as the menu writes them.
+local CASCADE = os.getenv("ERGOPTI_E2E_CASCADE") or "none"
+local cascade_arrows, cascade_consume = CASCADE:match("^(%d+)(.*)$")
+assert(CASCADE == "none" or (cascade_arrows and (cascade_consume == "" or cascade_consume == ",consume")),
+	"unknown cascade scenario")
+--- The neutral template with the cascade bound and delimiter consumption.
+--- @param content string
+--- @return string
+local function with_cascade(content)
+	local key = "\ncascade_max_arrows = "
+	local at = assert(content:find(key, 1, true), "the template lost cascade_max_arrows")
+	local line_end = assert(content:find("\n", at + 1, true), "the template's cascade line is unterminated")
+	content = content:sub(1, at - 1) .. key .. cascade_arrows .. content:sub(line_end)
+	if cascade_consume == ",consume" then
+		content = content .. "\n[hotstrings.terminator_consume]\nspace = true\nenter = true\n"
+	end
+	return content
+end
+if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
@@ -78,6 +98,7 @@ if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" then
 	local template = assert(io.open("_generated/config_template.toml", "rb"))
 	local content = template:read("*a")
 	if DYNAMIC == "dates" then content = with_date_rules(content) end
+	if CASCADE ~= "none" then content = with_cascade(content) end
 	local file = assert(io.open(selection_config, "wb"))
 	assert(file:write(content))
 	assert(file:close())
