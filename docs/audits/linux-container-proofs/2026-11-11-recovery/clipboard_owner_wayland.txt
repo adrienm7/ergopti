@@ -1,0 +1,2 @@
+clipboard owner receipts (wayland): ok
+wl_display_dispatch: Broken pipe
