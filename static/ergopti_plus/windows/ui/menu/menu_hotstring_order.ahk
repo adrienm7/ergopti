@@ -72,6 +72,25 @@ _HS_OrderMove(Order, Name, Delta) {
 	return Result
 }
 
+/**
+ * The id one menu category's order is stored under, the group id macOS and
+ * Linux key it by. A language category is "<language>_<stem>", never the stem
+ * of its file: French « autocorrection.toml » would otherwise share the
+ * neutral category's list. Any other category is its lowercased name, the
+ * stem of its root file.
+ */
+_HS_OrderCategoryId(Category) {
+	if !(Category is String) || Category == ""
+		throw ValueError("A hotstring section order needs a category name.")
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Cat in Pack["categories"] {
+			if Cat["v1"] == Category || Cat["v2"] == Category
+				return Cat["v2"]
+		}
+	}
+	return StrLower(Category)
+}
+
 /** Captures the source used by one category's native menu. */
 _HS_OrderSnapshot(Category, Path := unset) {
 	global ConfigurationFile
@@ -164,7 +183,11 @@ _HS_OrderMenu(Snapshot, Order, ByName) {
 		Map("hotstring_order_children", Entries))
 }
 
-/** Orders only tagged sections and strips private tags before native rendering. */
+/**
+ * Orders only tagged sections and strips private tags before native rendering.
+ * Category is the menu category; its stored id is resolved here, so no caller
+ * can key an order by the file a category happens to load from.
+ */
 _HS_OrderRows(Category, Rows) {
 	Source := [], ByName := Map(), Untagged := [], After := Map(), LastName := ""
 	ByName.CaseSense := true, After.CaseSense := true
@@ -187,7 +210,7 @@ _HS_OrderRows(Category, Rows) {
 	}
 	if ByName.Count == 0
 		return Rows
-	Snapshot := _HS_OrderSnapshot(Category)
+	Snapshot := _HS_OrderSnapshot(_HS_OrderCategoryId(Category))
 	Order := Snapshot is Map && Snapshot.Has("order") ? _HS_OrderResolve(Source, Snapshot["order"]) : _HS_OrderResolve(Source)
 	Result := Untagged.Clone()
 	for Name in Order {

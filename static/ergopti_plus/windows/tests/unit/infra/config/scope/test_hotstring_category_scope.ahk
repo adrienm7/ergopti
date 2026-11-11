@@ -566,3 +566,83 @@ _HSCS_OrderVector(Vector) {
 }
 for _HSCS_OrderVectorValue in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\section_order_vectors.json", "UTF-8"))["vectors"]
 	Test("hotstring-section-order: " . _HSCS_OrderVectorValue["name"], _HSCS_OrderVector.Bind(_HSCS_OrderVectorValue))
+
+
+; Every menu category keeps its own stored order. French autocorrection loads
+; from french\autocorrection.toml, yet its order is not the neutral category's
+; list: both drivers in Lua key it by its group id, and so must the tray.
+_HSCS_OrderMenuCategories() {
+	Names := ["DynamicHotstrings"]
+	for Name in _FLAT_HOTSTRING_V1_CATS
+		Names.Push(Name)
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Cat in Pack["categories"]
+			Names.Push(Cat["v1"])
+	}
+	return Names
+}
+
+_HSCS_OrderCategoryVectors() {
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\section_order_category_vectors.json", "UTF-8"))["vectors"]
+}
+
+_HSCS_OrderCategoryVector(Vector) {
+	Wanted := "\modules\hotstrings\" . (Vector["folder"] != "" ? Vector["folder"] . "\" : "") . Vector["stem"] . ".toml"
+	Matches := []
+	for Name in _HSCS_OrderMenuCategories() {
+		Path := _HotstringsPhysicalBundledTomlPath(Name)
+		if StrLen(Path) >= StrLen(Wanted) && SubStr(Path, -StrLen(Wanted)) = Wanted
+			Matches.Push(Name)
+	}
+	AssertTrue(Matches.Length >= 1, "a menu category loads from " . Wanted)
+	for Name in Matches
+		AssertEqual(Vector["id"], _HS_OrderCategoryId(Name), Name . " stores its order under its own id")
+}
+for _HSCS_OrderCategoryValue in _HSCS_OrderCategoryVectors()
+	Test("hotstring-section-order: category key: " . _HSCS_OrderCategoryValue["name"],
+		_HSCS_OrderCategoryVector.Bind(_HSCS_OrderCategoryValue))
+
+_HSCS_OrderCategoryIdsDistinct() {
+	Seen := Map(), Covered := Map()
+	for Vector in _HSCS_OrderCategoryVectors()
+		Covered[Vector["id"]] := true
+	for Name in _HSCS_OrderMenuCategories() {
+		Id := _HS_OrderCategoryId(Name)
+		AssertFalse(Seen.Has(Id) && Seen[Id] != Name, Name . " and " . (Seen.Has(Id) ? Seen[Id] : "") . " share the order key " . Id)
+		Seen[Id] := Name
+	}
+	for Id in HotstringsBundledCategories()
+		AssertTrue(Covered.Has(Id), "the shared corpus pins the order key of " . Id)
+}
+Test("hotstring-section-order: category key: no two menu categories share a stored order", _HSCS_OrderCategoryIdsDistinct)
+
+; The menu reads the stored list of the category it draws and nothing else.
+_HSCS_OrderRowsKeepTheirCategory() {
+	global ConfigurationFile
+	Rows() => [Map("label", "First", "section_order_id", "names"),
+		Map("label", "Second", "section_order_id", "accents")]
+	Labels(Result) {
+		Out := []
+		for Row in Result {
+			if Row.Has("label") && (Row["label"] == "First" || Row["label"] == "Second")
+				Out.Push(Row["label"])
+		}
+		return KL_JsonEncode(Out)
+	}
+	for Stored in ["autocorrection", "french_autocorrection"] {
+		Fixture := _ScopeOwnerFixture('[hotstrings.order_overrides]`n' . Stored . ' = ["accents", "names"]`n')
+		SavedPath := ConfigurationFile
+		try {
+			ConfigurationFile := Fixture.path
+			for Category in ["Autocorrection", "FrenchAutocorrection"] {
+				Owner := _HS_OrderCategoryId(Category) == Stored
+				AssertEqual(Owner ? '["Second","First"]' : '["First","Second"]', Labels(_HS_OrderRows(Category, Rows())),
+					Category . " with an order stored under " . Stored)
+			}
+		} finally {
+			ConfigurationFile := SavedPath
+			_ScopeOwnerCleanup(Fixture)
+		}
+	}
+}
+Test("hotstring-section-order: category key: the neutral and French orders never cross", _HSCS_OrderRowsKeepTheirCategory)

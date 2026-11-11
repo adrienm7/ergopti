@@ -5,4 +5,4 @@ description = "An action the user chose for the macOS Ctrl+G slot wins over the 
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 19
-to_version = 20
+to_version = 21

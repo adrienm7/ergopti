@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_section_order_language_key_copied_on_windows/case.toml
+
+[case]
+description = "The Windows order a neutral category shared with the French category of the same file name is copied to the French group id, so neither menu changes at the upgrade."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 20
+to_version = 21

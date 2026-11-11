@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_section_order_language_key_kept_on_windows/expected.toml
+
+[_meta]
+schema_version = 21
+
+[hotstrings.order_overrides]
+autocorrection = ["technical_terms", "names"]
+french_autocorrection = ["minus", "accents"]
