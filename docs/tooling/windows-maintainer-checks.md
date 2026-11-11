@@ -95,6 +95,7 @@ single-owner mutex.
 | `layout-emulation-row`                  | Layout emulation row: the list, the tick, None, a missing id  | `test_layout_manager_host.ahk`                                          |
 | `gestures-info-row`                     | Tray > Gestures: one « Infos… » row that opens the dialog     | `test_gesture_menu_status.ahk`                                          |
 | `asa-space-fast`                        | `asa` then Space fast, 20 times                               | `test_text_carrier_avoids_held_key.lua` (macOS)                         |
+| `personal-priority-and-left`            | Personal `sru` at priority 100; a hotstring with `{left}`     | `final_result_vectors.json`                                             |
 
 ## What stays manual
 
