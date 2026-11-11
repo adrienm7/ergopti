@@ -294,6 +294,32 @@ function Get-CollectionFileIdentity {
 	}
 }
 
+# The host polls progress.json every 100 ms; one read holds the file for well
+# under a millisecond, and this bound stays far below the contract's
+# retirement grace so a reader that never ends still fails the rewrite.
+$taskExclusiveOpenBoundMs = 2000
+
+<#
+.SYNOPSIS
+Opens an existing owned output exclusively, waiting out a concurrent host read.
+.DESCRIPTION
+A sharing or lock violation (Win32 32 or 33) means another handle is open. The
+host's progress reads are such handles: they end, so the open is retried until
+the bound; any other failure, or the bound itself, propagates.
+#>
+function Open-CollectionExclusive($Path) {
+	$taskOpenWatch = [Diagnostics.Stopwatch]::StartNew()
+	while ($true) {
+		try {
+			return [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+		} catch {
+			$taskOpenCode = $_.Exception.GetBaseException().HResult -band 0xffff
+			if (@(32, 33) -notcontains $taskOpenCode -or $taskOpenWatch.ElapsedMilliseconds -ge $taskExclusiveOpenBoundMs) { throw }
+		}
+		Start-Sleep -Milliseconds 10
+	}
+}
+
 function Write-CollectionText($Name, $Text) {
 	$taskBytes = $taskEncoding.GetBytes($Text)
 	if ($taskBytes.Length -gt $taskContract.max_output_bytes) { throw 'Diagnostic payload limit exceeded.' }
@@ -301,7 +327,7 @@ function Write-CollectionText($Name, $Text) {
 	if ($taskEvidenceReceipts.ContainsKey($Name)) {
 		$taskPrior = $taskEvidenceReceipts[$Name]
 		# The acquired exclusive stream is both the receipt verifier and the writer.
-		$taskOutput = [IO.File]::Open($taskTarget, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+		$taskOutput = Open-CollectionExclusive $taskTarget
 		try {
 			$taskIdentity = Get-CollectionFileIdentity $taskOutput
 			if (!(Test-CollectionFileIdentity $taskIdentity $taskPrior.identity) -or
