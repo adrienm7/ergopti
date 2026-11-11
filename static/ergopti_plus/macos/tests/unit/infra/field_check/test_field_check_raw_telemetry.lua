@@ -103,10 +103,11 @@ helpers.describe("field_raw_telemetry: the Metrics event tables", function()
 			ddl[#ddl + 1] = statement .. ";"
 		end
 		local path = os.tmpname()
+		-- Rows carry the recorded UTC offset since the metrics store it (KMD-1).
 		local inserts = {
-			"INSERT INTO events_window_topo VALUES ('d', 1, 't', '2026-11-11', 'window_move', 'a', NULL);",
-			"INSERT INTO events_window_topo VALUES ('d', 2, 't', '2026-11-11', 'window_move', 'a', NULL);",
-			"INSERT INTO events_network VALUES ('d', 1, 't', '2026-11-11', 'internet_up', 'a', NULL);",
+			"INSERT INTO events_window_topo VALUES ('d', 1, 't', '2026-11-11', 'window_move', 'a', NULL, NULL);",
+			"INSERT INTO events_window_topo VALUES ('d', 2, 't', '2026-11-11', 'window_move', 'a', NULL, NULL);",
+			"INSERT INTO events_network VALUES ('d', 1, 't', '2026-11-11', 'internet_up', 'a', NULL, NULL);",
 		}
 		local script = table.concat(ddl, "\n") .. "\n" .. table.concat(inserts, "\n") .. "\n"
 		local pipe = assert(io.popen("/usr/bin/sqlite3 '" .. path .. "'", "w"))
