@@ -2385,7 +2385,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						do_next()
 						return
 					end
-					if attempt < 2 then
+					-- The quick retry is an attempt of the budget, as on Windows and Linux:
+					-- outside it one prediction at multiplier 2 sent four requests, not two.
+					if attempt < 2 and attempt_index <= max_attempts then
+						attempt_index = attempt_index + 1
 						local retry_tokens = tokens + _RETRY_EXTRA_TOKENS
 						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _RETRY_TEMP_STEP)
 						Logger.debug(LOG, "[%s] Variant %d/%d quick retry: tokens=%d temp=%.2f",
