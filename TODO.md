@@ -316,6 +316,13 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 - [ ] **[CI] Native Lua acquisition:** qualify current-source macOS LuaSocket/native-client build and launch after Lua.org timeouts; the upstream byte-identical Debian mirror changes for Linux and macOS are integrated, and targeted fetch/refusal controls pass. The earlier failed CI sources predate the macOS mirror fix. Preserve exact hashes and native receiving requirements. [Delivery evidence](docs/audits/platform-parity/2026-11-05-sequential/delivery.md).
 - [ ] **[CI] Native keyboard-source fixture:** investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
+      2026-11-11: the refusal of run 42014901978 (Intel macOS 15) follows one line no passing log shows,
+      `CFMessagePortSendRequest FAILED(-1) to send to port com.apple.tsm.uiserver`: the service that applies the
+      selection did not answer for about 11 s. 6736a355 brackets the cohort with a read-only snapshot of the text-input
+      agents (launchd state, runs, last exit, crash reports, unified log) kept with its receipt, so the next refusal
+      names the cause. The cohort passed 41/41 (Intel) and 40/40 (Apple silicon) over 2026-11-07..10 and again in
+      [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); the cause stays unproven until a
+      refusal carries that snapshot.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
@@ -1308,18 +1315,42 @@ Each closes on a named green hosted or native run, recorded here.
       setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,
       Native XCTest (Intel), Build and all five Install-and-launch rows, guardian fixes included; macOS Unit,
       Integration and every E2E cell on run 41261068581.
+      2026-11-11 run [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) at `6736a355`: macOS Unit, Integration, every E2E cell (Native XCTest Intel, Launcher
+      XCTest macOS 26 with `Test Suite 'All tests' passed`, both Managed Ollama and Managed Ollama build cells = the
+      Issue #101 Swift and Go cells, Lease silence, Tooltip canvas, Archive update controls) and Build are green. L42:
+      the credentialed-redirect refusals (`testRealPACSourceRedirectsHaveFreshCredentialFreeOwners`,
+      `testRedirectIsRefusedWithoutSecondConnection`) pass in the full suite; L32's `memory_footprint_mb` is a Lua
+      field probe covered by the green Unit lots, not Swift. Still open: native Hotstrings category boot publication
+      and obsolete-leaf setters need an installed driver on a real Mac (no hosted row types into them), and item 31's
+      lane waits on its runtime build, which the pinned runtime rules keep out of scope tonight.
 - [ ] **Ollama Go cell** (cda1e10c5e) on the final source before a release (passed on run 40021624397).
+      Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
+      it closes only on the release candidate's own source, which tonight's no-release rule excludes.
 - [ ] **36.** macOS Package job: Sparkle install/refusal/retry/relaunch, both Brew positives, full-policy denial, Brew
       archive scenarios; Linux Flatpak/AppImage installation and PAC/session/TLS delivery.
+      2026-11-11: the item 36 cohort passes 24/24 in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Archive update controls, macOS 26), including
+      `testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch` and
+      `testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState`; the launcher cell's full suite prints the native
+      Sparkle wrong-key refusal and retry facts and the `brew` and `sparkle` package receipts PASS. Linux: Build and
+      all 20 Install-and-launch rows (Flatpak, AppImage, PAC/session/TLS delivery) green in [42936117998](https://github.com/adrienm7/ergopti/actions/runs/42936117998).
 - [ ] **40.** Signed native execution of the eight Karabiner default/recommended/switch variants.
+      A hosted runner runs the eight variants only against the ad hoc signed app of the "karabiner config"
+      Install-and-launch row (`hs_native_bootstrap_probe.py`); the Developer ID signature exists only on a release
+      build, which tonight's no-release rule forbids, so the signed run needs the next release candidate.
 - [ ] **104, 105.** Common autocorrection sections (native Windows/macOS, per-section E2E, package); dynamic
       hotstrings on macOS.
 - [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both extension TOML files;
       Windows native cases and Fedora/Alpine ShellRunner fixtures (Linux done in the start-up E2E).
 - [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification on macOS and Windows; provider published before
       model loading on macOS (Linux done).
+      macOS part on hosted CI: the macOS Unit lots (menu_llm, ui) that hold the composed-menu and provider-order tests
+      are green in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); a composed menu shown by an installed driver needs a real Mac. Windows part is the maintainer's.
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture receipts; daemon-report
       allocation failures on Intel and Apple silicon.
+      2026-11-11 [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137): the number-row Carbon cohort compiles and passes with its receipts on Intel (Native XCTest)
+      and Apple silicon (Managed Ollama cells). The daemon-report classes (`OwnedVirtualHIDDaemonReport*Tests`) pass
+      only in the Apple silicon full suite: no Intel cell selects them, so the Intel half stays open until the Intel
+      XCTest cell enrolls those classes.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
       (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
 - [ ] **Deploy site after a superseded push.** A `main` push that a newer one passes before its site deploys fails
@@ -1334,6 +1365,13 @@ Each closes on a named green hosted or native run, recorded here.
 - [ ] **Intermittent fixtures.** Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
       AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.
+      Scan of ci.yml runs 2026-11-07..10 (macOS and Linux): the cursor-display window switch step passed 40/40;
+      no cffi-lua clone retry or desktop-webview AI-focus failure appeared (the webview lane's 4 failures were a
+      managed Python download, a 504 and an on-screen pill check); `TestIdleDeadlinePhysicallyRetiresPeer` and
+      `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope` never failed (Swift launcher step 37 passes,
+      4 other failures). A new intermittent, `NativeAppClonerBundleOwnershipTests.testActualNativeCliLogLimits...`
+      (runs 42438031643, 42480689370, `[Errno 1] Operation not permitted`), is fixed at its cause in bce01f27: XNU
+      answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
 
 ## Maintainer decisions pending
 
