@@ -17,7 +17,7 @@
 --- text output) types the source's characters for physical key presses.
 --- Exit 0 = every check held, 1 = a failure, 2 = the machine cannot host it (no
 --- display, WebKit or lgi).
---- USAGE: dbus-run-session -- xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
+--- USAGE: xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
 --- ==============================================================================
 
 local ffi = require("ffi")
@@ -30,6 +30,7 @@ local WAIT_ATTEMPTS = 600
 local WAIT_SECONDS = 0.1
 local _checks, _failures = 0, 0
 local _scratch = nil
+local _bus_pid = nil
 
 local function check(condition, what)
 	_checks = _checks + 1
@@ -71,10 +72,7 @@ if not display then abort("no X display: run under xvfb-run") end
 local source_path = arg[1]
 local source_text = source_path and read(source_path)
 if not source_text then abort("usage: run_layout_editor_webview.lua <source.toml>") end
-if capture("id -u"):gsub("%s+$", "") ~= "0" and not os.getenv("DBUS_SESSION_BUS_ADDRESS") then
-	abort("no session bus: run under dbus-run-session")
-end
-for _, tool in ipairs({ "setxkbmap", "xkbcomp", "python3", "gsettings" }) do
+for _, tool in ipairs({ "setxkbmap", "xkbcomp", "python3", "gsettings", "dbus-daemon" }) do
 	if capture("command -v " .. tool .. " 2>/dev/null") == "" then abort(tool .. " is not installed") end
 end
 local ok_lgi, lgi = pcall(require, "lgi")
@@ -96,6 +94,14 @@ setenv("ERGOPTI_XKB_USER_ROOT", nil)
 setenv("WAYLAND_DISPLAY", nil)
 setenv("XDG_CURRENT_DESKTOP", nil)
 setenv("XDG_SESSION_TYPE", "x11")
+-- A private session bus started after the configuration folder moved: the dconf
+-- service it activates writes where gsettings, the installer and this probe
+-- read (a bus started before would write under the runner's own folder).
+local bus = capture("dbus-daemon --session --fork --print-address=1 --print-pid=1 2>/dev/null")
+local bus_address, bus_pid = bus:match("^(%S+)\n(%d+)")
+if not bus_address then abort("dbus-daemon did not start a session bus: " .. bus) end
+_bus_pid = bus_pid
+setenv("DBUS_SESSION_BUS_ADDRESS", bus_address)
 -- The installer runs on the runner's interpreter; Ergopti's own Python download
 -- on consent has its own live probe (run_managed_python_live.lua).
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
@@ -214,8 +220,8 @@ local function run()
 	-- No session type while installing: the layout manager installs into the user
 	-- tree from a Wayland or unknown session, as the number-row live probe does.
 	-- The desktop names itself GNOME, whose input-source setting (dconf on this
-	-- run's private session bus, dbus-run-session) the installer writes and reads
-	-- back; an unnamed desktop has no owner to confirm the switch.
+	-- run's private session bus) the installer writes and reads back; an unnamed
+	-- desktop has no owner to confirm the switch.
 	setenv("XDG_SESSION_TYPE", nil)
 	setenv("XDG_CURRENT_DESKTOP", "GNOME")
 	eval_sync(webview, "document.getElementById('le-confirm-yes').click(); 'yes'")
@@ -280,6 +286,7 @@ end
 local ran, result = pcall(run)
 if Manager then pcall(Manager.shutdown) end
 pcall(function() require("modules.keymap.layout_registry").shutdown() end)
+if _bus_pid then os.execute("kill " .. _bus_pid .. " 2>/dev/null") end
 if _scratch then os.execute("rm -rf " .. quote(_scratch)) end
 if not ran then
 	io.stderr:write(tostring(result) .. "\n")
