@@ -122,6 +122,17 @@ function M.name(axis, dx, dy)
 	return horizontal .. "_" .. vertical
 end
 
+--- The straight direction of a displacement's dominant axis: the slot a
+--- diagonal falls back to when its own slot is unbound (maintainer decision of
+--- 11 November 2026, macOS and Linux). A tie is horizontal, as in M.axis.
+--- @param dx number Horizontal displacement, positive rightward.
+--- @param dy number Vertical displacement, positive downward.
+--- @return string name right, left, down or up.
+function M.dominant(dx, dy)
+	assert(type(dx) == "number" and type(dy) == "number", "a displacement needs numeric dx and dy")
+	return M.name(math.abs(dx) >= math.abs(dy) and "horiz" or "vert", dx, dy)
+end
+
 --- Classifies a displacement straight to its direction name.
 --- @param dx number Horizontal displacement, positive rightward.
 --- @param dy number Vertical displacement, positive downward.
