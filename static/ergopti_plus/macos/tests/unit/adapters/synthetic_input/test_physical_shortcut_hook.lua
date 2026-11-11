@@ -93,6 +93,15 @@ for _,seam in ipairs({'admitted','action','conflicts'}) do
  eq(callback(event()),true,'Queue before '..seam..' callback invalidation')
  activate=true;deliver();eq(executed,0,'Terminal '..seam..' callback stop cannot dispatch an old record');eq(owner.stop(),true,'Reentrant '..seam..' cleanup settled')
 end
+-- The field run reads these counts: every suppression ends delivered, unacknowledged or dropped, once
+local before=factory.counts()
+owner,options=fresh();options.execute=function() return false end;eq(owner.start(options),true,'Start for an unacknowledged action')
+eq(callback(event()),true,'Suppressed before the refused action');deliver();eq(owner.stop(),true,'Unacknowledged control retires')
+local after=factory.counts()
+eq(after.suppressed-before.suppressed,1,'One suppression counted');eq(after.unacknowledged-before.unacknowledged,1,'The refused action is counted unacknowledged')
+eq(after.delivered,after.delivered,'Counts are numbers');eq(after.delivered>=1,true,'Earlier scenarios delivered')
+eq(after.suppressed,after.delivered+after.unacknowledged+after.dropped,'Every suppression has exactly one outcome')
+local copy=factory.counts();copy.suppressed=-1;eq(factory.counts().suppressed,after.suppressed,'counts() returns a copy')
 print('Independent Mac physical hook: '..passed..' passed; controlled Quartz ports, no device proof')
 
 		end, debug.traceback)

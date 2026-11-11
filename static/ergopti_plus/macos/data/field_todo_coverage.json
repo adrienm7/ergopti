@@ -143,8 +143,19 @@
 		{
 			"id": "physical_shortcut_delivery",
 			"title": "Physical shortcut delivery",
-			"checks": [],
-			"not_testable": "Code work, not a confirmation: keyboard_shortcuts.physical_delivery_available stays false until the delivery is built; the greyed row is closed on the macOS lane."
+			"checks": [
+				{
+					"step": "field_physical_shortcuts",
+					"report": ["physical_delivery_available"]
+				},
+				{
+					"step": "guided_physical_shortcut"
+				},
+				{
+					"step": "guided_physical_shortcut_output"
+				}
+			],
+			"condition": "Karabiner-Elements and the keymap tap running; a physical slot the person binds during the run."
 		},
 		{
 			"id": "taphold_word_reset",
