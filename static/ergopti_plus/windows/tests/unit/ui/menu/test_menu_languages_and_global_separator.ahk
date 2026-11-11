@@ -268,6 +268,29 @@ _MLG_DebugDrawsNoEmptyTests() {
 Test("menu layout: Debug draws no empty Tests submenu (debug-tests-submenu-empty)",
 	_MLG_DebugDrawsNoEmptyTests)
 
+; The shared corpus captions the Debug parent and its closing Tests submenu in
+; English and French; its row lists belong to macOS and Linux, whose Debug
+; rows differ from the Windows ones by declaration.
+_MLG_DebugCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\debug_parent.json", "UTF-8"))
+	for _, Code in ["en", "fr"] {
+		AssertTrue(Corpus.Has(Code), "the corpus captions the " . Code . " Debug parent")
+		_MLG_WithLocale(Code, _MLG_CheckDebugCorpus.Bind(Code, Corpus[Code]))
+	}
+}
+
+_MLG_CheckDebugCorpus(Code, Expected) {
+	AssertEqual(Expected["parent"], t("menu.debug.title"), Code . ": the parent caption _MI_StageDebug adds")
+	Built := _MI_BuildDebuggingMenu()
+	try {
+		Labels := _MLG_NativeLabels(Built)
+		AssertEqual(Expected["tests"], Labels[Labels.Length], Code . ": the Tests submenu closes Debug")
+	} finally _CTC_ReleaseMenu(Built)
+}
+Test("menu layout: the Debug parent and its Tests submenu keep their corpus captions (debug-parent)",
+	_MLG_DebugCorpus)
+
 ; Uninstall closes the Version / Updates submenu, after a separator, and keeps
 ; its label key and its action owner.
 _MLG_UninstallClosesTheAboutMenu() {
