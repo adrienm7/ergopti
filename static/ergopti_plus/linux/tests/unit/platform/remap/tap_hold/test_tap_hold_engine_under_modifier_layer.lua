@@ -162,6 +162,37 @@ helpers.describe("tap-hold engine: under a modifier and on the layer", function(
 		helpers.assert_nil(plain:process(ALT, UP, 360))
 	end)
 
+	-- nav_layer.ahk's static `*SC038` swallower is created before the layer's
+	-- Hotkey() bindings, and AHK fires the earliest eligible variant: a user
+	-- layers.toml binding LAlt never reaches LAlt tapping Backspace with the
+	-- layer on hold. Linux read the binding first (layer-swallow-beats-binding).
+	helpers.it("swallows LAlt tapping Backspace even when the layer binds LAlt (layer-swallow-beats-binding)", function()
+		local SPACE = 57
+		local nav = require("tests.support.nav_layer_fixture").recommended()
+		nav[ALT] = nav[KEY_J]
+		local keys = {
+			left_alt = DEFAULTS.left_alt,
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		}
+		local function bound_engine(lalt)
+			keys.left_alt = lalt
+			return Engine.new({ keys = keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
+				nav_layer = nav, key_text = Fixture.us_text, plan_text = Fixture.us_plan, one_shot_result = one_shot_result })
+		end
+		local e = bound_engine(DEFAULTS.left_alt)
+		e:process(SPACE, DOWN, 0)
+		local down = e:process(ALT, DOWN, 300)
+		helpers.assert_eq(down and trail(down), "", "LAlt is swallowed, not its binding")
+		local repeated = e:process(ALT, REPEAT, 800)
+		helpers.assert_eq(repeated and trail(repeated), "", "and so is its repeat")
+		local out, tap = e:process(ALT, UP, 860)
+		helpers.assert_eq({ out and trail(out), tap }, { "" }, "its release types nothing")
+		-- Control: LAlt with another tap takes the layer's binding.
+		e = bound_engine({ tap_action = "copy", hold_layer = "nav", time_activation_seconds = 0.2 })
+		e:process(SPACE, DOWN, 0)
+		helpers.assert_eq(trail(e:process(ALT, DOWN, 300)), "29↓ 105↓", "another LAlt tap is the layer's key")
+	end)
+
 	-- Every Windows tap-hold variant needs the layer off (not LayerEnabled in
 	-- each #HotIf, AltGr's in altgr_criteria.ahk), and the layer maps none of
 	-- these keys, so they are native there. The shipped LShift still copied on

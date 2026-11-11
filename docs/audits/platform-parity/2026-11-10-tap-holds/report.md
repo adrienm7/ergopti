@@ -35,6 +35,13 @@ OS, `lua/tap_hold`, the keymap areas it reads).
 | THL-004 | Pair with a hold, second key released after 20 ms                                    | Minimum tap checked (`constants.ahk` `TapHoldOwnImmediateModifier`)                        | The pair's tap ran                            | `pair-tap-minimum`                          |
 | THS-001 | Chord delay and symmetry defaults                                                    | Manifest `mod_combos` (100, false)                                                         | macOS reads `[hs_timeouts]`, an unpinned copy | `chord-defaults-single-source`              |
 
+Continued on November 11, 2026 (source `adfc5569`), from the remaining rows below:
+
+| Id      | Sequence                                                                                          | Windows                                                                                       | Linux before                                         | Regression                      |
+| ------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------- |
+| THL-005 | RCtrl tapping the one-shot Shift held, LAlt tapping Tab with no hold modifier struck under it     | `SC11D & SC038` (`lalt.ahk` 4.2): Shift+Tab at key-down, `OneShotShiftFix`, any hold layer    | A plain Tab (no hold), or LAlt held the layer        | `rctrl-one-shot-lalt-shift-tab` |
+| THL-006 | A user `layers.toml` binds LAlt; LAlt taps Backspace with the layer on hold; another key holds it | The static `*SC038` swallower (`nav_layer.ahk` 1) predates the `Hotkey()` bindings: swallowed | LAlt took the layer's binding (plain and per-source) | `layer-swallow-beats-binding`   |
+
 ## Decisions pending (behaviour left unchanged)
 
 - **THD-1, a pair tap under the navigation layer.** Windows `_KeyCombinationRunTap`
@@ -71,10 +78,7 @@ OS, `lua/tap_hold`, the keymap areas it reads).
 - **Windows (maintainer's change):** extend the minimum tap beyond LShift,
   LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
 
-- **Linux:** RCtrl as the one-shot Shift held while LAlt (tap Tab, no hold) is
-  struck: Windows `SC11D & SC038` types Shift+Tab, Linux a plain Tab. With a
-  user `layers.toml` that binds LAlt, Windows always swallows LAlt tapping
-  Backspace with the layer on hold; Linux reads the layer binding first.
+- **Linux:** done on November 11 (THL-005, THL-006 above).
 - **macOS:** RCtrl's one-shot Shift with no hold arms at key-down even on a
   long press (Windows: a long press holds LShift and arms nothing); LAlt's
   one-shot Shift holds no Shift while down and fires under every modifier
@@ -87,5 +91,5 @@ OS, `lua/tap_hold`, the keymap areas it reads).
   Shift, `SC11D & SC038` makes SC11D a prefix key, which probably delays
   RCtrl's own `*SC11D` hotkey to its release (unverified, no AHK runner).
   THD-3 above is likely a Windows defect.
-- **Docs:** the comment above the `rcmd_*` rows of `defaults.toml` describes
-  slots (CapsWord, CapsLock toggle, word deletes) the rows no longer carry.
+- **Docs:** done on November 11: the comments above the `rcmd_*` rows and the
+  `lcmd_rcmd` row of `defaults.toml` now describe the slots the rows carry.

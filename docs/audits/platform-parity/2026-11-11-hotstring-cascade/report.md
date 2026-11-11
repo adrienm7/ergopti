@@ -57,6 +57,20 @@ final entry leaves the link alone) passes before and after.
 | HCM-006 | macOS, `ab`, a no-break space, `:` fires `cd:`, then Backspace                        | Restores the trigger alone, the no-break space is not typed back (Linux the same) | The record was refused whenever a no-break space was stripped               | `undo-nbsp-stripped`                       |
 | HCS-001 | Inventory: macOS Backspace restore, Linux repeat window and consecutive repeat        | —                                                                                 | Declared absent on macOS / Linux after the 2026-11-06 decisions and URL-001 | `test-linux-feature-parity.cjs` projection |
 
+Continued later on November 11 (source `adfc5569`), from the remaining rows below:
+
+| Id      | Sequence                                                        | Windows and Linux                                                                                         | macOS before                                     | Regression           |
+| ------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------- |
+| HCM-007 | Stored number `612345678` (no trunk zero), type `+336123`       | Linux: `+336123` gives `+33612345678` (every digit kept)                                                  | Registered `+33123`, which skips the first digit | `intl-short-trigger` |
+| HCM-008 | `td`, a pause longer than the dynamic delay, then the magic key | No date: `TimeActivationSeconds` (`dynamic_hotstrings.ahk:149`), Linux `within_delay` (`manager.lua:603`) | The interceptor had no clock: the date was typed | `date-rule-delay`    |
+
+HCM-007's two triggers are now computed once in the shared
+`dynamic_hotstrings` module (`international_phone`, `international_prefix`),
+which both Lua drivers call. HCM-008: the keymap hands its interceptors the gap
+since the preceding physical key (`ctx.elapsed`) and owns the verdict
+(`dynamic_rule_within_delay`, the dynamic family's section delay, the same
+resolution as the programmable source); a missing gap fails closed.
+
 The shared engine now reports `typed_trigger` (the erased trigger text, the net
 typed text after a cascade that reached further left), so the undo no longer
 reads the stored spelling. The Linux cascade test's undo model typed the end
@@ -130,24 +144,20 @@ had no unit test of the undo at all: `test_backspace_undo.lua` is the first.
 
 ## Remaining work
 
-- **macOS:** the date hotstrings (`td★ dt★ date★`) have no expansion delay:
-  the shared interceptor contract carries no timestamps
-  (`dynamic_hotstrings/rules_engine.lua:207-250`, loop in `keymap/init.lua`),
-  while Windows (`dynamic_hotstrings.ahk:149`) and Linux (`manager.lua:603`)
-  gate them. Needs the interceptor to receive the expander gap.
-- **macOS and Windows:** for a stored number without a leading `0`
-  (`612345678`), the short `+33` trigger drops the first digit (`+33123`,
-  Windows `SubStr(Phone, 2, 3)`, macOS `rules_engine.lua:533`); Linux keeps
-  every digit (`+336123`), which the 2026-11-06 decision states for the output.
-  The three type the same `+33612345678`.
+- **macOS:** done (HCM-007, HCM-008 above).
+- **Windows (report only):** for a stored number without a leading `0`
+  (`612345678`), the short `+33` trigger still drops the first digit
+  (`+33123`, `SubStr(Phone, 2, 3)` in `dynamic_hotstrings.ahk:199`); macOS and
+  Linux now register `+336123`.
 - **Windows (report only):** the inventory still declares no repeat activation
   window on Windows although `HSE_RepeatWindowSeconds` gates it (decision of
   2026-11-06); its row in `behaviors.json` needs the maintainer's review of the
   Windows owner. The Backspace undo is refused in terminals, paste-mode hosts
   and Notepad (`hotstring_dispatch.ahk:1753-1755`; no record on those owners),
   where macOS and Linux restore. Not executed (no AHK runner).
-- **Docs:** in `macos/modules/keymap/expander.lua` the documentation block of
-  `prev_char_before` sits above `remember_undo`. The memory entry
+- **Docs:** the documentation block of `prev_char_before` in
+  `macos/modules/keymap/expander.lua` is back above its function (November 11).
+  The memory entry
   `project-hotstring-cascade` (« each link is chosen by the same matcher a
   typed key goes through ») now holds on macOS too.
 - **Native receiving:** none of the fixes was replayed in a real application
