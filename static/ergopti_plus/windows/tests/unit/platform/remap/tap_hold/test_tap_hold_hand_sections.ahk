@@ -436,6 +436,70 @@ _THHS_KeyDelayProviderContract(TargetPath) {
 Test("tap-holds: actual delay provider constructs both hands and refuses unowned commands (tap-hold-key-delay)",
 	() => _THHS_WithNativeFixture(_THHS_KeyDelayProviderContract))
 
+_THHS_Corpus(Name) {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\" . Name . ".json", "UTF-8"))
+}
+
+; Each corpus field names a declaration row; the shared manifest must carry it.
+_THHS_AssertDeclaredRows(Section, Expected) {
+	Definition := _MR_GetMenuDef(Section)
+	AssertEqual(Expected.Length, Definition.Length, Section . ": one declaration row per corpus row")
+	for Index, Want in Expected
+		for Field, Value in Want
+			if !(Value is Array)
+				AssertEqual(Value, Definition[Index][Field], Section . ": row " . Index . " " . Field)
+}
+
+; The three corpora of the per-key child: the native command variant, the head
+; composition and the delay tail. The real Windows key provider draws the ahk
+; projection of each, in both native command states.
+_THHS_CorpusKeyChild(TargetPath) {
+	global TapHold
+	Native := _THHS_Corpus("tap_hold_key_native")
+	Head := _THHS_Corpus("tap_hold_key_head")
+	Delay := _THHS_Corpus("tap_hold_key_delay")
+	Variant := false
+	for Candidate in Native["variants"]
+		for Platform in Candidate["platforms"]
+			if Platform == "ahk"
+				Variant := Candidate
+	AssertTrue(Variant is Map, "the native corpus names the Windows command")
+	Expected := Head["platforms"]["ahk"]
+	AssertEqual(Expected["native"], Variant["id"], "the head and native corpora name one Windows command")
+	AssertEqual(Native["section"], Head["include"], "the head includes the native command section")
+	_THHS_AssertDeclaredRows(Head["section"], Head["rows"])
+	_THHS_AssertDeclaredRows(Delay["tail_section"], Delay["tail"])
+	_THHS_AssertDeclaredRows(Delay["complete_section"], Delay["complete"])
+	for State in Native["states"] {
+		TapHold := Map("keys", State["configured"]
+			? Map("caps_lock", Map("tap_action", "copy", "hold_modifier", "ctrl")) : Map(), "inherit_defaults", false)
+		Row := _THHS_NativeCommandRow("caps_lock")
+		AssertEqual(t(Variant["label_key"]), Row["label"], State["name"] . ": the Windows native caption")
+		AssertEqual(State["disabled"], _MR_Get(Row, "disabled", false) ? true : false,
+			State["name"] . ": the native command availability")
+	}
+	TapHold := Map("keys", Map("caps_lock", Map("tap_action", "copy", "hold_modifier", "ctrl")), "inherit_defaults", false)
+	Rows := _THHS_KeyChildren("caps_lock")
+	Spec := Delay["platforms"]["ahk"]
+	AssertEqual(Spec["key_rows"], Rows.Length, "the Windows key child row count")
+	AssertEqual(t(Variant["label_key"]), Rows[1]["label"], "the native command opens the child")
+	AssertTrue(Rows[2].Get("separator", false), "the head separator follows it")
+	AssertEqual(StrReplace(t(Expected["tap_label"]), "%s", TapHoldCurrentTapLabel("caps_lock")), Rows[3]["label"])
+	AssertEqual(StrReplace(t(Expected["hold_label"]), "%s", TapHoldCurrentHoldLabel("caps_lock")), Rows[4]["label"])
+	for Index, Kind in Map(3, Expected["tap_kind"], 4, Expected["hold_kind"]) {
+		AssertEqual("action", Kind, "the corpus picker kind of row " . Index)
+		AssertTrue(HasMethod(Rows[Index].Get("action", 0), "Call") && !Rows[Index].Has("items"),
+			"row " . Index . " opens the shared action picker")
+	}
+	AssertTrue(Rows[Spec["delay_index"] - 1].Get("separator", false), "the delay tail opens with its separator")
+	Prefix := StrSplit(t(Delay["tail"][2]["i18n"]), "%s")[1]
+	AssertEqual(Prefix, SubStr(Rows[Spec["delay_index"]]["label"], 1, StrLen(Prefix)),
+		"the per-key delay sits at the corpus position")
+}
+Test("tap-holds: the Windows key child matches the native, head and delay corpora (tap-hold-key-corpus)",
+	() => _THHS_WithNativeFixture(_THHS_CorpusKeyChild))
+
 _THHS_KeyDelayRetainedOwnerRefusal(TargetPath) {
 	global TapHold
 	Rows := _THHS_KeyChildren("caps_lock")
