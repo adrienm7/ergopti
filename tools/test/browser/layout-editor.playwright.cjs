@@ -66,7 +66,7 @@ async function open(browser, origin, lang) {
 		if (!request.url().startsWith(origin + '/') && !request.url().startsWith('blob:'))
 			errors.push(`unexpected request: ${request.url()}`);
 	});
-	page.on('dialog', (dialog) => dialog.accept());
+	page.on('dialog', (dialog) => errors.push(`native dialog: ${dialog.message()}`));
 	await page.goto(`${origin}/ui/layout_editor/index.html?lang=${lang}`);
 	await page.waitForFunction(() => document.title && !document.title.startsWith('layout_editor.'));
 	return { page, errors };
@@ -78,6 +78,62 @@ async function downloaded(page, click) {
 		name: download.suggestedFilename(),
 		text: fs.readFileSync(await download.path(), 'utf8')
 	};
+}
+
+/** The layout manager page with a recording Linux-style bridge, as ErgoptiPlus hosts it. */
+async function exerciseManager(browser, origin) {
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	const strings = JSON.parse(fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8'));
+	await page.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.__posted = [];
+		window.webkit = {
+			messageHandlers: {
+				layout_manager_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+			}
+		};
+	}, strings);
+	await page.goto(`${origin}/ui/layout_manager/index.html`);
+	const state = {
+		platform: 'linux',
+		shortcut_menu_path: 'shortcuts/menu.lua',
+		index: { layouts: [] },
+		installed: {},
+		provided: {},
+		builtin: {}
+	};
+	await page.evaluate((state) => window.initData({ strings: {}, state }), state);
+	assert.equal(
+		await page.locator('#btn-editor').isVisible(),
+		false,
+		'no editor without host support'
+	);
+	await page.evaluate(
+		(state) => window.initData({ strings: {}, state, source_editor: true }),
+		state
+	);
+	await page.click('#btn-editor');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_open'));
+	await page.evaluate(() =>
+		window.sourceData({ text: null, folder: '/home/user/.config/ergopti/layout_sources/' })
+	);
+	await page.waitForSelector('#layout-editor #le-board');
+	assert.equal(await page.locator('#layout-view').isVisible(), false);
+	await page.click('#le-save');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'source_save'));
+	const posted = await page.evaluate(() => window.__posted.find((p) => p.action === 'source_save'));
+	assert.equal(posted.filename, 'my_layout.toml');
+	assert.match(posted.text, /format = "ergopti-layout"/);
+	await page.evaluate(() =>
+		window.sourceResult({ ok: true, detail: '/c/my_layout.toml', filename: 'my_layout.toml' })
+	);
+	assert.match(await page.textContent('#le-message'), /ErgoptiPlus/);
+	await page.click('#le-close');
+	assert.equal(await page.locator('#layout-view').isVisible(), true);
+	assert.deepEqual(errors, []);
+	await page.close();
 }
 
 (async () => {
@@ -131,6 +187,7 @@ async function downloaded(page, click) {
 		const exported = await downloaded(page, () => page.click('#le-export-keylayout'));
 		assert.equal(exported.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
 		await page.click('#le-convert');
+		await page.click('#le-confirm-yes');
 		await page.waitForSelector('#le-lost');
 		assert.notEqual(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), '');
 		assert.equal(
@@ -158,6 +215,9 @@ async function downloaded(page, click) {
 		}
 		assert.deepEqual(errors, []);
 		await page.close();
+
+		// Inside the layout manager window, the same editor saves through the host.
+		await exerciseManager(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {
