@@ -20,6 +20,7 @@ local Shell = require("adapters.shell_runner")
 local Files = require("adapters.file_system")
 local Paths = require("infra.config_paths")
 local i18n = require("infra.i18n")
+local TextUtils = require("text_utils")
 
 local LOG = "modules.take_note"
 
@@ -36,7 +37,7 @@ end
 function M.open(launch)
 	assert(type(launch) == "function", "daily notes need a background launcher")
 	local ok, answer = Shell.exec_checked("xdg-mime query default text/plain")
-	local handler = ok and type(answer) == "string" and answer:match("^%s*(.-)%s*$") or ""
+	local handler = ok and type(answer) == "string" and TextUtils.trim(answer) or ""
 	if not require("app_parameter").is_valid(handler) then
 		Logger.warn(LOG, "Daily note refused: the desktop has no registered text/plain handler.")
 		return refuse("notify.take_note_no_text_handler")

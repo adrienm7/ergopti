@@ -19,6 +19,7 @@ local ModuleSource = require("module_source_identity")
 local ModuleDirectory = require("module_source_directory")
 local ConfigKeys = require("config_keys")
 local Timings = require("infra.timings")
+local NativePath = require("native_path")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
@@ -70,7 +71,7 @@ M.same_chord_frame = same_chord_frame
 --- @param config_path string Absolute config.toml path.
 --- @return string|nil path Nil for a path without a folder.
 function M.chord_path_for(config_path)
-	local folder = type(config_path) == "string" and config_path:match("^(.*)/[^/]+$") or nil
+	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
 	if folder == nil then return nil end
 	return folder .. "/" .. require("tap_hold.shared_file").FILE_NAME
 end
