@@ -23,6 +23,11 @@
 ---    running launcher, which has no window, so nothing appears. The same
 ---    watcher reports that activation of the exact launcher PID to one
 ---    listener, which lets a waiting boot show its instructions again.
+--- 7. Requested quit: a quit the launcher receives from outside (Sparkle's
+---    relaunch, a logout, osascript) arrives as a distributed notification
+---    naming this runtime's process id. One handler runs the controlled exit,
+---    and the launcher's own termination after it is expected, not a liveness
+---    failure (MLC-002).
 --- ==============================================================================
 
 local M = {}
@@ -73,6 +78,9 @@ local _app_watcher = nil
 local _backstop_timer = nil
 local _backstop_committed = false
 local _activation_listener = nil
+local _quit_watcher = nil
+local _quit_handler = nil
+local _quit_requested = false
 
 
 
@@ -155,13 +163,16 @@ end
 local function release_resources()
 	local watcher = _app_watcher
 	local timer = _backstop_timer
+	local quit_watcher = _quit_watcher
 	-- A queued tick must become inert before native stop can throw or refuse
 	_backstop_committed = false
 	local watcher_stopped = stop_resource(watcher, "application watcher")
 	local timer_stopped = stop_backstop_timer(timer)
+	local quit_stopped = stop_resource(quit_watcher, "quit request watcher")
 	if watcher_stopped and _app_watcher == watcher then _app_watcher = nil end
 	if timer_stopped and _backstop_timer == timer then _backstop_timer = nil end
-	return watcher_stopped and timer_stopped
+	if quit_stopped and _quit_watcher == quit_watcher then _quit_watcher = nil end
+	return watcher_stopped and timer_stopped and quit_stopped
 end
 
 --- Requests injected emergency teardown at most once for the whole Lua state.
@@ -338,9 +349,36 @@ local function handle_application_event(_, event_type, app)
 		return
 	end
 	if pid ~= _launcher_pid then return end
+	-- The launcher asked for this quit: its end follows the controlled exit
+	-- already under way, and is not a liveness failure (MLC-002).
+	if _quit_requested then
+		Logger.info(LOG, "Swift launcher ended after the quit it requested.")
+		_managed_launch = false
+		_launcher_app = nil
+		release_resources()
+		return
+	end
 	-- macOS may discard bundle metadata before publishing `terminated`; the
 	-- matching event PID itself is the exact process whose liveness was lost
 	request_emergency_quit("launcher_terminated")
+end
+
+--- Runs the controlled exit the launcher asked this exact runtime for.
+--- @param _ string Notification name.
+--- @param object any The requested runtime's process id, as text.
+local function handle_quit_request(_, object)
+	if not _managed_launch or _emergency_requested or _quit_requested then return end
+	local own_ok, own_pid = pcall(function() return hs.processInfo.processID end)
+	if not own_ok or tostring(object) ~= tostring(own_pid) then return end
+	_quit_requested = true
+	local handler = _quit_handler
+	if handler == nil then
+		Logger.error(LOG, "The launcher requested a quit before its handler was registered.")
+		return
+	end
+	Logger.info(LOG, "The Swift launcher requested the controlled exit.")
+	local ok, err = xpcall(handler, debug.traceback)
+	if not ok then Logger.error(LOG, "Launcher quit handler raised: %s", tostring(err)) end
 end
 
 --- Guards the native application callback because Hammerspoon otherwise sends
@@ -363,6 +401,31 @@ end
 
 --- Creates and starts the strongly retained native application watcher.
 --- @return boolean started Whether the watcher is active.
+--- Starts the watcher of the launcher's quit requests (Identifiers).
+--- @return boolean armed
+local function arm_quit_watcher()
+	local notifications = hs.distributednotifications
+	if type(notifications) ~= "table" or type(notifications.new) ~= "function" then
+		Logger.error(LOG, "hs.distributednotifications is unavailable — no launcher quit request is heard.")
+		return false
+	end
+	local name = require("identifiers").macos_notifications.launcher_quit_request
+	local ok, watcher_or_err = xpcall(function()
+		local watcher = notifications.new(function(...)
+			local guarded_ok, err = xpcall(handle_quit_request, debug.traceback, ...)
+			if not guarded_ok then Logger.error(LOG, "Launcher quit request raised: %s", tostring(err)) end
+		end, name)
+		watcher:start()
+		return watcher
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Launcher quit request watcher could not start: %s", tostring(watcher_or_err))
+		return false
+	end
+	_quit_watcher = watcher_or_err
+	return true
+end
+
 local function arm_application_watcher()
 	if not hs or not hs.application or not hs.application.watcher
 		or type(hs.application.watcher.new) ~= "function" then
@@ -490,6 +553,10 @@ function M.init(emergency_quit)
 		request_emergency_quit("launcher_watcher_unavailable")
 		return false
 	end
+	if not arm_quit_watcher() then
+		request_emergency_quit("launcher_quit_watcher_unavailable")
+		return false
+	end
 
 	-- Starting the watcher before this lookup closes both sides of the boot race
 	if not check_launcher() then return false end
@@ -519,6 +586,17 @@ function M.watch_activation(listener)
 	return function()
 		if _activation_listener == listener then _activation_listener = nil end
 	end
+end
+
+--- Registers the controlled exit run when the launcher requests a quit.
+--- @param handler function Called once, with no argument.
+--- @return boolean registered
+--- @return string|nil detail Exact refusal.
+function M.watch_quit_request(handler)
+	if type(handler) ~= "function" then return false, "handler must be a function" end
+	if _quit_handler ~= nil then return false, "a launcher quit handler is already registered" end
+	_quit_handler = handler
+	return true
 end
 
 --- Detaches native liveness resources before an ordinary Hammerspoon shutdown.

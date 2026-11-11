@@ -1307,6 +1307,17 @@ do
 	end
 end
 
+-- A quit the launcher receives from outside (Sparkle's relaunch, a logout,
+-- osascript) runs the same controlled exit as the menu's Quit (MLC-002).
+if LauncherGuard and type(LauncherGuard.watch_quit_request) == "function" then
+	local registered, detail = LauncherGuard.watch_quit_request(function()
+		return TerminationCoordinator.request_user_exit("launcher_quit")
+	end)
+	if registered ~= true then
+		Logger.error(LOG, "Launcher quit requests are not handled: %s.", tostring(detail))
+	end
+end
+
 -- The transport may discover queue exhaustion, repeated ACK loss, or a native
 -- NACK only after boot. Route every such failure through the same bounded exact
 -- lease fence used for launcher loss; an unresponsive coordinator still reaches

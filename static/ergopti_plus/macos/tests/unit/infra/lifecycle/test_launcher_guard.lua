@@ -758,6 +758,49 @@ end)
 -- =======================================
 
 helpers.describe("launcher guard — callback containment", function()
+	-- A quit from outside (Sparkle's relaunch, a logout, osascript) ran only the
+	-- inert shutdown callback, and the launcher's own end then read as a liveness
+	-- failure (MLC-002, launcher-quit-request).
+	helpers.it("runs the controlled exit the launcher requests for this runtime (launcher-quit-request)", function()
+		with_guard(managed_environment(), function(guard, hs_stub)
+			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
+			local heard = {}
+			hs_stub.distributednotifications.new = function(callback, name)
+				heard[#heard + 1] = { callback = callback, name = name }
+				return { start = function(self) return self end, stop = function() return true end }
+			end
+			local quit_reasons, exits = {}, 0
+			helpers.assert_true(guard.init(function(reason) quit_reasons[#quit_reasons + 1] = reason end))
+			helpers.assert_eq(#heard, 1, "the quit request is watched while the launcher is")
+			helpers.assert_eq(heard[1].name, require("identifiers").macos_notifications.launcher_quit_request)
+			helpers.assert_true(guard.watch_quit_request(function() exits = exits + 1 end))
+
+			heard[1].callback(heard[1].name, "999999")
+			helpers.assert_eq(exits, 0, "another runtime's request is not this one's")
+			heard[1].callback(heard[1].name, tostring(hs_stub.processInfo.processID))
+			helpers.assert_eq(exits, 1, "the controlled exit runs")
+			heard[1].callback(heard[1].name, tostring(hs_stub.processInfo.processID))
+			helpers.assert_eq(exits, 1, "once")
+
+			hs_stub.application.__remove_for_pid(LAUNCHER_PID)
+			hs_stub.application.__emit(nil, hs_stub.application.watcher.terminated, make_app(LAUNCHER_PID, nil))
+			helpers.assert_eq(quit_reasons, {}, "the launcher's end after its requested quit is not a failure")
+		end)
+	end)
+
+	helpers.it("still fails closed on a launcher that ends without requesting a quit (launcher-quit-request)", function()
+		with_guard(managed_environment(), function(guard, hs_stub)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID))
+			local quit_reasons = {}
+			helpers.assert_true(guard.init(function(reason) quit_reasons[#quit_reasons + 1] = reason end))
+			helpers.assert_true(guard.watch_quit_request(function() end))
+			hs_stub.application.__remove_for_pid(LAUNCHER_PID)
+			hs_stub.application.__emit(nil, hs_stub.application.watcher.terminated, make_app(LAUNCHER_PID, nil))
+			helpers.assert_eq(quit_reasons, { "launcher_terminated" })
+		end)
+	end)
+
 	helpers.it("catches and file-logs an emergency callback throw exactly once", function()
 		with_guard(managed_environment(), function(guard, hs_stub, log_lines)
 			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
