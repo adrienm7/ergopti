@@ -30,7 +30,10 @@ that daemon, not the old one (a relay restart has already requested the old
 one's shutdown; under the unit systemd TERMs it at once). Every user Quit
 (`infra/quit_request.lua`, both degraded trays) first writes `quit` to the
 token (`report_quit`), and the watcher then keeps the update and starts
-nothing. Action: a new Quit path calls `report_quit`. systemd expands `$$`
+nothing. macOS does the same (`infra/updater_boot_ready.lua` `report_quit`, called
+by `TerminationCoordinator.request_user_exit` and the non-reload
+`hs.shutdownCallback`; `release_installer.lua` keeps the build on `quit`).
+Action: a new Quit path calls `report_quit`. systemd expands `$$`
 (and `${NAME}`) in a unit's command line, so the transient watcher's command
 goes through `systemd_watch_command`, which doubles every `$`. Action: any
 new `systemd-run` command escapes `$` the same way.

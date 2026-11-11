@@ -1108,6 +1108,16 @@ local function shutdown_all_resources()
 	local is_reload = false
 	pcall(function() is_reload = reload_guard.is_reloading() == true end)
 	local lease_reason = is_reload and "hammerspoon_reload" or "hammerspoon_quit"
+	-- Quitting the launcher or Hammerspoon outside the menu is a Quit too: a
+	-- release swap waiting for this boot keeps the update (infra/updater_boot_ready.lua).
+	if not is_reload then
+		local reported, report_err = pcall(function()
+			return require("infra.updater_boot_ready").report_quit("hammerspoon_quit")
+		end)
+		if not reported then
+			Logger.error(LOG, "The release swap could not be told of the quit: %s", tostring(report_err))
+		end
+	end
 	local accepted = request_exact_lease_revoke(lease_reason, function(fenced, detail)
 		if fenced then
 			Logger.info(LOG, "Shutdown exact Ergopti lease fence completed: %s", tostring(detail))
@@ -1274,6 +1284,9 @@ do
 			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
 			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
 			record_stage = ReloadBreadcrumb.record,
+			report_update_quit = function(reason)
+				return require("infra.updater_boot_ready").report_quit(reason)
+			end,
 			mark_reload = function()
 				reload_guard.mark_started(TimerScheduler.now() * 1000)
 				reload_guard.mark_reload()
