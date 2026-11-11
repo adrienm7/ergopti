@@ -1047,7 +1047,7 @@ for (const [job, platform] of [
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
 function checkManagedOllamaNative(body) {
-	const role = macRoleBody(body, 'managed-ollama-native', 38);
+	const role = macRoleBody(body, 'managed-ollama-native', 39);
 	// The clean source build runs in its own parallel cell of the same stage.
 	const producer = macRoleBody(body, 'managed-ollama-build', 9);
 	for (const step of [
