@@ -1100,7 +1100,8 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       (`tests/e2e/run_e2e.lua`, scripted keyboard, uinput into a model field; the container kernel has no evdev or
       uinput): `fb` + Space, Enter and ★ at 1, 2 and 3 arrows, Space and Enter consumed and not, give the
       `cascade_vectors.json` `fb_*` texts (11 scenarios, neutral and recommended presets). The same Space and Enter
-      cases are typed on a uinput keyboard in `run_daemon_live.lua` (CI native lane, not run here). Left: the
+      cases are typed on a uinput keyboard in `run_daemon_live.lua`: CI run 42952845748 (native lane, real
+      uinput and grab) received « Facebook » and Space, and « Facebook » then Enter. Left: the
       physical keyboard and the composed layout.
 - [ ] Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
       Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
