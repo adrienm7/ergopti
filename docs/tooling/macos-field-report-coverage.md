@@ -7,8 +7,9 @@ answers every open line: each line carries a `<!-- field-point: <id> -->` tag,
 that decides it, and the report ends with `todo_summary.md` (and
 `todo_summary.json`): one verdict per point, which the coordinator ticks from
 the report alone. Without `--installed` the steps that need the signed app are
-`not_run` with `needs_installed_run`; `--unattended` leaves the guided steps
-out and they are `not_run` with `left_out_unattended`.
+`not_run` with `needs_installed_run`. No mode leaves the guided steps out: one
+report does everything (decided by the coordinator on 2026-11-11, to review by
+the maintainer).
 
 Scope: this covers the macOS section only. Windows and Linux keep their own
 « To confirm » sections, collectors (`collect-windows-field-report.ps1`,

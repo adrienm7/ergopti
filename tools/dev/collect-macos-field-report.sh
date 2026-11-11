@@ -41,8 +41,6 @@
 #     its field-run root, and runs every step in it, the owned runtime's first
 #     install included (field_owned_install: the macOS administrator prompt and
 #     the driver approval are the only human steps, and the terminal says so)
-#   bash tools/dev/collect-macos-field-report.sh --unattended  same, with the
-#     guided steps left out (reported not_run in todo_summary.md)
 #
 # The guided steps: the steps field_run.json declares with kind "guided" need
 # one gesture of the person at the Mac (Wi-Fi off and on, a window moved,
@@ -123,13 +121,11 @@ log() { printf '[field-report] %s\n' "$*"; }
 
 push=true
 installed=false
-unattended=false
 for argument in "$@"; do
 	case "${argument}" in
 		--no-push) push=false ;;
 		--installed) installed=true ;;
-		--unattended) unattended=true ;;
-		*) fail "Expected no argument, --no-push, --installed or --unattended." ;;
+		*) fail "Expected no argument, --no-push or --installed." ;;
 	esac
 done
 
@@ -278,7 +274,6 @@ finalize() {
 	# steps.txt above; printed here so the terminal ends on what to tick.
 	local summary_flags=()
 	"${installed}" && summary_flags+=(--installed)
-	"${unattended}" && summary_flags+=(--unattended)
 	step todo_summary python3 "${REPO_ROOT}/tools/dev/field-todo-summary.py" --report "${out}" \
 		${summary_flags[@]+"${summary_flags[@]}"}
 	if [ -f "${out}/todo_summary.txt" ]; then
@@ -650,21 +645,18 @@ run_field_attempt() {
 	# The developer app is signed ad hoc: the owned runtime refuses to install
 	# under it, so the steps that need the signed app are left to --installed.
 	local steps_json='["all"]'
-	if [ "${installed}" != true ] || [ "${unattended}" = true ]; then
+	if [ "${installed}" != true ]; then
 		steps_json="$(python3 -c 'import json, sys
 steps = json.load(open(sys.argv[1]))["steps"]
-installed, unattended = sys.argv[2] == "true", sys.argv[3] == "true"
-print(json.dumps([s["id"] for s in steps if (installed or not s.get("signed_app"))
-	and not (unattended and s["kind"] == "guided")]))' "${REPO_ROOT}/${FIELD_RUN_SPEC}" "${installed}" "${unattended}")" \
+print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_ROOT}/${FIELD_RUN_SPEC}")" \
 			|| { log "Cannot read the steps of ${FIELD_RUN_SPEC}."; return 1; }
-		[ "${installed}" = true ] \
-			|| log "Developer app of this branch: the Karabiner runtime install steps are left out; --installed runs them on the signed dev prerelease."
-		[ "${unattended}" = true ] && log "--unattended: the guided steps are left out (not_run in todo_summary.md)."
+		log "Developer app of this branch: the Karabiner runtime install steps are left out; --installed runs them on the signed dev prerelease."
 	fi
-	if [ "${unattended}" != true ]; then
-		log "Stay at the Mac: the guided steps print a gesture here (👉 GUIDED), each waits for it, and the attested"
-		log "ones take y, n or s then Enter. Nothing done in time is recorded needs_person, never a pass."
-	fi
+	# One report does everything (decided by the coordinator on 2026-11-11, to
+	# review by the maintainer): the guided steps always run, with no mode that
+	# leaves them out.
+	log "Stay at the Mac: the guided steps print a gesture here (👉 GUIDED), each waits for it, and the attested"
+	log "ones take y, n or s then Enter. Nothing done in time is recorded needs_person, never a pass."
 	log "Developer app ready (pid ${pid}); requesting the field run within ${deadline_seconds} s."
 	log "The run is working now: do not reload or quit Ergopti; each step prints its verdict here."
 

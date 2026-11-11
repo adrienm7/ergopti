@@ -13,8 +13,8 @@
 #
 # FEATURES & RATIONALE:
 # 1. Nothing silently skipped: a step absent from the run is not_run with its
-#    reason (signed_app steps need --installed, guided steps are left out by
-#    --unattended), a report step missing from a result is a failure, and a
+#    reason (signed_app steps need --installed), a report step missing from a
+#    result is a failure, and a
 #    point no run can test says why, read from the coverage table.
 # 2. One verdict order for every point: fail, timeout, needs_person,
 #    needs_typing, not_run, skip, pass; the worst check decides.
@@ -24,7 +24,7 @@
 #    carries between its markers, and --check-doc fails when that copy is stale.
 #
 # USAGE:
-#   python3 tools/dev/field-todo-summary.py --report <report folder> [--installed] [--unattended]
+#   python3 tools/dev/field-todo-summary.py --report <report folder> [--installed]
 #   python3 tools/dev/field-todo-summary.py --doc
 #   python3 tools/dev/field-todo-summary.py --check-doc
 # ==============================================================================
@@ -45,8 +45,16 @@ DOC_END = "<!-- coverage-table:end -->"
 
 # Worst first: the first verdict of this list any check gives is the point's.
 ORDER = ["fail", "timeout", "needs_person", "needs_typing", "not_run", "skip", "pass"]
-MARKS = {"pass": "✅", "fail": "❌", "timeout": "⏱️", "needs_person": "🙋", "needs_typing": "⌨️",
-    "not_run": "⏸️", "skip": "⏭️", "not_testable": "🚫"}
+MARKS = {
+    "pass": "✅",
+    "fail": "❌",
+    "timeout": "⏱️",
+    "needs_person": "🙋",
+    "needs_typing": "⌨️",
+    "not_run": "⏸️",
+    "skip": "⏭️",
+    "not_testable": "🚫",
+}
 
 
 def load(path):
@@ -71,6 +79,7 @@ def worst(verdicts):
 # =================================
 # ======= 1/ Evidence reading =====
 # =================================
+
 
 def read_results(results_dir):
     """The step results of the run, by step id (the last attempt's copy)."""
@@ -98,17 +107,15 @@ def read_collector_steps(steps_path):
     return exits
 
 
-def not_run_reason(step, installed, unattended):
+def not_run_reason(step, installed):
     if step is None:
         return "undeclared_step"
     if step.get("signed_app") and not installed:
         return "needs_installed_run"
-    if step.get("kind") == "guided" and unattended:
-        return "left_out_unattended"
     return "absent_from_run"
 
 
-def judge_check(check, spec_steps, results, collector, installed, unattended):
+def judge_check(check, spec_steps, results, collector, installed):
     """One check's verdict and its evidence text."""
     if "collector" in check:
         name = check["collector"]
@@ -119,7 +126,10 @@ def judge_check(check, spec_steps, results, collector, installed, unattended):
     step_id = check["step"]
     result = results.get(step_id)
     if result is None:
-        return "not_run", f"{step_id}:{not_run_reason(spec_steps.get(step_id), installed, unattended)}"
+        return (
+            "not_run",
+            f"{step_id}:{not_run_reason(spec_steps.get(step_id), installed)}",
+        )
     verdict = result.get("verdict", "fail")
     codes = [str(code) for code in result.get("codes") or []]
     evidence = f"{step_id}:{verdict}" + (f"({','.join(codes[:3])})" if codes else "")
@@ -161,7 +171,7 @@ def judge_check(check, spec_steps, results, collector, installed, unattended):
     return worst(states), f"{step_id}[{' '.join(parts)}]"
 
 
-def summarize(coverage, spec, results, collector, installed, unattended):
+def summarize(coverage, spec, results, collector, installed):
     """One record per point: id, title, verdict, evidence, condition, not_testable."""
     spec_steps = {step["id"]: step for step in spec["steps"]}
     records = []
@@ -170,17 +180,21 @@ def summarize(coverage, spec, results, collector, installed, unattended):
         if not checks:
             verdict, evidence = "not_testable", []
         else:
-            judged = [judge_check(check, spec_steps, results, collector, installed, unattended) for check in checks]
+            judged = [
+                judge_check(check, spec_steps, results, collector, installed) for check in checks
+            ]
             verdict = worst([item[0] for item in judged])
             evidence = [item[1] for item in judged]
-        records.append({
-            "id": point["id"],
-            "title": point["title"],
-            "verdict": verdict,
-            "evidence": evidence,
-            "condition": point.get("condition"),
-            "not_testable": point.get("not_testable"),
-        })
+        records.append(
+            {
+                "id": point["id"],
+                "title": point["title"],
+                "verdict": verdict,
+                "evidence": evidence,
+                "condition": point.get("condition"),
+                "not_testable": point.get("not_testable"),
+            }
+        )
     return records
 
 
@@ -188,11 +202,12 @@ def summarize(coverage, spec, results, collector, installed, unattended):
 # ======= 2/ Rendering ==========
 # ===============================
 
+
 def cell(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
-def render_markdown(records, installed, unattended):
+def render_markdown(records, installed):
     counts = {}
     for record in records:
         counts[record["verdict"]] = counts.get(record["verdict"], 0) + 1
@@ -200,20 +215,31 @@ def render_markdown(records, installed, unattended):
         "# TODO « To confirm on the Mac »: verdict per point",
         "",
         "Generated by `tools/dev/field-todo-summary.py` from this report's field run results and `steps.txt`"
-        + f" (installed run: {'yes' if installed else 'no'}, guided steps: {'left out' if unattended else 'run'}).",
+        + f" (installed run: {'yes' if installed else 'no'}).",
         "Tick a TODO line (its `field-point` id) only on ✅ pass; a ✅ with a remainder still needs that remainder.",
         "",
-        "Totals: " + ", ".join(f"{MARKS.get(name, '')} {name} {counts[name]}" for name in ORDER + ["not_testable"]
-            if name in counts),
+        "Totals: "
+        + ", ".join(
+            f"{MARKS.get(name, '')} {name} {counts[name]}"
+            for name in ORDER + ["not_testable"]
+            if name in counts
+        ),
         "",
         "| Point | Verdict | Evidence | Condition | Not field-testable |",
         "| --- | --- | --- | --- | --- |",
     ]
     for record in records:
-        lines.append("| `{}` {} | {} {} | {} | {} | {} |".format(
-            record["id"], cell(record["title"]), MARKS.get(record["verdict"], ""), record["verdict"],
-            cell("; ".join(record["evidence"]) or "—"), cell(record["condition"] or "—"),
-            cell(record["not_testable"] or "—")))
+        lines.append(
+            "| `{}` {} | {} {} | {} | {} | {} |".format(
+                record["id"],
+                cell(record["title"]),
+                MARKS.get(record["verdict"], ""),
+                record["verdict"],
+                cell("; ".join(record["evidence"]) or "—"),
+                cell(record["condition"] or "—"),
+                cell(record["not_testable"] or "—"),
+            )
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -225,10 +251,14 @@ def mode_of(point, spec_steps):
     for check in checks:
         step = spec_steps.get(check.get("step"), {})
         if step.get("kind") == "guided":
-            modes.append("guided, observed" if step.get("mode") == "observe" else "guided, attested")
+            modes.append(
+                "guided, observed" if step.get("mode") == "observe" else "guided, attested"
+            )
         else:
             modes.append("automatic")
-    labels = [label for label in ("automatic", "guided, observed", "guided, attested") if label in modes]
+    labels = [
+        label for label in ("automatic", "guided, observed", "guided, attested") if label in modes
+    ]
     if any(spec_steps.get(check.get("step"), {}).get("signed_app") for check in checks):
         labels.append("needs --installed")
     return " + ".join(labels)
@@ -236,7 +266,12 @@ def mode_of(point, spec_steps):
 
 def render_doc_table(coverage, spec):
     spec_steps = {step["id"]: step for step in spec["steps"]}
-    lines = [DOC_START, "", "| Point | Checks | Mode | Condition | Not field-testable |", "| --- | --- | --- | --- | --- |"]
+    lines = [
+        DOC_START,
+        "",
+        "| Point | Checks | Mode | Condition | Not field-testable |",
+        "| --- | --- | --- | --- | --- |",
+    ]
     for point in coverage["points"]:
         names = []
         for check in point.get("checks") or []:
@@ -251,9 +286,16 @@ def render_doc_table(coverage, spec):
             if check.get("max") is not None:
                 name += f" ≤ {check['max']}"
             names.append(name)
-        lines.append("| `{}` {} | {} | {} | {} | {} |".format(
-            point["id"], cell(point["title"]), "; ".join(names) or "—", mode_of(point, spec_steps),
-            cell(point.get("condition") or "—"), cell(point.get("not_testable") or "—")))
+        lines.append(
+            "| `{}` {} | {} | {} | {} | {} |".format(
+                point["id"],
+                cell(point["title"]),
+                "; ".join(names) or "—",
+                mode_of(point, spec_steps),
+                cell(point.get("condition") or "—"),
+                cell(point.get("not_testable") or "—"),
+            )
+        )
     lines += ["", DOC_END]
     return "\n".join(lines)
 
@@ -283,20 +325,28 @@ def doc_block(text):
     start, end = text.find(DOC_START), text.find(DOC_END)
     if start < 0 or end < start:
         return None
-    return text[start:end + len(DOC_END)]
+    return text[start : end + len(DOC_END)]
 
 
 # ==========================
 # ======= 3/ Entry =========
 # ==========================
 
+
 def main(argv):
-    parser = argparse.ArgumentParser(description="One verdict per TODO « To confirm on the Mac » point.")
-    parser.add_argument("--report", help="The field report folder (field_run/ and steps.txt inside).")
+    parser = argparse.ArgumentParser(
+        description="One verdict per TODO « To confirm on the Mac » point."
+    )
+    parser.add_argument(
+        "--report", help="The field report folder (field_run/ and steps.txt inside)."
+    )
     parser.add_argument("--installed", action="store_true", help="The run was --installed.")
-    parser.add_argument("--unattended", action="store_true", help="The run left the guided steps out.")
-    parser.add_argument("--doc", action="store_true", help="Print the documentation's coverage table.")
-    parser.add_argument("--check-doc", action="store_true", help="Fail when the documentation's table is stale.")
+    parser.add_argument(
+        "--doc", action="store_true", help="Print the documentation's coverage table."
+    )
+    parser.add_argument(
+        "--check-doc", action="store_true", help="Fail when the documentation's table is stale."
+    )
     args = parser.parse_args(argv)
     coverage, spec = load(COVERAGE), load(SPEC)
     if args.doc:
@@ -305,25 +355,49 @@ def main(argv):
     if args.check_doc:
         with open(DOC, encoding="utf-8") as handle:
             block = doc_block(handle.read())
-        if block is None or normalized_table(block) != normalized_table(render_doc_table(coverage, spec)):
-            print("docs/tooling/macos-field-report-coverage.md: the coverage table is stale; "
-                "regenerate it with tools/dev/field-todo-summary.py --doc.", file=sys.stderr)
+        if block is None or normalized_table(block) != normalized_table(
+            render_doc_table(coverage, spec)
+        ):
+            print(
+                "docs/tooling/macos-field-report-coverage.md: the coverage table is stale; "
+                "regenerate it with tools/dev/field-todo-summary.py --doc.",
+                file=sys.stderr,
+            )
             return 1
         return 0
     if not args.report:
         parser.error("--report, --doc or --check-doc is required")
-    records = summarize(coverage, spec, read_results(os.path.join(args.report, "field_run")),
-        read_collector_steps(os.path.join(args.report, "steps.txt")), args.installed, args.unattended)
-    markdown = render_markdown(records, args.installed, args.unattended)
+    records = summarize(
+        coverage,
+        spec,
+        read_results(os.path.join(args.report, "field_run")),
+        read_collector_steps(os.path.join(args.report, "steps.txt")),
+        args.installed,
+    )
+    markdown = render_markdown(records, args.installed)
     with open(os.path.join(args.report, "todo_summary.md"), "w", encoding="utf-8") as handle:
         handle.write(markdown)
     with open(os.path.join(args.report, "todo_summary.json"), "w", encoding="utf-8") as handle:
-        json.dump({"schema": 1, "installed": args.installed, "unattended": args.unattended, "points": records},
-            handle, ensure_ascii=False, indent="\t")
+        json.dump(
+            {
+                "schema": 1,
+                "installed": args.installed,
+                "points": records,
+            },
+            handle,
+            ensure_ascii=False,
+            indent="\t",
+        )
         handle.write("\n")
     for record in records:
-        print(f"{MARKS.get(record['verdict'], '')} {record['verdict']:<13} {record['id']}"
-            + (f"  (not field-testable: {record['not_testable']})" if record["verdict"] == "not_testable" else ""))
+        print(
+            f"{MARKS.get(record['verdict'], '')} {record['verdict']:<13} {record['id']}"
+            + (
+                f"  (not field-testable: {record['not_testable']})"
+                if record["verdict"] == "not_testable"
+                else ""
+            )
+        )
     return 0
 
 
