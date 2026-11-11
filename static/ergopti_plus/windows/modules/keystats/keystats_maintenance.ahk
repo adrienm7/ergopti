@@ -14,7 +14,10 @@
 ;    applies it in SQLite while any ledger replays, so a sibling device never
 ;    brings a purged row back (maintainer decision 2026-11-06). The receipt is
 ;    the tombstone read back from the replayed reader image.
-; 2. Linux stamps its rows in UTC; the tombstone carries its UTC instant too.
+; 2. Rows store their instant in UTC with the offset they were recorded at
+;    (maintainer decision KMD-1): the tombstone row does too, through the
+;    events_system builder, and carries the same UTC instant, milliseconds
+;    included, under metadata utc, which purge_schema.sql compares rows with.
 ; 3. An Export is a VACUUM INTO copy of the reader image (query
 ;    export.vacuum_into) into the user's Downloads folder, taken after the
 ;    flush settles. Names and the tombstone match the macOS and Linux helper
@@ -22,6 +25,8 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+#Include keystats_local_time.ahk
 
 
 
@@ -59,12 +64,12 @@ KL_MetricsExportName(Stamp) {
 }
 
 ; Builds the tombstone journal entry of a purge taken now.
-; @param LocalTs {String} The local "YYYY-MM-DD HH:MM:SS.mmm" timestamp.
-; @param UtcStamp {String} The same instant as a YYYYMMDDHH24MISS UTC time.
-; @returns {Map} A system_event entry for KL_AppendLog.
-KL_MetricsTombstone(LocalTs, UtcStamp) {
+; @param LocalTs {String} The local "YYYY-MM-DD HH:MM:SS.mmm" journal timestamp.
+; @returns {Map} A system_event entry for KL_AppendLog; its utc is the UTC
+;   instant of LocalTs, milliseconds kept, the ts its events_system row stores.
+KL_MetricsTombstone(LocalTs) {
 	return Map("type", "system_event", "action", KLMaintenance.TOMBSTONE_ACTION, "timestamp", LocalTs,
-		"utc", FormatTime(UtcStamp, "yyyy-MM-dd HH:mm:ss"))
+		"utc", KL_TimestampFromLocal(LocalTs)["ts"])
 }
 
 ; Drains the typing buffer and reads today.log to its end.
@@ -108,10 +113,10 @@ KL_RunMetricsMaintenance(Kind, MetricsDir) {
 	HadImage := KLRCache.db != 0
 	db := 0
 	try {
-		Stamp := ""
+		Tombstone := 0
 		if (Kind = "purge") {
-			Stamp := KL_NowTimestamp()
-			if !KL_AppendLog(KL_MetricsTombstone(Stamp, A_NowUTC))
+			Tombstone := KL_MetricsTombstone(KL_NowTimestamp())
+			if !KL_AppendLog(Tombstone)
 				throw Error("the journal refused the tombstone")
 		}
 		if !KL_SettleMetricsWriter()
@@ -122,7 +127,7 @@ KL_RunMetricsMaintenance(Kind, MetricsDir) {
 		Path := ""
 		if (Kind = "purge") {
 			Rows := SQLite_Query(db, "SELECT count(*) AS n FROM events_system WHERE action="
-				. SQLite_Q(KLMaintenance.TOMBSTONE_ACTION) . " AND ts=" . SQLite_Q(Stamp) . ";")
+				. SQLite_Q(KLMaintenance.TOMBSTONE_ACTION) . " AND ts=" . SQLite_Q(Tombstone["utc"]) . ";")
 			if (Rows.Length != 1 || Rows[1]["n"] < 1)
 				throw Error("the tombstone is not in the replayed ledger")
 		} else {

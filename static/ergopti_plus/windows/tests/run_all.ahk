@@ -1314,6 +1314,8 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/metrics/test_metrics_rebuild_snapshots.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_stages.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_open_failure.ahk
+#Include unit/modules/keystats/reader/test_klr_utc_offset_migration.ahk
+#Include unit/modules/keystats/reader/test_klr_utc_offset_rows.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_rejection_identity.ahk
 #Include unit/modules/keystats/reader/test_klr_rebuild_publication.ahk
 #Include unit/modules/keystats/reader/test_klr_ledger_listing_failure.ahk
