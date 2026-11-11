@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "js-windows-diagnostic-progress-reader",
-			"ordinal": 612,
+			"ordinal": 624,
 			"name": "Windows diagnostic worker commits its archive while the host reads its progress",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-diagnostic-progress-reader.cjs"],
