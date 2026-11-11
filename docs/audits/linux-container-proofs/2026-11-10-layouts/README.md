@@ -32,18 +32,19 @@ From `static/ergopti_plus/linux`:
   GObject bindings);
 - `bash tests/hardware/run_input_sources_live.sh x11|gnome|kde|kde-x11|sway`;
 - `runuser -u <user> -- bash tests/hardware/run_input_sources_live.sh gnome|kde tests/hardware/run_user_layout_wayland_live.lua`
-  (the installer refuses desktop writes as root);
+  (the installer refuses desktop writes as root; on GNOME the script exits 3
+  after its first phase and runs again on a restarted shell, a new login);
 - `python3 tests/hardware/run_xkb_group_name_identity.py` (also in CI).
 
 ## Results
 
-| TODO line                         | Receipt                     | Outcome                                                                                                                                                                                                                                                                                                                                                    |
-| --------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Layout emulation over AZERTY (fr) | `layout_typing_live.txt`    | Closed. The 30 hand-read vectors of `keylayout_vectors.json` for Ergopti, Ergopti➕ and Ergo-L (letters, Shift, CapsLock, AltGr, dead keys, chained dead keys, multi-character output, the AZERTY-dead `^` key) typed into GTK and Qt and handed to the character path; Ctrl + Ergopti c copies, Ctrl + Ergopti z undoes; a row switched off types AZERTY. |
-| Accented shortcuts                | `layout_typing_live.txt`    | Closed. Ctrl+é copies in GTK and Qt with « é → C »; AltGr+é types the layout's level 3; Ctrl+2 with digits first stays Ctrl+KEY_2 on the wire.                                                                                                                                                                                                             |
-| Layout switching                  | `input_sources_*.txt`       | KDE Plasma 6.6.4 Wayland and X11, openbox X11 and sway closed (listing, ticks, menu switch, pause start/resume rules; `getLayoutsList` answers `a(sss)` on both Plasma sessions). GNOME Shell 46 open: see the findings.                                                                                                                                   |
-| W1 to W4                          | `user_layout_wayland_*.txt` | Open. GNOME: the installer's `apply-wayland` ends `not_loaded` and rolls back. KDE: inconclusive, the headless XWayland the installer reads back does not follow KWin without a focused client. W4 not attempted.                                                                                                                                          |
-| Bépo monnaie then cédille         | `layout_typing_live.txt`    | Qt types ₢ at once. GTK 3 open: see the findings.                                                                                                                                                                                                                                                                                                          |
+| TODO line                         | Receipt                     | Outcome                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Layout emulation over AZERTY (fr) | `layout_typing_live.txt`    | Closed. The 30 hand-read vectors of `keylayout_vectors.json` for Ergopti, Ergopti➕ and Ergo-L (letters, Shift, CapsLock, AltGr, dead keys, chained dead keys, multi-character output, the AZERTY-dead `^` key) typed into GTK and Qt and handed to the character path; Ctrl + Ergopti c copies, Ctrl + Ergopti z undoes; a row switched off types AZERTY.          |
+| Accented shortcuts                | `layout_typing_live.txt`    | Closed. Ctrl+é copies in GTK and Qt with « é → C »; AltGr+é types the layout's level 3; Ctrl+2 with digits first stays Ctrl+KEY_2 on the wire.                                                                                                                                                                                                                      |
+| Layout switching                  | `input_sources_*.txt`       | KDE Plasma 6.6.4 Wayland and X11, openbox X11 and sway closed (listing, ticks, menu switch, pause start/resume rules; `getLayoutsList` answers `a(sss)` on both Plasma sessions). GNOME Shell 46 open: see the findings.                                                                                                                                            |
+| W1 to W4                          | `user_layout_wayland_*.txt` | GNOME W1 to W3 closed after one login (Bépo: the user-tree slot loads with `ERGOPTI_SEVEN_LEVEL`, the digits-first build under the other slot replaces it with no restart; a layout registered during the session answers `needs_relogin`). KDE: inconclusive (Ergopti run), the headless XWayland does not follow KWin without a focused client. W4 not attempted. |
+| Bépo monnaie then cédille         | `layout_typing_live.txt`    | Qt types ₢ at once. GTK 3 open: see the findings.                                                                                                                                                                                                                                                                                                                   |
 
 ## Bugs the proofs found, fixed
 
@@ -55,6 +56,12 @@ From `static/ergopti_plus/linux`:
   route expansion failed on a fresh session.
 - `03a47899` an X11 layout named with non-ASCII characters (Bépo, the shipped
   « Français — Ergopti » files) made the daemon refuse to type with keys.
+- GNOME Shell 46 reads `~/.config/xkb/rules/evdev.xml` only when it starts:
+  apply-wayland selected an id registered after login, the shell fell back to
+  `us` and the read-back ended `not_loaded`. It now answers `needs_relogin`
+  for such an id, registers both slots and leaves the setting alone. The
+  headless proof also needs a key event for XWayland to receive a new keymap
+  (a Shift tap every 300 ms in `run_input_sources_live.sh gnome`).
 
 ## Findings left open
 

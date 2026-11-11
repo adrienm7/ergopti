@@ -22,7 +22,9 @@
 # The active layout is read back from the X server or XWayland
 # (lib/x11_active_layout.lua), on KWin Wayland from KWin's own active index
 # (lib/kde_active_layout.sh). Exit 0 = every check held, 1 = a check failed,
-# 2 = a prerequisite is missing. All processes and files are removed on exit.
+# 2 = a prerequisite is missing. A script that exits 3 on GNOME asks for a new
+# login: the shell restarts on the same HOME and the script runs again with
+# ERGOPTI_LIVE_PHASE=after_login. All processes and files are removed on exit.
 # ==============================================================================
 
 set -u
@@ -84,6 +86,65 @@ await_xwayland() {
 	exit 2
 }
 
+# Starts GNOME Shell on the session's HOME and buses, its XWayland and the
+# virtual keyboard; stop_gnome ends them, so a restart plays a new login.
+start_gnome() {
+	# --unsafe-mode: the shell's own current source is read back through Eval
+	# (lib/gnome_active_layout.sh); a headless XWayland may lag its group.
+	XDG_SESSION_TYPE=wayland gnome-shell --unsafe-mode --headless --wayland --virtual-monitor 1280x800 \
+		>"${SCRATCH}/shell.log" 2>&1 &
+	GNOME_PIDS="$!"
+	# mutter names its XWayland display; a stale socket of an earlier server can
+	# carry the same number, so the socket folder alone does not tell.
+	for _ in $(seq 1 100); do
+		number="$(sed -n 's/.*Using public X11 display :\([0-9][0-9]*\).*/\1/p' "${SCRATCH}/shell.log" | head -1)"
+		[ -n "${number}" ] && break
+		sleep 0.1
+	done
+	[ -n "${number}" ] || { echo "ENVIRONMENT: no XWayland appeared" >&2; exit 2; }
+	export DISPLAY=":${number}"
+	for _ in $(seq 1 100); do
+		XAUTHORITY="$(ls "${XDG_RUNTIME_DIR}"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)"
+		[ -n "${XAUTHORITY}" ] && break
+		sleep 0.1
+	done
+	export XAUTHORITY
+	# mutter starts XWayland when the first X client connects; a keyboard
+	# created before XWayland binds the seat may never reach it.
+	for _ in $(seq 1 100); do xkbcomp -xkb "${DISPLAY}" - >/dev/null 2>&1 && break; sleep 0.1; done
+	# The virtual keyboard mutter hands its keymap to XWayland through.
+	rm -f "${SCRATCH}/keyboard.in" "${SCRATCH}/keyboard.out"
+	mkfifo "${SCRATCH}/keyboard.in"
+	"${python_mock}" tests/hardware/lib/mutter_virtual_keyboard.py <"${SCRATCH}/keyboard.in" >"${SCRATCH}/keyboard.out" 2>&1 &
+	GNOME_PIDS="${GNOME_PIDS} $!"
+	exec 8>"${SCRATCH}/keyboard.in"
+	for _ in $(seq 1 100); do grep -q READY "${SCRATCH}/keyboard.out" 2>/dev/null && break; sleep 0.1; done
+	grep -q READY "${SCRATCH}/keyboard.out" || { echo "ENVIRONMENT: no mutter virtual keyboard" >&2; exit 2; }
+	echo "key 42 1" >&8
+	echo "key 42 0" >&8
+	# A headless XWayland receives a new compositor keymap only with the next
+	# key event: a Shift tap every 300 ms stands in for a typing user.
+	(while sleep 0.3; do echo "key 42 1"; echo "key 42 0"; done) >&8 2>/dev/null &
+	GNOME_PIDS="${GNOME_PIDS} $!"
+	# mutter's keymap reached XWayland once its symbols are "(unnamed)".
+	for _ in $(seq 1 100); do
+		xkbcomp -xkb "${DISPLAY}" - 2>/dev/null | grep -q 'xkb_symbols "(unnamed)"' && break
+		sleep 0.1
+	done
+	xkbcomp -xkb "${DISPLAY}" - 2>/dev/null | grep -q 'xkb_symbols "(unnamed)"' \
+		|| { echo "ENVIRONMENT: XWayland did not receive mutter's keymap" >&2; exit 2; }
+	PIDS="${PIDS} ${GNOME_PIDS}"
+}
+
+stop_gnome() {
+	exec 8>&-
+	# shellcheck disable=SC2086
+	kill ${GNOME_PIDS} 2>/dev/null
+	for pid in ${GNOME_PIDS}; do
+		while kill -0 "${pid}" 2>/dev/null; do sleep 0.1; done
+	done
+}
+
 case "${DESKTOP}" in
 x11)
 	need Xvfb; need openbox; need setxkbmap
@@ -110,36 +171,7 @@ gnome)
 	sleep 1
 	gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('xkb', 'fr')]"
 	gsettings set org.gnome.desktop.input-sources mru-sources "[('xkb', 'us'), ('xkb', 'fr')]"
-	# --unsafe-mode: the shell's own current source is read back through Eval
-	# (lib/gnome_active_layout.sh); a headless XWayland may lag its group.
-	XDG_SESSION_TYPE=wayland gnome-shell --unsafe-mode --headless --wayland --virtual-monitor 1280x800 \
-		>"${SCRATCH}/shell.log" 2>&1 &
-	PIDS="${PIDS} $!"
-	# mutter names its XWayland display; a stale socket of an earlier server can
-	# carry the same number, so the socket folder alone does not tell.
-	for _ in $(seq 1 100); do
-		number="$(sed -n 's/.*Using public X11 display :\([0-9][0-9]*\).*/\1/p' "${SCRATCH}/shell.log" | head -1)"
-		[ -n "${number}" ] && break
-		sleep 0.1
-	done
-	[ -n "${number}" ] || { echo "ENVIRONMENT: no XWayland appeared" >&2; exit 2; }
-	export DISPLAY=":${number}"
-	for _ in $(seq 1 100); do
-		XAUTHORITY="$(ls "${XDG_RUNTIME_DIR}"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)"
-		[ -n "${XAUTHORITY}" ] && break
-		sleep 0.1
-	done
-	export XAUTHORITY
-	# The virtual keyboard mutter hands its keymap to XWayland through.
-	mkfifo "${SCRATCH}/keyboard.in"
-	"${python_mock}" tests/hardware/lib/mutter_virtual_keyboard.py <"${SCRATCH}/keyboard.in" >"${SCRATCH}/keyboard.out" 2>&1 &
-	PIDS="${PIDS} $!"
-	exec 8>"${SCRATCH}/keyboard.in"
-	for _ in $(seq 1 100); do grep -q READY "${SCRATCH}/keyboard.out" 2>/dev/null && break; sleep 0.1; done
-	grep -q READY "${SCRATCH}/keyboard.out" || { echo "ENVIRONMENT: no mutter virtual keyboard" >&2; exit 2; }
-	echo "key 42 1" >&8
-	echo "key 42 0" >&8
-	sleep 1
+	start_gnome
 	export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME ERGOPTI_LIVE_DESKTOP=gnome ERGOPTI_LIVE_GNOME_UNSAFE=1
 	export ERGOPTI_LIVE_ACTIVE_CMD="sh tests/hardware/lib/gnome_active_layout.sh" ERGOPTI_LIVE_SIGNATURES="us=q fr=a"
 	;;
@@ -199,4 +231,18 @@ sway)
 	;;
 esac
 
-luajit "${2:-tests/hardware/run_input_sources_live.lua}"
+SCRIPT="${2:-tests/hardware/run_input_sources_live.lua}"
+luajit "${SCRIPT}"
+status=$?
+# Exit 3 asks for a new login (GNOME Shell reads the user registry only then):
+# the shell restarts on the same HOME and the script runs again.
+if [ "${status}" -eq 3 ] && [ "${DESKTOP}" = gnome ]; then
+	stop_gnome
+	# A process start is known to the second: a login comes well after the
+	# install (desktop_activation.GNOME_REGISTRY_MARGIN_SECONDS).
+	sleep 2
+	start_gnome
+	ERGOPTI_LIVE_PHASE=after_login luajit "${SCRIPT}"
+	status=$?
+fi
+exit "${status}"

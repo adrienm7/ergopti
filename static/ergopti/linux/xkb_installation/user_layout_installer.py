@@ -46,6 +46,8 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
+    GNOME_SHELL_PROCESS,
+    WAYLAND_NEEDS_RELOGIN,
     WAYLAND_SELECT_REFUSED,
     WAYLAND_SESSION_UNSUPPORTED,
     CleanupStatus,
@@ -53,9 +55,11 @@ from desktop_activation import (  # noqa: E402
     apply_x11_user_tree,
     compile_rmlvo,
     deactivate_layouts,
+    gnome_shell_knows_layout,
     keymap_has_type,
     live_readback_refusal,
     live_slots,
+    process_started_at,
     read_desktop_selection,
     running_as_root,
     select_live_slot,
@@ -287,7 +291,11 @@ def publish_shared_files(root: Path, home: Path, layouts: Dict[str, dict]) -> No
     registry = root / "rules" / "evdev.xml"
     if layouts:
         write_text(rules, build_rules(list(layouts)))
-        write_text(registry, build_registry(layouts))
+        content = build_registry(layouts)
+        # An unchanged registry keeps its date: GNOME Shell's view of it is
+        # judged by that date (gnome_shell_knows_layout).
+        if not registry.exists() or registry.read_text(encoding="utf-8") != content:
+            write_text(registry, content)
         write_manifest(root, layouts)
     else:
         for path in (rules, registry, root / MANIFEST_NAME):
@@ -546,6 +554,16 @@ def apply_wayland(
             WAYLAND_SELECT_REFUSED, "the %s layout setting is unreadable" % desktop
         )
     slot = slots[1] if selection.slot_in_use == slots[0] else slots[0]
+    other = slots[0] if slot == slots[1] else slots[1]
+    shell_known = True
+    if desktop == "gnome":
+        # Read before the install rewrites the registry.
+        started = process_started_at(GNOME_SHELL_PROCESS)
+        if started is None:
+            return _live_refusal(
+                WAYLAND_SELECT_REFUSED, "no %s process of this user" % GNOME_SHELL_PROCESS
+            )
+        shell_known = gnome_shell_knows_layout(root / "rules" / "evdev.xml", slot, started)
     report = install(
         slot,
         display_name,
@@ -558,13 +576,34 @@ def apply_wayland(
     )
     if not report["ok"]:
         return report
+    if not shell_known:
+        # Selecting an id the shell never read would switch the session to its
+        # "us" fallback: the setting stays as it is. The unused slot is
+        # registered too, so after one login both alternate live.
+        if selection.slot_in_use != other:
+            mirrored = install(
+                other,
+                display_name,
+                source_dir,
+                languages,
+                root,
+                home,
+                environ,
+                source_id=layout_id,
+            )
+            if not mirrored["ok"]:
+                return mirrored
+        return _live_refusal(
+            WAYLAND_NEEDS_RELOGIN,
+            "GNOME Shell reads %s only at login: log out and back in, then apply again"
+            % (root / "rules" / "evdev.xml"),
+        )
     applied, code = select_live_slot(slot, slots, selection, root, gnome_settle_ms / 1000, environ)
     if not applied:
         return _live_refusal(code, "not loaded: " + code)
     # The other slot is no longer selected, so rewriting it is invisible to the
     # compositor: both copies now hold this build, and a later activation of
     # either one types it.
-    other = slots[0] if slot == slots[1] else slots[1]
     mirrored = install(
         other, display_name, source_dir, languages, root, home, environ, source_id=layout_id
     )
