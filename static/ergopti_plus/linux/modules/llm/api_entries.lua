@@ -153,9 +153,11 @@ end
 --- A usable entry, or nil.
 --- @param raw any
 --- @param stored boolean|nil True only for an existing physical source row.
+--- @param key_missing boolean|nil The row's key is absent from the secret
+---   service: its empty key is not checked against the provider's policy.
 --- @return table|nil
 --- @return string|nil detail Exact obsolete identity reason, when proven.
-local function valid_entry(raw, stored)
+local function valid_entry(raw, stored, key_missing)
 	if type(raw) ~= "table" then return nil end
 	for _, key in ipairs({ "id", "provider", "label" }) do
 		if type(raw[key]) ~= "string" or raw[key] == "" then return nil end
@@ -174,7 +176,7 @@ local function valid_entry(raw, stored)
 	end
 	-- An unavailable inventory cannot disprove a stored optional-auth choice.
 	-- Candidate admission keeps its existing strict authentication owner.
-	if identity ~= "unpublished" then
+	if identity ~= "unpublished" and key_missing ~= true then
 		local _, servers = LocalCatalogue.load({})
 		if not AuthPolicy.entry_token_allowed(raw.provider, raw.token, raw.base_url, servers) then return nil end
 	end
@@ -218,7 +220,7 @@ end
 local function state()
 	if _state then return _state end
 	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {},
-		secrets = {}, plaintext = 0 }
+		secrets = {}, plaintext = 0, key_missing = {} }
 	local text, read_status = SourceWriter.read_classified(M.path())
 	if read_status ~= "ok" and read_status ~= "absent" then
 		_state.write_refusal = "its physical source could not be read completely"
@@ -262,7 +264,17 @@ local function state()
 	for index, raw in ipairs(root.entries) do
 		local reference = type(raw) == "table" and TokenStore.is_reference(raw.token) and raw.token or nil
 		local entry, outdated_reason
-		if reference and not tokens[reference] then
+		if reference and not tokens[reference] and unread[reference] == "absent" then
+			-- The service confirms no such item: a restored backup whose key was
+			-- deleted with its entry (decided by the maintainer on 2026-11-11).
+			-- The entry is listed as needing its key again; its reference is
+			-- written back unchanged until a new key replaces it.
+			local candidate = {}
+			for key, value in pairs(raw) do candidate[key] = value end
+			candidate.token = ""
+			entry, outdated_reason = valid_entry(candidate, true, true)
+			if entry then _state.key_missing[entry.id] = reference end
+		elseif reference and not tokens[reference] then
 			-- Kept as written, like any row this load cannot use: the key is
 			-- still in the service, and the next load that reaches it uses it.
 			outdated_reason = "its key is in the desktop secret service, which could not be read ("
@@ -380,7 +392,12 @@ local function persist(admit, publication, quiet, prestored)
 		end
 		return false
 	end
-	local function token_of(entry) return held[entry.id] and held[entry.id].reference or "" end
+	local function token_of(entry)
+		if held[entry.id] then return held[entry.id].reference end
+		-- A key still to re-enter keeps the reference it was restored with.
+		if entry.token == "" and current.key_missing[entry.id] then return current.key_missing[entry.id] end
+		return ""
+	end
 	local entries = {}
 	local pending = {}
 	for _, entry in ipairs(current.entries) do pending[entry.id] = entry end
@@ -493,6 +510,39 @@ function M.publish_migrated(stored, tokens)
 	end
 	if persist(nil, nil, false, prestored) then return true end
 	return false, current.store_refusal or "the API entries file could not be published", current.publishing == true
+end
+
+--- Whether an entry was restored without its key: its reference names no
+--- item of the secret service, so it needs its key re-entered.
+--- @param id string
+--- @return boolean
+function M.key_missing(id)
+	local entry = M.get(id)
+	return entry ~= nil and entry.token == "" and state().key_missing[id] ~= nil
+end
+
+--- Gives an entry a new key, stored in the secret service before the file
+--- names it. The entry's other fields and the selection stay as they were.
+--- @param id string
+--- @param token string A non-empty key.
+--- @return boolean saved
+function M.set_token(id, token)
+	if type(token) ~= "string" or token == "" then return false end
+	local current = state()
+	for _, entry in ipairs(current.entries) do
+		if entry.id == id then
+			local previous, missing = entry.token, current.key_missing[id]
+			entry.token = token
+			current.key_missing[id] = nil
+			if persist() then
+				Logger.info(LOG, "API entry '%s' has a new key.", id)
+				return true
+			end
+			entry.token, current.key_missing[id] = previous, missing
+			return false
+		end
+	end
+	return false
 end
 
 --- Why the last save was refused by the secret service, or nil.
@@ -639,7 +689,7 @@ function M.set_model(id, model)
 			local copy = {}
 			for key, value in pairs(entry) do copy[key] = value end
 			copy.model = model
-			local changed = valid_entry(copy)
+			local changed = valid_entry(copy, nil, entry.token == "" and current.key_missing[id] ~= nil)
 			if not changed then return false end
 			local previous = current.active_id
 			current.entries[index], current.active_id = changed, id

@@ -2637,6 +2637,7 @@
 	"model_browser.install_paused": "Ergopti रुका हुआ है: {name} स्थापित करने के लिए इसे फिर से शुरू करें।",
 	"model_browser.reason_install_ai_on": "पहले AI बंद करें: Ollama इंस्टॉल करने से यह Ollama के साथ फिर चालू हो जाता है।",
 	"model_browser.hint_api_no_key": "API कुंजी नहीं है: इस मॉडल को उपयोग करने के लिए इसे जोड़ें।",
+	"model_browser.hint_api_key_reenter": "कुंजी गायब है: यह प्रविष्टि बैकअप से अपनी कुंजी के बिना लौटी है। इसका उपयोग करने के लिए API कुंजी… से इसकी कुंजी फिर से दर्ज करें।",
 	"model_browser.hint_api_listing_unavailable": "इस प्रदाता की मॉडल सूची यहाँ उपलब्ध नहीं है: ज्ञात मॉडल दिखाए गए हैं; दूसरा मॉडल… से कोई दूसरी ID लिखें।",
 	"model_browser.hint_api_listing_refused": "प्रदाता ने अपने मॉडल सूचीबद्ध करने से मना कर दिया (कुंजी जाँचें): ज्ञात मॉडल दिखाए गए हैं, या कोई दूसरी ID लिखें।",
 	"model_browser.hint_api_listing_pending": "इस प्रदाता के मॉडल लोड हो रहे हैं…",
