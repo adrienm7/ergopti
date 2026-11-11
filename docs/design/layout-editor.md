@@ -17,6 +17,7 @@ All under `static/ergopti_plus/_shared/ui/layout_editor/`, classic scripts that 
 | `editor_model.js`  | Pure edits returning a new validated document, refusals with stable codes, layer selection by held modifiers, the typing simulation behind the live preview, undo/redo snapshots.                                                                                                                                                                                                                                                                                                                                                                                |
 | `editor_page.js`   | The DOM: toolbar, layer tabs, the physical board (`LAYER_EDITOR_DATA` geometry, numpad, media keys), the key inspector, modifiers and dead-key panels, Unicode palette, preview, export report, printable stickers. `LayoutEditorPage.mount(root, host)`.                                                                                                                                                                                                                                                                                                        |
 | `standalone.js`    | The website host: browser file picker, downloads, `?lang=` locale.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `lua_runner.js`    | Runs the shared Lua export adapter (`_shared/lua/layouts/source_export.lua`) in the vendored fengari VM (`vendor/fengari-web.js`, Lua 5.3), the module list the host fetches included, for the XKB conversion and the canonical `.keylayout` reading the KLC needs.                                                                                                                                                                                                                                                                                              |
 | `toml_prelude.js`  | The `exports` object the unmodified vendored CommonJS file assigns to.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `unicode_names.js` | Decodes the generated Unicode names table: name, aliases and block of a code point, and the name search.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
@@ -68,10 +69,18 @@ report as it is.
   generator's importer converts it exactly or refuses it; only after a refusal does the page offer « Convert
   approximately », which lists what it drops (sided modifiers, ANSI described on ISO, ambiguous compositions).
 - The page downloads the source, `layers.toml`, a `.keylayout` per variant (ISO, ANSI) compiled in the browser and,
-  on the site, the macOS bundle as one stored ZIP (`zip_writer.js`). Linux XKB and Windows KLC run through Lua
-  converters, so they come from the repository tool (`npm run layout-source -- export-…`); ErgoptiPlus installs the
-  compiled layout itself. Each report row names its
-  status, reason and the elements the target does not carry.
+  on the site, the macOS bundle as one stored ZIP (`zip_writer.js`), the Linux XKB files as one stored ZIP (the
+  `export-xkb` tree: symbols, `XCompose`, `xkb_types.txt`, `export.json`) and the Windows `.klc` (MSKLC bytes). The
+  XKB and KLC downloads run the repository tool's own steps, byte for byte (`test-layout-editor-target-exports.cjs`):
+  the shared target export (`layout_composer/target_export.js`, also loaded by `tools/lib/layout-source-xkb.cjs` and
+  `layout-source-klc.cjs`), the shared Lua export adapter in fengari (the tool runs it with Lua 5.4 through
+  `tools/lib/layout_source_export.lua`) and the tool's KLC generator wrapped verbatim
+  (`_generated/klc_generator.js`, from `codegen-layout-editor-klc-js.cjs`). The site host (`standalone.js`) loads the
+  VM, the Lua sources, the XKB data (`static/ergopti/linux/xkb_generation/data/`) and the generator on the first
+  click only. The `.klc` needs the Windows metadata (language tag, LCID, DLL name) set in « Windows options ». The
+  ErgoptiPlus hosts inline the page and cannot fetch these files, so they show a note pointing to the site instead:
+  ErgoptiPlus installs the compiled layout itself. Each report row names its status, reason and the elements the
+  target does not carry.
 - A `layers.toml` binding using `primary` is written per OS on the way back (same effect on every OS, pinned by
   `test-layout-editor-model.cjs`); a sequence of several chords is refused.
 - KbdEdit-style editing: drag a key onto another to swap (Ctrl copies), copy and paste a mapping, ISO or ANSI board,

@@ -318,14 +318,6 @@ body {
 	color: var(--le-sub);
 }
 
-.le-cli {
-	background: var(--le-surface-2);
-	border-radius: 6px;
-	display: block;
-	overflow-x: auto;
-	padding: 4px 8px;
-}
-
 /* =============================== */
 /* =============================== */
 /* ======= 5/ Stickers =========== */
