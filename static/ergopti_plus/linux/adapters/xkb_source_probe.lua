@@ -27,6 +27,14 @@ local _locked_generation, _last_locked = 0, nil
 local _input_generation, _last_input = 0, nil
 local _last_canonical_keymap = nil
 local _last_expected, _last_canonical_expected = nil, nil
+-- XkbNewKeyboardNotify and XkbMapNotify events drained so far: any change of the
+-- core keyboard's keymap reaches this connection as one of them.
+local _keymap_events = 0
+-- The keymap text read() last downloaded, on which connection and at which
+-- keymap event count: while neither moved, the server still holds that keymap,
+-- and read() reuses the text instead of downloading and serializing it again
+-- (about 0.6 ms of every injected press on an idle Xvfb, more on a busy server).
+local _downloaded = { connection = nil, events = nil, text = nil }
 local CORE_KEYBOARD = 0x100
 local GROUP_COMPONENTS = 0xf0
 local LOCKED_COMPONENT = 0x8
@@ -253,6 +261,7 @@ local function retire_published()
 	local connection = _connection
 	_connection, _display_name, _last_keymap, _last_group = nil, nil, nil, nil
 	_last_canonical_keymap = nil
+	_downloaded.connection, _downloaded.events, _downloaded.text = nil, nil, nil
 	_last_expected, _last_canonical_expected = nil, nil
 	_generation = _generation + 1
 	_locked_generation, _last_locked = _locked_generation + 1, nil
@@ -466,6 +475,7 @@ local function drain(native, connection)
 			if kind == 0 or kind == 1 or (kind == 2 and native.bit.band(tonumber(state.changed), GROUP_COMPONENTS) ~= 0) then
 				_generation = _generation + 1
 			end
+			if kind == 0 or kind == 1 then _keymap_events = _keymap_events + 1 end
 			if connection.receiving and (kind == 0 or kind == 1
 				or (kind == 2 and native.bit.band(tonumber(state.changed), GROUP_COMPONENTS + LOCKED_COMPONENT) ~= 0)) then
 				connection.receiving_revision = connection.receiving_revision + 1
@@ -1160,14 +1170,24 @@ local function read(expected, groups, require_locked, require_input)
 	if not drained then return nil, drain_reason end
 	local before, after = native.ffi.new("ErgoptiXkbState[1]"), native.ffi.new("ErgoptiXkbState[1]")
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, before) ~= 0 then return nil, "native-group-unavailable" end
-	local device = native.xkb11.xkb_x11_get_core_keyboard_device_id(connection.xcb)
-	if device < 0 then return nil, "native-keyboard-unavailable" end
-	local keymap = native.xkb11.xkb_x11_keymap_new_from_device(connection.context, connection.xcb, device, 0)
-	if keymap == nil then return nil, "native-keymap-unavailable" end
-	local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
-	local actual = bytes ~= nil and native.ffi.string(bytes) or nil
-	if bytes ~= nil then native.ffi.C.free(bytes) end
-	native.xkb.xkb_keymap_unref(keymap)
+	local actual
+	-- The drain above synchronized with the server: a keymap change made before
+	-- it has been counted, and one made after it is counted by the drain below,
+	-- which then reports the race exactly as a fresh download would.
+	if _downloaded.connection == connection and _downloaded.events == _keymap_events and _downloaded.text then
+		actual = _downloaded.text
+	else
+		local events = _keymap_events
+		local device = native.xkb11.xkb_x11_get_core_keyboard_device_id(connection.xcb)
+		if device < 0 then return nil, "native-keyboard-unavailable" end
+		local keymap = native.xkb11.xkb_x11_keymap_new_from_device(connection.context, connection.xcb, device, 0)
+		if keymap == nil then return nil, "native-keymap-unavailable" end
+		local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
+		actual = bytes ~= nil and native.ffi.string(bytes) or nil
+		if bytes ~= nil then native.ffi.C.free(bytes) end
+		native.xkb.xkb_keymap_unref(keymap)
+		if actual ~= nil then _downloaded.connection, _downloaded.events, _downloaded.text = connection, events, actual end
+	end
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, after) ~= 0 then return nil, "native-group-unavailable" end
 	local group = tonumber(after[0].group)
 	local locked = tonumber(after[0].locked_mods)
