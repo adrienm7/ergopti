@@ -381,6 +381,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-layout-bundle-plan.cjs"],
 			"repro": "npm run test:macos-layout-bundle-plan"
+		},
+		{
+			"id": "layout-editor-unicode-names",
+			"ordinal": 613,
+			"name": "layout editor Unicode names table decodes every name and answers wildcard searches",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-unicode-names.cjs"],
+			"repro": "npm run test:layout-editor-unicode-names"
 		}
 	]
 }

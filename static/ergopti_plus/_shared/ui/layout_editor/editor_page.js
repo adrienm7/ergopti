@@ -63,6 +63,8 @@ var LayoutEditorPage = (function () {
 	// The levels of another layout a layer can be filled from (the composer's levels).
 	const FILL_LEVELS = ['base', 'shift', 'altgr', 'shift_altgr', 'command'];
 	const STICKER_MAX_MM = 30;
+	// The drag data type of a character from the palette or the name search.
+	const CHAR_DRAG_TYPE = 'application/x-ergopti-character';
 
 	// ============================
 	// ======= 2/ Helpers =========
@@ -204,6 +206,12 @@ var LayoutEditorPage = (function () {
 			numpad: false,
 			deadKey: null,
 			paletteBlock: PALETTE_BLOCKS[0].id,
+			// Whether the palette is unfolded, so a render keeps it open.
+			paletteOpen: false,
+			// The name search: query, result cap and the last answer (null before a search).
+			nameSearch: { query: '', limit: UnicodeNames.DEFAULT_LIMIT, answer: null, failed: false },
+			// The text the character magnifier shows ('' shows its hint).
+			magnified: '',
 			presses: [],
 			locked: new Set(),
 			heldCustom: new Set(),
@@ -817,13 +825,27 @@ var LayoutEditorPage = (function () {
 								render();
 							},
 							onkeydown: (event) => clipboardKey(event, key.code),
+							...magnifyOn(magnifiedText(found && found.mapping)),
 							ondragstart: (event) => event.dataTransfer.setData('text/plain', key.code),
 							ondragover: (event) => event.preventDefault(),
 							// KbdEdit's drop: a plain drop swaps the two keys, Ctrl (or Alt) copies.
 							ondrop: (event) => {
 								event.preventDefault();
+								if (!editableLayer()) return;
+								// A character dragged from the palette or the name search maps the key to it.
+								const char = event.dataTransfer.getData(CHAR_DRAG_TYPE);
+								if (char)
+									return apply((d) =>
+										LayoutEditorModel.setMapping(
+											d,
+											state.layer,
+											key.code,
+											{ text: char },
+											state.platform || null
+										)
+									);
 								const from = event.dataTransfer.getData('text/plain');
-								if (!from || !editableLayer()) return;
+								if (!from) return;
 								const keep = event.ctrlKey || event.altKey;
 								apply((d) =>
 									LayoutEditorModel.transferMapping(
@@ -1046,45 +1068,250 @@ var LayoutEditorPage = (function () {
 					el('button', {
 						type: 'button',
 						class: 'le-glyph',
-						title: `U+${point.toString(16).toUpperCase().padStart(4, '0')}`,
+						title: UnicodeNames.codeLabel(point),
 						text: visible(char),
+						draggable: 'true',
+						ondragstart: (event) => event.dataTransfer.setData(CHAR_DRAG_TYPE, char),
 						onclick: () => {
 							target.value += char;
 							target.focus();
-						}
+						},
+						...magnifyOn(char)
 					})
 				);
 			}
 			const hex = el('input', { type: 'text', id: 'le-codepoint', placeholder: 'U+00E9', size: 8 });
-			return el('details', { class: 'le-palette' }, [
-				el('summary', { text: tl('palette.title') }),
-				select(
-					PALETTE_BLOCKS.map((b) => [b.id, tl(`palette.block.${b.id}`)]),
-					state.paletteBlock,
-					(value) => {
-						state.paletteBlock = value;
-						render();
-					},
-					{ id: 'le-palette-block' }
-				),
-				locate(),
-				hex,
+			return el(
+				'details',
+				{
+					class: 'le-palette',
+					open: state.paletteOpen,
+					ontoggle: (event) => {
+						state.paletteOpen = event.target.open;
+					}
+				},
+				[
+					el('summary', { text: tl('palette.title') }),
+					select(
+						PALETTE_BLOCKS.map((b) => [b.id, tl(`palette.block.${b.id}`)]),
+						state.paletteBlock,
+						(value) => {
+							state.paletteBlock = value;
+							render();
+						},
+						{ id: 'le-palette-block' }
+					),
+					locate(),
+					hex,
+					el('button', {
+						type: 'button',
+						text: tl('palette.insert'),
+						onclick: () => {
+							const point = parseInt(hex.value.replace(/^U\+/i, ''), 16);
+							if (
+								!Number.isInteger(point) ||
+								point < 0 ||
+								point > 0x10ffff ||
+								(point >= 0xd800 && point <= 0xdfff)
+							)
+								return notify('error', problemText({ code: 'codepoint_invalid', path: hex.value }));
+							target.value += String.fromCodePoint(point);
+						}
+					}),
+					grid,
+					nameSearch(target)
+				]
+			);
+		}
+
+		// ===================================
+		// ======= 9b/ Unicode names =========
+		// ===================================
+
+		/** Listeners that show a text in the character magnifier while it is hovered or focused. */
+		function magnifyOn(text) {
+			const show = () => magnify(text);
+			return { onmouseenter: show, onfocus: show };
+		}
+
+		/** The text a key shows on the board, for the magnifier: its characters, not a symbol. */
+		function magnifiedText(mapping) {
+			if (!mapping) return '';
+			const kind = LayoutEditorModel.kindOf(mapping);
+			if (kind === 'text') return mapping.text;
+			if (kind === 'dead_key') {
+				const dead = (doc().dead_keys || []).find((entry) => entry.id === mapping.dead_key);
+				return dead && dead.terminator ? dead.terminator : '';
+			}
+			return '';
+		}
+
+		/** Loads the names table if the page lacks it, then runs then(); a failure is shown. */
+		function withNames(then) {
+			if (UnicodeNames.available()) return then();
+			UnicodeNames.ensure().then(then, () => {
+				state.nameSearch.failed = true;
+				then();
+			});
+		}
+
+		/** Shows a text in the magnifier, updating it in place (no full render on hover). */
+		function magnify(text) {
+			state.magnified = text || '';
+			const node = root.querySelector('#le-magnifier');
+			if (!node) return;
+			if (state.magnified && !UnicodeNames.available() && !state.nameSearch.failed)
+				return withNames(() => {
+					const current = root.querySelector('#le-magnifier');
+					if (current) current.replaceWith(magnifier());
+				});
+			node.replaceWith(magnifier());
+		}
+
+		function copyText(text) {
+			const done = () => notify('ok', tl('magnifier.copied', { text: visible(text) }));
+			const fallback = () => {
+				const area = el('textarea', { class: 'le-copy-buffer', 'aria-hidden': 'true' });
+				area.value = text;
+				document.body.append(area);
+				area.select();
+				const copied = document.execCommand && document.execCommand('copy');
+				area.remove();
+				if (copied) done();
+				else notify('error', problemText({ code: 'copy_failed', path: '' }));
+			};
+			if (navigator.clipboard && navigator.clipboard.writeText)
+				navigator.clipboard.writeText(text).then(done, fallback);
+			else fallback();
+		}
+
+		/** KbdEdit's character magnifier: a large glyph with each code point, name and block. */
+		function magnifier() {
+			const text = state.magnified;
+			if (!text)
+				return el('aside', { class: 'le-magnifier', id: 'le-magnifier' }, [
+					el('h3', { text: tl('magnifier.title') }),
+					el('p', { class: 'le-note', text: tl('magnifier.hint') })
+				]);
+			const named = UnicodeNames.available();
+			const rows = Array.from(text).map((char) => {
+				const point = char.codePointAt(0);
+				const name = named ? UnicodeNames.nameOf(point) : null;
+				const block = named ? UnicodeNames.blockOf(point) : null;
+				return el('li', { class: 'le-magnifier-row' }, [
+					el('code', { text: UnicodeNames.codeLabel(point) }),
+					' ',
+					el('span', {
+						class: 'le-magnifier-name',
+						text: named
+							? name || tl('magnifier.unnamed')
+							: tl(state.nameSearch.failed ? 'names.unavailable' : 'names.loading')
+					}),
+					block ? el('span', { class: 'le-magnifier-block', text: ` · ${block}` }) : null
+				]);
+			});
+			return el('aside', { class: 'le-magnifier', id: 'le-magnifier' }, [
+				el('h3', { text: tl('magnifier.title') }),
+				el('div', { class: 'le-magnifier-glyph', id: 'le-magnifier-glyph', text: visible(text) }),
+				el('ul', { class: 'le-list', id: 'le-magnifier-rows' }, rows),
 				el('button', {
 					type: 'button',
-					text: tl('palette.insert'),
-					onclick: () => {
-						const point = parseInt(hex.value.replace(/^U\+/i, ''), 16);
-						if (
-							!Number.isInteger(point) ||
-							point < 0 ||
-							point > 0x10ffff ||
-							(point >= 0xd800 && point <= 0xdfff)
-						)
-							return notify('error', problemText({ code: 'codepoint_invalid', path: hex.value }));
-						target.value += String.fromCodePoint(point);
-					}
+					id: 'le-magnifier-copy',
+					text: tl('magnifier.copy'),
+					onclick: () => copyText(text)
+				})
+			]);
+		}
+
+		/** The search's answer as clickable cells, or its state. */
+		function nameResults(target) {
+			const search = state.nameSearch;
+			const box = el('div', { class: 'le-name-results', id: 'le-name-results' });
+			if (search.failed) {
+				box.append(el('p', { class: 'le-message error', text: tl('names.unavailable') }));
+				return box;
+			}
+			if (!search.answer) return box;
+			const { results, truncated } = search.answer;
+			box.append(
+				el('p', {
+					class: 'le-note',
+					id: 'le-name-count',
+					text: results.length
+						? tl(truncated ? 'names.truncated' : 'names.count', { count: results.length })
+						: tl('names.none')
 				}),
-				grid
+				el(
+					'div',
+					{ class: 'le-palette-grid' },
+					results.map((result) =>
+						el('button', {
+							type: 'button',
+							class: 'le-glyph',
+							'data-point': result.code,
+							title: `${result.code} ${result.name}`,
+							text: visible(result.char),
+							draggable: 'true',
+							ondragstart: (event) => event.dataTransfer.setData(CHAR_DRAG_TYPE, result.char),
+							onclick: () => {
+								target.value += result.char;
+								target.focus();
+							},
+							...magnifyOn(result.char)
+						})
+					)
+				)
+			);
+			return box;
+		}
+
+		/** Search characters by name, alias, glyph or code point, with `*` and `?` wildcards. */
+		function nameSearch(target) {
+			const search = state.nameSearch;
+			const query = el('input', {
+				type: 'search',
+				id: 'le-name-search',
+				value: search.query,
+				placeholder: tl('names.placeholder'),
+				onkeydown: (event) => {
+					if (event.key === 'Enter') {
+						event.preventDefault();
+						run();
+					}
+				}
+			});
+			const limit = el('input', {
+				type: 'number',
+				id: 'le-name-limit',
+				min: 1,
+				max: UnicodeNames.MAX_LIMIT,
+				value: search.limit
+			});
+			const holder = el('div', {}, nameResults(target));
+			function run() {
+				search.query = query.value;
+				search.limit = Math.min(
+					Math.max(1, Math.floor(Number(limit.value) || UnicodeNames.DEFAULT_LIMIT)),
+					UnicodeNames.MAX_LIMIT
+				);
+				limit.value = search.limit;
+				holder.replaceChildren(el('p', { class: 'le-note', text: tl('names.loading') }));
+				withNames(() => {
+					if (!search.failed) search.answer = UnicodeNames.search(search.query, search.limit);
+					holder.replaceChildren(nameResults(target));
+				});
+			}
+			return el('div', { class: 'le-name-search' }, [
+				el('label', { class: 'le-inline' }, [tl('names.label'), query]),
+				el('label', { class: 'le-inline' }, [tl('names.limit'), limit]),
+				el('button', {
+					type: 'button',
+					id: 'le-name-search-run',
+					text: tl('names.search'),
+					onclick: run
+				}),
+				el('p', { class: 'le-note', text: tl('names.help') }),
+				holder
 			]);
 		}
 
@@ -1979,7 +2206,7 @@ var LayoutEditorPage = (function () {
 				messageBar(),
 				metadata(),
 				layerTabs(),
-				el('div', { class: 'le-main' }, [board(), inspector()]),
+				el('div', { class: 'le-main' }, [board(), inspector(), magnifier()]),
 				el('div', { class: 'le-panels' }, [
 					LayoutSourceIO.isPreserved(doc()) ? null : modifiersPanel(),
 					LayoutSourceIO.isPreserved(doc()) ? null : windowsPanel(),

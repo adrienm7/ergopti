@@ -375,3 +375,40 @@ body {
 		grid-area: 2 / 2;
 	}
 }
+
+.le-name-search {
+	border-top: 1px solid var(--le-border);
+	margin-top: 8px;
+	padding-top: 6px;
+}
+
+.le-magnifier {
+	border: 1px solid var(--le-border);
+	border-radius: var(--le-radius);
+	flex: 0 1 240px;
+	min-width: 200px;
+	padding: 6px 10px;
+}
+
+.le-magnifier-glyph {
+	font-size: 64px;
+	line-height: 1.2;
+	min-height: 80px;
+	overflow-wrap: anywhere;
+	text-align: center;
+}
+
+.le-magnifier-name {
+	font-size: 0.85em;
+}
+
+.le-magnifier-block {
+	color: var(--le-sub);
+	font-size: 0.8em;
+}
+
+.le-copy-buffer {
+	left: -9999px;
+	position: fixed;
+	top: 0;
+}
