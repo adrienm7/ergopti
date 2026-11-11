@@ -197,29 +197,52 @@ end
 
 --- Decides one key press from the keyboard hook's consumption callback.
 --- @param detail table { code, value, mods }.
---- @param options table { active = fn() -> boolean, defer = fn(fn) -> boolean,
----   press = fn(combo) -> boolean, base_symbol?, number_row_mode?, settings? }.
+--- @param options table { active = fn() -> boolean, emulating = fn() -> boolean,
+---   defer = fn(fn) -> boolean, press = fn(combo) -> boolean, base_symbol?,
+---   number_row_mode?, settings? }.
 --- @return boolean consumed True when the press became the letter's chord.
+--- @return function|nil repeat_callback Owner of the held press's auto-repeats.
 function M.on_key(detail, options)
-	if type(options) ~= "table" or type(options.active) ~= "function" or not options.active() then return false end
+	if type(options) ~= "table" or type(options.emulating) ~= "function" then
+		error("accented shortcuts need to know whether the layout emulation runs", 2)
+	end
+	if type(options.active) ~= "function" or not options.active() then return false end
+	-- As Windows, which registers these chords only without the Ergopti
+	-- emulation: an emulated layout decides a chord on its own keys (SCL-002).
+	if options.emulating() == true then return false end
 	local ports = {
 		base_symbol = options.base_symbol or require("adapters.keyboard_layout").base_symbol,
 		number_row_mode = options.number_row_mode or require("adapters.keyboard_hook").number_row_mode,
 		settings = options.settings or M.settings,
 	}
-	local combo, id = M.combo_for(detail, ports)
-	if not combo then return false end
 	local press = options.press
-	local queued = options.defer(function()
-		if not options.active() then return end
-		if press(combo) ~= true then Logger.error(LOG, "Accented shortcut %s could not press %s.", id, combo) end
-	end)
-	if queued ~= true then
-		Logger.error(LOG, "Accented shortcut %s could not be queued: the key goes to the application.", id)
-		return false
+
+	--- Queues the chord one key event decides; false lets that event through.
+	local function queue(event)
+		local combo, id = M.combo_for(event, ports)
+		if not combo then return false end
+		local queued = options.defer(function()
+			if not options.active() then return end
+			if press(combo) ~= true then Logger.error(LOG, "Accented shortcut %s could not press %s.", id, combo) end
+		end)
+		if queued ~= true then
+			Logger.error(LOG, "Accented shortcut %s could not be queued: the key goes to the application.", id)
+			return false
+		end
+		Logger.debug(LOG, "Accented shortcut %s → %s.", id, combo)
+		return true
 	end
-	Logger.debug(LOG, "Accented shortcut %s → %s.", id, combo)
-	return true
+
+	if not queue(detail) then return false end
+	-- Each auto-repeat presses the chord again, as AHK's ^SCxxx hotkeys fire on
+	-- every repeat (holding Ctrl+è undoes repeatedly), with the modifiers held
+	-- at that repeat (SCL-001).
+	return true, function(repeat_detail)
+		if type(repeat_detail) ~= "table" or repeat_detail.code ~= detail.code or not options.active() then
+			return false
+		end
+		return queue({ code = repeat_detail.code, value = 1, mods = repeat_detail.mods })
+	end
 end
 
 return M
