@@ -35,6 +35,7 @@ local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
 local LivePlan = require("llm.request_plan.live")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
+local RequestSettings  = require("llm.request_settings")
 local PromptAction     = require("llm.prompt_action")
 local Logger           = require("infra.logger")
 local Timings          = require("infra.timings")
@@ -1996,6 +1997,28 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	log_request_cancellation(superseded_log_id, "supersede")
 	if not is_current_fetch() then return end
 
+	-- A change of the settings it was sent with retires the request, as on
+	-- Windows and Linux (maintainer decision AID-3, llm.request_settings): every
+	-- backend and streaming callback reads the request id through here.
+	local request_settings = core_llm.request_settings()
+	--- The current request id, after retiring this request when its settings changed.
+	--- @return number id
+	local function current_fetch_id()
+		if fetch_request_counter == my_fetch_id then
+			local changed = RequestSettings.change(request_settings, core_llm.request_settings())
+			if changed then
+				retire_request_log(my_fetch_id)
+				Logger.info(LOG, "LLM request retired: its %s changed while it was in flight (request=%d).",
+					changed, my_fetch_id)
+				local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
+				if not reset_ok or reset_result ~= true then
+					Logger.error(LOG, "LLM request retirement did not reset the pipeline: %s.", tostring(reset_result))
+				end
+			end
+		end
+		return fetch_request_counter
+	end
+
 	--- Fails closed only while this request still owns the surface.
 	--- @param stage string UI stage that failed to commit.
 	--- @param detail any Returned value or raised error.
@@ -2111,7 +2134,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			buffer                  = buffer,
 			tail                    = params.tail,
 			my_fetch_id             = my_fetch_id,
-			get_fetch_id            = function() return fetch_request_counter end,
+			get_fetch_id            = current_fetch_id,
 			is_streaming_enabled    = is_streaming_enabled,
 			is_streaming_multi_enabled = is_streaming_multi_enabled,
 			num_predictions         = num_preds,
@@ -2185,7 +2208,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local watchdog_ok, watchdog_result = xpcall(function()
 		return StreamingHandler.arm_watchdog({
 			my_fetch_id             = my_fetch_id,
-			get_fetch_id            = function() return fetch_request_counter end,
+			get_fetch_id            = current_fetch_id,
 			pending_predictions_ref = pending_ref,
 			predictions_visible_ref = visible_ref,
 			validation_mods         = normalize_mods(validation_mods),
@@ -2222,7 +2245,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			params.max_tokens, num_preds,
 			on_success,
 			on_fail,
-			sequential_mode, force_trigger, function() return fetch_request_counter end,
+			sequential_mode, force_trigger, current_fetch_id,
 			on_partial, request_profile
 		)
 	end, debug.traceback)

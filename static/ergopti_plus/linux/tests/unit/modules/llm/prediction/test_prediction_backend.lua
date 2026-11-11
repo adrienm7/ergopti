@@ -1002,6 +1002,56 @@ helpers.describe("ordinary predictions retain their exact native target", functi
 		if not ok then error(err, 0) end
 	end)
 
+	-- AID-3 (decided by the maintainer on 2026-11-11): a settings change while a
+	-- request is in flight retires it, as on Windows; the next one uses the new settings.
+	for _, change in ipairs({
+		{ field = "key", value = "new-key" }, { field = "model", value = "other-model" },
+		{ field = "provider", value = "groq" }, { field = "base_url", value = "https://proxy.example/v1" },
+		{ field = "id", value = "cerebras-2" },
+	}) do
+		helpers.it("retires the request in flight when the API entry's " .. change.field
+			.. " changes (settings-retire-inflight)", function()
+			local entry = {}
+			for key, value in pairs(ENTRY) do entry[key] = value end
+			local engine, calls, scheduler, restore = load("api", entry, nil, nil, true)
+			local ok, err = pcall(function()
+				engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+				helpers.assert_eq(#calls.remote, 1)
+				entry[change.field == "key" and "token" or change.field] = change.value
+				calls.remote[1].done(" que tout le monde aille bien", nil)
+				scheduler.settle()
+				helpers.assert_eq(engine.has_suggestions(), false, "the old settings' answer is not offered")
+				helpers.assert_eq(engine.is_predicting(), false, "the request is retired")
+				helpers.assert_true(calls.cancelled >= 1, "its transport is cancelled")
+				engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+				helpers.assert_eq(#calls.remote, 2, "the next request is sent")
+				helpers.assert_eq(calls.remote[2].target[change.field == "key" and "token" or change.field],
+					change.value, "with the new settings")
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("a new request retires one still in flight with changed settings (settings-retire-inflight)", function()
+		local entry = {}
+		for key, value in pairs(ENTRY) do entry[key] = value end
+		local engine, calls, _, restore = load("api", entry, nil, nil, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			helpers.assert_eq(#calls.remote, 1, "unchanged settings: the request in flight is waited for")
+			entry.token = "new-key"
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			helpers.assert_eq(#calls.remote, 2, "changed settings: the old request is retired, the new one sent")
+			helpers.assert_eq(calls.remote[2].target.token, "new-key")
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(engine.has_suggestions(), false, "the retired answer never shows")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("refuses an already visible prediction after a native window switch (prediction-native-focus)", function()
 		local engine, calls, _, restore = load("api", ENTRY)
 		local ok, err = pcall(function()
