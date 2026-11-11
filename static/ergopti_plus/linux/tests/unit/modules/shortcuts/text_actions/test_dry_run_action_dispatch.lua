@@ -175,12 +175,15 @@ helpers.describe("dry-run configured actions", function()
 			end
 		end
 		for _, action in ipairs({ "script_pause_toggle", "script_reload", "script_quit" }) do
-			helpers.it("dry-run-actions preserves " .. route .. " " .. action, function()
+			-- SCD-1: a keyboard slot (grabbed or observed) runs nothing in dry-run,
+			-- a script action included; the other routes keep their script actions.
+			local slot = route == "keyboard" or route == "observe"
+			helpers.it("dry-run-actions " .. (slot and "suspends " or "preserves ") .. route .. " " .. action, function()
 				with_action(route, "dry", action, function(world)
-					helpers.assert_eq(world.lifecycle, 1)
+					helpers.assert_eq(world.lifecycle, slot and 0 or 1)
 					helpers.assert_eq(#world.keys, 0)
 					helpers.assert_eq(world.reads, 0)
-					if route ~= "observe" then helpers.assert_true(world.consumed) end
+					if route ~= "observe" then helpers.assert_eq(world.consumed, not slot) end
 				end)
 			end)
 		end
