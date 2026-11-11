@@ -17,7 +17,7 @@
 --- text output) types the source's characters for physical key presses.
 --- Exit 0 = every check held, 1 = a failure, 2 = the machine cannot host it (no
 --- display, WebKit or lgi).
---- USAGE: xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
+--- USAGE: dbus-run-session -- xvfb-run -a luajit tests/hardware/run_layout_editor_webview.lua <source.toml>
 --- ==============================================================================
 
 local ffi = require("ffi")
@@ -71,7 +71,10 @@ if not display then abort("no X display: run under xvfb-run") end
 local source_path = arg[1]
 local source_text = source_path and read(source_path)
 if not source_text then abort("usage: run_layout_editor_webview.lua <source.toml>") end
-for _, tool in ipairs({ "setxkbmap", "xkbcomp", "python3" }) do
+if capture("id -u"):gsub("%s+$", "") ~= "0" and not os.getenv("DBUS_SESSION_BUS_ADDRESS") then
+	abort("no session bus: run under dbus-run-session")
+end
+for _, tool in ipairs({ "setxkbmap", "xkbcomp", "python3", "gsettings" }) do
 	if capture("command -v " .. tool .. " 2>/dev/null") == "" then abort(tool .. " is not installed") end
 end
 local ok_lgi, lgi = pcall(require, "lgi")
@@ -210,7 +213,11 @@ local function run()
 	local opened_text = message_text()
 	-- No session type while installing: the layout manager installs into the user
 	-- tree from a Wayland or unknown session, as the number-row live probe does.
+	-- The desktop names itself GNOME, whose input-source setting (dconf on this
+	-- run's private session bus, dbus-run-session) the installer writes and reads
+	-- back; an unnamed desktop has no owner to confirm the switch.
 	setenv("XDG_SESSION_TYPE", nil)
+	setenv("XDG_CURRENT_DESKTOP", "GNOME")
 	eval_sync(webview, "document.getElementById('le-confirm-yes').click(); 'yes'")
 	local installed = wait_for(webview, "(document.getElementById('le-message') || {}).className === "
 		.. "'le-message ok' && document.getElementById('le-message').textContent !== " .. Json.encode(opened_text))
@@ -223,7 +230,11 @@ local function run()
 			"as root the installer installs it but refuses to select it: " .. said)
 	else
 		check(installed, "the composer host installed and selected it and the page says so: " .. said)
+		local sources = capture("gsettings get org.gnome.desktop.input-sources sources 2>&1")
+		check(sources:match("^%[%('xkb', 'composed[^']*'%)") ~= nil,
+			"the GNOME input sources start with the composed layout: " .. sources:gsub("%s+$", ""))
 	end
+	setenv("XDG_CURRENT_DESKTOP", nil)
 
 	-- What the daemon stored from the page's own message.
 	local settings = assert(Registry.composer_settings())
