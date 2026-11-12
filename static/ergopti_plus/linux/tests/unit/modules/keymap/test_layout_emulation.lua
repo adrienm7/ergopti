@@ -94,6 +94,20 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not repeat_callback({ code = KEY_D, mods = {}, value = 2 }), "another key's repeat is refused")
 	end)
 
+	-- A pause stops typing (EDD-1, maintainer decision 2026-11-12): a paused
+	-- daemon leaves every key to the system layout, and types again on resume.
+	helpers.it("types nothing while paused and the layout again on resume (edd1-real-pause)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		helpers.assert_true(M.reload(), "the shipped Ergopti layout loads")
+		record.paused = true
+		helpers.assert_true(not press(M, KEY_Q, {}, "q"), "a paused daemon lets the key through")
+		helpers.assert_eq(#record.typed, 0, "nothing is typed while paused")
+		helpers.assert_eq(#record.dispatched, 0, "nothing reaches the character path while paused")
+		record.paused = false
+		helpers.assert_true(press(M, KEY_Q, {}, "q"), "the resumed daemon emulates again")
+		helpers.assert_eq(record.typed, { "è" })
+	end)
+
 	helpers.it("waits on a dead key and composes the next key", function()
 		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
 		M.reload()
