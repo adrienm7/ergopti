@@ -922,6 +922,15 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		})
 		local env = setmetatable({ shutdown = coordinator, privacy_owners = {}, require = function(name)
+			-- A TERM tells a waiting update watcher before the shutdown starts.
+			if name == "infra.updater_boot_ready" then
+				return { report_quit = function(reason)
+					state.quit_reports = (state.quit_reports or 0) + 1
+					helpers.assert_true(not coordinator.is_requested(), "the report precedes the shutdown")
+					helpers.assert_true(reason:match("^signal %d+$") ~= nil)
+					return true
+				end }
+			end
 			helpers.assert_eq(name, "infra.signal_handlers")
 			return { stop = function() return true end, start = function(opts)
 				state.handlers[2] = function() opts.on_term(2) end
@@ -960,6 +969,7 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 	helpers.it("(signal-output-ack) repeated TERM and INT cannot close or replay pending output retirement", function()
 		local state, coordinator, finish = fixture(false)
 		state.handlers[15](15); state.handlers[15](15); state.handlers[2](2)
+		helpers.assert_eq(state.quit_reports, 1, "only the signal that starts the shutdown reports a quit")
 		helpers.assert_true(coordinator.is_pending())
 		helpers.assert_eq(state.closes, 0)
 		local ok = pcall(finish)

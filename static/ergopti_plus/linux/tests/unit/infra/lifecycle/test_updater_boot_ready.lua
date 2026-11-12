@@ -108,4 +108,17 @@ helpers.describe("updater boot ready (linux-update-successor-ready)", function()
 		helpers.assert_true(source:find("successor = root and { root = root } or nil", 1, true) ~= nil,
 			"the restart on an installed release names the installation it watches")
 	end)
+
+	helpers.it("(update-signal-kept) a terminating signal tells the watcher before the shutdown", function()
+		-- The watcher side of a quit report is replayed in
+		-- test_updater_successor_watch (update-quit-kept); this pins the daemon side.
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		local handler = source:match("local function on_term%(sig%)(.-)\n\tend")
+		helpers.assert_true(handler ~= nil, "the TERM handler is found")
+		local reported = handler:find('require("infra.updater_boot_ready").report_quit', 1, true)
+		local requested = handler:find('shutdown.request("signal "', 1, true)
+		helpers.assert_true(reported ~= nil and requested ~= nil and reported < requested,
+			"a logout or service stop during the probation must not roll the update back")
+	end)
 end)

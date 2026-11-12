@@ -22,7 +22,8 @@
 ---    so a user who quits it before the report (or during the probation) would
 ---    otherwise see the update rolled back and the previous daemon started. The
 ---    Quit writes `quit` to the token instead; the watcher then keeps the update
----    and starts nothing.
+---    and starts nothing. A terminating signal (logout, a second launch's
+---    restart, a service stop) reports the same, as on macOS.
 --- ==============================================================================
 
 local M = {}

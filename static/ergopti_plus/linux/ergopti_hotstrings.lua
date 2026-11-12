@@ -900,6 +900,14 @@ local function install_signal_handlers()
 	privacy_owners.signals_stop = signals.stop
 	local function on_term(sig)
 		pcall(Logger.info, LOG, "Signal %d received — shutting down…", sig)
+		-- A logout, a second launch's restart or a service stop during an update's
+		-- ready wait or probation is no failed start: the watcher keeps the update
+		-- instead of starting the previous daemon, as the macOS shutdown callback
+		-- reports a quit for any termination that is not a reload.
+		if not shutdown.is_requested() then
+			local reported, report_err = pcall(require("infra.updater_boot_ready").report_quit, "signal " .. tostring(sig))
+			if not reported then pcall(Logger.error, LOG, "The update watcher could not be told of the signal: %s.", tostring(report_err)) end
+		end
 		shutdown.request("signal " .. tostring(sig))
 		-- Native retirement may still be pending after request() returns.
 		-- Output closes only in the normal clean-exit path after all ACKs.
