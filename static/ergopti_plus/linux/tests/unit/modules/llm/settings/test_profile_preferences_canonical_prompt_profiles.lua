@@ -475,6 +475,35 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 			end)
 		end)
 	end
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("custom-profile-child: an open editor saves an edited profile while paused (edd1-paused-writes)", function()
+		with_child(function(f)
+			helpers.assert_eq(f.child()[2].fn(), true)
+			f.ctx.paused = true; f.ctx.is_paused = function() return true end
+			local edited = profile(); edited.label = "Edited while paused"
+			helpers.assert_eq(f.opened().on_save(edited), true)
+			helpers.assert_eq(f.settings.list_user()[1].label, "Edited while paused")
+		end)
+	end)
+	helpers.it("custom-profile-child: an open editor saves a new profile while paused (edd1-paused-writes)", function()
+		with_child(function(f)
+			local function find(rows, title)
+				for _, row in ipairs(rows or {}) do
+					if row.title == title then return row end
+					local nested = find(row.menu, title); if nested then return nested end
+				end
+			end
+			local builder = require("ui.menu.builder")
+			local create = assert(find(builder.build(f.ctx), "menu.profiles.create_profile"), "create row missing")
+			helpers.assert_eq(create.fn(), true)
+			f.ctx.paused = true; f.ctx.is_paused = function() return true end
+			local created = profile(); created.id = f.opened().opts.profile_id; created.label = "Created while paused"
+			helpers.assert_eq(f.opened().on_save(created), true)
+			local labels = {}
+			for _, entry in ipairs(f.settings.list_user()) do labels[#labels + 1] = entry.label end
+			helpers.assert_true(table.concat(labels, ","):find("Created while paused", 1, true) ~= nil, table.concat(labels, ","))
+		end)
+	end)
 	helpers.it("custom-profile-child: Linux retains configuration access while paused", function()
 		with_child(function(f)
 			local held=f.child(); f.ctx.paused=true; f.ctx.is_paused=function() return true end
