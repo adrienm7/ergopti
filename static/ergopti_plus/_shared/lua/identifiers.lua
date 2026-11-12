@@ -63,4 +63,7 @@ return {
 	linux_stage = {
 		infix = "ergopti",
 	},
+	locales = {
+		system_fallback = "en",
+	},
 }

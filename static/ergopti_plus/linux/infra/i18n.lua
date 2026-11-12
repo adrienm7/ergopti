@@ -60,10 +60,6 @@ local function _load_persisted_locale()
 	return nil
 end
 
--- The catalogue of a system language without one, as on Windows and macOS and
--- in the Linux shell messages (install/messages.sh).
-local SYSTEM_FALLBACK_LOCALE = "en"
-
 --- Picks the catalogue of the session language, as the Windows and macOS
 --- drivers do for a first run: LC_ALL, then LC_MESSAGES, then LANG, as the
 --- shell messages read them; Norwegian bokmål and nynorsk share "no".
@@ -84,7 +80,8 @@ function M.detect_system_locale(available, getenv)
 	for _, code in ipairs(available) do
 		if code == language then return code end
 	end
-	return SYSTEM_FALLBACK_LOCALE
+	-- Declared once in _shared/data/identifiers.json (locales.system_fallback).
+	return require("identifiers").locales.system_fallback
 end
 
 -- =========================================
