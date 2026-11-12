@@ -190,6 +190,21 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 	end)
 end)
 
+-- The recommendation sets no one-shot timeout: a scope resets a stored one with
+-- the keys (one-shot-timeout-setting), in config.toml where it lives.
+helpers.describe("Linux tap-hold scope: the one-shot timeout", function()
+	helpers.it("(one-shot-timeout-setting) a restore deletes the stored config.toml timeout and keeps the rest", function()
+		with_scope(nil, '[tap_holds]\nsticky_timeout_ms = 4000\n[other]\nvalue = 17\n', function(s)
+			s.parameters.state.params = {}
+			local ok, detail = s.owner().apply("recommended")
+			helpers.assert_eq(ok, true, detail)
+			local stored = Codec.decode(read(s.config_path))
+			helpers.assert_nil(stored.tap_holds and stored.tap_holds.sticky_timeout_ms, "the stored timeout is reset")
+			helpers.assert_eq(stored.other.value, 17)
+		end)
+	end)
+end)
+
 helpers.describe("Linux tap-hold scope: clear to system", function()
 	-- The clear once removed [tap_hold] enabled with the keys, so the next key
 	-- the user set did nothing until the switch was found again.
