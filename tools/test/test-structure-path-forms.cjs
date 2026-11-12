@@ -218,6 +218,14 @@ function run() {
 			'local root = helpers.driver_root() .. "/../_shared/"\nlocal f = io.open(root .. "zz_probe_hs/data/a.toml")',
 			'a folder held in a Lua local, joined later'
 		);
+		assert.equal(
+			rewrite(
+				`${P}linux/tests/z.lua`,
+				'paths.shared = function(path)\n\tif path == "zz_probe_mod/hotstrings" then return nil end\nend'
+			),
+			'paths.shared = function(path)\n\tif path == "zz_probe_hs/data" then return nil end\nend',
+			'the argument a stand-in of the shared resolver is compared with'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
