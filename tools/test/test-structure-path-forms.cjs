@@ -311,6 +311,14 @@ function run() {
 			"const F = path.join(__dirname, '..', '..', 'static', 'ergopti_plus', '_shared', 'zz_probe_hs', 'data', 'a.toml');",
 			"a join from the file's own folder"
 		);
+		assert.equal(
+			rewrite(
+				'tools/build/z.py',
+				'S = (\n    ROOT\n    / "static"\n    / "ergopti_plus"\n    / "_shared"\n    / "zz_probe_mod"\n    / "hotstrings"\n    / "a.toml"\n)'
+			),
+			'S = (\n    ROOT\n    / "static" / "ergopti_plus" / "_shared" / "zz_probe_hs" / "data" / "a.toml"\n)',
+			'a Python / chain the formatter wrapped over lines'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
