@@ -212,6 +212,21 @@ function run() {
 		'if (!/require\\("core.text.engine.json"\\)\\.decode/.test(src)) fail();',
 		'a regular expression spells the load site require\\( with an escaped parenthesis'
 	);
+	const shell = 'tools/build/z.sh';
+	const mods =
+		'MODS=(\n\t"json"\n\t"keymap.terminators"\n)\nfor mod in "${MODS[@]}"; do\n\tluajit -e "pcall(require, \'${mod}\')"\ndone';
+	assert.equal(
+		Apply.rewriteText(
+			mods,
+			Plan.scanFile(shell, mods, Plan.referenceContext(MAP)),
+			new Map(),
+			shell
+		),
+		mods
+			.replace('"json"', '"core.text.engine.json"')
+			.replace('"keymap.terminators"', '"layouts.engine.terminators"'),
+		'a shell array of the module names a loop requires'
+	);
 	const pin = "if (!src.includes('keymap.terminators')) fail('menu.llm.app_profile_overrides');";
 	assert.equal(
 		Apply.rewriteText(pin, Plan.scanFile(tool, pin, Plan.referenceContext(MAP)), new Map(), tool),

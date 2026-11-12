@@ -382,6 +382,11 @@ function run() {
 			),
 			"const SPEC_ONLY = { 'zz_probe_hs/data/a.toml': 'read by humans' };"
 		);
+		assert.equal(
+			rewrite('tools/z.py', 'p = shared("zz_probe_mod", "hotstrings", "a.toml")'),
+			'p = shared("zz_probe_hs", "data", "a.toml")',
+			"a Python call of the tools' shared() resolver"
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
