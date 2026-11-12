@@ -149,6 +149,7 @@
 		"test:structure-lua-name-forms": "node ./tools/test/test-structure-lua-name-forms.cjs",
 		"test:structure-path-forms": "node ./tools/test/test-structure-path-forms.cjs",
 		"test:structure-run-phase2": "node ./tools/test/test-structure-run-phase2.cjs",
+		"test:pinned-reads-shared-helpers": "node ./tools/test/test-pinned-reads-shared-helpers.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
