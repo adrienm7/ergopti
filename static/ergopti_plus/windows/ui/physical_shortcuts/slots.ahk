@@ -45,7 +45,7 @@ class PhysicalSlots {
 		global _SharedDir
 		if (Path == "")
 			Path := _SharedDir . "\data\keycodes\physical_keys.json"
-		return PhysicalSlots(JsonParse(FileRead(Path, "UTF-8")))
+		return PhysicalSlots(JsonParse(FSReadStrict(Path)))
 	}
 
 	/**
