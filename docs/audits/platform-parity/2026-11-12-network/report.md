@@ -29,16 +29,21 @@ SPNEGO, GSS-API or Kerberos; NTLM stays refused (`docs/design/proxy-auth-relay.m
 NET-003 is `[llm] ollama_request_timeout_ms`; the macOS connect timeout reads
 `stream_connect_timeout_ms`.
 
+## Fixed after review
+
+- **NET-001 (macOS):** the owned Karabiner runtime artifact, the
+  VirtualHIDDevice package and the Karabiner DMG ran `/usr/bin/curl` with the
+  inherited Hammerspoon environment (no proxy), the DMG without
+  `--proto =https`, so a Mac that reaches the internet only through its proxy
+  could not install the remap engine and was told it was offline.
+  `platform/remap/network_download.lua` now runs each behind the opaque system
+  network prelude for the new `karabiner` client of `route_origins.json`
+  (GitHub's release origins) and names a refused route by its shared managed
+  network class. Regressions `net-001-remap-route` (route command, wiring,
+  the DMG pipeline over https only).
+
 ## Open
 
-- **NET-001 (macOS, medium):** the owned Karabiner runtime artifact
-  (`platform/remap/runtime_artifact_fetch.lua`), the VirtualHIDDevice package
-  (`runtime_vhid_update.lua`) and the Karabiner DMG (`onboarding.lua`, without
-  `--proto =https`) run `/usr/bin/curl` without the `network_env` prelude, so
-  a Mac that only reaches the internet through its proxy cannot install the
-  remap engine and is told it is offline. The fix runs each through the
-  prelude with a `route_origins.json` client and the shared failure classes;
-  left for its own batch.
 - **NET-003 follow-up (macOS):** the 12 s no-token streaming watchdog still
   ends a cold load before its first token; the registry comment claims an AHK
   equivalent that no Windows or Linux code reads. Needs a cross-driver
@@ -50,6 +55,10 @@ NET-003 is `[llm] ollama_request_timeout_ms`; the macOS connect timeout reads
 - **NET-005 (macOS, low, plausible):** `system_network_from_scutil` reads
   `ExcludeSimpleHostnames` for the fingerprint only, so a short internal host
   goes through the proxy where Windows' `<local>` bypass sends it direct.
+  `NO_PROXY` has no syntax for every single-label host, so curl, uv and Python
+  children cannot be told through the environment; the fix is a route-plan
+  step that sends a dot-free target origin direct, which needs each child's
+  target hosts at prelude time.
 
 ## Checked and kept
 
