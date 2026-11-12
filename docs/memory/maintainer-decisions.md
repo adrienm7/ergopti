@@ -117,6 +117,24 @@ with no `clear` refuses the borrow. Regressions `clipboard-unowned-empty`.
 Windows needs no change: assigning an empty `ClipboardAll` runs
 `EmptyClipboard`, which offers no format.
 
+## Ctrl+AltGr is Ctrl and the logical key, AltGr suspended (2026-11-11)
+
+Decided by the maintainer on 2026-11-11 (ILD-2): under the layout emulation,
+Ctrl+AltGr+key sends Ctrl and the key's logical character (its Ctrl level),
+with AltGr suspended, on every driver, as Linux already did (the shared
+`layouts.keylayout_emulation.decide` resolves any Ctrl chord at the Ctrl level,
+and `production_deps().emit_shortcut` leaves AltGr out of the chord). macOS,
+where the right Option key is AltGr, now clears Option from a Ctrl+Option
+shortcut (`modules/keymap/layout_emulation.lua` `key_down`); Cmd+Option keeps
+Option, being macOS's own chord family (decided by the coordinator on
+2026-11-11, to review by the maintainer). The shared vector
+`ctrl_altgr_sends_ctrl_and_the_logical_key` (`emulation_vectors.json`) pins
+the decision for the three drivers; regressions `ctrl-altgr-logical`. Settled
+with it (SCD-2, SCD-3): Ctrl+Alt+é sends Ctrl+Alt and the logical key, as
+ILD-1 sends every two-modifier chord, and a `ctrl_x` keyboard slot fires for
+Ctrl+AltGr+x, AltGr being suspended there; Linux already does both. Windows
+counterparts (maintainer): TODO « Windows (the PC agent's) ».
+
 ## No Linux keyboard slot runs through a pause (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (SCD-1): on Linux a keyboard slot
