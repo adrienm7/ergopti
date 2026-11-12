@@ -179,6 +179,13 @@ local function controller(state, context)
 			emulation.reload_if_started()
 			if type(state.on_config_changed) == "function" then state.on_config_changed() end
 		end,
+		-- The extension catalogue is read once per boot: a layout whose
+		-- extension was installed or removed loads or drops its hotstrings
+		-- through a daemon reload, as Windows' _LayMgrWeb_After does (LMH-004).
+		reload_extensions = function()
+			if type(state.on_reload) ~= "function" then return false end
+			return state.on_reload() == true
+		end,
 		-- A paused driver admits only the page's ready signal, as on Windows (LMH-003).
 		is_paused = function() return type(state.is_paused) == "function" and state.is_paused() == true end,
 		-- The layout editor applies a source's navigation layer through the

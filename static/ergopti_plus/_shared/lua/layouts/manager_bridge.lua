@@ -125,6 +125,34 @@ local function layout_changed(deps, id)
 	if not ok then deps.log("error", "The layout change of '%s' could not reach the emulation: %s.", id, tostring(err)) end
 end
 
+--- Whether a layout ships a hotstring extension, from the catalogue or its
+--- installed record (an uninstall reads the record before it goes).
+--- @param snapshot table The registry snapshot taken before the operation.
+--- @param id string
+--- @return boolean
+local function carries_extension(snapshot, id)
+	local entry = index_entry(snapshot.index, id)
+	local installed = (snapshot.installed or {})[id]
+	return (type(entry) == "table" and entry.extension ~= nil)
+		or (type(installed) == "table" and installed.extension ~= nil)
+end
+
+--- Asks the host to reload the driver after a layout's extension changed: the
+--- extension catalogue is read once per boot, so only a reload loads or drops
+--- its hotstrings, and the reload also restarts the emulation (LMH-004).
+--- @param deps table
+--- @param id string
+local function reload_extensions(deps, id)
+	if type(deps.reload_extensions) ~= "function" then
+		deps.log("error", "The extension of '%s' changed but this host cannot reload the driver.", id)
+		return
+	end
+	local ok, accepted = pcall(deps.reload_extensions, id)
+	if not ok or accepted ~= true then
+		deps.log("error", "The reload after the extension of '%s' changed was refused: %s.", id, tostring(accepted))
+	end
+end
+
 --- Handles the three composer messages of the page.
 --- @param deps table The controller's collaborators.
 --- @param controller table
@@ -280,6 +308,9 @@ end
 ---   layout is the emulated one and refreshes its menu (LMH-001, LMH-002). A
 ---   stored emulated layout stays chosen when it is uninstalled (maintainer
 ---   decision, 2026-11-12): the reload stops it, a reinstall resumes it.
+--- deps.reload_extensions(id) reloads the driver after a layout that ships a
+---   hotstring extension was installed, updated or uninstalled, in place of
+---   deps.layout_changed (LMH-004); it returns true when the reload started.
 --- deps.is_paused() answers true while the driver is paused: only the page's
 ---   ready signal is then admitted, as Windows' suspended driver does (LMH-003).
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
@@ -296,7 +327,7 @@ function M.new(deps)
 		return deps.push("updateState", M.page_state(deps.registry.snapshot(), controller.result))
 	end
 
-	local function operation_done(id, action)
+	local function operation_done(id, action, extension)
 		return function(ok, detail_or_code, detail)
 			if ok then
 				local warning = nil
@@ -308,7 +339,11 @@ function M.new(deps)
 					warning = detail_or_code.pending_activation == true and "pending_logout" or "not_enabled"
 				end
 				controller.result = { id = id, action = action, ok = true, warning = warning }
-				if action ~= "select" then layout_changed(deps, id) end
+				if extension then
+					reload_extensions(deps, id)
+				elseif action ~= "select" then
+					layout_changed(deps, id)
+				end
 			else
 				controller.result = { id = id, action = action, ok = false, code = tostring(detail_or_code),
 					detail = detail ~= nil and tostring(detail) or nil }
@@ -405,7 +440,7 @@ function M.new(deps)
 				deps.log("warn", "Refused to %s '%s': the catalogue does not list it.", action, id)
 				return false
 			end
-			deps.registry.install(id, operation_done(id, action))
+			deps.registry.install(id, operation_done(id, action, carries_extension(snapshot, id)))
 			push_state()
 			return true
 		end
@@ -414,7 +449,7 @@ function M.new(deps)
 			return false
 		end
 		if action == "uninstall" then
-			deps.registry.uninstall(id, operation_done(id, action))
+			deps.registry.uninstall(id, operation_done(id, action, carries_extension(snapshot, id)))
 		else
 			deps.registry.select(id, operation_done(id, action))
 		end

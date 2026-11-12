@@ -1707,6 +1707,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Emulation.reload_if_started()
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
+	-- The extension catalogue is read once per boot: a layout whose extension
+	-- was installed or removed loads or drops its hotstrings through a reload.
+	require("ui.layout_manager").set_extension_reloader(function()
+		return do_reload("menu") == true
+	end)
 	require("ui.layout_manager").set_pause_query(function()
 		local shortcuts_mod = core_mods.shortcuts_mod
 		return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
