@@ -19,6 +19,9 @@ vm.runInContext(
 	),
 	context
 );
+// The loaded page asks its host for the state once (WVH-001); the bindings
+// under test send nothing else until a field changes.
+assert.deepEqual(messages.splice(0), ['ready'], 'the page posts ready once on load');
 function field() {
 	const input = {
 		value: '',
