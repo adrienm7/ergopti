@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15-intel, macos-15]
+        runner: [macos-15-intel]
     steps:
       - uses: actions/checkout@v4
       - name: Discover the owner of com.apple.tsm.uiserver
@@ -69,24 +69,23 @@ jobs:
             launchctl print "gui/$uid/$1" 2>/dev/null | sed -n 's/^[[:space:]]*pid = \([0-9]*\)$/\1/p' | head -n 1
           }
           cohort baseline
-          for label in com.apple.TextInputMenuAgent com.apple.SystemUIServer.agent com.apple.TextInputSwitcher; do
-            pid="$(owner_pid "$label")"
-            echo "label=$label pid=${pid:-none}"
-            test -n "$pid" || continue
-            kill -STOP "$pid"
-            ps -o pid,stat,comm -p "$pid"
-            cohort "stopped-$label"
-            kill -CONT "$pid"
-            cohort "resumed-$label"
+          menu="$(owner_pid com.apple.TextInputMenuAgent)"
+          switcher="$(owner_pid com.apple.TextInputSwitcher)"
+          echo "menu=$menu switcher=$switcher"
+          kill -STOP "$menu" "$switcher"
+          cohort stopped-both
+          kill -CONT "$menu" "$switcher"
+          cohort resumed-both
+          for target in "$menu" "$switcher"; do
+            ( sleep 3.5; kill -STOP "$target" ) &
+            cohort "midrun-stop-$target"
+            kill -CONT "$target"
           done
-          pid="$(owner_pid com.apple.TextInputMenuAgent)"
-          if [ -n "$pid" ]; then
-            kill -KILL "$pid"
-            cohort killed-TextInputMenuAgent
-            sleep 5
-            echo "after kill: $(owner_pid com.apple.TextInputMenuAgent)"
-            cohort killed-respawn-TextInputMenuAgent
-          fi
+          ( sleep 3.5; kill -KILL "$(owner_pid com.apple.TextInputSwitcher)" ) &
+          cohort midrun-kill-switcher
+          ( sleep 3.5; kill -KILL "$(owner_pid com.apple.TextInputMenuAgent)" ) &
+          cohort midrun-kill-menu
+          cohort after-midrun-kills
           bash tools/diagnostics/macos_text_input_agents.sh "$RUNNER_TEMP/agents.txt" after || true
           cat "$RUNNER_TEMP/agents.txt" | head -n 120
       - uses: actions/upload-artifact@v4
@@ -94,17 +93,3 @@ jobs:
         with:
           name: probe-tsm-${{ matrix.runner }}
           path: ${{ runner.temp }}/cohort-*.log
-
-  translocation:
-    name: Translocation probe (${{ matrix.runner }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [macos-15, macos-26]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Translocate a quarantined ad hoc application
-        timeout-minutes: 6
-        run: python3 -u tools/diagnostics/probe_translocation.py
