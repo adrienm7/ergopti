@@ -143,7 +143,7 @@
 			]
 		},
 		"tap_hold_master": {
-			"members": ["tap_holds.enabled", "tap_holds.lone_modifier_tap_max_ms"],
+			"members": ["tap_holds.enabled", "tap_holds.lone_modifier_tap_max_ms", "tap_holds.sticky_timeout_ms"],
 			"registered": "yes",
 			"production_caller": "yes",
 			"persisted": "yes",

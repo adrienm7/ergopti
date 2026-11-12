@@ -381,6 +381,7 @@ two disagree in either direction.
 | `ui.menubar_icon`                                             | —               | n/a                                    | n/a                  |
 | `tap_holds.enabled`                                           | `karabiner`     | `evdev`, `uinput`                      | n/a                  |
 | `tap_holds.lone_modifier_tap_max_ms`                          | `karabiner`     | `evdev`, `uinput`                      | —                    |
+| `tap_holds.sticky_timeout_ms`                                 | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keys.wrap_text_if_selected`                        | —               | n/a                                    | n/a                  |
 | `shortcuts.keys.cmd_star`                                     | —               | n/a                                    | n/a                  |
 | `category_enabled.autocorrection`                             | n/a             | n/a                                    | —                    |
