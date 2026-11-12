@@ -1321,12 +1321,12 @@ between workers) green alone. All live checks pass, typed by the harness.
       vscode `user_folders` (per executable: `settings` under `%APPDATA%`, `extensions` under `{home}`) and replace the
       argument marked `user_folder: "extensions"`, as macOS and Linux now do; then extend the AHK App Cloner test.
       Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 8c28b52f): `AppCloner_UserFolders` reads `user_folders` per executable; test `bap-004-vscode-variants`.
-- [ ] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
+- [x] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
       (`ui/layout_manager/init.ahk`) writes `[layout] emulated_layout = ""` when the emulated layout is uninstalled, and
       `_LayoutComposer_Remove` (`composer.ahk`) does the same for « composed ». Keep the stored choice instead, as macOS and
       Linux now do: the menu row stays named, ticked and greyed (« — non appliqué »), the emulation stops and reloads, and
       resumes by itself when the layout is installed again. Then update the AHK tests that expect the cleared selection.
-      Blocked on 2026-11-12, question to the coordinator: `KeylayoutEmulation_Boot` downloads a selected layout whose local copy is missing (`read_local` throws, then `LayoutCatalogue_Install`), and the « Disposition à émuler » menu relies on it for a catalogue layout not yet installed. Keeping the choice and reloading would reinstall the layout at once. Either move the download to the menu choice (install, then select) and let the boot only report « — non appliqué » for an id the installed record lacks (it keeps repairing an installed but damaged copy), or keep the boot download and skip it for an id the user uninstalled (a persisted marker).
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`), option chosen by the coordinator: the boot never installs (`KeylayoutEmulation_Boot` reports a missing or damaged copy through `KeylayoutEmulation_FailedId`), the « Disposition à émuler » choice installs a layout that is not installed (or the failed one) before selecting it, or reloads when it is already chosen, and the menu names the failed choice with `menu.layout.emulation_failed`, ticked, as macOS and Linux. The row is not greyed: choosing it again is the reinstall action. Tests `keep-emulated-layout` and the keylayout boot case (an uninstall then a reload never reinstalls).
 - [x] **Layout editor host on Windows (maintainer request, 2026-11-11).** One pass, as planned in
       [layout-editor.md « Windows host »](docs/design/layout-editor.md#windows-host): `init.ahk` accepts `source_open`,
       `source_save`, `nav_save`, `composer_emulate` and sends `source_editor`, `emulate`, `nav_apply`; a new
