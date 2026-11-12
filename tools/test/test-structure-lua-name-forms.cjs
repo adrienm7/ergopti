@@ -139,6 +139,11 @@ function run() {
 			'local U = helpers.load_module("unicode_case")',
 			'local U = helpers.load_module("core.text.engine.unicode_case.core")'
 		],
+		// A field key of the table a require stand-in answers from.
+		[
+			'local modules = {}\nmodules.json = {}\nfunction env.require(name)\n\tif modules[name] then return modules[name] end\nend',
+			'local modules = {}\nmodules["core.text.engine.json"] = {}\nfunction env.require(name)\n\tif modules[name] then return modules[name] end\nend'
+		],
 		// A load site matched by a Lua pattern inside a string.
 		[
 			'local _, calls = code:gsub("require%(\\"json\\"%)%.decode%(", "")',

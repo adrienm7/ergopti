@@ -814,6 +814,23 @@ function sharedStandIns(text) {
 	return standIns;
 }
 
+/**
+ * The tables a require stand-in answers from (function environment.require(name)
+ * if modules[name] then return modules[name] end): their keys are module names.
+ * @returns {string[]}
+ */
+function standInTables(text) {
+	const tables = new Set();
+	for (const m of text.matchAll(
+		/(?:\bfunction\s+[\w.:]*\brequire\s*\(\s*([A-Za-z_]\w*)\s*\)|\brequire\s*=\s*function\s*\(\s*([A-Za-z_]\w*)\s*\))([^\n]*\n){0,6}/g
+	)) {
+		const param = m[1] || m[2];
+		for (const t of m[0].matchAll(new RegExp(`\\b([A-Za-z_]\\w*)\\[\\s*${param}\\s*\\]`, 'g')))
+			if (t[1] !== 'package') tables.add(t[1]);
+	}
+	return [...tables];
+}
+
 let listText = null;
 let listRanges = [];
 /**
@@ -1549,6 +1566,18 @@ function scanFile(file, text, ctx) {
 				add('lua-module-quoted', m[0], `${m[1]}\\${m[2]}${hit[2]}\\${m[2]}`, {
 					oldRepo: PREFIX + hit[0]
 				});
+		}
+		// modules.json = {} where a require stand-in answers modules[name]: the
+		// stand-in's table is keyed by module names, spelled as fields too.
+		for (const table of standInTables(text)) {
+			const field = new RegExp(`\\b${table}\\.([A-Za-z_]\\w*)(?=\\s*[,=])`, 'g');
+			for (const m of text.matchAll(field)) {
+				const hit = lookup(m[1]);
+				if (hit && hit[2])
+					add('lua-module-field', m[0], `${table}[${JSON.stringify(hit[2])}]`, {
+						oldRepo: PREFIX + hit[0]
+					});
+			}
 		}
 		// package.loaded.logger: a module key spelled as a field.
 		for (const m of text.matchAll(/\bpackage\.(loaded|preload)\.([A-Za-z_]\w*)(?!\w)/g)) {
