@@ -31,8 +31,11 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const OWNER = path.join(ROOT, 'tools/diagnostics/macos_tsm_refusal.py');
 const PYTHON = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const TEST = (name) => `Test Case '-[ErgoptiPlusTests.NumberRowSourceProbeTests ${name}]'`;
-const SOURCE =
-	'/Users/runner/work/ergopti/ergopti/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift';
+// The CI lines name the runner's checkout; the classifier reads only the message.
+const SOURCE = path.join(
+	ROOT,
+	'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift'
+);
 // Verbatim lines of job 127206005395 (run 42014901978, macos-15-intel).
 const UNANSWERED =
 	'2026-11-05 11:23:35.870 xctest[8730:26925] TSMSendMessageToUIServer: CFMessagePortSendRequest FAILED(-1) to send to port com.apple.tsm.uiserver';
