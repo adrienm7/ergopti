@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Fil:",
 	"apps.encryptor.prompt_confirm": "Bekreft passord:",
 	"apps.encryptor.prompt_password": "Passord:",
+	"apps.encryptor.reason_cannot_write": "Filen kunne ikke skrives i denne mappen.",
+	"apps.encryptor.reason_destination_folder": "Målet er en mappe.",
 	"apps.encryptor.success_decrypted": "Fil dekryptert:",
 	"apps.encryptor.success_encrypted": "Fil kryptert:",
 	"apps.encryptor.title_decrypt": "Dekrypter fil",

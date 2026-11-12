@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "파일:",
 	"apps.encryptor.prompt_confirm": "비밀번호 확인:",
 	"apps.encryptor.prompt_password": "비밀번호:",
+	"apps.encryptor.reason_cannot_write": "이 폴더에 파일을 쓸 수 없습니다.",
+	"apps.encryptor.reason_destination_folder": "대상이 폴더입니다.",
 	"apps.encryptor.success_decrypted": "파일이 복호화됨:",
 	"apps.encryptor.success_encrypted": "파일이 암호화됨:",
 	"apps.encryptor.title_decrypt": "파일 복호화",

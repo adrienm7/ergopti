@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "קובץ:",
 	"apps.encryptor.prompt_confirm": "אישור סיסמה:",
 	"apps.encryptor.prompt_password": "סיסמה:",
+	"apps.encryptor.reason_cannot_write": "לא ניתן היה לכתוב את הקובץ בתיקייה זו.",
+	"apps.encryptor.reason_destination_folder": "היעד הוא תיקייה.",
 	"apps.encryptor.success_decrypted": "הקובץ פוענח:",
 	"apps.encryptor.success_encrypted": "הקובץ הוצפן:",
 	"apps.encryptor.title_decrypt": "פענח קובץ",

@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Dosya:",
 	"apps.encryptor.prompt_confirm": "Şifreyi onayla:",
 	"apps.encryptor.prompt_password": "Şifre:",
+	"apps.encryptor.reason_cannot_write": "Dosya bu klasöre yazılamadı.",
+	"apps.encryptor.reason_destination_folder": "Hedef bir klasör.",
 	"apps.encryptor.success_decrypted": "Dosyanın şifresi çözüldü:",
 	"apps.encryptor.success_encrypted": "Dosya şifrelendi:",
 	"apps.encryptor.title_decrypt": "Dosyanın şifresini çöz",

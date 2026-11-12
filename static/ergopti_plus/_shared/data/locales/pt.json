@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Arquivo:",
 	"apps.encryptor.prompt_confirm": "Confirmar senha:",
 	"apps.encryptor.prompt_password": "Senha:",
+	"apps.encryptor.reason_cannot_write": "Não foi possível gravar o arquivo nesta pasta.",
+	"apps.encryptor.reason_destination_folder": "O destino é uma pasta.",
 	"apps.encryptor.success_decrypted": "Arquivo decifrado:",
 	"apps.encryptor.success_encrypted": "Arquivo cifrado:",
 	"apps.encryptor.title_decrypt": "Decifrar arquivo",

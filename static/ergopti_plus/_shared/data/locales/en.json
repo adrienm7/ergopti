@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "File:",
 	"apps.encryptor.prompt_confirm": "Confirm password:",
 	"apps.encryptor.prompt_password": "Password:",
+	"apps.encryptor.reason_cannot_write": "The file could not be written in this folder.",
+	"apps.encryptor.reason_destination_folder": "The destination is a folder.",
 	"apps.encryptor.success_decrypted": "File decrypted:",
 	"apps.encryptor.success_encrypted": "File encrypted:",
 	"apps.encryptor.title_decrypt": "Decrypt File",

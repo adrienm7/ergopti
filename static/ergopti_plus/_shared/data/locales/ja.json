@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "ファイル：",
 	"apps.encryptor.prompt_confirm": "パスワード確認：",
 	"apps.encryptor.prompt_password": "パスワード：",
+	"apps.encryptor.reason_cannot_write": "このフォルダにファイルを書き込めませんでした。",
+	"apps.encryptor.reason_destination_folder": "保存先はフォルダです。",
 	"apps.encryptor.success_decrypted": "復号完了：",
 	"apps.encryptor.success_encrypted": "暗号化完了：",
 	"apps.encryptor.title_decrypt": "ファイルを復号",

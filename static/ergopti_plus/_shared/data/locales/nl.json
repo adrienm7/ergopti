@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Bestand:",
 	"apps.encryptor.prompt_confirm": "Wachtwoord bevestigen:",
 	"apps.encryptor.prompt_password": "Wachtwoord:",
+	"apps.encryptor.reason_cannot_write": "Het bestand kon niet in deze map worden geschreven.",
+	"apps.encryptor.reason_destination_folder": "De bestemming is een map.",
 	"apps.encryptor.success_decrypted": "Bestand ontsleuteld:",
 	"apps.encryptor.success_encrypted": "Bestand versleuteld:",
 	"apps.encryptor.title_decrypt": "Bestand ontsleutelen",

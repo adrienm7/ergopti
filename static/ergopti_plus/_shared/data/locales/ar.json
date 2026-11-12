@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "الملف:",
 	"apps.encryptor.prompt_confirm": "تأكيد كلمة المرور:",
 	"apps.encryptor.prompt_password": "كلمة المرور:",
+	"apps.encryptor.reason_cannot_write": "تعذّرت كتابة الملف في هذا المجلد.",
+	"apps.encryptor.reason_destination_folder": "الوجهة مجلد.",
 	"apps.encryptor.success_decrypted": "تم فك تشفير الملف:",
 	"apps.encryptor.success_encrypted": "تم تشفير الملف:",
 	"apps.encryptor.title_decrypt": "فك تشفير الملف",

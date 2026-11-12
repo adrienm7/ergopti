@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "文件：",
 	"apps.encryptor.prompt_confirm": "确认密码：",
 	"apps.encryptor.prompt_password": "密码：",
+	"apps.encryptor.reason_cannot_write": "无法在此文件夹中写入文件。",
+	"apps.encryptor.reason_destination_folder": "目标是一个文件夹。",
 	"apps.encryptor.success_decrypted": "文件已解密：",
 	"apps.encryptor.success_encrypted": "文件已加密：",
 	"apps.encryptor.title_decrypt": "解密文件",

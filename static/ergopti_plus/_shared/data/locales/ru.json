@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Файл:",
 	"apps.encryptor.prompt_confirm": "Подтвердить пароль:",
 	"apps.encryptor.prompt_password": "Пароль:",
+	"apps.encryptor.reason_cannot_write": "Не удалось записать файл в эту папку.",
+	"apps.encryptor.reason_destination_folder": "Место назначения — папка.",
 	"apps.encryptor.success_decrypted": "Файл расшифрован:",
 	"apps.encryptor.success_encrypted": "Файл зашифрован:",
 	"apps.encryptor.title_decrypt": "Расшифровать файл",

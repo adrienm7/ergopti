@@ -160,6 +160,46 @@ try {
 		assert.notEqual(refused.status, 0, 'OpenSSL reports the bad decrypt');
 	});
 
+	scenario(
+		'(bap-007-failure-reason) only OpenSSL refusals exit 1; the AppleScript names the others',
+		() => {
+			const folder = fs.mkdtempSync(path.join(work, 'reason-'));
+			const clear = path.join(folder, 'notes.txt');
+			const sealed = `${clear}.enc`;
+			fs.writeFileSync(clear, 'sealed\n');
+			assert.equal(convert('encrypt', clear, sealed, passwordFile('r.pw', SENTINEL)).status, 0);
+			const wrong = convert(
+				'decrypt',
+				sealed,
+				path.join(folder, 'out.txt'),
+				passwordFile('r2.pw', 'no')
+			);
+			assert.equal(wrong.status, 1, 'a wrong password is OpenSSL status 1');
+			fs.mkdirSync(path.join(folder, 'notes'));
+			const into = convert(
+				'decrypt',
+				sealed,
+				path.join(folder, 'notes'),
+				passwordFile('r3.pw', SENTINEL)
+			);
+			assert.ok(
+				into.status !== 0 && into.status !== 1,
+				'a folder destination is not an OpenSSL refusal'
+			);
+			const code = fs
+				.readFileSync(applescript, 'utf8')
+				.split('\n')
+				.filter((line) => !/^\s*--/.test(line))
+				.join('\n');
+			assert.match(code, /on error number error_number\s+set convert_status to error_number/);
+			assert.match(code, /if convert_status is not 1 then/);
+			for (const key of ['reason_destination_folder', 'reason_cannot_write']) {
+				assert.match(code, new RegExp(`"apps\\.encryptor\\.${key}"`), `${key} is loaded`);
+				assert.match(code, new RegExp(`${key} of s`), `${key} is shown`);
+			}
+		}
+	);
+
 	scenario('(bap-001-folder-destination) a folder destination is refused, not filled', () => {
 		const folder = fs.mkdtempSync(path.join(work, 'folder-'));
 		const clear = path.join(folder, 'notes.txt');
