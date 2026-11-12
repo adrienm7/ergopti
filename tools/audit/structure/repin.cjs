@@ -21,13 +21,19 @@
  *    stops instead of guessing.
  * 3. History stays: files no structure step rewrites (docs/audits, the plan's
  *    own records, vendored code) keep the hashes they recorded.
+ * 4. Derived pins: a hash of a value built from a file (a producer with one
+ *    region restored) is listed in edits.cjs DERIVED_PINS with its derivation,
+ *    which must reproduce the pin from the pre-step bytes before it re-pins.
  *
  * USAGE:
  *   node tools/audit/structure/repin.cjs [--base <rev>] [--moves <file>] [--check]
+ *     [--derived-before <values>]
+ *   node tools/audit/structure/repin.cjs --derive-out <values>
  *   Compares the working tree with <rev> (HEAD by default), rewrites the pins
  *   and prints one line per re-pinned file. <file> is the JSON list of
  *   [old, new] moves apply-step --moves-out= wrote; --check rewrites nothing
- *   and fails when a pin is stale.
+ *   and fails when a pin is stale. --derive-out records the derived pins of the
+ *   tree before a step; --derived-before hands them to the re-pin after it.
  * ==============================================================================
  */
 
@@ -38,6 +44,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const Plan = require('./plan.cjs');
+const Edits = require('./edits.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const PIN = /\b[0-9a-f]{64}\b/g;
@@ -94,6 +101,36 @@ function baseHashes(root, base, paths) {
 	return hashes;
 }
 
+/**
+ * The value of every derived pin (edits.cjs DERIVED_PINS) in the tree at
+ * `root` as it stands, computed with that tree's own tools: the pre-step
+ * value before the step, the post-step one after it. Before the step each
+ * value must be the pin its holder holds.
+ * @param {{root?: string, moves?: Map<string, string>, entries?: Array, pinned?: boolean}} [options]
+ * @returns {Object<string, string>} Each holder, by its pre-step path, to its value.
+ */
+function deriveAll({
+	root = ROOT,
+	moves = new Map(),
+	entries = Edits.DERIVED_PINS,
+	pinned = false
+} = {}) {
+	const lib = (rel) => require(path.join(root, rel));
+	const values = {};
+	for (const e of entries) {
+		const at = (f) => path.join(root, moves.get(f) || f);
+		if (!fs.existsSync(at(e.file)) || !fs.existsSync(at(e.source)))
+			throw new Error(`repin: derived pin ${e.file} names a missing file`);
+		const holder = fs.readFileSync(at(e.file), 'utf8');
+		const value = e.derive(fs.readFileSync(at(e.source), 'utf8'), holder, lib);
+		if (!value) throw new Error(`repin: ${e.file} cannot be derived from ${e.source}`);
+		if (pinned && !holder.includes(value))
+			throw new Error(`repin: the derivation of ${e.file} no longer reproduces its pin`);
+		values[e.file] = value;
+	}
+	return values;
+}
+
 /** Tracked and new text files a structure step may rewrite. */
 function candidateFiles(root) {
 	return git(root, ['ls-files', '-co', '--exclude-standard', '-z'])
@@ -107,7 +144,14 @@ function candidateFiles(root) {
  * @param {{root?: string, base?: string, write?: boolean, moves?: Map<string, string>}} [options]
  * @returns {Array<{file: string, pins: Array<[string, string]>}>} The edits.
  */
-function repin({ root = ROOT, base = 'HEAD', write = true, moves = new Map() } = {}) {
+function repin({
+	root = ROOT,
+	base = 'HEAD',
+	write = true,
+	moves = new Map(),
+	derived = Edits.DERIVED_PINS,
+	derivedBefore = null
+} = {}) {
 	const edits = new Map();
 	const contents = new Map();
 	const read = (f) => {
@@ -122,6 +166,9 @@ function repin({ root = ROOT, base = 'HEAD', write = true, moves = new Map() } =
 		return contents.get(f);
 	};
 	const files = candidateFiles(root);
+	// A derived pin moves from its pre-step value, recorded by the runner
+	// before the step, to the value the step's tree derives now.
+	const derivedAfter = derivedBefore ? deriveAll({ root, moves, entries: derived }) : {};
 	for (let round = 0; round < MAX_ROUNDS; round++) {
 		const pairs = changedPairs(root, base, moves);
 		const before = baseHashes(
@@ -166,6 +213,21 @@ function repin({ root = ROOT, base = 'HEAD', write = true, moves = new Map() } =
 			edits.set(f, entry);
 			changed = true;
 		}
+		for (const [holder, to] of Object.entries(derivedAfter)) {
+			const f = moves.get(holder) || holder;
+			const from = derivedBefore[holder];
+			if (!from) throw new Error(`repin: no pre-step value of the derived pin ${holder}`);
+			const text = read(f);
+			if (from === to || text.includes(to)) continue;
+			if (!text.includes(from)) throw new Error(`repin: ${f} lost its pin ${from}`);
+			const updated = text.split(from).join(to);
+			contents.set(f, updated);
+			if (write) fs.writeFileSync(path.join(root, f), updated);
+			const entry = edits.get(f) || { file: f, pins: [] };
+			entry.pins.push([from, to]);
+			edits.set(f, entry);
+			changed = true;
+		}
 		if (!changed) return [...edits.values()];
 		// Without writing, the next round would read the old bytes again.
 		if (!write) return [...edits.values()];
@@ -180,7 +242,18 @@ function main() {
 	const check = args.includes('--check');
 	const movesAt = args.indexOf('--moves');
 	const moves = new Map(movesAt >= 0 ? JSON.parse(fs.readFileSync(args[movesAt + 1], 'utf8')) : []);
-	const edits = repin({ base, write: !check, moves });
+	const deriveOut = args.indexOf('--derive-out');
+	if (deriveOut >= 0) {
+		fs.writeFileSync(
+			args[deriveOut + 1],
+			JSON.stringify(deriveAll({ pinned: true }), null, 1) + '\n'
+		);
+		return;
+	}
+	const beforeAt = args.indexOf('--derived-before');
+	const derivedBefore =
+		beforeAt >= 0 ? JSON.parse(fs.readFileSync(args[beforeAt + 1], 'utf8')) : null;
+	const edits = repin({ base, write: !check, moves, derivedBefore });
 	for (const e of edits) console.log(`${e.file}: ${e.pins.length} pin(s)`);
 	console.log(`[repin] ${edits.length} file(s) ${check ? 'hold stale pins' : 're-pinned'}.`);
 	if (check && edits.length > 0) process.exit(1);
@@ -188,4 +261,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { repin, changedPairs };
+module.exports = { repin, changedPairs, deriveAll };
