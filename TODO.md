@@ -1358,19 +1358,24 @@ between workers) green alone. All live checks pass, typed by the harness.
       parser (« parse failed »); a malformed array stays a parse failure. Test in the updater suite: an HTML 200 requests
       the feed and answers `updater.no_connection`.
       Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 957aef5a, refined in fd719164): tests in `test_updater_release_fetch.ahk` and `test_updater_check_only_fallback.ahk` (UPD-1). Refined against the line above: the no-list answer covers a 200 that opens no JSON at all (`^\x{FEFF}?\s*[\[{]`), so a JSON object such as GitHub's error document stays a malformed release response, as the schedule publication tests require; for the maintainer to confirm.
-- [x] **UPD-2 on AHK (decided by the coordinator on 2026-11-12, after the maintainer's real pause).** A manual check,
-      the changelog and Versions windows, the release links, the channel and interval settings and the update prompt run
-      while paused, as macOS `check_now` and Linux `check_for_updates`: `_Updater_RequestPolicy` allows a manual request
-      whatever the pause, the suspend boundary keeps in-flight manual checks, background checks keep their pause drop.
-      Tests `test_updater_request_pause.ahk` (UPD-2 cases) and `upd-2-manual-check-while-paused`.
-- [ ] **Installs while paused on AHK (follow-up of UPD-2).** `_Updater_RefuseInstallWhileSuspended` still refuses an
-      install asked while paused (`Updater_DownloadAndInstall`, `_Updater_InstallPromptRelease`,
-      `_Updater_ActivateCachedRelease`), because the self-update transaction stops at a pause in four places: the
-      `updater-self-update` suspend step (`_Updater_QuiesceSelfUpdateForSuspend`, `infra/lifecycle.ahk`), the staging
-      monitor (`_Updater_CancelSelfUpdateForSuspend` on `A_IsSuspended`, `self_update.ahk`), the staging completion
-      (« Update staging completion discarded while suspended ») and the swap handshake (« the driver was suspended before
-      the swap handshake completed »). Let each run through a pause, then drop the refusal; about 10 Windows test files
-      pin the current stop (grep `CancelSelfUpdateForSuspend`, `QuiesceSelfUpdateForSuspend`).
+- [ ] **UPD-2 on AHK (decided by the coordinator on 2026-11-12, after the maintainer's real pause).** A manual check,
+      the changelog and Versions windows, the release links, the channel and interval settings and the update prompt
+      should run while paused, as macOS `check_now` and Linux `check_for_updates`; background checks keep their pause
+      drop. Tried on 2026-11-12 (ea031503, reverted in 79d1914b): `_Updater_RequestPolicy` allowed a manual request
+      whatever the pause, the suspend boundary (`_Updater_SwapAsyncRequestsForBoundary`) kept in-flight manual records,
+      the `_Updater_RefuseManualWhileSuspended` guards left the manual entry points, and `UpdateCheck_Perform` lost its
+      `BornSuspended` parameter. Windows CI run 43285586086 then showed what else relies on the pause revoking manual
+      work, to handle in the same change: `test_updater_transport_ownership.ahk` AHK-31 (a cancellation during owned
+      preparation) and AHK-33 (a pause inside the download START must still reject the reservation: installs stay
+      pause-sensitive, so `_Updater_TryReserveDownloadTransaction` and `_Updater_ManagedFailureOwnerIsCurrent` need the
+      request's pause generation of their own), the native update-consent fixtures
+      (`tests/fixtures/update_check_native_consent_body.ahk`, cases 1718-1720), `test_managed_terminal_failure.ahk:159`,
+      and the F-25 class loop in `test_webview_bridge_suspend_guard.ahk` that requires every message handler to read
+      `A_IsSuspended` (`_UpdateCheck_OnWebMessage`). Installs while paused stay a separate follow-up: the self-update
+      transaction stops at a pause in four places, the `updater-self-update` suspend step
+      (`_Updater_QuiesceSelfUpdateForSuspend`, `infra/lifecycle.ahk`), the staging monitor
+      (`_Updater_CancelSelfUpdateForSuspend`), the staging completion (« Update staging completion discarded while
+      suspended ») and the swap handshake (« the driver was suspended before the swap handshake completed »).
 - [ ] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
       logical key, AltGr suspended. `modules/keymap/keylayout/keylayout_emulation.ahk` `_KLE_OnAltGr`: with a Ctrl other
       than AltGr's own physically held, `_KLE_OnShortcut(Sc, "^")` (`"^+"` with Shift) instead of `_KLE_Emit`;
