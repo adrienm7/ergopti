@@ -630,7 +630,7 @@ function M.new()
 		--- @param mode string One of "exact", "fold", "conform".
 		--- @param source table The originating mapping, for the flags shared by every
 		---   entry derived from it.
-		local function register(trigger, replacement, mode, source)
+		local function register_one(trigger, replacement, mode, source)
 			local cps, n = utf8_codepoints(trigger)
 			if n == 0 then return end
 			-- Bucket key: the tail codepoint, Unicode-folded. trig_fold rather than
@@ -691,6 +691,25 @@ function M.new()
 				seq          = registered + 1,
 			}
 			registered = registered + 1
+		end
+
+		--- Files an entry and, for a trigger with an inner space, its no-break
+		--- and narrow no-break space variants: a no-break space typed inside a
+		--- trigger counts as a space on every OS (maintainer decision HSE-003,
+		--- 2026-11-12; the macOS registry's add_with_space_variants). A trigger
+		--- starting with a space is a word-boundary guard and keeps its own.
+		--- @param trigger string
+		--- @param replacement string
+		--- @param mode string
+		--- @param source table
+		local function register(trigger, replacement, mode, source)
+			register_one(trigger, replacement, mode, source)
+			local starts_with_space = trigger:sub(1, 1) == " " or trigger:sub(1, 2) == "\194\160"
+				or trigger:sub(1, 3) == "\226\128\175"
+			if not starts_with_space and trigger:find(" ", 1, true) then
+				register_one((trigger:gsub(" ", "\194\160")), replacement, mode, source)
+				register_one((trigger:gsub(" ", "\226\128\175")), replacement, mode, source)
+			end
 		end
 
 		--- Registers a mapping that has opted into case conformance.
