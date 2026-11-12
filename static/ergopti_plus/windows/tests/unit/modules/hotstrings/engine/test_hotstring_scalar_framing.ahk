@@ -159,7 +159,7 @@ _HTEI_Engine(Mode) {
 		suppressed: HSE_Suppressed, prefix_suppressed: _PrefixWatcherSuppressed, tick: _PrefixLastKeyTick}
 	; This qualified scope installs detached indexes before any real registry
 	; publication and retains the host's exact indexes, buffer and generations.
-	RegistryState := _PECASE_RegistryScope()
+	RegistryState := _HotstringRegistryScope()
 	try {
 		HSE_Terminators := Terminators()
 		_HotstringsTerminatorRecords := 0
@@ -229,7 +229,7 @@ _HTEI_Engine(Mode) {
 	} finally {
 		; Drain only the qualified scope's detached projection, then restore the
 		; exact host registry/buffer. Never clear a registry we did not create.
-		try _PECASE_RegistryScope(RegistryState)
+		try _HotstringRegistryScope(RegistryState)
 		finally {
 			HSE_Terminators := Saved.terms, _HotstringsTerminatorRecords := Saved.owner
 			HSE_WORD_TERMINATORS := Saved.word, HSE_CONSUMED_DELIMITERS := Saved.consumed

@@ -902,7 +902,7 @@ _HSCI_EnsureWriteCallout(Mode) {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
-		RegistryScope := _PECASE_RegistryScope()
+		RegistryScope := _HotstringRegistryScope()
 		DirCreate(Root . "\modules\hotstrings")
 		Index := Root . "\modules\hotstrings\_index.toml"
 		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
@@ -984,7 +984,7 @@ _HSCI_EnsureWriteCallout(Mode) {
 			CloseFailure := Err
 		if IsObject(RegistryScope) {
 			HSE_TestReset()
-			_PECASE_RegistryScope(RegistryScope)
+			_HotstringRegistryScope(RegistryScope)
 		}
 		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
 		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
