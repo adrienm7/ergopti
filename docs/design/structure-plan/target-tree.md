@@ -64,7 +64,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `diagnostics/engine/field_run`           |       3 |     3 | **1** |
 | `diagnostics/engine/reports`             |       8 |     3 |     2 |
 | `diagnostics/ui`                         |       5 |     5 |     5 |
-| `diagnostics/ui/error_dialog`            |   **1** | **1** | **1** |
 | `diagnostics/ui/field_check`             |   **1** | **1** |     3 |
 | `diagnostics/ui/healthcheck`             |      10 |     7 |     3 |
 | `gestures`                               |       3 |     3 |     3 |
@@ -103,7 +102,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `layouts/engine/registry`                |       5 |     5 |     3 |
 | `layouts/native`                         |       4 |     — |     — |
 | `layouts/ui`                             |       3 |     3 |     3 |
-| `layouts/ui/layer_editor`                |   **1** | **1** | **1** |
 | `layouts/ui/layout_manager`              |       3 | **1** | **1** |
 | `layouts/ui/menu`                        |   **1** |     3 |     3 |
 | `menu`                                   |       2 |     2 |     2 |
@@ -149,7 +147,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `settings/engine/publication`            |       2 |     — |     — |
 | `settings/engine/scope`                  |       2 |     3 |     4 |
 | `settings/ui`                            |       2 |     2 |     5 |
-| `settings/ui/config_cleanup`             |   **1** | **1** | **1** |
 | `settings/ui/menu`                       |       — |     4 |     3 |
 | `settings/ui/paths_editor`               |       2 |     — | **1** |
 | `shortcuts`                              |       5 |     4 |     3 |
@@ -173,7 +170,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `updater/ui`                             |       3 |     4 |     4 |
 | `updater/ui/changelog`                   |       2 |     2 | **1** |
 | `updater/ui/download_window`             |       2 |     4 | **1** |
-| `updater/ui/update_check`                |   **1** | **1** | **1** |
 
 ## Residual folders outside the bounds (code)
 
@@ -200,8 +196,9 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `_shared/metrics/engine/apps`
 - singleton_parity (1) `_shared/metrics/engine/journal`
 - singleton_parity (1) `_shared/metrics/engine/walker`
-- singleton_parity (1) `_shared/onboarding/ui`
+- singleton_parity (1) `_shared/onboarding`
 - singleton_parity (1) `_shared/platform/focus`
+- oversized (44) `_shared/ui`
 - singleton_parity (1) `linux/ai/ui/model_browser`
 - singleton_parity (1) `linux/ai/ui/prompt_editor`
 - singleton_parity (1) `linux/clipboard`
@@ -212,10 +209,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/core/text`
 - singleton_parity (1) `linux/core/text/engine/toml`
 - singleton_parity (1) `linux/core/timing`
-- singleton_parity (1) `linux/core/ui/ui/numeric_prompt`
-- singleton_parity (1) `linux/core/ui/ui/token_prompt`
 - singleton_parity (1) `linux/diagnostics/engine/field_run`
-- singleton_parity (1) `linux/diagnostics/ui/error_dialog`
 - singleton_parity (1) `linux/gestures/ui/menu`
 - singleton_parity (1) `linux/hotstrings/ui/hotstring_editor`
 - singleton_parity (1) `linux/hotstrings/ui/hotstrings_config_window`
@@ -223,7 +217,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/keyboard/engine/layers`
 - singleton_parity (1) `linux/keyboard/ui`
 - singleton_parity (1) `linux/layouts/engine/composer`
-- singleton_parity (1) `linux/layouts/ui/layer_editor`
 - singleton_parity (1) `linux/layouts/ui/layout_manager`
 - singleton_parity (1) `linux/metrics/adapters`
 - singleton_parity (1) `linux/metrics/engine/apps`
@@ -235,7 +228,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/metrics/ui/metrics_typing`
 - singleton_parity (1) `linux/onboarding`
 - singleton_parity (1) `linux/settings/engine/migration`
-- singleton_parity (1) `linux/settings/ui/config_cleanup`
 - singleton_parity (1) `linux/settings/ui/paths_editor`
 - singleton_parity (1) `linux/shortcuts/ui/action_picker`
 - singleton_parity (1) `linux/shortcuts/ui/menu`
@@ -244,7 +236,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/tray`
 - singleton_parity (1) `linux/updater/ui/changelog`
 - singleton_parity (1) `linux/updater/ui/download_window`
-- singleton_parity (1) `linux/updater/ui/update_check`
 - singleton_parity (1) `macos/ai/engine/settings`
 - singleton_parity (1) `macos/apps/adapters`
 - singleton_parity (1) `macos/apps/engine`
@@ -254,20 +245,16 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `macos/core/lifecycle`
 - singleton_parity (1) `macos/core/text`
 - singleton_parity (1) `macos/core/timing`
-- singleton_parity (1) `macos/diagnostics/ui/error_dialog`
 - singleton_parity (1) `macos/diagnostics/ui/field_check`
 - singleton_parity (1) `macos/keyboard/engine/keys`
 - singleton_parity (1) `macos/layouts/engine/composer`
 - singleton_parity (1) `macos/layouts/engine/emulation`
-- singleton_parity (1) `macos/layouts/ui/layer_editor`
 - singleton_parity (1) `macos/layouts/ui/layout_manager`
 - singleton_parity (1) `macos/metrics/engine/system`
 - singleton_parity (1) `macos/onboarding/engine`
-- singleton_parity (1) `macos/settings/ui/config_cleanup`
 - singleton_parity (1) `macos/shortcuts/native`
 - singleton_parity (1) `macos/shortcuts/ui/physical_shortcuts`
 - singleton_parity (1) `macos/tray`
-- singleton_parity (1) `macos/updater/ui/update_check`
 - singleton_parity (1) `windows/ai/ui/menu/models`
 - singleton_parity (1) `windows/ai/ui/menu/panels`
 - singleton_parity (1) `windows/apps/ui`
@@ -282,18 +269,14 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `windows/core/timing`
 - singleton_parity (1) `windows/core/timing/engine`
 - singleton_parity (1) `windows/diagnostics/data`
-- singleton_parity (1) `windows/diagnostics/ui/error_dialog`
 - singleton_parity (1) `windows/diagnostics/ui/field_check`
 - singleton_parity (1) `windows/gestures/ui/menu`
 - singleton_parity (1) `windows/keyboard/adapters`
 - singleton_parity (1) `windows/layouts/adapters`
-- singleton_parity (1) `windows/layouts/ui/layer_editor`
 - singleton_parity (1) `windows/layouts/ui/menu`
-- singleton_parity (1) `windows/settings/ui/config_cleanup`
 - singleton_parity (1) `windows/shortcuts/ui/menu`
 - singleton_parity (1) `windows/tap_hold/ui`
 - singleton_parity (1) `windows/updater/adapters`
-- singleton_parity (1) `windows/updater/ui/update_check`
 
 ## Residual folders outside the bounds (tests)
 
@@ -361,13 +344,11 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `apps/engine` on windows + macos — the Lua drivers share it from `_shared/lua/apps/engine/`
 - `core/logger/adapters` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `core/ui/engine/webview` on windows — the Lua drivers share it from `_shared/lua/core/ui/engine/webview/`
-- `core/ui/ui/numeric_prompt` on linux — the Lua drivers share it from `_shared/lua/core/ui/ui/numeric_prompt/`
 - `core/ui/ui/spotlight` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
-- `core/ui/ui/token_prompt` on linux — the Lua drivers share it from `_shared/lua/core/ui/ui/token_prompt/`
 - `diagnostics/adapters` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `diagnostics/engine/field_check` on macos — the Lua drivers share it from `_shared/lua/diagnostics/engine/field_check/`
 - `hotstrings/engine/expander` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `hotstrings/ui/hotstring_editor` on macos + linux — the Lua drivers share it from `_shared/lua/hotstrings/ui/hotstring_editor/`
+- `hotstrings/ui/hotstring_editor` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `install` on linux — declared OS-specific
 - `keyboard/adapters` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `keyboard/adapters/karabiner` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
@@ -394,8 +375,8 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `metrics/engine/view` on windows — the Lua drivers share it from `_shared/lua/metrics/engine/view/`
 - `metrics/engine/walker` on windows — the Lua drivers share it from `_shared/lua/metrics/engine/walker/`
 - `metrics/engine/wpm` on linux — the Lua drivers share it from `_shared/lua/metrics/engine/wpm/`
-- `metrics/ui/metrics_apps` on macos + linux — the Lua drivers share it from `_shared/lua/metrics/ui/metrics_apps/`
-- `metrics/ui/metrics_typing` on macos + linux — the Lua drivers share it from `_shared/lua/metrics/ui/metrics_typing/`
+- `metrics/ui/metrics_apps` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
+- `metrics/ui/metrics_typing` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `onboarding/adapters` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `onboarding/engine` on windows + macos — the Lua drivers share it from `_shared/lua/onboarding/engine/`
 - `onboarding/ui/permission_dialog` on macos — declared OS-specific
@@ -404,7 +385,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `settings/engine/migration` on windows + linux — the Lua drivers share it from `_shared/lua/settings/engine/migration/`
 - `settings/engine/publication` on windows — the Lua drivers share it from `_shared/lua/settings/engine/publication/`
 - `settings/ui/menu` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `settings/ui/paths_editor` on windows + linux — the Lua drivers share it from `_shared/lua/settings/ui/paths_editor/`
+- `settings/ui/paths_editor` on windows + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `shortcuts/engine/actions` on macos — the Lua drivers share it from `_shared/lua/shortcuts/engine/actions/`
 - `shortcuts/native` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `updater/adapters` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
