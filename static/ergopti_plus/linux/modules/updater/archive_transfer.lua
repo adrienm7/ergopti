@@ -59,6 +59,7 @@ function M.new(ports)
   local operation = { started = false }
   active = txn -- Reserve before native clock, source or artifact construction.
   local budget
+  local archive_idle_ms
   local function current()
    if active ~= txn or txn.cancelled or txn.finished then return false end
    local called, accepted = pcall(source, txn.token)
@@ -212,7 +213,10 @@ function M.new(ports)
 
   local timed, now = pcall(clock)
   budget = timed and Budget.capture(ports.defaults, now) or nil
-  local checksum_deadline = budget and enter("checksum") or nil
+  -- The archive's idle bound comes from the same shared declaration as its cap.
+  local limits = Budget.archive_limits(ports.defaults)
+  archive_idle_ms = limits and limits.idle_ms or nil
+  local checksum_deadline = budget and limits and enter("checksum") or nil
   if not checksum_deadline then txn.unknown = false; fail("update transfer admission refused", "download"); return operation end
   txn.constructing = txn.constructing + 1
   local published_metadata = { tag = selected.tag, download_url = selected.download_url, checksum_url = selected.checksum_url }
@@ -260,6 +264,7 @@ function M.new(ports)
      return download(selected.download_url, headers, target, { owner = owner,
       authorized = current, absolute_deadline_ms = archive_deadline,
       timeout_ms = math.max(1, math.floor(archive_deadline - clock())),
+      receive_idle_timeout_ms = archive_idle_ms,
       max_download_bytes = max_archive, follow_redirects = true, https_only = true }, done)
     end, function(downloaded, completion)
      if type(downloaded) ~= "table" or downloaded.ok ~= true or type(completion) ~= "table" then

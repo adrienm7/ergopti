@@ -530,6 +530,47 @@ if (fs.existsSync(deadToml)) {
 	pass('dead constants.toml is absent');
 }
 
+// The archive transfer budget is _shared/modules/updater/defaults.json
+// archive_transfer, read through transfer_budget.lua; a typed copy in the Linux
+// manager was never read (NET-004).
+if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
+	fail(
+		'linux/modules/updater/manager.lua keeps a DOWNLOAD_TIMEOUT_MS copy of the archive transfer budget'
+	);
+} else {
+	pass('the Linux manager keeps no typed archive transfer budget');
+}
+
+// The release archive's absolute and idle bounds are declared once in
+// _shared/modules/updater/defaults.json archive_transfer (decided by the
+// maintainer on 2026-11-12: 1,200 s absolute, 600 s without data, aligned on
+// Windows). Linux reads them through transfer_budget.lua; macOS passes them to
+// the staging script and the launcher; neither keeps a typed copy.
+{
+	const policy = defaults.archive_transfer || {};
+	if (policy.phase_timeout_ms?.archive !== 1200000 || policy.archive_idle_timeout_ms !== 600000) {
+		fail('archive_transfer must declare archive = 1200000 and archive_idle_timeout_ms = 600000');
+	} else {
+		pass('the release archive bounds are declared once in the shared defaults');
+	}
+	const macInstaller = fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/macos/modules/updater/release_installer.lua'),
+		'utf8'
+	);
+	const macStage = fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/macos/adapters/release_stage.sh'),
+		'utf8'
+	);
+	if (
+		/\b900000\b|--max-time 900\b/.test(macInstaller + macStage) ||
+		!macInstaller.includes('require("updater.transfer_budget").archive_limits(')
+	) {
+		fail('the macOS release download keeps a typed budget instead of the shared archive limits');
+	} else {
+		pass('the macOS release download reads the shared archive limits');
+	}
+}
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 if (exitCode === 0) {

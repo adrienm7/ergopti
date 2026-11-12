@@ -45,18 +45,14 @@ reload can replace the VM before `request_reload` returns. The duration is
   Fixtures use `ShellRunner._set_async_runner`; every Linux test process puts a
   sentinel `notify-send` first on PATH (`tests/support/notify_send_guard.lua`,
   pinned by `nui-003-spawn-guard`), so no test can show a real notification.
+  Each test case resolves `adapters.notifier` to a recording notifier
+  (`tests/support/notice_recorder.lua`), and a notice that still reaches the
+  sentinel fails the run with its test case named.
   Regression `nui-003-notify-send-failure`.
 - **NUI-005 (macOS):** measured through the real watcher, four refused
   source-change reloads then an admission gave five « Reloading » notices. The
   notice is now sent once per burst. Regression
   `nui-005-refused-reload-notice`.
-
-## Left
-
-- The Linux runner counts the notices that reach the notify-send sentinel
-  (about 370 across the groups, through fixtures that keep the real notifier)
-  instead of failing the run; make the count fatal once those fixtures install
-  `ShellRunner._set_async_runner`.
 
 ## Windows only (reported)
 

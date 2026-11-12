@@ -1328,6 +1328,10 @@ local function main()
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
 			and function() prediction_engine.cancel() end or nil,
+		-- A pause and a resume are announced, as on macOS (shared keys and levels).
+		notify = notifier and function(key, level)
+			return notifier.send(require("infra.i18n").get(key), { level = level })
+		end or nil,
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)

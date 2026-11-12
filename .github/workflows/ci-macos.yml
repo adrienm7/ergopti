@@ -553,6 +553,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The Sparkle clone failed once on a hosted runner; only the resolve is retried (bounded).
+          bash tools/ci/swiftpm-resolve.sh static/ergopti_plus/macos/launcher "$ERGOPTI_OLLAMA_BUILD_ROOT/swift"
           swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher \
             --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" 2>&1 | tee "$RUNNER_TEMP/managed-ollama-launcher-build.log"
           launcher_bin="$(swift build -c release --show-bin-path --package-path static/ergopti_plus/macos/launcher --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift")"
@@ -870,6 +872,8 @@ jobs:
           number_row_statuses=("${PIPESTATUS[@]}")
           set -e
           bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" after
+          # Names a refusal the unanswered text-input UI server caused; never the verdict.
+          python3 tools/diagnostics/macos_tsm_refusal.py --log "$transcript" --agents "$evidence/text-input-agents.txt" --receipt "$evidence/tsm-refusal.json"
           test "${#number_row_statuses[@]}" -eq 2
           set +e
           python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \
@@ -935,6 +939,7 @@ jobs:
             ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json
             ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt
             ${{ runner.temp }}/number-row-source-evidence/text-input-agents.txt
+            ${{ runner.temp }}/number-row-source-evidence/tsm-refusal.json
             ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift
             ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json

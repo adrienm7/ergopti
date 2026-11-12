@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Drives the real prediction engine and real streaming handler around a captured
 --- backend request. Once the live action-epoch predicate closes, every callback
---- created for that request (partial, success, failure, watchdog and debounce)
+--- created for that request (partial, success, failure and debounce)
 --- must become a no-op before it mutates refs, persists telemetry, logs, or paints.
 --- ==============================================================================
 
@@ -58,7 +58,6 @@ local function load_fixture(streaming)
 	package.loaded["infra.logger"] = Logger
 	package.loaded["infra.timings"] = {
 		sec = function(_section, key)
-			if key == "stream_watchdog_ms" then return 7 end
 			if key == "chain_fallback_ms" then return 1 end
 			return 0.1
 		end,
@@ -231,19 +230,6 @@ helpers.describe("prediction_engine: action-epoch quarantine closes async produc
 		helpers.assert_true(effect_total(fail_effects) > 0,
 			"the failure callback must have observable effects while open")
 
-		local _, watchdog_effects, watchdog_callbacks, _, clear_watchdog, watchdog_dispatch = load_fixture(true)
-		helpers.assert_eq(watchdog_dispatch(), 1)
-		watchdog_callbacks.partial("watchdog seed")
-		local watchdog
-		for _, timer in ipairs(hs.timer.__timers) do
-			if timer.delay == 7 then watchdog = timer; break end
-		end
-		helpers.assert_not_nil(watchdog)
-		clear_watchdog()
-		watchdog:fire()
-		helpers.assert_true(effect_total(watchdog_effects) > 0,
-			"the watchdog must be executable before its stale twin is tested")
-
 		local PE_debounce, _, _, _, _, _, get_debounce_fetches = load_fixture(false)
 		local timers_before = #hs.timer.__timers
 		PE_debounce.start_timer(0.02)
@@ -326,23 +312,5 @@ helpers.describe("prediction_engine: action-epoch quarantine closes async produc
 		callbacks.fail()
 		helpers.assert_eq(effect_total(effects), 0,
 			"stale failure escaped quarantine: " .. effect_summary(effects))
-	end)
-
-
-	helpers.it("the stream watchdog rechecks the live epoch before logging or rendering", function()
-		local _, effects, callbacks, set_available, clear_effects, dispatch = load_fixture(true)
-		helpers.assert_eq(dispatch(), 1)
-		callbacks.partial("positive control")
-		local watchdog
-		for _, timer in ipairs(hs.timer.__timers) do
-			if timer.delay == 7 then watchdog = timer; break end
-		end
-		helpers.assert_not_nil(watchdog, "perform_check must arm the real stream watchdog")
-		helpers.assert_true(watchdog.running)
-		set_available(false)
-		clear_effects()
-		watchdog:fire()
-		helpers.assert_eq(effect_total(effects), 0,
-			"stale watchdog escaped quarantine: " .. effect_summary(effects))
 	end)
 end)

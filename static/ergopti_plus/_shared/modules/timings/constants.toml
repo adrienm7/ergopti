@@ -54,6 +54,12 @@ ollama_runtime_metadata_poll_ms = 250
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.
 request_timeout_ms = 30000
 
+# Local Ollama request hard timeout: a cold CPU model load before generation
+# outlasts the remote budget above (NET-003). AHK: api_ollama/init.ahk
+# LLM_OLLAMA_TIMEOUT (curl -m). HS: api_ollama.lua stream --max-time. Linux:
+# api_ollama.lua postStream timeout.
+ollama_request_timeout_ms = 180000
+
 # Period of the AI health watch that repaints the AI menu title's dot when
 # the active backend turns ready or fails after the menu was built (any
 # backend: local API, MLX, Ollama). It only reads in-memory state.
@@ -181,10 +187,6 @@ discovery_poll_max_ms = 10000
 # pacing that exists never got to apply. The failure path is the one that
 # retries, so the storm happens exactly when the server is not answering.
 discovery_retry_cooldown_ms = 5000
-
-# Streaming watchdog: kill the handler if no token arrives within this window.
-# AHK streaming_handler equivalent; HS streaming_handler.lua STREAM_WATCHDOG_SEC.
-stream_watchdog_ms = 12000
 
 # Ollama installed-models cache TTL — avoids repeated "ollama list" calls.
 # AHK: models.ahk LLM_INSTALLED_CACHE_TTL_MS.

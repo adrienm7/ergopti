@@ -73,6 +73,8 @@ local function fake(overrides)
 	}
 	for name, answer in pairs(overrides or {}) do answers[name] = answer end
 	local fetcher = Fetch.new({
+		-- The production port wraps curl behind the network route (NET-001).
+		network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 		exec = function(executable, args, _, callback)
 			local name = executable:match("[^/]+$")
 			world.commands[#world.commands + 1] = { name = name, args = args }
@@ -122,6 +124,8 @@ helpers.describe("owned runtime artifact fetch: the first start", function()
 		local _, _, Fetch = fake()
 		local pending, commands = nil, 0
 		local fetcher = Fetch.new({
+			-- The production port wraps curl behind the network route (NET-001).
+			network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 			exec = function(_, _, _, callback) commands = commands + 1; pending = callback end,
 			exists = function() return false end, read = function() return nil end,
 			write = function() return true end, expand = function(path) return path:gsub("^~", "/Users/test") end,
@@ -143,6 +147,8 @@ helpers.describe("owned runtime artifact fetch: the first start", function()
 		local _, _, Fetch = fake()
 		local pending, curl_args
 		local fetcher = Fetch.new({
+			-- The production port wraps curl behind the network route (NET-001).
+			network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 			exec = function(executable, args, _, callback)
 				if executable == "/bin/rm" then pending = callback
 				elseif executable == "/usr/bin/curl" then curl_args = args; callback(1, "", "offline")
@@ -192,6 +198,8 @@ helpers.describe("owned runtime artifact fetch: the first start", function()
 		local _, _, Fetch = fake()
 		local reads = {}
 		local fetcher = Fetch.new({
+			-- The production port wraps curl behind the network route (NET-001).
+			network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 			exec = function(_, _, _, callback) callback(1, "", "offline") end,
 			exists = function() return false end,
 			read = function(path)
@@ -335,6 +343,8 @@ helpers.describe("owned runtime artifact fetch: then always that one", function(
 		local Fetch = require("platform.remap.runtime_artifact_fetch")
 		local held, runs = nil, 0
 		local fetcher = Fetch.new({
+			-- The production port wraps curl behind the network route (NET-001).
+			network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 			exec = function(executable, _, _, callback)
 				if executable:match("curl$") then
 					runs = runs + 1

@@ -484,6 +484,40 @@ function isProse(file, text, code, index) {
 	return /(\/\/|^\s*\*|^\s*\/\*|#)/.test(before);
 }
 
+/** Code just before a quoted name that loads it as a Lua module. */
+const MODULE_LOAD_BEFORE =
+	/(?:\brequire\s*\(?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\()\s*$/;
+
+/**
+ * Tells whether the quoted token at `index` is a Lua module load: a require
+ * argument or a package.loaded / package.preload key.
+ * @param {string} text Source text.
+ * @param {number} index Offset of the opening quote.
+ * @returns {boolean}
+ */
+function isModuleLoadSite(text, index) {
+	return MODULE_LOAD_BEFORE.test(text.slice(Math.max(0, index - 80), index));
+}
+
+/**
+ * Classifies one module a runtime edit expects.
+ * @param {Map<string, Array>} byLuaName Moved modules by "<root>|<old name>".
+ * @param {Set<string>} presentNames Module names the tree answers today.
+ * @param {string} tree Driver root of the module.
+ * @param {string} oldName Name the edit's source builds today.
+ * @param {string} newName Name the edit writes.
+ * @returns {'moving'|'moved'|'pending'|'wrong'} moving: this map renames it to
+ *   newName; moved: an earlier step did; pending: a later step will; wrong: the
+ *   plan sends it elsewhere.
+ */
+function runtimeEditState(byLuaName, presentNames, tree, oldName, newName) {
+	const hit = byLuaName.get(`${tree}|${oldName}`);
+	if (hit) return hit[2] === newName ? 'moving' : 'wrong';
+	if (presentNames.has(`${tree}|${newName}`)) return 'moved';
+	if (presentNames.has(`${tree}|${oldName}`)) return 'pending';
+	return 'wrong';
+}
+
 /**
  * Finds the references to moved files.
  * @param {Map<string, string|null>} map Tree-relative old path to target.
@@ -500,6 +534,15 @@ function references(map) {
 			const root = old.startsWith('_shared/') ? '_shared' : old.split('/')[0];
 			byLuaName.set(`${root}|${name}`, [old, target, luaModuleName(target, true)]);
 		}
+	}
+	// The module names the tree answers today, so a runtime edit can tell a
+	// module a later step moves from one an earlier step already moved.
+	const presentNames = new Set();
+	for (const old of map.keys()) {
+		const name = luaModuleName(old);
+		if (!name) continue;
+		const root = old.startsWith('_shared/') ? '_shared' : old.split('/')[0];
+		presentNames.add(`${root}|${name}`);
 	}
 	const byRepoDir = directoryMap(map);
 	const successors = splitSuccessors(map, byRepoDir);
@@ -553,10 +596,14 @@ function references(map) {
 		}
 		for (const e of Rules.RUNTIME_EDITS) {
 			if (PREFIX + e.file !== file || !text.includes(e.from)) continue;
-			const wrong = e.expect.filter(([tree, oldName, newName]) => {
-				const hit = byLuaName.get(`${tree}|${oldName}`);
-				return !hit || hit[2] !== newName;
-			});
+			const states = e.expect.map(([tree, oldName, newName]) =>
+				runtimeEditState(byLuaName, presentNames, tree, oldName, newName)
+			);
+			// A step that leaves one of the edit's modules for a later step has
+			// nothing to rewrite yet: the edit belongs to the step that moves the
+			// last of them, and the whole-sequence map sees them all moved.
+			if (!states.includes('wrong') && states.includes('pending')) continue;
+			const wrong = e.expect.filter((_, i) => states[i] === 'wrong');
 			const first = byLuaName.get(`${e.expect[0][0]}|${e.expect[0][1]}`);
 			add(
 				wrong.length ? 'lua-prefix-split' : 'lua-rewrite',
@@ -606,6 +653,10 @@ function references(map) {
 			}
 			const roots = inTree === '_shared' ? ['_shared', 'macos', 'linux'] : [inTree, '_shared'];
 			for (const m of text.matchAll(luaToken)) {
+				// A one-word string ("json", "chord", "logger") is a module name
+				// only where it is loaded: elsewhere it is a file type, a slot kind
+				// or a settings section that happens to share the name.
+				if (!m[1].includes('.') && !isModuleLoadSite(text, m.index)) continue;
 				for (const r of roots) {
 					const hit = byLuaName.get(`${r}|${m[1]}`);
 					if (hit) {
@@ -985,6 +1036,8 @@ module.exports = {
 	SPLIT,
 	attributeSteps,
 	REFUSED_KINDS,
+	runtimeEditState,
+	isModuleLoadSite,
 	REVIEWED_KINDS,
 	directoryMap,
 	moveMap,

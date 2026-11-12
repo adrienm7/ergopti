@@ -578,6 +578,16 @@ local function curl_args(url, headers, body, options)
 		args[#args + 1] = "--max-filesize"
 		args[#args + 1] = tostring(options.max_download_bytes)
 	end
+	-- A transfer that receives nothing for this long is stopped, as Windows'
+	-- WinHTTP receive timeout does (the release archive's idle bound).
+	local idle_ms = options.receive_idle_timeout_ms
+	if idle_ms ~= nil then
+		if type(idle_ms) ~= "number" or idle_ms < 1000 or idle_ms % 1 ~= 0 then error("HTTP receive idle timeout refused") end
+		args[#args + 1] = "--speed-limit"
+		args[#args + 1] = "1"
+		args[#args + 1] = "--speed-time"
+		args[#args + 1] = string.format("%d", math.floor(idle_ms / 1000))
+	end
 	args[#args + 1] = "--write-out"
 	-- Streaming bodies go directly to NDJSON consumers. Curl's stderr channel
 	-- carries the receipt separately, so split status markers are never data.
@@ -599,6 +609,16 @@ local function curl_args(url, headers, body, options)
 	if selection then
 		if selection.mode == "selected" then
 			lines[#lines + 1] = "proxy = " .. config_quote(selection.proxy)
+			-- A company proxy that asks for Negotiate is answered with the session's
+			-- Kerberos ticket, as Windows' WinHTTP answers with the signed-in user
+			-- (NET-002). Only for a proxy URL without its own credentials, which an
+			-- empty proxy-user would replace, and a curl that reports SPNEGO;
+			-- NTLM stays refused (docs/design/proxy-auth-relay.md).
+			local authority = tostring(selection.proxy):match("^[%a][%w+.-]*://([^/?#]*)") or ""
+			if options.proxy_negotiate_available == true and not authority:find("@", 1, true) then
+				lines[#lines + 1] = "proxy-anyauth"
+				lines[#lines + 1] = 'proxy-user = ":"'
+			end
 		elseif selection.mode == "direct" then
 			lines[#lines + 1] = 'proxy = ""'
 			lines[#lines + 1] = 'noproxy = "*"'
@@ -998,12 +1018,15 @@ local function admit_metadata(url, headers, body, options)
 		output_path = options.output_path,
 		output_target = output_target,
 		max_download_bytes = options.max_download_bytes,
+		receive_idle_timeout_ms = options.receive_idle_timeout_ms,
 		proxy_selection = options.proxy_selection,
 		-- The private runtime's curl unless the caller pinned one (infra/owned_programs.lua).
 		curl_executable = options.curl_executable or require("infra.owned_programs").path("curl"),
 		curl_executable_identity = copy_executable_identity(options.curl_executable_identity),
 		curl_executable_identity_exact = ExactIdentity.copy(options.curl_executable_identity_exact),
 		proxy_metrics_available = options.proxy_metrics_available == true and type(options.curl_executable) == "string",
+		-- Only the probed executable's own SPNEGO feature admits proxy-anyauth.
+		proxy_negotiate_available = options.proxy_negotiate_available == true and type(options.curl_executable) == "string",
 	}
 	if options.prepared_headers then
 		local conditional = prepared_headers[options.prepared_headers].conditional
