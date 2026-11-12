@@ -50,7 +50,7 @@ local LOG = "infra.quit_request"
 ---   notify_refused      function (decision) Tells the user of a refusal that comes after the click returned.
 --- @return function on_quit (reason?) Returns true when the quit started or is waiting, false when
 ---   refused at once. Every user Quit (tray row, shortcut, gesture) passes through it; reason names
----   the source and defaults to "tray quit".
+---   the source and defaults to "tray_quit".
 function M.new(ports)
 	assert(type(ports) == "table", "the quit request needs its ports")
 	assert(type(ports.shutdown) == "table" and type(ports.shutdown.is_requested) == "function"
@@ -82,7 +82,9 @@ function M.new(ports)
 	end
 
 	return function(reason)
-		if reason == nil then reason = "tray quit" end
+		-- The tray row's closed reason (_shared/modules/logger/vocabulary.json);
+		-- a shortcut or gesture names its own source.
+		if reason == nil then reason = "tray_quit" end
 		assert(type(reason) == "string" and reason ~= "", "a user Quit names its source")
 		local returned = false
 		local result = false
