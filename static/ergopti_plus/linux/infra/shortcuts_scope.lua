@@ -375,7 +375,9 @@ function M.new(options)
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
 		apply = function(config, updates, _, candidate_bytes, rendered)
-			if options.is_paused() then return false end
+			-- An editor's rows save while paused: a pause stops typing, not
+			-- configuration (EDD-1, maintainer decision 2026-11-12).
+			if not editing and options.is_paused() then return false end
 			if combinations and combinations.configuration_source_matches(owner, pair_source) ~= true then return false end
 			local chord = combinations and rendered.tap_hold or nil
 			local candidate = resolve(config, true, chord and chord.decoded)
@@ -451,8 +453,10 @@ function M.new(options)
 		if owner.pending() or (rows == nil and mode ~= "clear" and mode ~= "recommended")
 			or rows ~= nil and options.only ~= nil then return false end
 		busy = true
-		local observed, paused = pcall(options.is_paused)
-		if not observed or paused ~= false then busy = false; return false end
+		if rows == nil then
+			local observed, paused = pcall(options.is_paused)
+			if not observed or paused ~= false then busy = false; return false end
+		end
 		editing = rows ~= nil
 		if editing and edit_source then
 			local checked, current = pcall(edit_source.guard)

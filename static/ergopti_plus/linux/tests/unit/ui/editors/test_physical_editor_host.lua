@@ -133,7 +133,8 @@ helpers.describe("Physical editor exact native-closed debt retry", function()
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["logger.shim"] = helpers.make_logger_stub()
 			host = helpers.load_module("ui.physical_shortcuts.bridge")
-			local options = { scope = scope, is_paused = function() return false end }
+			local paused_now = false
+			local options = { scope = scope, is_paused = function() return paused_now end }
 			helpers.assert_true(host.open(options))
 			local first = epoch
 			host.on_window_closed(first + 1)
@@ -149,7 +150,11 @@ helpers.describe("Physical editor exact native-closed debt retry", function()
 			local closed = epoch
 			local function send(message) return host.on_message(message, {}, { app_name = "physical_shortcuts", epoch = closed }) end
 			helpers.assert_true(send({ action = "ready" }))
-			helpers.assert_true(send({ action = "capture_position", request = { request_id = 1 } }))
+			-- EDD-1 (maintainer, 2026-11-12): a capture keeps working after a pause.
+			paused_now = true
+			helpers.assert_true(send({ action = "capture_position", request = { request_id = 1 } }),
+				"a paused driver still captures a key for the editor (edd1-paused-writes)")
+			paused_now = false
 			cancel_refused = true
 			helpers.assert_true(manager.hide("physical_shortcuts", closed), "Exact native owner closes before its notice")
 			helpers.assert_eq(epoch, 0)
