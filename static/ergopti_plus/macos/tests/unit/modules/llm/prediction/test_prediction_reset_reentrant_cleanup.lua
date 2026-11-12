@@ -20,7 +20,7 @@ end
 
 
 helpers.describe("prediction reset cleanup ownership", function()
-	for _, boundary in ipairs({ "chain timing", "silent hide", "hide error", "watchdog stop",
+	for _, boundary in ipairs({ "chain timing", "silent hide", "hide error",
 		"backend cancel", "profile warmup stop", "cancellation info" }) do
 		helpers.it("preserves successor at " .. boundary .. " (reset-cleanup-owner)", function()
 			local reentered = false
@@ -58,13 +58,6 @@ helpers.describe("prediction reset cleanup ownership", function()
 				tooltip.hide_forced_silent = function() dispatch_successor(fixture); return true end
 			elseif boundary == "hide error" then
 				tooltip.hide_forced_silent = function() return false end
-			elseif boundary == "watchdog stop" then
-				local original_stop = fixture.handler.stop_watchdog
-				fixture.handler.stop_watchdog = function()
-					local result = original_stop()
-					dispatch_successor(fixture)
-					return result
-				end
 			elseif boundary == "profile warmup stop" then
 				core.pause_deferred_profile_warmup = function() dispatch_successor(fixture); return true end
 			end

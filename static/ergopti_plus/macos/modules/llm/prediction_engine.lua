@@ -12,7 +12,7 @@
 ---
 --- KEY RESPONSIBILITIES:
 --- 1. State ownership: pending predictions, visibility flag, request counters,
----    inactivity / chain / watchdog timers, and all LLM configuration.
+---    inactivity / chain timers, and all LLM configuration.
 --- 2. LLM pipeline: sends async requests, streams results progressively,
 ---    deduplicates candidates, and manages the auto-dismiss countdown.
 --- 3. Chain trigger: after a prediction is accepted, arms F16 detection so the
@@ -817,7 +817,7 @@ function M.set_llm_model(model_name)
 	local my_transition_generation = _model_transition_generation
 	local changed = active_model ~= model_name
 	if changed then
-		-- Model identity owns every pending debounce, watchdog and backend request.
+		-- Model identity owns every pending debounce and backend request.
 		-- Tear those down before publishing the new identity so a completion from
 		-- the old model cannot appear under the new menu selection.
 		if M.reset() ~= true then return false end
@@ -2038,21 +2038,6 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		return true
 	end
 
-	--- Abandons a request whose model showed nothing before the watchdog fired.
-	--- @return boolean reset True when this request performed the reset.
-	local function abandon_silent_request()
-		if not is_current_fetch() then return false end
-		retire_request_log(my_fetch_id)
-		log_request_cancellation(my_fetch_id, "timeout")
-		local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
-		if not reset_ok or reset_result ~= true then
-			Logger.error(LOG, "LLM request cleanup did not commit after its timeout (result: %s).",
-				tostring(reset_result))
-			return false
-		end
-		return true
-	end
-
 	-- An empty surface needs an explicit loading commit before any backend work.
 	-- Existing predictions were themselves committed by StreamingHandler, so they
 	-- may remain visible while the replacement request is dispatched.
@@ -2127,8 +2112,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 
 	-- Callback construction happens after the loading surface is live. Keep both
 	-- the context builders and the factory inside the same boundary: a throw here
-	-- otherwise strands a spinner with no watchdog and no backend callback able to
-	-- dismiss it.
+	-- otherwise strands a spinner with no backend callback able to dismiss it.
 	local callbacks_ok, on_partial_cb, on_success_cb, on_fail_cb = xpcall(function()
 		return StreamingHandler.build_callbacks({
 			buffer                  = buffer,
@@ -2203,31 +2187,6 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		run_async_callback("partial callback", on_partial_cb, partial_raw, stream_identity)
 	end or nil
 
-	-- A request without a live watchdog can strand the loading surface forever.
-	-- Treat timer construction and start verification as part of dispatch commit.
-	local watchdog_ok, watchdog_result = xpcall(function()
-		return StreamingHandler.arm_watchdog({
-			my_fetch_id             = my_fetch_id,
-			get_fetch_id            = current_fetch_id,
-			pending_predictions_ref = pending_ref,
-			predictions_visible_ref = visible_ref,
-			validation_mods         = normalize_mods(validation_mods),
-			navigation_mods         = normalize_mods(navigation_mods),
-			show_info_bar           = show_info_bar,
-			llm_display_name        = llm_display_name,
-			prediction_indent       = prediction_indent,
-			is_ai_preview_enabled   = is_ai_preview_enabled,
-			build_info_bar_text     = build_info_bar_text,
-			resolve_backend_label   = resolve_backend_label,
-			runtime_available       = runtime_available,
-			on_ui_unavailable       = close_current_request,
-			on_stream_timeout       = abandon_silent_request,
-		})
-	end, debug.traceback)
-	if not watchdog_ok or watchdog_result ~= true then
-		close_current_request("watchdog arm", watchdog_result)
-		return
-	end
 	if not is_current_fetch() then return end
 
 	_request_log_id = my_fetch_id
@@ -2257,7 +2216,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	dispatch_committed = true
 
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
-	-- never a loading paint or failed watchdog construction.
+	-- never a loading paint.
 	last_buffer_signature    = signature
 	_plan:on_sent(hs.timer.secondsSinceEpoch() * 1000)
 end
@@ -2916,7 +2875,6 @@ function M.reset(options)
 	if not hidden then cleanup_committed = false end
 
 	cleanup_stage("inactivity timer stop", stop_inactivity_timer, true)
-	cleanup_stage("stream watchdog stop", StreamingHandler.stop_watchdog, true)
 	-- Cancel any in-flight streaming curl UNCONDITIONALLY — not gated on the current
 	-- is_streaming_enabled. A stream dispatched while streaming was ON can still be in
 	-- flight after the user toggles streaming OFF; gating on the live flag would skip

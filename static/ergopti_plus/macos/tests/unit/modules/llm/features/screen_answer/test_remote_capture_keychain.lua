@@ -88,7 +88,6 @@ local function with_capture(callback)
 		}
 		package.loaded["modules.llm.streaming_handler"] = {
 			init = function() return true end,
-			stop_watchdog = function() return true end,
 			reset_failure_count = function() end,
 		}
 		package.loaded["modules.llm.api_mlx"] = { stop_warmup = function() return true end }
