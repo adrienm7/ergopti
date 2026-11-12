@@ -123,17 +123,31 @@ local function read_config_part(user_config_path)
 	return TapHoldFile.read_config(document, shapes, path), source, shapes
 end
 
+--- A copy of a config part's tables for the model a save edits: the save
+--- compares that model with the part it read, so they must not share a table.
+--- Arrays stay the same references, as their shape receipt names them.
+--- @param value any
+--- @param shapes table|nil The shape receipt of config.toml.
+--- @return any
+local function copy_tables(value, shapes)
+	if type(value) ~= "table" or (shapes and shapes.arrays[value]) then return value end
+	local out = {}
+	for key, child in pairs(value) do out[key] = copy_tables(child, shapes) end
+	return out
+end
+
 --- Lays the config.toml rows over a model read from tap_hold.toml.
 --- @param model table The Karabiner model, edited in place.
---- @param part table What read_config_part() returned.
-local function overlay_config(model, part)
+--- @param part table What read_config_part() returned, never shared with the model.
+--- @param shapes table|nil The shape receipt of config.toml.
+local function overlay_config(model, part, shapes)
 	if part[ConfigKeys.KEY.TAP_HOLDS] ~= nil then
 		if model.tap_holds == nil then model.tap_holds = {} end
 		if type(model.tap_holds) == "table" then
 			for leaf, value in pairs(part[ConfigKeys.KEY.TAP_HOLDS]) do model.tap_holds[leaf] = value end
 		end
 	end
-	model.mod_combos = part[ConfigKeys.KEY.MOD_COMBOS]
+	model.mod_combos = copy_tables(part[ConfigKeys.KEY.MOD_COMBOS], shapes)
 end
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
@@ -768,6 +782,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	if config_part == nil then return nil, "error" end
 	-- The source receipt is optional (a test seam may read without one).
 	if type(source) == "table" then source.config = config_source end
+	-- No tap_hold.toml yet: the state reads as a first launch whatever config.toml holds.
+	local tap_hold_absent = not data
 	if not data then
 		if next(config_part) == nil then
 			Logger.info(LOG, "No user config found — initializing from defaults.")
@@ -776,7 +792,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		Logger.info(LOG, "No tap_hold.toml yet — the config.toml rows apply over the defaults.")
 		data = {}
 	end
-	overlay_config(data, config_part)
+	overlay_config(data, config_part, config_shapes)
 	shapes = merged_shapes(shapes, config_shapes)
 
 	-- The switch decides whether any lease or guardian may be acquired, so an
@@ -928,7 +944,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local mod_combos_enabled = combinations_enabled(combos, user_config_path)
 
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
-	local status = source.status == "absent" and "absent" or "ok"
+	local status = tap_hold_absent and "absent" or "ok"
 	return {
 		enabled                   = integration_enabled,
 		runtime                   = runtime,
@@ -1075,7 +1091,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 
 	-- An ordinary save keeps every config.toml row it does not change, outdated
 	-- spellings included; a reset replaces what macOS owns there too.
-	if not overwrite_corrupt then overlay_config(document, config_part) end
+	if not overwrite_corrupt then overlay_config(document, config_part, config_shapes) end
 	document_shapes = merged_shapes(document_shapes, config_shapes)
 	local config_rows
 	local candidate_refusal = nil
