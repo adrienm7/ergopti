@@ -1,14 +1,21 @@
 {
-	"$description": "How App Cloner isolates a copy of an application, read by the Windows and Linux App Cloners; the macOS clone_app.sh keeps its own detection, held to the same executable names by tools/test/test-app-cloner-families.cjs. A source program is matched by its executable's base name, lower-cased and without `.exe`, in `detection_order`; an Electron program is also recognised by a `markers` path next to its real executable. Each family's `arguments` are passed before the user's own item to open; `{profile}` is the clone's private profile folder, `{window_class}` its own window class (so the dock or taskbar groups the clone apart) and `{home}` the user's home folder. An argument with `platforms` is passed only there. `web_app` is the argument that opens a URL as a separate application window. A program of no family (native) gets no argument: on Linux its XDG base directories point into the profile instead; Windows has no per-process equivalent, so its native clone is a separate shortcut only.",
+	"$description": "How App Cloner isolates a copy of an application, read by the Windows and Linux App Cloners; the macOS clone_app.sh keeps its own detection, held to the same executable names by tools/test/test-app-cloner-families.cjs. A source program is matched by its executable's base name, lower-cased and without `.exe`, in `detection_order`; an Electron program is also recognised by a `markers` path next to its real executable. Each family's `arguments` are passed before the user's own item to open; `{profile}` is the clone's private profile folder, `{window_class}` its own window class (so the dock or taskbar groups the clone apart) and `{home}` the user's home folder. An argument with `platforms` is passed only there. `web_app` is the argument that opens a URL as a separate application window. A program of no family (native) gets no argument: on Linux its XDG base directories point into the profile instead; Windows has no per-process equivalent, so its native clone is a separate shortcut only. A family with `user_folders` names, per executable, the folder of the instance's own settings (`settings`, under the platform's configuration folder, whose `User` the clone links) and of its extensions (`extensions`, under `{home}`, whose `extensions` folder the argument marked `user_folder: \"extensions\"` passes); an executable it does not list keeps the argument as written and VS Code's `Code` settings.",
 	"detection_order": ["vscode", "chromium", "firefox", "electron"],
 	"families": {
 		"vscode": {
 			"executables": ["code", "code - insiders", "code-insiders", "codium", "vscodium"],
 			"arguments": [
 				{ "value": "--user-data-dir={profile}" },
-				{ "value": "--extensions-dir={home}/.vscode/extensions" }
+				{ "value": "--extensions-dir={home}/.vscode/extensions", "user_folder": "extensions" }
 			],
-			"share_user_settings": true
+			"share_user_settings": true,
+			"user_folders": {
+				"code": { "settings": "Code", "extensions": ".vscode" },
+				"code - insiders": { "settings": "Code - Insiders", "extensions": ".vscode-insiders" },
+				"code-insiders": { "settings": "Code - Insiders", "extensions": ".vscode-insiders" },
+				"codium": { "settings": "VSCodium", "extensions": ".vscode-oss" },
+				"vscodium": { "settings": "VSCodium", "extensions": ".vscode-oss" }
+			}
 		},
 		"chromium": {
 			"executables": [
