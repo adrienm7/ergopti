@@ -165,6 +165,31 @@ function run() {
 		"const crypto = require('crypto');\nconst lua = `local json=require('core.text.engine.json')`;"
 	);
 
+	// A listed tool's own module-name tables move, one-word names included; a
+	// log tag of the Lua template it embeds does not.
+	const Edits = require('../audit/structure/edits.cjs');
+	const listedTool = 'tools/lib/zz-probe-binding.cjs';
+	Edits.MODULE_NAME_FILES.push({ file: listedTool, why: 'probe' });
+	try {
+		const table =
+			"const imports = { Json: 'json', Terms: 'keymap.terminators' };\n" +
+			'const tpl = `Logger.error("keymap.terminators", "x")`;\n' +
+			"if (name === 'json') ok();";
+		assert.equal(
+			Apply.rewriteText(
+				table,
+				Plan.scanFile(listedTool, table, Plan.referenceContext(MAP)),
+				new Map(),
+				listedTool
+			),
+			"const imports = { Json: 'core.text.engine.json', Terms: 'layouts.engine.terminators' };\n" +
+				'const tpl = `Logger.error("keymap.terminators", "x")`;\n' +
+				"if (name === 'core.text.engine.json') ok();"
+		);
+	} finally {
+		Edits.MODULE_NAME_FILES.pop();
+	}
+
 	const pin = "if (!src.includes('keymap.terminators')) fail('menu.llm.app_profile_overrides');";
 	assert.equal(
 		Apply.rewriteText(pin, Plan.scanFile(tool, pin, Plan.referenceContext(MAP)), new Map(), tool),

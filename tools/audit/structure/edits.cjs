@@ -122,4 +122,28 @@ const SYNTHETIC_PATHS = [
 	}
 ];
 
-module.exports = { FOLDER_EDITS, SYNTHETIC_PATHS };
+/**
+ * Tools that name Lua modules in their own tables, compared against the
+ * require sites they parse (a menu delegation map keyed by module name):
+ * every quoted name of a moved module in them is a module name.
+ */
+const MODULE_NAME_FILES = [
+	{
+		file: 'tools/lib/menu-shared-delegation.cjs',
+		why: 'MODULES and its comparisons name the shared menu modules a driver delegates to'
+	},
+	{
+		file: 'tools/lib/menu-native-llm-parent-binding.cjs',
+		why: 'its imports tables name the modules a Linux menu part requires'
+	},
+	{
+		file: 'tools/lib/menu-hotstring-language-binding.cjs',
+		why: 'its imports table names the modules the hotstring language menu requires'
+	},
+	{
+		file: 'tools/test/test-layouts-defaults-single-source.cjs',
+		why: 'it compares a parsed require argument with the layout registry module'
+	}
+];
+
+module.exports = { FOLDER_EDITS, SYNTHETIC_PATHS, MODULE_NAME_FILES };
