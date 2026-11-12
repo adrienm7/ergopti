@@ -328,7 +328,13 @@ function main() {
 		git('mv', '--', oldRepo, newRepo);
 	}
 	for (const r of retiredRepo) git('rm', '-q', '--', r);
-	git('add', '--', ...[...edits.keys(), ...movedRepo.values()]);
+	// A rewritten file this step also moved is staged at its new path: the old
+	// one no longer exists once the move ran.
+	git(
+		'add',
+		'--',
+		...new Set([...[...edits.keys()].map((f) => movedRepo.get(f) || f), ...movedRepo.values()])
+	);
 	console.log(
 		'applied and staged; run the step gates of docs/design/structure-plan.md before committing.'
 	);
