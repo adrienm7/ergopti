@@ -7,7 +7,7 @@
 	"macos.code_oversized": 9,
 	"macos.code_singleton": 1,
 	"macos.tests_oversized": 2,
-	"macos.tests_singleton": 60,
+	"macos.tests_singleton": 59,
 	"linux.code_oversized": 5,
 	"linux.code_singleton": 2,
 	"linux.tests_oversized": 3,
