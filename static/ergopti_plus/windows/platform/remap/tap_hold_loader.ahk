@@ -831,8 +831,16 @@ _TapHoldReadMacOnlyModifiers() {
 		try LoggerError("TapHoldLoader", "'shared_file.toml' declares no [modifiers] order — a macOS hold is refused as unknown.")
 		return Names
 	}
+	; Read here, not through the writer's picker reader: this runs at the
+	; loader's include position, where tap_hold_writer.ahk may not be included.
+	Picker := ParseTomlFile(_SharedDir . "\tap_hold\defaults.toml").Get("tap_hold.hold_picker", Map())
+	Modifiers := (Picker is Map) ? Picker.Get("modifiers", "") : ""
+	if !(Modifiers is Array) {
+		try LoggerError("TapHoldLoader", "'defaults.toml' declares no [tap_hold.hold_picker] modifiers — a macOS hold is refused as unknown.")
+		return Names
+	}
 	Offered := Map()
-	for _, Id in _TH_ReadHoldPickerArray("modifiers")
+	for _, Id in Modifiers
 		Offered[Id] := true
 	for _, Name in Order {
 		if !Offered.Has(Name)
