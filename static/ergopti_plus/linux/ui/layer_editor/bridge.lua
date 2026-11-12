@@ -362,7 +362,16 @@ function M.on_message(payload, state, context)
 				end
 				return result
 			end
-			if result.stale then result.stale = nil; return result end
+			if result.stale then
+				-- The folder moved after the write: nothing was applied, but the page
+				-- still waits for its answer and keeps every button disabled until
+				-- it comes, as Windows and macOS answer applied=false (LEH-002).
+				result.stale = nil
+				if opening_page_current(owner, state, context) then
+					call_page(state, "saveResult", { saved = true, applied = false, errors = {} })
+				end
+				return result
+			end
 			if opening_page_current(owner, state, context) then
 				call_page(state, "saveResult", { saved = true, applied = result.applied, errors = {} })
 			end
