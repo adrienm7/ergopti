@@ -2008,6 +2008,17 @@ function scanFile(file, text, ctx) {
 					listed: listed && !dotted
 				});
 		}
+		// package.loaded.json in an embedded Lua chunk: the module key spelled
+		// as a field, as in a Lua file.
+		for (const m of text.matchAll(/\bpackage\.(loaded|preload)\.([A-Za-z_]\w*)(?!\w)/g)) {
+			const shared = byLuaName.get(`_shared|${m[2]}`);
+			const own = drivers.map((d) => byLuaName.get(`${d}|${m[2]}`)).filter(Boolean);
+			const hit = shared || (new Set(own.map((h) => h[2])).size === 1 ? own[0] : null);
+			if (hit && hit[2])
+				add('lua-module-field', m[0], `package.${m[1]}[${JSON.stringify(hit[2])}]`, {
+					oldRepo: PREFIX + hit[0]
+				});
+		}
 	}
 	// A tool listed in edits.cjs MODULE_MEMBER_FILES names a shared module's
 	// method by the record name the menu delegation builds from the module

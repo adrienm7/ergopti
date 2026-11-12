@@ -70,6 +70,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "'missing-runtime.txt',\n\t\t'ai/data/fixture.json',"
 	},
 	{
+		// The E2E bootstrap check joins the shared decoder onto run_e2e.lua's
+		// own shared_lua variable, which no scan of this file can read.
+		file: 'tools/test/test-bash-resolution.cjs',
+		empties: '_shared/lua',
+		from: 'assert(json_path == shared_lua .. "/json.lua"',
+		to: 'assert(json_path == shared_lua .. "/core/text/engine/json.lua"'
+	},
+	{
 		// The locale is found relative to the page under test, a variable
 		// the scan cannot evaluate.
 		file: 'tools/test/support/metrics-apps-page.cjs',
