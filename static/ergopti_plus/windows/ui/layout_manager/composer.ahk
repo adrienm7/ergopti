@@ -694,7 +694,7 @@ _LayoutComposer_Remove(Deps) {
 		return
 	}
 	if Deps["selected"].Call() == Id {
-		; Back to the system layout, then reload without the composed layout.
+		; The choice is kept; reload without the composed layout (it is no longer emulated).
 		Completed := false
 		Reloaded(Accepted, FailureDetail := "") {
 			if Completed

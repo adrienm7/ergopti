@@ -44,6 +44,8 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
 		Name := (Entry is Map) ? Entry.Get("name", Active) : Active
 	}
 	Label := Name == "" ? t("menu.layout.emulated_none") : Format(t("menu.layout.emulated_status"), Name)
+	if (Active != "" && KeylayoutEmulation_FailedId() == Active)
+		Label .= " — " . t("menu.layout.emulation_failed")
 	return [Map("label", Label, "disabled", true)]
 }
 
@@ -52,15 +54,25 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
  * (_shared/lua/layouts/emulation_menu.lua): none, the built-in Ergopti
  * variants, then the registry layouts the app lists or the layout manager
  * installed. A choice goes through the layout manager's acknowledged handoff,
- * which restarts the driver on the new selection.
+ * which restarts the driver on the new selection. A registry layout that is not
+ * installed is installed first: the boot never installs (decided on 2026-11-12,
+ * as macOS and Linux), so an uninstalled layout stays chosen, named « cannot be
+ * emulated », until it is chosen again here or installed in the layout manager.
  * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
  * @param {Func} SelectFn Port with LayoutManager_Select's contract.
  * @param {Map} Index Registry metadata; the current catalogue when omitted.
  * @param {Map} Installed Installed-layout record; read from disk when omitted.
  * @param {Func} ErrorFn Port: ErrorFn(Message) tells a refused selection.
+ * @param {Func} InstallFn Port: InstallFn(Id, OnDone) installs a registry layout,
+ *   OnDone(Ok, Detail*); LayoutCatalogue_Install by default.
+ * @param {String} FailedId The selected id the boot could not emulate;
+ *   KeylayoutEmulation_FailedId() by default.
+ * @param {Func} AfterFn Port: AfterFn(Id, Action, OnDone) reloads the emulation
+ *   after an install; _LayMgrWeb_After by default.
  * @returns {Array} One submenu row holding the choices.
  */
-_LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset, Installed := unset, ErrorFn := 0) {
+_LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset, Installed := unset, ErrorFn := 0,
+		InstallFn := 0, FailedId := unset, AfterFn := 0) {
 	global Features, _ConfigDir, ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
 	if !IsSet(FeaturesSource)
 		FeaturesSource := Features
@@ -75,6 +87,13 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 	}
 	if !IsSet(Installed)
 		Installed := LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))
+	if !HasMethod(InstallFn, "Call")
+		InstallFn := (Id, OnDone) => LayoutCatalogue_Install(Id, LayoutRegistry_LocalDir(_ConfigDir), OnDone)
+	if !IsSet(FailedId)
+		FailedId := KeylayoutEmulation_FailedId()
+	if !HasMethod(AfterFn, "Call")
+		AfterFn := _LayMgrWeb_After
+	ComposerId := LayoutRegistry_Composer()["id"]
 	Current := LayoutManager_ActiveId(FeaturesSource)
 	Registry := Map()
 	for Entry in Index["layouts"]
@@ -102,7 +121,12 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 	; One call per choice owns its id: a closure over the loop variable would
 	; see its last value.
 	ChooseAction(Id) {
-		return (*) => _LAY_ChooseEmulation(Id, SelectFn, ErrorFn)
+		; A missing copy, or the chosen one the boot found unusable, is (re)installed:
+		; choosing it again is the repair the boot no longer does on its own.
+		NeedsInstall := Id != "" && Id != ERGOPTI_LAYOUT_ID && Id != ERGOPTI_PLUS_LAYOUT_ID
+			&& Id != ComposerId && (!Installed.Has(Id) || Id == FailedId)
+		return (*) => _LAY_ChooseEmulation(Id, SelectFn, ErrorFn, NeedsInstall ? InstallFn : 0,
+			Id == Current ? AfterFn : 0)
 	}
 	Items := []
 	for Pair in Choices {
@@ -111,6 +135,10 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 			Shown := Pair[2]
 		Items.Push(Map("label", Pair[2], "checked", Checked, "action", ChooseAction(Pair[1])))
 	}
+	; A chosen layout the boot could not emulate stays ticked and named, as macOS
+	; and Linux show their emulation status error.
+	if (Current != "" && FailedId == Current)
+		Shown .= " — " . t("menu.layout.emulation_failed")
 	return [Map("label", LabelValue(t("menu.layout.emulated_layout"), Shown), "items", Items)]
 }
 
@@ -126,13 +154,35 @@ _LAY_SortByName(Pairs) {
 	return Sorted
 }
 
-; Selects one emulation choice from the menu and tells a refusal.
-_LAY_ChooseEmulation(Id, SelectFn, ErrorFn) {
+; Selects one emulation choice from the menu and tells a refusal. A layout that
+; is not installed is installed first; when it is already the chosen one, the
+; install reloads the emulation instead of selecting it again.
+; @param InstallFn {Func|Integer} InstallFn(Id, OnDone), or 0 when installed.
+; @param AfterFn {Func|Integer} AfterFn(Id, Action, OnDone) for the chosen layout, or 0.
+_LAY_ChooseEmulation(Id, SelectFn, ErrorFn, InstallFn := 0, AfterFn := 0) {
 	try LoggerInfo("Layout", "Choosing the layout to emulate '{1}' from the menu.", Id == "" ? "none" : Id)
+	if HasMethod(InstallFn, "Call") {
+		LoggerInfo("Layout", "'{1}' is not installed; installing it before it is emulated.", Id)
+		InstallFn.Call(Id, _LAY_OnEmulationInstalled.Bind(Id, SelectFn, ErrorFn, AfterFn))
+		return true
+	}
 	if SelectFn.Call(Id)
 		return true
 	ErrorFn.Call(t("menu.layout.emulation_not_saved"))
 	return false
+}
+
+_LAY_OnEmulationInstalled(Id, SelectFn, ErrorFn, AfterFn, Ok, Detail*) {
+	if !Ok {
+		; LayoutCatalogue_Install logged the failure and its reason.
+		ErrorFn.Call(t("menu.layout.install_failed"))
+		return
+	}
+	if HasMethod(AfterFn, "Call") {
+		AfterFn.Call(Id, "install", (Reloaded) => Reloaded ? 0 : ErrorFn.Call(t("menu.layout.install_failed")))
+		return
+	}
+	_LAY_ChooseEmulation(Id, SelectFn, ErrorFn)
 }
 
 /**

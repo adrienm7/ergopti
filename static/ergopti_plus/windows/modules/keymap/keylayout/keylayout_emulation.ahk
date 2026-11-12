@@ -1246,30 +1246,48 @@ _KLE_DefaultBootDeps() {
 	return Map(
 		"keycodes", LayoutRegistry_Keycodes,
 		"register", KeylayoutEmulation_Register,
-		"read_local", LayoutRegistry_ReadLocal,
-		"install", LayoutCatalogue_Install
+		"read_local", LayoutRegistry_ReadLocal
 	)
 }
 
+; The registry id the boot could not emulate (not installed, unreadable or
+; refused), "" otherwise: the menu names it with « — cannot be emulated ».
+global KLE_BootFailedId := ""
+
 /**
- * Registers the emulation and loads the selected layout, installing it first
- * through the layout catalogue when it is not installed or its copy no longer
- * matches its record. Runs once at boot, before the Ergopti layers register
- * their hotkeys.
+ * The selected layout the boot could not emulate, as macOS and Linux report
+ * their emulation status error.
+ * @returns {string} Its registry id, or "".
+ */
+KeylayoutEmulation_FailedId() {
+	global KLE_BootFailedId
+	return KLE_BootFailedId
+}
+
+/**
+ * Registers the emulation and loads the selected layout from its installed
+ * copy. Runs once at boot, before the Ergopti layers register their hotkeys.
+ * The boot never installs (decided on 2026-11-12, as macOS and Linux): a layout
+ * the user uninstalled stays chosen and is not emulated until it is installed
+ * again, and a missing or damaged copy is reported, never silently downloaded.
+ * The menu choice installs a layout that is not installed yet.
  * @param {string} ConfigDir - Configuration folder, with its trailing backslash.
- * @param {Map} Deps - "keycodes", "register", "read_local" and "install"
- *   implementations; injectable for tests.
+ * @param {Map} Deps - "keycodes", "register" and "read_local" implementations;
+ *   injectable for tests.
  * @returns {boolean} Whether the layout is emulated when this returns (false
- *   while it downloads, or when nothing is selected or it failed).
+ *   when nothing is selected or it cannot be emulated).
  */
 KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
+	global KLE_BootFailedId
 	if !(Deps is Map)
 		Deps := _KLE_DefaultBootDeps()
+	KLE_BootFailedId := ""
 	Id := KeylayoutEmulation_SelectedId()
 	if (Id == "")
 		return false
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerError("LayoutEmulation", "The emulated layout '{1}' is not a registry id; nothing is emulated.", Id)
+		KLE_BootFailedId := Id
 		return false
 	}
 	KeycodeTable := Deps["keycodes"].Call()
@@ -1291,6 +1309,7 @@ KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
 			try Stored := Deps.Get("read_composed", LayoutComposer_ReadComposed).Call(ConfigDir)
 			catch as StoredErr {
 				LoggerError("LayoutEmulation", "The composed layout source is not usable ({1}); save it again in the layout editor.", StoredErr.Message)
+				KLE_BootFailedId := Id
 				return false
 			}
 			if Stored is Map {
@@ -1298,35 +1317,26 @@ KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
 				return _KLE_Activate(Id, Stored, KeycodeTable)
 			}
 			LoggerError("LayoutEmulation", "The composed layout is not usable ({1}); save it again in the layout manager.", Err.Message)
+			KLE_BootFailedId := Id
 			return false
 		}
-		LoggerInfo("LayoutEmulation", "The '{1}' layout is not usable locally ({2}); installing it.", Id, Err.Message)
-		Deps["install"].Call(Id, LocalDir, _KLE_OnInstalled.Bind(Id, LocalDir, KeycodeTable, Deps))
+		LoggerError("LayoutEmulation", "The '{1}' layout cannot be emulated ({2}); it stays chosen. Choose it again in the Keyboard layout menu, or install it in the layout manager.",
+			Id, Err.Message)
+		KLE_BootFailedId := Id
 		return false
 	}
 	return _KLE_Activate(Id, LocalCopy, KeycodeTable)
 }
 
-_KLE_OnInstalled(Id, LocalDir, KeycodeTable, Deps, Ok, Detail*) {
-	; LayoutCatalogue_Install already logged the failure and its reason.
-	if !Ok
-		return
-	try {
-		LocalCopy := Deps["read_local"].Call(Id, LocalDir)
-	} catch as Err {
-		LoggerError("LayoutEmulation", "The downloaded '{1}' layout cannot be read back: {2}", Id, Err.Message)
-		return
-	}
-	_KLE_Activate(Id, LocalCopy, KeycodeTable)
-}
-
 _KLE_Activate(Id, LocalCopy, KeycodeTable) {
+	global KLE_BootFailedId
 	LoggerStart("LayoutEmulation", "Loading the '{1}' layout for emulation…", Id)
 	try {
 		Keys := KeylayoutEmulation_Load(Id, LocalCopy["Text"], LocalCopy["Entry"]["keycode_convention"], KeycodeTable)
 	} catch as Err {
 		; Failed preparation must not unload the previously admitted source.
 		LoggerError("LayoutEmulation", "Loading the '{1}' layout failed: {2}", Id, Err.Message)
+		KLE_BootFailedId := Id
 		return false
 	}
 	LoggerSuccess("LayoutEmulation", "Emulating the '{1}' layout, version {2} ({3} keys).",

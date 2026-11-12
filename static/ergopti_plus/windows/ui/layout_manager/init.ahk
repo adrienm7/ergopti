@@ -673,12 +673,11 @@ _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
 		OnDone.Call(true)
 		return true
 	}
-	if Selected && Action == "uninstall" {
-		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
-		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, ConfigKey.LAYOUT_EMULATED_LAYOUT, Value))
-		if !WriteSelection.Call("")
-			return ConfigReportPersistenceFailure("the layout selection")
-	}
+	; The stored choice is kept (decided on 2026-11-12, as macOS and Linux): the
+	; reload stops the emulation, the menu names the layout « cannot be emulated »,
+	; and installing it again resumes it. The boot never reinstalls it.
+	if Selected && Action == "uninstall"
+		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; it stays chosen and is no longer emulated.", Id)
 	Refused(Reason) {
 		LoggerError("LayoutManager", "Runtime refresh refused after catalogue publication: {1}.", Reason)
 		OnDone.Call(false)
