@@ -1699,6 +1699,24 @@ function scanFile(file, text, ctx) {
 			// name expression) are left alone.
 			add(hit.kind, j.prefix + j.text, j.prefix + hit.rendered, hit);
 		}
+	// "ergopti_plus/_shared/modules/llm/validate_*.py": a glob whose last segment
+	// holds the wildcard; its folder follows a folder that moves whole.
+	for (const m of text.matchAll(/(["'])([\w.%\/-]+\/[\w.%-]+)\/([^\/"'\s*]*[*?][^\/"'\s]*)\1/g)) {
+		const hit = resolvePathToken(m[2], file, inTree, byRepoDir);
+		if (!hit || hit.newRepo === SPLIT || hit.newRepo === PREFIX) continue;
+		// Never widened to a whole tree (_shared/lua/** is the root switch's).
+		if (Census.TREES.some((t) => hit.newRepo === `${PREFIX}${t}`)) continue;
+		const respelled =
+			hit.form === 'repo'
+				? hit.newRepo
+				: hit.form === 'tree'
+					? hit.newRepo.slice(PREFIX.length)
+					: hit.form === 'embedded'
+						? hit.keep + hit.newRepo.slice(PREFIX.length)
+						: null;
+		if (respelled && respelled !== m[2])
+			add('source-check', m[0], `${m[1]}${respelled}/${m[3]}${m[1]}`, hit);
+	}
 	// SHARED_MODS=( "keycodes.evdev" … ) looped into pcall(require, '${mod}'): a
 	// shell array of the module names a Lua one-liner loads.
 	if (/\.sh$/.test(file))
