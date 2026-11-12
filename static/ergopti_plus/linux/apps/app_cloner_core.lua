@@ -229,10 +229,13 @@ function M.plan(request)
 	local family = M.family(catalogue, program, request.has_marker)
 
 	local base = M.slug(request.name)
-	local id, suffix = base, 1
+	-- A taken name gets the suffix on its id and on the name the menu shows,
+	-- "Name (2)" as Windows names the second shortcut (BAP-006).
+	local id, suffix, name = base, 1, request.name
 	while request.taken(id) do
 		suffix = suffix + 1
 		id = base .. "-" .. suffix
+		name = request.name .. " (" .. suffix .. ")"
 	end
 	local root = request.data_home .. "/ergopti/" .. catalogue.profile_folder .. "/" .. id
 	local profile = root .. "/profile"
@@ -282,7 +285,7 @@ function M.plan(request)
 	local desktop = {
 		"[Desktop Entry]",
 		"Type=Application",
-		"Name=" .. M.desktop_value(request.name),
+		"Name=" .. M.desktop_value(name),
 		"Exec=" .. M.desktop_exec_word("/bin/sh") .. " " .. M.desktop_exec_word(plan.launcher_path) .. " %U",
 		"Terminal=false",
 	}

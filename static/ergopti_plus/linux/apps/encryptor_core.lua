@@ -140,6 +140,10 @@ function M.convert(format, mode, input, output, password, openssl)
 		local file = assert(io.open(password_file, "wb"), "cannot write the password file")
 		file:write(password)
 		file:close()
+		-- mv -f moves the stage into a folder named like the output and returns 0,
+		-- so a folder destination would be reported as converted; Windows'
+		-- MoveFileExW refuses to replace one (BAP-001).
+		if succeeded("test -d " .. quote(output)) then reason = "destination_is_folder" return end
 		local folder = output:match("^(.*)/[^/]*$") or "."
 		local base = output:match("([^/]*)$")
 		stage = read_line("mktemp " .. quote((folder == "" and "/" or folder) .. "/." .. base .. ".XXXXXX") .. " 2>/dev/null")
@@ -179,6 +183,14 @@ end
 -- ======= 3/ Flow ==============
 -- ==============================
 -- ==============================
+
+-- The failure dialog's reason for each convert refusal the system caused.
+local FAILURE_REASONS = {
+	destination_is_folder = "apps.encryptor.reason_destination_folder",
+	open_failed           = "apps.encryptor.reason_cannot_write",
+	rename_failed         = "apps.encryptor.reason_cannot_write",
+	unreadable            = "apps.encryptor.reason_cannot_write",
+}
 
 --- Whether a path names an existing regular file.
 local function is_file(path)
@@ -225,10 +237,16 @@ function M.process_file(path, ports)
 			break
 		end
 	end
-	local ok = M.convert(format, mode, path, destination, password, ports.openssl)
+	local ok, reason = M.convert(format, mode, path, destination, password, ports.openssl)
 	if not ok then
-		dialogs.message("error", title,
-			t(encrypting and "apps.encryptor.err_encrypt_failed" or "apps.encryptor.err_decrypt_failed"))
+		local failure = t(encrypting and "apps.encryptor.err_encrypt_failed" or "apps.encryptor.err_decrypt_failed")
+		-- A refused write carries its reason, as Windows appends the system's
+		-- (BAP-007); OpenSSL's own refusal is the wrong password or a corrupted
+		-- file the message already names.
+		local reason_key = FAILURE_REASONS[reason]
+		if reason_key == nil and reason ~= "command_exited_nonzero" then reason_key = "apps.encryptor.reason_cannot_write" end
+		if reason_key then failure = failure .. "\n\n" .. t(reason_key) end
+		dialogs.message("error", title, failure)
 		return "failed"
 	end
 	local summary = t(encrypting and "apps.encryptor.success_encrypted" or "apps.encryptor.success_decrypted")
