@@ -994,7 +994,7 @@ _KLT_ReadNothing(Id, LocalDir) {
 	throw Error("The layout '" . Id . "' is not downloaded in " . LocalDir)
 }
 
-Test("keylayout emulation: boot registers first, then loads the local copy or downloads it (layout-registry-emulation)",
+Test("keylayout emulation: boot registers first, then loads the local copy and never downloads it (layout-registry-emulation)",
 	() => _KLT_WithEmulation(_KLT_BootCase))
 
 _KLT_BootCase() {
@@ -1014,27 +1014,21 @@ _KLT_BootCase() {
 	AssertEqual("register", _KLT_Join(Log), "a local copy is loaded without a download")
 	AssertEqual("ergol", KLE_Id)
 
-	; Missing locally: the hotkeys are still registered at boot, the layout
-	; arrives when the download reports success.
+	; Missing locally (an uninstalled layout, then the reload): the hotkeys are
+	; still registered, the layout stays chosen, and the boot never downloads it
+	; (decided on 2026-11-12, as macOS and Linux); the menu names it as failed.
 	KeylayoutEmulation_Unload()
 	Log := []
-	; An object, not a captured local: the download callback flips it.
-	Store := {Downloaded: false}
-	ReadAfterDownload := (Id, LocalDir) => Store.Downloaded ? _KLT_ReadRepoLocal(Id, LocalDir) : _KLT_ReadNothing(Id, LocalDir)
-	Fetch := (Id, LocalDir, OnDone, *) => (Log.Push("fetch " . Id . " into " . LocalDir),
-		Store.Downloaded := true, OnDone.Call(true, _KLT_Entry(Id)))
+	Fetch := (*) => Log.Push("fetch")
 	_KLT_WithLayoutFeatures(_KLT_BootLayout("ergol"), () =>
-		AssertFalse(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps(Log, ReadAfterDownload, Fetch)),
-			"the layout is not emulated yet when boot returns"))
-	AssertEqual("register; fetch ergol into C:\cfg\" . LayoutRegistry_Settings()["local_folder"] . "\", _KLT_Join(Log))
-	AssertEqual("ergol", KLE_Id, "the downloaded layout is loaded once the download succeeds")
-
-	; A failed download leaves the emulation inert.
-	KeylayoutEmulation_Unload()
-	Failing := (Id, LocalDir, OnDone, *) => OnDone.Call(false, "HTTP 404")
+		AssertFalse(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps(Log, _KLT_ReadNothing, Fetch)),
+			"an uninstalled layout is not emulated"))
+	AssertEqual("register", _KLT_Join(Log), "an uninstall then a reload never reinstalls the layout")
+	AssertFalse(IsObject(KLE_Model), "nothing is emulated")
+	AssertEqual("ergol", KeylayoutEmulation_FailedId(), "the menu is told the chosen layout is not emulated")
 	_KLT_WithLayoutFeatures(_KLT_BootLayout("ergol"), () =>
-		KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadNothing, Failing)))
-	AssertFalse(IsObject(KLE_Model), "nothing is emulated after a failed download")
+		AssertTrue(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadRepoLocal, Fetch))))
+	AssertEqual("", KeylayoutEmulation_FailedId(), "installed again, the layout resumes and the failure clears")
 }
 
 ; Capture the actual registration boundary, including names built by concatenation.

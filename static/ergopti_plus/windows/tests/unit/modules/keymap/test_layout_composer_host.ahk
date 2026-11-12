@@ -296,7 +296,7 @@ _LCH_RemoveCase() {
 		LayoutComposer_Handle("composer_save", Payload, _LCH_Deps(Dir, []))
 		Log2 := []
 		LayoutComposer_Handle("composer_remove", Map(), _LCH_Deps(Dir, Log2, "composed"))
-		AssertEqual("after composed uninstall", _LCH_Calls(Log2), "selected: back to the system layout")
+		AssertEqual("after composed uninstall", _LCH_Calls(Log2), "selected: the choice stays and the driver reloads")
 	} finally DirDelete(Dir, true)
 }
 

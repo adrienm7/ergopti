@@ -257,6 +257,83 @@ _LMH_NativeEmulationStatus() {
 Test("layout menu: the native status is grayed and management remains usable (layout-menu-emulation-status)",
 	_LMH_NativeEmulationStatus)
 
+; Keep the emulated layout (decided on 2026-11-12, as macOS and Linux): the menu
+; choice installs a layout that is not installed before selecting it, the boot
+; never does, and a chosen layout the boot could not emulate stays ticked and
+; named « cannot be emulated »; choosing it again installs it and reloads.
+_LMH_EmulationChoiceInstallsFirst() {
+	Index := Map("layouts", [Map("id", "ergol", "name", "Ergo-L")])
+	Chosen := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", false))
+	Log := []
+	Select := (Id) => (Log.Push("select " . Id), true)
+	Install := (Id, OnDone) => (Log.Push("install " . Id), OnDone.Call(true))
+	After := (Id, Action, OnDone) => (Log.Push(Action . " " . Id), OnDone.Call(true))
+	Refuse := (Message) => Log.Push("error")
+	Item(Rows, Name) {
+		for Row in Rows[1]["items"]
+			if Row["label"] == Name
+				return Row
+		Assert(false, "the menu lists " . Name)
+	}
+	Rows := _LAY_EmulationChoiceRows(Chosen, Select, Index, Map(), Refuse, Install, "ergol", After)
+	AssertTrue(InStr(Rows[1]["label"], t("menu.layout.emulation_failed")) > 0,
+		"a chosen layout the boot could not emulate is named as such")
+	Ergol := Item(Rows, "Ergo-L")
+	AssertTrue(Ergol["checked"], "and stays ticked")
+	Ergol["action"].Call()
+	AssertEqual("install ergol; install ergol", _LMH_JoinLog(Log),
+		"choosing it again installs it and reloads the emulation, never a second selection")
+	Log := []
+	Other := Map("layout", Map("emulated_layout", "", "ergopti_base", false))
+	Rows := _LAY_EmulationChoiceRows(Other, Select, Index, Map(), Refuse, Install, "", After)
+	AssertFalse(InStr(Rows[1]["label"], t("menu.layout.emulation_failed")) > 0, "nothing failed, nothing named")
+	Item(Rows, "Ergo-L")["action"].Call()
+	AssertEqual("install ergol; select ergol", _LMH_JoinLog(Log), "a layout not installed is installed, then selected")
+	Log := []
+	Rows := _LAY_EmulationChoiceRows(Other, Select, Index, Map("ergol", Map("name", "Ergo-L")), Refuse, Install, "", After)
+	Item(Rows, "Ergo-L")["action"].Call()
+	AssertEqual("select ergol", _LMH_JoinLog(Log), "an installed layout is selected without an install")
+	Log := []
+	Failing := (Id, OnDone) => (Log.Push("install " . Id), OnDone.Call(false, "offline"))
+	Rows := _LAY_EmulationChoiceRows(Other, Select, Index, Map(), Refuse, Failing, "", After)
+	Item(Rows, "Ergo-L")["action"].Call()
+	AssertEqual("install ergol; error", _LMH_JoinLog(Log), "a failed install is told and selects nothing")
+}
+Test("layout menu: a choice installs a missing layout first and names a failed one (keep-emulated-layout)",
+	_LMH_EmulationChoiceInstallsFirst)
+
+_LMH_JoinLog(Log) {
+	Joined := ""
+	for Line in Log
+		Joined .= (Joined == "" ? "" : "; ") . Line
+	return Joined
+}
+
+; An uninstall of the chosen layout keeps the stored choice and reloads, so the
+; emulation stops; the boot that follows never reinstalls it (keylayout boot test).
+_LMH_UninstallKeepsChoice() {
+	Directory := _LMH_TempDir()
+	try {
+		LocalDir := LayoutRegistry_LocalDir(Directory)
+		DirCreate(LocalDir)
+		Reloads := 0, Result := "pending"
+		Reload(Success, Owner, Refused) {
+			Reloads += 1
+			Success.Call()
+			return true
+		}
+		Options := Map("local_dir", LocalDir, "selected", (*) => "ergol", "packs", (*) => [], "reload", Reload)
+		AssertTrue(_LayMgrWeb_After("ergol", "uninstall", (Ok) => Result := Ok, Options))
+		AssertEqual(1, Reloads, "the emulation reloads without the uninstalled layout")
+		AssertEqual(true, Result)
+		Body := _DriverFuncBody("_LayMgrWeb_After")
+		Assert(Body != "", "_LayMgrWeb_After must exist")
+		AssertFalse(InStr(Body, "LAYOUT_EMULATED_LAYOUT") > 0, "the uninstall never rewrites the stored choice")
+	} finally DirDelete(Directory, true)
+}
+Test("layout manager: uninstalling the chosen layout keeps the choice and reloads (keep-emulated-layout)",
+	_LMH_UninstallKeepsChoice)
+
 
 
 
