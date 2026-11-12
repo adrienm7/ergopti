@@ -44,6 +44,7 @@ function run() {
 		['local root = Paths.shared("lua")', 'local root = Paths.shared_root()'],
 		['package.path = arg[1] .. "/lua/?.lua;" .. p', 'package.path = arg[1] .. "/?.lua;" .. p'],
 		["read(shared('lua', page.Lua.modulePath(name)))", 'read(shared(page.Lua.modulePath(name)))'],
+		["local shared_lua = '_shared' .. sep .. 'lua'", "local shared_lua = '_shared'"],
 		// The shared test folder as a whole is now the shared test tree.
 		['{ driver .. "/_shared/lua/test/" }', '{ driver .. "/_shared/tests/" }']
 	];
