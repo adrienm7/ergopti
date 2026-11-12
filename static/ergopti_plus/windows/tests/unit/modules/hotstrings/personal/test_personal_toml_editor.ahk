@@ -840,8 +840,7 @@ _PT102_WebInitNativeOutcome(Context, View, Lines, Unhandled, Failure) {
 		AssertEqual(Context.mode != "web-reject", Source["ready"])
 		AssertEqual(FSReadUtf8Exact(Context.path), Source["content"])
 		_HsEdWeb_SessionEpoch += 1
-		if PersonalTomlCommitAndReload.MaxParams >= 10
-			_HsEdWeb_InitSourceSettled(Source, true)
+		_HsEdWeb_InitSourceSettled(Source, true)
 		AssertFalse(_PersonalTomlOpeningSessionCurrent(Source),
 			"a late native completion cannot revive an old Web epoch")
 	} finally {

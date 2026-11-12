@@ -706,9 +706,7 @@ _PT102_Reload(Context, Data, SectionName, FeatureConfig) {
 _PT102_Commit(Context, Data, Deferred := false) {
 	Args := [Data, 0, _PT102_Stage.Bind(Context), _PT102_Replace.Bind(Context),
 		0, _PT102_Authorize.Bind(Context), _PT102_Reload.Bind(Context),
-		Deferred ? _PT102_Terminal.Bind(Context) : 0, 0]
-	if PersonalTomlCommitAndReload.MaxParams >= 10
-		Args.Push(Context.source)
+		Deferred ? _PT102_Terminal.Bind(Context) : 0, Context.source]
 	return PersonalTomlCommitAndReload(Args*)
 }
 
