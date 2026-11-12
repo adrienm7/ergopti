@@ -52,6 +52,27 @@ local ConfigKeys = require("config_keys")
 local TapHoldFile = require("platform.remap.tap_hold_file")
 -- Resolved at use, as before: the shared writer binds its native admission when loaded.
 local function writer() return require("toml_codec.writer") end
+
+--- Hands a config.toml publication of the tap-hold rows to the preferences
+--- owner. That owner saves config.toml only over the exact bytes it last read
+--- or wrote, so a publication it did not see would refuse every later
+--- preference save, and every scope after this one in a global restore.
+--- Preferences tracks no source before its own load (unit fixtures, early
+--- boot): there is then no read to keep current.
+--- @param path string The config.toml path.
+--- @param before table `{ status, content? }` the publication replaced.
+--- @param content string The published bytes.
+local function acknowledge_config_publication(path, before, content)
+	local Preferences = package.loaded["infra.preferences"]
+	if type(Preferences) ~= "table" or type(Preferences.source_snapshot) ~= "function" then return end
+	local current = Preferences.source_snapshot(path)
+	if current == nil then return end
+	if Preferences.replace_source(path, { status = before.status, content = before.content },
+		{ status = "ok", content = content }) ~= true then
+		Logger.warn(LOG, "The preferences hold another read of '%s' than the tap-hold rows replaced; "
+			.. "a preference save over that older read is refused.", path)
+	end
+end
 -- Declared here, above the readers below: section 1 declares its own TomlCodec later.
 local ConfigCodec = require("infra.toml.codec")
 
@@ -1286,6 +1307,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			return false, tostring(called and publish_detail or published),
 				type(config_cleanup) == "function" and companion or nil
 		end
+		acknowledge_config_publication(config_source.path, config_expected, config_candidate)
 	end
 	local publication_source = { status = source_status, content = source }
 	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
@@ -1349,6 +1371,7 @@ function M.publish_copy_taps_to_chords(plan, current_path, admission)
 	local receipt = { path = plan.config_path, source = plan.expected_source, candidate = plan.candidate, verify_absence = true }
 	if type(cleanup) == "function" then receipt.publication_cleanup = cleanup end
 	if not called or written ~= true then return false, called and detail or written, type(cleanup) == "function" and receipt or nil end
+	acknowledge_config_publication(plan.config_path, plan.expected_source, plan.candidate)
 	return true, nil, receipt
 end
 

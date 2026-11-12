@@ -122,7 +122,7 @@ function M.new(options)
 		-- cleanup. Physical edits retain their source-bound leaf validation;
 		-- the script chords' submenu writes only its own leaves.
 		local containers = config.select == nil and not config.editing and Preferences.SHORTCUT_CONTAINERS or nil
-		-- [mod_combos] lives in tap_hold.toml: the remap engine applies
+		-- [mod_combos] is the remap engine's, in config.toml: it applies
 		-- the Shortcuts scope's combination section itself (platform/remap
 		-- REMAP_SCOPE_SECTIONS), so this config.toml transaction leaves it.
 		if not config.editing then
