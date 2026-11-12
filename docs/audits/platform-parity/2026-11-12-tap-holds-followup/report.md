@@ -74,20 +74,20 @@ this branch.
 - **TCL-007 (low, macOS):** every macOS save re-renders the whole
   `tap_hold.toml`, which drops comments and the Linux header.
 
-## Open: the 2026-11-10 macOS rows (still true at `HEAD`)
+## Fixed after the maintainer's answer (2026-11-12), proven on the model
 
-- **LAlt's one-shot Shift:**
-  - **Now:** with no hold, `generator.lua`'s `#hold_to == 0` path fires at
-    key-down, holds no Shift, and accepts every modifier (`optional = ["any"]`).
-  - **Windows:** `lalt.ahk` holds LShift and stands down under RCtrl,
-    CapsLock, LShift or LCtrl.
-  - **Generator fix:** append the held `left_shift`, narrow `optional`, and
-    add swallow manipulators on `ke_held_*`, as the Fn blocker does.
-  - **Status:** needs native qualification on a Mac.
-- **A pair's first key:**
-  - **Now:** Karabiner rule order decides. Windows and Linux use press order.
-  - **Generator fix:** pairwise precedence variables set by a to-event's own
-    conditions (as `apply_tap_minimum` relies on), N² variables.
-  - **Status:** needs native qualification.
+- **Left Command's one-shot Shift (macOS):** with no hold it now holds
+  `left_shift` while down (the last `to` entry). One tracking-only
+  manipulator per held `right_option`, `caps_lock`, `left_shift` or `fn` (the
+  Windows LCtrl position) stands it down, as Windows' `lalt.ahk` 4.1 does.
+  Regression `lalt-one-shot-held-shift` (Karabiner v16 model). Field point
+  `lalt_one_shot`.
+- **A pair's first key (macOS):** `apply_pair_press_order` records, at each
+  key-down of a first key several pairs share, which rivals were already held.
+  It uses `ke_before_*` variables set through a to-event's own condition and
+  cleared at key-up. Each such pair is gated on no rival held before its own
+  first key, so the key held earliest wins, as on Windows and Linux.
+  Regression `pair-first-key-press-order`; the recommended preset's pinned
+  graph is re-pinned. Field point `pair_press_order`.
 
 Native receiving is unqualified.
