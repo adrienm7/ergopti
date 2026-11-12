@@ -27,7 +27,6 @@ local Labels     = require("menu.labels")
 local NativeDirectory = require("infra.native_directory")
 local RegularFileReader = require("infra.regular_file_reader")
 local LOG        = "i18n"
-local _miss_warned = {}
 
 local _locale    = "fr"   -- active locale code
 local _storage   = nil    -- storage adapter (lazy-loaded)
@@ -223,16 +222,7 @@ end
 --- @param key string Dot-notation key (e.g. "menu.global.reload").
 --- @return string Translated string, or the raw key on miss.
 function M.get(key)
-	local s = locale_mod.get(key)
-	if s ~= nil and s ~= "" then return s end
-	-- A total miss (active locale, en and fr) shows the raw key: warned once
-	-- per key, as on Windows, since every menu rebuild asks again.
-	if not _miss_warned[key] then
-		_miss_warned[key] = true
-		Logger.warn(LOG, "No translation for '%s' in the active locale, en or fr — the raw key is displayed.",
-			tostring(key))
-	end
-	return key
+	return locale_mod.display(key)
 end
 
 --- Whether a key has a translation, for a caller probing optional keys: unlike

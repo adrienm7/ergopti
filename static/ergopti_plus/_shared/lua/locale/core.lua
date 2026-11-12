@@ -82,6 +82,7 @@ function M.init(opts)
 		resolve_locale_path = opts.resolve_locale_path,
 		read_file  = type(opts.read_file) == "function" and opts.read_file or nil,
 		load_failure_reported = {},
+		miss_warned = {},
 		log_debug  = type(opts.log_debug)  == "function" and opts.log_debug  or nil,
 		log_warn   = type(opts.log_warn)   == "function" and opts.log_warn   or nil,
 		log_error  = type(opts.log_error)  == "function" and opts.log_error  or nil,
@@ -249,6 +250,25 @@ function M.get(key)
 		end
 	end
 	return s
+end
+
+--- Returns the translation shown for a label, or the key itself on a total
+--- miss (active locale, en and fr). The miss is warned once per key, as on
+--- Windows: every menu rebuild asks again. A caller probing an optional key
+--- uses has() instead, since its miss is not a defect.
+--- @param key string Dot-notation key.
+--- @return string
+function M.display(key)
+	local s = M.get(key)
+	if s ~= "" then return s end
+	if _state and not _state.miss_warned[key] then
+		_state.miss_warned[key] = true
+		if _state.log_warn then
+			_state.log_warn("i18n", "No translation for '%s' in the active locale, en or fr — the raw key is displayed.",
+				tostring(key))
+		end
+	end
+	return key
 end
 
 --- Returns the locale the translation backend currently owns.

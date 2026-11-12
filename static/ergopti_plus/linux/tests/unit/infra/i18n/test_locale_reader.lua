@@ -119,13 +119,14 @@ helpers.describe("linux/infra/i18n.lua", function()
 		helpers.assert_eq(i18n.get_locale(), "fr", "default locale is fr")
 	end)
 	helpers.it("i18n warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
-		local names = { "logger.shim", "infra.i18n" }
+		local names = { "logger.shim", "infra.i18n", "infra.locale", "locale.core" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local logs = {}
 		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 		package.loaded["logger.shim"] = logger
+		package.loaded["infra.locale"] = nil
 		local ok, detail = pcall(function()
 			local i18n = helpers.load_module("infra.i18n")
 			local function count(pattern)
