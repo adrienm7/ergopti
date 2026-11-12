@@ -1996,6 +1996,15 @@ function scanFile(file, text, ctx) {
 				});
 		}
 	}
+	// A tool listed in edits.cjs MODULE_MEMBER_FILES names a shared module's
+	// method by the record name the menu delegation builds from the module
+	// ('menu.personal_files.build'): its module part follows the module.
+	if (Edits.MODULE_MEMBER_FILES.some((e) => e.file === file))
+		for (const m of text.matchAll(/'([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\.([A-Za-z_]\w*)'/g)) {
+			const hit = byLuaName.get(`_shared|${m[1]}`);
+			if (hit && hit[2])
+				add('lua-module-member', m[0], `'${hit[2]}.${m[2]}'`, { oldRepo: PREFIX + hit[0] });
+		}
 	// A file whose path literals are synthetic coordinates (edits.cjs
 	// SYNTHETIC_PATHS) keeps them: only its module names, its own header and
 	// the shared root follow the plan.
