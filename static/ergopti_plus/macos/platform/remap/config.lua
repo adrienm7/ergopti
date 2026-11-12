@@ -54,6 +54,8 @@ local function writer() return require("toml_codec.writer") end
 -- Declared here, above the readers below: section 1 declares its own TomlCodec later.
 local ConfigCodec = require("infra.toml.codec")
 
+local LOG = "karabiner"
+
 --- The config.toml that holds the manifest's tap-hold rows, beside tap_hold.toml
 --- (platform/remap/tap_hold_file.lua owns the rule).
 --- @param user_config_path string The tap_hold.toml path.
@@ -150,7 +152,6 @@ local function overlay_config(model, part, shapes)
 	model.mod_combos = copy_part(part[ConfigKeys.KEY.MOD_COMBOS], shapes)
 end
 
-local LOG = "karabiner"
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
 local TAP_HOLD_MAX_TIMEOUT_MS           = Defaults.tap_hold_max_timeout_ms
