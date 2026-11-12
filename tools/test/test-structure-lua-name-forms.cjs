@@ -207,6 +207,20 @@ function run() {
 		),
 		"const cases = ['local J = require [[core.text.engine.json]]', 'return require [==[core.text.engine.json]==]'];"
 	);
+	// A runtime stand-in matches the require it fakes in escaped quotes.
+	const standIn =
+		'const stub = \'case "$*" in *"\\\'keymap.terminators\\\'"*) exit 1 ;; esac\';\n' +
+		"assert.match(calls, /pcall\\(require, 'keymap\\.terminators'\\)/);";
+	assert.equal(
+		Apply.rewriteText(
+			standIn,
+			Plan.scanFile(tool, standIn, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		'const stub = \'case "$*" in *"\\\'layouts.engine.terminators\\\'"*) exit 1 ;; esac\';\n' +
+			"assert.match(calls, /pcall\\(require, 'layouts\\.engine\\.terminators'\\)/);"
+	);
 	const lone = "assert(m.includes('json\").decode'));";
 	assert.equal(
 		Apply.rewriteText(lone, Plan.scanFile(tool, lone, Plan.referenceContext(MAP)), new Map(), tool),
