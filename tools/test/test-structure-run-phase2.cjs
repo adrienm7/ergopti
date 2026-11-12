@@ -47,6 +47,7 @@ function run() {
 	const order = [
 		'--fix-banners',
 		"'--write'",
+		'[REPIN, ',
 		'settleCodegen(key',
 		'--update-baseline',
 		"'--fail-on-violations'"

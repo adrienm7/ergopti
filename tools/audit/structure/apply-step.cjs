@@ -26,6 +26,7 @@
  *   node tools/audit/structure/apply-step.cjs --list
  *   node tools/audit/structure/apply-step.cjs <module>            dry run
  *   ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/apply-step.cjs <module> --apply
+ *     [--moves-out=<file>]   also writes the step's [old, new] moves as JSON
  *   <module> is a step key such as infra/config (ids such as S01 also work,
  *   but they renumber when the trees change).
  * ==============================================================================
@@ -533,6 +534,12 @@ function main() {
 	}
 	for (const r of retiredRepo) git('rm', '-q', '--', r);
 	pruneEmptyFolders([...movedRepo.keys(), ...retiredRepo]);
+	// The follow-ups (repin.cjs) pair each moved file with its new path from
+	// this list rather than from Git's similarity guess.
+	const movesOut = (args.find((a) => a.startsWith('--moves-out=')) || '').slice(
+		'--moves-out='.length
+	);
+	if (movesOut) fs.writeFileSync(movesOut, `${JSON.stringify([...movedRepo], null, '\t')}\n`);
 	// A rewritten file this step also moved is staged at its new path: the old
 	// one no longer exists once the move ran.
 	git(

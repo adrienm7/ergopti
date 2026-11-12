@@ -10,8 +10,9 @@
  *      name moved paths, so a step may rewrite the rules the next one reads;
  *   2. the mechanical follow-ups no rewrite can do: banner widths
  *      (lint-conventions --fix-banners), the formatter (format.cjs --write),
- *      the generated outputs (npm run gen, then npm run codegen) and the
- *      folder-bounds baseline;
+ *      the content pins of the changed files (repin.cjs), the generated
+ *      outputs (npm run gen, then npm run codegen) and the folder-bounds
+ *      baseline;
  *   3. the step's gates: the strict format and convention lint, then every
  *      --gate command given, run from the repository root;
  *   4. one commit, `refactor(structure): move <step> into its feature folder`.
@@ -38,6 +39,8 @@ const { spawnSync, execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const APPLY = path.join('tools', 'audit', 'structure', 'apply-step.cjs');
+const REPIN = path.join('tools', 'audit', 'structure', 'repin.cjs');
+const MAX_SETTLE_ROUNDS = 3;
 
 /** Runs a command from the repository root; returns its status and output tail. */
 function run(cmd, args, options = {}) {
@@ -176,7 +179,11 @@ function runStep(key, opts) {
 		throw Object.assign(new Error(`${key}: npm run gen changes the tree before the step`), {
 			receipt
 		});
-	action('apply', process.execPath, [APPLY, key, '--apply'], {
+	const movesFile = path.resolve(
+		ROOT,
+		git('rev-parse', '--git-path', 'ergopti-structure-moves.json').trim()
+	);
+	action('apply', process.execPath, [APPLY, key, '--apply', `--moves-out=${movesFile}`], {
 		env: { ERGOPTI_STRUCTURE_PHASE: '2' }
 	});
 	receipt.summary = receipt.actions[0].tail.split('\n').find((l) => l.startsWith('S')) || '';
@@ -188,9 +195,18 @@ function runStep(key, opts) {
 		'--warn-only'
 	]);
 	action('format', process.execPath, ['tools/lint/format.cjs', '--write']);
-	// Every leaf generator, then the domain build with its drift check.
-	runGenerators(key, receipt, receipt.baseGenerators);
-	settleCodegen(key, receipt);
+	// The content pins of every file the step changed (repin.cjs), every leaf
+	// generator, then the domain build with its drift check; again until the
+	// pins hold, since a generator may copy a pin and a pin may name an output.
+	for (let round = 1; ; round++) {
+		const pinned = action('repin', process.execPath, [REPIN, '--moves', movesFile]);
+		const repinned = Number((pinned.tail.match(/\[repin\] (\d+) file/) || [])[1]);
+		if (round > 1 && repinned === 0) break;
+		if (round > MAX_SETTLE_ROUNDS)
+			throw Object.assign(new Error(`${key}: pins and generators do not settle`), { receipt });
+		runGenerators(key, receipt, receipt.baseGenerators);
+		settleCodegen(key, receipt);
+	}
 	// The bounds only fall as the plan lands; a step lowers the ratchet.
 	action('folder bounds', process.execPath, [
 		'tools/test/test-structure-folder-bounds.cjs',
