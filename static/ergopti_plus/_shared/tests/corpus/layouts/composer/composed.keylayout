@@ -377,7 +377,7 @@
 			<key code="5" output=":"/>
 			<key code="6" output="/"/>
 			<key code="7" output="\"/>
-			<key code="8" output="&quot;"/>
+			<key code="8" output="&#x0022;"/>
 			<key code="9" output=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -414,7 +414,7 @@
 			<key code="42" output="!"/>
 			<key code="43" action="c_003d"/>
 			<key code="44" output="?"/>
-			<key code="45" output="&amp;"/>
+			<key code="45" output="&#x0026;"/>
 			<key code="46" output="$"/>
 			<key code="47" action="c_002b"/>
 			<key code="48" output="&#x0009;"/>
@@ -723,9 +723,9 @@
 			<key code="15" output="r"/>
 			<key code="16" output="y"/>
 			<key code="17" output="t"/>
-			<key code="18" output="&amp;"/>
+			<key code="18" output="&#x0026;"/>
 			<key code="19" output="é"/>
-			<key code="20" output="&quot;"/>
+			<key code="20" output="&#x0022;"/>
 			<key code="21" output="'"/>
 			<key code="22" output="-"/>
 			<key code="23" output="("/>
@@ -755,7 +755,7 @@
 			<key code="47" output=":"/>
 			<key code="48" output="&#x0009;"/>
 			<key code="49" output=" "/>
-			<key code="50" output="&lt;"/>
+			<key code="50" output="&#x003C;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
@@ -843,7 +843,7 @@
 			<key code="23" output="%"/>
 			<key code="24" output="+"/>
 			<key code="25" output="#"/>
-			<key code="26" output="&amp;"/>
+			<key code="26" output="&#x0026;"/>
 			<key code="27" output="_"/>
 			<key code="28" output="*"/>
 			<key code="29" output="@"/>
@@ -856,7 +856,7 @@
 			<key code="36" output="&#x000D;"/>
 			<key code="37" output="I"/>
 			<key code="38" output="R"/>
-			<key code="39" output="&quot;"/>
+			<key code="39" output="&#x0022;"/>
 			<key code="40" output="T"/>
 			<key code="41" output="U"/>
 			<key code="42" output="|"/>
@@ -867,7 +867,7 @@
 			<key code="47" output=";"/>
 			<key code="48" output="&#x0009;"/>
 			<key code="49" output=" "/>
-			<key code="50" output="&gt;"/>
+			<key code="50" output="&#x003E;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
@@ -1068,7 +1068,7 @@
 			<when state="ergol__caron" output="₉"/>
 		</action>
 		<action id="c_003c">
-			<when state="none" output="&lt;"/>
+			<when state="none" output="&#x003C;"/>
 			<when state="ergol__stroke" output="≮"/>
 			<when state="ergol__tilde" output="≲"/>
 		</action>
@@ -1080,7 +1080,7 @@
 			<when state="ergol__tilde" output="≃"/>
 		</action>
 		<action id="c_003e">
-			<when state="none" output="&gt;"/>
+			<when state="none" output="&#x003E;"/>
 			<when state="ergol__stroke" output="≯"/>
 			<when state="ergol__tilde" output="≳"/>
 		</action>
