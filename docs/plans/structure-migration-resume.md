@@ -43,6 +43,24 @@ same commit as each step or checkpoint. Times are Paris time.
   - `repin.cjs` records each old→new pin there, with the move that justifies
     it, and fails fast on a pin there it cannot attribute;
   - the runner writes a "Requalification" section into the step commit.
+- Decisions taken tonight without the coordinator, to review by the
+  maintainer:
+  - **Folder bounds during the migration** (`5261cc0d`). S02 opens Windows
+    `core/` with crypto as its only child, so the single-entry folder count
+    rises until the next core step fills it, and the ratchet, which only
+    falls, stopped the step. Under `ERGOPTI_STRUCTURE_PHASE=2` the runner now
+    passes `--allow-rise`; each rise is written into a « Bounds raised by
+    this step » section of the step commit. Outside the runner the ratchet
+    still only falls.
+  - **The port compliance gate** (`7c3a977e`): listed edits make it read
+    both homes of the AHK adapters (`windows/adapters`, `windows/core/crypto`)
+    instead of the driver root, the scattered folder's nearest common home.
+    The general rule, making every driver-root successor in live code a
+    refusal, is still open (open work, item 4 in the old numbering).
+- S02 (`core/crypto`): in progress. Its first applies found three tooling
+  gaps, each fixed (`b3060b7f`, `7c3a977e`, `5261cc0d`). The rebuild with S01
+  and S02 is running; then the c21 measurement, compared with c20 (S01 on dev
+  `520bb24c`: 632 JS checks, Lua groups all matching).
 - The coordinator has stopped for the night. Report only through this file
   and the commits.
 
