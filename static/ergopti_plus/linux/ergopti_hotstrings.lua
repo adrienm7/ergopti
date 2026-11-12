@@ -2477,7 +2477,11 @@ local function main()
 		dry_run = opts.dry_run == true,
 	})
 
-	local function on_click()
+	local function on_click(code)
+		-- A physical button press ends a gesture's click hold, as Windows' mouse
+		-- down subscribers do (GSX-001). A finger landing on the touchpad is no
+		-- button: it is how the held button drags.
+		if gestures and InputEvent.is_pointer_button(code) then gestures.release_clicks_on_activity() end
 		keystats.discard_roi()
 		TapHold.observe_copy_activity()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
