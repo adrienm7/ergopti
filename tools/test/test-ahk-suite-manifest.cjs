@@ -1059,7 +1059,7 @@ const SNAPSHOT16_OWNER =
 const SNAPSHOT16_TEST =
 	'static/ergopti_plus/windows/tests/unit/infra/test_buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_FIXED_IMAGES = {
-	[SNAPSHOT16_OWNER]: 'c2c26f6b4a8d3bd9c86153b17ffcc919a1ad47ec57c45043dfd5cd8ba2589ab1',
+	[SNAPSHOT16_OWNER]: 'b7a9e55e56e12e9ece64927d289cd3ecabaf36e909e6b8df90390ffef2fbfc26',
 	[SNAPSHOT16_TEST]: 'e660b8b031b7f3e4597dae0db279097bfae225a70abb39d274d6306a3ac0edbb'
 };
 const SNAPSHOT16_NAMES = [
