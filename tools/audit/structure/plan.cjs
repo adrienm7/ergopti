@@ -1492,6 +1492,26 @@ function scanFile(file, text, ctx) {
 				newRepo: target
 			});
 		}
+	// p:match("/modules/network/route_origins%.json$"): a Lua pattern anchored
+	// on the tail of a path. A tail exactly one file ends with follows that
+	// file, spelled from the same base and escaped the same way.
+	if (/\.(c?js|mjs|lua)$/.test(file))
+		for (const m of text.matchAll(
+			/((?::|\bstring\.)(?:match|find)\(\s*(?:[\w.]+\s*,\s*)?)(["'])\/((?:\w+\/)+\w+)%\.(\w+)\$\2/g
+		)) {
+			const tail = `${m[3]}.${m[4]}`;
+			const owners = filesEndingWith(tail);
+			if (owners.length !== 1 || !byRepoPath.has(owners[0])) continue;
+			const base = owners[0].slice(0, -tail.length - 1);
+			const target = byRepoPath.get(owners[0]);
+			if (!target || target === PREFIX || !target.startsWith(`${base}/`)) continue;
+			const rendered = target.slice(base.length + 1).replace(/\./g, '%.');
+			if (!/^[\w/%.]+$/.test(rendered)) continue;
+			add('source-check', m[0], `${m[1]}${m[2]}/${rendered}$${m[2]}`, {
+				oldRepo: owners[0],
+				newRepo: target
+			});
+		}
 	// SPEC_ONLY = { 'modules/tooltip/tint.js': … } in a tool: a bare path that
 	// names a file under _shared and nothing else follows that file.
 	// A captured source (a .txt snapshot of a predecessor) keeps what it held.
