@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "फ़ाइल:",
 	"apps.encryptor.prompt_confirm": "पासवर्ड की पुष्टि करें:",
 	"apps.encryptor.prompt_password": "पासवर्ड:",
+	"apps.encryptor.reason_cannot_write": "इस फ़ोल्डर में फ़ाइल नहीं लिखी जा सकी।",
+	"apps.encryptor.reason_destination_folder": "गंतव्य एक फ़ोल्डर है।",
 	"apps.encryptor.success_decrypted": "फ़ाइल डिक्रिप्ट हुई:",
 	"apps.encryptor.success_encrypted": "फ़ाइल एन्क्रिप्ट हुई:",
 	"apps.encryptor.title_decrypt": "फ़ाइल डिक्रिप्ट करें",
