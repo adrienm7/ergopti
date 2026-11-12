@@ -644,9 +644,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
-			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 			local function word_expanders_ready()
-				return true
+				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
 			end
 
 			--- Captures enough catalogue state to undo a persistence failure.
@@ -1180,10 +1179,11 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_personal"] = function()
 			local default_parent, group_rows, unavailable_rows = {}, {}, {}
 			local preferences_present, close_on_add, close_action = false, false, nil
-			-- A pause does not keep the editor closed: a pause stops typing, not
-			-- configuration (EDD-1, maintainer decision 2026-11-12).
 			local function editor_ready()
-				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
+				if ctx.paused == true or type(ctx.is_paused) ~= "function"
+					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
+				local ok, current = pcall(ctx.is_paused)
+				return ok and current == false
 			end
 			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },

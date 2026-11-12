@@ -140,6 +140,18 @@ local function enabled(ticket)
 	return value ~= "off"
 end
 
+--- Checks the current native pause reader without changing its owner.
+--- @param ctx table Actual menu context.
+--- @return boolean
+local function unpaused(ctx)
+	if rawget(ctx, "paused") == true then return false end
+	local getter = rawget(ctx, "is_paused")
+	if getter == nil then return true end
+	if type(getter) ~= "function" then return false end
+	local ok, value = pcall(getter)
+	return ok and value == false
+end
+
 --- Captures the genuine source before either AI child starts building.
 --- @param renderer table|nil Actual shared renderer binding.
 --- @param kind string "llm" or "agent".
@@ -258,9 +270,8 @@ function M.finish(ticket, children)
 	if not ticket or not rows(children) or not current(ticket) then return nil end
 	local native_children = capture(children)
 	if not native_children then return nil end
-	-- A pause does not grey the parent: a pause stops typing, not
-	-- configuration (EDD-1, maintainer decision 2026-11-12).
 	local ready = ticket.enabled ~= nil and type(ticket.native) == "table"
+		and unpaused(ticket.ctx)
 	local getters = ticket.kind == "llm" and {
 		llm_parent_enabled = function() return ticket.enabled end,
 		llm_parent_ready = function() return ready end,
