@@ -53,8 +53,10 @@ local function with_remap(route, dry, action, hold, body, revoke)
 			.. (hold and '[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "ctrl"\n' or "")
 		elseif route == "buffered" then config = config .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
 			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. action .. '"\n' end
+		-- The Tap-Holds switch is a config.toml row since schema v22.
+		if route == "single" then config = config .. '[tap_holds]\nenabled = true\n' end
 		file = assert(io.open(config_path, "wb")); assert(file:write(config)); assert(file:close())
-		local tap = '[tap_hold]\nenabled = ' .. tostring(route == "single") .. '\ninherit_defaults = false\n'
+		local tap = '[tap_hold]\ninherit_defaults = false\n'
 		if route == "single" then tap = tap .. '[tap_hold.keys.tab]\ntap_action = "' .. action .. '"\n'
 			.. 'hold_modifier = "' .. (hold and "ctrl" or "") .. '"\n' .. (hold and "" or 'hold_layer = ""\n') .. 'time_activation_seconds = 0.2\n' end
 		file = assert(io.open(tap_path, "wb")); assert(file:write(tap)); assert(file:close())
