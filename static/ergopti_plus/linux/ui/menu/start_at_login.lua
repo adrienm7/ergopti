@@ -40,7 +40,7 @@ local function read_state(run)
 	local detail = ok and "unexpected answer" or tostring(err or "query failed")
 	if last_read_failure ~= detail then
 		last_read_failure = detail
-		Logger.error(LOG, "Startup state could not be read: %s.", detail)
+		Logger.warn(LOG, "Startup state could not be read: %s.", detail)
 	end
 	return nil
 end

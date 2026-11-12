@@ -81,7 +81,7 @@ helpers.describe("login startup menu", function()
 		deps.resolver.resolve = function() return nil, "helper missing" end
 		helpers.assert_eq(module.request("status", nil, deps), false)
 		helpers.assert_eq(module.request("status", nil, deps), false)
-		helpers.assert_eq(calls.logs, { "error: Startup state could not be read: %s." })
+		helpers.assert_eq(calls.logs, { "warn: Startup state could not be read: %s." })
 		helpers.assert_eq(calls.errors, 0, "a status read never opens a dialog")
 		deps.resolver.resolve = resolve
 		module.request("status", nil, deps)

@@ -45,7 +45,7 @@ function M.request(action, changed, deps)
 			alert("dialog.start_at_login.failed", "critical")
 		elseif last_status_failure ~= detail then
 			last_status_failure = detail
-			logger.error("ui.menu.start_at_login", "Startup state could not be read: %s.", detail)
+			logger.warn("ui.menu.start_at_login", "Startup state could not be read: %s.", detail)
 		end
 	end
 	local executable, detail, environment = resolver.resolve()
