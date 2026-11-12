@@ -96,10 +96,12 @@ function M.native_aliases()
 end
 
 --- Creates the direct native participant with existing checkpoint/source owners.
---- @param options table Current menu persistence, pause, backup and writer ports.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Current menu persistence, backup and writer ports.
 --- @return table owner Apply/revert/release/pending/retry_restore.
 function M.new(options)
-	assert(type(options) == "table" and type(options.paused) == "function"
+	assert(type(options) == "table"
 		and type(options.storage_backup_path) == "function", "script scope requires current native menu owners")
 	local transaction
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end }
@@ -130,7 +132,7 @@ function M.new(options)
 	local owner
 	owner = Fenced.new({ owner = {}, native_token = token, transaction = adapter, scope = "global",
 		fences = runtime.fences, available = function()
-			return options.paused() == false and require("config_migrate").read_only_reason(options.path) == nil
+			return require("config_migrate").read_only_reason(options.path) == nil
 		end })
 	local release = owner.release
 	function owner.release()
