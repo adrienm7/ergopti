@@ -3,16 +3,13 @@
 --- ==============================================================================
 --- MODULE: Shared Tap-Hold File (shared)
 --- DESCRIPTION:
---- The one tap_hold.toml every driver keeps its tap-hold keys in
---- (_shared/tap_hold/SCHEMA.md): the keys, the global delay and, on macOS, the
---- Karabiner integration; and the config.toml rows beside it that hold the
---- manifest's tap-hold rows (`[tap_holds]` enabled, sticky_timeout_ms,
---- lone_modifier_tap_max_ms and the whole `[mod_combos]`, the maintainer
---- decision of 2026-11-11). This module translates both to and from the
---- Karabiner model macos/platform/remap/config.lua merges (the shape
---- config_karabiner.toml had: `[tap_holds]`, `[tap_holds.config.<macOS key>]`,
---- `[mod_combos.config.<macOS combination>]`), and converts an old
---- config_karabiner.toml once.
+--- The one tap_hold.toml every driver keeps its tap-hold settings in
+--- (_shared/tap_hold/SCHEMA.md): keys, global and sticky delays, lone-tap
+--- window, key combinations and, on macOS, the Karabiner integration. This
+--- module translates that file to and from the Karabiner model
+--- macos/platform/remap/config.lua merges (the shape config_karabiner.toml
+--- had: `[tap_holds]`, `[tap_holds.config.<macOS key>]`, `[mod_combos.config.<macOS
+--- combination>]`), and converts an old config_karabiner.toml once.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One vocabulary on disk. Keys are catalogue ids ([tap_hold.catalog]), a
@@ -30,11 +27,6 @@
 ---    recognises them and keeps reporting them as outdated.
 --- 4. Fail fast on shipped data: a catalogue key or combination the context
 ---    cannot place raises, never a guess.
---- 5. One home per row. A config-owned leaf left in tap_hold.toml (by a build
----    before schema v22, or a crash between the v22 migration's two writes) is
----    reported as outdated and left where it is, never read; only the one-time
----    config_karabiner.toml import writes them there, so the boot's v22
----    migration (_shared/core/config_schema/migrations.toml) moves them.
 --- ==============================================================================
 
 local M = {}
@@ -77,9 +69,6 @@ local TAP_HOLD_FIELDS = { enabled = true, inherit_defaults = true, time_activati
 local MODEL_TAP_HOLD_FIELDS = { enabled = true, timeout_ms = true, sticky_timeout_ms = true,
 	lone_modifier_tap_max_ms = true, config = true }
 local COMBO_FIELDS = { enabled = true, simultaneous_threshold_ms = true, symmetric = true, config = true }
-
--- Why a config-owned leaf found in tap_hold.toml is not read.
-local MOVED_TO_CONFIG = "kept in config.toml since schema v22; this copy is not read"
 
 -- An opaque leaf: a scalar or array found where the model expects a table.
 local OPAQUE = {}
@@ -303,9 +292,7 @@ function M.to_karabiner(document, ctx, is_table)
 		for field, value in pairs(section) do
 			if not TAP_HOLD_FIELDS[field] and not MODEL_TAP_HOLD_FIELDS[field] then tap_holds[field] = value end
 		end
-		for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do
-			if section[leaf] ~= nil then notes[#notes + 1] = { path = M.TAP_HOLD .. "." .. leaf, detail = MOVED_TO_CONFIG } end
-		end
+		for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do tap_holds[leaf] = section[leaf] end
 		if section.time_activation_seconds ~= nil then tap_holds.timeout_ms = to_ms(section.time_activation_seconds) end
 		local keys = section.keys
 		if keys ~= nil and not is_table(keys) then
@@ -325,7 +312,37 @@ function M.to_karabiner(document, ctx, is_table)
 		end
 		model[MODEL_TAP_HOLDS] = tap_holds
 	end
-	if document[M.COMBOS] ~= nil then notes[#notes + 1] = { path = M.COMBOS, detail = MOVED_TO_CONFIG } end
+	local combos = document[M.COMBOS]
+	if combos ~= nil and not is_table(combos) then
+		model[MODEL_COMBOS] = combos
+	elseif combos ~= nil then
+		local out = {}
+		for field, value in pairs(combos) do out[field] = value end
+		out.config = nil
+		local config = combos.config
+		if config ~= nil and not is_table(config) then
+			out.config = config
+		elseif config ~= nil then
+			out.config = {}
+			for pair, entry in pairs(config) do
+				local combo = ctx.combo_of_pair[pair]
+				local first, second = tostring(pair):match("^(.-)" .. KeyCombinations.PAIR_SEPARATOR .. "(.+)$")
+				if not (first and ctx.catalogue_ids[first] and ctx.catalogue_ids[second]) then
+					notes[#notes + 1] = { path = M.COMBOS .. ".config." .. tostring(pair),
+						detail = "no driver has this key combination" }
+				elseif combo then
+					if is_table(entry) then
+						local slots = {}
+						for field, value in pairs(entry) do slots[field] = value end
+						out.config[combo] = slots
+					else
+						out.config[combo] = entry
+					end
+				end
+			end
+		end
+		model[MODEL_COMBOS] = out
+	end
 	return model, notes
 end
 
@@ -344,10 +361,8 @@ end
 --- @param model table
 --- @param ctx table
 --- @param is_table function
---- @param with_config boolean Whether the config-owned leaves go into the
----   file too (the one-time config_karabiner.toml import only).
 --- @return table leaves `path -> value`, `holds` `key path -> { field, value }|false`
-local function flatten(model, ctx, is_table, with_config)
+local function flatten(model, ctx, is_table)
 	local leaves, holds = {}, {}
 	local function opaque(path, value)
 		leaves[path] = { [OPAQUE] = value }
@@ -363,9 +378,7 @@ local function flatten(model, ctx, is_table, with_config)
 		opaque(M.TAP_HOLD, tap_holds)
 	elseif tap_holds ~= nil then
 		carry(M.TAP_HOLD, tap_holds, MODEL_TAP_HOLD_FIELDS, TAP_HOLD_FIELDS)
-		if with_config then
-			for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do leaves[M.TAP_HOLD .. "." .. leaf] = tap_holds[leaf] end
-		end
+		for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do leaves[M.TAP_HOLD .. "." .. leaf] = tap_holds[leaf] end
 		if tap_holds.timeout_ms ~= nil then
 			leaves[M.TAP_HOLD .. ".time_activation_seconds"] = type(tap_holds.timeout_ms) == "number"
 				and tap_holds.timeout_ms / 1000 or tap_holds.timeout_ms
@@ -397,7 +410,7 @@ local function flatten(model, ctx, is_table, with_config)
 			end
 		end
 	end
-	local combos = with_config and model[MODEL_COMBOS] or nil
+	local combos = model[MODEL_COMBOS]
 	if combos ~= nil and not is_table(combos) then
 		opaque(M.COMBOS, combos)
 	elseif combos ~= nil then
@@ -471,12 +484,10 @@ end
 --- @param after table The model the save produced.
 --- @param ctx table See M.hs_context.
 --- @param is_table function(value) -> boolean For the document and both models.
---- @param with_config boolean|nil True only for the one-time config_karabiner.toml
----   import: the config-owned leaves (see M.config_rows) are written too.
-function M.apply_karabiner(document, before, after, ctx, is_table, with_config)
+function M.apply_karabiner(document, before, after, ctx, is_table)
 	if before[MODEL_KARABINER] ~= after[MODEL_KARABINER] then document[M.KARABINER] = after[MODEL_KARABINER] end
-	local old_leaves, old_holds = flatten(before, ctx, is_table, with_config == true)
-	local new_leaves, new_holds = flatten(after, ctx, is_table, with_config == true)
+	local old_leaves, old_holds = flatten(before, ctx, is_table)
+	local new_leaves, new_holds = flatten(after, ctx, is_table)
 	local changes = {}
 	local function compare(path, left, right)
 		if not same(left, right) then changes[#changes + 1] = { path = path, value = right } end
@@ -586,156 +597,18 @@ function M.file_segments(segments, ctx)
 	return out
 end
 
---- The shared document a model becomes over no file.
-local function new_document(model, ctx, is_table, with_config)
-	local document = {}
-	for key, value in pairs(model) do
-		if key ~= MODEL_TAP_HOLDS and key ~= MODEL_COMBOS and key ~= MODEL_KARABINER then document[key] = value end
-	end
-	M.apply_karabiner(document, {}, model, ctx, is_table, with_config)
-	return document
-end
-
---- The shared file an old config_karabiner.toml becomes, config-owned leaves
---- included: the boot's v22 config migration moves those into config.toml.
+--- The shared file an old config_karabiner.toml becomes.
 --- @param model table Decoded config_karabiner.toml.
 --- @param ctx table See M.hs_context.
 --- @param is_table function(value) -> boolean For the old document.
 --- @return table document The shared tap_hold.toml content, unstamped.
 function M.from_karabiner(model, ctx, is_table)
-	return new_document(model, ctx, is_table, true)
-end
-
---- The tap_hold.toml a save over no file writes: the keys, the global delay
---- and the Karabiner section; the config-owned leaves go to config.toml.
---- @param model table The model the save produced.
---- @param ctx table See M.hs_context.
---- @param is_table function(value) -> boolean
---- @return table document Unstamped.
-function M.new_file(model, ctx, is_table)
-	return new_document(model, ctx, is_table, false)
-end
-
-
-
-
--- =================================
--- =================================
--- ======= 5/ config.toml ==========
--- =================================
--- =================================
-
---- The config-owned part of the Karabiner model, from a decoded config.toml:
---- `tap_holds` holds the switch and the two timings, `mod_combos` the whole
---- key combinations section with each pair under its macOS combination id.
---- Values are handed on as they are: a malformed one is the model's to report.
---- @param document table Decoded config.toml (an absent file is {}).
---- @param ctx table See M.hs_context.
---- @param is_table function(value) -> boolean For the document.
---- @return table part `{ tap_holds = table|nil, mod_combos = any }`.
---- @return table notes `{ path, detail }` for each leaf macOS cannot run.
-function M.config_to_karabiner(document, ctx, is_table)
-	local part, notes = {}, {}
-	local section = document[MODEL_TAP_HOLDS]
-	if section ~= nil and not is_table(section) then
-		notes[#notes + 1] = { path = MODEL_TAP_HOLDS, detail = "it must be a table; the neutral settings are used" }
-	elseif section ~= nil then
-		local tap_holds = {}
-		for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do tap_holds[leaf] = section[leaf] end
-		if next(tap_holds) ~= nil then part[MODEL_TAP_HOLDS] = tap_holds end
+	local document = {}
+	for key, value in pairs(model) do
+		if key ~= MODEL_TAP_HOLDS and key ~= MODEL_COMBOS and key ~= MODEL_KARABINER then document[key] = value end
 	end
-	local combos = document[M.COMBOS]
-	if combos ~= nil and not is_table(combos) then
-		part[MODEL_COMBOS] = combos
-	elseif combos ~= nil then
-		local out = {}
-		for field, value in pairs(combos) do out[field] = value end
-		out.config = nil
-		local config = combos.config
-		if config ~= nil and not is_table(config) then
-			out.config = config
-		elseif config ~= nil then
-			out.config = {}
-			for pair, entry in pairs(config) do
-				local combo = ctx.combo_of_pair[pair]
-				local first, second = tostring(pair):match("^(.-)" .. KeyCombinations.PAIR_SEPARATOR .. "(.+)$")
-				if not (first and ctx.catalogue_ids[first] and ctx.catalogue_ids[second]) then
-					notes[#notes + 1] = { path = M.COMBOS .. ".config." .. tostring(pair),
-						detail = "no driver has this key combination" }
-				elseif combo then
-					if is_table(entry) then
-						local slots = {}
-						for field, value in pairs(entry) do slots[field] = value end
-						out.config[combo] = slots
-					else
-						out.config[combo] = entry
-					end
-				end
-			end
-		end
-		part[MODEL_COMBOS] = out
-	end
-	return part, notes
-end
-
--- Separates a leaf's section from its key in the leaf map of config_leaves.
-local LEAF_SEPARATOR = "\0"
-
---- The config.toml leaves macOS owns in a model, keyed by section and key; a
---- slot set to "none" is absent.
-local function config_leaves(model, ctx, is_table)
-	local leaves = {}
-	local function put(section, key, value)
-		if value ~= nil then leaves[section .. LEAF_SEPARATOR .. key] = { section = section, key = key, value = value } end
-	end
-	local tap_holds = model[MODEL_TAP_HOLDS]
-	if is_table(tap_holds) then
-		for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do put(MODEL_TAP_HOLDS, leaf, tap_holds[leaf]) end
-	end
-	local combos = model[MODEL_COMBOS]
-	if is_table(combos) then
-		for _, leaf in ipairs(SAME_COMBO_LEAVES) do put(M.COMBOS, leaf, combos[leaf]) end
-		if is_table(combos.config) then
-			for combo, entry in pairs(combos.config) do
-				local pair = ctx.pair_of_combo[combo]
-				if not pair then error("macOS key combination '" .. tostring(combo) .. "' has no pair id", 0) end
-				if is_table(entry) then
-					for _, slot in ipairs(COMBO_SLOTS) do
-						put(M.COMBOS .. ".config." .. pair, slot, entry[slot] ~= NONE and entry[slot] or nil)
-					end
-				else
-					put(M.COMBOS .. ".config", pair, entry)
-				end
-			end
-		end
-	end
-	return leaves
-end
-
---- The config.toml rows a save writes: every config-owned leaf the model now
---- holds differently from the config.toml it read, sorted. Other leaves
---- (another driver's pairs, fields macOS does not own) are never named.
---- @param before table The part M.config_to_karabiner() read, not edited since.
---- @param after table The model the save produced.
---- @param ctx table See M.hs_context.
---- @param is_table function(value) -> boolean For both.
---- @return table rows Dense `{ section, key, value }` or `{ section, key, delete = true }`.
-function M.config_rows(before, after, ctx, is_table)
-	local old, new = config_leaves(before, ctx, is_table), config_leaves(after, ctx, is_table)
-	local names = {}
-	for name in pairs(old) do names[#names + 1] = name end
-	for name in pairs(new) do if old[name] == nil then names[#names + 1] = name end end
-	table.sort(names)
-	local rows = {}
-	for _, name in ipairs(names) do
-		local left, right = old[name], new[name]
-		if right == nil then
-			rows[#rows + 1] = { section = left.section, key = left.key, delete = true }
-		elseif left == nil or not same(left.value, right.value) then
-			rows[#rows + 1] = { section = right.section, key = right.key, value = right.value }
-		end
-	end
-	return rows
+	M.apply_karabiner(document, {}, model, ctx, is_table)
+	return document
 end
 
 return M

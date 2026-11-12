@@ -4,6 +4,7 @@
 		"gestures.action_parameters",
 		"shortcuts.keyboard",
 		"shortcuts.tap_keys",
+		"tap_holds.sticky_timeout_ms",
 		"tap_holds.timeout_ms"
 	]
 }

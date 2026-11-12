@@ -5,4 +5,4 @@ description = "An order already stored under the French group id keeps its value
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 20
-to_version = 22
+to_version = 21

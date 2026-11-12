@@ -90,13 +90,14 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       Progress (2026-11-11, emulation): macOS and Linux emulate the records no `.keylayout` holds: `composer_save` takes the source's `emulation` table (`emulation_file`, `max_emulation_bytes`), checked by the shared engine for this source and platform, stored beside the TOML; each driver's layout emulation loads it for the `composed` layout and hands presses to it first (Linux: the hook's new `release_callback` ends held keys; macOS: one output rides the event, several are posted in order after it, the keyUp tap ends held keys). A tap-hold's built-in modifier applies to the keys under it, not to mouse clicks. Windows counterpart (maintainer): `composer.ahk` stores the `emulation` table beside the source and `keylayout_emulation.ahk` performs it like `source_emulation.lua`, replaying `emulation_vectors.json`.
       Done (2026-11-11, page side): « Install and use » now sends the source's emulation table for the host's OS with the source and its compiled `.keylayout` (`LayoutSourceIO.installPayload`), so the macOS and Linux drivers perform its custom modifiers, tap-holds and shortcuts; before, the page sent only the source and the `.keylayout`, and those records were lost on install. A tap-hold whose hold reaches a native layer hands the key to the OS layout without that layer's modifier, as the shared engine decides (open question for the maintainer).
       Left: Windows (maintainer): `windows/ui/layout_manager/composer.ahk` accepts `composer_save` with `source`, `keylayout` and `emulation` like `composer.lua` (`source_file`, `max_source_bytes`, `emulation_file`, `max_emulation_bytes` from `_shared/modules/layouts/defaults.json`; one form at a time), `keylayout_emulation.ahk` performs the stored table; `export-all`'s `windows/` KLC feeds the keyboard DLL build and unsigned installer, offered by `layout_system_install`.
-- [ ] **macOS export: bundle by default, ISO and ANSI.** A macOS layout can be one `.keylayout` file, but the
+- [x] **macOS export: bundle by default, ISO and ANSI.** A macOS layout can be one `.keylayout` file, but the
       default export is a `.bundle` holding both physical variants, ISO and ANSI (as `Ergopti_v2.2.0.bundle` does
       today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default), « ISO only » or « ANSI only », the
       last two giving a single `.keylayout`. Decided 2026-11-06: the user edits the ISO layout; the ANSI variant is
       derived by a fixed rule that moves the extra ISO key, and the editor can change where that key goes.
       Generator done (2026-11-11): `export-macos <source> <dir> [bundle|iso|ansi]` (bundle by default) writes `Info.plist`, `version.plist`, both `.keylayout` and UTF-16LE `InfoPlist.strings` keyed by the internal name. The rule swaps `IntlBackslash` with `physical.ansi_extra_key` (default `Backquote`), then each `physical.ansi_swaps` pair; Ergopti's `[["Backslash", "BracketRight"]]` reproduces the registry ANSI files exactly (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer: extra swaps are declared per layout, not fixed). Left: the export dialog's drop-down (editor/UI item), icons, and native loading proof on a Mac.
       Icons done (2026-11-11): `exports.macos.icon`/`ansi_icon` name a square PNG beside the source; each variant gets `<internal>.icns` (the PNG as its size's element) declared in its `KLInfo_` entry, a single `.keylayout` gets the `.icns` of its name. To confirm on the Mac: install the `macos/<internal>.bundle` that `export-all` writes for a structured source declaring `exports.macos.icon` into ~/Library/Keyboard Layouts, log out and in, and check both variants appear in Input Sources with their icon and type as compiled.
+      Native proof (2026-11-12, CI run 43134762560, macOS 26, job « E2E tests (Launcher XCTest and native probes (macOS 26)) », step « Receive the generated layout bundle natively »): the bundle the generator writes is registered (status 0), both variants are listed with an icon, and 56/56 typing vectors (base, Shift, Caps Lock, Option, a native remap, three dead-key sequences, both ISO and ANSI) type as the source, keyboard type 198. The ISO key's « < » and « > » needed numeric XML references (9421940b66). The editor's « macOS » drop-down chooses bundle, ISO or ANSI. Left: Mac confirm (maintainer) of the log-out/log-in check above in System Settings. Windows has no counterpart: this export is macOS's own format (Windows gets the .klc and the DLLs).
 - [x] **KbdEdit parity, or better.** The editor offers every KbdEdit capability (extra modifier levels such as Kana,
       Ctrl/Alt shortcuts that send another key than the typed character, Caps Lock modes, chained dead keys and
       compose, ligatures, numpad and media keys, key remapping, sticker printing, Unicode palette, live preview),
@@ -731,25 +732,40 @@ three-OS CI is green on the final source. See the handoff above for the current 
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
-- [x] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
-      did, Cmd versus Ctrl aside. Decided by the maintainer on 2026-11-11 (docs/memory/maintainer-decisions.md, top):
-      one home per manifest path. `config.toml` holds every `[[features.*]]` row: `[tap_holds]` `enabled`,
-      `lone_modifier_tap_max_ms`, `sticky_timeout_ms` and the whole `[mod_combos]`; the shared `tap_hold.toml` holds
-      the keys, the global delay, `inherit_defaults` and the macOS-only `[karabiner]` (`_shared/tap_hold/SCHEMA.md`,
-      `shared_file.toml`, `tap_hold.schema.json`). Done 2026-11-12: macOS (`platform/remap/config.lua`,
-      `tap_hold_file.lua`, `_shared/lua/tap_hold/shared_file.lua`) and Linux (loader, writer, manager, scopes) read
-      and write the rows in `config.toml`; the overnight Linux move of `[mod_combos]` into `tap_hold.toml` is
-      reverted; Windows, which already kept them in `config.toml`, reads another driver's `tap_hold.toml` (a macOS
-      `hold_action` or Cmd/Fn hold warned once, the tap kept; a leftover manifest row warned once) and keeps its
-      leaves on a write (a hold replaces `hold_action`, a rebind drops `enabled = false`). One migration: step
-      `v21_to_v22` of `_shared/core/config_schema/migrations.toml`, new op `import_companion` in the three
-      interpreters, copies the rows out of `tap_hold.toml` (macOS first carries `config_karabiner.toml` over),
-      backs both files up and deletes the moved values from `tap_hold.toml`. Cross-driver test: the corpus
-      `_shared/tests/corpus/tap_hold_shared_file/` holds each driver's written pair (`<driver>_written.toml` and
-      `.config.toml`); each suite pins its own and reads the three (Linux and macOS `test_tap_hold_shared_file.lua`,
-      Windows `test_tap_hold_shared_file.ahk`). Left, not this item: Windows keeps its Tap-Holds switch as
-      `[category_enabled] tap_holds`, so a Windows pair reads as switched off on macOS and Linux; Windows writes a
-      0.3 s delay as `0.29999999999999999`.
+- [ ] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
+      did, Cmd versus Ctrl aside. Decided 2026-11-10: one shared `tap_hold.toml` (keys, global and sticky delays,
+      lone-tap window, `mod_combos`; macOS-only `[karabiner]` section), `config.toml` keeps the `[[features.*]]` rows.
+      Done on macOS and in the shared pieces: the layout is specified in `_shared/tap_hold/SCHEMA.md`,
+      `_shared/tap_hold/shared_file.toml` and `_shared/core/config_schema/tap_hold.schema.json`; macOS reads and writes
+      `hammerspoon/tap_hold.toml` through `platform/remap/tap_hold_file.lua` and `_shared/lua/tap_hold/shared_file.lua`
+      (catalogue key ids, `<first>_then_<second>` pairs, seconds, `+`-joined holds, only changed leaves written) and
+      carries an old `config_karabiner.toml` over once (`migrations.toml` `[legacy_imports.hs]`, renamed
+      `.migrated`); Linux leaves another driver's keys alone and names a macOS `hold_action` once. The cross-driver
+      corpus `_shared/tests/corpus/tap_hold_shared_file/` pins each Lua writer's file byte for byte and what each
+      reader reads from both (`expected.toml`, contract `_shared/lua/test/tap_hold_shared_file_contract.lua`).
+      Left: Windows (maintainer), below; Linux and macOS are done.
+  - [x] **Linux `[mod_combos]` in `tap_hold.toml`.** Decided by the coordinator on 2026-11-11 overnight, to review by
+        the maintainer: the `[[features.mod_combos]]` rows keep their manifest declaration and are stored in
+        `tap_hold.toml`, as on macOS. `modules/shortcuts/key_combinations.lua` reads the taps, holds and switch from
+        `config.toml` and `[mod_combos]` from `tap_hold.toml` only, every receipt and lease check covering both files;
+        `infra/key_combinations_scope.lua` and `infra/shortcuts_scope.lua` publish `mod_combos.*` rows through the
+        transaction's new `companions` port, prepared by `tap_hold_writer.prepare_combo_rows` (versioned, stamped,
+        line-preserving), with its own backup and inverse. The boot moves `config.toml` `[mod_combos]` once
+        (`tap_hold_writer.import_config_combos`, `[legacy_imports.linux]`, translation `config_section` in
+        `migrate.lua`): both files backed up, `tap_hold.toml` published first, a crash between the writes finished
+        at the next start, a different `[mod_combos]` already in `tap_hold.toml` wins. `expected.toml` pins what
+        Linux reads of both corpus files' `[mod_combos]`.
+  - [ ] **Windows shared `tap_hold.toml` (maintainer).** `tap_hold_loader.ahk` / `tap_hold_writer.ahk` read and write
+        the shared layout: catalogue ids, `[mod_combos]` in `tap_hold.toml` (the combinations' reader and writer move
+        there, `config.toml` keeps the pair taps, holds and `[category_enabled] key_combinations`), ignore
+        `[karabiner]`, `hold_action`, `cmd`/`fn` with one warning, write `_meta.schema_version`. A
+        `[legacy_imports.ahk]` entry with `translate = "config_section"` and `section = "mod_combos"` moves
+        `config.toml` `[mod_combos]` the way Linux does (both backed up, `tap_hold.toml` first, equal copies only
+        delete the old one, a different shared copy wins), beside the Windows `config.toml` tap-hold keys' own
+        import. `tap_hold_migration.ahk` accepts the `[legacy_imports]` table of `migrations.toml` and validates it
+        like `migrate.parse_legacy_imports` (per translation: `retired_suffix` for `karabiner`, `section` for
+        `config_section`). The AHK suite reads both corpus files with `[reads.<file>.ahk]` added to `expected.toml`,
+        `mod_combos` included.
 - [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to

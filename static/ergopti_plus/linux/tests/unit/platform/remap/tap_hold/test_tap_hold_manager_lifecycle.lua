@@ -27,8 +27,7 @@ helpers.describe("tap-hold manager", function()
 		hook.set_remapper = function() return false end
 		local opts = { keyboard_hook = hook, execute_action = function() end,
 			action_names = require("modules.gestures.manager").get_executable_action_names,
-			on_text_injected = function() end, defaults_path = DEFAULTS, user_path = user_path,
-			config_path = require("tests.support.tap_hold_fixture").config_path(user_path) }
+			on_text_injected = function() end, defaults_path = DEFAULTS, user_path = user_path }
 		local first = Manager.init(opts)
 		hook.set_remapper = install
 		local called, retried = pcall(Manager.init, opts)
@@ -246,8 +245,7 @@ os.remove(user_path)
 			local hook = fake_hook()
 			Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,
 				action_names = Gestures.get_executable_action_names, on_text_injected = function() end,
-				defaults_path = DEFAULTS, user_path = user_path,
-				config_path = require("tests.support.tap_hold_fixture").config_path(user_path) })
+				defaults_path = DEFAULTS, user_path = user_path })
 			local code = require("platform.remap.tap_hold_engine").KEY_CODES.tab
 			hook.engine:process(code, 1, 0)
 			local _, tap, binding = hook.engine:process(code, 0, 100)
@@ -457,7 +455,7 @@ os.remove(user_path)
 		helpers.assert_true(not hook.engine:handles(58), "CapsLock is itself again")
 		write(user_path, '[tap_hold]\nenabled = false\n')
 		Manager.reload()
-		helpers.assert_nil(hook.engine, "config.toml's switch turns it off")
+		helpers.assert_nil(hook.engine, "the file's own switch turns it off")
 		helpers.assert_true(not Manager.file_enabled())
 		Manager._reset_for_test()
 		os.remove(user_path)
@@ -494,11 +492,10 @@ os.remove(user_path)
 				if fault == "exception" then error("controlled failure") end
 				return false
 			end
-			local called, result = pcall(Manager.apply_configuration, { tap_hold = { inherit_defaults = true } }, nil,
-				{ tap_holds = { enabled = false } })
+			local called, result = pcall(Manager.apply_configuration, { tap_hold = { enabled = false } })
 			local file_enabled, installed = Manager.file_enabled(), hook.engine
 			hook.set_remapper = install
-			local retried = Manager.apply_configuration({ tap_hold = { inherit_defaults = true } }, nil, { tap_holds = { enabled = false } })
+			local retried = Manager.apply_configuration({ tap_hold = { enabled = false } })
 			Manager._reset_for_test()
 			os.remove(user_path)
 			helpers.assert_true(called, "installation errors are reported as refusal")
@@ -512,7 +509,7 @@ os.remove(user_path)
 	helpers.it("keeps the current configuration when snapshot restoration is refused (snapshot-apply-refusal)", function()
 		local Manager, hook, _, user_path = manager()
 		local enabled = Manager.configuration_snapshot()
-		helpers.assert_true(Manager.apply_configuration({ tap_hold = { inherit_defaults = true } }, nil, { tap_holds = { enabled = false } }))
+		helpers.assert_true(Manager.apply_configuration({ tap_hold = { enabled = false } }))
 		local disabled = Manager.configuration_snapshot()
 		helpers.assert_true(Manager.restore_configuration(enabled))
 		local original, install = hook.engine, hook.set_remapper
@@ -626,7 +623,6 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 			on_text_injected = function() end,
 			defaults_path = DEFAULTS,
 			user_path = user_path,
-			config_path = require("tests.support.tap_hold_fixture").config_path(user_path),
 		})
 		local function close()
 			Logger.warn = real_warn

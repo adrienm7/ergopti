@@ -1104,15 +1104,18 @@ var LayoutComposer = (function () {
 	// ======= 6/ Serialization =======
 	// ================================
 
+	// The XML specials as numeric references, the only form Apple's own layouts
+	// use: macOS's keylayout loader leaves a named entity (&lt;) unread, so a key
+	// whose output was written that way typed nothing (native bundle receipt,
+	// CI run 43111697646: < and > on the ISO key typed "").
+	const XML_SPECIALS = new Set(['&', '<', '>', '"']);
+
 	function escapeAttribute(text) {
 		let out = '';
 		for (const c of text) {
-			if (c === '&') out += '&amp;';
-			else if (c === '<') out += '&lt;';
-			else if (c === '>') out += '&gt;';
-			else if (c === '"') out += '&quot;';
-			else if (c.codePointAt(0) < 0x20 || c.codePointAt(0) === 0x7f)
-				out += '&#x' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') + ';';
+			const code = c.codePointAt(0);
+			if (XML_SPECIALS.has(c) || code < 0x20 || code === 0x7f)
+				out += '&#x' + code.toString(16).toUpperCase().padStart(4, '0') + ';';
 			else out += c;
 		}
 		return out;

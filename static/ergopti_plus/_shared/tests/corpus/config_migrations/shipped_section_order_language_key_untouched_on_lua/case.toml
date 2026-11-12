@@ -5,4 +5,4 @@ description = "macOS and Linux always keyed a language category by its group id:
 drivers = ["hs", "linux"]
 outcome = "migrated"
 from_version = 20
-to_version = 22
+to_version = 21

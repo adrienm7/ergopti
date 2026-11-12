@@ -2,6 +2,9 @@
 
 --- Ordered-pair edits use the shared conditional publisher and acknowledged
 --- inverse. Pair input stays fenced until both source and delivery ACKs settle.
+--- The tap and hold slots publish in config.toml; `[mod_combos]` rows publish
+--- in the shared tap_hold.toml, the transaction's backed-up companion with its
+--- own inverse, prepared by the tap-hold writer.
 local Transaction = require("config_scope_transaction")
 local Shared = require("tap_hold.key_combinations")
 local Writer = require("toml_codec.writer")
@@ -22,6 +25,13 @@ function M.new(options)
 	local parameters = options.parameters or require("modules.gestures.manager")
 	for _,name in ipairs({"acquire_configuration","release_configuration","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","owns_configuration","configuration_domain","validate_slot","configuration_snapshot","configuration_source","configuration_source_matches","capture_edit_source","configuration_candidate","apply_configuration"}) do
 		assert(type(combinations[name]) == "function", "combination configuration owner is incomplete")
+	end
+	assert(type(options.chord_path) == "string" and type(options.chord_backup_path) == "string",
+		"combination scope requires its tap_hold.toml companion paths")
+	local same_frame = options.same_source_frame or require("modules.shortcuts.key_combinations").same_source_frame
+	-- The tap-hold writer prepares tap_hold.toml; it is resolved when a row reaches it.
+	local function prepare_chords(...)
+		return (options.prepare_chord_rows or require("platform.remap.tap_hold_writer").prepare_combo_rows)(...)
 	end
 	local manifest = options.manifest or require("infra.manifest_reader")
 	local function declared()
@@ -73,8 +83,7 @@ function M.new(options)
 		local document = expected and (expected.status == "ok" and Codec.decode(expected.content) or {})
 		local function detached_source()
 			local receipt = combinations.capture_edit_source(owner)
-			if type(receipt) ~= "table" or receipt.path ~= expected.path or receipt.status ~= expected.status
-				or receipt.content ~= expected.content or receipt.guard() ~= true then return false end
+			if type(receipt) ~= "table" or not same_frame(receipt, expected) or receipt.guard() ~= true then return false end
 			return true
 		end
 		local function current()
@@ -122,13 +131,17 @@ function M.new(options)
 		return type(binding) == "string" and combinations.configuration_domain(binding) == Shared.BINDING_SCOPE
 			and type(action) == "string" and type(parameters.get_action_parameter_spec(action)) == "string", action
 	end
-	local function capture(source)
+	local function capture(source, _, _, rendered)
 		local pairs = combinations.configuration_snapshot(owner)
 		local params = parameters.parameter_configuration_snapshot(owner)
 		frame = combinations.configuration_source(owner)
+		local chord = type(rendered) == "table" and rendered.tap_hold or nil
 		if type(pairs) ~= "table" or type(params) ~= "table" or type(frame) ~= "table" or type(source) ~= "table"
 			or frame.path ~= options.path or frame.status ~= source.status
-			or (frame.status == "ok" and frame.content ~= source.content) then return nil end
+			or (frame.status == "ok" and frame.content ~= source.content)
+			or type(chord) ~= "table" or type(frame.chord) ~= "table" or frame.chord.path ~= options.chord_path
+			or frame.chord.status ~= chord.source.status
+			or (frame.chord.status == "ok" and frame.chord.content ~= chord.source.content) then return nil end
 		local document = frame.status == "ok" and Codec.decode(frame.content) or {}
 		if parameters.parameter_configuration_matches(owner,document,function() return true end) ~= true
 			or combinations.configuration_source_matches(owner,frame) ~= true then return nil end
@@ -139,7 +152,25 @@ function M.new(options)
 		if combinations.apply_configuration(owner,snapshot.pairs) ~= true then return false end
 		return parameters.apply_parameter_configuration(owner,snapshot.parameters) == true
 	end
+	--- The published (or unchanged) tap_hold.toml frame of a candidate.
+	--- @param rendered table The transaction's rendered companion.
+	--- @return table frame `{ path, status, content }`.
+	local function chord_frame(rendered)
+		local chord = rendered.tap_hold
+		if chord.published then return { path = options.chord_path, status = "ok", content = chord.candidate } end
+		return { path = options.chord_path, status = chord.source.status, content = chord.source.content }
+	end
 	local transaction = Transaction.new({path=options.path,backup_path=options.backup_path,
+		companions={tap_hold={path=options.chord_path,backup_path=options.chord_backup_path,prefixes={ConfigKeys.KEY.MOD_COMBOS},
+			prepare=function(rows,files)
+				local prepared, detail, candidate, source = prepare_chords(options.chord_path,rows,files)
+				local expected = options.expected_source and options.expected_source.chord
+				if prepared == true and expected and (expected.path ~= options.chord_path or type(source) ~= "table"
+					or source.status ~= expected.status or (source.status == "ok" and source.content ~= expected.content)) then
+					return false,"Combination editor source changed."
+				end
+				return prepared,detail,candidate,source
+			end}},
 		files=options.files or require("adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
 			if scope == "key_combinations_gate" then
 				assert(mode == "configured" and type(gate_value) == "boolean")
@@ -202,9 +233,9 @@ function M.new(options)
 			end
 			return false
 		end,
-		apply=function(config,updates,_,candidate_bytes)
+		apply=function(config,updates,_,candidate_bytes,rendered)
 			if options.is_paused() ~= false then return false end
-			local candidate = { pairs = combinations.configuration_candidate(config,true),
+			local candidate = { pairs = combinations.configuration_candidate(config,true,rendered.tap_hold.decoded),
 				parameters = parameters.parameter_configuration_snapshot(owner) }
 			if type(candidate.parameters) ~= "table" then return false end
 			for _,row in ipairs(updates) do
@@ -213,7 +244,7 @@ function M.new(options)
 			if combinations.configuration_source_matches(owner,frame) ~= true then return false end
 			if install(candidate) ~= true then return false end
 			if combinations.configuration_source_matches(owner,frame) ~= true then return false end
-			published_frame = {path=options.path,status="ok",content=candidate_bytes}
+			published_frame = {path=options.path,status="ok",content=candidate_bytes,chord=chord_frame(rendered)}
 			return true
 		end,
 		after_publish=function()
@@ -286,8 +317,11 @@ function M.new(options)
 		return perform(function()
 			local captured = combinations.configuration_source(owner)
 			if type(captured) ~= "table" then return false end
-			local plan = Shared.plan_chord_copy(captured.status=="ok" and captured.content or "",{
+			local chord = captured.chord
+			if type(chord) ~= "table" then return false end
+			local plan = Shared.plan_chord_copy(chord.status=="ok" and chord.content or "",{
 				entries=combinations.configuration_entries(),settings=combinations.chord_settings(),tap_section=Shared.TAP_SECTION,
+				tap_source=captured.status=="ok" and captured.content or "",
 				is_action=function(action)
 					-- Every known participant must be admitted by the actual source owner.
 					for _,entry in ipairs(combinations.configuration_entries()) do
@@ -365,7 +399,11 @@ local function session(is_paused,expected_source)
 	if retained and retained.release() ~= true then return nil end
 	sequence = sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
-	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",is_paused=is_paused,expected_source=expected_source})
+	local stamp = os.date("%Y%m%d-%H%M%S").."-"..sequence
+	local chord_path = require("modules.shortcuts.key_combinations").chord_path_for(path)
+	retained = M.new({path=path,backup_path=path..".combinations-"..stamp..".bak",
+		chord_path=chord_path,chord_backup_path=chord_path..".combinations-"..stamp..".bak",
+		is_paused=is_paused,expected_source=expected_source})
 	return retained
 end
 

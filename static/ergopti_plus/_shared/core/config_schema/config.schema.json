@@ -21,16 +21,11 @@
 			"additionalProperties": false,
 			"properties": {
 				"enabled": { "type": "boolean" },
-				"lone_modifier_tap_max_ms": { "type": "integer", "minimum": 0 },
-				"sticky_timeout_ms": {
-					"description": "How long a one-shot Shift waits for its key, in milliseconds. Absent: the timing registry's tap_hold.one_shot_shift_timeout_ms.",
-					"type": "integer",
-					"exclusiveMinimum": 0
-				}
+				"lone_modifier_tap_max_ms": { "type": "integer", "minimum": 0 }
 			}
 		},
 		"mod_combos": {
-			"description": "The key combinations on every driver (maintainer decision of 2026-11-11): switch, timing, symmetry and each pair's slots under its <first>_then_<second> id; native source/output admission remains separately owned.",
+			"description": "Linux simultaneous settings and known pair combo leaves; native source/output admission remains separately owned.",
 			"type": "object",
 			"additionalProperties": true,
 			"properties": {
