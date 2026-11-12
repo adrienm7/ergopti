@@ -170,8 +170,8 @@ function run() {
 		"const crypto = require('crypto');\nconst lua = `local json=require('core.text.engine.json')`;"
 	);
 
-	// A listed tool's own module-name tables move, one-word names included; a
-	// log tag of the Lua template it embeds does not.
+	// A listed tool's own module-name tables move, one-word names included, and
+	// so does the log tag of the Lua template it embeds, as in the Lua it mirrors.
 	const Edits = require('../audit/structure/edits.cjs');
 	const listedTool = 'tools/lib/zz-probe-binding.cjs';
 	Edits.MODULE_NAME_FILES.push({ file: listedTool, why: 'probe' });
@@ -188,7 +188,7 @@ function run() {
 				listedTool
 			),
 			"const imports = { Json: 'core.text.engine.json', Terms: 'layouts.engine.terminators' };\n" +
-				'const tpl = `Logger.error("keymap.terminators", "x")`;\n' +
+				'const tpl = `Logger.error("layouts.engine.terminators", "x")`;\n' +
 				"if (name === 'core.text.engine.json') ok();"
 		);
 	} finally {

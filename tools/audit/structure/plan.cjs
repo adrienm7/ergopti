@@ -868,8 +868,7 @@ function filesEndingWith(tail) {
 /**
  * A quoted module name at `index` of a tool listed in edits.cjs
  * MODULE_NAME_FILES: one of the tool's own JavaScript values (a property, an
- * element or a comparison operand, in single quotes), never a log tag of a
- * Lua template the tool embeds.
+ * element or a comparison operand, in single quotes).
  */
 function isListedModuleSite(file, text, index) {
 	return (
@@ -969,6 +968,14 @@ const LUA_NAME_TABLE =
 	/\{\s*(?:--[^\n]*\n\s*)*(?:(["'])[A-Za-z_][\w.]*\1\s*[,;]\s*(?:--[^\n]*\n\s*)*)*(["'])[A-Za-z_][\w.]*\2\s*[,;]?\s*(?:--[^\n]*\n\s*)*\}/g;
 
 /** Code just before a quoted name that loads it as a Lua module. */
+// Logger.error( before a quoted tag: the tag names the logging module.
+const LUA_LOG_TAG_BEFORE = /\bLogger\.\w+\s*\(\s*$/;
+
+/** True when the quoted name at `index` is the tag of a Lua Logger call. */
+function isLuaLogTagSite(text, index) {
+	return LUA_LOG_TAG_BEFORE.test(text.slice(Math.max(0, index - 40), index));
+}
+
 const MODULE_LOAD_BEFORE =
 	/(?:\brequire\s*(?:[%\\]?\()?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\(|\b\w*(?:load|fresh)_(?:module|with_stubs)\s*\(|\brawget\s*\(\s*package\.(?:loaded|preload)\s*,|\bsearchpath\s*\()\s*$/;
 
@@ -1980,9 +1987,15 @@ function scanFile(file, text, ctx) {
 			// its own tables (new Set(['menu.personal_files', …])): every quoted
 			// name of a moved module there is one.
 			// Only the tool's own JavaScript values: a property, an element or a
-			// comparison operand in single quotes, never a Lua template's log tag.
+			// comparison operand in single quotes.
 			const listed = isListedModuleSite(file, text, m.index);
-			if ((!dotted && !listed && !isModuleLoadSite(text, m.index)) || NODE_MODULES.has(m[1]))
+			// The log tag of an embedded Lua chunk (Logger.error("x.y", …)) is
+			// the module's name, as in the Lua it mirrors, where it follows.
+			const tag = m[1].includes('.') && isLuaLogTagSite(text, m.index);
+			if (
+				(!dotted && !listed && !tag && !isModuleLoadSite(text, m.index)) ||
+				NODE_MODULES.has(m[1])
+			)
 				continue;
 			const shared = byLuaName.get(`_shared|${m[1]}`);
 			const own = drivers.map((d) => byLuaName.get(`${d}|${m[1]}`)).filter(Boolean);
@@ -1991,7 +2004,7 @@ function scanFile(file, text, ctx) {
 			if (hit && hit[2])
 				add('lua-module', m[1], hit[2], {
 					oldRepo: PREFIX + hit[0],
-					loadOnly: !dotted && !listed,
+					loadOnly: !dotted && !listed && !tag,
 					listed: listed && !dotted
 				});
 		}
@@ -2617,6 +2630,7 @@ module.exports = {
 	neverRewritten,
 	foreignBaseBefore,
 	isListedModuleSite,
+	isLuaLogTagSite,
 	EXISTING,
 	referenceContext,
 	scanFile,
