@@ -39,7 +39,7 @@ local function store(overrides)
 		read = function(path) return disk[path] end,
 		exists = function(path) return disk[path] ~= nil end,
 		write = function(path, text) disk[path] = text; return true end,
-		log = function(level, message) logs[#logs + 1] = level .. ": " .. message end,
+		log = function(level, message, ...) logs[#logs + 1] = level .. ": " .. string.format(message, ...) end,
 	}
 	for key, value in pairs(overrides or {}) do env[key] = value end
 	return SourceStore.new(env), disk, logs
@@ -99,7 +99,7 @@ helpers.describe("layout editor source store", function()
 		save("latin1.toml", "caf\233")
 		save("surrogate.toml", "\237\160\128")
 		for index, code in ipairs(refused) do
-			helpers.assert_eq(code, SourceStore.FAILURE_INVALID, "refusal " .. index)
+			helpers.assert_eq(code, settings().failures.invalid, "refusal " .. index)
 		end
 		helpers.assert_eq(#refused, 8)
 		helpers.assert_eq(next(disk), nil, "nothing was written")
@@ -111,8 +111,31 @@ helpers.describe("layout editor source store", function()
 		local result
 		operations.save({ filename = "a.toml", text = "x" }, function(...) result = { ... } end)
 		helpers.assert_eq(result[1], false)
-		helpers.assert_eq(result[2], SourceStore.FAILURE_WRITE)
+		helpers.assert_eq(result[2], settings().failures.write)
 		helpers.assert_eq(result[3], "disk full")
+	end)
+
+	helpers.it("(lmh-007-store-settings) reads the export name and failure codes from the shared defaults", function()
+		local s = settings()
+		helpers.assert_eq(s.nav_file, "layers.toml")
+		helpers.assert_eq(s.failures, { invalid = "source_invalid_file", write = "write_failed" })
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local handle = assert(io.open(Paths.shared(DEFAULTS_PATH), "r"))
+		local defaults = Json.decode(handle:read("*a"))
+		handle:close()
+		defaults.source.nav_file = "navigation.toml"
+		defaults.source.failures.invalid = "refused_here"
+		local renamed = assert(SourceStore.settings(defaults))
+		helpers.assert_true(SourceStore.is_source(renamed, "layers.toml"), "the old name is a source again")
+		helpers.assert_true(not SourceStore.is_source(renamed, "navigation.toml"), "the configured export is not")
+		helpers.assert_eq(SourceStore.read_picked(renamed, "/u/x.sh", function() end).code, "refused_here")
+		defaults.source.failures = nil
+		local _, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "failures")
+		defaults.source.failures, defaults.source.nav_file = { invalid = "a", write = "b" }, nil
+		_, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "nav_file")
 	end)
 
 	helpers.it("opens nothing when the pointer names a missing or foreign file", function()
@@ -131,9 +154,9 @@ helpers.describe("layout editor source store", function()
 		local picked = SourceStore.read_picked(settings(), "/u/My Layout.TOML", read)
 		helpers.assert_eq(picked.filename, "My Layout.TOML")
 		helpers.assert_eq(picked.text, "a = 1\n")
-		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/x.sh", read).code, SourceStore.FAILURE_INVALID)
-		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/latin.keylayout", read).code, SourceStore.FAILURE_INVALID)
-		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/missing.toml", read).code, SourceStore.FAILURE_INVALID)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/x.sh", read).code, settings().failures.invalid)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/latin.keylayout", read).code, settings().failures.invalid)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/missing.toml", read).code, settings().failures.invalid)
 	end)
 
 	helpers.it("accepts multi-byte UTF-8 and refuses overlong forms", function()

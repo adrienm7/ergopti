@@ -1537,7 +1537,7 @@ end
 --- @return boolean dispatched
 function M.source_save(payload, on_done, deps)
 	return with_source(deps, function(operations) operations.save(payload, on_done) end,
-		function(detail) on_done(false, SourceStore.FAILURE_WRITE, detail, nil) end)
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
 end
 
 --- Revokes every registry workflow before cancelling its external transports.

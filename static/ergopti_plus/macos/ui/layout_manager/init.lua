@@ -170,7 +170,7 @@ local function pick_source(on_done)
 	local settings, settings_err = SourceStore.settings(ok_defaults and defaults or nil)
 	if not settings then
 		Logger.error(LOG, "The layout editor cannot open files: %s.", tostring(settings_err))
-		on_done({ code = SourceStore.FAILURE_INVALID, detail = settings_err })
+		on_done({ code = require("modules.keymap.layout_registry").FAILURE_INVALID, detail = settings_err })
 		return
 	end
 	local path = DialogUtil.choose_layout_source(i18n.get("layout_editor.pick_message"),
