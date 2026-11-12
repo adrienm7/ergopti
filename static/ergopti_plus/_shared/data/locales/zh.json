@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "由于未安装程序“{1}”，无法卸载 Ergopti。请安装后重试。您的个人数据已保留。",
 	"menu.global.start_at_login": "登录时启动",
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
+	"dialog.start_at_login.approval": "请在刚打开的系统启动设置中允许 Ergopti。系统确认后，此选项将被勾选。",
 	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Windows 上暂未提供: 逐个令牌显示尚未在 Windows 上验证，因此此选项保持停用。",
 	"menu.layout.number_row": "数字行",

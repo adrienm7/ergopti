@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "プログラム「{1}」がインストールされていないため、Ergopti をアンインストールできませんでした。インストールしてからもう一度お試しください。個人データは保持されています。",
 	"menu.global.start_at_login": "ログイン時に起動",
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
+	"dialog.start_at_login.approval": "開いたシステムの起動設定で Ergopti を許可してください。システムが確認すると、このオプションにチェックが付きます。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Windows ではまだ非対応: トークンごとの表示は Windows で検証されていないため、このオプションは無効のままです。",
 	"menu.layout.number_row": "数字列",
