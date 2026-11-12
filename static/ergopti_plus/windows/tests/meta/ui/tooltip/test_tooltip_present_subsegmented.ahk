@@ -573,11 +573,19 @@ _TPS_PostPresentTokenGuardsEveryMutation() {
 		TimerCritical)
 	TimerCancel := InStr(StartTimer, "LLM_Engine_CancelTimer()", true,
 		TimerGuard)
+	; The re-arm goes through _LLM_Engine_ArmTimer: the caller's scheduler, else
+	; the engine's TimerScheduler port. Either way it arms, synchronously, inside
+	; the same Critical span.
 	TimerArm := InStr(StartTimer,
-		"ScheduleFn.Call(_LLM_Engine", true, TimerCancel)
+		'_LLM_Engine_ArmTimer(_LLM_Engine["pending_timer"]', true, TimerCancel)
+	TimerOff := InStr(StartTimer, "Critical(PreviousCritical)", true, TimerArm)
 	Assert(Capture > 0 and TimerCritical > Capture and TimerGuard > TimerCritical
-		and TimerCancel > TimerGuard and TimerArm > TimerCancel,
+		and TimerCancel > TimerGuard and TimerArm > TimerCancel and TimerOff > TimerArm,
 		"focus capture must stay outside Critical, then the surface token must be rechecked atomically with cancel + timer re-arm so a stale callback cannot evict newer LLM work")
+	ArmTimer := _StripFullLineComments(_DriverFuncBody("_LLM_Engine_ArmTimer"))
+	Assert(InStr(ArmTimer, "return ScheduleFn.Call(Callback, Period)") > 0
+		and InStr(ArmTimer, '_LLM_Engine_Port("timer").After(Callback, -Period)') > 0,
+		"the re-arm must reach the caller's scheduler or the engine's timer port with the bound callback")
 }
 
 ; AHK-003 / A1-03 (audit 2026-08-26): both production and headless suggestion
