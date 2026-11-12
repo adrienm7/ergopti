@@ -388,13 +388,16 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 		const dir = path.posix.dirname(file);
 		if (lead !== '%A_ScriptDir%/')
 			candidates.push({ form: 'file', lead, abs: path.posix.normalize(`${dir}/${rest}`) });
-		candidates.push({
-			form: 'root',
-			lead,
-			abs: path.posix.normalize(`${PREFIX}${inTree}/${rest}`)
-		});
+		// "./lua" and "../x" are relative to the file and nothing else.
+		const fileRelative = /^\.\.?\//.test(rest);
+		if (!fileRelative)
+			candidates.push({
+				form: 'root',
+				lead,
+				abs: path.posix.normalize(`${PREFIX}${inTree}/${rest}`)
+			});
 		// Paths.shared("modules/llm/x.json") and its peers resolve against _shared/.
-		if (inTree !== '_shared' && !lead)
+		if (inTree !== '_shared' && !lead && !fileRelative)
 			candidates.push({
 				form: 'shared',
 				lead,
@@ -404,7 +407,7 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 		// shared Lua root, which S00 turns into _shared itself. Only a Lua file
 		// is read that way: "<config>/hotstrings/x" in a redaction corpus is a
 		// user path, not the shared hotstrings folder.
-		if (!lead && /\.lua$/.test(rest))
+		if (!lead && !fileRelative && /\.lua$/.test(rest))
 			candidates.push({
 				form: 'shared',
 				lead,
