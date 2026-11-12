@@ -2077,6 +2077,21 @@ function scanFile(file, text, ctx) {
 					oldRepo: PREFIX + hit[0]
 				});
 		}
+		// case "$*" in *"\'keycodes.evdev\'"*): a dotted module name in escaped
+		// quotes, inside a stand-in for the runtime that requires it, where the
+		// file checks that require in another spelling.
+		for (const m of text.matchAll(/\\(['"])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\\\1/g)) {
+			const escaped = m[2].replace(/\./g, '\\.');
+			if (
+				!new RegExp(
+					`require[\\s\\S]{0,12}['"](?:${m[2]}|${escaped.replace(/\\/g, '\\\\')})['"]`
+				).test(text)
+			)
+				continue;
+			const hit = byLuaName.get(`_shared|${m[2]}`);
+			if (hit && hit[2])
+				add('lua-module-quoted', m[0], `\\${m[1]}${hit[2]}\\${m[1]}`, { oldRepo: PREFIX + hit[0] });
+		}
 		// 'string:layout.number_row_policy': the same module as a token of the
 		// require call a tool matches token by token.
 		for (const m of text.matchAll(/(['`])string:([A-Za-z_][\w.]*)\1/g)) {
