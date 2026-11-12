@@ -6,6 +6,7 @@ Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
 ## One configuration layout on every OS for tap-holds (2026-11-11)
+
 ## The Linux decoder judges millimetres (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (GSD-2): the Linux contact decoder
@@ -23,6 +24,7 @@ pins the three values and fails on a gesture source declaring a
 `*SWIPE_THRESHOLD`, `*UNITS_PER_MM` or `PAIR_SCROLL_TRAVEL*` literal. macOS
 measures millimetres already; Windows receives finished swipes. Regressions
 `gsd2-decoder-mm`.
+
 ## An answer that is not the release list is no connection (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (UPD-1): a GitHub API answer with
@@ -38,6 +40,7 @@ association that does not match) is « no connection » with the feed too, and
 the cached page is dropped so the next request is unconditional; macOS and
 Windows already fell back there. Windows counterpart (maintainer): TODO
 « Windows (the PC agent's) ». Regressions `upd1-captive-portal`.
+
 ## Linux stages are named per process and reaped at start (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (CFD-1): the Linux TOML writer
@@ -57,6 +60,7 @@ change: it stages through stdio `"w"`, which overwrites a leftover `.tmp`.
 Other Linux writers that stage `<file>.tmp` themselves (API entries, agent
 learning, tap-hold, app categories) are outside the decision and unchanged.
 Regressions `cfd1-stage-owner`.
+
 ## The Linux application identity is the WM class or app_id (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (ADD-3): Linux names an application
@@ -78,6 +82,7 @@ Windows interpreter validates at boot and whose identity (the process name)
 does not change (decided by the coordinator on 2026-11-11, to review by the
 maintainer). macOS keeps bundle ids unchanged; Windows keeps process names.
 Regressions `add3-app-identity`.
+
 ## A password manager is a secure field as a whole, from one list (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (ADD-1): every application of
@@ -100,6 +105,7 @@ driver-local list and on a Windows `SFD_SECURE_APPS` name missing from the
 file. Windows (maintainer): read the file in `secure_field_detector.ahk` and
 call `SFD_IsSecureApp` from `SFD_IsSecureField`; see TODO « Windows (the PC
 agent's) ». Regressions `add1-secure-app`.
+
 ## A borrowed unowned Linux clipboard goes back unowned (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (ADD-2): when a Linux borrower
@@ -158,7 +164,9 @@ section (`_shared/tap_hold/SCHEMA.md`).
 - A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
   the two files each driver writes; each suite pins its own and reads the
   others'. Do not move a manifest row back into `tap_hold.toml`.
+
 ## No Linux keyboard slot runs through a pause (2026-11-11)
+
 Decided by the maintainer on 2026-11-11 (SCD-1): on Linux a keyboard slot
 (`[shortcuts.keyboard]`) bound to a `script_*` action is held back while the
 driver is paused, in dry-run, or with Shortcuts off, like every other slot, as
