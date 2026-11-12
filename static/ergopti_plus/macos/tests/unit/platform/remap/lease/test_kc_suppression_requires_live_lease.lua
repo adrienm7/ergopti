@@ -84,7 +84,6 @@ local function load_remap(initially_enabled, options)
 			if listener then listener(ctx.phase, initially_enabled and TOKEN or nil) end
 			return true
 		end,
-		is_initialized = function() return ctx.phase_listener ~= nil end,
 		token = function() return TOKEN end,
 		start_paused = function(callback)
 			ctx.start_callback = callback
