@@ -1841,6 +1841,7 @@ static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_personal_in
 static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_user_code_contract.lua	static/ergopti_plus/linux/tests/unit/hotstrings/engine/dynamic/test_user_code_contract.lua	S26
 static/ergopti_plus/linux/tests/unit/modules/gestures/actions/test_background_commands.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_background_commands.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/actions/test_brightness_actions.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_brightness_actions.lua	S25
+static/ergopti_plus/linux/tests/unit/modules/gestures/actions/test_click_hold_pointer_release.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_click_hold_pointer_release.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/actions/test_desktop_navigation_actions.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_desktop_navigation_actions.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/actions/test_desktop_navigation_vectors.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_desktop_navigation_vectors.lua	S25
 static/ergopti_plus/linux/tests/unit/modules/gestures/actions/test_file_selection_vectors.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_file_selection_vectors.lua	S25
@@ -2175,6 +2176,7 @@ static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key
 static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua	static/ergopti_plus/linux/tests/unit/shortcuts/key_combinations/test_key_combinations.lua	S33
 static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_accented_shortcuts.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_accented_shortcuts.lua	S33
 static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_ai_off_disarms_ai_actions.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_ai_off_disarms_ai_actions.lua	S33
+static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_bound_chord_emulated_letter.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_bound_chord_emulated_letter.lua	S33
 static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_chatgpt.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_chatgpt.lua	S33
 static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_chatgpt_binding.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_chatgpt_binding.lua	S33
 static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_deferred_action_configuration_owner.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_deferred_action_configuration_owner.lua	S33
@@ -2244,7 +2246,6 @@ static/ergopti_plus/linux/tests/unit/modules/updater/vectors/test_updater_versio
 static/ergopti_plus/linux/tests/unit/modules/updater/vectors/test_version_label_vectors.lua	static/ergopti_plus/linux/tests/unit/updater/engine/vectors/test_version_label_vectors.lua	S35
 static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_key_combination_first_key_order.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_key_combination_first_key_order.lua	S28
 static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_ai_off.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_ai_off.lua	S28
-static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_combos_import.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_combos_import.lua	S28
 static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_engine_modifier_key.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_engine_modifier_key.lua	S28
 static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_engine_under_modifier_layer.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_engine_under_modifier_layer.lua	S28
 static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_integration.lua	S28
@@ -7700,6 +7701,7 @@ static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_ove
 static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_owned_press.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_owned_press.ahk	S28
 static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_prior_key.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_prior_key.ahk	S28
 static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_roll.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_roll.ahk	S28
+static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_shared_file.ahk	S28
 static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_tap_keeps_held_modifiers.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_tap_keeps_held_modifiers.ahk	S28
 static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_taphold_inherit_defaults_roundtrip.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_taphold_inherit_defaults_roundtrip.ahk	S28
 static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_taphold_synthetic_refcount_combo.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_taphold_synthetic_refcount_combo.ahk	S28

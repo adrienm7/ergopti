@@ -1145,8 +1145,8 @@ S01	lua-module	config_cleanup_session	settings.engine.migration.cleanup_session	
 S01	lua-module	config_defaults	settings.engine.publication.defaults	6	driver-test:5,lua-require:1
 S01	lua-module	config_file_inverse	settings.engine.migration.file_inverse	14	driver-test:8,lua-require:6
 S01	lua-module	config_keyboard_publication	settings.engine.publication.keyboard_publication	8	driver-test:4,lua-require:4
-S01	lua-module	config_keys	settings.engine.keys	187	lua-require:164,driver-test:16,tooling:4,repo-test:3
-S01	lua-module	config_migrate	settings.engine.migration.migrate	36	driver-test:22,lua-require:14
+S01	lua-module	config_keys	settings.engine.keys	189	lua-require:164,driver-test:18,tooling:4,repo-test:3
+S01	lua-module	config_migrate	settings.engine.migration.migrate	39	driver-test:24,lua-require:15
 S01	lua-module	config_obsolete_parents	settings.engine.migration.obsolete_parents	3	lua-require:2,driver-test:1
 S01	lua-module	config_outdated	settings.engine.migration.outdated	99	driver-test:53,lua-require:46
 S01	lua-module	config_reset_failure	settings.engine.publication.reset_failure	4	driver-test:2,lua-require:2
@@ -1389,7 +1389,7 @@ S01	lua-module	menu.wrap_preferences	menu.engine.wrap_preferences	5	driver-test:
 S01	lua-module	module_source_directory	core.fs.engine.module_source_directory	8	lua-require:6,driver-test:2
 S01	lua-module	module_source_identity	core.fs.engine.module_source_identity	9	lua-require:6,driver-test:3
 S01	lua-module	native_app_switcher_owner	core.ui.engine.native_app_switcher_owner	2	lua-require:1,driver-test:1
-S01	lua-module	native_path	core.fs.engine.native_path	130	lua-require:106,driver-test:21,repo-test:2,tooling:1
+S01	lua-module	native_path	core.fs.engine.native_path	129	lua-require:105,driver-test:21,repo-test:2,tooling:1
 S01	lua-module	native_presentation	menu.engine.native_presentation_core	4	lua-require:3,driver-test:1
 S01	lua-module	native_theme_data	core.ui.engine.native_theme_data	4	lua-require:3,driver-test:1
 S01	lua-module	native_worker_owner	core.lifecycle.engine.native_worker_owner	12	driver-test:9,lua-require:3
@@ -1449,9 +1449,9 @@ S01	lua-module	tap_hold.hold_options	tap_hold.engine.hold_options	16	driver-test
 S01	lua-module	tap_hold.key_catalog	tap_hold.engine.key_catalog	21	driver-test:14,lua-require:7
 S01	lua-module	tap_hold.key_combinations	tap_hold.engine.key_combinations	18	driver-test:10,lua-require:7,repo-test:1
 S01	lua-module	tap_hold.lone_tap	tap_hold.engine.lone_tap	9	lua-require:8,driver-test:1
-S01	lua-module	tap_hold.migrate	tap_hold.engine.migrate	5	lua-require:3,driver-test:2
+S01	lua-module	tap_hold.migrate	tap_hold.engine.migrate	4	driver-test:2,lua-require:2
 S01	lua-module	tap_hold.one_shot_shift	tap_hold.engine.one_shot_shift_core	4	lua-require:2,driver-test:1,repo-test:1
-S01	lua-module	tap_hold.shared_file	tap_hold.engine.shared_file	5	lua-require:3,driver-test:2
+S01	lua-module	tap_hold.shared_file	tap_hold.engine.shared_file	9	lua-require:7,driver-test:2
 S01	lua-module	test.action_parameter_label_contract	tests.lua.core.action_parameter_label_contract	2	driver-test:2
 S01	lua-module	test.adapter_errors_contract	tests.lua.diagnostics.adapter_errors_contract	2	driver-test:2
 S01	lua-module	test.agent_menu_root	tests.lua.ai.agent_menu_root	2	driver-test:2
@@ -1656,19 +1656,19 @@ S01	lua-module	test.user_model_records_contract	tests.lua.hotstrings.user_model_
 S01	lua-module	test.xkb_converter_contract	tests.lua.layouts.xkb_converter_contract	2	driver-test:2
 S01	lua-module	text_utils	core.text.engine.utils_core	214	lua-require:110,driver-test:101,repo-test:2,tooling:1
 S01	lua-module	timings	core.timing.engine.timings_core	8	driver-test:6,lua-require:2
-S01	lua-module	toml_codec	core.text.engine.toml_codec	280	driver-test:202,lua-require:75,repo-test:2,tooling:1
+S01	lua-module	toml_codec	core.text.engine.toml_codec	279	driver-test:201,lua-require:75,repo-test:2,tooling:1
 S01	lua-module	toml_codec.basic_string	core.text.engine.toml_codec.basic_string	39	driver-test:32,lua-require:7
 S01	lua-module	toml_codec.bom	core.text.engine.toml_codec.bom	34	driver-test:29,lua-require:5
 S01	lua-module	toml_codec.cleanup_roots	core.text.engine.toml_codec.cleanup_roots	2	lua-require:1,driver-test:1
 S01	lua-module	toml_codec.codec	core.text.engine.toml_codec.codec	41	driver-test:32,lua-require:9
-S01	lua-module	toml_codec.key_path	core.text.engine.toml_codec.key_path	69	driver-test:40,lua-require:28,tooling:1
+S01	lua-module	toml_codec.key_path	core.text.engine.toml_codec.key_path	67	driver-test:40,lua-require:26,tooling:1
 S01	lua-module	toml_codec.leaf_rows	core.text.engine.toml_codec.leaf_rows	39	driver-test:21,lua-require:18
 S01	lua-module	toml_codec.reader	core.text.engine.toml_codec.reader	67	driver-test:56,lua-require:10,tooling:1
 S01	lua-module	toml_codec.record_list	core.text.engine.toml_codec.record_list	5	lua-require:3,driver-test:2
 S01	lua-module	toml_codec.record_scanner	core.text.engine.toml_codec.record_scanner	49	driver-test:36,lua-require:13
 S01	lua-module	toml_codec.source_memo	core.text.engine.toml_codec.source_memo	6	driver-test:4,lua-require:2
 S01	lua-module	toml_codec.source_open	core.text.engine.toml_codec.source_open	13	driver-test:11,lua-require:2
-S01	lua-module	toml_codec.writer	core.text.engine.toml_codec.writer	239	driver-test:144,lua-require:93,tooling:1,repo-test:1
+S01	lua-module	toml_codec.writer	core.text.engine.toml_codec.writer	240	driver-test:145,lua-require:93,tooling:1,repo-test:1
 S01	lua-module	tooltip.layout	core.ui.engine.tooltip.layout	5	driver-test:3,lua-require:2
 S01	lua-module	tooltip.llm_line	core.ui.engine.tooltip.llm_line	9	lua-require:5,driver-test:4
 S01	lua-module	tooltip.tint	core.ui.engine.tooltip.tint	4	lua-require:2,driver-test:2
@@ -5601,7 +5601,7 @@ S01	path	\data\encryptor\format.json	static/ergopti_plus/_shared/apps/data/encry
 S01	path	\data\field_run_protocol.json	static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json	1	ahk-include:1
 S01	path	\data\hotstrings\common_autocorrection_migration.toml	static/ergopti_plus/_shared/hotstrings/data/autocorrection/common_autocorrection_migration.toml	2	ahk-include:1,driver-test:1
 S01	path	\data\hotstrings\common_autocorrection_sections.json	static/ergopti_plus/_shared/hotstrings/data/autocorrection/common_autocorrection_sections.json	1	driver-test:1
-S01	path	\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	1	ahk-include:1
+S01	path	\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	2	ahk-include:1,driver-test:1
 S01	path	\data\keycodes\physical_keys.json	static/ergopti_plus/_shared/layouts/data/keycodes/physical_keys.json	9	driver-test:5,ahk-include:4
 S01	path	\data\locale_names.json	static/ergopti_plus/_shared/core/i18n/data/locale_names.json	1	ahk-include:1
 S01	path	\data\locale_order.json	static/ergopti_plus/_shared/core/i18n/data/locale_order.json	4	driver-test:3,ahk-include:1
@@ -5675,7 +5675,7 @@ S01	path	\modules\shortcuts\physical_shortcuts.json	static/ergopti_plus/_shared/
 S01	path	\modules\timings\constants.toml	static/ergopti_plus/_shared/core/timing/data/constants.toml	8	driver-test:7,ahk-include:1
 S01	path	\modules\tooltip\constants.toml	static/ergopti_plus/_shared/core/ui/data/tooltip/constants.toml	5	driver-test:4,ahk-include:1
 S01	path	\modules\updater\asset_signing.json	static/ergopti_plus/_shared/updater/data/asset_signing.json	2	ahk-include:1,driver-test:1
-S01	path	\modules\updater\defaults.json	static/ergopti_plus/_shared/updater/data/defaults.json	15	driver-test:10,ahk-include:5
+S01	path	\modules\updater\defaults.json	static/ergopti_plus/_shared/updater/data/defaults.json	16	driver-test:11,ahk-include:5
 S01	path	\modules\wpm_widget\constants.toml	static/ergopti_plus/_shared/metrics/data/wpm_widget/constants.toml	3	driver-test:2,ahk-include:1
 S01	path	\modules\wrap_symbols\wrap_symbols.json	static/ergopti_plus/_shared/keyboard/data/wrap_symbols/wrap_symbols.json	4	ahk-include:2,driver-test:2
 S01	path	\shared\modules\diagnostics\collection.json	static/ergopti_plus/_shared/diagnostics/data/collection.json	1	driver-test:1
@@ -5685,9 +5685,10 @@ S01	path	\shared\modules\hotstrings\user_code.ahk	static/ergopti_plus/_shared/ho
 S01	path	\shared\tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	1	driver-test:1
 S01	path	\static\ergopti_plus\_shared\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	2	ahk-include:1,driver-test:1
 S01	path	\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json	static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json	1	ci-workflow:1
-S01	path	\tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	24	driver-test:17,ahk-include:7
+S01	path	\tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	25	driver-test:18,ahk-include:7
 S01	path	\tap_hold\migrations.toml	static/ergopti_plus/_shared/tap_hold/data/migrations.toml	1	ahk-include:1
 S01	path	\tap_hold\one_shot_shift.json	static/ergopti_plus/_shared/tap_hold/data/one_shot_shift.json	2	ahk-include:1,driver-test:1
+S01	path	\tap_hold\shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	1	ahk-include:1
 S01	path	_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	1	docs:1
 S01	path	_shared/ahk/config_binding_identity.ahk	static/ergopti_plus/_shared/settings/engine/publication/binding_identity.ahk	1	ahk-include:1
 S01	path	_shared/ahk/config_obsolete_parents.ahk	static/ergopti_plus/_shared/settings/engine/migration/obsolete_parents.ahk	1	ahk-include:1
@@ -5703,8 +5704,7 @@ S01	path	_shared/core/config_schema/examples/hotstrings_config.example.toml	stat
 S01	path	_shared/core/config_schema/examples/hs_config.example.toml	static/ergopti_plus/_shared/settings/data/config_schema/examples/hs_config.example.toml	1	other:1
 S01	path	_shared/core/config_schema/examples/hs_tap_hold.example.toml	static/ergopti_plus/_shared/settings/data/config_schema/examples/hs_tap_hold.example.toml	1	other:1
 S01	path	_shared/core/config_schema/examples/personal_info.example.toml	static/ergopti_plus/_shared/settings/data/config_schema/examples/personal_info.example.toml	1	other:1
-S01	path	_shared/core/config_schema/migrations.toml	static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml	13	docs:4,other:3,ahk-include:2,lua-require:1,build:1,tooling:1,repo-test:1
-S01	path	_shared/core/config_schema/tap_hold.schema.json	static/ergopti_plus/_shared/settings/data/config_schema/tap_hold.schema.json	1	docs:1
+S01	path	_shared/core/config_schema/migrations.toml	static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml	17	docs:6,other:3,ahk-include:3,lua-require:2,build:1,tooling:1,repo-test:1
 S01	path	_shared/core/domain/Expander.spec.js	static/ergopti_plus/_shared/core/text/data/domain/Expander.spec.js	2	other:1,docs:1
 S01	path	_shared/core/domain/GestureRecognizer.spec.js	static/ergopti_plus/_shared/core/text/data/domain/GestureRecognizer.spec.js	2	other:1,docs:1
 S01	path	_shared/core/domain/HotstringMatcher.spec.js	static/ergopti_plus/_shared/core/text/data/domain/HotstringMatcher.spec.js	5	driver-test:2,other:1,docs:1,repo-test:1
@@ -5797,7 +5797,7 @@ S01	path	_shared/lua/config_scope_composition.lua	static/ergopti_plus/_shared/se
 S01	path	_shared/lua/config_scope_fenced_transaction.lua	static/ergopti_plus/_shared/settings/engine/scope/fenced_transaction.lua	1	lua-require:1
 S01	path	_shared/lua/config_scope_file.lua	static/ergopti_plus/_shared/settings/engine/scope/file.lua	1	lua-require:1
 S01	path	_shared/lua/config_scope_participant.lua	static/ergopti_plus/_shared/settings/engine/scope/participant.lua	1	lua-require:1
-S01	path	_shared/lua/config_scope_transaction.lua	static/ergopti_plus/_shared/settings/engine/scope/transaction.lua	2	docs:1,lua-require:1
+S01	path	_shared/lua/config_scope_transaction.lua	static/ergopti_plus/_shared/settings/engine/scope/transaction.lua	1	lua-require:1
 S01	path	_shared/lua/config_unused_keys.lua	static/ergopti_plus/_shared/settings/engine/migration/unused_keys.lua	2	docs:1,lua-require:1
 S01	path	_shared/lua/config_user_models.lua	static/ergopti_plus/_shared/settings/engine/publication/user_models.lua	1	lua-require:1
 S01	path	_shared/lua/control/driver_control.lua	static/ergopti_plus/_shared/diagnostics/engine/control_driver_control.lua	4	lua-require:3,ahk-include:1
@@ -6271,7 +6271,7 @@ S01	path	_shared/lua/test/tap_hold_copy_check_contract.lua	static/ergopti_plus/_
 S01	path	_shared/lua/test/tap_hold_decision_contract.lua	static/ergopti_plus/_shared/tests/lua/keyboard/tap_hold_decision_contract.lua	3	driver-test:2,docs:1
 S01	path	_shared/lua/test/tap_hold_migrate_contract.lua	static/ergopti_plus/_shared/tests/lua/keyboard/tap_hold_migrate_contract.lua	2	driver-test:2
 S01	path	_shared/lua/test/tap_hold_rollover_contract.lua	static/ergopti_plus/_shared/tests/lua/keyboard/tap_hold_rollover_contract.lua	1	driver-test:1
-S01	path	_shared/lua/test/tap_hold_shared_file_contract.lua	static/ergopti_plus/_shared/tests/lua/keyboard/tap_hold_shared_file_contract.lua	3	docs:2,driver-test:1
+S01	path	_shared/lua/test/tap_hold_shared_file_contract.lua	static/ergopti_plus/_shared/tests/lua/keyboard/tap_hold_shared_file_contract.lua	2	driver-test:1,docs:1
 S01	path	_shared/lua/test/terminator_scope_contract.lua	static/ergopti_plus/_shared/tests/lua/hotstrings/terminator_scope_contract.lua	1	driver-test:1
 S01	path	_shared/lua/test/test_prediction_contract.lua	static/ergopti_plus/_shared/tests/lua/ai/test_prediction_contract.lua	1	driver-test:1
 S01	path	_shared/lua/test/text_cipher_raw_ingress_contract.lua	static/ergopti_plus/_shared/tests/lua/core/text_cipher_raw_ingress_contract.lua	1	driver-test:1
@@ -6345,7 +6345,7 @@ S01	path	_shared/lua/window_titles.lua	static/ergopti_plus/_shared/core/ui/engin
 S01	path	_shared/lua/wpm_widget/model.lua	static/ergopti_plus/_shared/metrics/engine/wpm_widget_model.lua	10	lua-require:5,repo-test:2,docs:1,driver-test:1,ahk-include:1
 S01	path	_shared/lua/wrap_pair/init.lua	static/ergopti_plus/_shared/keyboard/engine/wrap_pair.lua	2	lua-require:1,build:1
 S01	path	_shared/modules/actions/README.md	static/ergopti_plus/_shared/shortcuts/data/actions/README.md	2	docs:1,tooling:1
-S01	path	_shared/modules/actions/actions.toml	static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml	44	lua-require:15,repo-test:8,docs:7,tooling:5,driver-test:4,ahk-include:3,other:2
+S01	path	_shared/modules/actions/actions.toml	static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml	46	lua-require:15,docs:8,repo-test:8,driver-test:5,tooling:5,ahk-include:3,other:2
 S01	path	_shared/modules/actions/brightness.ahk	static/ergopti_plus/_shared/shortcuts/data/actions/brightness.ahk	1	ahk-include:1
 S01	path	_shared/modules/actions/brightness.json	static/ergopti_plus/_shared/shortcuts/data/actions/brightness.json	3	lua-require:1,build:1,tooling:1
 S01	path	_shared/modules/actions/modifier_chords.json	static/ergopti_plus/_shared/shortcuts/data/actions/modifier_chords.json	3	docs:1,lua-require:1,repo-test:1
@@ -6483,11 +6483,11 @@ S01	path	_shared/python/managed_ollama_sessions.py	static/ergopti_plus/_shared/a
 S01	path	_shared/python/managed_operation_receipt.py	static/ergopti_plus/_shared/ai/adapters/python/managed_operation_receipt.py	1	other:1
 S01	path	_shared/python/managed_source_alias.py	static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py	6	other:3,tooling:2,repo-test:1
 S01	path	_shared/python/network_proxy_policy.py	static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py	10	repo-test:4,tooling:3,other:2,driver-test:1
-S01	path	_shared/tap_hold/SCHEMA.md	static/ergopti_plus/_shared/tap_hold/data/SCHEMA.md	22	driver-test:8,docs:6,lua-require:6,other:2
+S01	path	_shared/tap_hold/SCHEMA.md	static/ergopti_plus/_shared/tap_hold/data/SCHEMA.md	26	driver-test:10,docs:5,lua-require:5,other:3,ahk-include:2,tooling:1
 S01	path	_shared/tap_hold/defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	47	docs:10,other:8,driver-test:8,lua-require:7,repo-test:7,ahk-include:5,tooling:2
-S01	path	_shared/tap_hold/migrations.toml	static/ergopti_plus/_shared/tap_hold/data/migrations.toml	16	lua-require:5,other:4,docs:2,driver-test:2,ahk-include:2,repo-test:1
+S01	path	_shared/tap_hold/migrations.toml	static/ergopti_plus/_shared/tap_hold/data/migrations.toml	17	lua-require:6,other:4,docs:2,driver-test:2,ahk-include:2,repo-test:1
 S01	path	_shared/tap_hold/one_shot_shift.json	static/ergopti_plus/_shared/tap_hold/data/one_shot_shift.json	7	driver-test:3,ahk-include:2,lua-require:1,repo-test:1
-S01	path	_shared/tap_hold/shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	3	docs:1,lua-require:1,other:1
+S01	path	_shared/tap_hold/shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	6	lua-require:2,docs:1,other:1,driver-test:1,ahk-include:1
 S01	path	actions.toml	static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml	1	docs:1
 S01	path	agent.lua	static/ergopti_plus/_shared/ai/engine/request_plan/agent.lua	1	lua-require:1
 S01	path	ahk_config.example.toml	static/ergopti_plus/_shared/settings/data/config_schema/examples/ahk_config.example.toml	1	other:1
@@ -6507,7 +6507,7 @@ S01	path	channel_vectors.json	static/ergopti_plus/_shared/updater/data/channel_v
 S01	path	channels.json	static/ergopti_plus/_shared/updater/data/channels.json	4	other:3,docs:1
 S01	path	codec.lua	static/ergopti_plus/_shared/core/text/engine/toml_codec/codec.lua	1	lua-require:1
 S01	path	common_autocorrection_sections.json	static/ergopti_plus/_shared/hotstrings/data/autocorrection/common_autocorrection_sections.json	1	docs:1
-S01	path	config.schema.json	static/ergopti_plus/_shared/settings/data/config_schema/config.schema.json	1	docs:1
+S01	path	config.schema.json	static/ergopti_plus/_shared/settings/data/config_schema/config.schema.json	2	docs:1,other:1
 S01	path	config_file_inverse.lua	static/ergopti_plus/_shared/settings/engine/migration/file_inverse.lua	1	lua-require:1
 S01	path	config_migrate.lua	static/ergopti_plus/_shared/settings/engine/migration/migrate.lua	2	lua-require:2
 S01	path	config_reset_failure.lua	static/ergopti_plus/_shared/settings/engine/publication/reset_failure.lua	1	lua-require:1
@@ -7124,7 +7124,7 @@ S01	path	tap_hold.schema.json	static/ergopti_plus/_shared/settings/data/config_s
 S01	path	tap_hold/defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	53	driver-test:40,lua-require:6,repo-test:3,docs:1,other:1,ahk-include:1,tooling:1
 S01	path	tap_hold/migrations.toml	static/ergopti_plus/_shared/tap_hold/data/migrations.toml	3	lua-require:2,repo-test:1
 S01	path	tap_hold/one_shot_shift.json	static/ergopti_plus/_shared/tap_hold/data/one_shot_shift.json	7	driver-test:5,lua-require:2
-S01	path	tap_hold/shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	1	lua-require:1
+S01	path	tap_hold/shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	2	lua-require:2
 S01	path	test/hotpath_segments_contract.lua	static/ergopti_plus/_shared/tests/lua/core/hotpath_segments_contract.lua	1	lua-require:1
 S01	path	test_vectors.json	static/ergopti_plus/_shared/core/logger/data/test_vectors.json	2	docs:2
 S01	path	text_crypto.lua	static/ergopti_plus/_shared/metrics/engine/privacy/text_crypto.lua	1	lua-require:1
@@ -7363,7 +7363,7 @@ S04	lua-module	infra.fs_dir	core.fs.engine.dir	112	driver-test:95,lua-require:15
 S04	lua-module	infra.native_directory	core.fs.engine.native_directory	24	lua-require:15,driver-test:9
 S04	lua-module	infra.no_replace_move	core.fs.engine.no_replace_move	11	lua-require:6,driver-test:5
 S04	lua-module	infra.openstep_plist	core.fs.engine.openstep_plist	5	driver-test:4,lua-require:1
-S04	lua-module	infra.paths	core.fs.engine.paths	648	driver-test:470,lua-require:170,repo-test:5,tooling:3
+S04	lua-module	infra.paths	core.fs.engine.paths	649	driver-test:470,lua-require:171,repo-test:5,tooling:3
 S04	lua-module	infra.private_sqlite_file	core.fs.engine.private_sqlite_file	6	driver-test:4,lua-require:2
 S04	lua-module	infra.regular_file_reader	core.fs.engine.regular_file_reader	74	lua-require:40,driver-test:32,repo-test:2
 S04	lua-module	infra.regular_file_writer	core.fs.engine.regular_file_writer	32	driver-test:20,lua-require:12
@@ -8973,7 +8973,7 @@ S11	lua-module	infra.native_timer	core.timing.engine.native_timer	32	driver-test
 S11	lua-module	infra.paced_job	core.timing.engine.paced_job	11	driver-test:8,lua-require:3
 S11	lua-module	infra.paced_json	core.timing.engine.paced_json	11	driver-test:9,lua-require:2
 S11	lua-module	infra.reload_timing	core.timing.engine.reload_timing	7	driver-test:4,lua-require:3
-S11	lua-module	infra.timings	core.timing.engine.timings	413	driver-test:251,lua-require:159,tooling:2,repo-test:1
+S11	lua-module	infra.timings	core.timing.engine.timings	414	driver-test:251,lua-require:160,tooling:2,repo-test:1
 S11	lua-module-inline	infra.deferred_work	core.timing.engine.deferred_work	1	driver-test:1
 S11	lua-module-inline	infra.paced_job	core.timing.engine.paced_job	1	lua-require:1
 S11	lua-module-inline	infra.reload_timing	core.timing.engine.reload_timing	1	driver-test:1
@@ -9829,7 +9829,7 @@ S15	lua-module	infra.device_names	platform.input.device_names	13	driver-test:10,
 S15	lua-module	infra.evdev_codes	platform.input.evdev_codes	48	driver-test:31,lua-require:17
 S15	lua-module	infra.input_access	platform.input.access	5	driver-test:3,lua-require:2
 S15	lua-module	infra.input_capture_gate	platform.input.capture_gate	14	driver-test:13,lua-require:1
-S15	lua-module	infra.input_event	platform.input.event	45	driver-test:35,lua-require:10
+S15	lua-module	infra.input_event	platform.input.event	46	driver-test:36,lua-require:10
 S15	lua-module	infra.keycodes	platform.input.keycodes	95	driver-test:81,lua-require:14
 S15	lua-module	infra.keysym	platform.input.keysym	4	lua-require:3,driver-test:1
 S15	lua-module	tests.unit.adapters.keyboard_hook.test_evdev_reader_controlled_fresh_native	tests.unit.platform.input.keyboard_hook.test_evdev_reader_controlled_fresh_native	1	driver-test:1
@@ -10399,7 +10399,7 @@ S18	lua-module	infra.owned_programs	settings.engine.preferences.owned_programs	1
 S18	lua-module	infra.personal_file_adoption	settings.engine.preferences.personal_file_adoption	8	driver-test:5,lua-require:3
 S18	lua-module	infra.personal_file_controls	settings.engine.preferences.personal_file_controls	6	driver-test:4,lua-require:2
 S18	lua-module	infra.personal_file_scope	settings.engine.scope.personal_file_scope	6	driver-test:5,lua-require:1
-S18	lua-module	infra.preferences	settings.engine.preferences.preferences	137	driver-test:118,lua-require:19
+S18	lua-module	infra.preferences	settings.engine.preferences.preferences	139	driver-test:119,lua-require:20
 S18	lua-module	infra.preferences_scope	settings.engine.scope.preferences_scope	3	lua-require:2,driver-test:1
 S18	lua-module	infra.program_binding_transaction	settings.engine.preferences.program_binding_transaction	8	driver-test:5,lua-require:3
 S18	lua-module	infra.scope_registry	settings.engine.scope.registry	19	lua-require:14,driver-test:5
@@ -10534,8 +10534,8 @@ S18	path	infra/config_io.ahk	static/ergopti_plus/windows/settings/engine/io.ahk	
 S18	path	infra/config_migrate.ahk	static/ergopti_plus/windows/settings/engine/migration/migrate.ahk	3	ahk-include:3
 S18	path	infra/config_migrate_records.ahk	static/ergopti_plus/windows/settings/engine/migration/migrate_records.ahk	1	ahk-include:1
 S18	path	infra/config_overrides.lua	static/ergopti_plus/macos/settings/engine/overrides.lua	2	lua-require:1,driver-test:1
-S18	path	infra/config_paths.lua	static/ergopti_plus/linux/settings/engine/paths.lua	6	driver-test:3,lua-require:2,other:1
-S18	path	infra/config_paths.lua	static/ergopti_plus/macos/settings/engine/paths.lua	5	lua-require:3,driver-test:2
+S18	path	infra/config_paths.lua	static/ergopti_plus/linux/settings/engine/paths.lua	4	lua-require:2,other:1,driver-test:1
+S18	path	infra/config_paths.lua	static/ergopti_plus/macos/settings/engine/paths.lua	6	lua-require:4,driver-test:2
 S18	path	infra/config_registry_cache.ahk	static/ergopti_plus/windows/settings/engine/publication/registry_cache.ahk	1	ahk-include:1
 S18	path	infra/config_scope.ahk	static/ergopti_plus/windows/settings/engine/scope/scope.ahk	2	ahk-include:2
 S18	path	infra/config_shortcuts.ahk	static/ergopti_plus/windows/settings/engine/shortcuts.ahk	6	ahk-include:3,driver-test:3
@@ -11049,7 +11049,7 @@ S19	join	resolve(SHARED, '../linux/ui/menu/builder.lua'	resolve(SHARED, '../linu
 S19	join	resolve(SHARED, '../macos/ui/menu/menu_utils.lua'	resolve(SHARED, '../macos/menu/ui/builder/utils.lua'	1	repo-test:1
 S19	join	resolve(SHARED, '../windows/infra/manifest_menu.ahk'	resolve(SHARED, '../windows/menu/engine/manifest_menu.ahk'	1	repo-test:1
 S19	lua-module	infra.manifest_menu	menu.engine.manifest_menu	240	driver-test:182,lua-require:52,repo-test:4,tooling:2
-S19	lua-module	infra.manifest_reader	menu.engine.manifest_reader	327	driver-test:212,lua-require:115
+S19	lua-module	infra.manifest_reader	menu.engine.manifest_reader	328	driver-test:213,lua-require:115
 S19	lua-module	infra.native_presentation	menu.engine.native_presentation	10	driver-test:4,lua-require:4,tooling:1,repo-test:1
 S19	lua-module	infra.ui_restore	menu.engine.ui_restore	23	driver-test:20,lua-require:3
 S19	lua-module	tests.unit.ui.menu.about.test_about_menu_channel_rows	tests.unit.menu.about.test_channel_rows	1	driver-test:1
@@ -14803,6 +14803,7 @@ S25	lua-module	modules.gestures.user_actions	gestures.engine.user_actions	11	dri
 S25	lua-module	modules.gestures.workspace_switcher	gestures.adapters.workspace_switcher	10	driver-test:6,lua-require:4
 S25	lua-module	tests.unit.modules.gestures.actions.test_background_commands	tests.unit.gestures.engine.actions.test_background_commands	1	driver-test:1
 S25	lua-module	tests.unit.modules.gestures.actions.test_brightness_actions	tests.unit.gestures.engine.actions.test_brightness_actions	1	driver-test:1
+S25	lua-module	tests.unit.modules.gestures.actions.test_click_hold_pointer_release	tests.unit.gestures.engine.actions.test_click_hold_pointer_release	1	driver-test:1
 S25	lua-module	tests.unit.modules.gestures.actions.test_desktop_navigation_actions	tests.unit.gestures.engine.actions.test_desktop_navigation_actions	1	driver-test:1
 S25	lua-module	tests.unit.modules.gestures.actions.test_desktop_navigation_vectors	tests.unit.gestures.engine.actions.test_desktop_navigation_vectors	1	driver-test:1
 S25	lua-module	tests.unit.modules.gestures.actions.test_dispatch_fences	tests.unit.gestures.engine.actions.test_dispatch_fences	1	driver-test:1
@@ -15130,6 +15131,7 @@ S25	path	tests/unit/modules/gestures/actions/test_apps_layer_actions.lua	static/
 S25	path	tests/unit/modules/gestures/actions/test_aux_deadline_publication.lua	static/ergopti_plus/macos/tests/unit/gestures/engine/actions/test_aux_deadline_publication.lua	1	driver-test:1
 S25	path	tests/unit/modules/gestures/actions/test_background_commands.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_background_commands.lua	1	driver-test:1
 S25	path	tests/unit/modules/gestures/actions/test_brightness_actions.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_brightness_actions.lua	1	driver-test:1
+S25	path	tests/unit/modules/gestures/actions/test_click_hold_pointer_release.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_click_hold_pointer_release.lua	1	driver-test:1
 S25	path	tests/unit/modules/gestures/actions/test_composite_resume.lua	static/ergopti_plus/macos/tests/unit/gestures/engine/actions/test_composite_resume.lua	1	driver-test:1
 S25	path	tests/unit/modules/gestures/actions/test_desktop_navigation_actions.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_desktop_navigation_actions.lua	1	driver-test:1
 S25	path	tests/unit/modules/gestures/actions/test_desktop_navigation_vectors.lua	static/ergopti_plus/linux/tests/unit/gestures/engine/actions/test_desktop_navigation_vectors.lua	1	driver-test:1
@@ -16817,7 +16819,7 @@ S28	lua-module	infra.key_combinations_scope	keyboard.engine.keys.combinations_sc
 S28	lua-module	infra.script_chord_catalogue	keyboard.engine.layers.script_chord_catalogue	15	driver-test:8,lua-require:7
 S28	lua-module	platform.remap	keyboard.engine	43	driver-test:34,lua-require:9
 S28	lua-module	platform.remap.action_catalogue	keyboard.engine.runtime.action_catalogue	3	lua-require:2,driver-test:1
-S28	lua-module	platform.remap.config	keyboard.engine.runtime.config	54	driver-test:53,lua-require:1
+S28	lua-module	platform.remap.config	keyboard.engine.runtime.config	55	driver-test:54,lua-require:1
 S28	lua-module	platform.remap.defaults	keyboard.engine.runtime.defaults	26	driver-test:21,lua-require:5
 S28	lua-module	platform.remap.deploy_pacing	keyboard.adapters.runtime.deploy_pacing	2	lua-require:1,driver-test:1
 S28	lua-module	platform.remap.generator	keyboard.engine.runtime.generator	38	driver-test:34,lua-require:4
@@ -16855,7 +16857,6 @@ S28	lua-module	tests.unit.platform.remap.generator_managed_lease.test_merge_ambi
 S28	lua-module	tests.unit.platform.remap.generator_managed_lease.test_publication	tests.unit.keyboard.engine.generator_managed_lease.test_publication	1	driver-test:1
 S28	lua-module	tests.unit.platform.remap.tap_hold.test_key_combination_first_key_order	tests.unit.keyboard.tap_hold.test_key_combination_first_key_order	1	driver-test:1
 S28	lua-module	tests.unit.platform.remap.tap_hold.test_tap_hold_ai_off	tests.unit.keyboard.tap_hold.test_ai_off	1	driver-test:1
-S28	lua-module	tests.unit.platform.remap.tap_hold.test_tap_hold_combos_import	tests.unit.keyboard.tap_hold.test_combos_import	1	driver-test:1
 S28	lua-module	tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key	tests.unit.keyboard.tap_hold.test_engine_modifier_key	1	driver-test:1
 S28	lua-module	tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer	tests.unit.keyboard.tap_hold.test_engine_under_modifier_layer	1	driver-test:1
 S28	lua-module	tests.unit.platform.remap.tap_hold.test_tap_hold_integration	tests.unit.keyboard.tap_hold.test_integration	1	driver-test:1
@@ -16928,7 +16929,7 @@ S28	path	adapters/system_switcher_runtime.lua	static/ergopti_plus/macos/keyboard
 S28	path	adapters/system_switcher_sampler.lua	static/ergopti_plus/macos/keyboard/adapters/system_switcher_sampler.lua	1	lua-require:1
 S28	path	altgr.ahk	static/ergopti_plus/windows/keyboard/engine/keys/altgr.ahk	2	ahk-include:2
 S28	path	altgr_criteria.ahk	static/ergopti_plus/windows/keyboard/engine/keys/altgr_criteria.ahk	1	ahk-include:1
-S28	path	config.lua	static/ergopti_plus/macos/keyboard/engine/runtime/config.lua	1	lua-require:1
+S28	path	config.lua	static/ergopti_plus/macos/keyboard/engine/runtime/config.lua	2	lua-require:2
 S28	path	constants.ahk	static/ergopti_plus/windows/keyboard/engine/keys/constants.ahk	1	docs:1
 S28	path	data/actions.json	static/ergopti_plus/macos/keyboard/data/actions.json	1	lua-require:1
 S28	path	data/legacy_layer_keys.json	static/ergopti_plus/macos/keyboard/data/legacy_layer_keys.json	1	lua-require:1
@@ -16961,7 +16962,7 @@ S28	path	lease_controller.lua	static/ergopti_plus/macos/keyboard/adapters/karabi
 S28	path	linux/infra/key_combinations_scope.lua	static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua	1	repo-test:1
 S28	path	linux/platform/remap/key_combination_engine.lua	static/ergopti_plus/linux/keyboard/engine/keys/combination_engine.lua	1	repo-test:1
 S28	path	linux/platform/remap/tap_copy.lua	static/ergopti_plus/linux/keyboard/engine/tap_copy.lua	1	docs:1
-S28	path	linux/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_shared_file.lua	1	driver-test:1
+S28	path	linux/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_shared_file.lua	2	driver-test:2
 S28	path	linux/ui/menu/key_combinations.lua	static/ergopti_plus/linux/keyboard/ui/menu_key_combinations.lua	2	repo-test:2
 S28	path	macos/platform/remap/config.lua	static/ergopti_plus/macos/keyboard/engine/runtime/config.lua	3	lua-require:1,other:1,tooling:1
 S28	path	macos/platform/remap/data/actions.json	static/ergopti_plus/macos/keyboard/data/actions.json	9	other:3,repo-test:3,lua-require:1,driver-test:1,tooling:1
@@ -16979,7 +16980,7 @@ S28	path	macos/platform/remap/runtime_manifest.lua	static/ergopti_plus/macos/key
 S28	path	macos/platform/remap/runtime_owner.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/owner.lua	2	docs:1,other:1
 S28	path	macos/platform/remap/runtime_vhid.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/vhid.lua	2	docs:1,other:1
 S28	path	macos/platform/remap/runtime_vhid_update.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/vhid_update.lua	2	docs:1,other:1
-S28	path	macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/config/test_tap_hold_shared_file.lua	1	driver-test:1
+S28	path	macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua	static/ergopti_plus/macos/tests/unit/keyboard/engine/config/test_tap_hold_shared_file.lua	2	driver-test:2
 S28	path	macos/ui/legacy_rules_cleanup.lua	static/ergopti_plus/macos/keyboard/ui/legacy_rules_cleanup.lua	1	repo-test:1
 S28	path	managed_rule_removal.lua	static/ergopti_plus/macos/keyboard/adapters/runtime/managed_rule_removal.lua	1	docs:1
 S28	path	meta/platform/remap/altgr/test_altgr_callbacks_serialized.ahk	static/ergopti_plus/windows/tests/meta/keyboard/altgr/test_callbacks_serialized.ahk	1	driver-test:1
@@ -17063,7 +17064,7 @@ S28	path	platform/remap/altgr.ahk	static/ergopti_plus/windows/keyboard/engine/ke
 S28	path	platform/remap/altgr_criteria.ahk	static/ergopti_plus/windows/keyboard/engine/keys/altgr_criteria.ahk	2	ahk-include:2
 S28	path	platform/remap/backspace.ahk	static/ergopti_plus/windows/keyboard/engine/keys/backspace.ahk	2	ahk-include:1,driver-test:1
 S28	path	platform/remap/capslock.ahk	static/ergopti_plus/windows/keyboard/engine/keys/capslock.ahk	3	driver-test:2,ahk-include:1
-S28	path	platform/remap/config.lua	static/ergopti_plus/macos/keyboard/engine/runtime/config.lua	5	driver-test:3,lua-require:2
+S28	path	platform/remap/config.lua	static/ergopti_plus/macos/keyboard/engine/runtime/config.lua	6	lua-require:3,driver-test:3
 S28	path	platform/remap/constants.ahk	static/ergopti_plus/windows/keyboard/engine/keys/constants.ahk	8	driver-test:4,ahk-include:3,docs:1
 S28	path	platform/remap/data/actions.json	static/ergopti_plus/macos/keyboard/data/actions.json	10	driver-test:6,lua-require:3,docs:1
 S28	path	platform/remap/data/capsword.json	static/ergopti_plus/macos/keyboard/data/capsword.json	1	lua-require:1
@@ -17480,7 +17481,6 @@ S28	path	tests/unit/platform/remap/tap_hold/test_key_combination_first_key_order
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_copy_check.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_tap_copy_check.ahk	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_activity_cancel.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_activity_cancel.ahk	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_ai_off.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_ai_off.lua	1	driver-test:1
-S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_combos_import.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_combos_import.lua	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_duration_transaction.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_duration_transaction.ahk	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_engine_modifier_key.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_engine_modifier_key.lua	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_engine_under_modifier_layer.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_engine_under_modifier_layer.lua	1	driver-test:1
@@ -17503,6 +17503,7 @@ S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_owned_press.ahk	static
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_prior_key.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_prior_key.ahk	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_roll.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_roll.ahk	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_roll.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_roll.lua	1	driver-test:1
+S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_shared_file.ahk	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_shared_file.lua	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_space_end_char.lua	static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_space_end_char.lua	1	driver-test:1
 S28	path	tests/unit/platform/remap/tap_hold/test_tap_hold_tap_keeps_held_modifiers.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_tap_keeps_held_modifiers.ahk	1	driver-test:1
@@ -17570,6 +17571,7 @@ S28	path	unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk	st
 S28	path	unit/platform/remap/tap_hold/test_tap_hold_owned_press.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_owned_press.ahk	1	driver-test:1
 S28	path	unit/platform/remap/tap_hold/test_tap_hold_prior_key.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_prior_key.ahk	1	driver-test:1
 S28	path	unit/platform/remap/tap_hold/test_tap_hold_roll.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_roll.ahk	1	driver-test:1
+S28	path	unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_shared_file.ahk	1	driver-test:1
 S28	path	unit/platform/remap/tap_hold/test_tap_hold_tap_keeps_held_modifiers.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_tap_keeps_held_modifiers.ahk	1	driver-test:1
 S28	path	unit/platform/remap/tap_hold/test_taphold_inherit_defaults_roundtrip.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_taphold_inherit_defaults_roundtrip.ahk	1	driver-test:1
 S28	path	unit/platform/remap/tap_hold/test_taphold_synthetic_refcount_combo.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_taphold_synthetic_refcount_combo.ahk	1	driver-test:1
@@ -17611,6 +17613,7 @@ S28	path	windows/platform/remap/tab.ahk	static/ergopti_plus/windows/keyboard/eng
 S28	path	windows/platform/remap/win.ahk	static/ergopti_plus/windows/keyboard/engine/keys/win.ahk	1	repo-test:1
 S28	path	windows/tests/meta/platform/remap/key_combinations/test_scan_code_shadows_key_name.ahk	static/ergopti_plus/windows/tests/meta/keyboard/key_combinations/test_scan_code_shadows_key_name.ahk	1	repo-test:1
 S28	path	windows/tests/unit/platform/remap/tap_hold/test_tap_hold_migration.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_migration.ahk	1	driver-test:1
+S28	path	windows/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk	static/ergopti_plus/windows/tests/unit/keyboard/engine/tap_hold/test_shared_file.ahk	3	driver-test:3
 S29	dir	modules/keymap	static/ergopti_plus/linux/layouts/engine	1	lua-require:1
 S29	dir	modules/keymap/keylayout	static/ergopti_plus/windows/layouts/engine/keylayout	1	ahk-include:1
 S29	dir	static/ergopti_plus/windows/native/keyboard_layout/_generated	static/ergopti_plus/windows/layouts/native	2	docs:1,build:1
@@ -17685,7 +17688,7 @@ S29	lua-module	infra.xkb_rmlvo	layouts.engine.xkb_rmlvo	9	driver-test:8,lua-requ
 S29	lua-module	modules.keymap.composer_check	layouts.engine.composer.check	5	lua-require:3,driver-test:2
 S29	lua-module	modules.keymap.input_sources	layouts.engine.input_sources	24	driver-test:17,lua-require:7
 S29	lua-module	modules.keymap.layout	layouts.engine.layout	13	driver-test:8,lua-require:5
-S29	lua-module	modules.keymap.layout_emulation	layouts.engine.registry.emulation	15	lua-require:8,driver-test:7
+S29	lua-module	modules.keymap.layout_emulation	layouts.engine.registry.emulation	16	lua-require:8,driver-test:8
 S29	lua-module	modules.keymap.layout_install	layouts.engine.registry.install	21	driver-test:17,lua-require:4
 S29	lua-module	modules.keymap.layout_registry	layouts.engine.registry.registry	62	driver-test:44,lua-require:16,tooling:2
 S29	lua-module	modules.keymap.layout_rows_build	layouts.engine.registry.rows_build	5	driver-test:3,lua-require:2
@@ -19863,7 +19866,7 @@ S33	lua-module	modules.shortcuts.bindings	shortcuts.engine.bindings	33	driver-te
 S33	lua-module	modules.shortcuts.caps_word_auto_off	shortcuts.engine.caps_word_auto_off	7	lua-require:4,driver-test:3
 S33	lua-module	modules.shortcuts.chatgpt	shortcuts.engine.chatgpt	13	driver-test:8,lua-require:5
 S33	lua-module	modules.shortcuts.input_source_conflict	shortcuts.engine.input_source_conflict	4	driver-test:3,lua-require:1
-S33	lua-module	modules.shortcuts.key_combinations	shortcuts.engine.key_combinations	25	driver-test:16,lua-require:9
+S33	lua-module	modules.shortcuts.key_combinations	shortcuts.engine.key_combinations	24	driver-test:15,lua-require:9
 S33	lua-module	modules.shortcuts.keyboard_shortcuts	shortcuts.engine.keyboard_shortcuts	80	driver-test:63,lua-require:17
 S33	lua-module	modules.shortcuts.magic_editor	shortcuts.engine.magic_editor	3	driver-test:2,lua-require:1
 S33	lua-module	modules.shortcuts.manager	shortcuts.engine.manager	39	driver-test:31,lua-require:8
@@ -19888,6 +19891,7 @@ S33	lua-module	tests.unit.modules.shortcuts.key_combinations.test_key_combinatio
 S33	lua-module	tests.unit.modules.shortcuts.key_combinations.test_key_combinations	tests.unit.shortcuts.key_combinations.test_key_combinations	1	driver-test:1
 S33	lua-module	tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts	tests.unit.shortcuts.keyboard.test_accented_shortcuts	1	driver-test:1
 S33	lua-module	tests.unit.modules.shortcuts.keyboard.test_ai_off_disarms_ai_actions	tests.unit.shortcuts.keyboard.test_ai_off_disarms_ai_actions	1	driver-test:1
+S33	lua-module	tests.unit.modules.shortcuts.keyboard.test_bound_chord_emulated_letter	tests.unit.shortcuts.keyboard.test_bound_chord_emulated_letter	1	driver-test:1
 S33	lua-module	tests.unit.modules.shortcuts.keyboard.test_chatgpt	tests.unit.shortcuts.keyboard.test_chatgpt	1	driver-test:1
 S33	lua-module	tests.unit.modules.shortcuts.keyboard.test_chatgpt_binding	tests.unit.shortcuts.keyboard.test_chatgpt_binding	1	driver-test:1
 S33	lua-module	tests.unit.modules.shortcuts.keyboard.test_deferred_action_configuration_owner	tests.unit.shortcuts.keyboard.test_deferred_action_configuration_owner	1	driver-test:1
@@ -20222,6 +20226,7 @@ S33	path	tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua
 S33	path	tests/unit/modules/shortcuts/keyboard/test_accented_shortcuts.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_accented_shortcuts.lua	1	driver-test:1
 S33	path	tests/unit/modules/shortcuts/keyboard/test_ai_off_disarms_ai_actions.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_ai_off_disarms_ai_actions.lua	1	driver-test:1
 S33	path	tests/unit/modules/shortcuts/keyboard/test_ai_off_disarms_ai_actions.lua	static/ergopti_plus/macos/tests/unit/shortcuts/engine/keyboard/test_ai_off_disarms_ai_actions.lua	1	driver-test:1
+S33	path	tests/unit/modules/shortcuts/keyboard/test_bound_chord_emulated_letter.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_bound_chord_emulated_letter.lua	1	driver-test:1
 S33	path	tests/unit/modules/shortcuts/keyboard/test_chatgpt.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_chatgpt.lua	1	driver-test:1
 S33	path	tests/unit/modules/shortcuts/keyboard/test_chatgpt_binding.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_chatgpt_binding.lua	1	driver-test:1
 S33	path	tests/unit/modules/shortcuts/keyboard/test_deferred_action_configuration_owner.lua	static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_deferred_action_configuration_owner.lua	1	driver-test:1
@@ -20492,17 +20497,16 @@ S34	lua-module	adapters.one_shot_shift	tap_hold.one_shot_shift	6	driver-test:4,l
 S34	lua-module	infra.tap_hold_scope	tap_hold.engine.scope	9	driver-test:6,lua-require:3
 S34	lua-module	modules.keymap.one_shot_shift	tap_hold.engine.one_shot_shift	3	driver-test:2,lua-require:1
 S34	lua-module	platform.remap.tap_hold_engine	tap_hold.engine.engine	30	driver-test:24,lua-require:5,tooling:1
-S34	lua-module	platform.remap.tap_hold_file	tap_hold.engine.file	15	driver-test:13,lua-require:2
+S34	lua-module	platform.remap.tap_hold_file	tap_hold.engine.file	17	driver-test:14,lua-require:3
 S34	lua-module	platform.remap.tap_hold_loader	tap_hold.engine.loader	30	driver-test:24,lua-require:6
 S34	lua-module	platform.remap.tap_hold_manager	tap_hold.engine.manager	37	driver-test:27,lua-require:9,repo-test:1
 S34	lua-module	platform.remap.tap_hold_migration	tap_hold.engine.migration	2	lua-require:2
 S34	lua-module	platform.remap.tap_hold_shapes	tap_hold.engine.shapes	3	lua-require:3
-S34	lua-module	platform.remap.tap_hold_writer	tap_hold.engine.writer	26	driver-test:18,lua-require:8
+S34	lua-module	platform.remap.tap_hold_writer	tap_hold.engine.writer	21	driver-test:15,lua-require:6
 S34	lua-module	ui.menu.menu_tap_holds	tap_hold.ui.menu_tap_holds	34	driver-test:30,lua-require:4
 S34	lua-module	ui.menu.menu_tap_keys	tap_hold.ui.menu_tap_keys	10	driver-test:9,lua-require:1
 S34	lua-module-escaped	platform%.remap%.tap_hold_writer	tap_hold%.engine%.writer	1	driver-test:1
-S34	lua-module-inline	platform.remap.tap_hold_manager	tap_hold.engine.manager	3	driver-test:3
-S34	lua-module-quoted	require(\"platform.remap.tap_hold_manager\"	require(\"tap_hold.engine.manager\"	1	driver-test:1
+S34	lua-module-inline	platform.remap.tap_hold_manager	tap_hold.engine.manager	2	driver-test:2
 S34	path	%A_LineFile%\..\tap_hold_migration.ahk	static/ergopti_plus/windows/tap_hold/engine/migration.ahk	1	ahk-include:1
 S34	path	../../platform/remap/tap_hold_roll.ahk	static/ergopti_plus/windows/tap_hold/engine/roll.ahk	1	driver-test:1
 S34	path	../linux/platform/remap/tap_hold_loader.lua	static/ergopti_plus/linux/tap_hold/engine/loader.lua	1	repo-test:1
@@ -20548,6 +20552,7 @@ S34	path	static/ergopti_plus/windows/platform/remap/tap_hold_roll.ahk	static/erg
 S34	path	static/ergopti_plus/windows/platform/remap/tap_hold_roll_keys.ahk	static/ergopti_plus/windows/tap_hold/engine/roll_keys.ahk	1	tooling:1
 S34	path	static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk	static/ergopti_plus/windows/tap_hold/engine/writer.ahk	1	tooling:1
 S34	path	static/ergopti_plus/windows/ui/menu/menu_taphold.ahk	static/ergopti_plus/windows/tap_hold/ui/menu_taphold.ahk	2	tooling:1,repo-test:1
+S34	path	tap_hold_loader.ahk	static/ergopti_plus/windows/tap_hold/engine/loader.ahk	1	ahk-include:1
 S34	path	tap_hold_migration.ahk	static/ergopti_plus/windows/tap_hold/engine/migration.ahk	1	ahk-include:1
 S34	path	tap_hold_roll.ahk	static/ergopti_plus/windows/tap_hold/engine/roll.ahk	2	ahk-include:2
 S34	path	tap_hold_roll_keys.ahk	static/ergopti_plus/windows/tap_hold/engine/roll_keys.ahk	1	ahk-include:1
@@ -20847,7 +20852,7 @@ S35	path	/lib/ergopti/linux/modules/updater/manager.lua	static/ergopti_plus/linu
 S35	path	/linux/infra/version.lua	static/ergopti_plus/linux/updater/engine/version.lua	3	driver-test:2,lua-require:1
 S35	path	/linux/modules/updater/manager.lua	static/ergopti_plus/linux/updater/engine/manager.lua	1	driver-test:1
 S35	path	/modules/updater/changelog.ahk	static/ergopti_plus/windows/updater/engine/changelog.ahk	1	driver-test:1
-S35	path	/modules/updater/core.ahk	static/ergopti_plus/windows/updater/engine/core.ahk	3	driver-test:3
+S35	path	/modules/updater/core.ahk	static/ergopti_plus/windows/updater/engine/core.ahk	1	driver-test:1
 S35	path	/modules/updater/restarter.lua	static/ergopti_plus/linux/updater/engine/restarter.lua	1	driver-test:1
 S35	path	/opt/ergopti-prefix/lib/ergopti/linux/modules/updater/manager.lua	static/ergopti_plus/linux/updater/engine/manager.lua	1	driver-test:1
 S35	path	\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk	static/ergopti_plus/windows/tests/unit/updater/engine/test_curl_capture.ahk	1	driver-test:1
@@ -22270,8 +22275,8 @@ S38	lua-module	tests.support.synthetic_action_fixture	tests.support.core.synthet
 S38	lua-module	tests.support.synthetic_input_fixture	tests.support.core.synthetic_input_fixture	21	driver-test:21
 S38	lua-module	tests.support.synthetic_input_stack	tests.support.core.synthetic_input_stack	10	driver-test:9,repo-test:1
 S38	lua-module	tests.support.system_actions_fixture	tests.support.core.system_actions_fixture	11	driver-test:11
-S38	lua-module	tests.support.tap_hold_file_text	tests.support.keyboard.tap_hold_file_text	9	driver-test:9
-S38	lua-module	tests.support.tap_hold_fixture	tests.support.keyboard.tap_hold_fixture	10	driver-test:10
+S38	lua-module	tests.support.tap_hold_file_text	tests.support.keyboard.tap_hold_file_text	10	driver-test:10
+S38	lua-module	tests.support.tap_hold_fixture	tests.support.keyboard.tap_hold_fixture	13	driver-test:13
 S38	lua-module	tests.support.text_destination_receipt	tests.support.core.text_destination_receipt	12	driver-test:12
 S38	lua-module	tests.support.text_owner_fixture	tests.support.core.text_owner_fixture	17	driver-test:17
 S38	lua-module	tests.support.text_sender_fixture	tests.support.core.text_sender_fixture	7	driver-test:7
@@ -22538,7 +22543,7 @@ S38	path	tests/support/synthetic_input_fixture.lua	static/ergopti_plus/macos/tes
 S38	path	tests/support/synthetic_input_stack.lua	static/ergopti_plus/macos/tests/support/core/synthetic_input_stack.lua	1	driver-test:1
 S38	path	tests/support/system_actions_fixture.lua	static/ergopti_plus/macos/tests/support/core/system_actions_fixture.lua	1	driver-test:1
 S38	path	tests/support/tap_hold_file_text.lua	static/ergopti_plus/macos/tests/support/keyboard/tap_hold_file_text.lua	1	driver-test:1
-S38	path	tests/support/tap_hold_fixture.lua	static/ergopti_plus/linux/tests/support/keyboard/tap_hold_fixture.lua	1	driver-test:1
+S38	path	tests/support/tap_hold_fixture.lua	static/ergopti_plus/linux/tests/support/keyboard/tap_hold_fixture.lua	4	driver-test:4
 S38	path	tests/support/text_destination_receipt.lua	static/ergopti_plus/macos/tests/support/core/text_destination_receipt.lua	1	driver-test:1
 S38	path	tests/support/text_owner_fixture.lua	static/ergopti_plus/linux/tests/support/core/text_owner_fixture.lua	1	driver-test:1
 S38	path	tests/support/text_sender_fixture.lua	static/ergopti_plus/macos/tests/support/core/text_sender_fixture.lua	1	driver-test:1
@@ -22627,6 +22632,7 @@ unknown	path	../../vendor/ergopti_system_proxy_worker.ps1	static/ergopti_plus/wi
 unknown	path	../../vendor/ergopti_winhttp_transport.ps1	static/ergopti_plus/windows/vendor/ergopti_winhttp_transport.ps1	1	docs:1
 unknown	path	../../vendor/karabiner-elements/manifest.lua	static/ergopti_plus/macos/vendor/karabiner-elements/manifest.lua	1	lua-require:1
 unknown	path	../_generated/config_migration_ops.ahk	static/ergopti_plus/windows/_generated/config_migration_ops.ahk	1	ahk-include:1
+unknown	path	../_generated/identifiers.ahk	static/ergopti_plus/windows/_generated/identifiers.ahk	1	ahk-include:1
 unknown	path	../_generated/menu_row_order.ahk	static/ergopti_plus/windows/_generated/menu_row_order.ahk	1	ahk-include:1
 unknown	path	../_generated/update_channels.ahk	static/ergopti_plus/windows/_generated/update_channels.ahk	1	ahk-include:1
 unknown	path	../_generated/update_schedule.ahk	static/ergopti_plus/windows/_generated/update_schedule.ahk	1	ahk-include:1
