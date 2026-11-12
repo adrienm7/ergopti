@@ -78,6 +78,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'assert(json_path == shared_lua .. "/core/text/engine/json.lua"'
 	},
 	{
+		// The bundle guard's needle for the daemon authority's shared load: the
+		// longer path no longer fits the Python line, and the formatter breaks
+		// the expression before its operator, as the needle now spells it.
+		file: 'tools/test/test-macos-bundle-payload.cjs',
+		empties: '_shared/python',
+		from: `'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py"'`,
+		to: `'Path(__file__).absolute().parents[2]\\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'`
+	},
+	{
 		// The locale is found relative to the page under test, a variable
 		// the scan cannot evaluate.
 		file: 'tools/test/support/metrics-apps-page.cjs',
