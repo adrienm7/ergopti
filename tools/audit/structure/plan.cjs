@@ -1312,8 +1312,10 @@ function referenceContext(map) {
 	// is quadratic on a long run (a generated 400 KB table took minutes).
 	const pathToken = /(?<![A-Za-z0-9_.%\\/-])[A-Za-z0-9_.%\\/-]*[A-Za-z0-9_-]\.[A-Za-z0-9]+/g;
 	// A folder spelled with at least one separator, quoted or not.
+	// Never the folder part of a longer path: _shared/data in
+	// _shared/data/identifiers.py is the file's, not a folder reference.
 	const dirToken =
-		/(?<![A-Za-z0-9_.%\\-])[A-Za-z0-9_.%\\-]*[\\/][A-Za-z0-9_.%\\/-]*[A-Za-z0-9_]\/?(?![A-Za-z0-9_.])/g;
+		/(?<![A-Za-z0-9_.%\\-])[A-Za-z0-9_.%\\-]*[\\/][A-Za-z0-9_.%\\/-]*[A-Za-z0-9_]\/?(?![A-Za-z0-9_.]|[\\/](?:[A-Za-z0-9_%-]|\.[A-Za-z0-9_]))/g;
 	const luaToken = /["']([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)["']/g;
 	return {
 		map,
