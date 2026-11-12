@@ -2211,7 +2211,10 @@ function splitScopeLine(text, index, raw, folderRepo, map) {
 	const start = text.lastIndexOf('\n', index - 1) + 1;
 	const before = text.slice(0, start).trimEnd();
 	const after = text.slice(start + line.length).trimStart();
-	const element = /[[,]$/.test(before) && (/,\s*$/.test(line) || after.startsWith(']'));
+	// A bare value, never a property: "globs": [...] or name: 'x' is a key.
+	const property = /^\s*(?:["'][^"']*["']|[\w$-]+)\s*:/.test(line);
+	const element =
+		!property && /[[,]$/.test(before) && (/,\s*$/.test(line) || after.startsWith(']'));
 	if (!element) return null;
 	const homes = splitHomes(folderRepo, map);
 	if (homes.length === 0) return null;
