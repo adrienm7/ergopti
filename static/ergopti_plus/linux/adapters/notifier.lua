@@ -69,6 +69,9 @@ local PREFIX_FOR_LEVEL = {
 -- How long a notification stays up, in milliseconds (the shared registry).
 local TIMEOUT_MS = require("infra.timings").ms("ui", "notification_ttl_ms")
 
+-- How long notify-send may take to hand the notice over (the shared registry).
+local SEND_TIMEOUT_MS = require("infra.timings").ms("ui", "notification_send_timeout_ms")
+
 -- Whether `notify-send` is present. nil until the first send probes for it.
 local _available = nil
 
@@ -120,7 +123,7 @@ end
 ---        onClick is accepted and ignored: `notify-send` returns as soon as the
 ---        notification is posted and cannot report a click without holding the
 ---        process open, which this daemon will not do on a keystroke path.
---- @return boolean Whether the notification command was admitted; not a delivery receipt.
+--- @return boolean Whether notify-send was started; its failure is logged when it exits.
 local function send(message, opts, caption, native_admit)
 	if type(message) ~= "string" or message == "" then
 		Logger.error(LOG, "send(): a message is required — nothing was shown.")
@@ -145,23 +148,19 @@ local function send(message, opts, caption, native_admit)
 			.. (type(options.title) == "string" and options.title ~= "" and options.title or DEFAULT_TITLE)
 	end
 
-	if not available() then
+	--- Leaves the notice in the log when the desktop cannot show it.
+	--- @param detail string Why it was not shown.
+	local function keep_in_log(detail)
 		-- Private notices may contain user paths or process output; only a
 		-- generic diagnostic may reach the fallback log.
-		if options.private == true then Logger.info(LOG, "[notification] Private notification unavailable.")
+		if options.private == true then Logger.info(LOG, "[notification] Private notification unavailable (%s).", detail)
 		else Logger.info(LOG, "[notification] %s: %s", caption and title or tostring(options.title or DEFAULT_TITLE), message) end
-		return false
 	end
 
-	-- Backgrounded, and its output discarded. notify-send returns once the
-	-- daemon acknowledges, which is fast but not instant, and this can be
-	-- reached from the keystroke path.
-	-- The native option boundary keeps option-looking caller text literal even
-	-- after shell quoting has preserved it as a single argv element.
-	local command = string.format(
-		"notify-send --app-name=%s --urgency=%s --expire-time=%d -- %s %s >/dev/null 2>&1 &",
-		Shell.quote(DEFAULT_TITLE), urgency, TIMEOUT_MS,
-		Shell.quote(title), Shell.quote(message))
+	if not available() then
+		keep_in_log("notify-send is not installed")
+		return false
+	end
 
 	-- Owned native notices can be invalidated by the capability probe or quoting.
 	-- Admission is checked at the actual effect boundary, never supplied by JS.
@@ -169,12 +168,27 @@ local function send(message, opts, caption, native_admit)
 		local admitted, current = pcall(native_admit)
 		if not admitted or current ~= true then return false end
 	end
-	local ok = Shell.run(command)
-	if not ok then
-		if options.private == true then Logger.error(LOG, "send(): private notification could not be shown.")
-		else Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message) end
+	-- An argv, never a shell line: the "--" boundary keeps option-looking caller
+	-- text literal. Run without blocking (reachable from the keystroke path) and
+	-- watched to its exit, so a notify-send that runs and fails (no notification
+	-- daemon, no session bus in the unit) is logged and its text kept in the log
+	-- instead of counted as shown (NUI-003). Ownership stays with the process
+	-- operation as before: a notice never delays shutdown, and its deadline stops
+	-- the child's group, so an exit leaves at most one bounded notify-send behind.
+	local argv = { "--app-name=" .. DEFAULT_TITLE, "--urgency=" .. urgency,
+		"--expire-time=" .. string.format("%d", TIMEOUT_MS), "--", title, message }
+	local handle, refusal = Shell.run_async("notify-send", argv, { timeout_ms = SEND_TIMEOUT_MS }, function(result)
+		if result.ok == true then return end
+		local detail = tostring(result.error or ("exit code " .. tostring(result.code)))
+		Logger.error(LOG, "send(): notify-send failed (%s) — the notice stays in the log.", detail)
+		keep_in_log(detail)
+	end)
+	if not handle then
+		Logger.error(LOG, "send(): notify-send could not start (%s) — the notice stays in the log.", tostring(refusal))
+		keep_in_log(tostring(refusal))
+		return false
 	end
-	return ok == true
+	return true
 end
 
 --- Sends a generic notice with the port's original literal-title contract.

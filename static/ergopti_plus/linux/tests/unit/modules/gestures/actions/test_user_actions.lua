@@ -362,6 +362,7 @@ helpers.describe("private user-action notification fallback", function()
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function() return false end,
+				run_async = function() return nil, "controlled spawn refusal" end,
 			}
 			package.loaded["adapters.notifier"] = nil
 			package.loaded["adapters.application_notifier"] = nil

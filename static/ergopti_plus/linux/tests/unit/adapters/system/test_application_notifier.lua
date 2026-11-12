@@ -48,7 +48,7 @@ local function with_owned_notice(body)
 		"window_titles", "adapters.shell_runner", "logger.shim", "infra.i18n", "infra.locale" }
 	local saved, native = {}, nil
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
-	local c = { commands = {}, quoted = {}, available = true, native_result = true }
+	local c = { commands = {}, argv = {}, quoted = {}, available = true, native_result = true }
 	package.loaded["logger.shim"] = helpers.make_logger_stub()
 	package.loaded["window_titles"] = nil
 	package.loaded["infra.i18n"] = {
@@ -71,9 +71,14 @@ local function with_owned_notice(body)
 			if c.on_quote then c.on_quote(value) end
 			return "Q[" .. value .. "]"
 		end,
-		run = function(command)
-			c.commands[#c.commands + 1] = command
-			return c.native_result
+		run = function() error("notify-send runs as an argv, never a shell line") end,
+		-- The native start (NUI-003): native_result false is a refused spawn.
+		run_async = function(executable, args, _options, callback)
+			c.argv[#c.argv + 1] = args
+			c.commands[#c.commands + 1] = executable .. " " .. table.concat(args, " ")
+			if c.native_result ~= true then return nil, "spawn failed: controlled" end
+			callback({ ok = true, code = 0 })
+			return { cancel = function() return true end, on_settled = function() return true end }
 		end,
 	}
 	package.loaded["adapters.application_notifier"], package.loaded["adapters.notifier"] = nil, nil
@@ -101,13 +106,16 @@ end
 
 helpers.describe("owned application notifications", function()
 	helpers.it("brands the actual Manager timeout notice once without changing its body", function()
+		local ttl = require("infra.timings").ms("ui", "notification_ttl_ms")
 		with_owned_notice(function(c, _, _, manager)
 			local native = manager()
 			native.now = 5100
 			native.timers[1].expired()
 			native.timers[1].expired()
 			helpers.assert_eq(#c.commands, 1)
-			helpers.assert_eq(c.commands[1], "notify-send --app-name=Q[Ergopti+] --urgency=normal --expire-time=5000 -- Q[ErgoptiPlus — ✖ Refusal heading] Q[Owned refusal body % ' 😀] >/dev/null 2>&1 &")
+			helpers.assert_eq(c.commands[1], "notify-send --app-name=Ergopti+ --urgency=normal --expire-time="
+				.. string.format("%d", ttl)
+				.. " -- ErgoptiPlus — ✖ Refusal heading Owned refusal body % ' 😀")
 			helpers.assert_eq(#native.effects, 0)
 		end)
 	end)
@@ -120,13 +128,15 @@ helpers.describe("owned application notifications", function()
 			helpers.assert_eq(#c.commands, 0)
 		end)
 	end)
-	helpers.it("refuses the old Manager notice after native-quote pause reentry", function()
+	helpers.it("leaves no shell-quoting window between admission and the native start", function()
+		-- The notice used to be quoted into a shell line after its admission, a
+		-- window a reentry could pause; notify-send now takes an argv (NUI-003).
 		with_owned_notice(function(c, _, _, manager)
 			local native = manager()
-			c.on_quote = function() native.paused = true end
 			native.now = 5100
 			native.timers[1].expired()
-			helpers.assert_eq(#c.commands, 0)
+			helpers.assert_eq(#c.commands, 1)
+			helpers.assert_eq(#c.quoted, 0, "nothing is quoted on the way to notify-send")
 		end)
 	end)
 	helpers.it("preserves the exact callback, body, options and independent generic title", function()
@@ -135,19 +145,18 @@ helpers.describe("owned application notifications", function()
 			local opts = { title = "Bare label", level = "error", onClick = click }
 			helpers.assert_eq(application.send_owned("Owned body", opts, function()
 				admitted = admitted + 1
-				helpers.assert_eq(#c.quoted, 3)
 				helpers.assert_eq(#c.commands, 0)
 				return true
 			end), true)
 			helpers.assert_eq(admitted, 1)
-			helpers.assert_eq(c.quoted[2], "ErgoptiPlus — ✖ Bare label")
-			helpers.assert_eq(c.quoted[3], "Owned body")
+			helpers.assert_eq(c.argv[1][5], "ErgoptiPlus — ✖ Bare label")
+			helpers.assert_eq(c.argv[1][6], "Owned body")
 			helpers.assert_eq(opts.title, "Bare label")
 			helpers.assert_eq(opts.level, "error")
 			helpers.assert_eq(opts.onClick, click)
 			helpers.assert_eq(generic.send_owned("External body", opts, function() return true end), true)
-			helpers.assert_eq(c.quoted[5], "✖ Bare label")
-			helpers.assert_eq(c.quoted[6], "External body")
+			helpers.assert_eq(c.argv[2][5], "✖ Bare label")
+			helpers.assert_eq(c.argv[2][6], "External body")
 		end)
 	end)
 	helpers.it("requires exact true from every current-owner admission callback", function()
