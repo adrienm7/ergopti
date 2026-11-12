@@ -732,7 +732,7 @@ helpers.describe("ui.bridge_handlers", function()
 					helpers.assert_eq(decoded.hotstrings.trigger_char, "§", "the explicit accepted choice replaces only its leaf")
 					helpers.assert_eq(decoded.future.keep, "independent")
 				end)
-				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				os.remove(path); os.remove(helpers.stage_path(path)); os.remove(target)
 				if not ok then error(err, 0) end
 			end)
 		end
@@ -772,7 +772,7 @@ helpers.describe("ui.bridge_handlers", function()
 						hotstrings = { trigger_char = "§" }, future = { keep = "independent" } },
 						"explicit replacement changes only the owned leaf, preserving the complete neighbor document")
 				end)
-				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				os.remove(path); os.remove(helpers.stage_path(path)); os.remove(target)
 				if not ok then error(err, 0) end
 			end)
 		end
@@ -792,7 +792,7 @@ helpers.describe("ui.bridge_handlers", function()
 				write_file(path, raw)
 				state.writer = require("toml_codec.writer")
 				NativeWriter.open = function(open_path, mode)
-					if open_path ~= path .. ".tmp" or mode ~= "wx" then return original_stage(open_path, mode) end
+					if open_path ~= helpers.stage_path(path) or mode ~= "wx" then return original_stage(open_path, mode) end
 					local function opened(fh, ...)
 						if not fh then return fh, ... end
 						return {
@@ -822,7 +822,7 @@ helpers.describe("ui.bridge_handlers", function()
 				helpers.assert_eq(captured.restarts, {})
 				local fh = assert(original_open(path, "r")); local bytes = fh:read("*a"); fh:close()
 				helpers.assert_eq(bytes, concurrent, "the real exact-source fence preserves the external edit")
-				helpers.assert_nil(original_open(path .. ".tmp", "r"), "no rejected staging file remains")
+				helpers.assert_nil(original_open(helpers.stage_path(path), "r"), "no rejected staging file remains")
 				captured.errors = {}
 				local retried = finish(state, { locale = "en", config_dir = target, operations = {
 					{ path = "hotstrings.trigger_char", value = "§" },
@@ -834,7 +834,7 @@ helpers.describe("ui.bridge_handlers", function()
 				helpers.assert_eq(require("toml_codec").decode(bytes).hotstrings.trigger_char, "§")
 			end)
 			NativeWriter.open = original_stage
-			os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+			os.remove(path); os.remove(helpers.stage_path(path)); os.remove(target)
 			if not ok then error(err, 0) end
 		end)
 
@@ -872,7 +872,7 @@ helpers.describe("ui.bridge_handlers", function()
 				end)
 				package.loaded["infra.hotstring_preferences"] = saved_preferences
 				package.loaded["modules.hotstrings.magic_key"] = saved_magic
-				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				os.remove(path); os.remove(helpers.stage_path(path)); os.remove(target)
 				if not ok then error(err, 0) end
 			end)
 		end
