@@ -48,6 +48,42 @@ TODO line.
 
 ## One configuration layout on every OS for tap-holds (2026-11-11)
 
+Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
+and the overnight Linux `[mod_combos]` move: one home per manifest path on
+every OS. `config.toml` holds every `[[features.*]]` row and the settings of
+the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
+`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
+symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
+`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
+`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
+`inherit_defaults`, the global delay `time_activation_seconds`,
+`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
+section (`_shared/tap_hold/SCHEMA.md`).
+
+- One migration step moves the old homes: `v21_to_v22` of
+  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
+  macOS and Linux (Windows already kept these rows in `config.toml`). The
+  boot names the driver's `tap_hold.toml` (macOS first carries an old
+  `config_karabiner.toml` over into it); the engine copies the values into
+  `config.toml` where it holds none, after its byte-exact backup, and the
+  driver then deletes the moved values from `tap_hold.toml`, after a backup
+  of that file. The config stamp makes it run once; a value left in
+  `tap_hold.toml` by a crash between the two writes is never read and is
+  warned as outdated.
+- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
+  the two files each driver writes; each suite pins its own and reads the
+  others'. Do not move a manifest row back into `tap_hold.toml`.
+- TCL-004, decided by the maintainer on 2026-11-12, « follow the position »: a
+  thumb-key setting follows the key at the same place under the thumb. The
+  shared file names the catalogue's positional PC id: the Mac `left_command`
+  is `left_alt`, `right_command` is `alt_gr` and `right_option` is
+  `right_ctrl`, after the order of `[tap_hold.catalog]`; the table is
+  `_shared/tap_hold/shared_file.toml` `[thumb_positions]`.
+  `shared_file.lua` maps the Mac thumb ids to those ids on read and write, so
+  Linux and Windows honour a key a Mac bound; a file still holding a Mac thumb
+  id is read as its positional key. Windows' AHK reader: TODO « Windows (the
+  PC agent's) ».
+
 ## The Linux decoder judges millimetres (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (GSD-2): the Linux contact decoder
@@ -177,34 +213,6 @@ with it (SCD-2, SCD-3): Ctrl+Alt+é sends Ctrl+Alt and the logical key, as
 ILD-1 sends every two-modifier chord, and a `ctrl_x` keyboard slot fires for
 Ctrl+AltGr+x, AltGr being suspended there; Linux already does both. Windows
 counterparts (maintainer): TODO « Windows (the PC agent's) ».
-
-## No Linux keyboard slot runs through a pause (2026-11-11)
-
-Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
-and the overnight Linux `[mod_combos]` move: one home per manifest path on
-every OS. `config.toml` holds every `[[features.*]]` row and the settings of
-the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
-`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
-symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
-`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
-`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
-`inherit_defaults`, the global delay `time_activation_seconds`,
-`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
-section (`_shared/tap_hold/SCHEMA.md`).
-
-- One migration step moves the old homes: `v21_to_v22` of
-  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
-  macOS and Linux (Windows already kept these rows in `config.toml`). The
-  boot names the driver's `tap_hold.toml` (macOS first carries an old
-  `config_karabiner.toml` over into it); the engine copies the values into
-  `config.toml` where it holds none, after its byte-exact backup, and the
-  driver then deletes the moved values from `tap_hold.toml`, after a backup
-  of that file. The config stamp makes it run once; a value left in
-  `tap_hold.toml` by a crash between the two writes is never read and is
-  warned as outdated.
-- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
-  the two files each driver writes; each suite pins its own and reads the
-  others'. Do not move a manifest row back into `tap_hold.toml`.
 
 ## No Linux keyboard slot runs through a pause (2026-11-11)
 

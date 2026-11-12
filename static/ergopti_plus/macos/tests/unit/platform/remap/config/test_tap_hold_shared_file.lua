@@ -131,6 +131,57 @@ local function assert_reads(state, expected)
 	end
 end
 
+-- Action ids and thumb keys a driver spells its own way (TCL-002, TCL-004).
+local SPELLINGS = helpers.shared() .. "/tests/corpus/tap_hold_spellings/"
+
+helpers.describe("Spellings across drivers in the shared tap_hold.toml (tap-hold-spellings)", function()
+	local expected = decode(assert(read(SPELLINGS .. "expected.toml"), "the spelling expectations are missing"))
+
+	helpers.it("macOS reads PC action ids and thumb keys under its own (tap-hold-spellings)", function()
+		with_folder(function(f)
+			write(f.path, assert(read(SPELLINGS .. "pc_written.toml")))
+			write(f.config_path, assert(read(SPELLINGS .. "pc_written.config.toml")))
+			local state, status = f.load()
+			helpers.assert_eq(status, "ok")
+			assert_reads(state, expected.reads.pc_written.hs)
+		end)
+	end)
+
+	helpers.it("macOS writes its action ids and thumb keys as the PC spells them (tap-hold-spellings)", function()
+		with_folder(function(f)
+			local state = f.config.build_default_state(f.keys, f.combos)
+			for _, field in ipairs({ "tap_hold_config", "mod_combos_config" }) do
+				for id, binding in pairs(expected.writes.hs.state[field]) do state[field][id] = binding end
+			end
+			helpers.assert_true(f.config.save_user_config(state, f.path), "the state is saved")
+			local stored = decode(read(f.path))
+			for key_id, entry in pairs(expected.writes.hs.file.tap_hold.keys) do
+				helpers.assert_eq(stored.tap_hold.keys[key_id], entry, key_id)
+			end
+			for _, mac_id in ipairs({ "left_command", "right_option" }) do
+				helpers.assert_nil(stored.tap_hold.keys[mac_id], "no Mac thumb id is written: " .. mac_id)
+			end
+			helpers.assert_eq(config_rows(read(f.config_path)).mod_combos.config.escape_then_tab,
+				expected.writes.hs.config.mod_combos.config.escape_then_tab)
+		end)
+	end)
+
+	helpers.it("a Mac thumb id loses to the PC key at its place and is named (tap-hold-spellings)", function()
+		with_folder(function(f)
+			write(f.path, assert(read(SPELLINGS .. "mac_thumb.toml")))
+			local state = f.load()
+			helpers.assert_eq(state.tap_hold_config.left_command.tap, "copy", "an old Mac id is still read")
+			helpers.assert_eq(state.tap_hold_config.right_option.tap, "backspace")
+			helpers.assert_eq(state.tap_hold_config.right_command.tap, "backspace", "the positional entry wins")
+			local named = false
+			for _, line in ipairs(f.warnings) do
+				if line:find("tap_hold.keys.right_command", 1, true) then named = true end
+			end
+			helpers.assert_true(named, "the superseded Mac entry is named")
+		end)
+	end)
+end)
+
 helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", function()
 	local expected = decode(assert(read(CORPUS .. "expected.toml"), "the corpus expectations are missing"))
 

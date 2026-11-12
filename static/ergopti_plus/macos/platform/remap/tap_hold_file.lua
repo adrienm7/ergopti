@@ -101,6 +101,7 @@ function M.context()
 			mod_combos = shipped_json(_DATA_DIR .. "mod_combos.json"),
 			actions = shipped_json(_DATA_DIR .. "actions.json"),
 			aliases = aliases,
+			spellings = require("_generated.action_catalogue").tap_hold_spellings,
 		})
 	end
 	return _context

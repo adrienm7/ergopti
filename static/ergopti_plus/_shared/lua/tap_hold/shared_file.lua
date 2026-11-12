@@ -122,8 +122,26 @@ function M.parse_spec(decoded)
 			end
 		end
 	end
+	local positions = decoded.thumb_positions
+	if type(positions) ~= "table" then error("shared tap-hold file spec: [thumb_positions] is missing", 0) end
+	local placed = {}
+	for from, to in pairs(positions) do
+		if type(from) ~= "string" or type(to) ~= "string" or from == to or placed[to] then
+			error("shared tap-hold file spec: [thumb_positions] maps distinct key ids to distinct key ids", 0)
+		end
+		placed[to] = true
+	end
 	return { order = modifiers.order, rank = rank, hs_names = modifiers.hs_names,
-		hs_hold_actions = modifiers.hs_hold_actions }
+		hs_hold_actions = modifiers.hs_hold_actions, thumb_positions = positions }
+end
+
+--- The positional key a Mac thumb key id names (spec [thumb_positions]), or
+--- the id itself: what every driver reads a file's key entry as.
+--- @param spec table See M.parse_spec.
+--- @param key_id string A catalogue id.
+--- @return string key_id
+function M.positional_key(spec, key_id)
+	return spec.thumb_positions[key_id] or key_id
 end
 
 --- The canonical spelling of a hold modifier: its modifiers, lower case,
@@ -159,7 +177,9 @@ end
 --- @param data table `{ catalogue = KeyCatalog.for_platform(defaults, "hs"),
 ---   catalogue_ids = { every [tap_hold.catalog] id },
 ---   tap_hold_keys = data/tap_hold_keys.json, mod_combos = data/mod_combos.json,
----   actions = data/actions.json, aliases = table|nil }`.
+---   actions = data/actions.json, aliases = table|nil,
+---   spellings = table|nil }`; `spellings` maps a macOS action id to the PC id
+---   the file holds for it (the action catalogue's `tap_hold_spellings`).
 --- @return table context
 function M.hs_context(spec, data)
 	assert(type(data) == "table", "the macOS tap-hold file context needs its data")
@@ -167,8 +187,21 @@ function M.hs_context(spec, data)
 	local catalogue_ids = {}
 	for _, id in ipairs(data.catalogue_ids) do catalogue_ids[id] = true end
 	local key_of_hs, hs_of_key = {}, {}
+	-- A Mac thumb key is written under the PC key at its place; its own id is
+	-- still read, below the positional one (M.positional_key).
 	for _, entry in ipairs(data.catalogue) do
-		key_of_hs[entry.id], hs_of_key[entry.key] = entry.key, entry.id
+		local positional = M.positional_key(spec, entry.key)
+		if positional ~= entry.key and not catalogue_ids[positional] then
+			error("[thumb_positions] places '" .. entry.key .. "' on '" .. positional .. "', which is no catalogue key", 0)
+		end
+		key_of_hs[entry.id], hs_of_key[positional] = positional, entry.id
+		if positional ~= entry.key then hs_of_key[entry.key] = entry.id end
+	end
+	-- The spellings of the actions macOS names under another id than the PC.
+	local shared_of_action, hs_of_action = {}, {}
+	for hs, shared in pairs(data.spellings or {}) do
+		if hs_of_action[shared] ~= nil then error("two macOS actions are spelled '" .. shared .. "' in the file", 0) end
+		shared_of_action[hs], hs_of_action[shared] = shared, hs
 	end
 	-- A combination names its keys by key code; a tap-hold key binds one.
 	local hs_of_code = {}
@@ -217,7 +250,24 @@ function M.hs_context(spec, data)
 	end
 	return { spec = spec, catalogue_ids = catalogue_ids, key_of_hs = key_of_hs, hs_of_key = hs_of_key, pair_of_combo = pair_of_combo,
 		combo_of_pair = combo_of_pair, hold_of_action = hold_of_action, action_of_modifier = action_of_modifier,
-		action_of_layer = action_of_layer, aliases = data.aliases }
+		action_of_layer = action_of_layer, aliases = data.aliases, shared_of_action = shared_of_action,
+		hs_of_action = hs_of_action }
+end
+
+--- The macOS action id an action the file holds names.
+--- @param ctx table See M.hs_context.
+--- @param value any
+--- @return any
+local function action_to_model(ctx, value)
+	return type(value) == "string" and ctx.hs_of_action[value] or value
+end
+
+--- The id the file holds for a macOS action id.
+--- @param ctx table See M.hs_context.
+--- @param value any
+--- @return any
+local function action_to_file(ctx, value)
+	return type(value) == "string" and ctx.shared_of_action[value] or value
 end
 
 
@@ -251,13 +301,13 @@ local function key_to_model(entry, ctx, where, notes)
 	if entry.enabled == false then return model end
 	local tap = entry.tap_action
 	if type(tap) == "string" then
-		if tap ~= "" then model.tap = tap end
+		if tap ~= "" then model.tap = action_to_model(ctx, tap) end
 	elseif tap ~= nil then
 		notes[#notes + 1] = { path = where .. ".tap_action", detail = "a tap is an action id" }
 	end
 	if entry.hold_action ~= nil then
 		if type(entry.hold_action) == "string" and entry.hold_action ~= "" then
-			model.hold = entry.hold_action
+			model.hold = action_to_model(ctx, entry.hold_action)
 		else
 			notes[#notes + 1] = { path = where .. ".hold_action", detail = "a hold action is an action id" }
 		end
@@ -314,9 +364,13 @@ function M.to_karabiner(document, ctx, is_table)
 			local config = {}
 			for key_id, entry in pairs(keys) do
 				local hs = ctx.hs_of_key[key_id]
+				local positional = type(key_id) == "string" and M.positional_key(ctx.spec, key_id) or key_id
 				-- A key another driver has is theirs; one no driver has is named.
 				if not ctx.catalogue_ids[key_id] then
 					notes[#notes + 1] = { path = M.TAP_HOLD .. ".keys." .. tostring(key_id), detail = "no driver has this tap-hold key" }
+				elseif positional ~= key_id and keys[positional] ~= nil then
+					notes[#notes + 1] = { path = M.TAP_HOLD .. ".keys." .. key_id,
+						detail = "the key at its place, '" .. positional .. "', is read instead" }
 				elseif hs then
 					config[hs] = is_table(entry) and key_to_model(entry, ctx, M.TAP_HOLD .. ".keys." .. key_id, notes) or entry
 				end
@@ -382,7 +436,7 @@ local function flatten(model, ctx, is_table, with_config)
 					opaque(base, entry)
 				else
 					carry(base, entry, MODEL_KEY_FIELDS, KEY_FIELDS)
-					leaves[base .. ".tap_action"] = entry.tap ~= NONE and entry.tap or nil
+					leaves[base .. ".tap_action"] = entry.tap ~= NONE and action_to_file(ctx, entry.tap) or nil
 					if entry.timeout_ms ~= nil then
 						leaves[base .. ".time_activation_seconds"] = type(entry.timeout_ms) == "number"
 							and entry.timeout_ms / 1000 or entry.timeout_ms
@@ -391,7 +445,7 @@ local function flatten(model, ctx, is_table, with_config)
 					if hold == nil or hold == NONE then
 						holds[base] = false
 					else
-						holds[base] = ctx.hold_of_action[hold] or { field = "hold_action", value = hold }
+						holds[base] = ctx.hold_of_action[hold] or { field = "hold_action", value = action_to_file(ctx, hold) }
 					end
 				end
 			end
@@ -416,7 +470,7 @@ local function flatten(model, ctx, is_table, with_config)
 				else
 					carry(base, entry, SLOT_FIELDS, SLOT_FIELDS)
 					for _, slot in ipairs(COMBO_SLOTS) do
-						leaves[base .. "." .. slot] = entry[slot] ~= NONE and entry[slot] or nil
+						leaves[base .. "." .. slot] = entry[slot] ~= NONE and action_to_file(ctx, entry[slot]) or nil
 					end
 				end
 			end
@@ -665,7 +719,9 @@ function M.config_to_karabiner(document, ctx, is_table)
 				elseif combo then
 					if is_table(entry) then
 						local slots = {}
-						for field, value in pairs(entry) do slots[field] = value end
+						for field, value in pairs(entry) do
+							slots[field] = SLOT_FIELDS[field] and action_to_model(ctx, value) or value
+						end
 						out.config[combo] = slots
 					else
 						out.config[combo] = entry
@@ -701,7 +757,7 @@ local function config_leaves(model, ctx, is_table)
 				if not pair then error("macOS key combination '" .. tostring(combo) .. "' has no pair id", 0) end
 				if is_table(entry) then
 					for _, slot in ipairs(COMBO_SLOTS) do
-						put(M.COMBOS .. ".config." .. pair, slot, entry[slot] ~= NONE and entry[slot] or nil)
+						put(M.COMBOS .. ".config." .. pair, slot, entry[slot] ~= NONE and action_to_file(ctx, entry[slot]) or nil)
 					end
 				else
 					put(M.COMBOS .. ".config", pair, entry)
