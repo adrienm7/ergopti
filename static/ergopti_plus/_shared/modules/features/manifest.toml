@@ -4577,6 +4577,20 @@ description_key = "menu.tapholds.lone_tap_title"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 
+# How long a one-shot Shift waits for the key it shifts, in milliseconds: a
+# config.toml row on every OS (maintainer decision of 2026-11-11). Its value
+# when absent is the timing registry's tap_hold.one_shot_shift_timeout_ms; on
+# macOS the Hammerspoon sticky modifiers read it, never Karabiner.
+[[features.tap_holds]]
+id = "sticky_timeout_ms"
+default = 2000
+recommended = 2000
+family = "setting"
+type = "number"
+description_key = "menu.tapholds.sticky_title"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+
 [[features.shortcuts.keys]]
 id = "wrap_text_if_selected"
 default = false
