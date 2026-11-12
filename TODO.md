@@ -1378,8 +1378,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       editor, adding or deleting hotstrings, and installs (layouts, Ollama or MLX models, apps). Then confirm that
       nothing that acts on typing stays active under Suspend (hotstrings, layout emulation, tap-holds, layers and
       chords, shortcuts, gestures, AI predictions and their warmups and local server), with a regression for any
-      that still acts, and that a setting changed while suspended applies on resume. See
-      `docs/memory/maintainer-decisions.md`.
+      that still acts, and that a setting changed while suspended applies on resume. Every executable
+      `A_IsSuspended` read is listed by file and line, classified, in
+      [the Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md): the writers
+      (`infra/hotstrings/personal_toml_io.ahk` among them) refuse too, and the tray root rebuild is refused while
+      suspended, which must change before the rows stop greying. See `docs/memory/maintainer-decisions.md`.
 - [ ] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.
