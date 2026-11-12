@@ -37,6 +37,12 @@ local function store(overrides)
 		settings = settings(),
 		config_dir = "/config/",
 		read = function(path) return disk[path] end,
+		read_bounded = function(path, max_bytes)
+			local text = disk[path]
+			if text == nil then return nil, "absent" end
+			if #text > max_bytes then return nil, "too_large" end
+			return text, "ok"
+		end,
 		exists = function(path) return disk[path] ~= nil end,
 		write = function(path, text) disk[path] = text; return true end,
 		log = function(level, message, ...) logs[#logs + 1] = level .. ": " .. string.format(message, ...) end,
@@ -136,6 +142,33 @@ helpers.describe("layout editor source store", function()
 		defaults.source.failures, defaults.source.nav_file = { invalid = "a", write = "b" }, nil
 		_, err = SourceStore.settings(defaults)
 		helpers.assert_contains(err, "nav_file")
+	end)
+
+	helpers.it("(lmh-006-bounded-reopen) reopens the last source through a bounded read and as UTF-8 only", function()
+		local files
+		local operations, disk, logs = store({
+			-- Only the pointer is read whole; the source itself goes through read_bounded.
+			read = function(path)
+				if path:match("%.toml$") then error("the last source was read unbounded") end
+				return files[path]
+			end,
+		})
+		files = disk
+		disk["/config/layout_sources/last_source"] = "latin.toml\n"
+		disk["/config/layout_sources/latin.toml"] = "caf\233"
+		local opened
+		operations.open(function(data) opened = data end)
+		helpers.assert_eq(opened.text, nil, "a non-UTF-8 last source is not reopened")
+		helpers.assert_contains(logs[1], "not UTF-8")
+		disk["/config/layout_sources/latin.toml"] = string.rep("x", settings().max_file_bytes + 1)
+		operations.open(function(data) opened = data end)
+		helpers.assert_eq(opened.text, nil, "an oversized last source is not reopened")
+		helpers.assert_contains(logs[2], "too_large")
+		disk["/config/layout_sources/latin.toml"] = "caf\195\169 = 1\n"
+		operations.open(function(data) opened = data end)
+		helpers.assert_eq(opened.text, "caf\195\169 = 1\n")
+		local ok, err = pcall(SourceStore.new, { settings = settings(), config_dir = "/c/" })
+		helpers.assert_true(not ok and tostring(err):match("read_bounded") ~= nil, "a store needs the bounded read")
 	end)
 
 	helpers.it("opens nothing when the pointer names a missing or foreign file", function()
