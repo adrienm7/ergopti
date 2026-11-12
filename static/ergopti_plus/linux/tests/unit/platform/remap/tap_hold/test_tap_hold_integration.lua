@@ -21,6 +21,8 @@ local KEY_A, KEY_J, KEY_K, KEY_U = 30, 36, 37, 22
 
 --- Starts a hook + manager + writer session on a user file holding `user_text`.
 local function session(user_text)
+	-- The switch and the timings the scenario spells go to config.toml beside it.
+	local config_text = require("tests.support.tap_hold_fixture").config(user_text)
 	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
 	local Hook = helpers.load_module("adapters.keyboard_hook")
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
@@ -31,12 +33,10 @@ local function session(user_text)
 	assert(made == true or made == 0, "the isolated configuration folder must exist")
 	local path = dir .. "/tap_hold.toml"
 	require("tests.support.nav_layer_fixture").write(dir)
-	if user_text then
-		local fh = assert(io.open(path, "w"))
-		fh:write(user_text)
+	for file, content in pairs({ [path] = user_text, [dir .. "/config.toml"] = config_text }) do
+		local fh = assert(io.open(file, "w"))
+		fh:write(content)
 		fh:close()
-	else
-		os.remove(path)
 	end
 	local actions = {}
 	-- The capitals the scenarios type, where a US layout has them: the one-shot
@@ -81,6 +81,7 @@ local function session(user_text)
 		Manager._reset_for_test()
 		Writer._reset_for_test()
 		os.remove(path)
+		os.remove(dir .. "/config.toml")
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
 	end
@@ -358,25 +359,26 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 	helpers.it("clears everything, then restores the recommended preset", function()
 		with_session(nil, function(s)
 			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
-			local function scope(mode, rows)
+			-- The switch is a config.toml row the scope publishes beside the keys.
+			local function scope(mode, config)
 				local path = s.manager.user_path()
 				local fh = assert(io.open(path, "r"))
 				local document = require("toml_codec").decode(fh:read("*a"))
 				fh:close()
 				helpers.assert_true(s.manager.apply_configuration(
-					require("toml_codec").decode(s.writer.render_scope(mode, document, rows, preset))))
+					require("toml_codec").decode(s.writer.render_scope(mode, document, {}, preset)), nil, config))
 			end
-			scope("clear", { { section = "tap_holds", key = "enabled", delete = true } })
+			scope("clear", {})
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")
 			s.drive({ tap(LSHIFT, 500) })
 			helpers.assert_eq(#s.actions, 0)
-			scope("recommended", { { section = "tap_holds", key = "enabled", value = true } })
+			scope("recommended", { tap_holds = { enabled = true } })
 			s.drive({ tap(LSHIFT, 1000) })
 			helpers.assert_eq(s.actions[1], "copy")
 		end)
 	end)
 
-	helpers.it("switches the feature off and on from the file", function()
+	helpers.it("switches the feature off and on from config.toml", function()
 		with_session(nil, function(s)
 			helpers.assert_true(s.writer.set_enabled(false))
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")
@@ -385,7 +387,7 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 		end)
 	end)
 
-	helpers.it("starts off when the user's file says so", function()
+	helpers.it("starts off when config.toml says so", function()
 		with_session("[tap_hold]\nenabled = false\n", function(s)
 			helpers.assert_true(not s.manager.is_active())
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")

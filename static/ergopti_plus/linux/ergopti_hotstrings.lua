@@ -1002,6 +1002,10 @@ local function main()
 			path          = require("infra.config_paths").config("config.toml"),
 			driver        = "linux",
 			registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+			-- The v22 step moves the switch, the timings and [mod_combos] out of the
+			-- tap_hold.toml beside config.toml, once (maintainer decision 2026-11-11).
+			companions    = { [require("tap_hold.shared_file").FILE_NAME] =
+				require("infra.config_paths").config(require("tap_hold.shared_file").FILE_NAME) },
 		})
 		-- A newer file stays read-only for the session: tell the user why their
 		-- changes do not stick. Block-local, as main() is near the upvalue limit.
@@ -1233,6 +1237,8 @@ local function main()
 		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
+		-- The switch and the timings are config.toml rows on every OS.
+		config_path = require("infra.config_paths").config("config.toml"),
 	})
 	end)
 	if not privacy_owners.tap_hold_called or privacy_owners.tap_hold_initialized ~= true then
@@ -1265,6 +1271,7 @@ local function main()
 	-- configuration folder's layers.toml when it has none.
 	require("platform.remap.tap_hold_writer").init({
 		path = TapHold.user_path(),
+		config_path = TapHold.config_path(),
 		reload = TapHold.reload,
 		is_tap_action = TapHold.is_tap_action,
 		canonical_hold = TapHold.canonical_hold,

@@ -31,7 +31,8 @@ local function with_manager(route, body)
 	local config_path, tap_path = os.tmpname(), os.tmpname()
 	local manager
 	local ok, detail = pcall(function()
-		local text = '[shortcuts]\nenabled = true\n'
+		-- The tap-hold switch is a config.toml row, here beside the pairs.
+		local text = '[tap_holds]\nenabled = true\n[shortcuts]\nenabled = true\n'
 		if route == "tap" or route == "hold" then
 			text = text .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "script_reload"\n'
 			if route == "hold" then text = text .. '[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "ctrl"\n' end
@@ -65,7 +66,7 @@ local function with_manager(route, body)
 				execute_action = function(action) assert(scripts.handlers[action])() end,
 				action_names = function() return { "script_reload" } end,
 				on_text_injected = function() error("native pass-through cannot inject text") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
+				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path, config_path = config_path }))
 			s.manager = manager
 			local snapshot = manager.configuration_snapshot()
 			helpers.assert_eq(snapshot.combinations.has_bindings(), route ~= "none")

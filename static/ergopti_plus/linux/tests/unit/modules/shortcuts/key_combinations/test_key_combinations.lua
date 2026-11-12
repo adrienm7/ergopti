@@ -223,7 +223,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
 		local Loader = require("platform.remap.tap_hold_loader")
 		local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded = Loader.load_document(defaults,{ tap_hold={enabled=false,inherit_defaults=true} },nil,"/controlled/tap_hold.toml")
+		local loaded = Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
@@ -234,7 +234,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 			-- requires it; previous cache identity is restored by the outer guard.
 			local manager = require("platform.remap.tap_hold_manager")
 			manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"})
 			helpers.assert_true(manager.is_active()); helpers.assert_true(hook.engine.has_combinations ~= nil)
 			helpers.assert_eq(next(hook.engine.by_code),nil,"tap-hold configuration switch stays independent")
 			local out = hook.engine:process(58,1,0,origin()); helpers.assert_eq(out,nil)
@@ -312,7 +312,7 @@ helpers.describe("configured pair publication lifecycle",function()
 	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
 		local Loader=require("platform.remap.tap_hold_loader")
 		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded=Loader.load_document(defaults,{tap_hold={enabled=true,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = true } })
 		local bytes=base_text
 		local hook={};hook.set_remapper=function(engine,callback)
 			if hook.engine and hook.engine.has_combinations then
@@ -328,7 +328,7 @@ helpers.describe("configured pair publication lifecycle",function()
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			local pairs=require("modules.shortcuts.key_combinations");local token={}
 			helpers.assert_true(pairs.acquire_configuration(token));helpers.assert_eq(hook.engine,nil)
 			local next_text=bytes:gsub('caps_lock_then_tab = "run_program"','caps_lock_then_tab = "copy"'):gsub('caps_lock_then_tab = "shift"','caps_lock_then_tab = "alt"')
@@ -394,7 +394,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
 		local Loader=require("platform.remap.tap_hold_loader")
 		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
 		local hook={};hook.set_remapper=function(engine,callback)
 			if hook.engine and hook.engine.has_combinations then hook.engine:release_all();if hook.engine:ack_retirement(true)~=true then return false end
@@ -409,7 +409,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			helpers.assert_eq(hook.engine,nil)
 			local pairs=require("modules.shortcuts.key_combinations")
 			local function publish(text)

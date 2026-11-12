@@ -103,7 +103,7 @@ local function with_scope(body, source, options)
 				local Loader = require("platform.remap.tap_hold_loader")
 				local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
 				local loaded_pairs = Loader.load_document(defaults,
-					{ tap_hold = { enabled = false, inherit_defaults = true } }, nil, path .. ".tap_hold.toml")
+					{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 				helpers.assert_true(combinations.install({ keys = loaded_pairs.catalog, hold_picker = loaded_pairs.hold_picker,
 					files = files, route = function() return path end, is_paused = function() return controls.paused end,
 					actions = { is_assignable = function(action)
@@ -180,7 +180,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			else
 				tap_path = os.tmpname()
 			end
-			Sandbox.write_bytes(tap_path, require("tests.support.tap_hold_fixture").with_preset(tap_config))
+			require("tests.support.tap_hold_fixture").write(tap_path, tap_config)
 			hook = { calls = 0 }
 			function hook.set_remapper(engine) hook.calls = hook.calls + 1; hook.engine = engine; return true end
 			function hook.key_text() return nil end
@@ -190,7 +190,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			Manager = require("platform.remap.tap_hold_manager")
 			helpers.assert_true(Manager.init({ keyboard_hook = hook, execute_action = function() error("no action during collision validation") end,
 				action_names = owners.gestures.get_executable_action_names, on_text_injected = function() error("no output during validation") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
+				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			controls.source_reads, controls.intentional_hook_changes = 0, 0
 			-- This fixture acknowledges initial readiness solely to reach preflight.
 			-- The genuine getter answers true since 2026-11-11 (LIN-004); outside an
@@ -235,6 +235,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 		end)
 		if Manager then Manager._reset_for_test() end
 		if tap_path then
+			os.remove(require("tests.support.tap_hold_fixture").config_path(tap_path))
 			local removed, detail = os.remove(tap_path)
 			if navigation_made and removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Tap fixture cleanup refused: " .. tostring(detail) end
 		end

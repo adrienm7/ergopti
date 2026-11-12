@@ -23,7 +23,11 @@
 ---    overwritten: the change is refused and the user's text stays as it was.
 --- 4. Temporary file then rename, so a crash mid-write cannot leave a file that
 ---    parses to nothing.
---- 5. The layer comes with its key: a hold that enters Ergopti's recommended
+--- 5. The switch and the two timings are manifest rows: set_enabled,
+---    set_lone_tap_max_ms and set_one_shot_timeout_ms publish config.toml
+---    `[tap_holds]` beside the file (maintainer decision of 2026-11-11), through
+---    the shared config writer, then reload the engine.
+--- 6. The layer comes with its key: a hold that enters Ergopti's recommended
 ---    layer creates the folder's layers.toml from it when there is none
 ---    (keymap.layer_preset), before the engine reloads. A key set to hold
 ---    the navigation layer in a folder without that file entered a layer
@@ -64,12 +68,13 @@ local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled
 -- chosen here replaces it, so every driver holds what the user just chose.
 local FOREIGN_HOLD_FIELD = "hold_action"
 
--- The [tap_hold] field of the lone modifier tap window (the loader's).
+-- The config.toml [tap_holds] fields of the lone modifier tap window and of
+-- the one-shot timeout (the loader's).
 local LONE_TAP_FIELD = require("platform.remap.tap_hold_loader").LONE_TAP_FIELD
-
--- The manifest rows under tap_holds that tap_hold.toml's [tap_hold] owns.
-local SCOPE_ROW_FIELDS = { enabled = true, [LONE_TAP_FIELD] = true }
 local ONE_SHOT_TIMEOUT_FIELD = require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_FIELD
+-- The [tap_hold] leaves config.toml owns since config schema v22: a scope
+-- render drops one a migration could not delete.
+local CONFIG_OWNED_FIELDS = { "enabled", LONE_TAP_FIELD, ONE_SHOT_TIMEOUT_FIELD }
 
 local HEADER = {
 	"# tap_hold.toml — written by the Ergopti+ tray menu.",
@@ -86,6 +91,7 @@ local HEADER = {
 -- =========================================
 
 local _path = nil
+local _config_path = nil      -- The config.toml the switch and the timings are published to.
 local _reload = nil
 local _is_tap_action = nil
 local _canonical_hold = nil
@@ -445,7 +451,8 @@ end
 -- =========================================
 
 --- Binds the writer to the user's file and the engine's reload.
---- @param opts table { path, reload() -> boolean, is_tap_action(id) -> boolean,
+--- @param opts table { path, config_path|nil (the config.toml beside path by
+---   default), reload() -> boolean, is_tap_action(id) -> boolean,
 ---   canonical_hold(kind, id) -> string|nil, string|nil,
 ---   layers = { shared_root, config_dir, file_adapter|nil } | nil }: the folder
 ---   whose layers.toml a hold entering the recommended layer creates when
@@ -468,8 +475,12 @@ function M.init(opts)
 		_layers = { shared_root = opts.layers.shared_root, config_dir = opts.layers.config_dir,
 			file_adapter = opts.layers.file_adapter }
 	end
+	if opts.config_path ~= nil and (type(opts.config_path) ~= "string" or opts.config_path == "") then
+		error("tap-hold writer config_path must be a path", 2)
+	end
 	retired_delays()
 	_path = opts.path
+	_config_path = opts.config_path or M.config_path_for(opts.path)
 	_reload = opts.reload
 	_is_tap_action = opts.is_tap_action
 	_canonical_hold = opts.canonical_hold
@@ -587,9 +598,45 @@ function M.set_global_threshold(seconds, guard)
 	end, guard)
 end
 
+--- The config.toml beside a tap_hold.toml (the loader's).
+M.config_path_for = require("platform.remap.tap_hold_loader").config_path_for
+
+--- One change to config.toml [tap_holds], then the engine reload.
+--- @param what string For the logs.
+--- @param row table The batch operation `{ section, key, value | delete }`.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean True when the change is saved and in force.
+local function commit_setting(what, row, guard)
+	if not _path then
+		Logger.error(LOG, "Tap-hold writer used before init() — '%s' not saved.", what)
+		return false
+	end
+	local path, reload, config = _path, _reload, _config_path
+	local content, status, detail = TomlWriter.read_classified(config)
+	if status ~= "ok" and status ~= "absent" then
+		Logger.error(LOG, "'%s' is unreadable (%s) — '%s' refused.", config, tostring(detail or status), what)
+		return false
+	end
+	if not edit_current(guard) or _path ~= path or _reload ~= reload or _config_path ~= config then return false end
+	local called, written, write_err = pcall(TomlWriter.batch_write, config, { row }, nil,
+		{ status = status, content = content })
+	if not called or written ~= true then
+		Logger.error(LOG, "Tap-hold change '%s' was not saved to '%s': %s.", what, config,
+			tostring(called and write_err or written))
+		return false
+	end
+	Logger.info(LOG, "Tap-hold change saved: %s.", what)
+	local reloaded_called, reloaded = pcall(reload)
+	if not reloaded_called or reloaded ~= true then
+		Logger.error(LOG, "Tap-hold change '%s' saved but the engine did not reload.", what)
+		return false
+	end
+	return true
+end
+
 --- Sets how long a modifier key pressed alone still taps, in milliseconds
---- ([tap_hold] lone_modifier_tap_max_ms, the manifest's
---- tap_holds.lone_modifier_tap_max_ms): 0 is the strict tap-hold.
+--- (config.toml [tap_holds] lone_modifier_tap_max_ms, a manifest row): 0 is the
+--- strict tap-hold.
 --- @param ms number 0 or a positive whole number of milliseconds.
 --- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
@@ -599,13 +646,13 @@ function M.set_lone_tap_max_ms(ms, guard)
 			tostring(ms))
 		return false
 	end
-	return commit("lone modifier tap window = " .. tostring(ms) .. " ms", function(document, shapes)
-		section(document, shapes)[LONE_TAP_FIELD] = ms
-	end, guard)
+	return commit_setting("lone modifier tap window = " .. tostring(ms) .. " ms",
+		Manifest.sparse_operation(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS, ms), guard)
 end
 
 --- Sets how long a one-shot Shift waits for its key, in milliseconds
---- ([tap_hold] sticky_timeout_ms, macOS's tap_holds.sticky_timeout_ms).
+--- (config.toml [tap_holds] sticky_timeout_ms). It has no manifest row: the
+--- timing registry's default is written as an absence.
 --- @param ms number A positive whole number of milliseconds.
 --- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
@@ -615,12 +662,12 @@ function M.set_one_shot_timeout_ms(ms, guard)
 			tostring(ms))
 		return false
 	end
-	return commit("one-shot timeout = " .. tostring(ms) .. " ms", function(document, shapes)
-		section(document, shapes)[ONE_SHOT_TIMEOUT_FIELD] = ms
-	end, guard)
+	local row = { section = ConfigKeys.KEY.TAP_HOLDS, key = ONE_SHOT_TIMEOUT_FIELD }
+	if ms == require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_DEFAULT_MS then row.delete = true else row.value = ms end
+	return commit_setting("one-shot timeout = " .. tostring(ms) .. " ms", row, guard)
 end
 
---- Switches the feature on or off in the file ([tap_hold] enabled).
+--- Switches the feature on or off (config.toml [tap_holds] enabled, a manifest row).
 --- @param enabled boolean
 --- @return boolean
 function M.set_enabled(enabled)
@@ -628,18 +675,19 @@ function M.set_enabled(enabled)
 		Logger.error(LOG, "set_enabled: a boolean is required — nothing written.")
 		return false
 	end
-	return commit("feature " .. (enabled and "on" or "off"), function(document, shapes)
-		section(document, shapes).enabled = enabled
-	end)
+	return commit_setting("feature " .. (enabled and "on" or "off"),
+		Manifest.sparse_operation(ConfigKeys.KEY.TAP_HOLDS_ENABLED, enabled))
 end
 
 --- Renders the tap-hold scope candidate without writing it: every owned field
---- is cleared, the manifest's master rows are applied, and a restore writes the
---- shipped preset explicitly instead of asking the loader to inherit it, so the
---- file says exactly what runs. Unknown sections and fields are preserved.
+--- is cleared and a restore writes the shipped preset explicitly instead of
+--- asking the loader to inherit it, so the file says exactly what runs. The
+--- manifest rows under tap_holds live in config.toml, published by the same
+--- transaction: no row reaches this file. Unknown sections and fields are
+--- preserved.
 --- @param mode string "recommended" or "clear".
 --- @param document table Decoded user document, consumed by this call.
---- @param rows table Manifest rows under tap_holds, routed by the transaction.
+--- @param rows table Rows routed to this file: always empty.
 --- @param preset table key id -> fields of the shipped preset.
 --- @param shapes table|nil Canonical receipt for the exact source document.
 --- @return string candidate Complete file text.
@@ -659,13 +707,11 @@ function M.render_scope(mode, document, rows, preset, shapes)
 	tap_hold.inherit_defaults = nil
 	-- The recommendation sets no delay: the user's global one goes with the keys'.
 	tap_hold.time_activation_seconds = nil
-	tap_hold[ONE_SHOT_TIMEOUT_FIELD] = nil
+	-- A config.toml leaf a v22 move left here is no setting of this file.
+	for _, field in ipairs(CONFIG_OWNED_FIELDS) do tap_hold[field] = nil end
 	clear_owned_keys(tap_hold, preset, shapes)
 	for _, row in ipairs(rows) do
-		if row.section ~= ConfigKeys.KEY.TAP_HOLDS or not SCOPE_ROW_FIELDS[row.key] then
-			error("tap-hold scope row has no tap_hold.toml owner: " .. tostring(row.section) .. "." .. tostring(row.key), 0)
-		end
-		if row.delete then tap_hold[row.key] = nil else tap_hold[row.key] = row.value end
+		error("tap-hold scope row has no tap_hold.toml owner: " .. tostring(row.section) .. "." .. tostring(row.key), 0)
 	end
 	if mode == "recommended" then
 		for key_id, fields in pairs(preset) do
@@ -700,7 +746,8 @@ local function customised(entry, fields)
 end
 
 --- Imports Ergopti's recommendation for the given keys into a tap_hold.toml
---- and switches the feature on ([tap_hold] enabled): the first-run wizard's
+--- and switches the feature on (config.toml [tap_holds] enabled, beside it):
+--- the first-run wizard's
 --- Tap-Holds answer. It only adds keys: a key holding the user's own setting
 --- refuses the whole import, and every other key, section and field stays as it
 --- was. The replaced file is backed up first. The wizard may configure another
@@ -709,10 +756,12 @@ end
 --- @param path string The tap_hold.toml of the folder being configured.
 --- @param key_ids table The engine's key ids (KEY_CODES), at least one.
 --- @param preset table key id -> fields of the shipped preset (loader.preset_keys).
+--- @param config_path string|nil The config.toml the switch is published to,
+---   the one beside path by default.
 --- @return boolean imported
 --- @return string|nil err Why nothing was written.
 --- @return string|nil backup The copy of the replaced file, nil for a new one.
-function M.import_recommended(path, key_ids, preset)
+function M.import_recommended(path, key_ids, preset, config_path)
 	if type(path) ~= "string" or path == "" or type(key_ids) ~= "table" or #key_ids == 0
 		or type(preset) ~= "table" then
 		return false, "the import needs a file, at least one key and the shipped preset"
@@ -769,7 +818,6 @@ function M.import_recommended(path, key_ids, preset)
 			return false, "'" .. path .. "' could not be backed up"
 		end
 	end
-	section(document, shapes).enabled = true
 	for _, key_id in ipairs(key_ids) do
 		local entry = key_entry(document, key_id, shapes)
 		for _, field in ipairs(OWNED_KEY_FIELDS) do entry[field] = nil end
@@ -777,6 +825,14 @@ function M.import_recommended(path, key_ids, preset)
 	end
 	if not write_document(path, document, shapes, { status = text and "ok" or "absent", content = text }) then
 		return false, "'" .. path .. "' could not be written"
+	end
+	local config = config_path or M.config_path_for(path)
+	local switched, switch_err = TomlWriter.batch_write(config,
+		{ Manifest.sparse_operation(ConfigKeys.KEY.TAP_HOLDS_ENABLED, true) })
+	if switched ~= true then
+		Logger.error(LOG, "The tap-hold keys were imported into '%s' but '%s' could not switch them on: %s.",
+			path, config, tostring(switch_err))
+		return false, "'" .. config .. "' could not be written"
 	end
 	Logger.success(LOG, "Imported %d recommended tap-hold key(s) into '%s' (backup: %s).",
 		#key_ids, path, tostring(backup or "none, the file is new"))
@@ -852,6 +908,7 @@ end
 --- Test seam: forgets the initialisation.
 function M._reset_for_test()
 	_path, _reload, _is_tap_action, _canonical_hold, _retired = nil, nil, nil, nil, nil
+	_config_path = nil
 end
 
 return M
