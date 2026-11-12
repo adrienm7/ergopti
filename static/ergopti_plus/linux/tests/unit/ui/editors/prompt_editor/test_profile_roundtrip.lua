@@ -77,9 +77,9 @@ local function with_editor(body)
 	end
 	local ok, err = pcall(body, f)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
-	local staging = uv.fs_lstat(path .. ".tmp")
+	local staging = uv.fs_lstat(helpers.stage_path(path))
 	if staging then
-		if staging.type == "directory" then assert(uv.fs_rmdir(path .. ".tmp")) else assert(os.remove(path .. ".tmp")) end
+		if staging.type == "directory" then assert(uv.fs_rmdir(helpers.stage_path(path))) else assert(os.remove(helpers.stage_path(path))) end
 	end
 	assert(os.remove(path)); assert(uv.fs_rmdir(dir))
 	if not ok then error(err, 0) end
@@ -224,12 +224,12 @@ helpers.describe("prompt editor profile round trips", function()
 			local payload, save = f.open(original)
 			payload.name = "Retry after filesystem refusal"
 			local bytes = f.read()
-			assert(uv.fs_mkdir(f.path .. ".tmp", 448))
+			assert(uv.fs_mkdir(helpers.stage_path(f.path), 448))
 			helpers.assert_eq(save(), { saved = false, closed = false })
 			helpers.assert_eq(f.read(), bytes)
 			helpers.assert_eq(f.profiles.resolve_id(original.id), original)
 			helpers.assert_eq(f.seen.closes, 0)
-			assert(uv.fs_rmdir(f.path .. ".tmp"))
+			assert(uv.fs_rmdir(helpers.stage_path(f.path)))
 			helpers.assert_eq(save(), { saved = true, closed = true })
 			local saved = f.disk(original.id)
 			helpers.assert_eq(saved.label, payload.name)
