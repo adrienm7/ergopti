@@ -59,7 +59,8 @@ for (const file of [
 	PREFIX + 'README.md',
 	PREFIX + 'codec.json',
 	PREFIX + 'codec.lua.bak',
-	'static/ergopti_plus/_shared/lua_backup/codec.lua'
+	// A neighbour of the shared Lua root, whatever that root is.
+	PREFIX.replace(/\/$/, '_backup/') + 'codec.lua'
 ]) {
 	const gates = selectGates([file]);
 	for (const gate of CONSUMER_GATES) {
