@@ -197,7 +197,6 @@ const SYNONYMS = new Set([
 	'lifecycle',
 	'network',
 	'text',
-	'text_utils',
 	'timings',
 	'file_system',
 	'process',
@@ -908,13 +907,12 @@ function mapShared(rest) {
 		const kept = isFile ? [segment] : hit.absorb ? tail : [segment, ...tail];
 		return place(hit.root, 'engine', kept);
 	}
-	if (root === 'ui') {
-		if (segment === '_generated' || segment === 'vendor')
-			return ['core', 'ui', 'web', segment, ...tail].join('/');
-		if (isFile) return place('core/ui', 'ui', ['web', segment]);
-		const feature = classify(UI_FEATURES, segment) || ALIASES[segment];
-		return feature ? place(feature, 'ui', [segment, ...tail]) : rest;
-	}
+	// _shared/ui/ is the webview document root: hosts build _shared/ui/<page>
+	// at runtime, pages import ../dom_utils.js, and the WebViews are allowed
+	// to read that one tree. It keeps its place (decided by the coordinator on
+	// 2026-11-11, to review by the maintainer); its page names already name
+	// their feature.
+	if (root === 'ui') return rest;
 	if (root === 'modules' || root === 'data') {
 		const stem = isFile ? classStem(segment) : segment;
 		const feature = classify(DATA_FEATURES, stem);
