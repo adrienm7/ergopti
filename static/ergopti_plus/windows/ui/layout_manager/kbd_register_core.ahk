@@ -28,6 +28,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\adapters\keyboard_layout_install.ahk
+
 
 
 
@@ -387,77 +389,11 @@ KbdRegister_Run(Words, Ports) {
  * @returns {Map} The ports of KbdRegister_Install and KbdRegister_Uninstall.
  */
 KbdRegister_SystemPorts() {
-	SetRegView(64)
-	Machine() {
-		ProcessMachine := 0, NativeMachine := 0
-		if !DllCall("Kernel32\IsWow64Process2", "Ptr", DllCall("Kernel32\GetCurrentProcess", "Ptr"),
-				"UShort*", &ProcessMachine, "UShort*", &NativeMachine)
-			throw OSError(A_LastError, -1, "IsWow64Process2")
-		return Map("process", ProcessMachine, "native", NativeMachine)
-	}
-	; System32 of a 32-bit process on 64-bit Windows is SysWOW64 unless redirection is off.
-	WithRedirection(RedirectOff, Fn) {
-		Wow := Machine()["process"] != 0
-		Old := 0
-		if RedirectOff && Wow && !DllCall("Kernel32\Wow64DisableWow64FsRedirection", "Ptr*", &Old)
-			throw OSError(A_LastError, -1, "Wow64DisableWow64FsRedirection")
-		try return Fn()
-		finally {
-			if RedirectOff && Wow
-				DllCall("Kernel32\Wow64RevertWow64FsRedirection", "Ptr", Old)
-		}
-	}
-	WriteFile(Path, Bytes, RedirectOff) {
-		WithRedirection(RedirectOff, () => _KbdRegister_WriteBytes(Path, Bytes))
-	}
-	DeleteFile(Path, RedirectOff) {
-		return WithRedirection(RedirectOff, () => _KbdRegister_DeleteFile(Path))
-	}
-	Subkeys(Key) {
-		Names := []
-		loop reg Key, "K"
-			Names.Push(A_LoopRegName)
-		return Names
-	}
-	Values(Key) {
-		Found := []
-		loop reg Key, "V"
-			Found.Push(Map("name", A_LoopRegName, "data", RegRead(Key, A_LoopRegName, "")))
-		return Found
-	}
-	ReadFile(Path) {
-		Bytes := FileRead(Path, "RAW")
-		if Bytes.Size == 0 || Bytes.Size > KbdRegister_Constant("max_dll_bytes")
-			throw Error(Path . " is empty or larger than a keyboard layout image")
-		return Bytes
-	}
-	WriteText(Path, Text) {
-		Handle := FileOpen(Path, "w", "UTF-8-RAW")
-		try Handle.Write(Text)
-		finally Handle.Close()
-	}
 	UninstallCommand(Dll) {
 		Command := KbdRegister_Command(["uninstall", Dll], KbdRegister_SelfEnv())
 		return '"' . Command["executable"] . '" ' . Command["arguments"]
 	}
-	return Map(
-		"reg_read", (Key, Name) => RegRead(Key, Name, ""),
-		"reg_subkeys", Subkeys,
-		"reg_values", Values,
-		"reg_write", (Type, Key, Name, Value) => RegWrite(Value, Type, Key, Name),
-		"reg_delete_value", (Key, Name) => RegDelete(Key, Name),
-		"reg_delete_key", (Key) => RegDeleteKey(Key),
-		"read_file", ReadFile,
-		"read_text", (Path) => FileRead(Path, "UTF-8"),
-		"write_text", WriteText,
-		"sha256", (Bytes) => CryptoSha256Bytes(Bytes),
-		"write_file", WriteFile,
-		"delete_file", DeleteFile,
-		"install_tip", (Text, Flags) => DllCall("Input\InstallLayoutOrTip", "WStr", Text, "UInt", Flags, "Int"),
-		"native_machine", () => Machine()["native"],
-		"windir", EnvGet("WINDIR"),
-		"uninstall_command", UninstallCommand
-	)
+	return LayoutInstallSystemPorts(KbdRegister_Constant("max_dll_bytes"), UninstallCommand)
 }
 
 /**
@@ -470,28 +406,6 @@ KbdRegister_SelfEnv() {
 	return Map("compiled", A_IsCompiled ? true : false,
 		"executable", A_IsCompiled ? A_ScriptFullPath : A_AhkPath,
 		"entry", A_IsCompiled ? "" : Folder . "\kbd_register.ahk")
-}
-
-_KbdRegister_WriteBytes(Path, Bytes) {
-	Handle := FileOpen(Path, "w")
-	try Handle.RawWrite(Bytes, Bytes.Size)
-	finally Handle.Close()
-}
-
-; A DLL a process still has loaded cannot be deleted: Windows removes it at the
-; next start (MOVEFILE_DELAY_UNTIL_REBOOT).
-_KbdRegister_DeleteFile(Path) {
-	if !FileExist(Path)
-		return "absent"
-	try {
-		FileDelete(Path)
-		return "deleted"
-	} catch OSError {
-		; Still loaded by a process: scheduled below instead.
-	}
-	if !DllCall("Kernel32\MoveFileExW", "WStr", Path, "Ptr", 0, "UInt", 0x4)
-		throw OSError(A_LastError, -1, "MoveFileExW " . Path)
-	return "at_reboot"
 }
 
 /**
