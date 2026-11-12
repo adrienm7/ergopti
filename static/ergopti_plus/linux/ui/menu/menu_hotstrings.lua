@@ -375,8 +375,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end, function()
-			return order_snapshot ~= nil and current_source() and ctx.paused ~= true
-				and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+			return order_snapshot ~= nil and current_source()
 		end)
 		for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
@@ -644,8 +644,9 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
+			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 			local function word_expanders_ready()
-				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
+				return true
 			end
 
 			--- Captures enough catalogue state to undo a persistence failure.
@@ -1136,8 +1137,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return true
 			end, function()
-				return order_snapshot ~= nil and ctx.paused ~= true
-					and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+				-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+				return order_snapshot ~= nil
 			end)
 			for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
@@ -1179,11 +1180,10 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_personal"] = function()
 			local default_parent, group_rows, unavailable_rows = {}, {}, {}
 			local preferences_present, close_on_add, close_action = false, false, nil
+			-- A pause does not keep the editor closed: a pause stops typing, not
+			-- configuration (EDD-1, maintainer decision 2026-11-12).
 			local function editor_ready()
-				if ctx.paused == true or type(ctx.is_paused) ~= "function"
-					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
-				local ok, current = pcall(ctx.is_paused)
-				return ok and current == false
+				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
 			end
 			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
@@ -1391,7 +1391,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				local packs = by_extension[extension_id]
 				local pack_rows, bound_rows = {}, {}
 				local function commit_gates(enabled)
-					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+					-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 					local bindings = {}
 					for _, leaf in ipairs(bound_sections[extension_id] or {}) do
 						bindings[#bindings + 1] = { group = leaf.category, section = leaf.section }
@@ -1436,10 +1436,10 @@ local function _manifest_hotstring_rows(ctx, config)
 						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,
 						-- Greyed while its category is off, like a section row there.
-						disabled = not category_on or ctx.paused == true,
-						action   = (category_on and ctx.paused ~= true) and function()
-							if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused())
-								or config.is_group_enabled(bound.category) ~= true then return false end
+						disabled = not category_on,
+						action   = category_on and function()
+							-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+							if config.is_group_enabled(bound.category) ~= true then return false end
 							local called, committed = pcall(function()
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)

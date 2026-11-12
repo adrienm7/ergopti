@@ -288,8 +288,8 @@ const LINUX_BODY = `
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return true
 			end, function()
-				return order_snapshot ~= nil and ctx.paused ~= true
-					and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+				-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+				return order_snapshot ~= nil
 			end)
 			for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
