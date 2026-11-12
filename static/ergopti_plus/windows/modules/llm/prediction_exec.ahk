@@ -753,26 +753,20 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 				? LLM_Translate_PredictionProfile(Override["translation_target"])
 				: LLM_FindProfile(Override["profile_id"],
 					_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
-			; A built-in record carries no label of its own; the menu's names it,
-			; so the user sees which of their prompts answered.
-			if (prof is Map and prof.Has("label"))
-				profile_label := prof["label"]
-			else if IsSet(LLM_Menu_GetProfileLabel)
-				profile_label := LLM_Menu_GetProfileLabel(Override["profile_id"])
+			profile_label := _LLM_Engine_ProfileLabel(prof, Override["profile_id"])
 		} else {
 			prof := LLM_GetActiveProfile(
 				_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),
 				_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
-			if (prof is Map and prof.Has("label"))
-				profile_label := prof["label"]
+			; The active prompt is named like an override's: a built-in one used to
+			; show no name at all, as it carries no label of its own.
+			profile_label := _LLM_Engine_ProfileLabel(prof, (prof is Map) ? prof.Get("id", "") : "")
 		}
 	}
 	info_parts := []
 	if (_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR])
-		info_parts := _LLM_Engine_InfoBarParts(
-			_LLM_Engine.Has("model") ? _LLM_Engine["model"] : "",
-			_LLM_Engine_ResolveBackendLabel(),
-			profile_label)
+		info_parts := _LLM_Engine_InfoBarParts(_LLM_Engine_InfoBarModel(),
+			_LLM_Engine_ResolveBackendLabel(), profile_label)
 	_LLM_Engine_Port("tooltip").SetDisplayOpts(Map(
 		ConfigLeaf.SHOW_INFO_BAR, !!(_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR]),
 		"info_parts", info_parts,
@@ -782,6 +776,36 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 		ConfigLeaf.PRED_INDENT, _LLM_Engine.Has(ConfigLeaf.PRED_INDENT) ? Integer(_LLM_Engine[ConfigLeaf.PRED_INDENT]) : 0,
 		ConfigLeaf.VAL_MODIFIERS, _LLM_Engine.Has(ConfigLeaf.VAL_MODIFIERS) ? _LLM_Engine[ConfigLeaf.VAL_MODIFIERS] : "",
 	))
+}
+
+/**
+ * The name a prompt goes by in the info bar: its own label, else the menu's.
+ * A built-in record carries no label of its own; the menu names it, so the
+ * user sees which of their prompts answered.
+ * @param {Map|String} Profile The prompt's record.
+ * @param {String} ProfileId Its id, for the menu's label.
+ * @returns {String}
+ */
+_LLM_Engine_ProfileLabel(Profile, ProfileId) {
+	if (Profile is Map and Profile.Has("label"))
+		return Profile["label"]
+	if (ProfileId != "" and IsSet(LLM_Menu_GetProfileLabel))
+		return LLM_Menu_GetProfileLabel(ProfileId)
+	return ""
+}
+
+/**
+ * The model the info bar names: the one that answers. An API request is
+ * answered by the active entry's model, not by the local model setting.
+ * @returns {String}
+ */
+_LLM_Engine_InfoBarModel() {
+	global _LLM_Engine
+	if (_LLM_Engine.Get("backend", "ollama") = "api") {
+		Entry := _LLM_Engine_GetActiveApiEntry()
+		return IsObject(Entry) ? LLM_RemoteEntryModel(Entry) : ""
+	}
+	return _LLM_Engine.Get("model", "")
 }
 
 ; Purple loading tooltip — macOS ``tooltip.show_loading`` parity. Fires once per
