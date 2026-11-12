@@ -146,7 +146,13 @@ $commands = @($ast.FindAll({ param($node)
     $node.InvocationOperator -eq [Management.Automation.Language.TokenKind]::Ampersand -and
     $node.CommandElements[0].Extent.Text -ceq ('"' + $directoryVariable + '/powershell.exe"')
 }, $true))
-if ($moduleAssignments.Count -ne 1 -or $commands.Count -ne 1) { throw 'Runtime directory authority is not forwarded exactly.' }
+# Every Windows PowerShell child the step starts must go through the pinned directory.
+$children = @($ast.FindAll({ param($node)
+    $node -is [Management.Automation.Language.CommandAst] -and
+    $node.InvocationOperator -eq [Management.Automation.Language.TokenKind]::Ampersand -and
+    $node.CommandElements[0].Extent.Text -match 'powershell\.exe'
+}, $true))
+if ($moduleAssignments.Count -ne 1 -or $commands.Count -lt 1 -or $commands.Count -ne $children.Count) { throw 'Runtime directory authority is not forwarded exactly.' }
 $probe = @'
 param($ExpectedDirectory, $ExpectedModules, $ExpectedExecutable)
 $ErrorActionPreference = 'Stop'
