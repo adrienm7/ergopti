@@ -280,6 +280,21 @@ helpers.describe("i18n: detect_system_locale()", function()
 		helpers.assert_eq(i18n.detect_system_locale(), "en",
 			"throwing current() must fall back to 'en'")
 	end)
+
+	helpers.it("takes its fallback from the shared identifiers (i18n-system-fallback)", function()
+		local identifiers = require("identifiers")
+		local saved = identifiers.locales.system_fallback
+		identifiers.locales.system_fallback = "de"
+		local ok, detail = pcall(function()
+			local i18n = load_i18n()
+			set_system_locale("xx_YY")
+			helpers.assert_eq(i18n.detect_system_locale(), "de")
+			clear_system_locale()
+			helpers.assert_eq(i18n.detect_system_locale(), "de")
+		end)
+		identifiers.locales.system_fallback = saved
+		assert(ok, detail)
+	end)
 end)
 
 
