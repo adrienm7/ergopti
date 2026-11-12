@@ -51,8 +51,10 @@ helpers.describe("detached recommendation source admission", function()
 				end
 				local called, detail = xpcall(function() body(path, fs, control, seed, fixture) end, debug.traceback)
 				io.open, os.rename = original_open, original_rename
+				-- The Tap-Holds switch publishes to the config.toml beside it.
+				local rows = dir .. "/config.toml"
 				for _, name in ipairs({ path, path .. ".backup", fixture.write_lock_path(path),
-					fixture.write_lock_path(path .. ".backup") }) do os.remove(name) end
+					fixture.write_lock_path(path .. ".backup"), rows, fixture.write_lock_path(rows) }) do os.remove(name) end
 				fixture.HOST_RMDIR(dir)
 				if not called then error(detail, 0) end
 			end)
@@ -179,7 +181,9 @@ helpers.describe("detached recommendation source admission", function()
 				helpers.assert_eq(remap.save_recommended_keys(request), true)
 				local model = require("toml_codec").decode(fs.read_with_status(path))
 				helpers.assert_eq(model.tap_hold.keys.left_shift.tap_action, "escape")
-				helpers.assert_eq(model.tap_hold.enabled, true)
+				local rows = require("toml_codec").decode(fs.read_with_status(path:match("^(.*)/") .. "/config.toml"))
+				helpers.assert_eq(rows.tap_holds.enabled, true, "the switch is the config.toml row")
+				helpers.assert_nil(model.tap_hold.enabled)
 				if not absent then
 					helpers.assert_eq(model.custom.keep, 19); helpers.assert_eq(model.karabiner.integration_enabled, false)
 					helpers.assert_eq(fs.read_with_status(request.backup_path), neutral)

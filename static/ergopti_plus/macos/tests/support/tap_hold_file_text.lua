@@ -91,6 +91,30 @@ function M.read_config(path)
 	return text
 end
 
+--- A tap_hold.toml path in a directory of its own, so the config.toml the driver
+--- reads beside it belongs to this test alone: beside os.tmpname() it would be
+--- one shared file of the scratch directory, read and written by every test.
+--- @return string path The tap_hold.toml path; the file does not exist yet.
+function M.private_path()
+	local lfs = require("lfs")
+	local stem = os.tmpname()
+	os.remove(stem)
+	local dir = stem .. ".d"
+	assert(lfs.mkdir(dir), "cannot create the private fixture directory " .. dir)
+	return dir .. "/tap_hold.toml"
+end
+
+--- Removes a private_path() directory and everything a test left in it.
+--- @param path string What private_path() returned.
+function M.remove_private(path)
+	local lfs = require("lfs")
+	local dir = assert(path:match("^(.*)/tap_hold%.toml$"), "not a private fixture path: " .. tostring(path))
+	for entry in lfs.dir(dir) do
+		if entry ~= "." and entry ~= ".." then os.remove(dir .. "/" .. entry) end
+	end
+	assert(lfs.rmdir(dir), "cannot remove the private fixture directory " .. dir)
+end
+
 --- Removes the config.toml beside a path and the backups a scope wrote of it.
 --- @param path string
 function M.remove_config(path)
@@ -163,6 +187,29 @@ function M.model(text, config_text)
 		assert(type(config) == "table", "config.toml text does not parse")
 	end
 	return M.model_of(document, shapes, config, config_shapes)
+end
+
+--- The Karabiner model the pair of files at a tap_hold.toml path reads as,
+--- with an array test over both shape receipts.
+--- @param path string The tap_hold.toml path; its config.toml may be absent.
+--- @return table model Without the version stamp.
+--- @return function is_array(value) -> boolean True for an array of either file.
+function M.decode_pair(path)
+	local fh = assert(io.open(path, "rb"))
+	local text = fh:read("*a")
+	fh:close()
+	local document, shapes = TomlCodec.decode_with_shapes(text)
+	assert(type(document) == "table", "tap_hold.toml text does not parse")
+	local config, config_shapes
+	local config_text = M.read_config(path)
+	if config_text ~= nil then
+		config, config_shapes = TomlCodec.decode_with_shapes(config_text)
+		assert(type(config) == "table", "config.toml text does not parse")
+	end
+	local function is_array(value)
+		return (shapes and shapes.arrays[value]) == true or (config_shapes and config_shapes.arrays[value]) == true
+	end
+	return M.model_of(document, shapes, config, config_shapes), is_array
 end
 
 --- The Karabiner model of a decoded pair: arrays and the sections carried by
