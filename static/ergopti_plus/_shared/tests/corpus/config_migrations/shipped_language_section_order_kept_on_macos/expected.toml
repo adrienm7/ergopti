@@ -1,0 +1,11 @@
+# _shared/tests/corpus/config_migrations/shipped_language_section_order_kept_on_macos/expected.toml
+
+[_meta]
+schema_version = 21
+
+[hotstrings.order_overrides]
+autocorrection = ["typographie", "majuscules"]
+french_autocorrection = ["majuscules", "typographie"]
+
+[script]
+locale = "fr"
