@@ -310,7 +310,7 @@ function M.open(existing, on_save)
 		delete_on_close = true,
 		frame         = frame,
 		title         = context.payload.title,
-		style_masks   = {"titled", "closable", "utility"},
+		style_masks   = {"titled", "closable", "resizable", "utility"},
 		usercontent   = uc,
 		assets_dir    = ASSETS_DIR,
 		on_navigation = function(action)

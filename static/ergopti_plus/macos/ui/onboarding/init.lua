@@ -1279,7 +1279,7 @@ function M.run(config_path)
 	end
 
 	local masks       = hs.webview.windowMasks
-	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)
 
 	local closed = false
 	_focus_owner = focus_owner
