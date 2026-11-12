@@ -155,9 +155,8 @@ _MTF_UpdaterOwner(State) {
 		AssertTrue(_UpdateCheck_ShowManagedFailure(Request, _UC_State, _MTF_Report(), _MTF_Present.Bind(State)), "the actual manual updater context transfers the terminal cause")
 		Session := State["terminal_session"], Payload := _MTF_Payload(Session, "proxy_settings")
 		AssertTrue(Session.Handle(Payload), "the exact manual request admits the shared native action")
-		_UpdaterPauseGeneration += 1
-		AssertFalse(Session.Handle(Payload), "the actual pause generation revokes the queued updater action")
-		_UpdaterPauseGeneration := Saved[5]
+		; A pause no longer revokes a manual updater action (UPD-2): only the
+		; request's own result identity does.
 		_UC_State := Map("state", "error")
 		AssertFalse(Session.Handle(Payload), "an equal-looking replacement updater result cannot borrow the old owner")
 		AssertEqual(1, State["opens"].Length)
@@ -166,7 +165,7 @@ _MTF_UpdaterOwner(State) {
 		_UpdaterPauseGeneration := Saved[5], _UpdaterRequestCounter := Saved[6]
 	}
 }
-Test("managed terminal failures: actual updater policy and state identity revoke actions", (*) => _MTF_Scope(_MTF_UpdaterOwner))
+Test("managed terminal failures: actual updater state identity revokes actions", (*) => _MTF_Scope(_MTF_UpdaterOwner))
 _MTF_ReleaseClassify(State, Receipt, CurrentFn, RetryFn) {
 	global _ReleaseInstallCurrent, _ReleaseInstallTerminal, _ReleaseInstallOperation, _ReleaseInstallTag, RELEASE_INSTALL_REASONS
 	Mode := State.Get("classifier_reentry", "")
