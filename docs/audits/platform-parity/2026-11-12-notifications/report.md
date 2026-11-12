@@ -33,21 +33,23 @@ The macOS « Reloading… » notice stays before the request: an accepted fenced
 reload can replace the VM before `request_reload` returns. The duration is
 `[ui] notification_ttl_ms`.
 
-## Open
+## Fixed after review
 
-- **NUI-003 (Linux, medium):** `adapters/notifier.lua` backgrounds
-  `notify-send … &`, so a notify-send that runs and fails (no notification
-  daemon, no session bus in the unit) is never logged and the message never
-  reaches the log fallback. The documented return value is an admission, not a
-  delivery receipt, so callers are not misled; the gap is the lost failure
-  log. The fix needs the owned asynchronous process path
-  (`ShellRunner.run_async`) with an exit callback, which changes shutdown
-  ownership of the child and the shell test seam the notifier's callers use;
-  left for a design decision.
-- **NUI-005 (macOS, low, plausible):** `infra/file_watchers.lua` sends its
-  reload notice before a reload the coordinator can refuse, and retries every
-  0.5 s, so a long refusal could repeat the notice; the menu's config watcher
-  can notify the same save too. Frequency not measured.
+- **NUI-003 (Linux):** `adapters/notifier.lua` backgrounded `notify-send … &`,
+  so a notify-send that ran and failed (no notification daemon, no session bus
+  in the unit) was never logged and its text never reached the log fallback.
+  It now runs as an argv through `ShellRunner.run_async` under
+  `[ui] notification_send_timeout_ms`; the exit callback logs the failure and
+  keeps the notice in the log. Ownership stays with the process operation (a
+  notice never delays shutdown; the deadline stops the child's group).
+  Fixtures use `ShellRunner._set_async_runner`; every Linux test process puts a
+  sentinel `notify-send` first on PATH (`tests/support/notify_send_guard.lua`,
+  pinned by `nui-003-spawn-guard`), so no test can show a real notification.
+  Regression `nui-003-notify-send-failure`.
+- **NUI-005 (macOS):** measured through the real watcher, four refused
+  source-change reloads then an admission gave five « Reloading » notices. The
+  notice is now sent once per burst. Regression
+  `nui-005-refused-reload-notice`.
 
 ## Windows only (reported)
 
