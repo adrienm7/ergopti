@@ -120,6 +120,10 @@ function run() {
 			"text = text:gsub('require%(\"core.text.engine.unicode_case.core\"%)%.KEY', 'x')"
 		],
 		[
+			'local E = helpers.load_with_stubs("json")',
+			'local E = helpers.load_with_stubs("core.text.engine.json")'
+		],
+		[
 			'local P = rawget(package.loaded, "unicode_case")',
 			'local P = rawget(package.loaded, "core.text.engine.unicode_case.core")'
 		],

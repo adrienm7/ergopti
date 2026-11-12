@@ -128,6 +128,7 @@ function rewriteOwnIncludes(text, oldRepo, newRepo, finalRepo) {
  * @returns {string} The rewritten text.
  */
 function rewriteText(text, rows, movedRepo, file) {
+	const original = text;
 	rows.sort((a, b) => b.old.length - a.old.length);
 	let rootSwitch = false;
 	// Every replacement is final: a rewritten span becomes a placeholder until
@@ -216,7 +217,79 @@ function rewriteText(text, rows, movedRepo, file) {
 		}
 	}
 	text = text.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[Number(i)]);
-	return rootSwitch ? Plan.sharedRootRewrite(text) : text;
+	if (rootSwitch) text = Plan.sharedRootRewrite(text);
+	return text === original ? text : repairCoupled(original, text);
+}
+
+// x:sub(1, 12) == "_shared/lua/": a length written beside the literal it measures.
+const SUB_PREFIX =
+	/(:sub\(\s*1\s*,\s*|\bstring\.sub\(\s*[\w.]+\s*,\s*1\s*,\s*)(\d+)(\s*\)\s*[=~]=\s*)(["'])([^"'\n]*)\4/g;
+// for _, dir in ipairs({ base, base .. "/a", base .. "/a/b" }) do … mkdir(dir
+const MKDIR_LADDER =
+	/(\bfor\s+_\s*,\s*(\w+)\s+in\s+ipairs\s*\(\s*\{)([^{}]*)(\}\s*\)\s*do\b[^\n]*\n?[^\n]*?mkdir\s*\(\s*)/g;
+
+/**
+ * Repairs what a rewrite of paths cannot keep consistent on its own:
+ * - a `sub(1, N) == "literal"` check whose literal was rewritten keeps N equal
+ *   to the literal's length, when it was equal before;
+ * - a list of folders created one `mkdir` at a time (a fixture tree) keeps
+ *   each folder once and gains the parents a deeper new path needs, in order.
+ * @param {string} before The file's text before the step.
+ * @param {string} after The rewritten text.
+ * @returns {string}
+ */
+function repairCoupled(before, after) {
+	const was = [...before.matchAll(SUB_PREFIX)].map((m) => Number(m[2]) === m[5].length);
+	let index = 0;
+	let out = after.replace(SUB_PREFIX, (whole, head, n, mid, q, lit) => {
+		const coupled = was[index++];
+		return coupled && Number(n) !== lit.length ? `${head}${lit.length}${mid}${q}${lit}${q}` : whole;
+	});
+	out = out.replace(MKDIR_LADDER, (whole, head, _v, body, tail) => {
+		// Split at the top-level commas only: an entry may call a function.
+		const entries = [];
+		let depth = 0;
+		let cur = '';
+		for (const ch of body) {
+			if (ch === '(') depth++;
+			if (ch === ')') depth--;
+			if (ch === ',' && depth === 0) {
+				entries.push(cur.trim());
+				cur = '';
+			} else cur += ch;
+		}
+		entries.push(cur.trim());
+		if (entries[entries.length - 1] === '') entries.pop();
+		// base, base .. "/a/b", or a bare "a/b" a loop joins onto a base itself.
+		const parsed = entries.map((e) => {
+			const m = e.match(/^([A-Za-z_][\w.]*)(?:\s*\.\.\s*(["'])(\/[^"'\n]*)\2)?$/);
+			if (m) return { base: m[1], rel: m[3] || '', q: m[2] || '"' };
+			const lit = e.match(/^(["'])([^"'\n\/][^"'\n]*)\1$/);
+			return lit ? { base: '', rel: `/${lit[2]}`, q: lit[1] } : { raw: e };
+		});
+		const render = (base, rel, q) =>
+			base === '' ? `${q}${rel.slice(1)}${q}` : rel ? `${base} .. ${q}${rel}${q}` : base;
+		const hasRoot = (base) => base === '' || parsed.some((p) => p.base === base && p.rel === '');
+		const seen = new Set();
+		const ordered = [];
+		const emit = (base, rel, q) => {
+			const key = `${base}|${rel}`;
+			if (seen.has(key)) return;
+			const parent = rel.slice(0, rel.lastIndexOf('/'));
+			if (rel && parent && !seen.has(`${base}|${parent}`) && hasRoot(base)) emit(base, parent, q);
+			seen.add(key);
+			ordered.push(render(base, rel, q));
+		};
+		for (const p of parsed) {
+			if (p.raw !== undefined) ordered.push(p.raw);
+			else emit(p.base, p.rel, p.q);
+		}
+		if (ordered.join(', ') === entries.join(', ')) return whole;
+		const lead = body.match(/^\s*/)[0];
+		const trail = body.match(/\s*$/)[0];
+		return `${head}${lead}${ordered.join(', ')}${trail}${tail}`;
+	});
+	return out;
 }
 
 /**
@@ -468,4 +541,10 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { newPathToken, rewriteOwnIncludes, rewriteText, pruneEmptyFolders };
+module.exports = {
+	newPathToken,
+	rewriteOwnIncludes,
+	rewriteText,
+	repairCoupled,
+	pruneEmptyFolders
+};
