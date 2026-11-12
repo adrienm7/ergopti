@@ -97,6 +97,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: `'. "$SCRIPT_DIR/../../../core/text/data/identifiers.sh"',`
 	},
 	{
+		// The shared helper ratchet scans the production Lua of _shared/lua but
+		// its tests. The root switch widens the scan to _shared, whose test tree
+		// (tests/lua and the fixtures beside it) it must skip whole.
+		file: 'tools/test/test-shared-lua-helpers-single-use.cjs',
+		empties: '_shared/lua',
+		from: "{ dir: '_shared/lua', excluded: '_shared/lua/test/', minFiles: 200 }",
+		to: "{ dir: '_shared', excluded: '_shared/tests/', minFiles: 200 }"
+	},
+	{
 		// The locale is found relative to the page under test, a variable
 		// the scan cannot evaluate.
 		file: 'tools/test/support/metrics-apps-page.cjs',
