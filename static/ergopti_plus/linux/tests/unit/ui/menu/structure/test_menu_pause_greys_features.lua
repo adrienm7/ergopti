@@ -60,10 +60,10 @@ local function build(paused, resumed)
 	})
 end
 
--- The feature rows, by their title key.
+-- The feature rows, by their title key. The AI parent still greys itself while
+-- paused on macOS and Linux: its switch and rows are the real pause's next pass.
 local FEATURE_KEYS = {
 	"menu.hotstrings.title",
-	"menu.llm.title",
 	"menu.metrics.title",
 	"menu.shortcuts.title",
 	"menu.gestures.title",
