@@ -469,6 +469,21 @@ end
 BootJournal.set_user_log_ready(true)
 boot_note("Native logger handshake committed: the launcher worker owns %s.", Logger.logs_dir())
 
+-- The Karabiner lease, the uninstaller and automatic startup accept only the
+-- launcher whose exported path equals the one derived from this Lua tree. Its
+-- outcome is logged before onboarding can defer boot, so an install location
+-- that breaks the exact-path proof (a translocated or symlinked application
+-- folder) is named at the first launch instead of at the first lease.
+do
+	local helper_path, helper_error = require("platform.remap.lease_helper").resolve()
+	if helper_path then
+		boot_note("Launcher helper resolved: %s.", helper_path)
+	else
+		Logger.warn(LOG, "Launcher helper refused: %s.", tostring(helper_error))
+		BootJournal.append("WARNING", "Launcher helper refused: " .. tostring(helper_error) .. ".")
+	end
+end
+
 -- Arm repeat collapsing (logger SPEC § 4.2) now that its summaries have a
 -- durable destination, and before any periodic source starts. Its flush tick is
 -- a TimerScheduler timer, so teardown cancels it with every other one; a refusal
