@@ -22,10 +22,10 @@ If the coordinating session stopped (weekly quota), any agent can continue from 
   `docs/plans/structure-migration-resume.md` first: base `dev` commit, steps done with their proof, the step in
   progress, the next command, known traps, how to regenerate `move-map.tsv`. One step per commit with
   `tools/audit/structure/apply-step.cjs` (`--check-all` clean first); a step is done when local gates and CI on the
-  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go. State at 22:15
-  Paris: S01 green locally on dev 7f64feb00 (all Lua groups and the JS suite match the dev reds); its proof is
-  `claude/ergopti-todo-structure-phase2-proof` (S01 step commit, a « Requalification » section for 55 Windows
-  cohort pins, rule C1 decided by the coordinator, to review by the maintainer), CI run 43304464415.
+  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go. State at 22:40
+  Paris: S01 green locally (all Lua groups and the JS suite match the dev reds); its proof on dev 520bb24c is
+  `claude/ergopti-todo-structure-phase2-proof-2` (S01 step commit, a « Requalification » section for 55 Windows
+  cohort pins, rule C1 decided by the coordinator, to review by the maintainer), CI run 43311674550.
 - **Reds `dev` already has (2026-11-12 evening), the baseline a step is compared with.** Windows Unit tests
   (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Linux E2E desktop-webview,
   updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common Packaging and
