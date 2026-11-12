@@ -2957,21 +2957,39 @@ console.log(
 				mode: 0o755
 			}
 		);
+		// The fakes go first in bash's own PATH. Git for Windows' bash puts its
+		// /usr/bin ahead of a directory prepended to the Windows PATH, so the real
+		// sleep ran there: three attempts slept 40 s and logged no delay.
+		const fakeFirst =
+			'FAKE="$FAKE_BIN"; if command -v cygpath >/dev/null 2>&1; then FAKE="$(cygpath -u "$FAKE_BIN")"; fi; ' +
+			'PATH="$FAKE:$PATH"; ';
+		const spawnFake = (command, args, failures) =>
+			require('node:child_process').spawnSync(
+				require('../lib/git-bash.cjs').bashExecutable(),
+				['--noprofile', '--norc', '-c', fakeFirst + command, ...args],
+				{
+					encoding: 'utf8',
+					env: { ...process.env, FAKE_BIN: bin, CALLS: calls, FAILURES: String(failures) }
+				}
+			);
+		const resolved = spawnFake(
+			'for tool in swift sleep; do [ "$(command -v "$tool")" = "$FAKE/$tool" ] && echo "$tool fake" || echo "$tool real"; done',
+			[],
+			0
+		);
+		assert.equal(resolved.status, 0, resolved.stderr);
+		assert.deepEqual(
+			resolved.stdout.trim().split(/\r?\n/),
+			['swift fake', 'sleep fake'],
+			'the script under test runs the fake swift and sleep on every OS, never the real sleep'
+		);
 		const run = (failures) => {
 			fs.rmSync(calls, { force: true });
 			fs.writeFileSync(calls, '');
-			const result = require('node:child_process').spawnSync(
-				require('../lib/git-bash.cjs').bashExecutable(),
+			const result = spawnFake(
+				'exec "$BASH" "$0" "$@"',
 				[script, owned, path.join(owned, 'scratch')],
-				{
-					encoding: 'utf8',
-					env: {
-						...process.env,
-						PATH: bin + path.delimiter + process.env.PATH,
-						CALLS: calls,
-						FAILURES: String(failures)
-					}
-				}
+				failures
 			);
 			const log = fs.readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
 			return { status: result.status, out: result.stdout, log };
