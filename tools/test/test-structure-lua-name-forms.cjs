@@ -184,6 +184,18 @@ function run() {
 		'const use = \'require("core.text.engine.json").decode(text)\';\n' +
 			"assert(m.includes('core.text.engine.json\").decode'));"
 	);
+	const token =
+		"const b = 'local J = require(\"json\")';\nconst t = ['identifier:require', 'string:json'];";
+	assert.equal(
+		Apply.rewriteText(
+			token,
+			Plan.scanFile(tool, token, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		'const b = \'local J = require("core.text.engine.json")\';\n' +
+			"const t = ['identifier:require', 'string:core.text.engine.json'];"
+	);
 	const lone = "assert(m.includes('json\").decode'));";
 	assert.equal(
 		Apply.rewriteText(lone, Plan.scanFile(tool, lone, Plan.referenceContext(MAP)), new Map(), tool),
