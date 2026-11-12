@@ -39,7 +39,8 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 
 	/// A file-backed capture cannot deadlock on native signature diagnostics.
 	/// On a deadline failure, retain the fixture instead of deleting live inputs.
-	private func child(_ executable: String, _ arguments: [String], root: URL) throws -> Receipt {
+	private func child(_ executable: String, _ arguments: [String], root: URL,
+		environment extra: [String: String] = [:]) throws -> Receipt {
 		let identity = UUID().uuidString
 		let outputURL = root.appendingPathComponent(identity + ".stdout")
 		let errorURL = root.appendingPathComponent(identity + ".stderr")
@@ -51,7 +52,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		let process = Process()
 		process.executableURL = URL(fileURLWithPath: executable)
 		process.arguments = arguments
-		process.environment = NativeFixtureChildEnvironment.make()
+		process.environment = NativeFixtureChildEnvironment.make().merging(extra) { _, owned in owned }
 		process.standardOutput = output
 		process.standardError = errors
 		let completed = DispatchSemaphore(value: 0)
@@ -157,21 +158,36 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		return value
 	}
 
+	/// The archive bounds modules/updater/release_installer.lua passes to the
+	/// staging script, read from their one declaration in the shared updater defaults.
+	private static func archiveBounds() throws -> (absoluteMs: Int, idleMs: Int) {
+		let defaults = repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/modules/updater/defaults.json")
+		let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: defaults)) as? [String: Any])
+		let phases = try XCTUnwrap(object["phase_timeout_ms"] as? [String: Any])
+		let absolute = try XCTUnwrap(phases["archive"] as? Int)
+		let idle = try XCTUnwrap(object["archive_idle_timeout_ms"] as? Int)
+		XCTAssertTrue(absolute % 1000 == 0 && idle % 1000 == 0 && idle >= 1000 && absolute >= idle)
+		return (absolute, idle)
+	}
+
 	private func stage(payload: URL, format: String, digest: String, running: URL,
 		expectedVersion: String, root: URL) throws -> (Receipt, URL, URL) {
 		let stage = root.appendingPathComponent("stage-" + UUID().uuidString)
 		let calls = root.appendingPathComponent("download-" + UUID().uuidString)
 		let copier = root.appendingPathComponent("curl-" + UUID().uuidString)
+		let bounds = try Self.archiveBounds()
 		// The fixture seam accepts only the production download's exact argument
 		// contract and URL. Digest/extraction/version/signature remain real tools.
 		try """
 		#!/bin/sh
-		[ "$#" -eq 13 ] || exit 90
+		[ "$#" -eq 17 ] || exit 90
 		[ "$1" = --fail ] && [ "$2" = --location ] && [ "$3" = --silent ] && [ "$4" = --show-error ] || exit 91
 		[ "$5" = --proto ] && [ "$6" = '=https' ] && [ "$7" = --proto-redir ] && [ "$8" = '=https' ] || exit 92
-		[ "$9" = --max-time ] && [ "${10}" = 900 ] && [ "${11}" = --output ] && [ "${13}" = \(quote(ownedURL)) ] || exit 93
+		[ "$9" = --max-time ] && [ "${10}" = \(bounds.absoluteMs / 1000) ] || exit 93
+		[ "${11}" = --speed-limit ] && [ "${12}" = 1 ] && [ "${13}" = --speed-time ] && [ "${14}" = \(bounds.idleMs / 1000) ] || exit 94
+		[ "${15}" = --output ] && [ "${17}" = \(quote(ownedURL)) ] || exit 95
 		printf 'owned-download\\n' >> \(quote(calls.path))
-		/bin/cp \(quote(payload.path)) "${12}"
+		/bin/cp \(quote(payload.path)) "${16}"
 		""".write(to: copier, atomically: true, encoding: .utf8)
 		try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: copier.path)
 		let owner = Self.repositoryURL.appendingPathComponent("static/ergopti_plus/macos/adapters/release_stage.sh")
@@ -179,7 +195,10 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		XCTAssertEqual(original.components(separatedBy: "/usr/bin/curl").count, 2, "Only the owned network call is replaced")
 		let script = original.replacingOccurrences(of: "/usr/bin/curl", with: quote(copier.path))
 		let result = try child("/bin/sh", ["-c", script, "stage", ownedURL, digest, stage.path,
-			expectedVersion, running.path, format, bundleName], root: root)
+			expectedVersion, running.path, format, bundleName], root: root, environment: [
+				"ERGOPTI_RELEASE_STAGE_TIMEOUT_MS": String(bounds.absoluteMs),
+				"ERGOPTI_RELEASE_STAGE_IDLE_MS": String(bounds.idleMs),
+			])
 		return (result, stage, calls)
 	}
 
