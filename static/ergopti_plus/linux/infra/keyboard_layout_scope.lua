@@ -56,13 +56,13 @@ function M.new(options)
 end
 
 --- Executes a menu request, retaining any failed inverse for the next retry.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
 --- @param mode string "recommended" or "clear".
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
+function M.apply(mode)
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid keyboard layout scope mode" end
-	if type(is_paused) ~= "function" or is_paused() then return false, "keyboard layout configuration is paused" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then
 		return false, "keyboard layout rollback is pending"
 	end
@@ -105,10 +105,9 @@ end
 --- The layout participant of a composed scope, bound to the retained owner. It
 --- settles each request only once the session holds the layout the stored rows
 --- describe.
---- @param is_paused function Live pause getter.
 --- @param ports table|nil { live } The number-row live owner (tests replace it).
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused, ports)
+function M.participant(ports)
 	ports = ports or {}
 	local live = ports.live or require("modules.keymap.number_row_live")
 	-- cohort: the owner of this participant's request; changed: its rows moved;
@@ -126,7 +125,7 @@ function M.participant(is_paused, ports)
 		if participant.pending() then return done(false, "the layout scope retains an unsettled request") end
 		applying = true
 		local before = live.stored()
-		local called, committed, detail = pcall(M.apply, mode, is_paused)
+		local called, committed, detail = pcall(M.apply, mode)
 		cohort = _owner
 		if not called or committed ~= true then
 			applying = false
@@ -201,12 +200,11 @@ end
 --- a global restore composes, so the session loads the stored rows before the
 --- request settles and a refused load reverts config.toml.
 --- @param mode string "recommended" or "clear".
---- @param is_paused function Live pause getter.
 --- @param on_settled function on_settled(ok, detail), called once.
 --- @param ports table|nil { live } The number-row live owner (tests replace it).
-function M.request(mode, is_paused, on_settled, ports)
+function M.request(mode, on_settled, ports)
 	assert(type(on_settled) == "function", "a keyboard layout scope request needs its settlement callback")
-	local participant = M.participant(is_paused, ports)
+	local participant = M.participant(ports)
 	participant.apply(mode, function(ok, detail)
 		-- A settled success has nothing left to revert; a failure was reverted
 		-- (or keeps its debt) by the participant itself.

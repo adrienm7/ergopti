@@ -230,9 +230,9 @@ local function _build_layouts(ctx)
 	-- The scope's restore and clear: the layout rows of config.toml (number-row
 	-- ordering and edges), loaded by the session before they settle.
 	local function apply_layout_scope(mode)
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		-- Runs while paused: a pause stops typing, not configuration (EDD-1).
 		local settled, committed = false, nil
-		require("infra.keyboard_layout_scope").request(mode, ctx.is_paused, function(ok, detail)
+		require("infra.keyboard_layout_scope").request(mode, function(ok, detail)
 			settled, committed = true, ok
 			if not ok then
 				Logger.error(LOG, "Keyboard layout scope '%s' was not applied: %s.", mode, tostring(detail))

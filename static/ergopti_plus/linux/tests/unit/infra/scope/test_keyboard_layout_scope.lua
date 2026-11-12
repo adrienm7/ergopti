@@ -116,11 +116,10 @@ helpers.describe("Linux keyboard layout scope", function()
 		end)
 	end)
 
-	helpers.it("refuses a paused request and an unknown mode before any request", function()
+	helpers.it("refuses an unknown mode before any request", function()
 		with_scope(function(_, _, path, _, Scope)
 			local before = Sandbox.read_bytes(path)
-			helpers.assert_eq((Scope.apply("recommended", function() return true end)), false)
-			helpers.assert_eq((Scope.apply("bogus", function() return false end)), false)
+			helpers.assert_eq((Scope.apply("bogus")), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), before)
 		end)
 	end)
@@ -129,7 +128,7 @@ helpers.describe("Linux keyboard layout scope", function()
 		with_scope(function(_, _, path, _, Scope)
 			local before = Sandbox.read_bytes(path)
 			local live, state = fake_live()
-			local participant = Scope.participant(function() return false end, { live = live })
+			local participant = Scope.participant({ live = live })
 			local settled
 			participant.apply("recommended", function(ok) settled = ok end)
 			state.answer(true)
@@ -148,7 +147,7 @@ helpers.describe("Linux keyboard layout scope", function()
 	helpers.it("settles only once the session holds the layout carrying the new rows (layout-scope-ack)", function()
 		with_scope(function(_, _, _, _, Scope)
 			local live, state = fake_live()
-			local participant = Scope.participant(function() return false end, { live = live })
+			local participant = Scope.participant({ live = live })
 			local settled
 			participant.apply("clear", function(ok, detail) settled = { ok, detail } end)
 			helpers.assert_nil(settled, "the rows are written but the session has not answered")
@@ -165,7 +164,7 @@ helpers.describe("Linux keyboard layout scope", function()
 		with_scope(function(_, _, path, _, Scope)
 			local before = Sandbox.read_bytes(path)
 			local live, state = fake_live()
-			local participant = Scope.participant(function() return false end, { live = live })
+			local participant = Scope.participant({ live = live })
 			local settled
 			participant.apply("recommended", function(ok, detail) settled = { ok, detail } end)
 			state.answer(false, "stale_keymap")
@@ -180,7 +179,7 @@ helpers.describe("Linux keyboard layout scope", function()
 		with_scope(function(_, _, path, _, Scope)
 			local before = Sandbox.read_bytes(path)
 			local live, state = fake_live({ unavailable = "session_unsupported" })
-			local participant = Scope.participant(function() return false end, { live = live })
+			local participant = Scope.participant({ live = live })
 			local settled
 			participant.apply("recommended", function(ok, detail) settled = { ok, detail } end)
 			helpers.assert_eq(settled, { true, "session_unsupported" })
@@ -194,7 +193,7 @@ helpers.describe("Linux keyboard layout scope", function()
 			local before = Sandbox.read_bytes(path)
 			local live, state = fake_live()
 			local settled
-			Scope.request("clear", function() return false end, function(ok, detail) settled = { ok, detail } end,
+			Scope.request("clear", function(ok, detail) settled = { ok, detail } end,
 				{ live = live })
 			helpers.assert_nil(settled, "settled only once the session answers")
 			state.answer(true)
@@ -206,7 +205,7 @@ helpers.describe("Linux keyboard layout scope", function()
 			local before = Sandbox.read_bytes(path)
 			local live, state = fake_live()
 			local settled
-			Scope.request("recommended", function() return false end, function(ok, detail) settled = { ok, detail } end,
+			Scope.request("recommended", function(ok, detail) settled = { ok, detail } end,
 				{ live = live })
 			state.answer(false, "stale_keymap")
 			helpers.assert_eq(settled[1], false)
@@ -219,7 +218,7 @@ helpers.describe("Linux keyboard layout scope", function()
 			helpers.assert_eq(owner.apply("recommended"), true)
 			owner.release()
 			local live, state = fake_live()
-			local participant = Scope.participant(function() return false end, { live = live })
+			local participant = Scope.participant({ live = live })
 			local settled
 			participant.apply("recommended", function(ok, detail) settled = { ok, detail } end)
 			helpers.assert_eq(settled, { true, "rows_unchanged" })
@@ -231,7 +230,7 @@ helpers.describe("Linux keyboard layout scope", function()
 		with_scope(function(_, _, path, _, Scope)
 			local before = Sandbox.read_bytes(path)
 			local live, state = fake_live()
-			local participant = Scope.participant(function() return false end, { live = live })
+			local participant = Scope.participant({ live = live })
 			participant.apply("recommended", function() end)
 			state.answer(true)
 			local reverted
@@ -264,7 +263,7 @@ helpers.describe("Linux keyboard layout scope", function()
 					apply = function(_, done) return done(false, "llm refused") end }
 				local settled
 				helpers.assert_eq(GlobalScope.apply("recommended", {
-					keyboard_layout = Scope.participant(function() return false end, { live = live }), llm = refusing,
+					keyboard_layout = Scope.participant({ live = live }), llm = refusing,
 				}, function(committed, report) settled = { committed, report } end), true)
 				helpers.assert_nil(settled, "the composition waits for the session")
 				local again
@@ -281,6 +280,12 @@ helpers.describe("Linux keyboard layout scope", function()
 			end)
 			package.loaded["infra.global_scope"] = saved
 			if not ok then error(err, 0) end
+		end)
+	end)
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("applies a request with no pause owner (edd1-paused-writes)", function()
+		with_scope(function(_, _, path, _, Scope)
+			helpers.assert_eq((Scope.apply("recommended")), true)
 		end)
 	end)
 end)
