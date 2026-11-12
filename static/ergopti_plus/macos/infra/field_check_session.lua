@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Field Check, Session Costs and Edge Cases
 --- DESCRIPTION:
---- The lines of TODO.md's « Mac hardware session » a program can answer, run by
+--- The lines of « To confirm on the Mac » (TODO-tests-macos.md) a program can answer, run by
 --- the field run with no person: the cost of the boot that started the app, its
 --- idle cost over a quiet window, and the file system's refusal to open a FIFO
 --- (section 7, `hs.fs.attributes` on a FIFO).

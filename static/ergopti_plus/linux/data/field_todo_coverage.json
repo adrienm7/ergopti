@@ -1,8 +1,8 @@
 {
-	"_comment": "Maps every point of TODO.md « To confirm on Linux » to the Linux field report evidence that decides it. Each unchecked TODO line carries <!-- field-point: <id> --> on its first line. A check names a step of data/field_run_steps.json (the daemon's field run) or of data/field_guided_steps.json (the collector's probe and guided steps, tools/dev/field-guided.py), optionally the report steps that decide it. A point with no check states why a field report cannot test it (not_testable). tools/dev/field-todo-summary.py --os linux gives one verdict per point (docs/tooling/linux-field-report-coverage.md); tests/unit/infra/control/test_field_todo_coverage.lua fails when a TODO line has no entry or an entry names a missing step.",
+	"_comment": "Maps every point of TODO-tests-linux.md « To confirm on Linux » to the Linux field report evidence that decides it. Each unchecked TODO line carries <!-- field-point: <id> --> on its first line. A check names a step of data/field_run_steps.json (the daemon's field run) or of data/field_guided_steps.json (the collector's probe and guided steps, tools/dev/field-guided.py), optionally the report steps that decide it. A point with no check states why a field report cannot test it (not_testable). tools/dev/field-todo-summary.py --os linux gives one verdict per point (docs/tooling/linux-field-report-coverage.md); tests/unit/infra/control/test_field_todo_coverage.lua fails when a TODO line has no entry or an entry names a missing step.",
 	"schema": 1,
 	"todo": {
-		"file": "TODO.md",
+		"file": "TODO-tests-linux.md",
 		"section": "## To confirm on Linux",
 		"tag": "field-point"
 	},
