@@ -6,8 +6,9 @@
 --- MODULE: Unicode Case Data
 --- DESCRIPTION:
 --- Complete Unicode 17.0 default case mappings consumed by
---- unicode_case/init.lua on macOS and Linux. Multi-codepoint mappings are retained
---- verbatim. word_separator (whitespace and dashes) starts a title-case word.
+--- the shared unicode_case module on macOS and Linux. Multi-codepoint mappings are
+--- retained verbatim. word_separator (whitespace and dashes) starts a title-case
+--- word.
 --- ==============================================================================
 
 return {
