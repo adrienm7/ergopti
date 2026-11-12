@@ -449,8 +449,8 @@ SourceEmulation_Press(Session, Code, Held, Now) {
 	if Session["held_keys"].Has(Code)
 		return _SrcEmu_Result(true, Actions)
 	Modifier := Model["modifier_keys"].Get(Code, 0)
-	TapHold := Model["tap_holds"].Get(Code, 0)
-	if !(Modifier is Map) && !(TapHold is Map)
+	TapHoldEntry := Model["tap_holds"].Get(Code, 0)
+	if !(Modifier is Map) && !(TapHoldEntry is Map)
 		_SrcEmu_Settle(Session, Now, Actions)
 	if Modifier is Map {
 		Session["held_keys"][Code] := "modifier"
@@ -464,11 +464,11 @@ SourceEmulation_Press(Session, Code, Held, Now) {
 		}
 		return _SrcEmu_Result(true, Actions)
 	}
-	if TapHold is Map {
+	if TapHoldEntry is Map {
 		; A second tap-hold key settles the first, as any other key does.
 		_SrcEmu_Settle(Session, Now, Actions)
 		Session["held_keys"][Code] := "tap_hold"
-		Session["pending"] := Map("entry", TapHold, "code", Code, "at", Now)
+		Session["pending"] := Map("entry", TapHoldEntry, "code", Code, "at", Now)
 		return _SrcEmu_Result(true, Actions)
 	}
 	Pressed := _SrcEmu_PressedIds(Session, Held)
