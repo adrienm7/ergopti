@@ -11,8 +11,8 @@ local function release_body(manager, count)
  local entries = {}
  for index = 1, count or 1 do
   entries[index] = '{"tag_name":"v2.0.' .. index .. '","assets":['
-   .. '{"name":"' .. manager.LINUX_ASSET_NAME .. '","browser_download_url":"https://example.invalid/archive"},'
-   .. '{"name":"' .. manager.LINUX_CHECKSUM_ASSET_NAME .. '","browser_download_url":"https://example.invalid/checksum"}]}'
+   .. '{"name":"' .. manager.LINUX_ASSET_NAME .. '","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/v2.0.' .. index .. '/' .. manager.LINUX_ASSET_NAME .. '"},'
+   .. '{"name":"' .. manager.LINUX_CHECKSUM_ASSET_NAME .. '","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/v2.0.' .. index .. '/' .. manager.LINUX_CHECKSUM_ASSET_NAME .. '"}]}'
  end
  return '[' .. table.concat(entries, ',') .. ']'
 end
