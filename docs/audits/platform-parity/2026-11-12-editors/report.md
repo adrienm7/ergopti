@@ -19,21 +19,21 @@ editor modules with their native stubs.
 | ------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------ |
 | EDM-001 | Save personal information while the write is refused or raises | Windows `_PersonalInfoReportSaveFailure` shows `dialog.personal_info.save_failed`; Linux notifies it | Logged only: the editor stayed open, silently | `personal-editor-save-failure` |
 
-## Decision asked of the coordinator
+## Decided
 
-- **EDD-1, an open editor while the driver is paused.** Windows refuses every
-  page message but `ready` while suspended (« WebMessageReceived bypasses
-  native Suspend … a paused driver still lets a page click write config »):
-  the prompt, paths, personal information, hotstrings, layer, layout manager,
-  hotstrings configuration, action picker, model browser and physical
-  shortcuts editors. The macOS and Linux editor bridges have no pause gate
-  (Linux physical shortcuts, changelog, download and update check aside), so
-  a Save after a pause writes there; Linux checks the pause when a prompt
-  profile is created but not when one is saved after an edit. Options: A
-  (recommended) refuse page writes while paused on macOS and Linux and say so
-  through each editor's save-failure path, and have Windows say so too
-  instead of dropping silently; B drop silently as Windows does; C allow them
-  everywhere.
+- **EDD-1, an open editor while the driver is paused** (decided by the
+  maintainer on 2026-11-12: C, a pause stops typing, not configuration).
+  Windows refuses every page message but `ready` while suspended; the macOS
+  and Linux editor bridges had no gate except where noted. Done on macOS and
+  Linux: the prompt editor's create and clone saves no longer read the pause
+  (Linux `menu_llm.lua`, macOS `profiles_manager.lua`), the layout manager's
+  LMH-003 gate is reverted (shared `manager_bridge.lua` and both hosts), and
+  the Linux physical shortcuts capture and editor rows work after a pause
+  (`physical_shortcuts/bridge.lua`, `shortcuts_scope.lua`). Every editor has an
+  `edd1-paused-writes` regression: prompt, personal information, paths, layer,
+  hotstrings, physical shortcuts and layout manager. The tray's feature rows
+  still grey while paused, and the menu's whole-scope restore and clear still
+  refuse. Windows counterpart in `TODO.md` « Windows (the PC agent's) ».
 
 ## Checked and kept
 
@@ -52,4 +52,4 @@ editor modules with their native stubs.
   `replace_profile`); Windows notifies through `_LLM_Menu_ProfileNotifyFailure`
   and Linux through `notify_save_refused`. To trace through `deps.save_prefs`
   before changing it.
-- EDD-1, then the layer editor page behaviour, `ui/tooltip` and `ui/wpm`.
+- The layer editor page behaviour, `ui/tooltip` and `ui/wpm`.
