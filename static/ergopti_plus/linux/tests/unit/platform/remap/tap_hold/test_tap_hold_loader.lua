@@ -200,7 +200,9 @@ assert(result.enabled == false and next(result.keys) == nil)
 	helpers.it("reports a malformed user file and keeps every key neutral", function()
 		local loaded = load('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.user_error, "malformed")
-		helpers.assert_eq(loaded.enabled, false)
+		-- The switch is the config.toml [tap_holds] row, which the fixture keeps on:
+		-- a broken tap_hold.toml leaves it as it is and runs no key.
+		helpers.assert_eq(loaded.enabled, true)
 		helpers.assert_nil(next(loaded.keys))
 	end)
 
