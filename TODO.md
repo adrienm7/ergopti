@@ -1269,6 +1269,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
+- [ ] **App Cloner item to open (maintainer decision, 2026-11-12).** `apps/bundled_apps.ahk`
+      `_AppCloner_InvalidOpenItem` accepts « https:/x » and « localhost:3000 » and refuses a « ~ » path. Align it with
+      macOS `validateOpenArg` and the Linux validator (`linux/apps/app_cloner.lua` `invalid_open_item`): expand « ~ »
+      to the profile folder and check the path exists; otherwise require « :// » or the `msteams:/l/` and
+      `msteams:/calendar` forms. Then extend the AHK App Cloner test with those cases.
 - [ ] **App Cloner VS Code variants (maintainer decision BAP-004, 2026-11-12).** `apps/app_cloner_core.ahk`
       links `%APPDATA%\Code\User` and passes the catalogue's `--extensions-dir={home}/.vscode/extensions` for every
       vscode-family program; VSCodium and the Insiders build keep their own. Read `_shared/data/app_cloner/families.json`
