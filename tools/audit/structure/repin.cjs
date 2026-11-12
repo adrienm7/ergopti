@@ -24,16 +24,22 @@
  * 4. Derived pins: a hash of a value built from a file (a producer with one
  *    region restored) is listed in edits.cjs DERIVED_PINS with its derivation,
  *    which must reproduce the pin from the pre-step bytes before it re-pins.
+ * 5. Requalified receipts: the Windows cohort frames and their pins, designed
+ *    to be immutable, are re-pinned only as an explicit requalification that
+ *    names each old→new pin and the file it follows; a derived pin there is
+ *    refused.
  *
  * USAGE:
  *   node tools/audit/structure/repin.cjs [--base <rev>] [--moves <file>] [--check]
- *     [--derived-before <values>]
+ *     [--derived-before <values>] [--requalify-out <records>]
  *   node tools/audit/structure/repin.cjs --derive-out <values>
  *   Compares the working tree with <rev> (HEAD by default), rewrites the pins
  *   and prints one line per re-pinned file. <file> is the JSON list of
  *   [old, new] moves apply-step --moves-out= wrote; --check rewrites nothing
  *   and fails when a pin is stale. --derive-out records the derived pins of the
  *   tree before a step; --derived-before hands them to the re-pin after it.
+ *   --requalify-out appends the requalified pins (edits.cjs REQUALIFIED_PINS)
+ *   to a JSON list the runner writes into the step's commit body.
  * ==============================================================================
  */
 
@@ -150,7 +156,9 @@ function repin({
 	write = true,
 	moves = new Map(),
 	derived = Edits.DERIVED_PINS,
-	derivedBefore = null
+	derivedBefore = null,
+	requalify = Edits.REQUALIFIED_PINS,
+	requalifications = []
 } = {}) {
 	const edits = new Map();
 	const contents = new Map();
@@ -166,6 +174,8 @@ function repin({
 		return contents.get(f);
 	};
 	const files = candidateFiles(root);
+	const requalified = new Set(requalify.map((e) => e.file));
+	requalifications.length = 0;
 	// A derived pin moves from its pre-step value, recorded by the runner
 	// before the step, to the value the step's tree derives now.
 	const derivedAfter = derivedBefore ? deriveAll({ root, moves, entries: derived }) : {};
@@ -177,6 +187,7 @@ function repin({
 			pairs.map(([o]) => o)
 		);
 		const next = new Map();
+		const origin = new Map(); // pre-step hash -> [old path, new path]
 		const ambiguous = new Set();
 		for (const [old, now] of pairs) {
 			if (now === null) continue;
@@ -189,7 +200,10 @@ function repin({
 			);
 			if (from === to) continue;
 			if (next.has(from) && next.get(from) !== to) ambiguous.add(from);
-			else next.set(from, to);
+			else {
+				next.set(from, to);
+				origin.set(from, [old, now]);
+			}
 		}
 		let changed = false;
 		for (const f of files) {
@@ -203,6 +217,10 @@ function repin({
 				const to = next.get(h);
 				if (!to) return h;
 				pins.push([h, to]);
+				if (requalified.has(f)) {
+					const [oldPath, newPath] = origin.get(h);
+					requalifications.push({ file: f, from: h, to, oldPath, newPath });
+				}
 				return to;
 			});
 			if (updated === text) continue;
@@ -215,6 +233,7 @@ function repin({
 		}
 		for (const [holder, to] of Object.entries(derivedAfter)) {
 			const f = moves.get(holder) || holder;
+			if (requalified.has(f)) throw new Error(`repin: ${f} is requalified, not re-derived`);
 			const from = derivedBefore[holder];
 			if (!from) throw new Error(`repin: no pre-step value of the derived pin ${holder}`);
 			const text = read(f);
@@ -235,6 +254,28 @@ function repin({
 	throw new Error(`repin: the pins do not settle after ${MAX_ROUNDS} rounds`);
 }
 
+/**
+ * The commit-body section that requalifies the immutable receipts a step
+ * re-pinned (edits.cjs REQUALIFIED_PINS): one line per pin, old→new, with the
+ * file whose move or rewrite justifies it.
+ * @param {Array<{file: string, from: string, to: string, oldPath: string, newPath: string}>} records
+ * @returns {string} The section, or '' when the step re-pinned none.
+ */
+function requalificationSection(records) {
+	if (records.length === 0) return '';
+	const lines = records.map(
+		(r) =>
+			`- ${r.file}: ${r.from} -> ${r.to} (${
+				r.oldPath === r.newPath ? `${r.oldPath} rewritten in place` : `${r.oldPath} -> ${r.newPath}`
+			})`
+	);
+	return (
+		'Requalification of the immutable Windows cohort receipts (to confirm\n' +
+		'on the real Windows PC):\n' +
+		lines.join('\n')
+	);
+}
+
 function main() {
 	const args = process.argv.slice(2);
 	const at = args.indexOf('--base');
@@ -253,7 +294,15 @@ function main() {
 	const beforeAt = args.indexOf('--derived-before');
 	const derivedBefore =
 		beforeAt >= 0 ? JSON.parse(fs.readFileSync(args[beforeAt + 1], 'utf8')) : null;
-	const edits = repin({ base, write: !check, moves, derivedBefore });
+	const requalifications = [];
+	const edits = repin({ base, write: !check, moves, derivedBefore, requalifications });
+	// Every round of the runner adds its requalified pins to the step's list.
+	const outAt = args.indexOf('--requalify-out');
+	if (outAt >= 0) {
+		const out = args[outAt + 1];
+		const earlier = fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, 'utf8')) : [];
+		fs.writeFileSync(out, JSON.stringify([...earlier, ...requalifications], null, 1) + '\n');
+	}
 	for (const e of edits) console.log(`${e.file}: ${e.pins.length} pin(s)`);
 	console.log(`[repin] ${edits.length} file(s) ${check ? 'hold stale pins' : 're-pinned'}.`);
 	if (check && edits.length > 0) process.exit(1);
@@ -261,4 +310,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { repin, changedPairs, deriveAll };
+module.exports = { repin, changedPairs, deriveAll, requalificationSection };

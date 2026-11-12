@@ -23,7 +23,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { repin, deriveAll } = require('../audit/structure/repin.cjs');
+const { repin, deriveAll, requalificationSection } = require('../audit/structure/repin.cjs');
 
 const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
@@ -114,10 +114,49 @@ function run() {
 		() => deriveAll({ root: derivedRepo.root, entries: [{ ...entry, derive: sha }], pinned: true }),
 		/no longer reproduces its pin/
 	);
+	// An immutable receipt is re-pinned only as a named requalification: each
+	// old→new pin with the move that justifies it, for the step's commit body.
+	const frame = scratch({ 'w/a.txt': 'a\n', 'frame.json': `{ "w/a.txt": "${sha('a\n')}" }\n` });
+	fs.mkdirSync(path.join(frame.root, 'x'));
+	frame.git('mv', 'w/a.txt', 'x/a.txt');
+	frame.write('x/a.txt', 'a moved\n');
+	const records = [];
+	repin({
+		root: frame.root,
+		moves: new Map([['w/a.txt', 'x/a.txt']]),
+		derived: [],
+		requalify: [{ file: 'frame.json' }],
+		requalifications: records
+	});
+	assert.deepEqual(records, [
+		{
+			file: 'frame.json',
+			from: sha('a\n'),
+			to: sha('a moved\n'),
+			oldPath: 'w/a.txt',
+			newPath: 'x/a.txt'
+		}
+	]);
+	assert.match(
+		requalificationSection(records),
+		/frame\.json: [0-9a-f]{64} -> [0-9a-f]{64} \(w\/a\.txt -> x\/a\.txt\)/
+	);
+	assert.equal(requalificationSection([]), '');
+	assert.throws(
+		() =>
+			repin({
+				root: derivedRepo.root,
+				derived: [entry],
+				derivedBefore,
+				requalify: [{ file: 'holder.txt' }]
+			}),
+		/requalified, not re-derived/
+	);
+
 	// The listed derivations reproduce their pins on the tree as it stands.
 	deriveAll({ pinned: true });
 
-	for (const r of [repo, twin, checked, derivedRepo])
+	for (const r of [repo, twin, checked, derivedRepo, frame])
 		fs.rmSync(r.root, { recursive: true, force: true });
 	console.log('[OK] a structure step re-pins every hash of a file it changed, and only those.');
 }
