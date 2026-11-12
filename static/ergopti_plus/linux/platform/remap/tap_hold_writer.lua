@@ -57,8 +57,8 @@ local LOG = "platform.remap.tap_hold_writer"
 --- The user file's name in the configuration folder.
 M.FILE_NAME = require("tap_hold.shared_file").FILE_NAME
 
--- The Windows loader's bound for time_activation_seconds.
-local MAX_THRESHOLD_SECONDS = 10
+-- The bound of time_activation_seconds: the timing registry's.
+local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
 
 -- The per-key fields whose runtime meaning belongs to this writer. A delay is
 -- only ever written when the user sets it: no key ships one.

@@ -58,9 +58,9 @@ local LoneTap = require("tap_hold.lone_tap")
 local LOG = "platform.remap.tap_hold_loader"
 local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
 
--- The Windows loader's bound for time_activation_seconds; the global default is
--- the timing registry's, the one declaration every driver reads or is pinned to.
-local MAX_THRESHOLD_SECONDS = 10
+-- The bound of time_activation_seconds and the global default: the timing
+-- registry's, the one declaration every driver reads or is pinned to.
+local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
 M.GLOBAL_DEFAULT_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
 
 -- How long a modifier key pressed alone still taps (config.toml [tap_holds]
