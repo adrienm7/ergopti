@@ -146,6 +146,19 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_eq(#state.calls, 1, "only the ready refresh ran: " .. table.concat(state.calls, ","))
 	end)
 
+	helpers.it("(lmh-004-extension-reload) a layout shipping an extension reloads the daemon", function()
+		local Bridge, state, daemon_state = bridge()
+		state.daemon_reloads = 0
+		daemon_state.on_reload = function() state.daemon_reloads = state.daemon_reloads + 1; return true end
+		daemon_state.layout_registry.snapshot = function()
+			return { platform = "linux", index = INDEX, installed = { ergol = { id = "ergol", extension = { root = "x" } } }, source = "cache" }
+		end
+		daemon_state.layout_registry.uninstall = function(_, on_done) on_done(true, {}) end
+		Bridge.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_true(Bridge.on_message({ action = "uninstall", id = "ergol" }, daemon_state).handled)
+		helpers.assert_eq(state.daemon_reloads, 1, "the uninstalled extension's hotstrings go through a reload")
+	end)
+
 	helpers.it("(lmh-005-emulate-tray) emulating without installing rebuilds the tray", function()
 		local Bridge, state, daemon_state = emulating_bridge()
 		state.rebuilds = 0

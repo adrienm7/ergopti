@@ -224,6 +224,34 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
 	end)
 
+	helpers.it("(lmh-004-extension-reload) a layout shipping an extension reloads the driver", function()
+		local changed, reloads, logs = {}, {}, {}
+		local snapshot = { platform = "macos", source = "network", active = "",
+			index = { layouts = { { id = "ergol", name = "Ergol" }, { id = "kaladrius", name = "K", extension = { root = "x" } } } },
+			installed = { ergol = { id = "ergol" }, bepo = { id = "bepo", extension = { root = "y" } } } }
+		local instance = ManagerBridge.new({
+			registry = {
+				snapshot = function() return snapshot end,
+				refresh = function(on_done) on_done({}) end,
+				install = function(_, on_done) on_done(true, {}) end,
+				uninstall = function(_, on_done) on_done(true, {}) end,
+				select = function(_, on_done) on_done(true, {}) end,
+			},
+			push = function() return true end, strings = function() return {} end,
+			open_url = function() end, close = function() end,
+			log = function(level, message) logs[#logs + 1] = level .. ":" .. message end,
+			layout_changed = function(id) changed[#changed + 1] = id end,
+			reload_extensions = function(id) reloads[#reloads + 1] = id; return true end,
+		})
+		helpers.assert_true(instance.on_message({ action = "install", id = "kaladrius" }))
+		helpers.assert_true(instance.on_message({ action = "uninstall", id = "bepo" }))
+		helpers.assert_true(instance.on_message({ action = "select", id = "bepo" }))
+		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
+		helpers.assert_eq(reloads, { "kaladrius", "bepo" }, "catalogue and installed extensions both reload; a select changes no extension")
+		helpers.assert_eq(changed, { "ergol" }, "a layout without an extension only reloads the emulation")
+		helpers.assert_eq(#logs, 0)
+	end)
+
 	helpers.it("(lmh-001-002-emulation-reload) the macOS host reloads the emulated layout and the menu", function()
 		local menu = assert(helpers.read_module_source("ui.menu"))
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
@@ -231,6 +259,8 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 		local host = assert(helpers.read_module_source("ui.layout_manager"))
 		helpers.assert_contains(host, "is_paused = function() return _pause_query ~= nil and _pause_query() == true end")
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_pause_query(function()')
+		helpers.assert_contains(menu, 'require("ui.layout_manager").set_extension_reloader(function()')
+		helpers.assert_contains(host, "reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end")
 		helpers.assert_contains(host, "if _layout_change_handler then _layout_change_handler(id) end")
 	end)
 end)
