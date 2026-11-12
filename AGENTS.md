@@ -49,6 +49,7 @@ skills and durable technical knowledge in routed memory.
   is checked on the other two before the fix is done.
 - Write code, identifiers, developer documentation, logs, and commit messages
   in English. Route user-facing French text through the `i18n` skill.
+- Give the maintainer every time in Paris time (Europe/Paris), never in UTC.
 - Treat the strict convention lint as authoritative for indentation, file
   headers, section banners, documentation, and punctuation. Comments explain
   why; public APIs use the language's established documentation format.
