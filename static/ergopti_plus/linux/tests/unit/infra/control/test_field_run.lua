@@ -123,7 +123,11 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		local uv = require("luv")
 		local quote = require("text_utils").shell_quote
 		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-field-source-XXXXXX"))
-		assert(uv.fs_mkdir(dir .. "/data", 448))
+		-- Every folder of the protocol's place, which the layout decides.
+		local folders, at = {}, dir
+		for part in (FieldRun.PROTOCOL_PATH:match("^(.*)/[^/]+$") or ""):gmatch("[^/]+") do
+			at = at .. "/" .. part; assert(uv.fs_mkdir(at, 448)); folders[#folders + 1] = at
+		end
 		local fifo = dir .. "/" .. FieldRun.PROTOCOL_PATH
 		local made = os.execute("mkfifo " .. quote(fifo))
 		assert(made == true or made == 0)
@@ -132,7 +136,9 @@ helpers.describe("Linux field run (linux-field-run)", function()
 			.. "..package.path; assert(not pcall(require('infra.field_run').load, " .. string.format("%q", dir)
 			.. ", " .. string.format("%q", root) .. "))"
 		local result = os.execute("timeout 3 " .. quote(uv.exepath()) .. " -e " .. quote(code))
-		assert(os.remove(fifo)); assert(uv.fs_rmdir(dir .. "/data")); assert(uv.fs_rmdir(dir))
+		assert(os.remove(fifo))
+		for index = #folders, 1, -1 do assert(uv.fs_rmdir(folders[index])) end
+		assert(uv.fs_rmdir(dir))
 		helpers.assert_true(result == true or result == 0, "a FIFO declaration must refuse promptly")
 	end)
 
