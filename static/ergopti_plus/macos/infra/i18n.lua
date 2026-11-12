@@ -107,7 +107,8 @@ local _locale_set_fn = nil  -- injected by init() below
 -- =============================
 
 --- Detects the macOS system UI locale and returns the best matching supported
---- locale code.  Falls back to "en" when the system locale cannot be mapped.
+--- locale code. Falls back to the shared system fallback (English) when the
+--- system locale cannot be mapped.
 --- Uses ``hs.host.locale.current()`` (Hammerspoon 0.9.93+); degrades gracefully
 --- when the API is unavailable.
 --- @return string A supported locale code, e.g. ``"fr"`` or ``"en"``.
@@ -118,9 +119,11 @@ function M.detect_system_locale()
 		local ok, val = pcall(hs.host.locale.current)
 		if ok and type(val) == "string" then raw = val end
 	end
+	-- Declared once in _shared/data/identifiers.json (locales.system_fallback).
+	local fallback = require("identifiers").locales.system_fallback
 	if not raw or raw == "" then
-		Logger.debug(LOG, "detect_system_locale: API unavailable — falling back to 'en'.")
-		return "en"
+		Logger.debug(LOG, "detect_system_locale: API unavailable — falling back to '%s'.", fallback)
+		return fallback
 	end
 	-- Try exact two-letter prefix first (e.g. "fr" from "fr_FR")
 	local lang = raw:match("^([a-z][a-z])")
@@ -130,8 +133,8 @@ function M.detect_system_locale()
 		Logger.debug(LOG, "detect_system_locale: '%s' → '%s'.", raw, lang)
 		return lang
 	end
-	Logger.debug(LOG, "detect_system_locale: '%s' not in supported list — falling back to 'en'.", raw)
-	return "en"
+	Logger.debug(LOG, "detect_system_locale: '%s' not in supported list — falling back to '%s'.", raw, fallback)
+	return fallback
 end
 
 --- Initialises the i18n module. Reads the persisted locale from hs.settings;
