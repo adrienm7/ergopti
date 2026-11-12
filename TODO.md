@@ -1269,6 +1269,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
+- [ ] **App Cloner VS Code variants (maintainer decision BAP-004, 2026-11-12).** `apps/app_cloner_core.ahk`
+      links `%APPDATA%\Code\User` and passes the catalogue's `--extensions-dir={home}/.vscode/extensions` for every
+      vscode-family program; VSCodium and the Insiders build keep their own. Read `_shared/data/app_cloner/families.json`
+      vscode `user_folders` (per executable: `settings` under `%APPDATA%`, `extensions` under `{home}`) and replace the
+      argument marked `user_folder: "extensions"`, as macOS and Linux now do; then extend the AHK App Cloner test.
 - [ ] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
       (`ui/layout_manager/init.ahk`) writes `[layout] emulated_layout = ""` when the emulated layout is uninstalled, and
       `_LayoutComposer_Remove` (`composer.ahk`) does the same for « composed ». Keep the stored choice instead, as macOS and
