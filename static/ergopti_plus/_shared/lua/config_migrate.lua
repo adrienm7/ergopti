@@ -1741,7 +1741,7 @@ function M.run(opts)
 	else
 		local companion_err
 		plan_context, companion_err = with_companions(opts.context, opts.companions, read)
-		if not plan_context then return refuse("failed", companion_err) end
+		if companion_err ~= nil then return refuse("failed", companion_err) end
 		plan = M.plan(source, registry, opts.driver, plan_context)
 		if version ~= nil and version ~= registry.current and plan.version ~= version then
 			return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
