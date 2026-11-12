@@ -129,9 +129,11 @@ helpers.describe("keymap: one clock read and no wasted allocation per keystroke"
 
 		local bucket_at = code:find("local star_bucket", 1, true)
 		local bare_at = bucket_at and code:find("local bare_star_bucket", bucket_at, true) or nil
+		-- The gate's shape, not the magic key's spelling: 28acbe7b24 renamed it to
+		-- typed_magic and the literal pin then failed with the gate intact.
 		local concat_at = bare_at and code:find(
-			"auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. typed_magic) or nil",
-			bare_at, true) or nil
+			"auto_buffer = %(star_bucket or bare_star_bucket%) and %(buffer %.%. [%a_][%w_]*%) or nil",
+			bare_at) or nil
 		helpers.assert_true(bucket_at ~= nil and bare_at ~= nil and concat_at ~= nil,
 			"the prospective resolver must still build the magic-key buffer when needed")
 		helpers.assert_true(bucket_at < bare_at and bare_at < concat_at,
