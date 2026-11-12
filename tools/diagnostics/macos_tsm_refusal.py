@@ -9,10 +9,11 @@ When that agent does not answer, HIToolbox prints one line per message,
     TSMSendMessageToUIServer: CFMessagePortSendRequest FAILED(-1) to send to
     port com.apple.tsm.uiserver
 
-and the selected source never changes, so the fixture reports a selection
-deadline, an unresolved cleanup and then "unavailable" for every later case.
-Stopping TextInputMenuAgent on a hosted runner reproduces exactly that
-signature, which no other text-input agent does.
+Every hosted refusal seen so far (a selection deadline, an unresolved cleanup,
+then "unavailable" for every later case) followed such lines. Stopping
+TextInputMenuAgent, or TextInputSwitcher behind it, prints them too, but the
+cohort then still passes (probe run 43189848716 on Intel), so an unanswered
+server is the state the refusals share, not a proven cause on its own.
 
 This owner reads the cohort transcript and the agent snapshot taken around it
 (macos_text_input_agents.sh) and writes a receipt whose state is one of:
@@ -22,8 +23,9 @@ This owner reads the cohort transcript and the agent snapshot taken around it
 - no_fixture_refusal: the cohort holds no selection refusal.
 
 It never changes the cohort verdict: the selected-receipt judge still fails the
-step. It prints a GitHub error annotation naming the state, so a failed run says
-which service refused instead of only that a deadline passed.
+step. It prints a GitHub error annotation naming the state, so a failed run
+says what the text-input services were doing instead of only that a deadline
+passed.
 """
 
 import argparse
@@ -120,10 +122,10 @@ def annotation(receipt):
         first = receipt["first_unanswered"]
         return (
             "::error::Native keyboard-source refusal: tsm_uiserver_unanswered. "
-            f"TextInputMenuAgent did not answer com.apple.tsm.uiserver (status {first['status']}, "
-            f"{receipt['unanswered_count']} messages, first in {first['case']}); "
-            f"the selection in {refusal['case']} was then refused. This is the hosted "
-            "runner's text-input service, not the fixture."
+            f"com.apple.tsm.uiserver (TextInputMenuAgent) did not answer (status {first['status']}, "
+            f"{receipt['unanswered_count']} messages, first in {first['case']}) before the "
+            f"selection in {refusal['case']} was refused. An unanswered server alone does not "
+            "refuse a selection, so this names the runner state, not a proven cause."
         )
     return (
         "::error::Native keyboard-source refusal: fixture_refusal_unclassified. "
