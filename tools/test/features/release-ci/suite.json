@@ -298,6 +298,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-flatpak-module-cache.cjs"],
 			"repro": "npm run test:linux-flatpak-module-cache"
+		},
+		{
+			"id": "js-macos-tsm-refusal",
+			"ordinal": 626,
+			"name": "a keyboard-source refusal after an unanswered com.apple.tsm.uiserver message is named tsm_uiserver_unanswered",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-tsm-refusal.cjs"],
+			"repro": "npm run test:macos-tsm-refusal"
 		}
 	]
 }
