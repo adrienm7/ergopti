@@ -775,12 +775,61 @@ function isSharedArgument(text, index) {
 	// constant the file hands to a shared reader.
 	const named = before.match(/\b(?:local|const|let)\s+([A-Za-z_]\w*)\s*=\s*["'`]$/);
 	if (named && new RegExp(`\\b\\w*[sS]hared\\w*\\(\\s*${named[1]}\\s*[,)]`).test(text)) return true;
+	// const SOURCES = ['data/x.json', …] … SOURCES.map((s) => sharedRel(s)):
+	// the elements of a list the file hands to a shared helper.
+	if (sharedLists(text).some(([from, to]) => index > from && index < to)) return true;
 	// read('lua/test/format.lua', SHARED): the base comes after the path.
 	if (/^[^"'`\n]*["'`]\s*,\s*\w*SHARED\w*\s*\)/.test(text.slice(index, index + 200))) return true;
 	return (
 		/\b\w*[sS]hared(?!_llm)\w*\(\s*["'`]$/.test(before) &&
 		!/shared_llm_path\(\s*["'`]$/.test(before)
 	);
+}
+
+let listText = null;
+let listRanges = [];
+/**
+ * The array constants of a file whose elements it hands, one by one, to a
+ * shared helper: `SOURCES.map((s) => sharedRel(s))`, `for (const [name,
+ * file] of TABLES) … shared(file)`. Their literals are relative to _shared.
+ * @returns {Array<[number, number]>} The offsets each array literal spans.
+ */
+function sharedLists(text) {
+	if (text === listText) return listRanges;
+	listRanges = [];
+	for (const m of text.matchAll(/\bconst\s+([A-Z][A-Z0-9_]*)\s*=\s*\[/g)) {
+		const name = m[1];
+		const uses = [
+			...text.matchAll(
+				new RegExp(
+					`\\b${name}\\.(?:map|flatMap|forEach|some|every|filter)\\(\\s*\\(?([^)=]*)\\)?\\s*=>([^\\n]*)`,
+					'g'
+				)
+			),
+			...text.matchAll(
+				new RegExp(`\\bfor\\s*\\(\\s*const\\s+([^)]*?)\\s+of\\s+${name}\\s*\\)([^\\n]*)`, 'g')
+			)
+		];
+		const handed = uses.some((u) =>
+			(u[1].match(/[A-Za-z_]\w*/g) || []).some((param) =>
+				new RegExp(`\\b\\w*[sS]hared(?!_llm)\\w*\\(\\s*${param}\\s*\\)`).test(u[2])
+			)
+		);
+		if (!handed) continue;
+		// The array runs to its matching bracket.
+		let depth = 0;
+		let end = -1;
+		for (let i = m.index + m[0].length - 1; i < text.length; i++) {
+			if (text[i] === '[') depth++;
+			else if (text[i] === ']' && --depth === 0) {
+				end = i;
+				break;
+			}
+		}
+		if (end > 0) listRanges.push([m.index + m[0].length - 1, end]);
+	}
+	listText = text;
+	return listRanges;
 }
 
 // A JavaScript require of a Node module or a dependency is not a Lua load,
