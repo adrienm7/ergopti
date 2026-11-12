@@ -218,12 +218,19 @@ function hotstringsRenderTimes(configRoot) {
 // template, which 8f859044ea grew by the two WPM notification-area settings,
 // and its boot parses that config.toml eight times: 11943 -> 12109 slow
 // steps (118 personal_info + 48) and 2179 -> 2191 flat values.
+// Raised on 2026-11-12, measured on a local run and CI run 43159682408:
+// 32b501b56f put the eight [gestures.modes] strings and eight
+// [gestures.sensitivities] numbers into the generated template. One parse of
+// the template went from 975 to 1029 slow lexer steps; the realistic boot,
+// whose CI parse count varies by one, counted 13567 locally and 13582 on CI
+// (13538 -> 13582). neutral-defaults seeds that template and stays under its
+// slow-step ceiling (11807), but its flat reads grew 2191 -> 2248.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
-	'toml.document_slow_steps': { all: 12109, [REALISTIC_HOTSTRINGS_FIXTURE]: 13538 },
-	'toml.flat_values': { all: 2191, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
+	'toml.document_slow_steps': { all: 12109, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
+	'toml.flat_values': { all: 2248, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
 };
 
 /**
