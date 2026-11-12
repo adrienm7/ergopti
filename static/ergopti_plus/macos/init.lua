@@ -217,7 +217,9 @@ do
 end
 
 -- Global user-notification logging bridge.
--- Any module using hs.notify.new() will now be traced in Logger.info.
+-- Any module using hs.notify.new() is traced in Logger.info, by shape only: a
+-- notification's text can quote a command's stderr meant for the user alone
+-- (NUI-004).
 do
 	if hs.notify and type(hs.notify.new) == "function" and hs.notify.__ergopti_info_wrapped ~= true then
 		local _orig_notify_new = hs.notify.new
@@ -226,8 +228,7 @@ do
 				local t = tostring(opts.title or "")
 				local b = tostring(opts.informativeText or "")
 				if t ~= "" or b ~= "" then
-					local payload = (t ~= "" and t or "(sans titre)") .. (b ~= "" and (" | " .. b) or "")
-					Logger.info("notify", "Notification utilisateur: %s", payload)
+					Logger.info("notify", "User notification created: title %d byte(s), body %d byte(s).", #t, #b)
 				end
 			end
 			return _orig_notify_new(opts, ...)
