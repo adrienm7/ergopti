@@ -404,6 +404,22 @@ helpers.describe("macOS navigation layer editor host", function()
 		end)
 	end)
 
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("publishes the page's session while the driver is paused (edd1-paused-writes)", function()
+	local paused_control = package.loaded["modules.shortcuts.script_control"]
+	package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+		local ok, failure = pcall(with_editor, function(editor, world)
+			local text = read_file(FIXTURE)
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			post(world, { action = "save", text = text })
+			helpers.assert_eq(last_call(world, "saveResult").saved, true)
+			helpers.assert_eq(read_file(world.dir .. "/layers.toml"), text)
+		end)
+	package.loaded["modules.shortcuts.script_control"] = paused_control
+		assert(ok, failure)
+	end)
+
 	helpers.it("keeps the window open when the regeneration is refused, and Cancel closes it", function()
 		with_editor(function(editor, world)
 			world.regenerate_accepts = false
