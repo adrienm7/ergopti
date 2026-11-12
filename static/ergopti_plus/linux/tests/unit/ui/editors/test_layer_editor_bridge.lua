@@ -343,6 +343,28 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_eq(next(keys), nil, "an absent tap-hold file never imports the preset keys")
 	end)
 
+	helpers.it("(leh-002-stale-folder-answer) answers the page when the folder moves after the write", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		-- The configuration folder changes once the file is written, as a paths
+		-- editor move in flight would.
+		world.state.config_paths.get_config_dir = function()
+			local written = io.open(dir .. "/layers.toml", "rb")
+			if written then written:close(); return dir .. "-moved" end
+			return dir
+		end
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
+		local outcome = Bridge.on_message({ action = "save", text = read_file(FIXTURE) }, world.state)
+		remove_config_dir(dir)
+		helpers.assert_eq(outcome.saved, true)
+		helpers.assert_eq(outcome.applied, false)
+		helpers.assert_eq(world.restarts, 0, "nothing is applied from the old folder")
+		local answer = last_call(world, "saveResult")
+		helpers.assert_true(answer ~= nil, "the page receives its saveResult")
+		helpers.assert_eq(answer.saved, true)
+		helpers.assert_eq(answer.applied, false)
+	end)
+
 	helpers.it("keeps the window open when the remap restart fails", function()
 		local dir = make_config_dir()
 		local world = make_state(dir)
