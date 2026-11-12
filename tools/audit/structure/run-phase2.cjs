@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: Structure Plan Phase 2 Runner
+ * MODULE: Structure Plan Step Runner
  * DESCRIPTION:
  * Applies the steps of docs/design/structure-plan.md in order, one commit per
  * step, so the day of phase 2 is one mechanical command. Each step:
