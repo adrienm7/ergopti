@@ -182,6 +182,32 @@ helpers.describe("Spellings across drivers in the shared tap_hold.toml (tap-hold
 	end)
 end)
 
+-- TCL-005: SCHEMA.md bounds a delay to 0 < x <= 10 s; macOS took a longer global
+-- delay and ran a key's delay <= 0 as the global without a word.
+helpers.describe("Delays outside the bound in the shared tap_hold.toml (tcl-005-delay-bound)", function()
+	helpers.it("a global delay above 10 s is named and not used (tcl-005-delay-bound)", function()
+		with_folder(function(f)
+			write(f.path, '[_meta]\nschema_version = 1\n[tap_hold]\ntime_activation_seconds = 12\n')
+			local state = f.load()
+			helpers.assert_eq(state.tap_hold_timeout_ms, f.config.build_default_state(f.keys, f.combos).tap_hold_timeout_ms)
+			helpers.assert_true(table.concat(f.warnings, "\n"):find("tap_hold.time_activation_seconds", 1, true) ~= nil,
+				"the warning names the file's leaf")
+		end)
+	end)
+
+	for _, seconds in ipairs({ "0", "-0.5", "11" }) do
+		helpers.it("a key's delay of " .. seconds .. " s is named, not silently replaced (tcl-005-delay-bound)", function()
+			with_folder(function(f)
+				write(f.path, '[_meta]\nschema_version = 1\n[tap_hold.keys.caps_lock]\ntap_action = "copy"\n'
+					.. "time_activation_seconds = " .. seconds .. "\n")
+				f.load()
+				helpers.assert_true(table.concat(f.warnings, "\n"):find("tap_hold.keys.caps_lock.time_activation_seconds", 1, true)
+					~= nil, "the warning names the key's delay: " .. table.concat(f.warnings, " | "))
+			end)
+		end)
+	end
+end)
+
 helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", function()
 	local expected = decode(assert(read(CORPUS .. "expected.toml"), "the corpus expectations are missing"))
 
