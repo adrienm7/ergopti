@@ -6,8 +6,10 @@
  * DESCRIPTION:
  * Applies the steps of docs/design/structure-plan.md in order, one commit per
  * step, so the day of phase 2 is one mechanical command. Each step:
- *   1. apply-step.cjs <step> --apply, in a fresh process: the tools themselves
- *      name moved paths, so a step may rewrite the rules the next one reads;
+ *   1. the derived pins of the tree before the step (repin.cjs --derive-out),
+ *      then apply-step.cjs <step> --apply, in a fresh process: the tools
+ *      themselves name moved paths, so a step may rewrite the rules the next
+ *      one reads;
  *   2. the mechanical follow-ups no rewrite can do: banner widths
  *      (lint-conventions --fix-banners), the formatter (format.cjs --write),
  *      the content pins of the changed files (repin.cjs), the generated
