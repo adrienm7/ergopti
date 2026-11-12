@@ -282,5 +282,6 @@ content = ['WebView2Loader', 'CreateCoreWebView2']
 "ui/paths_editor/" = "the folders editor is not a manifest feature"
 "ui/personal_info_editor/" = "the personal information editor edits the settings"
 "ui/personal_toml_editor_webview.ahk" = "the personal hotstrings editor edits the settings"
+"ui/physical_shortcuts/" = "the physical shortcut editor edits the shortcut settings"
 "ui/prompt_editor/" = "the prompt profile editor edits the settings"
 "ui/update_check/" = "the update window is not a manifest feature"
