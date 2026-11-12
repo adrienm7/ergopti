@@ -223,7 +223,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
 		local Loader = require("platform.remap.tap_hold_loader")
 		local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded = Loader.load_document(defaults,{ tap_hold={enabled=false,inherit_defaults=true} },nil,"/controlled/tap_hold.toml")
+		local loaded = Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
@@ -234,7 +234,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 			-- requires it; previous cache identity is restored by the outer guard.
 			local manager = require("platform.remap.tap_hold_manager")
 			manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"})
 			helpers.assert_true(manager.is_active()); helpers.assert_true(hook.engine.has_combinations ~= nil)
 			helpers.assert_eq(next(hook.engine.by_code),nil,"tap-hold configuration switch stays independent")
 			local out = hook.engine:process(58,1,0,origin()); helpers.assert_eq(out,nil)
@@ -312,7 +312,7 @@ helpers.describe("configured pair publication lifecycle",function()
 	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
 		local Loader=require("platform.remap.tap_hold_loader")
 		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded=Loader.load_document(defaults,{tap_hold={enabled=true,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = true } })
 		local bytes=base_text
 		local hook={};hook.set_remapper=function(engine,callback)
 			if hook.engine and hook.engine.has_combinations then
@@ -328,7 +328,7 @@ helpers.describe("configured pair publication lifecycle",function()
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			local pairs=require("modules.shortcuts.key_combinations");local token={}
 			helpers.assert_true(pairs.acquire_configuration(token));helpers.assert_eq(hook.engine,nil)
 			local next_text=bytes:gsub('caps_lock_then_tab = "run_program"','caps_lock_then_tab = "copy"'):gsub('caps_lock_then_tab = "shift"','caps_lock_then_tab = "alt"')
@@ -394,7 +394,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
 		local Loader=require("platform.remap.tap_hold_loader")
 		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
 		local hook={};hook.set_remapper=function(engine,callback)
 			if hook.engine and hook.engine.has_combinations then hook.engine:release_all();if hook.engine:ack_retirement(true)~=true then return false end
@@ -409,7 +409,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			helpers.assert_eq(hook.engine,nil)
 			local pairs=require("modules.shortcuts.key_combinations")
 			local function publish(text)
@@ -487,7 +487,6 @@ local function terminal_owner(port)
 	state.owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
 		files = { read_with_status = function() return base_text, "ok" end },
 		route = function() boundary("route"); return path end,
-		chord_route = function() return "/controlled/tap_hold.toml" end,
 		is_paused = function() boundary("pause"); return false end,
 		changed = function() return true end,
 		actions = { is_assignable = function(action) return action == "run_program" end } })
@@ -1321,7 +1320,7 @@ helpers.describe("same-device third slot through original production consumers (
 	local function with_chord(options,body)
 		options=options or {}
 		local before=options.before_manager
-		options.before_manager=function(s) s.bytes="";s.chord_bytes=source(); if before then before(s) end end
+		options.before_manager=function(s) s.bytes=source(); if before then before(s) end end
 		Fixture.with_manager_session(options,function(s) s.rows={}; body(s) end)
 	end
 	local function native_rows(s)
@@ -1362,7 +1361,7 @@ helpers.describe("same-device third slot through original production consumers (
 		with_adversarial_clock(function()
 			with_chord({}, function(s)
 				s.edge("a", 58, 1, 1000)
-				s.chord_bytes = s.chord_bytes:gsub("simultaneous_threshold_ms = 100", "simultaneous_threshold_ms = 101")
+				s.bytes = s.bytes:gsub("simultaneous_threshold_ms = 100", "simultaneous_threshold_ms = 101")
 				s.edge("a", 15, 1, 1010)
 				helpers.assert_eq(s.actions, {})
 				helpers.assert_eq(native_rows(s):find("29:1", 1, true), nil)
@@ -1425,7 +1424,7 @@ helpers.describe("same-device third slot through original production consumers (
 	helpers.it("withdraws a pending original press on canonical third-slot change",function()
 		with_chord({},function(s)
 			s.edge("a",58,1,1000);helpers.assert_eq(native_rows(s),"")
-			s.chord_bytes=source():gsub('combo = "copy"','combo = "paste"')
+			s.bytes=source():gsub('combo = "copy"','combo = "paste"')
 			s.edge("a",15,1,1010)
 			helpers.assert_eq(s.actions,{})
 			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil,"revoked first never reacquires standalone Ctrl")
@@ -1450,7 +1449,7 @@ helpers.describe("same-device third slot through original production consumers (
 		{ name="disabled third slots", apply=function(text) return text:gsub("%[mod_combos%]","[mod_combos]\nenabled = false") end },
 	}) do
 		helpers.it("preserves immediate ordered behavior for "..change.name,function()
-			with_chord({before_manager=function(s) s.chord_bytes=change.apply(s.chord_bytes) end},function(s)
+			with_chord({before_manager=function(s) s.bytes=change.apply(s.bytes) end},function(s)
 				s.edge("a",58,1,1000)
 				helpers.assert_eq(native_rows(s),"29:1","unissued third slot never delays original hold")
 				s.edge("a",58,0,1200); helpers.assert_eq(s.actions,{})
@@ -1459,7 +1458,7 @@ helpers.describe("same-device third slot through original production consumers (
 	end
 	for _,order in ipairs({{15,58},{58,15}}) do
 		helpers.it("retains explicit asymmetric order "..order[1],function()
-			with_chord({before_manager=function(s) s.chord_bytes=s.chord_bytes:gsub("symmetric = true","symmetric = false") end},function(s)
+			with_chord({before_manager=function(s) s.bytes=s.bytes:gsub("symmetric = true","symmetric = false") end},function(s)
 				s.edge("a",order[1],1,1000);s.edge("a",order[2],1,1010)
 				helpers.assert_eq(#s.actions,order[1]==15 and 1 or 0)
 				s.edge("a",order[2],0,1011);s.edge("a",order[1],0,1012)
@@ -1485,8 +1484,8 @@ helpers.describe("same-device third slot through original production consumers (
 		helpers.it("revokes the retained third-slot source when "..field.." changes",function()
 			with_chord({},function(s)
 				s.edge("a",58,1,1000)
-				s.chord_bytes=field=="symmetric" and s.chord_bytes:gsub("symmetric = true","symmetric = false")
-					or s.chord_bytes:gsub("simultaneous_threshold_ms = 100","simultaneous_threshold_ms = 101")
+				s.bytes=field=="symmetric" and s.bytes:gsub("symmetric = true","symmetric = false")
+					or s.bytes:gsub("simultaneous_threshold_ms = 100","simultaneous_threshold_ms = 101")
 				s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
 				helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
 				s.edge("a",15,0,1011);s.edge("a",58,0,1012)
@@ -1558,7 +1557,7 @@ helpers.describe("same-device third slot through original production consumers (
 	helpers.it("does not replay a foreign key after an acknowledged first-row callback revokes source",function()
 		local options={}
 		options.after_sync=function(s,code,value)
-			if code==29 and value==1 then options.after_sync=nil;s.chord_bytes=source():gsub('combo = "copy"','combo = "paste"') end
+			if code==29 and value==1 then options.after_sync=nil;s.bytes=source():gsub('combo = "copy"','combo = "paste"') end
 		end
 		with_chord(options,function(s)
 			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
@@ -1602,7 +1601,7 @@ helpers.describe("acknowledged buffered Reader cohort replacement (controlled tr
 	helpers.it("closes newly Hook-owned readers after remove and successful re-add",function()
 		local Fixture=require("tests.support.input_owner_fixture")
 		Fixture.with_manager_session({before_manager=function(s)
-			s.bytes="";s.chord_bytes='[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+			s.bytes='[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
 		end},function(s)
 			s.edge("a",58,1,1000);s.edge("a",15,1,1010)
 			s.edge("a",58,0,1020);s.edge("a",15,0,1021)
@@ -1639,7 +1638,7 @@ helpers.describe("generated Linux defaults received by original native combinati
   options=options or {};options.public_chords=true
   local before=options.before_manager
   options.before_manager=function(s)
-   s.bytes="";s.chord_bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
    if before then before(s) end
   end
   Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
@@ -1656,7 +1655,7 @@ helpers.describe("generated Linux defaults received by original native combinati
  end)
  helpers.it("(linux-chord-caps-word) runs a simultaneous CapsWord through the catalogue executor",function()
   with_public({action_names={"copy","caps_word"},before_manager=function(s)
-   s.bytes="";s.chord_bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="caps_word"\n'
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="caps_word"\n'
   end},function(s)
    helpers.assert_eq(s.owner.get_chord("tab_then_caps_lock"),"caps_word")
    s.edge("a",15,1,1000);s.edge("a",58,1,1050)
@@ -1674,7 +1673,7 @@ helpers.describe("generated Linux defaults received by original native combinati
   end)
  end)
  helpers.it("declaration alone and allNone slots create no pending first-press custody",function()
-  with_public({before_manager=function(s) s.chord_bytes="" end},function(s)
+  with_public({before_manager=function(s) s.bytes="" end},function(s)
    helpers.assert_eq(s.owner.get_chord("tab_then_caps_lock"),"none")
    s.edge("a",58,1,1000)
    helpers.assert_eq(s.rows[1],{29,1},"ordinary first hold remains immediate without an assigned chord")
@@ -1716,7 +1715,7 @@ helpers.describe("generated Linux defaults received by original native combinati
  for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
   '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
   helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
-   with_public({before_manager=function(s) s.chord_bytes=text end},function(s)
+   with_public({before_manager=function(s) s.bytes=text end},function(s)
     s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1})
     helpers.assert_eq(s.actions,{})
     s.edge("a",58,0,1100)
@@ -1731,7 +1730,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
  local function public(body,options)
   options=options or {};options.public_chords=true
   options.before_manager=function(s)
-   s.bytes="";s.chord_bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
   end
   Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
  end
@@ -1757,7 +1756,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
  end
  helpers.it("rejects an invented catalogue through the real saved route and original Hook",function()
   public(function(s)
-   s.chord_bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="private_unlisted"\n'
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="private_unlisted"\n'
    local Source=require("modules.shortcuts.key_combinations")
    local Catalogue=require("_generated.action_catalogue")
    helpers.assert_eq(Catalogue.actions.private_unlisted,nil)
@@ -1772,7 +1771,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
  end)
  helpers.it("rejects invented physical key identifiers with an otherwise real catalogue action",function()
   public(function(s)
-   s.chord_bytes='[mod_combos.config.foreign_a_then_foreign_b]\ncombo="copy"\n'
+   s.bytes='[mod_combos.config.foreign_a_then_foreign_b]\ncombo="copy"\n'
    local Source=require("modules.shortcuts.key_combinations")
    local caller=Source.new({keys={{id="foreign_a",key="foreign_a"},{id="foreign_b",key="foreign_b"}},
     hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
@@ -1984,7 +1983,7 @@ helpers.describe("relative-loader simultaneous source admission (controlled tran
 		end
 		local ok, failure = pcall(function()
 			Fixture.with_manager_session({ before_manager = function(s)
-				s.bytes = "";s.chord_bytes = '[mod_combos]\nsimultaneous_threshold_ms = 87\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+				s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 87\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
 			end }, function(s)
 				assert(s.manager.set_enabled(false), "only standalone tap-holds are disabled")
 				s.rows = {}
@@ -2033,14 +2032,14 @@ helpers.describe("original Manager pair action after genuine Logger callback (co
 		package.loaded["logger.shim"] = logger
 		local called, reason = pcall(function()
 			Fixture.with_manager_session({ before_manager = function(s)
-				s.bytes = "";s.chord_bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+				s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
 			end }, function(s)
 				local sink_calls = 0
 				logger.set_sink(function(line)
 					if line:find("[platform.remap.tap_hold_manager] Tap action 'copy'.", 1, true) then
 						sink_calls = sink_calls + 1
 						if mode == "source" then
-							s.chord_bytes = s.chord_bytes:gsub('combo = "copy"', 'combo = "paste"')
+							s.bytes = s.bytes:gsub('combo = "copy"', 'combo = "paste"')
 						elseif mode == "pause" then
 							s.pause_result = s.manager.set_paused(true)
 						end
@@ -2056,7 +2055,7 @@ helpers.describe("original Manager pair action after genuine Logger callback (co
 					if mode == "pause" then
 						helpers.assert_eq(s.pause_result, false, "busy retirement refusal is preserved; it is not an ACK")
 					else
-						helpers.assert_contains(s.chord_bytes, 'combo = "paste"')
+						helpers.assert_contains(s.bytes, 'combo = "paste"')
 					end
 				end
 				s.edge("a", 15, 0, 1011)
@@ -2088,7 +2087,7 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 			local original, original_metatable, altered_metatable, previous_eq
 			local called, reason = pcall(function()
 				Fixture.with_manager_session({ before_manager = function(s)
-					s.bytes = "";s.chord_bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+					s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
 				end }, function(s)
 					local sink_calls, eq_calls, restore_result = 0, 0, nil
 					logger.set_sink(function(line)

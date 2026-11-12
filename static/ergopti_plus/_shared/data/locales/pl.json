@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "Źródło zawiera folder modułów natywnych nieznanego pochodzenia.",
 	"linux_shell.install.xdg_autostart": "autostart XDG: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ już działa w tej sesji ({1} jest zajęty); to uruchomienie zostało odrzucone.",
+	"linux_shell.launch.restarting": "Ergopti+ działa już w tej sesji; zostanie poproszony o zamknięcie, a następnie uruchomiony ponownie.",
 	"linux_shell.launch.authorization_failed": "Autoryzacja dostępu do wejścia została anulowana lub nie powiodła się.",
 	"linux_shell.launch.groups_unavailable": "Sesja nie mogła uzyskać skonfigurowanych grup wejścia.",
 	"linux_shell.launch.session_lock_invalid": "Katalog blokady sesji musi być ścieżką bezwzględną.",

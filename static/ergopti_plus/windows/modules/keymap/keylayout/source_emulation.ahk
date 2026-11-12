@@ -61,6 +61,12 @@ SourceEmulation_Reported() {
 	return Reported
 }
 
+; The layout table field that lists tap-hold keys. It is a field of the emulation table,
+; not the [tap_holds] configuration section that shares its spelling.
+_SrcEmu_TapHoldsField() {
+	return "tap_holds" ; config-key-literal-ok
+}
+
 ; The built-in modifiers that have a left and a right key.
 _SrcEmu_Sided() {
 	static Sided := Map("shift", true, "control", true, "alt", true, "meta", true)
@@ -185,7 +191,7 @@ SourceEmulation_Compile(Table) {
 		throw Error("The layout emulation table is not an " . SourceEmulation_Contract("format") . " version "
 			. SourceEmulation_Contract("version") . " table.")
 	Model := Map("layout", Table.Get("layout", ""), "modifier_keys", Map(), "custom", Map(), "layers", [],
-		"layer_by_id", Map(), "shortcuts", [], "tap_holds", Map(), "remaps", Map())
+		"layer_by_id", Map(), "shortcuts", [], _SrcEmu_TapHoldsField(), Map(), "remaps", Map())
 	for Modifier in _SrcEmu_List(Table, "modifiers") {
 		if !(Modifier is Map) || !(Modifier.Get("id", 0) is String)
 				|| (Modifier.Get("mode", "") != "held" && Modifier.Get("mode", "") != "locked")
@@ -236,7 +242,7 @@ SourceEmulation_Compile(Table) {
 			"send_key", Shortcut["send_key"],
 			"send_modifiers", _SrcEmu_IdsOf(Shortcut.Get("send_modifiers", 0), Known, Where)))
 	}
-	for Index, Entry in _SrcEmu_List(Table, "tap_holds") {
+	for Index, Entry in _SrcEmu_List(Table, _SrcEmu_TapHoldsField()) {
 		Where := "tap_holds[" . Index . "]"
 		Threshold := (Entry is Map) ? Entry.Get("threshold_ms", 0) : 0
 		if !(Entry is Map) || !(Entry.Get("key", 0) is String) || !(Threshold is Integer) || Threshold <= 0
@@ -247,9 +253,9 @@ SourceEmulation_Compile(Table) {
 			throw Error("A tap-hold holds the unknown layer '" . String(Entry["hold_layer"]) . "'.")
 		if Entry.Has("hold_modifier") && !((Entry["hold_modifier"] is String) && Known(Entry["hold_modifier"]))
 			throw Error("A tap-hold holds the unknown modifier '" . String(Entry["hold_modifier"]) . "'.")
-		if Model["tap_holds"].Has(Entry["key"]) || Model["modifier_keys"].Has(Entry["key"])
+		if Model[_SrcEmu_TapHoldsField()].Has(Entry["key"]) || Model["modifier_keys"].Has(Entry["key"])
 			throw Error("The key " . Entry["key"] . " has two roles in the emulation table.")
-		Model["tap_holds"][Entry["key"]] := Map("key", Entry["key"],
+		Model[_SrcEmu_TapHoldsField()][Entry["key"]] := Map("key", Entry["key"],
 			"tap", _SrcEmu_MappingOf(Entry.Get("tap", 0), Where . ".tap"),
 			"hold_layer", Entry.Get("hold_layer", ""), "hold_modifier", Entry.Get("hold_modifier", ""),
 			"threshold_ms", Threshold)
@@ -268,7 +274,7 @@ SourceEmulation_Compile(Table) {
  * @returns {Boolean}
  */
 SourceEmulation_HasRecords(Model) {
-	if Model["modifier_keys"].Count || Model["tap_holds"].Count || Model["remaps"].Count
+	if Model["modifier_keys"].Count || Model[_SrcEmu_TapHoldsField()].Count || Model["remaps"].Count
 			|| Model["shortcuts"].Length
 		return true
 	for Layer in Model["layers"]
@@ -287,7 +293,7 @@ SourceEmulation_Keys(Model) {
 	Codes := Map()
 	for Code in Model["modifier_keys"]
 		Codes[Code] := true
-	for Code in Model["tap_holds"]
+	for Code in Model[_SrcEmu_TapHoldsField()]
 		Codes[Code] := true
 	for Code in Model["remaps"]
 		Codes[Code] := true
@@ -449,7 +455,7 @@ SourceEmulation_Press(Session, Code, Held, Now) {
 	if Session["held_keys"].Has(Code)
 		return _SrcEmu_Result(true, Actions)
 	Modifier := Model["modifier_keys"].Get(Code, 0)
-	TapHoldEntry := Model["tap_holds"].Get(Code, 0)
+	TapHoldEntry := Model[_SrcEmu_TapHoldsField()].Get(Code, 0)
 	if !(Modifier is Map) && !(TapHoldEntry is Map)
 		_SrcEmu_Settle(Session, Now, Actions)
 	if Modifier is Map {

@@ -1307,6 +1307,17 @@ do
 	end
 end
 
+-- A quit the launcher receives from outside (Sparkle's relaunch, a logout,
+-- osascript) runs the same controlled exit as the menu's Quit (MLC-002).
+if LauncherGuard and type(LauncherGuard.watch_quit_request) == "function" then
+	local registered, detail = LauncherGuard.watch_quit_request(function()
+		return TerminationCoordinator.request_user_exit("launcher_quit")
+	end)
+	if registered ~= true then
+		Logger.error(LOG, "Launcher quit requests are not handled: %s.", tostring(detail))
+	end
+end
+
 -- The transport may discover queue exhaustion, repeated ACK loss, or a native
 -- NACK only after boot. Route every such failure through the same bounded exact
 -- lease fence used for launcher loss; an unresponsive coordinator still reaches
@@ -1356,6 +1367,22 @@ do
 	else
 		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
 	end
+	-- The tap-hold rows of the manifest live in config.toml since its v22 step,
+	-- which moves them out of tap_hold.toml. An old config_karabiner.toml is
+	-- carried over into tap_hold.toml first, so a 1.0.9 configuration moves in
+	-- this one boot (_shared/tap_hold/migrations.toml [legacy_imports.hs]).
+	local tap_hold_path = config_paths.get("TapHoldConfigPath")
+	-- platform/remap/config.lua reads the rows from the config.toml beside it.
+	local TapHoldFile = require("platform.remap.tap_hold_file")
+	if TapHoldFile.config_toml_path_for(tap_hold_path) ~= config_paths.get("ConfigTomlPath") then
+		Logger.error(LOG, "tap_hold.toml '%s' is not beside config.toml '%s': the remap settings cannot find their rows.",
+			tap_hold_path, config_paths.get("ConfigTomlPath"))
+	end
+	local imported, import_outcome = TapHoldFile.import_legacy(tap_hold_path, file_system)
+	if not imported then
+		Logger.error(LOG, "The old remap settings could not be carried over before the config migration (%s).",
+			tostring(import_outcome))
+	end
 	local migration = ConfigMigrate.boot({
 		context       = context,
 		context_error = context_error,
@@ -1363,6 +1390,7 @@ do
 		driver        = "hs",
 		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = file_system,
+		companions    = { [require("tap_hold.shared_file").FILE_NAME] = tap_hold_path },
 	})
 	-- A file saved by a newer build stays untouched and read-only for the
 	-- session: say so, or every change the user makes silently fails to stick.

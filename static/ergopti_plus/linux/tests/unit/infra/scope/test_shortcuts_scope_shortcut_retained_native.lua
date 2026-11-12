@@ -427,13 +427,12 @@ helpers.describe("Linux physical edit four-owner collision preflight", function(
 		{ name = "ordinary native None reservation", source = COLLISION_BASE .. 'primary_j = "none"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
 		{ name = "plain tap key", source = COLLISION_BASE .. '[shortcuts.tap_keys]\nnumber_row_left = "copy"\n', key = "physical_none_Backquote", tap = NO_TAP_HOLDS },
 		{ name = "ordered combination", source = COLLISION_BASE .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n', key = "physical_none_Tab", tap = NO_TAP_HOLDS },
-		{ name = "simultaneous combination", source = COLLISION_BASE, chords = '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n', key = "physical_none_Tab", chord = "tab_then_caps_lock", tap = NO_TAP_HOLDS },
+		{ name = "simultaneous combination", source = COLLISION_BASE .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n', key = "physical_none_Tab", chord = "tab_then_caps_lock", tap = NO_TAP_HOLDS },
 		{ name = "native tap-hold prefix", source = COLLISION_BASE, key = "physical_none_Tab", tap = '[tap_hold]\nenabled = true\ninherit_defaults = true\n' },
 	}) do
 		helpers.it("refuses " .. case.name .. " before any write or native ownership change", function()
 			with_collision_scope(case.source, case.tap, function(scope, owners, controls, path)
 				local before = Sandbox.read_bytes(path)
-				if case.chords then helpers.assert_eq(Codec.decode(before).mod_combos, nil, "the third slot lives in tap_hold.toml") end
 				if case.chord then helpers.assert_eq(owners.combinations.get_chord(case.chord), "copy", "actual canonical simultaneous owner must claim this fixture") end
 				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = case.key, value = "copy", intent = "keyboard_assignment" } })
 				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
@@ -441,7 +440,7 @@ helpers.describe("Linux physical edit four-owner collision preflight", function(
 				helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
 				helpers.assert_eq(#controls.executed, 0); helpers.assert_eq(controls.pair_changes, 0)
 				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
-			end, nil, case.chords)
+			end)
 		end)
 	end
 	helpers.it("four-family preflight with no known collision does not grant native delivery", function()

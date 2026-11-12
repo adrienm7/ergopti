@@ -57,6 +57,9 @@ return {
 		end_marker = "end",
 		compiler = "linux/install/compile_bytecode.lua",
 	},
+	macos_notifications = {
+		launcher_quit_request = "com.ergoptiplus.app.quit-request",
+	},
 	linux_stage = {
 		infix = "ergopti",
 	},

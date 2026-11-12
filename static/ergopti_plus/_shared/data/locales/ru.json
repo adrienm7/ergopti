@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "Источник содержит папку нативных модулей неизвестного происхождения.",
 	"linux_shell.install.xdg_autostart": "автозапуск XDG: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ уже запущен в этом сеансе ({1} занят); этот запуск отклонён.",
+	"linux_shell.launch.restarting": "Ergopti+ уже запущен в этом сеансе; ему отправлен запрос на завершение, затем он будет перезапущен.",
 	"linux_shell.launch.authorization_failed": "Авторизация доступа к вводу отменена или не удалась.",
 	"linux_shell.launch.groups_unavailable": "Сеанс не смог получить настроенные группы ввода.",
 	"linux_shell.launch.session_lock_invalid": "Папка блокировки сеанса должна задаваться абсолютным путём.",

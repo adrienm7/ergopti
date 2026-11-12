@@ -576,7 +576,16 @@ _TH_BuildTapCandidate(KeyId, ActionId, Candidate) {
 	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
 		return false
 	Entry["tap_action"] := ActionId
+	_TH_RebindEnables(Entry)
 	return 1
+}
+
+; A key another driver switched off (enabled = false in the shared file) is
+; switched back on when the user chooses what it does here, as on macOS and
+; Linux (_shared/tap_hold/SCHEMA.md).
+_TH_RebindEnables(Entry) {
+	if Entry.Has("enabled")
+		Entry.Delete("enabled")
 }
 
 _TH_DurationValueValid(Seconds) {
@@ -842,6 +851,7 @@ _TH_BuildHoldCandidate(KeyId, Kind, Id, Candidate) {
 		Entry["hold_modifier"] := ""
 	else
 		return false
+	_TH_RebindEnables(Entry)
 	return 1
 }
 
@@ -854,6 +864,7 @@ _TH_BuildNativeCandidate(KeyId, Candidate) {
 	Entry["hold_modifier"] := ""
 	if Entry.Has("hold_layer")
 		Entry.Delete("hold_layer")
+	_TH_RebindEnables(Entry)
 	return 1
 }
 
@@ -1057,11 +1068,38 @@ _TH_MutationRows(Before, After, &Drops := unset) {
 	return Rows
 }
 
+; A hold chosen here replaces the macOS-only hold_action the shared file may
+; carry for that key, so every driver holds what the user just chose. The
+; loader never models hold_action, so it is read from the source document.
+; @param Content {String} The exact source bytes.
+; @param Rows {Array} The mutation rows, extended in place.
+_TH_DropForeignHolds(Content, Rows) {
+	Document := TOML_ParseDocument(Content)
+	Root := Document.Get("tap_hold", Map())
+	Entries := (Root is Map) ? Root.Get("keys", Map()) : Map()
+	if !(Entries is Map)
+		return
+	Prefix := "tap_hold.keys."
+	Dropped := Map()
+	for Row in Rows.Clone() {
+		if !(SubStr(Row.Section, 1, StrLen(Prefix)) == Prefix)
+				|| !(Row.Key == "hold_modifier" || Row.Key == "hold_layer")
+			continue
+		KeyId := SubStr(Row.Section, StrLen(Prefix) + 1)
+		Fields := Entries.Get(KeyId, "")
+		if Dropped.Has(KeyId) || !(Fields is Map) || !Fields.Has("hold_action")
+			continue
+		Dropped[KeyId] := true
+		Rows.Push({ Section: Row.Section, Key: "hold_action", Delete: true })
+	}
+}
+
 _TH_BuildMutationContent(Source, Before, Defaults, Path, Data) {
 	if !_TH_DurationSourceMatches(Source, Path)
 		return false
 	if Source["source_present"] {
 		Rows := _TH_MutationRows(Before, Data, &Drops)
+		_TH_DropForeignHolds(Source["source_content"], Rows)
 		Image := _TH_BuildSemanticImage(Path, Source["source_content"], 1, Rows, Defaults, Drops)
 		Source["content"] := Image["content"]
 		; Publish the projection of these exact future bytes, with defaults, rather

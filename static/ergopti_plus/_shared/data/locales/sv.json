@@ -1393,6 +1393,7 @@
 	"linux_shell.install.unreviewed_native_modules": "Källan innehåller en mapp med inbyggda moduler av okänt ursprung.",
 	"linux_shell.install.xdg_autostart": "XDG-autostart: {1}",
 	"linux_shell.launch.already_running": "Ergopti+ körs redan i den här sessionen ({1} är upptagen); den här starten avvisades.",
+	"linux_shell.launch.restarting": "Ergopti+ körs redan i den här sessionen; den ombeds avsluta och startas sedan om.",
 	"linux_shell.launch.authorization_failed": "Auktoriseringen för inmatningsåtkomst avbröts eller misslyckades.",
 	"linux_shell.launch.groups_unavailable": "Sessionen kunde inte få sina konfigurerade inmatningsgrupper.",
 	"linux_shell.launch.session_lock_invalid": "Mappen för sessionslåset måste vara en absolut sökväg.",

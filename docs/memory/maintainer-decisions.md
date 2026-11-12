@@ -151,6 +151,34 @@ through a pause (script chords, gestures, tap keys in dry-run,
 `script_save_reload` waits, `open_personal_shortcuts` runs. Regressions
 `scd1-slot-paused`, `scd1-paused-actions`. Windows needs no change.
 
+## One configuration layout on every OS for tap-holds (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
+and the overnight Linux `[mod_combos]` move: one home per manifest path on
+every OS. `config.toml` holds every `[[features.*]]` row and the settings of
+the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
+`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
+symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
+`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
+`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
+`inherit_defaults`, the global delay `time_activation_seconds`,
+`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
+section (`_shared/tap_hold/SCHEMA.md`).
+
+- One migration step moves the old homes: `v21_to_v22` of
+  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
+  macOS and Linux (Windows already kept these rows in `config.toml`). The
+  boot names the driver's `tap_hold.toml` (macOS first carries an old
+  `config_karabiner.toml` over into it); the engine copies the values into
+  `config.toml` where it holds none, after its byte-exact backup, and the
+  driver then deletes the moved values from `tap_hold.toml`, after a backup
+  of that file. The config stamp makes it run once; a value left in
+  `tap_hold.toml` by a crash between the two writes is never read and is
+  warned as outdated.
+- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
+  the two files each driver writes; each suite pins its own and reads the
+  others'. Do not move a manifest row back into `tap_hold.toml`.
+
 ## Windows swipes step with the fingers through raw HID reports (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: Windows gets the incremental touchpad
@@ -189,7 +217,7 @@ Decided by the maintainer on 2026-11-11: the old steps of
 `_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
 the registry every driver parses at boot and most of the config test time.
 `oldest_version` is v20, what 1.0.9 (the latest public release) and every
-1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+1.0.10 pre-release wrote; only `v20_to_v21` remained at the squash. A file stamped below it,
 including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
 cleanly on every driver: never written, the session read-only, one ERROR at
 boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
@@ -502,14 +530,11 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
 
 ## Tap-hold settings, minimum tap, tap-to-click and Linux proof (2026-11-10)
 
-- One home for the tap-hold settings on every OS: a shared `tap_hold.toml`
-  holds the keys, the global and sticky delays, the lone-tap window and the
-  modifier combinations (`mod_combos`); `config.toml` keeps the
-  `[[features.*]]` rows; the macOS-only Karabiner integration is its own
-  section of that file. Each driver migrates its old files once
-  (macOS `config_karabiner.toml`, Linux `config.toml` `mod_combos`, Windows
-  `config.toml` tap-hold keys), and a cross-driver test writes the file on one
-  driver and reads it on the other two.
+- One home for the tap-hold settings on every OS. Settled on 2026-11-11 (the
+  entry at the top of this page): the shared `tap_hold.toml` holds the keys,
+  the global delay and the macOS-only Karabiner section; `config.toml` keeps
+  every `[[features.*]]` row, the sticky delay, the lone-tap window and the
+  modifier combinations (`mod_combos`).
 - The minimum tap duration applies to every tap that waits for its release,
   the Linux rule, on the three drivers; Windows stops limiting it to LShift,
   LCtrl, RShift, CapsLock holding the layer and LAlt with a non-Backspace tap.
@@ -1096,9 +1121,10 @@ shared clipboard owner is busy. Output is neither dropped nor delayed
 ## The one-shot Shift timeout is a user setting on every OS (6 November 2026)
 
 Aligned on macOS: `sticky_timeout_ms` (2000 ms registry default) is editable on
-Windows (`config.toml` `[tap_holds]`, `_TH_CommitOneShotTimeoutMs`) and Linux
-(`tap_hold.toml` `[tap_hold]`, `set_one_shot_timeout_ms`), each with a tray row;
-only a positive whole number of milliseconds is admitted, no zero or unlimited.
+Windows (`_TH_CommitOneShotTimeoutMs`) and Linux (`set_one_shot_timeout_ms`),
+each with a tray row, in `config.toml` `[tap_holds]` on every OS since config
+schema v22; only a positive whole number of milliseconds is admitted, no zero
+or unlimited.
 
 ## CapsWord setting changes reach the running session (6 November 2026)
 
@@ -1300,3 +1326,18 @@ daemon serves raw keystrokes only to that signed app), so the steps
 runs every step, those included, on the newest signed dev prerelease. Action:
 keep the root daemon's signature check; mark any new step that needs the owned
 runtime installed `signed_app`, never weaken the check for test runs.
+
+## A second launch restarts the running app on every OS (2026-11-11)
+
+Opening ErgoptiPlus while it runs restarts it, as Windows' `#SingleInstance
+Force` does (MLC-003). macOS: the second launcher asks the running one to quit,
+which defers that quit until its runtime ran the menu Quit's controlled exit
+(MLC-002), waits for the sole-launcher lock within `[ui]
+user_quit_deadline_ms` plus `quit_handshake_margin_ms`, then takes it and boots
+(`main.swift` `acquireSoleLauncherOwnership`). Linux: `install/launch.sh` sends
+SIGTERM, the daemon's controlled exit, to the instance lock's holders and waits
+for the lock within the same bound (`_generated/launch_timings.sh`); under
+systemd a relaunch from the application menu restarts the unit. Only the login
+autostart (`--session-start`) leaves a running instance alone. Action: keep the
+restart pinned by `testASecondLauncherAsksTheRunningOneToQuitAndTakesOver` and
+`test_second_launch_restarts_the_running_daemon`.
