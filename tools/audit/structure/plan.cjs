@@ -430,15 +430,15 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 				abs: path.posix.normalize(PREFIX + token.slice(at + 1))
 			});
 	}
-	// "/shared/modules/x.json" in a test's fake file system: a root named for
-	// _shared, whose rest is a _shared path.
-	const alias = token.match(/^(.*\/)shared\/(.+)$/);
+	// "/shared/modules/x.json" or "/owned-shared/…" in a test's fake file
+	// system: a root named for _shared, whose rest is a _shared path.
+	const alias = token.match(/^(.*\/)((?:[A-Za-z0-9]+[-_])*shared)\/(.+)$/);
 	if (alias && !token.includes('/_shared/'))
 		candidates.push({
 			form: 'shared-alias',
 			lead: '',
-			keep: `${alias[1]}shared/`,
-			abs: path.posix.normalize(`${PREFIX}_shared/${alias[2]}`)
+			keep: `${alias[1]}${alias[2]}/`,
+			abs: path.posix.normalize(`${PREFIX}_shared/${alias[3]}`)
 		});
 	// The token names the first of its readings that exists today; only then
 	// is it looked up. Otherwise SCRIPT_DIR .. "/modules/hotstrings" (the
