@@ -395,6 +395,14 @@ function run() {
 			'{ "patterns": ["ergopti_plus/_shared/zz_probe_text/codec/x_*.lua"] }',
 			'a glob whose folder moves whole'
 		);
+		// A driver-named base keeps its own folder of a shared folder's name.
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				'const a = `${SHARED_REL}/zz_probe_mod/hotstrings`;\nconst b = `${DRIVER_REL}/zz_probe_mod/hotstrings/b.lua`;'
+			),
+			'const a = `${SHARED_REL}/zz_probe_hs/data`;\nconst b = `${DRIVER_REL}/zz_probe_mod/hotstrings/b.lua`;'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
