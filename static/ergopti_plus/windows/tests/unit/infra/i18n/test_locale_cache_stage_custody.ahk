@@ -29,14 +29,20 @@ _ILSC_Case(Collision, StaleCache) {
 		_I18nFallbacksWarmed, _I18nMissWarned]
 	Root := A_Temp . "\ergopti_locale_stage_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
 	Folders := []
-	Path := Root . "\data\locales\de.json"
-	Tsv := Root . "\data\locales\de.tsv", Stage := Tsv . ".tmp"
+	; The locale folder under the shared root; the fixture makes each level of it.
+	LocalesRel := "\data\locales"
+	Path := Root . LocalesRel . "\de.json"
+	Tsv := Root . LocalesRel . "\de.tsv", Stage := Tsv . ".tmp"
 	Foreign := "independent locale staging bytes é😀`n"
 	Prior := "custody.key`tprevious translation`n" . _I18N_TSV_SENTINEL . "1`n"
 	Expected := "native translation é😀"
 	PreviousCritical := Critical("Off")
 	try {
-		for Folder in [Root, Root . "\data", Root . "\data\locales"] {
+		Folder := Root
+		FSCreateDirectoryExclusiveStrict(Folder)
+		Folders.Push(Folder)
+		for Part in StrSplit(Trim(LocalesRel, "\"), "\") {
+			Folder .= "\" . Part
 			FSCreateDirectoryExclusiveStrict(Folder)
 			Folders.Push(Folder)
 		}
@@ -92,7 +98,7 @@ _ILSC_Case(Collision, StaleCache) {
 		_I18nCacheFr := Saved[8], _I18nCacheFrLoaded := Saved[9]
 		_I18nFallbacksWarmed := Saved[10], _I18nMissWarned := Saved[11]
 		try {
-			if Folders.Length == 3 {
+			if Folders.Length == 1 + StrSplit(Trim(LocalesRel, "\"), "\").Length {
 				for Leaf in [Path, Tsv, Stage]
 					if !FSDelete(Leaf)
 						throw Error("The private locale fixture could not retire an owned leaf.")
