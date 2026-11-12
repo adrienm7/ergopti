@@ -40,6 +40,7 @@ const P = 'static/ergopti_plus/';
 const FAKE = [
 	'_shared/zz_probe_data/locales/en.json',
 	'_shared/zz_probe_mod/hotstrings/a.toml',
+	'_shared/zz_probe_mod/hotstrings/a.json',
 	'linux/zz_probe_mod/hotstrings/b.lua',
 	'_shared/zz_probe_lua/codec/x.lua',
 	'macos/zz_probe_vendor/manifest.lua',
@@ -51,6 +52,7 @@ const FAKE = [
 const MAP = new Map([
 	['_shared/zz_probe_data/locales/en.json', '_shared/core/zz_probe_i18n/data/locales/en.json'],
 	['_shared/zz_probe_mod/hotstrings/a.toml', '_shared/zz_probe_hs/data/a.toml'],
+	['_shared/zz_probe_mod/hotstrings/a.json', '_shared/zz_probe_hs/data/a.json'],
 	['_shared/zz_probe_lua/codec/x.lua', '_shared/zz_probe_text/codec/x.lua'],
 	['linux/zz_probe_mod/hotstrings/b.lua', 'linux/zz_probe_mod/hotstrings/b.lua'],
 	['macos/zz_probe_vendor/manifest.lua', 'macos/zz_probe_vendor/manifest.lua'],
@@ -411,6 +413,14 @@ function run() {
 				'--- zz_probe_mod/hotstrings/b.lua\nlocal d = Paths.shared("zz_probe_mod/hotstrings")'
 			),
 			'--- zz_probe_mod/hotstrings/b.lua\nlocal d = Paths.shared("zz_probe_hs/data")'
+		);
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				'const SKIP = /_shared\\/zz_probe_mod\\/hotstrings\\/a\\.(toml|json)$/;'
+			),
+			'const SKIP = /_shared\\/zz_probe_hs\\/data\\/a\\.(toml|json)$/;',
+			'a regex path with an extension alternation'
 		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
