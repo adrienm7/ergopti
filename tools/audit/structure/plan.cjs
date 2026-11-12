@@ -1657,6 +1657,22 @@ function scanFile(file, text, ctx) {
 				newRepo: target
 			});
 		}
+	// /_shared\/data\/identifiers\.(py|sh)/: a regex path with an extension
+	// alternation, respelled when every alternative moves to the same folder.
+	if (/\.(c?js|mjs)$/.test(file))
+		for (const m of text.matchAll(
+			/(?<![\w-])([\w-]+(?:\\\/[\w-]+)+)\\\.\(((?:[A-Za-z0-9]+\|)+[A-Za-z0-9]+)\)/g
+		)) {
+			const stem = m[1].replace(/\\\//g, '/');
+			const repo = stem.startsWith(PREFIX) ? stem : `${PREFIX}${stem}`;
+			const targets = m[2].split('|').map((ext) => byRepoPath.get(`${repo}.${ext}`));
+			if (targets.some((t) => !t || t === PREFIX)) continue;
+			const stems = new Set(targets.map((t, i) => t.slice(0, -(m[2].split('|')[i].length + 1))));
+			if (stems.size !== 1) continue;
+			const fresh = [...stems][0];
+			const spelled = stem.startsWith(PREFIX) ? fresh : fresh.slice(PREFIX.length);
+			add('path-regex', m[1], spelled.replace(/\//g, '\\/'), { oldRepo: repo, newRepo: fresh });
+		}
 	// A Lua module name in a tool's regular expression: /tap_hold\.hold_options/.test(src).
 	// Tools only: a page's /^network\.failure\./ matches a locale key.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
