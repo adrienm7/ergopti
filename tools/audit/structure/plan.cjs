@@ -1181,7 +1181,7 @@ function runtimeEditState(byLuaName, presentNames, tree, oldName, newName) {
 // expression arguments are the path; at least two of them, since one literal is
 // an ordinary path token.
 const JOIN_CALL =
-	/\b([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\(\s*((?:[A-Za-z_$][\w$.]*(?:\(\))?\s*,\s*)*)/g;
+	/\b([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\(\s*((?:[A-Za-z_$][\w$.]*(?:\((?:\s*[A-Za-z_$][\w$]*\s*)?\))?\s*,\s*)*)/g;
 const JOIN_LITERAL = /(['"])([\w@.-]+(?:\/[\w@.-]+)*)\1/y;
 const JOIN_COMMA = /\s*,\s*/y;
 
@@ -1264,6 +1264,24 @@ function resolveJoinedPath(j, byRepoPath, byRepoDir, successors, env = new Map()
 	const baseName = named[named.length - 1];
 	if (baseName && env.has(baseName))
 		return resolveOnBase(j, env.get(baseName), joined, byRepoPath, byRepoDir, successors);
+	// path.join(path.dirname(FIXTURE_DIR), '..', 'x'): the folder of a known base.
+	const ofDir = (baseName || '').match(/^path\.dirname\(\s*([A-Za-z_$][\w$]*)\s*\)$/);
+	// Its pieces follow only a base that stays: nothing respells the base
+	// expression itself, so a moving one is a refusal.
+	if (ofDir && env.has(ofDir[1])) {
+		const dir = path.posix.dirname(env.get(ofDir[1]));
+		if (newFolder(dir, byRepoDir, successors) !== dir)
+			return { kind: 'join-split', rendered: '(split)', oldRepo: dir, newRepo: null };
+	}
+	if (ofDir && env.has(ofDir[1]))
+		return resolveOnBase(
+			j,
+			path.posix.dirname(env.get(ofDir[1])),
+			joined,
+			byRepoPath,
+			byRepoDir,
+			successors
+		);
 	// resolve(SHARED_ROOT, 'modules/llm'): a base the file imports, named for _shared.
 	if (baseName && /^\w*shared\w*$/i.test(baseName))
 		return resolveOnBase(j, `${PREFIX}_shared`, joined, byRepoPath, byRepoDir, successors);
@@ -1524,6 +1542,18 @@ function scanFile(file, text, ctx) {
 		else add(prose ? 'dir-split-prose' : 'dir-split', raw, '(split)', hit);
 	}
 	const jsEnv = /\.(c?js|mjs)$/.test(file) ? jsConstants(text, file) : new Map();
+	// path.join(root, `../data/locales/${code}.json`): the template's leading
+	// folder joined onto a known base follows that folder.
+	for (const m of text.matchAll(
+		/\b(?:path\.)?(?:join|resolve)\(\s*([A-Za-z_$][\w$]*)\s*,\s*`((?:\.\.\/)*[\w.-]+(?:\/[\w.-]+)*)\/\$\{/g
+	)) {
+		if (!jsEnv.has(m[1])) continue;
+		const j = { parts: [m[2]], quote: '`', separator: '', text: `\`${m[2]}` };
+		const hit = resolveOnBase(j, jsEnv.get(m[1]), m[2], byRepoPath, byRepoDir, successors);
+		if (!hit || hit.kind !== 'join') continue;
+		const piece = hit.rendered.slice(1, -1);
+		add('join', m[0], m[0].replace(`\`${m[2]}/`, `\`${piece}/`), hit);
+	}
 	// root .. "locale_order.json" onto a folder constant of a Lua file.
 	const luaEnv = luaConstants(text, file, inTree);
 	for (const [name, base] of luaEnv) {
@@ -2040,6 +2070,21 @@ function jsConstants(text, file) {
 			}
 			return acc === null ? null : norm(acc || '.');
 		}
+		// shared('tests', 'corpus', 'x'): the tools' resolver of _shared paths.
+		const sharedCall = expr.match(/^[\w$.]*\bshared\(([^()]*)\)$/);
+		if (sharedCall) {
+			const pieces = sharedCall[1]
+				.split(',')
+				.map((x) => x.trim())
+				.filter(Boolean)
+				.map((x) => (x.match(/^(['"])([^'"]*)\1$/) || [])[2]);
+			if (pieces.every((x) => x !== undefined))
+				return norm([`${PREFIX}_shared`, ...pieces].join('/'));
+		}
+		// path.dirname(X): the folder holding a known path.
+		const dirnameCall = expr.match(/^path\.dirname\(\s*([A-Za-z_$][\w$]*)\s*\)$/);
+		if (dirnameCall && env.has(dirnameCall[1]))
+			return norm(path.posix.dirname(env.get(dirnameCall[1]) || '.'));
 		const tpl = expr.match(/^`\$\{([A-Za-z_$][\w$]*)\}\/([^`$]*)`$/);
 		if (tpl && env.has(tpl[1])) return norm(`${env.get(tpl[1]) || '.'}/${tpl[2]}`);
 		const lit = expr.match(/^(['"])((?:static\/ergopti_plus|tools|docs)(?:\/[^'"]*)?)\1$/);

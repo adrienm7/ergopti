@@ -351,6 +351,29 @@ function run() {
 			),
 			"for (const rel of ['zz_probe_hs/data/a.toml']) {\n\tfs.writeFileSync(resolve(sharedDir, rel), t);\n}"
 		);
+		// A template's leading folder, and the folder of a shared() constant.
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				"const root = path.resolve(__dirname, '../../static/ergopti_plus/_shared/zz_probe_mod');\nread(path.join(root, `hotstrings/${name}.toml`));"
+			),
+			"const root = path.resolve(__dirname, '../../static/ergopti_plus/_shared');\nread(path.join(root, `zz_probe_hs/data/${name}.toml`));"
+		);
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				"const F = shared('zz_unmoved', 'x');\nconst L = path.join(path.dirname(F), '..', 'zz_probe_mod', 'hotstrings', 'a.toml');"
+			),
+			"const F = shared('zz_unmoved', 'x');\nconst L = path.join(path.dirname(F), '..', 'zz_probe_hs', 'data', 'a.toml');"
+		);
+		// A derived base that would itself move has no respelling: a refusal.
+		assert.ok(
+			Plan.scanFile(
+				'tools/test/z.cjs',
+				"const F = shared('zz_probe_mod', 'x');\nconst L = path.join(path.dirname(F), 'hotstrings', 'a.toml');",
+				Plan.referenceContext(MAP)
+			).some((r) => Plan.REFUSED_KINDS.has(r.kind))
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
