@@ -1341,9 +1341,14 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### All drivers
 
-- [ ] **Structure plan (maintainer request 2026-11-11):** [docs/design/structure-plan.md](docs/design/structure-plan.md)
-      (Rule A, every common value and logic in `_shared`; Rule B, one tree in every OS folder); apply once the AHK and
-      Linux/macOS feature work is finished, one step per commit with `tools/audit/structure/apply-step.cjs`.
+- [ ] **Structure plan (maintainer request 2026-11-11):** [docs/design/structure-plan.md](docs/design/structure-plan.md).
+      Rule A: every common value, text and logic in `_shared`. Rule B, decided by the maintainer on 2026-11-11:
+      feature-first trees (`<feature>/{engine,adapters,ui,data,native}`, `core/`, `platform/`), the same on every
+      driver and in `_shared`; file prefixes the folder repeats are renamed away (`keystats_walker.ahk` →
+      `walker.ahk`); `remap` is named `keyboard`; tests stay in `tests/<kind>/` mirroring the feature tree.
+      Start trigger: the go comes from the maintainer, as soon as the maintainer's AHK session has pushed its last
+      feature commits; the coordinator then launches phase 2 at once, one step per commit with
+      `tools/audit/structure/apply-step.cjs` (`--check-all` must be clean first).
 - [x] **Linux PAC lists through GIO (found 2026-11-10).** On GNOME, GIO keeps only the first entry of a PAC answer
       (`PROXY a; DIRECT` reaches the driver as `a`), so the managed Ollama stage's browser-style walk cannot fall
       back to DIRECT when that relay is down (docs/memory `project-linux-gio-hides-pac-failures`). Decide whether to

@@ -51,7 +51,7 @@ const FEATURES = [
 	'menu',
 	'metrics',
 	'onboarding',
-	'remap',
+	'keyboard',
 	'settings',
 	'shortcuts',
 	'tap_hold',
@@ -102,7 +102,7 @@ const ALIASES = {
 	menu: 'menu',
 	tray: 'tray',
 	onboarding: 'onboarding',
-	remap: 'remap',
+	remap: 'keyboard',
 	tap_hold: 'tap_hold',
 	clipboard: 'clipboard',
 	apps: 'apps',
@@ -151,7 +151,7 @@ const ALIASES = {
 	native_artifacts: 'core/lifecycle',
 	text_and_paths: 'core/text',
 	personal_files: 'settings',
-	karabiner_isolation: 'remap',
+	karabiner_isolation: 'keyboard',
 	vscode_bridge: 'core/network',
 	file_watchers: 'core/fs',
 	app_picker: 'apps',
@@ -166,7 +166,7 @@ const ALIASES = {
 	runtime_owner_ports: 'diagnostics',
 	field_check_ports: 'diagnostics',
 	prediction_tooltip_port: 'ai',
-	karabiner_coexistence: 'remap'
+	karabiner_coexistence: 'keyboard'
 };
 
 // The aliases that are mere synonyms of their root: their folder dissolves
@@ -197,7 +197,6 @@ const SYNONYMS = new Set([
 	'lifecycle',
 	'network',
 	'text',
-	'text_utils',
 	'timings',
 	'file_system',
 	'process',
@@ -216,7 +215,7 @@ const LOGIC_FEATURES = [
 	],
 	['tap_hold', /^(tap_hold|one_shot_shift)/],
 	[
-		'remap',
+		'keyboard',
 		/^(chord|tap_keys|sticky_modifiers|altgr|script_altgr|script_chord|capsword|caps_word|capslock|key_combination|nav_layer|wrap_pair|wrap_symbols|magic_editor|composed_text|suppressive_inputhook|slot_roles|remap|layers_loader|desktop_navigation)/
 	],
 	[
@@ -295,7 +294,7 @@ const ADAPTER_FEATURES = [
 		/^(clipboard|selection_transaction|wayland_selection|x11_selection|editor_replace|accessibility_copies|unicode_carrier|uia_selection)/
 	],
 	['tap_hold', /^one_shot_shift/],
-	['remap', /^(karabiner|remap|system_switcher)/],
+	['keyboard', /^(karabiner|remap|system_switcher)/],
 	[
 		'layouts',
 		/^(keyboard_layout|input_source|installed_physical_source|layout|xkb_|x11_keymap|keyboard_source)/
@@ -366,7 +365,7 @@ const UI_FEATURES = [
 		'apps',
 		/^(app_chooser|bundled_apps|app_cloner_python_offer|desktop_application_resolution(_worker)?)$/
 	],
-	['remap', /^(virtual_hid_update|legacy_rules_cleanup)$/],
+	['keyboard', /^(virtual_hid_update|legacy_rules_cleanup)$/],
 	['core/network', /^proxy_override$/],
 	[
 		'core/ui',
@@ -393,7 +392,7 @@ const DATA_FEATURES = [
 	['shortcuts', /^(actions|shortcuts)$/],
 	['settings', /^(config|features)$/],
 	['diagnostics', /^(control|diagnostics|field_)/],
-	['remap', /^wrap_symbols$/],
+	['keyboard', /^wrap_symbols$/],
 	['apps', /^(app_cloner|encryptor)$/]
 ];
 
@@ -409,7 +408,7 @@ const TEST_DATA_FEATURES = [
 	['menu', /^(menu|tray|sni)/],
 	['settings', /^(config|toml|paths|profile|pause|script|scope)/],
 	['onboarding', /^onboarding/],
-	['remap', /^(sticky|wrap|chord|tap|caps)/],
+	['keyboard', /^(sticky|wrap|chord|tap|caps)/],
 	['clipboard', /^clipboard/],
 	[
 		'core',
@@ -435,7 +434,7 @@ const MENU_SECTIONS = [
 		'layouts',
 		/^(keyboard_layout|layouts?|active_layout_rows|pause_layout_rows|quit_layout|keyboard_slots)/
 	],
-	['remap', /^(caps_word|key_combinations)/],
+	['keyboard', /^(caps_word|key_combinations)/],
 	[
 		'settings',
 		/^(paths|configuration|language|scoped_preferences|preferences_transaction|unused_keys_cleanup)/
@@ -483,6 +482,10 @@ const SPLITS = {
 		strip: /^llm_(?!request)/,
 		table: [
 			[
+				'settings',
+				/^(profiles?|profile_settings|settings|.*_settings|enable_admission|api_key_migration|api_entries|api_token_store|error_log|display|models)/
+			],
+			[
 				'api',
 				/^(api_|remote_formats|request_plan|option_validation|parser|rs256_signer|streaming_handler|stream_payload|backend_|provider_uses|thinking_families|opaque_network|proxy_relay|network_env|context$)/
 			],
@@ -503,10 +506,6 @@ const SPLITS = {
 			[
 				'policy',
 				/(_policy$|_classifier$|^(failure_class|thinking_off|temperature|process_limits|provider_config|config_guard|app_identity|app_profile|process_port|finite_process_port|context_buffer))/
-			],
-			[
-				'settings',
-				/^(profiles?|profile_settings|settings|.*_settings|enable_admission|api_key_migration|api_entries|api_token_store|error_log|display|models)/
 			]
 		]
 	},
@@ -571,7 +570,7 @@ const SPLITS = {
 			]
 		]
 	},
-	'remap/engine': {
+	'keyboard/engine': {
 		strip: null,
 		table: [
 			[
@@ -607,23 +606,14 @@ const SPLITS = {
 			['reports', /^(crash|diagnostic|error_|issue_|redact|git_status)/]
 		]
 	},
-	'remap/adapters': {
+	'keyboard/adapters': {
 		strip: null,
 		table: [
 			['runtime', /^(runtime_|deploy_pacing|guardian|managed_rule|token_reuse)/],
 			['karabiner', /^(ke_|lease_|karabiner)/]
 		]
 	},
-	'ai/data': {
-		strip: null,
-		table: [
-			['local_servers', /^(local_server|mlx|managed_|ollama|validate_)/],
-			[
-				'policy',
-				/(_policy|_admission|thinking_off|display|parser_limits|model_capabilities|legacy_ids)/
-			]
-		]
-	},
+
 	'core/ui/engine': {
 		strip: null,
 		table: [
@@ -653,7 +643,7 @@ const SPLITS = {
 const OS_SPECIFIC = {
 	macos: {
 		launcher: 'the Swift host application of the macOS runtime',
-		'remap/data': 'Karabiner remap data that only the macOS remap runtime reads',
+		'keyboard/data': 'Karabiner remap data that only the macOS remap runtime reads',
 		'onboarding/ui': 'the macOS privacy (TCC) grant walkthrough lives here'
 	},
 	linux: {
@@ -754,13 +744,13 @@ function mapCode(rel, tree) {
 				const leaf = rest[rest.length - 1];
 				const stem = classStem(leaf);
 				if (rest.length === 1 && /^tap_hold/.test(stem)) return place('tap_hold', 'engine', rest);
-				if (rest[0] === 'data') return place('remap', 'data', rest.slice(1));
+				if (rest[0] === 'data') return place('keyboard', 'data', rest.slice(1));
 				if (
 					rest.length === 1 &&
 					/^(runtime_|ke_|lease_|deploy_pacing|managed_rule|token_reuse|guardian)/.test(stem)
 				)
-					return place('remap', 'adapters', rest);
-				return place('remap', 'engine', rest);
+					return place('keyboard', 'adapters', rest);
+				return place('keyboard', 'engine', rest);
 			}
 			if (segment === 'network') return place('core/network', 'adapters', rest);
 			if (segment === 'tray') return place('tray', 'adapters', rest);
@@ -826,12 +816,45 @@ function applySplits(rel) {
 }
 
 /**
+ * True when a path already has the target shape: a feature folder, a
+ * core/<domain> or platform/<domain> folder, or (in _shared) the folders that
+ * keep their place. Today's homonyms are told apart: _shared/tap_hold/ held
+ * flat data files, _shared/core/ held config_schema/ and domain/, and the
+ * drivers' platform/ held remap/, network/, tray/ and flat files.
+ */
+function isTargetShaped(tree, parts) {
+	let p = parts;
+	if (p[0] === 'tests') {
+		if (tree === '_shared')
+			return ['lua', 'corpus', 'fixtures', 'conformance'].includes(p[1]) && p[1] !== 'lua'
+				? true
+				: p[1] === 'lua' && p.length > 3;
+		if (!/^(unit|meta|integration|contract|e2e|fixtures|support|hardware)$/.test(p[1] || ''))
+			return false;
+		p = p.slice(2);
+	}
+	const [first, second] = p;
+	if (p.length < 2) return false;
+	if (first === 'core') {
+		if (tree === '_shared' && (second === 'ports' || second === 'features.json')) return true;
+		return CORE_DOMAINS.includes(second) && p.length > 2;
+	}
+	if (first === 'platform') return PLATFORM_DOMAINS.includes(second) && p.length > 2;
+	if (!FEATURES.includes(first)) return false;
+	if (tree === '_shared' && first === 'tap_hold' && p.length === 2) return false;
+	return true;
+}
+
+/**
  * Maps one tree-relative path ("linux/infra/logger_sink.lua") to its target,
  * before the singleton pass.
  */
 function mapPath(treeRel) {
 	const [tree, ...restParts] = treeRel.split('/');
 	const rest = restParts.join('/');
+	// Already in the target tree: the rules are idempotent, so a step
+	// recomputed after its predecessors have landed moves nothing twice.
+	if (isTargetShaped(tree, restParts)) return treeRel;
 	if (tree === '_shared') return `_shared/${mapShared(rest)}`;
 	if (!DRIVERS.includes(tree)) return treeRel;
 
@@ -884,13 +907,12 @@ function mapShared(rest) {
 		const kept = isFile ? [segment] : hit.absorb ? tail : [segment, ...tail];
 		return place(hit.root, 'engine', kept);
 	}
-	if (root === 'ui') {
-		if (segment === '_generated' || segment === 'vendor')
-			return ['core', 'ui', 'web', segment, ...tail].join('/');
-		if (isFile) return place('core/ui', 'ui', ['web', segment]);
-		const feature = classify(UI_FEATURES, segment) || ALIASES[segment];
-		return feature ? place(feature, 'ui', [segment, ...tail]) : rest;
-	}
+	// _shared/ui/ is the webview document root: hosts build _shared/ui/<page>
+	// at runtime, pages import ../dom_utils.js, and the WebViews are allowed
+	// to read that one tree. It keeps its place (decided by the coordinator on
+	// 2026-11-11, to review by the maintainer); its page names already name
+	// their feature.
+	if (root === 'ui') return rest;
 	if (root === 'modules' || root === 'data') {
 		const stem = isFile ? classStem(segment) : segment;
 		const feature = classify(DATA_FEATURES, stem);
@@ -924,6 +946,188 @@ function mapShared(rest) {
 	return rest;
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Module names built at runtime
+// ──────────────────────────────────────────────────────────────────────────────
+
+// A Lua module name completed at runtime ("modules.llm." .. name) cannot be
+// found by a token scan. Each such site is listed with the names it builds,
+// so the plan can prove the new prefix reaches every one of them, and the
+// applier rewrites the prefix in that file only.
+const RUNTIME_PREFIXES = [
+	{
+		file: 'linux/infra/llm_scope.lua',
+		old: 'modules.llm.',
+		names: [
+			'settings',
+			'trigger_settings',
+			'display_settings',
+			'navigation_settings',
+			'profile_settings',
+			'agent_settings',
+			'profiles'
+		]
+	},
+	{
+		file: 'linux/ui/menu/unused_keys_cleanup.lua',
+		old: 'modules.llm.',
+		names: [
+			'settings',
+			'trigger_settings',
+			'display_settings',
+			'navigation_settings',
+			'profile_settings'
+		]
+	},
+	{
+		file: 'linux/tests/unit/modules/llm/runtime/test_scope_native_ack.lua',
+		old: 'modules.llm.',
+		names: ['api_ollama', 'api_remote']
+	},
+	{
+		file: 'macos/tests/support/llm_count_menu_fixture.lua',
+		old: 'ui.menu.menu_llm.',
+		names: ['temperature_panel', 'streaming_panel', 'trigger_panel']
+	},
+	{
+		file: 'macos/tests/support/physical_shortcut_registrar_fixture.lua',
+		old: 'modules.shortcuts.actions.',
+		names: ['text', 'apps', 'system']
+	},
+	{
+		file: 'macos/tests/support/physical_shortcut_scope_fixture.lua',
+		old: 'modules.shortcuts.actions.',
+		names: ['text', 'apps', 'system']
+	},
+	{
+		file: 'macos/tests/support/shortcuts_scope_fixture.lua',
+		old: 'modules.shortcuts.actions.',
+		names: ['text', 'apps', 'system']
+	},
+	{
+		file: 'macos/tests/unit/ui/menu/state/test_boot_saves_read_only.lua',
+		old: 'modules.shortcuts.',
+		// config-key-literal-ok: these are folder names that share a config key's spelling.
+		names: ['bindings', 'keyboard_shortcuts', 'tap_keys', 'script_control']
+	}
+];
+
+// A runtime-built name whose modules land under different prefixes: the site
+// is rewritten by a literal edit, and the plan checks that each old module
+// name reaches the new one the edit spells.
+const RUNTIME_EDITS = [
+	{
+		file: 'macos/tests/meta/boot/test_startup_optimizations.lua',
+		from: `for _, name in ipairs({ "gestures", "keymap", "shortcuts", "dynamic_hotstrings" }) do
+			local loaded = src:find('require("modules.' .. name .. '")', 1, true)`,
+		to: `for _, name in ipairs({ "gestures.engine", "hotstrings.engine.expander", "shortcuts.engine", "hotstrings.engine.dynamic" }) do
+			local loaded = src:find('require("' .. name .. '")', 1, true)`,
+		expect: [
+			['macos', 'modules.gestures', 'gestures.engine'],
+			['macos', 'modules.keymap', 'hotstrings.engine.expander'],
+			['macos', 'modules.shortcuts', 'shortcuts.engine'],
+			['macos', 'modules.dynamic_hotstrings', 'hotstrings.engine.dynamic']
+		],
+		prefix: 'modules.'
+	}
+];
+
+/** The old module names a runtime site builds: they keep their file names. */
+function pinnedModules() {
+	const out = new Set();
+	// By old module name, and by file stem in its tree, so a step recomputed
+	// after the move (where the old name is gone) keeps the pin.
+	for (const r of RUNTIME_PREFIXES)
+		for (const n of r.names)
+			out.add(`${r.file.split('/')[0]}|${r.old}${n}`).add(`${r.file.split('/')[0]}|stem:${n}`);
+	for (const e of RUNTIME_EDITS) for (const [tree, old] of e.expect) out.add(`${tree}|${old}`);
+	return out;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Prefix renames (decided by the maintainer on 2026-11-11)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Names a file keeps whatever prefix it carries: an entry point a loader looks
+// for by name, or a name too short to say anything once stripped.
+const RESERVED_STEMS = new Set([
+	'init',
+	'index',
+	'main',
+	'_index',
+	'readme',
+	'core',
+	'test',
+	'run',
+	'spec',
+	'fixture'
+]);
+
+// Only source files are renamed: data files, pages and assets are read by name.
+const RENAMED_EXTENSIONS = new Set(['.lua', '.ahk']);
+
+/** The singular a feature name has as a file prefix (layouts → layout_). */
+function singular(name) {
+	return name.endsWith('s') ? name.slice(0, -1) : name;
+}
+
+/**
+ * The prefixes a file's name may repeat once it sits in its feature folder:
+ * the feature (and its singular), every old folder name that is a synonym
+ * of that feature (keystats, llm, …), and each folder between the feature
+ * and the file. A prefix whose folder was folded away stays: menu_x.lua that
+ * lands directly in <feature>/ui/ keeps saying it is a menu section.
+ * @param {string} oldRel Path relative to its tree today.
+ * @param {string} newRel Path relative to its tree after the move.
+ */
+function redundantPrefixes(oldRel, newRel) {
+	const target = newRel.split('/');
+	const isTest = target[0] === 'tests';
+	const inner = isTest ? target.slice(2) : target;
+	// Only files inside a feature, core/<domain> or platform/<domain> folder.
+	const cross = ['core', 'platform'].includes(inner[0]);
+	if (inner.length < (cross ? 3 : 2) || (!cross && !FEATURES.includes(inner[0]))) return [];
+	const root = cross ? inner.slice(0, 2).join('/') : inner[0];
+	const out = new Set();
+	const last = root.split('/').pop();
+	out.add(last).add(singular(last));
+	for (const [alias, value] of Object.entries(ALIASES))
+		if (value === root && SYNONYMS.has(alias)) out.add(alias).add(singular(alias));
+	for (const folder of inner.slice(root.split('/').length, -1)) {
+		if (!SUBS.includes(folder)) out.add(folder).add(singular(folder));
+	}
+	return [...out].filter((p) => p.length >= 2).sort((a, b) => b.length - a.length);
+}
+
+/**
+ * The name a moved source file takes: its leading redundant prefixes
+ * stripped (keystats_walker.ahk in metrics/engine/walker/ → walker.ahk), as
+ * long as something meaningful remains. A test keeps its test_ marker. The
+ * caller keeps the old name when the new one is not unique in its folder.
+ * @returns {string} The file name, unchanged when nothing applies.
+ */
+function strippedName(oldRel, newRel) {
+	const name = newRel.split('/').pop();
+	const ext = name.slice(name.lastIndexOf('.'));
+	if (!RENAMED_EXTENSIONS.has(ext) || /(^|\/)(_generated|vendor|data)\//.test(newRel)) return name;
+	let stem = name.slice(0, -ext.length);
+	const marker = (stem.match(/^(test_|run_)/) || [''])[0];
+	stem = stem.slice(marker.length);
+	const prefixes = redundantPrefixes(oldRel, newRel);
+	for (let changed = true; changed; ) {
+		changed = false;
+		for (const p of prefixes) {
+			if (!stem.startsWith(`${p}_`)) continue;
+			const rest = stem.slice(p.length + 1);
+			if (rest.length < 2 || /^\d/.test(rest) || RESERVED_STEMS.has(rest)) continue;
+			stem = rest;
+			changed = true;
+			break;
+		}
+	}
+	return `${marker}${stem}${ext}`;
+}
+
 module.exports = {
 	FEATURES,
 	CORE_DOMAINS,
@@ -933,5 +1137,9 @@ module.exports = {
 	OS_SPECIFIC,
 	SPLITS,
 	classStem,
+	strippedName,
+	RUNTIME_PREFIXES,
+	RUNTIME_EDITS,
+	pinnedModules,
 	mapPath
 };
