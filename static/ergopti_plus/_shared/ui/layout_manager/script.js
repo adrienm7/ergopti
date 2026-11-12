@@ -441,9 +441,9 @@ window.initData = function (data) {
 		_strings = data.strings;
 		applyDomStrings();
 	}
-	// Only a host that stores the editor's files offers it (macOS and Linux).
+	// Only a host that stores the editor's files offers it (all three drivers).
 	// There the editor replaces the composer, which fills layers from the same
-	// sources; Windows keeps the composer until its host accepts a source.
+	// sources.
 	const editor = data.source_editor === true;
 	document.getElementById('btn-editor').hidden = !editor;
 	document.getElementById('btn-compose').hidden = editor;
@@ -507,6 +507,11 @@ function hostInstall(payload) {
 		const message = { source: payload.source, keylayout: payload.keylayout, use: true };
 		// The drivers perform the source's emulation table for what the .keylayout cannot hold.
 		if (payload.emulation !== undefined) message.emulation = payload.emulation;
+		// The Windows host registers the layout DLL images the page wrote.
+		if (payload.dlls !== undefined) {
+			message.dll_name = payload.dll_name;
+			message.dlls = payload.dlls;
+		}
 		send('composer_save', undefined, message);
 	});
 }
@@ -635,6 +640,9 @@ window.sourcePicked = function (data) {
  */
 window.sourceData = function (data) {
 	const initial = data && typeof data.text === 'string' ? data.text : null;
+	// A host that does not seed window._i18n_strings (Windows) sends the editor's strings here.
+	if (data && data.strings && typeof data.strings === 'object')
+		window._i18n_strings = Object.assign({}, window._i18n_strings || {}, data.strings);
 	showEditor(true);
 	if (_editor) {
 		if (initial !== null) _editor.open(data.filename, initial);

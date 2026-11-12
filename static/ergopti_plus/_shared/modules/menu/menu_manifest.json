@@ -2407,13 +2407,7 @@
 		{
 			"type": "command",
 			"id": "open_layout_editor",
-			"i18n": "menu.layout.edit",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_editor_is_on_the_website_on_windows"
+			"i18n": "menu.layout.edit"
 		},
 		{
 			"type": "list",

@@ -739,28 +739,52 @@ check('the three hosts accept exactly the actions the page sends', () => {
 	const ahkBlock = /global LAYMGR_ACTIONS := Map\(([\s\S]*?)\)\n/.exec(ahk);
 	assert.ok(ahkBlock, 'the Windows host declares no LAYMGR_ACTIONS');
 	const ahkActions = [...ahkBlock[1].matchAll(/"([a-z_]+)", true/g)].map((m) => m[1]).sort();
-	// The layout editor's file, navigation layer and emulate actions are wired on macOS and Linux; the Windows
-	// host (WebView2, the maintainer's) does not offer them yet, so its initData
-	// sends no source_editor and the page hides the editor button there. Decided
-	// by the coordinator on 2026-11-11 overnight, to review by the maintainer.
-	// Once Windows accepts them, this list must be emptied.
-	const windowsPending = [
-		'source_open',
-		'source_save',
-		'source_pick',
-		'nav_save',
-		'composer_emulate'
-	];
-	for (const action of windowsPending)
-		assert.ok(
-			!ahkActions.includes(action),
-			`the Windows host accepts ${action}: drop it from windowsPending`
-		);
+	// The Windows host offers the layout editor too (docs/design/layout-editor.md
+	// « Windows host »): no action of the page is pending there any more.
+	const windowsPending = [];
 	assert.deepEqual(
 		ahkActions,
 		page.filter((action) => !windowsPending.includes(action)),
 		'the Windows host accepts another list'
 	);
+});
+
+check('« Install and use » forwards the Windows layout DLL images the page wrote', () => {
+	const { context, window, messages } = loadPage();
+	window.initData({
+		strings,
+		state: { platform: 'windows', shortcut_menu_path: SHORTCUT_MENU.windows, index, installed: {} },
+		source_editor: true
+	});
+	let host = null;
+	context.LayoutEditorPage = {
+		mount: (root, options) => {
+			host = options;
+			return { open: () => {} };
+		}
+	};
+	window.sourceData({ text: null, strings: { 'layout_editor.btn.install': 'Install' } });
+	assert.ok(host, 'the editor is mounted on sourceData');
+	assert.equal(
+		window._i18n_strings['layout_editor.btn.install'],
+		'Install',
+		'the strings sent with sourceData reach the editor'
+	);
+	host.install({
+		source: 'format = "ergopti-layout"\n',
+		keylayout: '<?xml?>',
+		emulation: '{}',
+		dll_name: 'kbdmine',
+		dlls: { x86: 'TVo=', wow64: 'TVo=', x64: 'TVo=', arm64: 'TVo=' }
+	});
+	const sent = plain(messages[messages.length - 1]);
+	assert.equal(sent.action, 'composer_save');
+	assert.equal(sent.dll_name, 'kbdmine');
+	assert.deepEqual(Object.keys(sent.dlls).sort(), ['arm64', 'wow64', 'x64', 'x86']);
+	window.composerResult({ action: 'composer_save', ok: true });
+	host.install({ source: 's', keylayout: 'k' });
+	const plainSave = plain(messages[messages.length - 1]);
+	assert.ok(!('dlls' in plainSave), 'a host without images sends none');
 });
 
 check('every host names the shortcut menu file the page counts', () => {
