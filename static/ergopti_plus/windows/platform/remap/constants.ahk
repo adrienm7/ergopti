@@ -205,13 +205,16 @@ TapHoldLoneTapMaxMs() {
 TapHoldsLoadTimings() {
 	global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
 	global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
-	global TAP_COPY_VERIFY_MS
+	global TAP_COPY_VERIFY_MS, TAPHOLD_MAX_ACTIVATION_SECONDS
 	TAP_COPY_VERIFY_MS          := TimingsGet("tap_hold", "copy_verify_ms")
 	TAP_MIN_DURATION_MS         := TimingsGet("tap_hold", "tap_min_duration_ms")
 	KEY_REPEAT_INITIAL_DELAY_MS := TimingsGet("tap_hold", "key_repeat_initial_delay_ms")
 	KEY_REPEAT_INTERVAL_MS      := TimingsGet("tap_hold", "key_repeat_interval_ms")
 	ONE_SHOT_SHIFT_TIMEOUT_SEC  := TimingsGetSec("tap_hold", "one_shot_shift_timeout_ms")
 	TAPHOLD_DEFAULT_ACTIVATION_SECONDS := TimingsGetSec("tap_hold", "default_activation_ms")
+	; The bound of every delay, the registry's as on macOS and Linux (TCL-005);
+	; tap_hold_loader.ahk declares it for the headless suites that load no registry.
+	TAPHOLD_MAX_ACTIVATION_SECONDS := TimingsGetSec("tap_hold", "max_activation_ms")
 }
 
 
