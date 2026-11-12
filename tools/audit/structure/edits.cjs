@@ -137,6 +137,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 			"\t\tf.startsWith('static/ergopti_plus/_shared/settings/data/config_schema/') ||\n"
 	},
 	{
+		// The gate coverage test probes a contract under each of those trees;
+		// _shared/core becomes a feature folder, its contracts are the ports.
+		file: 'tools/test/test-shared-lua-gate-coverage.cjs',
+		empties: '_shared/core/config_schema',
+		from: "for (const tree of ['core', 'tests']) {",
+		to: "for (const tree of ['core/ports', 'tests']) {"
+	},
+	{
 		// The Go sources join the native folder, which the pattern above
 		// already excludes (the edit holds the new spelling of both).
 		file: 'tools/build/macos-bundle-manifest.json',
