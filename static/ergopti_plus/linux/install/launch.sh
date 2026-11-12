@@ -135,7 +135,9 @@ ergopti_restart_lock_holders() {
 	# shellcheck source=../_generated/launch_timings.sh
 	source "$DRIVER_ROOT/_generated/launch_timings.sh"
 	local wait_ms=$((ERGOPTI_USER_QUIT_DEADLINE_MS + ERGOPTI_QUIT_HANDSHAKE_MARGIN_MS))
-	flock -w "$((wait_ms / 1000))" 9
+	# BusyBox flock has no -w: a blocking flock under timeout bounds the wait on
+	# util-linux and BusyBox alike.
+	timeout "$((wait_ms / 1000))" flock 9
 }
 
 # Every daemon launch, including a terminal launch, takes the instance lock.
@@ -184,8 +186,11 @@ if "$DAEMON_LAUNCH"; then
 			# #SingleInstance Force does (MLC-003, decided by the maintainer on
 			# 2026-11-11): the lock holders are asked for their controlled exit
 			# (SIGTERM), and the launch takes the lock once they released it.
+			# A tray launch that cannot restart the holder keeps its session
+			# start contract (status 0); a direct launch reports EX_TEMPFAIL.
 			if ! ergopti_restart_lock_holders "$lock_root/ergopti.lock"; then
 				ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
+				if "$SESSION_START"; then exit 0; fi
 				exit 75
 			fi
 		else
