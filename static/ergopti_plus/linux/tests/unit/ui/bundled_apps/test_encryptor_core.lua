@@ -100,6 +100,21 @@ helpers.describe("Linux Encryptor (shared container)", function()
 		cleanup(dir)
 	end)
 
+	helpers.it("(bap-001-folder-destination) refuses a folder destination instead of reporting success", function()
+		local dir = work_dir()
+		local vector = VECTORS.containers[1]
+		write(dir .. "/v.enc", from_hex(vector.container_hex))
+		os.execute("mkdir " .. quote(dir .. "/v"))
+		local ok, reason = Core.convert(FORMAT, "decrypt", dir .. "/v.enc", dir .. "/v", vector.password, "openssl")
+		helpers.assert_true(not ok, "the folder is not replaced")
+		helpers.assert_eq(reason, "destination_is_folder")
+		local pipe = io.popen("ls -A " .. quote(dir .. "/v"))
+		local listing = pipe:read("*a")
+		pipe:close()
+		helpers.assert_eq(listing, "", "no stage is left inside the folder")
+		cleanup(dir)
+	end)
+
 	helpers.it("encryptor: never puts the password in a command line", function()
 		local dir = work_dir()
 		write(dir .. "/a", "x")
@@ -114,6 +129,30 @@ helpers.describe("Linux Encryptor (shared container)", function()
 		for _, command in ipairs(seen) do
 			helpers.assert_true(not command:find("s3ntinel", 1, true), "password in: " .. command)
 		end
+		cleanup(dir)
+	end)
+
+	helpers.it("(bap-007-failure-reason) a refused write names its reason; a wrong password does not", function()
+		local dir = work_dir()
+		local vector = VECTORS.containers[1]
+		write(dir .. "/v.enc", from_hex(vector.container_hex))
+		write(dir .. "/w.enc", from_hex(vector.container_hex))
+		os.execute("mkdir " .. quote(dir .. "/v"))
+		local answers = { vector.password, VECTORS.wrong_password }
+		local errors = {}
+		local dialogs = {
+			entry = function() return table.remove(answers, 1) end,
+			message = function(kind, _, text) if kind == "error" then errors[#errors + 1] = text end return true end,
+			question = function() return true end,
+			file = function() error("no picker expected") end,
+		}
+		local outcomes = Core.run({ dir .. "/v.enc", dir .. "/w.enc" }, {
+			dialogs = dialogs, t = function(key) return key end, format = FORMAT, openssl = "openssl",
+			reveal = function() end,
+		})
+		helpers.assert_eq(outcomes, { "failed", "failed" })
+		helpers.assert_eq(errors[1], "apps.encryptor.err_decrypt_failed\n\napps.encryptor.reason_destination_folder")
+		helpers.assert_eq(errors[2], "apps.encryptor.err_decrypt_failed", "the wrong password keeps the plain message")
 		cleanup(dir)
 	end)
 

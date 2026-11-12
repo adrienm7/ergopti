@@ -170,6 +170,24 @@ local function controller(state, context)
 			return false
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- A layout that changed while it is the emulated one reloads the
+		-- emulation: an uninstalled one stays chosen and stops, a reinstalled one
+		-- resumes (maintainer decision, 2026-11-12), and the tray shows its state
+		-- (LMH-001, LMH-002).
+		layout_changed = function(id)
+			if not emulation or type(emulation.status) ~= "function" or emulation.status().id ~= id then return end
+			emulation.reload_if_started()
+			if type(state.on_config_changed) == "function" then state.on_config_changed() end
+		end,
+		-- The extension catalogue is read once per boot: a layout whose
+		-- extension was installed or removed loads or drops its hotstrings
+		-- through a daemon reload, as Windows' _LayMgrWeb_After does (LMH-004).
+		reload_extensions = function()
+			if type(state.on_reload) ~= "function" then return false end
+			return state.on_reload() == true
+		end,
+		-- A paused driver admits only the page's ready signal, as on Windows (LMH-003).
+		is_paused = function() return type(state.is_paused) == "function" and state.is_paused() == true end,
 		-- The layout editor applies a source's navigation layer through the
 		-- navigation layer editor's own save (ui/layer_editor/bridge.lua).
 		apply_nav = layer_editor and function(text, done)
@@ -190,6 +208,9 @@ local function controller(state, context)
 				done(false, "emulate_failed", "the layout emulation did not reload the composed layout")
 				return
 			end
+			-- The tray ticks the newly emulated layout, as the menu row and macOS
+			-- do (LMH-005).
+			if type(state.on_config_changed) == "function" then state.on_config_changed() end
 			if current() then done(true) end
 		end or nil,
 	})

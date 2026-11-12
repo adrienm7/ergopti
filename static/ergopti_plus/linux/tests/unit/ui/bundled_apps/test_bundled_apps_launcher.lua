@@ -58,7 +58,7 @@ helpers.describe("Linux bundled apps launcher", function()
 		local deps, state = fake_deps()
 		helpers.assert_true(Apps.launch(Apps.APPS[2], deps))
 		local environment = {}
-		for _, pair in ipairs(state.spawned[1][3]) do environment[pair[1]] = pair[2] end
+		for _, pair in ipairs(state.spawned[#state.spawned][3]) do environment[pair[1]] = pair[2] end
 		helpers.assert_eq(environment.LUA_PATH, package.path)
 		helpers.assert_eq(environment.LUA_CPATH, package.cpath)
 		helpers.assert_eq(environment.ERGOPTI_RUNTIME_PREFIX, "/opt/runtime")
@@ -81,12 +81,33 @@ helpers.describe("Linux bundled apps launcher", function()
 		helpers.assert_contains(command, quote(host))
 	end)
 
+	helpers.it("(bap-008-encryptor-entries) opens .enc by default and keeps « Open with » for any file", function()
+		local deps, state = fake_deps()
+		helpers.assert_true(Apps.launch(Apps.APPS[2], deps))
+		local visible = state.files["/home/u/.local/share/applications/ergopti-encryptor.desktop"]
+		helpers.assert_contains(visible, "MimeType=application/x-ergopti-encrypted;\n")
+		helpers.assert_true(not visible:find("octet%-stream"), "the visible entry is no opener of any file")
+		helpers.assert_true(not visible:find("NoDisplay"), "the visible entry stays in the menus")
+		local any = state.files["/home/u/.local/share/applications/ergopti-encryptor-any.desktop"]
+		helpers.assert_contains(any, "MimeType=application/octet-stream;\n")
+		helpers.assert_contains(any, "NoDisplay=true\n")
+		local package = state.files["/home/u/.local/share/mime/packages/ergopti-encryptor.xml"]
+		helpers.assert_contains(package, '<mime-type type="application/x-ergopti-encrypted">')
+		helpers.assert_contains(package, '<glob pattern="*.enc"/>')
+		-- Only the .enc type is given a default opener.
+		local register = state.spawned[1]
+		helpers.assert_eq(register[1], "/bin/sh")
+		helpers.assert_contains(register[2][2], "xdg-mime default 'ergopti-encryptor.desktop' 'application/x-ergopti-encrypted'")
+		helpers.assert_contains(register[2][2], "update-mime-database '/home/u/.local/share/mime'")
+		helpers.assert_true(not register[2][2]:find("octet"), "no default for any file")
+		helpers.assert_eq(state.spawned[2][1], "/opt/runtime/bin/luajit", "then the app starts")
+	end)
+
 	helpers.it("bundled apps: writes the Encryptor drop target with its file field code", function()
 		local deps, state = fake_deps()
 		helpers.assert_true(Apps.launch(Apps.APPS[2], deps))
 		local entry = state.files["/home/u/.local/share/applications/ergopti-encryptor.desktop"]
 		helpers.assert_contains(entry, 'Exec="/bin/sh" "/home/u/.local/share/ergopti/apps/ergopti-encryptor.sh" %F\n')
-		helpers.assert_contains(entry, "MimeType=application/octet-stream;\n")
 		helpers.assert_contains(entry, "Comment=[menu.apps.encrypt_desc]\n")
 		local launcher = state.files["/home/u/.local/share/ergopti/apps/ergopti-encryptor.sh"]
 		helpers.assert_contains(launcher, "export ERGOPTI_RUNTIME_PREFIX='/opt/runtime'\n")

@@ -16,6 +16,9 @@
  * canonical at all. This guard pins the shared bridge's mirrored constants to
  * defaults.json and forbids the old divergent literals from reappearing in the
  * Linux consumers (they must defer to linux_bridge / prompt_builder).
+ * Request deadlines (NET-003): a local Ollama request on Linux and macOS reads
+ * [llm] ollama_request_timeout_ms, remote requests read [llm]
+ * request_timeout_ms; neither reads the other's key or a typed copy.
  * ==============================================================================
  */
 
@@ -142,19 +145,57 @@ if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
 	);
 }
 
-// ── 5. Linux Ollama request timeout must come from the timings registry
+// ── 5. LLM request deadlines come from the timings registry (NET-003)
+// A local Ollama request reads [llm] ollama_request_timeout_ms (the cold-load
+// budget Windows grants), remote requests keep [llm] request_timeout_ms. Each
+// side is pinned to its key, and a typed copy of either budget is refused.
 // Scanned RAW (not comment-stripped): the literal lives in a shell string and
 // Lua's "--" comment marker would otherwise clip the max-time token.
-const linuxOllamaRaw = read('linux/modules/llm/api_ollama.lua');
-if (/--max-time 30\b/.test(linuxOllamaRaw)) {
-	errors.push(
-		'linux/modules/llm/api_ollama.lua: magic curl timeout literal — use Timings.sec("llm", "request_timeout_ms")'
-	);
+const timingsToml = read('_shared/modules/timings/constants.toml');
+for (const key of ['request_timeout_ms', 'ollama_request_timeout_ms']) {
+	if (!new RegExp(`^${key}\\s*=\\s*\\d+`, 'm').test(timingsToml)) {
+		errors.push(`_shared/modules/timings/constants.toml: [llm] ${key} is missing`);
+	}
 }
-if (!linuxOllamaRaw.includes('Timings.sec("llm", "request_timeout_ms")')) {
-	errors.push(
-		'linux/modules/llm/api_ollama.lua: must read the LLM request timeout from Timings.sec("llm", "request_timeout_ms")'
-	);
+const readsKey = (src, key) =>
+	new RegExp(
+		`Timings\\.(?:ms|sec)\\("llm", "${key}"\\)|timings"\\)\\.(?:ms|sec)\\("llm", "${key}"\\)`
+	).test(src);
+const TYPED_DEADLINE = /--max-time \d|timeout_ms\s*=\s*\d|\b(?:30000|180000)\b/;
+const deadlineOwners = [
+	{
+		file: 'linux/modules/llm/api_ollama.lua',
+		key: 'ollama_request_timeout_ms',
+		other: 'request_timeout_ms'
+	},
+	{
+		file: 'macos/modules/llm/api_ollama.lua',
+		key: 'ollama_request_timeout_ms',
+		other: 'request_timeout_ms'
+	},
+	{
+		file: 'linux/modules/llm/api_remote.lua',
+		key: 'request_timeout_ms',
+		other: 'ollama_request_timeout_ms'
+	}
+];
+for (const owner of deadlineOwners) {
+	const raw = read(owner.file);
+	if (!readsKey(raw, owner.key)) {
+		errors.push(
+			`${owner.file}: must read its request deadline from Timings ("llm", "${owner.key}")`
+		);
+	}
+	if (readsKey(raw, owner.other)) {
+		errors.push(
+			`${owner.file}: reads "${owner.other}", the other side's budget — use "${owner.key}"`
+		);
+	}
+	if (TYPED_DEADLINE.test(stripLua(raw)) || /--max-time \d/.test(raw)) {
+		errors.push(
+			`${owner.file}: typed request deadline — read "${owner.key}" from the timings registry`
+		);
+	}
 }
 
 if (errors.length > 0) {

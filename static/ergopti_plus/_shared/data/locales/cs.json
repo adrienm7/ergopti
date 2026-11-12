@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Soubor:",
 	"apps.encryptor.prompt_confirm": "Potvrdit heslo:",
 	"apps.encryptor.prompt_password": "Heslo:",
+	"apps.encryptor.reason_cannot_write": "Soubor nelze do této složky zapsat.",
+	"apps.encryptor.reason_destination_folder": "Cíl je složka.",
 	"apps.encryptor.success_decrypted": "Soubor dešifrován:",
 	"apps.encryptor.success_encrypted": "Soubor zašifrován:",
 	"apps.encryptor.title_decrypt": "Dešifrovat soubor",

@@ -100,6 +100,12 @@ local function manager(options)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = function(path) return state.files[path] end,
+		read_bounded = function(path, max_bytes)
+			local text = state.files[path]
+			if text == nil then return nil, "absent" end
+			if #text > max_bytes then return nil, "too_large" end
+			return text, "ok"
+		end,
 		write = function(path, content) state.files[path] = content; return true end,
 		create = function(path, content)
 			if state.files[path] ~= nil then return false, "exists" end
