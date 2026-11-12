@@ -33,6 +33,10 @@ Startup refusals (tap-hold, signal handlers) keep their status: a
 deterministic refusal would restart every three seconds under
 `Restart=on-failure`.
 
+The degraded tray Quit (the fallback menu of a daemon whose tray adapter
+failed) takes the same user Quit owner; an owner that raises is logged and
+the shutdown is still requested, since that row is the last way out.
+
 LCY-002 pins the language the Linux unit tests read to French
 (`tests/support/session_language.lua`), the catalogue their fixtures were
 written against; children keep the real environment.
@@ -57,7 +61,5 @@ written against; children keep the real environment.
 
 ## Left
 
-- The degraded tray Quit (the tray adapter failed to load) still ends the
-  daemon without the user Quit owner; it keeps the watcher report.
 - Native receiving (a real systemd user session, a real resume) is
   unqualified.
