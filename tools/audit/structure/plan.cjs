@@ -778,12 +778,40 @@ function isSharedArgument(text, index) {
 	// const SOURCES = ['data/x.json', …] … SOURCES.map((s) => sharedRel(s)):
 	// the elements of a list the file hands to a shared helper.
 	if (sharedLists(text).some(([from, to]) => index > from && index < to)) return true;
+	// paths.shared = function(path) if path == "modules/hotstrings" …: the
+	// argument a stand-in of a shared resolver is compared with.
+	if (
+		sharedStandIns(text).some((sc) => index > sc.from && index < sc.to && sc.compare.test(before))
+	)
+		return true;
 	// read('lua/test/format.lua', SHARED): the base comes after the path.
 	if (/^[^"'`\n]*["'`]\s*,\s*\w*SHARED\w*\s*\)/.test(text.slice(index, index + 200))) return true;
 	return (
 		/\b\w*[sS]hared(?!_llm)\w*\(\s*["'`]$/.test(before) &&
 		!/shared_llm_path\(\s*["'`]$/.test(before)
 	);
+}
+
+let standInText = null;
+let standIns = [];
+/**
+ * The stand-ins a test assigns to a shared resolver (paths.shared =
+ * function(path) … end), each with the lines its parameter is compared in.
+ * @returns {Array<{from: number, to: number, compare: RegExp}>}
+ */
+function sharedStandIns(text) {
+	if (text === standInText) return standIns;
+	standIns = [];
+	for (const m of text.matchAll(
+		/\b[\w.]*[sS]hared(?!_llm)\w*\s*=\s*function\s*\(\s*([A-Za-z_]\w*)/g
+	))
+		standIns.push({
+			from: m.index,
+			to: m.index + 1500,
+			compare: new RegExp(`\\b${m[1]}\\s*[=~!]==?\\s*["'\`]$`)
+		});
+	standInText = text;
+	return standIns;
 }
 
 let listText = null;
