@@ -107,7 +107,8 @@ _LFGY_RenderCarriesItsOwnGuard() {
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in the driver source")
 
-	ShowAt := InStr(Body, "LLM_Tooltip_Show(display_slots")
+	; The engine paints through its TooltipRenderer port.
+	ShowAt := InStr(Body, '_LLM_Engine_Port("tooltip").Show(display_slots')
 	Assert(ShowAt > 0, "the tooltip render must still exist")
 
 	; The last render-side guard owns the tooltip call. Earlier final-only guards
