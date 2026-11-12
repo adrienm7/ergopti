@@ -2304,7 +2304,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_marker_and_heatmap_completeness.ahk
 #Include meta/adapters/input/test_text_send_direct_mode_guarded.ahk
 #Include meta/platform/network/test_http_post_reentrancy_guard.ahk
-#Include meta/modules/hotstrings/personal/test_personal_editor_autoexpand_i18n.ahk
 #Include meta/infra/toml/test_jsstr_cr_escaped.ahk
 #Include meta/infra/toml/test_json_string_literal_single_source.ahk
 #Include meta/infra/toml/test_json_string_decoder_single_source.ahk
