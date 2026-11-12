@@ -48,8 +48,17 @@ const NEVER_REWRITTEN = [
 	/^docs\/design\/structure-plan(\/|\.md$)/,
 	/^CHANGELOG/,
 	/^tools\/audit\/structure\/(?!rules\.cjs$)/,
-	/^tools\/test\/test-structure-[\w-]+\.cjs$/
+	/^tools\/test\/test-structure-[\w-]+\.cjs$/,
+	// Third-party code, pinned by its vendor digests; its paths are its own.
+	/^static\/ergopti_plus\/_shared\/ui\/vendor\/[^/]+\.js$/,
+	/^static\/ergopti_plus\/windows\/vendor\/(?:ComVar|Promise|UIA|WebView2)\.ahk$/,
+	/^static\/ergopti_plus\/macos\/vendor\/hs_asm\//
 ];
+
+/** True for a file no structure step rewrites. */
+function neverRewritten(file) {
+	return NEVER_REWRITTEN.some((re) => re.test(file));
+}
 const TEXT_LIMIT_BYTES = 2 * 1024 * 1024;
 const BINARY =
 	/\.(png|jpe?g|gif|ico|icns|webp|mp4|mov|woff2?|ttf|otf|zip|gz|xz|tar|dll|exe|dylib|so|a|o|bin|db|sqlite|pdf|keylayout\.bin)$/i;
@@ -333,7 +342,7 @@ function textFiles() {
 				})
 				.split('\0')
 				.filter(Boolean)
-				.filter((f) => !BINARY.test(f) && !NEVER_REWRITTEN.some((re) => re.test(f)))
+				.filter((f) => !BINARY.test(f) && !neverRewritten(f))
 		: [];
 }
 
@@ -2324,6 +2333,7 @@ if (require.main === module) main();
 
 module.exports = {
 	SPLIT,
+	neverRewritten,
 	EXISTING,
 	referenceContext,
 	scanFile,

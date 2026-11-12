@@ -534,6 +534,10 @@ function run() {
 		const coordinates = (t) => t.split('\n').filter((l) => /@[A-Za-z]?:?[/.\\]/.test(l));
 		assert.deepEqual(coordinates(out), coordinates(text), `${e.file}: ${e.why}`);
 	}
+	// Third-party code keeps its own paths; our scripts in a vendor folder move.
+	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
+	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));
+	assert.ok(!Plan.neverRewritten('static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1'));
 	console.log('[OK] every path form the structure plan rewrites follows the moved file.');
 }
 
