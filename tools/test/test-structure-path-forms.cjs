@@ -266,6 +266,17 @@ function run() {
 			'It lives in _shared/zz_probe_text/.',
 			'a folder that ends its sentence'
 		);
+		// A lone scattered folder whose nearest new folder is the tree root
+		// itself would become an empty name: the step refuses it.
+		const lone = Plan.scanFile(
+			`${P}linux/tests/z.lua`,
+			'mkdir(shared_dir .. "/zz_probe_mod")',
+			Plan.referenceContext(MAP)
+		);
+		assert.ok(
+			lone.some((r) => Plan.REFUSED_KINDS.has(r.kind)),
+			'a lone root-successor folder in live code refuses the step'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(

@@ -1475,9 +1475,20 @@ function scanFile(file, text, ctx) {
 		const prose = isProse(file, text, code, m.index);
 		const successor = successors.get(hit.oldRepo);
 		const deep = successor && successor.split('/').length > 3;
+		// A lone scattered folder whose nearest new folder is a tree root
+		// itself names no folder at all in live code (tmp .. "/modules" became
+		// tmp .. ""): a refusal, not an empty name.
+		const rootOnly =
+			successor &&
+			Census.TREES.some((t) => successor === `${PREFIX}${t}`) &&
+			raw
+				.replace(/\\/g, '/')
+				.replace(/^\/+|\/+$/g, '')
+				.split('/').length === 1;
 		if (prose && deep) add('dir', raw, successor, { ...hit, newRepo: successor });
 		else if (prose) add('dir-split-prose', raw, '(split)', hit);
-		else if (successor) add('dir-successor', raw, successor, { ...hit, newRepo: successor });
+		else if (successor && !rootOnly)
+			add('dir-successor', raw, successor, { ...hit, newRepo: successor });
 		else add(prose ? 'dir-split-prose' : 'dir-split', raw, '(split)', hit);
 	}
 	const jsEnv = /\.(c?js|mjs)$/.test(file) ? jsConstants(text, file) : new Map();
