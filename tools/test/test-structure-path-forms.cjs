@@ -199,6 +199,22 @@ function run() {
 			'mkdir_chain(shared_dir, "core", "zz_probe_i18n", "data", "locales")',
 			'a Lua call that spells a shared path in pieces'
 		);
+		assert.equal(
+			rewrite(
+				`${P}linux/tests/z.lua`,
+				'local root = helpers.driver_root() .. "/../_shared/zz_probe_mod/"\nlocal f = io.open(root .. "hotstrings/a.toml")'
+			),
+			'local root = helpers.driver_root() .. "/../_shared/"\nlocal f = io.open(root .. "zz_probe_hs/data/a.toml")',
+			'a folder held in a Lua local, joined later'
+		);
+		assert.equal(
+			rewrite(
+				`${P}linux/z.lua`,
+				'local ORDER = "zz_probe_mod/hotstrings/a.toml"\nreturn read_shared(ORDER)'
+			),
+			'local ORDER = "zz_probe_hs/data/a.toml"\nreturn read_shared(ORDER)',
+			'a constant handed to a shared reader'
+		);
 		const constants = (mod, last) =>
 			[
 				"const ROOT = path.resolve(__dirname, '..', '..');",
@@ -393,6 +409,13 @@ function run() {
 		'for _, r in ipairs({ "x", "x/y", "x/y/z" }) do mkdir(w .. "/" .. r) end',
 		'the same with bare relative entries joined onto a base by the loop'
 	);
+	// A generated table is one long run of path characters with no file
+	// name in it; the scan stays linear (the first S01 apply spent three
+	// minutes on a 400 KB table, retrying the token at every position).
+	const run = 'a-b_c%d'.repeat(30000);
+	const started = Date.now();
+	Plan.scanFile('tools/z.cjs', `const t = '${run}';`, Plan.referenceContext(MAP));
+	assert.ok(Date.now() - started < 5000, 'a long run of path characters scans in linear time');
 	console.log('[OK] every path form the structure plan rewrites follows the moved file.');
 }
 
