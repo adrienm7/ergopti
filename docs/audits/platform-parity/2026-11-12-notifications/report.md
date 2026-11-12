@@ -51,6 +51,13 @@ reload can replace the VM before `request_reload` returns. The duration is
   notice is now sent once per burst. Regression
   `nui-005-refused-reload-notice`.
 
+## Left
+
+- The Linux runner counts the notices that reach the notify-send sentinel
+  (about 370 across the groups, through fixtures that keep the real notifier)
+  instead of failing the run; make the count fatal once those fixtures install
+  `ShellRunner._set_async_runner`.
+
 ## Windows only (reported)
 
 - Direct `TrayTip` calls with the literal title "ErgoptiPlus"
