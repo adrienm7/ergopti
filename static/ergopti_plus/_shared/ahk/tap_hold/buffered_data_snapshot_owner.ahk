@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk
+﻿; _shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk
 #Requires AutoHotkey v2.0
 
 ; Pure source images, not configuration/input admission. Normal boot owns this
