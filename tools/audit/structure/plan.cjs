@@ -1331,18 +1331,23 @@ function scanFile(file, text, ctx) {
 	for (const m of text.matchAll(dirToken)) {
 		const raw = m[0].replace(/[\\/]$/, '');
 		if (/\.[A-Za-z0-9]+$/.test(raw) || !/[A-Za-z]/.test(raw)) continue;
-		const hit = stays(
-			raw,
-			resolvePathToken(
-				raw,
-				file,
-				inTree,
-				byRepoDir,
-				isSharedArgument(text, m.index) ||
-					sharedFolders.has(raw.replace(/\\/g, '/').replace(/^\//, ''))
-			)
-		);
+		const explicit =
+			isSharedArgument(text, m.index) ||
+			sharedFolders.has(raw.replace(/\\/g, '/').replace(/^\//, ''));
+		const hit = stays(raw, resolvePathToken(raw, file, inTree, byRepoDir, explicit));
 		if (!hit) continue;
+		// parent .. "/python" in live code: one folder name read against the
+		// file's tree or _shared by guess alone is no reference to either.
+		if (
+			!explicit &&
+			!['repo', 'tree', 'embedded', 'shared-alias'].includes(hit.form) &&
+			raw
+				.replace(/\\/g, '/')
+				.replace(/^\/|\/$/g, '')
+				.split('/').length === 1 &&
+			!isProse(file, text, code, m.index)
+		)
+			continue;
 		if (hit.newRepo !== SPLIT) {
 			add('dir', raw, hit.newRepo, hit);
 			continue;
