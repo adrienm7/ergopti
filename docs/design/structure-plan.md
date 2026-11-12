@@ -473,17 +473,46 @@ ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs \
 
 Each step is applied in a fresh process (the tools name moved paths too), then
 the follow-ups no rewrite can do: banner widths (`lint-conventions
---fix-banners`), the formatter (`format.cjs --write`), the generated outputs
-(`npm run codegen`; a generator that still writes an old path leaves an
-untracked file and stops the run), and `test-structure-folder-bounds
---update-baseline`. The strict format and convention lint and every `--gate`
-command run next; a red gate stops the run with the step staged. Then one
-commit per step (`refactor(structure): move <feature> into its feature folder`).
+--fix-banners`), the formatter (`format.cjs --write`), the content pins
+(`repin.cjs`, below), the leaf generators (`npm run gen`; a generator that
+fails on the stepped tree but not on the tree before it stops the run) and
+the domain build with its drift check (`npm run codegen`; a generator that
+still writes an old path leaves an untracked file and stops the run), again
+until the pins hold, then `test-structure-folder-bounds --update-baseline`.
+The strict format and convention lint and every `--gate` command run next; a
+red gate stops the run with the step staged. Then one commit per step
+(`refactor(structure): move <feature> into its feature folder`).
 
-The few sites whose new text is a decision rather than a rewrite (a scan over
-a folder the plan scatters, whose new scope no rule can know) are listed in
-`edits.cjs` with their exact text before and after and the folder whose
-emptying triggers them; a text that no longer matches refuses the step.
+**Content pins.** About a hundred SHA-256 values pin files a step rewrites
+(behavior owner reviews, generated-source hashes, vendor digests, the Windows
+cohort manifests and the receipts that pin those). `repin.cjs` replaces each
+64-hex value equal to a changed file's pre-step hash with its post-step hash,
+pairing moved files through the step's own list of moves (`apply-step
+--moves-out=`), and repeats until nothing changes. A hash shared by two files
+the step made different is refused; history (`docs/audits`, the plan's own
+records, vendored code) keeps what it recorded. A pin of a value derived from
+a file rather than of its bytes (a producer with one region restored, read
+through the config-key source view) is listed in `edits.cjs` `DERIVED_PINS`
+with its derivation: the runner records each value with the tree's own tools
+before the step (`repin.cjs --derive-out`), refusing one that no longer
+reproduces its pin, and the re-pin replaces it with the value the stepped
+tree derives.
+
+**Listed edits.** The few sites whose new text is a decision rather than a
+rewrite are listed in `edits.cjs`:
+
+- `FOLDER_EDITS`: a scan over a folder the plan scatters, whose new scope no
+  rule can know, or a site whose new spelling no rule can derive (a path
+  joined onto another file's variable, a needle the formatter re-wraps), with
+  its exact text before and after and the folder whose emptying (`empties`)
+  or the file whose move (`moves`) triggers it; a text that no longer
+  matches refuses the step;
+- `SYNTHETIC_PATHS`: files whose path literals are synthetic coordinates,
+  which keep them while their module names follow;
+- `MODULE_NAME_FILES` and `MODULE_MEMBER_FILES`: tools that name Lua modules
+  in their own tables, or by the `<module>.<method>` record names the menu
+  delegation builds;
+- `DERIVED_PINS`: the derived content pins above.
 
 ### The dry run of the whole sequence
 
@@ -688,7 +717,8 @@ mechanical edit; they head Rule A's order of work.
 | `tools/audit/structure/plan.cjs --write`           | appendices 1 to 4                             |
 | `tools/audit/structure/apply-step.cjs`             | one step, dry run by default                  |
 | `tools/audit/structure/run-phase2.cjs`             | every step in order, one commit per step      |
-| `tools/audit/structure/edits.cjs`                  | the explicit edits of scattered scan scopes   |
+| `tools/audit/structure/edits.cjs`                  | the listed edits, files and derived pins      |
+| `tools/audit/structure/repin.cjs`                  | the content pins of the files a step changed  |
 | `tools/audit/shared-literal-inventory.cjs --write` | appendices 5 and 6                            |
 | `tools/test/test-structure-folder-bounds.cjs`      | Rule B ratchet (`js-0507`)                    |
 | `tools/test/test-shared-literal-inventory.cjs`     | Rule A ratchet (`js-0508`)                    |
