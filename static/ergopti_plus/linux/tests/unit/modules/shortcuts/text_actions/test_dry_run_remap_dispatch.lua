@@ -47,14 +47,16 @@ local function with_remap(route, dry, action, hold, body, revoke)
 		environment.opts = evaluate(source:sub(first, last - 1) .. "\nreturn parse_args()", environment)
 		helpers.assert_eq(environment.opts.dry_run, dry)
 		helpers.assert_eq(environment.opts.tray, false)
+		-- The Tap-Holds switch is a config.toml row; tap_hold.toml holds the keys.
 		local config = '[shortcuts]\nenabled = true\n[gestures]\nenabled = false\n'
+			.. '[tap_holds]\nenabled = ' .. tostring(route == "single") .. '\n'
 			.. '[gesture_parameters]\ntap_hold__tab__send_text = "ok"\ncombination__caps_lock_then_tab__send_text = "ok"\ncombination__tab_then_caps_lock__send_text = "ok"\n'
 		if route == "ordered" then config = config .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "' .. action .. '"\n'
 			.. (hold and '[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "ctrl"\n' or "")
 		elseif route == "buffered" then config = config .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
 			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. action .. '"\n' end
 		file = assert(io.open(config_path, "wb")); assert(file:write(config)); assert(file:close())
-		local tap = '[tap_hold]\nenabled = ' .. tostring(route == "single") .. '\ninherit_defaults = false\n'
+		local tap = '[tap_hold]\ninherit_defaults = false\n'
 		if route == "single" then tap = tap .. '[tap_hold.keys.tab]\ntap_action = "' .. action .. '"\n'
 			.. 'hold_modifier = "' .. (hold and "ctrl" or "") .. '"\n' .. (hold and "" or 'hold_layer = ""\n') .. 'time_activation_seconds = 0.2\n' end
 		file = assert(io.open(tap_path, "wb")); assert(file:write(tap)); assert(file:close())
