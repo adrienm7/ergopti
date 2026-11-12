@@ -148,6 +148,10 @@ function M.init()
 		_locale = saved
 	else
 		_locale = M.detect_system_locale()
+		if saved ~= nil then
+			Logger.warn(LOG, "Persisted locale '%s' is unavailable — using the system locale '%s'.",
+				tostring(saved), _locale)
+		end
 	end
 	-- Patch infra/locale so it loads the right file
 	if _locale_set_fn then _locale_set_fn(_locale) end
