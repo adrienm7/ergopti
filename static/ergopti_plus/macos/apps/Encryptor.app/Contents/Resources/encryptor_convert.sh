@@ -38,6 +38,12 @@ if [ ! -f "$password_file" ]; then
 	exit 66
 fi
 
+# mv -f would move the stage into a folder named like OUTPUT and succeed, so
+# a folder destination is refused, as Windows' MoveFileExW refuses it.
+if [ -d "$output" ]; then
+	echo "encryptor_convert.sh: the output is a folder" >&2
+	exit 73
+fi
 stage=$(mktemp "$(dirname "$output")/.$(basename "$output").XXXXXX") || {
 	echo "encryptor_convert.sh: cannot create a stage next to the output" >&2
 	exit 73

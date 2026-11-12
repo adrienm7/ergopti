@@ -161,6 +161,92 @@ try {
 	});
 
 	scenario(
+		'(bap-007-failure-reason) only OpenSSL refusals exit 1; the AppleScript names the others',
+		() => {
+			const folder = fs.mkdtempSync(path.join(work, 'reason-'));
+			const clear = path.join(folder, 'notes.txt');
+			const sealed = `${clear}.enc`;
+			fs.writeFileSync(clear, 'sealed\n');
+			assert.equal(convert('encrypt', clear, sealed, passwordFile('r.pw', SENTINEL)).status, 0);
+			const wrong = convert(
+				'decrypt',
+				sealed,
+				path.join(folder, 'out.txt'),
+				passwordFile('r2.pw', 'no')
+			);
+			assert.equal(wrong.status, 1, 'a wrong password is OpenSSL status 1');
+			fs.mkdirSync(path.join(folder, 'notes'));
+			const into = convert(
+				'decrypt',
+				sealed,
+				path.join(folder, 'notes'),
+				passwordFile('r3.pw', SENTINEL)
+			);
+			assert.ok(
+				into.status !== 0 && into.status !== 1,
+				'a folder destination is not an OpenSSL refusal'
+			);
+			const code = fs
+				.readFileSync(applescript, 'utf8')
+				.split('\n')
+				.filter((line) => !/^\s*--/.test(line))
+				.join('\n');
+			assert.match(code, /on error number error_number\s+set convert_status to error_number/);
+			assert.match(code, /if convert_status is not 1 then/);
+			for (const key of ['reason_destination_folder', 'reason_cannot_write']) {
+				assert.match(code, new RegExp(`"apps\\.encryptor\\.${key}"`), `${key} is loaded`);
+				assert.match(code, new RegExp(`${key} of s`), `${key} is shown`);
+			}
+		}
+	);
+
+	scenario('(bap-003-overwrite-cancel) cancelling one overwrite skips that file only', () => {
+		const lines = fs
+			.readFileSync(applescript, 'utf8')
+			.split('\n')
+			.map((line) => line.trim())
+			.filter((line) => line !== '' && !line.startsWith('--'));
+		// An alert with a cancel button raises -128, which would end the whole
+		// « on open » batch unless the enclosing try catches it.
+		// ask_password's display dialog throws -128 by contract; its callers catch it.
+		const cancelling = lines.flatMap((line, index) =>
+			line.includes('cancel button') &&
+			lines.slice(Math.max(0, index - 4), index + 1).some((l) => l.includes('display alert'))
+				? [index]
+				: []
+		);
+		assert.ok(cancelling.length > 0, 'the overwrite alert is found');
+		for (const index of cancelling) {
+			const opener = lines
+				.slice(0, index)
+				.reverse()
+				.find((line) => line === 'try' || line === 'end try');
+			const handler = lines
+				.slice(index)
+				.find((line) => line.startsWith('on error') || line === 'end try');
+			assert.equal(opener, 'try', `the alert at line ${index} sits in a try`);
+			assert.equal(
+				handler,
+				'on error number -128',
+				`the alert at line ${index} catches its cancel`
+			);
+		}
+	});
+
+	scenario('(bap-001-folder-destination) a folder destination is refused, not filled', () => {
+		const folder = fs.mkdtempSync(path.join(work, 'folder-'));
+		const clear = path.join(folder, 'notes.txt');
+		const sealed = `${clear}.enc`;
+		fs.writeFileSync(clear, 'sealed\n');
+		assert.equal(convert('encrypt', clear, sealed, passwordFile('f.pw', SENTINEL)).status, 0);
+		const target = path.join(folder, 'notes');
+		fs.mkdirSync(target);
+		const refused = convert('decrypt', sealed, target, passwordFile('f2.pw', SENTINEL));
+		assert.notEqual(refused.status, 0, 'a folder destination is reported as a failure');
+		assert.deepEqual(fs.readdirSync(target), [], 'no stage is moved into the folder');
+	});
+
+	scenario(
 		'(encryptor-failed-conversion-keeps-destination) a refused decrypt leaves the approved overwrite target intact',
 		() => {
 			const folder = fs.mkdtempSync(path.join(work, 'keep-'));
