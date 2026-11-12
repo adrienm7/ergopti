@@ -312,6 +312,52 @@ _ManagedCurlControlPreFixStopRaises() {
 Test("managed curl owner: control, the pre-fix admission stop raises under that interruption (managed-abort-interrupted-by-refused-abort)",
 	_ManagedCurlControlPreFixStopRaises)
 
+; The deadline callback had the same two reads: _StopDeadline checked the field
+; and read it again for SetTimer, and _Deadline re-armed from the field. An Abort
+; interrupting either one clears it, so both handed SetTimer an Integer
+; (deadline-stop-reentry). The property plays the interruption as above.
+_ManagedCurlControlDeadlineStopReentry() {
+	State := _ManagedCurlControlState()
+	Request := _ManagedCurlControlNew(State)
+	Overridden := false
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		Armed := Request.DeadlineFn
+		AssertTrue(IsObject(Armed), "the request arms its deadline callback")
+		Slot := {Value: Armed, Reads: 0}
+		ReadOnce(Self) {
+			Slot.Reads += 1
+			Current := Slot.Value
+			Slot.Value := 0
+			return Current
+		}
+		Request.DefineProp("DeadlineFn", {
+			get: ReadOnce,
+			set: (Self, Value) => Slot.Value := Value
+		})
+		Overridden := true
+		Request._StopDeadline()
+		AssertEqual(1, Slot.Reads, "the deadline callback is read once, so an interruption cannot change it")
+		AssertEqual(0, Slot.Value, "the stop releases the deadline callback")
+		Request.DeleteProp("DeadlineFn")
+		Overridden := false
+		; A deadline tick that an Abort interrupted finds the field cleared.
+		Request.DeadlineFn := 0
+		try Request._Deadline()
+		catch as Failure
+			throw Error("a deadline tick after an interrupting stop raised « " . Failure.Message . " »")
+		AssertFalse(Request.Aborted, "a deadline tick with budget left never aborts the request")
+	} finally {
+		if Overridden {
+			Request.DeleteProp("DeadlineFn")
+			Request.DeadlineFn := 0
+		}
+		_ManagedCurlControlRelease(State)
+	}
+}
+Test("managed curl owner: an interrupted deadline stop or tick never hands SetTimer an Integer (deadline-stop-reentry)",
+	_ManagedCurlControlDeadlineStopReentry)
+
 _ManagedCurlControlExpiredAck() {
 	State := _ManagedCurlControlState()
 	Request := _ManagedCurlControlNew(State)
