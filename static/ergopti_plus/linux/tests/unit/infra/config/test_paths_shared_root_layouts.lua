@@ -46,6 +46,10 @@ local ok_lfs, lfs = pcall(require, "lfs")
 -- mirrors SHARED_PROBE_FILE in infra/paths.lua; a fixture carrying anything else
 -- would prove nothing about what the resolver actually looks for.
 local PROBE_REL = "data/locales/en.json"
+-- The folders of the probe path, outermost first: the fixture follows the
+-- probe wherever the layout puts it.
+local PROBE_FOLDERS = {}
+for part in (PROBE_REL:match("^(.*)/[^/]+$") or ""):gmatch("[^/]+") do PROBE_FOLDERS[#PROBE_FOLDERS + 1] = part end
 
 -- Fixtures live under the system temp directory, inside a per-run directory: a
 -- leftover from a crashed run and a concurrent run must not share a tree, or one
@@ -119,7 +123,7 @@ end
 --- @param shared_dir string Absolute path of the fixture's _shared directory.
 --- @return boolean True when the file was created.
 local function write_probe(shared_dir)
-	mkdir_chain(shared_dir, "data", "locales")
+	mkdir_chain(shared_dir, (table.unpack or unpack)(PROBE_FOLDERS))
 	local fh = io.open(shared_dir .. "/" .. PROBE_REL, "w")
 	if not fh then return false end
 	-- The contents are irrelevant: the probe only asks whether the file opens.
@@ -246,8 +250,9 @@ end
 local function unstage(root, staged)
 	for _, dir in ipairs(staged) do
 		os.remove(dir .. "/" .. PROBE_REL)
-		rmdir_one(dir .. "/data/locales")
-		rmdir_one(dir .. "/data")
+		for depth = #PROBE_FOLDERS, 1, -1 do
+			rmdir_one(dir .. "/" .. table.concat(PROBE_FOLDERS, "/", 1, depth))
+		end
 		rmdir_one(dir)
 	end
 	os.remove(root .. "/infra/paths.lua")
