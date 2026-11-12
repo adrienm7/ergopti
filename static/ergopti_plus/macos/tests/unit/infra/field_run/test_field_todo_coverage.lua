@@ -75,7 +75,7 @@ end
 
 
 
-helpers.describe("field report TODO coverage: TODO.md « To confirm on the Mac »", function()
+helpers.describe("field report TODO coverage: TODO-tests-macos.md « To confirm on the Mac »", function()
 	helpers.it("tags every open line with a point the coverage table declares, once", function()
 		local declared, tagged = {}, {}
 		for _, point in ipairs(COVERAGE.points) do

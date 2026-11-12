@@ -59,7 +59,7 @@ end
 
 
 
-helpers.describe("Linux field report TODO coverage: TODO.md « To confirm on Linux »", function()
+helpers.describe("Linux field report TODO coverage: TODO-tests-linux.md « To confirm on Linux »", function()
 	helpers.it("tags every open line with a point the coverage table declares, once", function()
 		local declared, tagged, open_lines = {}, {}, 0
 		for _, point in ipairs(COVERAGE.points) do

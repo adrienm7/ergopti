@@ -52,7 +52,7 @@
 # needs_person, never a pass.
 #
 # The TODO summary: tools/dev/field-todo-summary.py maps every point of
-# TODO.md « To confirm on the Mac » to its verdict in todo_summary.md and
+# TODO-tests-macos.md « To confirm on the Mac » to its verdict in todo_summary.md and
 # todo_summary.json (static/ergopti_plus/macos/data/field_todo_coverage.json).
 #
 # By default the field run tests the branch itself: the developer app of this
