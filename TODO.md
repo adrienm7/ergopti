@@ -1390,7 +1390,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       chords, shortcuts, gestures, AI predictions and their warmups and local server), with a regression for any
       that still acts, and that a setting changed while suspended applies on resume. See
       `docs/memory/maintainer-decisions.md`.
-      Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in [the pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md) on `claude/ergopti-todo-parity-b`.
+      Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in `docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md` of `claude/ergopti-todo-parity-b`.
 - [x] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.
