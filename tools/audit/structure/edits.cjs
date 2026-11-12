@@ -101,6 +101,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '"globs": ["**/*.lua", "static/ergopti_plus/_shared/keyboard/engine/chord/vectors.json"],'
 	},
 	{
+		// The shared test contracts join the shared test tree, which the
+		// pattern above already excludes.
+		file: 'tools/build/macos-bundle-manifest.json',
+		empties: '_shared/lua',
+		from: '"ergopti_plus/_shared/tests/**",\n\t\t\t\t"ergopti_plus/_shared/lua/test/**",',
+		to: '"ergopti_plus/_shared/tests/**",'
+	},
+	{
 		file: 'tools/build/windows_bundle_manifest.json',
 		empties: '_shared/python',
 		from: '"static/ergopti_plus/_shared/python/**",',
