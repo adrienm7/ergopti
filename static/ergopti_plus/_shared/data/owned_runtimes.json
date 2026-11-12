@@ -1217,9 +1217,9 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`gtk-launch`, `xdg-email`, `xdg-user-dir`",
-			"programs": ["gtk-launch", "xdg-email", "xdg-user-dir"],
-			"used_for": "Launch an app by its desktop id, the mail connector, the screenshots folder (`linux/modules/gestures/manager.lua`, `linux/modules/llm/agent_connectors.lua`)",
+			"tool": "`gtk-launch`, `xdg-email`, `xdg-user-dir`, `update-mime-database`",
+			"programs": ["gtk-launch", "xdg-email", "xdg-user-dir", "update-mime-database"],
+			"used_for": "Launch an app by its desktop id, the mail connector, the screenshots folder, register the Encryptor's .enc type (`linux/modules/gestures/manager.lua`, `linux/modules/llm/agent_connectors.lua`, `linux/ui/bundled_apps.lua`)",
 			"today": "Optional",
 			"current_class": "OPT",
 			"version_needed": "n/a",
