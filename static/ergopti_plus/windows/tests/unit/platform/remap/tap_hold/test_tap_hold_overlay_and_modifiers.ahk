@@ -341,12 +341,15 @@ _TH_UnknownHoldModifierKeepsTheTap() {
 		; The tap-only gate of capslock.ahk 2.5; 2.3 needs a non-empty hold.
 		AssertTrue(Entry["tap_action"] != "" && Entry.Get("hold_modifier", "") == "" && Entry.Get("hold_layer", "") == "",
 			Source . ": the tap-only hotkey must own CapsLock")
+		; A Cmd or Fn hold is a file macOS wrote (the shared tap_hold.toml): it
+		; is warned about, not an error; any other unknown hold is an ERROR.
+		Level := Unknown == "fn" ? "[WARN" : "[ERROR]"
 		Errors := 0
 		for _, Line in Captured {
-			if (InStr(Line, "[ERROR]") and InStr(Line, "'" . Unknown . "'") and InStr(Line, "caps_lock"))
+			if (InStr(Line, Level) and InStr(Line, "'" . Unknown . "'") and InStr(Line, "caps_lock"))
 				Errors++
 		}
-		AssertEqual(1, Errors, Source . ": one ERROR must name '" . Unknown . "' and the key")
+		AssertEqual(1, Errors, Source . ": one " . Level . " line must name '" . Unknown . "' and the key")
 		AssertEqual("AltGr", TH["keys"]["alt_gr"]["hold_modifier"], Source . ": an alias is a known hold")
 		AssertEqual("Ctrl + lShift", TH["keys"]["space"]["hold_modifier"], Source . ": so is a spelled-out combination")
 		PreviousKana := _ALTGR_KANA_FIXUP
