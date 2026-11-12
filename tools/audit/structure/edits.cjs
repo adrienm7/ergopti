@@ -63,6 +63,13 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "m[1] === 'shared_llm_path' ? `ai/data/${arg}` : arg"
 	},
 	{
+		// The walk fixture's expected request of that wrapper, under the same folder.
+		file: 'tools/test/test-shared-root-resolvers.cjs',
+		empties: '_shared/modules/llm',
+		from: "'missing-runtime.txt',\n\t\t'modules/llm/fixture.json',",
+		to: "'missing-runtime.txt',\n\t\t'ai/data/fixture.json',"
+	},
+	{
 		// The locale is found relative to the page under test, a variable
 		// the scan cannot evaluate.
 		file: 'tools/test/support/metrics-apps-page.cjs',
