@@ -193,6 +193,28 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_nil(Bridge.on_message({ action = "format_disk" }, world.state), "an unknown action does nothing")
 	end)
 
+	helpers.it("(leh-001-emulated-legends) shows the emulated layout's characters while one is emulated", function()
+		local registry = Json.decode(read_file(SHARED_ROOT .. "/data/keycodes/physical_keys.json"))
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		local w_code = registry.keys.KeyW.evdev
+		world.state.keyboard_layout = {
+			base_symbol = function(evdev) return evdev == w_code and { text = "w" } or nil end,
+			is_ready = function() return true end,
+		}
+		world.state.layout_emulation = {
+			status = function() return { active = true, id = "ergopti" } end,
+			-- KeyW is left to the XKB layout, as a row switched off would be.
+			legend = function(code) return code == "KeyQ" and "è" or nil end,
+		}
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
+		remove_config_dir(dir)
+		local init = last_call(world, "init")
+		helpers.assert_eq(init.legends.source, "emulation")
+		helpers.assert_eq(init.legends.keys.KeyQ, "è", "the emulated character")
+		helpers.assert_eq(init.legends.keys.KeyW, "w", "the XKB layout's character where the emulation passes")
+	end)
+
 	helpers.it("sends the loaded keymap's legends and the layer key (layer-editor-current-layout-legends)", function()
 		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local corpus = Json.decode(read_file(LEGENDS))
@@ -341,6 +363,28 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_nil(current, "saving a mapping cannot activate its layer holder")
 		helpers.assert_eq(active, false)
 		helpers.assert_eq(next(keys), nil, "an absent tap-hold file never imports the preset keys")
+	end)
+
+	helpers.it("(leh-002-stale-folder-answer) answers the page when the folder moves after the write", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		-- The configuration folder changes once the file is written, as a paths
+		-- editor move in flight would.
+		world.state.config_paths.get_config_dir = function()
+			local written = io.open(dir .. "/layers.toml", "rb")
+			if written then written:close(); return dir .. "-moved" end
+			return dir
+		end
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
+		local outcome = Bridge.on_message({ action = "save", text = read_file(FIXTURE) }, world.state)
+		remove_config_dir(dir)
+		helpers.assert_eq(outcome.saved, true)
+		helpers.assert_eq(outcome.applied, false)
+		helpers.assert_eq(world.restarts, 0, "nothing is applied from the old folder")
+		local answer = last_call(world, "saveResult")
+		helpers.assert_true(answer ~= nil, "the page receives its saveResult")
+		helpers.assert_eq(answer.saved, true)
+		helpers.assert_eq(answer.applied, false)
 	end)
 
 	helpers.it("keeps the window open when the remap restart fails", function()

@@ -80,7 +80,8 @@ end
 local function with_editor(scenario)
 	local names = { "infra.logger", "infra.i18n", "infra.paths", "infra.config_paths", "adapters.file_system",
 		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
-		"modules.shortcuts.bindings", "modules.keymap.layout_registry" }
+		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
+		"infra.notifications" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local prior_hs = _G.hs
@@ -166,8 +167,9 @@ local function with_editor(scenario)
 		-- The remap facade, holding the shipped tap-hold keys and defaults.
 		local defaults = TomlCodec.decode(read_file(helpers.shared("tap_hold/defaults.toml")))
 		world.karabiner = {
-			regenerate = function()
+			regenerate = function(on_done)
 				world.regenerations = world.regenerations + 1
+				world.on_done = on_done
 				if world.on_regenerate then world.on_regenerate() end
 				return world.regenerate_accepts
 			end,
@@ -522,6 +524,45 @@ helpers.describe("macOS navigation layer editor host", function()
 				helpers.assert_eq(refreshed.source, "os")
 			end)
 		end
+	end)
+
+	helpers.it("(leh-003-late-regeneration-failure) a regeneration failing after the window closed is notified", function()
+		with_editor(function(editor, world)
+			local notices = {}
+			package.loaded["infra.notifications"] = { notify = function(title, body, kind)
+				notices[#notices + 1] = { title, body, kind }
+				return true
+			end }
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			post(world, { action = "save", text = read_file(FIXTURE) })
+			helpers.assert_eq(last_call(world, "saveResult").applied, true, "accepted: the window closes at once")
+			helpers.assert_eq(#notices, 0, "nothing is notified while the regeneration runs")
+			world.on_done(false, "karabiner_cli_failed")
+			helpers.assert_eq(#notices, 1, "the late failure is notified")
+			helpers.assert_eq(notices[1], { "layer_editor.window_title", "layer_editor.apply_failed", "error" })
+			world.on_done(true)
+			helpers.assert_eq(#notices, 1, "a success says nothing")
+		end)
+	end)
+
+	helpers.it("(leh-001-emulated-legends) shows the emulated layout's characters while one is emulated", function()
+		local registry = Json.decode(read_file(helpers.shared("data/keycodes/physical_keys.json")))
+		with_editor(function(editor, world)
+			world.keymap[registry.keys.KeyQ.hs] = "q"
+			world.keymap[registry.keys.KeyW.hs] = "w"
+			package.loaded["modules.keymap.layout_emulation"] = {
+				status = function() return { active = true, id = "ergopti" } end,
+				-- KeyW is left to the input source, as a row switched off would be.
+				legend = function(code) return code == "KeyQ" and "è" or nil end,
+			}
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			local init = last_call(world, "init")
+			helpers.assert_eq(init.legends.source, "emulation")
+			helpers.assert_eq(init.legends.keys.KeyQ, "è", "the emulated character")
+			helpers.assert_eq(init.legends.keys.KeyW, "w", "the input source's character where the emulation passes")
+		end)
 	end)
 
 	helpers.it("refuses to open without a remap facade to apply the layer", function()
