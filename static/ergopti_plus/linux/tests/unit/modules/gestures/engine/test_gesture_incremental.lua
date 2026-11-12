@@ -280,6 +280,17 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		if not ok then error(failure, 0) end
 	end)
 
+	helpers.it("incremental: the cleanup keeps the saved modes and steps (gesture-slot-settings-cleanup)", function()
+		local source = "[gestures.modes]\nswipe_3_left = \"x1\"\nswipe_3_up = \"fast\"\n\n"
+			.. "[gestures.sensitivities]\nswipe_3_up = 12.0\n"
+		local scan = require("config_unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local offered = {}
+		for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+		table.sort(offered)
+		-- Only the mode the loader refuses is offered; a saved choice was before.
+		helpers.assert_eq(offered, { "gestures.modes.swipe_3_up" })
+	end)
+
 	helpers.it("incremental: a pad without a resolution fires once, as x1", function()
 		local pressed, M = pump({ swipe_3_left = "tab_prev" }, { swipe_3_left = "incremental" }, touch_events(path(-40)), nil)
 		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 1)
