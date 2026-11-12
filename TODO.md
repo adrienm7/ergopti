@@ -1269,6 +1269,13 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
+- [ ] **Mac thumb keys follow the position (maintainer decision TCL-004, 2026-11-12).**
+      `platform/remap/tap_hold_loader.ahk` ignores a `tap_hold.toml` key under a Mac thumb id. Read one as the PC key
+      at its place when the file does not name that key too (`_shared/tap_hold/shared_file.toml` `[thumb_positions]`:
+      `left_command` is `left_alt`, `right_command` is `alt_gr`, `right_option` is `right_ctrl`), as macOS
+      (`shared_file.lua` `positional_key`) and Linux (`tap_hold_loader.lua`) now do. Then read
+      `_shared/tests/corpus/tap_hold_spellings/mac_thumb.toml` in `test_tap_hold_shared_file.ahk` against the
+      `[reads.mac_thumb.linux]` expectations of its `expected.toml`.
 - [ ] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),

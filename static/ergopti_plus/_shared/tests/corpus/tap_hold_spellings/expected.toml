@@ -1,0 +1,44 @@
+# _shared/tests/corpus/tap_hold_spellings/expected.toml
+# What macOS and Linux read from the files of this corpus, and what macOS
+# writes, for the action ids a driver spells its own way (the action
+# catalogue's tap_hold_spellings, from _shared/modules/actions/actions.toml)
+# and the Mac thumb keys (_shared/tap_hold/shared_file.toml [thumb_positions]).
+# Read by macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua
+# and linux/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua.
+
+# macOS reads pc_written under its own ids and keys.
+[reads.pc_written.hs.tap_hold_config]
+caps_lock = { tap = "sticky_shift" }
+tab = { tap = "return" }
+left_command = { tap = "return" }
+right_command = { tap = "capsword" }
+
+[reads.pc_written.hs.mod_combos_config]
+esc_tab = { combo = "return" }
+
+# Linux reads the Mac thumb ids as the PC keys at their places.
+[reads.mac_thumb.linux.keys.left_alt]
+tap_action = "copy"
+
+[reads.mac_thumb.linux.keys.right_ctrl]
+tap_action = "backspace"
+
+[reads.mac_thumb.linux.keys.alt_gr]
+tap_action = "backspace"
+
+# macOS writes this state under the PC ids and keys.
+[writes.hs.state.tap_hold_config]
+caps_lock = { tap = "sticky_shift", hold = "none" }
+left_command = { tap = "return", hold = "none" }
+right_option = { tap = "capsword", hold = "none" }
+
+[writes.hs.state.mod_combos_config]
+esc_tab = { combo = "return", tap = "none", hold = "none" }
+
+[writes.hs.file.tap_hold.keys]
+caps_lock = { tap_action = "one_shot_shift" }
+left_alt = { tap_action = "enter" }
+right_ctrl = { tap_action = "caps_word" }
+
+[writes.hs.config.mod_combos.config.escape_then_tab]
+combo = "enter"
