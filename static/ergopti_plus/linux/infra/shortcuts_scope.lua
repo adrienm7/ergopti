@@ -607,11 +607,11 @@ function M.editor_owner(is_paused)
 	if _editor_busy or type(is_paused) ~= "function" then return nil end
 	_editor_busy = true
 	local called, result = pcall(function()
-		if is_paused() ~= false then return nil end
+		-- A pause does not keep the editor closed (EDD-1, 2026-11-12).
 		local path = require("infra.config_paths").config("config.toml")
 		if type(path) ~= "string" or path == "" then return nil end
 		if _editor_owner and _editor_owner.pending() and _editor_owner.retry_restore() ~= true then return nil end
-		if is_paused() ~= false or require("infra.config_paths").config("config.toml") ~= path then return nil end
+		if require("infra.config_paths").config("config.toml") ~= path then return nil end
 		if _editor_owner and _editor_path ~= path then
 			_editor_owner.release()
 			_editor_owner, _editor_path, _editor_pause = nil, nil, nil
@@ -622,7 +622,7 @@ function M.editor_owner(is_paused)
 			local owner = M.new({ path = path,
 				backup_path = path .. ".physical-shortcuts-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 				is_paused = function() return _editor_pause and _editor_pause() end })
-			if is_paused() ~= false or require("infra.config_paths").config("config.toml") ~= path then
+			if require("infra.config_paths").config("config.toml") ~= path then
 				owner.release()
 				return nil
 			end
