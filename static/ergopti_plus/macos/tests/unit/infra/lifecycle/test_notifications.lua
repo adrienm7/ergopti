@@ -91,6 +91,22 @@ helpers.describe("notifications.notify", function()
 			"only the notice's shape is logged")
 	end)
 
+	helpers.it("(nui-006-notification-ttl) withdraws a notice after the registry's duration", function()
+		local captured = nil
+		_G.hs.notify.new = function(arg1, arg2)
+			captured = type(arg1) == "function" and arg2 or arg1
+			local native = {}
+			native.send = function() return native end
+			return native
+		end
+		helpers.assert_true(notifications.notify("hello"))
+		helpers.assert_eq(captured.withdrawAfter, require("infra.timings").sec("ui", "notification_ttl_ms"),
+			"one declaration in _shared/modules/timings/constants.toml, shared with Linux")
+		local file = assert(io.open(helpers.driver_root() .. "/infra/notifications.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		helpers.assert_true(source:find("RETENTION_SEC = 5", 1, true) == nil and source:find("withdrawAfter   = 5", 1, true) == nil, "no typed copy of the duration")
+	end)
+
 	helpers.it("returns false and never claims dispatch if hs.notify.new throws", function()
 		local lines = {}
 		local Logger = require("infra.logger")

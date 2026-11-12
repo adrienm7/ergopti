@@ -33,11 +33,13 @@ M.DEBUG = false
 local _logo_path  = ""
 local _logo_image = nil
 
--- Hammerspoon's native notification default is five seconds. Retain each
+-- How long a notification stays up (the shared registry). Retain each
 -- clickable userdata for that same bounded window so its completion callback
 -- cannot be collected before the user acts, then release it whether or not the
 -- callback ran.
-local NOTIFICATION_RETENTION_SEC = 5
+--- @return number seconds Read when a notice is sent, so loading this module
+---   reads no timing.
+local function retention_sec() return require("infra.timings").sec("ui", "notification_ttl_ms") end
 local _notification_owners = {}
 local _next_notification_id = 0
 
@@ -134,6 +136,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 	if on_click ~= nil and type(on_click) ~= "function" then
 		return false, "notification click action must be a function"
 	end
+	local retention = retention_sec()
 	local title_text = ""
 	local info_text = tostring(title_or_msg)
 
@@ -172,7 +175,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 			title           = title_text,
 			informativeText = info_text,
 			contentImage    = _get_logo(),
-			withdrawAfter   = NOTIFICATION_RETENTION_SEC,
+			withdrawAfter   = retention,
 		})
 	end, debug.traceback)
 	if not created or notification_or_err == nil or notification_or_err == false then
@@ -196,7 +199,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 	owner_id = _next_notification_id
 	_notification_owners[owner_id] = { notification = notification }
 	local cleanup_timer, cleanup_committed = TimerScheduler.after(
-		NOTIFICATION_RETENTION_SEC,
+		retention,
 		function() _notification_owners[owner_id] = nil end
 	)
 	if cleanup_committed ~= true then
