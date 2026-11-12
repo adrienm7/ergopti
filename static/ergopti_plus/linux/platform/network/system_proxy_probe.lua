@@ -386,6 +386,12 @@ local function curl_capabilities()
 	return {
 		version = string.format("%d.%d.%d", major, minor, patch),
 		proxy_used = executable ~= nil and (major > 8 or (major == 8 and minor >= 7)),
+		-- A curl that can answer a Negotiate (Kerberos) proxy challenge with the
+		-- session's ticket, as Windows' WinHTTP does with the signed-in user
+		-- (NET-002); a build without GSS-API would refuse the option outright.
+		proxy_negotiate = output:match("\nFeatures:[^\n]*%f[%w]SPNEGO%f[%W]") ~= nil
+			or output:match("\nFeatures:[^\n]*%f[%w]GSS%-API%f[%W]") ~= nil
+			or output:match("\nFeatures:[^\n]*%f[%w]Kerberos%f[%W]") ~= nil,
 		executable = executable,
 		executable_observation = executable and "owned-child" or nil,
 		executable_identity = executable and executable_identity or nil,

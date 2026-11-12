@@ -536,6 +536,7 @@ function M.new(dependencies)
 			if exact then options.curl_executable, options.curl_executable_identity_exact = executable, exact end
 		end
 		options.proxy_metrics_available = options.curl_executable ~= nil and capabilities.proxy_used == true
+		options.proxy_negotiate_available = type(capabilities) == "table" and capabilities.proxy_negotiate == true
 		options.authorized = nil
 		if record.authorized then
 			options.authorized = function()
