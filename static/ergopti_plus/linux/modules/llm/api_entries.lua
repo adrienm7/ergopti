@@ -496,7 +496,9 @@ end
 ---   published the references: the caller must then keep their keys.
 function M.publish_migrated(stored, tokens)
 	local current = state()
-	if current.plaintext == 0 then return false, "no plaintext key is left to move" end
+	-- Nothing left: a save moved every key meanwhile, which is the migration's
+	-- own goal, told apart from a refusal (AIX-002).
+	if current.plaintext == 0 then return false, "no plaintext key is left to move", false, true end
 	if current.publishing then return false, "API entries are already publishing" end
 	local prestored = {}
 	for _, entry in ipairs(current.entries) do

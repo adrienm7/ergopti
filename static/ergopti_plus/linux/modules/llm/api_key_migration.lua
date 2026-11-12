@@ -99,10 +99,19 @@ local function store_all(keys, generation)
 			return
 		end
 		if index > #keys then
-			local published, reason, uncertain = _ports.entries.publish_migrated(stored, tokens)
+			local published, reason, uncertain, nothing_left = _ports.entries.publish_migrated(stored, tokens)
 			if published then
 				_state = "done"
 				Logger.success(LOG, "%d plaintext API key(s) moved to the desktop secret service.", #keys)
+				return
+			end
+			if nothing_left then
+				-- A save moved every key while this attempt stored its own copies:
+				-- the goal is reached, so the copies go and the migration ends
+				-- without the « stay in plaintext » warning (AIX-002).
+				discard(references)
+				_state = "done"
+				Logger.success(LOG, "The plaintext API keys were already moved to the desktop secret service by a save.")
 				return
 			end
 			if not uncertain then discard(references) end
