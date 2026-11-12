@@ -50,6 +50,10 @@ const DEFECTS_DIR = shared('tests/corpus/config_migration_registries');
 const DRIVERS = ['ahk', 'hs', 'linux'];
 const OUTCOMES = ['migrated', 'current', 'newer', 'invalid', 'unsupported'];
 const BARE = /^[A-Za-z0-9_-]+$/;
+// A companion file is named bare; the driver resolves its path at boot.
+const COMPANION_FILE = /^[A-Za-z0-9_-]+\.toml$/;
+// The corpus spells the companion of a case as companion_<file> beside its input.
+const COMPANION_PREFIX = 'companion_';
 
 // Required and optional fields of each op of the closed set: the registry's
 // header comment is their one source, and the Windows table is generated from it.
@@ -247,6 +251,11 @@ function validateOp(op, where) {
 			}
 		});
 	}
+	if (
+		op.op === 'import_companion' &&
+		!(typeof op.file === 'string' && COMPANION_FILE.test(op.file))
+	)
+		fail(where, 'import_companion names its file bare, as name.toml');
 	if (op.op === 'set_if_absent') {
 		const value = op.value;
 		const ok = isScalar(value) || (Array.isArray(value) && value.every(isScalar));
@@ -570,6 +579,49 @@ function moveErgoptiVariant(model, op) {
 	source.delete(op.key);
 }
 
+/**
+ * The leaves one import_companion op addresses in its companion: one key, or
+ * every key of the section and of every section below it, sorted.
+ * @param {Map<string, Map<string, *>>} companion
+ * @param {object} op
+ * @returns {{section: string, key: string, toSection: string}[]}
+ */
+function companionLeaves(companion, op) {
+	if (op.key !== undefined) {
+		const values = companion.get(op.section);
+		return values && values.has(op.key)
+			? [{ section: op.section, key: op.key, toSection: op.to_section }]
+			: [];
+	}
+	const leaves = [];
+	for (const name of sectionsAtOrBelow(companion, op.section)) {
+		const toSection = op.to_section + name.slice(op.section.length);
+		for (const key of [...companion.get(name).keys()].sort())
+			leaves.push({ section: name, key, toSection });
+	}
+	return leaves;
+}
+
+/**
+ * The migration context of one corpus case: the shared one, plus every
+ * companion file the case registry's import_companion ops name, read from
+ * companion_<file> beside the input (an absent file holds nothing).
+ * @param {string} dir - Case directory.
+ * @param {object} registry - Validated case registry.
+ * @returns {object}
+ */
+function caseContext(dir, registry) {
+	const companions = {};
+	for (const step of registry.steps) {
+		for (const op of step.ops || []) {
+			if (op.op !== 'import_companion' || companions[op.file]) continue;
+			const file = path.join(dir, COMPANION_PREFIX + op.file);
+			companions[op.file] = fs.existsSync(file) ? flatten(readToml(file) || {}) : new Map();
+		}
+	}
+	return { ...migrationContext, companions };
+}
+
 function applyOp(model, op, context) {
 	switch (op.op) {
 		case 'move_ergopti_variant': {
@@ -657,6 +709,20 @@ function applyOp(model, op, context) {
 			} else if (model.has(op.section)) {
 				model.get(op.section).delete(op.key);
 				dropIfEmpty(model, op.section);
+			}
+			break;
+		}
+		case 'import_companion': {
+			// Values the driver kept in another file of its folder are copied
+			// where config.toml holds none; the companion itself is not changed.
+			const companion = context?.companions?.[op.file];
+			if (!(companion instanceof Map)) throw new Error(`missing companion ${op.file}`);
+			for (const leaf of companionLeaves(companion, op)) {
+				if (!copyDestinationAbsent(model, leaf.toSection, leaf.key)) continue;
+				if (!model.has(leaf.toSection)) model.set(leaf.toSection, new Map());
+				model
+					.get(leaf.toSection)
+					.set(leaf.key, structuredClone(companion.get(leaf.section).get(leaf.key)));
 			}
 			break;
 		}
@@ -879,7 +945,8 @@ for (const name of onDisk) {
 			registry,
 			name + '/input.toml'
 		);
-		const result = migrate(flatten(input, opaqueInput), registry, driver, migrationContext);
+		const context = caseContext(dir, registry);
+		const result = migrate(flatten(input, opaqueInput), registry, driver, context);
 		replays += 1;
 		if (result.outcome !== meta.outcome) {
 			fail(name, `${driver}: outcome '${result.outcome}', case says '${meta.outcome}'`);
@@ -908,7 +975,7 @@ for (const name of onDisk) {
 		}
 		const replayInput = cloneModel(result.model);
 		replayInput.get('_meta').set('schema_version', meta.from_version);
-		const replay = migrate(replayInput, registry, driver, migrationContext);
+		const replay = migrate(replayInput, registry, driver, context);
 		if (replay.outcome !== 'migrated' || !sameValue(normalized(replay.model), actual)) {
 			fail(
 				name,

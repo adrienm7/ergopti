@@ -87,6 +87,18 @@
 #   { op = "set_if_absent", section, key, value }
 #       Writes a value only where the key is absent (freezes an old default
 #       before the default changes).
+#   { op = "import_companion", file, section, to_section, key? }
+#       Copies into config.toml what the driver kept in another file of its
+#       configuration folder, named bare (``file``: tap_hold.toml): the value
+#       of ``key``, or without ``key`` every key of ``section`` and of every
+#       section below it, each to the same place under ``to_section``. A
+#       target config.toml already holds keeps its value (the copy_if_absent
+#       rule). The driver names the file's path at boot (an absent file holds
+#       nothing, an unreadable one refuses the migration). Once the migrated
+#       config.toml is published, every value the op addressed is deleted
+#       from that file line by line, after a byte-exact backup
+#       ``<name>.pre-v<N>-<stamp>.toml`` beside it; a failure there is logged
+#       and leaves the values unread.
 # A section left without keys by an op disappears. Every op is idempotent, so
 # replaying a step on its own output changes nothing.
 #

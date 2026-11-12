@@ -14,7 +14,7 @@
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
 ;    step is a list of ops from a closed set (rename, rename_prefix,
 ;    move_section, merge_into, map_value, wrap_value, encode_value, delete,
-;    set_if_absent)
+;    set_if_absent, import_companion)
 ;    and this file holds their only Windows semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
@@ -162,6 +162,9 @@ _ConfigMigrateValidateOp(Op, Where) {
 				throw Error(Where . ": each map entry is { from, to } with scalar values")
 		}
 	}
+	; A companion is named bare: the driver resolves its path, never the registry.
+	if (Op["op"] == "import_companion") && !((Op["file"] is String) && RegExMatch(Op["file"], "^[A-Za-z0-9_-]+\.toml$"))
+		throw Error(Where . ": import_companion names its file bare, as name.toml")
 	if (Op["op"] == "set_if_absent" && !_ConfigMigrateIsScalar(Op["value"])) {
 		if !(Op["value"] is Array)
 			throw Error(Where . ": set_if_absent writes a scalar or an array")
@@ -571,6 +574,45 @@ _ConfigMigrateCanonicalJson(Value) {
 	return (Value is String) ? JsonStringLiteral(Value) : String(Value)
 }
 
+; The sections of the companion file a driver handed in the migration context
+; (Context["companions"][File] := Map("status", "ok" | "absent", "content", Text)).
+; A companion the migration needs and the driver did not hand throws: reading it
+; as empty would stamp config.toml without the values it must receive.
+_ConfigMigrateCompanionSections(Context, FileName) {
+	if !(Context is Map) || !(Context.Get("companions", 0) is Map) || !(Context["companions"].Get(FileName, 0) is Map)
+		throw Error("config_migrate: the migration needs the companion " . FileName . ", which the driver did not hand")
+	Companion := Context["companions"][FileName]
+	if Companion.Get("status", "") == "absent"
+		return Map()
+	if !(Companion.Get("status", "") == "ok") || !(Companion.Get("content", 0) is String)
+		throw Error("config_migrate: the companion " . FileName . " could not be read")
+	return _ConfigMigrateParse(Companion["content"], FileName)
+}
+
+; Copies values the driver kept in a companion file into config.toml where it
+; holds none (the copy_if_absent rule): one key, or every key of a section and
+; of every section below it, each to the same place under to_section.
+_ConfigMigrateImportCompanion(Model, Op, Context) {
+	Companion := _ConfigMigrateCompanionSections(Context, Op["file"])
+	Leaves := []
+	if Op.Has("key") {
+		if Companion.Has(Op["section"]) && Companion[Op["section"]].Has(Op["key"])
+			Leaves.Push([Op["section"], Op["key"], Op["to_section"]])
+	} else {
+		for Name in _ConfigMigrateSectionsAtOrBelow(Companion, Op["section"]) {
+			for Key in _ConfigMigrateKeys(Companion[Name])
+				Leaves.Push([Name, Key, Op["to_section"] . SubStr(Name, StrLen(Op["section"]) + 1)])
+		}
+	}
+	for Leaf in Leaves {
+		if !_ConfigMigrateCopyDestinationAbsent(Model, Leaf[3], Leaf[2])
+			continue
+		if !Model.Has(Leaf[3])
+			Model[Leaf[3]] := Map()
+		Model[Leaf[3]][Leaf[2]] := ManifestCloneValue(Companion[Leaf[1]][Leaf[2]])
+	}
+}
+
 ; Applies one validated op to the model.
 _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 	Section := Op["section"]
@@ -646,6 +688,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 				Model[Section] := Map()
 			if !Model[Section].Has(Op["key"])
 				Model[Section][Op["key"]] := Op["value"]
+		case "import_companion":
+			_ConfigMigrateImportCompanion(Model, Op, Context)
 		default:
 			throw Error("unknown config migration op '" . Op["op"] . "'")
 	}
