@@ -579,6 +579,7 @@ return {
 	"tests.unit.modules.gestures.actions.test_take_note",
 	"tests.unit.modules.gestures.actions.test_keep_awake",
 	"tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts",
+	"tests.unit.modules.shortcuts.keyboard.test_bound_chord_emulated_letter",
 	"tests.unit.ui.editors.physical.test_physical_delivery_available",
 	"tests.unit.infra.test_features_manifest_projection",
 	"tests.unit.modules.updater.vectors.test_update_channels_vectors",

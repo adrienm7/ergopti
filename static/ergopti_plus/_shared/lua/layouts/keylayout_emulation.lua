@@ -496,6 +496,27 @@ local function row_emulated(session, code)
 	return row == nil or session.config.row_on[row] == true
 end
 
+--- The character a Ctrl, Alt or Win chord on a key sends while the emulation
+--- runs, without changing the session: a keyboard shortcut slot matches it, as
+--- Windows registers a slot on the key that types its letter (ILX-001). nil
+--- when the chord keeps the system layout's key.
+--- @param session table
+--- @param code string KeyboardEvent.code.
+--- @param ctrl boolean
+--- @param alt boolean
+--- @param win boolean
+--- @return string|nil char
+--- @return boolean emulated Whether the emulation owns this key's chords.
+function M.chord_char(session, code, ctrl, alt, win)
+	local config = session.config
+	if config == nil then error("The emulation session is not configured.") end
+	if not (ctrl or alt or win) or session.model.mac_codes[code] == nil then return nil, false end
+	if M.NATIVE_CHORD_KEYS[code] or not config.base or not row_emulated(session, code) then return nil, false end
+	local char = M.shortcut_char(session.model, code, ctrl and "ctrl" or (alt and "alt" or "win"))
+	if char == "" then return nil, true end
+	return char, true
+end
+
 --- What the emulation types unshifted on a key from the neutral state, for a
 --- legend: a dead key shows its terminator, a key the emulation leaves to the
 --- OS layout (base off, row switched off, unmapped) shows nothing. The digit
@@ -561,12 +582,10 @@ function M.decide(session, code, shift, caps, option, ctrl, alt, win, native)
 	local mac = session.model.mac_codes[code]
 	if mac == nil then return M.PASS, nil end
 	if ctrl or alt or win then
-		if M.NATIVE_CHORD_KEYS[code] or not config.base or not row_emulated(session, code) then
-			return M.PASS, nil
-		end
-		session.state = M.NEUTRAL
-		local char = M.shortcut_char(session.model, code, ctrl and "ctrl" or (alt and "alt" or "win"))
-		if char == "" then return M.PASS, nil end
+		local char, emulated = M.chord_char(session, code, ctrl, alt, win)
+		-- An emulated key's chord ends a pending dead key, whatever it sends.
+		if emulated then session.state = M.NEUTRAL end
+		if char == nil then return M.PASS, nil end
 		return M.SHORTCUT, char
 	end
 	local emulated = row_emulated(session, code)

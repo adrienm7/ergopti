@@ -341,6 +341,20 @@ function M.on_key(detail)
 end
 
 
+--- The character a Ctrl, Alt or Super chord on this key sends while the
+--- emulation runs, without typing anything: the keyboard shortcut slots match
+--- it, as Windows registers a slot on the key that types its letter (ILX-001).
+--- @param detail table Keyboard hook press detail.
+--- @return string|nil char nil when the chord keeps the system layout's key.
+function M.chord_key(detail)
+	local session = _session
+	if session == nil or type(detail) ~= "table" or _deps.is_active() ~= true then return nil end
+	local code = _evdev_to_code[detail.code]
+	if code == nil then return nil end
+	local mods = merged_mods(type(detail.mods) == "table" and detail.mods or {})
+	return (Emulation.chord_char(session, code, mods.ctrl == true, mods.alt == true, mods.meta == true))
+end
+
 
 
 
