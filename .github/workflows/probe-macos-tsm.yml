@@ -52,9 +52,11 @@ jobs:
             local name="$1"
             echo "::group::cohort $name"
             python3 tools/diagnostics/probe_tsm_port.py
+            export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$RUNNER_TEMP/tis-$name.XXXXXX")"
+            export ERGOPTI_TIS_EVIDENCE_SESSION="$(openssl rand -hex 32)"
             script -q /dev/null swift test --skip-build --package-path static/ergopti_plus/macos/launcher \
               --scratch-path "$RUNNER_TEMP/swift" --filter '(^|[.])NumberRowSourceProbeTests([/.]|$)' 2>&1 \
-              | tee "$RUNNER_TEMP/cohort-$name.log" | grep -E "TSM|CFMessagePort|error:|Executed|failed \(" || true
+              | tee "$RUNNER_TEMP/cohort-$name.log" | grep -E "TSM|CFMessagePort|error:|Executed|failed \(|passed \(" || true
             echo "::endgroup::"
             echo "SUMMARY $name: $(grep -c 'CFMessagePortSendRequest FAILED' "$RUNNER_TEMP/cohort-$name.log") tsm lines; $(grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/cohort-$name.log" | tail -n 1)"
           }
