@@ -8,8 +8,10 @@
  * selection deadline, an unresolved cleanup and "unavailable" for every later
  * case (runs 42014901978, 43013053161, 43172671159). Each refusal followed
  * TSMSendMessageToUIServer lines: TextInputMenuAgent, which serves
- * com.apple.tsm.uiserver, did not answer, and stopping that agent on a hosted
- * runner reproduces the same lines. tools/diagnostics/macos_tsm_refusal.py
+ * com.apple.tsm.uiserver, did not answer. Stopping that agent on a hosted
+ * runner prints the same lines while the cohort still passes, so the state is
+ * shared by the refusals but not proven to cause them.
+ * tools/diagnostics/macos_tsm_refusal.py
  * names that state in a receipt and an error annotation. This test runs it on
  * the verbatim transcript lines of job 127206005395 and proves each state can
  * fail: the unanswered state needs the line before the refusal, a refusal
@@ -112,10 +114,7 @@ try {
 		original.stdout,
 		/^::error::Native keyboard-source refusal: tsm_uiserver_unanswered\. /m
 	);
-	assert.match(
-		original.stdout,
-		/This is the hosted runner's text-input service, not the fixture\./
-	);
+	assert.match(original.stdout, /names the runner state, not a proven cause\./);
 	checks++;
 
 	// The macOS 26 refusal of run 43108782369 carried no unanswered message.
