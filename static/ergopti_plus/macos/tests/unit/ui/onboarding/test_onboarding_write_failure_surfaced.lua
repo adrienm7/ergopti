@@ -319,7 +319,10 @@ helpers.describe("wizard genuine canonical admitted native Finish with private p
 			local content, status = f.files.read_with_status(f.path)
 			helpers.assert_eq(status, "ok")
 			local decoded = require("toml_codec").decode(content)
-			helpers.assert_eq(decoded._meta.schema_version, 21)
+			-- The stamp is the registry's current version, never a literal copy.
+			local Migrate = require("config_migrate")
+			local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
+			helpers.assert_eq(decoded._meta.schema_version, registry.current)
 			helpers.assert_eq(decoded.llm.enabled, true)
 			helpers.assert_eq(decoded.hotstrings.trigger_char, "ù")
 			helpers.assert_eq(decoded.future.keep, "owned by another feature")

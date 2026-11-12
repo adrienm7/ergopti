@@ -14,7 +14,9 @@ local helpers = require("tests.helpers")
 local KEYS = { { id = "caps_lock" }, { id = "left_shift" }, { id = "escape" } }
 local COMBOS = { { id = "esc_tab" } }
 
---- Runs body with the real config module over an in-memory file.
+--- Runs body with the real config module over an in-memory pair of files:
+--- remap.toml (`disk.content`) and the config.toml beside it (`disk.config`),
+--- which holds the manifest rows. `disk.writes` counts remap.toml's writes.
 --- @param source string|nil Initial bytes, nil for absent.
 --- @param body function Receives the config module and the disk table.
 local function with_disk(source, body)
@@ -22,12 +24,18 @@ local function with_disk(source, body)
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local files = require("adapters.file_system")
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged
-		local disk = { content = source, writes = 0 }
-		files.read_with_status = function()
+		local config_path = config.config_toml_path_for("remap.toml")
+		local disk = { content = source, writes = 0, config_writes = 0 }
+		files.read_with_status = function(path)
+			if path == config_path then return disk.config, disk.config and "ok" or "absent" end
 			if disk.before_read then disk.before_read() end
 			return disk.content, disk.content and "ok" or "absent"
 		end
-		files.write_if_unchanged = function(_, content)
+		files.write_if_unchanged = function(path, content)
+			if path == config_path then
+				disk.config_writes, disk.config = disk.config_writes + 1, content
+				return true
+			end
 			disk.writes, disk.content = disk.writes + 1, content
 			return true
 		end

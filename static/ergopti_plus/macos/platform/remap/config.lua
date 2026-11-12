@@ -100,12 +100,13 @@ local function merged_shapes(left, right)
 		document = left and left.document or nil }
 end
 
---- Reads the config.toml beside tap_hold.toml for its tap-hold rows.
+--- Reads the config.toml beside tap_hold.toml for its tap-hold rows. A module
+--- field, as _load_toml_file is, so a test can state both files' reads.
 --- @param user_config_path string The tap_hold.toml path.
 --- @return table|nil part What TapHoldFile.read_config() returns; nil when unsafe.
 --- @return table source `{ path, status, content? }`, the exact same-read bytes.
 --- @return table|nil shapes The shape receipt of config.toml.
-local function read_config_part(user_config_path)
+function M._read_config_part(user_config_path)
 	local path = M.config_toml_path_for(user_config_path)
 	local raw, status = FileSystem.read_with_status(path)
 	local source = { path = path, status = status, content = status == "ok" and raw or nil }
@@ -122,17 +123,31 @@ local function read_config_part(user_config_path)
 	return TapHoldFile.read_config(document, shapes, path), source, shapes
 end
 
---- Lays the config.toml rows over a model read from tap_hold.toml.
+--- A copy of a config part's value that keeps every decoded array itself: the
+--- shape receipt names arrays by identity.
+--- @param value any
+--- @param shapes table|nil The config.toml shape receipt.
+--- @return any
+local function copy_part(value, shapes)
+	if type(value) ~= "table" or (shapes and shapes.arrays[value]) then return value end
+	local out = {}
+	for key, item in pairs(value) do out[key] = copy_part(item, shapes) end
+	return out
+end
+
+--- Lays the config.toml rows over a model read from tap_hold.toml. The model
+--- gets copies: a save edits it and compares it with the part it read.
 --- @param model table The Karabiner model, edited in place.
---- @param part table What read_config_part() returned.
-local function overlay_config(model, part)
+--- @param part table What M._read_config_part() returned, never edited here.
+--- @param shapes table|nil The config.toml shape receipt.
+local function overlay_config(model, part, shapes)
 	if part[ConfigKeys.KEY.TAP_HOLDS] ~= nil then
 		if model.tap_holds == nil then model.tap_holds = {} end
 		if type(model.tap_holds) == "table" then
-			for leaf, value in pairs(part[ConfigKeys.KEY.TAP_HOLDS]) do model.tap_holds[leaf] = value end
+			for leaf, value in pairs(part[ConfigKeys.KEY.TAP_HOLDS]) do model.tap_holds[leaf] = copy_part(value, shapes) end
 		end
 	end
-	model.mod_combos = part[ConfigKeys.KEY.MOD_COMBOS]
+	model.mod_combos = copy_part(part[ConfigKeys.KEY.MOD_COMBOS], shapes)
 end
 
 local LOG = "karabiner"
@@ -765,7 +780,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 	-- The manifest rows live in config.toml: an unsafe one refuses the state
 	-- like a corrupt tap_hold.toml, rather than read its rows as neutral.
-	local config_part, config_source, config_shapes = read_config_part(user_config_path)
+	local config_part, config_source, config_shapes = M._read_config_part(user_config_path)
 	if config_part == nil then return nil, "error" end
 	source.config = config_source
 	if not data then
@@ -776,7 +791,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		Logger.info(LOG, "No tap_hold.toml yet — the config.toml rows apply over the defaults.")
 		data = {}
 	end
-	overlay_config(data, config_part)
+	overlay_config(data, config_part, config_shapes)
 	shapes = merged_shapes(shapes, config_shapes)
 
 	-- The switch decides whether any lease or guardian may be acquired, so an
@@ -1002,7 +1017,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 	local shared_file, reset_base
 	local source, source_status
 	-- The config.toml rows read before the save, compared with the model after.
-	local config_part, config_source, config_shapes = read_config_part(user_config_path)
+	local config_part, config_source, config_shapes = M._read_config_part(user_config_path)
 	if config_part == nil then
 		Logger.error(LOG, "Refusing to save the remap settings: the config.toml beside '%s' is unsafe — settings NOT saved.",
 			user_config_path)
@@ -1075,7 +1090,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 
 	-- An ordinary save keeps every config.toml row it does not change, outdated
 	-- spellings included; a reset replaces what macOS owns there too.
-	if not overwrite_corrupt then overlay_config(document, config_part) end
+	if not overwrite_corrupt then overlay_config(document, config_part, config_shapes) end
 	document_shapes = merged_shapes(document_shapes, config_shapes)
 	local config_rows
 	local candidate_refusal = nil

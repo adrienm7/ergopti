@@ -78,7 +78,7 @@ local function with_folder(body)
 		local combos = Json.decode(read(data .. "mod_combos.json"))
 		local ok, err = pcall(body, { config = config, dir = dir, path = path, config_path = dir .. "/config.toml",
 			keys = keys, combos = combos,
-			warnings = warnings, errors = errors, files = files,
+			warnings = warnings, errors = errors, files = files, native_write = native_write,
 			load = function() return config.load_user_config(keys, combos, path) end })
 		files.write_if_unchanged = native_write
 		for _, name in ipairs({ "tap_hold.toml", "config.toml", "config_karabiner.toml",
@@ -258,8 +258,14 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 				'{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "sticky_timeout_ms", to_section = "tap_holds" },',
 				'{ op = "import_companion", file = "tap_hold.toml", section = "mod_combos", to_section = "mod_combos" },',
 				"]" }, "\n"))))
-			local result = Engine.run({ path = f.config_path, driver = "hs", registry = registry, stamp = STAMP,
-				file_adapter = f.files, companions = { ["tap_hold.toml"] = f.path } })
+			-- Through the native configuration owner, as the boot runs it: the
+			-- engine refuses a substituted adapter, so the fixture's writer steps aside.
+			local fixture_write = f.files.write_if_unchanged
+			f.files.write_if_unchanged = f.native_write
+			local called, result = pcall(Engine.run, { path = f.config_path, driver = "hs", registry = registry,
+				stamp = STAMP, companions = { ["tap_hold.toml"] = f.path } })
+			f.files.write_if_unchanged = fixture_write
+			assert(called, tostring(result))
 			helpers.assert_eq(result.status, "migrated", tostring(result.detail))
 			helpers.assert_eq(decode(read(f.path)), decode(read(CORPUS .. "macos_written.toml")))
 			helpers.assert_eq(config_rows(read(f.config_path)), config_rows(read(CORPUS .. "macos_written.config.toml")))

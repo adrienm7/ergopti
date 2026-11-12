@@ -22,11 +22,12 @@ local FUTURE = '[future]\nmaximum = 9_223_372_036_854_775_807\n'
 ---   file holds its shared tap_hold.toml text), or the file's bytes with `raw`.
 --- @param body function Assertions receiving the owner, source and publication seam.
 --- @param raw boolean|nil True when `source` is already the file's bytes.
-local function with_file(source, body, raw)
+--- @param config_raw string|nil With `raw`: the bytes of the config.toml beside it.
+local function with_file(source, body, raw, config_raw)
 	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.toml.codec", "toml_codec" }, function()
 		local Config = helpers.load_with_stubs("platform.remap.config")
 		local Files, Codec = require("adapters.file_system"), require("infra.toml.codec")
-		local path = os.tmpname()
+		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
@@ -34,7 +35,7 @@ local function with_file(source, body, raw)
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
 		local Text = require("tests.support.tap_hold_file_text")
-		local source_config
+		local source_config = config_raw
 		if not raw then source, source_config = Text.file(source) end
 		write(source)
 		Text.write_config(path, source_config)
@@ -43,6 +44,11 @@ local function with_file(source, body, raw)
 		state.tap_hold_timeout_ms = 1234
 		local native, controls = Files.write_if_unchanged, { writes = 0 }
 		Files.write_if_unchanged = function(destination, candidate, expected)
+			-- The manifest rows publish to the config.toml beside it, counted apart.
+			if destination == Text.config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				return native(destination, candidate, expected)
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = controls.expected or source })
@@ -50,9 +56,10 @@ local function with_file(source, body, raw)
 			return native(destination, candidate, expected)
 		end
 		local ok, err = pcall(body, { config = Config, files = Files, codec = Codec, model = function(text) return Text.model(text, Text.read_config(path)) end, original = source, state = state,
-			path = path, read = read, write = write, controls = controls })
+			path = path, read = read, write = write, controls = controls,
+			read_config = function() return Text.read_config(path) end })
 		Files.write_if_unchanged = native
-		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
+		Text.remove_private(path)
 		if not ok then error(err, 0) end
 	end)
 end
@@ -105,7 +112,8 @@ helpers.describe("remap source-bound full-document encoding", function()
 			f.state.enabled = true
 			helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
 			helpers.assert_contains(f.read(), "enabled = 1.0")
-			helpers.assert_contains(f.read(), 'enabled = "obsolete"')
+			-- The Tap-Holds switch is a config.toml row.
+			helpers.assert_contains(f.read_config(), 'enabled = "obsolete"')
 			helpers.assert_contains(f.read(), "integration_enabled = true")
 			helpers.assert_contains(f.read(), "kind = 1.0")
 		end)
@@ -114,24 +122,25 @@ helpers.describe("remap source-bound full-document encoding", function()
 	for _, vector in ipairs({ { original = "-0.0", changed = "0.0" },
 		{ original = "0.0", changed = "-0.0" } }) do
 		helpers.it("publishes a changed owned floating-zero sign: " .. vector.original, function()
-			with_file("[_meta]\nschema_version = 1\n[tap_hold]\nlone_modifier_tap_max_ms = " .. vector.original .. "\n", function(f)
+			-- The lone-tap window is a config.toml row.
+			with_file("[_meta]\nschema_version = 1\n", function(f)
 				f.state.lone_modifier_tap_max_ms = tonumber(vector.changed)
 				helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
-				helpers.assert_contains(f.read(), "lone_modifier_tap_max_ms = " .. vector.changed .. "\n")
+				helpers.assert_contains(f.read_config(), "lone_modifier_tap_max_ms = " .. vector.changed .. "\n")
 				local value = f.model(f.read()).tap_holds.lone_modifier_tap_max_ms
 				helpers.assert_eq(1 / value, 1 / tonumber(vector.changed))
 				if math.type then helpers.assert_eq(math.type(value), "float") end
-			end, true)
+			end, true, "[tap_holds]\nlone_modifier_tap_max_ms = " .. vector.original .. "\n")
 		end)
 	end
 
 	helpers.it("publishes an explicit owned integer zero with its integer kind", function()
-		with_file("[_meta]\nschema_version = 1\n[tap_hold]\nlone_modifier_tap_max_ms = 0.0\n", function(f)
+		with_file("[_meta]\nschema_version = 1\n", function(f)
 			f.state.lone_modifier_tap_max_ms = 0
 			helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
-			helpers.assert_contains(f.read(), "lone_modifier_tap_max_ms = 0\n")
+			helpers.assert_contains(f.read_config(), "lone_modifier_tap_max_ms = 0\n")
 			helpers.assert_eq(math.type(f.model(f.read()).tap_holds.lone_modifier_tap_max_ms), "integer")
-		end, true)
+		end, true, "[tap_holds]\nlone_modifier_tap_max_ms = 0.0\n")
 	end)
 
 	helpers.it("refuses a replaced source generation before publication", function()

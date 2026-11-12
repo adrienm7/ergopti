@@ -35,7 +35,7 @@ helpers.describe("remap scope transaction", function()
 			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-1")
 			helpers.assert_true(accepted)
 			helpers.assert_eq(disk.files["/remap/backup-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE, config = { status = "absent" } } },
 				"the save may only replace the backed-up bytes")
 			local saved = calls.saved_payloads[1]
 			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))

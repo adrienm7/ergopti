@@ -158,6 +158,12 @@ helpers.describe("configured navigation reservations share actual remap settings
 		end
 		local settings_text = settings or '[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = true\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n'
 		local layer_text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "none"\n'
+		-- A case states the Tap-Holds switch beside the keys; it is the
+		-- config.toml row beside tap_hold.toml.
+		local rows = directory .. "/config.toml"
+		local switch = settings_text:match("%[tap_hold%]\nenabled = (%a+)\n")
+		settings_text = settings_text:gsub("%[tap_hold%]\nenabled = %a+\n", "", 1)
+		if switch then write(rows, "[tap_holds]\nenabled = " .. switch .. "\n") end
 		write(config, settings_text); write(layer, layer_text)
 		local called, detail = xpcall(function()
 			helpers.with_stub_scope({ "platform.remap.nav_layer" }, function()
@@ -191,7 +197,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 				assert(os.remove(guard))
 			end
 		end
-		assert(os.remove(config)); assert(os.remove(layer)); assert(lfs.rmdir(directory))
+		assert(os.remove(config)); assert(os.remove(layer)); os.remove(rows); assert(lfs.rmdir(directory))
 		if not called then error(detail, 0) end
 	end
 

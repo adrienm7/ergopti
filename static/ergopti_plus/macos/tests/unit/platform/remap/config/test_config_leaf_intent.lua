@@ -29,7 +29,7 @@ local function with_file(original, body)
 		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
 		require("config_outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
-		local path = os.tmpname()
+		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
@@ -47,6 +47,11 @@ local function with_file(original, body)
 		-- The source fence is the writer's; this fixture records the exact
 		-- candidate it would publish over the unchanged source.
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The manifest rows publish to the config.toml beside it, counted apart.
+			if destination == Text.config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				Text.write_config(path, content); return true
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = original })
@@ -59,7 +64,7 @@ local function with_file(original, body)
 		local ok, err = pcall(body, { config = config, path = path, warnings = warnings, errors = errors,
 			controls = controls, load = load, read = read, decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original })
 		files.write_if_unchanged = native_write
-		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
+		Text.remove_private(path)
 		if not ok then error(err, 0) end
 	end)
 end

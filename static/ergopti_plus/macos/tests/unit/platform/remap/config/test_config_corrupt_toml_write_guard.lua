@@ -62,9 +62,15 @@ local function write_file(path, content)
 	fh:close()
 end
 
+local Text = require("tests.support.tap_hold_file_text")
+
+--- A tap_hold.toml path of its own: the config.toml beside it is this test's.
+local function private_path()
+	return Text.private_path()
+end
+
 local function cleanup(path)
-	os.remove(path .. ".tmp")
-	os.remove(path)
+	Text.remove_private(path)
 end
 
 --- Returns the TOML the writer produced for `path`, wherever it landed.
@@ -114,7 +120,7 @@ end
 helpers.describe("Config.save_user_config — corrupt file is not overwritten (karabiner-silent-reset)", function()
 
 	helpers.it("leaves an unparseable config byte-identical and stages nothing", function()
-		local path = os.tmpname()
+		local path = private_path()
 		write_file(path, CORRUPT_TOML)
 
 		local saved
@@ -137,7 +143,7 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 	end)
 
 	helpers.it("refuses unreadable existing config and failed staging commits", function()
-		local path = os.tmpname()
+		local path = private_path()
 		local original = "[karabiner]\nenabled = false\n"
 		write_file(path, original)
 		local original_open = io.open
@@ -164,6 +170,8 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 		local original_write_if_unchanged = FileSystem.write_if_unchanged
 		local reads = 0
 		FileSystem.read_with_status = function(candidate)
+			-- The config.toml beside it is read for the manifest rows, absent here.
+			if candidate == Text.config_path(path) then return nil, "absent" end
 			reads = reads + 1
 			return original, "ok"
 		end
@@ -188,7 +196,7 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 	end)
 
 	helpers.it("names the corrupt path so the user can go and repair it", function()
-		local path = os.tmpname()
+		local path = private_path()
 		write_file(path, CORRUPT_TOML)
 
 		local logged = with_captured_errors(function()
@@ -215,8 +223,7 @@ end)
 helpers.describe("Config.save_user_config — normal saves are untouched", function()
 
 	helpers.it("writes the config when the file does not exist yet (first launch)", function()
-		local path = os.tmpname()
-		os.remove(path)  -- os.tmpname creates the file on some builds
+		local path = private_path()
 
 		local payload
 		local write_assertion
@@ -241,7 +248,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 	end)
 
 	helpers.it("still rewrites a config that decodes cleanly", function()
-		local path = os.tmpname()
+		local path = private_path()
 		local valid = "[karabiner]\nenabled = false\n"
 		write_file(path, valid)
 
@@ -250,11 +257,15 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local original_read = FileSystem.read_with_status
 		local reads = 0
 		local original_write = FileSystem.write_if_unchanged
+		local rows_payload
 		FileSystem.read_with_status = function(candidate)
+			if candidate == Text.config_path(path) then return nil, "absent" end
 			reads = reads + 1
 			return valid, "ok"
 		end
 		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
+			-- The sticky delay is a config.toml row, published beside it.
+			if candidate == Text.config_path(path) then rows_payload = content; return true end
 			write_assertion = candidate == path
 				and type(expected_source) == "table"
 				and expected_source.status == "ok"
@@ -276,14 +287,14 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			"the writer must revalidate the exact classified bytes before publication")
 		helpers.assert_true(payload ~= nil,
 			"a valid config must still be re-encoded and written — the guard must not block healthy saves")
-		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
-			"the produced payload must carry the new state: got " .. helpers.inspect(payload))
+		helpers.assert_true(rows_payload ~= nil and rows_payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
+			"the produced config.toml rows must carry the new state: got " .. helpers.inspect(rows_payload))
 		helpers.assert_true(logged:find("Refusing to overwrite") == nil,
 			"a decodable config must never trigger the corruption refusal")
 	end)
 
 	helpers.it("lets an explicit reset rebuild a corrupt file", function()
-		local path = os.tmpname()
+		local path = private_path()
 		write_file(path, CORRUPT_TOML)
 
 		-- Explicit reset may replace malformed content, while conditional
@@ -291,8 +302,10 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local payload
 		local write_assertion
 		local publication_source
+		local rows_payload
 		local original_write = FileSystem.write_if_unchanged
 		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
+			if candidate == Text.config_path(path) then rows_payload = content; return true end
 			write_assertion = candidate == path
 			publication_source = expected_source
 			payload = content
@@ -309,7 +322,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			"repair authority must retain the exact malformed-source publication fence")
 		helpers.assert_true(payload ~= nil,
 			"the explicit reset must be allowed to overwrite an unparseable config")
-		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
+		helpers.assert_true(rows_payload ~= nil and rows_payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
 			"the reset must publish the supplied state, not the corrupt bytes")
 	end)
 

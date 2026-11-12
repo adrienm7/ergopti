@@ -144,12 +144,17 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 	helpers.it("handles genuine first-launch (absent file) with quiet INFO", function()
 		reset_captured()
 		local orig_load = Config._load_toml_file
-		Config._load_toml_file = function(_path)
-			return nil  -- absent, not corrupt
+		local orig_part = Config._read_config_part
+		Config._load_toml_file = function(path)
+			return nil, "absent", { path = path, status = "absent" }  -- absent, not corrupt
+		end
+		-- No config.toml beside it either: a genuine first launch.
+		Config._read_config_part = function(path)
+			return {}, { path = Config.config_toml_path_for(path), status = "absent" }, nil
 		end
 
 		local state, status = Config.load_user_config({}, {}, "/fake/first_launch.toml")
-		Config._load_toml_file = orig_load
+		Config._load_toml_file, Config._read_config_part = orig_load, orig_part
 
 		helpers.assert_true(type(state) == "table")
 		helpers.assert_eq(status, "absent")
