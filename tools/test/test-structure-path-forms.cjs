@@ -247,6 +247,11 @@ function run() {
 			['dir-split'],
 			'a scattered shared folder named whole refuses the step'
 		);
+		assert.equal(
+			rewrite(`${P}_shared/zz_probe_mod/vendor.js`, 'e.paths = ["./zz_probe_lua"]'),
+			'e.paths = ["./zz_probe_lua"]',
+			'a ./ path is relative to its file, never to the tree root'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
