@@ -242,9 +242,91 @@ local function stamp(document)
 	document[Migrate.META_SECTION][Migrate.VERSION_KEY] = M.registry().current
 end
 
---- The text a save publishes.
---- @param file table|nil What M.read() returned for the source, nil when the
----   save starts from no file (absent, explicit reset or backed-up repair).
+--- Whether two leaf values are the same, numbers by kind and sign too.
+local function same_value(left, right)
+	if type(left) == "number" and type(right) == "number" then
+		local kind = math.type or function() return nil end
+		return left == right and kind(left) == kind(right) and (left ~= 0 or 1 / left == 1 / right)
+	end
+	if type(left) ~= "table" or type(right) ~= "table" then return left == right end
+	for key, value in pairs(left) do if not same_value(value, right[key]) then return false end end
+	for key in pairs(right) do if left[key] == nil then return false end end
+	return true
+end
+
+--- The line edits (config_migrate record operations) that turn the decoded
+--- source into the document a save produced: a changed leaf is deleted then
+--- set, a table gone is deleted whole. Nil when one cannot be spelled so: a
+--- leaf at the root, or an array that holds tables.
+--- @param old table Decoded source.
+--- @param new table The document to publish.
+--- @param old_table function(value) -> boolean For the source.
+--- @param new_table function(value) -> boolean For the document.
+--- @return table|nil ops
+local function edit_operations(old, new, old_table, new_table)
+	local deletes, sets = {}, {}
+	local function settable(value)
+		if type(value) ~= "table" then return true end
+		for _, item in pairs(value) do if type(item) == "table" then return false end end
+		return true
+	end
+	local function walk(section, left, right)
+		local keys = {}
+		for key in pairs(left or {}) do keys[key] = true end
+		for key in pairs(right or {}) do keys[key] = true end
+		for key in pairs(keys) do
+			local o, n = left and left[key], right and right[key]
+			local path = section and (section .. "." .. key) or key
+			local o_table, n_table = o ~= nil and old_table(o), n ~= nil and new_table(n)
+			if o_table and n_table then
+				if not walk(path, o, n) then return false end
+			elseif not (o ~= nil and n ~= nil and not o_table and not n_table and same_value(o, n)) then
+				if o_table then
+					deletes[#deletes + 1] = { op = "delete", section = path }
+				elseif o ~= nil then
+					if section == nil then return false end
+					deletes[#deletes + 1] = { op = "delete", section = section, key = key }
+				end
+				if n_table then
+					if not walk(path, nil, n) then return false end
+				elseif n ~= nil then
+					if section == nil or not settable(n) then return false end
+					sets[#sets + 1] = { op = "set_if_absent", section = section, key = key, value = n }
+				end
+			end
+		end
+		return true
+	end
+	if not walk(nil, old, new) then return nil end
+	for _, op in ipairs(sets) do deletes[#deletes + 1] = op end
+	return deletes
+end
+
+--- The source edited line by line into `document`, nil when the edit cannot be
+--- spelled or does not read back as the document.
+--- @param source string The exact bytes the save read.
+--- @param document table The document to publish.
+--- @param shapes table|nil Its shape receipt.
+--- @return string|nil text
+local function edited_source(source, document, shapes)
+	local decoded_ok, old, old_shapes = pcall(TomlCodec.decode_with_shapes, source)
+	if not decoded_ok or type(old) ~= "table" then return nil end
+	local ops = edit_operations(old, document, table_test(old_shapes), table_test(shapes))
+	if ops == nil then return nil end
+	if #ops == 0 then return source end
+	local plan = require("config_migrate").plan_operations(source, ops)
+	if plan.outcome ~= "migrated" and plan.outcome ~= "current" then return nil end
+	local reread_ok, reread = pcall(TomlCodec.decode, plan.candidate)
+	if not reread_ok or not same_value(reread, document) then return nil end
+	return plan.candidate
+end
+
+--- The text a save publishes. Over a file it read, the save edits its exact
+--- bytes line by line, so comments, order and another driver's spelling stay;
+--- an edit that cannot be spelled so re-renders the file, and says so.
+--- @param file table|nil What M.read() returned for the source, with
+---   `source_text` its exact bytes; nil when the save starts from no file
+---   (absent, explicit reset or backed-up repair).
 --- @param model table The model the save produced.
 --- @return string text
 function M.encode(file, model)
@@ -258,6 +340,11 @@ function M.encode(file, model)
 	end
 	SharedFile.apply_karabiner(file.document, file.before, model, M.context(), table_test(file.shapes))
 	stamp(file.document)
+	if type(file.source_text) == "string" then
+		local edited = edited_source(file.source_text, file.document, file.shapes)
+		if edited then return edited end
+		Logger.warn(LOG, "The tap-hold change cannot be written line by line; the file is rewritten whole and its comments are not kept.")
+	end
 	if file.shapes then return TomlCodec.encode_with_shapes(file.document, file.shapes) end
 	return TomlCodec.encode(file.document)
 end

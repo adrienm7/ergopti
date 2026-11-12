@@ -182,6 +182,29 @@ helpers.describe("Spellings across drivers in the shared tap_hold.toml (tap-hold
 	end)
 end)
 
+-- TCL-007: every macOS save rendered tap_hold.toml afresh, dropping the user's
+-- comments and the header the Linux writer puts on top.
+helpers.describe("A macOS save edits tap_hold.toml line by line (tcl-007-keep-comments)", function()
+	helpers.it("keeps the comments and the Linux header of the Linux pair (tcl-007-keep-comments)", function()
+		with_folder(function(f)
+			local source = assert(read(CORPUS .. "linux_written.toml"))
+				.. "# My own note about the next key.\n[tap_hold.keys.escape]\ntap_action = \"copy\" # inline note\n"
+			write(f.path, source)
+			write(f.config_path, assert(read(CORPUS .. "linux_written.config.toml")))
+			local state = f.load()
+			state.tap_hold_config.escape = { tap = "paste", hold = "none" }
+			helpers.assert_true(f.config.save_user_config(state, f.path))
+			local text = read(f.path)
+			helpers.assert_contains(text, "# tap_hold.toml — written by the Ergopti+ tray menu.")
+			helpers.assert_contains(text, "# My own note about the next key.")
+			helpers.assert_eq(decode(text).tap_hold.keys.escape.tap_action, "paste")
+			for _, line in ipairs(f.warnings) do
+				helpers.assert_true(line:find("rewritten whole", 1, true) == nil, "the file is not rewritten: " .. line)
+			end
+		end)
+	end)
+end)
+
 -- TCL-006: over a file laid on the shipped keys, a cleared tap or hold written as
 -- an absent field read as the shipped one on Windows and Linux.
 helpers.describe("Clearing a key over inherit_defaults (tcl-006-explicit-none)", function()
