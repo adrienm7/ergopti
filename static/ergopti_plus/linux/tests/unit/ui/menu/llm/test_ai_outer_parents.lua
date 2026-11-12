@@ -344,7 +344,8 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				local row = parent(ctx, kind)
 				helpers.assert_type(row, "table", "the paused feature remains visible")
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_nil(row.menu, "the original pause owner removes every executable child")
+				-- The tray no longer strips the paused submenu (EDD-1); the parent
+				-- itself still greys until the AI menu joins the real pause.
 				helpers.assert_nil(row.fn, "the original parent still has no click action")
 			end)
 		end)
