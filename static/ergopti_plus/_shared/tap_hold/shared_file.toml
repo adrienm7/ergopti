@@ -1,8 +1,8 @@
 # _shared/tap_hold/shared_file.toml
 # The layout of the user's tap_hold.toml, the one file every driver keeps its
-# tap-hold settings in (maintainer decision of 2026-11-10). SCHEMA.md beside
-# this file is the prose specification; this file is the part a reader needs
-# as data.
+# tap-hold keys in; the manifest's rows live in config.toml (maintainer decision
+# of 2026-11-11). SCHEMA.md beside this file is the prose specification; this
+# file is the part a reader needs as data.
 #
 # READ AT RUNTIME BY THE macOS DRIVER through _shared/lua/tap_hold/shared_file.lua,
 # which translates the file to and from the Karabiner model of
@@ -33,9 +33,11 @@
 file_name = "tap_hold.toml"
 # The version stamp, owned by _shared/tap_hold/migrations.toml.
 meta_section = "_meta"
-# Keys, global and sticky delays, lone-tap window: every driver.
+# Keys and the global delay: every driver. The Tap-Holds switch and the sticky
+# and lone-tap timings are config.toml [tap_holds] rows since schema v22.
 tap_hold_section = "tap_hold"
-# Key combinations (timing, symmetry, switch and each pair's slots): every driver.
+# Key combinations: a config.toml section on every driver since config.toml
+# schema v22. Named here so a reader reports a copy left in tap_hold.toml.
 combos_section = "mod_combos"
 # « Ergopti uses Karabiner » and the runtime choice: macOS only.
 karabiner_section = "karabiner"
