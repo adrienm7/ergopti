@@ -5,4 +5,4 @@ description = "A configuration ErgoptiPlus 1.0.9 wrote on Linux (v20, the oldest
 drivers = ["linux"]
 outcome = "migrated"
 from_version = 20
-to_version = 21
+to_version = 22

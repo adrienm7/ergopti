@@ -29,8 +29,10 @@ local function with_file(source, body)
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
 		local Text = require("tests.support.tap_hold_file_text")
-		source = Text.file(source)
+		local source_config
+		source, source_config = Text.file(source)
 		write(source)
+		Text.write_config(path, source_config)
 		local files = require("adapters.file_system")
 		local native_write, native_conditional, native_read = files.write, files.write_if_unchanged, files.read_with_status
 		local controls = { writes = 0 }
@@ -51,9 +53,9 @@ local function with_file(source, body)
 		end
 		local ok, err = pcall(body, { config = config, path = path, files = files, warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
-			decode = Text.model, file = Text.file, original = source })
+			decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = source })
 		files.write, files.write_if_unchanged, files.read_with_status = native_write, native_conditional, native_read
-		os.remove(path); os.remove(path .. ".tmp")
+		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
 		if not ok then error(err, 0) end
 	end)
 end

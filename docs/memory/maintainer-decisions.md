@@ -219,7 +219,7 @@ Decided by the maintainer on 2026-11-11: the old steps of
 `_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
 the registry every driver parses at boot and most of the config test time.
 `oldest_version` is v20, what 1.0.9 (the latest public release) and every
-1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+1.0.10 pre-release wrote; only `v20_to_v21` remained at the squash. A file stamped below it,
 including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
 cleanly on every driver: never written, the session read-only, one ERROR at
 boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
@@ -1123,9 +1123,10 @@ shared clipboard owner is busy. Output is neither dropped nor delayed
 ## The one-shot Shift timeout is a user setting on every OS (6 November 2026)
 
 Aligned on macOS: `sticky_timeout_ms` (2000 ms registry default) is editable on
-Windows (`config.toml` `[tap_holds]`, `_TH_CommitOneShotTimeoutMs`) and Linux
-(`tap_hold.toml` `[tap_hold]`, `set_one_shot_timeout_ms`), each with a tray row;
-only a positive whole number of milliseconds is admitted, no zero or unlimited.
+Windows (`_TH_CommitOneShotTimeoutMs`) and Linux (`set_one_shot_timeout_ms`),
+each with a tray row, in `config.toml` `[tap_holds]` on every OS since config
+schema v22; only a positive whole number of milliseconds is admitted, no zero
+or unlimited.
 
 ## CapsWord setting changes reach the running session (6 November 2026)
 
