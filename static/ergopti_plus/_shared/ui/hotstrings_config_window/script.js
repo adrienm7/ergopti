@@ -387,3 +387,14 @@ function bindTooltip(field, cat, sec) {
 // The Linux hardware harness found this window unreachable that way while the
 // editor — which has always assigned `window.initData` explicitly — worked.
 window.setData = setData;
+
+// Ask for the state once setData is published. Windows and macOS also push it
+// when the navigation completes and drop this string message; the Linux bridge
+// pushes only on it, so without it the window opened empty (WVH-001).
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', function () {
+		send('ready');
+	});
+} else {
+	send('ready');
+}
