@@ -83,10 +83,12 @@ function M.verify_configured_rewrite(receipt)
 end
 
 --- Creates the direct participant's existing file transaction and native fences.
---- @param options table Path, backup path, storage backup path, files and pause getter.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Path, backup path, storage backup path and files.
 --- @return table owner Apply/revert/release/pending/retry_restore.
 function M.new(options)
-	assert(type(options) == "table" and type(options.is_paused) == "function", "script scope requires its pause owner")
+	assert(type(options) == "table", "script scope requires its options")
 	local transaction
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end, edit_key = options.edit_key }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "linux", aliases = options.aliases or aliases(),
@@ -101,7 +103,7 @@ function M.new(options)
 	local owner
 	owner = Fenced.new({ owner = {}, native_token = token, transaction = transaction, scope = "global",
 		fences = runtime.fences, available = function()
-			return options.is_paused() == false and require("config_migrate").read_only_reason(options.path) == nil
+			return require("config_migrate").read_only_reason(options.path) == nil
 		end })
 	local release = owner.release
 	function owner.release()
@@ -149,7 +151,7 @@ function M.edit_setting(key, value)
 	end
 	local owner = M.new({ path = path, backup_path = backup,
 		storage_backup_path = storage_backup,
-		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
+		files = require("adapters.file_system"), allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
 		aliases = { [key] = { alias = alias, native = require(native_name) } }, only = { [key] = true },
 		prepare_batch = prepare, preserve_unchanged = true,
 		validate_update = function(scope, row)
@@ -176,28 +178,25 @@ function M.edit_locale(value) return M.edit_setting(ConfigKeys.KEY.SCRIPT_LOCALE
 
 --- Applies requested script rows, retaining its exact native/file inverse.
 --- @param mode string Recommended or clear.
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
-	if type(is_paused) ~= "function" or is_paused() ~= false then return false, "script configuration is paused" end
+function M.apply(mode)
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "script rollback remains pending" end
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
 	local backup = path .. ".script-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak"
 	_owner = M.new({ path = path, backup_path = backup, storage_backup_path = backup .. ".settings",
-		files = require("adapters.file_system"), is_paused = is_paused })
+		files = require("adapters.file_system") })
 	local committed, detail = _owner.apply(mode)
 	if committed ~= true then Logger.warn("infra.script_scope", "Script scope refused: %s.", tostring(detail)) end
 	return committed, detail
 end
 
 --- Retains the exact participant cohort through the shared composition.
---- @param is_paused function Live pause getter.
 --- @return table participant Shared synchronous participant.
-function M.participant(is_paused)
+function M.participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused) end,
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end
