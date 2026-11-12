@@ -452,6 +452,18 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
    controls.paused=true;helpers.assert_eq(Scope.editor_owner(paused),nil);controls.paused=false;helpers.assert_eq(Scope.editor_owner(paused),owner)
   end)
  end)
+ -- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+ helpers.it('(edd1-paused-writes) an open physical shortcuts editor commits its edit after a pause',function()
+  with_scope(function(_,owners,controls,path)
+   local Scope=require('infra.shortcuts_scope');local paused=function()return controls.paused end
+   local owner=Scope.editor_owner(paused);helpers.assert_true(type(owner)=='table')
+   local _,receipt=owner.capture_editor_inventory()
+   controls.paused=true
+   helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}},receipt),true)
+   helpers.assert_eq(Codec.decode(Writer.read_classified(path)).shortcuts.keyboard.physical_none_KeyJ,'none')
+   controls.paused=false
+  end)
+ end)
  helpers.it('(physical-editor-ui) reopen cannot replace an owner whose actual child retirement is pending',function()
   local scalar='{"version":1,"executable":"/bin/sh","arguments":[]}'
   local initial='[shortcuts]\nenabled=true\n[shortcuts.keyboard]\nphysical_none_KeyJ="run_program"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__run_program=\''..scalar..'\'\n'
