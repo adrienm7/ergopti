@@ -36,6 +36,9 @@ local Timings = require("infra.timings")
 local LOG = "modules.llm.api_key_migration"
 
 local _ports = nil
+-- The keys the attempt in flight stored and no file names yet: a shutdown
+-- discards them, since its cancelled child calls nothing back (AIX-003).
+local _unpublished = nil
 local _state = "uninitialized"
 local _timer = nil
 local _attempt = 0
@@ -66,6 +69,7 @@ end
 --- Deletes the keys an attempt stored but no file names, without blocking.
 --- @param references table List of references.
 local function discard(references)
+	if references == _unpublished then _unpublished = nil end
 	for _, reference in ipairs(references) do
 		_ports.store.clear_async(reference, _ports.store_timeout_ms, function(ok, reason)
 			if not ok then
@@ -93,6 +97,7 @@ end
 --- @param generation number
 local function store_all(keys, generation)
 	local stored, tokens, references = {}, {}, {}
+	_unpublished = references
 	local function step(index)
 		if not current(generation) then
 			discard(references)
@@ -100,6 +105,7 @@ local function store_all(keys, generation)
 		end
 		if index > #keys then
 			local published, reason, uncertain, nothing_left = _ports.entries.publish_migrated(stored, tokens)
+			_unpublished = nil
 			if published then
 				_state = "done"
 				Logger.success(LOG, "%d plaintext API key(s) moved to the desktop secret service.", #keys)
@@ -242,6 +248,10 @@ function M.shutdown()
 	-- A cancelled child calls nothing back; its process group is killed.
 	if type(_operation) == "table" and type(_operation.cancel) == "function" then pcall(_operation.cancel, _operation) end
 	_operation = nil
+	-- The keys this attempt already stored are named by no file: without this
+	-- they stayed in the secret service, one more orphan per interrupted run.
+	if _unpublished and #_unpublished > 0 then discard(_unpublished) end
+	_unpublished = nil
 	if _state ~= "uninitialized" then _state = "stopped" end
 	return cancelled
 end
