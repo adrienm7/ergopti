@@ -1357,7 +1357,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       warning and returns "" (no list: the caller reads the Atom feed, « no connection ») instead of reaching the release
       parser (« parse failed »); a malformed array stays a parse failure. Test in the updater suite: an HTML 200 requests
       the feed and answers `updater.no_connection`.
-      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 957aef5a): tests in `test_updater_release_fetch.ahk` and `test_updater_check_only_fallback.ahk` (UPD-1).
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 957aef5a, refined in fd719164): tests in `test_updater_release_fetch.ahk` and `test_updater_check_only_fallback.ahk` (UPD-1). Refined against the line above: the no-list answer covers a 200 that opens no JSON at all (`^\x{FEFF}?\s*[\[{]`), so a JSON object such as GitHub's error document stays a malformed release response, as the schedule publication tests require; for the maintainer to confirm.
 - [ ] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
       logical key, AltGr suspended. `modules/keymap/keylayout/keylayout_emulation.ahk` `_KLE_OnAltGr`: with a Ctrl other
       than AltGr's own physically held, `_KLE_OnShortcut(Sc, "^")` (`"^+"` with Shift) instead of `_KLE_Emit`;
