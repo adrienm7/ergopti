@@ -208,9 +208,12 @@ function rewriteText(text, rows, movedRepo, file) {
 			(!row.old.includes('.') || row.resolution?.loadOnly || row.resolution?.listed)
 		) {
 			// A one-word name moves only where it is loaded (Plan.isModuleLoadSite)
-			// or where a listed tool names it (Plan.isListedModuleSite).
+			// or where a listed tool names it (Plan.isListedModuleSite); a dotted
+			// one also as the tag of a Lua log call (Plan.isLuaLogTagSite).
 			text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), (whole, quote, offset, all) =>
-				Plan.isModuleLoadSite(all, offset) || Plan.isListedModuleSite(file, all, offset)
+				Plan.isModuleLoadSite(all, offset) ||
+				Plan.isListedModuleSite(file, all, offset) ||
+				(row.old.includes('.') && Plan.isLuaLogTagSite(all, offset))
 					? `${quote}${hold(row.new)}${quote}`
 					: whole
 			);
