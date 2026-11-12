@@ -64,7 +64,6 @@ local function load_engine(paused)
 	}
 	package.loaded["modules.llm.streaming_handler"] = {
 		reset_failure_count = function() end,
-		stop_watchdog = function() return true end,
 	}
 	package.loaded["modules.llm.warmup_controller"] = {
 		stop = function() return true end,

@@ -29,8 +29,14 @@ require("test.runner_home").isolate()
 -- The fixtures read the French catalogue whatever the session language says
 -- (tests/support/session_language.lua); helpers load once per test process.
 require("tests.support.session_language").install()
--- No fixture may show a real desktop notification (tests/support/notify_send_guard.lua).
-require("tests.support.notify_send_guard").install()
+-- No fixture may show a real desktop notification: each case resolves the
+-- notifier to a recorder (tests/support/notice_recorder.lua), and a notice that
+-- still reaches notify-send hits a sentinel that fails the run
+-- (tests/support/notify_send_guard.lua).
+local NotifySendGuard = require("tests.support.notify_send_guard")
+NotifySendGuard.install()
+local NoticeRecorder = require("tests.support.notice_recorder")
+NoticeRecorder.install()
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
@@ -375,17 +381,20 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring) so one behaviour can be re-run in isolation.
+	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
+	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
+	NoticeRecorder.begin_case(M.is_fixture_double)
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
-		if ok == nil then return end
 	else
-		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 		ok, err = pcall(function()
 			if _before_each_fn then _before_each_fn() end
 			fn()
 		end)
 	end
+	NoticeRecorder.end_case()
+	NotifySendGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -409,6 +418,11 @@ function M.make_logger_stub()
 		ring_buffer_snapshot = function() return {} end,
 	}
 end
+
+--- What the current case sent through the recording notifier
+--- (tests/support/notice_recorder.lua), in order.
+--- @return table notices { { title, message, urgency, args }, ... }
+function M.recorded_notices() return NoticeRecorder.notices() end
 
 --- Returns the global test result tally.
 --- @return table { passed, failed, failures }
@@ -450,6 +464,14 @@ local function is_test_double(value, roots)
 		end
 	end
 	return false
+end
+
+--- Whether a package.loaded value is a double defined by the test suite.
+--- @param value any Loaded value.
+--- @return boolean
+function M.is_fixture_double(value)
+	local driver = M.driver_root()
+	return is_test_double(value, { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/lua/test/" })
 end
 
 --- Puts back every product module left replaced by a test double since a
@@ -511,6 +533,7 @@ function M.measure_module(name, callback)
 	for key, value in pairs(package.loaded) do before[key] = value end
 	local previous = _current_module
 	_current_module = name
+	NotifySendGuard.enter_case(name .. " (outside a test case)")
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)

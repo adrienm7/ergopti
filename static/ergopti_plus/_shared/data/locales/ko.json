@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "“{1}” 프로그램이 설치되어 있지 않아 Ergopti를 제거하지 못했습니다. 설치한 뒤 다시 시도하세요. 개인 데이터는 보존되었습니다.",
 	"menu.global.start_at_login": "로그인 시 시작",
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
+	"dialog.start_at_login.approval": "방금 열린 시스템 시작 설정에서 Ergopti를 허용하세요. 시스템이 확인하면 이 옵션이 선택됩니다.",
 	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "아직 Windows 제외: 토큰 단위 표시가 Windows에서 검증되지 않았으므로 이 옵션은 비활성 상태로 유지됩니다.",
 	"menu.layout.number_row": "숫자 행",

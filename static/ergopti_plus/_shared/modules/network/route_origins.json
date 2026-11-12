@@ -5,6 +5,7 @@
 			"https://registry.ollama.ai",
 			"https://dd20bb891979d25aebc8bec07b2b3bbc.r2.cloudflarestorage.com"
 		],
+		"karabiner": ["https://github.com", "https://release-assets.githubusercontent.com"],
 		"uv": [
 			"https://pypi.org",
 			"https://files.pythonhosted.org",

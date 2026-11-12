@@ -11,6 +11,7 @@ local M = {}
 local busy = false
 local enabled = false
 local pending = nil
+local last_status_failure = nil
 
 --- Reads or changes startup without blocking the event loop.
 --- @param action string
@@ -26,21 +27,30 @@ function M.request(action, changed, deps)
 	local resolver = deps.resolver or require("platform.remap.lease_helper")
 	local shell = deps.shell or require("adapters.shell_runner")
 	local logger = deps.logger or require("infra.logger")
+	local function alert(text_key, style)
+		local i18n = deps.i18n or require("infra.i18n")
+		local dialog = deps.dialog or require("infra.dialog_util")
+		local shown, err = pcall(function()
+			dialog.block_alert(i18n.get("menu.global.start_at_login"),
+				i18n.get(text_key), i18n.get("button.ok"), nil, style)
+		end)
+		if not shown then logger.error("ui.menu.start_at_login", "Startup dialog failed: %s.", tostring(err)) end
+	end
+	-- A toggle failure is told every time; a status read runs at every menu
+	-- rebuild, so the same failure is logged once until a read succeeds again.
 	local function fail(detail)
-		logger.error("ui.menu.start_at_login", "Startup setting failed: %s.", tostring(detail))
+		detail = tostring(detail)
 		if action == "toggle" then
-			local i18n = deps.i18n or require("infra.i18n")
-			local dialog = deps.dialog or require("infra.dialog_util")
-			local shown, err = pcall(function()
-				dialog.block_alert(i18n.get("menu.global.start_at_login"),
-					i18n.get("dialog.start_at_login.failed"), i18n.get("button.ok"), nil, "critical")
-			end)
-			if not shown then logger.error("ui.menu.start_at_login", "Startup failure dialog failed: %s.", tostring(err)) end
+			logger.error("ui.menu.start_at_login", "Startup setting failed: %s.", detail)
+			alert("dialog.start_at_login.failed", "critical")
+		elseif last_status_failure ~= detail then
+			last_status_failure = detail
+			logger.warn("ui.menu.start_at_login", "Startup state could not be read: %s.", detail)
 		end
 	end
 	local executable, detail, environment = resolver.resolve()
 	if not executable then
-		if action == "toggle" then fail(detail) end
+		fail(detail)
 		return false
 	end
 	busy = true
@@ -57,9 +67,15 @@ function M.request(action, changed, deps)
 			drain_pending()
 			return
 		end
+		if action == "status" then last_status_failure = nil end
 		local previous = enabled
 		enabled = state == "enabled"
-		if action == "toggle" and state == "approval" then fail("macOS approval is required") end
+		-- The native worker has already opened System Settings on Login Items:
+		-- the user has one step left there, which is not a failure to report.
+		if action == "toggle" and state == "approval" then
+			logger.warn("ui.menu.start_at_login", "Startup waits for the user's approval in System Settings.")
+			alert("dialog.start_at_login.approval", "informational")
+		end
 		if previous ~= enabled and changed then
 			local updated, err = pcall(changed)
 			if not updated then logger.error("ui.menu.start_at_login", "Startup menu refresh failed: %s.", tostring(err)) end

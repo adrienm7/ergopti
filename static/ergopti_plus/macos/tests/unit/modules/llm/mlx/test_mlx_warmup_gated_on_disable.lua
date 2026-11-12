@@ -412,7 +412,6 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		package.loaded["modules.llm.streaming_handler"] = {
 			init = function(_) return true end,
 			build_callbacks = function(_) return function() end, function() end, function() end end,
-			arm_watchdog = function(_) return true end, stop_watchdog = function() return true end,
 			reset_failure_count = function() end, cancel_streaming = function() return true end,
 		}
 		package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }

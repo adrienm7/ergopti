@@ -279,7 +279,9 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 			script = script:gsub("/bin/rm", function() return rm end)
 		end
 		if opts.parent_readonly then assert(sh("chmod 500 " .. quote(dir)) == 0) end
-		local status, output = sh("sh -c " .. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
+		-- The archive bounds the installer reads from the shared updater defaults.
+		local status, output = sh("ERGOPTI_RELEASE_STAGE_TIMEOUT_MS=1200000 ERGOPTI_RELEASE_STAGE_IDLE_MS=600000 sh -c "
+			.. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
 			.. " " .. quote(dir .. "/stage") .. " 0.0.0-dev.139 /Applications/ErgoptiPlus.app "
 			.. quote(opts.format or "zip") .. " " .. quote(opts.bundle or "ErgoptiPlus.app"))
 		if opts.parent_readonly then assert(sh("chmod 700 " .. quote(dir)) == 0) end
@@ -652,10 +654,16 @@ helpers.describe("release_installer: the native stage request", function()
 		helpers.assert_eq(request.url, URL)
 		helpers.assert_eq(request.sha256, DIGEST)
 		helpers.assert_eq(request.output, captured.args[6] .. "/release.tar.xz")
-		helpers.assert_eq(request.timeout_ms, 900000)
+		-- (release-archive-budget) the shared bounds, aligned on Windows.
+		local limits = require("updater.transfer_budget").archive_limits(require("adapters.json_codec").decode(
+			assert(io.open(require("infra.paths").shared("modules/updater/defaults.json"), "rb")):read("*a")))
+		helpers.assert_eq(request.timeout_ms, limits.absolute_ms)
+		helpers.assert_eq(request.idle_timeout_ms, limits.idle_ms)
+		helpers.assert_eq(captured.environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS, string.format("%d", limits.absolute_ms))
+		helpers.assert_eq(captured.environment.ERGOPTI_RELEASE_STAGE_IDLE_MS, string.format("%d", limits.idle_ms))
 		local count = 0
 		for _ in pairs(request) do count = count + 1 end
-		helpers.assert_eq(count, 5)
+		helpers.assert_eq(count, 6)
 		helpers.assert_eq(asset.format, "tar.xz")
 	end)
 	helpers.it("refuses failed or oversized serialization before native acquisition", function()

@@ -223,8 +223,16 @@ end
 --- @return string Translated string, or the raw key on miss.
 function M.get(key)
 	local s = locale_mod.get(key)
-	if s == nil or s == "" then return key end
+	if s == nil or s == "" then return locale_mod.missing(key) end
 	return s
+end
+
+--- Whether a key has a translation, for a caller probing optional keys: unlike
+--- get(), a miss is not a defect and is never logged.
+--- @param key string Dot-notation key.
+--- @return boolean
+function M.has(key)
+	return locale_mod.has(key) == true
 end
 
 --- Returns the active locale code (e.g. "fr").

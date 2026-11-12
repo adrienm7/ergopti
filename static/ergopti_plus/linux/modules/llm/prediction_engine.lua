@@ -842,7 +842,8 @@ local function profile_display_name(profile)
 	end
 	local ok, I18n = pcall(require, "infra.i18n")
 	local key = "llm.profile." .. tostring(profile.id) .. ".label"
-	local label = ok and type(I18n.get) == "function" and I18n.get(key) or nil
+	-- Probed: a profile id without a catalogue label shows its id, not a miss.
+	local label = ok and type(I18n.has) == "function" and I18n.has(key) and I18n.get(key) or nil
 	if type(label) ~= "string" or label == "" or label == key then return tostring(profile.id) end
 	-- The menu's long form is "●○○ Basic — Simple prediction"; the bar keeps
 	-- the name.

@@ -657,7 +657,7 @@ end)
 
 -- ==========================================================
 -- ==========================================================
--- ======= 3/ Existing-Surface and Watchdog Repaints ========
+-- ======= 3/ Existing-Surface Repaints ====================
 -- ==========================================================
 -- ==========================================================
 
@@ -673,31 +673,18 @@ helpers.describe("streaming_handler: every repaint propagates UI failure", funct
 			"the dismiss timer must not arm after a failed fallback repaint")
 	end)
 
-	Scope.it("fails closed when the stream watchdog cannot repaint", function()
-		local fixture = load_fixture(false)
-		fixture.pending.value = { prediction(" retained") }
-		fixture.visible.value = true
-		fixture.handler.arm_watchdog(fixture.context)
-		local watchdog = hs.timer.__timers[#hs.timer.__timers]
-		helpers.assert_not_nil(watchdog)
-		watchdog:fire()
-		helpers.assert_eq(fixture.renders, 1)
-		helpers.assert_eq(fixture.ui_failures, 1)
-	end)
-
-	Scope.it("closes a loading surface when no partial result arrived before the watchdog", function()
+	Scope.it("(stream-watchdog-removed) lets a slow first token arrive without a stall timeout", function()
+		-- A cold model load shows its first token late; only the request's own
+		-- deadline ([llm] ollama_request_timeout_ms) ends it, as on Windows and
+		-- Linux (decided by the maintainer on 2026-11-12).
 		local fixture = load_fixture(true)
-		fixture.handler.arm_watchdog(fixture.context)
-		local watchdog = hs.timer.__timers[#hs.timer.__timers]
-		helpers.assert_not_nil(watchdog)
-		watchdog:fire()
-
-		helpers.assert_eq(fixture.renders, 0,
-			"an empty stream has no prediction frame it can truthfully paint")
-		helpers.assert_eq(fixture.timeouts, 1,
-			"the loading owner must close instead of leaving a permanent spinner")
-		helpers.assert_eq(fixture.ui_failures, 0,
-			"a slow model is a timeout, not a failed paint that opens the error window")
+		helpers.assert_eq(fixture.handler.arm_watchdog, nil, "no stall watchdog is armed for a request")
+		for _, timer in ipairs(hs.timer.__timers or {}) do
+			if type(timer.fire) == "function" then pcall(timer.fire, timer) end
+		end
+		helpers.assert_eq(fixture.timeouts or 0, 0, "nothing ends the request before its deadline")
+		fixture.partial("late first token")
+		helpers.assert_eq(fixture.renders, 1, "the late first token still reaches the surface")
 	end)
 
 	Scope.it("contains a tint throw inside the partial-render transaction", function()
@@ -715,160 +702,5 @@ helpers.describe("streaming_handler: every repaint propagates UI failure", funct
 			"native tint failed",
 			"the protected render boundary must preserve the original dependency error"
 		)
-	end)
-end)
-
-
-
-
-
--- ==========================================================
--- ==========================================================
--- ======= 4/ Watchdog Construction Transaction =============
--- ==========================================================
--- ==========================================================
-
-helpers.describe("streaming_handler: watchdog construction is proven", function()
-	for _, case in ipairs({
-		{
-			name = "throwing constructor",
-			create = function() error("native timer failed") end,
-		},
-		{
-			name = "nil constructor result",
-			create = function() return nil end,
-		},
-		{
-			name = "stopped constructor result",
-			create = function()
-				return {
-					running = false,
-					stop = function(self) self.running = false end,
-				}
-			end,
-		},
-	}) do
-		Scope.it("rejects a " .. case.name, function()
-			local fixture = load_fixture(true, nil, nil, case.create)
-			local armed = fixture.handler.arm_watchdog(fixture.context)
-
-			helpers.assert_eq(armed, false,
-				"arm_watchdog must report only a verified live timer")
-			helpers.assert_eq(fixture.renders, 0)
-			helpers.assert_eq(fixture.ui_failures, 0,
-				"construction failure is returned to the dispatch owner, not misreported as a repaint")
-		end)
-	end
-end)
-
-
-
-
-
--- ==========================================================
--- ==========================================================
--- ======= 5/ Final Callback Watchdog Revalidation ==========
--- ==========================================================
--- ==========================================================
-
-helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", function()
-	Scope.it("drops a final success superseded by the native stop proof", function()
-		local fixture_ref = {}
-		local fixture = load_fixture(true, true, true, superseding_timer_factory(fixture_ref))
-		fixture_ref.value = fixture
-		helpers.assert_true(fixture.handler.arm_watchdog(fixture.context))
-
-		fixture.success({ prediction(" stale completion") }, 25, true, false)
-
-		helpers.assert_eq(fixture.live_id, 2,
-			"the negative control must supersede the request inside native running()")
-		helpers.assert_eq(fixture.raw_logs, 0,
-			"a superseded final response must not cross the logging boundary")
-		helpers.assert_eq(fixture.renders, 0)
-		helpers.assert_eq(fixture.suggested, 0)
-		helpers.assert_eq(#fixture.pending.value, 0)
-		helpers.assert_eq(fixture.visible.value, false)
-	end)
-
-	Scope.it("does not log a response superseded by the frontmost-app lookup", function()
-		local fixture = load_fixture(true, true, true)
-		fixture.frontmost_hook = function(state)
-			state.live_id = state.live_id + 1
-		end
-
-		fixture.success({ prediction(" stale after app lookup") }, 25, true, false)
-
-		helpers.assert_eq(fixture.frontmost_calls, 1,
-			"the negative control must cross the real app lookup boundary")
-		helpers.assert_eq(fixture.live_id, 2)
-		helpers.assert_eq(fixture.raw_logs, 0,
-			"frontmost-app supersession must fence durable keystats output")
-		helpers.assert_eq(fixture.renders, 0)
-		helpers.assert_eq(fixture.suggested, 0)
-	end)
-
-	Scope.it("drops a failure superseded by the native stop proof", function()
-		local fixture_ref = {}
-		local fixture = load_fixture(true, nil, nil, superseding_timer_factory(fixture_ref))
-		fixture_ref.value = fixture
-		fixture.pending.value = { prediction(" retained successor surface") }
-		fixture.visible.value = true
-		helpers.assert_true(fixture.handler.arm_watchdog(fixture.context))
-
-		fixture.fail()
-
-		helpers.assert_eq(fixture.live_id, 2,
-			"the negative control must supersede the request inside native running()")
-		helpers.assert_eq(fixture.renders, 0,
-			"the stale failure must not repaint the successor's retained surface")
-		helpers.assert_eq(fixture.ui_failures, 0)
-		helpers.assert_eq(#fixture.pending.value, 1)
-		helpers.assert_eq(fixture.visible.value, true)
-	end)
-
-	Scope.it("does not notify for a failure superseded by backend lookup", function()
-		local fixture = load_fixture(true)
-		fixture.pending.value = { prediction(" retained successor surface") }
-		fixture.visible.value = true
-		fixture.fail()
-		fixture.fail()
-		fixture.fail()
-		helpers.assert_eq(fixture.renders, 3,
-			"three current failures must prime the real four-failure threshold")
-
-		fixture.backend = "mlx"
-		fixture.backend_hook = function(state)
-			state.live_id = state.live_id + 1
-		end
-		fixture.fail()
-
-		helpers.assert_eq(fixture.backend_calls, 1,
-			"the negative control must cross the threshold backend lookup")
-		helpers.assert_eq(fixture.live_id, 2)
-		helpers.assert_eq(fixture.notifications, 0,
-			"a superseded threshold failure must not notify for the old request")
-		helpers.assert_eq(fixture.renders, 3)
-	end)
-
-	Scope.it("does not hide successor UI after notification send supersedes", function()
-		local fixture = load_fixture(true)
-		fixture.fail()
-		fixture.fail()
-		fixture.fail()
-		fixture.hide_calls = 0
-		fixture.backend = "mlx"
-		fixture.notify_hook = function(state)
-			state.live_id = state.live_id + 1
-		end
-
-		fixture.fail()
-
-		helpers.assert_eq(fixture.backend_calls, 1)
-		helpers.assert_eq(fixture.notifications, 1,
-			"the negative control must cross the real notification send boundary")
-		helpers.assert_eq(fixture.live_id, 2)
-		helpers.assert_eq(fixture.hide_calls, 0,
-			"the stale failure cannot hide UI after notification supersession")
-		helpers.assert_eq(fixture.renders, 0)
 	end)
 end)

@@ -51,6 +51,40 @@ helpers.describe("login startup", function()
 		helpers.assert_eq(Startup.command_available(function() return true, "enabled\n" end), true)
 		helpers.assert_eq(Startup.command_available(function() return true, "disabled\n" end), true)
 	end)
+	helpers.it("logs a failed read once until a read succeeds, and every failed change (login-startup)", function()
+		local previous_logger = package.loaded["logger.shim"]
+		local previous_subject = package.loaded["ui.menu.start_at_login"]
+		local logs = {}
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+		package.loaded["logger.shim"] = logger
+		local okay, detail = pcall(function()
+			local subject = helpers.load_module("ui.menu.start_at_login")
+			local function failing() return false, "", "command exited with status 78" end
+			helpers.assert_eq(subject.enabled(failing), nil)
+			helpers.assert_eq(subject.command_available(failing), nil)
+			local function count(pattern)
+				local found = 0
+				for _, line in ipairs(logs) do if line:find(pattern, 1, true) then found = found + 1 end end
+				return found
+			end
+			helpers.assert_eq(count("Startup state could not be read: command exited with status 78."), 1)
+			helpers.assert_eq(subject.enabled(function() return true, "disabled\n" end), false)
+			-- The logger folds consecutive identical lines; a line between keeps this one apart.
+			logger.info("test", "separator")
+			helpers.assert_eq(subject.enabled(failing), nil)
+			helpers.assert_eq(count("Startup state could not be read"), 2, "a success re-arms the log")
+			helpers.assert_eq(subject.toggle(function(command)
+				if command:match(" status$") then return true, "disabled\n" end
+				return false, "", "command exited with status 78"
+			end), false)
+			helpers.assert_eq(count("Startup enable failed: command exited with status 78."), 1)
+			helpers.assert_eq(subject.toggle(function() return true, "disabled\n" end), false)
+			helpers.assert_eq(count("Startup enable was not confirmed by the next read."), 1)
+		end)
+		package.loaded["logger.shim"], package.loaded["ui.menu.start_at_login"] = previous_logger, previous_subject
+		assert(okay, detail)
+	end)
 end)
 
 

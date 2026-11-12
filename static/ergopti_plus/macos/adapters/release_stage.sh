@@ -21,6 +21,14 @@ case "$bundle" in
 	*) exit 20 ;;
 esac
 umask 077
+# The archive's absolute and idle bounds, in milliseconds, from the shared
+# updater defaults the caller read (modules/updater/release_installer.lua).
+timeout_ms=${ERGOPTI_RELEASE_STAGE_TIMEOUT_MS:-}
+idle_ms=${ERGOPTI_RELEASE_STAGE_IDLE_MS:-}
+case "$timeout_ms:$idle_ms" in
+	*[!0-9:]*|:*|*:) exit 20 ;;
+esac
+[ "$idle_ms" -ge 1000 ] && [ "$timeout_ms" -ge "$idle_ms" ] || exit 20
 # A timestamp collision must not reuse an earlier archive or app.
 /bin/mkdir "$dir" || exit 10
 archive="$dir/release.$format"
@@ -29,7 +37,8 @@ archive="$dir/release.$format"
 explicit_route="${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}"
 if [ -n "$explicit_route" ] || [ "${ERGOPTI_RELEASE_STAGE_REQUEST+present}" != present ]; then
 	/usr/bin/curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' \
-		--max-time 900 --output "$archive" "$url" || exit 10
+		--max-time "$((timeout_ms / 1000))" --speed-limit 1 --speed-time "$((idle_ms / 1000))" \
+		--output "$archive" "$url" || exit 10
 else
 	launcher="${ERGOPTI_LAUNCHER_EXECUTABLE:-}"
 	expected="${ERGOPTI_LAUNCHER_DEVICE:-}:${ERGOPTI_LAUNCHER_INODE:-}"
@@ -60,11 +69,13 @@ else
 	field=$(/usr/bin/plutil -extract output raw -o - "$request_file") || exit 10
 	[ "$field" = "$archive" ] || exit 10
 	field=$(/usr/bin/plutil -extract timeout_ms raw -o - "$request_file") || exit 10
-	[ "$field" = 900000 ] || exit 10
+	[ "$field" = "$timeout_ms" ] || exit 10
+	field=$(/usr/bin/plutil -extract idle_timeout_ms raw -o - "$request_file") || exit 10
+	[ "$field" = "$idle_ms" ] || exit 10
 	receipt_file="$dir/download-receipt.json"
 	# Foreground execution retains the original shell task's completion behavior.
-	# The CLI owns its single 900-second budget, EOF, network and spool closure.
-	"$launcher" --managed-bootstrap-download 900000 < "$request_file" > "$receipt_file"
+	# The CLI owns the request's budget, EOF, network and spool closure.
+	"$launcher" --managed-bootstrap-download "$timeout_ms" < "$request_file" > "$receipt_file"
 	native_status=$?
 	launcher_current || exit 10
 	[ -d "$dir" ] && [ ! -L "$dir" ] || exit 10
