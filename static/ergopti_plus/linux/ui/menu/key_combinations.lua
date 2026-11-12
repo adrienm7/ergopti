@@ -24,7 +24,7 @@ function M.build(ctx,ui)
 	local pairs = require("modules.shortcuts.key_combinations")
 	local Scope = require("infra.key_combinations_scope")
 	local t,renderer = ui.get,ui.manifest
-	if type(th)~="table" or type(actions)~="table" or type(ctx.is_paused)~="function" then return {} end
+	if type(th)~="table" or type(actions)~="table" then return {} end
 	local keys,holds = th.key_catalog(),th.hold_options()
 	local delay_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	local symmetry_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
@@ -38,8 +38,6 @@ function M.build(ctx,ui)
 		return accepted==true
 	end
 	local function snapshot()
-		local observed,paused=pcall(ctx.is_paused)
-		if ctx.paused==true or not observed or paused~=false then return nil end
 		local retried,settled=pcall(Scope.retry_restore)
 		if not retried or settled~=true then return nil end
 		local captured,receipt=pcall(pairs.capture_edit_source)
@@ -58,7 +56,7 @@ function M.build(ctx,ui)
 	end
 	local function edit(rows,source)
 		if not source then return feedback(false) end
-		return feedback(Scope.edit(rows,ctx.is_paused,source))
+		return feedback(Scope.edit(rows,source))
 	end
 	local editable = snapshot() ~= nil
 	local function action_label(action)
@@ -153,17 +151,17 @@ function M.build(ctx,ui)
 	render.commands[require("config_keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		local desired=not pairs.is_enabled()
-		local committed=feedback(Scope.set_enabled(desired,ctx.is_paused,source))
+		local committed=feedback(Scope.set_enabled(desired,source))
 		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
 		return committed
 	end
 	render.commands[require("config_keys").COMMAND.SCOPE_RESTORE]=function()
 		local source=snapshot();if not source then return feedback(false) end
-		return feedback(Scope.apply("recommended",ctx.is_paused,source))
+		return feedback(Scope.apply("recommended",source))
 	end
 	render.commands[require("config_keys").COMMAND.SCOPE_CLEAR]=function()
 		local source=snapshot();if not source then return feedback(false) end
-		return feedback(Scope.apply("clear",ctx.is_paused,source))
+		return feedback(Scope.apply("clear",source))
 	end
 	render.state_getters[require("config_keys").COMMAND.COMBO_SYMMETRIC]=function()
 		local settings=chord_declared and pairs.chord_settings() or nil
@@ -174,11 +172,11 @@ function M.build(ctx,ui)
 		local source=snapshot();local settings=chord_declared and pairs.chord_settings() or nil
 		if not source or not settings then return feedback(false) end
 		settings.combo_symmetric=not settings.combo_symmetric
-		return feedback(Scope.set_chord_settings(settings,ctx.is_paused,source))
+		return feedback(Scope.set_chord_settings(settings,source))
 	end
 	render.commands[require("config_keys").COMMAND.COPY_TAP_TO_COMBO]=function()
 		local source=snapshot();if not source or not chord_declared then return feedback(false) end
-		return feedback(Scope.copy_taps_to_chords(ctx.is_paused,source))
+		return feedback(Scope.copy_taps_to_chords(source))
 	end
 	end
 	local function timing_rows()
@@ -192,7 +190,7 @@ function M.build(ctx,ui)
 				if type(selected)~="string" or not selected:match("^%s*%d+%.?%d*%s*$") then return feedback(false) end
 				local delay=tonumber(selected)
 				if not delay or delay<=0 or delay>=math.huge or source.guard()~=true then return feedback(false) end
-				return feedback(Scope.set_chord_settings({simultaneous_threshold_ms=delay,combo_symmetric=settings.combo_symmetric},ctx.is_paused,source))
+				return feedback(Scope.set_chord_settings({simultaneous_threshold_ms=delay,combo_symmetric=settings.combo_symmetric},source))
 			end}}
 	end
 	return renderer.build("key_combinations_group","KeyCombinations",nil,nil,render,{
