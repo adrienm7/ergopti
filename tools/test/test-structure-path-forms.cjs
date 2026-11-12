@@ -403,6 +403,15 @@ function run() {
 			),
 			'const a = `${SHARED_REL}/zz_probe_hs/data`;\nconst b = `${DRIVER_REL}/zz_probe_mod/hotstrings/b.lua`;'
 		);
+		// A folder row never rewrites the head of a longer path (a driver
+		// file's own header under a folder that shares a shared folder's name).
+		assert.equal(
+			rewrite(
+				`${P}linux/zz_probe_mod/hotstrings/b.lua`,
+				'--- zz_probe_mod/hotstrings/b.lua\nlocal d = Paths.shared("zz_probe_mod/hotstrings")'
+			),
+			'--- zz_probe_mod/hotstrings/b.lua\nlocal d = Paths.shared("zz_probe_hs/data")'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(

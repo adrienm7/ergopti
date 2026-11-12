@@ -221,8 +221,13 @@ function rewriteText(text, rows, movedRepo, file) {
 		} else {
 			// Whole tokens only: tests/unit/modules/llm must not rewrite
 			// inside tests/unit/modules/llm_extra or a longer path.
+			// A folder never as the head of a longer path: modules/llm in a
+			// driver's own modules/llm/x.lua header is that file's.
+			const folder = row.kind === 'dir' || row.kind === 'dir-successor';
 			const bounded = new RegExp(
-				`(?<![A-Za-z0-9_.\\-/\\\\])${esc}(?![A-Za-z0-9_\\-]|\\.[A-Za-z0-9])`,
+				`(?<![A-Za-z0-9_.\\-/\\\\])${esc}(?![A-Za-z0-9_\\-]|\\.[A-Za-z0-9]${
+					folder ? '|[\\\\/](?:[A-Za-z0-9_%-]|\\.[A-Za-z0-9_])' : ''
+				})`,
 				'g'
 			);
 			const next = newPathToken(row, movedRepo);
