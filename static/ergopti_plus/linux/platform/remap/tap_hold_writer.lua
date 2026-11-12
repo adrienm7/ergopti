@@ -651,8 +651,8 @@ function M.set_lone_tap_max_ms(ms, guard)
 end
 
 --- Sets how long a one-shot Shift waits for its key, in milliseconds
---- (config.toml [tap_holds] sticky_timeout_ms). It has no manifest row: the
---- timing registry's default is written as an absence.
+--- (config.toml [tap_holds] sticky_timeout_ms, a manifest row whose default is
+--- the timing registry's): the default is written as an absence.
 --- @param ms number A positive whole number of milliseconds.
 --- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
@@ -662,9 +662,8 @@ function M.set_one_shot_timeout_ms(ms, guard)
 			tostring(ms))
 		return false
 	end
-	local row = { section = ConfigKeys.KEY.TAP_HOLDS, key = ONE_SHOT_TIMEOUT_FIELD }
-	if ms == require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_DEFAULT_MS then row.delete = true else row.value = ms end
-	return commit_setting("one-shot timeout = " .. tostring(ms) .. " ms", row, guard)
+	return commit_setting("one-shot timeout = " .. tostring(ms) .. " ms",
+		Manifest.sparse_operation(ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, ms), guard)
 end
 
 --- Switches the feature on or off (config.toml [tap_holds] enabled, a manifest row).

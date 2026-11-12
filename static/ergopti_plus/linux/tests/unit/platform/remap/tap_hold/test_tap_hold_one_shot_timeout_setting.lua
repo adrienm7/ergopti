@@ -132,10 +132,12 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 	end)
 
 	helpers.it("the scope resets the config.toml timeout with the keys (one-shot-timeout-setting)", function()
-		local source = assert(io.open(require("infra.paths").driver_root() .. "/infra/tap_hold_scope.lua", "r"))
-		local text = source:read("*a")
-		source:close()
-		helpers.assert_true(text:find("key = ConfigKeys.LEAF.STICKY_TIMEOUT_MS, delete = true", 1, true) ~= nil,
-			"the scope's config.toml batch deletes a stored timeout")
+		-- A manifest row under the tap_holds scope: its restore and clear reach it.
+		local Manifest = require("infra.manifest_reader")
+		local ConfigKeys = require("config_keys")
+		local entry = Manifest.find_entry_by_path(ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+		helpers.assert_true(type(entry) == "table", "the timeout is a manifest row")
+		helpers.assert_eq(Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS), Loader.ONE_SHOT_TIMEOUT_DEFAULT_MS,
+			"its default is the timeout the engine runs")
 	end)
 end)

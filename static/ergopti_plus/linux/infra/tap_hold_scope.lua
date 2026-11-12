@@ -155,14 +155,8 @@ function M.new(options)
 			local operations = {}
 			for _, row in ipairs(updates) do operations[#operations + 1] = row end
 			for _, row in ipairs(legacy) do operations[#operations + 1] = row end
-			-- The one-shot timeout has no manifest row; the scope resets it with the
-			-- keys, as the recommendation sets none. Only a stored one is deleted:
-			-- a scope never creates config.toml for a row it removes.
-			local stored = source and source.status == "ok" and Codec.decode(source.content) or nil
-			local settings = type(stored) == "table" and stored[ConfigKeys.KEY.TAP_HOLDS] or nil
-			if type(settings) == "table" and settings[ConfigKeys.LEAF.STICKY_TIMEOUT_MS] ~= nil then
-				operations[#operations + 1] = { section = ConfigKeys.KEY.TAP_HOLDS, key = ConfigKeys.LEAF.STICKY_TIMEOUT_MS, delete = true }
-			end
+			-- The one-shot timeout is a manifest row under tap_holds: the scope
+			-- restores and clears it with the switch and the lone-tap window.
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
 		capture = function()

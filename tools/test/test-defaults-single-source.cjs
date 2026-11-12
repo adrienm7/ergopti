@@ -182,6 +182,26 @@ async function main() {
 		assert.equal(entry.recommended, shipped, `metrics.${id} recommends what it ships`);
 		assert.equal(entry.default_per_platform, undefined, `metrics.${id} has one default`);
 	}
+	// The one-shot Shift timeout is a config.toml row on every OS (decision of
+	// 2026-11-11); every driver runs the timing registry's value when it is
+	// absent, so the manifest row must declare that same value.
+	const stickyEntry = manifest.entries.find(
+		(entry) => entry.section === 'tap_holds' && entry.id === 'sticky_timeout_ms'
+	);
+	assert(stickyEntry, 'tap_holds.sticky_timeout_ms must be declared');
+	const timingRegistry = parse(
+		fs.readFileSync(paths.shared('modules/timings/constants.toml'), 'utf8')
+	);
+	assert.equal(
+		stickyEntry.default,
+		timingRegistry.tap_hold.one_shot_shift_timeout_ms,
+		'the sticky timeout row declares the timing registry default the drivers run'
+	);
+	assert.equal(
+		stickyEntry.recommended,
+		stickyEntry.default,
+		'the sticky timeout recommends its default'
+	);
 	// PAR-6: the base expansion delay has ONE declaration, the manifest default of
 	// hotstrings.expansion_delay, read by all three drivers. Neither the shared
 	// hotstring defaults nor the timing registry may declare it again.
