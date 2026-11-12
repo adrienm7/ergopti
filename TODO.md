@@ -160,6 +160,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Progress (12 November 2026, [diagnostics page campaign](docs/audits/platform-parity/2026-11-12-healthcheck/report.md), branch `claude/ergopti-todo-parity-b`): actions, pause, stale results: no finding (one shared validator and report owner, the collection a Windows capability). Left: native receiving unqualified.
       Progress (12 November 2026, [Linux install campaign](docs/audits/platform-parity/2026-11-12-linux-install/report.md), branch `claude/ergopti-todo-parity-b`): startup ownership, uninstall, configuration cleanup (download steps left to the other track). Fixed: a checkout's startup entry no longer takes the standalone installation's name, which blocked a later install (LIN-001). Left: a deleted checkout's entry stays until a checkout run rewrites it.
       Progress (12 November 2026, [editors campaign, first pass](docs/audits/platform-parity/2026-11-12-editors/report.md), branch `claude/ergopti-todo-parity-b`): page and bridge behaviour of the personal information, prompt, paths and hotstrings editors. Fixed on macOS: a refused personal information save is told (EDM-001). EDD-1 decided by the maintainer on 2026-11-12 (a pause stops typing, not configuration): macOS and Linux editors save while paused, the LMH-003 gate reverted, Windows counterpart below. Left: the macOS prompt editor's refused-save notice, the layer editor page, tooltips, WPM.
+      Progress (12 November 2026, [pause, first pass](docs/audits/platform-parity/2026-11-12-pause/report.md), branch `claude/ergopti-todo-parity-b`): EDD-1 sharpened into a « real pause » (configuration and installs stay available, typing stays inert, a setting changed while paused applies on resume). Done on macOS and Linux: the physical shortcuts editor opens while paused, and every menu's whole-scope restore and clear runs while paused, the Configuration menu's included (`edd1-paused-writes`). Left: the tray's `greyed_when_paused` feature rows, the per-row configuration and install gates inside the submenus, the audit that every typing feature (layout emulation first) is inert while paused, and the macOS unused-key clean, which still greys while paused.
 
 ## Dead-key composition parity follow-up
 
@@ -1360,7 +1361,14 @@ between workers) green alone. All live checks pass, typed by the harness.
       `ui/personal_info_editor`, `ui/personal_toml_editor_webview.ahk`, `ui/layer_editor`, `ui/layout_manager`
       (`_LayMgrWeb_*`), `ui/hotstrings_config_window`, `ui/action_picker`, `ui/model_browser` and
       `ui/physical_shortcuts`; keep `ready`'s handling. Test in each editor's suite: a save while suspended writes the
-      file. See `docs/memory/maintainer-decisions.md`.
+      file. Extended the same day into a « real pause »: also remove the Suspend gates on every configuration or
+      install action, i.e. the tray rows the manifest marks `greyed_when_paused` (they stay live while suspended),
+      each menu's whole-scope restore and clear and the Configuration menu's, opening the physical shortcuts
+      editor, adding or deleting hotstrings, and installs (layouts, Ollama or MLX models, apps). Then confirm that
+      nothing that acts on typing stays active under Suspend (hotstrings, layout emulation, tap-holds, layers and
+      chords, shortcuts, gestures, AI predictions and their warmups and local server), with a regression for any
+      that still acts, and that a setting changed while suspended applies on resume. See
+      `docs/memory/maintainer-decisions.md`.
 - [ ] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.
