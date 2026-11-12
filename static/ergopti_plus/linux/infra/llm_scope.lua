@@ -86,11 +86,12 @@ function M.new(options)
 end
 
 --- Applies one real AI scope without exposing credentials or model files.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
 --- @param mode string Clear or recommended.
---- @param is_paused boolean Optional menu pause state.
 --- @return boolean committed
-function M.apply(mode, is_paused)
-	if is_paused or (mode ~= "clear" and mode ~= "recommended") then return false end
+function M.apply(mode)
+	if mode ~= "clear" and mode ~= "recommended" then return false end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false end
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
@@ -103,11 +104,10 @@ function M.apply(mode, is_paused)
 end
 
 --- The AI participant of a composed scope, bound to the retained owner.
---- @param is_paused function Live pause getter.
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused)
+function M.participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused()) end,
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end
