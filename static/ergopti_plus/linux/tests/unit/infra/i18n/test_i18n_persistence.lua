@@ -175,6 +175,48 @@ helpers.describe("i18n persistence", function()
 			if not ok then error(err, 0) end
 		end)
 
+		helpers.it("(lcy-002-system-locale) picks the session language as Windows and macOS do", function()
+			local i18n = helpers.load_module("infra.i18n")
+			local available = { "de", "en", "fr", "no" }
+			local function env(values) return function(name) return values[name] end end
+			helpers.assert_eq(i18n.detect_system_locale(available, env({ LANG = "de_DE.UTF-8" })), "de")
+			helpers.assert_eq(i18n.detect_system_locale(available,
+				env({ LC_ALL = "fr_FR.UTF-8", LC_MESSAGES = "de_DE", LANG = "en_US" })), "fr", "LC_ALL wins")
+			helpers.assert_eq(i18n.detect_system_locale(available,
+				env({ LC_MESSAGES = "nb_NO.UTF-8", LANG = "de_DE" })), "no", "bokmål reads the Norwegian catalogue")
+			helpers.assert_eq(i18n.detect_system_locale(available, env({ LANG = "C" })), "en")
+			helpers.assert_eq(i18n.detect_system_locale(available, env({ LANG = "ja_JP.UTF-8" })), "en",
+				"a language without a catalogue reads English, not French")
+			helpers.assert_eq(i18n.detect_system_locale(available, env({})), "en")
+			package.loaded["infra.i18n"] = nil
+		end)
+
+		helpers.it("(lcy-002-system-locale) a first run and an unknown saved code follow the session language", function()
+			local saved_storage = package.loaded["adapters.storage"]
+			local saved_scope = package.loaded["infra.script_scope"]
+			local saved_getenv = os.getenv
+			package.loaded["infra.script_scope"] = stub_scope_for_store()
+			local ok, err = pcall(function()
+				os.getenv = function(name) if name == "LANG" then return "de_DE.UTF-8" end return nil end
+				for _, saved in ipairs({ false, "xx" }) do
+					package.loaded["adapters.storage"] = {
+						get = function() return saved or nil end,
+						set = function() return true end,
+					}
+					local i18n = helpers.load_module("infra.i18n")
+					i18n.init()
+					helpers.assert_eq(i18n.get_locale(), "de",
+						"saved=" .. tostring(saved) .. " must follow the session language")
+					package.loaded["infra.i18n"] = nil
+				end
+			end)
+			os.getenv = saved_getenv
+			package.loaded["adapters.storage"] = saved_storage
+			package.loaded["infra.script_scope"] = saved_scope
+			package.loaded["infra.i18n"] = nil
+			if not ok then error(err, 0) end
+		end)
+
     -- Cleanup: ensure "fr" is the default for subsequent tests.
     helpers.it("_cleanup_reset_locale_to_fr", function()
       local i18n = helpers.load_module("infra.i18n")

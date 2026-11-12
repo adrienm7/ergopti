@@ -868,7 +868,8 @@ local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod, prepared)
 end
 
 
---- The tray's Quit: refused for the same causes as on macOS (infra/quit_request.lua).
+--- The user's Quit (tray row, shortcut, gesture): refused for the same causes as on
+--- macOS (infra/quit_request.lua).
 --- Held in privacy_owners: main() already sits at LuaJIT's 60-upvalue limit.
 privacy_owners.tray_quit = require("infra.quit_request").new({
 	shutdown = shutdown,
@@ -877,7 +878,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 	writer_active = function() return require("infra.scope_registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
-	report_update_quit = function() require("infra.updater_boot_ready").report_quit("the tray Quit") end,
+	report_update_quit = function(reason) require("infra.updater_boot_ready").report_quit(reason) end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
 	end,
@@ -899,6 +900,14 @@ local function install_signal_handlers()
 	privacy_owners.signals_stop = signals.stop
 	local function on_term(sig)
 		pcall(Logger.info, LOG, "Signal %d received — shutting down…", sig)
+		-- A logout, a second launch's restart or a service stop during an update's
+		-- ready wait or probation is no failed start: the watcher keeps the update
+		-- instead of starting the previous daemon, as the macOS shutdown callback
+		-- reports a quit for any termination that is not a reload.
+		if not shutdown.is_requested() then
+			local reported, report_err = pcall(require("infra.updater_boot_ready").report_quit, "signal " .. tostring(sig))
+			if not reported then pcall(Logger.error, LOG, "The update watcher could not be told of the signal: %s.", tostring(report_err)) end
+		end
 		shutdown.request("signal " .. tostring(sig))
 		-- Native retirement may still be pending after request() returns.
 		-- Output closes only in the normal clean-exit path after all ACKs.
@@ -1304,10 +1313,10 @@ local function main()
 			engine:reset(false)
 		end,
 		reload = perform_reload,
-		quit = function(reason)
-			if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
-			shutdown.request(reason)
-		end,
+		-- A shortcut or gesture Quit is the same user Quit as the tray row: it
+		-- cancels a reload in flight, waits for writes and tells a waiting update
+		-- watcher, so the update is not rolled back (LCY-003).
+		quit = function(reason) return privacy_owners.tray_quit(reason) end,
 		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
@@ -3003,11 +3012,14 @@ local function main()
 			end
 			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
 				function()
-					-- A failed watcher report never keeps the daemon from quitting.
-					if not pcall(require("infra.updater_boot_ready").report_quit, "the degraded tray Quit") then
-						Logger.error(LOG, "The update watcher could not be told of the Quit.")
+					-- The same user Quit owner as every other Quit (LCY-003). This
+					-- row is the last way out of a daemon whose tray failed, so an
+					-- owner that raises still ends the daemon, after saying so.
+					local called, err = pcall(privacy_owners.tray_quit, "degraded tray quit")
+					if not called then
+						Logger.error(LOG, "The user Quit owner raised (%s); quitting through the shutdown alone.", tostring(err))
+						shutdown.request("degraded tray quit")
 					end
-					shutdown.request("degraded tray quit")
 				end)
 		end
 	elseif opts.tray and not tray_menu then
@@ -3408,7 +3420,7 @@ local function main()
 	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
 	-- at-rest migration.
 	local function stop_input_loop()
-		shutdown.request("runtime callback failure", "runtime callback failure")
+		shutdown.request_failure("runtime callback failure", "runtime callback failure")
 	end
 
 	-- Summarises the repeat streaks that are due, so a source that fell silent
@@ -3668,7 +3680,8 @@ local function main()
 		onIdle = function()
 			if shutdown.is_requested() then shutdown.poll(); return end
 			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
-				shutdown.request("keyboard hook stopped")
+				-- Only an emergency stops the hook before a shutdown was requested.
+				shutdown.request_failure("keyboard hook stopped")
 				return
 			end
 			if tray_menu then
@@ -3767,4 +3780,10 @@ if not ok_main then
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.
 	os.exit(1)
+end
+-- Input that stopped at run time is a failure for the supervisor too (LCY-001);
+-- the teardown above already ran, so only the status remains to report.
+if shutdown.failure() then
+	pcall(Logger.error, LOG, "Daemon exiting after a run-time failure: %s.", shutdown.failure())
+	os.exit(ShutdownCoordinator.RUNTIME_FAILURE_EXIT_CODE)
 end

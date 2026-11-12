@@ -522,6 +522,23 @@ helpers.describe("shutdown coordinator: pre-wait ownership", function()
 		helpers.assert_eq(calls[4], "hook.emergency:runtime callback failure")
 		helpers.assert_eq(calls[5], "loop.stop")
 	end)
+
+	helpers.it("(lcy-001-failure-exit) records a run-time failure for a non-zero exit", function()
+		local coordinator, calls = coordinator_fixture()
+		helpers.assert_eq(coordinator.failure(), nil)
+		helpers.assert_true(coordinator.request_failure("runtime callback failure", "runtime callback failure"))
+		helpers.assert_eq(calls[4], "hook.emergency:runtime callback failure")
+		helpers.assert_eq(coordinator.failure(), "runtime callback failure")
+		helpers.assert_eq(ShutdownCoordinator.RUNTIME_FAILURE_EXIT_CODE, 70)
+		helpers.assert_true(not pcall(coordinator.request_failure, ""), "a failure names its cause")
+	end)
+
+	helpers.it("(lcy-001-failure-exit) a failure after a requested exit keeps that exit successful", function()
+		local coordinator = coordinator_fixture()
+		helpers.assert_true(coordinator.request("tray quit"))
+		helpers.assert_eq(coordinator.request_failure("keyboard hook stopped"), false)
+		helpers.assert_eq(coordinator.failure(), nil, "the hook a Quit stopped is not a failure")
+	end)
 end)
 
 helpers.describe("shutdown coordinator: daemon integration", function()
@@ -548,6 +565,12 @@ helpers.describe("shutdown coordinator: daemon integration", function()
 			helpers.assert_contains(source, 'name = "' .. owner .. '"',
 				"the pre-wait registry lost owner " .. owner)
 		end
+		for _, trigger in ipairs({ "runtime callback failure", "keyboard hook stopped" }) do
+			helpers.assert_contains(source, 'shutdown.request_failure("' .. trigger .. '"',
+				"a run-time input loss must exit non-zero for systemd: " .. trigger)
+		end
+		helpers.assert_contains(source, "os.exit(ShutdownCoordinator.RUNTIME_FAILURE_EXIT_CODE)",
+			"Main reports a recorded run-time failure in its exit status")
 		for _, trigger in ipairs({
 			"signal ", "tray quit", "degraded tray quit", "runtime callback failure",
 			"keyboard hook stopped", "event loop returned",
@@ -899,6 +922,15 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		})
 		local env = setmetatable({ shutdown = coordinator, privacy_owners = {}, require = function(name)
+			-- A TERM tells a waiting update watcher before the shutdown starts.
+			if name == "infra.updater_boot_ready" then
+				return { report_quit = function(reason)
+					state.quit_reports = (state.quit_reports or 0) + 1
+					helpers.assert_true(not coordinator.is_requested(), "the report precedes the shutdown")
+					helpers.assert_true(reason:match("^signal %d+$") ~= nil)
+					return true
+				end }
+			end
 			helpers.assert_eq(name, "infra.signal_handlers")
 			return { stop = function() return true end, start = function(opts)
 				state.handlers[2] = function() opts.on_term(2) end
@@ -937,6 +969,7 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 	helpers.it("(signal-output-ack) repeated TERM and INT cannot close or replay pending output retirement", function()
 		local state, coordinator, finish = fixture(false)
 		state.handlers[15](15); state.handlers[15](15); state.handlers[2](2)
+		helpers.assert_eq(state.quit_reports, 1, "only the signal that starts the shutdown reports a quit")
 		helpers.assert_true(coordinator.is_pending())
 		helpers.assert_eq(state.closes, 0)
 		local ok = pcall(finish)
