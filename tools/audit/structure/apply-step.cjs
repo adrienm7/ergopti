@@ -269,6 +269,15 @@ function main() {
 	if (created.length > 0)
 		throw new Error('refusing --apply: resolve the Lua module collisions above first');
 
+	// Every refusal is found before the first write, so a refused step leaves
+	// the tree as it found it instead of half rewritten.
+	const refusedRows = refs.filter((row) => Plan.REFUSED_KINDS.has(row.kind));
+	if (refusedRows.length > 0)
+		throw new Error(
+			`refusing --apply: ${refusedRows.length} refused reference(s), nothing changed:\n  ` +
+				refusedRows.map((row) => `${row.file}: ${row.old} ${row.new}`).join('\n  ')
+		);
+
 	// References first, in the files' current locations; then the moves.
 	for (const [file, rows] of edits) {
 		rows.sort((a, b) => b.old.length - a.old.length);
