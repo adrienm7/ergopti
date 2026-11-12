@@ -1,0 +1,15 @@
+# _shared/tests/corpus/tap_hold_shared_file/macos_written.config.toml
+# The config.toml rows the macOS writer publishes beside macos_written.toml for
+# the same state: the switch, the timings and the key combinations.
+
+[mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = true
+
+[mod_combos.config.escape_then_tab]
+combo = "copy"
+
+[tap_holds]
+enabled = true
+lone_modifier_tap_max_ms = 0
+sticky_timeout_ms = 1500

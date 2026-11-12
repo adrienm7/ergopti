@@ -19,23 +19,7 @@ integration_enabled = false
 
 
 
-[mod_combos]
-simultaneous_threshold_ms = 80
-symmetric = true
-
-
-
-[mod_combos.config.escape_then_tab]
-combo = "copy"
-
-
-
-
-
 [tap_hold]
-enabled = true
-lone_modifier_tap_max_ms = 0
-sticky_timeout_ms = 1500
 time_activation_seconds = 0.25
 
 

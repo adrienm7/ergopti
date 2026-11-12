@@ -6,7 +6,7 @@ local h = require("tests.helpers")
 local with_fs = require("tests.support.file_system_transaction_fixture").with_fixture
 local with_remap = require("tests.support.remap_transaction_fixture")
 local Codec = require("toml_codec")
--- A macOS combination; the shared tap_hold.toml names it by its pair id.
+-- A macOS combination; config.toml names it by its pair id.
 local entries = { { id = "esc_tab" } }
 local PAIR = "escape_then_tab"
 local actions = { { id = "none" }, { id = "escape" }, { id = "layer" }, { id = "caps_word" } }
@@ -19,7 +19,11 @@ local function read(path)
 end
 local function scoped(run, lock)
  return with_fs(function(fixture)
-  local path = os.tmpname():gsub("\\", "/")
+  -- The chords are config.toml rows, read beside the route: a config.toml
+  -- route is its own companion, so every path below names the published file.
+  local dir = os.tmpname():gsub("\\", "/")
+  os.remove(dir); assert(os.execute('mkdir "' .. dir .. '"'))
+  local path = dir .. "/config.toml"
   local adapter = fixture.make_adapter(nil, nil, nil, nil, lock)
   -- Controlled final-admission port: the actual FileSystem pipeline performs
   -- its disk, source, staging and cleanup work; this test port checks the
@@ -45,7 +49,7 @@ local function scoped(run, lock)
     return run(Config, adapter, path)
    end)
   end, debug.traceback))
-  os.remove(path); os.remove(fixture.write_lock_path(path))
+  os.remove(path); os.remove(fixture.write_lock_path(path)); os.execute('rmdir "' .. dir .. '"')
   if not result[1] then error(result[2], 0) end
   return table.unpack(result, 2, result.n)
  end)
