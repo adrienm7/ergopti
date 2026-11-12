@@ -10,6 +10,51 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Review status at resumption — November 12, 2026
+
+The audit resumed on November 10. `tools/audit/source-areas.py --ref HEAD` at
+`c054579d` gives 381 areas against the 363 of the pinned November 5 census
+(`audits/platform-parity/2026-11-05-native-ui/source-areas.json`): 18 new, none
+removed, 221 with changed members. The focused campaigns below own the new and
+changed areas of their module; each report holds its audited revision, its
+fixed and open findings and its proof limits. As at the pause, **reviewed does
+not mean native-certified**: none of these campaigns ran the native receivers.
+
+| Module                                             | Campaign                                                                |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| Tap-holds, chords, navigation layer                | [report](audits/platform-parity/2026-11-10-tap-holds/report.md)         |
+| Hotstring cascade and trigger arbitration          | [report](audits/platform-parity/2026-11-11-hotstring-cascade/report.md) |
+| Gestures                                           | [report](audits/platform-parity/2026-11-11-gestures/report.md)          |
+| Input layout, keymap, layout engine                | [report](audits/platform-parity/2026-11-11-input-layout/report.md)      |
+| Keyboard shortcuts and text actions                | [report](audits/platform-parity/2026-11-11-shortcuts/report.md)         |
+| Updater, update check, changelog                   | [report](audits/platform-parity/2026-11-11-updater/report.md)           |
+| Lua adapters and infra (clipboard, privacy, focus) | [report](audits/platform-parity/2026-11-11-adapters/report.md)          |
+| Configuration, scopes, migration                   | [report](audits/platform-parity/2026-11-11-config/report.md)            |
+| AI flows (LLM, model browser, prompts)             | [report](audits/platform-parity/2026-11-11-ai-flows/report.md)          |
+| Metrics and keystats                               | [report](audits/platform-parity/2026-11-11-metrics/report.md)           |
+| macOS launcher (source reading)                    | [report](audits/platform-parity/2026-11-11-macos-launcher/report.md)    |
+| Lifecycle: reload, quit, signals, wake             | [report](audits/platform-parity/2026-11-12-lifecycle/report.md)         |
+| Notifications, tooltips, dialogs                   | [report](audits/platform-parity/2026-11-12-notifications/report.md)     |
+| Network: proxies, trust, deadlines, downloads      | [report](audits/platform-parity/2026-11-12-network/report.md)           |
+| Start at login                                     | [report](audits/platform-parity/2026-11-12-start-at-login/report.md)    |
+| i18n at run time                                   | [report](audits/platform-parity/2026-11-12-i18n-runtime/report.md)      |
+| Menus and tray                                     | [report](audits/platform-parity/2026-11-12-menus-tray/report.md)        |
+| Layout manager and layout editor host              | [report](audits/platform-parity/2026-11-12-layout-manager/report.md)    |
+| Diagnostics page                                   | [report](audits/platform-parity/2026-11-12-healthcheck/report.md)       |
+| Onboarding                                         | [report](audits/platform-parity/2026-11-12-onboarding/report.md)        |
+| Linux install tree                                 | [report](audits/platform-parity/2026-11-12-linux-install/report.md)     |
+| Bundled apps (App Cloner, Encryptor)               | [report](audits/platform-parity/2026-11-12-bundled-apps/report.md)      |
+| Navigation layer editor host                       | [report](audits/platform-parity/2026-11-12-layer-editor/report.md)      |
+| Webview hosts                                      | [report](audits/platform-parity/2026-11-12-webview-hosts/report.md)     |
+
+Changed areas no campaign owns yet: the shared plumbing (`lua/crash_report.lua`,
+`modules/logger`, `modules/timings`, `lua/features`, `modules/features`), which
+the cross-driver single-source gates hold; the `_generated` trees, reviewed
+through their generators; and vendor code, out of parity scope. The tap-hold
+module drifted after its campaign (the shared tap-hold file of the 2026-11-11
+decision, its migrations, writers and the Karabiner generator): its follow-up
+reviews that drift.
+
 ## Review status at pause — November 5, 2026
 
 The maintainer requested a pause after the dead-key campaign delivered in
