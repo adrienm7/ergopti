@@ -29,7 +29,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "a7fc25d07b97fc87cba0068425d6f04bd00c2b6659e1c2661a49895ec773dd2c"
+			"sha256": "f48734a489bbd3b75500ff4d4c71f7ae0a91d1d6d82176fca04679da13e5e007"
 		},
 		{
 			"id": "macos-control",
@@ -43,7 +43,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.undo_on_backspace",
-			"sha256": "a7fc25d07b97fc87cba0068425d6f04bd00c2b6659e1c2661a49895ec773dd2c"
+			"sha256": "f48734a489bbd3b75500ff4d4c71f7ae0a91d1d6d82176fca04679da13e5e007"
 		},
 		{
 			"id": "linux-repeat",
@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "e62ac50e3af07719216176f4ef8cc322b5a45ce9a9197835bd710313fdec51db"
+			"sha256": "d45445dbec26bc581ff76385f60e8cf22b0e8532d29f42afe974a29f07459daa"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -71,7 +71,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_PressNative",
-			"sha256": "73de4e37b4c265408b927a0c1298cf13fed3f1f24a2739f31332fdbd1ed003a0"
+			"sha256": "7437a13ce63623eb280233ff6c1433b5209220b744a0f486c04f06316c8ec368"
 		},
 		{
 			"id": "macos-dead-native",
@@ -99,7 +99,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-			"sha256": "73de4e37b4c265408b927a0c1298cf13fed3f1f24a2739f31332fdbd1ed003a0"
+			"sha256": "7437a13ce63623eb280233ff6c1433b5209220b744a0f486c04f06316c8ec368"
 		},
 		{
 			"id": "macos-layout-emulation",
@@ -113,7 +113,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "a96fec3801557887771b824a4a0d66c86db4cf4c0c47eb695e3c6bcc8c3f39d0"
+			"sha256": "fae217f6c16b03afce34cf0edd890268b1f191c7b0080af69f24fac375cfcbbe"
 		}
 	],
 	"behaviors": [

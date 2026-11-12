@@ -29,7 +29,7 @@ local function with_file(original, body)
 		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
 		require("config_outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
-		local path = os.tmpname()
+		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
@@ -37,14 +37,21 @@ local function with_file(original, body)
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
 		local Text = require("tests.support.tap_hold_file_text")
-		original = Text.file(original)
+		local original_config
+		original, original_config = Text.file(original)
 		write(original)
+		Text.write_config(path, original_config)
 		local files = require("adapters.file_system")
 		local native_write = files.write_if_unchanged
 		local controls = { writes = 0 }
 		-- The source fence is the writer's; this fixture records the exact
 		-- candidate it would publish over the unchanged current source.
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The manifest rows publish to the config.toml beside it, counted apart.
+			if destination == Text.config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				Text.write_config(path, content); return true
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = read() })
@@ -55,9 +62,9 @@ local function with_file(original, body)
 			return config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, path)
 		end
 		local ok, err = pcall(body, { config = config, path = path, warnings = warnings, errors = errors,
-			controls = controls, load = load, read = read, decode = Text.model, original = original })
+			controls = controls, load = load, read = read, decode = function(text) return Text.model(text, Text.read_config(path)) end, original = original })
 		files.write_if_unchanged = native_write
-		os.remove(path); os.remove(path .. ".tmp")
+		Text.remove_private(path)
 		if not ok then error(err, 0) end
 	end)
 end

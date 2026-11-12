@@ -129,6 +129,24 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not press(M, KEY_F1, { ctrl = true }), "a key outside the layout passes")
 	end)
 
+	-- Windows registers a keyboard slot on the key that types its letter in the
+	-- emulated layout; Linux matched the system layout's key (ILX-001).
+	helpers.it("names the emulated letter of a chord for the shortcut slots, typing nothing (ilx-001-slot-emulated-letter)", function()
+		local M, record = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		M.reload()
+		helpers.assert_eq(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "z", "Ctrl on Q is Ergopti's z")
+		helpers.assert_eq(M.chord_key({ code = KEY_Q, mods = { alt = true } }), "z")
+		helpers.assert_nil(M.chord_key({ code = KEY_Q, mods = {} }), "no chord, no slot letter")
+		helpers.assert_nil(M.chord_key({ code = KEY_F1, mods = { ctrl = true } }), "a key outside the layout")
+		helpers.assert_eq(record.shortcuts, {}, "the query sends nothing")
+		helpers.assert_eq(record.typed, {}, "and types nothing")
+		record.paused = true
+		helpers.assert_nil(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "a paused emulation names nothing")
+		local off = fixture({ emulated_layout = "" })
+		off.reload()
+		helpers.assert_nil(off.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "no emulated layout")
+	end)
+
 	-- A chord of two modifiers sends the key of the layout's character, as a
 	-- single-modifier chord does, the held modifiers kept (ILD-1, decided by the
 	-- maintainer on 2026-11-11: the logical key everywhere; two-modifier-chord).
@@ -326,8 +344,14 @@ helpers.describe("layout emulation (Linux): a layout source's records", function
 		record.now = 1300
 		helpers.assert_true(press(M, KEY_A), "a key under the held Shift")
 		helpers.assert_eq(record.typed, { " ", "A" }, "the keylayout types it shifted")
-		helpers.assert_true(press(M, KEY_F1), "a key the keylayout leaves to the OS")
+		local passed, pass_repeat = press(M, KEY_F1)
+		helpers.assert_true(passed, "a key the keylayout leaves to the OS")
 		helpers.assert_eq(record.keys, { "F1+shift" }, "it goes out with the held Shift")
+		-- Held, it repeats under the held Shift, as with a real one (ilx-002-held-modifier-repeat).
+		helpers.assert_eq(type(pass_repeat), "function", "the passed key owns its repeat")
+		helpers.assert_true(pass_repeat({ code = KEY_F1, mods = {}, value = 2 }))
+		helpers.assert_eq(record.keys, { "F1+shift", "F1+shift" }, "each repeat presses it again")
+		helpers.assert_true(not pass_repeat({ code = KEY_A, mods = {}, value = 2 }), "another key's repeat is not its own")
 		record.now = 1400
 		helpers.assert_true(tab_release({ code = KEY_TAB, value = 0 }))
 		helpers.assert_true(press(M, KEY_A))

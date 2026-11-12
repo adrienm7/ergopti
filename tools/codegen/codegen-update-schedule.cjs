@@ -7,7 +7,8 @@
  * Emits the automatic update-check timing of _shared/modules/updater/
  * defaults.json (presets, boot delay, jitter, failure backoff, re-evaluation
  * period and the key of the persisted check record) as the data the Windows
- * schedule port (windows/modules/updater/schedule.ahk) interprets.
+ * schedule port (windows/modules/updater/schedule.ahk) interprets, and the
+ * archive_transfer download bounds the Windows release download applies.
  *
  * WHY THIS EXISTS:
  * The frequency presets were copied by hand into the AHK updater and the Linux
@@ -54,6 +55,7 @@ function ahkInt(value, name) {
 
 function emitAhk(defaults) {
 	const timing = defaults.timing;
+	const transfer = defaults.archive_transfer;
 	const presets = timing.check_interval_presets
 		.map(
 			(preset) =>
@@ -91,6 +93,14 @@ function emitAhk(defaults) {
 		`\t\t"failure_backoff_sec", [${backoff}],\n` +
 		`\t\t"reevaluate_sec", ${ahkInt(timing.reevaluate_sec, 'reevaluate_sec')},\n` +
 		`\t\t"state_storage_key", ${ahkStr(defaults.check_state.storage_key)})\n` +
+		'}\n' +
+		'\n' +
+		'; The release download bounds of archive_transfer, shared with macOS and Linux:\n' +
+		'; the receive timeout between two reads and the absolute archive deadline.\n' +
+		'UpdateArchiveTransferData() {\n' +
+		'\treturn Map(\n' +
+		`\t\t"archive_idle_timeout_ms", ${ahkInt(transfer.archive_idle_timeout_ms, 'archive_idle_timeout_ms')},\n` +
+		`\t\t"archive_phase_timeout_ms", ${ahkInt(transfer.phase_timeout_ms.archive, 'phase_timeout_ms.archive')})\n` +
 		'}\n'
 	);
 }

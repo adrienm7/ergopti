@@ -35,3 +35,11 @@ UpdateScheduleData() {
 		"reevaluate_sec", 300,
 		"state_storage_key", "updater.check_state")
 }
+
+; The release download bounds of archive_transfer, shared with macOS and Linux:
+; the receive timeout between two reads and the absolute archive deadline.
+UpdateArchiveTransferData() {
+	return Map(
+		"archive_idle_timeout_ms", 600000,
+		"archive_phase_timeout_ms", 1200000)
+}

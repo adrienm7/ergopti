@@ -7,8 +7,9 @@
 ; MODULE: Application Identifiers and External Hosts
 ; DESCRIPTION:
 ; The application file names, bundle ids, service labels, external hosts and
-; field report names. A misspelt name fails at the first access. Hosts are bare
-; names: build a URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
+; field report names, and the catalogue shown for a system language without
+; one. A misspelt name fails at the first access. Hosts are bare names: build a
+; URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
 ; ==============================================================================
 
 class Identifiers {
@@ -50,5 +51,8 @@ class Identifiers {
 		static FOLDER := "docs/field-reports"
 		static BASE_CONFIG_KEY := "ergoptiFieldBase"
 		static ENVIRONMENT := "ERGOPTI_FIELD_RUN_ROOT"
+	}
+	class Locales {
+		static SYSTEM_FALLBACK := "en"
 	}
 }

@@ -5,9 +5,10 @@
 --- DESCRIPTION:
 --- Restores Ergopti's recommended tap-holds or clears them to the keyboard's own
 --- behaviour through the shared scope transaction: the user's tap_hold.toml is
---- the manifest preset's file, and the tap-hold action parameters stay in
---- config.toml. Both get verified backups, the engine acknowledges the exact
---- candidate before anything is published, and a refusal restores both.
+--- the manifest preset's file (the keys); the switch, the timings and the
+--- tap-hold action parameters stay in config.toml. Both get verified backups,
+--- the engine acknowledges the exact pair of candidates before anything is
+--- published, and a refusal restores both.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Explicit Preset: a restore writes every shipped key field instead of
@@ -146,7 +147,9 @@ function M.new(options)
 		path = options.path, backup_path = options.backup_path, files = files, manifest = Manifest,
 		owned_paths = inventory, owners = validators,
 		presets = { tap_hold = {
-			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path, prefixes = { ConfigKeys.KEY.TAP_HOLDS },
+			-- No row is routed here: every manifest row under tap_holds is a
+			-- config.toml row (maintainer decision of 2026-11-11).
+			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path,
 			render = function(mode, document, rows, shapes) return writer.render_scope(mode, document, rows, preset, shapes) end,
 		} },
 		prepare_batch = function(path, updates, adapter)
@@ -161,14 +164,14 @@ function M.new(options)
 			if type(snapshot.tap_hold) ~= "table" or type(snapshot.parameters) ~= "table" then return nil end
 			return snapshot
 		end,
-		apply = function(_, _, _, _, presets)
+		apply = function(config, _, _, _, presets)
 			local candidate = parameters.parameter_configuration_snapshot(owner)
 			if type(candidate) ~= "table" then return false end
 			for key in pairs(candidate) do
 				if parameter_domain("gesture_parameters." .. key) then candidate[key] = nil end
 			end
 			if parameters.apply_parameter_configuration(owner, candidate) ~= true then return false end
-			return manager.apply_configuration(presets.tap_hold.decoded, presets.tap_hold.shapes) == true
+			return manager.apply_configuration(presets.tap_hold.decoded, presets.tap_hold.shapes, config) == true
 		end,
 		restore = apply_state,
 	})

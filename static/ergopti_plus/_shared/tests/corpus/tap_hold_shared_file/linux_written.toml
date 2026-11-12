@@ -7,9 +7,6 @@
 schema_version = 1
 
 [tap_hold]
-enabled = true
-lone_modifier_tap_max_ms = 0
-sticky_timeout_ms = 1500
 time_activation_seconds = 0.25
 
 [tap_hold.keys.caps_lock]

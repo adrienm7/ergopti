@@ -33,8 +33,11 @@ global ACCENTED_SHORTCUT_LETTERS := Map(
 	"a_grave", "à"
 )
 
-; Every modifier chord remapped, AltGr (^!) deliberately excluded.
-global ACCENTED_SHORTCUT_PREFIXES := ["^", "^+", "!", "!+", "#", "#+"]
+; Every modifier chord remapped, AltGr (^!) deliberately excluded. The left-side
+; Ctrl+Alt chords (<^<!, never AltGr's LCtrl+RAlt) send Ctrl+Alt and the logical
+; key, as every chord of two modifiers does on Linux (SCD-2, decided by the
+; maintainer on 2026-11-11): Ctrl+Alt+é sends Ctrl+Alt+C.
+global ACCENTED_SHORTCUT_PREFIXES := ["^", "^+", "!", "!+", "#", "#+", "<^<!", "<^<!+"]
 
 ; Layout handle and effective digit-access policy → Map(scancode → feature id).
 global _AccentedShortcutLayoutCache := Map()

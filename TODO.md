@@ -8,6 +8,25 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Resume here (2026-11-12 evening, read first)
+
+If the coordinating session stopped (weekly quota), any agent can continue from this section alone. Follow
+[AGENTS.md](AGENTS.md); never push `dev` or `main` without the maintainer's go in the current conversation.
+
+- **Folder migration by OS (structure plan, the priority).** Plan: [docs/design/structure-plan.md](docs/design/structure-plan.md)
+  (item « Structure plan » under « Remaining code work »). The work runs overnight on branch
+  `claude/ergopti-todo-structure-phase2`, not on `dev`; if it had to be rebased it continues on
+  `claude/ergopti-todo-structure-phase2-night` (never force-pushed). Read the branch's
+  `docs/plans/structure-migration-resume.md` first: base `dev` commit, steps done with their proof, the step in
+  progress, the next command, known traps, how to regenerate `move-map.tsv`. One step per commit with
+  `tools/audit/structure/apply-step.cjs` (`--check-all` clean first); a step is done when local gates and CI on the
+  three OS show only the reds `dev` already has. Land on `dev` only with the maintainer's go.
+- **TODO cleanup (maintainer request 2026-11-12).** This file keeps only features and fixes: drop the `[x]` items
+  (they stay in Git history), keeping as a new short open line any leftover a done item still names. The three
+  hardware sections move verbatim, headings unchanged, to `TODO-tests-macos.md`, `TODO-tests-windows.md` and
+  `TODO-tests-linux.md`; then point `todo.file` in `static/ergopti_plus/{linux,macos}/data/field_todo_coverage.json`
+  at the new files and rerun the two `test_field_todo_coverage.lua` tests. Remove this bullet once done.
+
 ## Windows CI reliability (2026-11-07)
 
 - [x] **[CODE] Boot counts 2 more TOML parses than on 2026-11-05:** the boot log's "Document parses by owner"
@@ -151,6 +170,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Progress (12 November 2026, [AI flows follow-up](docs/audits/platform-parity/2026-11-12-ai-flows-followup/report.md)): drift since the AI-flows campaign and the selection actions reviewed. Fixed: the tone and translation actions refuse in an app excluded from the AI on Linux and macOS, as on Windows (AIX-001); the Linux key migration ends quietly when a save moved the keys (AIX-002) and a shutdown discards the keys an attempt stored (AIX-003). The campaign's leftover Linux retry row is parity with Windows. Native receiving unqualified.
       Progress (12 November 2026, [configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md)): the campaign's enum row and the cleanup of the same leaves. Fixed: an enum written in another case reads in its manifest spelling, as on Windows, in the Linux AI, hotstring, number-row and gesture readers and the shared emulation settings (CFX-001) and in the macOS preference loader (CFX-002); the Linux cleanup no longer offers saved swipe modes and steps for deletion (CFX-003). Left: the macOS preference hydration beyond `load` and `current_view`, NFD and NFC paths on macOS; native receiving unqualified.
       Progress (12 November 2026, [updater follow-up](docs/audits/platform-parity/2026-11-12-updater-followup/report.md)): the campaign's two uncompared rows. Fixed: a macOS manual check whose window cannot open runs and notifies its answer, through the shared `updater.check_notice` (UPX-001); the Linux bundle, checksum and signature are bound to the repository's download path for the release's tag, as on Windows and macOS (UPX-002). UPD-2 decided by the coordinator on 2026-11-12 from the maintainer's pause rule (a manual check runs during a pause, as on macOS and Linux; Windows line below). Native receiving unqualified.
+      Progress (12 November 2026, [input/layout follow-up](docs/audits/platform-parity/2026-11-12-input-layout-followup/report.md)): the campaign's two open Linux rows. Fixed: a keyboard slot follows the emulated letter, as on Windows (ILX-001, through the shared `keylayout_emulation.chord_char`); a key passed under a tap-hold's held modifier repeats (ILX-002). Left: the macOS Carbon slots against the tap rewrite, to confirm on a Mac; native receiving unqualified.
+      Progress (12 November 2026, [gestures follow-up](docs/audits/platform-parity/2026-11-12-gestures-followup/report.md)): the campaign's open Linux row. Fixed: a physical mouse click releases a gesture's click hold, as on Windows and macOS, a touchpad touch keeping it for the drag (GSX-001). Left: GSD-1, the modules not reviewed in depth; native receiving unqualified.
       Progress (12 November 2026, [notifications campaign](docs/audits/platform-parity/2026-11-12-notifications/report.md)): areas taken: notifications, their logs, levels and lifetime, tooltips and tray state. Fixed: a refused shortcut or gesture Quit is told on macOS and Linux (NUI-001); a refused macOS menu Reload is told (NUI-002); macOS logs a notice by its shape, never its text (NUI-004); one notification lifetime in the timings registry (NUI-006); Linux system action failures are error notices (NUI-007). After review: a notify-send that runs and fails is logged and kept in the log (NUI-003), a refused macOS source-change reload is told once per burst (NUI-005). Left: the macOS pause and resume notices, asked of the maintainer; make the Linux runner's notify-send sentinel count fatal (`tests/run.lua`) once the ~370 notices that still reach it through the real notifier have a `ShellRunner._set_async_runner` seam.
       Progress (12 November 2026, [lifecycle campaign](docs/audits/platform-parity/2026-11-12-lifecycle/report.md)): areas taken: reload, user Quit, signals and logout, wake, first run. Fixed on Linux: input that stops at run time exits non-zero so systemd restarts the daemon (LCY-001); a first run follows the session language, English fallback (LCY-002); a shortcut or gesture Quit takes the user Quit owner (LCY-003); a signal during an update's probation keeps the update (LCY-004); the degraded tray Quit takes the same owner. Left: native receiving unqualified.
       Progress (11 November 2026, [adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md)): areas taken: the Lua drivers' `adapters/` and `infra/` (clipboard, privacy, focus identity). Fixed on Linux: an X11 clipboard holding only an image is borrowed and restored whole (CBL-001). ADD-1 to 3 decided by the maintainer on 2026-11-11 (a password manager of the one shared list `_shared/data/secure_apps.json` is a secure field as a whole on macOS and Linux, Windows counterpart below; a borrowed unowned Linux clipboard goes back unowned, as on macOS; the Linux application identity is the WM class or app_id under X11 and Wayland, comm only as fallback, saved exclusion lists converted once). Left: configuration, lifecycle, notification and network adapters in depth, native receiving unqualified.
@@ -777,40 +798,25 @@ three-OS CI is green on the final source. See the handoff above for the current 
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
-- [ ] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
-      did, Cmd versus Ctrl aside. Decided 2026-11-10: one shared `tap_hold.toml` (keys, global and sticky delays,
-      lone-tap window, `mod_combos`; macOS-only `[karabiner]` section), `config.toml` keeps the `[[features.*]]` rows.
-      Done on macOS and in the shared pieces: the layout is specified in `_shared/tap_hold/SCHEMA.md`,
-      `_shared/tap_hold/shared_file.toml` and `_shared/core/config_schema/tap_hold.schema.json`; macOS reads and writes
-      `hammerspoon/tap_hold.toml` through `platform/remap/tap_hold_file.lua` and `_shared/lua/tap_hold/shared_file.lua`
-      (catalogue key ids, `<first>_then_<second>` pairs, seconds, `+`-joined holds, only changed leaves written) and
-      carries an old `config_karabiner.toml` over once (`migrations.toml` `[legacy_imports.hs]`, renamed
-      `.migrated`); Linux leaves another driver's keys alone and names a macOS `hold_action` once. The cross-driver
-      corpus `_shared/tests/corpus/tap_hold_shared_file/` pins each Lua writer's file byte for byte and what each
-      reader reads from both (`expected.toml`, contract `_shared/lua/test/tap_hold_shared_file_contract.lua`).
-      Left: Windows (maintainer), below; Linux and macOS are done.
-  - [x] **Linux `[mod_combos]` in `tap_hold.toml`.** Decided by the coordinator on 2026-11-11 overnight, to review by
-        the maintainer: the `[[features.mod_combos]]` rows keep their manifest declaration and are stored in
-        `tap_hold.toml`, as on macOS. `modules/shortcuts/key_combinations.lua` reads the taps, holds and switch from
-        `config.toml` and `[mod_combos]` from `tap_hold.toml` only, every receipt and lease check covering both files;
-        `infra/key_combinations_scope.lua` and `infra/shortcuts_scope.lua` publish `mod_combos.*` rows through the
-        transaction's new `companions` port, prepared by `tap_hold_writer.prepare_combo_rows` (versioned, stamped,
-        line-preserving), with its own backup and inverse. The boot moves `config.toml` `[mod_combos]` once
-        (`tap_hold_writer.import_config_combos`, `[legacy_imports.linux]`, translation `config_section` in
-        `migrate.lua`): both files backed up, `tap_hold.toml` published first, a crash between the writes finished
-        at the next start, a different `[mod_combos]` already in `tap_hold.toml` wins. `expected.toml` pins what
-        Linux reads of both corpus files' `[mod_combos]`.
-  - [ ] **Windows shared `tap_hold.toml` (maintainer).** `tap_hold_loader.ahk` / `tap_hold_writer.ahk` read and write
-        the shared layout: catalogue ids, `[mod_combos]` in `tap_hold.toml` (the combinations' reader and writer move
-        there, `config.toml` keeps the pair taps, holds and `[category_enabled] key_combinations`), ignore
-        `[karabiner]`, `hold_action`, `cmd`/`fn` with one warning, write `_meta.schema_version`. A
-        `[legacy_imports.ahk]` entry with `translate = "config_section"` and `section = "mod_combos"` moves
-        `config.toml` `[mod_combos]` the way Linux does (both backed up, `tap_hold.toml` first, equal copies only
-        delete the old one, a different shared copy wins), beside the Windows `config.toml` tap-hold keys' own
-        import. `tap_hold_migration.ahk` accepts the `[legacy_imports]` table of `migrations.toml` and validates it
-        like `migrate.parse_legacy_imports` (per translation: `retired_suffix` for `karabiner`, `section` for
-        `config_section`). The AHK suite reads both corpus files with `[reads.<file>.ahk]` added to `expected.toml`,
-        `mod_combos` included.
+- [x] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
+      did, Cmd versus Ctrl aside. Decided by the maintainer on 2026-11-11 (docs/memory/maintainer-decisions.md, top):
+      one home per manifest path. `config.toml` holds every `[[features.*]]` row: `[tap_holds]` `enabled`,
+      `lone_modifier_tap_max_ms`, `sticky_timeout_ms` and the whole `[mod_combos]`; the shared `tap_hold.toml` holds
+      the keys, the global delay, `inherit_defaults` and the macOS-only `[karabiner]` (`_shared/tap_hold/SCHEMA.md`,
+      `shared_file.toml`, `tap_hold.schema.json`). Done 2026-11-12: macOS (`platform/remap/config.lua`,
+      `tap_hold_file.lua`, `_shared/lua/tap_hold/shared_file.lua`) and Linux (loader, writer, manager, scopes) read
+      and write the rows in `config.toml`; the overnight Linux move of `[mod_combos]` into `tap_hold.toml` is
+      reverted; Windows, which already kept them in `config.toml`, reads another driver's `tap_hold.toml` (a macOS
+      `hold_action` or Cmd/Fn hold warned once, the tap kept; a leftover manifest row warned once) and keeps its
+      leaves on a write (a hold replaces `hold_action`, a rebind drops `enabled = false`). One migration: step
+      `v21_to_v22` of `_shared/core/config_schema/migrations.toml`, new op `import_companion` in the three
+      interpreters, copies the rows out of `tap_hold.toml` (macOS first carries `config_karabiner.toml` over),
+      backs both files up and deletes the moved values from `tap_hold.toml`. Cross-driver test: the corpus
+      `_shared/tests/corpus/tap_hold_shared_file/` holds each driver's written pair (`<driver>_written.toml` and
+      `.config.toml`); each suite pins its own and reads the three (Linux and macOS `test_tap_hold_shared_file.lua`,
+      Windows `test_tap_hold_shared_file.ahk`). Left, not this item: Windows keeps its Tap-Holds switch as
+      `[category_enabled] tap_holds`, so a Windows pair reads as switched off on macOS and Linux; Windows writes a
+      0.3 s delay as `0.29999999999999999`.
 - [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
@@ -1284,39 +1290,40 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
-- [ ] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
+- [x] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
-- [ ] **Manual update check during a pause (UPD-2, decided by the coordinator on 2026-11-12 from the maintainer's
-      pause rule: installs stay allowed during a pause).** `_Updater_ShowAvailableUpdateEntry` and
-      `_Updater_ShowAvailableUpdateRunning` (`modules/updater/self_update.ahk`) refuse a manual check while suspended
-      (`_Updater_RefuseManualWhileSuspended`); macOS and Linux run it. Drop the refusal for the manual check and update
-      the AHK updater test that expects it.
-- [ ] **No-break space inside a trigger (maintainer decision HSE-003, 2026-11-12).** macOS (`add_with_space_variants`) and
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 3b88056e, seal b15901b4): `codegen:update-schedule` emits `UpdateArchiveTransferData()`, core.ahk reads both bounds from it, and the single-source gate covers Windows.
+- [x] **No-break space inside a trigger (maintainer decision HSE-003, 2026-11-12).** macOS (`add_with_space_variants`) and
       now the shared engine register, for a trigger with an inner space that does not start with one, its U+00A0 and
       U+202F variants, so `la` + no-break space + `notre` fires `la nôtre`. `CreateCaseSensitiveHotstrings` registers no
       such variant: add both (skipping triggers that start with a space), and extend the AHK hotstring registration test.
-- [ ] **Hotstring short entry forms (maintainer decision HSE-002, 2026-11-12).** macOS and Linux now load the bare-key
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 4fc9a85c): `HSE_NoBreakSpaceVariants`, for the cased and the literal families; tests `hse-003-nbsp-trigger` in `test_hotstring_engine_match.ahk`.
+- [x] **Hotstring short entry forms (maintainer decision HSE-002, 2026-11-12).** macOS and Linux now load the bare-key
       and the simple `"bbq" = "text"` entries, as `infra/toml/toml_loader.ahk` does. Its `_HOTSTRING_ENTRY_PATTERN` still
       drops an inline-table entry whose keys come in another order than output, is_word, auto_expand, is_case_sensitive,
       final_result, or that carries only `output` (the Lua reader defaults each missing flag to false); accept any key
       order and missing flags, and extend `test_toml_loader.ahk` with both cases.
-- [ ] **App Cloner item to open (maintainer decision, 2026-11-12).** `apps/bundled_apps.ahk`
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 5ee6c6e4): `HS_EntryPattern` builds the engine and preview patterns (output required, flags and priority optional in any order, read member by member); tests `hse-002-short-entry-forms`.
+- [x] **App Cloner item to open (maintainer decision, 2026-11-12).** `apps/bundled_apps.ahk`
       `_AppCloner_InvalidOpenItem` accepts « https:/x » and « localhost:3000 » and refuses a « ~ » path. Align it with
       macOS `validateOpenArg` and the Linux validator (`linux/apps/app_cloner.lua` `invalid_open_item`): expand « ~ »
       to the profile folder and check the path exists; otherwise require « :// » or the `msteams:/l/` and
       `msteams:/calendar` forms. Then extend the AHK App Cloner test with those cases.
-- [ ] **App Cloner VS Code variants (maintainer decision BAP-004, 2026-11-12).** `apps/app_cloner_core.ahk`
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 0129cbc7): « ~ » expanded and checked, otherwise « :// » or the Teams forms; test `bundled-apps-cloner-open-item`.
+- [x] **App Cloner VS Code variants (maintainer decision BAP-004, 2026-11-12).** `apps/app_cloner_core.ahk`
       links `%APPDATA%\Code\User` and passes the catalogue's `--extensions-dir={home}/.vscode/extensions` for every
       vscode-family program; VSCodium and the Insiders build keep their own. Read `_shared/data/app_cloner/families.json`
       vscode `user_folders` (per executable: `settings` under `%APPDATA%`, `extensions` under `{home}`) and replace the
       argument marked `user_folder: "extensions"`, as macOS and Linux now do; then extend the AHK App Cloner test.
-- [ ] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 8c28b52f): `AppCloner_UserFolders` reads `user_folders` per executable; test `bap-004-vscode-variants`.
+- [x] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
       (`ui/layout_manager/init.ahk`) writes `[layout] emulated_layout = ""` when the emulated layout is uninstalled, and
       `_LayoutComposer_Remove` (`composer.ahk`) does the same for « composed ». Keep the stored choice instead, as macOS and
       Linux now do: the menu row stays named, ticked and greyed (« — non appliqué »), the emulation stops and reloads, and
       resumes by itself when the layout is installed again. Then update the AHK tests that expect the cleared selection.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`), option chosen by the coordinator: the boot never installs (`KeylayoutEmulation_Boot` reports a missing or damaged copy through `KeylayoutEmulation_FailedId`), the « Disposition à émuler » choice installs a layout that is not installed (or the failed one) before selecting it, or reloads when it is already chosen, and the menu names the failed choice with `menu.layout.emulation_failed`, ticked, as macOS and Linux. The row is not greyed: choosing it again is the reinstall action. Tests `keep-emulated-layout` and the keylayout boot case (an uninstall then a reload never reinstalls).
 - [x] **Layout editor host on Windows (maintainer request, 2026-11-11).** One pass, as planned in
       [layout-editor.md « Windows host »](docs/design/layout-editor.md#windows-host): `init.ahk` accepts `source_open`,
       `source_save`, `nav_save`, `composer_emulate` and sends `source_editor`, `emulate`, `nav_apply`; a new
@@ -1340,23 +1347,44 @@ between workers) green alone. All live checks pass, typed by the harness.
       milliseconds and offset; `keystats_walker_events.ahk` reads `ts` plus the offset (an old Linux row with the current
       offset) in `KLW_IsNightWake`, the hour slot and the days of `KLW_WalkAppSwitch`, `KLW_WalkWindowSwitch` and
       `KLW_WalkSystemEvent`. Full list: `docs/memory/maintainer-decisions.md`.
-- [ ] **AID-2 on AHK (Windows suites red until done).** `LLM_TokenExchange_Read` appends the service's message
+- [x] **AID-2 on AHK (Windows suites red until done).** `LLM_TokenExchange_Read` appends the service's message
       (`error_description`, `errorMessage`, `error.message`, `message`, then `error`; one line, at most 200 bytes) and the
       `api_common.ahk` phrase list takes « the token exchange answered http 400 »; `test_llm_shared_vectors.ahk` and
       `test_llm_api_token_exchange.ahk` replay the updated shared corpora.
+      Already in the code on 2026-11-12 (`_LLM_TokenExchange_ServiceMessage`, the api_common phrase); the llm shard passed on Windows CI run 43261921277.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
-- [ ] **ADD-1 on AHK (decided by the maintainer on 2026-11-11).** `adapters/secure_field_detector.ahk`: build
+- [x] **ADD-1 on AHK (decided by the maintainer on 2026-11-11).** `adapters/secure_field_detector.ahk`: build
       `SFD_SECURE_APPS` from the `windows` names of `_shared/data/secure_apps.json` (a `Map` with `CaseSense := "Off"`;
       a read or parse failure makes every application secure) instead of its literal, and return true at the top of
       `SFD_IsSecureField` when `SFD_IsSecureApp(WinGetProcessName("ahk_id " Hwnd))`, so hotstrings, the LLM bridge,
       predictions, agent actions and metrics follow. Test in `test_secure_field_detector.ahk`: a `RoboForm.exe` window is
       secure; `test-secure-apps-single-source.cjs` then drops its Windows subset check for a no-literal check.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 9c3cf49c): `SFD_SecureApps` reads the shared file once (an unreadable file makes every application secure), `SFD_IsSecureAppWindow` answers per top-level window and process id; `test-secure-apps-single-source.cjs` requires no typed list.
 
-- [ ] **UPD-1 on AHK (decided by the maintainer on 2026-11-11).** `modules/updater/core.ahk` `_Updater_InterpretResponse`:
+- [x] **UPD-1 on AHK (decided by the maintainer on 2026-11-11).** `modules/updater/core.ahk` `_Updater_InterpretResponse`:
       a 200 whose body does not open a JSON array (`^\x{FEFF}?\s*\[`, the opening half of `ui/changelog/init.ahk:747`) logs a
       warning and returns "" (no list: the caller reads the Atom feed, « no connection ») instead of reaching the release
       parser (« parse failed »); a malformed array stays a parse failure. Test in the updater suite: an HTML 200 requests
       the feed and answers `updater.no_connection`.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 957aef5a, refined in fd719164): tests in `test_updater_release_fetch.ahk` and `test_updater_check_only_fallback.ahk` (UPD-1). Refined against the line above: the no-list answer covers a 200 that opens no JSON at all (`^\x{FEFF}?\s*[\[{]`), so a JSON object such as GitHub's error document stays a malformed release response, as the schedule publication tests require; for the maintainer to confirm.
+- [ ] **UPD-2 on AHK (decided by the coordinator on 2026-11-12, after the maintainer's real pause).** A manual check,
+      the changelog and Versions windows, the release links, the channel and interval settings and the update prompt
+      should run while paused, as macOS `check_now` and Linux `check_for_updates`; background checks keep their pause
+      drop. Tried on 2026-11-12 (ea031503, reverted in 79d1914b): `_Updater_RequestPolicy` allowed a manual request
+      whatever the pause, the suspend boundary (`_Updater_SwapAsyncRequestsForBoundary`) kept in-flight manual records,
+      the `_Updater_RefuseManualWhileSuspended` guards left the manual entry points, and `UpdateCheck_Perform` lost its
+      `BornSuspended` parameter. Windows CI run 43285586086 then showed what else relies on the pause revoking manual
+      work, to handle in the same change: `test_updater_transport_ownership.ahk` AHK-31 (a cancellation during owned
+      preparation) and AHK-33 (a pause inside the download START must still reject the reservation: installs stay
+      pause-sensitive, so `_Updater_TryReserveDownloadTransaction` and `_Updater_ManagedFailureOwnerIsCurrent` need the
+      request's pause generation of their own), the native update-consent fixtures
+      (`tests/fixtures/update_check_native_consent_body.ahk`, cases 1718-1720), `test_managed_terminal_failure.ahk:159`,
+      and the F-25 class loop in `test_webview_bridge_suspend_guard.ahk` that requires every message handler to read
+      `A_IsSuspended` (`_UpdateCheck_OnWebMessage`). Installs while paused stay a separate follow-up: the self-update
+      transaction stops at a pause in four places, the `updater-self-update` suspend step
+      (`_Updater_QuiesceSelfUpdateForSuspend`, `infra/lifecycle.ahk`), the staging monitor
+      (`_Updater_CancelSelfUpdateForSuspend`), the staging completion (« Update staging completion discarded while
+      suspended ») and the swap handshake (« the driver was suspended before the swap handshake completed »).
 - [ ] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
       logical key, AltGr suspended. `modules/keymap/keylayout/keylayout_emulation.ahk` `_KLE_OnAltGr`: with a Ctrl other
       than AltGr's own physically held, `_KLE_OnShortcut(Sc, "^")` (`"^+"` with Shift) instead of `_KLE_Emit`;
@@ -1365,13 +1393,16 @@ between workers) green alone. All live checks pass, typed by the harness.
       `AccentedShortcuts_Register`: add the `<^<!` and `<^<!+` prefixes (SCD-2, Ctrl+Alt+é sends Ctrl+Alt+C).
       `modules/shortcuts/utils.ahk` `AddShortcut` for a `^` slot: also `<^>!^` + scan code to the same callback, guarded by
       the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
-- [ ] **Pause and resume notices on AHK (decided by the maintainer on 2026-11-12).** After a committed pause show
+      ILD-2 and SCD-2 done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 7163ba50 and ee18e2d9: `_KLE_AltGrShortcutMods` with `_KLE_RealCtrlHeld`, the `<^<!` and `<^<!+` chords). Left: SCD-3. `AddShortcut` in `modules/shortcuts/utils.ahk` has no production caller, so the `<^>!^` registration belongs where the `ctrl_x` slots are really registered; find that registrar first, then add the hotkey guarded by `_KLE_RealCtrlHeld()` and test Ctrl+AltGr+x running the `ctrl_x` action.
+- [x] **Pause and resume notices on AHK (decided by the maintainer on 2026-11-12).** After a committed pause show
       `script_control.paused` at the warning level, after a committed resume `script_control.resumed` at the success level,
       for `[ui] notification_ttl_ms`, as macOS `publish_pause_state` and Linux `script_actions` (`PAUSE_NOTICES`) do.
-- [ ] **SAW-001 on AHK (start-at-login report, 2026-11-12).** `infra/start_at_login.ahk` `StartAtLoginToggle`: when
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, c9f84592): `NotifyPauseState` once each transition committed. TrayTip takes no duration, so `[ui] notification_ttl_ms` cannot hold the Windows balloon; the system keeps its own display time.
+- [x] **SAW-001 on AHK (start-at-login report, 2026-11-12).** `infra/start_at_login.ahk` `StartAtLoginToggle`: when
       Startup Apps keeps the new shortcut disabled, it opens `ms-settings:startupapps` and then shows « Could not change
       automatic startup ». Show `dialog.start_at_login.approval` (informational, already in the 21 locales) on that branch,
       the failure dialog on the others, as macOS does. Test in the startup suite through `NoticeFn`.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 3088850d): `StartupApprovalPending` and `_StartAtLoginReportFailure`; the test drives the report through `NoticeFn` and pins the branch in the toggle, which a test cannot reach for real (an isolated profile has no approval reader).
 - [ ] **EDD-1 on AHK (decided by the maintainer on 2026-11-12: a pause stops typing, not configuration).** Remove the
       `A_IsSuspended` page-message gates that drop or refuse a configuration write while suspended, in
       `ui/prompt_editor/init.ahk` (`_PromptEdWeb_OnWebMessage` and `_PromptEdWeb_Save`), `ui/paths_editor`,
@@ -1390,9 +1421,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       [the Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md): the writers
       (`infra/hotstrings/personal_toml_io.ahk` among them) refuse too, and the tray root rebuild is refused while
       suspended, which must change before the rows stop greying. See `docs/memory/maintainer-decisions.md`.
-- [ ] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
+      Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in [the pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md) on `claude/ergopti-todo-parity-b`.
+- [x] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.
+      Done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, cd671fd1): the identifiers codegen projects `locales` to AutoHotkey; `Identifiers.Locales.SYSTEM_FALLBACK`.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
@@ -1482,6 +1515,7 @@ between workers) green alone. All live checks pass, typed by the harness.
 ### All drivers
 
 - [ ] **Structure plan (maintainer request 2026-11-11):** [docs/design/structure-plan.md](docs/design/structure-plan.md).
+      In progress: see « Resume here » at the top (branch `claude/ergopti-todo-structure-phase2`).
       Rule A: every common value, text and logic in `_shared`. Rule B, decided by the maintainer on 2026-11-11:
       feature-first trees (`<feature>/{engine,adapters,ui,data,native}`, `core/`, `platform/`), the same on every
       driver and in `_shared`; file prefixes the folder repeats are renamed away (`keystats_walker.ahk` →

@@ -75,10 +75,12 @@ global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
 ; budget than the tiny JSON API calls above. Reusing the 30 s API value made the
 ; WinHttpRequest receive timeout abort the transfer at 30 s on slow/metered links,
 ; defeating the 600 s SetTimer poll ceiling (updater-download-receive-timeout).
-global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000  ; binary download receive
+; Both bounds come from archive_transfer of the shared updater defaults, which
+; macOS and Linux read too (generated as UpdateArchiveTransferData()).
+global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := UpdateArchiveTransferData()["archive_idle_timeout_ms"]
 ; Absolute wall-clock owner for the complete download transaction. Per-read
 ; timeouts do not stop a peer that sends one byte before every read deadline.
-global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := 1200000
+global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := UpdateArchiveTransferData()["archive_phase_timeout_ms"]
 
 ; Floor for the downloaded exe size (512 KB). A real ErgoptiPlus binary is
 ; several MB; anything below this is certainly a partial download or a CDN
@@ -2666,6 +2668,15 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset,
 		}
 		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
 	} else if (Status == 200) {
+		; A 200 that does not open JSON (a captive portal or proxy page) is no
+		; release list: answer none, so the caller reads the Atom feed and says
+		; « no connection » rather than « parse failed » (UPD-1). A body that opens
+		; JSON stays the parser's: a malformed array, or an object such as GitHub's
+		; error document, is still a malformed release response.
+		if !(Body is String) || !RegExMatch(Body, "^\x{FEFF}?\s*[\[{]") {
+			try LoggerWarn("Updater", "GitHub answered HTTP 200 without JSON for '{1}'.", Url)
+			return ""
+		}
 		Json := Body
 		if (Etag is String and Etag != ""
 			and _Updater_JsonPayloadIsUsable(Json)) {

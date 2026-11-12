@@ -1,11 +1,6 @@
 --- modules/shortcuts/key_combinations.lua
 
---- Canonical ordered pairs from two files. config.toml holds the tap and hold
---- slots and the category switch; the shared tap_hold.toml holds `[mod_combos]`
---- (the third slots, their timing, symmetry and switch), as on every driver
---- (_shared/tap_hold/SCHEMA.md). A `[mod_combos]` left in config.toml is not
---- read: the boot import moves it once. Every source receipt, guard and lease
---- check covers the bytes of both files. Runtime selection and publication
+--- Canonical config-backed ordered pairs. Runtime selection and publication
 --- retain separate exact leases; unknown/future pairs are never rewritten here.
 local Shared = require("tap_hold.key_combinations")
 local TableUtil = require("table_util")
@@ -19,7 +14,6 @@ local ModuleSource = require("module_source_identity")
 local ModuleDirectory = require("module_source_directory")
 local ConfigKeys = require("config_keys")
 local Timings = require("infra.timings")
-local NativePath = require("native_path")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
@@ -54,37 +48,6 @@ local function declared_settings()
 	return settings
 end
 local M, instance = {}, nil
-
---- Whether two chord source frames name the same exact tap_hold.toml bytes.
---- @param left table|nil `{ path, status, content }`.
---- @param right table|nil `{ path, status, content }`.
---- @return boolean
-local function same_chord_frame(left, right)
-	return type(left) == "table" and type(right) == "table" and left.path == right.path
-		and left.status == right.status and (left.status ~= "ok" or left.content == right.content)
-end
-M.same_chord_frame = same_chord_frame
-
---- The shared tap_hold.toml that holds `[mod_combos]` for a config.toml: the
---- file beside it, as infra/config_paths.lua places every configuration file
---- in one folder (the path the tap-hold manager reads).
---- @param config_path string Absolute config.toml path.
---- @return string|nil path Nil for a path without a folder.
-function M.chord_path_for(config_path)
-	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
-	if folder == nil then return nil end
-	return folder .. "/" .. require("tap_hold.shared_file").FILE_NAME
-end
-
---- Whether two complete source frames (config.toml and its chord part) match.
---- @param left table|nil `{ path, status, content, chord }`.
---- @param right table|nil `{ path, status, content, chord }`.
---- @return boolean
-function M.same_source_frame(left, right)
-	return type(left) == "table" and type(right) == "table" and left.path == right.path
-		and left.status == right.status and (left.status ~= "ok" or left.content == right.content)
-		and same_chord_frame(left.chord, right.chord)
-end
 local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
 local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
@@ -98,8 +61,6 @@ function M.new(options)
 	assert(type(options) == "table" and type(options.keys) == "table" and type(options.is_paused) == "function" and type(options.changed) == "function")
 	local files = options.files or Files
 	local route = options.route or function() return ConfigPaths.config("config.toml") end
-	-- The shared tap_hold.toml sits beside config.toml in the configuration folder.
-	local chord_route = options.chord_route or function() return M.chord_path_for(route()) end
 	local key_ids, known, holds = {}, {}, { none = true }
 	local pair = Shared.pair
 	local original_policy = rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
@@ -118,16 +79,12 @@ function M.new(options)
 	local catalogue = options.actions or require("modules.gestures.manager")
 	local owner, state, lease, generation, busy = {}, nil, nil, 0, false
 	local delivery_fence
-	local function candidate(document, strict, shapes, chord_document, chord_shapes)
+	local function candidate(document, strict, shapes)
 		assert(type(document) == "table", "decoded canonical config required")
-		assert(chord_document == nil or type(chord_document) == "table", "decoded tap_hold.toml required")
-		local function namespace_of(receipt)
-			return function(value)
-				assert(value == nil or type(value)=="table" and not (receipt and receipt.arrays[value]),"pair namespace shape refused")
-				return value or {}
-			end
+		local function namespace(value)
+			assert(value == nil or type(value)=="table" and not (shapes and shapes.arrays[value]),"pair namespace shape refused")
+			return value or {}
 		end
-		local namespace = namespace_of(shapes)
 		local shortcuts = namespace(document.shortcuts)
 		assert(shortcuts == nil or type(shortcuts) == "table", "shortcut config shape refused")
 		shortcuts = shortcuts or {}
@@ -152,10 +109,8 @@ function M.new(options)
 		-- Declared Linux absence values are read from Features, never hs_timeouts.
 		-- Without that declaration, the predecessor explicit-source contract stays
 		-- unchanged; malformed/occupied known fields never become default values.
-		-- The third slots are read from tap_hold.toml only; config.toml's copy is inert.
-		local combos = (chord_document or {})[ConfigKeys.KEY.MOD_COMBOS]
+		local combos = document.mod_combos
 		local normalized, third = pcall(function()
-			local namespace = namespace_of(chord_shapes)
 			local defaults=declared_settings()
 			if defaults then combos=namespace(combos) else assert(type(combos)=="table") end
 			local delay,symmetric=combos.simultaneous_threshold_ms,combos.symmetric
@@ -203,39 +158,21 @@ function M.new(options)
 	local function read()
 		local path = route()
 		assert(type(path) == "string" and path:sub(1,1) == "/" and not path:find("\0",1,true), "pair canonical route refused")
-		local chord_path = chord_route()
-		assert(type(chord_path) == "string" and chord_path:sub(1,1) == "/" and not chord_path:find("\0",1,true)
-			and chord_path ~= path, "chord canonical route refused")
 		local bytes, status = files.read_with_status(path)
 		assert(status == "ok" or status == "absent", "pair source unreadable")
-		local chord_bytes, chord_status = files.read_with_status(chord_path)
-		assert(chord_status == "ok" or chord_status == "absent", "chord source unreadable")
 		local document,shapes={},nil
 		if status=="ok" then document,shapes=Codec.decode_with_shapes(bytes) end
-		local chord_document,chord_shapes={},nil
-		if chord_status=="ok" then chord_document,chord_shapes=Codec.decode_with_shapes(chord_bytes) end
-		local chord = { path = chord_path, status = chord_status, content = chord_status == "ok" and chord_bytes or nil }
-		return candidate(document,false,shapes,chord_document,chord_shapes), path, bytes, status, chord
-	end
-	--- Whether tap_hold.toml still holds a frame's exact bytes at its route.
-	--- @param frame table `{ path, status, content }`.
-	--- @return boolean
-	local function chord_current(frame)
-		if type(frame) ~= "table" then return false end
-		local routed, current_path = pcall(chord_route)
-		if not routed or current_path ~= frame.path then return false end
-		local called, current, current_status = pcall(files.read_with_status, current_path)
-		return called and current_status == frame.status and (current_status ~= "ok" or current == frame.content)
+		return candidate(document,false,shapes), path, bytes, status
 	end
 	local refused = false
 	local function safe_read()
-		local ok, selected, path, bytes, status, chord = pcall(read)
+		local ok, selected, path, bytes, status = pcall(read)
 		if not ok then
 			if not refused then Logger.error("modules.shortcuts.key_combinations", "Canonical combination source refused; native admission is disabled.") end
 			refused = true; return nil
 		end
 		refused = false
-		return selected, path, bytes, status, chord
+		return selected, path, bytes, status
 	end
 	state = safe_read() or candidate({}, false)
 	function owner.has_bindings()
@@ -275,19 +212,18 @@ function M.new(options)
 		-- Only a retained delivery token can inspect the settled native frame.
 		local function permitted() return delivery_fence == nil or type(token) == "table" and delivery_fence == token end
 		if busy or lease or not permitted() then return nil end
-		local prior, path, bytes, status, chord = safe_read()
+		local prior, path, bytes, status = safe_read()
 		if not prior then return nil end
 		if prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		local captured, revision = state, generation
-		local receipt = { path = path, status = status, content = status == "ok" and bytes or nil, chord = chord }
+		local receipt = { path = path, status = status, content = status == "ok" and bytes or nil }
 		receipt.guard = function()
 			if busy or lease or not permitted() or state ~= captured or generation ~= revision then return false end
 			local routed, current_path = pcall(route)
 			if not routed or current_path ~= path then return false end
 			local called, current, current_status = pcall(files.read_with_status,path)
-			local chord_ok = chord_current(chord)
 			local final_route, final_path = pcall(route)
-			return called and current_status == status and (status ~= "ok" or current == bytes) and chord_ok
+			return called and current_status == status and (status ~= "ok" or current == bytes)
 				and final_route and final_path == path and not busy and not lease and permitted()
 				and state == captured and generation == revision
 		end
@@ -313,7 +249,7 @@ function M.new(options)
 				and source.guard() == true and rawequal(instance, owner) and state == captured and generation == revision
 		end
 		if not current() then return nil end
-		return { claims = claims, path = source.path, content = source.content, status = source.status, chord = source.chord, current = current,
+		return { claims = claims, path = source.path, content = source.content, status = source.status, current = current,
 			sealed = function() return rawequal(instance, owner) and state == captured and generation == revision
 				and not busy and lease == nil and delivery_fence == nil end }
 	end
@@ -358,13 +294,12 @@ function M.new(options)
 	end
 	function owner.capture_runtime()
 		if busy or lease or delivery_fence or not state.enabled or options.is_paused() ~= false then return nil end
-		local prior, path, bytes, status, chord = safe_read()
+		local prior, path, bytes, status = safe_read()
 		if not prior or status ~= "ok" or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		local captured, revision = state, generation
 		return function()
 			if busy or lease or delivery_fence or state ~= captured or generation ~= revision or options.is_paused() ~= false or not same_route(path) then return false end
 			local current_ok, current, current_status = pcall(files.read_with_status,path)
-			current_ok = current_ok and chord_current(chord)
 			-- Native route and pause getters may acquire a new configuration lease.
 			-- Check private currency only after every external callback has returned.
 			local pause_ok, paused = pcall(options.is_paused)
@@ -377,7 +312,7 @@ function M.new(options)
 		local pair = type(binding) == "string" and binding:match("^combination__(.+)$")
 		if busy or lease or delivery_fence or not pair or not known[pair] or state.taps[pair] ~= action
 			or not state.enabled or options.is_paused() ~= false then return nil end
-		local prior, path, bytes, status, chord = safe_read()
+		local prior, path, bytes, status = safe_read()
 		if not prior or status ~= "ok" or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps)
 			or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		local revision, captured = generation, state
@@ -385,7 +320,6 @@ function M.new(options)
 			if busy or lease or delivery_fence or state ~= captured or generation ~= revision or not state.enabled
 				or options.is_paused() ~= false or state.taps[pair] ~= action or not same_route(path) then return false end
 			local current_ok, current, current_status = pcall(files.read_with_status,path)
-			current_ok = current_ok and chord_current(chord)
 			local pause_ok, paused = pcall(options.is_paused)
 			local routed = same_route(path)
 			return current_ok and current_status == "ok" and current == bytes and pause_ok and paused == false and routed
@@ -454,12 +388,12 @@ function M.new(options)
 	function owner.configuration_source(token)
 		if token ~= lease or busy then return nil end
 		local captured, revision = state, generation
-		local prior, path, bytes, status, chord = safe_read()
+		local prior, path, bytes, status = safe_read()
 		local routed, current_path = pcall(route)
 		if not prior or not routed or current_path ~= path
 			or token ~= lease or busy or state ~= captured or generation ~= revision
 			or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
-		return {path=path,status=status,content=status == "ok" and bytes or nil,chord=chord}
+		return {path=path,status=status,content=status == "ok" and bytes or nil}
 	end
 	--- Checks source identity after external native callbacks without requiring
 	--- the candidate state to equal the previous unpublished runtime snapshot.
@@ -468,11 +402,10 @@ function M.new(options)
 	function owner.configuration_source_matches(token, source)
 		if token ~= lease or busy or type(source) ~= "table" then return false end
 		local captured, revision = state, generation
-		local prior, path, bytes, status, chord = safe_read()
+		local prior, path, bytes, status = safe_read()
 		local routed, current_path = pcall(route)
 		return prior ~= nil and routed and current_path == path
 			and path == source.path and status == source.status and (status ~= "ok" or bytes == source.content)
-			and same_chord_frame(chord, source.chord)
 			and token == lease and not busy and state == captured and generation == revision
 	end
 	function owner.configuration_snapshot(token)
@@ -481,23 +414,16 @@ function M.new(options)
 		if state.chords then snapshot.chords, snapshot.chord_settings, snapshot.chord_enabled = clone(state.chords), clone(state.chord_settings), state.chord_enabled end
 		return snapshot
 	end
-	--- Resolves this owner's view of a candidate pair of documents.
-	--- @param document table Decoded config.toml candidate.
-	--- @param strict boolean|nil True for a scope's own post-write candidate.
-	--- @param chord_document table|nil Decoded tap_hold.toml candidate.
-	function owner.configuration_candidate(document, strict, chord_document)
-		return candidate(document,strict,nil,chord_document)
-	end
+	function owner.configuration_candidate(document, strict) return candidate(document,strict) end
 	function owner.apply_configuration(token, selected)
 		if lease ~= token or busy or type(selected) ~= "table" then return false end
 		local document = {shortcuts={key_combination_taps=selected.taps,key_combination_holds=selected.holds}, category_enabled={key_combinations=selected.enabled}}
-		local chord_document = {}
 		if selected.chords then
 			local configured = {}; for pair, action in pairs(selected.chords) do configured[pair] = {combo=action} end
-			chord_document[ConfigKeys.KEY.MOD_COMBOS] = { config=configured, enabled=selected.chord_enabled,
+			document.mod_combos = { config=configured, enabled=selected.chord_enabled,
 				symmetric=selected.chord_settings.combo_symmetric, simultaneous_threshold_ms=selected.chord_settings.simultaneous_threshold_ms }
 		end
-		local copy = candidate(document,true,nil,chord_document)
+		local copy = candidate(document,true)
 		state, generation, busy = copy, generation + 1, true
 		local ok, installed = pcall(options.changed)
 		busy = false

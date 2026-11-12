@@ -16,14 +16,14 @@ local Config = helpers.load_module("platform.remap.tap_hold_loader")
 
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 
---- Loads the defaults with a user file holding `text`.
+--- Loads the defaults with a user file holding `text`, its switch and timings
+--- in the config.toml beside it (tests/support/tap_hold_fixture.lua).
 local function load(text)
 	local path = os.tmpname()
-	local fh = assert(io.open(path, "w"))
-	fh:write(require("tests.support.tap_hold_fixture").with_preset(text))
-	fh:close()
-	local loaded = Config.load(DEFAULTS, path)
+	local config_path = require("tests.support.tap_hold_fixture").write(path, text)
+	local loaded = Config.load(DEFAULTS, path, config_path)
 	os.remove(path)
+	os.remove(config_path)
 	return loaded
 end
 
@@ -97,8 +97,15 @@ assert(result.enabled == false and next(result.keys) == nil)
 		helpers.assert_nil(next(loaded.keys), "Disable all leaves no tap-hold")
 	end)
 
-	helpers.it("reads the feature switch", function()
+	helpers.it("reads the feature switch from config.toml", function()
 		helpers.assert_true(not load('[tap_hold]\nenabled = false\n').enabled)
+		helpers.assert_true(load('[tap_hold]\nenabled = true\n').enabled)
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n")
+		fh:close()
+		helpers.assert_eq(Config.load(DEFAULTS, path).enabled, false, "a switch left in tap_hold.toml is never read")
+		os.remove(path)
 	end)
 
 	helpers.it("falls back to the global delay for a threshold out of range", function()
@@ -193,7 +200,9 @@ assert(result.enabled == false and next(result.keys) == nil)
 	helpers.it("reports a malformed user file and keeps every key neutral", function()
 		local loaded = load('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.user_error, "malformed")
-		helpers.assert_eq(loaded.enabled, false)
+		-- The switch is the config.toml row (on in this fixture), which reads
+		-- fine; the malformed tap_hold.toml leaves every key neutral.
+		helpers.assert_eq(loaded.enabled, true)
 		helpers.assert_nil(next(loaded.keys))
 	end)
 
@@ -331,8 +340,18 @@ helpers.describe("tap-hold config: the wizard's report of a folder", function()
 		local fh = assert(io.open(path, "w"))
 		fh:write(text)
 		fh:close()
-		local result, err = Config.key_report(DEFAULTS, path)
+		local tap_text = text:gsub("%[tap_hold%]\nenabled = %a+\n", "[tap_hold]\n")
+		fh = assert(io.open(path, "w"))
+		fh:write(tap_text)
+		fh:close()
+		local config_path = path .. ".config.toml"
+		local switch = text:match("%[tap_hold%]\nenabled = (%a+)\n")
+		fh = assert(io.open(config_path, "w"))
+		fh:write(switch and ("[tap_holds]\nenabled = " .. switch .. "\n") or "")
+		fh:close()
+		local result, err = Config.key_report(DEFAULTS, path, config_path)
 		os.remove(path)
+		os.remove(config_path)
 		return result, err
 	end
 

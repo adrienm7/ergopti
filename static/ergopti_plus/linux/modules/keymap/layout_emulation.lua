@@ -313,7 +313,14 @@ function M.on_key(detail)
 		local held = {}
 		for id in pairs(engine_held(mods)) do if id ~= "caps_lock" then held[#held + 1] = id end end
 		table.sort(held)
-		return _deps.emit_key(code, held) == true
+		if _deps.emit_key(code, held) ~= true then return false end
+		-- Each auto-repeat presses the key again under the held modifier, as the
+		-- OS repeats a key held with a real one (ILL-004, ILX-002).
+		local pressed = detail.code
+		return true, function(repeat_detail)
+			if type(repeat_detail) ~= "table" or repeat_detail.code ~= pressed or _session ~= session then return false end
+			return M.on_key(repeat_detail) == true
+		end
 	end
 	if decision == Emulation.SHORTCUT then
 		if _deps.emit_shortcut(text, detail.code, mods) == true then
@@ -340,6 +347,20 @@ function M.on_key(detail)
 	end
 end
 
+
+--- The character a Ctrl, Alt or Super chord on this key sends while the
+--- emulation runs, without typing anything: the keyboard shortcut slots match
+--- it, as Windows registers a slot on the key that types its letter (ILX-001).
+--- @param detail table Keyboard hook press detail.
+--- @return string|nil char nil when the chord keeps the system layout's key.
+function M.chord_key(detail)
+	local session = _session
+	if session == nil or type(detail) ~= "table" or _deps.is_active() ~= true then return nil end
+	local code = _evdev_to_code[detail.code]
+	if code == nil then return nil end
+	local mods = merged_mods(type(detail.mods) == "table" and detail.mods or {})
+	return (Emulation.chord_char(session, code, mods.ctrl == true, mods.alt == true, mods.meta == true))
+end
 
 
 

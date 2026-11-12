@@ -47,7 +47,19 @@
 ; misplaced decimal point) rather than an intent, and the value is concatenated
 ; straight into a KeyWait timeout — so anything past it is rejected at the
 ; loader boundary instead of stalling a hotkey thread for minutes.
+; Declared here for the headless suites; the boot sets it from the timing
+; registry's tap_hold.max_activation_ms (TapHoldsLoadTimings), the bound macOS and
+; Linux read too, and the same 10 s.
 global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
+; The modifiers of the shared file that no Windows key holds (cmd, fn): the
+; names of _shared/tap_hold/shared_file.toml [modifiers] order that the hold
+; picker does not offer. A file carrying them keeps them; this driver warns once
+; and holds nothing. Read at this include position, like the aliases below.
+global TAPHOLD_MACOS_MODIFIERS := _TapHoldReadMacOnlyModifiers()
+; The PC key at the place of each Mac thumb key (maintainer decision TCL-004,
+; « follow the position »): _shared/tap_hold/shared_file.toml [thumb_positions],
+; read at this include position like the tables around it.
+global TAPHOLD_THUMB_POSITIONS := _TapHoldReadThumbPositions()
 ; The other spellings of a hold modifier (altgr, lctrl...), read here, at this
 ; file's include position, and never from a #HotIf: those are live before the
 ; auto-execute section runs, during Bundle_Init's message-pumping RunWait, and
@@ -226,12 +238,22 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 	}
 	if (MigrateWith != "")
 		TapHoldMigrationReadAsCurrent(Document, MigrateWith)
+	; The user file is shared by every OS (_shared/tap_hold/SCHEMA.md): [karabiner]
+	; is macOS's own and is left alone; a manifest row an older macOS or Linux
+	; build kept here lives in config.toml now and is not read from this file.
+	if (MigrateWith != "") && Document.Has(ConfigLeaf.MOD_COMBOS)
+		_TapHoldReportConfigOwned(FilePath, ConfigLeaf.MOD_COMBOS)
 	if !Document.Has("tap_hold")
 		return
 	Root := Document["tap_hold"]
 	if !(Root is Map) {
 		try LoggerError("TapHoldLoader", "The tap_hold source namespace must be a table.")
 		return
+	}
+	if (MigrateWith != "") {
+		for Field in TapHoldConfigOwnedFields()
+			if Root.Has(Field)
+				_TapHoldReportConfigOwned(FilePath, "tap_hold." . Field)
 	}
 	if Root.Has("inherit_defaults") {
 		if Root["inherit_defaults"] is TOML_Bool
@@ -255,10 +277,15 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 		return
 	}
 	InvalidKeys := Map()
-	for KeyId, Entry in Root["keys"] {
-		if !(KeyId is String) || !RegExMatch(KeyId, "^[A-Za-z0-9_]+$")
+	for FileKeyId, Entry in Root["keys"] {
+		if !(FileKeyId is String) || !RegExMatch(FileKeyId, "^[A-Za-z0-9_]+$")
 			continue
-		CurrentPath := "tap_hold.keys." . KeyId
+		CurrentPath := "tap_hold.keys." . FileKeyId
+		; A Mac thumb key is the PC key at its place (TCL-004); "" when the file
+		; names that key too, which wins.
+		KeyId := _TapHoldPositionalKey(FileKeyId, Root["keys"])
+		if (KeyId == "")
+			continue
 		if !(Entry is Map) {
 			try LoggerError("TapHoldLoader", "Field '[{1}]' must be a key table; key disabled.", CurrentPath)
 			InvalidKeys[KeyId] := true
@@ -266,7 +293,7 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 		}
 		for Key, Typed in Entry {
 			LiteralKind := _TOML_ValueKind(Typed)
-			if LiteralKind == "string" && !_TapHold_FieldStringIsQuoted(Records, KeyId, Key)
+			if LiteralKind == "string" && !_TapHold_FieldStringIsQuoted(Records, FileKeyId, Key)
 				LiteralKind := "unknown"
 			Value := _ConfigTomlNativeValue(Typed)
 			ExpectedKind := TapHoldFieldKinds().Get(Key, "")
@@ -277,7 +304,8 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 			; still disables its key below (AHK-134).
 			if (ExpectedKind == "") {
 				ConfigOutdatedReportInFile(FilePath, CurrentPath . "." . Key,
-					"no tap-hold key has this field",
+					Key == "hold_action" ? "a macOS hold action; the key keeps its tap and holds nothing here"
+						: "no tap-hold key has this field",
 					(Message, Args*) => LoggerWarn("TapHoldLoader", Message, Args*))
 				continue
 			}
@@ -317,7 +345,14 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 			; to hold and swallowed the key, tap included. Refuse it here, as the
 			; Linux loader does: the entry holds the picker's "none" and keeps its
 			; tap, and the user's choice still replaces a default hold.
-			if (Key == "hold_modifier" and Value != "" and !_TapHoldHoldModifierIsKnown(Value)) {
+			if (Key == "hold_modifier" and Value != "" and _TapHoldHoldModifierIsMacOnly(Value)) {
+				; A Cmd or Fn hold written on macOS: the shared file is right, this
+				; keyboard has no such modifier. Warned once; the tap stays.
+				ConfigOutdatedReportInFile(FilePath, CurrentPath . "." . Key,
+					"'" . Value . "' holds a macOS modifier; the key keeps its tap and holds nothing here",
+					(Message, Args*) => LoggerWarn("TapHoldLoader", Message, Args*))
+				Value := ""
+			} else if (Key == "hold_modifier" and Value != "" and !_TapHoldHoldModifierIsKnown(Value)) {
 				try LoggerError("TapHoldLoader",
 					"Unknown hold_modifier '{1}' for tap-hold key '{2}' in [tap_hold.keys.{2}]; its hold is dropped and its tap kept (expected ctrl, shift, alt, alt_gr or win, or an alias of the hold picker).",
 					Value, KeyId)
@@ -780,6 +815,93 @@ TapHoldOneShotEndKeys(MagicKey) {
 	for Char in _TapHoldOneShotTable()["results"]
 		Keys .= Char
 	return Keys . MagicKey
+}
+
+; The [tap_hold] fields an older macOS or Linux build kept in tap_hold.toml and
+; config.toml holds since schema v22 (_shared/core/config_schema/migrations.toml):
+; Windows always read them from config.toml [tap_holds].
+TapHoldConfigOwnedFields() {
+	static Fields := ["enabled", ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS, ConfigLeaf.STICKY_TIMEOUT_MS]
+	return Fields
+}
+
+; Warns once that a leaf of the shared tap_hold.toml is kept in config.toml.
+_TapHoldReportConfigOwned(FilePath, EntryPath) {
+	ConfigOutdatedReportInFile(FilePath, EntryPath,
+		"kept in config.toml since schema v22; this copy is not read",
+		(Message, Args*) => LoggerWarn("TapHoldLoader", Message, Args*))
+}
+
+; The Mac thumb keys of the shared file and the PC key at the place of each.
+; @returns {Map} Mac catalogue id -> PC catalogue id.
+_TapHoldReadThumbPositions() {
+	global _SharedDir
+	Spec := ParseTomlFile(_SharedDir . "\tap_hold\shared_file.toml")
+	Positions := Spec.Get("thumb_positions", "")
+	Out := Map()
+	if !(Positions is Map) {
+		try LoggerError("TapHoldLoader", "'shared_file.toml' declares no [thumb_positions] — a Mac thumb key is not read.")
+		return Out
+	}
+	for MacId, PcId in Positions
+		Out[MacId] := PcId
+	return Out
+}
+
+; The key a shared-file entry configures here: a Mac thumb id is the PC key at
+; its place unless the file names that key too, which wins ("" then).
+; @param FileKeyId {String} The entry's id in the file.
+; @param Keys {Map} Every entry of [tap_hold.keys].
+; @returns {String} The key id, or "" when the entry is superseded.
+_TapHoldPositionalKey(FileKeyId, Keys) {
+	global TAPHOLD_THUMB_POSITIONS
+	if !TAPHOLD_THUMB_POSITIONS.Has(FileKeyId)
+		return FileKeyId
+	Positional := TAPHOLD_THUMB_POSITIONS[FileKeyId]
+	return Keys.Has(Positional) ? "" : Positional
+}
+
+; The shared modifier names the hold picker does not offer, lower case.
+; @returns {Map} Name -> true.
+_TapHoldReadMacOnlyModifiers() {
+	global _SharedDir
+	Spec := ParseTomlFile(_SharedDir . "\tap_hold\shared_file.toml")
+	Order := Spec.Has("modifiers") ? Spec["modifiers"].Get("order", "") : ""
+	Names := Map()
+	if !(Order is Array) {
+		try LoggerError("TapHoldLoader", "'shared_file.toml' declares no [modifiers] order — a macOS hold is refused as unknown.")
+		return Names
+	}
+	; Read here, not through the writer's picker reader: this runs at the
+	; loader's include position, where tap_hold_writer.ahk may not be included.
+	Picker := ParseTomlFile(_SharedDir . "\tap_hold\defaults.toml").Get("tap_hold.hold_picker", Map())
+	Modifiers := (Picker is Map) ? Picker.Get("modifiers", "") : ""
+	if !(Modifiers is Array) {
+		try LoggerError("TapHoldLoader", "'defaults.toml' declares no [tap_hold.hold_picker] modifiers — a macOS hold is refused as unknown.")
+		return Names
+	}
+	Offered := Map()
+	for _, Id in Modifiers
+		Offered[Id] := true
+	for _, Name in Order {
+		if !Offered.Has(Name)
+			Names[StrLower(Name)] := true
+	}
+	return Names
+}
+
+; Whether a hold_modifier names only modifiers macOS has and this keyboard has
+; not, and at least one of them.
+_TapHoldHoldModifierIsMacOnly(ModifierValue) {
+	global TAPHOLD_MACOS_MODIFIERS
+	Parts := _TapHoldHoldModifierParts(ModifierValue, &Invalid)
+	if (Invalid.Length == 0)
+		return false
+	for _, Token in Invalid {
+		if !TAPHOLD_MACOS_MODIFIERS.Has(StrLower(Trim(Token)))
+			return false
+	}
+	return true
 }
 
 /** Returns the per-key fields consumed by the tap-hold loader and preset owner. */

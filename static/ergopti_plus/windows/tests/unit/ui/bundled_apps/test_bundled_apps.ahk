@@ -227,6 +227,26 @@ _BAT_VsCodeAndFirefoxPlans() {
 }
 Test("(bundled-apps-cloner-plan) shares VS Code settings and gives Firefox its own profile", _BAT_VsCodeAndFirefoxPlans)
 
+; BAP-004 (maintainer decision, 2026-11-12): VSCodium and the Insiders build keep
+; their own settings and extensions, read from the catalogue's user_folders per
+; executable, as macOS and Linux do.
+_BAT_VsCodeVariantFolders() {
+	for Row in [
+			["C:\Codium\VSCodium.exe", "VSCodium", ".vscode-oss"],
+			["C:\Codium\codium.exe", "VSCodium", ".vscode-oss"],
+			["C:\Insiders\Code - Insiders.exe", "Code - Insiders", ".vscode-insiders"],
+			["C:\Code\Code.exe", "Code", ".vscode"]] {
+		Plan := AppCloner_Plan(_BAT_Request(Row[1]))
+		AssertEqual("vscode", Plan["family"], Row[1] . " is a VS Code family program")
+		AssertContains(Plan["arguments"], "--extensions-dir=C:\Users\u\" . Row[3] . "\extensions")
+		AssertEqual("C:\Users\u\AppData\Roaming\" . Row[2] . "\User", Plan["links"][1]["target"],
+			Row[1] . " links its own settings")
+	}
+	Oss := AppCloner_Plan(_BAT_Request("C:\Codium\VSCodium.exe"))
+	AssertFalse(InStr(Oss["arguments"], "\.vscode\extensions") > 0, "VSCodium never reads VS Code's extensions")
+}
+Test("(bundled-apps-cloner-plan) gives VSCodium and Insiders their own folders (bap-004-vscode-variants)", _BAT_VsCodeVariantFolders)
+
 _BAT_NativeAndTaken() {
 	Native := AppCloner_Plan(_BAT_Request("C:\Windows\notepad.exe", Map("has_marker", (P, M) => false)))
 	AssertEqual("native", Native["family"])
@@ -263,6 +283,35 @@ _BAT_ClonerFlow() {
 	AssertContains(State["written"]["arguments"], "https://example.com")
 }
 Test("(bundled-apps-cloner-flow) reads the shortcut, refuses a missing path and writes the clone", _BAT_ClonerFlow)
+
+; The item to open follows macOS validateOpenArg and the Linux invalid_open_item
+; (maintainer decision, 2026-11-12): « ~ » is the profile folder, and a URL needs
+; « :// » or a Teams link, so « https:/x » and « localhost:3000 » are refused.
+_BAT_OpenItemValidation() {
+	Exists := (Path) => (Path == "C:\H" || Path == "C:\H\Docs")
+	for Row in [
+			["https://example.com", [], "https://example.com"],
+			["msteams:/l/meetup-join/x", [], "msteams:/l/meetup-join/x"],
+			["msteams:/calendar", [], "msteams:/calendar"],
+			["~", [], "C:\H"],
+			["~\Docs", [], "C:\H\Docs"],
+			["~/Docs", [], "C:\H\Docs"],
+			["C:\H\Docs", [], "C:\H\Docs"],
+			["~\Missing", ["apps.cloner.err_path_missing", "~\Missing"], ""],
+			["https:/x", ["apps.cloner.err_url_format", ""], ""],
+			["localhost:3000", ["apps.cloner.err_url_format", ""], ""],
+			["msteams:/other", ["apps.cloner.err_url_format", ""], ""]] {
+		Invalid := _AppCloner_InvalidOpenItem(Row[1], Exists, "C:\H", &Resolved)
+		AssertEqual(Row[2].Length, Invalid.Length, "verdict for '" . Row[1] . "'")
+		if Row[2].Length {
+			AssertEqual(Row[2][1], Invalid[1], "error key for '" . Row[1] . "'")
+			AssertEqual(Row[2][2], Invalid[2], "error value for '" . Row[1] . "'")
+		} else {
+			AssertEqual(Row[3], Resolved, "item to open for '" . Row[1] . "'")
+		}
+	}
+}
+Test("(bundled-apps-cloner-open-item) expands ~ and refuses an item without :// as macOS and Linux", _BAT_OpenItemValidation)
 
 
 

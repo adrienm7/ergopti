@@ -1022,6 +1022,10 @@ local function main()
 			path          = require("infra.config_paths").config("config.toml"),
 			driver        = "linux",
 			registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+			-- The v22 step moves the switch, the timings and [mod_combos] out of the
+			-- tap_hold.toml beside config.toml, once (maintainer decision 2026-11-11).
+			companions    = { [require("tap_hold.shared_file").FILE_NAME] =
+				require("infra.config_paths").config(require("tap_hold.shared_file").FILE_NAME) },
 		})
 		-- A newer file stays read-only for the session: tell the user why their
 		-- changes do not stick. Block-local, as main() is near the upvalue limit.
@@ -1207,9 +1211,6 @@ local function main()
 	-- tap_hold.toml is versioned like config.toml: migrated before the engine reads it.
 	require("platform.remap.tap_hold_writer").migrate_file(
 		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
-	-- Then the key combinations config.toml kept until 1.0.9 move into it, once.
-	require("platform.remap.tap_hold_writer").import_config_combos(require("infra.config_paths").config("config.toml"),
-		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
 	local TapHold = require("platform.remap.tap_hold_manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
@@ -1259,6 +1260,8 @@ local function main()
 		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
+		-- The switch and the timings are config.toml rows on every OS.
+		config_path = require("infra.config_paths").config("config.toml"),
 	})
 	end)
 	if not privacy_owners.tap_hold_called or privacy_owners.tap_hold_initialized ~= true then
@@ -1291,6 +1294,7 @@ local function main()
 	-- configuration folder's layers.toml when it has none.
 	require("platform.remap.tap_hold_writer").init({
 		path = TapHold.user_path(),
+		config_path = TapHold.config_path(),
 		reload = TapHold.reload,
 		is_tap_action = TapHold.is_tap_action,
 		canonical_hold = TapHold.canonical_hold,
@@ -2473,7 +2477,11 @@ local function main()
 		dry_run = opts.dry_run == true,
 	})
 
-	local function on_click()
+	local function on_click(code)
+		-- A physical button press ends a gesture's click hold, as Windows' mouse
+		-- down subscribers do (GSX-001). A finger landing on the touchpad is no
+		-- button: it is how the held button drags.
+		if gestures and InputEvent.is_pointer_button(code) then gestures.release_clicks_on_activity() end
 		keystats.discard_roi()
 		TapHold.observe_copy_activity()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
@@ -2652,6 +2660,15 @@ local function main()
 	-- action included (SCD-1); the AltGr script chords are their own consumer.
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+		-- Under an emulated layout a slot follows the emulated letter, as on
+		-- Windows: Ctrl on the key typing « a » is the ctrl+a slot (ILX-001).
+		local emulated_key = require("modules.keymap.layout_emulation").chord_key(detail)
+		if emulated_key then
+			local offered = {}
+			for field, value in pairs(detail) do offered[field] = value end
+			offered.key = emulated_key
+			detail = offered
+		end
 		local consumed = keyboard_shortcuts.consume(detail, {
 			pause_epoch = script_actions.pause_epoch,
 			only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
