@@ -37,6 +37,11 @@ local function with_file(original, body)
 		local native_read, native_write = files.read_with_status, files.write_if_unchanged
 		local controls = { writes = 0 }
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The config.toml beside it takes the manifest's tap-hold rows (schema v22).
+			if destination == require("tests.support.tap_hold_file_text").config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				return native_write(destination, content, expected)
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = controls.expected or original })

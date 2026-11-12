@@ -22,6 +22,46 @@ package.loaded["infra.toml.codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("platform.remap.config")
 
+-- The manifest's tap-hold rows live in the config.toml beside tap_hold.toml
+-- (config schema v22). A test hands that file's text here; nil reads it as
+-- absent, never the runner's real /tmp file.
+local config_text = nil
+do
+	local files = package.loaded["adapters.file_system"]
+	local native_read = files.read_with_status
+	files.read_with_status = function(path, ...)
+		if type(path) == "string" and path:match("config%.toml$") then
+			if config_text ~= nil then return config_text, "ok" end
+			return nil, "absent"
+		end
+		return native_read(path, ...)
+	end
+end
+
+--- The config.toml rows a save would publish, captured before any write.
+--- @param state table State to persist.
+--- @return table rows `{ section, key, value? , delete? }`.
+local function saved_config_rows(state)
+	local writer = require("toml_codec.writer")
+	local original_prepare = writer.prepare_batch
+	local captured = {}
+	writer.prepare_batch = function(_, updates)
+		captured = updates
+		return false, "stop before the disk write"
+	end
+	pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", true)
+	writer.prepare_batch = original_prepare
+	return captured
+end
+
+--- The value a row list writes at one config.toml leaf, nil when absent.
+local function row_value(rows, section, key)
+	for _, row in ipairs(rows) do
+		if row.section == section and row.key == key and not row.delete then return row.value end
+	end
+	return nil
+end
+
 
 helpers.describe("Config.load_available_actions: shared modifier chords", function()
 	helpers.it("adds all macOS modifier combinations named from the key name table", function()
@@ -287,29 +327,20 @@ end)
 
 helpers.describe("Config: the Tap-Holds feature switch", function()
 	helpers.it("persists explicit activation and reads absence as neutral", function()
-		local codec = package.loaded["infra.toml.codec"]
-		local encoded = nil
-		local original_encode = codec.encode
-		codec.encode = function(value)
-			encoded = value
-			error("stop before the disk write")
-		end
 		local state = Config.build_default_state({}, {})
 		helpers.assert_eq(state.tap_holds_enabled, false, "a fresh install leaves Tap-Holds off")
 		state.tap_holds_enabled = true
-		pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", merge_existing ~= true)
-		codec.encode = original_encode
-		helpers.assert_eq(encoded.tap_hold.enabled, true)
+		helpers.assert_eq(row_value(saved_config_rows(state), "tap_holds", "enabled"), true,
+			"the switch is a config.toml [tap_holds] row")
 
 		local original_load = Config._load_toml_file
 		for _, case in ipairs({ { stored = false, expected = false }, { stored = true, expected = true }, { expected = false } }) do
 			Config._load_toml_file = function()
-				return {
-					tap_holds = { enabled = case.stored, config = { escape = { tap = "escape", hold = "ctrl" } } },
-					mod_combos = { config = {} },
-				}
+				return { tap_holds = { config = { escape = { tap = "escape", hold = "ctrl" } } }, mod_combos = { config = {} } }
 			end
+			config_text = case.stored == nil and "" or ("[tap_holds]" .. string.char(10) .. "enabled = " .. tostring(case.stored) .. string.char(10))
 			local loaded = Config.load_user_config({ { id = "escape" } }, {}, "/tmp/tap_hold.toml")
+			config_text = nil
 			helpers.assert_eq(loaded.tap_holds_enabled, case.expected)
 			helpers.assert_eq(loaded.tap_hold_config.escape.hold, "ctrl",
 				"the assignments load unchanged whatever the switch")
@@ -323,31 +354,21 @@ end)
 -- neutral value (on); an explicit one is kept as written.
 helpers.describe("Config: the key-combinations switch", function()
 	helpers.it("persists [mod_combos] enabled when set and leaves it absent otherwise", function()
-		local codec = package.loaded["infra.toml.codec"]
-		local original_encode = codec.encode
-		local encoded = nil
-		codec.encode = function(value)
-			encoded = value
-			error("stop before the disk write")
-		end
 		local state = Config.build_default_state({}, {})
 		helpers.assert_nil(state.mod_combos_enabled, "a fresh install leaves the switch absent")
-		pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", true)
-		helpers.assert_nil(encoded.mod_combos.enabled, "an inherited switch is not written")
+		helpers.assert_nil(row_value(saved_config_rows(state), "mod_combos", "enabled"), "an inherited switch is not written")
 		state.mod_combos_enabled = false
-		pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", true)
-		codec.encode = original_encode
-		helpers.assert_eq(encoded.mod_combos.enabled, false)
+		helpers.assert_eq(row_value(saved_config_rows(state), "mod_combos", "enabled"), false,
+			"the switch is a config.toml [mod_combos] row")
 
 		local original_load = Config._load_toml_file
 		for _, case in ipairs({ { stored = false }, { stored = true }, {} }) do
 			Config._load_toml_file = function()
-				return {
-					tap_holds = { enabled = true, config = {} },
-					mod_combos = { enabled = case.stored, config = {} },
-				}
+				return { tap_holds = { config = {} } }
 			end
+			config_text = case.stored == nil and "" or ("[mod_combos]" .. string.char(10) .. "enabled = " .. tostring(case.stored) .. string.char(10))
 			local loaded = Config.load_user_config({}, {}, "/tmp/tap_hold.toml")
+			config_text = nil
 			helpers.assert_eq(loaded.mod_combos_enabled, case.stored)
 		end
 		Config._load_toml_file = original_load
@@ -427,7 +448,7 @@ helpers.describe("Config.load_user_config — new tap/hold key seeding (karabine
 			{ id = "caps_lock", label = "Caps" },  -- new key not in the saved config
 		}
 
-		local state = Config.load_user_config(tap_hold_keys, {}, "/fake/path.toml")
+		local state = Config.load_user_config(tap_hold_keys, {}, "/tmp/tap_hold.toml")
 
 		-- Restore original function
 		Config._load_toml_file = original_load
@@ -466,7 +487,7 @@ helpers.describe("Config.load_user_config — new tap/hold key seeding (karabine
 			}
 		end
 
-		local state = Config.load_user_config({ { id = "escape", label = "Esc" } }, {}, "/fake/path.toml")
+		local state = Config.load_user_config({ { id = "escape", label = "Esc" } }, {}, "/tmp/tap_hold.toml")
 		Config._load_toml_file = original_load
 
 		helpers.assert_eq(state.tap_hold_config.escape.timeout_ms, 333,

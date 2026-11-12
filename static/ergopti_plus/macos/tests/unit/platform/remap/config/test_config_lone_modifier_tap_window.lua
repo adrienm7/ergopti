@@ -47,6 +47,12 @@ local function with_file(original, body)
 		-- The source fence is the writer's; this fixture records the exact
 		-- candidate it would publish over the unchanged current source.
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The config.toml beside it takes the manifest's tap-hold rows (schema v22).
+			if destination == require("tests.support.tap_hold_file_text").config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				local handle = assert(io.open(destination, "wb")); assert(handle:write(content)); assert(handle:close())
+				return true
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = read() })

@@ -163,7 +163,10 @@ helpers.describe("Config.save_user_config — corrupt file is not overwritten (k
 		local original_read = FileSystem.read_with_status
 		local original_write_if_unchanged = FileSystem.write_if_unchanged
 		local reads = 0
+		-- The config.toml beside it holds no tap-hold row here (config schema v22).
+		local config_path = Config.config_toml_path_for(path)
 		FileSystem.read_with_status = function(candidate)
+			if candidate == config_path then return nil, "absent" end
 			reads = reads + 1
 			return original, "ok"
 		end
@@ -250,11 +253,15 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local original_read = FileSystem.read_with_status
 		local reads = 0
 		local original_write = FileSystem.write_if_unchanged
+		-- The one-shot timeout is a config.toml row beside it (config schema v22).
+		local config_path, config_payload = Config.config_toml_path_for(path), nil
 		FileSystem.read_with_status = function(candidate)
+			if candidate == config_path then return nil, "absent" end
 			reads = reads + 1
 			return valid, "ok"
 		end
 		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
+			if candidate == config_path then config_payload = content; return true end
 			write_assertion = candidate == path
 				and type(expected_source) == "table"
 				and expected_source.status == "ok"
@@ -276,7 +283,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			"the writer must revalidate the exact classified bytes before publication")
 		helpers.assert_true(payload ~= nil,
 			"a valid config must still be re-encoded and written — the guard must not block healthy saves")
-		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
+		helpers.assert_true(type(config_payload) == "string" and config_payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
 			"the produced payload must carry the new state: got " .. helpers.inspect(payload))
 		helpers.assert_true(logged:find("Refusing to overwrite") == nil,
 			"a decodable config must never trigger the corruption refusal")
@@ -292,7 +299,10 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local write_assertion
 		local publication_source
 		local original_write = FileSystem.write_if_unchanged
+		-- The one-shot timeout is a config.toml row beside it (config schema v22).
+		local config_path, config_payload = Config.config_toml_path_for(path), nil
 		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
+			if candidate == config_path then config_payload = content; return true end
 			write_assertion = candidate == path
 			publication_source = expected_source
 			payload = content
@@ -301,6 +311,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local saved = Config.save_user_config(make_state(), path, true)
 		FileSystem.write_if_unchanged = original_write
 		cleanup(path)
+		os.remove(config_path)
 
 		helpers.assert_eq(saved, true)
 		helpers.assert_true(write_assertion,
@@ -309,7 +320,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			"repair authority must retain the exact malformed-source publication fence")
 		helpers.assert_true(payload ~= nil,
 			"the explicit reset must be allowed to overwrite an unparseable config")
-		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
+		helpers.assert_true(type(config_payload) == "string" and config_payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
 			"the reset must publish the supplied state, not the corrupt bytes")
 	end)
 

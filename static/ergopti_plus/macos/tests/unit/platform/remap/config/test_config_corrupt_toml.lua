@@ -148,7 +148,8 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 			return nil  -- absent, not corrupt
 		end
 
-		local state, status = Config.load_user_config({}, {}, "/fake/first_launch.toml")
+		-- A real folder: the config.toml beside it (its tap-hold rows) is read too.
+		local state, status = Config.load_user_config({}, {}, os.tmpname() .. "_first_launch.toml")
 		Config._load_toml_file = orig_load
 
 		helpers.assert_true(type(state) == "table")

@@ -37,6 +37,11 @@ local function with_file(original, body)
 		local native_read, native_write = files.read_with_status, files.write_if_unchanged
 		local controls = { writes = 0 }
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The config.toml beside it takes the manifest's tap-hold rows (schema v22).
+			if destination == require("tests.support.tap_hold_file_text").config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				return native_write(destination, content, expected)
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = controls.expected or original })
@@ -46,7 +51,7 @@ local function with_file(original, body)
 		local function load()
 			return config.load_user_config({ { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } }, path)
 		end
-		local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
+		local ok, err = pcall(body, { config = config, files = files, path = path, config_path = Text.config_path(path), warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
 			decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original, native_read = native_read })
 		files.read_with_status, files.write_if_unchanged = native_read, native_write
@@ -55,11 +60,13 @@ local function with_file(original, body)
 	end)
 end
 
---- Where the shared tap_hold.toml keeps a model leaf: `[tap_holds]` is `[tap_hold]`.
+--- Where a model leaf is warned about: both Boolean leaves of this file are
+--- config.toml rows since schema v22 (`[tap_holds] enabled`, `[mod_combos]
+--- symmetric`), named as config.toml spells them.
 --- @param leaf table `{ section, key }` in the Karabiner model.
 --- @return string
 local function file_leaf(leaf)
-	return (leaf.section == "tap_holds" and "tap_hold" or leaf.section) .. "." .. leaf.key
+	return leaf.section .. "." .. leaf.key
 end
 
 helpers.describe("TODO33 Boolean leaf audit", function()
@@ -90,7 +97,7 @@ helpers.describe("TODO33 Boolean leaf audit", function()
 				helpers.assert_eq(state[leaf.state], false)
 				helpers.assert_eq(#f.warnings, 1)
 				helpers.assert_contains(f.warnings[1], file_leaf(leaf))
-				helpers.assert_contains(f.warnings[1], f.path)
+				helpers.assert_contains(f.warnings[1], f.config_path)
 				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(f.errors, {})
 			end)
@@ -140,7 +147,7 @@ helpers.describe("Obsolete remap Boolean leaf publication contracts", function()
 					helpers.assert_eq(state[leaf.state], false)
 					helpers.assert_eq(f.read(), f.original, "load never mutates obsolete source bytes")
 					helpers.assert_eq(#f.warnings, 1)
-					helpers.assert_contains(f.warnings[1], "'" .. file_leaf(leaf) .. "' in '" .. f.path .. "'")
+					helpers.assert_contains(f.warnings[1], "'" .. file_leaf(leaf) .. "' in '" .. f.config_path .. "'")
 					state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 					helpers.assert_true(f.config.save_user_config(state, f.path))
 					helpers.assert_eq(f.decode(f.read()), f.decode(f.file(saved_fixture(leaf, vector.literal))),

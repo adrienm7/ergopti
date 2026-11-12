@@ -43,6 +43,11 @@ local function with_file(source, body, raw)
 		state.tap_hold_timeout_ms = 1234
 		local native, controls = Files.write_if_unchanged, { writes = 0 }
 		Files.write_if_unchanged = function(destination, candidate, expected)
+			-- The config.toml beside it takes the manifest's tap-hold rows (schema v22).
+			if destination == require("tests.support.tap_hold_file_text").config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				return native(destination, candidate, expected)
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = controls.expected or source })

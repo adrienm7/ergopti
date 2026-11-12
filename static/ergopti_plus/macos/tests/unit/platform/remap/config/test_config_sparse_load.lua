@@ -93,7 +93,8 @@ helpers.describe("Remap configuration sparse loading", function()
 		-- no driver has; another driver's keys are not outdated here.
 		local source = '[_meta]\nschema_version = 1\n[tap_hold.keys]\nretired_key = "legacy"\n'
 			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
-			.. '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
+		-- The key combinations are config.toml rows beside it since schema v22.
+		local config_source = '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
 		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system",
 			"infra.logger", "logger.shim", "infra.toml.codec", "toml_codec" }, function()
 			local warnings, errors = {}, {}
@@ -105,9 +106,16 @@ helpers.describe("Remap configuration sparse loading", function()
 			local config = helpers.load_with_stubs("platform.remap.config")
 			local files = require("adapters.file_system")
 			local old_read, old_write = files.read_with_status, files.write_if_unchanged
-			local written
-			files.read_with_status = function() return source, "ok" end
-			files.write_if_unchanged = function(_, content) written = content; return true end
+			local written, written_config = nil, nil
+			files.read_with_status = function(path)
+				if path == "config.toml" then return config_source, "ok" end
+				return source, "ok"
+			end
+			files.write_if_unchanged = function(path, content)
+				if path == "config.toml" then written_config = content; config_source = content
+				else written = content end
+				return true
+			end
 			local ok, err = pcall(function()
 				local keys, combos = { { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } }
 				local state, status = config.load_user_config(keys, combos, "karabiner.toml")
@@ -117,8 +125,9 @@ helpers.describe("Remap configuration sparse loading", function()
 				helpers.assert_eq(state.tap_hold_config.escape, { tap = "copy", hold = "none" })
 				local text = table.concat(warnings, "\n")
 				helpers.assert_eq(#warnings, 2, text)
-				for _, entry in ipairs({ "tap_hold.keys.retired_key", "mod_combos.config.retired_combo" }) do
-					helpers.assert_true(text:find("'" .. entry .. "' in 'karabiner.toml'", 1, true) ~= nil, entry .. ": " .. text)
+				for entry, file in pairs({ ["tap_hold.keys.retired_key"] = "karabiner.toml",
+					["mod_combos.config.retired_combo"] = "config.toml" }) do
+					helpers.assert_true(text:find("'" .. entry .. "' in '" .. file .. "'", 1, true) ~= nil, entry .. ": " .. text)
 				end
 				config.load_user_config(keys, combos, "karabiner.toml")
 				helpers.assert_eq(#warnings, 2, "a reload does not name them again")
@@ -128,7 +137,8 @@ helpers.describe("Remap configuration sparse loading", function()
 				local stored = require("infra.toml.codec").decode(written)
 				helpers.assert_eq(stored.tap_hold.keys.tab.tap_action, "paste")
 				helpers.assert_eq(stored.tap_hold.keys.retired_key, "legacy", "a retired entry stays for the user to fix")
-				helpers.assert_eq(stored.mod_combos.config.retired_combo.hold, "ctrl")
+				local stored_config = require("infra.toml.codec").decode(written_config or config_source)
+				helpers.assert_eq(stored_config.mod_combos.config.retired_combo.hold, "ctrl")
 				source = '[_meta]\nschema_version = 1\n[tap_hold.keys]\ntab = "legacy"\n'
 				local known = config.load_user_config(keys, combos, "karabiner.toml")
 				helpers.assert_eq(known.tap_hold_config.tab, { tap = "none", hold = "none" }, "it runs as neutral")
@@ -148,17 +158,17 @@ helpers.describe("Remap obsolete scalar leaves", function()
 		{ section = "tap_holds", key = "timeout_ms", state = "tap_hold_timeout_ms", literal = '"slow"', raw = "slow",
 			file = "tap_hold.time_activation_seconds" },
 		{ section = "tap_holds", key = "sticky_timeout_ms", state = "sticky_timeout_ms", literal = '"later"', raw = "later",
-			file = "tap_hold.sticky_timeout_ms" },
+			file = "tap_holds.sticky_timeout_ms", config = true },
 		{ section = "mod_combos", key = "simultaneous_threshold_ms", state = "simultaneous_threshold_ms", literal = '"soon"', raw = "soon",
-			file = "mod_combos.simultaneous_threshold_ms" },
+			file = "mod_combos.simultaneous_threshold_ms", config = true },
 		{ section = "mod_combos", key = "enabled", state = "mod_combos_enabled", literal = '"old"', raw = "old",
-			file = "mod_combos.enabled" },
+			file = "mod_combos.enabled", config = true },
 		{ section = "tap_holds", key = "timeout_ms", state = "tap_hold_timeout_ms", literal = "0", raw = 0,
 			file = "tap_hold.time_activation_seconds" },
 		{ section = "tap_holds", key = "sticky_timeout_ms", state = "sticky_timeout_ms", literal = "0.5", raw = 0.5,
-			file = "tap_hold.sticky_timeout_ms" },
+			file = "tap_holds.sticky_timeout_ms", config = true },
 		{ section = "mod_combos", key = "simultaneous_threshold_ms", state = "simultaneous_threshold_ms", literal = "-2", raw = -2,
-			file = "mod_combos.simultaneous_threshold_ms" },
+			file = "mod_combos.simultaneous_threshold_ms", config = true },
 	}
 	local function source(leaf)
 		return '[' .. leaf.section .. ']\n' .. leaf.key .. ' = ' .. leaf.literal
@@ -193,6 +203,11 @@ helpers.describe("Remap obsolete scalar leaves", function()
 			local native_read, native_write = files.read_with_status, files.write_if_unchanged
 			local controls = { writes = 0 }
 			files.write_if_unchanged = function(destination, content, expected)
+				-- The config.toml beside it takes the manifest's tap-hold rows (schema v22).
+				if destination == Text.config_path(path) then
+					controls.config_writes = (controls.config_writes or 0) + 1
+					return native_write(destination, content, expected)
+				end
 				controls.writes = controls.writes + 1
 				helpers.assert_eq(destination, path)
 				helpers.assert_eq(expected, { status = "ok", content = controls.expected or original })
@@ -202,7 +217,9 @@ helpers.describe("Remap obsolete scalar leaves", function()
 			local function load()
 				return config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, path)
 			end
-			local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
+			-- A config-owned leaf is warned about in the config.toml beside the file.
+			local function home(leaf) return leaf.config and Text.config_path(path) or path end
+			local ok, err = pcall(body, { config = config, files = files, path = path, home = home, warnings = warnings,
 				errors = errors, controls = controls, load = load, read = read, write = write,
 				decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original, native_read = native_read })
 			files.read_with_status, files.write_if_unchanged = native_read, native_write
@@ -218,7 +235,7 @@ helpers.describe("Remap obsolete scalar leaves", function()
 				local state, status = f.load()
 				helpers.assert_eq(status, "ok")
 				helpers.assert_eq(#f.warnings, 1)
-				helpers.assert_contains(f.warnings[1], "'" .. leaf.file .. "' in '" .. f.path .. "'")
+				helpers.assert_contains(f.warnings[1], "'" .. leaf.file .. "' in '" .. f.home(leaf) .. "'")
 				f.load()
 				helpers.assert_eq(#f.warnings, 1, "re-reading the same obsolete entry warns once")
 				state.tap_hold_config.escape.tap = "paste"
