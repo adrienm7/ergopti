@@ -760,40 +760,25 @@ three-OS CI is green on the final source. See the handoff above for the current 
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
       and Linux, with a regression test typing three keys inside the timeout.
-- [ ] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
-      did, Cmd versus Ctrl aside. Decided 2026-11-10: one shared `tap_hold.toml` (keys, global and sticky delays,
-      lone-tap window, `mod_combos`; macOS-only `[karabiner]` section), `config.toml` keeps the `[[features.*]]` rows.
-      Done on macOS and in the shared pieces: the layout is specified in `_shared/tap_hold/SCHEMA.md`,
-      `_shared/tap_hold/shared_file.toml` and `_shared/core/config_schema/tap_hold.schema.json`; macOS reads and writes
-      `hammerspoon/tap_hold.toml` through `platform/remap/tap_hold_file.lua` and `_shared/lua/tap_hold/shared_file.lua`
-      (catalogue key ids, `<first>_then_<second>` pairs, seconds, `+`-joined holds, only changed leaves written) and
-      carries an old `config_karabiner.toml` over once (`migrations.toml` `[legacy_imports.hs]`, renamed
-      `.migrated`); Linux leaves another driver's keys alone and names a macOS `hold_action` once. The cross-driver
-      corpus `_shared/tests/corpus/tap_hold_shared_file/` pins each Lua writer's file byte for byte and what each
-      reader reads from both (`expected.toml`, contract `_shared/lua/test/tap_hold_shared_file_contract.lua`).
-      Left: Windows (maintainer), below; Linux and macOS are done.
-  - [x] **Linux `[mod_combos]` in `tap_hold.toml`.** Decided by the coordinator on 2026-11-11 overnight, to review by
-        the maintainer: the `[[features.mod_combos]]` rows keep their manifest declaration and are stored in
-        `tap_hold.toml`, as on macOS. `modules/shortcuts/key_combinations.lua` reads the taps, holds and switch from
-        `config.toml` and `[mod_combos]` from `tap_hold.toml` only, every receipt and lease check covering both files;
-        `infra/key_combinations_scope.lua` and `infra/shortcuts_scope.lua` publish `mod_combos.*` rows through the
-        transaction's new `companions` port, prepared by `tap_hold_writer.prepare_combo_rows` (versioned, stamped,
-        line-preserving), with its own backup and inverse. The boot moves `config.toml` `[mod_combos]` once
-        (`tap_hold_writer.import_config_combos`, `[legacy_imports.linux]`, translation `config_section` in
-        `migrate.lua`): both files backed up, `tap_hold.toml` published first, a crash between the writes finished
-        at the next start, a different `[mod_combos]` already in `tap_hold.toml` wins. `expected.toml` pins what
-        Linux reads of both corpus files' `[mod_combos]`.
-  - [ ] **Windows shared `tap_hold.toml` (maintainer).** `tap_hold_loader.ahk` / `tap_hold_writer.ahk` read and write
-        the shared layout: catalogue ids, `[mod_combos]` in `tap_hold.toml` (the combinations' reader and writer move
-        there, `config.toml` keeps the pair taps, holds and `[category_enabled] key_combinations`), ignore
-        `[karabiner]`, `hold_action`, `cmd`/`fn` with one warning, write `_meta.schema_version`. A
-        `[legacy_imports.ahk]` entry with `translate = "config_section"` and `section = "mod_combos"` moves
-        `config.toml` `[mod_combos]` the way Linux does (both backed up, `tap_hold.toml` first, equal copies only
-        delete the old one, a different shared copy wins), beside the Windows `config.toml` tap-hold keys' own
-        import. `tap_hold_migration.ahk` accepts the `[legacy_imports]` table of `migrations.toml` and validates it
-        like `migrate.parse_legacy_imports` (per translation: `retired_suffix` for `karabiner`, `section` for
-        `config_section`). The AHK suite reads both corpus files with `[reads.<file>.ahk]` added to `expected.toml`,
-        `mod_combos` included.
+- [x] **One configuration layout on every OS.** A macOS configuration imported on Windows or Linux must work as it
+      did, Cmd versus Ctrl aside. Decided by the maintainer on 2026-11-11 (docs/memory/maintainer-decisions.md, top):
+      one home per manifest path. `config.toml` holds every `[[features.*]]` row: `[tap_holds]` `enabled`,
+      `lone_modifier_tap_max_ms`, `sticky_timeout_ms` and the whole `[mod_combos]`; the shared `tap_hold.toml` holds
+      the keys, the global delay, `inherit_defaults` and the macOS-only `[karabiner]` (`_shared/tap_hold/SCHEMA.md`,
+      `shared_file.toml`, `tap_hold.schema.json`). Done 2026-11-12: macOS (`platform/remap/config.lua`,
+      `tap_hold_file.lua`, `_shared/lua/tap_hold/shared_file.lua`) and Linux (loader, writer, manager, scopes) read
+      and write the rows in `config.toml`; the overnight Linux move of `[mod_combos]` into `tap_hold.toml` is
+      reverted; Windows, which already kept them in `config.toml`, reads another driver's `tap_hold.toml` (a macOS
+      `hold_action` or Cmd/Fn hold warned once, the tap kept; a leftover manifest row warned once) and keeps its
+      leaves on a write (a hold replaces `hold_action`, a rebind drops `enabled = false`). One migration: step
+      `v21_to_v22` of `_shared/core/config_schema/migrations.toml`, new op `import_companion` in the three
+      interpreters, copies the rows out of `tap_hold.toml` (macOS first carries `config_karabiner.toml` over),
+      backs both files up and deletes the moved values from `tap_hold.toml`. Cross-driver test: the corpus
+      `_shared/tests/corpus/tap_hold_shared_file/` holds each driver's written pair (`<driver>_written.toml` and
+      `.config.toml`); each suite pins its own and reads the three (Linux and macOS `test_tap_hold_shared_file.lua`,
+      Windows `test_tap_hold_shared_file.ahk`). Left, not this item: Windows keeps its Tap-Holds switch as
+      `[category_enabled] tap_holds`, so a Windows pair reads as switched off on macOS and Linux; Windows writes a
+      0.3 s delay as `0.29999999999999999`.
 - [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to

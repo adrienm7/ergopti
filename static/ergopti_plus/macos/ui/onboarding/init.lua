@@ -685,11 +685,15 @@ end
 --- @return string|nil detail
 local function prepare_destination(path)
 	local ConfigMigrate = require("config_migrate")
+	-- The v22 step moves the tap-hold rows out of the tap_hold.toml beside it.
+	local tap_hold_path = (require("native_path").directory_prefix(path) or "")
+		.. require("tap_hold.shared_file").FILE_NAME
 	local result = ConfigMigrate.boot({
 		path          = path,
 		driver        = MIGRATION_DRIVER,
 		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = FileSystem,
+		companions    = { [require("tap_hold.shared_file").FILE_NAME] = tap_hold_path },
 	})
 	if result.read_only then return false, result.detail end
 	return true

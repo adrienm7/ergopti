@@ -30,8 +30,13 @@ the same Lua name.
 ### project-the-tap-hold-file-is-one-layout-translated-at-the-boundary
 
 `tap_hold.toml` has one layout on every OS (`_shared/tap_hold/SCHEMA.md`):
-catalogue key ids, `<first>_then_<second>` pairs, seconds, `+`-joined
-modifiers. macOS keeps merging its old Karabiner model in
+catalogue key ids, seconds, `+`-joined modifiers. It holds the keys and the
+global delay only; every manifest row (`[tap_holds]` switch and timings,
+`[mod_combos]` with its `<first>_then_<second>` pairs) lives in `config.toml`
+on every driver since config schema v22 (maintainer decision of 2026-11-11).
+A reader warns once about such a row left in `tap_hold.toml` and never reads
+it; step `v21_to_v22` (op `import_companion`, M.run `companions`) moved them.
+macOS keeps merging its old Karabiner model in
 `platform/remap/config.lua` and translates only at the file boundary
 (`platform/remap/tap_hold_file.lua`, `_shared/lua/tap_hold/shared_file.lua`):
 a save compares the model it started from with the one it ends with and
@@ -40,8 +45,9 @@ spellings survive. Every writer stamps `[_meta] schema_version`: an unstamped
 file is version 0 and the v0_to_v1 step drops delays equal to the retired
 ones, so a macOS file without the stamp would lose a user's 350 ms on Linux.
 Change the layout in SCHEMA.md, `shared_file.toml` and the corpus
-`_shared/tests/corpus/tap_hold_shared_file/` together; each suite pins its own
-writer's corpus file byte for byte and reads the other's.
+`_shared/tests/corpus/tap_hold_shared_file/` together; each suite (Linux,
+macOS, Windows) pins its own writers' pair byte for byte (`tap_hold.toml`) and
+by value (`.config.toml` rows) and reads all three pairs.
 
 ### project-registry-flows-and-healthcheck-bridges-stay-per-driver
 

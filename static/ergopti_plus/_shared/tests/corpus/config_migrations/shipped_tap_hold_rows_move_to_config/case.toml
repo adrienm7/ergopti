@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_tap_hold_rows_move_to_config/case.toml
+
+[case]
+description = "macOS and Linux kept the tap-hold switch, the one-shot and lone-tap timings and the key combinations in tap_hold.toml: v22 moves them into config.toml, where a value already held wins; the keys and the global delay stay behind."
+drivers = ["hs", "linux"]
+outcome = "migrated"
+from_version = 21
+to_version = 22
