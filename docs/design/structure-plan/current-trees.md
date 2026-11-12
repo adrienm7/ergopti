@@ -13,9 +13,6 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 | `bin`                         |       — |      — |   **1** |
 | `data`                        |   **1** |      5 |       3 |
 | `desktop_focus`               |       — |      — |       2 |
-| `desktop_focus/gnome`         |       — |      — |       2 |
-| `desktop_focus/kwin`          |       — |      — |       2 |
-| `desktop_focus/kwin/contents` |       — |      — |   **1** |
 | `infra`                       | **109** | **89** | **113** |
 | `infra/hotstrings`            |  **26** |      — |       — |
 | `infra/metrics`               |       2 |      — |       — |
@@ -114,8 +111,6 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (44) `_shared/ui`
 - oversized (58) `linux/adapters`
 - singleton (1) `linux/bin`
-- singleton (1) `linux/desktop_focus/kwin/contents`
-- singleton (1) `linux/desktop_focus/kwin/contents/code`
 - oversized (113) `linux/infra`
 - singleton_parity (1) `linux/infra/toml`
 - singleton_parity (1) `linux/modules/diagnostics`
@@ -185,7 +180,7 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 - oversized (202) `_shared/lua/test`
 - singleton (1) `_shared/tests/fixtures/keystats`
 - oversized (42) `linux/tests/fixtures`
-- oversized (323) `linux/tests/hardware`
+- oversized (324) `linux/tests/hardware`
 - singleton (1) `linux/tests/hardware/fixtures/wayland`
 - oversized (52) `linux/tests/support`
 - singleton (1) `linux/tests/support/adapters/network`
@@ -315,10 +310,6 @@ Bounds: 2 to 20 direct entries per folder. Bold counts are outside them; — mea
 
 - `bin` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `desktop_focus` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/gnome` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/kwin` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/kwin/contents` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
-- `desktop_focus/kwin/contents/code` on linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `infra/hotstrings` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
 - `infra/metrics` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
 - `install` on linux — declared OS-specific

@@ -12,21 +12,20 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `ai/adapters`                            |       3 |    14 |     — |
 | `ai/data`                                |       — |     2 |     — |
 | `ai/engine`                              |      11 |    13 |     9 |
-| `ai/engine/agent`                        |       3 |     3 |     3 |
-| `ai/engine/api`                          |      11 |    18 |     7 |
+| `ai/engine/agent`                        |       3 |     3 |     2 |
+| `ai/engine/api`                          |      11 |    18 |     4 |
 | `ai/engine/api_ollama`                   |       7 |     — |     — |
 | `ai/engine/bootstrap`                    |       — |    15 |     — |
 | `ai/engine/local_servers`                |       3 |     7 |    13 |
 | `ai/engine/ollama`                       |      11 |    13 |     9 |
 | `ai/engine/prediction`                   |      13 |     8 |     3 |
-| `ai/engine/settings`                     |       2 | **1** |     8 |
+| `ai/engine/settings`                     |       2 | **1** |    12 |
 | `ai/ui`                                  |       3 |     5 |     5 |
 | `ai/ui/menu`                             |      18 |    19 |     7 |
 | `ai/ui/model_browser`                    |       2 |     2 | **1** |
 | `ai/ui/prompt_editor`                    |       2 |     2 | **1** |
-| `apps`                                   |       8 |     4 |     8 |
+| `apps`                                   |       8 |     5 |     8 |
 | `apps/adapters`                          |       2 | **1** |     2 |
-| `apps/bundled`                           |       — |     2 |     — |
 | `apps/engine`                            |       2 | **1** |     — |
 | `apps/ui`                                |   **1** |     2 |     5 |
 | `apps/ui/menu`                           |   **1** | **1** |     2 |
@@ -85,6 +84,16 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `hotstrings/ui/menu`                     |       3 |     7 |     2 |
 | `hotstrings/ui/personal_info_editor`     |       2 |     2 | **1** |
 | `install`                                |       — |     — |    20 |
+| `keyboard`                               |       2 |     4 |     2 |
+| `keyboard/adapters`                      |   **1** |     5 |     — |
+| `keyboard/adapters/karabiner`            |       — |     8 |     — |
+| `keyboard/adapters/runtime`              |       — |    12 |     — |
+| `keyboard/data`                          |       — |     6 |     — |
+| `keyboard/engine`                        |      12 |     8 |     3 |
+| `keyboard/engine/keys`                   |      18 | **1** |     2 |
+| `keyboard/engine/layers`                 |       6 |     4 | **1** |
+| `keyboard/engine/runtime`                |       — |     7 |     — |
+| `keyboard/ui`                            |       — |     3 | **1** |
 | `layouts`                                |       4 |     3 |     3 |
 | `layouts/adapters`                       |   **1** |     5 |     6 |
 | `layouts/engine`                         |       7 |     6 |     7 |
@@ -129,22 +138,10 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `onboarding/ui/permission_dialog`        |       — |     2 |     — |
 | `platform`                               |       4 |     3 |     4 |
 | `platform/desktop_focus`                 |       — |     — |     2 |
-| `platform/desktop_focus/gnome`           |       — |     — |     2 |
-| `platform/desktop_focus/kwin`            |       — |     — |     2 |
 | `platform/focus`                         |       3 |     5 |    12 |
 | `platform/input`                         |       7 |     9 |    11 |
 | `platform/native`                        |      19 |     — |     — |
 | `platform/system`                        |       6 |     4 |     3 |
-| `remap`                                  |       2 |     4 |     2 |
-| `remap/adapters`                         |   **1** |     5 |     — |
-| `remap/adapters/karabiner`               |       — |     8 |     — |
-| `remap/adapters/runtime`                 |       — |    12 |     — |
-| `remap/data`                             |       — |     6 |     — |
-| `remap/engine`                           |      12 |     8 |     3 |
-| `remap/engine/keys`                      |      18 | **1** |     2 |
-| `remap/engine/layers`                    |       6 |     4 | **1** |
-| `remap/engine/runtime`                   |       — |     7 |     — |
-| `remap/ui`                               |       — |     3 | **1** |
 | `settings`                               |       2 |     2 |     2 |
 | `settings/engine`                        |       9 |     6 |     4 |
 | `settings/engine/migration`              |       6 |     — | **1** |
@@ -181,6 +178,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 ## Residual folders outside the bounds (code)
 
 - singleton_parity (1) `_shared/ai/adapters`
+- oversized (37) `_shared/ai/data`
 - singleton_parity (1) `_shared/ai/engine/bootstrap`
 - singleton (1) `_shared/apps/data/app_cloner`
 - singleton (1) `_shared/apps/data/encryptor`
@@ -195,6 +193,8 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton (1) `_shared/diagnostics/data/control`
 - singleton_parity (1) `_shared/diagnostics/engine/field_check`
 - singleton_parity (1) `_shared/gestures`
+- singleton_parity (1) `_shared/keyboard/data`
+- singleton_parity (1) `_shared/keyboard/engine/layers`
 - singleton (1) `_shared/metrics/data/db/migrations`
 - singleton_parity (1) `_shared/metrics/engine/aggregator`
 - singleton_parity (1) `_shared/metrics/engine/apps`
@@ -202,8 +202,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `_shared/metrics/engine/walker`
 - singleton_parity (1) `_shared/onboarding/ui`
 - singleton_parity (1) `_shared/platform/focus`
-- singleton_parity (1) `_shared/remap/data`
-- singleton_parity (1) `_shared/remap/engine/layers`
 - singleton_parity (1) `linux/ai/ui/model_browser`
 - singleton_parity (1) `linux/ai/ui/prompt_editor`
 - singleton_parity (1) `linux/clipboard`
@@ -222,6 +220,8 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/hotstrings/ui/hotstring_editor`
 - singleton_parity (1) `linux/hotstrings/ui/hotstrings_config_window`
 - singleton_parity (1) `linux/hotstrings/ui/personal_info_editor`
+- singleton_parity (1) `linux/keyboard/engine/layers`
+- singleton_parity (1) `linux/keyboard/ui`
 - singleton_parity (1) `linux/layouts/engine/composer`
 - singleton_parity (1) `linux/layouts/ui/layer_editor`
 - singleton_parity (1) `linux/layouts/ui/layout_manager`
@@ -234,8 +234,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/metrics/ui/metrics_apps`
 - singleton_parity (1) `linux/metrics/ui/metrics_typing`
 - singleton_parity (1) `linux/onboarding`
-- singleton_parity (1) `linux/remap/engine/layers`
-- singleton_parity (1) `linux/remap/ui`
 - singleton_parity (1) `linux/settings/engine/migration`
 - singleton_parity (1) `linux/settings/ui/config_cleanup`
 - singleton_parity (1) `linux/settings/ui/paths_editor`
@@ -258,13 +256,13 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `macos/core/timing`
 - singleton_parity (1) `macos/diagnostics/ui/error_dialog`
 - singleton_parity (1) `macos/diagnostics/ui/field_check`
+- singleton_parity (1) `macos/keyboard/engine/keys`
 - singleton_parity (1) `macos/layouts/engine/composer`
 - singleton_parity (1) `macos/layouts/engine/emulation`
 - singleton_parity (1) `macos/layouts/ui/layer_editor`
 - singleton_parity (1) `macos/layouts/ui/layout_manager`
 - singleton_parity (1) `macos/metrics/engine/system`
 - singleton_parity (1) `macos/onboarding/engine`
-- singleton_parity (1) `macos/remap/engine/keys`
 - singleton_parity (1) `macos/settings/ui/config_cleanup`
 - singleton_parity (1) `macos/shortcuts/native`
 - singleton_parity (1) `macos/shortcuts/ui/physical_shortcuts`
@@ -287,10 +285,10 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `windows/diagnostics/ui/error_dialog`
 - singleton_parity (1) `windows/diagnostics/ui/field_check`
 - singleton_parity (1) `windows/gestures/ui/menu`
+- singleton_parity (1) `windows/keyboard/adapters`
 - singleton_parity (1) `windows/layouts/adapters`
 - singleton_parity (1) `windows/layouts/ui/layer_editor`
 - singleton_parity (1) `windows/layouts/ui/menu`
-- singleton_parity (1) `windows/remap/adapters`
 - singleton_parity (1) `windows/settings/ui/config_cleanup`
 - singleton_parity (1) `windows/shortcuts/ui/menu`
 - singleton_parity (1) `windows/tap_hold/ui`
@@ -301,12 +299,12 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 
 - singleton (1) `_shared/tests/fixtures/keystats`
 - oversized (44) `_shared/tests/lua`
-- singleton_parity (1) `linux/tests/fixtures/remap`
+- singleton_parity (1) `linux/tests/fixtures/keyboard`
 - singleton_parity (1) `linux/tests/fixtures/settings`
 - oversized (115) `linux/tests/hardware`
 - oversized (120) `linux/tests/hardware/core`
 - singleton (1) `linux/tests/hardware/fixtures/wayland`
-- singleton (1) `linux/tests/hardware/remap`
+- singleton (1) `linux/tests/hardware/keyboard`
 - singleton (1) `linux/tests/support/core/fs`
 - singleton (1) `linux/tests/support/core/network`
 - singleton_parity (1) `linux/tests/support/core/ui`
@@ -360,7 +358,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `ai/engine/bootstrap` on macos — the Lua drivers share it from `_shared/lua/ai/engine/bootstrap/`
 - `ai/ui/menu/models` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `ai/ui/menu/panels` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `apps/bundled` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `apps/engine` on windows + macos — the Lua drivers share it from `_shared/lua/apps/engine/`
 - `core/logger/adapters` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `core/ui/engine/webview` on windows — the Lua drivers share it from `_shared/lua/core/ui/engine/webview/`
@@ -372,6 +369,12 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `hotstrings/engine/expander` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `hotstrings/ui/hotstring_editor` on macos + linux — the Lua drivers share it from `_shared/lua/hotstrings/ui/hotstring_editor/`
 - `install` on linux — declared OS-specific
+- `keyboard/adapters` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
+- `keyboard/adapters/karabiner` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
+- `keyboard/adapters/runtime` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
+- `keyboard/data` on macos — declared OS-specific
+- `keyboard/engine/runtime` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
+- `keyboard/ui` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `launcher` on macos — declared OS-specific
 - `launcher/Sources` on macos — declared OS-specific
 - `launcher/Sources/CPOSIXCompatibility` on macos — declared OS-specific
@@ -397,15 +400,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `onboarding/engine` on windows + macos — the Lua drivers share it from `_shared/lua/onboarding/engine/`
 - `onboarding/ui/permission_dialog` on macos — declared OS-specific
 - `platform/desktop_focus` on linux — declared OS-specific
-- `platform/desktop_focus/gnome` on linux — declared OS-specific
-- `platform/desktop_focus/kwin` on linux — declared OS-specific
 - `platform/native` on windows — declared OS-specific
-- `remap/adapters` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `remap/adapters/karabiner` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `remap/adapters/runtime` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `remap/data` on macos — declared OS-specific
-- `remap/engine/runtime` on macos — code exists on these drivers only; the counterpart gains the folder with its first file
-- `remap/ui` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `settings/engine/migration` on windows + linux — the Lua drivers share it from `_shared/lua/settings/engine/migration/`
 - `settings/engine/publication` on windows — the Lua drivers share it from `_shared/lua/settings/engine/publication/`
 - `settings/ui/menu` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
@@ -418,36 +413,3 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 ## Lua module names both roots would answer
 
 Both the driver root and `_shared/lua` are on `package.path`, so the first wins silently. Each of these is a driver shim that re-exports the shared module under the same name; the step that creates the collision retires the shim (callers already use that name) or renames it, and apply-step.cjs refuses until it does.
-
-- `ai.engine.local_servers.local_server_ports` — `linux/ai/engine/local_servers/local_server_ports.lua`
-- `ai.engine.settings.enable_admission` — `linux/ai/engine/settings/enable_admission.lua`
-- `core.network.engine.proxy_auth_relay` — `linux/core/network/engine/proxy_auth_relay.lua`
-- `core.network.engine.proxy_policy` — `linux/core/network/engine/proxy_policy.lua`
-- `core.timing.engine.timings` — `linux/core/timing/engine/timings.lua`
-- `hotstrings.engine.dynamic.user_code` — `linux/hotstrings/engine/dynamic/user_code.lua`
-- `layouts.engine.composer.composer_check` — `linux/layouts/engine/composer/composer_check.lua`
-- `menu.engine.manifest_reader` — `linux/menu/engine/manifest_reader.lua`
-- `menu.engine.native_presentation` — `linux/menu/engine/native_presentation.lua`
-- `metrics.engine.privacy.roi_policy` — `linux/metrics/engine/privacy/roi_policy.lua`
-- `metrics.engine.privacy.text_cipher` — `linux/metrics/engine/privacy/text_cipher.lua`
-- `metrics.engine.privacy.text_migration` — `linux/metrics/engine/privacy/text_migration.lua`
-- `platform.focus.application_notifier` — `linux/platform/focus/application_notifier.lua`
-- `settings.engine.migration.legacy_folder_migration` — `linux/settings/engine/migration/legacy_folder_migration.lua`
-- `updater.engine.config_backup` — `linux/updater/engine/config_backup.lua`
-- `updater.engine.version` — `linux/updater/engine/version.lua`
-- `ai.engine.api.parser` — `macos/ai/engine/api/parser.lua`
-- `ai.engine.local_servers.local_server_ports` — `macos/ai/engine/local_servers/local_server_ports.lua`
-- `ai.engine.prediction.prompt_builder` — `macos/ai/engine/prediction/prompt_builder.lua`
-- `core.timing.engine.timings` — `macos/core/timing/engine/timings.lua`
-- `hotstrings.engine.dynamic` — `macos/hotstrings/engine/dynamic/init.lua`
-- `hotstrings.engine.dynamic.user_code` — `macos/hotstrings/engine/dynamic/user_code.lua`
-- `layouts.engine.composer.composer_check` — `macos/layouts/engine/composer/composer_check.lua`
-- `menu.engine.manifest_reader` — `macos/menu/engine/manifest_reader.lua`
-- `menu.engine.native_presentation` — `macos/menu/engine/native_presentation.lua`
-- `metrics.engine.privacy.text_cipher` — `macos/metrics/engine/privacy/text_cipher.lua`
-- `metrics.engine.privacy.text_migration` — `macos/metrics/engine/privacy/text_migration.lua`
-- `platform.focus.application_notifier` — `macos/platform/focus/application_notifier.lua`
-- `platform.input.keycodes` — `macos/platform/input/keycodes.lua`
-- `shortcuts.engine.magic_editor` — `macos/shortcuts/engine/magic_editor.lua`
-- `tap_hold.engine.one_shot_shift` — `macos/tap_hold/engine/one_shot_shift.lua`
-- `updater.engine.config_backup` — `macos/updater/engine/config_backup.lua`
