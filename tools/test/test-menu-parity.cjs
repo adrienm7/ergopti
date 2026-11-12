@@ -3660,7 +3660,11 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 			],
 			['and Preferences.admit() == true', 'and true', 'withdrawn persistence admission'],
 			['and Preferences.admit() == true', 'and Preferences.admit()', 'untyped admission'],
-			['return Preferences.admit() == true and', 'return true and', 'withdrawn restore admission'],
+			[
+				'return Preferences.admit() == true\n\tend',
+				'return true\n\tend',
+				'withdrawn restore admission'
+			],
 			[
 				'ctx.paused ~= true and Preferences.admit()',
 				'true and Preferences.admit()',
