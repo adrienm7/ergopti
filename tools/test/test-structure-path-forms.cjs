@@ -211,6 +211,11 @@ function run() {
 			'a folder held in a Lua local, joined later'
 		);
 		assert.equal(
+			rewrite(`${P}_shared/zz_probe_mod/x.go`, '//hotstrings:build !windows\n\npackage x\n'),
+			'//hotstrings:build !windows\n\npackage x\n',
+			'a Go build directive (//go:build in _shared/go) is not a folder'
+		);
+		assert.equal(
 			rewrite('tools/x.cjs', "const T = read('zz_probe_mod/hotstrings/a.toml', SHARED);"),
 			"const T = read('zz_probe_hs/data/a.toml', SHARED);",
 			'a reader that takes the shared base after the path'

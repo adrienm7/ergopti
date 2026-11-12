@@ -358,6 +358,9 @@ function categoryOf(file) {
  * @returns {{form: string, lead: string, oldRepo: string, newRepo: string}|null}
  */
 function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false, folders = null) {
+	// //go:build or a // comment: a comment marker, never a path the plan
+	// moves (file:///A.app/… is a path, after its empty authority).
+	if (/^\/\/(?!\/)/.test(raw)) return null;
 	// "\\\\modules\\\\x" in a JavaScript string spells the Windows path \\modules\\x.
 	const token = raw.replace(/\\\\|\\/g, '/');
 	const candidates = [];
