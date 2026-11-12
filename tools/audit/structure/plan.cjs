@@ -371,12 +371,37 @@ function resolvePathToken(raw, file, inTree, byRepoPath) {
 				abs: path.posix.normalize(`${PREFIX}_shared/lua/${rest}`)
 			});
 	}
-	for (const c of candidates) {
-		if (byRepoPath.has(c.abs))
-			return { form: c.form, lead: c.lead, oldRepo: c.abs, newRepo: byRepoPath.get(c.abs) };
-	}
-	return null;
+	// The token names the first of its readings that exists today; only then
+	// is it looked up. Otherwise SCRIPT_DIR .. "/modules/hotstrings" (the
+	// driver's own folder) would read as _shared/modules/hotstrings whenever
+	// only the shared one moves.
+	const existing = candidates.find((c) => EXISTING.has(c.abs));
+	if (!existing || !byRepoPath.has(existing.abs)) return null;
+	return {
+		form: existing.form,
+		lead: existing.lead,
+		oldRepo: existing.abs,
+		newRepo: byRepoPath.get(existing.abs)
+	};
 }
+
+// Every tracked file and folder of the repository, as the index has them.
+const EXISTING = (() => {
+	const out = new Set();
+	for (const f of require('node:child_process')
+		.execFileSync('git', ['ls-files', '-z'], {
+			cwd: ROOT,
+			encoding: 'utf8',
+			maxBuffer: 64 * 1024 * 1024
+		})
+		.split('\0')
+		.filter(Boolean)) {
+		out.add(f);
+		const parts = f.split('/');
+		for (let i = 1; i < parts.length; i++) out.add(parts.slice(0, i).join('/'));
+	}
+	return out;
+})();
 
 const SPLIT = '(split)';
 

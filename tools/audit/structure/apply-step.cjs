@@ -54,8 +54,10 @@ function newPathToken(row, movedRepo) {
 	else if (r.form === 'tree') out = r.newRepo.slice(PREFIX.length);
 	else if (r.form === 'shared') out = r.newRepo.slice(`${PREFIX}_shared/`.length);
 	else if (r.form === 'root') {
-		const tree = r.newRepo.slice(PREFIX.length).split('/')[0];
-		out = r.lead + r.newRepo.slice(`${PREFIX}${tree}/`.length);
+		// Relative to the root of the referencing file's tree, which may not be
+		// the target's: driver_root .. "/../_shared/data/x" keeps its "../_shared".
+		const refTree = row.file.slice(PREFIX.length).split('/')[0];
+		out = r.lead + path.posix.relative(`${PREFIX}${refTree}`, r.newRepo);
 	} else {
 		// File-relative: relative to where the referencing file will be.
 		const from = path.posix.dirname(movedRepo.get(row.file) || row.file);
@@ -111,6 +113,27 @@ function checkAll(map, plan) {
 	const refs = Plan.attributeSteps(plan, Plan.references(map));
 	const byStep = new Map(plan.map((s) => [s.id, []]));
 	for (const r of refs) (byStep.get(r.step) || byStep.set(r.step, []).get(r.step)).push(r);
+	// Every rewrite must be computable: a token the applier cannot spell
+	// would stop phase 2 in the middle of a step.
+	const finalRepo = new Map(
+		[...map].filter(([, t]) => t).map(([o, t]) => [PREFIX + o, PREFIX + t])
+	);
+	for (const r of refs) {
+		if (
+			/^lua-/.test(r.kind) ||
+			r.new === '(retired)' ||
+			r.new === Plan.SPLIT ||
+			Plan.REFUSED_KINDS.has(r.kind)
+		)
+			continue;
+		try {
+			newPathToken(r, finalRepo);
+		} catch (error) {
+			problems.push(
+				`${r.step}: cannot spell the rewrite of ${r.old} in ${r.file}: ${error.message}`
+			);
+		}
+	}
 	const touched = new Set();
 	for (const s of plan)
 		for (const [o, t] of s.moves) touched.add(PREFIX + o).add(PREFIX + (t || o));
@@ -232,11 +255,9 @@ function main() {
 		for (const [file, rows] of edits) {
 			for (const row of rows) {
 				const next =
-					row.kind === 'lua-module'
+					/^lua-/.test(row.kind) || row.new === '(retired)' || row.new === Plan.SPLIT
 						? row.new
-						: row.new === '(retired)'
-							? '(retired)'
-							: newPathToken(row, movedRepo);
+						: newPathToken(row, movedRepo);
 				console.log(`  ${file}: ${row.old} -> ${next}`);
 			}
 		}
