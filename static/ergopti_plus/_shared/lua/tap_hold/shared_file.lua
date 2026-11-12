@@ -537,6 +537,18 @@ function M.apply_karabiner(document, before, after, ctx, is_table, with_config)
 	end
 	for path, value in pairs(new_leaves) do compare(path, old_leaves[path], value) end
 	for path, value in pairs(old_leaves) do if new_leaves[path] == nil then compare(path, value, nil) end end
+	-- A file laid over the shipped keys reads an absent tap or hold as the
+	-- shipped one on Windows and Linux, so a tap or hold macOS clears is
+	-- written as nothing: tap "none", hold "" (SCHEMA.md).
+	local section = document[M.TAP_HOLD]
+	local inherit = is_table(section) and section.inherit_defaults == true
+	if inherit then
+		for _, change in ipairs(changes) do
+			if change.value == nil and change.path:match("^" .. M.TAP_HOLD .. "%.keys%.[^%.]+%.tap_action$") then
+				change.value = NONE
+			end
+		end
+	end
 	local function hold_of(holds, path)
 		local hold = holds[path]
 		if hold == nil or hold == false then return nil end
@@ -549,7 +561,11 @@ function M.apply_karabiner(document, before, after, ctx, is_table, with_config)
 		if hold_of(old_holds, path) ~= hold_of(new_holds, path) then
 			for _, field in ipairs(HOLD_FIELDS) do changes[#changes + 1] = { path = path .. "." .. field } end
 			local hold = new_holds[path]
-			if hold then changes[#changes + 1] = { path = path .. "." .. hold.field, value = hold.value, last = true } end
+			if hold then
+				changes[#changes + 1] = { path = path .. "." .. hold.field, value = hold.value, last = true }
+			elseif inherit then
+				changes[#changes + 1] = { path = path .. ".hold_modifier", value = "", last = true }
+			end
 		end
 	end
 	-- A key macOS rebinds is switched back on: the user just chose what it does.
