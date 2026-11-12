@@ -43,10 +43,10 @@ than 20 entries (40 in tests).
 | Rule B today: one-entry code folders                        | 32 (plus 40 that mirror a real folder on another driver)                                                                                                                                                |
 | Rule B today: test folders over 40 entries / with one entry | 18 / 97                                                                                                                                                                                                 |
 | Rule B today: top-level folders on one or two drivers       | 4 (`bin`, `desktop_focus`, `install`, `launcher`)                                                                                                                                                       |
-| after the plan: code folders over 20 / with one entry       | 1 / 8 (`_shared/ai/data`, read by file name; and `_shared/*/data/*` folders codegen reads by path)                                                                                                      |
+| after the plan: code folders over 20 / with one entry       | 2 / 8 (`_shared/ui`, the webview document root, and `_shared/ai/data`, read by file name; and `_shared/*/data/*` folders codegen reads by path)                                                         |
 | after the plan: test folders over 40 / with one entry       | 15 / 28                                                                                                                                                                                                 |
 | after the plan: top-level folders on one or two drivers     | 2 (`macos/launcher`, `linux/install`); 18 feature sub-folders exist where their code does                                                                                                               |
-| plan size                                                   | 8,079 moves (2,803 of them renames) in 38 steps, 1 retired README, 56,168 reference rewrites (718 to read in review, 0 refused), 32 shared modules taking the `_core` suffix                            |
+| plan size                                                   | 7,930 moves (2,818 of them renames) in 38 steps, 1 retired README, 55,218 reference rewrites (651 to read in review, 0 refused), 32 shared modules taking the `_core` suffix                            |
 | Rule A: hand-typed values in production driver source       | 1,921 (Windows 642, macOS 783, Linux 374, and 122 macOS/Linux logic pairs)                                                                                                                              |
 | Rule A: constant names declared on two or three drivers     | 54, 13 of them with different values                                                                                                                                                                    |
 | Rule A: Lua functions or tables both Lua drivers carry      | 104 functions, 18 data tables                                                                                                                                                                           |
@@ -230,7 +230,7 @@ OS-specific, by name and on one driver only:
 _shared/                     the same feature names
   <feature>/engine/          the Lua both Lua drivers require (today _shared/lua/)
   <feature>/data/            data files (today _shared/modules/ and _shared/data/)
-  <feature>/ui/<page>/       web pages (today _shared/ui/)
+  ui/<page>/                 web pages stay in the webview document root
   core/<domain>/ …, core/ports/ and core/features.json unchanged
   tests/{corpus,fixtures,lua,conformance}/
 ```
@@ -269,7 +269,6 @@ and the Lua shim collisions.
 | linux    | `modules/keymap/layout_registry.lua`            | `layouts/engine/registry/layout_registry.lua`          |
 | linux    | `ui/layout_manager/bridge.lua`                  | `layouts/ui/layout_manager/bridge.lua`                 |
 | \_shared | `lua/layouts/registry.lua`                      | `layouts/engine/registry/registry.lua`                 |
-| \_shared | `ui/layout_composer/composer.css`               | `layouts/ui/layout_composer/composer.css`              |
 | \_shared | `keymap/layer_actions.toml`                     | `layouts/data/layer_actions.toml`                      |
 
 **metrics**
@@ -287,7 +286,6 @@ and the Lua shim collisions.
 | linux    | `adapters/wpm_surface.lua`                | `metrics/adapters/wpm_surface.lua`             |
 | \_shared | `lua/keystats/queries.lua`                | `metrics/engine/queries.lua`                   |
 | \_shared | `data/db/schema.sql`                      | `metrics/data/db/schema.sql`                   |
-| \_shared | `ui/metrics_typing/index.html`            | `metrics/ui/metrics_typing/index.html`         |
 
 ### How a path is classified
 
@@ -312,7 +310,8 @@ and the Lua shim collisions.
    real on another driver stays a folder everywhere. `_shared` data folders keep
    their layout, which codegen reads by path.
 
-**Residuals.** 8 one-entry folders, all `_shared/*/data/*` (a `db/migrations/`
+**Residuals.** `_shared/ui` (44 pages, the webview document root) and
+`_shared/ai/data` (37 files read by name) stay over the bound. 8 one-entry folders, all `_shared/*/data/*` (a `db/migrations/`
 folder is read as a directory; the others are named data sets). 15 test
 folders over 40 entries are behaviour suites (Windows LLM servers, updater,
 gestures meta tests) and split when their owner next touches them.
@@ -350,7 +349,7 @@ now repeats, in the same step that moves it (`git mv`, so history follows).
 - a module whose name a runtime site builds (`RUNTIME_PREFIXES`) keeps its
   file name.
 
-In all, 2,803 of the 8,079 moves are renames (510 of them production source
+In all, 2,818 of the 7,930 moves are renames (525 of them production source
 files, the rest tests); move-map.tsv lists each with its new name.
 
 Examples: `metrics/engine/walker/keystats_walker_core.ahk` →
@@ -418,7 +417,7 @@ A step moves one feature (or one `core/` or `platform/` domain) on the three
 drivers, its `_shared` part and its tests together, so every step leaves a
 consistent, green tree.
 
-1. **`_shared`** (S00, 1,013 moves): every shared file to its feature home,
+1. **`_shared`** (S00, 864 moves): every shared file to its feature home,
    with the switch of the shared Lua root described above. The drivers keep
    their paths in this step; their `require` names of shared modules and
    their shared paths are rewritten.
@@ -436,7 +435,7 @@ consistent, green tree.
 Within the features any order works, because Lua names are root-relative and
 `apply-step.cjs` re-relativises `#Include` lines against the final location
 of their target; a concurrent change can make a later feature urgent. The
-largest steps (`ai` 1,049 moves, `_shared` 1,013, `metrics` 798, `hotstrings` 650) can be split by sub-folder if their review is too long.
+largest steps (`ai` 1,049 moves, `_shared` 864, `metrics` 798, `hotstrings` 650) can be split by sub-folder if their review is too long.
 
 ### Applying a step
 
@@ -470,7 +469,7 @@ sequence instead, on today's index (about three minutes):
   that moves the file it names, or the last one to empty the folder it names)
   and is either rewritten mechanically or listed for review; none is refused.
 
-On e87a9d0d it reports 0 refusals and 718 references to read in review. They
+On e87a9d0d it reports 0 refusals and 651 references to read in review. They
 are references to a folder the plan scatters:
 
 - in prose and comments they name the folder's deepest common new home
@@ -529,8 +528,8 @@ plain 2..20 check with the residual data folders listed as exemptions.
 
 ## Risks
 
-The layer-first plan moved 3,071 files; feature-first moves 8,079 (2,803 of
-them renamed) and rewrites 56,168 references instead of 37,131, because almost every path changes its
+The layer-first plan moved 3,071 files; feature-first moves 7,930 (2,818 of
+them renamed) and rewrites 55,218 references instead of 37,131, because almost every path changes its
 first segment. The risks are the same kinds, larger:
 
 - **Windows `#Include`.** About 3,100 `#Include` lines name a relative path
@@ -547,7 +546,7 @@ first segment. The risks are the same kinds, larger:
   rewrite keeps every line in place and only changes its path. Every Windows
   step needs G-windows on the Windows lane before its commit.
 - **Lua `require` names.** Every driver module name changes its prefix
-  (`infra.logger` → `core.logger.engine.logger`) and 2,803 files are renamed;
+  (`infra.logger` → `core.logger.engine.logger`) and 2,818 files are renamed;
   the token scan finds the quoted names and `RUNTIME_PREFIXES` /
   `RUNTIME_EDITS` cover the names built at runtime. The shared root moves from
   `_shared/lua` to `_shared` inside S00, and 32 shared modules take the
@@ -595,11 +594,11 @@ first segment. The risks are the same kinds, larger:
 | what a folder says                | the kind of code (adapter, service, window)                                        | the capability; the kind is the sub-folder (`engine/`, `adapters/`, `ui/`)                           |
 | moving logic to `_shared`         | changes its module name (`infra.x` → `infra.config.x` in another root)             | keeps it (`x.engine.y` in either root)                                                               |
 | ports-and-adapters contract       | visible at the top (`adapters/` implements `core/ports`)                           | inside each feature (`x/adapters/`); `core/ports/` still declares the contracts                      |
-| cost                              | 3,071 moves, 37,131 rewrites, 50 steps                                             | 8,079 moves (2,803 renames), 56,168 rewrites, 38 steps                                               |
+| cost                              | 3,071 moves, 37,131 rewrites, 50 steps                                             | 7,930 moves (2,818 renames), 55,218 rewrites, 38 steps                                               |
 | AHK `#Include` churn              | moderate: neighbours mostly move together                                          | high: most includes change, all mechanical                                                           |
 | cross-feature code                | hidden in `infra/`                                                                 | explicit in `core/` and `platform/`, which every reviewer can see grow                               |
 | folder bounds after the plan      | 5 oversized, 13 one-entry code folders                                             | 0 oversized, 8 one-entry code folders                                                                |
-| one-entry folders kept for parity | about 20 on Linux (`ui/*` bridges)                                                 | 23 to 43 per driver: a feature's uniform sub-folders hold one file where its code is small           |
+| one-entry folders kept for parity | about 20 on Linux (`ui/*` bridges)                                                 | 19 to 37 per driver: a feature's uniform sub-folders hold one file where its code is small           |
 | risk of a wrong home              | low: the layer is mechanical                                                       | real: the feature tables in `rules.cjs` decide where a cross-cutting file goes; review them per step |
 
 ## Decisions
@@ -635,7 +634,11 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer:
    packages, the `core/ports` catalogue (one specification per port).
 5. Parity wins over the one-entry rule; Rule B compares module names, so a
    one-file module may be a file on one driver and a folder on another.
-6. `_shared` is the shared Lua root (module names `x.engine.y`); a driver
+6. `_shared/ui/` keeps its pages: it is the webview document root (hosts build
+   `_shared/ui/<page>` at runtime, pages import `../dom_utils.js`, the
+   WebViews may read that one tree), and its page names already name their
+   feature. It stays over the 20-entry bound as a residual.
+7. `_shared` is the shared Lua root (module names `x.engine.y`); a driver
    module and a shared module with the same name are told apart by the
    shared one taking the `_core` suffix (see [Lua module names](#lua-module-names)).
 
