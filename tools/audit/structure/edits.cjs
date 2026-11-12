@@ -69,6 +69,42 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		empties: '_shared/data/locales',
 		from: "path.resolve(path.dirname(page), '../../data/locales/fr.json')",
 		to: "path.resolve(path.dirname(page), '../../core/i18n/data/locales/fr.json')"
+	},
+	// The Windows bundle excludes three shared folders whole. S01 scatters
+	// them, and their nearest new folder (_shared itself) would exclude every
+	// shared file: each glob lists the new homes of exactly what it matched.
+	{
+		file: 'tools/build/windows_bundle_manifest.json',
+		empties: '_shared/core/config_schema',
+		from: '"globs": ["static/ergopti_plus/_shared/core/**"],',
+		to:
+			'"globs": [\n\t\t\t\t"static/ergopti_plus/_shared/core/features.json",\n' +
+			'\t\t\t\t"static/ergopti_plus/_shared/core/ports/**",\n' +
+			'\t\t\t\t"static/ergopti_plus/_shared/core/text/data/domain/**",\n' +
+			'\t\t\t\t"static/ergopti_plus/_shared/settings/data/config_schema/**"\n\t\t\t],'
+	},
+	{
+		file: 'tools/build/windows_bundle_manifest.json',
+		empties: '_shared/modules',
+		from: '"globs": ["static/ergopti_plus/_shared/modules/**/*.js"],',
+		to:
+			'"globs": [\n\t\t\t\t"static/ergopti_plus/_shared/core/network/data/*.js",\n' +
+			'\t\t\t\t"static/ergopti_plus/_shared/core/ui/data/tooltip/*.js",\n' +
+			'\t\t\t\t"static/ergopti_plus/_shared/updater/data/*.js"\n\t\t\t],'
+	},
+	{
+		// The shared Lua root becomes _shared itself; its one non-Lua file
+		// keeps its exclusion, and **/*.lua covers the rest.
+		file: 'tools/build/windows_bundle_manifest.json',
+		empties: '_shared/lua',
+		from: '"globs": ["static/ergopti_plus/_shared/lua/**", "**/*.lua"],',
+		to: '"globs": ["**/*.lua", "static/ergopti_plus/_shared/keyboard/engine/chord/vectors.json"],'
+	},
+	{
+		file: 'tools/build/windows_bundle_manifest.json',
+		empties: '_shared/python',
+		from: '"static/ergopti_plus/_shared/python/**",',
+		to: '"static/ergopti_plus/_shared/ai/adapters/python/**",'
 	}
 ];
 
