@@ -1,15 +1,14 @@
 --- tests/unit/ui/menu/tray/test_tray_paused_greys_features.lua
 
 --- ==============================================================================
---- MODULE: Regression — pause greys every feature row of the real macOS tray
+--- MODULE: Regression — a pause keeps every feature row of the real macOS tray
 --- DESCRIPTION:
 --- Builds the tray from the REAL menu modules while the script is paused and
 --- checks what hs.menubar would receive at the top level.
 ---
---- WHY IT EXISTS: each feature builder decided its own pause gating, so only
---- Shortcuts and Gestures greyed out; Hotstrings, AI, Metrics and Tap-Holds
---- stayed live during « pause = tout éteint », and Metrics could even be toggled.
---- The meta rows and the title row that resumes the script must stay usable.
+--- WHY IT EXISTS: a pause stops typing, not configuration (EDD-1, maintainer
+--- decision 2026-11-12), so every feature row stays reachable while paused;
+--- the meta rows and the title row that resumes the script stay usable too.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -166,15 +165,17 @@ end
 helpers.describe("the real macOS tray while paused", LayoutFixture.scoped(function()
 	local menu, build_error = build_tray(true)
 
-	helpers.it("greys every feature row and strips its handler while paused", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("keeps every feature row live while paused (edd1-paused-writes)", function()
 		helpers.assert_nil(build_error, "Builder.generate raised while paused")
 		local rows = index_rows(menu, FEATURE_ROWS)
+		local greyed = {}
 		for _, key in ipairs(FEATURE_ROWS) do
 			local row = rows[key]
 			helpers.assert_true(row ~= nil, "the paused tray lost its '" .. key .. "' row")
-			helpers.assert_true(row.disabled == true, "'" .. key .. "' must be greyed while paused")
-			helpers.assert_nil(row.fn, "'" .. key .. "' must not stay clickable while paused")
+			if row.disabled == true then greyed[#greyed + 1] = key end
 		end
+		helpers.assert_eq(table.concat(greyed, ", "), "", "no feature row greys while paused")
 	end)
 
 	helpers.it("keeps the meta rows and the resume title row usable while paused", function()

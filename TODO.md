@@ -1357,7 +1357,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       (`_LayMgrWeb_*`), `ui/hotstrings_config_window`, `ui/action_picker`, `ui/model_browser` and
       `ui/physical_shortcuts`; keep `ready`'s handling. Test in each editor's suite: a save while suspended writes the
       file. Extended the same day into a « real pause »: also remove the Suspend gates on every configuration or
-      install action, i.e. the tray rows the manifest marks `greyed_when_paused` (they stay live while suspended),
+      install action, i.e. the tray rows the manifest marks `greyed_when_paused` (they stay live while suspended;
+      `menu_init.ahk` is now the only reader of that key, so delete it from `menu.toml` together with the gates),
       each menu's whole-scope restore and clear and the Configuration menu's, opening the physical shortcuts
       editor, adding or deleting hotstrings, and installs (layouts, Ollama or MLX models, apps). Then confirm that
       nothing that acts on typing stays active under Suspend (hotstrings, layout emulation, tap-holds, layers and

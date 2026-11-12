@@ -227,8 +227,10 @@ french_magickey = "FrenchMagicKey"
 # maintainer's order of 2026-10-01). A separator is drawn only between two
 # rows a platform shows.
 #
-# `greyed_when_paused` marks feature rows; every driver greys and disables those
-# rows while keeping the configuration and lifecycle tail available.
+# `greyed_when_paused` marks feature rows. Only the AHK tray still greys them
+# under Suspend: a pause stops typing, not configuration (EDD-1, maintainer
+# decision 2026-11-12), so the macOS and Linux trays keep them live, and the
+# Windows agent deletes the key together with its A_IsSuspended gates.
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
 [[menu.top_level]]

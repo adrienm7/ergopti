@@ -4080,11 +4080,6 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 			],
 			[
 				'linux/ui/menu/builder.lua',
-				'local function _grey_for_pause(row)\n',
-				'local function _grey_for_pause(row)\ndo return nil end\n'
-			],
-			[
-				'linux/ui/menu/builder.lua',
 				'local function _row_is_for_linux(row)\n',
 				'local function _row_is_for_linux(row)\ndo return false end\n'
 			],
