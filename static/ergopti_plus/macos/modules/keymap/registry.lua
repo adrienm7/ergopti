@@ -833,10 +833,11 @@ function M.add(trigger, replacement, opts)
 	-- Title/UPPER replacement plain-text forms are computed lazily below, only on
 	-- the explicit-variant path (the case-conform path never needs them, which is
 	-- the bulk of the corpus at startup).
-	-- Case variants belong to the trigger BODY, never to the configured magic
-	-- action suffix. With an alphabetic key such as "a", uppercasing the whole
-	-- string registered "BTWA" while the physical action is still lowercase
-	-- "a", making the advertised uppercase expansion unreachable.
+	-- Case variants belong to the trigger body; a letter magic key follows the
+	-- word's case in the UPPER variant, as Windows' conform compares against the
+	-- uppercased canonical trigger (maintainer decision HSE-004, 2026-11-12):
+	-- with the key "a", BTWA (Shift held on the magic press) expands and BTWa
+	-- does not. The Title variant keeps the key lowercase (Btwa), as Windows.
 	local case_suffix = ""
 	local case_body   = trigger
 	if owns_magic then
@@ -898,8 +899,9 @@ function M.add(trigger, replacement, opts)
 			title_trigs[#title_trigs + 1] = body .. case_suffix
 		end
 		local upper_trigs = {}
+		local upper_suffix = case_suffix ~= "" and (text_utils.trig_upper(case_suffix)[1] or case_suffix) or ""
 		for _, body in ipairs(text_utils.trig_upper(lower_body)) do
-			upper_trigs[#upper_trigs + 1] = body .. case_suffix
+			upper_trigs[#upper_trigs + 1] = body .. upper_suffix
 		end
 
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, false)

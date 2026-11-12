@@ -679,6 +679,17 @@ end
 --- @param event_chars string|nil Real physical payload at commit time. Preview
 ---        callers omit it and resolve the configured logical action.
 --- @return table|nil resolution
+--- The uppercase form of a letter magic key, which completes an uppercase
+--- trigger (HSE-004), or nil for a key without one (★, punctuation).
+--- @param magic string The configured magic key.
+--- @return string|nil upper
+function M.cased_magic(magic)
+	if type(magic) ~= "string" or text_utils.utf8_len(magic) ~= 1 then return nil end
+	local upper = text_utils.trig_upper(magic)[1]
+	if upper == nil or upper == magic then return nil end
+	return upper
+end
+
 function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 	if not require_state("resolve_magic_action") then return nil end
 	if type(buffer) ~= "string" then return nil end
@@ -686,8 +697,12 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 
 	local magic = _state.magic_key
 	if type(magic) ~= "string" or magic == "" then return nil end
-	if event_chars ~= nil and not Terminators.matches_magic_event(event_chars, magic) then return nil end
+	local cased = event_chars ~= nil and event_chars == M.cased_magic(magic)
+	if event_chars ~= nil and not cased and not Terminators.matches_magic_event(event_chars, magic) then return nil end
 	local physical_magic = event_chars or magic
+	-- The magic key as the trigger spells it: its uppercase completes an
+	-- uppercase trigger (HSE-004).
+	local typed_magic = cased and event_chars or magic
 	local auto_buffer = nil
 	local star_attempts = {}
 	local literal_attempts = {}
@@ -698,7 +713,7 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 		local tail_char = (ok_tail and tail_offset) and buffer:sub(tail_offset) or nil
 		local star_bucket = tail_char and _registry.mappings_for_star_tail(tail_char) or nil
 		local bare_star_bucket = _registry.mappings_for_star_tail("")
-		auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. magic) or nil
+		auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. typed_magic) or nil
 		-- A bare magic-key mapping is globally shortest, so scanning it after the
 		-- tail-specific bucket preserves the registry's longest-first order without
 		-- rebuilding or linearly scanning the full magic-key bucket per preview.
