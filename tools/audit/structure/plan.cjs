@@ -904,9 +904,7 @@ function sharedLists(text) {
 			)
 		];
 		const handed = uses.some((u) =>
-			(u[1].match(/[A-Za-z_]\w*/g) || []).some((param) =>
-				new RegExp(`\\b\\w*[sS]hared(?!_llm)\\w*\\(\\s*${param}\\s*\\)`).test(u[2])
-			)
+			(u[1].match(/[A-Za-z_]\w*/g) || []).some((param) => handsToShared(u[2], param))
 		);
 		if (!handed) continue;
 		// The array runs to its matching bracket.
@@ -921,8 +919,24 @@ function sharedLists(text) {
 		}
 		if (end > 0) listRanges.push([m.index + m[0].length - 1, end]);
 	}
+	// for (const rel of ['modules/features/manifest.toml', …]) … resolve(sharedDir, rel)
+	for (const m of text.matchAll(/\bfor\s*\(\s*const\s+([A-Za-z_]\w*)\s+of\s+\[([^\]]*)\]\s*\)/g)) {
+		const body = text.slice(m.index + m[0].length, m.index + m[0].length + 400);
+		if (handsToShared(body, m[1]))
+			listRanges.push([m.index + m[0].indexOf('['), m.index + m[0].lastIndexOf(']')]);
+	}
 	listText = text;
 	return listRanges;
+}
+
+/** True when `code` hands `name` to a shared helper or joins it onto a shared base. */
+function handsToShared(code, name) {
+	return (
+		new RegExp(`\\b\\w*[sS]hared(?!_llm)\\w*\\(\\s*${name}\\s*\\)`).test(code) ||
+		new RegExp(
+			`\\b(?:path\\.)?(?:resolve|join)\\(\\s*\\w*[sS][hH][aA][rR][eE][dD]\\w*\\s*,\\s*${name}\\s*\\)`
+		).test(code)
+	);
 }
 
 // A JavaScript require of a Node module or a dependency is not a Lua load,
@@ -1208,6 +1222,8 @@ function joinedPaths(text) {
 			more,
 			after,
 			index: start,
+			// The call up to the joined pieces: the row matches at this site only.
+			prefix: text.slice(m.index, start),
 			text: text.slice(start, at),
 			parts,
 			quote,
@@ -1632,7 +1648,9 @@ function scanFile(file, text, ctx) {
 				sharedRootRewrite(lineAt(text, j.index)) !== lineAt(text, j.index)
 			)
 				continue;
-			add(hit.kind, j.text, hit.rendered, hit);
+			// With its call prefix, so the same pieces elsewhere ('lua' in a file
+			// name expression) are left alone.
+			add(hit.kind, j.prefix + j.text, j.prefix + hit.rendered, hit);
 		}
 	// A scan scope over a folder the plan scatters (edits.cjs FOLDER_EDITS):
 	// the step that empties the folder rewrites it as listed, and a listed

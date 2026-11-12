@@ -335,6 +335,22 @@ function run() {
 			),
 			'assert.match(lua, /shared\\("zz_probe_hs\\/data\\/a\\.toml"\\)/);'
 		);
+		// A join is respelled where it is, not wherever its pieces recur.
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				"const d = path.join(SHARED, 'zz_probe_lua');\nconst ext = lua ? 'zz_probe_lua' : 'ahk';"
+			),
+			"const d = path.join(SHARED, 'zz_probe_text');\nconst ext = lua ? 'zz_probe_lua' : 'ahk';"
+		);
+		// An inline list joined onto a shared-named base.
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				"for (const rel of ['zz_probe_mod/hotstrings/a.toml']) {\n\tfs.writeFileSync(resolve(sharedDir, rel), t);\n}"
+			),
+			"for (const rel of ['zz_probe_hs/data/a.toml']) {\n\tfs.writeFileSync(resolve(sharedDir, rel), t);\n}"
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
