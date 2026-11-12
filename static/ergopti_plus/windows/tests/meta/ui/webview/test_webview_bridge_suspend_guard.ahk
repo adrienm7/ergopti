@@ -191,12 +191,24 @@ _A0720WV_ManualBridgeHasSuspendPolicy(Fn, Body) {
 		"the updater bridges must capture AHK-14 provenance before the COM message read can yield")
 }
 
+; A pause stops typing, not configuration (EDD-1, maintainer decision
+; 2026-11-12): these configuration pages save while suspended, so their
+; handlers must NOT gate on A_IsSuspended (edd1-paused-writes). Every other
+; handler keeps its guard until its own page joins this list.
+_A0720WV_ConfigurationHandlers() {
+	return Map("_HsEdWeb_OnWebMessage", true, "_PiEdWeb_OnWebMessage", true)
+}
+
 _A0720WV_EveryHandlerIsSuspendGuarded() {
 	Checked := 0
+	Configuration := _A0720WV_ConfigurationHandlers()
 	for _, Fn in _A0720WV_MessageHandlers() {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . " must exist — if a host was renamed, update this list rather than dropping the handler from the invariant")
-		if InStr(Body, "_Updater_ReadManualBridgeMessage(")
+		if Configuration.Has(Fn)
+			Assert(InStr(Body, "A_IsSuspended") == 0,
+				Fn . " is a configuration page: a suspended driver still saves what it sends (EDD-1)")
+		else if InStr(Body, "_Updater_ReadManualBridgeMessage(")
 			_A0720WV_ManualBridgeHasSuspendPolicy(Fn, Body)
 		else
 			Assert(InStr(Body, "A_IsSuspended") > 0,
@@ -217,7 +229,7 @@ Test("webview: every message handler honours the suspend invariant (F-25)",
 ; model browser ended up with a permanently empty table (F-32's class).
 _A0720WV_ReadyIsNotGatedAway() {
 	for _, Fn in ["_OnbWeb_OnWebMessage", "_HCWWeb_OnWebMessage", "_PathsEdWeb_OnWebMessage"
-	            , "_PiEdWeb_OnWebMessage", "_ActPickWeb_OnWebMessage"] {
+	            , "_ActPickWeb_OnWebMessage"] {
 		Body := _DriverFuncBody(Fn)
 		if (Body == "" or InStr(Body, "ready") = 0)
 			continue

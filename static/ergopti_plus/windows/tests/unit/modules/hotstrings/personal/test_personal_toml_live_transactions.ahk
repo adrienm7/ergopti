@@ -275,13 +275,14 @@ _PTIOCX_Reload(Data, SectionName, FeatureConfig) {
 	_PTIOCX_ReloaderWasCritical := _PTIOCX_ReloaderWasCritical || A_IsCritical
 }
 
-; Suspend can be active before admission or arrive while the complete stage is
-; being written. Neither sequence may reach atomic replacement or live HSE.
-_PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
+; A pause stops typing, not configuration (EDD-1, maintainer decision
+; 2026-11-12): Suspend active before admission, or arriving while the complete
+; stage is written, still publishes the save (edd1-paused-writes).
+_PTIOCX_SuspendStillPublishes() {
 	global ScriptInformation, _ReadPersonalTomlCache
 	global _PTIOCX_WriteCalls, _PTIOCX_ReplaceCalls, _PTIOCX_ReloadCalls
 	global _PTIOCX_WriterWasCritical, _PTIOCX_ReplacerWasCritical
-	global PERSONAL_TOML_COMMIT_FAILED
+	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_OK
 	Path := A_Temp . "\\ergopti_personal_suspend_transaction_"
 		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
 	Original := '[_meta]`ndescription = "old"`n'
@@ -298,15 +299,17 @@ _PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
 
 		_PTIOCX_Reset()
 		Suspend(1)
-		AssertEqual(PERSONAL_TOML_COMMIT_FAILED,
+		AssertEqual(PERSONAL_TOML_COMMIT_OK,
 			PersonalTomlCommitAndReload(Data, 0, _PTIOCX_WriteStage.Bind(),
 				_PTIOCX_ReplaceStage.Bind(), 0, 0, _PTIOCX_Reload.Bind()))
-		AssertEqual(0, _PTIOCX_WriteCalls,
-			"a save received under Suspend must fail before staging")
-		AssertEqual(0, _PTIOCX_ReplaceCalls)
-		AssertEqual(0, _PTIOCX_ReloadCalls)
-		AssertEqual(Original, FileRead(Path, "UTF-8-RAW"))
+		AssertEqual(1, _PTIOCX_WriteCalls,
+			"a save received under Suspend is staged")
+		AssertEqual(1, _PTIOCX_ReplaceCalls, "and replaces the file")
+		AssertTrue(FileRead(Path, "UTF-8-RAW") != Original, "the suspended save is durable")
 		Suspend(0)
+		FileDelete(Path)
+		FileAppend(Original, Path, "UTF-8-RAW")
+		_ReadPersonalTomlCache := false
 
 		_PTIOCX_Reset()
 		TerminalBundle := _ConfigWriteTerminalTryAcquire([Path])
@@ -322,22 +325,20 @@ _PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
 		} finally _ConfigWriteTerminalRelease(TerminalBundle)
 
 		_PTIOCX_Reset("suspend-stage")
-		AssertEqual(PERSONAL_TOML_COMMIT_FAILED,
+		AssertEqual(PERSONAL_TOML_COMMIT_OK,
 			PersonalTomlCommitAndReload(Data, 0, _PTIOCX_WriteStage.Bind(),
 				_PTIOCX_ReplaceStage.Bind(), 0, 0, _PTIOCX_Reload.Bind()))
 		AssertTrue(A_IsSuspended,
-			"the injected stage seam must place the final authorization under Suspend")
+			"the injected stage seam places the final authorization under Suspend")
 		AssertEqual(1, _PTIOCX_WriteCalls)
-		AssertEqual(0, _PTIOCX_ReplaceCalls,
-			"a suspension observed after staging must refuse the atomic replacement")
-		AssertEqual(0, _PTIOCX_ReloadCalls,
-			"a refused durable publication must never mutate the live registry")
-		AssertEqual(Original, FileRead(Path, "UTF-8-RAW"))
+		AssertEqual(1, _PTIOCX_ReplaceCalls,
+			"a suspension observed after staging still replaces the file")
+		AssertTrue(FileRead(Path, "UTF-8-RAW") != Original)
 		AssertFalse(_PTIOCX_WriterWasCritical,
-			"the suspend-aware owner must not make staging Critical")
+			"the owner must not make staging Critical")
 		AssertFalse(_PTIOCX_ReplacerWasCritical)
 		_PTIOP_AssertLeaseFree(Path,
-			"every suspended refusal must release the personal path owner")
+			"every suspended save must release the personal path owner")
 	} finally {
 		if A_IsSuspended
 			Suspend(0)
@@ -349,8 +350,8 @@ _PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
 		_PTIOCX_Reset()
 	}
 }
-Test("personal-toml-live-transaction: Suspend refuses admission and post-stage publication",
-	_PTIOCX_SuspendRefusesBeforeDurableAndLivePublication)
+Test("personal-toml-live-transaction: Suspend still publishes the save (edd1-paused-writes)",
+	_PTIOCX_SuspendStillPublishes)
 
 ; A path relocation after request capture must be observed both before atomic
 ; replacement and again before the matching live registry projection.
@@ -553,14 +554,15 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 		"a deferred WebView failure must be user-visible, not only logged")
 	WebMessageBody := _DriverFuncBody("_HsEdWeb_OnWebMessage")
 	Assert(WebMessageBody != "")
-	Assert(InStr(WebMessageBody, "_HsEdWeb_ShowSaveFailure") > 0,
-		"a WebView save received under Suspend must surface its refusal")
+	; A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+	Assert(InStr(WebMessageBody, "A_IsSuspended") == 0,
+		"a WebView save received under Suspend is handled like any other")
 	ShowFailureBody := _DriverFuncBody("_HsEdWeb_ShowSaveFailure")
 	Assert(ShowFailureBody != "")
 	; The failure script is built by one owner the reporter delegates to.
 	FailureJsBody := _DriverFuncBody("_HsEdWeb_SaveFailureJs")
 	Assert(InStr(ShowFailureBody, "_HsEdWeb_SaveFailureJs(") > 0 && InStr(FailureJsBody, "save-toast") > 0,
-		"the suspended refusal must replace the page's optimistic saved toast")
+		"a refused save must replace the page's optimistic saved toast")
 	for FunctionName in ["_PersonalTomlQueueLiveRequest",
 			"_PersonalTomlTryPublishRequest",
 			"_PersonalTomlPublishRequestOwned"] {
@@ -704,9 +706,7 @@ _PT102_Reload(Context, Data, SectionName, FeatureConfig) {
 _PT102_Commit(Context, Data, Deferred := false) {
 	Args := [Data, 0, _PT102_Stage.Bind(Context), _PT102_Replace.Bind(Context),
 		0, _PT102_Authorize.Bind(Context), _PT102_Reload.Bind(Context),
-		Deferred ? _PT102_Terminal.Bind(Context) : 0, 0]
-	if PersonalTomlCommitAndReload.MaxParams >= 10
-		Args.Push(Context.source)
+		Deferred ? _PT102_Terminal.Bind(Context) : 0, Context.source]
 	return PersonalTomlCommitAndReload(Args*)
 }
 
@@ -1041,7 +1041,8 @@ _PTA_FinalHotstring(Context) {
 		AssertTrue(Facts.admitted_before, "the live genuine session must pass before the cutpoint revokes it")
 		AssertTrue(Facts.stage != "")
 		AssertFalse(FileExist(Facts.stage), "success consumes the stage; refusal cleans it")
-		if Context.mode == "live" {
+		; A pause stops typing, not configuration (EDD-1): a paused rename publishes (edd1-paused-writes).
+		if Context.mode == "live" || Context.mode == "pause" {
 			AssertTrue(Result)
 			AssertTrue(FSUtf8ExactMatches(Context.path, Candidate))
 			AssertEqual(1, Facts.published)
@@ -1089,7 +1090,8 @@ _PTA_FinalMetadata(Context) {
 	AssertFalse(Facts.hook_critical)
 	AssertTrue(Facts.leased, "the genuine patch holds its existing owner through the cutpoint")
 	AssertFalse(FileExist(Facts.stage))
-	if Context.mode == "live" {
+	; A pause stops typing, not configuration (EDD-1): a paused rename publishes (edd1-paused-writes).
+	if Context.mode == "live" || Context.mode == "pause" {
 		AssertTrue(Result)
 		AssertTrue(FSUtf8ExactMatches(Context.path, Candidate))
 	} else {
@@ -1173,7 +1175,8 @@ _PTA_FinalInformation(Mode) {
 		AssertFalse(Facts.replace_critical, "the existing arbitrary two-argument ReplaceFn ABI stays outside Critical")
 		AssertTrue(Facts.admitted_before)
 		AssertFalse(FileExist(Facts.stage))
-		if Mode == "live" {
+		; A pause stops typing, not configuration (EDD-1): a paused rename publishes (edd1-paused-writes).
+		if Mode == "live" || Mode == "pause" {
 			AssertTrue(Result)
 			AssertTrue(FSUtf8ExactMatches(Path, Candidate))
 			AssertEqual(1, Facts.published)

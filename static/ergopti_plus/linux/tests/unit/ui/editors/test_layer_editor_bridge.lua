@@ -67,6 +67,7 @@ end
 local function remove_config_dir(dir)
 	os.remove(dir .. "/layers.toml")
 	os.remove(dir .. "/tap_hold.toml")
+	os.remove(dir .. "/config.toml")
 	os.execute('rmdir "' .. dir .. '"')
 end
 
@@ -252,7 +253,11 @@ helpers.describe("Linux navigation layer editor bridge", function()
 				set_remapper = function() end }
 			-- The shipped tap-hold keys in force, as the recommended import leaves them.
 			local config = assert(io.open(dir .. "/tap_hold.toml", "wb"))
-			config:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n")
+			config:write("[tap_hold]\ninherit_defaults = true\n")
+			config:close()
+			-- The switch is a config.toml row.
+			config = assert(io.open(dir .. "/config.toml", "wb"))
+			config:write("[tap_holds]\nenabled = true\n")
 			config:close()
 			Manager._reset_for_test()
 			Manager.init({ keyboard_hook = hook, execute_action = function() end,
@@ -306,9 +311,12 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local dir = make_config_dir()
 		local config = assert(io.open(dir .. "/tap_hold.toml", "wb"))
-		config:write('[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+		config:write('[tap_hold]\ninherit_defaults = false\n'
 			.. '[tap_hold.keys.left_alt]\ntime_activation_seconds = 0.2\n'
 			.. 'tap_action = "backspace"\nhold_layer = "nav"\n')
+		config:close()
+		config = assert(io.open(dir .. "/config.toml", "wb"))
+		config:write("[tap_holds]\nenabled = true\n")
 		config:close()
 		local world = make_state(dir)
 		local hook = { key_text = function() return nil end,

@@ -21,7 +21,7 @@ local function with_file(source, body)
 		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
 		require("config_outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
-		local path = os.tmpname()
+		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
@@ -29,12 +29,19 @@ local function with_file(source, body)
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
 		local Text = require("tests.support.tap_hold_file_text")
-		source = Text.file(source)
+		local source_config
+		source, source_config = Text.file(source)
 		write(source)
+		Text.write_config(path, source_config)
 		local files = require("adapters.file_system")
 		local native_write, native_conditional, native_read = files.write, files.write_if_unchanged, files.read_with_status
 		local controls = { writes = 0 }
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The manifest rows publish to the config.toml beside it, counted apart.
+			if destination == Text.config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				return native_conditional(destination, content, expected)
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = controls.expected or source })
@@ -51,9 +58,9 @@ local function with_file(source, body)
 		end
 		local ok, err = pcall(body, { config = config, path = path, files = files, warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
-			decode = Text.model, file = Text.file, original = source })
+			decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = source })
 		files.write, files.write_if_unchanged, files.read_with_status = native_write, native_conditional, native_read
-		os.remove(path); os.remove(path .. ".tmp")
+		Text.remove_private(path)
 		if not ok then error(err, 0) end
 	end)
 end

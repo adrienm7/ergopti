@@ -32,19 +32,16 @@ global _TomlCountCache   := Map()   ; key = CategoryName|SectionName → count
 global _TomlFileSectionCounts := Map()
 
 ; Pre-compiled regex for a full TOML hotstring entry line. Defined once at
-; module level so AHK does not recompile this ~100-char pattern for every line
-; scanned by LoadHotstringsSection (thousands of iterations at boot).
-; The trailing is_case_sensitive_strict and priority keys are both optional so a
-; personal entry carrying an individual `priority = N` override still matches —
-; without that group the boot loader would silently skip the whole entry and the
-; per-hotstring priority feature would be a no-op (the value is then read back by
-; _ParseEntryPriority, which is order-tolerant).
+; module level so AHK does not rebuild this pattern for every line scanned by
+; LoadHotstringsSection (thousands of iterations at boot).
 ; The trigger is a quoted key or a bare one (A-Z a-z 0-9 _ -); the branch reset
 ; keeps it group 1 either way. The editor wrote bare keys (1.0.9) that this
 ; pattern skipped, so a personal `par` hotstring never loaded and never fired.
-; HS_PREFIX_ENTRY_PATTERN (hotstring_registry.ahk) holds the same key grammar.
-global _HOTSTRING_ENTRY_PATTERN :=
-		'i)^(?|"([^"\\]*(?:\\.[^"\\]*)*)"|([A-Za-z0-9_\-]+))\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+; Groups: 1 trigger, 2 output, 3 is_word, 4 auto_expand, 5 is_case_sensitive,
+; 6 final_result, 7 is_case_sensitive_strict, 8 priority (built by
+; HS_EntryPattern, which HS_PREFIX_ENTRY_PATTERN in hotstring_registry.ahk shares).
+global _HOTSTRING_ENTRY_PATTERN := HS_EntryPattern(["is_word", "auto_expand",
+	"is_case_sensitive", "final_result", "is_case_sensitive_strict", "priority"])
 
 ; Simple `key = "value"` entry shape that LoadExtTomlFile also registers (as a
 ; CreateCaseSensitiveHotstrings call) when the full inline-table pattern misses.
@@ -65,6 +62,34 @@ global _HOTSTRING_SIMPLE_ENTRY_PATTERN :=
 ; be previewed. The two sides were unified on the FILE SET first; this is the
 ; other half, the GRAMMAR, and a shared constant is what stops it drifting again.
 global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
+
+
+
+
+
+; Builds the inline-table entry pattern: `output` is required, every flag and
+; `priority` optional and in any order (maintainer decision HSE-002, 2026-11-12:
+; the Lua reader defaults a missing flag to false, and an entry the editor or a
+; user wrote in another order used to be dropped here). Each lookahead walks the
+; table member by member, so a key spelled inside the output text is never read
+; as a flag. Group 1 is the trigger, 2 the output, then one group per name of
+; CapturedKeys in order (empty when the key is absent).
+; @param CapturedKeys {Array} Flag names (or "priority") to capture.
+; @returns {String} The case-insensitive pattern, anchored at the line start.
+HS_EntryPattern(CapturedKeys) {
+	StrBody := '[^"\\]*(?:\\.[^"\\]*)*'
+	Member := '(?:output\s*=\s*"' . StrBody . '"'
+		. '|(?:is_word|auto_expand|is_case_sensitive|final_result|is_case_sensitive_strict)\s*=\s*(?:true|false)'
+		. '|priority\s*=\s*[0-9]+)'
+	Skip := '\{\s*(?:' . Member . '\s*,\s*)*?'
+	Pattern := 'i)^(?|"(' . StrBody . ')"|([A-Za-z0-9_\-]+))\s*=\s*'
+		. '(?=' . Skip . 'output\s*=\s*"(' . StrBody . ')")'
+	for Key in CapturedKeys {
+		Value := (Key == "priority") ? "([0-9]+)" : "(true|false)"
+		Pattern .= '(?=(?:' . Skip . Key . '\s*=\s*' . Value . ')?)'
+	}
+	return Pattern . '\{\s*' . Member . '(?:\s*,\s*' . Member . ')*\s*\}'
+}
 
 
 

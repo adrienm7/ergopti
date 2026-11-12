@@ -91,22 +91,11 @@ ops = [
 #   old file is renamed with once its content is published in tap_hold.toml
 #   (kept, never deleted: it is the user's backup). The driver imports only
 #   while its tap_hold.toml does not exist yet, so the import runs once; with
-#   both files present the shared one wins and the old one is left alone.
-#   translate = "config_section": a `section` the driver's config.toml kept,
-#   moved as it is (_shared/lua/tap_hold/migrate.lua from_config_section), then
-#   deleted from config.toml line by line; config.toml is not renamed. Both
-#   files are backed up first, tap_hold.toml is published first: a crash
-#   between the two writes leaves both copies equal, and the next boot only
-#   deletes the old one. When tap_hold.toml already holds a different
-#   `section`, the shared file wins and config.toml is left as it is.
+#   both files present the shared one wins and the old one is left alone. The
+#   macOS boot imports before it versions config.toml, whose v21_to_v22 step
+#   (_shared/core/config_schema/migrations.toml) then moves the switch, the
+#   timings and the key combinations on into config.toml.
 [legacy_imports.hs]
 source = "config_karabiner.toml"
 translate = "karabiner"
 retired_suffix = ".migrated"
-
-# Decided by the coordinator on 2026-11-11 overnight, to review by the
-# maintainer: Linux kept [mod_combos] in config.toml until 1.0.9.
-[legacy_imports.linux]
-source = "config.toml"
-translate = "config_section"
-section = "mod_combos"

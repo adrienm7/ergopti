@@ -12,8 +12,9 @@ Decided by the maintainer on 2026-11-12 (HSE-002): a bare-key entry
 hotstring with an end character, case-conform and final) load on every OS.
 The shared `toml_codec/reader.lua` accepts them only in a section the
 document's `[_meta] sections_order` lists, so `constants.toml`, the tap-hold
-defaults and the tooltip configuration parse as before. Windows has a TODO
-line for an inline-table entry in another key order or with only `output`.
+defaults and the tooltip configuration parse as before. Windows'
+`HS_EntryPattern` (`infra/toml/toml_loader.ahk`) also takes an inline-table
+entry in any key order or with only `output`, each missing flag false.
 Regression `hse-002-short-entry-forms`.
 
 ## A no-break space counts as a space inside a trigger (2026-11-12)
@@ -21,8 +22,9 @@ Regression `hse-002-short-entry-forms`.
 Decided by the maintainer on 2026-11-12 (HSE-003): a trigger with an inner
 space fires when typed with U+00A0 or U+202F there, on every OS; a trigger
 starting with a space (a word-boundary guard) keeps its own. macOS
-(`add_with_space_variants`) and the shared engine register the variants;
-Windows has a TODO line. Regression `hse-003-nbsp-trigger`.
+(`add_with_space_variants`), the shared engine and Windows
+(`HSE_NoBreakSpaceVariants`, cased and literal families) register the
+variants. Regression `hse-003-nbsp-trigger`.
 
 ## A letter magic key follows the word's case (2026-11-12)
 
@@ -42,8 +44,8 @@ names them per executable (`settings` under the platform's configuration
 folder, `extensions` under `{home}`) and marks the replaced argument
 `user_folder: "extensions"`; the change is additive, so the current AHK reader
 keeps working. macOS (`clone_app.sh`, variant from the bundled CLI) and Linux
-(`app_cloner_core.lua`) read it; Windows has its TODO line. Regressions
-`bap-004-vscode-variants`.
+(`app_cloner_core.lua`) and Windows (`AppCloner_UserFolders`) read it.
+Regressions `bap-004-vscode-variants`.
 
 ## The Linux Encryptor opens only .enc files by default (2026-11-12)
 
@@ -71,8 +73,7 @@ Decided by the maintainer on 2026-11-12: the item a clone opens follows the
 macOS `validateOpenArg`: a path, absolute or under « ~ » (expanded), must
 exist; anything else needs « :// » or Teams' `msteams:/l/` and
 `msteams:/calendar` forms, so « https:/x » and « localhost:3000 » are refused.
-Linux follows it since BAP-005; Windows' `_AppCloner_InvalidOpenItem` has its
-TODO line.
+Linux follows it since BAP-005, Windows' `_AppCloner_InvalidOpenItem` too.
 
 ## A pause stops typing, not configuration (2026-11-12)
 
@@ -101,6 +102,42 @@ and clear). The Windows `A_IsSuspended` configuration gates are to remove
 configuration action; gate the typing runtime instead.
 
 ## One configuration layout on every OS for tap-holds (2026-11-11)
+
+Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
+and the overnight Linux `[mod_combos]` move: one home per manifest path on
+every OS. `config.toml` holds every `[[features.*]]` row and the settings of
+the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
+`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
+symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
+`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
+`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
+`inherit_defaults`, the global delay `time_activation_seconds`,
+`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
+section (`_shared/tap_hold/SCHEMA.md`).
+
+- One migration step moves the old homes: `v21_to_v22` of
+  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
+  macOS and Linux (Windows already kept these rows in `config.toml`). The
+  boot names the driver's `tap_hold.toml` (macOS first carries an old
+  `config_karabiner.toml` over into it); the engine copies the values into
+  `config.toml` where it holds none, after its byte-exact backup, and the
+  driver then deletes the moved values from `tap_hold.toml`, after a backup
+  of that file. The config stamp makes it run once; a value left in
+  `tap_hold.toml` by a crash between the two writes is never read and is
+  warned as outdated.
+- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
+  the two files each driver writes; each suite pins its own and reads the
+  others'. Do not move a manifest row back into `tap_hold.toml`.
+- TCL-004, decided by the maintainer on 2026-11-12, « follow the position »: a
+  thumb-key setting follows the key at the same place under the thumb. The
+  shared file names the catalogue's positional PC id: the Mac `left_command`
+  is `left_alt`, `right_command` is `alt_gr` and `right_option` is
+  `right_ctrl`, after the order of `[tap_hold.catalog]`; the table is
+  `_shared/tap_hold/shared_file.toml` `[thumb_positions]`.
+  `shared_file.lua` maps the Mac thumb ids to those ids on read and write, so
+  Linux and Windows honour a key a Mac bound; a file still holding a Mac thumb
+  id is read as its positional key by the three drivers (Windows:
+  `tap_hold_loader.ahk` `_TapHoldPositionalKey`).
 
 ## The Linux decoder judges millimetres (2026-11-11)
 
@@ -234,34 +271,6 @@ counterparts (maintainer): TODO « Windows (the PC agent's) ».
 
 ## No Linux keyboard slot runs through a pause (2026-11-11)
 
-Decided by the maintainer on 2026-11-11, settling the 2026-11-10 entry below
-and the overnight Linux `[mod_combos]` move: one home per manifest path on
-every OS. `config.toml` holds every `[[features.*]]` row and the settings of
-the same sections: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms` and
-`sticky_timeout_ms`, and the whole `[mod_combos]` section (switch, timing,
-symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
-`[category_enabled]` and `[shortcuts.key_combination_*]`. The shared
-`tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
-`inherit_defaults`, the global delay `time_activation_seconds`,
-`[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
-section (`_shared/tap_hold/SCHEMA.md`).
-
-- One migration step moves the old homes: `v21_to_v22` of
-  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
-  macOS and Linux (Windows already kept these rows in `config.toml`). The
-  boot names the driver's `tap_hold.toml` (macOS first carries an old
-  `config_karabiner.toml` over into it); the engine copies the values into
-  `config.toml` where it holds none, after its byte-exact backup, and the
-  driver then deletes the moved values from `tap_hold.toml`, after a backup
-  of that file. The config stamp makes it run once; a value left in
-  `tap_hold.toml` by a crash between the two writes is never read and is
-  warned as outdated.
-- A cross-driver corpus (`_shared/tests/corpus/tap_hold_shared_file/`) holds
-  the two files each driver writes; each suite pins its own and reads the
-  others'. Do not move a manifest row back into `tap_hold.toml`.
-
-## No Linux keyboard slot runs through a pause (2026-11-11)
-
 Decided by the maintainer on 2026-11-11 (SCD-1): on Linux a keyboard slot
 (`[shortcuts.keyboard]`) bound to a `script_*` action is held back while the
 driver is paused, in dry-run, or with Shortcuts off, like every other slot, as
@@ -314,7 +323,7 @@ Decided by the maintainer on 2026-11-11: the old steps of
 `_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
 the registry every driver parses at boot and most of the config test time.
 `oldest_version` is v20, what 1.0.9 (the latest public release) and every
-1.0.10 pre-release wrote; only `v20_to_v21` remains. A file stamped below it,
+1.0.10 pre-release wrote; only `v20_to_v21` remained at the squash. A file stamped below it,
 including the v12 of 1.0.0 to 1.0.6 and the v16 of 1.0.7 and 1.0.8, is refused
 cleanly on every driver: never written, the session read-only, one ERROR at
 boot and the `config.read_only.older_schema` notice naming 1.0.9 as the bridge
@@ -1218,9 +1227,10 @@ shared clipboard owner is busy. Output is neither dropped nor delayed
 ## The one-shot Shift timeout is a user setting on every OS (6 November 2026)
 
 Aligned on macOS: `sticky_timeout_ms` (2000 ms registry default) is editable on
-Windows (`config.toml` `[tap_holds]`, `_TH_CommitOneShotTimeoutMs`) and Linux
-(`tap_hold.toml` `[tap_hold]`, `set_one_shot_timeout_ms`), each with a tray row;
-only a positive whole number of milliseconds is admitted, no zero or unlimited.
+Windows (`_TH_CommitOneShotTimeoutMs`) and Linux (`set_one_shot_timeout_ms`),
+each with a tray row, in `config.toml` `[tap_holds]` on every OS since config
+schema v22; only a positive whole number of milliseconds is admitted, no zero
+or unlimited.
 
 ## CapsWord setting changes reach the running session (6 November 2026)
 

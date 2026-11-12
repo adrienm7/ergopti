@@ -187,18 +187,28 @@ _Encryptor_Browse(Ports) {
 ; ==================================
 
 /**
- * Validates the optional item to open, as the macOS builder does.
+ * Validates the optional item to open, as macOS validateOpenArg and the Linux
+ * invalid_open_item do: « ~ » is the profile folder, a path must exist, and
+ * anything else needs « :// » or a Teams « msteams:/l/ » or « msteams:/calendar »
+ * link, so « https:/x » and « localhost:3000 » are refused.
+ * @param {String} Item The trimmed answer.
+ * @param {Func} Exists Path existence port.
+ * @param {String} Home The profile folder « ~ » stands for.
+ * @param {VarRef} Resolved Receives the item to open, « ~ » expanded.
  * @returns {Array} [] when valid, else [error key, value].
  */
-_AppCloner_InvalidOpenItem(Item, Exists) {
+_AppCloner_InvalidOpenItem(Item, Exists, Home, &Resolved) {
+	Resolved := Item
 	if Item == ""
 		return []
-	if RegExMatch(Item, "^[A-Za-z]:\\|^\\\\") {
-		if Exists.Call(Item)
+	if Item == "~" || RegExMatch(Item, "^~[\\/]")
+		Resolved := Home . StrReplace(SubStr(Item, 2), "/", "\")
+	if RegExMatch(Resolved, "^[A-Za-z]:[\\/]|^\\\\") {
+		if Exists.Call(Resolved)
 			return []
 		return ["apps.cloner.err_path_missing", Item]
 	}
-	if RegExMatch(Item, "^[A-Za-z][A-Za-z0-9+.\-]*:")
+	if InStr(Item, "://") || RegExMatch(Item, "^msteams:/(?:l/|calendar)")
 		return []
 	return ["apps.cloner.err_url_format", ""]
 }
@@ -242,9 +252,11 @@ AppCloner_Run(Ports) {
 		if !(OpenItem is String)
 			return "cancelled"
 		OpenItem := Trim(OpenItem)
-		Invalid := _AppCloner_InvalidOpenItem(OpenItem, Ports["exists"])
-		if Invalid.Length == 0
+		Invalid := _AppCloner_InvalidOpenItem(OpenItem, Ports["exists"], Ports["home"], &ResolvedItem)
+		if Invalid.Length == 0 {
+			OpenItem := ResolvedItem
 			break
+		}
 		Ports["message"].Call("warning", AppText("apps.cloner.title_invalid_input"), AppText(Invalid[1], Invalid[2]))
 	}
 	if !Ports["choice"].Call(AppText("apps.cloner.title_icon_style"), AppText("apps.cloner.msg_icon_style_portable"),

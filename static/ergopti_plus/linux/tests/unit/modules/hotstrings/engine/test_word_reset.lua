@@ -424,7 +424,7 @@ helpers.describe("word reset: the daemon wiring", function()
 
 	helpers.it("word reset, resets the engine on a click at the configured boundary", function()
 		local text = source("ergopti_hotstrings.lua")
-		local click = text:find("local function on_click()", 1, true)
+		local click = text:find("local function on_click(code)", 1, true)
 		helpers.assert_true(click ~= nil)
 		local body = text:sub(click, text:find("\n\tend\n", click, true))
 		helpers.assert_contains(body, 'engine:reset(at_word_start, nil, "navigation")')

@@ -272,23 +272,8 @@ _HsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
-	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
-	; disarms hotkeys. Without this a paused driver still lets a page click write
-	; config, re-register hotstrings or launch an elevated install.
-	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
-	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready") {
-		if (Action == "save") {
-			try SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_ShowSaveFailure), -1)
-			catch as Err {
-				try LoggerError("HsEditor",
-					"Could not defer the suspended save refusal: {1}.",
-					Err.Message)
-				_HsEdWeb_ShowSaveFailure()
-			}
-		}
-		return
-	}
+	; A pause stops typing, not configuration (EDD-1, maintainer decision
+	; 2026-11-12): a suspended driver still saves what the page sends.
 	Data   := Payload.Has("data") ? Payload["data"] : Map()
 	; Defer out of the COM callback, like every sibling editor host already does
 	; (paths_editor, personal_info_editor, prompt_editor). `save` does file I/O
@@ -419,13 +404,7 @@ _HsEdWeb_DeferredSaveCompleted(OpeningSource, Added, CommitResult) {
 		return
 	global PERSONAL_TOML_COMMIT_FAILED
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
-		if A_IsSuspended {
-			try LoggerError("HsEditor",
-				"The deferred personal-hotstring save was refused after Suspend became active.")
-			_HsEdWeb_ShowSaveFailure()
-		} else {
-			_HsEdWeb_ReportSaveFailure()
-		}
+		_HsEdWeb_ReportSaveFailure()
 		return
 	}
 	try LoggerSuccess("HsEditor",
@@ -437,10 +416,6 @@ _HsEdWeb_Save(Data) {
 	global _HsEdWeb_OpeningSource
 	OpeningSource := _HsEdWeb_OpeningSource
 	if !_PersonalTomlOpeningSessionCurrent(OpeningSource) {
-		_HsEdWeb_ShowSaveFailure()
-		return
-	}
-	if A_IsSuspended {
 		_HsEdWeb_ShowSaveFailure()
 		return
 	}
@@ -462,12 +437,9 @@ _HsEdWeb_Save(Data) {
 	Added := HS_PersonalSectionsAdded(ReadPersonalToml(true)["sections_order"], order)
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
 	CommitResult := PersonalTomlCommitAndReload(WriteData,
-		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource, Added), 0, OpeningSource)
+		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource, Added), OpeningSource)
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
-		if A_IsSuspended
-			_HsEdWeb_ShowSaveFailure()
-		else
-			_HsEdWeb_ReportSaveFailure()
+		_HsEdWeb_ReportSaveFailure()
 		return
 	}
 	if (CommitResult == PERSONAL_TOML_COMMIT_DEFERRED) {
@@ -503,8 +475,6 @@ _HsEdWeb_EnableAdded(Added) {
 ; (compact_view / auto_close / default_section); map them onto the
 ; [personal_editor] keys the tray menu also reads.
 _HsEdWeb_SavePref(Data) {
-	if A_IsSuspended
-		return false
 	if (!(Data is Map) || !Data.Has("key"))
 		return
 	key := Data["key"]

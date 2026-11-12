@@ -54,8 +54,8 @@ const GROUPS = [
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
 // AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone, and
-// so is the name its atomic-write stages carry (linux/infra/stage_owner.lua), and
-// the catalogue the Lua drivers show for a system language without one.
+// so is the name its atomic-write stages carry (linux/infra/stage_owner.lua). The
+// catalogue shown for a system language without one also reaches AutoHotkey.
 const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'locales']);
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
 // the launcher's quit request to its embedded runtime (MLC-002).
@@ -64,6 +64,9 @@ const PROJECTED_GROUPS = GROUPS.filter(
 	(group) => !LUA_ONLY_GROUPS.has(group) && !MACOS_ONLY_GROUPS.has(group)
 );
 const SWIFT_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
+// The system-language fallback reaches AutoHotkey too: Windows falls back to the
+// same catalogue as the Lua drivers (infra/i18n.ahk _I18nDetectSystemLocale, I18W-001).
+const AHK_GROUPS = [...PROJECTED_GROUPS, 'locales'];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-
 // separated plain segments, with an optional final slash for a prefix.
@@ -204,7 +207,7 @@ ${SWIFT_GROUPS.map((group) => {
 `;
 
 /** AutoHotkey class name of a group. */
-const AHK_CLASS = SWIFT_ENUM;
+const AHK_CLASS = { ...SWIFT_ENUM, locales: 'Locales' };
 const ahk = `\uFEFF; _generated/identifiers.ahk
 ${BANNER(';')}
 #Requires AutoHotkey v2.0
@@ -213,12 +216,13 @@ ${BANNER(';')}
 ; MODULE: Application Identifiers and External Hosts
 ; DESCRIPTION:
 ; The application file names, bundle ids, service labels, external hosts and
-; field report names. A misspelt name fails at the first access. Hosts are bare
-; names: build a URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
+; field report names, and the catalogue shown for a system language without
+; one. A misspelt name fails at the first access. Hosts are bare names: build a
+; URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
 ; ==============================================================================
 
 class Identifiers {
-${PROJECTED_GROUPS.map((group) => {
+${AHK_GROUPS.map((group) => {
 	const rows = Object.entries(source[group]).map(
 		([key, value]) => `\t\tstatic ${key.toUpperCase()} := "${value}"`
 	);

@@ -22,8 +22,13 @@
 ---     silently; the rest applies;
 ---   - only [tap_hold] inherit_defaults = true lays the user file over the
 ---     shipped keys; otherwise it starts from no keys at all (an empty file is
----     the keyboard's own behaviour), and enabled = false switches the feature
----     off. The scope restore writes the preset explicitly instead;
+---     the keyboard's own behaviour). The scope restore writes the preset
+---     explicitly instead;
+---   - the switch and the two timings are manifest rows, read from config.toml
+---     `[tap_holds]` (enabled, lone_modifier_tap_max_ms, sticky_timeout_ms), as
+---     on every OS (maintainer decision of 2026-11-11). The same leaves still
+---     found in tap_hold.toml `[tap_hold]` are left there by a migration that
+---     could not finish: warned once, never read;
 ---   - a key's delay is its own `time_activation_seconds` when the user set one,
 ---     else the global delay: `[tap_hold] time_activation_seconds` when the user
 ---     set it, else the timing registry's default. No shipped key carries a
@@ -53,22 +58,21 @@ local LoneTap = require("tap_hold.lone_tap")
 local LOG = "platform.remap.tap_hold_loader"
 local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
 
--- The Windows loader's bound for time_activation_seconds; the global default is
--- the timing registry's, the one declaration every driver reads or is pinned to.
-local MAX_THRESHOLD_SECONDS = 10
+-- The bound of time_activation_seconds and the global default: the timing
+-- registry's, the one declaration every driver reads or is pinned to.
+local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
 M.GLOBAL_DEFAULT_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
 
--- How long a modifier key pressed alone still taps ([tap_hold]
--- lone_modifier_tap_max_ms, the manifest's tap_holds.lone_modifier_tap_max_ms):
--- Linux keeps it in tap_hold.toml beside the `enabled` switch.
+-- How long a modifier key pressed alone still taps (config.toml [tap_holds]
+-- lone_modifier_tap_max_ms, the manifest's tap_holds.lone_modifier_tap_max_ms).
 M.LONE_TAP_FIELD = ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS
 local LONE_TAP_FIELD = M.LONE_TAP_FIELD
 M.LONE_TAP_DEFAULT_MS = LoneTap.validate(Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 
--- How long a one-shot Shift waits for its key ([tap_hold] sticky_timeout_ms,
--- the leaf macOS keeps under [tap_holds]): a positive whole number of
--- milliseconds within the timer ceiling, the timing registry's default when
--- absent. No zero or unlimited value: macOS refuses them too.
+-- How long a one-shot Shift waits for its key (config.toml [tap_holds]
+-- sticky_timeout_ms): a positive whole number of milliseconds within the timer
+-- ceiling, the timing registry's default when absent. No zero or unlimited
+-- value: macOS refuses them too.
 M.ONE_SHOT_TIMEOUT_FIELD = ConfigKeys.LEAF.STICKY_TIMEOUT_MS
 local ONE_SHOT_TIMEOUT_FIELD = M.ONE_SHOT_TIMEOUT_FIELD
 M.ONE_SHOT_TIMEOUT_DEFAULT_MS = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
@@ -92,7 +96,28 @@ local KEY_FIELDS = {
 }
 
 -- What a warning names when a candidate document has no file path yet.
-local USER_FILE_NAME = "tap_hold.toml"
+local USER_FILE_NAME = require("tap_hold.shared_file").FILE_NAME
+
+-- The [tap_hold] leaves config.toml [tap_holds] owns since config schema v22.
+local CONFIG_OWNED_FIELDS = { "enabled", LONE_TAP_FIELD, ONE_SHOT_TIMEOUT_FIELD }
+
+-- The shared file's layout, read once: [thumb_positions] places each Mac thumb
+-- key on the PC key at its position (maintainer decision TCL-004).
+local shared_spec = nil
+
+--- The shared file's spec (_shared/tap_hold/shared_file.toml).
+--- @return table See tap_hold.shared_file.parse_spec.
+local function shared_file_spec()
+	if shared_spec == nil then
+		local path = require("infra.paths").shared("tap_hold/shared_file.toml")
+		local text, status = Writer.read_classified(path)
+		if status ~= "ok" or type(text) ~= "string" then
+			error("the shared tap-hold file spec is unreadable: " .. tostring(path), 0)
+		end
+		shared_spec = require("tap_hold.shared_file").parse_spec(TomlCodec.decode(text))
+	end
+	return shared_spec
+end
 
 --- Reads and decodes one TOML file.
 --- @param path string
@@ -214,20 +239,49 @@ function M.preset_keys(defaults_path)
 	return keys
 end
 
+--- The config.toml beside a tap_hold.toml, where the switch and the timings
+--- live: infra/config_paths.lua keeps every configuration file of a folder
+--- together.
+--- @param path string The tap_hold.toml path.
+--- @return string
+function M.config_path_for(path)
+	local folder = assert(require("native_path").dirname(path), "tap_hold.toml needs a configuration folder")
+	return folder .. "/config.toml"
+end
+
+--- Reads the config.toml the switch and the timings live in; an absent file is
+--- an empty document, an unreadable or malformed one is reported and read as
+--- absent, so every setting takes its default and nothing is half applied.
+--- @param config_path string|nil
+--- @return table|nil document
+--- @return string|nil err
+function M.read_config(config_path)
+	if not config_path then return nil end
+	local document, err = read_toml(config_path)
+	if err == "absent" then return nil end
+	if err then
+		Logger.error(LOG, "'%s' is %s — the tap-hold switch and timings take their defaults.", config_path, err)
+		return nil, err
+	end
+	return document
+end
+
 --- Loads the effective configuration.
 --- @param defaults_path string The shared defaults.toml.
 --- @param user_path string|nil The user's tap_hold.toml.
+--- @param config_path string|nil The config.toml beside it, which holds the
+---   switch and the timings; nil reads them as their defaults.
 --- @return table { enabled = boolean, keys = { [id] = fields }, user_error = string|nil,
 ---   hold_picker = table|nil, catalog = table } `catalog` is this driver's column
 ---   of the shared key catalogue: the keys the tray lists, in order, with hands.
-function M.load(defaults_path, user_path)
+function M.load(defaults_path, user_path, config_path)
 	local user, user_err, shapes = nil, nil, nil
 	if user_path then
 		user, user_err, shapes = read_toml(user_path, true)
 		if user_err == "absent" then user_err = nil end
 		if user_err then Logger.error(LOG, "User tap_hold.toml '%s' is %s — tap-holds remain neutral.", user_path, user_err) end
 	end
-	return M.load_document(defaults_path, user, user_err, user_path, shapes)
+	return M.load_document(defaults_path, user, user_err, user_path, shapes, M.read_config(config_path), config_path)
 end
 
 --- Builds the effective configuration from an already decoded user document,
@@ -239,9 +293,12 @@ end
 --- @param user_err string|nil Why the user file could not be read.
 --- @param user_path string|nil Where the user document lives, named by warnings.
 --- @param shapes table|nil Canonical receipt bound to this decoded document.
+--- @param config table|nil Decoded config.toml: its `[tap_holds]` holds the
+---   switch and the timings; nil reads them as their defaults.
+--- @param config_path string|nil Where config.toml lives, named by warnings.
 --- @return table Same shape as M.load(), plus `user_fields`: key id -> the
 ---   fields the user file sets.
-function M.load_document(defaults_path, user, user_err, user_path, shapes)
+function M.load_document(defaults_path, user, user_err, user_path, shapes, config, config_path)
 	assert(shapes == nil or (type(shapes) == "table" and type(shapes.arrays) == "table"
 		and shapes.document == user), "tap-hold shape receipt belongs to another document")
 	local defaults = read_defaults(defaults_path)
@@ -268,14 +325,34 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	end
 	local section = table_or_absent(user and user.tap_hold, { "tap_hold" })
 	local overrides = table_or_absent(section.keys, { "tap_hold", "keys" })
-	local global = {}
-	for _, field in ipairs({ "enabled", "inherit_defaults" }) do
-		local value = section[field]
-		if value ~= nil and type(value) ~= "boolean" then
-			Outdated.report_in_file(user_file, { "tap_hold", field }, "it must be true or false; the stored value is ignored")
-		else
-			global[field] = value
+	-- A leaf config.toml owns, left in tap_hold.toml by a v22 move that could
+	-- not delete it, is never read.
+	for _, field in ipairs(CONFIG_OWNED_FIELDS) do
+		if section[field] ~= nil then
+			Outdated.report_in_file(user_file, { "tap_hold", field },
+				"kept in config.toml [" .. ConfigKeys.KEY.TAP_HOLDS .. "] since config schema v22")
 		end
+	end
+	local global = {}
+	local inherit = section.inherit_defaults
+	if inherit ~= nil and type(inherit) ~= "boolean" then
+		Outdated.report_in_file(user_file, { "tap_hold", "inherit_defaults" }, "it must be true or false; the stored value is ignored")
+	else
+		global.inherit_defaults = inherit
+	end
+	local config_file = config_path or "config.toml"
+	local settings = type(config) == "table" and config[ConfigKeys.KEY.TAP_HOLDS] or nil
+	if settings ~= nil and type(settings) ~= "table" then
+		Outdated.report_in_file(config_file, { ConfigKeys.KEY.TAP_HOLDS },
+			"it must be a table; the tap-hold switch and timings take their defaults")
+		settings = nil
+	end
+	settings = settings or {}
+	if settings.enabled ~= nil and type(settings.enabled) ~= "boolean" then
+		Outdated.report_in_file(config_file, { ConfigKeys.KEY.TAP_HOLDS, "enabled" },
+			"it must be true or false; the stored value is ignored")
+	else
+		global.enabled = settings.enabled
 	end
 	-- The global delay: the user's when the file sets a usable one, else the
 	-- registry's. A key with none of its own takes it.
@@ -294,23 +371,23 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	-- How long a modifier key pressed alone still taps: the user's when the file
 	-- sets a valid one, else the manifest's default.
 	local lone_tap_max_ms = M.LONE_TAP_DEFAULT_MS
-	local stored_lone_tap = section[LONE_TAP_FIELD]
+	local stored_lone_tap = settings[LONE_TAP_FIELD]
 	if stored_lone_tap ~= nil then
 		if pcall(LoneTap.validate, stored_lone_tap) then
 			lone_tap_max_ms = stored_lone_tap
 		else
-			Outdated.report_in_file(user_file, { "tap_hold", LONE_TAP_FIELD },
+			Outdated.report_in_file(config_file, { ConfigKeys.KEY.TAP_HOLDS, LONE_TAP_FIELD },
 				string.format("%s is not 0 or a whole number of milliseconds; the window stays %d ms",
 					tostring(stored_lone_tap), M.LONE_TAP_DEFAULT_MS))
 		end
 	end
 	local one_shot_timeout_ms = M.ONE_SHOT_TIMEOUT_DEFAULT_MS
-	local stored_one_shot = section[ONE_SHOT_TIMEOUT_FIELD]
+	local stored_one_shot = settings[ONE_SHOT_TIMEOUT_FIELD]
 	if stored_one_shot ~= nil then
 		if M.valid_one_shot_timeout_ms(stored_one_shot) then
 			one_shot_timeout_ms = stored_one_shot
 		else
-			Outdated.report_in_file(user_file, { "tap_hold", ONE_SHOT_TIMEOUT_FIELD },
+			Outdated.report_in_file(config_file, { ConfigKeys.KEY.TAP_HOLDS, ONE_SHOT_TIMEOUT_FIELD },
 				string.format("%s is not a positive whole number of milliseconds; the one-shot timeout stays %d ms",
 					tostring(stored_one_shot), M.ONE_SHOT_TIMEOUT_DEFAULT_MS))
 		end
@@ -333,7 +410,20 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	-- a catalogue key Linux lacks (Fn, the Mac Option and Command keys) is theirs.
 	local catalogued = {}
 	for _, entry in ipairs(defaults.tap_hold.catalog.keys) do catalogued[entry.id] = true end
+	-- A Mac thumb key a Mac wrote under its own id is the PC key at its place,
+	-- unless the file names that key too (shared_file.toml [thumb_positions]).
+	local placed = {}
 	for key_id, override in pairs(overrides) do
+		local positional = type(key_id) == "string" and require("tap_hold.shared_file").positional_key(shared_file_spec(), key_id)
+		if positional and positional ~= key_id and remappable[positional] and overrides[positional] == nil then
+			placed[positional] = override
+		end
+	end
+	-- A copy: the decoded document is the caller's.
+	local entries = {}
+	for key_id, override in pairs(overrides) do entries[key_id] = override end
+	for key_id, override in pairs(placed) do entries[key_id] = override end
+	for key_id, override in pairs(entries) do
 		if catalogued[key_id] and not remappable[key_id] then
 			-- Left as it is for the driver that has the key.
 		elseif not remappable[key_id] then
@@ -417,19 +507,22 @@ local function behaves_as(fields, recommended, own_delay)
 end
 
 --- The first-run wizard's view of a folder's tap_hold.toml: the Tap-Holds
---- switch in force and each key it configures, as the shipped recommendation or
---- as the user's own setting, compared through the same validation the engine
---- runs. A key the file leaves to the keyboard is absent, so the wizard may
---- import it; it never imports over another one.
+--- switch in force (config.toml) and each key it configures, as the shipped
+--- recommendation or as the user's own setting, compared through the same
+--- validation the engine runs. A key the file leaves to the keyboard is
+--- absent, so the wizard may import it; it never imports over another one.
 --- @param defaults_path string The shared defaults.toml.
 --- @param user_path string The folder's tap_hold.toml.
+--- @param config_path string|nil The folder's config.toml; nil reads the switch as its default.
 --- @return table|nil report `{ enabled = boolean, keys = { [id] = "recommended"|"customised" } }`
 --- @return string|nil err Why the file could not be read.
-function M.key_report(defaults_path, user_path)
+function M.key_report(defaults_path, user_path, config_path)
 	local user, user_err, shapes = read_toml(user_path, true)
 	if user_err == "absent" then user, user_err = nil, nil end
 	if user_err then return nil, "'" .. tostring(user_path) .. "' is " .. user_err end
-	local loaded = M.load_document(defaults_path, user, nil, user_path, shapes)
+	local config, config_err = M.read_config(config_path)
+	if config_err then return nil, "'" .. tostring(config_path) .. "' is " .. config_err end
+	local loaded = M.load_document(defaults_path, user, nil, user_path, shapes, config, config_path)
 	local recommended = M.load_document(defaults_path,
 		{ tap_hold = { keys = M.preset_keys(defaults_path) } }, nil).keys
 	local keys = {}

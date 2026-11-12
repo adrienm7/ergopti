@@ -48,6 +48,18 @@ TestI18n_PauseSafe() {
 }
 Test("i18n: pause/suspend must not break locale loading or t() fallback", TestI18n_PauseSafe)
 
+; I18W-001: a system language without a catalogue falls back to the shared
+; locales.system_fallback of identifiers.json, as the Lua drivers read it.
+TestI18n_SystemFallbackIsShared() {
+	global _SharedDir
+	Shared := JsonParse(FileRead(_SharedDir . "\data\identifiers.json", "UTF-8"))["locales"]["system_fallback"]
+	AssertEqual(Shared, Identifiers.Locales.SYSTEM_FALLBACK, "the generated fallback is the shared one")
+	AssertEqual(Shared, _I18nDetectSystemLocale({Ui: (*) => "xx-XX"}), "an unsupported language takes it")
+	AssertEqual(Shared, _I18nDetectSystemLocale({Ui: (*) => ""}), "an unavailable language takes it")
+	AssertEqual("fr", _I18nDetectSystemLocale({Ui: (*) => "fr-FR"}), "a supported language keeps its own")
+}
+Test("i18n: the system language fallback is the shared one (I18W-001)", TestI18n_SystemFallbackIsShared)
+
 _I18nTmpJson(Content) {
 	Path := A_Temp . "\i18n_test_locale.json"
 	if FileExist(Path) {

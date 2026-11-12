@@ -10,7 +10,8 @@ _SFS_ChildSource() {
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
 	for Name in ["SFD_IsSecureField", "SFD_FocusedHwnd", "SFD_DetectNative", "SFD_CommitFieldVerdict",
 		"SFD_TryGetCachedVerdict", "SFD_FocusSnapshot", "SFD_InvalidateFocus", "SFD_FocusEventCallback",
-		"SFD_FreeFocusCallback", "SFD_EnsureFocusTracking", "SFD_Stop", "TickElapsed64", "TickExpired64"] {
+		"SFD_FreeFocusCallback", "SFD_EnsureFocusTracking", "SFD_Stop", "TickElapsed64", "TickExpired64",
+		"SFD_IsSecureAppWindow", "SFD_IsSecureApp", "SFD_ProcessNameOf"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The actual native detector dependency must exist: " . Name)
 		Source .= Definition . "`n"
@@ -28,8 +29,16 @@ _SFS_ChildSource() {
 		AssertTrue(RegExMatch(Candidate, "m)^global SFD_FIELD_CACHE_TTL_MS := [0-9]+$", &Ttl),
 			"The native probe must retain the actual detector TTL")
 		Source .= Ttl[0] . "`n"
+		; The secure-application gate runs first in SFD_IsSecureField (ADD-1).
+		AssertTrue(RegExMatch(Candidate, "m)^global SFD_SECURE_APP_ROOT := .+$", &Root),
+			"The detector must retain its per-window secure-application cache")
+		Source .= Root[0] . "`n"
 	}
 	AssertEqual(1, Owners, "One actual adapter owns the detector cache")
+	; The child's windows belong to AutoHotkey, never a secure application: the
+	; shared list is not this probe's subject, so it holds none while the ADD-1
+	; gate of SFD_IsSecureField stays the real one.
+	Source .= 'SFD_SecureApps() {`n`tApps := Map()`n`tApps.CaseSense := "Off"`n`treturn Apps`n}`n'
 	return Cached := Source . FileRead(_DriverDir . "\tests\fixtures\secure_field_native_style_body.ahk", "UTF-8")
 }
 _SFS_Complete(State, Code, Output, ErrorText) {

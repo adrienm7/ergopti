@@ -13,7 +13,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Data-only steps. A step is a list of ops from a closed set (rename,
 ---    rename_prefix, move_section, merge_into, map_value, wrap_value, encode_value,
----    delete, set_if_absent). The engine
+---    delete, set_if_absent, import_companion). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
 ---    interpreter and to the JS reference, and the registry defects under
@@ -30,7 +30,11 @@
 --- 4. A file this build cannot version is never written. A newer, invalid or
 ---    unreadable file, or a failed migration, makes every later write to that
 ---    path refuse for the session through toml_codec.writer, and logs ERROR.
---- 5. A file this build writes stays versioned. For an absent, current or
+--- 5. A companion file moves once. An import_companion step copies values the
+---    driver kept in another file of its folder (M.run `companions`) into
+---    config.toml; after the migrated config.toml is published, those values
+---    are deleted from the companion, after its own byte-exact backup.
+--- 6. A file this build writes stays versioned. For an absent, current or
 ---    migrated file the stamp becomes the row toml_codec.writer adds when a
 ---    writer creates the file, so a later boot never reads a file this build
 ---    created as an unstamped, older one.
@@ -168,7 +172,12 @@ local OPS = {
 	encode_value  = { required = { "section", "key", "to_section", "to_key", "encoding" }, optional = {} },
 	delete        = { required = { "section" }, optional = { "key" } },
 	set_if_absent = { required = { "section", "key", "value" }, optional = {} },
+	import_companion = { required = { "file", "section", "to_section" }, optional = { "key" } },
 }
+
+-- A companion file is named bare, beside or below the configuration folder:
+-- the driver resolves its path, the registry never spells one.
+local COMPANION_FILE_PATTERN = "^[%w_%-]+%.toml$"
 
 
 
@@ -515,6 +524,9 @@ local function validate_op(op)
 		for _, item in ipairs(op.value) do
 			if not is_scalar(item) then return false, "set_if_absent arrays hold scalars only" end
 		end
+	end
+	if op.op == "import_companion" and (type(op.file) ~= "string" or not op.file:match(COMPANION_FILE_PATTERN)) then
+		return false, "import_companion names its file bare, as name.toml"
 	end
 	return true
 end
@@ -1032,6 +1044,90 @@ function APPLY.set_if_absent(sections, op)
 	if sections[op.section][op.key] == nil then sections[op.section][op.key] = { value = op.value } end
 end
 
+--- The flat sections of a companion file the driver handed in the context
+--- (`context.companions[file] = { status = "ok"|"absent", content }`). A file
+--- the migration needs and the driver did not hand raises: reading it as
+--- empty would publish config.toml at the new version without its values.
+--- @param context table|nil
+--- @param file string
+--- @return table sections `{ [section] = { [key] = entry } }`.
+local function companion_sections(context, file)
+	local companion = type(context) == "table" and type(context.companions) == "table" and context.companions[file]
+	if type(companion) ~= "table" then
+		error("config_migrate: the migration needs the companion " .. file .. ", which the driver did not hand", 2)
+	end
+	if companion.status == "absent" then return {} end
+	if companion.status ~= "ok" or type(companion.content) ~= "string" then
+		error("config_migrate: the companion " .. file .. " could not be read", 2)
+	end
+	local model, detail = M.model_from_source(companion.content)
+	if not model then error("config_migrate: the companion " .. file .. " is unusable: " .. tostring(detail), 2) end
+	return model.sections
+end
+
+--- The `{ section, key }` leaves one import_companion op addresses in its
+--- companion, sorted: what it copies, and what the driver removes from the
+--- companion once config.toml holds it.
+--- @param companion table Flat sections of the companion.
+--- @param op table A validated import_companion op.
+--- @return table leaves Dense `{ section, key, to_section }` entries.
+local function companion_leaves(companion, op)
+	local leaves = {}
+	if op.key ~= nil then
+		if companion[op.section] and companion[op.section][op.key] ~= nil then
+			leaves[1] = { section = op.section, key = op.key, to_section = op.to_section }
+		end
+		return leaves
+	end
+	for _, name in ipairs(sections_at_or_below(companion, op.section)) do
+		local target = op.to_section .. name:sub(#op.section + 1)
+		for _, key in ipairs(sorted_keys(companion[name])) do
+			leaves[#leaves + 1] = { section = name, key = key, to_section = target }
+		end
+	end
+	return leaves
+end
+
+--- Copies values the driver kept in a companion file into config.toml where
+--- it holds none (the copy_if_absent rule). The companion's own records stay
+--- behind: a copied value is rendered afresh in config.toml.
+function APPLY.import_companion(sections, op, context)
+	local companion = companion_sections(context, op.file)
+	for _, leaf in ipairs(companion_leaves(companion, op)) do
+		if copy_destination_absent(sections, leaf.to_section, leaf.key) then
+			if sections[leaf.to_section] == nil then sections[leaf.to_section] = {} end
+			sections[leaf.to_section][leaf.key] = {
+				value = LeafRows.clone_value(companion[leaf.section][leaf.key].value) }
+		end
+	end
+end
+
+--- The companion leaves the steps a migration ran addressed, per file: what a
+--- driver deletes from each companion once the migrated config.toml is
+--- published. A leaf config.toml already held is listed too: it is no longer
+--- read from the companion either.
+--- @param registry table Validated registry.
+--- @param driver string
+--- @param from_version number The version the migration started from.
+--- @param context table The context the plan ran with.
+--- @return table leaves `{ [file] = { { section, key } } }`, empty when no step imports.
+function M.companion_leaves(registry, driver, from_version, context)
+	local out = {}
+	for _, step in ipairs(registry.steps) do
+		if step.from >= from_version and step.drivers[driver] then
+			for _, op in ipairs(step.ops) do
+				if op.op == "import_companion" then
+					out[op.file] = out[op.file] or {}
+					for _, leaf in ipairs(companion_leaves(companion_sections(context, op.file), op)) do
+						table.insert(out[op.file], { section = leaf.section, key = leaf.key })
+					end
+				end
+			end
+		end
+	end
+	return out
+end
+
 --- Reads a model's version against a registry.
 --- @param model table
 --- @param registry table
@@ -1253,8 +1349,8 @@ function M.plan_operations(source, operations)
 	for _, op in ipairs(operations) do
 		local valid, detail = validate_op(op)
 		if not valid then return { outcome = "failed", detail = detail } end
-		if op.op == "move_chord_action" then
-			return { outcome = "failed", detail = "independent record operations cannot depend on action context" }
+		if op.op == "move_chord_action" or op.op == "import_companion" then
+			return { outcome = "failed", detail = "independent record operations cannot depend on migration context" }
 		end
 	end
 	local before, scan = M.model_from_source(source)
@@ -1377,6 +1473,104 @@ function M.read_only_notice_key(result)
 	return nil
 end
 
+--- The migration context with the companion files the driver named read in:
+--- `companions` maps a bare file name to its path. Read only when a migration
+--- is due, through the same reader as config.toml; an absent file holds
+--- nothing, an unreadable one refuses the migration.
+--- @param context table|nil The driver's migration context.
+--- @param companions table|nil `{ [file] = path }`.
+--- @param read function The reader of M.run.
+--- @return table|nil context A copy holding `companions[file] = { status, content, path }`;
+---   the driver's own context (nil included) when it named no companion.
+--- @return string|nil detail Why a companion could not be read; nil on success.
+local function with_companions(context, companions, read)
+	if companions == nil then return context end
+	if type(companions) ~= "table" then return nil, "companions must map bare file names to paths" end
+	local out = {}
+	for name, value in pairs(type(context) == "table" and context or {}) do out[name] = value end
+	local handed = {}
+	for file, value in pairs(type(out.companions) == "table" and out.companions or {}) do handed[file] = value end
+	for _, file in ipairs(sorted_keys(companions)) do
+		local companion_path = companions[file]
+		if type(file) ~= "string" or not file:match(COMPANION_FILE_PATTERN)
+			or type(companion_path) ~= "string" or companion_path == "" then
+			return nil, "the companion '" .. tostring(file) .. "' needs a bare file name and a path"
+		end
+		local called, content, status, detail = pcall(read, companion_path)
+		if not called then return nil, "reading the companion '" .. companion_path .. "' raised: " .. tostring(content) end
+		if status == "absent" then
+			handed[file] = { status = "absent", path = companion_path }
+		elseif status == "ok" and type(content) == "string" then
+			handed[file] = { status = "ok", content = content, path = companion_path }
+		else
+			return nil, "the companion '" .. companion_path .. "' could not be read (" .. tostring(detail or status) .. ")"
+		end
+	end
+	out.companions = handed
+	return out
+end
+
+--- Deletes from one companion the values a migration moved into config.toml,
+--- line by line, after a byte-exact backup beside it. Refuses, leaving the
+--- file as it is, when it changed since the migration read it.
+--- @param companion table `{ status = "ok", content, path }`.
+--- @param leaves table Dense `{ section, key }` entries.
+--- @param version number The version the migration reached, named by the backup.
+--- @param opts table Options of M.run.
+--- @return boolean retired
+--- @return string detail The backup path, or why the values stay.
+local function retire_companion(companion, leaves, version, opts)
+	local ops = {}
+	for _, leaf in ipairs(leaves) do ops[#ops + 1] = { op = "delete", section = leaf.section, key = leaf.key } end
+	local plan = M.plan_operations(companion.content, ops)
+	if plan.outcome ~= "migrated" then
+		return false, "the moved values cannot be deleted line by line (" .. tostring(plan.detail or plan.outcome) .. ")"
+	end
+	local current, status = writer().read_classified(companion.path, opts.file_adapter)
+	if status ~= "ok" or current ~= companion.content then return false, "it changed since the migration read it" end
+	local backup = M.backup_path(companion.path, version, opts.stamp or os.date(M.STAMP_FORMAT))
+	local made, made_detail = writer().publish_if_unchanged(backup, companion.content, opts.file_adapter, { status = "absent" })
+	if made ~= true then return false, "its backup '" .. backup .. "' could not be created: " .. tostring(made_detail) end
+	local copy, copy_status = writer().read_classified(backup, opts.file_adapter)
+	if copy_status ~= "ok" or copy ~= companion.content then
+		return false, "its backup '" .. backup .. "' does not hold the exact bytes"
+	end
+	local published, detail = writer().publish_if_unchanged(companion.path, plan.candidate, opts.file_adapter,
+		{ status = "ok", content = companion.content })
+	if published ~= true then return false, "publication failed: " .. tostring(detail) end
+	return true, backup
+end
+
+--- After a published migration, deletes from every companion what its steps
+--- moved into config.toml. config.toml already holds the values, so a failure
+--- leaves them unread in the companion and is logged, never a refusal.
+--- @param context table|nil The context the plan ran with.
+--- @param registry table Validated registry.
+--- @param opts table Options of M.run.
+--- @param from_version number The version the migration started from.
+--- @param log table The logger of M.run.
+--- @return table outcomes `{ [file] = { retired = boolean, detail = string } }`.
+local function retire_companions(context, registry, opts, from_version, log)
+	local outcomes = {}
+	if type(context) ~= "table" or type(context.companions) ~= "table" then return outcomes end
+	local leaves = M.companion_leaves(registry, opts.driver, from_version, context)
+	for _, file in ipairs(sorted_keys(leaves)) do
+		local companion = context.companions[file]
+		if #leaves[file] > 0 and type(companion.path) == "string" then
+			local retired, detail = retire_companion(companion, leaves[file], registry.current, opts)
+			outcomes[file] = { retired = retired, detail = detail }
+			if retired then
+				log.success(LOG, "Moved %d value(s) of '%s' into the configuration; backup at '%s'.",
+					#leaves[file], companion.path, detail)
+			else
+				log.error(LOG, "The values moved into the configuration stay in '%s', unread: %s.",
+					companion.path, detail)
+			end
+		end
+	end
+	return outcomes
+end
+
 --- Migrates a config file at boot. Every outcome other than "absent",
 --- "current" and "migrated" leaves the file untouched and refuses every later
 --- write to it for the session.
@@ -1386,8 +1580,12 @@ end
 --- `publish(path, content, expected_source) -> true | false, detail`; by
 --- default all three go through toml_codec.writer with `file_adapter`.
 --- @param opts table `{ path, driver, registry? | registry_path, stamp?,
----   file_adapter?, read?, create_backup?, publish?, logger? }`.
---- @return table result `{ status, from?, to?, backup?, read_only, detail? }`.
+---   file_adapter?, read?, create_backup?, publish?, logger?, context?,
+---   companions? }`; `companions` maps the bare file name an import_companion
+---   op names to its path, read when a migration is due.
+--- @return table result `{ status, from?, to?, backup?, read_only, detail?,
+---   companions? }`; `companions[file] = { retired, detail }` after a migration
+---   that moved values out of that file.
 function M.run(opts)
 	if type(opts) ~= "table" or getmetatable(opts) ~= nil
 		or type(rawget(opts, "path")) ~= "string" or rawget(opts, "path") == "" then
@@ -1398,7 +1596,7 @@ function M.run(opts)
 	local supplied = opts
 	opts = {}
 	for _, name in ipairs({ "path", "driver", "registry", "registry_path", "stamp", "file_adapter", "read",
-		"create_backup", "publish", "logger", "context", "context_error" }) do opts[name] = rawget(supplied, name) end
+		"create_backup", "publish", "logger", "context", "context_error", "companions" }) do opts[name] = rawget(supplied, name) end
 	if not M.DRIVERS[opts.driver] then error("config_migrate.run needs a known driver", 2) end
 	local path = opts.path
 	local key, ambiguous = destination_key(path)
@@ -1538,11 +1736,15 @@ function M.run(opts)
 	-- owns current-schema admission for inline/dotted/quoted metadata. A current
 	-- document needs no plan: its outcome was replaced by this one, and building
 	-- it decoded and scanned the file again on every boot.
-	local plan
+	local plan, plan_context
 	if current_schema({ status = "ok", content = source }, registry.current, record.stampless_current) then
 		plan = { outcome = "current", version = registry.current, candidate = source }
 	else
-		plan = M.plan(source, registry, opts.driver, opts.context)
+		local companion_err
+		plan_context, companion_err = with_companions(opts.context, opts.companions, read)
+		-- A nil context is a run without one; only a detail is a refusal.
+		if companion_err ~= nil then return refuse("failed", companion_err) end
+		plan = M.plan(source, registry, opts.driver, plan_context)
 		if version ~= nil and version ~= registry.current and plan.version ~= version then
 			return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
 		end
@@ -1615,6 +1817,7 @@ function M.run(opts)
 	result.previous = source
 	log.success(LOG, "Migrated '%s' from schema v%s to v%s; backup at '%s'.", path,
 		version_text(plan.version), version_text(registry.current), backup)
+	result.companions = retire_companions(plan_context, registry, opts, plan.version, log)
 	return writable("migrated")
 end
 

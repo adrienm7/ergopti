@@ -2,11 +2,15 @@
 
 # The shared tap_hold.toml
 
-Every driver keeps its tap-hold settings in one file, `tap_hold.toml`, with one
-layout (maintainer decision of 2026-11-10, `docs/memory/maintainer-decisions.md`).
-A file copied from one OS to another works as it did, Cmd versus Ctrl aside.
-`config.toml` keeps the `[[features.*]]` rows of the manifest; the tap-hold
-keys, delays and key combinations live here.
+Every driver keeps its tap-hold keys in one file, `tap_hold.toml`, with one
+layout, and the manifest's rows in `config.toml` (maintainer decision of
+2026-11-11, `docs/memory/maintainer-decisions.md`). A pair of files copied from
+one OS to another works as it did, Cmd versus Ctrl aside.
+
+| Home            | What it holds                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tap_hold.toml` | `[_meta]`, `[tap_hold]` `inherit_defaults` and the global delay, `[tap_hold.keys.<key id>]`, macOS `[karabiner]`                                                                      |
+| `config.toml`   | every `[[features.*]]` row: `[tap_holds]` `enabled`, `lone_modifier_tap_max_ms`, `sticky_timeout_ms`; the whole `[mod_combos]`; `[category_enabled]`; `[shortcuts.key_combination_*]` |
 
 | Driver  | File                                 | Reader and writer                                                                                                 |
 | ------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
@@ -35,18 +39,29 @@ non-negative integer, and reads such a file as it is.
 - A key combination is `<first>_then_<second>` over the same ids, the first key
   pressed first: `escape_then_tab`.
 - A driver that has no such key or combination leaves the entry untouched.
+- A Mac thumb key is written under the PC key at its place (maintainer
+  decision TCL-004, « follow the position », `shared_file.toml`
+  `[thumb_positions]`): `left_command` is `left_alt`, `right_command` is
+  `alt_gr`, `right_option` is `right_ctrl`. Every driver reads an entry still
+  under a Mac thumb id as that key, unless the file names the key too.
+- An action is named by the id Windows and Linux bind (`enter`,
+  `one_shot_shift`, `caps_word`). macOS translates its own spelling (`return`,
+  `sticky_shift`, `capsword`) on read and write through the generated action
+  catalogue's `tap_hold_spellings`, built from the one-to-one equivalents and
+  `[karabiner_aliases]` of `_shared/modules/actions/actions.toml`.
 
 ## Sections
 
 ### `[tap_hold]` (every driver)
 
-| Field                      | Type    | Meaning                                                                                           |
-| -------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `enabled`                  | boolean | The Tap-Holds switch. Absent: the manifest default.                                               |
-| `inherit_defaults`         | boolean | Windows and Linux: lay the file over the shipped keys. macOS writes every key it binds.           |
-| `time_activation_seconds`  | number  | The global delay, in seconds, in `0 < x <= 10`. Absent: `tap_hold.default_activation_ms`.         |
-| `sticky_timeout_ms`        | integer | How long a one-shot Shift waits for its key, in ms. Absent: `tap_hold.one_shot_shift_timeout_ms`. |
-| `lone_modifier_tap_max_ms` | integer | How long a modifier key pressed alone still taps, in ms; `0` is the strict tap-hold.              |
+| Field                     | Type    | Meaning                                                                                   |
+| ------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `inherit_defaults`        | boolean | Windows and Linux: lay the file over the shipped keys. macOS writes every key it binds.   |
+| `time_activation_seconds` | number  | The global delay, in seconds, in `0 < x <= 10`. Absent: `tap_hold.default_activation_ms`. |
+
+`enabled`, `sticky_timeout_ms` and `lone_modifier_tap_max_ms` are `config.toml`
+`[tap_holds]` rows (below). A copy left here by a build before config.toml
+schema v22 is warned once as outdated and never read.
 
 ### `[tap_hold.keys.<key id>]` (every driver)
 
@@ -64,7 +79,17 @@ removes the other two. `cmd` and `fn` are macOS modifiers: Windows and Linux
 warn once and hold nothing on a key that holds them, and keep its tap.
 `alt_gr` is written for the macOS AltGr hold (`altgr`).
 
-### `[mod_combos]` and `[mod_combos.config.<pair id>]` (every driver)
+## The config.toml rows
+
+### `[tap_holds]` (config.toml)
+
+| Field                      | Type    | Meaning                                                                                                                            |
+| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`                  | boolean | The Tap-Holds switch on macOS and Linux. Absent: the manifest default. Windows keeps its switch as `[category_enabled] tap_holds`. |
+| `sticky_timeout_ms`        | integer | How long a one-shot Shift waits for its key, in ms. Absent: `tap_hold.one_shot_shift_timeout_ms`.                                  |
+| `lone_modifier_tap_max_ms` | integer | How long a modifier key pressed alone still taps, in ms; `0` is the strict tap-hold.                                               |
+
+### `[mod_combos]` and `[mod_combos.config.<pair id>]` (config.toml)
 
 | Field                        | Type    | Meaning                                                       |
 | ---------------------------- | ------- | ------------------------------------------------------------- |
@@ -74,15 +99,12 @@ warn once and hold nothing on a key that holds them, and keep its tap.
 | `config.<pair>.combo`        | string  | The action of the combination. Absent or `"none"`: none.      |
 | `config.<pair>.tap`, `.hold` | string  | macOS only: the action of the pair's tap and hold slots.      |
 
-macOS and Linux read and write this section here. On Linux,
-`modules/shortcuts/key_combinations.lua` reads it, and the Shortcuts and key
-combinations scopes publish it through the tap-hold writer
-(`prepare_combo_rows`) as the second backed-up file of their transaction;
-`config.toml` keeps the pair taps and holds and the
+Every driver reads and writes this section in `config.toml`, beside the pair
+taps and holds (`[shortcuts.key_combination_taps]` and `_holds`) and the
 `[category_enabled] key_combinations` switch. A `[mod_combos]` left in
-`config.toml` is never read.
+`tap_hold.toml` by a build before schema v22 is warned once and never read.
 
-### `[karabiner]` (macOS only)
+### `[karabiner]` (macOS only, tap_hold.toml)
 
 `integration_enabled`, `runtime`, `close_other_instances`: « Ergopti uses
 Karabiner » and the runtime choice (ADR 011). Windows and Linux never read or
@@ -92,29 +114,38 @@ write it.
 
 A driver writes only the leaves it owns and changed, and keeps every other
 section, key, field and spelling: a file carried between machines keeps the
-settings of every driver. Two writes replace the whole file: the macOS
+settings of every driver. A hold chosen on Windows or Linux replaces a macOS
+`hold_action`, and a key rebound on any driver loses an `enabled = false`. Two writes replace the whole file: the macOS
 « Restore » that clobbers an unparseable file (`save_user_config` with
 `overwrite_corrupt`) and the first save over no file at all.
 
 ## Old files
 
-Each driver carries its old files over once, as `migrations.toml`
-`[legacy_imports]` declares:
+The old homes move once:
 
-- macOS `hammerspoon/config_karabiner.toml`: translated by
-  `shared_file.from_karabiner`, published as `tap_hold.toml`, then renamed
-  `config_karabiner.toml.migrated`. Only while `tap_hold.toml` does not exist.
-- Linux `config.toml` `[mod_combos]`: moved as it is into `tap_hold.toml` at
-  boot (`tap_hold_writer.import_config_combos`, translation `config_section`),
-  then deleted from `config.toml` line by line. Both files are backed up first
-  and `tap_hold.toml` is published first; when it already holds a different
-  `[mod_combos]`, it wins and `config.toml` is left as it is.
-- Windows `config.toml` tap-hold keys: the Windows driver's own migration.
+- macOS `hammerspoon/config_karabiner.toml` (`migrations.toml`
+  `[legacy_imports.hs]`): translated by `shared_file.from_karabiner`,
+  published as `tap_hold.toml`, then renamed `config_karabiner.toml.migrated`.
+  Only while `tap_hold.toml` does not exist; the macOS boot runs it before it
+  versions config.toml.
+- macOS and Linux `tap_hold.toml` `[tap_hold]` `enabled`, `sticky_timeout_ms`,
+  `lone_modifier_tap_max_ms` and `[mod_combos]`: step `v21_to_v22` of
+  `_shared/core/config_schema/migrations.toml` (op `import_companion`) copies
+  them into config.toml where it holds none, after config.toml's own backup,
+  then deletes them from tap_hold.toml line by line after a backup
+  `tap_hold.pre-v22-<stamp>.toml` beside it. The config.toml stamp makes it
+  run once.
+- Windows kept these rows in `config.toml` already: nothing moves.
 
 ## Cross-driver corpus
 
-`_shared/tests/corpus/tap_hold_shared_file/` holds a file written by each Lua
-driver's writer and what each driver must read from it. Each driver suite
-replays its own writer against its file byte for byte and reads both files
-through its own reader (`_shared/lua/test/tap_hold_shared_file_contract.lua`).
-The Windows suite reads the same files.
+`_shared/tests/corpus/tap_hold_shared_file/` holds, for each driver, the
+`tap_hold.toml` its writers write (`<driver>_written.toml`) and the config.toml
+rows written beside it (`<driver>_written.config.toml`), and what each driver
+must read from every pair (`expected.toml`, `[reads.<name>.<driver>]`). Each
+suite pins its own `tap_hold.toml` byte for byte and its own rows as values,
+and reads the three pairs with its own readers: Linux
+`tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua`, macOS
+`tests/unit/platform/remap/config/test_tap_hold_shared_file.lua`, Windows
+`tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk`; the layout
+of every pair is pinned by `_shared/lua/test/tap_hold_shared_file_contract.lua`.

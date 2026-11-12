@@ -820,7 +820,7 @@ local function with_daemon_wrap(body, options)
 			"\n\t-- The script-management chords") .. "\nreturn wrap_on_type", env)
 		local focus = assert(source:match("process_lifecycle%.onFocusChange%((function%(appName, windowTitle%).-\n\t\tend)%)"))
 		state.focus = evaluate("return " .. focus, env)
-		state.click = evaluate(span("local function on_click()", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
+		state.click = evaluate(span("local function on_click(code)", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
 		state.consume = evaluate(span("local on_consume = input_capture_gate.guard(function(detail)",
 			"\n\t-- Bind the same privacy owner") .. "\nreturn on_consume", env)
 		state.wrap, state.actions, state.gate, state.shortcuts = env.wrap_on_type, env.script_actions, env.input_capture_gate, shortcuts

@@ -231,6 +231,21 @@ _TQA_Notices() {
 		NotifyQuitRefused((Text, Opts) => (QuitNotice.Push([Text, Opts["level"]]), true))
 		AssertEqual(t("notify.quit_refused"), QuitNotice[1][1], "the one locale key")
 		AssertEqual("error", QuitNotice[1][2])
+		; A committed pause and resume are told, as on macOS and Linux.
+		PauseNotice := []
+		NotifyPauseState(true, (Text, Opts) => (PauseNotice.Push([Text, Opts["level"]]), true))
+		NotifyPauseState(false, (Text, Opts) => (PauseNotice.Push([Text, Opts["level"]]), true))
+		AssertEqual(t("script_control.paused"), PauseNotice[1][1], "the pause names itself")
+		AssertEqual("warning", PauseNotice[1][2], "the pause is a warning")
+		AssertEqual(t("script_control.resumed"), PauseNotice[2][1], "the resume names itself")
+		AssertEqual("success", PauseNotice[2][2], "the resume is a success")
+		for Name in ["Ergopti_OnSuspendEnter", "Ergopti_OnSuspendResume"] {
+			Body := _DriverFuncBody(Name)
+			Assert(Body != "", Name . " must exist")
+			Finish := InStr(Body, "LifecycleTransitionFinish(Transition)", , -1)
+			Told := InStr(Body, "NotifyPauseState(")
+			Assert(Told > Finish && Finish > 0, Name . " tells the state only once the transition committed")
+		}
 	} finally
 		LoggerClearTestSink()
 	Joined := ""
