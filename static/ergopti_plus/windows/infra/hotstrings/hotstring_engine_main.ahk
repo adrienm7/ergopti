@@ -714,14 +714,14 @@ HSE_DeferredRegistrationStart() {
 				throw Error("The deferred hotstring registration has already started.")
 		HSE_DeferredRegistration.Started := A_TickCount
 		LoggerStart("Hotstrings", "{1}: registering in slices…", HSE_DeferredRegistration.Name)
-		SetTimer(HSE_DeferredRegistrationSlice, -1)
+		TimerArmOneShotMs(HSE_DeferredRegistrationSlice, 1)
 		return true
 }
 
 ; Drop the pending job: a full rebuild registers those sections inline.
 HSE_DeferredRegistrationCancel() {
 		global HSE_DeferredRegistration
-		SetTimer(HSE_DeferredRegistrationSlice, 0)
+		TimerSetCallback(HSE_DeferredRegistrationSlice, 0)
 		Job := HSE_DeferredRegistration
 		if !Job
 				return false
@@ -794,7 +794,7 @@ HSE_DeferredRegistrationSlice(BudgetMs := "") {
 		Job.Slices += 1
 		Job.BusyMs += (PerfClockTicks() - Started) * 1000 / Frequency
 		if (Job.StepIndex <= Job.Steps.Length) {
-				SetTimer(HSE_DeferredRegistrationSlice, -TimingsGet("hotstrings", "deferred_registration_gap_ms"))
+				TimerArmOneShotMs(HSE_DeferredRegistrationSlice, TimingsGet("hotstrings", "deferred_registration_gap_ms"))
 				return true
 		}
 		HSE_DeferredRegistration := 0

@@ -535,6 +535,6 @@ TouchpadRegistrySkipsDeviceRestart(OnDone := 0) {
 		return false
 	LoggerInfo(TouchpadRegistryLogTag(), "Isolated profile: the touchpad device is not restarted.")
 	if HasMethod(OnDone, "Call")
-		SetTimer(() => OnDone.Call(true), -1)
+		TimerArmOneShotMs(() => OnDone.Call(true), 1)
 	return true
 }
