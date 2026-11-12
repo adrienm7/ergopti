@@ -426,8 +426,8 @@ local function _build_shortcuts(ctx)
 		-- and without a question, like every scope row.
 		local function group_scope_rows(prefix)
 			local function apply_group_scope(mode)
-				if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-				local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "keyboard_group:" .. prefix)
+				-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+				local committed = require("infra.shortcuts_scope").apply(mode, "keyboard_group:" .. prefix)
 				if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return committed
 			end
@@ -607,8 +607,7 @@ local function _build_shortcuts(ctx)
 			return rows
 		end
 		local function apply_chords_scope(mode)
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-			local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "script_chords")
+			local committed = require("infra.shortcuts_scope").apply(mode, "script_chords")
 			if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return committed
 		end
@@ -750,8 +749,7 @@ local function _build_shortcuts(ctx)
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	local function apply_shortcuts_scope(mode)
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
+		local committed = require("infra.shortcuts_scope").apply(mode)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
@@ -796,7 +794,7 @@ local function _build_shortcuts(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
-		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
+		scope = function() return require("infra.shortcuts_scope").editor_owner() end,
 		host = function() return require("ui.physical_shortcuts.bridge") end,
 		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
 	})
