@@ -19,7 +19,10 @@
 ---    message from a window already closed can neither save nor close a new one.
 --- 3. A refused save keeps the window open with the reason. A saved file whose
 ---    regeneration cannot even be requested keeps it open too, saying the file
----    is written but not applied yet; otherwise the window closes.
+---    is written but not applied yet; otherwise the window closes at once. A
+---    regeneration that fails later, once the window is gone, says so in an
+---    error notification (maintainer decision LEH-003, 2026-11-12): Windows and
+---    Linux apply synchronously, before their window closes.
 --- 4. Legends: each key that types a character shows what the current input
 ---    source puts on it (infra/keycodes over hs.keycodes.map, which follows the
 ---    input source live), read in the registry's ISO form the navigation layer
@@ -224,6 +227,11 @@ local function request_regeneration(karabiner)
 	local ok, accepted = pcall(karabiner.regenerate, function(done, reason)
 		if done ~= true then
 			Logger.warn(LOG, "The edited navigation layer is saved but not deployed yet: %s.", tostring(reason))
+			local sent, notify_err = require("infra.notifications").notify(i18n.get("layer_editor.window_title"),
+				i18n.get("layer_editor.apply_failed"), "error")
+			if not sent then
+				Logger.error(LOG, "The late regeneration failure could not be notified: %s.", tostring(notify_err))
+			end
 		end
 	end)
 	if not ok then
