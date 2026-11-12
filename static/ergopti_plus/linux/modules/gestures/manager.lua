@@ -2702,6 +2702,36 @@ function M.scope_legacy_operations(config)
 	return operations
 end
 
+--- Reads [gestures.modes] and [gestures.sensitivities]; an invalid entry is
+--- outdated configuration, reported and left out. With `mark`, the entries the
+--- loader takes are marked for the unused-key cleanup instead of applied: the
+--- cleanup offered every saved mode and step for deletion before.
+--- @param config table Decoded config.toml.
+--- @param mark function|nil mark(...segments) from config_unused_keys.
+local function load_slot_settings(config, mark)
+	local section = type(config.gestures) == "table" and config.gestures or {}
+	local Sensitivity = require("gestures.sensitivity")
+	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
+		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+		if type(slot) == "string" then
+			mode = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(MODES_SECTION .. "." .. slot), mode)
+		end
+		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
+			if mark then mark("gestures", "modes", slot) else _modes[slot] = mode end
+		else
+			ConfigOutdated.report({ "gestures", "modes", tostring(slot) }, "not a swipe slot mode (x1 or incremental)", Logger)
+		end
+	end
+	for slot, value in pairs(type(section.sensitivities) == "table" and section.sensitivities or {}) do
+		local step = Sensitivity.coerce(value)
+		if M.DEFAULT_SENSITIVITIES[slot] ~= nil and step ~= nil then
+			if mark then mark("gestures", "sensitivities", slot) else _sensitivities[slot] = step end
+		else
+			ConfigOutdated.report({ "gestures", "sensitivities", tostring(slot) }, "not a swipe slot step in range", Logger)
+		end
+	end
+end
+
 --- Marks every config.toml path the gesture loader takes.
 --- @param config table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
@@ -2721,33 +2751,7 @@ function M.mark_config_reads(config, mark)
 		param = function(section_name, key) mark_at(section_name, key) end,
 		enabled = function() mark(CONFIG_SECTION, "enabled") end,
 	})
-end
-
---- Reads [gestures.modes] and [gestures.sensitivities]; an invalid entry is
---- outdated configuration, reported and left out.
---- @param config table Decoded config.toml.
-local function load_slot_settings(config)
-	local section = type(config.gestures) == "table" and config.gestures or {}
-	local Sensitivity = require("gestures.sensitivity")
-	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
-		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
-		if type(slot) == "string" then
-			mode = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(MODES_SECTION .. "." .. slot), mode)
-		end
-		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
-			_modes[slot] = mode
-		else
-			ConfigOutdated.report({ "gestures", "modes", tostring(slot) }, "not a swipe slot mode (x1 or incremental)", Logger)
-		end
-	end
-	for slot, value in pairs(type(section.sensitivities) == "table" and section.sensitivities or {}) do
-		local step = Sensitivity.coerce(value)
-		if M.DEFAULT_SENSITIVITIES[slot] ~= nil and step ~= nil then
-			_sensitivities[slot] = step
-		else
-			ConfigOutdated.report({ "gestures", "sensitivities", tostring(slot) }, "not a swipe slot step in range", Logger)
-		end
-	end
+	load_slot_settings(config, mark)
 end
 
 local function load_user_config(path)
