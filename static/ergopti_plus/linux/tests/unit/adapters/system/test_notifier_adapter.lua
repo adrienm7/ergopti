@@ -94,6 +94,18 @@ helpers.describe("notifier: sending", function()
 		end)
 	end)
 
+	helpers.it("(nui-006-notification-ttl) keeps the notice up for the registry's duration", function()
+		with_shell(nil, function(notifier, commands)
+			notifier.send("bonjour")
+			local ttl = require("infra.timings").ms("ui", "notification_ttl_ms")
+			helpers.assert_true(commands[1]:find("--expire-time=" .. string.format("%d", ttl), 1, true) ~= nil,
+				"one declaration in _shared/modules/timings/constants.toml, shared with macOS")
+		end)
+		local file = assert(io.open(helpers.driver_root() .. "/adapters/notifier.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		helpers.assert_true(source:find("TIMEOUT_MS = 5000", 1, true) == nil, "no typed copy of the duration")
+	end)
+
 	helpers.it("does not block the caller", function()
 		with_shell(nil, function(notifier, commands)
 			notifier.send("bonjour")

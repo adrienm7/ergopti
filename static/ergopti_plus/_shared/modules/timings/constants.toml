@@ -965,6 +965,13 @@ ollama_deps_poll_ms = 3000
 # grace main.swift gives a leftover embedded runtime (LauncherTimings).
 user_quit_deadline_ms = 12000
 
+# How long a desktop notification stays up: long enough to read a sentence,
+# short enough not to stack up during a burst of them. HS:
+# infra/notifications.lua withdrawAfter and its owner retention. Linux:
+# adapters/notifier.lua notify-send --expire-time. Windows TrayTip uses the
+# system's own duration (NUI-006).
+notification_ttl_ms = 5000
+
 # Margin past user_quit_deadline_ms a launcher waits for the running instance's
 # controlled exit before it gives up: the macOS launcher answering a quit from
 # outside (Sparkle relaunch, logout, osascript; MLC-002), and a second launch
