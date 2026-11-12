@@ -1091,6 +1091,8 @@ const SHARED_ROOT_REWRITES = [
 	[new RegExp(`${SHARED_IDENT}\\s*\\.\\.\\s*(["'])\\/?lua\\2`, 'g'), '$1'],
 	// shared .. "/lua/?.lua;" and SHARED .. "lua/?.lua;".
 	[new RegExp(`${SHARED_IDENT}(\\s*\\.\\.\\s*)(["'])(\\/?)lua\\/`, 'g'), '$1$2$3$4'],
+	// '_shared' .. sep .. 'lua': the root joined with a separator variable.
+	[/(["'])_shared\1(\s*\.\.\s*[A-Za-z_]\w*\s*\.\.\s*)(["'])lua\3/g, '$1_shared$1'],
 	// Python: shared / "lua".
 	[new RegExp(`${SHARED_IDENT}\\s*\\/\\s*(["'])lua\\2`, 'g'), '$1'],
 	// shared('lua', modulePath) in a tool: the module path is now _shared-relative.
