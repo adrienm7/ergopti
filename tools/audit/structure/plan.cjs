@@ -817,7 +817,38 @@ function isModuleLoadSite(text, index) {
 	const alias = loadedAliases(text);
 	if (alias !== null && alias.test(before)) return true;
 	if (keyedByModuleName(text, index, before)) return true;
+	const wrappers = requireWrappers(text);
+	if (wrappers !== null && wrappers.test(before)) return true;
 	return comparesModuleName(text, index, before);
+}
+
+let wrapperText = null;
+let wrapperPattern = null;
+/**
+ * The local functions of a file that hand their only parameter to require
+ * (local function collision_dependency(name) local loaded, owner =
+ * pcall(require, name) … end): a call of one loads its argument.
+ * @returns {RegExp|null} The code before a quoted argument of such a call.
+ */
+function requireWrappers(text) {
+	if (text !== wrapperText) {
+		const names = [];
+		for (const m of text.matchAll(
+			/\blocal\s+function\s+([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)\s*\)([^\n]*\n){0,4}/g
+		)) {
+			const body = m[0].slice(m[0].indexOf(')') + 1);
+			const param = m[2];
+			if (
+				new RegExp(`\\b(?:pcall\\s*\\(\\s*require\\s*,|require\\s*\\()\\s*${param}\\s*\\)`).test(
+					body
+				)
+			)
+				names.push(m[1]);
+		}
+		wrapperPattern = names.length > 0 ? new RegExp(`\\b(?:${names.join('|')})\\s*\\(\\s*$`) : null;
+		wrapperText = text;
+	}
+	return wrapperPattern;
 }
 
 /**
