@@ -51,6 +51,7 @@ local MODULE_NAMES = {
 	"infra.launcher_guard",
 	"adapters.file_system",
 	"platform.remap",
+	"platform.remap.tap_hold_file",
 	"ui.menu",
 	"ui.menu.menu_llm",
 	"modules.llm.mlx_deps_checker",
@@ -372,6 +373,12 @@ local function run_isolated(options, assertions)
 			},
 			["adapters.file_system"] = {},
 			["platform.remap"] = Karabiner,
+			-- The boot carries an old config_karabiner.toml over before the config
+			-- migration; this fixture has no file system, hence no old file.
+			["platform.remap.tap_hold_file"] = {
+				config_toml_path_for = function() return "/virtual/ConfigTomlPath" end,
+				import_legacy = function() return true, "none" end,
+			},
 			["ui.menu"] = { stop_watchers = function() return true end },
 			["ui.menu.menu_llm"] = MenuLLM,
 			["modules.llm.mlx_deps_checker"] = {},
