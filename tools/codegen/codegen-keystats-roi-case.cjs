@@ -23,6 +23,18 @@ const LUA_OUTPUT = 'static/ergopti_plus/_shared/lua/keystats/roi_case.lua';
 const CORPUS_OUTPUT =
 	'static/ergopti_plus/_shared/tests/corpus/keystats/roi_lowercase_vectors.json';
 
+/**
+ * The case table of the Unicode source, from its `return {` on: the bytes the
+ * qualification measured. The comment header above it names the file's own
+ * place and changes when the file moves; the table does not.
+ */
+function unicodeTable(unicodeBytes) {
+	const text = unicodeBytes.toString('utf8');
+	const at = text.indexOf('\nreturn {');
+	if (at < 0) throw new Error('The Unicode source has no case table.');
+	return text.slice(at + 1);
+}
+
 /** Builds only the profile whose full candidate set was observed on Windows. */
 function project(profile, unicodeBytes) {
 	const qualification = profile.qualification;
@@ -34,8 +46,8 @@ function project(profile, unicodeBytes) {
 		throw new Error('ROI casing requires its qualified Node and Unicode versions.');
 	}
 	if (
-		crypto.createHash('sha256').update(unicodeBytes).digest('hex') !==
-		qualification.unicode_source_sha256
+		crypto.createHash('sha256').update(unicodeTable(unicodeBytes)).digest('hex') !==
+		qualification.unicode_table_sha256
 	) {
 		throw new Error('The Unicode source changed; requalify the Windows ROI casing profile.');
 	}

@@ -57,8 +57,17 @@ function refuses(edit, reason) {
 	assert.throws(() => Codegen.project(changed, unicode), reason);
 }
 
+// The header names the source's own place: the structure move rewrites it, and
+// the measured table is unchanged. A changed table still needs requalifying.
+const text = unicode.toString('utf8');
+const moved = Buffer.from(text.replace(/^--- [^\n]*\n/, '--- _shared/elsewhere/data.lua\n'));
+assert.equal(Codegen.project(profile, moved).mappings.size, 1013, 'a moved header stays qualified');
+assert.throws(
+	() => Codegen.project(profile, Buffer.from(text.replace('return {', 'return {\n\textra = 1,'))),
+	/requalify/
+);
 refuses((changed) => (changed.qualification.node_version = 'unqualified'), /qualified Node/);
-refuses((changed) => (changed.qualification.unicode_source_sha256 = 'unqualified'), /requalify/);
+refuses((changed) => (changed.qualification.unicode_table_sha256 = 'unqualified'), /requalify/);
 refuses((changed) => changed.retained_ranges.unshift([-1, -1]), /scalar intervals/);
 refuses(
 	(changed) => changed.retained_ranges.unshift(changed.retained_ranges[0]),
