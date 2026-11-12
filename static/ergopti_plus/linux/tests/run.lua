@@ -235,13 +235,12 @@ if not execution_ok then
 end
 
 -- No test reached a real notify-send: the sentinel shadows it on PATH
--- (tests/support/notify_send_guard.lua, pinned by its meta test). Fixtures that
--- still reach the sentinel through the real notifier are counted, not failed.
-local spawned_notices = require("tests.support.notify_send_guard").spawned()
-if spawned_notices then
-	local _, count = spawned_notices:gsub("\n", "")
-	print(string.format("notify-send sentinel: %d notice(s) reached it instead of a desktop notification.", count))
-end
+-- (tests/support/notify_send_guard.lua, pinned by its meta test). A notice that
+-- reaches the sentinel means a fixture bypassed the notifier seams
+-- (tests/support/notice_recorder.lua): the run fails and names each case.
+local notices_escaped = require("tests.support.notify_send_guard").report(function(line)
+	io.stderr:write("tests/run.lua: " .. line)
+end)
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
@@ -253,6 +252,7 @@ if r.failed > 0 then
 	end
 	os.exit(1)
 end
+if notices_escaped then os.exit(1) end
 if helpers.timing_failed() then
 	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)
