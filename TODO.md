@@ -1285,6 +1285,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
+- [ ] **Hotstring short entry forms (maintainer decision HSE-002, 2026-11-12).** macOS and Linux now load the bare-key
+      and the simple `"bbq" = "text"` entries, as `infra/toml/toml_loader.ahk` does. Its `_HOTSTRING_ENTRY_PATTERN` still
+      drops an inline-table entry whose keys come in another order than output, is_word, auto_expand, is_case_sensitive,
+      final_result, or that carries only `output` (the Lua reader defaults each missing flag to false); accept any key
+      order and missing flags, and extend `test_toml_loader.ahk` with both cases.
 - [ ] **App Cloner item to open (maintainer decision, 2026-11-12).** `apps/bundled_apps.ahk`
       `_AppCloner_InvalidOpenItem` accepts « https:/x » and « localhost:3000 » and refuses a « ~ » path. Align it with
       macOS `validateOpenArg` and the Linux validator (`linux/apps/app_cloner.lua` `invalid_open_item`): expand « ~ »
