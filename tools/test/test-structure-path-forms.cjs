@@ -252,6 +252,20 @@ function run() {
 			'e.paths = ["./zz_probe_lua"]',
 			'a ./ path is relative to its file, never to the tree root'
 		);
+		// The folder part of a longer path is that path's, not a folder reference:
+		// a bare path to a file nobody holds stays (here, a driver file).
+		assert.equal(
+			rewrite(
+				`${P}_shared/zz_probe_mod/m.toml`,
+				'# Linux gained it in zz_probe_mod/hotstrings/zz_x.lua.'
+			),
+			'# Linux gained it in zz_probe_mod/hotstrings/zz_x.lua.'
+		);
+		assert.equal(
+			rewrite(`${P}_shared/zz_probe_mod/notes.md`, 'It lives in _shared/zz_probe_lua/.'),
+			'It lives in _shared/zz_probe_text/.',
+			'a folder that ends its sentence'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
