@@ -106,12 +106,20 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			helpers.assert_eq(state.edits[1][1].value,"shift")
 		end)
 	end)
-	for _,mode in ipairs({"cancel","unknown","source","paused"}) do
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("publishes a hold picked while paused (edd1-paused-writes)",function()
+		with_menu(function(state)
+			state.click(state.find("Hold 1 + hold 2 → "))
+			state.paused=true
+			helpers.assert_true(state.hold.confirm("shift"))
+			helpers.assert_eq(#state.edits,1)
+		end)
+	end)
+	for _,mode in ipairs({"cancel","unknown","source"}) do
 		helpers.it("refuses "..mode.." without any publication and keeps the picker open (key-combination-hold-picker)",function()
 			with_menu(function(state)
 				state.click(state.find("Hold 1 + hold 2 → "))
 				if mode=="source" then state.source="[unrelated]\nchanged=true\n" end
-				if mode=="paused" then state.paused=true end
 				if mode~="cancel" then
 					helpers.assert_eq(state.hold.confirm(mode=="unknown" and "copy" or "shift"),false,
 						"a refused pick returns false, so the bridge keeps the picker open")
