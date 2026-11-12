@@ -16,8 +16,9 @@
 ---
 --- Legends: each key that types a character shows what the keymap the daemon
 --- loaded (adapters/keyboard_layout, the session's own XKB keymap, which it
---- reloads on a layout switch) types on its evdev code at level 1. Linux
---- emulates no layout: an installed Ergopti is the XKB layout itself. The
+--- reloads on a layout switch) types on its evdev code at level 1, or, while a
+--- layout is emulated (modules/keymap/layout_emulation), what the emulation
+--- types there, with the source « emulation » as on Windows (LEH-001). The
 --- layer key is the tap-hold key whose hold enters the edited layer in the
 --- remap manager's keys, found in the registry by its evdev code.
 --- ==============================================================================
@@ -177,17 +178,23 @@ local function load_context(shared_root)
 	})
 end
 
---- The legends of the keymap the daemon loaded.
+--- The legends of the layout the user types with: the emulated one, else the
+--- keymap the daemon loaded.
 --- @param state table Daemon state.
 --- @param ctx table The loader context.
 --- @return table legends The page's `legends`.
 local function current_legends(state, ctx)
 	local layout = dependency(state, "keyboard_layout", "adapters.keyboard_layout")
 	if not layout then error("the keyboard layout adapter is unavailable", 0) end
+	local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
+	if not emulation then error("the layout emulation is unavailable", 0) end
+	local emulating = emulation.status().active == true
 	local legends, unresolved = LayerEditor.legends({
 		ctx       = ctx,
-		source    = LayerEditor.LEGEND_SOURCE_OS,
-		character = function(_, entry)
+		source    = emulating and LayerEditor.LEGEND_SOURCE_EMULATION or LayerEditor.LEGEND_SOURCE_OS,
+		character = function(code, entry)
+			local emulated = emulating and emulation.legend(code) or nil
+			if emulated ~= nil then return emulated end
 			local symbol = type(entry.evdev) == "number" and layout.base_symbol(entry.evdev) or nil
 			return type(symbol) == "table" and symbol.text or nil
 		end,

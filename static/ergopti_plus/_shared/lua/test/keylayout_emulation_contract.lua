@@ -141,6 +141,35 @@ function M.register(helpers, shared)
 			end
 		end)
 
+		helpers.it("(leh-001-emulated-legends) a legend is what the key types unshifted from rest", function()
+			local checked = 0
+			for _, case in ipairs({
+				{ layout = "ergopti" }, { layout = "ergol" },
+				{ layout = "ergopti", settings = { number_row = "digits" } },
+				{ layout = "ergopti", settings = { emulate_top_row = false } },
+			}) do
+				for code in pairs(rows) do
+					local live = session(case.layout, case.settings)
+					local legend = Emulation.legend(live, code)
+					helpers.assert_true(not Emulation.pending(live), code .. ": a legend leaves no dead key")
+					local decision, text = Emulation.decide(live, code, false, false, false, false, false, false, nil)
+					if decision == Emulation.PASS then
+						helpers.assert_eq(legend, "", case.layout .. " " .. code .. " is the system layout's")
+					elseif text ~= "" then
+						helpers.assert_eq(legend, text, case.layout .. " " .. code)
+						checked = checked + 1
+					else
+						helpers.assert_true(Emulation.pending(live) and legend ~= "",
+							case.layout .. " " .. code .. ": a dead key shows its terminator")
+					end
+				end
+			end
+			helpers.assert_true(checked >= 100, "only " .. checked .. " legends compared")
+			local off = session("ergopti", { emulate_top_row = false })
+			helpers.assert_eq(Emulation.legend(off, "KeyQ"), "", "a row switched off is the system layout's")
+			helpers.assert_true(Emulation.legend(session("ergopti"), "KeyQ") ~= "", "the top row is emulated")
+		end)
+
 		helpers.it("refuses an unknown convention and an uncompiled session", function()
 			local ok = pcall(Emulation.mac_codes, keycodes, "jis")
 			helpers.assert_true(not ok, "an unknown convention raises")
