@@ -271,6 +271,11 @@ Released as v1.0.9; these requests of 1-2 November are still open.
 
 ## Remaining code work
 
+- [ ] **Requalify the Windows key-combination and updater cohorts on the real PC after the structure
+      migration.** Each structure step re-pins the immutable cohort receipts (rule C1, decided by the
+      coordinator on 2026-11-12, to review by the maintainer); its commit body lists every old→new pin with the
+      move that justifies it under « Requalification ». Run both cohorts natively on the Windows PC once the
+      migration has landed, and confirm the re-pinned frames.
 - [ ] **Windows AV-surface ceilings (found 2026-11-12).** The first Windows / Build of the current tree, run
       43291765266 (artifact `ergoptiplus-av-surface-43291765266-1`), exceeds four ceilings of
       `tools/ci/windows-exe-av-surface.json`: elevated_run 4/3, elevation_wording 4/3, injection_wording 13/11,
