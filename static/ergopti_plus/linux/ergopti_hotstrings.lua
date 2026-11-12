@@ -3012,11 +3012,14 @@ local function main()
 			end
 			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
 				function()
-					-- A failed watcher report never keeps the daemon from quitting.
-					if not pcall(require("infra.updater_boot_ready").report_quit, "the degraded tray Quit") then
-						Logger.error(LOG, "The update watcher could not be told of the Quit.")
+					-- The same user Quit owner as every other Quit (LCY-003). This
+					-- row is the last way out of a daemon whose tray failed, so an
+					-- owner that raises still ends the daemon, after saying so.
+					local called, err = pcall(privacy_owners.tray_quit, "degraded tray quit")
+					if not called then
+						Logger.error(LOG, "The user Quit owner raised (%s); quitting through the shutdown alone.", tostring(err))
+						shutdown.request("degraded tray quit")
 					end
-					shutdown.request("degraded tray quit")
 				end)
 		end
 	elseif opts.tray and not tray_menu then
