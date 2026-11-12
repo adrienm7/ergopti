@@ -390,6 +390,15 @@ and the next module candidates. The audit is paused at the maintainer's request.
       (`tsm_uiserver_unanswered`, `fixture_refusal_unclassified` or `no_fixture_refusal`) with the agent snapshot; the
       verdict and the exact cohorts are unchanged (`tools/test/test-macos-tsm-refusal.cjs`). Next refusal: read its
       receipt and snapshot (did the agent's pid or run count change?) before trying another perturbation.
+      2026-11-12 afternoon: the refusal now recurs on macOS 26 in the full launcher suite ("Run Swift launcher tests on
+      macOS 26"), with no `tsm.uiserver` line in any of them: [43222724578](https://github.com/adrienm7/ergopti/actions/runs/43222724578) (job 131204789756) on
+      `KeyboardCharacterMappingTests.testFreshKeyboardEventsFollowLayoutAndShiftFlags` at 13:26:12 UTC, then
+      `KeyboardSourceProbeTests` (3), `NativeInputSourceSelectionTests` (4) and `NumberRowSourceProbeTests` (7)
+      "unavailable"; [43228623723](https://github.com/adrienm7/ergopti/actions/runs/43228623723) (job 131226750544) on the number-row cohort's first selecting case
+      (`testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI`, French) at 14:12:29, five seconds after
+      `NativeInputSourceSelectionTests` passed, then six more "unavailable". With 43108782369 that is three macOS 26
+      refusals without the line. The full-suite step carries no text-input snapshot or `tsm-refusal.json`, so the
+      next step is to bracket it as the number-row step is.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
