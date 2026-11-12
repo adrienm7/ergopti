@@ -226,6 +226,11 @@ function run() {
 			'paths.shared = function(path)\n\tif path == "zz_probe_hs/data" then return nil end\nend',
 			'the argument a stand-in of the shared resolver is compared with'
 		);
+		assert.equal(
+			rewrite('tools/test/z.cjs', "assert.ok(src.includes('zz_probe_mod/hotstrings/a.toml'));"),
+			"assert.ok(src.includes('zz_probe_hs/data/a.toml'));",
+			'a source check names a file by the tail of its path'
+		);
 		// A whole shared folder handed to the resolver: respelled when it moves
 		// whole, a refusal when the plan scatters it.
 		assert.equal(
