@@ -170,6 +170,18 @@ function run() {
 		"const crypto = require('crypto');\nconst lua = `local json=require('core.text.engine.json')`;"
 	);
 
+	// The module key of an embedded chunk spelled as a field moves too.
+	const field = 'const lua = `assert(package.loaded.json.decode)`;';
+	assert.equal(
+		Apply.rewriteText(
+			field,
+			Plan.scanFile(tool, field, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		'const lua = `assert(package.loaded["core.text.engine.json"].decode)`;'
+	);
+
 	// A listed tool's own module-name tables move, one-word names included, and
 	// so does the log tag of the Lua template it embeds, as in the Lua it mirrors.
 	const Edits = require('../audit/structure/edits.cjs');
