@@ -1406,7 +1406,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       [the Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md): the writers
       (`infra/hotstrings/personal_toml_io.ahk` among them) refuse too, and the tray root rebuild is refused while
       suspended, which must change before the rows stop greying. See `docs/memory/maintainer-decisions.md`.
-      Not started on 2026-11-12: about thirty `A_IsSuspended` gates across the ten editors (counts: model_browser 9, layer_editor 7, paths_editor 6, personal_toml_editor_webview 5, prompt_editor 3, layout_manager 2, hotstrings_config_window 2, personal_info_editor 1, action_picker 1, physical_shortcuts 1) and 25 Windows test files that read them; do one editor per commit, each with its « save while suspended writes the file » test.
+      Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in [the pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md) on `claude/ergopti-todo-parity-b`.
 - [x] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.
