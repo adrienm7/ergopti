@@ -160,4 +160,20 @@ helpers.describe("case-folded star-tail preview", function()
 		helpers.assert_nil(Expander.cased_magic(STAR), "a magic key with no case has no cased form")
 		local _ = Bridge
 	end)
+
+	-- The literal-tail path took `buffer .. magic` when no star mapping shared
+	-- the tail, so the uppercase press missed OLDA there and only there.
+	helpers.it("(hse-004-literal-tail-case) a literal tail mapping sees the magic key as typed", function()
+		local effects = {}
+		local _, Registry, _, Expander = fresh_runtime(effects, "a")
+		Registry.add("olda", "promised", { auto_expand = true })
+		Registry.sort_mappings()
+		local mapping = (Registry.mappings_for_literal_magic_tail("d") or {})[1]
+		helpers.assert_not_nil(mapping, "olda ends on the literal magic key")
+		local resolution = Expander.resolve_magic_action("OLD", nil, "A")
+		helpers.assert_not_nil(resolution, "Shift+magic after OLD reaches the literal mapping")
+		helpers.assert_eq(resolution.winner.mapping, mapping)
+		-- The ordinary path reads OLDA, typed: the uppercase word's expansion.
+		helpers.assert_eq(resolution.winner.eff_repl, "PROMISED")
+	end)
 end)

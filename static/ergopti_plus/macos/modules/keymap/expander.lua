@@ -748,7 +748,9 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 			and tail_char and _registry.mappings_for_literal_magic_tail(tail_char) or nil
 		local literal_bare_bucket = type(_registry.mappings_for_literal_magic_tail) == "function"
 			and _registry.mappings_for_literal_magic_tail("") or nil
-		if literal_tail_bucket or literal_bare_bucket then auto_buffer = auto_buffer or (buffer .. magic) end
+		-- The ordinary auto path reads the magic key as typed, its uppercase
+		-- included (HSE-004), whether or not a star mapping shares the tail.
+		if literal_tail_bucket or literal_bare_bucket then auto_buffer = auto_buffer or (buffer .. typed_magic) end
 		for bucket_index = 1, 2 do
 			local literal_bucket = bucket_index == 1 and literal_tail_bucket or literal_bare_bucket
 			if literal_bucket then
