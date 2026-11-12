@@ -140,25 +140,63 @@ function M.launcher_text(executable, words, deps)
 	return table.concat(lines, "\n") .. "\n"
 end
 
---- Writes an app's desktop entry and its launcher.
+--- The shared-mime-info package declaring the encrypted file type on its
+--- extension (_shared/data/encryptor/format.json).
+--- @param format table The decoded format.
+--- @return string xml
+function M.mime_package(format)
+	return table.concat({
+		'<?xml version="1.0" encoding="UTF-8"?>',
+		'<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">',
+		'\t<mime-type type="' .. format.mime_type .. '">',
+		"\t\t<comment>Ergopti Encryptor file</comment>",
+		'\t\t<glob pattern="*' .. format.encrypted_extension .. '"/>',
+		"\t</mime-type>",
+		"</mime-info>",
+	}, "\n") .. "\n"
+end
+
+--- Writes an app's desktop entries and its launcher. The Encryptor gets two
+--- (maintainer decision BAP-008, 2026-11-12): the visible one opens its own
+--- type, the .enc files, and is made their default opener; a hidden one
+--- (NoDisplay) keeps it in « Open with » for any file without ever being made
+--- a default, as Windows offers it through Send To.
 --- @return boolean ok
 local function install_desktop_entry(app, executable, words, deps)
 	local Core = require("apps.app_cloner_core")
+	local format = require("apps.encryptor_core").load_format()
 	local data_home = deps.data_home()
 	local launcher = data_home .. "/ergopti/apps/" .. app.desktop_entry .. ".sh"
-	local entry = table.concat({
-		"[Desktop Entry]",
-		"Type=Application",
-		"Name=" .. Core.desktop_value(app.name),
-		"Comment=" .. Core.desktop_value(deps.text(app.description_key)),
-		"Exec=" .. Core.desktop_exec_word("/bin/sh") .. " " .. Core.desktop_exec_word(launcher) .. " %F",
-		"Icon=dialog-password",
-		"MimeType=application/octet-stream;",
-		"Terminal=false",
-		"X-Ergopti-Bundled-App=true",
-	}, "\n") .. "\n"
-	return deps.write_file(launcher, M.launcher_text(executable, words, deps))
-		and deps.write_file(data_home .. "/applications/" .. app.desktop_entry .. ".desktop", entry)
+	local function entry(mime_type, hidden)
+		local lines = {
+			"[Desktop Entry]",
+			"Type=Application",
+			"Name=" .. Core.desktop_value(app.name),
+			"Comment=" .. Core.desktop_value(deps.text(app.description_key)),
+			"Exec=" .. Core.desktop_exec_word("/bin/sh") .. " " .. Core.desktop_exec_word(launcher) .. " %F",
+			"Icon=dialog-password",
+			"MimeType=" .. mime_type .. ";",
+			"Terminal=false",
+			"X-Ergopti-Bundled-App=true",
+		}
+		if hidden then lines[#lines + 1] = "NoDisplay=true" end
+		return table.concat(lines, "\n") .. "\n"
+	end
+	local applications = data_home .. "/applications/"
+	local mime_root = data_home .. "/mime"
+	local written = deps.write_file(launcher, M.launcher_text(executable, words, deps))
+		and deps.write_file(applications .. app.desktop_entry .. ".desktop", entry(format.mime_type, false))
+		and deps.write_file(applications .. app.desktop_entry .. "-any.desktop", entry("application/octet-stream", true))
+		and deps.write_file(mime_root .. "/packages/" .. app.desktop_entry .. ".xml", M.mime_package(format))
+	if not written then return false end
+	-- Both tools are optional: without them the type is known at the next
+	-- session's database rebuild and the desktop picks the only opener of it.
+	local register = "command -v update-mime-database >/dev/null 2>&1 && update-mime-database " .. quote(mime_root)
+		.. "; command -v xdg-mime >/dev/null 2>&1 && xdg-mime default "
+		.. quote(app.desktop_entry .. ".desktop") .. " " .. quote(format.mime_type)
+	return deps.spawn("/bin/sh", { "-c", register }, {}, function(code)
+		if code ~= 0 then Logger.warn(LOG, "The %s file type was registered with status %s.", app.name, tostring(code)) end
+	end)
 end
 
 --- Starts one bundled app.
