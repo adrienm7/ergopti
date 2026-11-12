@@ -1,3 +1,4 @@
+# _shared/data/identifiers.py
 # AUTO-GENERATED from _shared/data/identifiers.json.
 # DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 """Application names, bundle ids, service labels and external hosts.

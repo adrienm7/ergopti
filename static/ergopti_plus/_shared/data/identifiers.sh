@@ -1,4 +1,5 @@
 #!/bin/sh
+# _shared/data/identifiers.sh
 # AUTO-GENERATED from _shared/data/identifiers.json.
 # DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 
