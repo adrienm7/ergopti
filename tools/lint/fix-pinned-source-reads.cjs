@@ -274,6 +274,21 @@ function convertHelperPass(get, set, convertedNames, blocked) {
 		const callRe = new RegExp(`(?<![:.\\w])${name}\\(\\s*("[^"\\n]*")\\s*([,)])`, 'g');
 		const calls = [...src.matchAll(callRe)];
 		if (calls.length === 0) continue;
+		// A helper whose every call names a file outside the driver (a shared JSON
+		// corpus read from SHARED .. path) is not a source reader: there is no
+		// driver source to select, so it is neither converted nor refused.
+		const driverFile = (c) =>
+			fs.existsSync(
+				path.join(
+					MACOS,
+					c[1]
+						.slice(1, -1)
+						.replace(/^[.\\/]+/, '')
+						.split('/')
+						.join(path.sep)
+				)
+			);
+		if (!calls.some(driverFile)) continue;
 		const selectors = new Map();
 		let refused = null;
 		for (const c of calls) {

@@ -713,6 +713,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-run-phase2.cjs"],
 			"repro": "npm run test:structure-run-phase2"
+		},
+		{
+			"id": "js-0516",
+			"ordinal": 633,
+			"name": "the pinned-read fixer leaves a test helper that reads shared data alone instead of blocking its commit",
+			"cmd": "node",
+			"args": ["tools/test/test-pinned-reads-shared-helpers.cjs"],
+			"repro": "npm run test:pinned-reads-shared-helpers"
 		}
 	]
 }
