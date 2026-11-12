@@ -28,13 +28,13 @@ the paused-custody regression asserts.
 
 ## Second pass: tray rows and submenu rows
 
-| Sequence                                                                                  | Before                                                                                                                                       | Regression                                 |
-| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Pause, then open a feature menu from the tray                                             | Both trays greyed every row the manifest marks `greyed_when_paused`; macOS Shortcuts and Gestures and the Linux AI parents greyed themselves | `edd1-paused-writes` in both trays' suites |
-| Pause, then use the Configuration menu's « clean unused keys » (macOS)                    | Greyed and stripped of its handler                                                                                                           | shared Configuration contract, macOS suite |
-| Pause, then reorder, toggle or bulk-toggle Linux hotstring sections, or open their editor | Greyed and refused                                                                                                                           | Linux hotstrings suites                    |
-| Pause, then change the layout switched to on pause or resume                              | Greyed on both drivers                                                                                                                       | layout switching suites                    |
-| Pause, then edit a Linux keyboard group or the wrap choices, or restore or clear gestures | Refused                                                                                                                                      | Linux shortcuts and gestures suites        |
+| Sequence                                                                                  | Before                                                                                                              | Regression                                 |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Pause, then open a feature menu from the tray                                             | Both trays greyed every row the manifest marks `greyed_when_paused`; macOS Shortcuts and Gestures greyed themselves | `edd1-paused-writes` in both trays' suites |
+| Pause, then use the Configuration menu's « clean unused keys » (macOS)                    | Greyed and stripped of its handler                                                                                  | shared Configuration contract, macOS suite |
+| Pause, then reorder, toggle or bulk-toggle Linux hotstring sections                       | Greyed and refused                                                                                                  | Linux hotstrings suites                    |
+| Pause, then change the layout switched to on pause or resume                              | Greyed on both drivers                                                                                              | layout switching suites                    |
+| Pause, then edit a Linux keyboard group or the wrap choices, or restore or clear gestures | Refused                                                                                                             | Linux shortcuts and gestures suites        |
 
 `greyed_when_paused` stays in `menu.toml`: only the AHK tray reads it now,
 and the Windows agent deletes it with its `A_IsSuspended` gates (choice B,
@@ -53,8 +53,11 @@ source proofs reworked first:
   paused; the edit path needs a pause-safe reload first.
 - Programmable hotstrings switch (shared policy): enabling loads the user's
   code at once.
-- macOS and Linux AI menus: the enable switch, the privacy and trigger rows
-  read the pause through shared policies.
+- macOS and Linux AI menus: the parent row, the enable switch and the
+  privacy and trigger rows read the pause through shared policies.
+- The personal hotstrings editor row and the word expander rows on macOS and
+  Linux: their shared corpus (`personal_editor_command.json`) and contract
+  still pin the pause, so all drivers move together.
 - macOS hotstrings submenus (`menu_hotstrings*.lua`): the section, bulk,
   delay and personal rows still grey; `tools/lib/menu-hotstring-language-binding.cjs`
   and `test-menu-manifest.cjs` prove those pause locals structurally and must

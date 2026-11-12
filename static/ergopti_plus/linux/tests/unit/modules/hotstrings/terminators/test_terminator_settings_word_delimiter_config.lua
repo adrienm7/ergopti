@@ -741,8 +741,9 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 			helpers.assert_eq(sandbox.read_bytes(path), stored)
 			for position = 1, 3 do helpers.assert_eq(receipts[position], false) end
 			local grey, _, grey_observed = menu_controls(Settings, true, false)
-			helpers.assert_eq(grey_observed.hotstrings_disabled, true)
-			helpers.assert_nil(grey_observed.hotstrings_submenu, "paused native roots strip every feature action")
+			-- The tray keeps the Hotstrings row live while paused (EDD-1); the word
+			-- expander rows themselves still grey until all drivers move together.
+			helpers.assert_true(grey_observed.hotstrings_disabled ~= true, "a paused tray keeps the Hotstrings row")
 			for position = 1, 3 do helpers.assert_eq(grey[position].disabled, true) end
 			helpers.assert_eq(grey_observed.writes, 0)
 		end)
