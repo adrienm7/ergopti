@@ -39,6 +39,16 @@ non-negative integer, and reads such a file as it is.
 - A key combination is `<first>_then_<second>` over the same ids, the first key
   pressed first: `escape_then_tab`.
 - A driver that has no such key or combination leaves the entry untouched.
+- A Mac thumb key is written under the PC key at its place (maintainer
+  decision TCL-004, « follow the position », `shared_file.toml`
+  `[thumb_positions]`): `left_command` is `left_alt`, `right_command` is
+  `alt_gr`, `right_option` is `right_ctrl`. Every driver reads an entry still
+  under a Mac thumb id as that key, unless the file names the key too.
+- An action is named by the id Windows and Linux bind (`enter`,
+  `one_shot_shift`, `caps_word`). macOS translates its own spelling (`return`,
+  `sticky_shift`, `capsword`) on read and write through the generated action
+  catalogue's `tap_hold_spellings`, built from the one-to-one equivalents and
+  `[karabiner_aliases]` of `_shared/modules/actions/actions.toml`.
 
 ## Sections
 
