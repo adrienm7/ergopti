@@ -160,6 +160,33 @@ function M.read(path)
 	return result
 end
 
+--- Reads at most max_bytes from a regular file, refusing a longer one before
+--- its remaining bytes are read (the macOS adapter's read_bounded contract).
+--- @param path string Absolute path to the file.
+--- @param max_bytes integer Maximum accepted byte length.
+--- @return string|nil content
+--- @return string status `ok`, `absent`, `too_large`, or `error`.
+--- @return string|nil detail
+function M.read_bounded(path, max_bytes)
+	if type(max_bytes) ~= "number" or max_bytes < 0 or max_bytes % 1 ~= 0 then
+		return nil, "error", "max_bytes must be a non-negative integer"
+	end
+	if not valid_native_path(path) then return nil, "error", "path must be a non-empty string without NUL" end
+	local status = M.path_status(path)
+	if status == "absent" then return nil, "absent", nil end
+	local fh, open_err = require("infra.regular_file_reader").open(path)
+	if not fh then return nil, "error", tostring(open_err) end
+	local read_ok, content, read_err = pcall(fh.read, fh, max_bytes + 1)
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not read_ok or (content ~= nil and type(content) ~= "string") then
+		return nil, "error", tostring(read_ok and read_err or content)
+	end
+	if not close_ok or closed ~= true then return nil, "error", tostring(close_ok and close_err or closed) end
+	content = content or ""
+	if #content > max_bytes then return nil, "too_large", nil end
+	return content, "ok", nil
+end
+
 --- Writes and closes a native file, preserving both failure receipts.
 --- A successful write alone does not guarantee that buffered bytes were flushed.
 --- LuaJIT can return true from write; stock Lua returns the file handle instead.

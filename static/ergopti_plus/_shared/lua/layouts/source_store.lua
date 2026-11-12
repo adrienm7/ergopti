@@ -19,6 +19,8 @@
 ---    nothing is truncated or rewritten silently. The codes, the folder, the
 ---    navigation export's name and the bounds come from the shared layout
 ---    defaults, which Windows' source_store.ahk reads too.
+--- 4. Reopening is bounded like opening: the last source is read through a
+---    bounded read and must be UTF-8 text, as a picked file must.
 --- 3. Saving never installs or activates anything: the editor's files are the
 ---    user's; installing a generated layout stays the layout manager's job.
 --- ==============================================================================
@@ -179,12 +181,14 @@ end
 
 --- Creates the open and save operations over a driver's ports.
 --- env: settings (M.settings), config_dir (with a trailing slash), read(path),
----   write(path, text) -> ok, err (creating the folder), exists(path),
----   log(level, message, ...).
+---   read_bounded(path, max_bytes) -> text|nil, status (`ok`, `absent`,
+---   `too_large` or `error`), detail, write(path, text) -> ok, err (creating
+---   the folder), exists(path), log(level, message, ...).
 --- @param env table
 --- @return table { open, save, folder }
 function M.new(env)
 	local settings = env.settings
+	if type(env.read_bounded) ~= "function" then error("source_store.new: env.read_bounded is required", 2) end
 	local operations = {}
 
 	local function folder()
@@ -201,11 +205,13 @@ function M.new(env)
 			local name = env.read(pointer)
 			name = type(name) == "string" and name:gsub("%s+$", "") or nil
 			local ok = name and M.check(settings, { filename = name, text = "x" }) and M.is_source(settings, name)
-			local text = ok and env.exists(folder() .. name) and env.read(folder() .. name) or nil
-			if type(text) == "string" and #text <= settings.max_file_bytes then
+			local text, status = nil, "invalid_name"
+			if ok then text, status = env.read_bounded(folder() .. name, settings.max_file_bytes) end
+			if type(text) == "string" and status == "ok" and M.is_utf8(text) then
 				data.text, data.filename = text, name
 			else
-				env.log("error", "The last layout source named by %s is unreadable.", pointer)
+				env.log("error", "The last layout source named by %s is unreadable (%s).", pointer,
+					type(text) == "string" and status == "ok" and "not UTF-8 text" or tostring(status))
 			end
 		end
 		on_done(data)
