@@ -26,6 +26,19 @@ helpers.describe("personal editor literal brace payload", function()
 	end)
 end)
 
+-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+helpers.describe("personal hotstrings editor while paused", function()
+	helpers.it("saves the page's hotstrings while the daemon is paused (edd1-paused-writes)", function()
+		with_opening_file(function(f)
+			f.state.is_paused = function() return true end
+			helpers.assert_true(f.ready())
+			helpers.assert_true(f.save("written while paused").saved)
+			local decoded = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(decoded.english.old.output, "written while paused")
+		end)
+	end)
+end)
+
 helpers.describe("personal editor row origins", function()
 	helpers.it("preserves source metadata and comment across move, rename and later save", function()
 		with_opening_file(function(f)

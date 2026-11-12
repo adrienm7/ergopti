@@ -179,12 +179,12 @@ end
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), layout ({ rows, live } for
 ---   the keyboard-layout participant, or nil), backup_path(scope),
----   defer(fn), paused() and refresh(committed, report), which also receives
+---   defer(fn) and refresh(committed, report), which also receives
 ---   every refusal, with the typed failure point of its report.
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
-	for _, name in ipairs({ "backup_path", "defer", "paused", "refresh" }) do
+	for _, name in ipairs({ "backup_path", "defer", "refresh" }) do
 		assert(type(options[name]) == "function", "the global scope needs " .. name)
 	end
 	-- Retired with the clear's question on 2026-09-30: a caller still wiring
@@ -221,7 +221,6 @@ function M.new(options)
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean accepted True once the composition started.
 	function owner.apply(mode)
-		if options.paused() ~= false then return false end
 		if composition.pending() then
 			local settled = false
 			composition.retry_restore(function(ok) settled = ok == true end)

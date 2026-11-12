@@ -1249,17 +1249,11 @@ local function apply_pair_press_order(rules, pair_rules)
 		end
 	end
 	if next(rivals) == nil then return end
-	local function sorted(set)
-		local list = {}
-		for key in pairs(set) do list[#list + 1] = key end
-		table.sort(list)
-		return list
-	end
 	for rule in pairs(pair_rules) do
 		for _, manipulator in ipairs(rule.manipulators or {}) do
 			local k1, k2 = pair_keys(manipulator)
 			if k1 and rivals[k1] then
-				for _, other in ipairs(sorted(firsts[k2])) do
+				for _, other in ipairs(TableUtil.sorted_keys(firsts[k2])) do
 					if other ~= k1 then
 						manipulator.conditions[#manipulator.conditions + 1] = {
 							type = "variable_unless", name = held_before_var(other, k1), value = 1,
@@ -1284,7 +1278,7 @@ local function apply_pair_press_order(rules, pair_rules)
 		for _, manipulator in ipairs(rule.manipulators or {}) do
 			after_held(manipulator.to, 1, function(key)
 				local events = {}
-				for _, other in ipairs(sorted(rivals[key])) do
+				for _, other in ipairs(TableUtil.sorted_keys(rivals[key])) do
 					events[#events + 1] = set_var_event(held_before_var(other, key), 0)
 					local set = set_var_event(held_before_var(other, key), 1)
 					set.conditions = { { type = "variable_if", name = held_var_name(other), value = 1 } }
@@ -1294,7 +1288,7 @@ local function apply_pair_press_order(rules, pair_rules)
 			end)
 			after_held(manipulator.to_after_key_up, 0, function(key)
 				local events = {}
-				for _, other in ipairs(sorted(rivals[key])) do
+				for _, other in ipairs(TableUtil.sorted_keys(rivals[key])) do
 					events[#events + 1] = set_var_event(held_before_var(other, key), 0)
 					events[#events + 1] = set_var_event(held_before_var(key, other), 0)
 				end

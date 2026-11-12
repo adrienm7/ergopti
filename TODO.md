@@ -160,6 +160,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Progress (12 November 2026, [onboarding campaign](docs/audits/platform-parity/2026-11-12-onboarding/report.md), branch `claude/ergopti-todo-parity-b`): the wizard's bridges, catalogue and answers. Fixed on macOS: the chosen language waits for Finish, as on Windows and Linux (OBM-001), and a missing or unshipped locale is refused instead of becoming English (OBM-002). Left: Linux host dialogs during the wizard keep the running language; native WebView receiving unqualified.
       Progress (12 November 2026, [diagnostics page campaign](docs/audits/platform-parity/2026-11-12-healthcheck/report.md), branch `claude/ergopti-todo-parity-b`): actions, pause, stale results: no finding (one shared validator and report owner, the collection a Windows capability). Left: native receiving unqualified.
       Progress (12 November 2026, [Linux install campaign](docs/audits/platform-parity/2026-11-12-linux-install/report.md), branch `claude/ergopti-todo-parity-b`): startup ownership, uninstall, configuration cleanup (download steps left to the other track). Fixed: a checkout's startup entry no longer takes the standalone installation's name, which blocked a later install (LIN-001). Left: a deleted checkout's entry stays until a checkout run rewrites it.
+      Progress (12 November 2026, [editors campaign, first pass](docs/audits/platform-parity/2026-11-12-editors/report.md), branch `claude/ergopti-todo-parity-b`): page and bridge behaviour of the personal information, prompt, paths and hotstrings editors. Fixed on macOS: a refused personal information save is told (EDM-001). EDD-1 decided by the maintainer on 2026-11-12 (a pause stops typing, not configuration): macOS and Linux editors save while paused, the LMH-003 gate reverted, Windows counterpart below. Left: the macOS prompt editor's refused-save notice, the layer editor page, tooltips, WPM.
+      Progress (12 November 2026, [pause, first pass](docs/audits/platform-parity/2026-11-12-pause/report.md), branch `claude/ergopti-todo-parity-b`): EDD-1 sharpened into a « real pause » (configuration and installs stay available, typing stays inert, a setting changed while paused applies on resume). Done on macOS and Linux: the physical shortcuts editor opens while paused, and every menu's whole-scope restore and clear runs while paused, the Configuration menu's included (`edd1-paused-writes`). Left: the tray's `greyed_when_paused` feature rows, the per-row configuration and install gates inside the submenus, the audit that every typing feature (layout emulation first) is inert while paused, and the macOS unused-key clean, which still greys while paused.
 
 ## Dead-key composition parity follow-up
 
@@ -394,6 +396,15 @@ and the next module candidates. The audit is paused at the maintainer's request.
       (`tsm_uiserver_unanswered`, `fixture_refusal_unclassified` or `no_fixture_refusal`) with the agent snapshot; the
       verdict and the exact cohorts are unchanged (`tools/test/test-macos-tsm-refusal.cjs`). Next refusal: read its
       receipt and snapshot (did the agent's pid or run count change?) before trying another perturbation.
+      2026-11-12 afternoon: the refusal now recurs on macOS 26 in the full launcher suite ("Run Swift launcher tests on
+      macOS 26"), with no `tsm.uiserver` line in any of them: [43222724578](https://github.com/adrienm7/ergopti/actions/runs/43222724578) (job 131204789756) on
+      `KeyboardCharacterMappingTests.testFreshKeyboardEventsFollowLayoutAndShiftFlags` at 13:26:12 UTC, then
+      `KeyboardSourceProbeTests` (3), `NativeInputSourceSelectionTests` (4) and `NumberRowSourceProbeTests` (7)
+      "unavailable"; [43228623723](https://github.com/adrienm7/ergopti/actions/runs/43228623723) (job 131226750544) on the number-row cohort's first selecting case
+      (`testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI`, French) at 14:12:29, five seconds after
+      `NativeInputSourceSelectionTests` passed, then six more "unavailable". With 43108782369 that is three macOS 26
+      refusals without the line. The full-suite step carries no text-input snapshot or `tsm-refusal.json`, so the
+      next step is to bracket it as the number-row step is.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
@@ -1354,6 +1365,20 @@ between workers) green alone. All live checks pass, typed by the harness.
       Startup Apps keeps the new shortcut disabled, it opens `ms-settings:startupapps` and then shows « Could not change
       automatic startup ». Show `dialog.start_at_login.approval` (informational, already in the 21 locales) on that branch,
       the failure dialog on the others, as macOS does. Test in the startup suite through `NoticeFn`.
+- [ ] **EDD-1 on AHK (decided by the maintainer on 2026-11-12: a pause stops typing, not configuration).** Remove the
+      `A_IsSuspended` page-message gates that drop or refuse a configuration write while suspended, in
+      `ui/prompt_editor/init.ahk` (`_PromptEdWeb_OnWebMessage` and `_PromptEdWeb_Save`), `ui/paths_editor`,
+      `ui/personal_info_editor`, `ui/personal_toml_editor_webview.ahk`, `ui/layer_editor`, `ui/layout_manager`
+      (`_LayMgrWeb_*`), `ui/hotstrings_config_window`, `ui/action_picker`, `ui/model_browser` and
+      `ui/physical_shortcuts`; keep `ready`'s handling. Test in each editor's suite: a save while suspended writes the
+      file. Extended the same day into a « real pause »: also remove the Suspend gates on every configuration or
+      install action, i.e. the tray rows the manifest marks `greyed_when_paused` (they stay live while suspended),
+      each menu's whole-scope restore and clear and the Configuration menu's, opening the physical shortcuts
+      editor, adding or deleting hotstrings, and installs (layouts, Ollama or MLX models, apps). Then confirm that
+      nothing that acts on typing stays active under Suspend (hotstrings, layout emulation, tap-holds, layers and
+      chords, shortcuts, gestures, AI predictions and their warmups and local server), with a regression for any
+      that still acts, and that a setting changed while suspended applies on resume. See
+      `docs/memory/maintainer-decisions.md`.
 - [ ] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
       returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
       it, as the Lua drivers do.

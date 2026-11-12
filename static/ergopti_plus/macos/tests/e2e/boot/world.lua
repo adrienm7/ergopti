@@ -682,6 +682,15 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		and args[1] == "-l" and args[2] == "1" and args[3] == "-n" and args[4] == "0" then
 		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
 	end
+	-- A remap download runs curl behind the system network prelude
+	-- (platform/remap/network_download.lua): /bin/sh -c '<prelude>exec /usr/bin/curl "$@"'
+	-- <tag> <curl arguments>. The shell becomes curl, so it answers as curl does
+	-- here; the generic shell answer below would report a download that never ran.
+	if path == "/bin/sh" and args[1] == "-c" and tostring(args[2]):find('exec /usr/bin/curl "$@"', 1, true) then
+		local curl_args = {}
+		for index = 4, #args do curl_args[#curl_args + 1] = args[index] end
+		return machine_answer("/usr/bin/curl", curl_args, helper, environment, launcher_environment)
+	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
 	-- Ergopti's own runtime artifact (platform/remap/runtime_artifact_fetch.lua):
 	-- its folder steps succeed and the E2E Mac is offline, so the download fails
