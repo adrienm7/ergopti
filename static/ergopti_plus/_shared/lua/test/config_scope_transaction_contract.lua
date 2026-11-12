@@ -305,9 +305,8 @@ return function(helpers)
 	end)
 
 	--- A preset owner over a separate file, routing the manifest's tap_holds rows:
-	--- the master flag and the lone modifier tap window, the two leaves the Linux
-	--- writer stores in tap_hold.toml. Its runtime marker follows the preset
-	--- candidate's master flag.
+	--- the master flag, the lone modifier tap window and the one-shot timeout.
+	--- Its runtime marker follows the preset candidate's master flag.
 	local function preset_fixture(preset_source)
 		local KEY = require("config_keys").KEY
 		local options, files, writes, runtime, controls, original = fixture()
@@ -319,8 +318,8 @@ return function(helpers)
 				local tap_hold = document.tap_hold or {}
 				for _, row in ipairs(rows) do
 					local path = row.section .. "." .. row.key
-					helpers.assert_true(path == KEY.TAP_HOLDS_ENABLED or path == KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS,
-						"a tap_holds scope row the preset file owns: " .. path)
+					helpers.assert_true(path == KEY.TAP_HOLDS_ENABLED or path == KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS
+						or path == KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, "a tap_holds scope row the preset file owns: " .. path)
 					if row.delete then tap_hold[row.key] = nil else tap_hold[row.key] = row.value end
 				end
 				tap_hold.keys = mode == "recommended" and { caps_lock = { tap_action = "escape" } } or nil
