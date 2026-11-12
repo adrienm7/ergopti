@@ -12,8 +12,10 @@ When that agent does not answer, HIToolbox prints one line per message,
 Every hosted refusal seen so far (a selection deadline, an unresolved cleanup,
 then "unavailable" for every later case) followed such lines. Stopping
 TextInputMenuAgent, or TextInputSwitcher behind it, prints them too, but the
-cohort then still passes (probe run 43189848716 on Intel), so an unanswered
-server is the state the refusals share, not a proven cause on its own.
+cohort then still passes (probe run 43189848716 on Intel), and so did stopping
+both, or stopping or killing either while the cohort selected; a fresh Intel
+runner's passing cohort printed four such lines (probe run 43194666371). An
+unanswered server is therefore the state the refusals share, not their cause.
 
 This owner reads the cohort transcript and the agent snapshot taken around it
 (macos_text_input_agents.sh) and writes a receipt whose state is one of:
@@ -125,7 +127,8 @@ def annotation(receipt):
             f"com.apple.tsm.uiserver (TextInputMenuAgent) did not answer (status {first['status']}, "
             f"{receipt['unanswered_count']} messages, first in {first['case']}) before the "
             f"selection in {refusal['case']} was refused. An unanswered server alone does not "
-            "refuse a selection, so this names the runner state, not a proven cause."
+            "refuse a selection and passing cohorts print it too, so this names the runner "
+            "state, not a proven cause."
         )
     return (
         "::error::Native keyboard-source refusal: fixture_refusal_unclassified. "
