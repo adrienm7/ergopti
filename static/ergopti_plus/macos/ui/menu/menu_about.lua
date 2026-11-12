@@ -36,6 +36,8 @@ local Updater   = require("modules.updater")
 local VersionLabel = require("updater.version_label")
 local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
+local CheckNotice = require("updater.check_notice")
+local Notifications = require("infra.notifications")
 local LOG       = "menu_about"
 
 
@@ -108,6 +110,33 @@ end
 --- @param owner table The menu session's update-channel owner.
 --- @param subscribed string Registry id of the subscribed channel.
 --- @return table row A provider row with its items.
+--- Runs the check a click asked for when the update-check window cannot open,
+--- and notifies its answer in the sentence the window would show.
+--- @param checks table|nil The automatic-check owner (check_now).
+--- @param owner table|nil The menu session's channel owner.
+--- @param on_change function|nil Menu refresh after the answer.
+--- @return boolean dispatched
+local function notify_check_without_window(checks, owner, on_change)
+	Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
+	if type(checks) ~= "table" or type(checks.check_now) ~= "function"
+		or type(owner) ~= "table" or type(owner.get) ~= "function" then
+		Logger.error(LOG, "No automatic-check owner: the update check cannot run without its window.")
+		return false
+	end
+	return checks.check_now(owner.get(), function(result)
+		local body = CheckNotice.body(result, i18n.get, function(id)
+			local entry = Updater.channels().channel(id)
+			return entry and i18n.get(entry.label_key) or tostring(id)
+		end)
+		local notified, err = Notifications.notify(i18n.get("updater.window_title"), body,
+			result.state == "error" and "warning" or "info")
+		if notified ~= true then
+			Logger.error(LOG, "The update-check answer could not be notified: %s.", tostring(err))
+		end
+		if type(on_change) == "function" then on_change() end
+	end) == true
+end
+
 local function channel_picker(owner, subscribed)
 	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
@@ -201,11 +230,16 @@ function M.build(ctx, actions)
 		-- consent to install it, so it goes straight to Sparkle.
 		local check_action = function()
 				Logger.info(LOG, "User asked for an update check (channel: %s).", channel)
-				require("ui.update_check").open({
+				local on_change = type(ctx) == "table" and ctx.updateMenu or nil
+				local opened = require("ui.update_check").open({
 					checks = checks,
 					channel_owner = owner,
-					on_change = type(ctx) == "table" and ctx.updateMenu or nil,
+					on_change = on_change,
 				})
+				if opened == true then return true end
+				-- Without its window the click showed nothing: the check runs and its
+				-- answer is notified, as on Windows and Linux (UPX-001).
+				return notify_check_without_window(checks, owner, on_change)
 		end
 		local offered_label
 		if type(latest) == "table" and type(latest.tag) == "string" and latest.tag ~= ""
