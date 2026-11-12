@@ -103,5 +103,6 @@ cases = [
 	"shipped_language_section_order_kept_on_linux",
 	"shipped_release_ai_enabled_kept_on_macos",
 	"shipped_language_section_order_kept_on_macos",
-	"op_import_companion"
+	"op_import_companion",
+	"shipped_tap_hold_rows_move_to_config"
 ]
