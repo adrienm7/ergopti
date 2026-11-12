@@ -44,10 +44,13 @@ function run() {
 	assert.match(refused.stderr, /ERGOPTI_STRUCTURE_PHASE=2/);
 
 	// The follow-ups a step needs and no path rewrite can do, in order.
+	// The derived pins are recorded by the tree before the step applies.
 	const order = [
+		"'--derive-out'",
+		"'--apply'",
 		'--fix-banners',
 		"'--write'",
-		'[REPIN, ',
+		"'--derived-before'",
 		'settleCodegen(key',
 		'--update-baseline',
 		"'--fail-on-violations'"
