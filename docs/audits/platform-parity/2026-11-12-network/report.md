@@ -42,16 +42,19 @@ NET-003 is `[llm] ollama_request_timeout_ms`; the macOS connect timeout reads
   network class. Regressions `net-001-remap-route` (route command, wiring,
   the DMG pipeline over https only).
 
+- **NET-003 follow-up (macOS), decided by the maintainer on 2026-11-12:** the
+  12 s no-token streaming watchdog is removed with `[llm] stream_watchdog_ms`;
+  only the request's own deadline ends a slow stream, as on Windows and Linux.
+  Regression `stream-watchdog-removed`.
+- **NET-004, decided by the maintainer on 2026-11-12:** the release archive is
+  bounded by one shared declaration aligned on Windows, `archive_transfer`
+  `phase_timeout_ms.archive = 1200000` and `archive_idle_timeout_ms = 600000`,
+  read on Linux (curl's speed bound) and macOS (staging script and launcher
+  request); the Windows side has its TODO line. Regression
+  `release-archive-budget`.
+
 ## Open
 
-- **NET-003 follow-up (macOS):** the 12 s no-token streaming watchdog still
-  ends a cold load before its first token; the registry comment claims an AHK
-  equivalent that no Windows or Linux code reads. Needs a cross-driver
-  decision.
-- **NET-004 (macOS, Windows):** the macOS release download keeps a typed
-  900 s budget (`release_installer.lua`, `release_stage.sh`) and Windows 600 s
-  receive and 1,200 s absolute, while the shared `archive_transfer.archive` is
-  300 s. Which value is right is a maintainer decision.
 - **NET-005 (macOS, low, plausible):** `system_network_from_scutil` reads
   `ExcludeSimpleHostnames` for the fingerprint only, so a short internal host
   goes through the proxy where Windows' `<local>` bypass sends it direct.
