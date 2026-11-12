@@ -86,6 +86,12 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 			"the script_quit port must reach the user Quit owner")
 		helpers.assert_true(source:find('report_quit("the tray Quit")', 1, true) == nil,
 			"the watcher report names the Quit source it was given")
+		local degraded = source:match('tray_menu%.setFallbackMenu%((.-)\n\t\t\t\tend%)')
+		helpers.assert_true(degraded ~= nil, "the degraded tray Quit is found")
+		local owner = degraded:find('pcall(privacy_owners.tray_quit, "degraded tray quit")', 1, true)
+		local safety = degraded:find('shutdown.request("degraded tray quit")', 1, true)
+		helpers.assert_true(owner ~= nil and safety ~= nil and owner < safety,
+			"the degraded tray Quit takes the user Quit owner and ends the daemon only when that owner raises")
 	end)
 
 	helpers.it("admits a quit, applies the pause layout, then starts the shutdown", function()
