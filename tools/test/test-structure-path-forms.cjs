@@ -117,6 +117,12 @@ function run() {
 			rewrite('tools/lint/x.cjs', "const TREES = [\n\t'linux/zz_scatter',\n\t'macos/ui'\n];"),
 			"const TREES = [\n\t'linux/zz_scatter',\n\t'linux/zz_core/y',\n\t'macos/ui'\n];"
 		);
+		// A property line is no list element: its key would be duplicated.
+		const property = "const o = {\n\ta: 1,\n\troots: 'linux/zz_scatter',\n\tb: 2\n};";
+		assert.ok(
+			!rewrite('tools/lint/x.cjs', property).includes('zz_core'),
+			'a property names no list'
+		);
 		const kept = "fail('route OS access through linux/zz_scatter/ instead');";
 		assert.equal(rewrite('tools/lint/x.cjs', kept), kept);
 		// Regular expressions of a path: behind the variable holding the checkout,
