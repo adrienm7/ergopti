@@ -40,11 +40,6 @@ global UC_HOST_ACCESS_ALLOW := 1
 global UC_PAGE_ACTIONS := Map("close", "", "update", "available", "whats_new", "available",
 	"open_url", "available", "switch_channel", "", "report", "error", "open_log", "error")
 
-; The actions that drive the updater, refused while the driver is paused; the
-; others (close, report, open the log) change nothing ErgoptiPlus does, as in
-; the error window
-global UC_UPDATER_ACTIONS := Map("update", true, "whats_new", true, "open_url", true, "switch_channel", true)
-
 ; The phases an answer may carry, as the page knows them
 global UC_ANSWER_STATES := Map("up_to_date", true, "available", true, "no_release", true, "error", true)
 
@@ -289,15 +284,14 @@ _UpdateCheck_NativeTexts(State) {
 ; @param Name {String} One of UC_PAGE_ACTIONS.
 ; @param Channel {String} The channel of a switch line.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only): install,
-;   changelog, open_url, set_channel, report, open_log, close, refuse_paused.
-; @param BornSuspended {Boolean} Whether the driver was paused when the click
-;   arrived: an updater action is then refused visibly.
+;   changelog, open_url, set_channel, report, open_log, close. A pause does not
+;   refuse an action (UPD-2): it stops typing, not what the user asks for.
 ; @param ActionOwner {Object} Optional exact answer captured at dispatch; direct
 ;   synchronous callers capture the current answer at entry.
 ; @param Url {String} The clicked link of an open_url action.
 ; @returns {Map} { ok, missing, closed }
-UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, ActionOwner := unset, Url := "") {
-	global UC_PAGE_ACTIONS, UC_UPDATER_ACTIONS
+UpdateCheck_Perform(Name, Channel := "", Effects := 0, ActionOwner := unset, Url := "") {
+	global UC_PAGE_ACTIONS
 	Outcome := Map("ok", false, "missing", false, "closed", false)
 	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
 	if !UC_PAGE_ACTIONS.Has(Name) || !_UpdateCheck_ActionCurrent(Owner)
@@ -309,10 +303,6 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, A
 		return Outcome
 	}
 	Effect(Key, Default) => (Effects is Map && Effects.Has(Key)) ? Effects[Key] : Default
-	if (BornSuspended && UC_UPDATER_ACTIONS.Has(Name)) {
-		Effect("refuse_paused", _Updater_RefuseManualWhileSuspended).Call()
-		return Outcome
-	}
 
 	switch Name {
 		case "close":
@@ -853,10 +843,6 @@ _UpdateCheck_OnWebMessage(Epoch, Handler, Args) {
 	global _UC_WindowEpoch, _UC_ResetDone
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
 		return
-	; The callback bypasses native Suspend: whether the driver was paused is read
-	; before the COM read can pump messages. The page still loads and closes
-	; while paused; its updater actions are refused (UpdateCheck_Perform)
-	BornSuspended := A_IsSuspended
 	Owner := _UpdateCheck_CaptureActionOwner()
 	try Raw := Args.TryGetWebMessageAsString()
 	catch as Err {
@@ -865,16 +851,15 @@ _UpdateCheck_OnWebMessage(Epoch, Handler, Args) {
 	}
 	if !_UpdateCheck_ActionCurrent(Owner)
 		return
-	SetTimer(_UpdateCheck_HandleMessage.Bind(Epoch, Raw, BornSuspended, 0, Owner), -1)
+	SetTimer(_UpdateCheck_HandleMessage.Bind(Epoch, Raw, 0, Owner), -1)
 }
 
 ; Handles one message of the page, on its own stack.
 ; @param Epoch {Integer}
 ; @param Raw {String}
-; @param BornSuspended {Boolean} Whether the driver was paused when it arrived.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only).
 ; @param ActionOwner {Object} Optional exact answer retained before the COM read.
-_UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, ActionOwner := unset) {
+_UpdateCheck_HandleMessage(Epoch, Raw, Effects := 0, ActionOwner := unset) {
 	global _UC_WindowEpoch, _UC_ResetDone, _UC_State, UC_PAGE_ACTIONS
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) || !(_UC_State is Map)
 		return
@@ -898,18 +883,17 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, Act
 		LoggerWarn("UpdateCheck", "Refused an update-check message that is not one of its actions.")
 		return
 	}
-	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects, Owner, Url)
+	_UpdateCheck_Act(Epoch, Name, Channel, Effects, Owner, Url)
 }
 
 ; Performs one action and answers it, in the page or the native window.
 ; @param Epoch {Integer}
 ; @param Name {String}
 ; @param Channel {String}
-; @param BornSuspended {Boolean} Whether the driver was paused at the click.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only).
 ; @param ActionOwner {Object} Optional exact answer retained by the event source.
 ; @param Url {String} The clicked link of an open_url action.
-_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, ActionOwner := unset, Url := "") {
+_UpdateCheck_Act(Epoch, Name, Channel, Effects := 0, ActionOwner := unset, Url := "") {
 	global _UC_WindowEpoch, _UC_ResetDone, _UC_Native, _UC_Gui
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
 		return
@@ -919,7 +903,7 @@ _UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, Act
 	LoggerInfo("UpdateCheck", "Update-check window action: {1}.", Name)
 	if !_UpdateCheck_ActionCurrent(Owner)
 		return
-	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, BornSuspended, Owner, Url)
+	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, Owner, Url)
 	catch as Err {
 		LoggerError("UpdateCheck", "The update-check action '{1}' failed: {2}", Name, Err.Message)
 		Outcome := Map("ok", false, "missing", false, "closed", false)

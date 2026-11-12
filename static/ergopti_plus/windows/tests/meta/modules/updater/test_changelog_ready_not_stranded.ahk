@@ -55,17 +55,13 @@ _CLRS_ReadyIsNotGatedAway() {
 	ReadyHandlerPos := ReadyPos > 0
 		? InStr(Body, "_CLW_OnPageReady(ExpectedWindowEpoch)", , ReadyPos)
 		: 0
-	BornPausedPos := ReadyHandlerPos > 0
-		? InStr(Body, "Request.BornSuspended", , ReadyHandlerPos)
-		: 0
-	PolicyPos := BornPausedPos > 0
-		? InStr(Body, "_Updater_RequestMayPublish(Request)", , BornPausedPos)
+	PolicyPos := ReadyHandlerPos > 0
+		? InStr(Body, "_Updater_RequestMayPublish(Request)", , ReadyHandlerPos)
 		: 0
 	Assert(CapturePos > 0 and MsgPos > CapturePos and SessionPos > MsgPos
 		and ActionPos > SessionPos and ReadyPos > ActionPos
-		and ReadyHandlerPos > ReadyPos and BornPausedPos > ReadyHandlerPos
-		and PolicyPos > BornPausedPos,
-		'the authenticated one-shot `ready` lifecycle signal must route before both captured pause gates, while every user action after it remains guarded. Gating `ready` strands the window because resume re-triggers nothing')
+		and ReadyHandlerPos > ReadyPos and PolicyPos > ReadyHandlerPos,
+		'the authenticated one-shot `ready` lifecycle signal must route before the request policy, while every user action after it remains revalidated. Gating `ready` strands the window because nothing re-triggers it')
 }
 Test("meta changelog-ready-not-stranded: the suspend guard exempts the page's ready signal",
 	_CLRS_ReadyIsNotGatedAway)
