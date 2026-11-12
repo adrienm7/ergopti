@@ -192,3 +192,111 @@ helpers.describe("installed login startup menu and native helper", function()
 		end)
 	end
 end)
+
+--- Runs the genuine menu and helper against a private source checkout (SAD-1).
+--- @param body function Receives the menu, the checkout's launcher, the entry path and a writer.
+local function with_source_startup(body)
+	local uv, Paths = require("luv"), require("infra.paths")
+	local loaded = { "adapters.shell_runner", "ui.menu.start_at_login" }
+	local previous = {}
+	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
+	local Shell
+	local source_root, original_root = Paths.driver_root(), Paths.driver_root
+	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-source-login-XXXXXX"))
+	local driver = root .. "/clone d'été/static/ergopti_plus/linux"
+	local environment = { PATH = root .. "/commands:" .. assert(os.getenv("PATH")), XDG_CONFIG_HOME = root .. "/config" }
+	local saved = {}
+	for key in pairs(environment) do saved[key] = os.getenv(key) end
+	local function write(path, text)
+		local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
+	end
+	local okay, detail = xpcall(function()
+		Shell = helpers.load_module("adapters.shell_runner")
+		local menu = helpers.load_module("ui.menu.start_at_login")
+		assert(Shell.run("mkdir -p -- " .. Shell.quote(driver .. "/install") .. " " .. Shell.quote(driver .. "/bin")
+			.. " " .. Shell.quote(driver .. "/../_shared/data/locales") .. " " .. Shell.quote(root .. "/commands")))
+		for _, name in ipairs({ "start_at_login.sh", "desktop_entry.sh", "config_home.sh" }) do
+			local file = assert(io.open(source_root .. "/install/" .. name, "rb"))
+			local text = assert(file:read("*a")); assert(file:close())
+			write(driver .. "/install/" .. name, text)
+		end
+		require("tests.support.shell_messages_fixture").provide(driver .. "/install")
+		write(driver .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\n")
+		write(driver .. "/../_shared/data/locales/en.json", "{}\n")
+		-- No user unit and no enabled service: the XDG entry alone is the startup.
+		write(root .. "/commands/systemctl", "#!/bin/bash\nif [ \"$2\" = is-enabled ]; then exit 1; fi\nexit 0\n")
+		assert(uv.fs_chmod(root .. "/commands/systemctl", 493))
+		for key, value in pairs(environment) do assert(uv.os_setenv(key, value)) end
+		Paths.driver_root = function() return driver end
+		body(menu, driver .. "/bin/ergopti-hotstrings", root .. "/config/autostart/ergopti-hotstrings.desktop", write)
+	end, debug.traceback)
+	Paths.driver_root = original_root
+	for key in pairs(environment) do
+		if saved[key] == nil then assert(uv.os_unsetenv(key)) else assert(uv.os_setenv(key, saved[key])) end
+	end
+	for _, name in ipairs(loaded) do package.loaded[name] = previous[name] end
+	if Shell then assert(Shell.run("rm -rf -- " .. Shell.quote(root))) end
+	if not okay then error(detail, 0) end
+end
+
+--- Reads a whole file.
+local function read_file(path)
+	local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
+end
+
+helpers.describe("login startup on a source run (SAD-1)", function()
+	helpers.it("(login-source-run) starts the checkout's own launcher by absolute path", function()
+		with_source_startup(function(menu, launcher, desktop)
+			helpers.assert_eq(menu.command_available(), true)
+			helpers.assert_eq(menu.enabled(), false)
+			helpers.assert_eq(menu.toggle(), true)
+			helpers.assert_eq(menu.enabled(), true)
+			local bytes = read_file(desktop)
+			helpers.assert_true(bytes:find('Exec=/bin/bash "' .. launcher .. '" --tray\n', 1, true) ~= nil, bytes)
+			helpers.assert_true(bytes:find("Hidden=false", 1, true) ~= nil)
+			helpers.assert_eq(menu.toggle(), true)
+			helpers.assert_eq(menu.enabled(), false)
+			helpers.assert_true(read_file(desktop):find("Hidden=true", 1, true) ~= nil)
+		end)
+	end)
+	helpers.it("(login-source-run) reports an entry whose launcher is gone and rewrites it on enable", function()
+		with_source_startup(function(menu, launcher, desktop, write)
+			assert(require("adapters.shell_runner").run("mkdir -p -- "
+				.. require("adapters.shell_runner").quote(desktop:match("^(.*)/[^/]+$"))))
+			write(desktop, '[Desktop Entry]\nType=Application\nName=Ergopti\n'
+				.. 'Exec=/bin/bash "/moved/clone/static/ergopti_plus/linux/bin/ergopti-hotstrings" --tray\n'
+				.. 'Terminal=false\nHidden=false\nX-Ergopti-Startup=true\n')
+			local previous_logger = package.loaded["logger.shim"]
+			local logs = {}
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			local ok, failure = pcall(function()
+				local subject = helpers.load_module("ui.menu.start_at_login")
+				helpers.assert_eq(subject.enabled(), false, "a gone launcher starts nothing")
+				helpers.assert_eq(subject.command_available(), true, "the entry is ours to rewrite")
+				local warned = 0
+				for _, line in ipairs(logs) do
+					if line:find("names a launcher that no longer exists", 1, true) then warned = warned + 1 end
+				end
+				helpers.assert_eq(warned, 1, "the stale entry is said once")
+				helpers.assert_eq(subject.toggle(), true)
+				helpers.assert_eq(subject.enabled(), true)
+				helpers.assert_true(read_file(desktop):find('Exec=/bin/bash "' .. launcher .. '" --tray\n', 1, true) ~= nil)
+			end)
+			package.loaded["logger.shim"] = previous_logger
+			assert(ok, failure)
+		end)
+	end)
+	helpers.it("(login-source-run) keeps a live foreign entry as another command", function()
+		with_source_startup(function(menu, _, desktop, write)
+			assert(require("adapters.shell_runner").run("mkdir -p -- "
+				.. require("adapters.shell_runner").quote(desktop:match("^(.*)/[^/]+$"))))
+			write(desktop, '[Desktop Entry]\nType=Application\nExec=/bin/bash "/bin/sh" --tray\n'
+				.. 'X-Ergopti-Startup=true\n')
+			helpers.assert_eq(menu.command_available(), false)
+			helpers.assert_eq(menu.toggle(), false)
+			helpers.assert_true(read_file(desktop):find('Exec=/bin/bash "/bin/sh" --tray', 1, true) ~= nil)
+		end)
+	end)
+end)
