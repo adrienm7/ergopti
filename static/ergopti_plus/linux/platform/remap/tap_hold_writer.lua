@@ -662,7 +662,7 @@ function M.set_one_shot_timeout_ms(ms, guard)
 			tostring(ms))
 		return false
 	end
-	local row = { section = ConfigKeys.KEY.TAP_HOLDS, key = ONE_SHOT_TIMEOUT_FIELD }
+	local row = { section = ConfigKeys.KEY.TAP_HOLDS, key = ConfigKeys.LEAF.STICKY_TIMEOUT_MS }
 	if ms == require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_DEFAULT_MS then row.delete = true else row.value = ms end
 	return commit_setting("one-shot timeout = " .. tostring(ms) .. " ms", row, guard)
 end

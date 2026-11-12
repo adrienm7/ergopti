@@ -1288,14 +1288,6 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
-- [ ] **AHK reds after the shared tap-hold layout re-land (2026-11-12, CI run 43247530033).** The re-landed
-      `platform/remap/tap_hold_loader.ahk` / `infra/config_migrate.ahk` (verbatim from `wt/taphold-landed`) leave
-      15 Windows unit cases red, none of them red on `dev` 44f0ded3: in keymap-gestures,
-      « LoadTapHoldToml: an unknown hold_modifier drops the hold and keeps the tap » (no ERROR names `fn`,
-      `test_tap_hold_overlay_and_modifiers.ahk:349`) and the three « Layer editor save … respects native
-      admission »; in ui, the eight « Layer editor readiness / navigation pause » and the three « Layout manager
-      command » cases, all « feature-state initialization failed: This local variable has not been assigned a
-      value ». Find the unassigned local on the feature-state path the series changed and fix it in AHK.
 - [ ] **Mac thumb keys follow the position (maintainer decision TCL-004, 2026-11-12).**
       `platform/remap/tap_hold_loader.ahk` ignores a `tap_hold.toml` key under a Mac thumb id. Read one as the PC key
       at its place when the file does not name that key too (`_shared/tap_hold/shared_file.toml` `[thumb_positions]`:
@@ -1303,10 +1295,6 @@ between workers) green alone. All live checks pass, typed by the harness.
       (`shared_file.lua` `positional_key`) and Linux (`tap_hold_loader.lua`) now do. Then read
       `_shared/tests/corpus/tap_hold_spellings/mac_thumb.toml` in `test_tap_hold_shared_file.ahk` against the
       `[reads.mac_thumb.linux]` expectations of its `expected.toml`.
-- [ ] **Tap-hold delay bound from the timing registry (TCL-005, 2026-11-12).** `platform/remap/tap_hold_loader.ahk`
-      keeps the 10 s bound of `time_activation_seconds` as a literal; read `_shared/modules/timings/constants.toml`
-      `[tap_hold] max_activation_ms`, which macOS (`platform/remap/defaults.lua`) and Linux (`tap_hold_loader.lua`,
-      `tap_hold_writer.lua`) now read.
 - [ ] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
