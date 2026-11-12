@@ -87,6 +87,11 @@ function run() {
 			'local O = require("llm.app_profile_overrides"); local v = storage.get("llm.app_profile_overrides")',
 			'local O = require("ai.engine.policy.app_profile_overrides"); local v = storage.get("llm.app_profile_overrides")'
 		],
+		// In a list of module names, a config key spelling a module is the module.
+		[
+			'local OWNED = { "json", "keystats.session_events", "llm.app_profile_overrides" }',
+			'local OWNED = { "core.text.engine.json", "metrics.engine.session_events", "ai.engine.policy.app_profile_overrides" }'
+		],
 		[
 			'assert_contains(src, "f[require(\\"unicode_case\\").X]")',
 			'assert_contains(src, "f[require(\\"core.text.engine.unicode_case.core\\").X]")'

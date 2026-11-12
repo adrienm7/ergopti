@@ -1737,8 +1737,10 @@ function scanFile(file, text, ctx) {
 				continue;
 			const words = names.filter((n) => !n.includes('.') && lookup(n) && lookup(n)[2]);
 			if (words.length === 0) continue;
+			// Inside a list of module names, a name that is also a config key
+			// ("llm.app_profile_overrides") is the module.
 			const next = t[0].replace(/(["'])([A-Za-z_][\w.]*)\1/g, (whole, q, n) => {
-				const hit = configKeys().has(n) ? null : lookup(n);
+				const hit = lookup(n);
 				return hit && hit[2] ? `${q}${hit[2]}${q}` : whole;
 			});
 			add('lua-module-list', t[0], next, { oldRepo: PREFIX + lookup(words[0])[0] });
