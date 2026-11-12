@@ -94,10 +94,6 @@
 		],
 		"divergent": false
 	},
-	"STREAM_TMPFILE_CLEANUP_SEC": {
-		"files": ["macos/modules/llm/api_mlx_inference.lua", "macos/modules/llm/api_ollama.lua"],
-		"divergent": false
-	},
 	"THINK_PAUSE_MS": {
 		"files": [
 			"windows/modules/keystats/keystats_constants.ahk",
