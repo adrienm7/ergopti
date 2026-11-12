@@ -70,7 +70,7 @@ _CMG_Cases() {
 		Cases.Push(Map("name", Name,
 			"spec", _CMG_Parse(CaseDir . "\case.toml")["case"],
 			"registry", FileExist(Own) ? ConfigMigrateLoadRegistry(Own) : ConfigMigrateShippedRegistry(),
-			"input", CaseDir . "\input.toml", "expected", CaseDir . "\expected.toml"))
+			"input", CaseDir . "\input.toml", "expected", CaseDir . "\expected.toml", "dir", CaseDir))
 	}
 	return Cases
 }
@@ -111,6 +111,25 @@ _CMG_MigrationContext() {
 	return Map("modifier_chords", Catalogue, "assignable_actions", Actions)
 }
 
+; The migration context of one corpus case: the shared one, plus every
+; companion its registry's import_companion ops name, read from
+; companion_<file> beside the input as a driver hands it (absent when missing).
+_CMG_CaseContext(CaseInfo) {
+	Context := _CMG_MigrationContext()
+	Companions := Map()
+	for Step in CaseInfo["registry"]["steps"] {
+		for Op in Step["ops"] {
+			if !(Op["op"] == "import_companion") || Companions.Has(Op["file"])
+				continue
+			Path := CaseInfo["dir"] . "\companion_" . Op["file"]
+			Companions[Op["file"]] := FileExist(Path) ? Map("status", "ok", "content", _CMG_Read(Path))
+				: Map("status", "absent")
+		}
+	}
+	Context["companions"] := Companions
+	return Context
+}
+
 _CMG_RingText() {
 	Text := ""
 	for _, Line in LoggerRingBufferSnapshot()
@@ -138,7 +157,7 @@ _CMG_CorpusPlansMatchExpected() {
 		Replayed += 1
 		Name := CaseInfo["name"]
 		Registry := CaseInfo["registry"]
-		Plan := ConfigMigratePlan(_CMG_Read(CaseInfo["input"]), Registry, "ahk", _CMG_MigrationContext())
+		Plan := ConfigMigratePlan(_CMG_Read(CaseInfo["input"]), Registry, "ahk", _CMG_CaseContext(CaseInfo))
 		AssertEqual(Spec["outcome"], Plan["outcome"], Name . ": outcome (" . Plan["detail"] . ")")
 		if (Spec["outcome"] != "migrated") {
 			AssertFalse(Plan.Has("candidate"), Name . ": a refused or current file has no candidate")
@@ -158,7 +177,7 @@ _CMG_CorpusPlansMatchExpected() {
 			. ": the migrated file must read as expected.toml - got " . _CMG_ModelText(Migrated)
 			. " expected " . _CMG_ModelText(Expected))
 		Replay := ConfigMigrateApplySteps(_ConfigMigrateClone(Migrated), Registry, "ahk",
-			Spec["from_version"], _CMG_MigrationContext())
+			Spec["from_version"], _CMG_CaseContext(CaseInfo))
 		Assert(ConfigMigrateSameModel(Replay, Migrated),
 			Name . ": replaying the steps on their own output must change nothing")
 	}
@@ -260,6 +279,21 @@ _CMG_ChordRequiresContext() {
 }
 Test("config migrate: absent chord context refuses legacy cleanup (config-migrate-chord-context)", _CMG_ChordRequiresContext)
 
+_CMG_ImportRequiresCompanion() {
+	Dir := _CMG_CorpusDir() . "\op_import_companion"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	Raised := false
+	try ConfigMigratePlan(Input, Registry, "ahk", _CMG_MigrationContext())
+	catch as Err {
+		Raised := true
+		AssertContains(Err.Message, "the companion tap_hold.toml")
+	}
+	AssertTrue(Raised, "an import without the companion the driver must hand refuses")
+	AssertEqual(Input, _CMG_Read(Dir . "\input.toml"), "the source remains unchanged")
+}
+Test("config migrate: an import without its companion refuses (config-migrate-import-companion)", _CMG_ImportRequiresCompanion)
+
 _CMG_StampOnlyPreservesExactRecords() {
 	Dir := _CMG_CorpusDir() . "\copy_preserves_occupied_namespaces"
 	Input := _CMG_Read(Dir . "\input.toml")
@@ -302,7 +336,7 @@ _CMG_CorpusBootTransactions() {
 			Path := Dir . "\config.toml"
 			Input := _CMG_Read(CaseInfo["input"])
 			AssertTrue(FSWriteDurable(Path, Input), Name . ": the fixture config must be written")
-			Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, 0, 0, _CMG_MigrationContext())
+			Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, 0, 0, _CMG_CaseContext(CaseInfo))
 			AssertEqual(Spec["outcome"], Result["status"], Name . ": boot status (" . Result["detail"] . ")")
 			Backup := ConfigMigrateBackupPath(Path, Registry["current"], _CMG_STAMP)
 			if (Spec["outcome"] == "migrated") {
@@ -312,7 +346,7 @@ _CMG_CorpusBootTransactions() {
 				Assert(ConfigMigrateSameModel(_CMG_Parse(Path), _CMG_Parse(CaseInfo["expected"])),
 					Name . ": the published file reads as expected.toml")
 				Published := _CMG_Read(Path)
-				Again := ConfigMigrateRun(Path, Registry, "20990101-000001", 0, 0, _CMG_MigrationContext())
+				Again := ConfigMigrateRun(Path, Registry, "20990101-000001", 0, 0, _CMG_CaseContext(CaseInfo))
 				AssertEqual("current", Again["status"], Name . ": a second boot finds the file current")
 				Assert(FSUtf8ExactMatches(Path, Published), Name . ": a current file is not rewritten")
 				AssertFalse(FileExist(ConfigMigrateBackupPath(Path, Registry["current"], "20990101-000001")),

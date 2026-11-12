@@ -553,7 +553,6 @@ return {
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_lone_tap_window",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_one_shot_timeout_setting",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_migration",
-	"tests.unit.platform.remap.tap_hold.test_tap_hold_combos_import",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_shared_file",
 	"tests.unit.modules.hotstrings.terminators.test_terminator_no_fallback",
 	"tests.unit.adapters.runtime.test_timer_scheduler_adapter",

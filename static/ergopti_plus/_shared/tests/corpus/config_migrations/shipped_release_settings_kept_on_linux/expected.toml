@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_release_settings_kept_on_linux/expected.toml
 
 [_meta]
-schema_version = 21
+schema_version = 22
 
 [category_enabled]
 shortcuts = true

@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migrations/op_import_companion/expected.toml
+
+[_meta]
+schema_version = 2
+
+[gestures]
+enabled = true
+
+[mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = false
+
+[mod_combos.config.escape_then_tab]
+combo = "copy"
+
+[tap_holds]
+enabled = true
