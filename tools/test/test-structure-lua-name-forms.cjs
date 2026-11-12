@@ -190,6 +190,12 @@ function run() {
 		Edits.MODULE_NAME_FILES.pop();
 	}
 
+	const rx = 'if (!/keymap\\.terminators/.test(src)) fail();';
+	assert.equal(
+		Apply.rewriteText(rx, Plan.scanFile(tool, rx, Plan.referenceContext(MAP)), new Map(), tool),
+		'if (!/layouts\\.engine\\.terminators/.test(src)) fail();',
+		'a tool checks a source with a regular expression of a module name'
+	);
 	const pin = "if (!src.includes('keymap.terminators')) fail('menu.llm.app_profile_overrides');";
 	assert.equal(
 		Apply.rewriteText(pin, Plan.scanFile(tool, pin, Plan.referenceContext(MAP)), new Map(), tool),
