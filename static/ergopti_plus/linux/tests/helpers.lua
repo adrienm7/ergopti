@@ -384,7 +384,7 @@ function M.it(name, fn)
 	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
 	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
-	NoticeRecorder.begin_case()
+	NoticeRecorder.begin_case(M.is_fixture_double)
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
 	else
@@ -464,6 +464,14 @@ local function is_test_double(value, roots)
 		end
 	end
 	return false
+end
+
+--- Whether a package.loaded value is a double defined by the test suite.
+--- @param value any Loaded value.
+--- @return boolean
+function M.is_fixture_double(value)
+	local driver = M.driver_root()
+	return is_test_double(value, { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/lua/test/" })
 end
 
 --- Puts back every product module left replaced by a test double since a
