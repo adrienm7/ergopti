@@ -456,10 +456,11 @@ if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(APPS_DRIVER
 	);
 }
 
-// « Pause = tout éteint »: a pause greys every feature row and leaves the tail
-// live, because the tail is how the user resumes, inspects or leaves a paused
-// script. The manifest marks those rows once, the macOS and Linux roots read the
-// mark, and the AHK pause test holds the Windows builders to it. The approved
+// The manifest marks the feature rows once. Only the AHK tray still greys them
+// under Suspend: a pause stops typing, not configuration (EDD-1, 2026-11-12),
+// so the macOS and Linux roots keep them live, and the Windows agent deletes
+// the mark together with its A_IsSuspended gates. Until then the AHK pause test
+// holds the Windows builders to it. The approved
 // order puts every feature before the tail, which Versions (the About row)
 // opens, so the mark must cover exactly the rows above it.
 const PAUSE_MARK = 'greyed_when_paused';
