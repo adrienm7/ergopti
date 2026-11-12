@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "Ergopti kaldırılamadı çünkü “{1}” programı yüklü değil. Programı yükleyip yeniden deneyin. Kişisel verileriniz korundu.",
 	"menu.global.start_at_login": "Oturum açıldığında başlat",
 	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
+	"dialog.start_at_login.approval": "Az önce açılan sistem başlangıç ayarlarında Ergopti’ye izin verin. Sistem onayladığında seçenek işaretlenir.",
 	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Henüz Windows'ta yok: belirteç belirteç gösterim Windows'ta doğrulanmadı, bu yüzden bu seçenek devre dışı kalır.",
 	"menu.layout.number_row": "Sayı satırı",

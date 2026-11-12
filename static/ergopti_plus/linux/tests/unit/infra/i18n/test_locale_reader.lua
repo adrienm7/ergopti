@@ -118,4 +118,31 @@ helpers.describe("linux/infra/i18n.lua", function()
 		local i18n = require("infra.i18n")
 		helpers.assert_eq(i18n.get_locale(), "fr", "default locale is fr")
 	end)
+	helpers.it("i18n warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
+		local names = { "logger.shim", "infra.i18n", "infra.locale", "locale.core" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local logs = {}
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+		package.loaded["logger.shim"] = logger
+		package.loaded["infra.locale"] = nil
+		local ok, detail = pcall(function()
+			local i18n = helpers.load_module("infra.i18n")
+			local function count(pattern)
+				local found = 0
+				for _, line in ipairs(logs) do if line:find(pattern, 1, true) then found = found + 1 end end
+				return found
+			end
+			helpers.assert_eq(i18n.has("this.key.does.not.exist.anywhere"), false)
+			helpers.assert_eq(count("No translation"), 0, "a probe is not a defect")
+			helpers.assert_eq(i18n.get("this.key.does.not.exist.anywhere"), "this.key.does.not.exist.anywhere")
+			logger.info("test", "separator")
+			i18n.get("this.key.does.not.exist.anywhere")
+			helpers.assert_eq(count("No translation for 'this.key.does.not.exist.anywhere'"), 1)
+			helpers.assert_true(i18n.has("menu.global.quit"))
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		assert(ok, detail)
+	end)
 end)

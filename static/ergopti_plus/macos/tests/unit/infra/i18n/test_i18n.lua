@@ -31,8 +31,11 @@ package.loaded["menu.labels"] = {
 
 -- Stub lib.locale so get() returns controlled values.
 local _locale_store = {}
+-- missing() is the shared core's answer to a miss: the raw key. Its
+-- once-per-key warning is tested against the real core below.
 package.loaded["infra.locale"] = {
 	get = function(key) return _locale_store[key] end,
+	missing = function(key) return key end,
 }
 
 -- Stub lib.logger (silent no-op).
@@ -280,6 +283,21 @@ helpers.describe("i18n: detect_system_locale()", function()
 		helpers.assert_eq(i18n.detect_system_locale(), "en",
 			"throwing current() must fall back to 'en'")
 	end)
+
+	helpers.it("takes its fallback from the shared identifiers (i18n-system-fallback)", function()
+		local identifiers = require("identifiers")
+		local saved = identifiers.locales.system_fallback
+		identifiers.locales.system_fallback = "de"
+		local ok, detail = pcall(function()
+			local i18n = load_i18n()
+			set_system_locale("xx_YY")
+			helpers.assert_eq(i18n.detect_system_locale(), "de")
+			clear_system_locale()
+			helpers.assert_eq(i18n.detect_system_locale(), "de")
+		end)
+		identifiers.locales.system_fallback = saved
+		assert(ok, detail)
+	end)
 end)
 
 
@@ -337,6 +355,22 @@ helpers.describe("i18n: init()", function()
 		helpers.assert_eq(i18n.get_locale(), "en",
 			"invalid saved locale must fall back to system detection")
 	end)
+
+	helpers.it("warns about a saved locale without a catalogue (i18n-unknown-saved)", function()
+		hs.settings.set("ergopti.i18n_locale", "xx")
+		set_system_locale("de_DE")
+		local logger = package.loaded["infra.logger"]
+		local warn, warnings = logger.warn, {}
+		logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+		local ok, detail = pcall(function()
+			local i18n = load_i18n()
+			i18n.set_locale_injector(function(_) end)
+			i18n.init()
+		end)
+		logger.warn = warn
+		assert(ok, detail)
+		helpers.assert_eq(warnings, { "Persisted locale 'xx' is unavailable — using the system locale 'de'." })
+	end)
 end)
 
 
@@ -377,6 +411,28 @@ helpers.describe("i18n: get()", function()
 		local i18n = load_i18n()
 		helpers.assert_eq(i18n.get("empty.key"), "empty.key",
 			"empty translation must return the key itself")
+	end)
+
+	helpers.it("warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
+		local stub_locale, stub_core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		local logger = package.loaded["infra.logger"]
+		local warn, warnings = logger.warn, {}
+		logger.warn = function(_, message, key) warnings[#warnings + 1] = message:gsub("%%s", key or "") end
+		package.loaded["infra.locale"] = nil
+		local ok, detail = pcall(function()
+			local locale = require("infra.locale")
+			helpers.assert_eq(locale.has("__missing_key__"), false)
+			helpers.assert_eq(#warnings, 0, "a probe is not a defect")
+			helpers.assert_eq(locale.missing("__missing_key__"), "__missing_key__")
+			locale.missing("__missing_key__")
+			locale.missing("__other_missing__")
+		end)
+		logger.warn = warn
+		package.loaded["infra.locale"], package.loaded["locale.core"] = stub_locale, stub_core
+		assert(ok, detail)
+		helpers.assert_eq(#warnings, 2, "each missing key is warned once")
+		helpers.assert_true(warnings[1]:find("'__missing_key__'", 1, true) ~= nil)
+		helpers.assert_true(warnings[2]:find("'__other_missing__'", 1, true) ~= nil)
 	end)
 end)
 

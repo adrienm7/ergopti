@@ -147,6 +147,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Progress (11 November 2026, [adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md)): areas taken: the Lua drivers' `adapters/` and `infra/` (clipboard, privacy, focus identity). Fixed on Linux: an X11 clipboard holding only an image is borrowed and restored whole (CBL-001). ADD-1 to 3 decided by the maintainer on 2026-11-11 (a password manager of the one shared list `_shared/data/secure_apps.json` is a secure field as a whole on macOS and Linux, Windows counterpart below; a borrowed unowned Linux clipboard goes back unowned, as on macOS; the Linux application identity is the WM class or app_id under X11 and Wayland, comm only as fallback, saved exclusion lists converted once). Left: configuration, lifecycle, notification and network adapters in depth, native receiving unqualified.
       Progress (11 November 2026, [configuration campaign](docs/audits/platform-parity/2026-11-11-config/report.md)): configuration, scopes and migration of the Lua drivers. Fixed: a `[script]` enum written in another case is adopted in its manifest spelling on macOS and Linux (CFS-001), a Linux setting edit removes its rollback copies once it commits (CFL-002), `storage.json` is private on the LuaJIT runtime (CFL-003). CFD-1 decided by the maintainer on 2026-11-11 (Linux stages are named per process, pid and start tick, and a dead process's stages are reaped at start; a foreign stage is still refused). Left: the case variants of the other enum readers, native receiving unqualified.
       Progress (11 November 2026, [macOS launcher campaign](docs/audits/platform-parity/2026-11-11-macos-launcher/report.md)): source reading only (no Swift toolchain here), nothing fixed. Findings for a Mac: MLC-001 (MJConfigFile seeded before the single-launcher lock, so a second launcher repoints the running runtime; the `.cjs` guard misses the top-level write), MLC-002 (a quit from outside skips the controlled exit and can report a runtime failure), MLC-003 (a second launch after boot shows nothing; product decision), MLC-004 (the leftover-runtime grace is a literal below the quit deadline), MLC-005 (exact-path check under App Translocation, to probe).
+      Progress (12 November 2026, [start-at-login campaign](docs/audits/platform-parity/2026-11-12-start-at-login/report.md), branch `claude/ergopti-todo-parity-b`): census 381 areas (18 new, 220 changed since the pinned census); never-campaigned changed areas listed in the report (menus, i18n, editors, healthcheck, onboarding, Linux install). Fixed: macOS tells the Login Items approval step instead of the failure dialog (SAM-001) and logs a failed startup read (SAM-002); Linux logs a failed startup read and each refused change (SAL-001). The macOS memory note on ordinary Hammerspoon over a checkout corrected. Decision pending: SAD-1 (start at login on a Linux source run or the macOS developer app). Left: native receiving unqualified.
+      Progress (12 November 2026, [i18n run-time campaign](docs/audits/platform-parity/2026-11-12-i18n-runtime/report.md), branch `claude/ergopti-todo-parity-b`): areas taken: locale choice, lookup chain and miss reporting at run time. Fixed: macOS and Linux warn once for each raw key shown, probes go through `has()` (I18-001); macOS warns about a saved locale without a catalogue (I18-002) and takes its fallback from `locales.system_fallback` (I18-003). Left: native receiving unqualified.
 
 ## Dead-key composition parity follow-up
 
@@ -365,6 +367,22 @@ and the next module candidates. The audit is paused at the maintainer's request.
       names the cause. The cohort passed 41/41 (Intel) and 40/40 (Apple silicon) over 2026-11-07..10 and again in
       [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); the cause stays unproven until a
       refusal carries that snapshot.
+      2026-11-12: scan of ci.yml runs 2026-11-07..12 (282 of 353 runs on dev, claude/_ and tmp/_): the cohort steps ran
+      61 times on Intel and 62 on Apple silicon; 2 Intel refusals, [43013053161](https://github.com/adrienm7/ergopti/actions/runs/43013053161)
+      (job 130500102196) and [43172671159](https://github.com/adrienm7/ergopti/actions/runs/43172671159) (tmp/ci-snapshot, job 131034291324),
+      both after `CFMessagePortSendRequest FAILED(-1)` lines, as in 42014901978; none on Apple silicon. One macOS 26
+      `KeyboardSourceProbeTests` refusal in the full launcher suite ([43108782369](https://github.com/adrienm7/ergopti/actions/runs/43108782369),
+      job 130833096151) has no such line. Probes on hosted runners (temporary `probe-macos-tsm.yml`, removed in 3363b94e):
+      `TextInputMenuAgent` owns `com.apple.tsm.uiserver`; stopping it prints the line (20 on macos-15, 31 on Intel), so
+      does stopping `TextInputSwitcher` on Intel (12), not stopping SystemUIServer. But every perturbed cohort still passed
+      12/12: agent stopped ([43189848716](https://github.com/adrienm7/ergopti/actions/runs/43189848716), job 131086084762), both stopped, either
+      stopped or killed while the cohort selected ([43194666371](https://github.com/adrienm7/ergopti/actions/runs/43194666371), job 131102413569),
+      and that fresh runner's unperturbed baseline printed four such lines and passed. So the unanswered server is a
+      state the refusals share, not their cause; the cause is still unproven and no retry was added. 71a16621 (wording
+      corrected in 4d2e7e55, 533e2762) writes `tsm-refusal.json` beside the number-row receipt and annotates the state
+      (`tsm_uiserver_unanswered`, `fixture_refusal_unclassified` or `no_fixture_refusal`) with the agent snapshot; the
+      verdict and the exact cohorts are unchanged (`tools/test/test-macos-tsm-refusal.cjs`). Next refusal: read its
+      receipt and snapshot (did the agent's pid or run count change?) before trying another perturbation.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
@@ -1287,6 +1305,16 @@ between workers) green alone. All live checks pass, typed by the harness.
       `AccentedShortcuts_Register`: add the `<^<!` and `<^<!+` prefixes (SCD-2, Ctrl+Alt+é sends Ctrl+Alt+C).
       `modules/shortcuts/utils.ahk` `AddShortcut` for a `^` slot: also `<^>!^` + scan code to the same callback, guarded by
       the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
+- [ ] **Pause and resume notices on AHK (decided by the maintainer on 2026-11-12).** After a committed pause show
+      `script_control.paused` at the warning level, after a committed resume `script_control.resumed` at the success level,
+      for `[ui] notification_ttl_ms`, as macOS `publish_pause_state` and Linux `script_actions` (`PAUSE_NOTICES`) do.
+- [ ] **SAW-001 on AHK (start-at-login report, 2026-11-12).** `infra/start_at_login.ahk` `StartAtLoginToggle`: when
+      Startup Apps keeps the new shortcut disabled, it opens `ms-settings:startupapps` and then shows « Could not change
+      automatic startup ». Show `dialog.start_at_login.approval` (informational, already in the 21 locales) on that branch,
+      the failure dialog on the others, as macOS does. Test in the startup suite through `NoticeFn`.
+- [ ] **I18W-001 on AHK (i18n run-time report, 2026-11-12, low priority).** `infra/i18n.ahk` `_I18nDetectSystemLocale`
+      returns an `"en"` literal; emit `locales.system_fallback` in `_generated/identifiers.ahk` through its codegen and read
+      it, as the Lua drivers do.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
@@ -1633,6 +1661,17 @@ Each closes on a named green hosted or native run, recorded here.
       not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
       0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
       42929436137 is green (job 130295941982); keep it listed until it stays green.
+      Scan 2026-11-12 of ci.yml runs 2026-11-07..12 on dev, claude/_ and tmp/_ (282 of 353 runs listed, 71 runs of
+      2026-11-07..10 and the second job pages of ten large runs not read; logs read for the A/B buckets and one sample
+      per other failure group): `symlink_logs_dir` Quit timeout only once (job 130257482167 above); its failed-launch
+      artifact (launch-gate-failed-ci-macos-15-symlink_logs_dir\_\_tilde_paths-attempt-1, with the launcher and
+      Hammerspoon samples) could not be read from this session (artifact storage host refused by its network policy),
+      so it stays unexplained. No failure of the window switch, cffi-lua clone, desktop-webview AI focus,
+      `TestIdleDeadlinePhysicallyRetiresPeer` or `testBridgeHardDeath...` in the logs read; the sampled Linux install
+      and webview failures were an APT mirror timeout (1200 s) and WIP tests. `NativeAppClonerBundleOwnershipTests`
+      EPERM appears twice more, in [42940650392](https://github.com/adrienm7/ergopti/actions/runs/42940650392) and [42927169227](https://github.com/adrienm7/ergopti/actions/runs/42927169227), (2026-11-11, macOS 26); whether
+      their sources hold its fix bce01f27 is not checked (that commit is not reachable from this clone). Nothing reproduced, so nothing was changed here; the keyboard-source refusals are under « [CI] Native
+      keyboard-source fixture ».
 
 ## Maintainer decisions pending
 

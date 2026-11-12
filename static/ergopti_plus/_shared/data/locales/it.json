@@ -4153,6 +4153,7 @@
 	"dialog.uninstall.missing_program": "Non è stato possibile disinstallare Ergopti perché il programma «{1}» non è installato. Installalo e riprova. I tuoi dati personali sono stati conservati.",
 	"menu.global.start_at_login": "Avvia all’accesso",
 	"dialog.start_at_login.failed": "Impossibile modificare l’avvio automatico. Controlla le impostazioni di avvio del sistema.",
+	"dialog.start_at_login.approval": "Consenti Ergopti nelle impostazioni di avvio del sistema, appena aperte. L’opzione verrà spuntata non appena il sistema la conferma.",
 	"onboarding.error.open_failed": "Impossibile aprire la configurazione guidata. Controlla i registri e riprova dal menu.",
 	"platform_reason.token_streaming_unvalidated_on_windows": "Non ancora su Windows: la visualizzazione token per token non è stata ancora convalidata su Windows, quindi questa opzione rimane inattiva.",
 	"menu.layout.number_row": "Riga dei numeri",
