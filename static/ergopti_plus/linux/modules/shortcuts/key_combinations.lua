@@ -170,8 +170,17 @@ function M.new(options)
 				local row=namespace(configured[pair])
 				local action=row.combo
 				if action==nil then action="none" end
-				assert(action=="none" or type(action)=="string" and action~="one_shot_shift"
-					and catalogue.is_assignable(action)==true,"invalid known chord slot")
+				local valid=action=="none" or type(action)=="string" and action~="one_shot_shift"
+					and catalogue.is_assignable(action)==true
+				assert(not strict or valid,"invalid known chord slot")
+				-- One action this driver lacks (another OS's, in the shared
+				-- tap_hold.toml) costs that pair only, as macOS drops one leaf:
+				-- every other chord stays (TCL-003).
+				if not valid then
+					Logger.warn("modules.shortcuts.key_combinations",
+						"The %s chord's action '%s' is not available here; that chord does nothing.", pair, tostring(action))
+					action="none"
+				end
 				chords[pair]=action; explicit=explicit or row.combo~=nil
 			end
 			assert(defaults or explicit)

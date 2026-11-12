@@ -72,6 +72,32 @@ exist; anything else needs « :// » or Teams' `msteams:/l/` and
 Linux follows it since BAP-005; Windows' `_AppCloner_InvalidOpenItem` has its
 TODO line.
 
+## A pause stops typing, not configuration (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (EDD-1), then sharpened the same day
+into a « real pause »: while the driver is paused, configuration stays fully
+available and nothing that acts on typing is active.
+
+- Allowed while paused, on every OS: every menu setting, adding and deleting
+  hotstrings, every editor save, and installs (layouts, AI models through
+  Ollama or MLX, apps). An editor window already open when the driver is
+  paused keeps saving. A menu's whole-scope « restore recommended » and
+  « clear », the Configuration menu's included, run while paused.
+- Stopped while paused: everything that acts on typing or input, meaning
+  hotstrings, layout emulation, tap-holds, layers and chords, shortcuts and
+  gestures, and AI predictions with what serves them live (prediction
+  streaming, warmups, the local inference server used for predictions, and
+  the activation pause owner itself).
+- A setting changed during a pause applies on resume, not before.
+
+macOS and Linux follow it through `edd1-paused-writes` regressions (the
+LMH-003 layout manager gate reverted, the prompt editor's create and clone
+saves, the physical shortcuts editor and capture, every scope owner's restore
+and clear). The Windows `A_IsSuspended` configuration gates are to remove
+(TODO « Windows (the PC agent's) »). Pages that are not configuration
+(changelog, update check) keep their own rules. Do not add a pause gate to a
+configuration action; gate the typing runtime instead.
+
 ## One configuration layout on every OS for tap-holds (2026-11-11)
 
 ## The Linux decoder judges millimetres (2026-11-11)

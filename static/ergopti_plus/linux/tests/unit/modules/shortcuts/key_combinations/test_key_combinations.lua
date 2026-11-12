@@ -2190,3 +2190,32 @@ helpers.describe("owned roll journal action acknowledgement", function()
 		local next_step, reason = journal.next(); helpers.assert_eq(next_step, nil); helpers.assert_eq(reason, "refused")
 	end)
 end)
+
+-- One chord action this driver lacks (another OS's, in the shared
+-- tap_hold.toml) used to drop every chord without a word (TCL-003).
+helpers.describe("chord slots read from the shared tap_hold.toml", function()
+	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+		local chord_path = "/controlled/tap_hold.toml"
+		local chords_text = '[_meta]\nschema_version = 1\n[mod_combos]\nenabled = true\n'
+			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "run_program"\n'
+			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "mission_control"\n'
+		local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+			files = { read_with_status = function(file)
+				if file == chord_path then return chords_text, "ok" end
+				if file == path then return base_text, "ok" end
+				return nil, "absent"
+			end },
+			route = function() return path end,
+			chord_route = function() return chord_path end,
+			is_paused = function() return false end,
+			changed = function() return true end,
+			actions = { is_assignable = function(action) return action == "run_program" end } })
+		local token = {}
+		helpers.assert_true(owner.acquire_configuration(token))
+		local snapshot = owner.configuration_snapshot(token)
+		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
+		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "run_program")
+		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
+		helpers.assert_true(owner.release_configuration(token))
+	end)
+end)

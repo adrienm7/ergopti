@@ -279,7 +279,7 @@ function M.open(current_info, save_callback)
 		if not ok_ui or not ui_builder then return nil end
 
 		local masks       = hs.webview.windowMasks
-		local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+		local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)
 		local screen = hs.screen.mainScreen()
 		local sf = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
 		-- Clamp the shared manifest dimensions to the active screen
