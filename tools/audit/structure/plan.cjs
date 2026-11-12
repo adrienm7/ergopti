@@ -1564,6 +1564,21 @@ function scanFile(file, text, ctx) {
 				newRepo: target || repo
 			});
 		}
+	// /\\modules\\llm\\x\.json"/ in a tool: an AutoHotkey path, joined onto
+	// _SharedDir (or the driver's own folder), checked with a regular expression.
+	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
+		for (const m of text.matchAll(/(?<![\w\\])(?:\\\\[\w-]+)+(?:\\\.[A-Za-z0-9]+)(?![\w\\])/g)) {
+			const plain = m[0].replace(/\\\\/g, '/').replace(/\\\./g, '.');
+			const base = [`${PREFIX}_shared`, `${PREFIX}windows`].find((b) => EXISTING.has(b + plain));
+			if (!base) continue;
+			const target = byRepoPath.get(base + plain);
+			if (!target || target === PREFIX || !target.startsWith(`${base}/`)) continue;
+			const rel = target.slice(base.length);
+			add('path-regex', m[0], rel.replace(/\./g, '\\.').replace(/\//g, '\\\\'), {
+				oldRepo: base + plain,
+				newRepo: target
+			});
+		}
 	// A Lua module name in a tool's regular expression: /tap_hold\.hold_options/.test(src).
 	// Tools only: a page's /^network\.failure\./ matches a locale key.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
@@ -1580,15 +1595,28 @@ function scanFile(file, text, ctx) {
 		for (const m of text.matchAll(/(?<![\w-])[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
 			const plain = m[0].replace(/\\\//g, '/').replace(/\\\./g, '.');
 			const isFile = /\.[A-Za-z0-9]+$/.test(plain);
-			const hit = resolvePathToken(plain, file, inTree, isFile ? byRepoPath : byRepoDir);
+			// A tool's regex of a bare relative path (shared\("modules\/llm\/x\.json"\))
+			// names it under _shared, where the drivers' resolvers read it.
+			const hit = resolvePathToken(
+				plain,
+				file,
+				inTree,
+				isFile ? byRepoPath : byRepoDir,
+				!inTree && /^tools\//.test(file) && !plain.startsWith('static/')
+			);
 			if (
 				!hit ||
 				hit.newRepo === SPLIT ||
 				hit.newRepo === PREFIX ||
-				!['repo', 'tree'].includes(hit.form)
+				!['repo', 'tree', 'shared'].includes(hit.form)
 			)
 				continue;
-			const spelled = hit.form === 'repo' ? hit.newRepo : hit.newRepo.slice(PREFIX.length);
+			const spelled =
+				hit.form === 'repo'
+					? hit.newRepo
+					: hit.form === 'shared'
+						? hit.newRepo.slice(`${PREFIX}_shared/`.length)
+						: hit.newRepo.slice(PREFIX.length);
 			add('path-regex', m[0], spelled.replace(/\./g, '\\.').replace(/\//g, '\\/'), hit);
 		}
 	if (/\.(c?js|mjs|lua)$/.test(file))
