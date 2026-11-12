@@ -831,6 +831,28 @@ function standInTables(text) {
 	return [...tables];
 }
 
+let tailIndex = null;
+let tailIndexSize = -1;
+/**
+ * The repository files whose path ends with `/<tail>`.
+ * @returns {string[]}
+ */
+function filesEndingWith(tail) {
+	// Rebuilt when the index of existing paths changes (a test adds fakes).
+	if (tailIndex === null || tailIndexSize !== EXISTING.size) {
+		tailIndexSize = EXISTING.size;
+		tailIndex = new Map();
+		for (const p of EXISTING) {
+			const base = p.slice(p.lastIndexOf('/') + 1);
+			if (!/\.[A-Za-z0-9]+$/.test(base)) continue;
+			if (!tailIndex.has(base)) tailIndex.set(base, []);
+			tailIndex.get(base).push(p);
+		}
+	}
+	const name = tail.slice(tail.lastIndexOf('/') + 1);
+	return (tailIndex.get(name) || []).filter((p) => p.endsWith(`/${tail}`));
+}
+
 let listText = null;
 let listRanges = [];
 /**
@@ -1367,6 +1389,26 @@ function scanFile(file, text, ctx) {
 		const rel = hit.newRepo.slice(`${PREFIX}_shared/`.length);
 		add('shared-prefix', m[0], `${m[1]}${m[2]}${rel}/`, hit);
 	}
+	// src.includes('tap_hold/one_shot_shift.json'): a test checks that a source
+	// names a file by the tail of its path. A tail exactly one file of the
+	// repository ends with follows that file, spelled from the same base.
+	if (/\.(c?js|mjs)$/.test(file))
+		for (const m of text.matchAll(
+			/(\.(?:includes|indexOf|lastIndexOf|startsWith|endsWith)\(\s*)(["'`])([\w.-]+(?:\/[\w.-]+)+\.[A-Za-z0-9]+)\2/g
+		)) {
+			const tail = m[3];
+			if (Census.TREES.some((t) => tail.startsWith(`${t}/`)) || tail.startsWith(PREFIX)) continue;
+			const owners = filesEndingWith(tail);
+			if (owners.length !== 1 || !byRepoPath.has(owners[0])) continue;
+			const base = owners[0].slice(0, -tail.length - 1);
+			const target = byRepoPath.get(owners[0]);
+			if (!target || target === PREFIX || !target.startsWith(`${base}/`)) continue;
+			const rendered = target.slice(base.length + 1);
+			add('source-check', m[0], `${m[1]}${m[2]}${rendered}${m[2]}`, {
+				oldRepo: owners[0],
+				newRepo: target
+			});
+		}
 	// Paths.shared("data") with the file name joined on later: a whole shared
 	// folder. One the plan moves whole is respelled; one it scatters is a
 	// refusal, never a silent pass (the locale order was read from a folder

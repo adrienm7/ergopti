@@ -171,6 +171,7 @@ function rewriteText(text, rows, movedRepo, file) {
 				'folder-edit',
 				'lua-module-quoted',
 				'shared-prefix',
+				'source-check',
 				'lua-concat'
 			].includes(row.kind)
 		) {
