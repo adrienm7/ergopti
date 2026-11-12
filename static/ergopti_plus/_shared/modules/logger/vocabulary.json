@@ -56,6 +56,7 @@
 		"control_state_identifier",
 		"control_terminator",
 		"destination_changed",
+		"destination_is_folder",
 		"disabled_key_is_empty_cell",
 		"dispatch",
 		"download",
