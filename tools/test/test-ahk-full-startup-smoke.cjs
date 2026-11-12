@@ -227,12 +227,19 @@ function hotstringsRenderTimes(configRoot) {
 // 2191 -> 2248, and CI run 43172671159 parsed it once more than the local
 // run (15 document parses, not 14), one more 1029-step template parse:
 // 11807 locally, 12841 on CI (12109 -> 12841).
+// Raised on 2026-11-12 (evening), measured on two CI runs of different branches:
+// neutral-defaults counted 2250 flat values (2248 -> 2250) with the same 15
+// parses and 12841 slow steps both on claude/ergopti-todo-windows-ahk (run
+// 43274338951) and on claude/ergopti-todo-ci-acceptance-3 (run 43275759107),
+// which shares only the dev base and carries no TOML or config change. The two
+// values come from the dev base the boot seeds (its generated config template),
+// not from either branch; every other fixture and counter is unchanged.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2248, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
+	'toml.flat_values': { all: 2250, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
 };
 
 /**
