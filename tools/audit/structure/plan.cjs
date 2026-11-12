@@ -1367,6 +1367,23 @@ function scanFile(file, text, ctx) {
 		const rel = hit.newRepo.slice(`${PREFIX}_shared/`.length);
 		add('shared-prefix', m[0], `${m[1]}${m[2]}${rel}/`, hit);
 	}
+	// Paths.shared("data") with the file name joined on later: a whole shared
+	// folder. One the plan moves whole is respelled; one it scatters is a
+	// refusal, never a silent pass (the locale order was read from a folder
+	// S01 emptied).
+	for (const m of text.matchAll(
+		/(\b\w*[sS]hared(?!_llm)\w*\(\s*)(["'`])([A-Za-z0-9_-]+)\2(?=\s*\))/g
+	)) {
+		if (m[3] === 'lua' && rootSwitch) continue;
+		const hit = resolvePathToken(m[3], file, inTree, byRepoDir, true);
+		if (!hit || hit.form !== 'shared') continue;
+		if (hit.newRepo === SPLIT) {
+			if (!isProse(file, text, code, m.index)) add('dir-split', m[0], '(split)', hit);
+			continue;
+		}
+		const rel = hit.newRepo.slice(`${PREFIX}_shared/`.length);
+		add('shared-prefix', m[0], `${m[1]}${m[2]}${rel}${m[2]}`, hit);
+	}
 	if (selfTarget && file.endsWith('.lua')) {
 		for (const t of ownTails(text, selfOld, selfTarget))
 			add('lua-tail', t.old, t.new, { oldRepo: file });
