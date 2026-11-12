@@ -429,6 +429,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-pages-post-ready.cjs"],
 			"repro": "npm run test:linux-pages-post-ready"
+		},
+		{
+			"id": "host-context-menu",
+			"ordinal": 630,
+			"name": "host pages keep the native context menu closed outside text fields",
+			"cmd": "node",
+			"args": ["tools/test/test-host-context-menu.cjs"],
+			"repro": "npm run test:host-context-menu"
 		}
 	]
 }
