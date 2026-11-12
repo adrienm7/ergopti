@@ -1075,6 +1075,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				decoded, shapes = {}, nil
 			else
 				shared_file = TapHoldFile.read(decoded, shapes, user_config_path)
+				-- The save edits these bytes line by line: comments and other drivers' text stay.
+				shared_file.source_text = source
 				if not shared_file.writable then
 					Logger.error(LOG, "Refusing to overwrite '%s': it was saved by a newer build or its version is unusable — settings NOT saved.",
 						user_config_path)
