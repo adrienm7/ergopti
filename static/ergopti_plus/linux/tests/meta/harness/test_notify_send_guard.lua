@@ -16,11 +16,18 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 	helpers.it("resolves notify-send to the sentinel and records a spawn", function()
 		if type(jit) ~= "table" then return end
 		local dir = assert(Guard.dir())
-		local resolved = io.popen("command -v notify-send"):read("*l")
+		-- A pure-Lua PATH walk: the first entry holding a readable notify-send is
+		-- what children run. No program is probed by name.
+		local resolved
+		for entry in (os.getenv("PATH") or ""):gmatch("[^:]+") do
+			local candidate = io.open(entry .. "/notify-send", "rb")
+			if candidate then candidate:close(); resolved = entry .. "/notify-send"; break end
+		end
 		helpers.assert_eq(resolved, dir .. "/notify-send", "children resolve notify-send to the sentinel")
 		local log = os.tmpname()
 		os.remove(log)
-		local status = os.execute(Guard.LOG_VARIABLE .. "='" .. log .. "' notify-send --urgency=low -- 'probe' 'body'")
+		-- The sentinel itself, by its absolute path.
+		local status = os.execute(Guard.LOG_VARIABLE .. "='" .. log .. "' '" .. resolved .. "' --urgency=low -- 'probe' 'body'")
 		helpers.assert_true(status ~= true and status ~= 0, "the sentinel answers with a failure")
 		local file = assert(io.open(log, "rb"))
 		local recorded = file:read("*a")
