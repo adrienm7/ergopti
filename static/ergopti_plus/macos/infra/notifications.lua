@@ -216,8 +216,11 @@ function M.notify(title_or_msg, body, kind, on_click)
 		return false, detail
 	end
 
-	Logger.info(LOG, "Notification dispatched (%s): %s — %s.",
-		tostring(kind or "default"), title_text, info_text)
+	-- Only the notice's shape reaches the log: a body can quote a command's
+	-- stderr or a private argument meant for the user alone, as Windows' TrayTip
+	-- and the Linux private notices never log it (NUI-004).
+	Logger.info(LOG, "Notification dispatched (%s): title %d byte(s), body %d byte(s).",
+		tostring(kind or "default"), #title_text, #info_text)
 	return true
 end
 
