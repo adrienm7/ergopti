@@ -243,8 +243,8 @@ local function _manifest_metrics_rows(ctx, k)
 	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 	-- The Configuration clear still composes the metrics scope owner.
 	local function restore_metrics_scope()
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local committed = require("infra.metrics_scope").apply("recommended", ctx.is_paused)
+		-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+		local committed = require("infra.metrics_scope").apply("recommended")
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end

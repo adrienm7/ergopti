@@ -79,13 +79,13 @@ function M.new(options)
 end
 
 --- Executes a menu request, retaining any failed inverse for the next retry.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
 --- @param mode string Recommended or clear.
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
+function M.apply(mode)
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid metrics scope mode" end
-	if type(is_paused) ~= "function" or is_paused() then return false, "metrics configuration is paused" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "metrics rollback is pending" end
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
@@ -100,11 +100,10 @@ function M.apply(mode, is_paused)
 end
 
 --- The metrics participant of a composed scope, bound to the retained owner.
---- @param is_paused function Live pause getter.
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused)
+function M.participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused) end,
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end

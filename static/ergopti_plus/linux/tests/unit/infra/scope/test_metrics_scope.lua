@@ -283,7 +283,8 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						helpers.assert_eq(type(action), "function", "the real renderer must bind the scope command")
 						if scenario == "pause before the click" then paused = true end
 						action()
-						local committed = scenario == "recommended"
+						-- EDD-1 (maintainer, 2026-11-12): a click after a pause still restores.
+						local committed = scenario ~= "publication refusal"
 						helpers.assert_eq(changed, committed and 1 or 0)
 						helpers.assert_eq(questions, 0, "the restore applies at once (restore-recommended-no-confirm)")
 						if committed then
