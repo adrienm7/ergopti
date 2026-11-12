@@ -27,7 +27,7 @@ local function with_menu(body)
 			files={read_with_status=function() return state.source,"ok" end},is_paused=function() return state.paused end,
 			actions=gestures,changed=function() return true end});Pair.set_instance(owner)
 		package.loaded["infra.key_combinations_scope"]={retry_restore=function() return true end,
-			edit=function(rows,_,receipt)
+			edit=function(rows,receipt)
 				if receipt.guard()~=true then return false end
 				state.edits[#state.edits+1]=rows;return true
 			end,set_enabled=function() return true end}
