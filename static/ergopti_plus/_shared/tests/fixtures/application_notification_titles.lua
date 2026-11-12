@@ -41,9 +41,18 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 	package.loaded["adapters.shell_runner"] = {
 		has_command = function() return native_mode ~= "unavailable" end,
 		quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
-		run = function(command)
-			commands[#commands + 1] = command
-			return native_mode ~= "refuse"
+		run = function() error("notify-send runs as an argv, never a shell line") end,
+		-- Linux starts notify-send through run_async (NUI-003): options are
+		-- rendered bare and operands quoted; "refuse" is a refused spawn.
+		run_async = function(executable, args, _options, callback)
+			local words = { executable }
+			for index, arg in ipairs(args) do
+				words[#words + 1] = index <= 4 and arg or ("'" .. tostring(arg):gsub("'", "'\\''") .. "'")
+			end
+			commands[#commands + 1] = table.concat(words, " ")
+			if native_mode == "refuse" then return nil, "spawn refused" end
+			callback({ ok = true, code = 0 })
+			return { cancel = function() return true end, on_settled = function() return true end }
 		end,
 	}
 	_G.hs = { notify = { new = function(first, properties)
@@ -94,14 +103,14 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 			assert_eq(application.send("Bare label", options), false)
 		else
 			assert_eq(generic.send("Literal body", { title = "Literal title", level = "warning" }), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=normal --expire-time=5000 -- '⚠ Literal title' 'Literal body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=normal --expire-time=5000 -- '⚠ Literal title' 'Literal body'")
 			assert_eq(generic.send("Literal body"), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=low --expire-time=5000 -- 'Ergopti+' 'Literal body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=low --expire-time=5000 -- 'Ergopti+' 'Literal body'")
 			assert_eq(application.send("Native body"), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=low --expire-time=5000 -- '" .. expected.default .. "' 'Native body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=low --expire-time=5000 -- '" .. expected.default .. "' 'Native body'")
 			local options = { title = "Bare label", level = "warning", onClick = function() end }
 			assert_eq(application.send("Native body", options), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=normal --expire-time=5000 -- '" .. expected.decorated .. "' 'Native body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=normal --expire-time=5000 -- '" .. expected.decorated .. "' 'Native body'")
 			assert_eq(options.title, "Bare label")
 			assert_eq(options.level, "warning")
 			native_mode = "refuse"
