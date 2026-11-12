@@ -1598,6 +1598,10 @@ function scanFile(file, text, ctx) {
 		// new folder; live code is a refusal until rules.cjs resolves the site.
 		const prose = isProse(file, text, code, m.index);
 		const successor = successors.get(hit.oldRepo);
+		// A folder whose files only move within it (windows/tests/meta/adapters
+		// to windows/tests/meta/core/crypto) keeps its name: nothing to respell,
+		// and a respelling would lose the escapes of a regular expression.
+		if (successor === hit.oldRepo) continue;
 		const deep = successor && successor.split('/').length > 3;
 		// A lone scattered folder whose nearest new folder is a tree root
 		// itself names no folder at all in live code (tmp .. "/modules" became
