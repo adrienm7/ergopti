@@ -31,8 +31,15 @@ package.loaded["menu.labels"] = {
 
 -- Stub lib.locale so get() returns controlled values.
 local _locale_store = {}
+-- display() is the shared core's label lookup: the raw key on a miss. Its
+-- once-per-key warning is tested against the real core below.
 package.loaded["infra.locale"] = {
 	get = function(key) return _locale_store[key] end,
+	display = function(key)
+		local s = _locale_store[key]
+		if s == nil or s == "" then return key end
+		return s
+	end,
 }
 
 -- Stub lib.logger (silent no-op).
@@ -411,18 +418,22 @@ helpers.describe("i18n: get()", function()
 	end)
 
 	helpers.it("warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
+		local stub_locale, stub_core = package.loaded["infra.locale"], package.loaded["locale.core"]
 		local logger = package.loaded["infra.logger"]
 		local warn, warnings = logger.warn, {}
 		logger.warn = function(_, message, key) warnings[#warnings + 1] = message:gsub("%%s", key or "") end
-		local i18n = load_i18n()
+		package.loaded["infra.locale"] = nil
 		local ok, detail = pcall(function()
-			i18n.get("__missing_key__")
-			i18n.get("__missing_key__")
-			i18n.get("__other_missing__")
-			_locale_store["menu.global.reload"] = "Recharger"
-			i18n.get("menu.global.reload")
+			local locale = require("infra.locale")
+			helpers.assert_eq(locale.has("__missing_key__"), false)
+			helpers.assert_eq(#warnings, 0, "a probe is not a defect")
+			helpers.assert_eq(locale.display("__missing_key__"), "__missing_key__")
+			locale.display("__missing_key__")
+			locale.display("__other_missing__")
+			helpers.assert_true(locale.display("menu.global.reload") ~= "menu.global.reload")
 		end)
 		logger.warn = warn
+		package.loaded["infra.locale"], package.loaded["locale.core"] = stub_locale, stub_core
 		assert(ok, detail)
 		helpers.assert_eq(#warnings, 2, "each missing key is warned once")
 		helpers.assert_true(warnings[1]:find("'__missing_key__'", 1, true) ~= nil)
