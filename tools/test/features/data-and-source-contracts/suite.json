@@ -673,6 +673,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-runtime-edit-steps.cjs"],
 			"repro": "npm run test:structure-runtime-edit-steps"
+		},
+		{
+			"id": "js-0511",
+			"ordinal": 628,
+			"name": "structure plan moves a one-word Lua module name only where it is loaded, never a same-spelled word",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-module-load-sites.cjs"],
+			"repro": "npm run test:structure-module-load-sites"
 		}
 	]
 }

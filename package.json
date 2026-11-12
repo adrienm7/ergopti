@@ -144,6 +144,7 @@
 		"test:tree-parity": "node ./tools/test/test-driver-tree-parity.cjs",
 		"test:structure-folder-bounds": "node ./tools/test/test-structure-folder-bounds.cjs",
 		"test:structure-runtime-edit-steps": "node ./tools/test/test-structure-runtime-edit-steps.cjs",
+		"test:structure-module-load-sites": "node ./tools/test/test-structure-module-load-sites.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
