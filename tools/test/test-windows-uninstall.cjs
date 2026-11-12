@@ -26,7 +26,11 @@ if (process.platform !== 'win32') {
 	console.log('[SKIP] Windows portable uninstall execution requires PowerShell on Windows.');
 	process.exit(0);
 }
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-uninstall-test-'));
+// The Recycle Bin record names the long path. A hosted runner's TEMP is the 8.3
+// form (C:\Users\RUNNER~1\...), so the fixture lives under the long form of it.
+const scratch = fs.mkdtempSync(
+	path.join(fs.realpathSync.native(os.tmpdir()), 'ergopti-uninstall-test-')
+);
 const ps = (value) => `'${value.replaceAll("'", "''")}'`;
 try {
 	const script = path.join(scratch, 'test.ps1');

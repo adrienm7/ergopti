@@ -248,7 +248,7 @@ _R7NB_NativeUninstallPolicy() {
 		if Observed[1]["exit"] != 0
 			NativeCliPrintFailureOutput("native uninstall policy", Observed[1]["output"])
 		AssertEqual(0, Observed[1]["exit"], "native uninstall policy output: " . NativeCliFailureHeadline(Observed[1]["output"]))
-		Marker := "[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable."
+		Marker := "[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable, and recycles that exact file (the real Recycle Bin received only this test's own temporary fixture, removed afterwards)."
 		Markers := 0
 		for Line in StrSplit(StrReplace(Observed[1]["output"], "`r`n", "`n"), "`n")
 			if Line == Marker
