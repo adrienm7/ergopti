@@ -33,27 +33,17 @@ Checked and kept:
 | ------- | ----- | ---------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
 | HSE-001 | Linux | Expand `xgboost` at a TUI prompt in a terminal | A wait of `[debounce] terminal_hotstring_key_delay_ms` after each Backspace | One burst of Backspaces, then one 20 ms pause: the prompt can judge every deletion against one stale render (`xgboostXGBoost`) | `hse-001-terminal-erase-pacing` |
 
-## Open
+## Decided and fixed after review (2026-11-12)
 
-- **HSE-002 (macOS and Linux, medium-low):** the shared reader
-  `_shared/lua/toml_codec/reader.lua` `parse_entry` takes only a quoted key
-  followed by an inline table. Windows `toml_loader.ahk` also loads a bare key
-  (`par = { output = … }`) and the simple form `"bbq" = "text"`.
-  - **Effect:** such hand-edited extension or personal entries fire on Windows
-    only, with no log line on macOS or Linux.
-  - **Why not fixed here:** the same reader parses `constants.toml`, the
-    tap-hold defaults and the tooltip config, where those shapes are plain
-    values. The fix needs a hotstring-only entry path or an explicit refusal.
-  - **Windows (report only):** its fixed-order regex drops an entry whose keys
-    are in another order, or one with only `output`, which the Lua side loads.
-- **HSE-003 (macOS, low, decision):** a trigger with an inner space, such as
-  `la notre`, also fires when typed with a no-break space on macOS only
-  (`registry.lua` `add_with_space_variants`). Windows and the shared engine
-  register no such variant.
-- **HSE-004 (macOS vs Windows and Linux, low, decision):** with a letter as
-  the magic key (for example `a`), macOS keeps the magic key out of the case
-  variants: `BTWa` expands and `BTWA` does not. Windows and Linux conform
-  against the uppercased canonical trigger, magic key included, so `BTWA`
-  expands and `BTWa` does not.
+- **HSE-002:** the shared reader loads the bare-key and simple-form entries in
+  a section `[_meta] sections_order` lists, as Windows does. Other sections
+  keep their plain values. Regression `hse-002-short-entry-forms`. The Windows
+  side (any key order, only `output`) has a TODO line.
+- **HSE-003:** the shared engine, so Linux, registers a trigger's no-break and
+  narrow no-break space variants, as macOS did. Regression
+  `hse-003-nbsp-trigger`. Windows has a TODO line.
+- **HSE-004:** macOS follows Windows. A letter magic key follows the word's
+  case, so `BTWA` expands and `BTWa` does not. Regression
+  `hse-004-magic-key-case`.
 
 Native receiving is unqualified.

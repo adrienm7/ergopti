@@ -5,6 +5,34 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Hotstring short entry forms load everywhere (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (HSE-002): a bare-key entry
+(`par = { output = … }`) and the simple form (`"bbq" = "text"`, a word
+hotstring with an end character, case-conform and final) load on every OS.
+The shared `toml_codec/reader.lua` accepts them only in a section the
+document's `[_meta] sections_order` lists, so `constants.toml`, the tap-hold
+defaults and the tooltip configuration parse as before. Windows has a TODO
+line for an inline-table entry in another key order or with only `output`.
+Regression `hse-002-short-entry-forms`.
+
+## A no-break space counts as a space inside a trigger (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (HSE-003): a trigger with an inner
+space fires when typed with U+00A0 or U+202F there, on every OS; a trigger
+starting with a space (a word-boundary guard) keeps its own. macOS
+(`add_with_space_variants`) and the shared engine register the variants;
+Windows has a TODO line. Regression `hse-003-nbsp-trigger`.
+
+## A letter magic key follows the word's case (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (HSE-004), following Windows: with a
+letter as the magic key (`a`), `BTWA` expands to BY THE WAY and `BTWa`
+fires nothing; the Title form keeps the key lowercase (`Btwa`). macOS
+registers the UPPER variant with the uppercased key and resolves a
+Shift+magic press against the uppercase star mappings (never the letter
+repeat). Regression `hse-004-magic-key-case`.
+
 ## App Cloner clones of VS Code variants keep their own folders (2026-11-12)
 
 Decided by the maintainer on 2026-11-12 (BAP-004): a VSCodium or VS Code
