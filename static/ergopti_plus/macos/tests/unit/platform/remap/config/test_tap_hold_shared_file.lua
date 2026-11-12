@@ -182,6 +182,33 @@ helpers.describe("Spellings across drivers in the shared tap_hold.toml (tap-hold
 	end)
 end)
 
+-- TCL-006: over a file laid on the shipped keys, a cleared tap or hold written as
+-- an absent field read as the shipped one on Windows and Linux.
+helpers.describe("Clearing a key over inherit_defaults (tcl-006-explicit-none)", function()
+	helpers.it("a cleared tap and hold are written as nothing, not left out (tcl-006-explicit-none)", function()
+		with_folder(function(f)
+			write(f.path, '[_meta]\nschema_version = 1\n[tap_hold]\ninherit_defaults = true\n'
+				.. '[tap_hold.keys.caps_lock]\ntap_action = "copy"\nhold_modifier = "ctrl"\n')
+			local state = f.load()
+			state.tap_hold_config.caps_lock = { tap = "none", hold = "none" }
+			helpers.assert_true(f.config.save_user_config(state, f.path))
+			helpers.assert_eq(decode(read(f.path)).tap_hold.keys.caps_lock, { tap_action = "none", hold_modifier = "" })
+			local reloaded = f.load()
+			helpers.assert_eq(reloaded.tap_hold_config.caps_lock, { tap = "none", hold = "none" }, "macOS reads it back as none")
+		end)
+	end)
+
+	helpers.it("without inherit_defaults a cleared key is left out as before (tcl-006-explicit-none)", function()
+		with_folder(function(f)
+			write(f.path, '[_meta]\nschema_version = 1\n[tap_hold.keys.caps_lock]\ntap_action = "copy"\nhold_modifier = "ctrl"\n')
+			local state = f.load()
+			state.tap_hold_config.caps_lock = { tap = "none", hold = "none" }
+			helpers.assert_true(f.config.save_user_config(state, f.path))
+			helpers.assert_nil((decode(read(f.path)).tap_hold or {}).keys)
+		end)
+	end)
+end)
+
 -- TCL-005: SCHEMA.md bounds a delay to 0 < x <= 10 s; macOS took a longer global
 -- delay and ran a key's delay <= 0 as the global without a word.
 helpers.describe("Delays outside the bound in the shared tap_hold.toml (tcl-005-delay-bound)", function()
