@@ -138,6 +138,11 @@ function run() {
 		[
 			'local U = helpers.load_module("unicode_case")',
 			'local U = helpers.load_module("core.text.engine.unicode_case.core")'
+		],
+		// A local function that hands its parameter to require loads its argument.
+		[
+			'local function dependency(name)\n\tlocal ok, owner = pcall(require, name)\n\treturn ok and owner\nend\nlocal J = dependency("json")\nlocal label = describe("json")',
+			'local function dependency(name)\n\tlocal ok, owner = pcall(require, name)\n\treturn ok and owner\nend\nlocal J = dependency("core.text.engine.json")\nlocal label = describe("json")'
 		]
 	];
 	for (const [before, after] of cases) assert.equal(rewrite(before), after, before);
