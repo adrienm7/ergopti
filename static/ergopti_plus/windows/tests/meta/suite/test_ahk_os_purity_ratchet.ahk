@@ -170,7 +170,10 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; 2026-11-03: the startup smoke's mutex probe, exit and deadline moved into
 ; adapters/process_lifecycle.ahk; read from this counter at modules+lib 248
 ; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
-_AOPR_BASELINE_CORE  := 248
+; 2026-11-12: the layout registry watch and the metrics time zone conversions
+; moved into adapters/registry_notify.ahk and adapters/system_time_zone.ahk;
+; read from this counter at modules+lib 247, tightened.
+_AOPR_BASELINE_CORE  := 247
 _AOPR_BASELINE_UI    := 125
 _AOPR_BASELINE_ENTRY := 7
 
@@ -311,8 +314,11 @@ _AOPR_AssertFamilies(Label, Files, Baseline) {
 ; entry: 10 (Timer=8 Binding=1 GuiMenu=0 Process=0 Window=0 KeyState=1)
 ; 2026-11-03, read from this counter: core 593 (Timer=226 Binding=230 GuiMenu=32
 ; Process=25 Window=49 KeyState=31), tightened; entry 10 (Timer=9 KeyState=1).
-_AOPR_FAMILY_BASELINE_CORE  := 593
-_AOPR_FAMILY_BASELINE_UI    := 186
+; 2026-11-12: the touchpad, layout registry watch and deferred hotstring
+; timers moved onto the timer adapter; read from this counter at core 592 and
+; ui 182, tightened.
+_AOPR_FAMILY_BASELINE_CORE  := 592
+_AOPR_FAMILY_BASELINE_UI    := 182
 _AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
