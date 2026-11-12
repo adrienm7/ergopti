@@ -229,3 +229,12 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 		end)
 	end)
 end)
+
+helpers.describe("hotstring preference enums written in another case", function()
+	helpers.it("reads the magic key source in its manifest spelling (config-enum-case)", function()
+		with_preferences('[hotstrings]\nmagic_key_source = "keyj"\n', function(Preferences)
+			helpers.assert_eq(Preferences.get("hotstrings.magic_key_source"), "KeyJ")
+		end)
+	end)
+end)
+

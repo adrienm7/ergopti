@@ -262,6 +262,24 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		if not ok then error(failure, 0) end
 	end)
 
+	helpers.it("incremental: a mode written in another case takes its manifest spelling (config-enum-case)", function()
+		local saved = package.loaded[MANAGER]
+		local tmp = os.tmpname()
+		local fh = assert(io.open(tmp, "w"))
+		fh:write("[gestures.modes]\nswipe_3_left = \"X1\"\nswipe_3_up = \"Incremental\"\n")
+		fh:close()
+		local ok, failure = pcall(function()
+			local M = helpers.load_module(MANAGER)
+			M.init({ persist = true, config_path = tmp })
+			-- Windows' loader admits a case variant and keeps the manifest spelling.
+			helpers.assert_eq(M.get_mode("swipe_3_left"), "x1")
+			helpers.assert_eq(M.get_mode("swipe_3_up"), "incremental")
+		end)
+		os.remove(tmp)
+		package.loaded[MANAGER] = saved
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("incremental: a pad without a resolution fires once, as x1", function()
 		local pressed, M = pump({ swipe_3_left = "tab_prev" }, { swipe_3_left = "incremental" }, touch_events(path(-40)), nil)
 		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 1)
