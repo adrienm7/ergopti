@@ -838,10 +838,13 @@ async function main() {
 			}
 			if (fixture === TOO_OLD_FIXTURE) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
-				// The refused session may only report that its saves were refused.
+				// The refused session may only report the migration's own refusal of this
+				// file as unsupported, and that its saves were refused.
 				const foreign = loggedErrors(configRoot).filter(
 					(line) =>
-						!/Refusing full-state persistence|identical line|error window for 'ConfigIO'/.test(line)
+						!/\[ConfigMigrate\] Config migration of '[^']*config\.toml' refused \(unsupported\)|Refusing full-state persistence|identical line|error window for 'ConfigIO'/.test(
+							line
+						)
 				);
 				if (foreign.length > 0) return fail(`${fixture}: ${foreign[0]}`);
 				const logs = path.join(configRoot, ...SMOKE_LOGS);
