@@ -133,9 +133,7 @@ local function with_tap_holds(body)
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local user_path = os.tmpname()
-	local fh = assert(io.open(user_path, "w"))
-	fh:write(require("tests.support.tap_hold_fixture").with_preset(nil))
-	fh:close()
+	local config_path = require("tests.support.tap_hold_fixture").write(user_path, nil)
 	local ok, err = pcall(function()
 		local Manager = require("platform.remap.tap_hold_manager")
 		Manager.init({
@@ -144,6 +142,7 @@ local function with_tap_holds(body)
 				held_shortcut_modifier_codes = function() return {} end },
 			execute_action = function() end, on_text_injected = function() end,
 			action_names = function() return {} end, defaults_path = DEFAULTS, user_path = user_path,
+			config_path = config_path,
 		})
 		local calls = {}
 		package.loaded["infra.tap_hold_scope"] = {
@@ -153,6 +152,7 @@ local function with_tap_holds(body)
 		Manager._reset_for_test()
 	end)
 	os.remove(user_path)
+	os.remove(config_path)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end

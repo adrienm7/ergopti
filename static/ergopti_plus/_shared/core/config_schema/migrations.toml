@@ -143,7 +143,7 @@ ops = [
 [steps.v21_to_v22]
 from = 21
 to = 22
-drivers = ["hs"]
+drivers = ["hs", "linux"]
 reason = "The tap-hold switch, the one-shot and lone-tap timings and the key combinations are rows of the feature manifest, kept in config.toml on every OS; macOS and Linux kept them in tap_hold.toml, which now holds the keys only (maintainer decision of 2026-11-11)."
 # Windows always kept these rows in config.toml. macOS carries an old
 # config_karabiner.toml over into tap_hold.toml before this step reads it, so

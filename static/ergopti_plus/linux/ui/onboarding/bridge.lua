@@ -160,7 +160,7 @@ local function tap_hold_values_of(state, path)
 	end
 	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
 	local ok, report, err = pcall(loader.key_report, Paths.shared("tap_hold/defaults.toml"),
-		folder .. "/" .. writer.FILE_NAME)
+		folder .. "/" .. writer.FILE_NAME, path)
 	if not ok or not report then
 		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
 		return nil
@@ -331,10 +331,14 @@ end
 --- @return string|nil detail
 local function prepare_destination(path)
 	local ConfigMigrate = require("config_migrate")
+	local SharedFile = require("tap_hold.shared_file")
+	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
 	local result = ConfigMigrate.boot({
 		path          = path,
 		driver        = MIGRATION_DRIVER,
 		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
+		-- The v22 step moves the tap-hold rows out of the folder's tap_hold.toml.
+		companions    = { [SharedFile.FILE_NAME] = folder .. "/" .. SharedFile.FILE_NAME },
 	})
 	if result.read_only then return false, result.detail end
 	return true

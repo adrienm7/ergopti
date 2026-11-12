@@ -44,7 +44,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "fcccea1c82c12d10fd7fca105576b8d9ac9e08fc96a2ae8000477b3cec86b31b"
+					"sha256": "19fb62f1269dc7b7d10ef9375180cb6fe228c7be32673e5db5cbb5abef3e588d"
 				}
 			]
 		}
@@ -99,7 +99,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "fcccea1c82c12d10fd7fca105576b8d9ac9e08fc96a2ae8000477b3cec86b31b"
+					"sha256": "19fb62f1269dc7b7d10ef9375180cb6fe228c7be32673e5db5cbb5abef3e588d"
 				}
 			]
 		}
@@ -154,7 +154,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "fcccea1c82c12d10fd7fca105576b8d9ac9e08fc96a2ae8000477b3cec86b31b"
+					"sha256": "19fb62f1269dc7b7d10ef9375180cb6fe228c7be32673e5db5cbb5abef3e588d"
 				}
 			]
 		}
@@ -360,7 +360,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "fcccea1c82c12d10fd7fca105576b8d9ac9e08fc96a2ae8000477b3cec86b31b"
+					"sha256": "19fb62f1269dc7b7d10ef9375180cb6fe228c7be32673e5db5cbb5abef3e588d"
 				}
 			]
 		}

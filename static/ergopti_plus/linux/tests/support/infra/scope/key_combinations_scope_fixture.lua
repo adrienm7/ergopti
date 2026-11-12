@@ -61,7 +61,7 @@ local function with_owner(body, managed, public_chords)
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
 			local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-			local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
@@ -78,7 +78,7 @@ local function with_owner(body, managed, public_chords)
 			for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 			package.loaded["modules.shortcuts.key_combinations"]=nil
 			state.manager=require("platform.remap.tap_hold_manager")
-			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			state.pairs=require("modules.shortcuts.key_combinations")
 		else
 		local keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} }
