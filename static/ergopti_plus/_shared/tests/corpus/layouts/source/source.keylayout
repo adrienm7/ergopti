@@ -38,7 +38,7 @@
 			<key code="39" action="¨"/>
 			<key code="42" output="*"/>
 			<key code="48" output="&#x0009;"/>
-			<key code="50" output="&lt;"/>
+			<key code="50" output="&#x003C;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>
@@ -94,7 +94,7 @@
 			<key code="31" output="O"/>
 			<key code="36" output="&#x000D;"/>
 			<key code="48" output="&#x0009;"/>
-			<key code="50" output="&gt;"/>
+			<key code="50" output="&#x003E;"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="52" output="&#x0003;"/>
 			<key code="53" output="&#x001B;"/>

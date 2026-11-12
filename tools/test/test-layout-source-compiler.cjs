@@ -250,6 +250,10 @@ const golden = read(path.join(corpus, 'source.keylayout'));
 		golden,
 		'regenerate with: npm run layout-source -- export-macos <corpus>/source.toml <new-dir> iso'
 	);
+	// macOS's keylayout loader reads only numeric references: a key written with
+	// output="&lt;" typed nothing on the native bundle receipt (CI run 43111697646).
+	assert.doesNotMatch(compiled.text, /&(lt|gt|amp|quot|apos);/, 'no named XML entity');
+	assert.match(compiled.text, /<key code="50" output="&#x003C;"\/>/, 'the ISO key types <');
 	assert.deepEqual(clone(compiled.omitted), [
 		{ path: 'modifiers.kana_lock', reason: 'custom_modifier_not_in_keylayout' },
 		{ path: 'layers.kana', reason: 'modifier_not_in_keylayout' },
