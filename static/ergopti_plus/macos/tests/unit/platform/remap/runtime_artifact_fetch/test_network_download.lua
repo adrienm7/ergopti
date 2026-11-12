@@ -1,4 +1,4 @@
---- tests/unit/platform/remap/network_download/test_network_download.lua
+--- tests/unit/platform/remap/runtime_artifact_fetch/test_network_download.lua
 
 --- ==============================================================================
 --- MODULE: Remap Engine Download Route
