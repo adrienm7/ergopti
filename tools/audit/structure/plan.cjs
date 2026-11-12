@@ -1531,7 +1531,7 @@ function scanFile(file, text, ctx) {
 	// ROOT / "static" / "ergopti_plus" / "_shared" / "data" / "x.sql": a Python
 	// path joined with the / operator, read from the tree it passes through.
 	if (file.endsWith('.py'))
-		for (const m of text.matchAll(/(?:[ \t]*\/[ \t]*(["'])[\w.?-]+\1)+/g)) {
+		for (const m of text.matchAll(/(?:\s*\/\s*(["'])[\w.?-]+\1)+/g)) {
 			const pieces = [...m[0].matchAll(/(["'])([\w.?-]+)\1/g)].map((x) => x[2]);
 			const at = pieces.findIndex((p) => Census.TREES.includes(p));
 			if (at < 0 || at === pieces.length - 1) continue;
