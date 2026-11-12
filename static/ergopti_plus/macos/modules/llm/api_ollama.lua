@@ -734,12 +734,14 @@ function M.pause_warmup()
 	return daemon_settled and warmup_settled
 end
 
--- curl --max-time ceiling for streaming requests (seconds).
--- STREAM_TMPFILE_CLEANUP_SEC is the safety-net delay before removing the
--- payload temp file; it must be strictly greater than STREAM_MAX_TIME_SEC so
--- the file is never deleted while curl is still reading it.
-local STREAM_MAX_TIME_SEC      = 60
-local STREAM_TMPFILE_CLEANUP_SEC = 70
+-- curl --max-time ceiling for streaming requests, the shared local Ollama
+-- budget (NET-003). The payload temp file's safety-net removal waits past it,
+-- so the file is never deleted while curl is still reading it. Read when a
+-- request starts, so loading this module reads no timing.
+local STREAM_TMPFILE_CLEANUP_MARGIN_SEC = 10
+
+--- @return number seconds
+local function stream_max_time_sec() return require("infra.timings").sec("llm", "ollama_request_timeout_ms") end
 
 -- Ensure Ollama daemon is running — fully async to avoid blocking the Cocoa
 -- run loop. Previous implementation used synchronous hs.execute + usleep which
@@ -1963,8 +1965,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return ShellRunner.spawn("/usr/bin/curl", {
 			"-s", "-N", "-X", "POST",
 			"-H", "Content-Type: application/json",
-			"--connect-timeout", "5",   -- abort if TCP handshake exceeds 5 s (Ollama dead)
-			"--max-time", tostring(STREAM_MAX_TIME_SEC),  -- hard ceiling; also drives cleanup delay
+			-- Abort a TCP handshake that never completes (Ollama dead).
+			"--connect-timeout", tostring(require("infra.timings").sec("llm", "stream_connect_timeout_ms")),
+			"--max-time", tostring(stream_max_time_sec()),  -- hard ceiling; also drives cleanup delay
 			"--data-binary", "@" .. tmp_path,
 			M.get_base_url() .. "/api/chat",
 		}, on_done, on_chunk)
@@ -2012,9 +2015,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
 	-- Safety-net: remove the payload temp file even if on_done fires late or not
-	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
+	-- at all. The delay passes the --max-time ceiling so curl has finished reading.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
-		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
+		return TimerScheduler.after(stream_max_time_sec() + STREAM_TMPFILE_CLEANUP_MARGIN_SEC, function()
 			retire_payload()
 		end)
 	end, debug.traceback)

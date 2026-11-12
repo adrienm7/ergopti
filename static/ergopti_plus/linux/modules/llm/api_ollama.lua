@@ -297,7 +297,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	local function dispatch()
 		if not request_current(request) then return false end
 		return HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
-			timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000,
+			timeout_ms = Timings.ms("llm", "ollama_request_timeout_ms"),
 			authorized = function() return request_current(request) end,
 		}, function(chunk)
 			if not request_current(request) then return end

@@ -54,6 +54,12 @@ ollama_runtime_metadata_poll_ms = 250
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.
 request_timeout_ms = 30000
 
+# Local Ollama request hard timeout: a cold CPU model load before generation
+# outlasts the remote budget above (NET-003). AHK: api_ollama/init.ahk
+# LLM_OLLAMA_TIMEOUT (curl -m). HS: api_ollama.lua stream --max-time. Linux:
+# api_ollama.lua postStream timeout.
+ollama_request_timeout_ms = 180000
+
 # Period of the AI health watch that repaints the AI menu title's dot when
 # the active backend turns ready or fails after the menu was built (any
 # backend: local API, MLX, Ollama). It only reads in-memory state.

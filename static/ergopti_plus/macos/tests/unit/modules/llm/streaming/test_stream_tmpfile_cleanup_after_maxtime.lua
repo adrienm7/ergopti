@@ -42,51 +42,28 @@ end
 do
 	local src = read_src("local function read_ollama_port_override") -- modules/llm/api_ollama.lua
 
-	-- Test 1: STREAM_MAX_TIME_SEC constant must be defined.
-	local max_time_def = src:match("local STREAM_MAX_TIME_SEC%s*=%s*(%d+)")
+	-- Test 1: the --max-time ceiling is the shared local Ollama budget (NET-003).
 	helpers.assert_true(
-		max_time_def ~= nil,
-		"api_ollama.lua must define STREAM_MAX_TIME_SEC constant (llm-api-net-03)"
+		src:find('require("infra.timings").sec("llm", "ollama_request_timeout_ms")', 1, true) ~= nil,
+		"api_ollama.lua must read its --max-time ceiling from [llm] ollama_request_timeout_ms (NET-003)"
+	)
+	helpers.assert_true(src:find('"--max-time", tostring(stream_max_time_sec())', 1, true) ~= nil,
+		"curl --max-time must use the registry ceiling (llm-api-net-03)")
+
+	-- Test 2: the safety-net removal waits strictly past that ceiling.
+	local margin = tonumber(src:match("local STREAM_TMPFILE_CLEANUP_MARGIN_SEC%s*=%s*(%d+)"))
+	helpers.assert_true(margin ~= nil and margin > 0,
+		"the payload cleanup margin past --max-time must be positive (llm-api-net-03)")
+	helpers.assert_true(
+		src:find("TimerScheduler.after(stream_max_time_sec() + STREAM_TMPFILE_CLEANUP_MARGIN_SEC,", 1, true) ~= nil,
+		"api_ollama.lua safety-net timer must wait past the --max-time ceiling (llm-api-net-03)"
 	)
 
-	-- Test 2: STREAM_TMPFILE_CLEANUP_SEC constant must be defined and be a number.
-	local cleanup_def = src:match("local STREAM_TMPFILE_CLEANUP_SEC%s*=%s*(%d+)")
-	helpers.assert_true(
-		cleanup_def ~= nil,
-		"api_ollama.lua must define STREAM_TMPFILE_CLEANUP_SEC constant (llm-api-net-03)"
-	)
-
-	-- Test 3: STREAM_TMPFILE_CLEANUP_SEC >= STREAM_MAX_TIME_SEC.
-	local max_time_val  = tonumber(max_time_def)
-	local cleanup_val   = tonumber(cleanup_def)
-	helpers.assert_true(
-		max_time_val ~= nil and cleanup_val ~= nil and cleanup_val >= max_time_val,
-		string.format(
-			"STREAM_TMPFILE_CLEANUP_SEC (%s) must be >= STREAM_MAX_TIME_SEC (%s) (llm-api-net-03)",
-			tostring(cleanup_def), tostring(max_time_def)
-		)
-	)
-
-	-- Test 4: curl --max-time must use the named constant, not a bare literal.
-	local has_max_time_literal = src:find('"--max-time", "60"', 1, true) ~= nil
-	helpers.assert_true(
-		not has_max_time_literal,
-		"api_ollama.lua must not use bare literal \"60\" for --max-time (llm-api-net-03)"
-	)
+	-- Test 3: no typed ceiling or delay remains.
+	helpers.assert_true(src:find('"--max-time", "60"', 1, true) == nil and src:find("TimerScheduler.after(10,", 1, true) == nil,
+		"api_ollama.lua must not use bare literals for --max-time or the cleanup timer (llm-api-net-03)")
 	-- The registered stream-cleanup-deadline case compares actual native curl
 	-- arguments with the scheduled timer; a declaration is not argument coverage.
-
-	-- Test 5: Safety-net timer must use STREAM_TMPFILE_CLEANUP_SEC, not the old 10s literal.
-	local has_old_delay = src:find("TimerScheduler.after(10,", 1, true) ~= nil
-	helpers.assert_true(
-		not has_old_delay,
-		"api_ollama.lua must not use bare literal 10 s for the temp-file cleanup timer (llm-api-net-03)"
-	)
-	local has_named_delay = src:find("TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC,", 1, true) ~= nil
-	helpers.assert_true(
-		has_named_delay,
-		"api_ollama.lua safety-net timer must use STREAM_TMPFILE_CLEANUP_SEC (llm-api-net-03)"
-	)
 
 	-- Test 6: on_done must relinquish task ownership and then settle its payload owner
 	-- before any parser or user callback can fail. Assert ordering instead of a
