@@ -223,13 +223,15 @@ function hotstringsRenderTimes(configRoot) {
 // [gestures.sensitivities] numbers into the generated template. One parse of
 // the template went from 975 to 1029 slow lexer steps; the realistic boot,
 // whose CI parse count varies by one, counted 13567 locally and 13582 on CI
-// (13538 -> 13582). neutral-defaults seeds that template and stays under its
-// slow-step ceiling (11807), but its flat reads grew 2191 -> 2248.
+// (13538 -> 13582). neutral-defaults seeds that template: its flat reads grew
+// 2191 -> 2248, and CI run 43172671159 parsed it once more than the local
+// run (15 document parses, not 14), one more 1029-step template parse:
+// 11807 locally, 12841 on CI (12109 -> 12841).
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
-	'toml.document_slow_steps': { all: 12109, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
+	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
 	'toml.flat_values': { all: 2248, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
 };
 
