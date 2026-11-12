@@ -2042,6 +2042,18 @@ function scanFile(file, text, ctx) {
 					listed: listed && !dotted
 				});
 		}
+		// 'text_utils").trim': the tail of a require call the file spells in
+		// full elsewhere (require("text_utils").trim(text)), checked in a message.
+		for (const m of text.matchAll(/(['`])([A-Za-z_][\w.]*)"\)\.([A-Za-z_]\w*)\1/g)) {
+			if (!text.includes(`require("${m[2]}")`)) continue;
+			const shared = byLuaName.get(`_shared|${m[2]}`);
+			const own = drivers.map((d) => byLuaName.get(`${d}|${m[2]}`)).filter(Boolean);
+			const hit = shared || (new Set(own.map((h) => h[2])).size === 1 ? own[0] : null);
+			if (hit && hit[2])
+				add('lua-module-quoted', m[0], `${m[1]}${hit[2]}").${m[3]}${m[1]}`, {
+					oldRepo: PREFIX + hit[0]
+				});
+		}
 		// package.loaded.json in an embedded Lua chunk: the module key spelled
 		// as a field, as in a Lua file.
 		for (const m of text.matchAll(/\bpackage\.(loaded|preload)\.([A-Za-z_]\w*)(?!\w)/g)) {
