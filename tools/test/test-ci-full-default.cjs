@@ -1494,6 +1494,8 @@ check('v103 launcher cell defers Brew and owned-runtime only while PAC stays man
 		const shell =
 			`set -euo pipefail
 RUNNER_TEMP="/owned path"
+# The admission slice ends with the macOS-only text-input agent snapshot.
+bash() { :; }
 node() {
     case "$*" in
         *"--scope macos-native-pac --validate-scope-receipt-profile"*) printf '%s' "$PROFILE" ;;

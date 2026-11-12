@@ -379,7 +379,10 @@ function fixtureCheckpointHarness(commands, directory) {
 	fs.writeFileSync(path.join(directory, 'workflow-publisher.py'), publishers[0][1] + '\n');
 	return (
 		'node() { if [ "$SWIFT_FIXTURE_PLATFORM" = "win32" ] && [ "$1" = "tools/diagnostics/tis_evidence_transport.cjs" ]; then shift; "$SWIFT_FIXTURE_NODE" "$SWIFT_FIXTURE_TIS_PORT" "$@"; else "$SWIFT_FIXTURE_NODE" "$@"; fi; }\n' +
-		'python3() { if [ "$SWIFT_FIXTURE_PLATFORM" = "win32" ]; then "$SWIFT_FIXTURE_PYTHON" "$SWIFT_FIXTURE_PYTHON_PORT" "$@"; else "$SWIFT_FIXTURE_PYTHON" "$@"; fi; }\n'
+		// Only the stdin checkpoint publisher has a Windows port; the refusal receipt runs as is.
+		'python3() { if [ "$SWIFT_FIXTURE_PLATFORM" = "win32" ] && [ "$1" = "-" ]; then "$SWIFT_FIXTURE_PYTHON" "$SWIFT_FIXTURE_PYTHON_PORT" "$@"; else "$SWIFT_FIXTURE_PYTHON" "$@"; fi; }\n' +
+		// launchctl exists only on macOS; the fixture host answers with an empty agent phase.
+		'bash() { if [ "$1" = "tools/diagnostics/macos_text_input_agents.sh" ]; then printf "phase=%s now_epoch=0 machine=fixture\\n" "$3" >> "$2"; else command bash "$@"; fi; }\n'
 	);
 }
 
@@ -493,6 +496,12 @@ try {
 		assert.equal(result.error, undefined);
 		assert.equal(result.status, expected, result.stdout + result.stderr);
 		const evidence = path.join(fixture, 'swift-launcher-evidence');
+		// The refusal receipt is written beside the transcript and never changes the verdict.
+		const refusal = JSON.parse(fs.readFileSync(path.join(evidence, 'tsm-refusal.json'), 'utf8'));
+		assert.deepEqual(
+			refusal.agent.map((phase) => phase.phase),
+			['before', 'after']
+		);
 		const transcripts = fs.readdirSync(evidence).filter((name) => name.startsWith('xctest.log.'));
 		assert.equal(
 			transcripts.length,
