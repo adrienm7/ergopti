@@ -27,8 +27,10 @@ elif [[ "$DRIVER_ROOT" = */lib/ergopti/linux ]]; then
 elif [ -f "$DRIVER_ROOT/bin/ergopti-hotstrings" ] && [ -f "$DRIVER_ROOT/../_shared/data/locales/en.json" ]; then
 	# A source run starts its own checkout by absolute path, as Windows registers
 	# its source script (SAD-1). Its launcher takes the daemon's --tray alone;
-	# a second start at login is refused by the session lock.
-	DESKTOP_NAME=ergopti-hotstrings.desktop
+	# a second start at login is refused by the session lock. Its entry has a
+	# name of its own: the standalone installer refuses an ergopti-hotstrings
+	# entry it does not own, so a checkout's entry there would block installing.
+	DESKTOP_NAME=ergopti-source.desktop
 	LAUNCHER="$DRIVER_ROOT/bin/ergopti-hotstrings"
 	LAUNCH_ARGUMENTS=--tray
 	receipt_allowed=false
