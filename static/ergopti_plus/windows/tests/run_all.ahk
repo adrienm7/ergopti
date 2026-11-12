@@ -542,6 +542,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/engine/test_domain_expander.ahk
 #Include unit/infra/toml/test_toml_loader.ahk
 #Include unit/infra/toml/test_toml_helpers_roundtrip.ahk
+#Include support/hotstring_registry_scope.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstrings_cache.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstring_language_packs.ahk
 #Include unit/ui/menu/test_menu_languages_and_global_separator.ahk
