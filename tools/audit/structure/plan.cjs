@@ -1593,6 +1593,18 @@ function scanFile(file, text, ctx) {
 		const piece = hit.rendered.slice(1, -1);
 		add('join', m[0], m[0].replace(`\`${m[2]}/`, `\`${piece}/`), hit);
 	}
+	// resolve(SHARED, 'data/locales/' + code + '.json'): a folder piece, kept
+	// with its trailing slash, concatenated onto a name and joined onto a base.
+	for (const m of text.matchAll(
+		/\b(?:path\.)?(?:join|resolve)\(\s*([A-Za-z_$][\w$]*)\s*,\s*(['"])((?:\.\.\/)*[\w.-]+(?:\/[\w.-]+)*)\/\2\s*\+/g
+	)) {
+		if (!jsEnv.has(m[1])) continue;
+		const j = { parts: [m[3]], quote: m[2], separator: '', text: `${m[2]}${m[3]}` };
+		const hit = resolveOnBase(j, jsEnv.get(m[1]), m[3], byRepoPath, byRepoDir, successors);
+		if (!hit || hit.kind !== 'join') continue;
+		const piece = hit.rendered.slice(1, -1);
+		add('join', m[0], m[0].replace(`${m[2]}${m[3]}/`, `${m[2]}${piece}/`), hit);
+	}
 	// root .. "locale_order.json" onto a folder constant of a Lua file.
 	const luaEnv = luaConstants(text, file, inTree);
 	for (const [name, base] of luaEnv) {
@@ -2166,8 +2178,20 @@ function jsConstants(text, file) {
 		if (env.has(a)) return env.get(a);
 		return undefined;
 	};
+	// const { resolve } = require('path'): the bare name is path.resolve.
+	const imported = (text.match(
+		/\bconst\s*\{([^}]*)\}\s*=\s*require\(\s*['"](?:node:)?path['"]\s*\)/
+	) || [])[1];
+	const bare = new Set(
+		(imported || '')
+			.split(',')
+			.map((x) => x.trim())
+			.filter((x) => x === 'join' || x === 'resolve')
+	);
 	const evaluate = (expr) => {
-		const call = expr.match(/^path\.(join|resolve)\(([^()]*)\)$/);
+		const named = expr.match(/^(join|resolve)\(/);
+		const call =
+			named && !bare.has(named[1]) ? null : expr.match(/^(?:path\.)?(join|resolve)\(([^()]*)\)$/);
 		if (call) {
 			let acc = null;
 			for (const raw of call[2]
