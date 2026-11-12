@@ -196,6 +196,17 @@ function run() {
 		'const b = \'local J = require("core.text.engine.json")\';\n' +
 			"const t = ['identifier:require', 'string:core.text.engine.json'];"
 	);
+	const longBracket =
+		"const cases = ['local J = require [[json]]', 'return require [==[json]==]'];";
+	assert.equal(
+		Apply.rewriteText(
+			longBracket,
+			Plan.scanFile(tool, longBracket, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		"const cases = ['local J = require [[core.text.engine.json]]', 'return require [==[core.text.engine.json]==]'];"
+	);
 	const lone = "assert(m.includes('json\").decode'));";
 	assert.equal(
 		Apply.rewriteText(lone, Plan.scanFile(tool, lone, Plan.referenceContext(MAP)), new Map(), tool),
