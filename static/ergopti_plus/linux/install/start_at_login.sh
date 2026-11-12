@@ -14,6 +14,8 @@ ergopti_resolve_config_home CONFIG_ROOT
 ACTION="${1:-status}"
 case "$ACTION" in status|enable|disable) ;; *) exit 64 ;; esac
 
+# The arguments the entry passes its launcher; empty is the installed form.
+LAUNCH_ARGUMENTS=
 if [ "$DRIVER_ROOT" = /usr/lib/ergopti ]; then
 	DESKTOP_NAME=ergopti.desktop
 	LAUNCHER=/usr/bin/ergopti
@@ -22,6 +24,14 @@ elif [[ "$DRIVER_ROOT" = */lib/ergopti/linux ]]; then
 	DESKTOP_NAME=ergopti-hotstrings.desktop
 	LAUNCHER="${DRIVER_ROOT%/lib/ergopti/linux}/bin/ergopti-hotstrings"
 	receipt_allowed=true
+elif [ -f "$DRIVER_ROOT/bin/ergopti-hotstrings" ] && [ -f "$DRIVER_ROOT/../_shared/data/locales/en.json" ]; then
+	# A source run starts its own checkout by absolute path, as Windows registers
+	# its source script (SAD-1). Its launcher takes the daemon's --tray alone;
+	# a second start at login is refused by the session lock.
+	DESKTOP_NAME=ergopti-hotstrings.desktop
+	LAUNCHER="$DRIVER_ROOT/bin/ergopti-hotstrings"
+	LAUNCH_ARGUMENTS=--tray
+	receipt_allowed=false
 else
 	ergopti_msg startup.requires_installed >&2
 	exit 78
@@ -71,9 +81,23 @@ if { [ -e "$USER_UNIT" ] || [ -L "$USER_UNIT" ]; } && ! startup_unit_compatible 
 	exit 78
 fi
 
+# An entry this menu wrote whose launcher no longer exists (a moved or deleted
+# checkout, a removed installation) starts nothing at login. It is reported as
+# stale, and an explicit enable or disable rewrites it for this launcher. A
+# standalone installation's entry is held by its removal receipt instead, which
+# a rewrite here could not keep exact: there it stays another command.
+startup_entry_stale() {
+	local named
+	! "$receipt_allowed" || return 1
+	[ -f "$DESKTOP_FILE" ] && [ ! -L "$DESKTOP_FILE" ] || return 1
+	named="$(ergopti_desktop_entry_launcher "$DESKTOP_FILE")" || return 1
+	[ "$named" != "$LAUNCHER" ] && [ ! -e "$named" ]
+}
+
 if [ "$ACTION" = status ]; then
+	if startup_entry_stale; then printf 'stale\n'; exit 0; fi
 	# Report a real conflicting command without acquiring it for replacement.
-	if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER"; then
+	if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER" "$LAUNCH_ARGUMENTS"; then
 		printf 'other\n'
 		exit 0
 	fi
@@ -99,7 +123,7 @@ startup_record() {
 }
 
 # Validate the eventual Exec before allocating or publishing any setting.
-desktop_exec="$(ergopti_desktop_exec "$LAUNCHER")" || exit 78
+desktop_exec="$(ergopti_desktop_exec "$LAUNCHER" ${LAUNCH_ARGUMENTS:+"$LAUNCH_ARGUMENTS"})" || exit 78
 
 if { [ -e "$DESKTOP_FILE" ] || [ -L "$DESKTOP_FILE" ]; } \
 	&& { [ -L "$DESKTOP_FILE" ] || [ ! -f "$DESKTOP_FILE" ]; }; then
@@ -107,7 +131,8 @@ if { [ -e "$DESKTOP_FILE" ] || [ -L "$DESKTOP_FILE" ]; } \
 	startup_record invalid-source desktop "$DESKTOP_FILE"
 	exit 78
 fi
-if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER"; then
+if [ -f "$DESKTOP_FILE" ] && ! startup_entry_stale \
+	&& ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER" "$LAUNCH_ARGUMENTS"; then
 	ergopti_msg startup.foreign_entry >&2
 	exit 78
 fi
