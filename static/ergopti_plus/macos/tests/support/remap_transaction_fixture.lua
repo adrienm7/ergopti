@@ -396,6 +396,7 @@ return function(run, dependencies)
 					publish_phase("stopping")
 					return true
 				end,
+				is_initialized = function() return calls.lease_init > 0 end,
 				status = function()
 					return calls.lease_phase, {
 						phase = calls.lease_phase,
