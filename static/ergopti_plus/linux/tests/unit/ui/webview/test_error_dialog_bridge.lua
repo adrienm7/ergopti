@@ -31,8 +31,9 @@ local ERRORS_FILE = HOME .. "/.local/state/" .. FOLDER .. "/logs/ErgoptiPlus_err
 local function load_bridge(controls)
 	controls = controls or {}
 	local Json = require("json")
-	local function document(name)
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/" .. name .. ".json", "rb"))
+	-- Each document is named by its path under _shared, wherever it lives.
+	local function shared_document(relative)
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/" .. relative, "rb"))
 		local value = Json.decode(file:read("*a")); assert(file:close()); return value
 	end
 	local sharing_schema = require("healthcheck.snapshot").load_config(function(path)
@@ -68,7 +69,7 @@ local function load_bridge(controls)
 		["ui.healthcheck.bridge"] = {
 			DRIVER = "linux",
 			config = function()
-				return { redaction = context.redaction, templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema }
+				return { redaction = context.redaction, templates = shared_document("modules/diagnostics/issue_templates.json"), repository = shared_document("modules/updater/defaults.json").github, schema = sharing_schema }
 			end,
 			build_snapshot = function()
 				if context.on_snapshot then context.on_snapshot() end

@@ -30,8 +30,9 @@ local ERRORS_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_error
 local function load_dialog(controls)
 	controls = controls or {}
 	local Json = require("json")
-	local function document(name)
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/" .. name .. ".json", "rb"))
+	-- Each document is named by its path under _shared, wherever it lives.
+	local function shared_document(relative)
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/" .. relative, "rb"))
 		local value = Json.decode(file:read("*a")); assert(file:close()); return value
 	end
 	local sharing_schema = require("healthcheck.snapshot").load_config(helpers.shared).schema
@@ -97,7 +98,7 @@ local function load_dialog(controls)
 				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>", email_placeholder = "<email>", foreign_home_markers = {}, shared_profile_names = {}, path_name_max_words = 3, config_placeholder = "<config>", config_name_placeholder = "<name>", config_known_names = {},
 					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
 					secret_value_min_length = 6 },
-				templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema,
+				templates = shared_document("modules/diagnostics/issue_templates.json"), repository = shared_document("modules/updater/defaults.json").github, schema = sharing_schema,
 			}
 		end,
 		run = function()
