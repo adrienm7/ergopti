@@ -20,6 +20,13 @@ same commit as each step or checkpoint. Times are Paris time.
   locally only. It needed three tooling fixes (`b3060b7f`, `7c3a977e`,
   `5261cc0d`) and the driver-root rule (`476e929a`, `24b22b12`). It has no CI
   run yet. Do not go further than S02 until S01 is green on CI.
+- S02's local measurement (c21, against S01's c20 on the same base) shows new
+  reds of its own, not yet read:
+  - JS: js-0035 (banner-marker safety), js-0241 (driver tree parity I1),
+    js-0253 (port × driver adapter matrix), js-0280 (scan coverage of
+    platform/), js-0281 (untracked artifacts), js-0441 (Windows unit matrix
+    groups);
+  - Lua: macOS meta, 3 new failures; macOS modules, 1 new failure.
 
 ### S01 CI failures (run 43311674550): causes found and their state
 
