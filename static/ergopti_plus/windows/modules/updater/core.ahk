@@ -2668,12 +2668,13 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset,
 		}
 		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
 	} else if (Status == 200) {
-		; A 200 that does not open a JSON array (a captive portal or proxy page) is
-		; no release list: answer none, so the caller reads the Atom feed and says
-		; « no connection » rather than « parse failed » (UPD-1, as the changelog
-		; window's _CLW_ClassifySource). A malformed array stays a parse failure.
-		if !(Body is String) || !RegExMatch(Body, "^\x{FEFF}?\s*\[") {
-			try LoggerWarn("Updater", "GitHub answered HTTP 200 without a JSON release array for '{1}'.", Url)
+		; A 200 that does not open JSON (a captive portal or proxy page) is no
+		; release list: answer none, so the caller reads the Atom feed and says
+		; « no connection » rather than « parse failed » (UPD-1). A body that opens
+		; JSON stays the parser's: a malformed array, or an object such as GitHub's
+		; error document, is still a malformed release response.
+		if !(Body is String) || !RegExMatch(Body, "^\x{FEFF}?\s*[\[{]") {
+			try LoggerWarn("Updater", "GitHub answered HTTP 200 without JSON for '{1}'.", Url)
 			return ""
 		}
 		Json := Body

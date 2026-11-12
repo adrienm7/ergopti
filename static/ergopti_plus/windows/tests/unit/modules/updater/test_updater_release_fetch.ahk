@@ -454,11 +454,11 @@ _UpdaterTest_JsonStringZeroHasTypedTransportSemantics() {
 	SavedCache := _UpdaterFetchCache
 	try {
 		_UpdaterFetchCache := Map()
-		; A release list is a JSON array (UPD-1): the String "0" is no list, so it
+		; A body that opens no JSON is no list (UPD-1): the String "0" is none, so it
 		; answers none and never enters the cache.
 		AssertEqual("", _Updater_InterpretResponse(
 			200, "0", "typed-etag", "typed-zero", "test://typed-zero"),
-			'a 200 whose body is "0" opens no JSON array and answers no list')
+			'a 200 whose body is "0" opens no JSON and answers no list')
 		AssertFalse(_UpdaterFetchCache.Has("typed-zero"), "a body that is no list is never cached")
 	} finally {
 		_UpdaterFetchCache := SavedCache
