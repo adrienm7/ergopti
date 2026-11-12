@@ -49,7 +49,9 @@ const FAKE = [
 	'_shared/lua/zz_probe_hot/p.lua',
 	'_shared/lua/zz_probe_hot/q.lua',
 	'_shared/zz_inward/x.lua',
-	'_shared/zz_inward/y.lua'
+	'_shared/zz_inward/y.lua',
+	'linux/zz_scatter/x.lua',
+	'linux/zz_scatter/y.lua'
 ];
 const MAP = new Map([
 	['_shared/zz_probe_data/locales/en.json', '_shared/core/zz_probe_i18n/data/locales/en.json'],
@@ -63,7 +65,9 @@ const MAP = new Map([
 	['_shared/lua/zz_probe_hot/p.lua', '_shared/zz_hot/engine/p.lua'],
 	['_shared/lua/zz_probe_hot/q.lua', '_shared/zz_hot/engine/q.lua'],
 	['_shared/zz_inward/x.lua', '_shared/zz_inward/b/x.lua'],
-	['_shared/zz_inward/y.lua', '_shared/zz_inward/c/y.lua']
+	['_shared/zz_inward/y.lua', '_shared/zz_inward/c/y.lua'],
+	['linux/zz_scatter/x.lua', 'linux/zz_scatter/x.lua'],
+	['linux/zz_scatter/y.lua', 'linux/zz_core/y/y.lua']
 ]);
 
 function withFakes(fn) {
@@ -105,6 +109,16 @@ function run() {
 		// escapes and all: S02 rewrote such a regex into invalid JavaScript.
 		const inward = 'const m = f.match(/^static\\/ergopti_plus\\/_shared\\/zz_inward\\/(.+)$/);';
 		assert.equal(rewrite('tools/x.cjs', inward), inward);
+		// A driver folder that scatters with the driver root as its nearest
+		// home: a list element names each real home, never the whole driver;
+		// elsewhere the folder, which keeps files, keeps its name (S02 widened
+		// the lint scopes of windows/adapters to windows).
+		assert.equal(
+			rewrite('tools/lint/x.cjs', "const TREES = [\n\t'linux/zz_scatter',\n\t'macos/ui'\n];"),
+			"const TREES = [\n\t'linux/zz_scatter',\n\t'linux/zz_core/y',\n\t'macos/ui'\n];"
+		);
+		const kept = "fail('route OS access through linux/zz_scatter/ instead');";
+		assert.equal(rewrite('tools/lint/x.cjs', kept), kept);
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(

@@ -153,6 +153,8 @@ function rewriteText(text, rows, movedRepo, file) {
 			console.log(`  review by hand: ${file} names retired ${row.old}`);
 			continue;
 		}
+		// A scattered folder that keeps its name: listed for review, not rewritten.
+		if (row.kind === 'dir-kept') continue;
 		if (Plan.REFUSED_KINDS.has(row.kind))
 			throw new Error(`refused reference ${row.file}: ${row.old}`);
 		// A sentence naming a folder that scatters stays as written; the
@@ -172,6 +174,7 @@ function rewriteText(text, rows, movedRepo, file) {
 				'folder-edit',
 				'lua-module-quoted',
 				'lua-module-member',
+				'scope-split',
 				'shared-prefix',
 				'source-check',
 				'lua-concat'
