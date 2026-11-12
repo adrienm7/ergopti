@@ -1290,7 +1290,7 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 - [ ] **AHK reds after the shared tap-hold layout re-land (2026-11-12, CI run 43247530033).** The re-landed
       `platform/remap/tap_hold_loader.ahk` / `infra/config_migrate.ahk` (verbatim from `wt/taphold-landed`) leave
-      14 Windows unit cases red, none of them red on `dev` 44f0ded3: in keymap-gestures,
+      15 Windows unit cases red, none of them red on `dev` 44f0ded3: in keymap-gestures,
       « LoadTapHoldToml: an unknown hold_modifier drops the hold and keeps the tap » (no ERROR names `fn`,
       `test_tap_hold_overlay_and_modifiers.ahk:349`) and the three « Layer editor save … respects native
       admission »; in ui, the eight « Layer editor readiness / navigation pause » and the three « Layout manager
