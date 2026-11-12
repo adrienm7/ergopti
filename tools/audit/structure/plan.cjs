@@ -1512,8 +1512,10 @@ function scanFile(file, text, ctx) {
 		const use = new RegExp(`\\b${name}\\s*\\.\\.\\s*(["'])([\\w.\\/-]+)\\1`, 'g');
 		for (const m of text.matchAll(use)) {
 			const lead = m[2].startsWith('/') ? '/' : '';
+			// root .. "locales/" .. code: a folder piece keeps its trailing slash.
+			const trail = m[2].length > 1 && m[2].endsWith('/') ? '/' : '';
 			const j = {
-				parts: [m[2].replace(/^\//, '')],
+				parts: [m[2].replace(/^\//, '').replace(/\/$/, '')],
 				quote: m[1],
 				separator: '',
 				text: `${m[1]}${m[2]}${m[1]}`
@@ -1521,7 +1523,7 @@ function scanFile(file, text, ctx) {
 			const hit = resolveOnBase(j, base, j.parts[0], byRepoPath, byRepoDir, successors);
 			if (!hit || hit.kind !== 'join') continue;
 			const piece = hit.rendered.slice(1, -1);
-			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${m[1]}`), hit);
+			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${trail}${m[1]}`), hit);
 		}
 	}
 	// A Lua module name in a tool's regular expression: /tap_hold\.hold_options/.test(src).
