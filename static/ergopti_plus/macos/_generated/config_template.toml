@@ -722,6 +722,7 @@ menubar_icon = "v1"
 [tap_holds]
 enabled = false
 lone_modifier_tap_max_ms = 1000
+sticky_timeout_ms = 2000
 
 
 

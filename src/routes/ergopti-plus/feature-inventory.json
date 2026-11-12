@@ -5748,6 +5748,21 @@
 		"reason": null
 	},
 	{
+		"path": "tap_holds.sticky_timeout_ms",
+		"family": "setting",
+		"labels": {
+			"fr": "Délai du modificateur rémanent : %s",
+			"en": "Sticky modifier delay: %s"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "shortcuts.keys.wrap_text_if_selected",
 		"family": "feature",
 		"labels": {
