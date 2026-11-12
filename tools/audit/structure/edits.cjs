@@ -72,4 +72,18 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 	}
 ];
 
-module.exports = { FOLDER_EDITS };
+/**
+ * Files whose path literals are synthetic coordinates, not references to the
+ * tree: a fake source root (@C:/repo/shared/config_migrate.lua) that a
+ * lexical owner normalizes, compares or derives siblings from. Rewriting some
+ * of them to the new layout breaks the arithmetic between the others, and
+ * none of them names a file of the repository.
+ */
+const SYNTHETIC_PATHS = [
+	{
+		file: 'static/ergopti_plus/_shared/lua/test/module_source_identity_contract.lua',
+		why: 'module_source_identity.sibling() derives one fake source from another'
+	}
+];
+
+module.exports = { FOLDER_EDITS, SYNTHETIC_PATHS };
