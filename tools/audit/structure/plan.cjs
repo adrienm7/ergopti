@@ -1524,6 +1524,17 @@ function scanFile(file, text, ctx) {
 			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${m[1]}`), hit);
 		}
 	}
+	// A Lua module name in a tool's regular expression: /tap_hold\.hold_options/.test(src).
+	// Tools only: a page's /^network\.failure\./ matches a locale key.
+	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
+		for (const rx of text.matchAll(/(?<=[(=!,:&|?]\s*)\/((?:\\.|[^/\\\n])+)\/[dgimsuy]*/g))
+			for (const m of rx[1].matchAll(/(?<![\w\\])[A-Za-z_]\w*(?:\\\.[A-Za-z_]\w*)+(?![\w])/g)) {
+				const name = m[0].replace(/\\\./g, '.');
+				if (configKeys().has(name) || localeKeys().has(name)) continue;
+				const hit = byLuaName.get(`_shared|${name}`);
+				if (hit && hit[2] && hit[2] !== name)
+					add('path-regex', m[0], hit[2].replace(/\./g, '\\.'), { oldRepo: PREFIX + hit[0] });
+			}
 	// A path in a regular expression: /static\/ergopti_plus\/_shared\/x\.json/.
 	if (/\.(c?js|mjs)$/.test(file))
 		for (const m of text.matchAll(/(?<![\w-])[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
