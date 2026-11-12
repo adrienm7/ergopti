@@ -332,3 +332,66 @@ helpers.describe("api_key_migration: a locked keyring never delays input readine
 			"the blocking move is not on the boot path")
 	end)
 end)
+
+-- The migration's own outcomes over faked ports: a save that moved every key
+-- first (AIX-002).
+helpers.describe("api_key_migration: an attempt overtaken by a save or a shutdown", function()
+	--- Loads a fresh migration over scripted entries and store ports.
+	local function faked()
+		local saved_migration, saved_logger = package.loaded["modules.llm.api_key_migration"], package.loaded["logger.shim"]
+		local world = { logs = {}, timers = {}, pending = {}, cleared = {}, plaintext = 2 }
+		package.loaded["logger.shim"] = setmetatable({}, { __index = function(_, level)
+			return function(_, fmt, ...) world.logs[#world.logs + 1] = level .. ": " .. string.format(fmt, ...) end
+		end })
+		package.loaded["modules.llm.api_key_migration"] = nil
+		local migration = require("modules.llm.api_key_migration")
+		assert(migration.init({
+			entries = {
+				plaintext_keys = function()
+					if world.plaintext == 0 then return {} end
+					return { { id = "a", token = "ka" }, { id = "b", token = "kb" } }
+				end,
+				publish_migrated = function()
+					if world.plaintext == 0 then return false, "no plaintext key is left to move", false, true end
+					world.plaintext = 0
+					return true
+				end,
+			},
+			store = {
+				probe_lock_async = function(_, callback) callback("unlocked") end,
+				store_async = function(id, _, _, callback)
+					world.pending[#world.pending + 1] = { id = id, callback = callback }
+					return { cancel = function() end }
+				end,
+				clear_async = function(reference, _, callback) world.cleared[#world.cleared + 1] = reference; callback(true) end,
+			},
+			scheduler = {
+				after = function(_, fn) world.timers[#world.timers + 1] = fn; return {} end,
+				cancel = function() return true end,
+			},
+			timings = { probe_ms = 1, store_ms = 1, retry_ms = 60000, retry_max_ms = 1800000 },
+		}))
+		world.restore = function()
+			migration.shutdown()
+			package.loaded["modules.llm.api_key_migration"] = saved_migration
+			package.loaded["logger.shim"] = saved_logger
+		end
+		return migration, world
+	end
+
+	helpers.it("(aix-002-migration-overtaken) a save that moved every key ends the migration without a warning", function()
+		local migration, world = faked()
+		migration.start(); table.remove(world.timers, 1)()
+		world.pending[1].callback("secret-service:a#1")
+		world.plaintext = 0 -- the menu's save stored both keys itself
+		world.pending[2].callback("secret-service:b#1")
+		helpers.assert_eq(migration.status(), "done")
+		for _, line in ipairs(world.logs) do
+			helpers.assert_true(not line:find("stay in plaintext", 1, true), "false warning: " .. line)
+		end
+		helpers.assert_eq(world.cleared, { "secret-service:a#1", "secret-service:b#1" }, "the attempt's own copies go")
+		helpers.assert_eq(#world.timers, 0, "no further attempt is armed")
+		world.restore()
+	end)
+
+end)
