@@ -40,15 +40,22 @@ modules under LuaJIT; no evdev/uinput, Hammerspoon or AHK was executed.
   the `script_` prefix. Regressions `scd1-slot-paused`, `scd1-paused-actions`.
   Windows: no change.
 
-## Decisions pending (behaviour left unchanged)
-
-- **SCD-2, accented shortcuts with two non-Shift modifiers.** Linux turns
-  Ctrl+Alt+é into Ctrl+Alt+C; Windows registers only `^ ^+ ! !+ # #+`, since
-  Ctrl+Alt is AltGr there. It rides on ILD-1 (the logical key for chords of
-  two modifiers, decided for the layout emulation).
-- **SCD-3, a Ctrl slot under AltGr.** A `ctrl_x` slot fires on Linux for
-  Ctrl+AltGr+x (`keyboard_shortcuts.match` leaves AltGr out); Windows' `^x`
-  does not fire, AltGr adding Alt. It rides on ILD-2 (Ctrl+AltGr).
+- **SCD-2, accented shortcuts with two non-Shift modifiers** (settled with
+  ILD-1, decided by the maintainer on 2026-11-11): Ctrl+Alt+é sends Ctrl+Alt
+  and the logical key (Ctrl+Alt+C), as every chord of two modifiers does;
+  Linux already does it. Windows counterpart, for the maintainer
+  (`modules/keymap/layout/accented_shortcuts.ahk`, `AccentedShortcuts_Register`):
+  register the left-side `<^<!` and `<^<!+` prefixes beside `^ ^+ ! !+ # #+`,
+  so AltGr (LCtrl+RAlt) stays a text level, and test Ctrl+Alt+é sending
+  Ctrl+Alt+C.
+- **SCD-3, a Ctrl slot under AltGr** (settled with ILD-2, decided by the
+  maintainer on 2026-11-11): AltGr is suspended under Ctrl, so a `ctrl_x`
+  slot fires for Ctrl+AltGr+x, as Linux does (`keyboard_shortcuts.match`
+  leaves AltGr out). Windows counterpart, for the maintainer
+  (`modules/shortcuts/utils.ahk` `AddShortcut`, for a `^` slot): also register
+  the hotkey under AltGr with a physical Ctrl held (`<^>!^` + the scan code,
+  guarded by `GetKeyState` of the physical Ctrl) to the same callback, and
+  test Ctrl+AltGr+x running the `ctrl_x` action.
 
 ## Refuted
 
