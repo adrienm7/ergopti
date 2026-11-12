@@ -1256,7 +1256,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       (`error_description`, `errorMessage`, `error.message`, `message`, then `error`; one line, at most 200 bytes) and the
       `api_common.ahk` phrase list takes « the token exchange answered http 400 »; `test_llm_shared_vectors.ahk` and
       `test_llm_api_token_exchange.ahk` replay the updated shared corpora.
-- **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
+- **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
   before the registry loads. PAR-83: the host in `ollama_managed_files.ps1`. Moving `tests/run_*.ahk` to
