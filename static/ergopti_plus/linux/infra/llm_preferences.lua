@@ -103,6 +103,8 @@ local function lookup(document, path)
 	end
 	if value == nil then return nil, "absent" end
 	local definition = Manifest.find_entry_by_path(path)
+	-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+	value = ConfigOutdated.canonical_enum_value(definition, value)
 	if definition and not pcall(validate, definition, value) then
 		ConfigOutdated.report(path, "the value no longer fits its " .. tostring(definition.type) .. " setting", Logger)
 		return nil, "invalid"

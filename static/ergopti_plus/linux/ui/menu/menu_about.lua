@@ -177,7 +177,7 @@ local function _about_update_rows(ctx)
 				Logger.info(LOG, "Update check answered: %s (current: %s).",
 					tostring(type(result) == "table" and result.state), up.current_version())
 				-- The structured answer the window would show: each outcome keeps its
-				-- own sentence (modules/updater/check_notice.lua).
+				-- own sentence (_shared/lua/updater/check_notice.lua).
 				if type(ctx.on_update_checked) == "function" then
 					ctx.on_update_checked(result)
 				end

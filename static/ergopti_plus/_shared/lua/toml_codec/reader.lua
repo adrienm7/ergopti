@@ -147,22 +147,49 @@ end
 -- ===============================
 
 --- Parses a hotstring entry line.
+--- In a hotstring section (`hotstring`, a section the document's
+--- `[_meta] sections_order` lists) the two short forms Windows' toml_loader.ahk
+--- loads are entries too (maintainer decision HSE-002, 2026-11-12): a bare key
+--- (`par = { output = … }`, which the 1.0.9 editor wrote) and the simple form
+--- (`"bbq" = "text"`, a word hotstring with an end character, case-conform and
+--- final, as Windows' CreateCaseSensitiveHotstrings registers it). Elsewhere a
+--- line keeps its plain key-value meaning (constants.toml, the tap-hold
+--- defaults, the tooltip configuration).
 --- @param line string The line to parse.
+--- @param hotstring boolean|nil Whether the line belongs to a hotstring section.
 --- @return table|nil Returns a structured table, PARSE_ERROR, or nil.
-local function parse_entry(line)
+local function parse_entry(line, hotstring)
 	if type(line) ~= "string" then return nil end
 
 	local i = skip_ws(line, 1)
-	if line:sub(i, i) ~= "\"" then return nil end
-
-	local trigger, j = parse_dq_string(line, i)
-	if trigger == nil then return PARSE_ERROR end
+	local trigger, j
+	if line:sub(i, i) == "\"" then
+		trigger, j = parse_dq_string(line, i)
+		if trigger == nil then return PARSE_ERROR end
+	elseif hotstring then
+		local bare = line:match("^[A-Za-z0-9_%-]+", i)
+		if not bare then return nil end
+		trigger, j = bare, i + #bare
+	else
+		return nil
+	end
 
 	i = j
 	i = skip_ws(line, i)
 	if line:sub(i, i) ~= "=" then return PARSE_ERROR end
 
 	i = skip_ws(line, i + 1)
+	if hotstring and line:sub(i, i) == "\"" then
+		local output, k = parse_dq_string(line, i)
+		if output == nil then return PARSE_ERROR end
+		local rest = skip_ws(line, k)
+		if rest <= #line and line:sub(rest, rest) ~= "#" then return PARSE_ERROR end
+		return {
+			trigger = trigger, output = output,
+			is_word = true, auto_expand = false, is_case_sensitive = false,
+			is_case_sensitive_strict = false, final_result = true, priority = nil,
+		}
+	end
 	if line:sub(i, i) ~= "{" then return nil end
 	i = i + 1
 
@@ -449,6 +476,9 @@ local function parse_lines(lines)
 	-- Parser state
 	local mode             = "top"   -- "top" | "meta" | "meta_sections" | "meta_section" | "section"
 	local current_sec      = nil
+	-- The sections [_meta] sections_order lists: only their lines may use the
+	-- short entry forms (parse_entry).
+	local hotstring_sections = {}
 	local current_meta_sec = nil
 	local first_line       = true
 	local semantic_ok      = true
@@ -589,6 +619,7 @@ local function parse_lines(lines)
 					local order = parse_string_array(arr_val)
 					if order == PARSE_ERROR then semantic_ok = false; return end
 					result.meta.sections_order = order
+					for _, name in ipairs(order) do hotstring_sections[name] = true end
 				else
 					local key, val = parse_kv_value(line)
 					if val == PARSE_ERROR then semantic_ok = false; return end
@@ -646,7 +677,7 @@ local function parse_lines(lines)
 				end
 
 			elseif mode == "section" and current_sec then
-				local entry = parse_entry(line)
+				local entry = parse_entry(line, hotstring_sections[current_sec] == true)
 				if entry == PARSE_ERROR then
 					semantic_ok = false
 					return

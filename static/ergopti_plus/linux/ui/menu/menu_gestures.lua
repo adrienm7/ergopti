@@ -36,8 +36,8 @@ local function _build_gestures(ctx)
 	-- would emit its rows into a menu the renderer never returns — every gesture
 	-- row silently missing, with nothing failing.
 	local gesture_rows = {}
+	-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 	local function apply_scope(mode)
-		if ctx.paused == true then return false end
 		local committed = ge.apply_scope(mode)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed

@@ -105,6 +105,16 @@ helpers.describe("translation of the selection end to end (llm_translate_selecti
 		end)
 	end)
 
+	helpers.it("(aix-001-excluded-app-selection) refuses in an app excluded from the AI, before reading the selection", function()
+		with_world(SELECTION, "fr", function(world)
+			world.engine.set_llm_disabled_apps({ { bundleID = "test.translate", name = "Test" } })
+			trigger(world, "ui")
+			helpers.assert_eq(#world.posts, 0, "nothing is sent to the provider")
+			helpers.assert_eq(#world.keys, 0, "the selection is not even copied")
+			world.engine.set_llm_disabled_apps({})
+		end)
+	end)
+
 	helpers.it("refuses like a manual prediction when the AI is off, before reading the selection", function()
 		with_world(SELECTION, "fr", function(world)
 			world.engine.set_llm_enabled(false)

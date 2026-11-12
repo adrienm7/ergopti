@@ -39,4 +39,36 @@ return function(helpers, corpus, expected_count)
 			end)
 		end
 	end)
+
+	helpers.describe("shared hotstring reader: the short entry forms", function()
+		helpers.it("(hse-002-short-entry-forms) a hotstring section loads bare-key and simple-form entries as Windows does", function()
+			local document, committed = Reader.parse_text(table.concat({
+				"[_meta]", 'sections_order = ["s"]', "[s]",
+				'"aaq" = { output = "quoted", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }',
+				'par = { output = "bare key" }',
+				'"bbq" = "simple"',
+				'cc-q = "bare simple"  # a comment',
+			}, "\n") .. "\n")
+			helpers.assert_true(committed)
+			local by = {}
+			for _, entry in ipairs(document.sections.s.entries) do by[entry.trigger] = entry end
+			helpers.assert_eq(by.aaq and by.aaq.output, "quoted")
+			helpers.assert_eq(by.par and by.par.output, "bare key")
+			helpers.assert_eq(by.bbq and by.bbq.output, "simple")
+			helpers.assert_eq(by["cc-q"] and by["cc-q"].output, "bare simple")
+			-- Windows registers the simple form with CreateCaseSensitiveHotstrings:
+			-- a word hotstring, end character, case-conform, final.
+			helpers.assert_eq({ by.bbq.is_word, by.bbq.auto_expand, by.bbq.is_case_sensitive, by.bbq.final_result },
+				{ true, false, false, true })
+			helpers.assert_eq(document.sections.s.bbq, nil, "an entry is no plain value")
+		end)
+		helpers.it("(hse-002-short-entry-forms) a section sections_order does not list keeps plain values", function()
+			local document, committed = Reader.parse_text(table.concat({
+				"[limits]", 'label = "plain"', 'tuple = { a = "b" }',
+			}, "\n") .. "\n")
+			helpers.assert_true(committed)
+			helpers.assert_eq(document.sections.limits.label, "plain")
+			helpers.assert_eq(#document.sections.limits.entries, 0, "no entry outside a hotstring section")
+		end)
+	end)
 end

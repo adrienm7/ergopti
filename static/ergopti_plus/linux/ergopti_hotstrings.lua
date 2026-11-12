@@ -2892,7 +2892,7 @@ local function main()
 			-- so an install row appears for a found release.
 			on_update_checked = function(result)
 				if notifier and ok_i18n and i18n_mod then
-					local body = require("modules.updater.check_notice").body(result, i18n_mod.get, function(id)
+					local body = require("updater.check_notice").body(result, i18n_mod.get, function(id)
 						local channel = updater.CHANNELS.channel(id)
 						return channel and i18n_mod.get(channel.label_key) or tostring(id)
 					end)
@@ -3266,7 +3266,7 @@ local function main()
 			-- A release read from the public feed says it cannot be installed yet.
 			local accepted = false
 			if notifier and ok_i18n and i18n_mod then
-				local body = require("modules.updater.check_notice").release_body(release, i18n_mod.get)
+				local body = require("updater.check_notice").release_body(release, i18n_mod.get)
 				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",

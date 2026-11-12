@@ -92,7 +92,7 @@ local function world()
 		end}
 	package.loaded['infra.manifest_reader']=manifest
 	package.loaded['infra.config_paths']={config=function()return '/memory/config.toml'end}
-	package.loaded['config_outdated']={manifest_value_fits=function()return true end,report=function()end}
+	package.loaded['config_outdated']={manifest_value_fits=function()return true end,canonical_enum_value=function(_,value)return value end,report=function()end}
 	package.loaded['toml_codec.writer']=routed
 	local prefs = helpers.load_module("infra.llm_preferences")
 	package.loaded['infra.llm_preferences']=prefs

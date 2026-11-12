@@ -577,8 +577,8 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.state_getters = {
-		-- The switch's tick answers the stored preference. The pause greys the
-		-- whole submenu from its parent row, and the switch refuses while paused.
+		-- The switch's tick answers the stored preference. The switch refuses
+		-- while paused, since it starts the gesture engine at once.
 		gestures_enabled = function() return state.gestures == true end,
 	}
 
@@ -594,7 +594,8 @@ function M.build(ctx)
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })
-	if item then item.disabled = paused or nil end
+	-- A pause does not grey the parent: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	return item
 end
 

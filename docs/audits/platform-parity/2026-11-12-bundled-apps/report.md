@@ -38,7 +38,7 @@ Checked and kept:
 
 BAP-002 adds the macOS executable names « google chrome », « microsoft edge »
 and « brave browser » to the catalogue; a web URL opens in the clone itself,
-as an `--app` window for Chromium. BAP-007 adds two keys in the 21 locales and
+as an argument (no `--app` window: on macOS a standalone web window is the PWA mode's WKWebView launcher). BAP-007 adds two keys in the 21 locales and
 shows them for every refusal but OpenSSL's own (a wrong password or a
 corrupted file, which the message already names). The macOS AppleScript
 changes (BAP-003, BAP-007) need `main.scpt` recompiled on the Mac
