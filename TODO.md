@@ -1285,6 +1285,10 @@ between workers) green alone. All live checks pass, typed by the harness.
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
+- [ ] **No-break space inside a trigger (maintainer decision HSE-003, 2026-11-12).** macOS (`add_with_space_variants`) and
+      now the shared engine register, for a trigger with an inner space that does not start with one, its U+00A0 and
+      U+202F variants, so `la` + no-break space + `notre` fires `la nôtre`. `CreateCaseSensitiveHotstrings` registers no
+      such variant: add both (skipping triggers that start with a space), and extend the AHK hotstring registration test.
 - [ ] **Hotstring short entry forms (maintainer decision HSE-002, 2026-11-12).** macOS and Linux now load the bare-key
       and the simple `"bbq" = "text"` entries, as `infra/toml/toml_loader.ahk` does. Its `_HOTSTRING_ENTRY_PATTERN` still
       drops an inline-table entry whose keys come in another order than output, is_word, auto_expand, is_case_sensitive,
