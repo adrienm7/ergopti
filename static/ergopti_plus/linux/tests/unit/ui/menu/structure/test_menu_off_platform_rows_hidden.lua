@@ -39,9 +39,8 @@ local TRANSLATIONS = {
 local function write_fixture_manifest()
 	local tmp_dir = os.tmpname()
 	os.remove(tmp_dir)
-	os.execute('mkdir "' .. tmp_dir .. '"')
 	local manifest_dir = tmp_dir .. "/modules/menu"
-	os.execute('mkdir "' .. tmp_dir .. '/modules" "' .. manifest_dir .. '"')
+	os.execute('mkdir -p "' .. manifest_dir .. '"')
 
 	local fh = io.open(manifest_dir .. "/menu_manifest.json", "w")
 	helpers.assert_true(fh ~= nil, "could not create the fixture manifest")
