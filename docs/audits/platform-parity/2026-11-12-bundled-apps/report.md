@@ -48,14 +48,14 @@ changes (BAP-003, BAP-007) need `main.scpt` recompiled on the Mac
 
 - **BAP-004 (macOS, Linux):** VSCodium and Insiders clones get their own
   settings and extensions through families.json `user_folders`, an additive
-  field the AHK reader ignores. Regression `bap-004-vscode-variants`. Windows
-  has its TODO line.
+  field. Regression `bap-004-vscode-variants`. Windows reads it too
+  (`AppCloner_UserFolders`, 2026-11-12).
 - **BAP-008 (Linux):** two desktop entries. The visible one opens the
   dedicated `application/x-ergopti-encrypted` type of `*.enc` and is its
   default opener. A `NoDisplay` entry keeps « Open with » for any file and is
   never a default. Regression `bap-008-encryptor-entries`.
-- **BAP-005 on Windows:** a TODO line aligns `_AppCloner_InvalidOpenItem` with
-  the macOS and Linux validators.
+- **BAP-005 on Windows:** `_AppCloner_InvalidOpenItem` follows the macOS and
+  Linux validators (2026-11-12).
 
 ## Open
 

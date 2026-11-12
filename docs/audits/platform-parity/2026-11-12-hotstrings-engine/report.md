@@ -38,10 +38,11 @@ Checked and kept:
 - **HSE-002:** the shared reader loads the bare-key and simple-form entries in
   a section `[_meta] sections_order` lists, as Windows does. Other sections
   keep their plain values. Regression `hse-002-short-entry-forms`. The Windows
-  side (any key order, only `output`) has a TODO line.
+  side (any key order, only `output`) is done too (`HS_EntryPattern`).
 - **HSE-003:** the shared engine, so Linux, registers a trigger's no-break and
   narrow no-break space variants, as macOS did. Regression
-  `hse-003-nbsp-trigger`. Windows has a TODO line.
+  `hse-003-nbsp-trigger`. Windows registers them too
+  (`HSE_NoBreakSpaceVariants`).
 - **HSE-004:** macOS follows Windows. A letter magic key follows the word's
   case, so `BTWA` expands and `BTWa` does not. Regression
   `hse-004-magic-key-case`.

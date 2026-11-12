@@ -50,7 +50,7 @@ NET-003 is `[llm] ollama_request_timeout_ms`; the macOS connect timeout reads
   bounded by one shared declaration aligned on Windows, `archive_transfer`
   `phase_timeout_ms.archive = 1200000` and `archive_idle_timeout_ms = 600000`,
   read on Linux (curl's speed bound) and macOS (staging script and launcher
-  request); the Windows side has its TODO line. Regression
+  request) and Windows (the generated `UpdateArchiveTransferData()`). Regression
   `release-archive-budget`.
 
 ## Open
