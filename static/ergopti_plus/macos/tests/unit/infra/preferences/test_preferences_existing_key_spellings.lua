@@ -108,7 +108,9 @@ local function migrated_old_build_file()
 	local catalogue = dofile(helpers.shared("../macos/_generated/action_catalogue.lua"))
 	local context, detail = Migrate.load_context(helpers.shared("modules/actions/modifier_chords.json"), catalogue)
 	helpers.assert_true(context ~= nil, detail)
-	local source = "[_meta]\nschema_version = " .. registry.oldest .. "\n\n" .. old_build_file()
+	-- The v22 step reads the folder's tap_hold.toml: this test folder has none.
+	context.companions = { [require("tap_hold.shared_file").FILE_NAME] = { status = "absent" } }
+	local source ="[_meta]\nschema_version = " .. registry.oldest .. "\n\n" .. old_build_file()
 	local plan = Migrate.plan(source, registry, "hs", context)
 	helpers.assert_eq(plan.outcome, "migrated", plan.detail)
 	return plan.candidate

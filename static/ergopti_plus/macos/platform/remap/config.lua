@@ -33,6 +33,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local LOG = "karabiner"
 local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
@@ -134,8 +135,6 @@ local function overlay_config(model, part)
 	end
 	model.mod_combos = part[ConfigKeys.KEY.MOD_COMBOS]
 end
-
-local LOG = "karabiner"
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
 local LoneTap = require("tap_hold.lone_tap")
@@ -767,7 +766,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	-- like a corrupt tap_hold.toml, rather than read its rows as neutral.
 	local config_part, config_source, config_shapes = read_config_part(user_config_path)
 	if config_part == nil then return nil, "error" end
-	source.config = config_source
+	-- The source receipt is optional (a test seam may read without one).
+	if type(source) == "table" then source.config = config_source end
 	if not data then
 		if next(config_part) == nil then
 			Logger.info(LOG, "No user config found — initializing from defaults.")

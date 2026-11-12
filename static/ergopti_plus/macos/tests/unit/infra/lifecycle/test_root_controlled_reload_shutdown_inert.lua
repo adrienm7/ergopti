@@ -370,7 +370,9 @@ local function run_isolated(options, assertions)
 				init = function() return true end,
 				stop = function() return true end,
 			},
-			["adapters.file_system"] = {},
+			-- The boot carries an old config_karabiner.toml over before the config
+			-- migration; this early-boot folder holds none.
+			["adapters.file_system"] = { read_with_status = function() return nil, "absent" end },
 			["platform.remap"] = Karabiner,
 			["ui.menu"] = { stop_watchers = function() return true end },
 			["ui.menu.menu_llm"] = MenuLLM,
