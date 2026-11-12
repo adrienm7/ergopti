@@ -119,6 +119,22 @@ function run() {
 		);
 		const kept = "fail('route OS access through linux/zz_scatter/ instead');";
 		assert.equal(rewrite('tools/lint/x.cjs', kept), kept);
+		// Regular expressions of a path: behind the variable holding the checkout,
+		// and the Windows spelling that names the shared root first.
+		assert.equal(
+			rewrite(
+				'tools/x.cjs',
+				'assert.match(s, /\\$REPO_ROOT\\/static\\/ergopti_plus\\/_shared\\/zz_probe_mod\\/hotstrings\\/a\\.json/);'
+			),
+			'assert.match(s, /\\$REPO_ROOT\\/static\\/ergopti_plus\\/_shared\\/zz_probe_hs\\/data\\/a\\.json/);'
+		);
+		assert.equal(
+			rewrite(
+				'tools/x.cjs',
+				'assert.match(s, /_shared\\\\zz_probe_mod\\\\hotstrings\\\\a\\.json/);'
+			),
+			'assert.match(s, /_shared\\\\zz_probe_hs\\\\data\\\\a\\.json/);'
+		);
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(

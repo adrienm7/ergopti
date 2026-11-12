@@ -1724,14 +1724,24 @@ function scanFile(file, text, ctx) {
 	// /\\modules\\llm\\x\.json"/ in a tool: an AutoHotkey path, joined onto
 	// _SharedDir (or the driver's own folder), checked with a regular expression.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
-		for (const m of text.matchAll(/(?<![\w\\])(?:\\\\[\w-]+)+(?:\\\.[A-Za-z0-9]+)(?![\w\\])/g)) {
-			const plain = m[0].replace(/\\\\/g, '/').replace(/\\\./g, '.');
-			const base = [`${PREFIX}_shared`, `${PREFIX}windows`].find((b) => EXISTING.has(b + plain));
+		for (const m of text.matchAll(
+			/(?<![\w\\])(_shared)?(?:\\\\[\w-]+)+(?:\\\.[A-Za-z0-9]+)(?![\w\\])/g
+		)) {
+			// _shared\\data\\x\.json: the shared root named first, without a separator.
+			const lead = m[1] ? '_shared\\\\' : '';
+			const plain = m[0]
+				.slice(m[1] ? m[1].length : 0)
+				.replace(/\\\\/g, '/')
+				.replace(/\\\./g, '.');
+			const base = (m[1] ? [`${PREFIX}_shared`] : [`${PREFIX}_shared`, `${PREFIX}windows`]).find(
+				(b) => EXISTING.has(b + plain)
+			);
 			if (!base) continue;
 			const target = byRepoPath.get(base + plain);
 			if (!target || target === PREFIX || !target.startsWith(`${base}/`)) continue;
 			const rel = target.slice(base.length);
-			add('path-regex', m[0], rel.replace(/\./g, '\\.').replace(/\//g, '\\\\'), {
+			const spelled = rel.replace(/\./g, '\\.').replace(/\//g, '\\\\');
+			add('path-regex', m[0], lead ? lead + spelled.replace(/^\\\\/, '') : spelled, {
 				oldRepo: base + plain,
 				newRepo: target
 			});
@@ -1765,7 +1775,11 @@ function scanFile(file, text, ctx) {
 			}
 	// A path in a regular expression: /static\/ergopti_plus\/_shared\/x\.json/.
 	if (/\.(c?js|mjs)$/.test(file))
-		for (const m of text.matchAll(/(?<![\w-])[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
+		for (const found of text.matchAll(/(?<![\w-])[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
+			// \$REPO_ROOT\/static\/ergopti_plus\/…: the path starts at the tree,
+			// after the variable that holds the checkout.
+			const anchor = found[0].indexOf('static\\/ergopti_plus\\/');
+			const m = anchor > 0 ? [found[0].slice(anchor)] : found;
 			const plain = m[0].replace(/\\\//g, '/').replace(/\\\./g, '.');
 			const isFile = /\.[A-Za-z0-9]+$/.test(plain);
 			// A tool's regex of a bare relative path (shared\("modules\/llm\/x\.json"\))
