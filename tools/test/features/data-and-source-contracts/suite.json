@@ -665,6 +665,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-secure-apps-single-source.cjs"],
 			"repro": "node tools/test/test-secure-apps-single-source.cjs"
+		},
+		{
+			"id": "js-0510",
+			"ordinal": 627,
+			"name": "structure plan runtime edits wait for the step that moves their last module, and a refused step writes nothing",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-runtime-edit-steps.cjs"],
+			"repro": "npm run test:structure-runtime-edit-steps"
 		}
 	]
 }
