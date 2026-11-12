@@ -31,6 +31,9 @@
 const assert = require('node:assert/strict');
 const Plan = require('../audit/structure/plan.cjs');
 const Apply = require('../audit/structure/apply-step.cjs');
+const Edits = require('../audit/structure/edits.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const P = 'static/ergopti_plus/';
 // Synthetic paths, so the test holds before and after phase 2.
@@ -421,6 +424,20 @@ function run() {
 	const started = Date.now();
 	Plan.scanFile('tools/z.cjs', `const t = '${run}';`, Plan.referenceContext(MAP));
 	assert.ok(Date.now() - started < 5000, 'a long run of path characters scans in linear time');
+	// Every listed edit still matches the file it names, so the step that
+	// empties its folder rewrites it instead of refusing.
+	const full = Plan.moveMap().map;
+	const fullCtx = Plan.referenceContext(full);
+	const repo = path.resolve(__dirname, '..', '..');
+	for (const e of Edits.FOLDER_EDITS) {
+		const text = fs.readFileSync(path.join(repo, e.file), 'utf8');
+		// Once applied (the proof branch), the folder is gone and so is the text.
+		if (!fs.existsSync(path.join(repo, P, e.empties)) && !text.includes(e.from)) continue;
+		const kinds = Plan.scanFile(e.file, text, fullCtx)
+			.filter((r) => r.old === e.from)
+			.map((r) => r.kind);
+		assert.deepEqual(kinds, ['folder-edit'], `${e.file}: the listed edit applies`);
+	}
 	console.log('[OK] every path form the structure plan rewrites follows the moved file.');
 }
 
