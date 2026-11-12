@@ -211,7 +211,7 @@ end)
 -- (Updater_ShowAvailableUpdateCallback); the notice now follows the result
 -- the window shows (UPL-002, check-notice-wording).
 helpers.describe("updater: the fallback notification words the check's answer (check-notice-wording)", function()
-	local Notice = helpers.load_module("modules.updater.check_notice")
+	local Notice = helpers.load_module("updater.check_notice")
 	local CheckResult = require("updater.check_result")
 	--- A locale double that shows each key with its substitutions.
 	local function get(key)

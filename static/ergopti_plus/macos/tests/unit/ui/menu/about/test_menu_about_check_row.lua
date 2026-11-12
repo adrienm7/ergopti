@@ -15,8 +15,9 @@ local helpers = require("tests.helpers")
 --- Builds the About submenu of a packaged build and returns its check row with
 --- the recorded window opens and Sparkle requests.
 local function build(latest, pending)
-	local recorded = { opens = {}, requests = {}, completions = 0 }
+	local recorded = { opens = {}, requests = {}, completions = 0, opened = true, checked = {}, notices = {} }
 	local saved = {
+		notifications = package.loaded["infra.notifications"],
 		window = package.loaded["ui.update_check"],
 		launcher = package.loaded["adapters.update_launcher"],
 		changelog = package.loaded["ui.changelog"],
@@ -29,7 +30,13 @@ local function build(latest, pending)
 		}
 	end
 	package.loaded["ui.update_check"] = {
-		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return true end,
+		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return recorded.opened end,
+	}
+	package.loaded["infra.notifications"] = {
+		notify = function(title, body, kind)
+			recorded.notices[#recorded.notices + 1] = { title = title, body = body, kind = kind }
+			return true
+		end,
 	}
 	package.loaded["adapters.update_launcher"] = {
 		request_check = function(channel) recorded.requests[#recorded.requests + 1] = channel; return true end,
@@ -46,6 +53,10 @@ local function build(latest, pending)
 		interval = function() return 86400 end,
 		set_interval = function() return true end,
 		latest = function() return latest end,
+		check_now = function(channel, on_result)
+			recorded.checked[#recorded.checked + 1] = { channel = channel, on_result = on_result }
+			return true
+		end,
 	}
 	local refresh = function() end
 	local ok, rows = pcall(function()
@@ -58,6 +69,7 @@ local function build(latest, pending)
 	Updater.is_local_source = real_local
 	package.loaded["ui.menu.menu_about"] = nil
 	local function restore()
+		package.loaded["infra.notifications"] = saved.notifications
 		package.loaded["ui.update_check"] = saved.window
 		package.loaded["adapters.update_launcher"] = saved.launcher
 		package.loaded["ui.changelog"] = saved.changelog
@@ -86,6 +98,29 @@ helpers.describe("menu_about: the check row (macOS)", function()
 			helpers.assert_true(recorded.opens[1].checks == recorded.checks, "the window checks through the Lua owner")
 			helpers.assert_true(recorded.opens[1].channel_owner == recorded.owner, "switches go through the channel owner")
 			helpers.assert_true(recorded.opens[1].on_change == recorded.refresh, "the menu refreshes after an answer")
+		end)
+		recorded.restore()
+		if not ok then error(err, 0) end
+	end)
+
+	-- A refused window used to leave the click with no answer at all (UPX-001).
+	helpers.it("without its window the check runs and its answer is notified (upx-001-check-without-window)", function()
+		local recorded = build(nil)
+		recorded.opened = false
+		local ok, err = pcall(function()
+			recorded.row.fn()
+			helpers.assert_eq(#recorded.opens, 1, "the window is tried first")
+			helpers.assert_eq(#recorded.checked, 1, "the check still runs")
+			helpers.assert_eq(recorded.checked[1].channel, "dev", "on the menu session's channel")
+			recorded.checked[1].on_result({ state = "up_to_date", channel = "dev", current = "1.2.3" })
+			local i18n = require("infra.i18n")
+			helpers.assert_eq(#recorded.notices, 1, "the answer is notified")
+			helpers.assert_eq(recorded.notices[1].title, i18n.get("updater.window_title"))
+			helpers.assert_eq(recorded.notices[1].body, (i18n.get("updater.up_to_date"):gsub("{1}", "1.2.3")))
+			helpers.assert_eq(recorded.notices[1].kind, "info")
+			recorded.checked[1].on_result({ state = "error", channel = "dev", current = "1.2.3",
+				reason_key = "updater.no_connection" })
+			helpers.assert_eq(recorded.notices[2].kind, "warning", "a failed check is a warning")
 		end)
 		recorded.restore()
 		if not ok then error(err, 0) end
