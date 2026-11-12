@@ -174,7 +174,7 @@ end
 function M.reap_settings()
 	local folders, seen, removed = {}, {}, 0
 	for _, file in ipairs({ require("infra.config_paths").config("config.toml"), require("adapters.storage").path() }) do
-		local folder = type(file) == "string" and file:match("^(.*)/[^/]+$") or nil
+		local folder = type(file) == "string" and require("native_path").dirname(file) or nil
 		if folder and folder ~= "" and not seen[folder] then
 			seen[folder] = true
 			folders[#folders + 1] = folder
