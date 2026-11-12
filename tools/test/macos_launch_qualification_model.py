@@ -24,6 +24,8 @@ names = {
     "qualify_native_features",
     "feature_proof",
     "quit_evidence_detail",
+    "helper_failures",
+    "helper_spellings",
 }
 selected = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
 assert len(selected) == len(names), "Every exact source producer must exist"
@@ -57,6 +59,9 @@ scope.update(
     BOOTSTRAP_QUALIFICATION="inert",
     HS_DOMAIN="inert",
     bounded_refusal=str,
+    HELPER_RESOLVED=re.compile(r"^helper (.+)$"),
+    HELPER_REFUSED="refused helper",
+    relocation=SimpleNamespace(SCENARIOS=()),
 )
 # Validators accept only what the active model step admits.
 accepted = {"features": False, "transport": False}
@@ -74,7 +79,8 @@ def admitted(kind, message):
 PRODUCT = {"product": "inert"}
 good = {
     "launcher_log": "configured",
-    "driver_log": "ready",
+    "driver_log": "ready\nhelper inert",
+    "launcher_helpers": ["inert"],
     "alive_after_window": True,
     "quit_seconds": 0.2,
     "state_problems": [],

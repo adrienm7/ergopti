@@ -21,6 +21,7 @@ import hs_delayed_timer_probe as timer_probe
 import macos_app_dirs as app_dirs
 import hs_karabiner_config_probe as karabiner_probe
 import hs_native_bootstrap_probe as bootstrap
+import macos_app_relocation as relocation
 
 spec = importlib.util.spec_from_file_location(
     "launch_gate", Path(__file__).with_name("macos_launch_gate.py")
@@ -136,9 +137,18 @@ def scripting_line(pid=42, getter="boolean", allowed="true", bridge="callable"):
     )
 
 
+INSTALLED_HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+
+
+def helper_line(path=INSTALLED_HELPER):
+    """Return init.lua's boot note of a resolved exact-path launcher helper."""
+    return f"2026-10-18 00:00:00 [INFO] [init] Launcher helper resolved: {path}.\n"
+
+
 HEALTHY = {
     "launcher_log": "[t] embedded Hammerspoon bootstrap logger configured\n",
-    "driver_log": "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
+    "driver_log": helper_line() + "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
+    "launcher_helpers": [INSTALLED_HELPER],
     "alive_after_window": True,
     "quit_seconds": 1.5,
     "state_problems": [],
@@ -995,12 +1005,17 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(failures, [])
 
     def test_early_log_without_marker_is_not_startup(self):
-        failures = gate.evaluate("clean", observe(driver_log="Path: log file open\n"))
+        failures = gate.evaluate(
+            "clean", observe(driver_log=helper_line() + "Path: log file open\n")
+        )
         self.assertEqual(failures, ["the driver log has no completed startup marker"])
 
     def test_driver_error_invalidates_marker(self):
         failures = gate.evaluate(
-            "clean", observe(driver_log="Onboarding wizard opened.\n[ERROR] [x] later failure\n")
+            "clean",
+            observe(
+                driver_log=helper_line() + "Onboarding wizard opened.\n[ERROR] [x] later failure\n"
+            ),
         )
         self.assertEqual(len(failures), 1)
         self.assertIn("ERROR", failures[0])
@@ -1107,7 +1122,7 @@ class VerdictTests(unittest.TestCase):
 
     def test_configured_boot_waits_for_accessibility(self):
         waiting = observe(
-            driver_log="[INFO] [accessibility_wait] Waiting for the Accessibility "
+            driver_log=helper_line() + "[INFO] [accessibility_wait] Waiting for the Accessibility "
             "permission (up to 600 s)…\n"
         )
         self.assertEqual(gate.evaluate("configured_symlink", waiting), [])
@@ -1230,6 +1245,9 @@ CI_PROFILE = [
     "dangling_logs",
     "configured_symlink",
     "plain_open",
+    "symlinked_applications",
+    "spaced_accented_path",
+    "translocated",
 ]
 RELEASE_PROFILE = [
     "clean",
@@ -1245,6 +1263,9 @@ RELEASE_PROFILE = [
     "dangling_logs",
     "configured_symlink",
     "plain_open",
+    "symlinked_applications",
+    "spaced_accented_path",
+    "translocated",
 ]
 SCRIPT = Path(__file__).with_name("macos_launch_gate.py")
 
@@ -1326,6 +1347,171 @@ def load_tests(loader, tests, pattern):
     tests.addTests(loader.loadTestsFromModule(hs_karabiner_config_probe_test))
     tests.addTests(loader.loadTestsFromModule(hs_native_bootstrap_probe_test))
     return tests
+
+
+class LauncherHelperTests(unittest.TestCase):
+    """MLC-005: every healthy launch names the exact launcher helper it resolved."""
+
+    def test_missing_helper_note_is_rejected(self):
+        failures = gate.evaluate(
+            "clean", observe(driver_log="[SUCCESS] [onboarding] Onboarding wizard opened.\n")
+        )
+        self.assertEqual(failures, ["the driver log holds 0 launcher helper resolutions, not one"])
+
+    def test_refused_helper_is_rejected_with_its_reason(self):
+        refusal = (
+            "2026-10-18 00:00:00 [WARNING] [init] Launcher helper refused: "
+            "ERGOPTI_LAUNCHER_EXECUTABLE differs from the bundle-owned helper.\n"
+        )
+        failures = gate.evaluate(
+            "translocated", observe(driver_log=refusal + HEALTHY["driver_log"])
+        )
+        self.assertEqual(len(failures), 1)
+        self.assertIn("differs from the bundle-owned helper", failures[0])
+
+    def test_helper_resolved_to_another_launcher_is_rejected(self):
+        failures = gate.evaluate(
+            "symlinked_applications",
+            observe(
+                driver_log=helper_line(
+                    "/Users/runner/Downloads/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+                )
+                + "[SUCCESS] [onboarding] Onboarding wizard opened.\n"
+            ),
+        )
+        self.assertEqual(len(failures), 1)
+        self.assertIn("not one of", failures[0])
+
+    def test_home_redacted_spelling_is_admitted(self):
+        home = Path("/Users/runner")
+        helper = home / "gitcfg/Applications de L\u00e9a/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+        spellings = gate.helper_spellings([helper], home)
+        self.assertEqual(
+            spellings,
+            [
+                str(helper),
+                "~/gitcfg/Applications de L\u00e9a/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+            ],
+        )
+        logged = observe(
+            launcher_helpers=spellings,
+            driver_log=helper_line(spellings[1])
+            + "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
+        )
+        self.assertEqual(gate.evaluate("spaced_accented_path", logged), [])
+
+    def test_relocated_scenarios_join_both_profiles(self):
+        for name in relocation.SCENARIOS:
+            self.assertIn(name, gate.PROFILES["ci"])
+            self.assertIn(name, gate.PROFILES["release"])
+
+
+class FakeTranslocation:
+    """Records the mount calls a translocated relocation makes."""
+
+    def __init__(self, root):
+        self.root = root
+        self.calls = []
+
+    def create(self, original):
+        self.calls.append(("create", original))
+        mounted = self.root / "AppTranslocation/0123/d" / original.name
+        mounted.mkdir(parents=True)
+        return mounted
+
+    def delete(self, mounted):
+        self.calls.append(("delete", mounted))
+        mounted.rmdir()
+
+
+class RelocationTests(unittest.TestCase):
+    """Each relocation opens the bundle elsewhere and leaves /Applications as it was."""
+
+    def installed(self, root):
+        app = root / "Applications/ErgoptiPlus.app"
+        (app / "Contents/MacOS").mkdir(parents=True)
+        (app / "Contents/MacOS/ErgoptiPlus").write_text("launcher")
+        return app
+
+    def test_symlinked_folder_opens_through_the_link(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, home = self.installed(root), root / "home"
+            moved = relocation.Relocation("symlinked_applications", app, home)
+            opened = moved.enter()
+            self.assertEqual(opened, home / "gitcfg/LinkedApplications/ErgoptiPlus.app")
+            self.assertTrue((home / "gitcfg/LinkedApplications").is_symlink())
+            self.assertFalse(app.exists())
+            self.assertEqual(
+                moved.candidates(opened),
+                [opened, Path(os.path.realpath(home / "gitcfg/Applications/ErgoptiPlus.app"))],
+            )
+            moved.leave()
+            self.assertTrue((app / "Contents/MacOS/ErgoptiPlus").is_file())
+            self.assertEqual(sorted(p.name for p in (home / "gitcfg").iterdir()), [])
+
+    def test_spaced_accented_folder_keeps_its_precomposed_name(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, home = self.installed(root), root / "home"
+            moved = relocation.Relocation("spaced_accented_path", app, home)
+            opened = moved.enter()
+            self.assertEqual(opened.parent.name, "Applications de L\u00e9a")
+            self.assertIn(" ", str(opened))
+            self.assertTrue((opened / "Contents/MacOS/ErgoptiPlus").is_file())
+            self.assertEqual(moved.candidates(opened), [opened])
+            moved.leave()
+            self.assertTrue(app.is_dir())
+            self.assertFalse((home / "gitcfg/Applications de L\u00e9a").exists())
+
+    def test_translocation_quarantines_mounts_and_undoes_everything(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, home = self.installed(root), root / "home"
+            commands = []
+            mounts = FakeTranslocation(root)
+            moved = relocation.Relocation(
+                "translocated",
+                app,
+                home,
+                runner=lambda arguments, **_: commands.append(arguments),
+                translocation=mounts,
+            )
+            opened = moved.enter()
+            downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
+            self.assertEqual(opened, root / "AppTranslocation/0123/d/ErgoptiPlus.app")
+            self.assertEqual(commands[0][:4], ["xattr", "-r", "-w", "com.apple.quarantine"])
+            self.assertRegex(commands[0][4], r"^0083;[0-9a-f]+;Safari;[0-9A-F-]{36}$")
+            self.assertEqual(commands[0][5], str(downloaded))
+            moved.leave()
+            self.assertEqual(mounts.calls, [("create", downloaded), ("delete", opened)])
+            self.assertEqual(commands[1], ["xattr", "-dr", "com.apple.quarantine", str(downloaded)])
+            self.assertTrue(app.is_dir())
+            self.assertFalse((home / "gitcfg/Downloads").exists())
+
+    def test_existing_location_is_refused_before_moving_the_bundle(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, home = self.installed(root), root / "home"
+            (home / "gitcfg/Applications de L\u00e9a").mkdir(parents=True)
+            moved = relocation.Relocation("spaced_accented_path", app, home)
+            with self.assertRaisesRegex(RuntimeError, "already exists"):
+                moved.enter()
+            self.assertTrue(app.is_dir())
+
+    def test_failed_unmount_is_reported_after_the_bundle_returns(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, home = self.installed(root), root / "home"
+            mounts = FakeTranslocation(root)
+            mounts.delete = mock.Mock(side_effect=RuntimeError("busy mount"))
+            moved = relocation.Relocation(
+                "translocated", app, home, runner=lambda *_, **__: None, translocation=mounts
+            )
+            moved.enter()
+            with self.assertRaisesRegex(RuntimeError, "busy mount"):
+                moved.leave()
+            self.assertTrue(app.is_dir())
 
 
 class NativeQualificationRunTests(unittest.TestCase):
@@ -1426,7 +1612,12 @@ class NativeQualificationRunTests(unittest.TestCase):
                 mock.patch.object(gate.subprocess, "run", side_effect=native_run),
                 mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
                 mock.patch.object(gate, "read_text", side_effect=read_text),
-                mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
+                mock.patch.object(
+                    gate,
+                    "driver_logs",
+                    return_value=helper_line(launcher)
+                    + "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
+                ),
                 mock.patch.object(gate, "check_state", return_value=[]),
                 mock.patch.object(gate, "quit_application", side_effect=quit_owned),
                 mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
