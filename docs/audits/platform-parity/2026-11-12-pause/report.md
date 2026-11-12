@@ -62,3 +62,5 @@ source proofs reworked first:
 - macOS magic key source capture: it listens to a physical key press.
 - The audit that every typing feature (layout emulation first) is inert while
   paused, and that a setting changed while paused applies on resume.
+- Windows: every `A_IsSuspended` gate is listed in
+  [the Windows inventory](windows-inventory.md); none was changed here.
