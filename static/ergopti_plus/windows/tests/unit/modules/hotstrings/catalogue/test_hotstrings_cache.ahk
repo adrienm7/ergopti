@@ -306,13 +306,15 @@ _HsCacheCommonReferenceNative(UseCache, SourceOrdered := false) {
 		else
 			LoadHotstringsSection("autocorrection", "caps", { Enabled: true })
 		Assert(HSE_RegistryByGroup.Has(Key), "the real loader must publish the historical group")
-		Registered := HSE_RegistryByGroup[Key]
+		Registered := _HsCacheWithoutSpaceVariants(HSE_RegistryByGroup[Key])
 		AssertEqual(140, Registered.Length, "every historical rule registers once")
 		for Index, Row in Reference["entries"] {
 			Spec := Registered[Index]
 			Assert(Spec.Trigger == Row["trigger"], "the native registration order remains historical")
 			Assert(Spec.Replacement == Row["output"], "the native replacement remains exact")
-			AssertEqual(Row["ordinal"], Spec.Seq, "equal-priority collisions keep their insertion precedence")
+			AssertEqual(Row["ordinal"], Index, "the reference lists the rules in their insertion order")
+			if Index > 1
+				Assert(Spec.Seq > Registered[Index - 1].Seq, "equal-priority collisions keep their insertion precedence")
 			AssertEqual(Row["is_word"], Spec.IsWord)
 			AssertEqual(Row["auto_expand"], Spec.Auto)
 			AssertEqual(Row["final_result"], Spec.FinalResult)
@@ -591,14 +593,19 @@ _HsCacheCommonSplitNative(Selection, ThroughTsv := false, ThroughRegistrar := fa
 			_HS_RegisterAutocorrection()
 		} else
 			LoadHotstringsCategory("autocorrection", Sections)
-		Observed := Map(), RegisteredCount := 0
+		Selected := []
 		for Key, Specs in HSE_RegistryByGroup
 			for Spec in Specs {
 				if ThroughRegistrar && !RegExMatch(Key, "^autocorrection\.(names|abbreviations|technical_terms)$")
 					continue
-				Observed[Spec.Seq] := Spec
-				RegisteredCount += 1
+				Selected.Push(Spec)
 			}
+		; The rules in insertion order, ranked 1..N without their no-break variants.
+		Observed := Map(), RegisteredCount := 0
+		for Spec in _HsCacheSortBySeq(_HsCacheWithoutSpaceVariants(Selected)) {
+			RegisteredCount += 1
+			Observed[RegisteredCount] := Spec
+		}
 		AssertEqual(Selection == "all" ? 140 : ExpectedCounts[Selection], RegisteredCount)
 		Index := 0
 		for Row in Reference["entries"] {
@@ -1122,3 +1129,35 @@ _HCOW_PublicEnsure(Collision, TruncateStage := false) {
 for _HCOW_Collision in [true, false]
 	Test("hotstrings cache stage: public Ensure collision=" . _HCOW_Collision
 		. " (hotstrings-cache-stage-ownership)", _HCOW_PublicEnsure.Bind(_HCOW_Collision))
+
+; HSE-003 registers a no-break and a narrow no-break variant beside each trigger
+; with an inner space. The historical reference counts rules, so a variant whose
+; space form is registered too is set aside; the rules keep their own order.
+; @param Specs {Array} Registered specs.
+; @returns {Array} The specs without their no-break space variants.
+_HsCacheWithoutSpaceVariants(Specs) {
+	Triggers := Map()
+	for Spec in Specs
+		Triggers[Spec.Trigger] := true
+	Kept := []
+	for Spec in Specs {
+		Spaced := StrReplace(StrReplace(Spec.Trigger, Chr(0xA0), " "), Chr(0x202F), " ")
+		if (Spaced != Spec.Trigger) && Triggers.Has(Spaced)
+			continue
+		Kept.Push(Spec)
+	}
+	return Kept
+}
+
+; @param Specs {Array} Registered specs.
+; @returns {Array} The same specs by ascending insertion sequence.
+_HsCacheSortBySeq(Specs) {
+	Sorted := []
+	for Spec in Specs {
+		Position := Sorted.Length + 1
+		while Position > 1 && Sorted[Position - 1].Seq > Spec.Seq
+			Position -= 1
+		Sorted.InsertAt(Position, Spec)
+	}
+	return Sorted
+}
