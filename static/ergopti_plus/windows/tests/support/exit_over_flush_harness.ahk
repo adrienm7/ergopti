@@ -165,6 +165,9 @@ WebView_StopBrowserWarmup(*) {
 WPMTrayReadout_Shutdown(*) {
 	return true
 }
+RawTouchpadStop(*) {
+	return true
+}
 MenuDispatcher_Shutdown(*) {
 	return true
 }
