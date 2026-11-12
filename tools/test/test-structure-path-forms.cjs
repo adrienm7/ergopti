@@ -89,6 +89,19 @@ function rewrite(file, text) {
 
 function run() {
 	withFakes(() => {
+		// A bare resolve imported from path, and a folder piece with its trailing
+		// slash concatenated onto a name: the locale catalogue read per code.
+		assert.equal(
+			rewrite(
+				'tools/x.cjs',
+				"const { resolve } = require('path');\n" +
+					"const SHARED = resolve(__dirname, '..', 'static/ergopti_plus/_shared');\n" +
+					"read(resolve(SHARED, 'zz_probe_data/locales/' + code + '.json'));"
+			),
+			"const { resolve } = require('path');\n" +
+				"const SHARED = resolve(__dirname, '..', 'static/ergopti_plus/_shared');\n" +
+				"read(resolve(SHARED, 'core/zz_probe_i18n/data/locales/' + code + '.json'));"
+		);
 		assert.equal(
 			rewrite('tools/x.cjs', "const L = path.join(SP, '_shared', 'zz_probe_data', 'locales');"),
 			"const L = path.join(SP, '_shared', 'core', 'zz_probe_i18n', 'data', 'locales');"
