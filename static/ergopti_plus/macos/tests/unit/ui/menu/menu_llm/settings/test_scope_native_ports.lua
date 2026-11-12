@@ -47,9 +47,12 @@ helpers.describe("LLM scope native ports", function()
 			helpers.assert_eq(mode, "recommended")
 			-- ai-menu-no-clear: the AI menu's clear row was retired with its command
 			helpers.assert_nil(commands.scope_clear, "the AI menu registers no clear command")
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 			calls.set_paused(true)
 			calls.handler.build_item()
-			helpers.assert_eq(calls.render_ctx.commands.scope_restore(), false)
+			selected, mode = nil, nil
+			helpers.assert_eq(calls.render_ctx.commands.scope_restore(), true)
+			helpers.assert_eq(mode, "recommended", "a paused session still restores the AI settings")
 		end)
 	end)
 
