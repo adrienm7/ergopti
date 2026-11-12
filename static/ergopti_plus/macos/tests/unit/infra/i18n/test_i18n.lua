@@ -31,15 +31,11 @@ package.loaded["menu.labels"] = {
 
 -- Stub lib.locale so get() returns controlled values.
 local _locale_store = {}
--- display() is the shared core's label lookup: the raw key on a miss. Its
+-- missing() is the shared core's answer to a miss: the raw key. Its
 -- once-per-key warning is tested against the real core below.
 package.loaded["infra.locale"] = {
 	get = function(key) return _locale_store[key] end,
-	display = function(key)
-		local s = _locale_store[key]
-		if s == nil or s == "" then return key end
-		return s
-	end,
+	missing = function(key) return key end,
 }
 
 -- Stub lib.logger (silent no-op).
@@ -427,10 +423,9 @@ helpers.describe("i18n: get()", function()
 			local locale = require("infra.locale")
 			helpers.assert_eq(locale.has("__missing_key__"), false)
 			helpers.assert_eq(#warnings, 0, "a probe is not a defect")
-			helpers.assert_eq(locale.display("__missing_key__"), "__missing_key__")
-			locale.display("__missing_key__")
-			locale.display("__other_missing__")
-			helpers.assert_true(locale.display("menu.global.reload") ~= "menu.global.reload")
+			helpers.assert_eq(locale.missing("__missing_key__"), "__missing_key__")
+			locale.missing("__missing_key__")
+			locale.missing("__other_missing__")
 		end)
 		logger.warn = warn
 		package.loaded["infra.locale"], package.loaded["locale.core"] = stub_locale, stub_core
