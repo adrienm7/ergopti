@@ -1698,6 +1698,25 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if type(updateMenu) == "function" then updateMenu() end
 		return true
 	end)
+	-- A layout that changed while it is the emulated one reloads the emulation:
+	-- an uninstalled one stays chosen and stops, a reinstalled one resumes
+	-- (maintainer decision, 2026-11-12), and the menu shows its new state.
+	require("ui.layout_manager").set_layout_change_handler(function(id)
+		local Emulation = require("modules.keymap.layout_emulation")
+		if Emulation.status().id ~= id then return end
+		Emulation.reload_if_started()
+		if type(updateMenu) == "function" then updateMenu() end
+	end)
+	-- The extension catalogue is read once per boot: a layout whose extension
+	-- was installed or removed loads or drops its hotstrings through a reload.
+	require("ui.layout_manager").set_extension_reloader(function()
+		return do_reload("menu") == true
+	end)
+	require("ui.layout_manager").set_pause_query(function()
+		local shortcuts_mod = core_mods.shortcuts_mod
+		return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
+			and shortcuts_mod.is_paused() == true
+	end)
 	WindowToggle.set_opener("changelog", function()
 		return require("ui.changelog").open({ channel_owner = channel_owner })
 	end)

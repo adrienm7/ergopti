@@ -67,6 +67,33 @@ helpers.describe("onboarding window title", function()
 		end)
 	end)
 
+	-- OBM-001: the running script kept the chosen language when the wizard was
+	-- closed before Finish, and a refused Finish restored that same language.
+	helpers.it("(onboarding-locale-choice) choosing a language waits for Finish", function()
+		with_delivery(function(_, state, pending)
+			local i18n = locale_aware_i18n()
+			state.receiver({ body = { action = "localeSelected", locale = "fr" } })
+			helpers.assert_eq(i18n.get_locale(), "en", "the running script keeps its language")
+			state.receiver({ body = { action = "ready" } })
+			pending[#pending]()
+			helpers.assert_eq(state.titles[#state.titles].title, window_title("fr"),
+				"the page reopens in the chosen language")
+		end)
+	end)
+
+	helpers.it("(onboarding-locale-choice) a language the build does not ship is refused", function()
+		with_delivery(function(_, state, pending)
+			local i18n = locale_aware_i18n()
+			state.receiver({ body = { action = "previewLocale" } })
+			state.receiver({ body = { action = "localeSelected", locale = 42 } })
+			helpers.assert_eq(#state.titles, 0, "no preview in a substituted language")
+			helpers.assert_eq(i18n.get_locale(), "en")
+			state.receiver({ body = { action = "ready" } })
+			pending[#pending]()
+			helpers.assert_eq(state.titles[#state.titles].title, window_title("en"))
+		end)
+	end)
+
 	helpers.it("(onboarding-window-title) initData retitles in the current locale", function()
 		with_delivery(function(_, state, pending)
 			locale_aware_i18n()
