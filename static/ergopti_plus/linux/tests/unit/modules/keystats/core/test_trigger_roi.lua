@@ -247,7 +247,7 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 		first = assert(source:find("\tlocal function on_pointer_event(", 1, true))
 		last = assert(source:find("\n\t-- Text the daemon types itself", first, true))
 		local pointer = compile(source:sub(first, last - 1) .. "\nreturn on_pointer_event")
-		first = assert(source:find("\tlocal function on_click()", 1, true))
+		first = assert(source:find("\tlocal function on_click(code)", 1, true))
 		last = assert(source:find("\n\t-- A pointer event", first, true))
 		local click = compile(source:sub(first, last - 1) .. "\nreturn on_click")
 		local function type_text(text)
