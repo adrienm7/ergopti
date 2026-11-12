@@ -521,8 +521,10 @@ class CurlAsyncRequest {
 		if this.Aborted
 			return false
 		if this._ManagedIsLive() {
-			this.ManagedAdmissionFn := ObjBindMethod(this, "_PollManagedAdmission")
-			SetTimer(this.ManagedAdmissionFn, -1)
+			; Arm the local: the field can be cleared by an Abort between the lines.
+			AdmissionFn := ObjBindMethod(this, "_PollManagedAdmission")
+			this.ManagedAdmissionFn := AdmissionFn
+			SetTimer(AdmissionFn, -1)
 		}
 		return true
 	}
@@ -663,9 +665,16 @@ class CurlAsyncRequest {
 	}
 
 	_StopDeadline() {
-		if IsObject(this.DeadlineFn)
-			SetTimer(this.DeadlineFn, 0)
-		this.DeadlineFn := 0
+		; One read, cleared at once, like _StopManagedAdmission: the deadline timer
+		; can interrupt between two lines and abort the request, clearing the
+		; field, so a second read could hand SetTimer an Integer (deadline-stop-reentry).
+		PreviousCritical := Critical("On")
+		try {
+			DeadlineFn := this.DeadlineFn
+			this.DeadlineFn := 0
+		} finally Critical(PreviousCritical)
+		if IsObject(DeadlineFn)
+			SetTimer(DeadlineFn, 0)
 	}
 
 	_Remaining() {
@@ -676,7 +685,10 @@ class CurlAsyncRequest {
 		if this.Completed || this.Aborted
 			return
 		if this._Remaining() > 0 {
-			SetTimer(this.DeadlineFn, -Max(1, this._Remaining()))
+			; A stop that interrupted this deadline released the callback: nothing to re-arm.
+			DeadlineFn := this.DeadlineFn
+			if IsObject(DeadlineFn)
+				SetTimer(DeadlineFn, -Max(1, this._Remaining()))
 			return
 		}
 		this.Abort()
@@ -718,8 +730,9 @@ class CurlAsyncRequest {
 		}
 		if this._Remaining() <= 0
 			return this.Abort()
-		this.DeadlineFn := ObjBindMethod(this, "_Deadline")
-		SetTimer(this.DeadlineFn, -Max(1, this._Remaining()))
+		DeadlineFn := ObjBindMethod(this, "_Deadline")
+		this.DeadlineFn := DeadlineFn
+		SetTimer(DeadlineFn, -Max(1, this._Remaining()))
 		try return this._SendManaged(Body)
 		catch {
 			this._MarkNativeDispatchRefused()
