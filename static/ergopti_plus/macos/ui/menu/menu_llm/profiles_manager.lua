@@ -722,10 +722,11 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				"Cloned-profile editor",
 				prompt_editor.open,
 				copy,
+				-- The page's save runs while paused: a pause stops typing, not
+				-- configuration (EDD-1, maintainer decision 2026-11-12).
 				retryable_editor_save(function(updated)
 				if type(updated) ~= "table" then return false end
-				if not is_ready() or not settle_profile_mutation_recovery(deps)
-					or not is_ready() then return false end
+				if not settle_profile_mutation_recovery(deps) then return false end
 				if type(replace_profile) ~= "function"
 					or replace_profile(copy, updated) ~= true then
 					return false
@@ -1215,10 +1216,10 @@ local function build_profile_menu(
 				"Profile creation editor",
 				prompt_editor.open,
 				nil,
+				-- The page's save runs while paused (EDD-1).
 				retryable_editor_save(function(new_profile)
 					if type(new_profile) ~= "table" then return false end
-					if not create_ready() or not settle_profile_mutation_recovery(deps)
-						or not create_ready() then return false end
+					if not settle_profile_mutation_recovery(deps) then return false end
 					if type(activate_candidate) ~= "function"
 						or activate_candidate(new_profile) ~= true then
 						return false
