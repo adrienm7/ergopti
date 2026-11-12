@@ -432,10 +432,9 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
   local created,opened,refused=0,0,0
   local paused,ready=false,true
   local host={physical_delivery_available=function()return true end,native_available=function()return ready end,available=function(owner)return owner~=nil end,open=function(options)helpers.assert_eq(options.scope.marker,'native');opened=opened+1;return true end}
-  local ports=require('shortcuts.physical_editor_menu').new({scope=function()created=created+1;return{marker='native'}end,host=function()return host end,paused=function()return paused end,refused=function()refused=refused+1 end})
+  local ports=require('shortcuts.physical_editor_menu').new({scope=function()created=created+1;return{marker='native'}end,host=function()return host end,refused=function()refused=refused+1 end})
   helpers.assert_eq(ports.ready(),true);helpers.assert_eq(created,0);helpers.assert_eq(opened,0)
-  paused=true;helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0);helpers.assert_eq(refused,1)
-  paused=false;ready=false;helpers.assert_eq(ports.ready(),false);helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0)
+  ready=false;helpers.assert_eq(ports.ready(),false);helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0);helpers.assert_eq(refused,1)
   ready=true;helpers.assert_eq(ports.open(),true);helpers.assert_eq(created,1);helpers.assert_eq(opened,1)
  end)
  helpers.it('(physical-editor-ui) same native issuer survives window reopen and canonical edits',function()
@@ -449,7 +448,8 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
    local _,current=owner.capture_editor_inventory();helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',delete=true}},current),true)
    helpers.assert_eq(Codec.decode(Writer.read_classified(path)).shortcuts.keyboard.physical_none_KeyJ,nil)
    local entered=false;helpers.assert_eq(Scope.editor_owner(function()if not entered then entered=true;helpers.assert_eq(Scope.editor_owner(paused),nil,'Reentrant factory cannot replace owner')end;return false end),owner)
-   controls.paused=true;helpers.assert_eq(Scope.editor_owner(paused),nil);controls.paused=false;helpers.assert_eq(Scope.editor_owner(paused),owner)
+   -- EDD-1 (maintainer, 2026-11-12): a paused daemon still opens the editor (edd1-paused-writes).
+   controls.paused=true;helpers.assert_eq(Scope.editor_owner(paused),owner);controls.paused=false
   end)
  end)
  -- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
@@ -475,11 +475,11 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
    controls.finish_worker();helpers.assert_eq(Scope.editor_owner(paused),owner);helpers.assert_eq(owner.pending(),false)
   end,initial)
  end)
- helpers.it('(physical-editor-ui) terminal pause callback cannot return a stale route owner',function()
+ helpers.it('(physical-editor-ui) a route changed during the owner check cannot return a stale owner',function()
   with_scope(function(_,owners,controls,path)
    local Scope=require('infra.shortcuts_scope');local paused=function()return false end;local owner=Scope.editor_owner(paused)
-   local route,reads=path,0;package.loaded['infra.config_paths'].config=function()return route end
-   local result=Scope.editor_owner(function()reads=reads+1;if reads==2 then route=path..'.foreign' end;return false end)
+   local route,reads=path,0;package.loaded['infra.config_paths'].config=function()reads=reads+1;local current=route;if reads==1 then route=path..'.foreign' end;return current end
+   local result=Scope.editor_owner(paused)
    helpers.assert_eq(reads,2);helpers.assert_eq(result,nil);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),SOURCE)
    route=path;helpers.assert_eq(Scope.editor_owner(paused),owner,'Refused final callback never discards exact issuer')
   end)
@@ -620,7 +620,7 @@ helpers.describe("Physical native host and menu capability admission", function(
 			helpers.assert_eq(host.physical_delivery_available(),false)
 			helpers.assert_eq(host.available(scope),false)
 			local menu=require("shortcuts.physical_editor_menu").new({host=function()return host end,
-				scope=function()captures=captures+1;return scope end,paused=function()return false end,
+				scope=function()captures=captures+1;return scope end,
 				refused=function()opened=opened+1 end})
 			helpers.assert_eq(menu.ready(),false)
 			helpers.assert_eq(menu.open(),false)

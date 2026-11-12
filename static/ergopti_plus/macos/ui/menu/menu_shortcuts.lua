@@ -903,11 +903,6 @@ function M.build(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
-		paused = function()
-			if paused then return nil end
-			if type(ctx.physical_shortcuts_paused) ~= "function" then return nil end
-			return ctx.physical_shortcuts_paused()
-		end,
 		scope = function()
 			if type(ctx.physical_shortcuts_scope) == "function" then return ctx.physical_shortcuts_scope() end
 		end,

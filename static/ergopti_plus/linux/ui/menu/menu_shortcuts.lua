@@ -796,10 +796,6 @@ local function _build_shortcuts(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
-		paused = function()
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return nil end
-			return ctx.is_paused()
-		end,
 		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
 		host = function() return require("ui.physical_shortcuts.bridge") end,
 		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
