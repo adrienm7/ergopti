@@ -61,6 +61,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		empties: '_shared/modules/llm',
 		from: "m[1] === 'shared_llm_path' ? `modules/llm/${arg}` : arg",
 		to: "m[1] === 'shared_llm_path' ? `ai/data/${arg}` : arg"
+	},
+	{
+		// The locale is found relative to the page under test, a variable
+		// the scan cannot evaluate.
+		file: 'tools/test/support/metrics-apps-page.cjs',
+		empties: '_shared/data/locales',
+		from: "path.resolve(path.dirname(page), '../../data/locales/fr.json')",
+		to: "path.resolve(path.dirname(page), '../../core/i18n/data/locales/fr.json')"
 	}
 ];
 
