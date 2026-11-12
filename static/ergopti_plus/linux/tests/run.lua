@@ -234,6 +234,15 @@ if not execution_ok then
 	os.exit(1)
 end
 
+-- No test reached a real notify-send: the sentinel shadows it on PATH
+-- (tests/support/notify_send_guard.lua, pinned by its meta test). Fixtures that
+-- still reach the sentinel through the real notifier are counted, not failed.
+local spawned_notices = require("tests.support.notify_send_guard").spawned()
+if spawned_notices then
+	local _, count = spawned_notices:gsub("\n", "")
+	print(string.format("notify-send sentinel: %d notice(s) reached it instead of a desktop notification.", count))
+end
+
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
 		local replay = "luajit tests/run.lua"

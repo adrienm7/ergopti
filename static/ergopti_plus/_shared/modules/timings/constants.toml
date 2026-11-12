@@ -972,6 +972,12 @@ user_quit_deadline_ms = 12000
 # system's own duration (NUI-006).
 notification_ttl_ms = 5000
 
+# Linux: how long notify-send may take to hand a notice to the notification
+# daemon before its owned process group is stopped and the notice reported as
+# lost (adapters/notifier.lua; NUI-003). notify-send returns once the daemon
+# acknowledges, so only a hung session bus reaches this deadline.
+notification_send_timeout_ms = 5000
+
 # Margin past user_quit_deadline_ms a launcher waits for the running instance's
 # controlled exit before it gives up: the macOS launcher answering a quit from
 # outside (Sparkle relaunch, logout, osascript; MLC-002), and a second launch

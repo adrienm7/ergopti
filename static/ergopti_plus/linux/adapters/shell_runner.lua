@@ -69,6 +69,8 @@ local HEREDOC_BASE_TOKEN = "ERGOPTI_STDIN"
 -- never be captured as a nil global: in Lua the scope of a local starts AFTER
 -- the statement that declares it.
 local _test_runner = nil
+-- The asynchronous twin of the test runner (M._set_async_runner).
+local _test_async_runner = nil
 
 -- Every real exit is reported through one throttled recorder: the program name,
 -- the status and the duration, never the command line, which can carry user
@@ -497,6 +499,7 @@ local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_outp
 --- @return string|nil error Why admission failed; the completion callback stays silent.
 --- @return table|nil cleanup Pending native owner after refused admission, when any.
 function M.run_async(executable, args, options, callback)
+	if _test_async_runner then return _test_async_runner(executable, args, options, callback) end
 	if not luv then return nil, "asynchronous execution needs libuv" end
 	local refusal = M.validate_spawn_args(executable, args)
 	if refusal ~= "" then return nil, refusal end
@@ -585,6 +588,20 @@ end
 --- Restores real execution.
 function M._reset_runner()
 	_test_runner = nil
+end
+
+--- Installs an asynchronous test runner: run_async hands it its executable,
+--- argv, options and callback instead of spawning, and returns what it returns
+--- (a handle, or nil and a refusal). Fixtures install it as they install
+--- _set_runner, so no test spawns a real desktop program.
+--- @param fn function|nil (executable, args, options, callback); nil resets.
+function M._set_async_runner(fn)
+	_test_async_runner = (type(fn) == "function") and fn or nil
+end
+
+--- Restores real asynchronous execution.
+function M._reset_async_runner()
+	_test_async_runner = nil
 end
 
 return M

@@ -29,6 +29,8 @@ require("test.runner_home").isolate()
 -- The fixtures read the French catalogue whatever the session language says
 -- (tests/support/session_language.lua); helpers load once per test process.
 require("tests.support.session_language").install()
+-- No fixture may show a real desktop notification (tests/support/notify_send_guard.lua).
+require("tests.support.notify_send_guard").install()
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
