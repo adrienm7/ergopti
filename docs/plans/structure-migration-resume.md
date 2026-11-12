@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-12, 21:15)
+## Where things stand (2026-11-12, 21:45)
 
 - Branch: `claude/ergopti-todo-structure-phase2`. It is pushed fast-forward
   only and never rebased. A rebase would go to
@@ -16,11 +16,20 @@ same commit as each step or checkpoint. Times are Paris time.
 - Step in progress: S01 (`_shared`, 867 moves, about 17 000 references in
   about 4 900 files). It applies cleanly with every format, lint and codegen
   gate green.
-- Against the dev baseline, its gates are:
-  - Linux and macOS Lua groups: 0 new reds (last full cycle);
-  - JS suite: 34 new reds before this evening's fixes. 9 remained on
-    `6ea83b8e`, and each has a fix pushed after it. A re-probe on `3e4e387d`
-    is the next measurement.
+- Measured against the dev baseline:
+  - the 34 JS checks that were new reds: 1 red left on `3e4e387d` (the shared
+    helper ratchet), fixed by `b4659a72`;
+  - Linux and macOS Lua groups: 0 new reds at the last full cycle.
+- In progress: a full cycle on `b4659a72` (whole JS suite and both Lua
+  drivers' groups, S01 applied by the runner). When it shows no new reds, S01
+  is green locally. Windows is then proven on CI.
+- Decision C for the Windows cohort pins is implemented as C1 (`9e01a8e0`).
+  The (c) frames are the owner's input, not its output, so they are
+  requalified, not regenerated. The coordinator was asked to confirm C1:
+  - `edits.cjs` `REQUALIFIED_PINS` lists the five receipts;
+  - `repin.cjs` records each old→new pin there, with the move that justifies
+    it, and refuses a derived pin there;
+  - the runner writes a "Requalification" section into the step commit.
 
 ## Next commands
 
@@ -45,7 +54,9 @@ The runner commits the step in that worktree. Then:
 1. S01: re-measure the JS new-reds and fix any left in the tooling
    (`tools/audit/structure/plan.cjs`, `apply-step.cjs`, `edits.cjs`,
    `repin.cjs`), never in the stepped output.
-2. Coordinator decision C for the Windows cohort pins. Not implemented yet:
+2. Coordinator decision C for the Windows cohort pins, done as C1 except the
+   TODO line, which waits for dev's TODO split (TODO.md + TODO-tests-\*.md).
+   The original request:
    - classes (a) and (b), the review and generated-source pins: `repin.cjs`
      re-pins them, as it does today;
    - class (c), `tools/ci/windows-key-combination-cohort-original-inputs.json`,
