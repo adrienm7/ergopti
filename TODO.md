@@ -397,8 +397,14 @@ and the next module candidates. The audit is paused at the maintainer's request.
       "unavailable"; [43228623723](https://github.com/adrienm7/ergopti/actions/runs/43228623723) (job 131226750544) on the number-row cohort's first selecting case
       (`testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI`, French) at 14:12:29, five seconds after
       `NativeInputSourceSelectionTests` passed, then six more "unavailable". With 43108782369 that is three macOS 26
-      refusals without the line. The full-suite step carries no text-input snapshot or `tsm-refusal.json`, so the
-      next step is to bracket it as the number-row step is.
+      refusals without the line. cf44fb4e brackets the full-suite step with the snapshot and receipt (aef8ae05 models
+      it in the two Release ci harnesses that run that step on Linux), and da7cf001 copies the refused case's
+      selection timeline (each enable, select, restore and disable call with its offset, status and the target and
+      current sources' state) from the TIS session into the receipt and the job-log annotation. The first run with
+      both, [43243856260](https://github.com/adrienm7/ergopti/actions/runs/43243856260) (job 131276173863, 16:31 Paris), passed: the full suite and
+      `testFreshKeyboardEventsFollowLayoutAndShiftFlags` passed, 13 TIS records closed, receipt
+      `no_fixture_refusal`. So 2 of the 3 full-suite runs refused. Still unproven: whether a refusal follows a select
+      issued before the enable is observed; the next refusal's annotation answers it.
 
 - [x] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption. Done: the obsolete Windows-not-wired section of the shared README now describes the AutoHotkey mask twin; the metadata-only missing localization key is noted as a separate audit (not fixed here).
 - [x] **[PARITY] Personal aliases and preparation (alphabets documented in the shared personal_info README; Windows eager pre-generation cost moved to « To confirm on the Windows PC », macOS Unicode aliases tracked below):** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
