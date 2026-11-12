@@ -93,14 +93,14 @@ end
 --- Reads the canonical language order shared with the other drivers and the
 --- site (_shared/data/locale_order.json) and returns a {code -> rank} map, or
 --- nil if it can't be read/decoded — the caller then falls back to code order.
---- @param data_dir string Absolute path to the _shared/data directory.
+--- @param order_path string Absolute path of locale_order.json.
 --- @return table|nil Map of locale code to 1-based rank.
-local function _load_order(data_dir)
+local function _load_order(order_path)
 	local ok_j, json_mod = pcall(require, "json")
 	if not ok_j or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil
 	end
-	local f = RegularFileReader.open_source(data_dir .. "/locale_order.json")
+	local f = RegularFileReader.open_source(order_path)
 	if not f then return nil end
 	local read, raw = pcall(f.read, f, "*a")
 	local closed, accepted = pcall(f.close, f)
@@ -154,7 +154,7 @@ local function _scan_locales()
 	-- Same resolver: this line carried the same wrong depth, so the canonical
 	-- display order never loaded either and the two surviving locales sorted
 	-- alphabetically instead.
-	local rank = _load_order(Paths.shared("data"))
+	local rank = _load_order(Paths.shared("data/locale_order.json"))
 	if rank then
 		table.sort(codes, function(a, b)
 			local ra, rb = rank[a] or math.huge, rank[b] or math.huge
