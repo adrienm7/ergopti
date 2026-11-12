@@ -385,6 +385,35 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(SystemActions.FOLDER_REFUSALS.unsupported_file_manager, "system_actions.file_manager_unsupported")
 	end)
 
+	helpers.it("(nui-007-failure-level) a terminal or new-file failure is an error notice", function()
+		local levels = {}
+		with_modules({
+			["adapters.file_manager_folder"] = {
+				available = function() return true end,
+				read_active_folder = function() return { path = "/nonexistent/ergopti-nui-007", bus = ":1.9" } end,
+				reveal_command = function() return "reveal" end,
+			},
+			["adapters.application_notifier"] = { send = function(message, opts)
+				levels[#levels + 1] = { message = message, level = opts and opts.level }
+				return true
+			end },
+			["modules.gestures.user_actions"] = {
+				resolve_terminal = function() return nil end,
+				detached_command = function() return "true" end,
+			},
+		}, function()
+			with_recorded_shell(function()
+				Gestures.execute_action("open_terminal_here", "tap_3")
+				Gestures.execute_action("new_text_file_here", "tap_3")
+			end)
+		end)
+		local i18n = require("infra.i18n")
+		helpers.assert_eq(levels, {
+			{ message = i18n.get("user_actions.terminal_unavailable"), level = "error" },
+			{ message = i18n.get("system_actions.new_text_file_failed"), level = "error" },
+		}, "Windows and user_actions show these failures as errors")
+	end)
+
 	helpers.it("new_text_file_here creates the first free name exclusively and reveals it (system-actions)", function()
 		local dir = os.tmpname()
 		os.remove(dir)
