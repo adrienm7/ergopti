@@ -15,9 +15,8 @@
  *   2. Neither Lua driver declares a list of its own: the detectors and the
  *      Linux metrics read the shared file through _shared/lua/secure_apps.lua,
  *      over its generated projection secure_apps_data.lua, which matches it.
- *   3. Every process name Windows' SFD_SECURE_APPS still spells is a windows
- *      entry of the shared list, so the maintainer's move of the Windows gate
- *      onto the file (TODO « Windows (the PC agent's) ») narrows nothing.
+ *   3. Windows keeps no typed list: its secure-field detector reads the
+ *      `windows` names of the shared file at run time.
  * ==============================================================================
  */
 
@@ -81,14 +80,14 @@ for (const app of document.apps || [])
 					`secure_apps_data.lua lacks ${platform} ${identity}: run node tools/codegen/codegen-secure-apps.cjs`
 				);
 
-// 3. Windows narrows nothing once it reads the file.
+// 3. Windows reads the file (ADD-1): no typed list is left in its detector.
 const ahk = read('windows/adapters/secure_field_detector.ahk');
-const block = ahk.match(/global SFD_SECURE_APPS := Map\(([\s\S]*?)\n\)/);
-if (!block) errors.push('windows/adapters/secure_field_detector.ahk: SFD_SECURE_APPS not found');
-else
-	for (const [, name] of block[1].matchAll(/"([^"]+)",\s*true/g))
-		if (!windowsNames.has(name.toLowerCase()))
-			errors.push(`Windows SFD_SECURE_APPS holds ${name}, missing from the shared windows list`);
+if (/global SFD_SECURE_APPS := Map\(/.test(ahk) || /"[^"]+\.exe",\s*true/.test(ahk))
+	errors.push('windows/adapters/secure_field_detector.ahk keeps a typed secure application list');
+if (!ahk.includes('\\data\\secure_apps.json'))
+	errors.push(
+		'windows/adapters/secure_field_detector.ahk does not read _shared/data/secure_apps.json'
+	);
 
 if (errors.length) {
 	console.error(
@@ -98,5 +97,5 @@ if (errors.length) {
 	process.exit(1);
 }
 console.log(
-	`PASS: ${ids.size} secure applications in one shared list, read by macOS and Linux; Windows' list is a subset.`
+	`PASS: ${ids.size} secure applications in one shared list, read by macOS, Linux and Windows.`
 );
