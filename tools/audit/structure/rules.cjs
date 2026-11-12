@@ -237,7 +237,7 @@ const LOGIC_FEATURES = [
 	['updater', /^(updater|update_|release|asset_signature|archive_|version$)/],
 	[
 		'apps',
-		/^(app_picker|app_folders|app_parameter|app_cloner|encryptor|bundled_apps|program_provider)/
+		/^(app_picker|app_folders|app_parameter|app_cloner|encryptor|bundled_apps|program_provider|secure_apps|linux_app_identities)/
 	],
 	['onboarding', /^(onboarding|first_boot|accessibility_wait|start_at_login|privacy_panes)/],
 	['tray', /^(tray_|appindicator|tray$)/],
@@ -913,6 +913,11 @@ function mapShared(rest) {
 	// 2026-11-11, to review by the maintainer); its page names already name
 	// their feature.
 	if (root === 'ui') return rest;
+	// The hotstring catalogue is read as a directory tree (every pack under it
+	// loads), so it keeps a folder of its own instead of absorbing the
+	// feature's data folder, where personal_info/ and autocorrection/ land.
+	if (root === 'modules' && segment === 'hotstrings' && !isFile)
+		return place('hotstrings', 'data', ['catalogue', ...tail]);
 	if (root === 'modules' || root === 'data') {
 		const stem = isFile ? classStem(segment) : segment;
 		const feature = classify(DATA_FEATURES, stem);

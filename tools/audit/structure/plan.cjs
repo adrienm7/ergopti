@@ -28,6 +28,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Census = require('./census.cjs');
 const Rules = require('./rules.cjs');
+const Edits = require('./edits.cjs');
 const { stripComments } = require('../../lib/script-source.cjs');
 
 // A feature's sub-folders: a one-file sub-folder folds into the feature and
@@ -39,7 +40,16 @@ const OUT_DIR = 'docs/design/structure-plan';
 const PREFIX = `${Census.BASE}/`;
 
 // History is not rewritten: dated audit records name the paths of their day.
-const NEVER_REWRITTEN = [/^docs\/audits\//, /^docs\/design\/structure-plan\//, /^CHANGELOG/];
+// The plan, its appendices, its own tools and tests describe today's tree on
+// purpose (their tables and fixtures name old paths); rules.cjs is rewritten,
+// since its runtime sites name files that move.
+const NEVER_REWRITTEN = [
+	/^docs\/audits\//,
+	/^docs\/design\/structure-plan(\/|\.md$)/,
+	/^CHANGELOG/,
+	/^tools\/audit\/structure\/(?!rules\.cjs$)/,
+	/^tools\/test\/test-structure-[\w-]+\.cjs$/
+];
 const TEXT_LIMIT_BYTES = 2 * 1024 * 1024;
 const BINARY =
 	/\.(png|jpe?g|gif|ico|icns|webp|mp4|mov|woff2?|ttf|otf|zip|gz|xz|tar|dll|exe|dylib|so|a|o|bin|db|sqlite|pdf|keylayout\.bin)$/i;
@@ -217,6 +227,13 @@ function moveMap(files = Census.trackedFiles(ROOT).map((f) => f.slice(PREFIX.len
 	foldSingletons(map, new Map([...Census.folderTable(files)].map(([k, v]) => [k, v.size])));
 	renamePrefixes(map);
 	resolveLuaCollisions(map);
+	// The shared Lua root switches in one step (sharedRootRewrite): a file the
+	// rules leave under _shared/lua/ would keep a second root alive.
+	const leftInRoot = [...map.values()].filter((t) => t && t.startsWith(SHARED_LUA_ROOT));
+	if (leftInRoot.length > 0)
+		throw new Error(
+			`${leftInRoot.length} file(s) stay under _shared/lua/, e.g. ${leftInRoot[0]}: give them a home in rules.cjs`
+		);
 	// Two files must never meet at one target.
 	const seen = new Map();
 	for (const [old, target] of map) {
@@ -293,8 +310,10 @@ function luaModuleName(treeRel, target = false) {
 		// Today the shared Lua root is _shared/lua; in the target it is _shared.
 		// Both are on package.path while the migration runs, so a file still
 		// under lua/ keeps its old name in either mode.
+		// The shared test modules move to _shared/tests/lua/ and are named from
+		// _shared like any shared module (test.assertions → tests.lua.assertions).
 		if (rel.startsWith('lua/')) rel = rel.slice(4);
-		else if (!target || /^tests\//.test(rel)) return null;
+		else if (!target || (/^tests\//.test(rel) && !/^tests\/lua\//.test(rel))) return null;
 	}
 	return rel
 		.replace(/\.lua$/, '')
@@ -338,12 +357,28 @@ function categoryOf(file) {
  * form it was written in so the rewrite can keep that form.
  * @returns {{form: string, lead: string, oldRepo: string, newRepo: string}|null}
  */
-function resolvePathToken(raw, file, inTree, byRepoPath) {
-	const token = raw.replace(/\\/g, '/');
+function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false, folders = null) {
+	// "\\\\modules\\\\x" in a JavaScript string spells the Windows path \\modules\\x.
+	const token = raw.replace(/\\\\|\\/g, '/');
 	const candidates = [];
+	// Paths.shared("modules/hotstrings"): the argument is relative to _shared,
+	// whatever the driver's own tree holds under the same name.
+	// The root itself (SHARED .. "/lua") is the root switch's.
+	if (sharedArgument && !token.startsWith(PREFIX) && token.replace(/^\//, '') !== 'lua')
+		candidates.push({
+			form: 'shared',
+			lead: '',
+			abs: path.posix.normalize(`${PREFIX}_shared/${token.replace(/^\//, '')}`)
+		});
 	if (token.startsWith(PREFIX)) candidates.push({ form: 'repo', lead: '', abs: token });
+	// repository .. "/static/ergopti_plus/…": the leading slash joins the root.
+	if (token.startsWith(`/${PREFIX}`))
+		candidates.push({ form: 'repo', lead: '', abs: token.slice(1) });
 	const tree = Census.TREES.find((t) => token.startsWith(`${t}/`));
 	if (tree) candidates.push({ form: 'tree', lead: '', abs: PREFIX + token });
+	// `${SP}/_shared/modules/x.json`: a tree path joined onto the drivers' root.
+	const joinedTree = Census.TREES.find((t) => token.startsWith(`/${t}/`));
+	if (joinedTree) candidates.push({ form: 'tree', lead: '', abs: PREFIX + token.slice(1) });
 	if (inTree && !token.startsWith(PREFIX)) {
 		const lead = (token.match(/^(%A_LineFile%\/\.\.\/|%A_ScriptDir%\/)/) || [''])[0];
 		const rest = token.slice(lead.length);
@@ -363,23 +398,77 @@ function resolvePathToken(raw, file, inTree, byRepoPath) {
 				abs: path.posix.normalize(`${PREFIX}_shared/${rest}`)
 			});
 		// SHARED_LUA_DIR .. "/toml_codec/source_open.lua": relative to today's
-		// shared Lua root, which S00 turns into _shared itself.
-		if (!lead)
+		// shared Lua root, which S00 turns into _shared itself. Only a Lua file
+		// is read that way: "<config>/hotstrings/x" in a redaction corpus is a
+		// user path, not the shared hotstrings folder.
+		if (!lead && /\.lua$/.test(rest))
 			candidates.push({
 				form: 'shared',
 				lead,
 				abs: path.posix.normalize(`${PREFIX}_shared/lua/${rest}`)
 			});
 	}
+	// require('../../static/ergopti_plus/_shared/x.json') from a tool.
+	if (!inTree && /^\.\.?\//.test(token))
+		candidates.push({
+			form: 'file',
+			lead: '',
+			abs: path.posix.normalize(`${path.posix.dirname(file)}/${token}`)
+		});
+	// …/Contents/Resources/_shared/data/x, ergopti_plus/_shared/x: a bundle or
+	// a partial repository path that embeds a tree keeps what precedes it.
+	for (const t of Census.TREES) {
+		const at = token.indexOf(`/${t}/`);
+		if (at >= 0)
+			candidates.push({
+				form: 'embedded',
+				lead: '',
+				keep: token.slice(0, at + 1),
+				abs: path.posix.normalize(PREFIX + token.slice(at + 1))
+			});
+	}
+	// "/shared/modules/x.json" in a test's fake file system: a root named for
+	// _shared, whose rest is a _shared path.
+	const alias = token.match(/^(.*\/)shared\/(.+)$/);
+	if (alias && !token.includes('/_shared/'))
+		candidates.push({
+			form: 'shared-alias',
+			lead: '',
+			keep: `${alias[1]}shared/`,
+			abs: path.posix.normalize(`${PREFIX}_shared/${alias[2]}`)
+		});
 	// The token names the first of its readings that exists today; only then
 	// is it looked up. Otherwise SCRIPT_DIR .. "/modules/hotstrings" (the
 	// driver's own folder) would read as _shared/modules/hotstrings whenever
 	// only the shared one moves.
 	const existing = candidates.find((c) => EXISTING.has(c.abs));
+	if (!existing && folders && token.includes('/')) {
+		// A file the index does not hold (generated, never committed) in a
+		// folder that moves whole follows its folder. Explicit forms only: a
+		// bare relative name may be anything.
+		const c = candidates.find(
+			(x) =>
+				(['repo', 'tree', 'embedded'].includes(x.form) ||
+					(sharedArgument && x.form === 'shared')) &&
+				path.posix.dirname(x.abs) !== `${PREFIX}_shared/lua` &&
+				EXISTING.has(path.posix.dirname(x.abs)) &&
+				folders.has(path.posix.dirname(x.abs)) &&
+				folders.get(path.posix.dirname(x.abs)) !== SPLIT
+		);
+		if (!c) return null;
+		return {
+			form: c.form,
+			lead: c.lead,
+			keep: c.keep,
+			oldRepo: path.posix.dirname(c.abs),
+			newRepo: `${folders.get(path.posix.dirname(c.abs))}/${path.posix.basename(c.abs)}`
+		};
+	}
 	if (!existing || !byRepoPath.has(existing.abs)) return null;
 	return {
 		form: existing.form,
 		lead: existing.lead,
+		keep: existing.keep,
 		oldRepo: existing.abs,
 		newRepo: byRepoPath.get(existing.abs)
 	};
@@ -484,9 +573,221 @@ function isProse(file, text, code, index) {
 	return /(\/\/|^\s*\*|^\s*\/\*|#)/.test(before);
 }
 
+/**
+ * A path a moving file spells relative to itself ("../../vendor/x.lua") whose
+ * target stays: it is re-relativised against the file's new place.
+ * @returns {{form: string, lead: string, oldRepo: string, newRepo: string}|null}
+ */
+function resolveOwnRelative(token, file, selfTarget) {
+	const abs = path.posix.normalize(`${path.posix.dirname(file)}/${token.replace(/\\/g, '/')}`);
+	if (!EXISTING.has(abs) || !selfTarget) return null;
+	return { form: 'file', lead: '', oldRepo: abs, newRepo: abs };
+}
+
+/** Escapes a path for a Lua pattern the way the sources write it. */
+const luaPatternEscape = (p) => p.replace(/[.-]/g, (c) => `%${c}`);
+
+/**
+ * The tails of its own path a moving Lua file matches to find its root:
+ * source:match("^(.*)/modules/llm/ollama_binary%.lua$") or "^(.*)/infra/[^/]+$".
+ * The part before the tail (the driver root) stays, so the tail is respelled
+ * from the file's new place.
+ */
+function ownTails(text, selfOld, selfTarget) {
+	const out = [];
+	const tree = selfOld.split('/')[0];
+	for (const m of text.matchAll(
+		/\/((?:[\w]+(?:%[.-][\w]+)*\/)*)([\w]+(?:%[.-][\w]+)*%\.lua|\[\^\/\]\+)\$/g
+	)) {
+		const dirs = m[1].replace(/%([.-])/g, '$1');
+		const leaf = m[2] === '[^/]+' ? null : m[2].replace(/%([.-])/g, '$1');
+		const ownRel = selfOld.slice(tree.length + 1);
+		const tail = dirs + (leaf || path.posix.basename(selfOld));
+		if (!`/${ownRel}`.endsWith(`/${tail}`)) continue;
+		const anchor = ownRel.slice(0, ownRel.length - tail.length); // kept, with its trailing slash
+		const newRel = selfTarget.slice(tree.length + 1);
+		if (!newRel.startsWith(anchor)) continue;
+		const newTail = newRel.slice(anchor.length);
+		const spelled = leaf
+			? luaPatternEscape(newTail)
+			: `${luaPatternEscape(path.posix.dirname(newTail) === '.' ? '' : `${path.posix.dirname(newTail)}/`)}[^/]+`;
+		const next = `/${spelled}$`.replace('//', '/');
+		if (next !== m[0]) out.push({ old: m[0], new: next });
+	}
+	// The same tail spelled with a separator variable:
+	// "^(.*)" .. sep .. "lua" .. sep .. "test" .. sep .. "x%.lua$".
+	for (const m of text.matchAll(
+		/(["'])\^\(\.\*\)\1((?:\s*\.\.\s*\w+\s*\.\.\s*(["'])[\w%.$-]+\3)+)/g
+	)) {
+		const sepVar = (m[2].match(/\.\.\s*(\w+)\s*\.\./) || [])[1];
+		const parts = [...m[2].matchAll(/(["'])([\w%.$-]+)\1/g)].map((x) => x[2]);
+		const lastRaw = parts[parts.length - 1];
+		if (!sepVar || (!lastRaw.endsWith('%.lua$') && !lastRaw.endsWith('%.lua'))) continue;
+		const dollar = lastRaw.endsWith('$');
+		const tail = parts
+			.map((p, i) => (i === parts.length - 1 && dollar ? p.slice(0, -1) : p))
+			.map((p) => p.replace(/%([.-])/g, '$1'))
+			.join('/');
+		const ownRel = selfOld.slice(tree.length + 1);
+		if (!`/${ownRel}`.endsWith(`/${tail}`)) continue;
+		const anchor = ownRel.slice(0, ownRel.length - tail.length);
+		const newRel = selfTarget.slice(tree.length + 1);
+		if (!newRel.startsWith(anchor)) continue;
+		const q = m[3];
+		const spelled = newRel
+			.slice(anchor.length)
+			.split('/')
+			.map(
+				(p, i, all) =>
+					` .. ${sepVar} .. ${q}${luaPatternEscape(p)}${i === all.length - 1 && dollar ? '$' : ''}${q}`
+			)
+			.join('');
+		if (spelled !== m[2]) out.push({ old: m[0], new: `${m[1]}^(.*)${m[1]}${spelled}` });
+	}
+	return out;
+}
+
+/**
+ * The dirname() climbs a moving Lua file makes from its own source path to
+ * reach a folder that stays (_shared, the driver root):
+ * NativePath.dirname(assert(NativePath.dirname(source))). The number of
+ * climbs follows the file's new depth.
+ */
+function ownClimbs(text, selfOld, selfTarget) {
+	const out = [];
+	const vars = [
+		...text.matchAll(/\blocal\s+(\w+)\s*=[^\n]*\bdebug\.getinfo\(\s*1\s*,\s*["']S["']\s*\)/g)
+	].map((m) => m[1]);
+	// The anchor a climb of k folders reaches from the file today, and the
+	// number of climbs that reaches it from the new place (null: no stable anchor).
+	const climbsFor = (k) => {
+		const oldParts = selfOld.split('/');
+		if (k >= oldParts.length) return null;
+		const anchor = oldParts.slice(0, oldParts.length - k).join('/');
+		if (!selfTarget.startsWith(`${anchor}/`)) return null;
+		return selfTarget.split('/').length - anchor.split('/').length;
+	};
+	// One climb per line: local dir = NativePath.dirname(src) or src, then
+	// dir = NativePath.dirname(dir) or dir / dir = dir and NativePath.dirname(dir).
+	const lines = text.split('\n');
+	for (let i = 0; i < lines.length; i++) {
+		const head = lines[i].match(
+			/^(\s*)local\s+(\w+)\s*=\s*NativePath\.dirname\((\w+)\)(?:\s+or\s+\3)?\s*(?:--.*)?$/
+		);
+		if (!head || !vars.includes(head[3])) continue;
+		const x = head[2];
+		const step = new RegExp(
+			`^(\\s*)${x}\\s*=\\s*(?:${x}\\s+and\\s+NativePath\\.dirname\\(${x}\\)|NativePath\\.dirname\\(${x}\\)\\s+or\\s+${x})\\s*(?:--.*)?$`
+		);
+		let j = i + 1;
+		while (j < lines.length && step.test(lines[j])) j++;
+		const k = j - i;
+		const k2 = climbsFor(k);
+		if (k2 === null || k2 === k || k2 < 1) continue;
+		const block = lines.slice(i, j);
+		const template = (
+			j - 1 > i ? lines[j - 1] : `${head[1]}${x} = ${x} and NativePath.dirname(${x})`
+		).replace(/\s*--.*$/, '');
+		const next = k2 > k ? [...block, ...Array(k2 - k).fill(template)] : block.slice(0, k2);
+		out.push({ old: block.join('\n'), new: next.join('\n') });
+	}
+	for (const v of new Set(vars)) {
+		const re = new RegExp(`((?:NativePath\\.dirname\\((?:assert\\()?)+)${v}\\b`, 'g');
+		for (const m of text.matchAll(re)) {
+			const k = (m[1].match(/NativePath\.dirname\(/g) || []).length;
+			const asserts = (m[1].match(/assert\(/g) || []).length;
+			const closers = k + asserts;
+			const after = text.slice(m.index + m[0].length, m.index + m[0].length + closers);
+			if (after !== ')'.repeat(closers)) continue;
+			const oldParts = selfOld.split('/');
+			if (k >= oldParts.length) continue;
+			const anchor = oldParts.slice(0, oldParts.length - k).join('/');
+			if (!selfTarget.startsWith(`${anchor}/`)) continue;
+			const k2 = selfTarget.split('/').length - anchor.split('/').length;
+			if (k2 === k) continue;
+			const wrap = asserts > 0;
+			let expr = `NativePath.dirname(${v})`;
+			for (let i = 1; i < k2; i++)
+				expr = `NativePath.dirname(${wrap ? 'assert(' : ''}${expr}${wrap ? ')' : ''})`;
+			out.push({ old: m[0] + after, new: expr });
+		}
+	}
+	return out;
+}
+
+let CONFIG_KEYS = null;
+/**
+ * The configuration keys, from the generated config_keys.lua wherever the plan
+ * has put it: a key such as "llm.app_profile_overrides" can spell a module
+ * name, and a stored setting must keep its key.
+ * @returns {Set<string>}
+ */
+function configKeys() {
+	if (CONFIG_KEYS) return CONFIG_KEYS;
+	CONFIG_KEYS = new Set();
+	const source = [...EXISTING].find((f) =>
+		new RegExp(`^${PREFIX}_shared/(.+/)?config_keys\\.lua$`).test(f)
+	);
+	if (!source)
+		throw new Error('config_keys.lua not found under _shared: the plan needs the key list');
+	for (const m of fs.readFileSync(path.join(ROOT, source), 'utf8').matchAll(/=\s*"([^"]+)"/g))
+		CONFIG_KEYS.add(m[1]);
+	return CONFIG_KEYS;
+}
+
+let LOCALE_KEYS = null;
+/** The keys of the English locale, wherever the plan has put it. */
+function localeKeys() {
+	if (LOCALE_KEYS) return LOCALE_KEYS;
+	const source = [...EXISTING].find((f) =>
+		new RegExp(`^${PREFIX}_shared/(.+/)?locales/en\\.json$`).test(f)
+	);
+	if (!source)
+		throw new Error('locales/en.json not found under _shared: the plan needs the key list');
+	LOCALE_KEYS = new Set(Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, source), 'utf8'))));
+	return LOCALE_KEYS;
+}
+
+/** True when the token at `index` opens the argument of a Paths.shared call. */
+function isSharedArgument(text, index) {
+	// Paths.shared("x"), helpers.shared("x"), shared('x') and readShared(`x`)
+	// in the tools; Paths.shared_llm_path("x") is relative to the AI data.
+	const before = text.slice(Math.max(0, index - 40), index);
+	// SHARED_DIR .. "/modules/x", SHARED / "modules/x", SHARED + '/x',
+	// ${SRC_SHARED}/modules/x, _SharedDir . "\\modules\\x" (AHK): a path joined onto an
+	// expression naming _shared.
+	if (/\b\w*[sS][hH][aA][rR][eE][dD]\w*(?:\(\))?\s*(?:\.\.|\/|\+|\s\.)\s*["'`]$/.test(before))
+		return true;
+	if (/\$\{?\w*SHARED\w*\}?$/.test(before)) return true;
+	// const MENU_SOURCE_REL = 'modules/menu/menu.toml' beside shared(): a path
+	// relative to _shared kept in a constant.
+	if (/\bconst\s+\w*_REL\s*=\s*["'`]$/.test(before) && /\bshared\(|SHARED/.test(text)) return true;
+	return (
+		/\b\w*[sS]hared(?!_llm)\w*\(\s*["'`]$/.test(before) &&
+		!/shared_llm_path\(\s*["'`]$/.test(before)
+	);
+}
+
+// A JavaScript require of a Node module or a dependency is not a Lua load,
+// even where a Lua module shares its name ("crypto", "path").
+const NODE_MODULES = new Set([
+	...require('node:module').builtinModules,
+	...(fs.existsSync(path.join(ROOT, 'node_modules'))
+		? fs.readdirSync(path.join(ROOT, 'node_modules'))
+		: [])
+]);
+
+/** A one-line Lua string literal; group 2 is its content. */
+const LUA_SHORT_STRING = /(["'])((?:\\.|(?!\1)[^\\\n])*)\1/g;
+/** A dotted name bounded inside a string: not a prefix of a longer name. */
+const INLINE_MODULE_NAME = /(?<![\w.%])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)(?!\w|\.[A-Za-z_])/g;
+/** A Lua table constructor of string literals only. */
+const LUA_NAME_TABLE =
+	/\{\s*(?:--[^\n]*\n\s*)*(?:(["'])[A-Za-z_][\w.]*\1\s*[,;]\s*(?:--[^\n]*\n\s*)*)*(["'])[A-Za-z_][\w.]*\2\s*[,;]?\s*(?:--[^\n]*\n\s*)*\}/g;
+
 /** Code just before a quoted name that loads it as a Lua module. */
 const MODULE_LOAD_BEFORE =
-	/(?:\brequire\s*\(?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\()\s*$/;
+	/(?:\brequire\s*(?:%?\()?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\(|\b\w*(?:load|fresh)_module\s*\(|\brawget\s*\(\s*package\.(?:loaded|preload)\s*,|\bsearchpath\s*\()\s*$/;
 
 /**
  * Tells whether the quoted token at `index` is a Lua module load: a require
@@ -496,7 +797,160 @@ const MODULE_LOAD_BEFORE =
  * @returns {boolean}
  */
 function isModuleLoadSite(text, index) {
-	return MODULE_LOAD_BEFORE.test(text.slice(Math.max(0, index - 80), index));
+	const before = text.slice(Math.max(0, index - 80), index);
+	if (MODULE_LOAD_BEFORE.test(before)) return true;
+	const alias = loadedAliases(text);
+	if (alias !== null && alias.test(before)) return true;
+	if (keyedByModuleName(text, index, before)) return true;
+	return comparesModuleName(text, index, before);
+}
+
+/**
+ * A key of a table keyed by module names, the require stand-ins of a test
+ * ({ ["tests.helpers"] = reporter, ["text_utils"] = { … } }): a one-word key
+ * beside dotted ones is a module name too.
+ */
+function keyedByModuleName(text, index, before) {
+	if (!/\[\s*$/.test(before)) return false;
+	const close = text.slice(index).match(/^(["'])[A-Za-z_]\w*\1\s*\]\s*=/);
+	if (!close) return false;
+	const around = text.slice(Math.max(0, index - 400), index + 400);
+	return /\[\s*(["'])[a-z_]\w*(?:\.[a-z_]\w*)+\1\s*\]\s*=/.test(around);
+}
+
+let scopeText = null;
+let scopes = [];
+/**
+ * A comparison with a variable that holds a module name: the parameter of a
+ * require stand-in (require = function(name) … name == "number_policy") or
+ * the key of a walk of package.loaded (for key in pairs(package.loaded) …
+ * key ~= "logger"). Each holds within the next lines after it is bound.
+ */
+function comparesModuleName(text, index, before) {
+	if (text !== scopeText) {
+		scopes = [];
+		for (const m of text.matchAll(/\brequire\s*=\s*function\s*\(\s*(\w+)/g))
+			scopes.push({ name: m[1], from: m.index, to: m.index + 1500 });
+		for (const m of text.matchAll(
+			/\bfor\s+(\w+)[^\n]*?\bin\s+(?:next\s*,|i?pairs\s*\()\s*package\.loaded\b/g
+		))
+			scopes.push({ name: m[1], from: m.index, to: m.index + 800 });
+		scopeText = text;
+	}
+	for (const sc of scopes) {
+		if (index < sc.from || index > sc.to) continue;
+		if (new RegExp(`\\b${sc.name}\\s*[=~]=\\s*$`).test(before)) return true;
+	}
+	return false;
+}
+
+let aliasText = null;
+let aliasPattern = null;
+/**
+ * The names a file gives package.loaded (local Modules = package.loaded;
+ * local cache, saved = package.loaded, {}): rawget(Modules, "x") and
+ * cache["x"] are load sites like package.loaded["x"].
+ * @returns {RegExp|null} The pattern of text just before such a key.
+ */
+function loadedAliases(text) {
+	if (text === aliasText) return aliasPattern;
+	const names = new Set();
+	for (const m of text.matchAll(/\blocal\s+([\w\s,]+?)\s*=\s*([^\n]+)/g)) {
+		const vars = m[1].split(',').map((v) => v.trim());
+		const values = m[2].split(',').map((v) => v.trim());
+		vars.forEach((v, i) => {
+			if (/^package\.loaded\b/.test(values[i] || '') && /^\w+$/.test(v)) names.add(v);
+		});
+	}
+	aliasText = text;
+	aliasPattern =
+		names.size === 0
+			? null
+			: new RegExp(
+					`(?:\\brawget\\s*\\(\\s*(?:${[...names].join('|')})\\s*,|\\b(?:${[...names].join('|')})\\s*\\[)\\s*$`
+				);
+	return aliasPattern;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// The shared Lua root switch
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Today the shared Lua root is _shared/lua; in the target it is _shared itself.
+// The step that empties _shared/lua turns every resolver into one of _shared in
+// the same commit (docs/design/structure-plan.md, Lua module names), so there
+// is never a period with two shared roots.
+const SHARED_LUA_ROOT = '_shared/lua/';
+
+// An expression naming the shared root: shared, SHARED, shared_root,
+// logger_shared_root, Paths.shared_root() …
+const SHARED_IDENT = String.raw`((?:[A-Za-z_]\w*\.)*[A-Za-z_]*[Ss][Hh][Aa][Rr][Ee][Dd]\w*(?:\(\))?)`;
+
+/**
+ * The rewrites of the root switch, in order. Paths to files and folders that
+ * move are rewritten first, as ordinary path tokens; these catch what is left:
+ * the root spelled as a folder (LUA_PATH patterns, install layouts, fixture
+ * trees), the shared test modules' folder, and the root built by a join onto
+ * an expression that names _shared.
+ */
+const SHARED_ROOT_REWRITES = [
+	// The shared test modules' folder: its files are rewritten one by one
+	// above, so what is left names the folder as a whole (an exclusion, a
+	// prune, a test-double root), which is now the shared test tree.
+	[/(?<![A-Za-z0-9_.-])_shared([\\/])lua\1test(?![A-Za-z0-9_.-])/g, '_shared$1tests'],
+	[/(?<![A-Za-z0-9_.-])_shared([\\/])lua(?![A-Za-z0-9_.-])/g, '_shared'],
+	// shared_root .. "/lua": the whole literal names the root.
+	[new RegExp(`${SHARED_IDENT}\\s*\\.\\.\\s*(["'])\\/?lua\\2`, 'g'), '$1'],
+	// shared .. "/lua/?.lua;" and SHARED .. "lua/?.lua;".
+	[new RegExp(`${SHARED_IDENT}(\\s*\\.\\.\\s*)(["'])(\\/?)lua\\/`, 'g'), '$1$2$3$4'],
+	// Python: shared / "lua".
+	[new RegExp(`${SHARED_IDENT}\\s*\\/\\s*(["'])lua\\2`, 'g'), '$1'],
+	// shared('lua', modulePath) in a tool: the module path is now _shared-relative.
+	[/\bshared\(\s*(['"])lua\1\s*,\s*/g, 'shared('],
+	// arg[1] .. "/lua/?.lua;": a LUA_PATH fragment only the shared Lua root has.
+	[/(["'])\/lua\/\?(\.lua|\/init\.lua)/g, '$1/?$2'],
+	// Paths.shared("lua") asks for the root itself.
+	[/\bPaths\.shared\(\s*(["'])lua\1\s*\)/g, 'Paths.shared_root()'],
+	// helpers.shared("lua/") in a test asks for the root itself.
+	[/(\.shared\(\s*)(["'])lua\/?\2(\s*\))/g, '$1$2$2$3']
+];
+
+/** True when `text` spells the shared Lua root in a form the switch rewrites. */
+function hasSharedRoot(text) {
+	return SHARED_ROOT_REWRITES.some(([re]) => new RegExp(re.source).test(text));
+}
+
+/** Applies the shared Lua root switch to one file's text. */
+function sharedRootRewrite(text) {
+	return SHARED_ROOT_REWRITES.reduce((out, [re, to]) => out.replace(re, to), text);
+}
+
+/**
+ * True when `map` moves every file out of `folder` (tree-relative).
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ */
+function emptiesFolder(map, folder) {
+	const prefix = `${folder}/`;
+	let leaves = false;
+	for (const [o, t] of map) {
+		if (t && t.startsWith(prefix)) return false;
+		if (o.startsWith(prefix) && t !== o) leaves = true;
+	}
+	return leaves;
+}
+
+/**
+ * True when `map` empties the shared Lua root: the step that does it carries
+ * the switch.
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ */
+function switchesSharedRoot(map) {
+	let leaves = false;
+	for (const [o, t] of map) {
+		if (t && t.startsWith(SHARED_LUA_ROOT)) return false;
+		if (o.startsWith(SHARED_LUA_ROOT) && t !== o) leaves = true;
+	}
+	return leaves;
 }
 
 /**
@@ -518,12 +972,119 @@ function runtimeEditState(byLuaName, presentNames, tree, oldName, newName) {
 	return 'wrong';
 }
 
+// A call argument list that spells a path in pieces:
+// path.join(ROOT, 'tree', 'folder', 'file.json'). The literals after any leading
+// expression arguments are the path; at least two of them, since one literal is
+// an ordinary path token.
+const JOIN_CALL =
+	/\b([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\(\s*((?:[A-Za-z_$][\w$.]*(?:\(\))?\s*,\s*)*)/g;
+const JOIN_LITERAL = /(['"])([\w@.-]+(?:\/[\w@.-]+)*)\1/y;
+const JOIN_COMMA = /\s*,\s*/y;
+
 /**
- * Finds the references to moved files.
- * @param {Map<string, string|null>} map Tree-relative old path to target.
- * @returns {object[]} One row per (file, old token).
+ * The path-shaped literal runs of a JavaScript file.
+ * @returns {{text: string, parts: string[], quote: string, callee: string, separator: string}[]}
  */
-function references(map) {
+function joinedPaths(text) {
+	const out = [];
+	for (const m of text.matchAll(JOIN_CALL)) {
+		let at = m.index + m[0].length;
+		const start = at;
+		const parts = [];
+		let quote = null;
+		let separator = null;
+		for (;;) {
+			JOIN_LITERAL.lastIndex = at;
+			const lit = JOIN_LITERAL.exec(text);
+			if (!lit) break;
+			quote = quote || lit[1];
+			parts.push(lit[2]);
+			at = JOIN_LITERAL.lastIndex;
+			JOIN_COMMA.lastIndex = at;
+			const comma = JOIN_COMMA.exec(text);
+			if (!comma) break;
+			JOIN_LITERAL.lastIndex = JOIN_COMMA.lastIndex;
+			if (!JOIN_LITERAL.test(text)) break;
+			separator = separator || comma[0];
+			at = JOIN_COMMA.lastIndex;
+		}
+		// One literal joined onto a named base (path.join(DATA, 'x.json')) is a
+		// path too, when the base is a constant the file defines.
+		if (parts.length < 2 && !(parts.length === 1 && m[2].trim())) continue;
+		out.push({ text: text.slice(start, at), parts, quote, callee: m[1], before: m[2], separator });
+	}
+	return out;
+}
+
+/**
+ * Resolves a joined literal run to a moved file or folder, and renders its
+ * new spelling in the same pieces: one literal per path segment below the
+ * base the run started from.
+ */
+function resolveJoinedPath(j, byRepoPath, byRepoDir, successors, env = new Map()) {
+	const joined = path.posix.normalize(j.parts.join('/'));
+	const named = (j.before || '')
+		.split(',')
+		.map((a) => a.trim())
+		.filter(Boolean);
+	const baseName = named[named.length - 1];
+	if (baseName && env.has(baseName))
+		return resolveOnBase(j, env.get(baseName), joined, byRepoPath, byRepoDir, successors);
+	// resolve(SHARED_ROOT, 'modules/llm'): a base the file imports, named for _shared.
+	if (baseName && /^\w*shared\w*$/i.test(baseName))
+		return resolveOnBase(j, `${PREFIX}_shared`, joined, byRepoPath, byRepoDir, successors);
+	if (j.parts.length < 2) return null;
+	const bases = [];
+	if (joined.startsWith(PREFIX)) bases.push('');
+	if (Census.TREES.some((t) => joined === t || joined.startsWith(`${t}/`))) bases.push(PREFIX);
+	// shared('modules', 'llm', 'x.json') or path.join(SHARED, 'data', …): a
+	// helper or a base rooted at _shared.
+	if (/shared/i.test(j.callee) || /shared/i.test(j.before || '')) bases.push(`${PREFIX}_shared/`);
+	for (const base of bases) {
+		const oldRepo = base + joined;
+		if (!EXISTING.has(oldRepo)) {
+			// A file the index does not hold (a fixture a test writes, a generated
+			// output) in a folder that moves whole follows its folder.
+			for (let d = path.posix.dirname(oldRepo); d.length > base.length; d = path.posix.dirname(d)) {
+				if (!EXISTING.has(d)) continue;
+				const to = byRepoDir.get(d);
+				if (!to || to === SPLIT) break;
+				const newRepo = to + oldRepo.slice(d.length);
+				if (!newRepo.startsWith(base)) break;
+				const rendered = newRepo
+					.slice(base.length)
+					.split('/')
+					.map((p) => `${j.quote}${p}${j.quote}`)
+					.join(j.separator || ', ');
+				return { kind: 'join', rendered, oldRepo: d, newRepo };
+			}
+			continue;
+		}
+		let newRepo = byRepoPath.get(oldRepo) || byRepoDir.get(oldRepo);
+		if (!newRepo) return null;
+		let kind = 'join';
+		if (newRepo === SPLIT) {
+			newRepo = successors.get(oldRepo);
+			kind = 'join-successor';
+		}
+		if (!newRepo || newRepo === PREFIX || !newRepo.startsWith(base))
+			return { kind: 'join-split', rendered: '(split)', oldRepo, newRepo: null };
+		const rel = newRepo.slice(base.length);
+		const rendered = rel
+			.split('/')
+			.map((p) => `${j.quote}${p}${j.quote}`)
+			.join(j.separator || ', ');
+		return { kind, rendered, oldRepo, newRepo };
+	}
+	return null;
+}
+
+/**
+ * What references() needs to judge a file: the moves by path, folder and Lua
+ * name, and the names the tree answers before and after.
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ */
+function referenceContext(map) {
 	const moved = new Map([...map].filter(([o, t]) => o !== t));
 	const byRepoPath = new Map();
 	const byLuaName = new Map(); // "<root>|<name>" -> [old, target]
@@ -544,14 +1105,484 @@ function references(map) {
 		const root = old.startsWith('_shared/') ? '_shared' : old.split('/')[0];
 		presentNames.add(`${root}|${name}`);
 	}
+	const targetNames = new Set();
+	for (const t of map.values()) {
+		const name = t && luaModuleName(t, true);
+		if (name) targetNames.add(`${t.split('/')[0]}|${name}`);
+	}
 	const byRepoDir = directoryMap(map);
 	const successors = splitSuccessors(map, byRepoDir);
-	const rows = [];
+	const rootSwitch = switchesSharedRoot(map);
 	const pathToken = /[A-Za-z0-9_.%\\/-]*[A-Za-z0-9_-]\.[A-Za-z0-9]+/g;
 	// A folder spelled with at least one separator, quoted or not.
 	const dirToken = /[A-Za-z0-9_.%\\-]*[\\/][A-Za-z0-9_.%\\/-]*[A-Za-z0-9_]\/?(?![A-Za-z0-9_.])/g;
 	const luaToken = /["']([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)["']/g;
+	return {
+		map,
+		moved,
+		byRepoPath,
+		byLuaName,
+		presentNames,
+		targetNames,
+		byRepoDir,
+		successors,
+		rootSwitch,
+		pathToken,
+		dirToken,
+		luaToken
+	};
+}
+
+/**
+ * The references one file makes to moved files.
+ * @param {string} file Repository path.
+ * @param {string} text Its content.
+ * @param {object} ctx referenceContext(map).
+ * @returns {object[]} One row per (file, old token).
+ */
+function scanFile(file, text, ctx) {
+	const {
+		map,
+		moved,
+		byRepoPath,
+		byLuaName,
+		presentNames,
+		targetNames,
+		byRepoDir,
+		successors,
+		rootSwitch,
+		pathToken,
+		dirToken,
+		luaToken
+	} = ctx;
+	const rows = [];
+	const code = /\.(lua|ahk)$/.test(file) ? stripComments(text, path.extname(file)) : null;
+	const inTree = file.startsWith(PREFIX) ? file.slice(PREFIX.length).split('/')[0] : null;
+	const category = categoryOf(file);
+	const seen = new Set();
+	const add = (kind, oldToken, newToken, resolution = null) => {
+		const key = `${kind}|${oldToken}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		rows.push({ file, category, kind, old: oldToken, new: newToken, resolution });
+	};
+	if (rootSwitch && hasSharedRoot(text))
+		add('shared-root', '_shared/lua', '_shared', { oldRepo: `${PREFIX}_shared/lua` });
+	// The file itself moves: what it spells relative to its own place must
+	// follow it even when the target stays.
+	const selfOld = inTree ? file.slice(PREFIX.length) : null;
+	const selfTarget = selfOld && moved.has(selfOld) ? moved.get(selfOld) : null;
+	const stays = (token, hit) =>
+		!hit && selfTarget && /^\.\.?[\\/]/.test(token)
+			? resolveOwnRelative(token, file, selfTarget)
+			: hit;
+	const sharedFolders = new Set();
+	for (const m of text.matchAll(pathToken)) {
+		const hit = stays(
+			m[0],
+			resolvePathToken(m[0], file, inTree, byRepoPath, isSharedArgument(text, m.index), byRepoDir)
+		);
+		if (hit) add('path', m[0], hit.newRepo === PREFIX ? '(retired)' : hit.newRepo, hit);
+		// base .. "/modules/llm/defaults.json" read as _shared: the same file's
+		// base .. "/modules/llm" names that shared folder too, not the driver's.
+		if (hit && hit.form === 'shared' && inTree)
+			for (
+				let d = path.posix.dirname(m[0].replace(/\\/g, '/'));
+				d && d !== '.' && d !== '/';
+				d = path.posix.dirname(d)
+			)
+				sharedFolders.add(d.replace(/^\//, ''));
+	}
+	// helpers.shared("keymap/" .. name): a one-folder prefix the folder token
+	// cannot see (it needs a separator inside).
+	for (const m of text.matchAll(
+		/(\b\w*[sS]hared(?!_llm)\w*\(\s*)(["'`])([A-Za-z0-9_.-]+)\/(?=\2|\$\{)/g
+	)) {
+		const hit = resolvePathToken(m[3], file, inTree, byRepoDir, true);
+		if (!hit || hit.form !== 'shared' || hit.newRepo === SPLIT) continue;
+		const rel = hit.newRepo.slice(`${PREFIX}_shared/`.length);
+		add('shared-prefix', m[0], `${m[1]}${m[2]}${rel}/`, hit);
+	}
+	if (selfTarget && file.endsWith('.lua')) {
+		for (const t of ownTails(text, selfOld, selfTarget))
+			add('lua-tail', t.old, t.new, { oldRepo: file });
+		for (const c of ownClimbs(text, selfOld, selfTarget))
+			add('lua-climb', c.old, c.new, { oldRepo: file });
+	}
+	for (const m of text.matchAll(dirToken)) {
+		const raw = m[0].replace(/[\\/]$/, '');
+		if (/\.[A-Za-z0-9]+$/.test(raw) || !/[A-Za-z]/.test(raw)) continue;
+		const hit = stays(
+			raw,
+			resolvePathToken(
+				raw,
+				file,
+				inTree,
+				byRepoDir,
+				isSharedArgument(text, m.index) ||
+					sharedFolders.has(raw.replace(/\\/g, '/').replace(/^\//, ''))
+			)
+		);
+		if (!hit) continue;
+		if (hit.newRepo !== SPLIT) {
+			add('dir', raw, hit.newRepo, hit);
+			continue;
+		}
+		// A folder the plan scatters: prose and comments name its nearest common
+		// new folder; live code is a refusal until rules.cjs resolves the site.
+		const prose = isProse(file, text, code, m.index);
+		const successor = successors.get(hit.oldRepo);
+		const deep = successor && successor.split('/').length > 3;
+		if (prose && deep) add('dir', raw, successor, { ...hit, newRepo: successor });
+		else if (prose) add('dir-split-prose', raw, '(split)', hit);
+		else if (successor) add('dir-successor', raw, successor, { ...hit, newRepo: successor });
+		else add(prose ? 'dir-split-prose' : 'dir-split', raw, '(split)', hit);
+	}
+	const jsEnv = /\.(c?js|mjs)$/.test(file) ? jsConstants(text, file) : new Map();
+	// A path in a regular expression: /static\/ergopti_plus\/_shared\/x\.json/.
+	if (/\.(c?js|mjs)$/.test(file))
+		for (const m of text.matchAll(/[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
+			const plain = m[0].replace(/\\\//g, '/').replace(/\\\./g, '.');
+			const isFile = /\.[A-Za-z0-9]+$/.test(plain);
+			const hit = resolvePathToken(plain, file, inTree, isFile ? byRepoPath : byRepoDir);
+			if (
+				!hit ||
+				hit.newRepo === SPLIT ||
+				hit.newRepo === PREFIX ||
+				!['repo', 'tree'].includes(hit.form)
+			)
+				continue;
+			const spelled = hit.form === 'repo' ? hit.newRepo : hit.newRepo.slice(PREFIX.length);
+			add('path-regex', m[0], spelled.replace(/\./g, '\\.').replace(/\//g, '\\/'), hit);
+		}
+	if (/\.(c?js|mjs)$/.test(file))
+		for (const j of joinedPaths(text)) {
+			const hit = resolveJoinedPath(j, byRepoPath, byRepoDir, successors, jsEnv);
+			if (hit) add(hit.kind, j.text, hit.rendered, hit);
+		}
+	// A scan scope over a folder the plan scatters (edits.cjs FOLDER_EDITS):
+	// the step that empties the folder rewrites it as listed, and a listed
+	// text that no longer matches refuses the step instead of passing silently.
+	for (const e of Edits.FOLDER_EDITS) {
+		if (e.file !== file || !emptiesFolder(map, e.empties)) continue;
+		if (text.includes(e.from)) add('folder-edit', e.from, e.to, { oldRepo: PREFIX + e.empties });
+		else
+			add('folder-edit-stale', e.from, `(${e.file} no longer holds the listed text)`, {
+				oldRepo: PREFIX + e.empties
+			});
+	}
+	for (const e of Rules.RUNTIME_EDITS) {
+		if (PREFIX + e.file !== file || !text.includes(e.from)) continue;
+		const states = e.expect.map(([tree, oldName, newName]) =>
+			runtimeEditState(byLuaName, presentNames, tree, oldName, newName)
+		);
+		// A step that leaves one of the edit's modules for a later step has
+		// nothing to rewrite yet: the edit belongs to the step that moves the
+		// last of them, and the whole-sequence map sees them all moved.
+		if (!states.includes('wrong') && states.includes('pending')) continue;
+		const wrong = e.expect.filter((_, i) => states[i] === 'wrong');
+		const first = byLuaName.get(`${e.expect[0][0]}|${e.expect[0][1]}`);
+		add(
+			wrong.length ? 'lua-prefix-split' : 'lua-rewrite',
+			e.from,
+			wrong.length ? `(edit expects ${wrong.map((w) => w[1]).join(', ')})` : e.to,
+			{
+				oldRepo: first ? PREFIX + first[0] : null
+			}
+		);
+	}
+	if (file.endsWith('.lua') && inTree) {
+		// A quoted prefix completed by concatenation: "modules.llm." .. name.
+		for (const m of text.matchAll(
+			/(?:\brequire\s*\(?\s*|package\.loaded\s*\[\s*)["']((?:[A-Za-z_][A-Za-z0-9_]*\.)+)["']\s*\.\./g
+		)) {
+			if (Rules.RUNTIME_EDITS.some((e) => PREFIX + e.file === file && e.prefix === m[1])) continue;
+			const site = Rules.RUNTIME_PREFIXES.find((r) => PREFIX + r.file === file && r.old === m[1]);
+			const under = [...byLuaName.keys()].filter((k) => k.split('|')[1].startsWith(m[1]));
+			if (under.length === 0) continue;
+			if (!site) {
+				add('lua-prefix-split', m[1], '(unlisted runtime prefix)');
+				continue;
+			}
+			// Names with no module file are stubs of absent modules: they follow
+			// the prefix and prove nothing either way.
+			const found = site.names
+				.map((n) => [
+					n,
+					[inTree, '_shared'].map((r) => byLuaName.get(`${r}|${m[1]}${n}`)).find(Boolean)
+				])
+				.filter(([, hit]) => hit);
+			const news = found.map(([n, hit]) => [n, hit[2]]);
+			const prefix = news.length
+				? news[0][1].slice(0, news[0][1].length - news[0][0].length)
+				: m[1];
+			const ok = news.every(([n, full]) => full === prefix + n);
+			const first = found.length ? found[0][1] : null;
+			add(
+				ok ? 'lua-prefix' : 'lua-prefix-split',
+				m[1],
+				ok ? prefix : `(names scatter: ${news.map((x) => x[1]).join(', ')})`,
+				{
+					oldRepo: first ? PREFIX + first[0] : null
+				}
+			);
+		}
+		const roots = inTree === '_shared' ? ['_shared', 'macos', 'linux'] : [inTree, '_shared'];
+		// A name escaped for a Lua pattern: src:find('require%("test%.x"%)').
+		for (const m of text.matchAll(/(?<![\w%.])([A-Za-z_]\w*(?:%\.[A-Za-z_]\w*)+)(?![\w])/g)) {
+			const name = m[1].replace(/%\./g, '.');
+			for (const r of roots) {
+				const hit = byLuaName.get(`${r}|${name}`);
+				if (hit && hit[2]) {
+					add('lua-module-escaped', m[1], hit[2].replace(/\./g, '%.'), {
+						oldRepo: PREFIX + hit[0]
+					});
+					break;
+				}
+			}
+		}
+		const lookup = (name) => {
+			for (const r of roots) {
+				const hit = byLuaName.get(`${r}|${name}`);
+				if (hit) return hit;
+			}
+			return null;
+		};
+		// A load site quoted inside a string: 'params[require(\"config_keys\").KEY.X]'.
+		for (const m of text.matchAll(
+			/(\b(?:require\s*\(?|package\.(?:loaded|preload)\s*\[)\s*)\\(["'])([A-Za-z_][\w.]*)\\\2/g
+		)) {
+			const hit = lookup(m[3]);
+			if (hit && hit[2])
+				add('lua-module-quoted', m[0], `${m[1]}\\${m[2]}${hit[2]}\\${m[2]}`, {
+					oldRepo: PREFIX + hit[0]
+				});
+		}
+		// package.loaded.logger: a module key spelled as a field.
+		for (const m of text.matchAll(/\bpackage\.(loaded|preload)\.([A-Za-z_]\w*)(?!\w)/g)) {
+			const hit = lookup(m[2]);
+			if (hit && hit[2])
+				add('lua-module-field', m[0], `package.${m[1]}[${JSON.stringify(hit[2])}]`, {
+					oldRepo: PREFIX + hit[0]
+				});
+		}
+		// A dotted module name inside a longer string: "infra.monotonic,keystats.x",
+		// "require('keystats.x') loads". Strings only: in code, keystats.metrics
+		// is a field of a local table that happens to share a module's name.
+		for (const lit of text.matchAll(LUA_SHORT_STRING)) {
+			if (/^[A-Za-z_][\w.]*$/.test(lit[2])) continue; // a whole name: luaToken below
+			for (const m of lit[2].matchAll(INLINE_MODULE_NAME)) {
+				const hit = configKeys().has(m[1]) ? null : lookup(m[1]);
+				if (hit && hit[2]) add('lua-module-inline', m[1], hit[2], { oldRepo: PREFIX + hit[0] });
+			}
+		}
+		// A table of module names ({ "keymap.terminators", "json", … }): every
+		// entry is a module name the tree answers and one at least is dotted, so
+		// its one-word entries are module names too. Rewritten as a whole.
+		for (const t of text.matchAll(LUA_NAME_TABLE)) {
+			const names = [...t[0].matchAll(/(["'])([A-Za-z_][\w.]*)\1/g)].map((x) => x[2]);
+			// Names of an earlier step are already new: both spellings count.
+			const known = (n) =>
+				roots.some((r) => presentNames.has(`${r}|${n}`) || targetNames.has(`${r}|${n}`));
+			// Or a table handed to a module helper (with_fresh_modules({ … })), or
+			// iterated to load or purge each name (for _, n in ipairs({ … }) do
+			// package.loaded[n] = nil).
+			const lead = text.slice(Math.max(0, t.index - 60), t.index);
+			const after = text.slice(t.index + t[0].length, t.index + t[0].length + 200);
+			const helper = /\b\w*modules?\w*\s*\(\s*$/i.test(lead);
+			// The loop variable itself is what is loaded or purged, not a piece of
+			// a name it builds ("modules." .. name is a runtime site).
+			const loopVar = (lead.match(/\bfor\s+\w+\s*,\s*(\w+)\s+in\s+i?pairs\s*\(\s*$/) || [])[1];
+			const loop =
+				!!loopVar &&
+				new RegExp(
+					`(?:package\\.(?:loaded|preload)\\s*\\[|\\brequire\\s*\\(|\\brawget\\s*\\(\\s*package\\.loaded\\s*,)\\s*${loopVar}\\s*[\\])]`
+				).test(after);
+			if (
+				names.length < (helper || loop ? 1 : 2) ||
+				!(helper || loop || names.some((n) => n.includes('.') && known(n) && !configKeys().has(n)))
+			)
+				continue;
+			const words = names.filter((n) => !n.includes('.') && lookup(n) && lookup(n)[2]);
+			if (words.length === 0) continue;
+			const next = t[0].replace(/(["'])([A-Za-z_][\w.]*)\1/g, (whole, q, n) => {
+				const hit = configKeys().has(n) ? null : lookup(n);
+				return hit && hit[2] ? `${q}${hit[2]}${q}` : whole;
+			});
+			add('lua-module-list', t[0], next, { oldRepo: PREFIX + lookup(words[0])[0] });
+		}
+		for (const m of text.matchAll(luaToken)) {
+			// A one-word string ("json", "chord", "logger") is a module name
+			// only where it is loaded: elsewhere it is a file type, a slot kind
+			// or a settings section that happens to share the name.
+			// A config key that spells a module name ("llm.app_profile_overrides")
+			// is a key everywhere but at a load site, like a one-word name.
+			const loadOnly = !m[1].includes('.') || configKeys().has(m[1]);
+			if (loadOnly && !isModuleLoadSite(text, m.index)) continue;
+			for (const r of roots) {
+				const hit = byLuaName.get(`${r}|${m[1]}`);
+				if (hit) {
+					add('lua-module', m[1], hit[2] || '(retired)', {
+						oldRepo: PREFIX + hit[0],
+						loadOnly
+					});
+					break;
+				}
+			}
+		}
+	} else if (/\.(c?js|mjs|py|sh|ya?ml|nix|lua)$/.test(file)) {
+		// Lua run from another language (luajit -e, a stdin chunk, a fixture
+		// written to disk): its require sites, and only those, move. The driver
+		// is the one the file names; a name both Lua drivers answer differently
+		// is left alone rather than guessed.
+		const drivers = ['macos', 'linux'].filter((d) => file.includes(d) || text.includes(`/${d}`));
+		for (const m of text.matchAll(luaToken)) {
+			// A dotted name a tool checks a source for (src.includes('keystats.x'))
+			// is a module name too, unless it is a config or locale key.
+			// Only as the argument of a source check: a registry key or a menu id
+			// elsewhere in a tool may share a module's spelling ('updater.channels').
+			const dotted =
+				m[1].includes('.') &&
+				/\.(c?js|mjs|py)$/.test(file) &&
+				/\.(?:includes|indexOf|lastIndexOf|startsWith|endsWith|find|count)\(\s*$/.test(
+					text.slice(Math.max(0, m.index - 40), m.index)
+				) &&
+				!configKeys().has(m[1]) &&
+				!localeKeys().has(m[1]);
+			if ((!dotted && !isModuleLoadSite(text, m.index)) || NODE_MODULES.has(m[1])) continue;
+			const shared = byLuaName.get(`_shared|${m[1]}`);
+			const own = drivers.map((d) => byLuaName.get(`${d}|${m[1]}`)).filter(Boolean);
+			const targets = new Set(own.map((h) => h[2]));
+			const hit = shared || (targets.size === 1 ? own[0] : null);
+			if (hit && hit[2])
+				add('lua-module', m[1], hit[2], { oldRepo: PREFIX + hit[0], loadOnly: !dotted });
+		}
+	}
+	return rows;
+}
+
+/** The new place of a repository folder: itself, its target, or a split folder's successor. */
+function newFolder(dir, byRepoDir, successors) {
+	const hit = byRepoDir.get(dir);
+	if (!hit) return dir;
+	return hit === SPLIT ? successors.get(dir) || null : hit;
+}
+
+/**
+ * A join onto a constant the file defines: the pieces are respelled from the
+ * new place of that base, so `path.join(DATA, 'locale_order.json')` follows
+ * both the file and `DATA = path.join(SHARED, 'data')`.
+ */
+function resolveOnBase(j, base, joined, byRepoPath, byRepoDir, successors) {
+	const full = path.posix.normalize(base ? `${base}/${joined}` : joined);
+	if (!EXISTING.has(full)) return null;
+	const newBase = newFolder(base, byRepoDir, successors);
+	let newFull = byRepoPath.get(full) || null;
+	if (!newFull) newFull = newFolder(full, byRepoDir, successors);
+	if (newFull === full && newBase === base) return null;
+	if (newBase === null || newFull === null || newFull === PREFIX)
+		return { kind: 'join-split', rendered: '(split)', oldRepo: full, newRepo: null };
+	// Relative to the base's new place, climbing out of it when the original
+	// climbed too (path.join(WIN, '..', '_shared', …)).
+	const rel = path.posix.relative(newBase || '.', newFull) || '.';
+	const pieces = j.parts.length === 1 ? [rel] : rel.split('/');
+	const rendered = pieces.map((p) => `${j.quote}${p}${j.quote}`).join(j.separator || ', ');
+	if (rendered === j.text) return null;
+	return { kind: 'join', rendered, oldRepo: full, newRepo: newFull };
+}
+
+/**
+ * The path constants a JavaScript file defines, evaluated to repository
+ * paths ('' is the repository root): `ROOT = path.resolve(__dirname, '..', '..')`,
+ * `SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared')`,
+ * `DATA = path.join(SHARED, 'data')`, `` X = `${SHARED}/data` ``.
+ * @returns {Map<string, string>}
+ */
+function jsConstants(text, file) {
+	const env = new Map();
+	const dir = path.posix.dirname(file);
+	const norm = (p) => {
+		const n = path.posix.normalize(p);
+		if (n === '.') return '';
+		return n.startsWith('..') ? null : n.replace(/\/$/, '');
+	};
+	const argValue = (a) => {
+		if (a === '__dirname') return dir;
+		const lit = a.match(/^(['"])([^'"]*)\1$/);
+		if (lit) return { piece: lit[2] };
+		if (env.has(a)) return env.get(a);
+		return undefined;
+	};
+	const evaluate = (expr) => {
+		const call = expr.match(/^path\.(join|resolve)\(([^()]*)\)$/);
+		if (call) {
+			let acc = null;
+			for (const raw of call[2]
+				.split(',')
+				.map((x) => x.trim())
+				.filter(Boolean)) {
+				const v = argValue(raw);
+				if (v === undefined) return null;
+				if (typeof v === 'string') acc = v;
+				else if (acc === null) return null;
+				else acc = acc ? `${acc}/${v.piece}` : v.piece;
+			}
+			return acc === null ? null : norm(acc || '.');
+		}
+		const tpl = expr.match(/^`\$\{([A-Za-z_$][\w$]*)\}\/([^`$]*)`$/);
+		if (tpl && env.has(tpl[1])) return norm(`${env.get(tpl[1]) || '.'}/${tpl[2]}`);
+		const lit = expr.match(/^(['"])((?:static\/ergopti_plus|tools|docs)(?:\/[^'"]*)?)\1$/);
+		if (lit) return norm(lit[2]);
+		return null;
+	};
+	for (const m of text.matchAll(
+		/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+?)\s*;?\s*$/gm
+	)) {
+		const v = evaluate(m[2].trim());
+		if (v !== null && v !== undefined) env.set(m[1], v);
+	}
+	return env;
+}
+
+/**
+ * The test data whose exact bytes another file pins by SHA-256 (a corpus
+ * captured from a legacy reader): a rewrite would break the pin, and the old
+ * paths it holds are history like an audit's.
+ * @returns {Set<string>} Repository paths.
+ */
+function pinnedBytes() {
+	const crypto = require('node:crypto');
+	const pins = new Set();
+	const hashes = new Map();
 	for (const file of textFiles()) {
+		let bytes;
+		try {
+			bytes = fs.readFileSync(path.join(ROOT, file));
+		} catch {
+			continue;
+		}
+		if (bytes.length > TEXT_LIMIT_BYTES) continue;
+		hashes.set(file, crypto.createHash('sha256').update(bytes).digest('hex'));
+		for (const m of bytes.toString('utf8').matchAll(/\b[0-9a-f]{64}\b/g)) pins.add(m[0]);
+	}
+	// Captured corpora only: a source or a test support file tracked by a digest
+	// manifest moves and is rewritten like any other, and its manifest follows.
+	return new Set(
+		[...hashes].filter(([f, h]) => pins.has(h) && /(^|\/)tests\/corpus\//.test(f)).map(([f]) => f)
+	);
+}
+
+/**
+ * Finds the references to moved files.
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ * @returns {object[]} One row per (file, old token).
+ */
+function references(map) {
+	const ctx = referenceContext(map);
+	const rows = [];
+	const pinned = pinnedBytes();
+	for (const file of textFiles()) {
+		if (pinned.has(file)) continue;
 		const abs = path.join(ROOT, file);
 		let stat;
 		try {
@@ -561,111 +1592,7 @@ function references(map) {
 		}
 		if (stat.size > TEXT_LIMIT_BYTES) continue;
 		const text = fs.readFileSync(abs, 'utf8');
-		const code = /\.(lua|ahk)$/.test(file) ? stripComments(text, path.extname(file)) : null;
-		const inTree = file.startsWith(PREFIX) ? file.slice(PREFIX.length).split('/')[0] : null;
-		const category = categoryOf(file);
-		const seen = new Set();
-		const add = (kind, oldToken, newToken, resolution = null) => {
-			const key = `${kind}|${oldToken}`;
-			if (seen.has(key)) return;
-			seen.add(key);
-			rows.push({ file, category, kind, old: oldToken, new: newToken, resolution });
-		};
-		for (const m of text.matchAll(pathToken)) {
-			const hit = resolvePathToken(m[0], file, inTree, byRepoPath);
-			if (hit) add('path', m[0], hit.newRepo === PREFIX ? '(retired)' : hit.newRepo, hit);
-		}
-		for (const m of text.matchAll(dirToken)) {
-			const raw = m[0].replace(/[\\/]$/, '');
-			if (/\.[A-Za-z0-9]+$/.test(raw) || !/[A-Za-z]/.test(raw)) continue;
-			const hit = resolvePathToken(raw, file, inTree, byRepoDir);
-			if (!hit) continue;
-			if (hit.newRepo !== SPLIT) {
-				add('dir', raw, hit.newRepo, hit);
-				continue;
-			}
-			// A folder the plan scatters: prose and comments name its nearest common
-			// new folder; live code is a refusal until rules.cjs resolves the site.
-			const prose = isProse(file, text, code, m.index);
-			const successor = successors.get(hit.oldRepo);
-			const deep = successor && successor.split('/').length > 3;
-			if (prose && deep) add('dir', raw, successor, { ...hit, newRepo: successor });
-			else if (prose) add('dir-split-prose', raw, '(split)', hit);
-			else if (successor) add('dir-successor', raw, successor, { ...hit, newRepo: successor });
-			else add(prose ? 'dir-split-prose' : 'dir-split', raw, '(split)', hit);
-		}
-		for (const e of Rules.RUNTIME_EDITS) {
-			if (PREFIX + e.file !== file || !text.includes(e.from)) continue;
-			const states = e.expect.map(([tree, oldName, newName]) =>
-				runtimeEditState(byLuaName, presentNames, tree, oldName, newName)
-			);
-			// A step that leaves one of the edit's modules for a later step has
-			// nothing to rewrite yet: the edit belongs to the step that moves the
-			// last of them, and the whole-sequence map sees them all moved.
-			if (!states.includes('wrong') && states.includes('pending')) continue;
-			const wrong = e.expect.filter((_, i) => states[i] === 'wrong');
-			const first = byLuaName.get(`${e.expect[0][0]}|${e.expect[0][1]}`);
-			add(
-				wrong.length ? 'lua-prefix-split' : 'lua-rewrite',
-				e.from,
-				wrong.length ? `(edit expects ${wrong.map((w) => w[1]).join(', ')})` : e.to,
-				{
-					oldRepo: first ? PREFIX + first[0] : null
-				}
-			);
-		}
-		if (file.endsWith('.lua') && inTree) {
-			// A quoted prefix completed by concatenation: "modules.llm." .. name.
-			for (const m of text.matchAll(
-				/(?:\brequire\s*\(?\s*|package\.loaded\s*\[\s*)["']((?:[A-Za-z_][A-Za-z0-9_]*\.)+)["']\s*\.\./g
-			)) {
-				if (Rules.RUNTIME_EDITS.some((e) => PREFIX + e.file === file && e.prefix === m[1]))
-					continue;
-				const site = Rules.RUNTIME_PREFIXES.find((r) => PREFIX + r.file === file && r.old === m[1]);
-				const under = [...byLuaName.keys()].filter((k) => k.split('|')[1].startsWith(m[1]));
-				if (under.length === 0) continue;
-				if (!site) {
-					add('lua-prefix-split', m[1], '(unlisted runtime prefix)');
-					continue;
-				}
-				// Names with no module file are stubs of absent modules: they follow
-				// the prefix and prove nothing either way.
-				const found = site.names
-					.map((n) => [
-						n,
-						[inTree, '_shared'].map((r) => byLuaName.get(`${r}|${m[1]}${n}`)).find(Boolean)
-					])
-					.filter(([, hit]) => hit);
-				const news = found.map(([n, hit]) => [n, hit[2]]);
-				const prefix = news.length
-					? news[0][1].slice(0, news[0][1].length - news[0][0].length)
-					: m[1];
-				const ok = news.every(([n, full]) => full === prefix + n);
-				const first = found.length ? found[0][1] : null;
-				add(
-					ok ? 'lua-prefix' : 'lua-prefix-split',
-					m[1],
-					ok ? prefix : `(names scatter: ${news.map((x) => x[1]).join(', ')})`,
-					{
-						oldRepo: first ? PREFIX + first[0] : null
-					}
-				);
-			}
-			const roots = inTree === '_shared' ? ['_shared', 'macos', 'linux'] : [inTree, '_shared'];
-			for (const m of text.matchAll(luaToken)) {
-				// A one-word string ("json", "chord", "logger") is a module name
-				// only where it is loaded: elsewhere it is a file type, a slot kind
-				// or a settings section that happens to share the name.
-				if (!m[1].includes('.') && !isModuleLoadSite(text, m.index)) continue;
-				for (const r of roots) {
-					const hit = byLuaName.get(`${r}|${m[1]}`);
-					if (hit) {
-						add('lua-module', m[1], hit[2] || '(retired)', { oldRepo: PREFIX + hit[0] });
-						break;
-					}
-				}
-			}
-		}
+		rows.push(...scanFile(file, text, ctx));
 	}
 	return rows;
 }
@@ -727,9 +1654,9 @@ function attributeSteps(plan, refs) {
 }
 
 /** The kinds a step cannot apply mechanically: phase 2 refuses them. */
-const REFUSED_KINDS = new Set(['dir-split', 'lua-prefix-split']);
+const REFUSED_KINDS = new Set(['dir-split', 'lua-prefix-split', 'join-split', 'folder-edit-stale']);
 /** The kinds the step applies but a reviewer reads. */
-const REVIEWED_KINDS = new Set(['dir-successor', 'dir-split-prose']);
+const REVIEWED_KINDS = new Set(['dir-successor', 'dir-split-prose', 'join-successor']);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Gates
@@ -1034,6 +1961,18 @@ if (require.main === module) main();
 
 module.exports = {
 	SPLIT,
+	EXISTING,
+	referenceContext,
+	scanFile,
+	SHARED_LUA_ROOT,
+	pinnedBytes,
+	LUA_SHORT_STRING,
+	ownTails,
+	ownClimbs,
+	joinedPaths,
+	jsConstants,
+	sharedRootRewrite,
+	switchesSharedRoot,
 	attributeSteps,
 	REFUSED_KINDS,
 	runtimeEditState,

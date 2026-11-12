@@ -45,12 +45,26 @@ function git(...args) {
 	return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
+// The kinds whose new token newPathToken spells from the referencing file's
+// place; every other kind carries its new text in the row.
+const SPELLED_KINDS = new Set(['path', 'dir', 'dir-successor', 'dir-split-prose', 'dir-split']);
+
 /** Builds the new spelling of a path token in the form it was written. */
 function newPathToken(row, movedRepo) {
 	const r = row.resolution;
-	const backslash = row.old.includes('\\') && !row.old.includes('/');
+	// The separator the token was written with: "/", "\" (AHK, Windows) or
+	// the doubled "\\" of a JavaScript string that spells a Windows path.
+	const sep = row.old.includes('/')
+		? '/'
+		: row.old.includes('\\\\')
+			? '\\\\'
+			: row.old.includes('\\')
+				? '\\'
+				: '/';
 	let out;
 	if (r.form === 'repo') out = r.newRepo;
+	else if (r.form === 'embedded') out = r.keep + r.newRepo.slice(PREFIX.length);
+	else if (r.form === 'shared-alias') out = r.keep + r.newRepo.slice(`${PREFIX}_shared/`.length);
 	else if (r.form === 'tree') out = r.newRepo.slice(PREFIX.length);
 	else if (r.form === 'shared') out = r.newRepo.slice(`${PREFIX}_shared/`.length);
 	else if (r.form === 'root') {
@@ -58,6 +72,22 @@ function newPathToken(row, movedRepo) {
 		// the target's: driver_root .. "/../_shared/data/x" keeps its "../_shared".
 		const refTree = row.file.slice(PREFIX.length).split('/')[0];
 		out = r.lead + path.posix.relative(`${PREFIX}${refTree}`, r.newRepo);
+		// A token that climbs out of the tree and back in keeps that climb:
+		// driver_root() .. "/../_shared/modules/x" written in a _shared file still
+		// starts from a driver root at run time.
+		const segs = row.old
+			.replace(/\\\\|\\/g, '/')
+			.slice(r.lead.length)
+			.replace(/^\//, '')
+			.split('/');
+		for (let i = segs.length - 1; i > 0; i--) {
+			const head = segs.slice(0, i);
+			if (!head.includes('..')) continue;
+			const dir = path.posix.normalize(`${PREFIX}${refTree}/${head.join('/')}`);
+			if (!r.newRepo.startsWith(`${dir}/`)) continue;
+			out = `${r.lead}${head.join('/')}/${path.posix.relative(dir, r.newRepo)}`;
+			break;
+		}
 	} else {
 		// File-relative: relative to where the referencing file will be.
 		const from = path.posix.dirname(movedRepo.get(row.file) || row.file);
@@ -65,9 +95,10 @@ function newPathToken(row, movedRepo) {
 		if (r.lead === '' && !rel.startsWith('.') && row.old.startsWith('./')) rel = `./${rel}`;
 		out = r.lead + rel;
 	}
-	// A token spelled with a leading slash (DIR .. "/adapters/x.lua") keeps it.
-	if (row.old.startsWith('/') && out !== '' && !out.startsWith('/')) out = `/${out}`;
-	return backslash ? out.replace(/\//g, '\\') : out;
+	// A token spelled with a leading separator (DIR .. "/adapters/x.lua",
+	// _SharedDir . "\modules\x.json") keeps it.
+	if (row.old.startsWith(sep) && out !== '' && !out.startsWith('/')) out = `/${out}`;
+	return sep === '/' ? out : out.replace(/\//g, sep);
 }
 
 /** Re-relativises the relative #Include lines of an AHK file that moves. */
@@ -84,6 +115,130 @@ function rewriteOwnIncludes(text, oldRepo, newRepo, finalRepo) {
 			return head + (lead || '') + (sep === '\\' ? rel.replace(/\//g, '\\') : rel);
 		}
 	);
+}
+
+/**
+ * Rewrites one file's text for the references a step lists in it. Rows run
+ * longest first, so a long path is rewritten before a token it contains; the
+ * shared Lua root switch runs last, on what the path rewrites leave.
+ * @param {string} text The file's text.
+ * @param {object[]} rows The file's rows of Plan.references().
+ * @param {Map<string, string>} movedRepo The step's moves, repository paths.
+ * @param {string} file The file's repository path, for messages.
+ * @returns {string} The rewritten text.
+ */
+function rewriteText(text, rows, movedRepo, file) {
+	rows.sort((a, b) => b.old.length - a.old.length);
+	let rootSwitch = false;
+	// Every replacement is final: a rewritten span becomes a placeholder until
+	// the end, so a shorter row (the folder _shared/core) never rewrites inside
+	// what a longer one wrote (…/_shared/core/network/data/x.json).
+	const slots = [];
+	const hold = (value) => {
+		slots.push(value);
+		return `\u0000${slots.length - 1}\u0000`;
+	};
+	const swap = (from, to) => {
+		text = text.split(from).join(hold(to));
+	};
+	for (const row of rows) {
+		// The root switch runs last, on what the path rewrites leave.
+		if (row.kind === 'shared-root') {
+			rootSwitch = true;
+			continue;
+		}
+		if (row.new === '(retired)') {
+			console.log(`  review by hand: ${file} names retired ${row.old}`);
+			continue;
+		}
+		if (Plan.REFUSED_KINDS.has(row.kind))
+			throw new Error(`refused reference ${row.file}: ${row.old}`);
+		// A sentence naming a folder that scatters stays as written; the
+		// review list of the step names it.
+		if (row.new === Plan.SPLIT) continue;
+		const esc = row.old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		if (row.kind === 'lua-rewrite') {
+			if (!text.includes(row.old))
+				throw new Error(`${file}: the listed runtime edit no longer matches`);
+			swap(row.old, row.new);
+			continue;
+		}
+		if (
+			['lua-tail', 'lua-climb', 'folder-edit', 'lua-module-quoted', 'shared-prefix'].includes(
+				row.kind
+			)
+		) {
+			swap(row.old, row.new);
+			continue;
+		}
+		if (row.kind === 'lua-module-field') {
+			text = text.replace(new RegExp(`${esc}(?!\\w)`, 'g'), () => hold(row.new));
+			continue;
+		}
+		if (row.kind === 'lua-module-list') {
+			swap(row.old, row.new);
+			continue;
+		}
+		if (row.kind === 'lua-module-inline') {
+			const inline = new RegExp(`(?<![\\w.%])${esc}(?!\\w|\\.[A-Za-z_])`, 'g');
+			text = text.replace(Plan.LUA_SHORT_STRING, (lit) => lit.replace(inline, () => hold(row.new)));
+			continue;
+		}
+		if (row.kind === 'path-regex') {
+			text = text.replace(new RegExp(`(?<![\\w\\\\])${esc}(?![\\w])`, 'g'), () => hold(row.new));
+			continue;
+		}
+		if (row.kind === 'join' || row.kind === 'join-successor') {
+			swap(row.old, row.new);
+			continue;
+		}
+		if (row.kind === 'lua-module-escaped') {
+			text = text.replace(new RegExp(`(?<![\\w%.])${esc}(?![\\w])`, 'g'), () => hold(row.new));
+		} else if (row.kind === 'lua-module' && (!row.old.includes('.') || row.resolution?.loadOnly)) {
+			// A one-word name moves only where it is loaded (Plan.isModuleLoadSite).
+			text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), (whole, quote, offset, all) =>
+				Plan.isModuleLoadSite(all, offset) ? `${quote}${hold(row.new)}${quote}` : whole
+			);
+		} else if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
+			text = text.replace(
+				new RegExp(`(["'])${esc}\\1`, 'g'),
+				(whole, quote) => `${quote}${hold(row.new)}${quote}`
+			);
+		} else {
+			// Whole tokens only: tests/unit/modules/llm must not rewrite
+			// inside tests/unit/modules/llm_extra or a longer path.
+			const bounded = new RegExp(
+				`(?<![A-Za-z0-9_.\\-/\\\\])${esc}(?![A-Za-z0-9_\\-]|\\.[A-Za-z0-9])`,
+				'g'
+			);
+			const next = newPathToken(row, movedRepo);
+			text = text.replace(bounded, () => hold(next));
+		}
+	}
+	text = text.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[Number(i)]);
+	return rootSwitch ? Plan.sharedRootRewrite(text) : text;
+}
+
+/**
+ * Removes the folders a step leaves empty. Git forgets them, but a checkout
+ * that applied the step keeps them on disk, and a source scan that walks the
+ * file system (a runner discovering suites, a gate counting folders) would
+ * still see the old tree. A folder holding an ignored file is not empty and
+ * stays.
+ * @param {string[]} oldRepoPaths Repository paths of the files that left.
+ */
+function pruneEmptyFolders(oldRepoPaths) {
+	const folders = new Set();
+	for (const f of oldRepoPaths) {
+		const parts = f.split('/');
+		for (let i = parts.length - 1; i > PREFIX.split('/').length; i--)
+			folders.add(parts.slice(0, i).join('/'));
+	}
+	// Deepest first, so a parent is seen after its emptied children.
+	for (const dir of [...folders].sort((a, b) => b.split('/').length - a.split('/').length)) {
+		const abs = path.join(ROOT, dir);
+		if (fs.existsSync(abs) && fs.readdirSync(abs).length === 0) fs.rmdirSync(abs);
+	}
 }
 
 /**
@@ -120,7 +275,7 @@ function checkAll(map, plan) {
 	);
 	for (const r of refs) {
 		if (
-			/^lua-/.test(r.kind) ||
+			!SPELLED_KINDS.has(r.kind) ||
 			r.new === '(retired)' ||
 			r.new === Plan.SPLIT ||
 			Plan.REFUSED_KINDS.has(r.kind)
@@ -255,7 +410,7 @@ function main() {
 		for (const [file, rows] of edits) {
 			for (const row of rows) {
 				const next =
-					/^lua-/.test(row.kind) || row.new === '(retired)' || row.new === Plan.SPLIT
+					!SPELLED_KINDS.has(row.kind) || row.new === '(retired)' || row.new === Plan.SPLIT
 						? row.new
 						: newPathToken(row, movedRepo);
 				console.log(`  ${file}: ${row.old} -> ${next}`);
@@ -280,43 +435,8 @@ function main() {
 
 	// References first, in the files' current locations; then the moves.
 	for (const [file, rows] of edits) {
-		rows.sort((a, b) => b.old.length - a.old.length);
 		const abs = path.join(ROOT, file);
-		let text = fs.readFileSync(abs, 'utf8');
-		for (const row of rows) {
-			if (row.new === '(retired)') {
-				console.log(`  review by hand: ${file} names retired ${row.old}`);
-				continue;
-			}
-			if (Plan.REFUSED_KINDS.has(row.kind))
-				throw new Error(`refused reference ${row.file}: ${row.old}`);
-			// A sentence naming a folder that scatters stays as written; the
-			// review list of the step names it.
-			if (row.new === Plan.SPLIT) continue;
-			const esc = row.old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			if (row.kind === 'lua-rewrite') {
-				if (!text.includes(row.old))
-					throw new Error(`${file}: the listed runtime edit no longer matches`);
-				text = text.split(row.old).join(row.new);
-				continue;
-			}
-			if (row.kind === 'lua-module' && !row.old.includes('.')) {
-				// A one-word name moves only where it is loaded (Plan.isModuleLoadSite).
-				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), (whole, quote, offset, all) =>
-					Plan.isModuleLoadSite(all, offset) ? `${quote}${row.new}${quote}` : whole
-				);
-			} else if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
-				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), `$1${row.new}$1`);
-			} else {
-				// Whole tokens only: tests/unit/modules/llm must not rewrite
-				// inside tests/unit/modules/llm_extra or a longer path.
-				const bounded = new RegExp(
-					`(?<![A-Za-z0-9_.\\-/\\\\])${esc}(?![A-Za-z0-9_\\-]|\\.[A-Za-z0-9])`,
-					'g'
-				);
-				text = text.replace(bounded, newPathToken(row, movedRepo));
-			}
-		}
+		const text = rewriteText(fs.readFileSync(abs, 'utf8'), rows, movedRepo, file);
 		fs.writeFileSync(abs, text, 'utf8');
 	}
 	const finalRepo = new Map(
@@ -333,6 +453,7 @@ function main() {
 		git('mv', '--', oldRepo, newRepo);
 	}
 	for (const r of retiredRepo) git('rm', '-q', '--', r);
+	pruneEmptyFolders([...movedRepo.keys(), ...retiredRepo]);
 	// A rewritten file this step also moved is staged at its new path: the old
 	// one no longer exists once the move ran.
 	git(
@@ -347,4 +468,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { newPathToken, rewriteOwnIncludes };
+module.exports = { newPathToken, rewriteOwnIncludes, rewriteText, pruneEmptyFolders };
