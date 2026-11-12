@@ -31,20 +31,41 @@ local function open_editor(kind, fixture, native)
 end
 
 helpers.describe("profile editor rejected Save remains retryable", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	for _, kind in ipairs({ "create", "clone", "edit" }) do
+		helpers.it("(edd1-paused-writes) an open " .. kind .. " editor saves while paused", function()
+			local original = { id = "custom", label = "Original" }
+			Fixture.with_fixture({ initial_profiles = kind == "edit" and { original } or nil }, function(fixture, native)
+				open_editor(kind, fixture, native)
+				fixture.deps.script_control.is_paused = function() return true end
+				local before = fixture.save_count()
+				native.save("Saved while paused")
+				helpers.assert_eq(fixture.save_count(), before + 1, "the paused driver still writes the profile")
+				local labels = {}
+				for _, entry in ipairs(fixture.durable().llm_user_profiles) do labels[#labels + 1] = entry.label end
+				helpers.assert_true(table.concat(labels, ","):find("Saved while paused", 1, true) ~= nil)
+				helpers.assert_eq(native.deletes, 1)
+			end)
+		end)
+	end
+
 	helpers.it("(profile-editor-save-retry) refuses direct in-flight Save reentry before readiness effects", function()
 		Fixture.with_fixture({}, function(fixture, native)
 			open_editor("create", fixture, native)
 			local attempted, nested = false, nil
-			fixture.deps.script_control.is_paused = function()
+			local llm = package.loaded["modules.llm"]
+			local set_user_profiles = llm.set_user_profiles
+			llm.set_user_profiles = function(...)
 				if not attempted then
 					attempted = true
 					nested = native.save_callbacks[1]({ id = assert(native.last_save_payload).id,
 						label = "Nested draft", raw_prompt = "nested" })
 				end
-				return false
+				return set_user_profiles(...)
 			end
 			native.save("Outer draft")
-			helpers.assert_true(attempted, "the real Save must read its current admission")
+			llm.set_user_profiles = set_user_profiles
+			helpers.assert_true(attempted, "the real Save must reach its registry publication")
 			helpers.assert_eq(nested, false, "one business Save callback cannot reenter its own transaction")
 			helpers.assert_eq(fixture.save_count(), 1)
 			helpers.assert_eq(#fixture.state.llm_user_profiles, 1)
