@@ -117,6 +117,27 @@ function run() {
 		out,
 		'p = "static/ergopti_plus/_shared/core/text/engine/json.lua"; q = root .. "/_shared/?.lua"'
 	);
+	// shared('lua', name) is a join onto the old root, not a split folder: the
+	// switch drops the piece, and the step is not refused for it.
+	const root = 'static/ergopti_plus/_shared/lua';
+	const had = Plan.EXISTING.has(root);
+	Plan.EXISTING.add(root);
+	try {
+		const ctx = Plan.referenceContext(empties);
+		const line = "const src = read(shared('lua', page.Lua.modulePath(name)));\n";
+		const rows = Plan.scanFile('tools/test/z.cjs', line, ctx);
+		assert.deepEqual(
+			rows.map((r) => r.kind),
+			['shared-root'],
+			'a join onto the old root leaves the respelling to the switch'
+		);
+		assert.equal(
+			Apply.rewriteText(line, rows, new Map(), 'tools/test/z.cjs'),
+			'const src = read(shared(page.Lua.modulePath(name)));\n'
+		);
+	} finally {
+		if (!had) Plan.EXISTING.delete(root);
+	}
 	console.log(
 		'[OK] the step that empties _shared/lua switches every spelling of the shared Lua root.'
 	);
