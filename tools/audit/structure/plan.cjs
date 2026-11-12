@@ -1613,6 +1613,20 @@ function scanFile(file, text, ctx) {
 				.replace(/\\/g, '/')
 				.replace(/^\/+|\/+$/g, '')
 				.split('/').length === 1;
+		// A scattered folder whose nearest new home is a driver root: in live
+		// code, the root would widen a scan to the whole driver. An element of a
+		// list on its own line becomes one element per real new home.
+		if (!prose && successor && Census.DRIVERS.some((d) => successor === `${PREFIX}${d}`)) {
+			const expanded = splitScopeLine(text, m.index, raw, hit.oldRepo, map);
+			if (expanded) add('scope-split', expanded.old, expanded.new, hit);
+			// A folder that keeps files keeps its name, for the reviewer and the
+			// step's gates (a scan that must also read the new homes fails
+			// there); one the step empties names nothing and is refused.
+			else if (splitHomes(hit.oldRepo, map)[0] === hit.oldRepo.slice(PREFIX.length))
+				add('dir-kept', raw, raw, hit);
+			else add('dir-split', raw, '(split)', hit);
+			continue;
+		}
 		if (prose && deep) add('dir', raw, successor, { ...hit, newRepo: successor });
 		else if (prose) add('dir-split-prose', raw, '(split)', hit);
 		else if (successor && !rootOnly)
@@ -2152,6 +2166,50 @@ function scanFile(file, text, ctx) {
 	return rows;
 }
 
+/**
+ * The new homes of a folder the step scatters: the folder itself while it
+ * keeps a file, then each new folder of a file it loses, outermost only.
+ * @param {string} folderRepo Repository path of the folder.
+ * @param {Map<string, string|null>} map Tree-relative old path to target.
+ * @returns {string[]} Tree-relative folders.
+ */
+function splitHomes(folderRepo, map) {
+	const rel = folderRepo.slice(PREFIX.length);
+	const homes = [];
+	for (const [old, target] of map) {
+		if (!old.startsWith(`${rel}/`) || !target) continue;
+		const home = target === old ? rel : path.posix.dirname(target);
+		if (!homes.includes(home)) homes.push(home);
+	}
+	homes.sort((a, b) => (a === rel ? -1 : b === rel ? 1 : a < b ? -1 : a > b ? 1 : 0));
+	return homes.filter((h) => !homes.some((o) => o !== h && h.startsWith(`${o}/`)));
+}
+
+/**
+ * A list element on its own line naming a scattered folder, respelled as one
+ * element per new home of the folder (splitHomes), in the element's own form.
+ * @returns {{old: string, new: string}|null} The line and its expansion.
+ */
+function splitScopeLine(text, index, raw, folderRepo, map) {
+	const line = lineAt(text, index);
+	const rel = folderRepo.slice(PREFIX.length);
+	if (line.split(raw).length !== 2 || !raw.replace(/\\/g, '/').endsWith(rel)) return null;
+	const start = text.lastIndexOf('\n', index - 1) + 1;
+	const before = text.slice(0, start).trimEnd();
+	const after = text.slice(start + line.length).trimStart();
+	const element = /[[,]$/.test(before) && (/,\s*$/.test(line) || after.startsWith(']'));
+	if (!element) return null;
+	const homes = splitHomes(folderRepo, map);
+	if (homes.length === 0) return null;
+	const stem = raw.slice(0, raw.length - rel.length);
+	const lines = homes.map((h, i) => {
+		const respelled = line.replace(raw, stem + h);
+		// Every element but the last of a line without a comma needs one.
+		return i < homes.length - 1 && !/,\s*$/.test(respelled) ? `${respelled},` : respelled;
+	});
+	return { old: line, new: lines.join('\n') };
+}
+
 /** The whole line of `text` that holds offset `index`. */
 function lineAt(text, index) {
 	const start = text.lastIndexOf('\n', index - 1) + 1;
@@ -2455,7 +2513,13 @@ function attributeSteps(plan, refs) {
 /** The kinds a step cannot apply mechanically: phase 2 refuses them. */
 const REFUSED_KINDS = new Set(['dir-split', 'lua-prefix-split', 'join-split', 'folder-edit-stale']);
 /** The kinds the step applies but a reviewer reads. */
-const REVIEWED_KINDS = new Set(['dir-successor', 'dir-split-prose', 'join-successor']);
+const REVIEWED_KINDS = new Set([
+	'dir-kept',
+	'dir-successor',
+	'dir-split-prose',
+	'join-successor',
+	'scope-split'
+]);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Gates
