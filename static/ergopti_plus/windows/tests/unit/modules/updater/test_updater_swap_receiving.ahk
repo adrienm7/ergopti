@@ -57,7 +57,7 @@ _PWRU_ImageLabel(Path) {
 ; the driver does (_Updater_ValidateBootReadyEventName, PLC_SignalNamedEvent),
 ; unless a refuse.<label> file tells it to exit first; it then stays alive
 ; until the scenario releases it, so the worker's probation sees a live driver.
-_PWRU_WriteBootScript(Dir, ReleaseName) {
+_PWRU_WriteBootScript(CurrentExe, ReleaseName) {
 	global PWRU_MARKER_PREFIX, PWRU_REFUSED_BOOT_EXIT
 	Script := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n"
 		. "Image := FileOpen(A_AhkPath, 'r')`nImage.Pos := Image.Length - " . (StrLen(PWRU_MARKER_PREFIX) + 3) . "`n"
@@ -72,7 +72,9 @@ _PWRU_WriteBootScript(Dir, ReleaseName) {
 		. "Release := DllCall('OpenEventW', 'UInt', 0x00100000, 'Int', false, 'Str', '" . ReleaseName . "', 'Ptr')`n"
 		. "if Release`n`tDllCall('WaitForSingleObject', 'Ptr', Release, 'UInt', " . _USTX_WorkerCompletionTimeoutMs() . ")`n"
 		. "ExitApp(0)`n"
-	FileAppend(Chr(0xFEFF) . Script, Dir . "\ErgoptiPlus.ahk", "UTF-8-RAW")
+	; A compiled interpreter run without a script argument runs the script named
+	; after it, beside it: the boot script takes the exe's own name.
+	FileAppend(Chr(0xFEFF) . Script, RegExReplace(CurrentExe, "i)\.exe$", ".ahk"), "UTF-8-RAW")
 }
 
 ; Runs one swap. Scenario: "boots", "refuses" or "parent-dies".
@@ -91,7 +93,7 @@ _PWRU_RunSwap(Scenario) {
 		DirCreate(Dir . "\staged")
 		_PWRU_WriteImage(CurrentExe, "OLD")
 		_PWRU_WriteImage(NewExe, "NEW")
-		_PWRU_WriteBootScript(Dir, ReleaseName)
+		_PWRU_WriteBootScript(CurrentExe, ReleaseName)
 		if (Scenario == "refuses")
 			FileAppend("", Dir . "\refuse.NEW")
 		FileAppend(FileRead(_Updater_SwapWorkerPath(), "UTF-8"), SwapScript, "UTF-8-RAW")
