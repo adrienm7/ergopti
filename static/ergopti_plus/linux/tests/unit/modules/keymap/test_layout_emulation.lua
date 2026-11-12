@@ -330,8 +330,14 @@ helpers.describe("layout emulation (Linux): a layout source's records", function
 		record.now = 1300
 		helpers.assert_true(press(M, KEY_A), "a key under the held Shift")
 		helpers.assert_eq(record.typed, { " ", "A" }, "the keylayout types it shifted")
-		helpers.assert_true(press(M, KEY_F1), "a key the keylayout leaves to the OS")
+		local passed, pass_repeat = press(M, KEY_F1)
+		helpers.assert_true(passed, "a key the keylayout leaves to the OS")
 		helpers.assert_eq(record.keys, { "F1+shift" }, "it goes out with the held Shift")
+		-- Held, it repeats under the held Shift, as with a real one (ilx-002-held-modifier-repeat).
+		helpers.assert_eq(type(pass_repeat), "function", "the passed key owns its repeat")
+		helpers.assert_true(pass_repeat({ code = KEY_F1, mods = {}, value = 2 }))
+		helpers.assert_eq(record.keys, { "F1+shift", "F1+shift" }, "each repeat presses it again")
+		helpers.assert_true(not pass_repeat({ code = KEY_A, mods = {}, value = 2 }), "another key's repeat is not its own")
 		record.now = 1400
 		helpers.assert_true(tab_release({ code = KEY_TAB, value = 0 }))
 		helpers.assert_true(press(M, KEY_A))

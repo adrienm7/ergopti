@@ -355,7 +355,7 @@
 				{
 					"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.on_key(detail)",
-					"sha256": "98e371c7b07328dab02b046770991fc20be527f5159bd45487e62b8f2f03b74a"
+					"sha256": "fae217f6c16b03afce34cf0edd890268b1f191c7b0080af69f24fac375cfcbbe"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
