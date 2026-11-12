@@ -25,6 +25,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\adapters\system_time_zone.ahk
+
 
 
 
@@ -72,15 +74,6 @@ _KL_SystemTimeStamp(Time) {
 		NumGet(Time, 6, "UShort"), NumGet(Time, 8, "UShort"), NumGet(Time, 10, "UShort"), NumGet(Time, 12, "UShort"))
 }
 
-; The active dynamic time zone (DYNAMIC_TIME_ZONE_INFORMATION, 432 bytes), whose
-; year-specific rules the conversions below apply.
-_KL_DynamicTimeZone() {
-	Zone := Buffer(432, 0)
-	if DllCall("Kernel32\GetDynamicTimeZoneInformation", "Ptr", Zone, "UInt") = 0xFFFFFFFF
-		throw OSError(A_LastError, -1, "the active time zone is unreadable")
-	return Zone
-}
-
 
 
 
@@ -95,10 +88,7 @@ _KL_DynamicTimeZone() {
 ; @param UtcStamp {String} The instant as a YYYYMMDDHH24MISS UTC time.
 ; @returns {Integer} The offset.
 KL_UtcOffsetAt(UtcStamp) {
-	LocalTime := Buffer(16, 0)
-	if !DllCall("Kernel32\SystemTimeToTzSpecificLocalTimeEx", "Ptr", _KL_DynamicTimeZone(),
-			"Ptr", _KL_StampSystemTime(UtcStamp), "Ptr", LocalTime, "Int")
-		throw OSError(A_LastError, -1, "the UTC instant " . UtcStamp . " has no local time")
+	LocalTime := NativeZoneLocalFromUtc(NativeDynamicTimeZone(), _KL_StampSystemTime(UtcStamp), UtcStamp)
 	return DateDiff(_KL_SystemTimeStamp(LocalTime), UtcStamp, "Minutes")
 }
 
@@ -117,10 +107,7 @@ KL_TimestampFromLocal(LocalTs) {
 	if !Fields
 		throw ValueError("not a metrics timestamp: " . String(LocalTs))
 	LocalStamp := _KL_FieldsStamp(Fields)
-	Utc := Buffer(16, 0)
-	if !DllCall("Kernel32\TzSpecificLocalTimeToSystemTimeEx", "Ptr", _KL_DynamicTimeZone(),
-			"Ptr", _KL_StampSystemTime(LocalStamp), "Ptr", Utc, "Int")
-		throw OSError(A_LastError, -1, "the local timestamp " . LocalTs . " has no instant")
+	Utc := NativeZoneUtcFromLocal(NativeDynamicTimeZone(), _KL_StampSystemTime(LocalStamp), LocalTs)
 	UtcStamp := _KL_SystemTimeStamp(Utc)
 	return Map("ts", _KL_StampTimestamp(UtcStamp, Fields["fraction"]),
 		"utc_offset_min", DateDiff(LocalStamp, UtcStamp, "Minutes"))
