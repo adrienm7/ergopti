@@ -19,9 +19,6 @@ local M = {}
 local NetworkEnv = require("modules.llm.network_env")
 local Admission = require("modules.llm.opaque_network_admission")
 
--- The route client every remap download resolves its proxy for.
-M.ROUTE_CLIENT = "karabiner"
-
 -- curl is exec'd by the prelude's shell, so its PID, exit status and output
 -- remain the task's own.
 local EXEC_CURL = 'exec /usr/bin/curl "$@"'
@@ -48,7 +45,8 @@ end
 --- @return function|nil describe M.describe_failure for this command.
 function M.command(tag, curl_args)
 	assert(type(curl_args) == "table", "a remap download needs its curl arguments")
-	local prelude, err = NetworkEnv.opaque_prelude(tag, { pac_probe_client = M.ROUTE_CLIENT })
+	-- Every remap download resolves its proxy for the `karabiner` route client.
+	local prelude, err = NetworkEnv.opaque_prelude(tag, { pac_probe_client = "karabiner" })
 	if not prelude then return nil, tostring(err) end
 	local args = { "-c", prelude .. EXEC_CURL, tag }
 	for _, value in ipairs(curl_args) do args[#args + 1] = value end
