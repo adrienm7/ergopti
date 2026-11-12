@@ -33,19 +33,16 @@
 ; ============================
 ; ============================
 
-; Known password-manager process names — expansion welcome, never shrink.
-global SFD_SECURE_APPS := Map(
-	"1Password.exe",        true,
-	"KeePass.exe",          true,
-	"KeePassXC.exe",        true,
-	"Bitwarden.exe",        true,
-	"LastPass.exe",         true,
-	"Dashlane.exe",         true,
-	"RoboForm.exe",         true,
-	"Authy.exe",            true,
-	"keepass2.exe",         true,
-	"credential_guard",     true
-)
+; Secure applications: the `windows` process names of _shared/data/secure_apps.json
+; (ADD-1, decided by the maintainer on 2026-11-11), read once by SFD_SecureApps.
+; 0 until read, then the Map; -1 once a read or parse failed, which
+; makes every application secure: a missing list must never open a password manager.
+global SFD_SECURE_APPS := 0
+
+; The process verdict of the last focused top-level window, keyed by its handle
+; and process id (a handle can be reused by another process), so the name is
+; read once per window rather than once per keystroke.
+global SFD_SECURE_APP_ROOT := Map("hwnd", 0, "pid", 0, "secure", true)
 
 ; One exact-focus triage cache. ``pending_hwnd`` and ``pending_generation``
 ; prevent repeated calls while typing in one unknown browser/Electron control
@@ -101,6 +98,10 @@ global SFD_UIA_CONTEXT_MATCH_FN := 0
 SFD_IsSecureField(KnownFocusedHwnd := unset) {
 	Hwnd := IsSet(KnownFocusedHwnd) ? KnownFocusedHwnd : SFD_FocusedHwnd()
 	if !(Hwnd is Integer) || Hwnd <= 0
+		return true
+	; A secure application is secure whatever field has focus (ADD-1), so
+	; hotstrings, the LLM bridge, predictions, agent actions and metrics follow.
+	if SFD_IsSecureAppWindow(Hwnd)
 		return true
 	SFD_EnsureFocusTracking()
 	Focus := SFD_FocusSnapshot()
@@ -597,18 +598,75 @@ SFD_ProbeFocusedUia(Hwnd, FocusGeneration,
 	}
 }
 
-; Returns true if AppId matches any entry in the SFD_SECURE_APPS constant Map.
-; An empty or missing AppId is treated as non-secure to avoid false positives.
-; @param AppId {String} Process name of the active application (e.g. KeePass.exe).
-; @return {Boolean} True on success, false on error.
-SFD_IsSecureApp(AppId) {
-	if AppId = ""
+; Returns the secure applications by process name (compared without case),
+; read once from _shared/data/secure_apps.json, or false when it cannot be read.
+; @return {Map|Integer} The process names, or false after a failed read.
+SFD_SecureApps() {
+	global SFD_SECURE_APPS, _SharedDir
+	if IsObject(SFD_SECURE_APPS)
+		return SFD_SECURE_APPS
+	if SFD_SECURE_APPS == -1
 		return false
+	Apps := Map()
+	Apps.CaseSense := "Off"
 	try {
-		return SFD_SECURE_APPS.Has(AppId) ? true : false
-	} catch {
+		Data := JsonParse(FileRead(_SharedDir . "\data\secure_apps.json", "UTF-8"))
+		for Entry in Data["apps"]
+			for Name in Entry["windows"]
+				Apps[Name] := true
+	} catch as Err {
+		try LoggerError("SecureField", "The secure applications cannot be read ({1}); every application is treated as secure.",
+			Err.Message)
+		SFD_SECURE_APPS := -1
 		return false
 	}
+	SFD_SECURE_APPS := Apps
+	return Apps
+}
+
+; Returns true if AppId is a secure application, or when the list cannot be read.
+; An empty or missing AppId is treated as non-secure to avoid false positives.
+; @param AppId {String} Process name of the active application (e.g. KeePass.exe).
+; @return {Boolean} Whether the application is secure.
+SFD_IsSecureApp(AppId) {
+	if !(AppId is String) || AppId == ""
+		return false
+	Apps := SFD_SecureApps()
+	if !IsObject(Apps)
+		return true
+	return Apps.Has(AppId)
+}
+
+; Returns the process name of the top-level window holding Hwnd, or "" when the
+; window is gone (no process to classify; the field checks still run).
+; @param Root {Integer} Top-level window handle.
+; @return {String}
+SFD_ProcessNameOf(Root) {
+	try return WinGetProcessName("ahk_id " . Root)
+	catch as Err {
+		try LoggerDebug("SecureField", "No process name for window {1}: {2}.", Root, Err.Message)
+		return ""
+	}
+}
+
+; Whether the focused control belongs to a secure application, cached per
+; top-level window.
+; @param Hwnd {Integer} Focused control or window.
+; @return {Boolean}
+SFD_IsSecureAppWindow(Hwnd) {
+	global SFD_SECURE_APP_ROOT
+	Root := DllCall("GetAncestor", "ptr", Hwnd, "uint", 2, "ptr")  ; GA_ROOT
+	if !Root
+		Root := Hwnd
+	Pid := 0
+	DllCall("GetWindowThreadProcessId", "ptr", Root, "uint*", &Pid)
+	if Pid && SFD_SECURE_APP_ROOT["hwnd"] == Root && SFD_SECURE_APP_ROOT["pid"] == Pid
+		return SFD_SECURE_APP_ROOT["secure"]
+	Secure := SFD_IsSecureApp(SFD_ProcessNameOf(Root))
+	SFD_SECURE_APP_ROOT["hwnd"] := Root
+	SFD_SECURE_APP_ROOT["pid"] := Pid
+	SFD_SECURE_APP_ROOT["secure"] := Secure
+	return Secure
 }
 
 ; Retire the focused-element identity and every verdict derived from it.
