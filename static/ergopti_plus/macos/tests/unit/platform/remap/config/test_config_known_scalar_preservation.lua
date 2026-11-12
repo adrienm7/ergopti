@@ -51,7 +51,7 @@ local function with_file(original, body)
 		local function load()
 			return config.load_user_config({ { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } }, path)
 		end
-		local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
+		local ok, err = pcall(body, { config = config, files = files, path = path, config_path = Text.config_path(path), warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
 			decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original, native_read = native_read })
 		files.read_with_status, files.write_if_unchanged = native_read, native_write
@@ -161,7 +161,8 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 				helpers.assert_eq(state.enabled, false, "explicit integration consent is unchanged")
 				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(#f.warnings, 2)
-				helpers.assert_contains(table.concat(f.warnings, "\n"), "'mod_combos.config.escape_then_tab' in '" .. f.path .. "'")
+				-- The key combinations are config.toml rows since schema v22.
+				helpers.assert_contains(table.concat(f.warnings, "\n"), "'mod_combos.config.escape_then_tab' in '" .. f.config_path .. "'")
 				state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 				helpers.assert_eq(f.config.save_user_config(state, f.path), true, "obsolete combination cannot refuse unrelated edits")
 				helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
@@ -191,8 +192,12 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 					f.write(f.file('[karabiner]\nintegration_enabled = false\n[mod_combos.config.esc_tab]\ntap = "none"\nhold = "none"\ncombo = "none"\n'))
 					f.controls.expected = f.read()
 					helpers.assert_eq(f.config.save_user_config(state, f.path), true, "explicit source repair admits the candidate")
+					-- A config.toml save names only the leaves it changes: the neutral
+					-- slots the repair spelled out stay as written.
+					local repaired = { tap = "none", hold = "none", combo = "none" }
+					repaired[field] = "copy"
 					helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
-						mod_combos = { config = { esc_tab = { [field] = "copy" } } } }, "complete repaired source model")
+						mod_combos = { config = { esc_tab = repaired } } }, "complete repaired source model")
 				end)
 			end)
 		end
@@ -233,10 +238,13 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 			helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
 				tap_holds = { enabled = false, timeout_ms = 200, sticky_timeout_ms = 2000,
 					lone_modifier_tap_max_ms = 1000 },
-				mod_combos = { simultaneous_threshold_ms = 100, symmetric = false },
+				-- config.toml is every driver's: a combination macOS does not
+				-- know may be another driver's, so the reset leaves it there.
+				mod_combos = { simultaneous_threshold_ms = 100, symmetric = false,
+					config = { future = { opaque = { 1, 2 } } } },
 				-- The file is shared: a section no macOS setting owns may be another driver's.
 				future = { keep = "independent" } },
-				"explicit reset writes its full neutral intent and drops the combination no driver has")
+				"explicit reset writes its full neutral intent and keeps the combination macOS does not know")
 		end)
 	end)
 

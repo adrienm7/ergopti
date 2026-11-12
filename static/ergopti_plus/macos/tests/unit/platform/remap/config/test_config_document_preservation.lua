@@ -55,7 +55,9 @@ local function with_file(source, body, raw)
 			return native(destination, candidate, expected)
 		end
 		local ok, err = pcall(body, { config = Config, files = Files, codec = Codec, model = function(text) return Text.model(text, Text.read_config(path)) end, original = source, state = state,
-			path = path, read = read, write = write, controls = controls })
+			path = path, read = read, write = write, controls = controls,
+			read_config = function() return Text.read_config(path) end,
+			write_config = function(text) Text.write_config(path, text) end })
 		Files.write_if_unchanged = native
 		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
 		if not ok then error(err, 0) end
@@ -110,7 +112,8 @@ helpers.describe("remap source-bound full-document encoding", function()
 			f.state.enabled = true
 			helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
 			helpers.assert_contains(f.read(), "enabled = 1.0")
-			helpers.assert_contains(f.read(), 'enabled = "obsolete"')
+			-- [tap_holds] enabled is a config.toml row since schema v22.
+			helpers.assert_contains(f.read_config(), 'enabled = "obsolete"')
 			helpers.assert_contains(f.read(), "integration_enabled = true")
 			helpers.assert_contains(f.read(), "kind = 1.0")
 		end)
@@ -119,10 +122,12 @@ helpers.describe("remap source-bound full-document encoding", function()
 	for _, vector in ipairs({ { original = "-0.0", changed = "0.0" },
 		{ original = "0.0", changed = "-0.0" } }) do
 		helpers.it("publishes a changed owned floating-zero sign: " .. vector.original, function()
-			with_file("[_meta]\nschema_version = 1\n[tap_hold]\nlone_modifier_tap_max_ms = " .. vector.original .. "\n", function(f)
+			with_file("[_meta]\nschema_version = 1\n", function(f)
+				-- The lone modifier tap window is a config.toml row since schema v22.
+				f.write_config("[tap_holds]\nlone_modifier_tap_max_ms = " .. vector.original .. "\n")
 				f.state.lone_modifier_tap_max_ms = tonumber(vector.changed)
 				helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
-				helpers.assert_contains(f.read(), "lone_modifier_tap_max_ms = " .. vector.changed .. "\n")
+				helpers.assert_contains(f.read_config(), "lone_modifier_tap_max_ms = " .. vector.changed .. "\n")
 				local value = f.model(f.read()).tap_holds.lone_modifier_tap_max_ms
 				helpers.assert_eq(1 / value, 1 / tonumber(vector.changed))
 				if math.type then helpers.assert_eq(math.type(value), "float") end
@@ -131,10 +136,11 @@ helpers.describe("remap source-bound full-document encoding", function()
 	end
 
 	helpers.it("publishes an explicit owned integer zero with its integer kind", function()
-		with_file("[_meta]\nschema_version = 1\n[tap_hold]\nlone_modifier_tap_max_ms = 0.0\n", function(f)
+		with_file("[_meta]\nschema_version = 1\n", function(f)
+			f.write_config("[tap_holds]\nlone_modifier_tap_max_ms = 0.0\n")
 			f.state.lone_modifier_tap_max_ms = 0
 			helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
-			helpers.assert_contains(f.read(), "lone_modifier_tap_max_ms = 0\n")
+			helpers.assert_contains(f.read_config(), "lone_modifier_tap_max_ms = 0\n")
 			helpers.assert_eq(math.type(f.model(f.read()).tap_holds.lone_modifier_tap_max_ms), "integer")
 		end, true)
 	end)

@@ -259,7 +259,7 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 				'{ op = "import_companion", file = "tap_hold.toml", section = "mod_combos", to_section = "mod_combos" },',
 				"]" }, "\n"))))
 			local result = Engine.run({ path = f.config_path, driver = "hs", registry = registry, stamp = STAMP,
-				file_adapter = f.files, companions = { ["tap_hold.toml"] = f.path } })
+				companions = { ["tap_hold.toml"] = f.path } })
 			helpers.assert_eq(result.status, "migrated", tostring(result.detail))
 			helpers.assert_eq(decode(read(f.path)), decode(read(CORPUS .. "macos_written.toml")))
 			helpers.assert_eq(config_rows(read(f.config_path)), config_rows(read(CORPUS .. "macos_written.config.toml")))

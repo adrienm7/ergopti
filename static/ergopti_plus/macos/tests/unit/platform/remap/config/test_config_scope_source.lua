@@ -22,12 +22,20 @@ local function with_disk(source, body)
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local files = require("adapters.file_system")
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged
-		local disk = { content = source, writes = 0 }
-		files.read_with_status = function()
+		-- The manifest's tap-hold rows are the config.toml beside it (schema v22):
+		-- `disk.content` is remap.toml, `disk.config` that config.toml.
+		local disk = { content = source, writes = 0, config_writes = 0 }
+		local config_path = config.config_toml_path_for("remap.toml")
+		files.read_with_status = function(path)
+			if path == config_path then return disk.config, disk.config and "ok" or "absent" end
 			if disk.before_read then disk.before_read() end
 			return disk.content, disk.content and "ok" or "absent"
 		end
-		files.write_if_unchanged = function(_, content)
+		files.write_if_unchanged = function(path, content)
+			if path == config_path then
+				disk.config_writes, disk.config = disk.config_writes + 1, content
+				return true
+			end
 			disk.writes, disk.content = disk.writes + 1, content
 			return true
 		end

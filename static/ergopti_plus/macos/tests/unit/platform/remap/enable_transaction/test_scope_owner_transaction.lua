@@ -28,6 +28,19 @@ local with_wheel_owner = Fixture.with_wheel_owner
 
 
 
+--- The tap_hold.toml part of each witnessed source: the config.toml beside it
+--- (schema v22) is witnessed under `config`, checked on its own.
+--- @param list table Expected sources a save received.
+--- @return table
+local function tap_hold_witnesses(list)
+	local out = {}
+	for index, entry in ipairs(list) do
+		helpers.assert_type(entry.config, "table", "the config.toml beside it is witnessed too")
+		out[index] = { status = entry.status, content = entry.content }
+	end
+	return out
+end
+
 helpers.describe("remap scope transaction", function()
 	helpers.it("restores the recommended keys over a verified backup, leaving the chords", function()
 		with_fixture(function(fixture)
@@ -35,7 +48,7 @@ helpers.describe("remap scope transaction", function()
 			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-1")
 			helpers.assert_true(accepted)
 			helpers.assert_eq(disk.files["/remap/backup-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(tap_hold_witnesses(disk.expected), { { status = "ok", content = SOURCE } },
 				"the save may only replace the backed-up bytes")
 			local saved = calls.saved_payloads[1]
 			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))

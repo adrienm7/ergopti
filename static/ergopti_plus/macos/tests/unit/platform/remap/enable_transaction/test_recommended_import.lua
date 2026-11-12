@@ -85,6 +85,19 @@ local function wizard_settings(tap_hold_config)
 	return paths
 end
 
+--- The tap_hold.toml part of each witnessed source: the config.toml beside it
+--- (schema v22) is witnessed under `config`, checked on its own.
+--- @param list table Expected sources a save received.
+--- @return table
+local function tap_hold_witnesses(list)
+	local out = {}
+	for index, entry in ipairs(list) do
+		helpers.assert_type(entry.config, "table", "the config.toml beside it is witnessed too")
+		out[index] = { status = entry.status, content = entry.content }
+	end
+	return out
+end
+
 helpers.describe("the remap owner imports the wizard's checked keys", function()
 	helpers.it("takes them in the running bridge's transaction over a backup, success on the terminal", function()
 		with_fixture(function(fixture)
@@ -96,7 +109,7 @@ helpers.describe("the remap owner imports the wizard's checked keys", function()
 			helpers.assert_true(remap.import_recommended_keys({ keys = { "caps_lock" }, backup_path = "/remap/b-1" },
 				function(ok, reason) settled[#settled + 1] = { ok = ok, reason = reason } end))
 			helpers.assert_eq(disk.files["/remap/b-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(tap_hold_witnesses(disk.expected), { { status = "ok", content = SOURCE } },
 				"the save replaces only the bytes the backup holds")
 			helpers.assert_eq(#settled, 0, "no success before the Karabiner terminal")
 			helpers.assert_eq(deploy.regenerations, 1)
@@ -168,7 +181,7 @@ helpers.describe("the remap owner imports the wizard's checked keys", function()
 			helpers.assert_true(saved_ok, tostring(detail))
 			helpers.assert_eq(paths, { WIZARD }, "the folder's own file is read")
 			helpers.assert_eq(disk.files["/wizard/b-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(tap_hold_witnesses(disk.expected), { { status = "ok", content = SOURCE } },
 				"the save replaces only the bytes the backup holds")
 			local saved = calls.saved_payloads[1]
 			helpers.assert_eq(saved.tap_holds_enabled, true)

@@ -30,8 +30,17 @@ local function load(source)
 		config = helpers.load_with_stubs("platform.remap.config")
 		local files = require("adapters.file_system")
 		local old_read = files.read_with_status
-		local text = require("tests.support.tap_hold_file_text").file(source)
-		files.read_with_status = function() return text, "ok" end
+		local Text = require("tests.support.tap_hold_file_text")
+		-- The manifest's tap-hold rows are the config.toml beside it (schema v22).
+		local text, config_text = Text.file(source)
+		local config_path = Text.config_path("sparse-remap-config.toml")
+		files.read_with_status = function(path)
+			if path == config_path then
+				if config_text == nil then return nil, "absent" end
+				return config_text, "ok"
+			end
+			return text, "ok"
+		end
 		local ok, err = pcall(function()
 			state, status = config.load_user_config({ { id = "escape" }, { id = "tab" } },
 				{ { id = "esc_tab" } }, "sparse-remap-config.toml")

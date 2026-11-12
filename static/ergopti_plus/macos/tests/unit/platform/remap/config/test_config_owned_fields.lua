@@ -28,12 +28,28 @@ local function with_source(source, body)
 		-- The source is stated in the Karabiner model; the file holds its
 		-- shared tap_hold.toml text, read back through the same translation.
 		local Text = require("tests.support.tap_hold_file_text")
-		source = Text.file(source)
-		local codec = { decode = Text.model }
+		-- The manifest's tap-hold rows are the config.toml beside it (schema v22):
+		-- a decoded publication is the pair, each side as last written.
+		local config_source
+		source, config_source = Text.file(source)
+		local config_path = Text.config_path("owned-remap-config.toml")
+		local captured = { writes = 0, config_writes = 0 }
+		local codec = { decode = function(content)
+			return Text.model(content, captured.config_content or config_source)
+		end }
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged
-		local captured = { writes = 0 }
-		files.read_with_status = function() return source, "ok" end
+		files.read_with_status = function(path)
+			if path == config_path then
+				if config_source == nil then return nil, "absent" end
+				return config_source, "ok"
+			end
+			return source, "ok"
+		end
 		files.write_if_unchanged = function(path, content, expected)
+			if path == config_path then
+				captured.config_writes, captured.config_content = captured.config_writes + 1, content
+				return true
+			end
 			helpers.assert_eq(path, "owned-remap-config.toml")
 			helpers.assert_eq(expected, { status = "ok", content = source })
 			captured.writes, captured.content = captured.writes + 1, content
@@ -87,7 +103,14 @@ helpers.describe("Remap configuration owned fields", function()
 			helpers.assert_eq(stored.tap_holds.config.escape, { custom = { note = "keep" } })
 			helpers.assert_eq(stored.mod_combos.config.esc_tab, { custom = { note = "keep" } })
 			helpers.assert_eq(stored.tap_holds.config.future_key.tap, "future")
-			require("adapters.file_system").read_with_status = function() return captured.content, "ok" end
+			local saved_config = captured.config_content or config_source
+			require("adapters.file_system").read_with_status = function(path)
+				if path == config_path then
+					if saved_config == nil then return nil, "absent" end
+					return saved_config, "ok"
+				end
+				return captured.content, "ok"
+			end
 			local reloaded, status = config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, "owned-remap-config.toml")
 			helpers.assert_eq(status, "ok")
 			helpers.assert_eq(reloaded.tap_holds_enabled, false)

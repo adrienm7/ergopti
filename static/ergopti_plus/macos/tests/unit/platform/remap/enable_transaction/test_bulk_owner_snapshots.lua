@@ -158,7 +158,18 @@ helpers.describe("configured navigation reservations share actual remap settings
 		end
 		local settings_text = settings or '[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = true\n[tap_hold.keys.left_shift]\nhold_layer = "nav"\n'
 		local layer_text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "none"\n'
-		write(config, settings_text); write(layer, layer_text)
+		-- The Tap-Holds switch is a config.toml row since schema v22: a case states
+		-- it in its tap_hold.toml layout and the fixture puts it where the v22
+		-- migration leaves it.
+		local companion = directory .. "/config.toml"
+		local switch = settings_text:match("%[tap_hold%]\nenabled = (%a+)\n")
+		local tap_text = settings_text:gsub("%[tap_hold%]\nenabled = %a+\n", "")
+		write(config, tap_text); write(layer, layer_text)
+		if switch ~= nil then
+			local Migrate = require("config_migrate")
+			local current = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH))).current
+			write(companion, "[_meta]\nschema_version = " .. tostring(current) .. "\n[tap_holds]\nenabled = " .. switch .. "\n")
+		end
 		local called, detail = xpcall(function()
 			helpers.with_stub_scope({ "platform.remap.nav_layer" }, function()
 				package.loaded["platform.remap.nav_layer"] = nil
@@ -191,7 +202,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 				assert(os.remove(guard))
 			end
 		end
-		assert(os.remove(config)); assert(os.remove(layer)); assert(lfs.rmdir(directory))
+		assert(os.remove(config)); assert(os.remove(layer)); os.remove(companion); assert(lfs.rmdir(directory))
 		if not called then error(detail, 0) end
 	end
 

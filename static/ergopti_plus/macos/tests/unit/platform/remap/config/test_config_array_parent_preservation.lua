@@ -51,13 +51,31 @@ local function with_file(original, body)
 		local function load()
 			return config.load_user_config({ { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } }, path)
 		end
-		local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
+		local ok, err = pcall(body, { config = config, files = files, path = path, config_path = Text.config_path(path), warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
 			decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original, native_read = native_read })
 		files.read_with_status, files.write_if_unchanged = native_read, native_write
 		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
 		if not ok then error(err, 0) end
 	end)
+end
+
+--- The model the saved pair reads as, with one shape receipt over both files:
+--- the key combinations are config.toml rows since schema v22.
+--- @param f table The fixture.
+--- @return table model, table shapes `{ arrays }`, table document The decoded tap_hold.toml.
+local function stored_pair(f)
+	local codec = require("infra.toml.codec")
+	local Text = require("tests.support.tap_hold_file_text")
+	local document, shapes = codec.decode_with_shapes(f.read())
+	local config, config_shapes
+	local config_text = Text.read_config(f.path)
+	if config_text ~= nil then config, config_shapes = codec.decode_with_shapes(config_text) end
+	local arrays = {}
+	for _, receipt in ipairs({ shapes, config_shapes }) do
+		for value, flag in pairs(receipt and receipt.arrays or {}) do arrays[value] = flag end
+	end
+	return Text.model_of(document, shapes, config, config_shapes), { arrays = arrays }, document
 end
 
 local VECTORS = {
@@ -95,13 +113,13 @@ helpers.describe("Array remap dictionaries", function()
 					helpers.assert_eq(state.tap_hold_config.escape, { tap = "none", hold = "none" })
 					helpers.assert_eq(state.mod_combos_config.esc_tab, { tap = "none", hold = "none", combo = "none" })
 					helpers.assert_eq(#f.warnings, 1)
-					helpers.assert_contains(f.warnings[1], "'" .. vector.file .. "' in '" .. f.path .. "'")
+					local home = vector.section == "mod_combos" and f.config_path or f.path
+					helpers.assert_contains(f.warnings[1], "'" .. vector.file .. "' in '" .. home .. "'")
 					helpers.assert_eq(f.read(), f.original, "read-only admission retains exact bytes")
 					state.enabled = false
 					helpers.assert_true(f.config.save_user_config(state, f.path))
-					local codec = require("infra.toml.codec")
-					local stored, shapes = codec.decode_with_shapes(f.read())
-					local preserved = obsolete(require("tests.support.tap_hold_file_text").model_of(stored, shapes), vector)
+					local model, shapes, stored = stored_pair(f)
+					local preserved = obsolete(model, vector)
 					helpers.assert_eq(preserved, array.value)
 					helpers.assert_true(shapes.arrays[preserved], "source remains an array, including empty arrays")
 					helpers.assert_eq(stored.future, { keep = { {}, { "literal-neighbor" } } })
@@ -152,8 +170,7 @@ helpers.describe("Array remap dictionaries", function()
 				if vector.section == "tap_holds" then state.tap_hold_timeout_ms = 1234
 				else state.simultaneous_threshold_ms = 1234 end
 				helpers.assert_true(f.config.save_user_config(state, f.path))
-				local decoded, shapes = require("infra.toml.codec").decode_with_shapes(f.read())
-				local stored = require("tests.support.tap_hold_file_text").model_of(decoded, shapes)
+				local stored, shapes = stored_pair(f)
 				helpers.assert_eq(obsolete(stored, vector), {})
 				helpers.assert_true(shapes.arrays[obsolete(stored, vector)])
 				helpers.assert_eq(stored[vector.section][vector.section == "tap_holds" and "timeout_ms"
@@ -185,8 +202,7 @@ helpers.describe("Array remap dictionaries", function()
 			helpers.assert_eq(state.mod_combos_config.esc_tab.hold, "ctrl")
 			state.enabled = false
 			helpers.assert_true(f.config.save_user_config(state, f.path))
-			local decoded, shapes = require("infra.toml.codec").decode_with_shapes(f.read())
-			local stored = require("tests.support.tap_hold_file_text").model_of(decoded, shapes)
+			local stored, shapes = stored_pair(f)
 			helpers.assert_eq(stored.tap_holds.config.escape, { tap = "copy", future = { {}, { "retained" } } })
 			helpers.assert_eq(stored.mod_combos.config.esc_tab, { hold = "ctrl", future = { { choices = {} } } })
 			helpers.assert_true(shapes.arrays[stored.tap_holds.config.escape.future[1]])
