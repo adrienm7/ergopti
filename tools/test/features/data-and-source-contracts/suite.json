@@ -684,7 +684,7 @@
 		},
 		{
 			"id": "js-0512",
-			"ordinal": 629,
+			"ordinal": 631,
 			"name": "structure plan switches every spelling of the shared Lua root in the step that empties _shared/lua",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shared-root-switch.cjs"],
@@ -692,7 +692,7 @@
 		},
 		{
 			"id": "js-0513",
-			"ordinal": 630,
+			"ordinal": 632,
 			"name": "structure plan follows every spelling of a moved Lua module name, and same-spelled words and keys stay",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-lua-name-forms.cjs"],
@@ -700,7 +700,7 @@
 		},
 		{
 			"id": "js-0514",
-			"ordinal": 631,
+			"ordinal": 633,
 			"name": "structure plan rewrites every form a moved path takes (joins, constants, Paths.shared, self-location, AHK and regex spellings)",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-path-forms.cjs"],
@@ -708,7 +708,7 @@
 		},
 		{
 			"id": "js-0515",
-			"ordinal": 632,
+			"ordinal": 634,
 			"name": "structure plan phase 2 runner refuses without its go and owns the follow-ups of each step",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-run-phase2.cjs"],
@@ -716,7 +716,7 @@
 		},
 		{
 			"id": "js-0516",
-			"ordinal": 633,
+			"ordinal": 635,
 			"name": "the pinned-read fixer leaves a test helper that reads shared data alone instead of blocking its commit",
 			"cmd": "node",
 			"args": ["tools/test/test-pinned-reads-shared-helpers.cjs"],
@@ -724,7 +724,7 @@
 		},
 		{
 			"id": "js-0517",
-			"ordinal": 634,
+			"ordinal": 636,
 			"name": "a structure step re-pins every hash of a file it changed, follows chains, refuses ambiguity and keeps history",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-repin.cjs"],
