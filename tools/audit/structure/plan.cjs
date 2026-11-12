@@ -768,6 +768,10 @@ function isSharedArgument(text, index) {
 	// const MENU_SOURCE_REL = 'modules/menu/menu.toml' beside shared(): a path
 	// relative to _shared kept in a constant.
 	if (/\bconst\s+\w*_REL\s*=\s*["'`]$/.test(before) && /\bshared\(|SHARED/.test(text)) return true;
+	// local ORDER_FILE = "data/locale_order.json" … read_shared(ORDER_FILE): a
+	// constant the file hands to a shared reader.
+	const named = before.match(/\b(?:local|const|let)\s+([A-Za-z_]\w*)\s*=\s*["'`]$/);
+	if (named && new RegExp(`\\b\\w*[sS]hared\\w*\\(\\s*${named[1]}\\s*[,)]`).test(text)) return true;
 	return (
 		/\b\w*[sS]hared(?!_llm)\w*\(\s*["'`]$/.test(before) &&
 		!/shared_llm_path\(\s*["'`]$/.test(before)
@@ -1129,9 +1133,13 @@ function referenceContext(map) {
 	const byRepoDir = directoryMap(map);
 	const successors = splitSuccessors(map, byRepoDir);
 	const rootSwitch = switchesSharedRoot(map);
-	const pathToken = /[A-Za-z0-9_.%\\/-]*[A-Za-z0-9_-]\.[A-Za-z0-9]+/g;
+	// Each token starts where its run of path characters starts: a match from
+	// a later position of the same run is the same match, and trying them all
+	// is quadratic on a long run (a generated 400 KB table took minutes).
+	const pathToken = /(?<![A-Za-z0-9_.%\\/-])[A-Za-z0-9_.%\\/-]*[A-Za-z0-9_-]\.[A-Za-z0-9]+/g;
 	// A folder spelled with at least one separator, quoted or not.
-	const dirToken = /[A-Za-z0-9_.%\\-]*[\\/][A-Za-z0-9_.%\\/-]*[A-Za-z0-9_]\/?(?![A-Za-z0-9_.])/g;
+	const dirToken =
+		/(?<![A-Za-z0-9_.%\\-])[A-Za-z0-9_.%\\-]*[\\/][A-Za-z0-9_.%\\/-]*[A-Za-z0-9_]\/?(?![A-Za-z0-9_.])/g;
 	const luaToken = /["']([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)["']/g;
 	return {
 		map,
@@ -1255,9 +1263,27 @@ function scanFile(file, text, ctx) {
 		else add(prose ? 'dir-split-prose' : 'dir-split', raw, '(split)', hit);
 	}
 	const jsEnv = /\.(c?js|mjs)$/.test(file) ? jsConstants(text, file) : new Map();
+	// root .. "locale_order.json" onto a folder constant of a Lua file.
+	const luaEnv = luaConstants(text, file, inTree);
+	for (const [name, base] of luaEnv) {
+		const use = new RegExp(`\\b${name}\\s*\\.\\.\\s*(["'])([\\w.\\/-]+)\\1`, 'g');
+		for (const m of text.matchAll(use)) {
+			const lead = m[2].startsWith('/') ? '/' : '';
+			const j = {
+				parts: [m[2].replace(/^\//, '')],
+				quote: m[1],
+				separator: '',
+				text: `${m[1]}${m[2]}${m[1]}`
+			};
+			const hit = resolveOnBase(j, base, j.parts[0], byRepoPath, byRepoDir, successors);
+			if (!hit || hit.kind !== 'join') continue;
+			const piece = hit.rendered.slice(1, -1);
+			add('lua-concat', m[0], m[0].replace(j.text, `${m[1]}${lead}${piece}${m[1]}`), hit);
+		}
+	}
 	// A path in a regular expression: /static\/ergopti_plus\/_shared\/x\.json/.
 	if (/\.(c?js|mjs)$/.test(file))
-		for (const m of text.matchAll(/[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
+		for (const m of text.matchAll(/(?<![\w-])[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {
 			const plain = m[0].replace(/\\\//g, '/').replace(/\\\./g, '.');
 			const isFile = /\.[A-Za-z0-9]+$/.test(plain);
 			const hit = resolvePathToken(plain, file, inTree, isFile ? byRepoPath : byRepoDir);
@@ -1524,6 +1550,54 @@ function resolveOnBase(j, base, joined, byRepoPath, byRepoDir, successors) {
 	const rendered = pieces.map((p) => `${j.quote}${p}${j.quote}`).join(j.separator || ', ');
 	if (rendered === j.text) return null;
 	return { kind: 'join', rendered, oldRepo: full, newRepo: newFull };
+}
+
+/**
+ * The folder constants a Lua file defines, evaluated to repository paths:
+ * `local root = helpers.driver_root() .. "/../_shared/data/"`. A later
+ * `root .. "locale_order.json"` is then respelled from the new place of root.
+ * @returns {Map<string, string>}
+ */
+function luaConstants(text, file, inTree) {
+	const env = new Map();
+	if (!file.endsWith('.lua')) return env;
+	const driverRoot = Census.DRIVERS.includes(inTree) ? `${PREFIX}${inTree}` : null;
+	const term = (t) => {
+		if (/^(?:[\w.]+\.)?driver_root\(\)$/.test(t)) return driverRoot;
+		if (/^(?:[\w.]+\.)?shared_root\(\)$/.test(t)) return `${PREFIX}_shared`;
+		const lit = t.match(/^(["'])([^"'\n]*)\1$/);
+		if (lit) return { piece: lit[2] };
+		return env.has(t) ? env.get(t) : undefined;
+	};
+	for (const m of text.matchAll(/^[ \t]*local\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*$/gm)) {
+		// Split at the concatenations outside string literals ("/../" is a path).
+		const terms = [...m[2].matchAll(/(["'])(?:(?!\1)[^\n])*\1|[^.'"]+(?:\.(?!\.)[^.'"]*)*/g)]
+			.map((t) => t[0].trim())
+			.filter(Boolean);
+		let acc = null;
+		let ok = terms.length > 1 || /^[\w.]+$/.test(terms[0]);
+		for (const t of terms) {
+			const v = term(t);
+			if (v === undefined || v === null) {
+				ok = false;
+				break;
+			}
+			if (typeof v === 'string') {
+				if (acc !== null) {
+					ok = false;
+					break;
+				}
+				acc = v;
+			} else if (acc === null) {
+				ok = false;
+				break;
+			} else acc += v.piece;
+		}
+		if (!ok || acc === null) continue;
+		const norm = path.posix.normalize(acc).replace(/\/$/, '');
+		if (norm.startsWith(PREFIX) && EXISTING.has(norm)) env.set(m[1], norm);
+	}
+	return env;
 }
 
 /**
