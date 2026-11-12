@@ -58,7 +58,7 @@ succeeds again, since each menu rebuild reads the state.
   installed copy ») outside `/usr/lib/ergopti` and `*/lib/ergopti/linux`, so on
   a checkout the row was live and every click showed the failure dialog, while
   Windows registers its source script (`StartupLaunchCommand` with the
-  interpreter). Done on Linux: a checkout writes the XDG entry for its own
+  interpreter). Done on Linux: a checkout writes the XDG entry `ergopti-source.desktop` (a name of its own: `install.sh` refuses an `ergopti-hotstrings` entry it does not own, so sharing it would block a later standalone install) for its own
   `bin/ergopti-hotstrings` by absolute path (`--tray`; a second start at login
   is refused by the session lock). An entry this menu wrote whose launcher no
   longer exists is reported as `stale`: a warning, logged once, the row
