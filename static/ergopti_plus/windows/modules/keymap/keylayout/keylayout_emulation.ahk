@@ -808,7 +808,45 @@ _KLE_OnKey(Sc, Shift, *) {
 }
 
 _KLE_OnAltGr(Sc, *) {
-	_KLE_Emit(Sc, KS_ShiftIsHeld(), true)
+	Shift := KS_ShiftIsHeld()
+	Mods := _KLE_AltGrShortcutMods(_KLE_RealCtrlHeld(), Shift)
+	if (Mods != "") {
+		_KLE_OnShortcut(Sc, Mods)
+		return
+	}
+	_KLE_Emit(Sc, Shift, true)
+}
+
+; Ctrl+AltGr+key sends Ctrl and the logical key, AltGr suspended (ILD-2, decided
+; by the maintainer on 2026-11-11, as Linux does): the chord a real Ctrl makes
+; of an AltGr press, or "" when AltGr types its level.
+; @param CtrlHeld {Boolean} A Ctrl other than AltGr's own is physically held.
+; @param Shift {Boolean} Shift is held.
+; @returns {String} "^", "^+" or "".
+_KLE_AltGrShortcutMods(CtrlHeld, Shift) {
+	if !CtrlHeld
+		return ""
+	return Shift ? "^+" : "^"
+}
+
+; Whether a Ctrl other than AltGr's own is physically held: the right Ctrl, or a
+; left Ctrl that is not the fake LCtrl a standard AltGr layout adds to every
+; AltGr press (the press ledger tells the real key from that alias).
+; @param StateFn {Func} (Name) -> physical state; GetKeyState by default.
+; @param RealFn {Func} (Name) -> 1 real, 0 alias, -1 unknown; KS_RealPressState by default.
+; @returns {Boolean}
+_KLE_RealCtrlHeld(StateFn := 0, RealFn := 0) {
+	if !HasMethod(StateFn, "Call")
+		StateFn := (Name) => GetKeyState(Name, "P")
+	if !HasMethod(RealFn, "Call")
+		RealFn := KS_RealPressState
+	if StateFn.Call("RCtrl")
+		return true
+	if !StateFn.Call("LCtrl")
+		return false
+	if !KS_AltGrAddsFakeLCtrl()
+		return true
+	return RealFn.Call("LCtrl") == 1
 }
 
 _KLE_OnShortcut(Sc, Mods, *) {
