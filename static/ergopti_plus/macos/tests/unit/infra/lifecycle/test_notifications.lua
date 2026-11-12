@@ -81,8 +81,7 @@ helpers.describe("notifications.notify", function()
 	end)
 
 	helpers.it("(nui-004-notice-privacy) the hs.notify bridge logs English metadata only", function()
-		local file = assert(io.open(helpers.driver_root() .. "/init.lua", "rb"))
-		local source = assert(file:read("*a")); assert(file:close())
+		local source = assert(helpers.read_driver_unit("-- Global user-notification logging bridge."))
 		local bridge = source:match("%-%- Global user%-notification logging bridge%.(.-)\nend\n")
 		helpers.assert_true(bridge ~= nil, "the bridge is found")
 		helpers.assert_true(bridge:find("sans titre", 1, true) == nil and bridge:find("utilisateur", 1, true) == nil,
@@ -102,8 +101,7 @@ helpers.describe("notifications.notify", function()
 		helpers.assert_true(notifications.notify("hello"))
 		helpers.assert_eq(captured.withdrawAfter, require("infra.timings").sec("ui", "notification_ttl_ms"),
 			"one declaration in _shared/modules/timings/constants.toml, shared with Linux")
-		local file = assert(io.open(helpers.driver_root() .. "/infra/notifications.lua", "rb"))
-		local source = assert(file:read("*a")); assert(file:close())
+		local source = assert(helpers.read_module_source("infra.notifications"))
 		helpers.assert_true(source:find("RETENTION_SEC = 5", 1, true) == nil and source:find("withdrawAfter   = 5", 1, true) == nil, "no typed copy of the duration")
 	end)
 

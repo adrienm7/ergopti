@@ -17,8 +17,7 @@ local helpers = require("tests.helpers")
 --- @param accepted any What do_reload returns.
 --- @return function reload, table notices
 local function reload_action(accepted)
-	local file = assert(io.open(helpers.driver_root() .. "/ui/menu/init.lua", "rb"))
-	local source = assert(file:read("*a")); assert(file:close())
+	local source = assert(helpers.read_module_source("ui.menu"))
 	local body = source:match("\n\t\treload%s+= (function%(%)\n.-\n\t\tend),\n")
 	helpers.assert_true(body ~= nil, "the menu reload action is found")
 	local notices = {}
