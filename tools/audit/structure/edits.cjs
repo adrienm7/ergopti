@@ -227,4 +227,37 @@ const MODULE_MEMBER_FILES = [
 	}
 ];
 
-module.exports = { FOLDER_EDITS, SYNTHETIC_PATHS, MODULE_NAME_FILES, MODULE_MEMBER_FILES };
+// Pins of a value derived from a file rather than of its bytes. repin.cjs
+// re-derives each one: the derivation must reproduce the pin from the
+// pre-step bytes, or the step stops, so an entry cannot fall behind its test.
+// `derive(source, holder, lib)` gets the source file and the pin holder as
+// text, and `lib(path)` loads a module of the tree being measured.
+const DERIVED_PINS = [
+	{
+		file: 'tools/test/fixtures/personal-section-owner-counterexamples.cjs',
+		source: 'static/ergopti_plus/macos/ui/menu/menu_hotstrings_custom.lua',
+		why:
+			'it pins the producer, read through the config-key source view, with its ' +
+			'section row restored to ORIGINAL_SECTION_ROW',
+		derive(raw, holder, lib) {
+			const { expandConfigKeys } = lib('tools/lib/config-key-tokens.cjs');
+			const source = expandConfigKeys(raw);
+			const row = holder.match(/const ORIGINAL_SECTION_ROW = `([^`]*)`;/)[1];
+			const start = '\n\t\t\t\tlocal ready = group_enabled and not paused';
+			const end = '\n\t\t\t\ttarget[#target + 1] = row';
+			const at = source.indexOf(start);
+			const last = source.indexOf(end, at);
+			if (at < 0 || last < 0) return null;
+			const original = source.slice(0, at) + row + source.slice(last + end.length);
+			return require('node:crypto').createHash('sha256').update(original).digest('hex');
+		}
+	}
+];
+
+module.exports = {
+	FOLDER_EDITS,
+	SYNTHETIC_PATHS,
+	MODULE_NAME_FILES,
+	MODULE_MEMBER_FILES,
+	DERIVED_PINS
+};
