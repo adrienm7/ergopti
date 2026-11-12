@@ -387,6 +387,14 @@ function run() {
 			'p = shared("zz_probe_hs", "data", "a.toml")',
 			"a Python call of the tools' shared() resolver"
 		);
+		assert.equal(
+			rewrite(
+				'tools/build/z.json',
+				'{ "patterns": ["ergopti_plus/_shared/zz_probe_lua/codec/*.lua"] }'
+			),
+			'{ "patterns": ["ergopti_plus/_shared/zz_probe_text/codec/*.lua"] }',
+			'a glob whose folder moves whole'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
