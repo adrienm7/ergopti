@@ -93,6 +93,14 @@ end
 
 helpers.describe("ollama payload: keep_alive", function()
 
+	helpers.it("(net-003-ollama-deadline) gives a local request the shared Ollama budget, not the remote one", function()
+		local request = captured_request({ stream = false })
+		local Timings = require("infra.timings")
+		helpers.assert_eq(request.options.timeout_ms, Timings.ms("llm", "ollama_request_timeout_ms"),
+			"a cold CPU model load outlasts the remote API budget; Windows gives Ollama the same ceiling")
+		helpers.assert_true(request.options.timeout_ms > Timings.ms("llm", "request_timeout_ms"))
+	end)
+
 	helpers.it("tells Ollama how long to keep the model resident", function()
 		local request = captured_request({ stream = false })
 		helpers.assert_true(request.body:find("keep_alive", 1, true) ~= nil,
