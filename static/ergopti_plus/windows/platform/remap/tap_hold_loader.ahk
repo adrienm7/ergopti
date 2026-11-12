@@ -47,6 +47,9 @@
 ; misplaced decimal point) rather than an intent, and the value is concatenated
 ; straight into a KeyWait timeout — so anything past it is rejected at the
 ; loader boundary instead of stalling a hotkey thread for minutes.
+; Declared here for the headless suites; the boot sets it from the timing
+; registry's tap_hold.max_activation_ms (TapHoldsLoadTimings), the bound macOS and
+; Linux read too, and the same 10 s.
 global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 ; The modifiers of the shared file that no Windows key holds (cmd, fn): the
 ; names of _shared/tap_hold/shared_file.toml [modifiers] order that the hold
