@@ -1517,8 +1517,20 @@ function scanFile(file, text, ctx) {
 	// SPEC_ONLY = { 'modules/tooltip/tint.js': … } in a tool: a bare path that
 	// names a file under _shared and nothing else follows that file.
 	// A captured source (a .txt snapshot of a predecessor) keeps what it held.
-	if (/^tools\//.test(file) && !/\.txt$/.test(file))
-		for (const m of text.matchAll(/(["'`])([\w.-]+(?:\/[\w.-]+)+\.[A-Za-z0-9]+)\1/g)) {
+	// copy_tree "${SHARED_SRC}/" … --exclude modules/features/behaviors.json:
+	// the same bare path, unquoted, as a shell exclusion.
+	const barePaths = [
+		...(/^tools\//.test(file) && !/\.txt$/.test(file)
+			? text.matchAll(/(["'`])([\w.-]+(?:\/[\w.-]+)+\.[A-Za-z0-9]+)\1/g)
+			: []),
+		...(/^tools\/.*\.sh$/.test(file)
+			? [
+					...text.matchAll(/(--exclude[= ])()([\w.-]+(?:\/[\w.-]+)+\.[A-Za-z0-9]+)(?![\w.\/-])/g)
+				].map((x) => Object.assign([x[0], x[1], x[3]], { unquoted: true, index: x.index }))
+			: [])
+	];
+	if (barePaths.length > 0)
+		for (const m of barePaths) {
 			const rel = m[2];
 			if (Census.TREES.some((t) => rel.startsWith(`${t}/`)) || rel.startsWith('static/')) continue;
 			const shared = `${PREFIX}_shared/${rel}`;
@@ -1526,7 +1538,8 @@ function scanFile(file, text, ctx) {
 			if (Census.DRIVERS.some((d) => EXISTING.has(`${PREFIX}${d}/${rel}`))) continue;
 			const target = byRepoPath.get(shared);
 			if (!target || target === PREFIX || !target.startsWith(`${PREFIX}_shared/`)) continue;
-			add('source-check', m[0], `${m[1]}${target.slice(`${PREFIX}_shared/`.length)}${m[1]}`, {
+			const respelled = target.slice(`${PREFIX}_shared/`.length);
+			add('source-check', m[0], m.unquoted ? `${m[1]}${respelled}` : `${m[1]}${respelled}${m[1]}`, {
 				oldRepo: shared,
 				newRepo: target
 			});

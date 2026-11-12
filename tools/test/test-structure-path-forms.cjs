@@ -89,6 +89,14 @@ function rewrite(file, text) {
 
 function run() {
 	withFakes(() => {
+		// A shell exclusion of a bare _shared path, unquoted.
+		assert.equal(
+			rewrite(
+				'tools/build/x.sh',
+				'copy_tree "$S/" "$B/" --exclude zz_probe_mod/hotstrings/a.json\n'
+			),
+			'copy_tree "$S/" "$B/" --exclude zz_probe_hs/data/a.json\n'
+		);
 		// A Lua pattern anchored on a path tail, embedded in a tool or in Lua.
 		assert.equal(
 			rewrite('tools/x.cjs', 'const lua = `if p:match("/zz_probe_mod/hotstrings/a%.json$") then`;'),
