@@ -75,7 +75,6 @@ _A0720WV_DeferredMutationsRecheckSuspend() {
 		"_OnbWeb_Finish",
 		"_OnbWeb_RegisterGesturesAuto",
 		"_OnbWeb_RegisterGesturesManual",
-		"_HsEdWeb_SavePref",
 		"_PathsEdWeb_Browse",
 		"_PathsEdWeb_Save",
 		"_PromptEdWeb_Save",
@@ -92,3 +91,17 @@ _A0720WV_DeferredMutationsRecheckSuspend() {
 }
 Test("webview: deferred mutations recheck Suspend at effect time (AHK-061)",
 	_A0720WV_DeferredMutationsRecheckSuspend)
+
+; A pause stops typing, not configuration (EDD-1, maintainer decision
+; 2026-11-12): the personal hotstrings editor's deferred effects save while
+; suspended (edd1-paused-writes).
+_A0720WV_ConfigurationEffectsIgnoreSuspend() {
+	for _, Fn in ["_HsEdWeb_SavePref", "_HsEdWeb_Save"] {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . " must exist")
+		Assert(InStr(Body, "A_IsSuspended") == 0,
+			Fn . " is a configuration effect: a suspended driver still saves it")
+	}
+}
+Test("webview: configuration effects save while suspended (edd1-paused-writes)",
+	_A0720WV_ConfigurationEffectsIgnoreSuspend)

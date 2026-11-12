@@ -257,15 +257,9 @@ _PersonalTomlOpeningAuthority(Source, FilePath, OwnerToken) {
 	SourcePath := Source.Get("path", "")
 	if !(SourcePath is String) || SourcePath == ""
 		return false
-	return _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) && !_PersonalWritesPaused()
+	return _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
 		&& _ConfigWriteLeaseKey(SourcePath) == _ConfigWriteLeaseKey(FilePath)
 		&& _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
-}
-
-; A user's pause holds back writes. A quarantined smoke is paused only to stay off
-; the session's input, and its first boot still creates its private files.
-_PersonalWritesPaused() {
-	return A_IsSuspended && !(IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined)
 }
 
 _PersonalTomlOpeningImageMatches(Source, FilePath, OwnerToken) {
@@ -711,7 +705,7 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 _PersonalTomlNativeAdmission(FilePath, OwnerToken := 0, OpeningSource := 0,
 		PreservationSource := 0, PersonalInfoSource := 0) {
 	if OwnerToken is Object {
-		if !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) || _PersonalWritesPaused()
+		if !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
 			return false
 	} else if !((OwnerToken is Integer) && OwnerToken == 0)
 		return false
@@ -770,7 +764,7 @@ _PersonalTomlHeldPreflight(Stage, FilePath, PhysicalPath, Content, AuthorizeFn,
 			&& (Observed["content"] == PreservationSource["content"])
 		PreviousCritical := Critical("On")
 		try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
-			&& !_PersonalWritesPaused() && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+			&& _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
 		finally Critical(PreviousCritical)
 		if !SourceMatches
 			return false
@@ -918,7 +912,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 				&& (Observed["content"] == PreservationSource["content"])
 			PreviousCritical := Critical("On")
 			try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
-				&& !_PersonalWritesPaused() && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+				&& _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
 			finally Critical(PreviousCritical)
 			if !SourceMatches {
 				_PersonalTomlCleanupStage(StagePath, DeleteFn)
@@ -1480,11 +1474,8 @@ _PersonalInfoSerializeCandidate(Information, Letters) {
 }
 
 _PersonalInfoAuthorizeCommit(AuthorizeFn := 0) {
-	; GUI and WebView callbacks bypass Suspend, and the WebView bridge defers the
-	; actual save through SetTimer. Re-check at the final rename, not only when
-	; the message was received, so pause cannot land inside a yielded stage write.
-	if A_IsSuspended
-		return false
+	; A pause stops typing, not configuration (EDD-1, maintainer decision
+	; 2026-11-12): a suspended driver still saves its personal information.
 	if (AuthorizeFn is Integer) && AuthorizeFn == 0
 		return true
 	if !HasMethod(AuthorizeFn, "Call")
@@ -1524,10 +1515,6 @@ PersonalInfoCommitValues(FilePath, Values, WriterFn := 0, ReplaceFn := 0,
 	}
 	if !(Values is Map) {
 		try LoggerError("PersonalToml", "Refusing a personal-information save whose values are not a Map.")
-		return false
-	}
-	if A_IsSuspended {
-		try LoggerError("PersonalToml", "Refusing a personal-information save while the driver is suspended.")
 		return false
 	}
 	if !((AuthorizeFn is Integer) && AuthorizeFn == 0)
@@ -1716,7 +1703,7 @@ _PersonalInfoEditorSourceCurrent(Owner, FilePath) {
 			return false
 	if Owner["kind"] != "personal-info-editor" || !(Owner["active"] is Integer)
 		|| Owner["active"] != 1 || !(Owner["path"] is String) || !(FilePath is String)
-		|| Owner["path"] == "" || FilePath == "" || A_IsSuspended
+		|| Owner["path"] == "" || FilePath == ""
 		|| !_PersonalInfoEditorReceiptValid(Owner["source"])
 		|| !_PersonalInfoEditorPathCurrent(Owner)
 		|| !(Owner["generation"] is Integer) || Owner["generation"] != HSE_RuntimeDecisionGeneration
@@ -1750,7 +1737,7 @@ _PersonalInfoEditorSourcesEqual(Expected, Observed) {
 ; usable without making its target the configured path, while a relocation of
 ; the configured identity invalidates the attempt that started before it.
 _PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
-	if !Source["admitted"] || _PersonalWritesPaused()
+	if !Source["admitted"]
 			|| !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
 		return false
 	if Source.Has("editor_owner") && !_PersonalInfoEditorSourceCurrent(Source["editor_owner"], FilePath)
@@ -2011,23 +1998,6 @@ _PersonalTomlLiveCommitState(Replacement := unset) {
 	return State
 }
 
-; Treat an injected suspend predicate as a test seam only. Production always
-; samples A_IsSuspended at every boundary that can follow a yield.
-_PersonalTomlRequestIsSuspended(SuspendFn := 0) {
-	if (SuspendFn is Integer) && SuspendFn == 0
-		return A_IsSuspended
-	if !HasMethod(SuspendFn, "Call")
-		return true
-	try Result := SuspendFn.Call()
-	catch as Err {
-		try LoggerError("PersonalToml",
-			"The personal-hotstring suspend predicate failed: {1}.",
-			Err.Message)
-		return true
-	}
-	return !(Result is Integer) || Result != 0
-}
-
 ; Revalidate both authorities after every yielding boundary. Owning yesterday's
 ; path is not authority to publish into the registry selected by today's path.
 _PersonalTomlRequestContextIsCurrent(Request, OwnerToken) {
@@ -2045,7 +2015,7 @@ _PersonalTomlRequestContextIsCurrent(Request, OwnerToken) {
 		&& !((Request.OpeningSource is Integer) && Request.OpeningSource == 0)
 		&& !_PersonalTomlOpeningSessionCurrent(Request.OpeningSource)
 		return false
-	return !_PersonalTomlRequestIsSuspended(Request.SuspendFn)
+	return true
 }
 
 ; Final stage authorization composes the live suspend/path owner with the
@@ -2099,7 +2069,6 @@ _PersonalTomlResyncSnapshot(Request) {
 		ReloadSections: Request.ReloadSections,
 		ReloadFn: Request.ReloadFn,
 		HasInjectedReloader: Request.HasInjectedReloader,
-		SuspendFn: Request.SuspendFn,
 		CompletionFn: 0,
 		Deferred: false,
 	}
@@ -2113,8 +2082,6 @@ _PersonalTomlResyncSnapshot(Request) {
 ; owner: those collisions fail immediately instead of creating orphaned work.
 _PersonalTomlQueueLiveRequest(Request) {
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
-	if _PersonalTomlRequestIsSuspended(Request.SuspendFn)
-		return PERSONAL_TOML_COMMIT_FAILED
 	if !HasMethod(Request.CompletionFn, "Call") {
 		try LoggerError("PersonalToml",
 			"Refusing to defer a personal-hotstring save without a terminal completion callback.")
@@ -2251,7 +2218,6 @@ _PersonalTomlPublishRequestOwned(Request, OwnerToken) {
 				|| !(Observed["content"] == PendingResync.DurableImage)
 				return PERSONAL_TOML_COMMIT_FAILED
 			if !_PersonalTomlWriteLeaseOwns(OwnerToken, Request.FilePath)
-				|| A_IsSuspended
 				|| _ConfigWriteLeaseKey(PersonalTomlPath()) != _ConfigWriteLeaseKey(Request.FilePath)
 				|| (Request.OpeningSource is Map && !_PersonalTomlOpeningSessionCurrent(Request.OpeningSource))
 				return PERSONAL_TOML_COMMIT_FAILED
@@ -2319,11 +2285,6 @@ _PersonalTomlClaimPendingOrRelease(OwnerToken, FilePath) {
 ; explicitly non-Critical.
 _PersonalTomlTryPublishRequest(Request) {
 	global PERSONAL_TOML_COMMIT_FAILED
-	if _PersonalTomlRequestIsSuspended(Request.SuspendFn) {
-		_PersonalTomlNotifyDeferredCompletion(
-			Request, PERSONAL_TOML_COMMIT_FAILED)
-		return PERSONAL_TOML_COMMIT_FAILED
-	}
 	State := _PersonalTomlLiveCommitState()
 	OwnerToken := false
 	Superseded := false
@@ -2418,14 +2379,14 @@ _PersonalTomlTryPublishRequest(Request) {
 
 PersonalTomlCommitAndReload(Data, RequestedSections := 0, WriterFn := 0,
 		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, ReloadFn := 0,
-		CompletionFn := 0, SuspendFn := 0, OpeningSource := 0) {
+		CompletionFn := 0, OpeningSource := 0) {
 	global PERSONAL_TOML_COMMIT_FAILED
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return PersonalTomlCommitAndReload(Data, RequestedSections,
 			WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, ReloadFn,
-			CompletionFn, SuspendFn, OpeningSource)
+			CompletionFn, OpeningSource)
 		finally Critical(InheritedCritical)
 	}
 	HasInjectedReloader := !((ReloadFn is Integer) && ReloadFn == 0)
@@ -2440,17 +2401,8 @@ PersonalTomlCommitAndReload(Data, RequestedSections := 0, WriterFn := 0,
 			"Refusing a personal-hotstring transaction with a non-callable completion callback.")
 		return PERSONAL_TOML_COMMIT_FAILED
 	}
-	if !((SuspendFn is Integer) && SuspendFn == 0)
-			&& !HasMethod(SuspendFn, "Call") {
-		try LoggerError("PersonalToml",
-			"Refusing a personal-hotstring transaction with a non-callable suspend predicate.")
-		return PERSONAL_TOML_COMMIT_FAILED
-	}
-	if _PersonalTomlRequestIsSuspended(SuspendFn) {
-		try LoggerWarn("PersonalToml",
-			"Refusing a personal-hotstring save while the driver is suspended.")
-		return PERSONAL_TOML_COMMIT_FAILED
-	}
+	; A pause stops typing, not configuration (EDD-1, maintainer decision
+	; 2026-11-12): a suspended driver still saves its personal hotstrings.
 
 	; Pure memory only: take a stable candidate before a nested GUI callback can
 	; mutate the caller's model. Critical is off again before any
@@ -2485,7 +2437,6 @@ PersonalTomlCommitAndReload(Data, RequestedSections := 0, WriterFn := 0,
 		ReloadFn: ReloadFn,
 		HasInjectedReloader: HasInjectedReloader,
 		CompletionFn: CompletionFn,
-		SuspendFn: SuspendFn,
 		OpeningSource: OpeningSource,
 		Deferred: false,
 	}
