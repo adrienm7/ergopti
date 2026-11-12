@@ -1,6 +1,6 @@
 {
 	"_comment": "Counts of tools/test/test-shared-literal-inventory.cjs (Rule A of docs/design/structure-plan.md), measured 2026-11-11. They can only go down: lower them with --update-baseline in the change that moves a copy to its shared home; never raise one.",
-	"linux.limit": 79,
+	"linux.limit": 78,
 	"linux.duration": 61,
 	"linux.path_name": 55,
 	"linux.enum_name": 178,
