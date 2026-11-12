@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Touchpad Checks Closed On A Container Proof
 --- DESCRIPTION:
---- The touchpad lines of TODO.md "To confirm on Linux" asked for a real pad.
+--- The touchpad lines of TODO-tests-linux.md "To confirm on Linux" asked for a real pad.
 --- The maintainer's rule of 2026-11-10 closes a check the cloud cannot run on
 --- hardware with a container proof (docs/memory/maintainer-decisions.md). Each
 --- case here replays a trace in `libinput record` format, kept under

@@ -4,7 +4,7 @@
 # ==============================================================================
 # MODULE: Field report, per-TODO-point summary (macOS and Linux)
 # DESCRIPTION:
-# Turns one field report into one verdict per point of its TODO.md section
+# Turns one field report into one verdict per point of its TODO-tests-<os>.md section
 # (« To confirm on the Mac », « To confirm on Linux »), so the coordinator can
 # tick lines from the report alone. The points and the evidence that decides
 # each are static/ergopti_plus/<os>/data/field_todo_coverage.json; the evidence
