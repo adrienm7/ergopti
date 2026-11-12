@@ -103,6 +103,8 @@ local function with_remap(options, body)
 
 	local calls = {
 		phase = options.initial_phase or "active",
+		lease_initialized = options.lease_uninitialized ~= true,
+		lease_status_calls = 0,
 		current_token = TOKENS[1],
 		token_index = 1,
 		order = {},
@@ -443,7 +445,14 @@ local function with_remap(options, body)
 			calls.phase_listener = listener
 			return true
 		end,
+		is_initialized = function() return calls.lease_initialized end,
 		status = function()
+			calls.lease_status_calls = calls.lease_status_calls + 1
+			if not calls.lease_initialized then
+				-- Mirrors the real require_state guard, which logs an ERROR.
+				calls.logs[#calls.logs + 1] = { level = "error", message = "'status' called before M.init()" }
+				return "uninitialized", { phase = "uninitialized" }
+			end
 			if calls.status_failures_remaining > 0 then
 				calls.status_failures_remaining = calls.status_failures_remaining - 1
 				error("synthetic-lease-status-failure")
