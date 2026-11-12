@@ -209,6 +209,7 @@ graph TD
         WINDOWS_input_probe_native["InputProbeNative.ahk"]
         WINDOWS_key_state["KeyState.ahk"]
         WINDOWS_keyboard_hook["KeyboardHook.ahk"]
+        WINDOWS_keyboard_layout_install["KeyboardLayoutInstall.ahk"]
         WINDOWS_keyboard_layout_switch["KeyboardLayoutSwitch.ahk"]
         WINDOWS_llm_automation["LlmAutomation.ahk"]
         WINDOWS_llm_nav_event_owner["LlmNavEventOwner.ahk"]

@@ -105,6 +105,7 @@ const WINDOWS_MECHANICS = {
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keystats/keystats_prefetch.ahk': 'how a worker process is spawned',
 	'ui/menu/menu_apps.ahk': 'how a bundled app process is spawned',
+	'ui/layout_manager/kbd_register_core.ahk': 'how the elevated layout installer relaunches itself',
 	'modules/dynamic_hotstrings/user_code.ahk':
 		'launch an owned personal-code worker with the bundled interpreter /script mode',
 	'adapters/program_providers.ahk':
