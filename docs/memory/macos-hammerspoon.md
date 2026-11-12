@@ -937,11 +937,14 @@ first physical input.
 
 ### project-hs-fork-admission-in-both-launch-modes
 
-Opening ordinary Hammerspoon with a Git checkout is a supported launch path;
-users must not need to build or start ErgoptiPlus.app to obtain its native
-remapping dependencies. App and repository onboarding must install and select
-the same pinned owned runtime (`project-hs-owned-remap-runtime`), from the same
-root-owned location, whichever way Ergopti was started. An installed or running
+A Git checkout runs through the developer app (`tools/dev/run-macos-dev-app.sh`),
+never through ordinary Hammerspoon: `infra/instance_admission.lua` admits only
+a runtime the launcher started with its logger authority, and tells a stock
+Hammerspoon pointed at the checkout why the driver did not start. Users of a
+checkout must still not need a published ErgoptiPlus.app to obtain the native
+remapping dependencies. Developer-app and installed-app onboarding must install
+and select the same pinned owned runtime (`project-hs-owned-remap-runtime`),
+from the same root-owned location, whichever way Ergopti was started. An installed or running
 official Karabiner-Elements is a coexistence case, not proof of runtime
 readiness: verify the owned peers by designated requirement and the live stream
 capability, leave the user's `~/.config/karabiner` untouched, and include a
