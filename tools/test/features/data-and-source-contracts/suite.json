@@ -705,6 +705,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-path-forms.cjs"],
 			"repro": "npm run test:structure-path-forms"
+		},
+		{
+			"id": "js-0515",
+			"ordinal": 632,
+			"name": "structure plan phase 2 runner refuses without its go and owns the follow-ups of each step",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-run-phase2.cjs"],
+			"repro": "npm run test:structure-run-phase2"
 		}
 	]
 }
