@@ -36,10 +36,15 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 		-- A pure-Lua PATH walk: the first entry holding a readable notify-send is
 		-- what children run. No program is probed by name.
 		local resolved
+		local visited = {}
 		for entry in (os.getenv("PATH") or ""):gmatch("[^:]+") do
+			visited[#visited + 1] = entry
 			local candidate = io.open(entry .. "/notify-send", "rb")
 			if candidate then candidate:close(); resolved = entry .. "/notify-send"; break end
 		end
+		-- An empty walk or a PATH with no notify-send anywhere must not pass.
+		helpers.assert_true(#visited > 0, "the PATH walk visited at least one entry")
+		helpers.assert_true(resolved ~= nil, "the PATH walk found a notify-send")
 		helpers.assert_eq(resolved, dir .. "/notify-send", "children resolve notify-send to the sentinel")
 		local log = os.tmpname()
 		os.remove(log)
