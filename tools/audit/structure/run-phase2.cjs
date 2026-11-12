@@ -38,6 +38,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync, execFileSync } = require('node:child_process');
+const Repin = require('./repin.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const APPLY = path.join('tools', 'audit', 'structure', 'apply-step.cjs');
@@ -190,6 +191,12 @@ function runStep(key, opts) {
 		ROOT,
 		git('rev-parse', '--git-path', 'ergopti-structure-derived.json').trim()
 	);
+	// The requalified pins of every re-pin round, for the commit body.
+	const requalifyFile = path.resolve(
+		ROOT,
+		git('rev-parse', '--git-path', 'ergopti-structure-requalify.json').trim()
+	);
+	fs.rmSync(requalifyFile, { force: true });
 	const derived = run(process.execPath, [REPIN, '--derive-out', derivedFile]);
 	if (derived.status !== 0)
 		throw Object.assign(new Error(`${key}: derived pins:\n${derived.tail}`), { receipt });
@@ -214,7 +221,9 @@ function runStep(key, opts) {
 			'--moves',
 			movesFile,
 			'--derived-before',
-			derivedFile
+			derivedFile,
+			'--requalify-out',
+			requalifyFile
 		]);
 		const repinned = Number((pinned.tail.match(/\[repin\] (\d+) file/) || [])[1]);
 		if (round > 1 && repinned === 0) break;
@@ -250,7 +259,14 @@ function runStep(key, opts) {
 			{ receipt }
 		);
 	if (opts.commit) {
-		const message = `refactor(structure): move ${key} into its feature folder\n\n${receipt.summary}`;
+		const records = fs.existsSync(requalifyFile)
+			? JSON.parse(fs.readFileSync(requalifyFile, 'utf8'))
+			: [];
+		receipt.requalified = records;
+		const section = Repin.requalificationSection(records);
+		const message =
+			`refactor(structure): move ${key} into its feature folder\n\n${receipt.summary}` +
+			(section ? `\n\n${section}` : '');
 		action('commit', 'git', ['commit', '-q', '-m', message]);
 		receipt.commit = git('rev-parse', 'HEAD').trim();
 	}
