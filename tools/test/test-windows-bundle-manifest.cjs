@@ -75,7 +75,14 @@ const LICENSE_NOTICES = new Set([`${SHARED_REL}/ui/vendor/LICENSES.md`]);
 const NEVER_RUNTIME = [
 	['behavior review metadata', (arc) => arc === `${SHARED_REL}/modules/features/behaviors.json`],
 	['shared test corpora', (arc) => arc.startsWith(`${SHARED_REL}/tests/`)],
-	['Python driver runtime', (arc) => arc.startsWith(`${SHARED_REL}/python/`)],
+	// A Python source or anything under a python folder, wherever the layout
+	// puts it (_shared/python/ today, <feature>/adapters/python/ tomorrow).
+	[
+		'Python driver runtime',
+		(arc) =>
+			arc.startsWith(`${SHARED_REL}/`) &&
+			(/\.py[co]?$/.test(arc) || arc.split('/').includes('python'))
+	],
 	['native compile sources', (arc) => arc.startsWith(`${SHARED_REL}/native/`)],
 	['Go compile sources', (arc) => arc.startsWith(`${SHARED_REL}/go/`)],
 	[
