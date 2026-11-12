@@ -539,6 +539,13 @@ const WINDOWS_FILE_RETENTION = [
 			'${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/',
 			'${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/'
 		]
+	},
+	{
+		name: 'Retain the receiving scenario evidence',
+		condition: '${{ always() && ' + WINDOWS_NATIVE_LOT + ' }}',
+		artifact:
+			'windows-receiving-scenarios-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		paths: ['${{ runner.temp }}/windows-receiving-scenarios/']
 	}
 ];
 
@@ -873,6 +880,7 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'test-ahk', 'Test native compiled startup admission', "matrix.module == 'meta'"],
 	[WINDOWS_BOX, 'integration-ahk', 'Receive managed Ollama file component', WINDOWS_NATIVE_LOT],
 	[WINDOWS_BOX, 'integration-ahk', 'Run native desktop AHK cohorts', WINDOWS_NATIVE_LOT],
+	[WINDOWS_BOX, 'integration-ahk', 'Receive the recovery and flow scenarios', WINDOWS_NATIVE_LOT],
 	// The proxy relay runs end to end once, in the native lot, with its Go pin.
 	[WINDOWS_BOX, 'integration-ahk', 'Read the pinned Go toolchain', WINDOWS_NATIVE_LOT],
 	[WINDOWS_BOX, 'integration-ahk', 'Install the pinned Go toolchain', WINDOWS_NATIVE_LOT],
@@ -4598,7 +4606,7 @@ const WINDOWS_FILE_RECEIVER_LINES = [
 	'if ($bootstrapExit -ne 0 -or $bootstrapStderr.Length -ne 0 -or'
 ];
 
-// These two uploads retain failed component evidence; they do not admit
+// These uploads retain failed component and receiving evidence; they do not admit
 // skipping the actual file-component receiver or a conditional Windows lane.
 function windowsFileRetentionProblems(files) {
 	const steps = files
@@ -4712,6 +4720,83 @@ for (const command of WINDOWS_FILE_RECEIVER_LINES)
 		componentBody.replace(command, '# ' + command),
 		windowsFileRetentionProblems
 	);
+
+// The Windows receiving scenarios ([PHYS-W] in TODO.md) run once, in the native
+// lot, through their one runner, whose census names every case it requires.
+const WINDOWS_RECEIVING_STEP = 'Receive the recovery and flow scenarios';
+const WINDOWS_RECEIVING_RUNNER = './tools/test/run-windows-receiving-scenarios.ps1';
+const WINDOWS_RECEIVING_SLUGS = [
+	'phys-w-receiving-migration-tree',
+	'phys-w-receiving-migration-acl',
+	'phys-w-receiving-migration-journal',
+	'phys-w-receiving-updater-swap',
+	'phys-w-receiving-dpapi',
+	'phys-w-receiving-widget-position',
+	'phys-w-receiving-recycle-bin',
+	'phys-w-receiving-selection-focus'
+];
+function windowsReceivingProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === WINDOWS_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'integration-ahk')
+		.flatMap((job) => pipeline.steps(job.body));
+	const found = steps.filter((step) => step.name === WINDOWS_RECEIVING_STEP);
+	const problems = [];
+	if (
+		found.length !== 1 ||
+		pipeline.stepField(found[0].body, 'if') !== WINDOWS_NATIVE_LOT ||
+		pipeline.stepField(found[0].body, 'shell') !== 'powershell' ||
+		JSON.stringify(logicalLines(found[0].body)) !== JSON.stringify([WINDOWS_RECEIVING_RUNNER])
+	)
+		problems.push(
+			`${WINDOWS_RECEIVING_STEP} must run ${WINDOWS_RECEIVING_RUNNER} once, in Windows PowerShell, in the native lot`
+		);
+	return problems;
+}
+errors.push(...windowsReceivingProblems(pipeline.files()));
+{
+	const receiver = pipeline.step(pipeline.job('integration-ahk'), WINDOWS_RECEIVING_STEP);
+	for (const [description, from, to] of [
+		['missing step', receiver, ''],
+		['renamed step', WINDOWS_RECEIVING_STEP, 'Receive some scenarios'],
+		[
+			'other lot',
+			`        if: ${WINDOWS_NATIVE_LOT}\n`,
+			"        if: matrix.lot == 'Driver startup'\n"
+		],
+		['pwsh instead of Windows PowerShell', '        shell: powershell\n', '        shell: pwsh\n'],
+		[
+			'commented runner',
+			`        run: ${WINDOWS_RECEIVING_RUNNER}`,
+			`        run: '# ${WINDOWS_RECEIVING_RUNNER}'`
+		],
+		['extra filter', WINDOWS_RECEIVING_RUNNER, `${WINDOWS_RECEIVING_RUNNER} -Ahk none`]
+	])
+		mustCatch(
+			`Windows receiving scenarios: ${description}`,
+			WINDOWS_BOX,
+			receiver,
+			receiver.replace(from, () => to),
+			windowsReceivingProblems
+		);
+	// Every audited scenario keeps at least one case in the runner's census, and
+	// the census selects nothing else.
+	const census = fs.readFileSync(
+		path.join(__dirname, '..', '..', WINDOWS_RECEIVING_RUNNER),
+		'utf8'
+	);
+	const block = census.match(/\$ExpectedNames = @\(\n([\s\S]*?)\n\)/);
+	const names = block ? [...block[1].matchAll(/^ {4}'(.+)',?$/gm)].map((match) => match[1]) : [];
+	if (names.length === 0)
+		errors.push(`${WINDOWS_RECEIVING_RUNNER} must declare its census of receiving cases`);
+	for (const name of names)
+		if (!WINDOWS_RECEIVING_SLUGS.some((slug) => name.endsWith(`(${slug})`)))
+			errors.push(`receiving case outside the audited scenarios: ${name}`);
+	for (const slug of WINDOWS_RECEIVING_SLUGS)
+		if (!names.some((name) => name.endsWith(`(${slug})`)))
+			errors.push(`the receiving census has no case for ${slug}`);
+}
 
 // Multiline comments and literal here-string payloads are not active receivers.
 for (const [opening, closing] of [
