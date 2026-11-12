@@ -189,10 +189,15 @@ function repin({
 		const next = new Map();
 		const origin = new Map(); // pre-step hash -> [old path, new path]
 		const ambiguous = new Set();
+		// Files the step removed with no new place: a requalified pin of one
+		// cannot be attributed to any file of the step.
+		const gone = new Map();
 		for (const [old, now] of pairs) {
-			if (now === null) continue;
+			if (now === null || !fs.existsSync(path.join(root, now))) {
+				gone.set(before.get(old), old);
+				continue;
+			}
 			const abs = path.join(root, now);
-			if (!fs.existsSync(abs)) continue;
 			const from = before.get(old);
 			const cached = contents.get(now);
 			const to = sha256(
@@ -214,6 +219,10 @@ function repin({
 			const updated = text.replace(PIN, (h) => {
 				if (ambiguous.has(h))
 					throw new Error(`repin: ${f} pins ${h}, shared by files the step made different`);
+				if (requalified.has(f) && gone.has(h) && !next.has(h))
+					throw new Error(
+						`repin: ${f} pins ${h} of ${gone.get(h)}, which the step removed: no file accounts for it`
+					);
 				const to = next.get(h);
 				if (!to) return h;
 				pins.push([h, to]);
