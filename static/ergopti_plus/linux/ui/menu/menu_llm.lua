@@ -477,8 +477,9 @@ local function _build_llm(ctx)
 				opts = editor_opts
 			end
 			if create and not create_ready() then return false end
+			-- The page's save runs while paused: a pause stops typing, not
+			-- configuration (EDD-1, maintainer decision 2026-11-12).
 			return Editor.open(existing, function(profile)
-				if create and not create_ready() then return false end
 				return save_profile(profile, activate, expected_existing)
 			end, opts)
 		end
