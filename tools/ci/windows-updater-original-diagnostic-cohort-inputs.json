@@ -45,7 +45,7 @@
 	],
 	"source_sha256": {
 		"static/ergopti_plus/windows/_generated/update_channels.ahk": "34f8079401c7377c7242e5fd4a40332a1a10b078d7c9f2a893e7814709abe733",
-		"static/ergopti_plus/windows/_generated/update_schedule.ahk": "d13e790c22ce73d57a6dd7b6ace50d73f3f2b74ca43593a0f9177d0c89decaf7",
+		"static/ergopti_plus/windows/_generated/update_schedule.ahk": "9aa63d57202fb29a5b04ce345ee7cff2ebc1eaac7631ff36b5b08d6e6d1da2dc",
 		"static/ergopti_plus/windows/infra/config_io.ahk": "0da5bcc8c9a42658a093b2ad182787b79cef18a87d87fd0233b7ac3d2e2962fc",
 		"static/ergopti_plus/windows/infra/config_migrate.ahk": "61ebefc2b7c5c1552da0e0849ccaf160aed8a8a3abd6fc5edae6c81cf0b38473",
 		"static/ergopti_plus/windows/infra/config_transition_runtime.ahk": "b1a258c9027ca56419cf7f2d564226b11d4598ed6712a48b5c43aa65d5b045f7",
@@ -55,7 +55,7 @@
 		"static/ergopti_plus/windows/modules/updater/changelog.ahk": "047e274588b1620e30825844066e84ae88b33a7d50f52534702dbf6a1278877e",
 		"static/ergopti_plus/windows/modules/updater/channels.ahk": "d65f0823227bca1f86d102542629bd369c8a28de064036680e49c754961c8961",
 		"static/ergopti_plus/windows/modules/updater/config_backup.ahk": "2b01fd38179f368f281d00cec5169900585be6e26f291c1fec8d0d7fc1bdecd0",
-		"static/ergopti_plus/windows/modules/updater/core.ahk": "443d49ed4499a9d09cfbdceb06141426ab40baa2c89a0497b947cd20f4b01057",
+		"static/ergopti_plus/windows/modules/updater/core.ahk": "cf77d4018edd17e138a7c2d7d2a9eef1fc35e13fc7014933e4440284c64a2872",
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "7081fdff0ff33cbaa2f4ca6d7d3e80d4ac6ae0f4c11932bc65c63b203ac6fbd3",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "75911a019052ec48f5734485c115f4e7e2a52e30dd54587b296bdfaeef466805",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "67278a30de5da09b14c83626582776db7ae575ed",
+	"source_pin_base": "3b88056e7316f9c6e1bc377bd6390fe363927d38",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
