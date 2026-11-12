@@ -5,6 +5,34 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Hotstring short entry forms load everywhere (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (HSE-002): a bare-key entry
+(`par = { output = … }`) and the simple form (`"bbq" = "text"`, a word
+hotstring with an end character, case-conform and final) load on every OS.
+The shared `toml_codec/reader.lua` accepts them only in a section the
+document's `[_meta] sections_order` lists, so `constants.toml`, the tap-hold
+defaults and the tooltip configuration parse as before. Windows has a TODO
+line for an inline-table entry in another key order or with only `output`.
+Regression `hse-002-short-entry-forms`.
+
+## A no-break space counts as a space inside a trigger (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (HSE-003): a trigger with an inner
+space fires when typed with U+00A0 or U+202F there, on every OS; a trigger
+starting with a space (a word-boundary guard) keeps its own. macOS
+(`add_with_space_variants`) and the shared engine register the variants;
+Windows has a TODO line. Regression `hse-003-nbsp-trigger`.
+
+## A letter magic key follows the word's case (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (HSE-004), following Windows: with a
+letter as the magic key (`a`), `BTWA` expands to BY THE WAY and `BTWa`
+fires nothing; the Title form keeps the key lowercase (`Btwa`). macOS
+registers the UPPER variant with the uppercased key and resolves a
+Shift+magic press against the uppercase star mappings (never the letter
+repeat). Regression `hse-004-magic-key-case`.
+
 ## App Cloner clones of VS Code variants keep their own folders (2026-11-12)
 
 Decided by the maintainer on 2026-11-12 (BAP-004): a VSCodium or VS Code
@@ -45,6 +73,32 @@ exist; anything else needs « :// » or Teams' `msteams:/l/` and
 `msteams:/calendar` forms, so « https:/x » and « localhost:3000 » are refused.
 Linux follows it since BAP-005; Windows' `_AppCloner_InvalidOpenItem` has its
 TODO line.
+
+## A pause stops typing, not configuration (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (EDD-1), then sharpened the same day
+into a « real pause »: while the driver is paused, configuration stays fully
+available and nothing that acts on typing is active.
+
+- Allowed while paused, on every OS: every menu setting, adding and deleting
+  hotstrings, every editor save, and installs (layouts, AI models through
+  Ollama or MLX, apps). An editor window already open when the driver is
+  paused keeps saving. A menu's whole-scope « restore recommended » and
+  « clear », the Configuration menu's included, run while paused.
+- Stopped while paused: everything that acts on typing or input, meaning
+  hotstrings, layout emulation, tap-holds, layers and chords, shortcuts and
+  gestures, and AI predictions with what serves them live (prediction
+  streaming, warmups, the local inference server used for predictions, and
+  the activation pause owner itself).
+- A setting changed during a pause applies on resume, not before.
+
+macOS and Linux follow it through `edd1-paused-writes` regressions (the
+LMH-003 layout manager gate reverted, the prompt editor's create and clone
+saves, the physical shortcuts editor and capture, every scope owner's restore
+and clear). The Windows `A_IsSuspended` configuration gates are to remove
+(TODO « Windows (the PC agent's) »). Pages that are not configuration
+(changelog, update check) keep their own rules. Do not add a pause gate to a
+configuration action; gate the typing runtime instead.
 
 ## One configuration layout on every OS for tap-holds (2026-11-11)
 

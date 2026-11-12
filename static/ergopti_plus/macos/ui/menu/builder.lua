@@ -506,9 +506,10 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- « Restore recommended » and « Clear » run the Hotstrings scope owner, which
 	-- asks first and changes config.toml and the override file as one
 	-- transaction; the ordinary save path never writes them.
+	-- A pause does not refuse them: a pause stops typing, not configuration (EDD-1).
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		hs_ctx.commands[command] = function()
-			if ctx.paused or type(ctx.apply_preference_scope) ~= "function" then return false end
+			if type(ctx.apply_preference_scope) ~= "function" then return false end
 			return ctx.apply_preference_scope("hotstrings", mode) == true
 		end
 	end
@@ -723,20 +724,15 @@ function M.generate(ctx, menu_mods, actions)
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
-			-- Pause owns the bindings axis for the whole pause window: pause_all()
-			-- snapshots what was running and resume_all() restores that snapshot.
-			-- A row that rewrites the configuration in between is either discarded
-			-- on resume or breaks the « pause = tout éteint » invariant, so those
-			-- three are greyed AND stripped of their handler: a disabled row whose
-			-- fn survives still fires the moment the greying is rendered wrong
-			-- somewhere else. The rows that only open a window stay live.
+			-- A pause stops typing, not configuration (EDD-1, maintainer decision
+			-- 2026-11-12): the whole-scope restore and clear stay live while
+			-- paused, since every scope owner writes through its own transaction.
+			-- The unused-key clean was not part of that decision and stays greyed
+			-- AND stripped of its handler: a disabled row whose fn survives still
+			-- fires the moment the greying is rendered wrong somewhere else.
 			local pause_gated = {}
-			-- pairs, not ipairs: an unregistered command is nil, and ipairs would
-			-- stop there and leave the rows after it ungated.
-			for _, fn in pairs({ restore = restore, clear = clear, clean = clean }) do
-				-- An unregistered command draws no row, so it has nothing to gate.
-				if type(fn) == "function" then pause_gated[fn] = true end
-			end
+			-- An unregistered command draws no row, so it has nothing to gate.
+			if type(clean) == "function" then pause_gated[clean] = true end
 			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
 			if not configuration_dense(rows, true) then return {} end
 			if ctx.paused then

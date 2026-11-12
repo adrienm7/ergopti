@@ -171,8 +171,10 @@ helpers.describe("acknowledged Linux ordered pair editing",function()
 			s.changed=nil;helpers.assert_true(s.scope.retry_restore());helpers.assert_eq(s.bytes[path],source);failed(s.scope.pending())
 		end)
 	end)
-	helpers.it("refuses paused edits before native acquisition or source changes",function()
-		with_owner(function(s) s.paused=true;failed(s.scope.edit(edits));helpers.assert_eq(s.changes,0);helpers.assert_eq(s.publications,0) end)
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("edits the ordered pairs while paused (edd1-paused-writes)",function()
+		with_owner(function(s) s.paused=true;helpers.assert_true(s.scope.edit(edits));helpers.assert_eq(s.publications,1)
+			helpers.assert_eq(Codec.decode(s.bytes[path]).shortcuts.key_combination_holds[pair],"alt") end)
 	end)
 end)
 
@@ -431,7 +433,7 @@ helpers.describe("exact configuration route after native callbacks",function()
 				hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,route=function() return route end,
 				is_paused=function() return s.paused end,actions=s.gestures,changed=function() return true end})
 			local owner=Scope.new({path=path,backup_path=backup,chord_path=Fixture.chord_path,chord_backup_path=Fixture.chord_backup,files=s.files,combinations=owned,parameters=s.gestures,
-				manifest={scope_plan=function() return {presets={},operations={}} end},is_paused=function() return s.paused end})
+				manifest={scope_plan=function() return {presets={},operations={}} end}})
 			local apply=s.gestures.apply_parameter_configuration
 			s.gestures.apply_parameter_configuration=function(token,params)
 				local accepted=apply(token,params);route=other;return accepted
@@ -466,7 +468,7 @@ helpers.describe("final ordered-pair publication route ownership",function()
 						return true
 					end})
 				local owner=Scope.new({path=path,backup_path=backup,chord_path=Fixture.chord_path,chord_backup_path=Fixture.chord_backup,files=s.files,combinations=owned,parameters=s.gestures,
-					manifest={scope_plan=function() return {presets={},operations={}} end},is_paused=function() return s.paused end})
+					manifest={scope_plan=function() return {presets={},operations={}} end}})
 				if phase=="publication" then
 					s.before_publish=function(target,candidate)
 						if target==path and not handed then handed=true;route=other;s.bytes[other]=candidate end
@@ -608,19 +610,23 @@ end)
 
 
 
-helpers.describe("staged publication source after native pause callback",function()
-	helpers.it("retains exact inverse and fenced delivery after the final pause getter changes canonical route",function()
+-- The pause getter is no longer a configuration callback (EDD-1): the final
+-- native callback is the pair owner's own source read.
+helpers.describe("staged publication source after the final native source read",function()
+	helpers.it("retains exact inverse and fenced delivery after the final source read changes canonical route",function()
 		with_owner(function(s)
-			local route,other=path,"/controlled/final-pause.toml";local armed,handed,calls=false,false,0
+			local route,other=path,"/controlled/final-pause.toml";local armed,handed=false,false
 			local Pair=require("modules.shortcuts.key_combinations")
+			local reads=setmetatable({read_with_status=function(...)
+				local bytes,status=s.files.read_with_status(...)
+				if armed and not handed then handed=true;route=other;s.bytes[other]=s.bytes[path] end
+				return bytes,status
+			end},{__index=s.files})
 			local owned=Pair.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},
-				hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,route=function() return route end,
-				is_paused=function()
-					if armed and not handed then calls=calls+1;if calls==5 then handed=true;route=other;s.bytes[other]=s.bytes[path] end end
-					return false
-				end,actions=s.gestures,changed=function() return true end})
+				hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=reads,route=function() return route end,
+				is_paused=function() return false end,actions=s.gestures,changed=function() return true end})
 			local owner=Scope.new({path=path,backup_path=backup,chord_path=Fixture.chord_path,chord_backup_path=Fixture.chord_backup,files=s.files,combinations=owned,parameters=s.gestures,
-				manifest={scope_plan=function() return {presets={},operations={}} end},is_paused=function() return false end})
+				manifest={scope_plan=function() return {presets={},operations={}} end}})
 			local release=s.gestures.release_parameter_configuration
 			s.gestures.release_parameter_configuration=function(token)
 				local accepted=release(token);if accepted and token==owner and s.publications==1 then armed=true end;return accepted

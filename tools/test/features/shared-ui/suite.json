@@ -421,6 +421,22 @@
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-installer.cjs"],
 			"repro": "npm run test:kbd-installer"
+		},
+		{
+			"id": "linux-pages-post-ready",
+			"ordinal": 629,
+			"name": "every shared page a Linux bridge waits for posts ready, so none opens empty on Linux",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-pages-post-ready.cjs"],
+			"repro": "npm run test:linux-pages-post-ready"
+		},
+		{
+			"id": "host-context-menu",
+			"ordinal": 630,
+			"name": "host pages keep the native context menu closed outside text fields",
+			"cmd": "node",
+			"args": ["tools/test/test-host-context-menu.cjs"],
+			"repro": "npm run test:host-context-menu"
 		}
 	]
 }

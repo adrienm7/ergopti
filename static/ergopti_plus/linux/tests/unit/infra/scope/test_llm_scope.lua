@@ -312,6 +312,21 @@ helpers.describe("Linux terminal LLM scope", function()
 	end)
 end)
 
+-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+helpers.describe("Linux AI scope while paused", function()
+	helpers.it("applies the restore a paused menu requests (edd1-paused-writes)", function()
+		with_scope(function(owner)
+			local scope = require("infra.llm_scope")
+			local old_new = scope.new
+			scope.new = function() return owner end
+			local ok, applied = pcall(scope.apply, "recommended", true)
+			scope.new = old_new
+			assert(ok, applied)
+			helpers.assert_eq(applied, true, "the menu's pause state no longer refuses the scope")
+		end)
+	end)
+end)
+
 helpers.describe("Linux terminal LLM scope revert", function()
 	helpers.it("reverts a committed clear to the exact file and the enabled engine", function()
 		with_scope(function(owner, engine, _, path, backup)

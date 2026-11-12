@@ -38,11 +38,10 @@ function M.available(scope)
 end
 
 --- Opens one shared form over the existing acknowledged native scope.
---- @param options table Scope owner and live pause getter.
+--- @param options table Scope owner.
 --- @return boolean opened
 function M.open(options)
-	if type(options) ~= "table" or type(options.is_paused) ~= "function" or options.is_paused() ~= false
-		or not M.available(options.scope) then return false end
+	if type(options) ~= "table" or not M.available(options.scope) then return false end
 	if session ~= nil and M.close() ~= true then return false end
 	local Manager = require("ui.webview_manager")
 	local Gestures = require("modules.gestures.manager")
@@ -51,7 +50,6 @@ function M.open(options)
 		rawget(Hook, "cancel_position"), rawget(Hook, "position_capture_available")
 	local current_epoch, page_current = rawget(Manager, "current_epoch"), rawget(Manager, "page_current")
 	local eval_js = rawget(Manager, "eval_js")
-	local pause_current = options.is_paused
 	local path = Paths.shared("data/keycodes/physical_keys.json")
 	local bytes, status
 	if path then bytes, status = require("toml_codec.writer").read_classified(path) end
@@ -85,11 +83,11 @@ function M.open(options)
 		local reread, final = pcall(current_epoch, APP)
 		return reread and final == epoch and page_owner() and candidate.epoch == epoch
 	end
+	-- A key capture keeps working after a pause: the editor writes
+	-- configuration, which a pause leaves alone (EDD-1, 2026-11-12).
 	local function observation_current()
-		if not current() or rawget(options, "is_paused") ~= pause_current then return false end
-		local called, paused = pcall(pause_current)
-		return called and paused == false and current() and rawget(options, "is_paused") == pause_current
-			and rawequal(package.loaded["adapters.keyboard_hook"], Hook)
+		if not current() then return false end
+		return current() and rawequal(package.loaded["adapters.keyboard_hook"], Hook)
 			and rawget(Hook, "capture_position") == capture_position
 			and rawget(Hook, "cancel_position") == cancel_position
 			and rawget(Hook, "position_capture_available") == position_available

@@ -62,19 +62,21 @@ helpers.describe("injector: the erase pause follows the pacing port", function()
 		done()
 	end)
 
-	helpers.it("pauses for a target that needs it", function()
+	helpers.it("(hse-001-terminal-erase-pacing) waits after each Backspace for a target that needs it", function()
 		local injector, pauses = load()
 		injector.set_erase_pacing(function() return true end)
 		helpers.assert_true(injector.inject(2, "Bo").ok)
-		helpers.assert_eq(#pauses, 1, "a terminal processes the deletions before the text")
+		local delay = require("infra.timings").ms("debounce", "terminal_hotstring_key_delay_ms") / 1000
+		helpers.assert_eq(pauses, { delay, delay },
+			"a terminal reads each deletion against its own render, as Windows and macOS pace it")
 		done()
 	end)
 
-	helpers.it("pauses when the pacing port fails", function()
+	helpers.it("paces each Backspace when the pacing port fails", function()
 		local injector, pauses = load()
 		injector.set_erase_pacing(function() error("focus unreadable") end)
 		helpers.assert_true(injector.inject(2, "Bo").ok)
-		helpers.assert_eq(#pauses, 1)
+		helpers.assert_eq(#pauses, 2)
 		done()
 	end)
 

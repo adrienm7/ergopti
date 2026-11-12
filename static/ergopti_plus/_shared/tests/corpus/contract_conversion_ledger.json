@@ -1028,7 +1028,7 @@
 		},
 		{
 			"contract": "config_scope_script_contract.lua",
-			"lua_sites": 10,
+			"lua_sites": 11,
 			"data_driven": [],
 			"stays_in_lua": [
 				{
@@ -1044,7 +1044,11 @@
 					"reason": "file_effects"
 				},
 				{
-					"case": "refuses paused and invalid requests before source or alias mutation",
+					"case": "applies while paused (edd1-paused-writes)",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses invalid requests before source or alias mutation",
 					"reason": "transaction_sequence"
 				},
 				{

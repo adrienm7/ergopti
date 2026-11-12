@@ -1082,14 +1082,14 @@ esac
 #                            no-ops because the app isn't yet a registered
 #                            URL handler in this process tree.
 URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*:'
-# A browser clone opens a web URL itself: `open -a` would hand it to the
-# browser's main instance, not the clone's profile. A Chromium clone opens it
-# as its own application window, the catalogue's web_app argument.
+# A browser clone opens a web URL itself, as an argument: `open -a` would hand
+# it to the browser's main instance, not the clone's profile. A standalone web
+# window is the PWA mode's WKWebView launcher, so no browser app window is asked
+# for here.
 WEB_URL_RE='^https?://'
 if [[ -n "$OPEN_ARG" && "$OPEN_ARG" =~ $WEB_URL_RE ]]; then
 	case "$APP_FAMILY" in
-		chromium) ARGS+=("--app=$OPEN_ARG"); OPEN_ARG="" ;;
-		firefox) ARGS+=("$OPEN_ARG"); OPEN_ARG="" ;;
+		chromium|firefox) ARGS+=("$OPEN_ARG"); OPEN_ARG="" ;;
 	esac
 fi
 if [[ -n "$OPEN_ARG" && ! "$OPEN_ARG" =~ $URL_SCHEME_RE ]]; then

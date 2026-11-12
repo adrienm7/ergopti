@@ -566,16 +566,18 @@ helpers.describe("exact staged pair delivery fence",function()
 	end)
 end)
 
-helpers.describe("pair source receipt after final native pause callback",function()
+helpers.describe("pair source receipt after the final native source read",function()
+	-- The pause getter is no longer a configuration callback (EDD-1); the
+	-- source read is the last one, so a route handed off in it must refuse.
 	for _,phase in ipairs({"editor","configuration","matches"}) do
-		helpers.it("refuses a same-byte canonical route handoff in final "..phase.." pause getter",function()
-			local route, armed, calls=path,false,0;local token={}
+		helpers.it("refuses a same-byte canonical route handoff in the final "..phase.." source read",function()
+			local route, armed=path,false;local token={}
 			local owner=Owner.new({keys=catalog,hold_picker={modifiers={"shift","alt"},layers={"nav"}},
-				files={read_with_status=function() return base_text,"ok" end},route=function() return route end,
-				is_paused=function()
-					if armed then calls=calls+1;if calls==(phase=="editor" and 3 or 2) then route="/controlled/foreign.toml" end end
-					return false
-				end,changed=function() return true end,actions={is_assignable=function(action) return action=="run_program" end}})
+				files={read_with_status=function()
+					if armed then armed=false;route="/controlled/foreign.toml" end
+					return base_text,"ok"
+				end},route=function() return route end,
+				is_paused=function() return false end,changed=function() return true end,actions={is_assignable=function(action) return action=="run_program" end}})
 			helpers.assert_true(owner.acquire_configuration(token));helpers.assert_true(owner.acquire_delivery_fence(token))
 			if phase=="editor" then helpers.assert_true(owner.release_configuration(token)) end
 			armed=true
@@ -583,7 +585,7 @@ helpers.describe("pair source receipt after final native pause callback",functio
 			if phase=="editor" then receipt=owner.capture_edit_source(token)
 			elseif phase=="configuration" then receipt=owner.configuration_source(token)
 			else receipt=owner.configuration_source_matches(token,{path=path,status="ok",content=base_text}) end
-			helpers.assert_eq(route,"/controlled/foreign.toml","The final native pause getter must cause the handoff")
+			helpers.assert_eq(route,"/controlled/foreign.toml","The final source read must cause the handoff")
 			if phase=="matches" then assert_false(receipt) else helpers.assert_eq(receipt,nil) end
 			helpers.assert_true(owner.owns_delivery_fence(token));helpers.assert_eq(owner.capture_runtime(),nil)
 		end)
@@ -2186,5 +2188,34 @@ helpers.describe("owned roll journal action acknowledgement", function()
 		helpers.assert_eq(action.run(function() return false end, receipt), false)
 		helpers.assert_eq(action.finish(receipt), false)
 		local next_step, reason = journal.next(); helpers.assert_eq(next_step, nil); helpers.assert_eq(reason, "refused")
+	end)
+end)
+
+-- One chord action this driver lacks (another OS's, in the shared
+-- tap_hold.toml) used to drop every chord without a word (TCL-003).
+helpers.describe("chord slots read from the shared tap_hold.toml", function()
+	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+		local chord_path = "/controlled/tap_hold.toml"
+		local chords_text = '[_meta]\nschema_version = 1\n[mod_combos]\nenabled = true\n'
+			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "run_program"\n'
+			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "mission_control"\n'
+		local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+			files = { read_with_status = function(file)
+				if file == chord_path then return chords_text, "ok" end
+				if file == path then return base_text, "ok" end
+				return nil, "absent"
+			end },
+			route = function() return path end,
+			chord_route = function() return chord_path end,
+			is_paused = function() return false end,
+			changed = function() return true end,
+			actions = { is_assignable = function(action) return action == "run_program" end } })
+		local token = {}
+		helpers.assert_true(owner.acquire_configuration(token))
+		local snapshot = owner.configuration_snapshot(token)
+		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
+		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "run_program")
+		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
+		helpers.assert_true(owner.release_configuration(token))
 	end)
 end)
