@@ -28,6 +28,7 @@
 
 
 #Include ../adapters/system_locale.ahk
+#Include ../_generated/identifiers.ahk
 
 
 
@@ -100,11 +101,15 @@ _I18nDetectSystemLocale(LocaleProbe := 0) {
 				return Code
 			}
 		}
-		try LoggerDebug("i18n", "detect_system_locale: '{1}' not supported — falling back to 'en'.", Code)
+		try LoggerDebug("i18n", "detect_system_locale: '{1}' not supported — falling back to '{2}'.", Code,
+			Identifiers.Locales.SYSTEM_FALLBACK)
 	} else {
-		try LoggerDebug("i18n", "detect_system_locale: user UI language unavailable — falling back to 'en'.")
+		try LoggerDebug("i18n", "detect_system_locale: user UI language unavailable — falling back to '{1}'.",
+			Identifiers.Locales.SYSTEM_FALLBACK)
 	}
-	return "en"
+	; The shared fallback catalogue (identifiers.json locales.system_fallback),
+	; as the Lua drivers read it (I18W-001).
+	return Identifiers.Locales.SYSTEM_FALLBACK
 }
 
 
