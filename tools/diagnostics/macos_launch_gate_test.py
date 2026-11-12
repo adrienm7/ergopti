@@ -1155,6 +1155,26 @@ class VerdictTests(unittest.TestCase):
 class StateTests(unittest.TestCase):
     """The application must never rewrite the user's own folder layout."""
 
+    def test_every_declared_scenario_seeds_a_user_state(self):
+        # run() seeds before it relocates, so a scenario seed() does not know
+        # failed every relocation row on CI (43243856260) while run() was faked here.
+        for scenario in gate.SCENARIOS:
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                with mock.patch.object(gate.subprocess, "run"):
+                    try:
+                        state = gate.seed(scenario, home, "", "2026-11-12")
+                    except OSError as error:
+                        self.skipTest(f"symbolic links unavailable here: {error}")
+                self.assertIn("config_dir", state)
+
+    def test_relocation_scenarios_keep_the_clean_user_state(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            clean = gate.seed("clean", home, "", "2026-11-12")
+            for scenario in relocation.SCENARIOS:
+                self.assertEqual(gate.seed(scenario, home, "", "2026-11-12"), clean, scenario)
+
     def test_configured_state_has_a_completed_config_behind_a_symlink(self):
         self.assertTrue(gate.CONFIG_TEMPLATE.is_file(), gate.CONFIG_TEMPLATE)
         with tempfile.TemporaryDirectory() as folder:
