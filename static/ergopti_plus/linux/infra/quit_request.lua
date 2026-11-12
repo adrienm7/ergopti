@@ -42,13 +42,15 @@ local LOG = "infra.quit_request"
 ---   writer_active       function Whether a scope write, rollback or the global composition is pending.
 ---   publication_pending function Whether a hotstring publication is pending.
 ---   apply_pause_layout  function Applies the pause layout; its failure never blocks the quit.
----   report_update_quit  function Tells a waiting update watcher that the user quit; its failure never blocks the quit.
+---   report_update_quit  function (reason) Tells a waiting update watcher that the user quit; its failure never blocks the quit.
 ---   schedule            function (seconds, callback) -> boolean, arms a one-shot timer.
 ---   now                 function Monotonic seconds.
 ---   timeout             number   Seconds a deferred Quit may wait (the user-quit deadline).
 ---   poll                number   Seconds between two reads while waiting.
 ---   notify_refused      function (decision) Tells the user of a refusal that comes after the click returned.
---- @return function on_quit Returns true when the quit started or is waiting, false when refused at once.
+--- @return function on_quit (reason?) Returns true when the quit started or is waiting, false when
+---   refused at once. Every user Quit (tray row, shortcut, gesture) passes through it; reason names
+---   the source and defaults to "tray quit".
 function M.new(ports)
 	assert(type(ports) == "table", "the quit request needs its ports")
 	assert(type(ports.shutdown) == "table" and type(ports.shutdown.is_requested) == "function"
@@ -62,24 +64,26 @@ function M.new(ports)
 	--- Starts the shutdown for an admitted quit.
 	--- @param decision table Admitted decision.
 	--- @return boolean started
-	local function start(decision)
+	local function start(decision, reason)
 		if decision.abandon_reload then
 			local called, err = pcall(ports.abandon_reload)
 			if not called then Logger.error(LOG, "Reload cancellation raised: %s.", tostring(err)) end
 		end
-		local reported, report_err = pcall(ports.report_update_quit)
+		local reported, report_err = pcall(ports.report_update_quit, reason)
 		if not reported then Logger.error(LOG, "Update watcher Quit report raised: %s.", tostring(report_err)) end
 		if not ports.shutdown.is_requested() then
 			local called, err = pcall(ports.apply_pause_layout)
 			if not called then Logger.error(LOG, "Quit layout switch raised: %s.", tostring(err)) end
 		end
-		local accepted = ports.shutdown.request("tray quit")
+		local accepted = ports.shutdown.request(reason)
 		-- A relay restart had already started the shutdown: abandoning it left the
 		-- exit running with nothing to follow it, which is what Quit asked for.
 		return accepted or (decision.abandon_reload and ports.shutdown.is_requested())
 	end
 
-	return function()
+	return function(reason)
+		if reason == nil then reason = "tray quit" end
+		assert(type(reason) == "string" and reason ~= "", "a user Quit names its source")
 		local returned = false
 		local result = false
 		local state = QuitAdmission.await({
@@ -98,7 +102,7 @@ function M.new(ports)
 			timeout = ports.timeout,
 			poll = ports.poll,
 			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
-			on_admitted = function(decision) result = start(decision) == true end,
+			on_admitted = function(decision) result = start(decision, reason) == true end,
 			on_refused = function(decision)
 				if not decision.timed_out then Logger.warn(LOG, "%s", decision.message) end
 				result = false

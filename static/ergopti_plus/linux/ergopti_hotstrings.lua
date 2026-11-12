@@ -868,7 +868,8 @@ local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod, prepared)
 end
 
 
---- The tray's Quit: refused for the same causes as on macOS (infra/quit_request.lua).
+--- The user's Quit (tray row, shortcut, gesture): refused for the same causes as on
+--- macOS (infra/quit_request.lua).
 --- Held in privacy_owners: main() already sits at LuaJIT's 60-upvalue limit.
 privacy_owners.tray_quit = require("infra.quit_request").new({
 	shutdown = shutdown,
@@ -877,7 +878,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 	writer_active = function() return require("infra.scope_registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
-	report_update_quit = function() require("infra.updater_boot_ready").report_quit("the tray Quit") end,
+	report_update_quit = function(reason) require("infra.updater_boot_ready").report_quit(reason) end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
 	end,
@@ -1304,10 +1305,10 @@ local function main()
 			engine:reset(false)
 		end,
 		reload = perform_reload,
-		quit = function(reason)
-			if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
-			shutdown.request(reason)
-		end,
+		-- A shortcut or gesture Quit is the same user Quit as the tray row: it
+		-- cancels a reload in flight, waits for writes and tells a waiting update
+		-- watcher, so the update is not rolled back (LCY-003).
+		quit = function(reason) return privacy_owners.tray_quit(reason) end,
 		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
