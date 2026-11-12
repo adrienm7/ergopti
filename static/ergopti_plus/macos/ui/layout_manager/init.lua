@@ -69,6 +69,10 @@ local _layout_change_handler = nil
 -- nil until then, and every command is admitted.
 local _pause_query = nil
 
+-- Reloads the driver after a layout's hotstring extension changed (LMH-004),
+-- bound by the menu (M.set_extension_reloader); nil until then.
+local _extension_reloader = nil
+
 --- Settles exact window and callback owners before admitting another window.
 --- @return boolean settled Native cleanup committed or already consumed the window.
 local function settle_retired_window()
@@ -201,6 +205,7 @@ local function controller_for(view)
 			if _layout_change_handler then _layout_change_handler(id) end
 		end,
 		is_paused = function() return _pause_query ~= nil and _pause_query() == true end,
+		reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end,
 		apply_nav = _nav_applier and function(text, on_done)
 			local applier = _nav_applier
 			if not applier then
@@ -377,6 +382,15 @@ function M.set_layout_change_handler(handler)
 		error("layout_manager.set_layout_change_handler: a function or nil is required", 2)
 	end
 	_layout_change_handler = handler
+end
+
+--- Binds the driver reload that follows a change of a layout's extension.
+--- @param reloader function|nil reloader(id) returns true when the reload started.
+function M.set_extension_reloader(reloader)
+	if reloader ~= nil and type(reloader) ~= "function" then
+		error("layout_manager.set_extension_reloader: a function or nil is required", 2)
+	end
+	_extension_reloader = reloader
 end
 
 --- Binds the pause state the bridge reads before admitting a page command.
