@@ -63,11 +63,12 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "m[1] === 'shared_llm_path' ? `ai/data/${arg}` : arg"
 	},
 	{
-		// The walk fixture's expected request of that wrapper, under the same folder.
+		// The walk fixture's expected request of that wrapper, under the same
+		// folder and in the sorted place its new name takes.
 		file: 'tools/test/test-shared-root-resolvers.cjs',
 		empties: '_shared/modules/llm',
-		from: "'missing-runtime.txt',\n\t\t'modules/llm/fixture.json',",
-		to: "'missing-runtime.txt',\n\t\t'ai/data/fixture.json',"
+		from: "[...requested.keys()].sort(), [\n\t\t'missing-runtime.txt',\n\t\t'modules/llm/fixture.json',",
+		to: "[...requested.keys()].sort(), [\n\t\t'ai/data/fixture.json',\n\t\t'missing-runtime.txt',"
 	},
 	{
 		// The E2E bootstrap check joins the shared decoder onto run_e2e.lua's
