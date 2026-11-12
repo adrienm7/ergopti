@@ -367,6 +367,27 @@ local function global_privacy_blocks()
 	return false
 end
 
+--- Whether the focused application is one the user excluded from the AI
+--- (llm.trigger.disabled_apps). A selection step refuses there before the
+--- selection is read, as Windows' tone and translation actions do
+--- (_LLM_Engine_ShouldSuppressForDisabledApps, AIX-001).
+--- A field, not a local: this chunk is at Lua's limit of 200 locals.
+--- @return boolean excluded
+function M._focused_app_excluded()
+	local blocked, app_id = global_privacy_blocks()
+	if blocked then return false end
+	if app_id == nil then
+		local ok_app
+		ok_app, app_id = pcall(function()
+			local lifecycle = require("adapters.process_lifecycle")
+			local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
+			return type(foreground) == "table" and rawget(foreground, "appId") or nil
+		end)
+		if not ok_app or not known_app_id(app_id) then return false end
+	end
+	return TriggerSettings.is_app_disabled(app_id, false) == true
+end
+
 local function _is_secure_context()
 	local blocked, app_id = global_privacy_blocks()
 	if blocked then return true end
@@ -1632,6 +1653,10 @@ function M.shift_tone(direction, cycle)
 		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
+	if M._focused_app_excluded() then
+		Logger.info(LOG, "Tone step refused: the focused app is excluded from the AI.")
+		return false
+	end
 	local inflight = _debounce.tone_inflight
 	if _debounce.supersedes("tone", inflight ~= nil) then
 		_debounce.tone_inflight = nil
@@ -2285,6 +2310,10 @@ function M.translate_selection(value)
 	if reason then
 		Logger.info(LOG, "Translation refused (%s).", reason)
 		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+		return false
+	end
+	if M._focused_app_excluded() then
+		Logger.info(LOG, "Translation refused: the focused app is excluded from the AI.")
 		return false
 	end
 	local data = Translation.data()
