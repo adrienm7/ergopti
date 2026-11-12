@@ -343,6 +343,16 @@ function M.key_down(e, key_code)
 	if Emulation.pending(session) then native = e:getCharacters(false) end
 	local decision, text = Emulation.decide(session, code, flags.shift == true, flags.capslock == true,
 		flags.alt == true, flags.ctrl == true, false, flags.cmd == true, native)
+	-- Ctrl+AltGr (Ctrl+Option, Option being the AltGr level here) sends Ctrl and
+	-- the key's logical character with the level key suspended, as Linux does
+	-- (ILD-2, decided by the maintainer on 2026-11-11). Cmd+Option keeps Option:
+	-- it is macOS's own chord family, not a level (decided by the coordinator on
+	-- 2026-11-11, to review by the maintainer).
+	if decision == Emulation.SHORTCUT and flags.ctrl == true and flags.alt == true and flags.cmd ~= true then
+		local suspended = {}
+		for name, held in pairs(flags) do if name ~= "alt" then suspended[name] = held end end
+		flags = suspended
+	end
 	if #prefix > 0 then
 		-- A tap settled by this press types first: the press's own output follows it.
 		if decision == Emulation.TYPE or decision == Emulation.TYPE_PASS then
@@ -368,7 +378,7 @@ function M.key_down(e, key_code)
 			e:setKeyCode(target)
 			if target ~= key_code then _rewritten[key_code] = target end
 		end
-		if next(_virtual) ~= nil then e:setFlags(flags) end
+		if next(_virtual) ~= nil or flags.alt ~= merged_flags(e:getFlags()).alt then e:setFlags(flags) end
 		return false
 	end
 	if decision == Emulation.TYPE and text == "" then return true end

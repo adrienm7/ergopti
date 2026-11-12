@@ -135,6 +135,40 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_eq(sent, { "z:ctrl+shift", "z:alt+ctrl" }, "Ergopti's z with the held modifiers")
 	end)
 
+	-- Ctrl+AltGr is Ctrl and the key's logical character with AltGr suspended,
+	-- the rule macOS now follows too (ILD-2, decided by the maintainer on
+	-- 2026-11-11; ctrl-altgr-logical): the production chord carries no AltGr.
+	helpers.it("presses Ctrl and the logical key for Ctrl+AltGr, AltGr suspended (ctrl-altgr-logical)", function()
+		local saved = { combo = package.loaded["modules.gestures.combo_emitter"],
+			layout = package.loaded["adapters.keyboard_layout"] }
+		local chords = {}
+		package.loaded["modules.gestures.combo_emitter"] = {
+			KEYSYM_TO_CODE = { z = 44 },
+			press_codes = function(modifiers, keys)
+				chords[#chords + 1] = { modifiers = modifiers, keys = keys }
+				return true
+			end,
+		}
+		package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function(_, us_code) return us_code, {} end }
+		local ok, problem = pcall(function()
+			package.loaded["modules.keymap.layout_emulation"] = nil
+			local M = require("modules.keymap.layout_emulation")
+			local deps = M.production_deps({ injector = {}, is_paused = function() return false end,
+				dispatch_char = function() return false end, magic_evdev = function() return nil end, dry_run = false })
+			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, altgr = true }))
+			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, shift = true, altgr = true }))
+		end)
+		package.loaded["modules.gestures.combo_emitter"] = saved.combo
+		package.loaded["adapters.keyboard_layout"] = saved.layout
+		package.loaded["modules.keymap.layout_emulation"] = nil
+		if not ok then error(problem, 0) end
+		local Codes = require("infra.evdev_codes")
+		helpers.assert_eq(chords, {
+			{ modifiers = { Codes.KEY_LEFTCTRL }, keys = { 44 } },
+			{ modifiers = { Codes.KEY_LEFTCTRL, Codes.KEY_LEFTSHIFT }, keys = { 44 } },
+		}, "Ctrl and the logical z, with no AltGr in the chord")
+	end)
+
 	-- AHK's ^SCxxx hotkeys fire on every auto-repeat and macOS rewrites each
 	-- repeated key-down; Linux consumed the chord with no repeat callback, so
 	-- the hook swallowed every repeat: holding Ctrl+z undid once (ILL-004,

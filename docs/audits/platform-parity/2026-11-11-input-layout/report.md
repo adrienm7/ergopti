@@ -69,12 +69,22 @@ bound-chord consumer, then the layout emulation (regression
   also reads a physical LCtrl+LAlt as AltGr, so the chord must be checked in
   an application that types AltGr symbols.
 
-## Decisions pending
-
-- **ILD-2, Ctrl+AltGr.** Windows types the AltGr level (`SC138 & Sc`); Linux
-  sends Ctrl + the logical key with AltGr suspended. Recommendation: follow
-  Windows and type the AltGr level, Ctrl dropped: AltGr is a text level, not a
-  shortcut modifier, and on Windows it already carries Ctrl.
+- **ILD-2, Ctrl+AltGr** (decided by the maintainer on 2026-11-11): Linux's
+  rule on every OS, against the recommendation: Ctrl and the key's logical
+  character (its Ctrl level), AltGr suspended. Linux already did it (the
+  shared engine, `emit_shortcut` leaving AltGr out); macOS now clears Option
+  from a Ctrl+Option shortcut (`layout_emulation.lua` `key_down`, Cmd+Option
+  unchanged: decided by the coordinator on 2026-11-11, to review by the
+  maintainer). Shared vector `ctrl_altgr_sends_ctrl_and_the_logical_key`;
+  regressions `ctrl-altgr-logical` on each. Windows counterpart, for the
+  maintainer (`modules/keymap/keylayout/keylayout_emulation.ahk`): in
+  `_KLE_OnAltGr(Sc, *)`, when a Ctrl other than AltGr's own is physically
+  held (`GetKeyState("RCtrl", "P")`, or `GetKeyState("LCtrl", "P")` beyond the
+  LCtrl AltGr synthesises), call `_KLE_OnShortcut(Sc, "^")` (with `+` when
+  Shift is held) instead of `_KLE_Emit`, so `SendEvent("^{" Char "}")`
+  releases AltGr's RAlt around the chord; `_KLT_OptionsDecide` in
+  `test_keylayout_emulation.ahk` routes a press holding both `ctrl` and
+  `altgr` the same way, so the shared vector replays there.
 
 ## Refuted
 
