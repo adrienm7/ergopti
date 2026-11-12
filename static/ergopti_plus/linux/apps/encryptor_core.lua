@@ -50,7 +50,8 @@ function M.load_format(path)
 	local format = Json.decode(raw)
 	assert(type(format) == "table" and format.magic == "Salted__" and type(format.iterations) == "number"
 		and type(format.cipher) == "string" and type(format.kdf_digest) == "string"
-		and type(format.encrypted_extension) == "string" and type(format.decrypted_fallback_suffix) == "string",
+		and type(format.encrypted_extension) == "string" and type(format.decrypted_fallback_suffix) == "string"
+		and type(format.mime_type) == "string" and format.mime_type:match("^application/[%w.+-]+$") ~= nil,
 		"the shared Encryptor format is malformed")
 	return format
 end
