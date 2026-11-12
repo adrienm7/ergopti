@@ -2262,16 +2262,14 @@ function M.build_karabiner_json(
 		end
 
 		-- Per-key tap/hold threshold override (nil = inherit the global parameter).
-		local per_key_ms = tonumber(cfg.timeout_ms)
-		if per_key_ms and per_key_ms <= 0 then
+		-- A delay outside 0 < ms <= the bound was named when the file was read
+		-- (config.lua) and inherits; one between whole milliseconds, which a
+		-- delay in seconds can be, deploys to the nearest one Karabiner takes.
+		local per_key_ms = type(cfg.timeout_ms) == "number" and cfg.timeout_ms or nil
+		if per_key_ms and (per_key_ms ~= per_key_ms or per_key_ms <= 0 or per_key_ms > Defaults.tap_hold_max_timeout_ms) then
 			per_key_ms = nil
-		elseif cfg.timeout_ms ~= nil and not is_integer(per_key_ms) then
-			local err = string.format(
-				"tap/hold timeout for key '%s' must be an integer number of milliseconds",
-				tostring(key_def.id)
-			)
-			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
-			return nil, err
+		elseif per_key_ms and not is_integer(per_key_ms) then
+			per_key_ms = math.max(1, math.floor(per_key_ms + 0.5))
 		end
 		-- No key ships a delay: one without an override of its own carries no
 		-- per-manipulator threshold and follows the global parameter, so a change

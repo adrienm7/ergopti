@@ -711,6 +711,13 @@ key_repeat_interval_ms = 100
 # Caps Lock and Left Shift used to ship 350 ms.
 default_activation_ms = 200
 
+# The longest tap-vs-hold delay, the global one or a key's own: the bound of
+# _shared/tap_hold/SCHEMA.md (0 < x <= 10 s). A longer one is warned and not
+# used. HS: platform/remap/defaults.lua tap_hold_max_timeout_ms. LX:
+# platform/remap/tap_hold_loader.lua and tap_hold_writer.lua. AHK keeps its own
+# bound (TODO « Windows (the PC agent's) »).
+max_activation_ms = 10000
+
 # One-shot shift: auto-cancel timeout if no subsequent key is pressed.
 # AHK: tap_holds/constants.ahk ONE_SHOT_SHIFT_TIMEOUT_SEC (seconds).
 one_shot_shift_timeout_ms = 2000

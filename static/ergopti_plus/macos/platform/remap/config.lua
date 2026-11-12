@@ -153,6 +153,7 @@ end
 local LOG = "karabiner"
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
+local TAP_HOLD_MAX_TIMEOUT_MS           = Defaults.tap_hold_max_timeout_ms
 local LoneTap = require("tap_hold.lone_tap")
 -- How long a modifier key pressed alone still taps: the manifest's
 -- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
@@ -169,11 +170,15 @@ local OUTDATED_ARRAY_REASON = "a remap dictionary is not an array; the neutral s
 --- @return boolean outdated True when the raw leaf must survive ordinary saves.
 local function timing_leaf(section, key, default, path, section_name)
 	if section[key] == nil then return default, false end
+	-- The global delay has SCHEMA.md's bound, read wherever this leaf is.
+	local maximum = section_name == ConfigKeys.KEY.TAP_HOLDS and key == "timeout_ms" and TAP_HOLD_MAX_TIMEOUT_MS or nil
 	local called, value = pcall(tonumber, section[key])
 	if called and require("number_policy").within_timer_ceiling(value)
-		and value > 0 and value % 1 == 0 then return value, false end
-	Outdated.report_in_file(path, { section_name, key },
-		"a timing is a finite positive whole number of milliseconds; the canonical default is used", Logger)
+		and value > 0 and value % 1 == 0 and (maximum == nil or value <= maximum) then return value, false end
+	Outdated.report_in_file(path, { section_name, key }, maximum == nil
+		and "a timing is a finite positive whole number of milliseconds; the canonical default is used"
+		or string.format("a delay is a positive whole number of milliseconds up to %d; the canonical default is used",
+			maximum), Logger)
 	return default, true
 end
 
@@ -919,6 +924,17 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 	drop_outdated(tap_hold_config, tap_hold_keys, ConfigKeys.KEY.TAP_HOLDS, { "tap", "hold" })
 	drop_outdated(combos_config, mod_combos, ConfigKeys.KEY.MOD_COMBOS, { "tap", "hold", "combo" })
+
+	-- A key's own delay the generator cannot deploy is named here, once: the key
+	-- follows the global delay, and the file keeps the value for the user.
+	for id, entry in pairs(tap_hold_config) do
+		local own = type(entry) == "table" and entry.timeout_ms or nil
+		if own ~= nil and not (type(own) == "number" and own > 0 and own <= TAP_HOLD_MAX_TIMEOUT_MS) then
+			Outdated.report_in_file(user_config_path, { ConfigKeys.KEY.TAP_HOLDS, "config", tostring(id), "timeout_ms" },
+				string.format("a key's delay is more than 0 and at most %d ms; the key follows the global delay",
+					TAP_HOLD_MAX_TIMEOUT_MS), Logger)
+		end
+	end
 
 	-- Reads one optional number; absence is the canonical default.
 	local function timing(section, key, default, label)
