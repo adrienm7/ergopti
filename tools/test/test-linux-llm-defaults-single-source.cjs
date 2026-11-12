@@ -158,23 +158,43 @@ for (const key of ['request_timeout_ms', 'ollama_request_timeout_ms']) {
 	}
 }
 const readsKey = (src, key) =>
-	new RegExp(`Timings\\.(?:ms|sec)\\("llm", "${key}"\\)|timings"\\)\\.(?:ms|sec)\\("llm", "${key}"\\)`).test(src);
+	new RegExp(
+		`Timings\\.(?:ms|sec)\\("llm", "${key}"\\)|timings"\\)\\.(?:ms|sec)\\("llm", "${key}"\\)`
+	).test(src);
 const TYPED_DEADLINE = /--max-time \d|timeout_ms\s*=\s*\d|\b(?:30000|180000)\b/;
 const deadlineOwners = [
-	{ file: 'linux/modules/llm/api_ollama.lua', key: 'ollama_request_timeout_ms', other: 'request_timeout_ms' },
-	{ file: 'macos/modules/llm/api_ollama.lua', key: 'ollama_request_timeout_ms', other: 'request_timeout_ms' },
-	{ file: 'linux/modules/llm/api_remote.lua', key: 'request_timeout_ms', other: 'ollama_request_timeout_ms' },
+	{
+		file: 'linux/modules/llm/api_ollama.lua',
+		key: 'ollama_request_timeout_ms',
+		other: 'request_timeout_ms'
+	},
+	{
+		file: 'macos/modules/llm/api_ollama.lua',
+		key: 'ollama_request_timeout_ms',
+		other: 'request_timeout_ms'
+	},
+	{
+		file: 'linux/modules/llm/api_remote.lua',
+		key: 'request_timeout_ms',
+		other: 'ollama_request_timeout_ms'
+	}
 ];
 for (const owner of deadlineOwners) {
 	const raw = read(owner.file);
 	if (!readsKey(raw, owner.key)) {
-		errors.push(`${owner.file}: must read its request deadline from Timings ("llm", "${owner.key}")`);
+		errors.push(
+			`${owner.file}: must read its request deadline from Timings ("llm", "${owner.key}")`
+		);
 	}
 	if (readsKey(raw, owner.other)) {
-		errors.push(`${owner.file}: reads "${owner.other}", the other side's budget — use "${owner.key}"`);
+		errors.push(
+			`${owner.file}: reads "${owner.other}", the other side's budget — use "${owner.key}"`
+		);
 	}
 	if (TYPED_DEADLINE.test(stripLua(raw)) || /--max-time \d/.test(raw)) {
-		errors.push(`${owner.file}: typed request deadline — read "${owner.key}" from the timings registry`);
+		errors.push(
+			`${owner.file}: typed request deadline — read "${owner.key}" from the timings registry`
+		);
 	}
 }
 
