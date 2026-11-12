@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: Structure Plan Phase 2 Runner Contract
+ * MODULE: Structure Plan Step Runner Contract
  * DESCRIPTION:
  * run-phase2.cjs applies the steps of the structure plan in order, one commit
  * per step. The first real application of S01 stopped on gates no rewrite can
