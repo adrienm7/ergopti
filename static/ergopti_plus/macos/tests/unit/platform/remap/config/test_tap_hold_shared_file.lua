@@ -3,15 +3,12 @@
 --- ==============================================================================
 --- MODULE: The Shared Tap-Hold File On macOS
 --- DESCRIPTION:
---- macOS keeps its remap keys in the shared tap_hold.toml
---- (_shared/tap_hold/SCHEMA.md) and the manifest's tap-hold rows (the switch,
---- the one-shot and lone-tap timings, the key combinations) in the config.toml
---- beside it. The writer's pair is pinned by the cross-driver corpus
---- (_shared/tests/corpus/tap_hold_shared_file): tap_hold.toml byte for byte,
---- config.toml as values. The macOS reader reads every driver's pair as
---- expected.toml says, a macOS save over the Linux pair keeps every leaf macOS
---- does not own, and an old config_karabiner.toml is carried over once, its
---- rows moved on into config.toml by the v22 config migration.
+--- macOS keeps its remap settings in the shared tap_hold.toml
+--- (_shared/tap_hold/SCHEMA.md). The writer's file is pinned byte for byte by
+--- the cross-driver corpus (_shared/tests/corpus/tap_hold_shared_file), whose
+--- other file the Linux writer wrote: the macOS reader reads both as
+--- expected.toml says, a macOS save over the Linux file keeps every leaf macOS
+--- does not own, and an old config_karabiner.toml is carried over once.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -19,9 +16,6 @@ local helpers = require("tests.helpers")
 local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger",
 	"logger.shim", "toml_codec", "infra.toml.codec" }
 local CORPUS = helpers.shared() .. "/tests/corpus/tap_hold_shared_file/"
--- The pairs of the corpus, each <name>.toml and <name>.config.toml.
-local PAIRS = { "macos_written", "linux_written", "windows_written" }
-local STAMP = "20990101-000000"
 
 require("test.tap_hold_shared_file_contract").register(helpers, { driver = "macos", shared_root = helpers.shared() })
 
@@ -76,13 +70,11 @@ local function with_folder(body)
 		local data = helpers.driver_root() .. "/platform/remap/data/"
 		local keys = Json.decode(read(data .. "tap_hold_keys.json"))
 		local combos = Json.decode(read(data .. "mod_combos.json"))
-		local ok, err = pcall(body, { config = config, dir = dir, path = path, config_path = dir .. "/config.toml",
-			keys = keys, combos = combos,
+		local ok, err = pcall(body, { config = config, dir = dir, path = path, keys = keys, combos = combos,
 			warnings = warnings, errors = errors, files = files,
 			load = function() return config.load_user_config(keys, combos, path) end })
 		files.write_if_unchanged = native_write
-		for _, name in ipairs({ "tap_hold.toml", "config.toml", "config_karabiner.toml",
-			"config_karabiner.toml.migrated", "config.pre-v22-" .. STAMP .. ".toml", "tap_hold.pre-v22-" .. STAMP .. ".toml" }) do
+		for _, name in ipairs({ "tap_hold.toml", "config_karabiner.toml", "config_karabiner.toml.migrated" }) do
 			os.remove(dir .. "/" .. name)
 		end
 		os.execute('rmdir "' .. dir .. '"')
@@ -108,13 +100,6 @@ local function corpus_state(f)
 	return state
 end
 
---- A decoded config.toml without its version stamp.
-local function config_rows(text)
-	local document = decode(text or "")
-	document._meta = nil
-	return document
-end
-
 --- Asserts that a loaded state matches an expected.toml `hs` table.
 local function assert_reads(state, expected)
 	for field, value in pairs(expected) do
@@ -134,20 +119,17 @@ end
 helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", function()
 	local expected = decode(assert(read(CORPUS .. "expected.toml"), "the corpus expectations are missing"))
 
-	helpers.it("the macOS writer writes the corpus pair (tap-hold-shared-file)", function()
+	helpers.it("the macOS writer writes the corpus file byte for byte (tap-hold-shared-file)", function()
 		with_folder(function(f)
 			helpers.assert_true(f.config.save_user_config(corpus_state(f), f.path), "the corpus state is saved")
-			helpers.assert_eq(read(f.path), read(CORPUS .. "macos_written.toml"), "tap_hold.toml byte for byte")
-			helpers.assert_eq(config_rows(read(f.config_path)), config_rows(read(CORPUS .. "macos_written.config.toml")),
-				"the config.toml rows as values")
+			helpers.assert_eq(read(f.path), read(CORPUS .. "macos_written.toml"))
 		end)
 	end)
 
-	for _, name in ipairs(PAIRS) do
-		helpers.it("the macOS reader reads the " .. name .. " pair as expected.toml says (tap-hold-shared-file)", function()
+	for _, name in ipairs({ "macos_written", "linux_written" }) do
+		helpers.it("the macOS reader reads " .. name .. ".toml as expected.toml says (tap-hold-shared-file)", function()
 			with_folder(function(f)
 				write(f.path, assert(read(CORPUS .. name .. ".toml")))
-				write(f.config_path, assert(read(CORPUS .. name .. ".config.toml")))
 				local state, status = f.load()
 				helpers.assert_eq(status, "ok")
 				assert_reads(state, expected.reads[name].hs)
@@ -155,28 +137,10 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 		end)
 	end
 
-	helpers.it("a tap-hold row left in tap_hold.toml is named and not read (tap-hold-shared-file)", function()
-		with_folder(function(f)
-			write(f.path, '[_meta]\nschema_version = 1\n[tap_hold]\nenabled = true\nsticky_timeout_ms = 900\n')
-			local state = f.load()
-			helpers.assert_eq(state.sticky_timeout_ms, f.config.build_default_state(f.keys, f.combos).sticky_timeout_ms)
-			local named = false
-			for _, line in ipairs(f.warnings) do
-				if line:find("tap_hold.sticky_timeout_ms", 1, true) and line:find("config.toml", 1, true) then named = true end
-			end
-			helpers.assert_true(named, "the warning names the leaf and its new home")
-			state.tap_hold_config.tab = { tap = "copy", hold = "none" }
-			helpers.assert_true(f.config.save_user_config(state, f.path))
-			helpers.assert_eq(decode(read(f.path)).tap_hold.sticky_timeout_ms, 900, "the unread copy stays for the user")
-		end)
-	end)
-
-	helpers.it("a macOS save over the Linux pair keeps every leaf macOS does not own (tap-hold-shared-file)", function()
+	helpers.it("a macOS save over the Linux file keeps every leaf macOS does not own (tap-hold-shared-file)", function()
 		with_folder(function(f)
 			local source = assert(read(CORPUS .. "linux_written.toml"))
-			local config_source = assert(read(CORPUS .. "linux_written.config.toml"))
 			write(f.path, source)
-			write(f.config_path, config_source)
 			local state = f.load()
 			state.tap_hold_config.escape = { tap = "copy", hold = "none" }
 			helpers.assert_true(f.config.save_user_config(state, f.path), "the change is saved")
@@ -187,7 +151,6 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 			after.karabiner = nil
 			helpers.assert_eq(after, before, "only the escape key and macOS's own section changed")
 			helpers.assert_eq(decode(read(f.path)).tap_hold.keys.escape, { tap_action = "copy" })
-			helpers.assert_eq(read(f.config_path), config_source, "a save that changes no row leaves config.toml as it is")
 		end)
 	end)
 
@@ -230,10 +193,10 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 
 	helpers.it("a file a newer build saved is read and never written (tap-hold-shared-file)", function()
 		with_folder(function(f)
-			local source = '[_meta]\nschema_version = 99\n[tap_hold.keys.caps_lock]\ntap_action = "copy"\n'
+			local source = '[_meta]\nschema_version = 99\n[tap_hold]\nenabled = true\n'
 			write(f.path, source)
 			local state = f.load()
-			helpers.assert_eq(state.tap_hold_config.caps_lock.tap, "copy")
+			helpers.assert_eq(state.tap_holds_enabled, true)
 			state.tap_hold_timeout_ms = 300
 			helpers.assert_eq(f.config.save_user_config(state, f.path), false)
 			helpers.assert_eq(read(f.path), source)
@@ -247,22 +210,7 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 			write(legacy, text)
 			local TapHoldFile = require("platform.remap.tap_hold_file")
 			helpers.assert_eq({ TapHoldFile.import_legacy(f.path, f.files) }, { true, "imported" })
-			-- The boot then versions config.toml: its v22 step moves the rows on.
-			write(f.config_path, "[_meta]\nschema_version = 21\n")
-			local Engine = require("config_migrate")
-			local registry = assert(Engine.validate_registry(decode(table.concat({
-				"[registry]", "current_version = 22", "unstamped_version = 2", "oldest_version = 21",
-				"[steps.v21_to_v22]", "from = 21", "to = 22", 'drivers = ["hs"]', 'reason = "Contract."', "ops = [",
-				'{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "enabled", to_section = "tap_holds" },',
-				'{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "lone_modifier_tap_max_ms", to_section = "tap_holds" },',
-				'{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "sticky_timeout_ms", to_section = "tap_holds" },',
-				'{ op = "import_companion", file = "tap_hold.toml", section = "mod_combos", to_section = "mod_combos" },',
-				"]" }, "\n"))))
-			local result = Engine.run({ path = f.config_path, driver = "hs", registry = registry, stamp = STAMP,
-				file_adapter = f.files, companions = { ["tap_hold.toml"] = f.path } })
-			helpers.assert_eq(result.status, "migrated", tostring(result.detail))
 			helpers.assert_eq(decode(read(f.path)), decode(read(CORPUS .. "macos_written.toml")))
-			helpers.assert_eq(config_rows(read(f.config_path)), config_rows(read(CORPUS .. "macos_written.config.toml")))
 			helpers.assert_eq(read(legacy), nil, "the old file is no longer read")
 			helpers.assert_eq(read(legacy .. ".migrated"), text, "the old file is kept as a backup")
 			helpers.assert_eq({ TapHoldFile.import_legacy(f.path, f.files) }, { true, "none" })

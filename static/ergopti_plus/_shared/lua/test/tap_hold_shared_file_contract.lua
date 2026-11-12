@@ -5,13 +5,11 @@
 --- DESCRIPTION:
 --- The layout every driver's tap_hold.toml keeps (_shared/tap_hold/SCHEMA.md),
 --- registered once per driver suite: the spec data parses, a hold modifier has
---- one spelling, and each pair of the cross-driver corpus
---- (_shared/tests/corpus/tap_hold_shared_file) keeps its homes: <name>.toml is
---- stamped with the current version, names its keys by catalogue id and holds
---- only the fields the specification lists; <name>.config.toml holds only the
---- config.toml rows of the tap-holds and key combinations, combinations named
---- by pair id (maintainer decision of 2026-11-11). A driver whose writer
---- drifted from the layout fails here before another driver reads it.
+--- one spelling, and each file of the cross-driver corpus
+--- (_shared/tests/corpus/tap_hold_shared_file) is stamped with the current
+--- version, names its keys by catalogue id and its combinations by pair id,
+--- and holds only the fields the specification lists. A driver whose writer
+--- drifted from the layout fails here before the other driver reads it.
 ---
 --- USAGE (one call per driver suite):
 ---   require("test.tap_hold_shared_file_contract").register(helpers,
@@ -25,18 +23,17 @@ local Migrate = require("tap_hold.migrate")
 local TomlCodec = require("toml_codec")
 
 -- The files of the corpus each driver's writer produced.
-M.FILES = { "linux_written", "macos_written", "windows_written" }
+M.FILES = { "linux_written", "macos_written" }
 
 -- The fields SCHEMA.md lists, per table.
 local FIELDS = {
-	tap_hold = { inherit_defaults = true, time_activation_seconds = true, keys = true },
+	tap_hold = { enabled = true, inherit_defaults = true, time_activation_seconds = true, sticky_timeout_ms = true,
+		lone_modifier_tap_max_ms = true, keys = true },
 	key = { tap_action = true, hold_modifier = true, hold_layer = true, hold_action = true,
 		time_activation_seconds = true, enabled = true },
-	karabiner = { integration_enabled = true, runtime = true, close_other_instances = true },
-	-- The config.toml side of a pair.
-	tap_holds = { enabled = true, lone_modifier_tap_max_ms = true, sticky_timeout_ms = true },
 	mod_combos = { enabled = true, simultaneous_threshold_ms = true, symmetric = true, config = true },
 	pair = { combo = true, tap = true, hold = true },
+	karabiner = { integration_enabled = true, runtime = true, close_other_instances = true },
 }
 
 --- Reads a file whole, failing loudly when it is missing.
@@ -76,9 +73,10 @@ function M.register(helpers, opts)
 			helpers.assert_eq(SharedFile.canonical_modifier(spec, ""), nil)
 		end)
 
-		helpers.it("the only legacy import is macOS config_karabiner.toml", function()
+		helpers.it("the legacy imports are declared: macOS config_karabiner.toml, Linux config.toml [mod_combos]", function()
 			helpers.assert_eq(registry.legacy_imports, {
 				hs = { source = "config_karabiner.toml", translate = "karabiner", retired_suffix = ".migrated" },
+				linux = { source = "config.toml", translate = "config_section", section = "mod_combos" },
 			})
 		end)
 
@@ -86,28 +84,21 @@ function M.register(helpers, opts)
 			helpers.it("corpus file " .. name .. ".toml keeps the shared layout", function()
 				local document = TomlCodec.decode(read(root .. "/tests/corpus/tap_hold_shared_file/" .. name .. ".toml"))
 				helpers.assert_eq(document[SharedFile.META][Migrate.VERSION_KEY], registry.current, "stamped current")
-				helpers.assert_eq(unknown(document, { _meta = true, tap_hold = true, karabiner = true }), {},
-					"tap_hold.toml holds the keys; the manifest rows live in config.toml")
+				helpers.assert_eq(unknown(document, { _meta = true, tap_hold = true, mod_combos = true, karabiner = true }), {})
 				local section = document.tap_hold or {}
 				helpers.assert_eq(unknown(section, FIELDS.tap_hold), {})
 				for key_id, entry in pairs(section.keys or {}) do
 					helpers.assert_true(catalogue[key_id], "'" .. key_id .. "' is a catalogue id")
 					helpers.assert_eq(unknown(entry, FIELDS.key), {}, key_id)
 				end
-				helpers.assert_eq(unknown(document.karabiner or {}, FIELDS.karabiner), {})
-			end)
-
-			helpers.it("corpus file " .. name .. ".config.toml holds the config.toml rows only", function()
-				local config = TomlCodec.decode(read(root .. "/tests/corpus/tap_hold_shared_file/" .. name .. ".config.toml"))
-				helpers.assert_eq(unknown(config, { tap_holds = true, mod_combos = true }), {})
-				helpers.assert_eq(unknown(config.tap_holds or {}, FIELDS.tap_holds), {})
-				local combos = config.mod_combos or {}
+				local combos = document.mod_combos or {}
 				helpers.assert_eq(unknown(combos, FIELDS.mod_combos), {})
 				for pair, entry in pairs(combos.config or {}) do
 					local first, second = pair:match("^(.-)_then_(.+)$")
 					helpers.assert_true(catalogue[first] and catalogue[second], "'" .. pair .. "' is a pair of catalogue ids")
 					helpers.assert_eq(unknown(entry, FIELDS.pair), {}, pair)
 				end
+				helpers.assert_eq(unknown(document.karabiner or {}, FIELDS.karabiner), {})
 			end)
 		end
 	end)

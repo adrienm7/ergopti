@@ -2,7 +2,7 @@
 
 local helpers = require("tests.helpers")
 local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_writer", "ui.menu.builder", "ui.action_picker.bridge" }
-local INITIAL = '[tap_hold]\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\ntime_activation_seconds = 0.2\n'
+local INITIAL = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\ntime_activation_seconds = 0.2\n'
 local function read(path)
 	local f = io.open(path, "rb"); if not f then return nil end
 	local text = f:read("*a"); assert(f:close()); return text
@@ -18,12 +18,7 @@ local function with_editor(body, options)
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path, defaults = os.tmpname(), os.tmpname(); os.remove(path)
 	write(defaults, assert(read(require("infra.paths").shared("tap_hold/defaults.toml"))))
-	-- The switch is a config.toml row beside the file.
-	local config_path = path .. ".config.toml"
-	if not options.absent then
-		write(path, INITIAL)
-		write(config_path, "[tap_holds]\nenabled = " .. tostring(not options.file_off) .. "\n")
-	end
+	if not options.absent then write(path, options.file_off and INITIAL:gsub("enabled = true", "enabled = false") or INITIAL) end
 	local Prompt = require("ui.text_prompt")
 	local ask, execute, open = Prompt.ask, os.execute, io.open
 	local FileWriter = require("infra.regular_file_writer")
@@ -31,7 +26,7 @@ local function with_editor(body, options)
 	local manager
 	local ok, err = xpcall(function()
 		manager = require(MODULES[1])
-		assert(manager.init({ defaults_path = defaults, user_path = path, config_path = config_path,
+		assert(manager.init({ defaults_path = defaults, user_path = path,
 			keyboard_hook = { set_remapper = function() return true end, key_text = function() return nil end,
 				held_modifiers = function() return {} end, held_text_modifier_codes = function() return {} end,
 				held_shortcut_modifier_codes = function() return {} end },
@@ -40,7 +35,7 @@ local function with_editor(body, options)
 		local writer = require(MODULES[2])
 		local s = { manager = manager, writer = writer, path = path, defaults = defaults, notices = 0, paused = false }
 		s.bind = function(reload)
-			writer.init({ path = path, config_path = config_path, reload = reload or function() if s.reload_refused then return false end; return manager.reload() end, is_tap_action = manager.is_tap_action, canonical_hold = manager.canonical_hold })
+			writer.init({ path = path, reload = reload or function() if s.reload_refused then return false end; return manager.reload() end, is_tap_action = manager.is_tap_action, canonical_hold = manager.canonical_hold })
 		end
 		s.bind()
 		package.loaded[MODULES[4]] = { open = function(opts, confirm)
@@ -109,7 +104,7 @@ local function with_editor(body, options)
 	FileWriter.open = writer_open
 	if manager then manager._reset_for_test() end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
-	for _, filename in ipairs({ path, defaults, path .. ".tmp", config_path }) do os.remove(filename) end
+	for _, filename in ipairs({ path, defaults, path .. ".tmp" }) do os.remove(filename) end
 	if not ok then error(err, 0) end
 end
 

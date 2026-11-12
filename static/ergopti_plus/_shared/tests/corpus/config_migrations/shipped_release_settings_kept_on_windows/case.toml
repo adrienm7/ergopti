@@ -5,4 +5,4 @@ description = "A configuration ErgoptiPlus 1.0.9 wrote on Windows (v20, the olde
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 20
-to_version = 22
+to_version = 21

@@ -8,11 +8,9 @@
 --- pause or when the feature is switched off.
 ---
 --- FEATURES & RATIONALE:
---- 1. One owner for "is a tap-hold active right now": the runtime switch, the
----    config.toml [tap_holds] enabled row and the daemon's pause all meet in
----    _apply(), so none of them can leave a half-installed engine. The keys come
----    from tap_hold.toml, the switch and the timings from the config.toml
----    beside it: every source guard covers the bytes of both files.
+--- 1. One owner for "is a tap-hold active right now": the feature switch, the
+---    [tap_hold] enabled flag of the user's file and the daemon's pause all
+---    meet in _apply(), so none of them can leave a half-installed engine.
 --- 2. Every change goes through the hook's set_remapper(), which releases what
 ---    the previous engine held first — switching off or pausing while CapsLock
 ---    is down cannot leave Ctrl pressed.
@@ -131,7 +129,6 @@ local _action_names = nil    -- The action catalogue's ids.
 local _on_text_injected = nil -- Told of text the injector typed for a one-shot.
 local _defaults_path = nil
 local _user_path = nil
-local _config_path = nil     -- The config.toml beside _user_path: switch and timings.
 local _loaded = nil          -- Config.load() result.
 local _engine = nil          -- Built from _loaded; nil when there is nothing to run.
 local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
@@ -672,9 +669,9 @@ local function _build(loaded, boot)
 		roll_keys = loaded.roll_keys,
 		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
-		-- config.toml's [tap_holds] lone_modifier_tap_max_ms, or the manifest's default.
+		-- tap_hold.toml's [tap_hold] lone_modifier_tap_max_ms, or the manifest's default.
 		lone_tap_max_ms = loaded.lone_tap_max_ms,
-		-- config.toml's [tap_holds] sticky_timeout_ms, or the timing registry's default.
+		-- tap_hold.toml's [tap_hold] sticky_timeout_ms, or the timing registry's default.
 		one_shot_timeout_ms = loaded.one_shot_timeout_ms,
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
@@ -737,7 +734,7 @@ end
 --- @param boot boolean|nil Whether this is the initial daemon load.
 local function _load(boot)
 	assert(config_exports_current(),"original tap-hold loader exports changed")
-	local decoded=original_config_load(_defaults_path,_user_path,_config_path)
+	local decoded=original_config_load(_defaults_path,_user_path)
 	assert(config_exports_current(),"original tap-hold loader exports changed during read")
 	if not boot and decoded.user_error then error("tap-hold user file " .. tostring(decoded.user_error), 0) end
 	local loaded,one_shot,engine,combinations=_build(decoded,boot)
@@ -759,8 +756,7 @@ end
 --- Loads the configuration and installs the engine.
 --- @param opts table { keyboard_hook, execute_action(action, binding),
 ---   action_names() -> ids, on_text_injected(text), told of each one-shot
----   result the injector typed, defaults_path, user_path, config_path|nil (the
----   config.toml beside user_path by default), dry_run = boolean|nil }
+---   result the injector typed, defaults_path, user_path, dry_run = boolean|nil }
 function M.init(opts)
 	if _initialized then error("tap-hold manager already initialised", 2) end
 	if type(opts) ~= "table" then error("tap-hold manager options must be a table", 2) end
@@ -781,9 +777,6 @@ function M.init(opts)
 			error("tap-hold manager requires " .. name, 2)
 		end
 	end
-	if opts.config_path ~= nil and (type(opts.config_path) ~= "string" or opts.config_path == "") then
-		error("tap-hold manager config_path must be a path", 2)
-	end
 	-- Keystats imports Manager before Hook. Select the loaded receiver at init,
 	-- before callbacks; its private frame controller alone proves native rights.
 	_native_hook = package.loaded["adapters.keyboard_hook"]
@@ -801,7 +794,6 @@ function M.init(opts)
 	end
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
-	_config_path = opts.config_path or Config.config_path_for(opts.user_path)
 	_enabled, _paused = true, false
 	_load(true)
 	_initialized = true
@@ -858,10 +850,8 @@ end
 --- scope transaction acknowledges exactly what it is about to write.
 --- @param document table Decoded candidate tap_hold.toml.
 --- @param shapes table|nil Canonical receipt bound to this exact candidate.
---- @param config table|nil Decoded candidate config.toml (switch and timings);
----   nil reads the file as it stands.
 --- @return boolean True once the candidate engine is installed.
-function M.apply_configuration(document, shapes, config)
+function M.apply_configuration(document, shapes)
 	_require_init()
 	if type(document) ~= "table" then
 		Logger.error(LOG, "Tap-hold scope candidate must be a decoded document — nothing changed.")
@@ -869,8 +859,7 @@ function M.apply_configuration(document, shapes, config)
 	end
 	local ok, loaded, one_shot, engine, combinations = pcall(function()
 		assert(config_exports_current(),"original tap-hold loader exports changed")
-		if config == nil then config = Config.read_config(_config_path) end
-		local decoded=original_config_document(_defaults_path,document,nil,_user_path,shapes,config,_config_path)
+		local decoded=original_config_document(_defaults_path,document,nil,_user_path,shapes)
 		assert(config_exports_current(),"original tap-hold loader exports changed during candidate read")
 		local loaded,one_shot,engine,combinations=_build(decoded)
 		assert(config_exports_current(),"original tap-hold loader exports changed during construction")
@@ -930,7 +919,7 @@ function M.set_enabled(enabled)
 end
 
 --- How long a modifier key pressed alone still taps, in milliseconds (0 = strict):
---- the value of the configuration in force, read from config.toml.
+--- the value of the configuration in force, read from tap_hold.toml.
 --- @return number
 function M.lone_tap_max_ms()
 	_require_init()
@@ -938,7 +927,7 @@ function M.lone_tap_max_ms()
 end
 
 --- Sets how long a modifier key pressed alone still taps: written to
---- config.toml by the writer, which reloads this manager, so the file stays
+--- tap_hold.toml by the writer, which reloads this manager, so the file stays
 --- the one source of the value.
 --- @param ms number 0 (strict) or a positive whole number of milliseconds.
 --- @param guard function|nil Original deferred editor, strict true required.
@@ -949,14 +938,14 @@ function M.set_lone_tap_max_ms(ms, guard)
 end
 
 --- How long a one-shot Shift waits for its key, in milliseconds: the value of
---- the configuration in force, read from config.toml.
+--- the configuration in force, read from tap_hold.toml.
 --- @return number
 function M.one_shot_timeout_ms()
 	_require_init()
 	return _loaded.one_shot_timeout_ms
 end
 
---- Sets how long a one-shot Shift waits for its key: written to config.toml
+--- Sets how long a one-shot Shift waits for its key: written to tap_hold.toml
 --- by the writer, which reloads this manager.
 --- @param ms number A positive whole number of milliseconds.
 --- @param guard function|nil Original deferred editor, strict true required.
@@ -1024,7 +1013,7 @@ function M.capture_configuration_edit()
 	if not _initialized or not _loaded or _paused or not config_exports_current() then return nil end
 	local Files = require("adapters.file_system")
 	local read, factory = Files.read_with_status, M.capture_configuration_edit
-	local path, defaults, loaded, config_path = _user_path, _defaults_path, _loaded, _config_path
+	local path, defaults, loaded = _user_path, _defaults_path, _loaded
 	local engine, installed, generation = _engine, _installed_engine, _generation
 	local enabled, combinations = _enabled, _combinations
 	local keys, rolls, catalog, holds = copy_fields(loaded.keys), copy_fields(loaded.roll_keys),
@@ -1034,7 +1023,6 @@ function M.capture_configuration_edit()
 		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
 			and M.capture_configuration_edit == factory and _initialized and not _paused
 			and _generation == generation and _user_path == path and _defaults_path == defaults
-			and _config_path == config_path
 			and rawequal(_loaded, loaded) and rawequal(_engine, engine) and rawequal(_installed_engine, installed)
 			and _enabled == enabled and rawequal(_combinations, combinations)
 			and loaded.enabled == file_enabled and loaded.lone_tap_max_ms == lone
@@ -1045,11 +1033,9 @@ function M.capture_configuration_edit()
 	end
 	local bytes, status = read(path)
 	local shipped, shipped_status = read(defaults)
-	local settings, settings_status = read(config_path)
 	if not runtime() or (status ~= "ok" and status ~= "absent") or shipped_status ~= "ok"
-		or (status == "ok" and type(bytes) ~= "string") or type(shipped) ~= "string"
-		or (settings_status ~= "ok" and settings_status ~= "absent") then return nil end
-	local ok, decoded = pcall(original_config_load, defaults, path, config_path)
+		or (status == "ok" and type(bytes) ~= "string") or type(shipped) ~= "string" then return nil end
+	local ok, decoded = pcall(original_config_load, defaults, path)
 	if not ok or type(decoded) ~= "table" or decoded.enabled ~= file_enabled or decoded.lone_tap_max_ms ~= lone
 		or decoded.one_shot_timeout_ms ~= one_shot_ms
 		or not fields_equal(decoded.keys, keys) or not fields_equal(decoded.roll_keys, rolls)
@@ -1058,10 +1044,8 @@ function M.capture_configuration_edit()
 		if not runtime() then return false end
 		local content, classification = read(path)
 		local current_defaults, defaults_status = read(defaults)
-		local current_settings, current_settings_status = read(config_path)
 		return content == bytes and classification == status and current_defaults == shipped
-			and defaults_status == shipped_status and current_settings == settings
-			and current_settings_status == settings_status and runtime()
+			and defaults_status == shipped_status and runtime()
 	end
 	if current() ~= true then return nil end
 	return current
@@ -1076,15 +1060,12 @@ function M.capture_tap_action(binding, action)
 	local key_id = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
 	if key_id == nil or type(action) ~= "string" or action == "" or M.get_tap_action(key_id) ~= action then return nil end
 	local files = require("adapters.file_system")
-	local path, defaults, config_path = _user_path, _defaults_path, _config_path
+	local path, defaults = _user_path, _defaults_path
 	local text, status = files.read_with_status(path)
 	local shipped, shipped_status = files.read_with_status(defaults)
-	local settings, settings_status = files.read_with_status(config_path)
-	if status ~= "ok" or type(text) ~= "string" or shipped_status ~= "ok" or type(shipped) ~= "string"
-		or (settings_status ~= "ok" and settings_status ~= "absent") then return nil end
+	if status ~= "ok" or type(text) ~= "string" or shipped_status ~= "ok" or type(shipped) ~= "string" then return nil end
 	local ok, loaded = pcall(function()
-		local config = settings_status == "ok" and Codec.decode(settings) or nil
-		return Config.load_document(defaults, Codec.decode(text), nil, path, nil, config, config_path)
+		return Config.load_document(defaults, Codec.decode(text), nil, path)
 	end)
 	if not ok or loaded.enabled ~= _loaded.enabled then return nil end
 	-- The source must describe the whole live configuration, including inherited
@@ -1102,16 +1083,13 @@ function M.capture_tap_action(binding, action)
 	local generation, engine = _generation, _engine
 	local function current_runtime()
 		return generation == _generation and engine == _engine and _user_path == path and _defaults_path == defaults
-			and _config_path == config_path
 			and M.get_tap_action(key_id) == action and equal_keys(loaded.keys, _loaded.keys)
 	end
 	local function guard()
 		if not current_runtime() then return false end
 		local current, current_status = files.read_with_status(path)
 		local current_defaults, defaults_status = files.read_with_status(defaults)
-		local current_settings, current_settings_status = files.read_with_status(config_path)
 		return current_status == "ok" and current == text and defaults_status == "ok" and current_defaults == shipped
-			and current_settings_status == settings_status and current_settings == settings
 			and current_runtime()
 	end
 	if guard() ~= true then return nil end
@@ -1128,18 +1106,11 @@ function M.key_catalog()
 	return _loaded.catalog
 end
 
---- Whether config.toml sets the feature on (its [tap_holds] enabled).
+--- Whether the user's file sets the feature on (its [tap_hold] enabled).
 --- @return boolean
 function M.file_enabled()
 	_require_init()
 	return _loaded.enabled
-end
-
---- The config.toml the switch and the timings are read from.
---- @return string
-function M.config_path()
-	_require_init()
-	return _config_path
 end
 
 --- The user's tap_hold.toml path, the file the menu edits.
@@ -1216,7 +1187,6 @@ end
 function M._reset_for_test()
 	if _hook and _hook.set_remapper(nil) == false then return false end
 	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
-	_config_path = nil
 	_on_text_injected = nil
 	if _tap_copy then _tap_copy:stop() end
 	_tap_copy = nil
@@ -1239,17 +1209,13 @@ function M.capture_collision_inventory()
 	local Files = require("adapters.file_system")
 	local read, factory = Files.read_with_status, M.capture_collision_inventory
 	local path, defaults, loaded, engine, installed, epoch = _user_path, _defaults_path, _loaded, _engine, _installed_engine, _generation
-	local config_path = _config_path
 	local enabled, paused, combinations = _enabled, _paused, _combinations
 	local nav_record = nav_builds[engine]
 	if not nav_mapping_current(engine, nav_record) then return nil end
 	local bytes, status = read(path)
 	local shipped, shipped_status = read(defaults)
-	local settings, settings_status = read(config_path)
-	if status ~= "ok" or shipped_status ~= "ok" or type(bytes) ~= "string" or type(shipped) ~= "string"
-		or (settings_status ~= "ok" and settings_status ~= "absent") then return nil end
-	local decoded = original_config_document(defaults, original_codec_decode(bytes), nil, path, nil,
-		settings_status == "ok" and original_codec_decode(settings) or nil, config_path)
+	if status ~= "ok" or shipped_status ~= "ok" or type(bytes) ~= "string" or type(shipped) ~= "string" then return nil end
+	local decoded = original_config_document(defaults, original_codec_decode(bytes), nil, path)
 	if not nav_mapping_current(engine, nav_record) or not config_exports_current() then return nil end
 	if decoded.enabled ~= loaded.enabled or not fields_equal(decoded.keys, loaded.keys) then return nil end
 	local keys = copy_fields(loaded.keys)
@@ -1273,7 +1239,7 @@ function M.capture_collision_inventory()
 			if not rawequal(engine.by_code[code], saved.row) or not fields_equal(saved.row, saved.fields) then return false end
 		end
 		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M) and _initialized
-			and _user_path == path and _defaults_path == defaults and _config_path == config_path and rawequal(_loaded, loaded)
+			and _user_path == path and _defaults_path == defaults and rawequal(_loaded, loaded)
 			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _generation == epoch
 			and _enabled == enabled and _paused == paused and not paused and config_exports_current()
 			and loaded.enabled == decoded.enabled and rawequal(_combinations, combinations)
@@ -1286,10 +1252,8 @@ function M.capture_collision_inventory()
 		if not runtime() then return false end
 		local content, classification = read(path)
 		local current_defaults, defaults_status = read(defaults)
-		local current_settings, current_settings_status = read(config_path)
 		if content ~= bytes or classification ~= status or current_defaults ~= shipped
-			or defaults_status ~= shipped_status or current_settings ~= settings
-			or current_settings_status ~= settings_status or not runtime() then return false end
+			or defaults_status ~= shipped_status or not runtime() then return false end
 		if original_shared_root() ~= nav_record.shared_root or not runtime() or nav_record.current() ~= true then return false end
 		return runtime()
 	end

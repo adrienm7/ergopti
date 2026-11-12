@@ -25,7 +25,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "d763b9725d7cf8faae8e1a8889d644f25be257858a753a155cf189b951354880"
+					"sha256": "8c2b5d8ae331b16991e2d7e336dac85bc68da156bd86441a3ad60077039018a9"
 				}
 			],
 			"macos": [
@@ -44,7 +44,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "e94c7ffa53bd9741c6acb810561f169879573ba574ae7d0b60ab9cc7f92f9064"
+					"sha256": "2620e25ad26fa96c336adbc67669d78de051d0b6c6a0f777149e57e2b3865ed1"
 				}
 			]
 		}
@@ -99,7 +99,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "e94c7ffa53bd9741c6acb810561f169879573ba574ae7d0b60ab9cc7f92f9064"
+					"sha256": "2620e25ad26fa96c336adbc67669d78de051d0b6c6a0f777149e57e2b3865ed1"
 				}
 			]
 		}
@@ -130,7 +130,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "d763b9725d7cf8faae8e1a8889d644f25be257858a753a155cf189b951354880"
+					"sha256": "8c2b5d8ae331b16991e2d7e336dac85bc68da156bd86441a3ad60077039018a9"
 				}
 			],
 			"macos": [
@@ -154,7 +154,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "e94c7ffa53bd9741c6acb810561f169879573ba574ae7d0b60ab9cc7f92f9064"
+					"sha256": "2620e25ad26fa96c336adbc67669d78de051d0b6c6a0f777149e57e2b3865ed1"
 				}
 			]
 		}
@@ -360,7 +360,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "e94c7ffa53bd9741c6acb810561f169879573ba574ae7d0b60ab9cc7f92f9064"
+					"sha256": "2620e25ad26fa96c336adbc67669d78de051d0b6c6a0f777149e57e2b3865ed1"
 				}
 			]
 		}

@@ -136,8 +136,8 @@ runner cannot answer.
   through `render_scope()` (the preset written explicitly, never inherited)
   and publishes both files in the shared scope transaction.
 - **`tap_hold_manager.lua`** is the single owner of "is a tap-hold active":
-  the feature switch (config.toml `[tap_holds] enabled`, beside the two
-  timings since config schema v22) and the daemon's pause meet in one place. It installs the engine only through
+  the feature switch, the file's `enabled` flag and the daemon's pause meet
+  in one place. It installs the engine only through
   `keyboard_hook.set_remapper()`, which releases everything the previous
   engine held before swapping — so switching off, pausing, reloading or
   stopping while CapsLock is down cannot leave Ctrl pressed. Never hand the

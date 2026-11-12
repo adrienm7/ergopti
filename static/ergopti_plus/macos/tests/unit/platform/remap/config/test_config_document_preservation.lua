@@ -34,10 +34,8 @@ local function with_file(source, body, raw)
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
 		local Text = require("tests.support.tap_hold_file_text")
-		local source_config
-		if not raw then source, source_config = Text.file(source) end
+		if not raw then source = Text.file(source) end
 		write(source)
-		Text.write_config(path, source_config)
 		local state = Config.build_default_state({ { id = "tab" } }, {})
 		state.enabled = nil
 		state.tap_hold_timeout_ms = 1234
@@ -49,10 +47,10 @@ local function with_file(source, body, raw)
 			if controls.before_publish then controls.before_publish() end
 			return native(destination, candidate, expected)
 		end
-		local ok, err = pcall(body, { config = Config, files = Files, codec = Codec, model = function(text) return Text.model(text, Text.read_config(path)) end, original = source, state = state,
+		local ok, err = pcall(body, { config = Config, files = Files, codec = Codec, model = Text.model, original = source, state = state,
 			path = path, read = read, write = write, controls = controls })
 		Files.write_if_unchanged = native
-		os.remove(path); os.remove(path .. ".tmp"); Text.remove_config(path)
+		os.remove(path); os.remove(path .. ".tmp")
 		if not ok then error(err, 0) end
 	end)
 end
