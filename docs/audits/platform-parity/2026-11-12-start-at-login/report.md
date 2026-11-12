@@ -53,19 +53,27 @@ succeeds again, since each menu rebuild reads the state.
 
 ## Decision for the coordinator
 
-- **SAD-1, a source run on Linux.** `start_at_login.sh` exits 78
-  (« requires an installed copy ») outside `/usr/lib/ergopti` and
-  `*/lib/ergopti/linux`, so on a checkout the row is enabled, unchecked, and
-  every click shows the failure dialog. Windows registers its source script
-  (`StartupLaunchCommand` with the interpreter); the macOS developer app's
-  bundle identifier differs from the worker's `kErgoptiBundleId`, so it is
-  refused too (to confirm on a Mac).
-  - A (recommended): grey the row on a source run with a reason, as
-    Uninstall already is (`installed_build`), on Linux and on the macOS
-    developer app.
-  - B: support a source run on Linux (an autostart entry for the checkout's
-    launcher), as Windows does.
-  - C: keep the current behaviour.
+- **SAD-1, a source run** (decided by the maintainer on 2026-11-12: B,
+  support it). On Linux, `start_at_login.sh` exited 78 (« requires an
+  installed copy ») outside `/usr/lib/ergopti` and `*/lib/ergopti/linux`, so on
+  a checkout the row was live and every click showed the failure dialog, while
+  Windows registers its source script (`StartupLaunchCommand` with the
+  interpreter). Done on Linux: a checkout writes the XDG entry for its own
+  `bin/ergopti-hotstrings` by absolute path (`--tray`; a second start at login
+  is refused by the session lock). An entry this menu wrote whose launcher no
+  longer exists is reported as `stale`: a warning, logged once, the row
+  unchecked and live, and the next enable rewrites the entry for the current
+  launcher. A standalone installation keeps such an entry as another command,
+  since its removal receipt holds the entry's exact bytes. Regressions
+  `login-source-run`. Nothing can be logged at login itself when the launcher
+  is gone: no Ergopti starts. On macOS the developer app carries the
+  launcher's bundle identifier, so the login-item worker accepts it, and the
+  helper resolver derives that worker from the developer app's own bundle
+  (pinned by `login-source-run` in `test_lease_helper_identity.lua`); whether
+  `SMAppService` accepts the ad hoc signed bundle is to confirm on a Mac. A row
+  reason for the stale entry was not added: the row's `disabled_reasons` needs
+  a state getter on every driver, Windows included, and the Windows renderer
+  refuses the row without it.
 
 ## Checked and kept
 
