@@ -18,7 +18,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `ai/engine/bootstrap`                    |       — |    15 |     — |
 | `ai/engine/local_servers`                |       3 |     7 |    13 |
 | `ai/engine/ollama`                       |      11 |    13 |     9 |
-| `ai/engine/prediction`                   |      13 |     8 |     3 |
+| `ai/engine/prediction`                   |      14 |     8 |     3 |
 | `ai/engine/settings`                     |       2 | **1** |    12 |
 | `ai/ui`                                  |       3 |     5 |     5 |
 | `ai/ui/menu`                             |      18 |    19 |     7 |
@@ -40,7 +40,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `core/i18n`                              |   **1** | **1** | **1** |
 | `core/i18n/engine`                       |       2 |     2 |     2 |
 | `core/lifecycle`                         |       2 | **1** | **1** |
-| `core/lifecycle/engine`                  |      10 |     9 |    10 |
+| `core/lifecycle/engine`                  |      10 |     9 |    12 |
 | `core/logger`                            |   **1** |     2 | **1** |
 | `core/logger/adapters`                   |       — |     2 |     — |
 | `core/logger/engine`                     |       6 |     6 |     5 |
@@ -72,6 +72,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `gestures/ui`                            |       2 |     2 |     2 |
 | `gestures/ui/menu`                       |   **1** |     2 | **1** |
 | `hotstrings`                             |       4 |     2 |     3 |
+| `hotstrings/adapters`                    |       2 |     — | **1** |
 | `hotstrings/engine`                      |       5 |     6 |    19 |
 | `hotstrings/engine/catalogue`            |      17 |     5 |     3 |
 | `hotstrings/engine/dynamic`              |       2 |     6 |     4 |
@@ -88,21 +89,21 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `keyboard/adapters/karabiner`            |       — |     8 |     — |
 | `keyboard/adapters/runtime`              |       — |    12 |     — |
 | `keyboard/data`                          |       — |     6 |     — |
-| `keyboard/engine`                        |      12 |     8 |     3 |
+| `keyboard/engine`                        |      12 |     9 |     3 |
 | `keyboard/engine/keys`                   |      18 | **1** |     2 |
 | `keyboard/engine/layers`                 |       6 |     4 | **1** |
 | `keyboard/engine/runtime`                |       — |     7 |     — |
 | `keyboard/ui`                            |       — |     3 | **1** |
 | `layouts`                                |       4 |     3 |     3 |
-| `layouts/adapters`                       |   **1** |     5 |     6 |
+| `layouts/adapters`                       |       2 |     5 |     6 |
 | `layouts/engine`                         |       7 |     6 |     7 |
 | `layouts/engine/composer`                |       — | **1** | **1** |
 | `layouts/engine/emulation`               |       2 | **1** |     5 |
-| `layouts/engine/keylayout`               |       8 |     — |     — |
+| `layouts/engine/keylayout`               |       9 |     — |     — |
 | `layouts/engine/registry`                |       5 |     5 |     3 |
 | `layouts/native`                         |       4 |     — |     — |
 | `layouts/ui`                             |       3 |     3 |     3 |
-| `layouts/ui/layout_manager`              |       3 | **1** | **1** |
+| `layouts/ui/layout_manager`              |       6 | **1** | **1** |
 | `layouts/ui/menu`                        |   **1** |     3 |     3 |
 | `menu`                                   |       2 |     2 |     2 |
 | `menu/engine`                            |      11 |     4 |     3 |
@@ -165,7 +166,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 | `tray/adapters`                          |       5 |     2 |     2 |
 | `updater`                                |       4 |     3 |     3 |
 | `updater/adapters`                       |   **1** |     2 |     — |
-| `updater/engine`                         |       8 |     7 |    13 |
+| `updater/engine`                         |       8 |     7 |    12 |
 | `updater/native`                         |       — |     — |     2 |
 | `updater/ui`                             |       3 |     4 |     4 |
 | `updater/ui/changelog`                   |       2 |     2 | **1** |
@@ -211,6 +212,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `linux/core/timing`
 - singleton_parity (1) `linux/diagnostics/engine/field_run`
 - singleton_parity (1) `linux/gestures/ui/menu`
+- singleton_parity (1) `linux/hotstrings/adapters`
 - singleton_parity (1) `linux/hotstrings/ui/hotstring_editor`
 - singleton_parity (1) `linux/hotstrings/ui/hotstrings_config_window`
 - singleton_parity (1) `linux/hotstrings/ui/personal_info_editor`
@@ -272,7 +274,6 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - singleton_parity (1) `windows/diagnostics/ui/field_check`
 - singleton_parity (1) `windows/gestures/ui/menu`
 - singleton_parity (1) `windows/keyboard/adapters`
-- singleton_parity (1) `windows/layouts/adapters`
 - singleton_parity (1) `windows/layouts/ui/menu`
 - singleton_parity (1) `windows/shortcuts/ui/menu`
 - singleton_parity (1) `windows/tap_hold/ui`
@@ -321,9 +322,10 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - oversized (49) `windows/tests/meta/gestures`
 - singleton (1) `windows/tests/startup`
 - singleton (1) `windows/tests/support/git_refusal`
+- singleton_parity (1) `windows/tests/support/hotstrings`
 - singleton_parity (1) `windows/tests/support/metrics`
 - singleton_parity (1) `windows/tests/support/updater`
-- oversized (51) `windows/tests/unit/ai/api`
+- oversized (52) `windows/tests/unit/ai/api`
 - oversized (53) `windows/tests/unit/ai/servers`
 - singleton (1) `windows/tests/unit/core/crypto`
 - oversized (43) `windows/tests/unit/hotstrings/engine/engine`
@@ -331,7 +333,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - oversized (49) `windows/tests/unit/metrics/engine/reader`
 - oversized (41) `windows/tests/unit/settings/engine/persistence`
 - singleton (1) `windows/tests/unit/tray`
-- oversized (51) `windows/tests/unit/updater/engine`
+- oversized (52) `windows/tests/unit/updater/engine`
 
 ## Architecture folders on one or two drivers only, after the moves
 
@@ -347,6 +349,7 @@ The same rules (tools/audit/structure/rules.cjs) applied to the three drivers. B
 - `core/ui/ui/spotlight` on windows — code exists on these drivers only; the counterpart gains the folder with its first file
 - `diagnostics/adapters` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `diagnostics/engine/field_check` on macos — the Lua drivers share it from `_shared/lua/diagnostics/engine/field_check/`
+- `hotstrings/adapters` on windows + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `hotstrings/engine/expander` on windows + macos — code exists on these drivers only; the counterpart gains the folder with its first file
 - `hotstrings/ui/hotstring_editor` on macos + linux — code exists on these drivers only; the counterpart gains the folder with its first file
 - `install` on linux — declared OS-specific
