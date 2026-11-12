@@ -496,6 +496,24 @@ local function row_emulated(session, code)
 	return row == nil or session.config.row_on[row] == true
 end
 
+--- What the emulation types unshifted on a key from the neutral state, for a
+--- legend: a dead key shows its terminator, a key the emulation leaves to the
+--- OS layout (base off, row switched off, unmapped) shows nothing. The digit
+--- row follows the configured number-row ordering, as typing does. Reads the
+--- session without changing its dead-key state.
+--- @param session table A configured session.
+--- @param code string The key's KeyboardEvent.code.
+--- @return string text "" when the OS layout types that key.
+function M.legend(session, code)
+	local config = session.config
+	if config == nil then error("The emulation session is not configured.") end
+	local mac = session.model.mac_codes[code]
+	if mac == nil or not config.base or not row_emulated(session, code) then return "" end
+	local shift = config.swaps[false][code] == true
+	local resolved = M.resolve(session.model, session.model.levels[combo_key(shift, false, false)], mac)
+	return resolved.kind == "none" and "" or resolved.text
+end
+
 --- Types one layout level and advances the state machine.
 local function step_level(session, mac, shift, caps, option)
 	local model = session.model

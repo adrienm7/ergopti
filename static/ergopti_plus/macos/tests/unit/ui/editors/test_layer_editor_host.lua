@@ -80,7 +80,7 @@ end
 local function with_editor(scenario)
 	local names = { "infra.logger", "infra.i18n", "infra.paths", "infra.config_paths", "adapters.file_system",
 		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
-		"modules.shortcuts.bindings", "modules.keymap.layout_registry" }
+		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local prior_hs = _G.hs
@@ -522,6 +522,25 @@ helpers.describe("macOS navigation layer editor host", function()
 				helpers.assert_eq(refreshed.source, "os")
 			end)
 		end
+	end)
+
+	helpers.it("(leh-001-emulated-legends) shows the emulated layout's characters while one is emulated", function()
+		local registry = Json.decode(read_file(helpers.shared("data/keycodes/physical_keys.json")))
+		with_editor(function(editor, world)
+			world.keymap[registry.keys.KeyQ.hs] = "q"
+			world.keymap[registry.keys.KeyW.hs] = "w"
+			package.loaded["modules.keymap.layout_emulation"] = {
+				status = function() return { active = true, id = "ergopti" } end,
+				-- KeyW is left to the input source, as a row switched off would be.
+				legend = function(code) return code == "KeyQ" and "è" or nil end,
+			}
+			editor.open({ karabiner = world.karabiner })
+			post(world, "ready")
+			local init = last_call(world, "init")
+			helpers.assert_eq(init.legends.source, "emulation")
+			helpers.assert_eq(init.legends.keys.KeyQ, "è", "the emulated character")
+			helpers.assert_eq(init.legends.keys.KeyW, "w", "the input source's character where the emulation passes")
+		end)
 	end)
 
 	helpers.it("refuses to open without a remap facade to apply the layer", function()

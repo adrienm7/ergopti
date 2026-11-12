@@ -23,9 +23,12 @@
 --- 4. Legends: each key that types a character shows what the current input
 ---    source puts on it (infra/keycodes over hs.keycodes.map, which follows the
 ---    input source live), read in the registry's ISO form the navigation layer
----    is generated for. macOS emulates no layout: an installed Ergopti is the
----    input source itself. The page asks again when its window comes back to
----    the front, so a switch made meanwhile shows.
+---    is generated for. While a layout is emulated
+---    (modules/keymap/layout_emulation), a key shows what the emulation types
+---    there and the source is « emulation », as on Windows (LEH-001); a key it
+---    leaves to the input source shows the input source's character. The page
+---    asks again when its window comes back to the front, so a switch made
+---    meanwhile shows.
 --- 5. The layer key is the tap-hold key whose hold is the layer action
 ---    (NavLayer.HOLD_ACTION_ID) in the remap facade's configuration, found in
 ---    the registry by its Karabiner key code.
@@ -101,14 +104,19 @@ local function iso_field(entry, field)
 	return entry[field]
 end
 
---- The legends of the current input source.
+--- The legends of the layout the user types with: the emulated one, else the
+--- current input source.
 --- @param ctx table The loader context.
 --- @return table legends The page's `legends`.
 local function current_legends(ctx)
+	local Emulation = require("modules.keymap.layout_emulation")
+	local emulating = Emulation.status().active == true
 	local legends, unresolved = LayerEditor.legends({
 		ctx       = ctx,
-		source    = LayerEditor.LEGEND_SOURCE_OS,
-		character = function(_, entry)
+		source    = emulating and LayerEditor.LEGEND_SOURCE_EMULATION or LayerEditor.LEGEND_SOURCE_OS,
+		character = function(code, entry)
+			local emulated = emulating and Emulation.legend(code) or nil
+			if emulated ~= nil then return emulated end
 			local keycode = iso_field(entry, "hs")
 			return type(keycode) == "number" and Keycodes.character_for(keycode) or nil
 		end,
