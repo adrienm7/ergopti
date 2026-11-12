@@ -12,18 +12,20 @@ for one launch-gate scenario and left exactly as it was found:
 
 1. symlinked_applications: the application folder is reached through a link;
 2. spaced_accented_path: a folder whose name holds a space and an accent;
-3. translocated: macOS App Translocation, the read-only randomized mount that
-   Gatekeeper runs a quarantined download from. Security.framework creates the
-   same mount with SecTranslocateCreateSecureDirectoryForURL, which this module
-   calls directly because a hosted runner cannot answer the Gatekeeper prompt
-   that would otherwise precede it.
+3. translocated: macOS App Translocation. A download whose quarantine the user
+   approved at the Gatekeeper prompt, opened where it was downloaded, runs
+   from a read-only nullfs mount under .../AppTranslocation/<UUID>/d/. A hosted
+   runner cannot answer that prompt, so the gate writes the approved
+   quarantine flags itself; LaunchServices then mounts and runs the bundle
+   exactly as for a user (probe run 43189848716). The private
+   SecTranslocateCreateSecureDirectoryForURL is refused there with EPERM.
 
 Every location lives under ~/gitcfg, which the runner reset owns.
 """
 
-import ctypes
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import time
@@ -37,130 +39,33 @@ LOCATIONS = {
     "translocated": ("gitcfg/Downloads", None),
 }
 SCENARIOS = tuple(LOCATIONS)
-SECURITY = "/System/Library/Frameworks/Security.framework/Security"
-CORE_FOUNDATION = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
-UTF8 = 0x08000100
-PATH_LIMIT = 4096
+# Quarantine flags of a browser download the user approved at the Gatekeeper
+# prompt; the pending 0083 of the install step would open that prompt instead.
+APPROVED_QUARANTINE_FLAGS = "00c3"
+LAUNCHER_RELATIVE = "Contents/MacOS/ErgoptiPlus"
+TRANSLOCATION_MARKER = "/AppTranslocation/"
+NULLFS_MOUNT = re.compile(r"^(?P<source>.+) on (?P<target>.+) \(nullfs, ")
 
 
-class Translocation:
-    """The private Security.framework calls that create and retire one mount."""
-
-    def __init__(self):
-        self.security = ctypes.cdll.LoadLibrary(SECURITY)
-        self.cf = ctypes.cdll.LoadLibrary(CORE_FOUNDATION)
-        self.cf.CFURLCreateFromFileSystemRepresentation.restype = ctypes.c_void_p
-        self.cf.CFURLCreateFromFileSystemRepresentation.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_char_p,
-            ctypes.c_long,
-            ctypes.c_bool,
-        ]
-        self.cf.CFURLGetFileSystemRepresentation.restype = ctypes.c_bool
-        self.cf.CFURLGetFileSystemRepresentation.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_bool,
-            ctypes.c_char_p,
-            ctypes.c_long,
-        ]
-        self.cf.CFCopyDescription.restype = ctypes.c_void_p
-        self.cf.CFCopyDescription.argtypes = [ctypes.c_void_p]
-        self.cf.CFStringGetCString.restype = ctypes.c_bool
-        self.cf.CFStringGetCString.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_char_p,
-            ctypes.c_long,
-            ctypes.c_uint32,
-        ]
-        self.cf.CFRelease.argtypes = [ctypes.c_void_p]
-        create = self.security.SecTranslocateCreateSecureDirectoryForURL
-        create.restype = ctypes.c_void_p
-        create.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
-        delete = self.security.SecTranslocateDeleteSecureDirectory
-        delete.restype = ctypes.c_bool
-        delete.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
-        check = self.security.SecTranslocateIsTranslocatedURL
-        check.restype = ctypes.c_bool
-        check.argtypes = [
-            ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_bool),
-            ctypes.POINTER(ctypes.c_void_p),
-        ]
-
-    def url(self, path):
-        raw = os.fsencode(path)
-        url = self.cf.CFURLCreateFromFileSystemRepresentation(None, raw, len(raw), True)
-        if not url:
-            raise RuntimeError(f"CoreFoundation refused the path {path}")
-        return url
-
-    def describe(self, reference):
-        text = ctypes.create_string_buffer(PATH_LIMIT)
-        description = self.cf.CFCopyDescription(reference)
-        self.cf.CFStringGetCString(description, text, PATH_LIMIT, UTF8)
-        self.cf.CFRelease(description)
-        return text.value.decode("utf-8", "replace")
-
-    def create(self, original):
-        """Mount one translocation of original and return the mounted bundle path."""
-        source = self.url(original)
-        error = ctypes.c_void_p()
-        mounted = self.security.SecTranslocateCreateSecureDirectoryForURL(
-            source, None, ctypes.byref(error)
-        )
-        self.cf.CFRelease(source)
-        if not mounted:
-            detail = self.describe(error.value) if error.value else "no error object"
-            raise RuntimeError(f"SecTranslocateCreateSecureDirectoryForURL refused: {detail}")
-        buffer = ctypes.create_string_buffer(PATH_LIMIT)
-        resolved = self.cf.CFURLGetFileSystemRepresentation(mounted, True, buffer, PATH_LIMIT)
-        self.cf.CFRelease(mounted)
-        if not resolved:
-            raise RuntimeError("The translocated bundle has no file-system path")
-        path = Path(os.fsdecode(buffer.value))
-        flag = ctypes.c_bool(False)
-        error = ctypes.c_void_p()
-        url = self.url(path)
-        answered = self.security.SecTranslocateIsTranslocatedURL(
-            url, ctypes.byref(flag), ctypes.byref(error)
-        )
-        self.cf.CFRelease(url)
-        if not answered or not flag.value:
-            raise RuntimeError(f"Security.framework does not report {path} as translocated")
-        return path
-
-    def delete(self, mounted):
-        """Unmount one translocation; refuse instead of leaving a mount behind."""
-        url = self.url(mounted)
-        error = ctypes.c_void_p()
-        deleted = self.security.SecTranslocateDeleteSecureDirectory(url, ctypes.byref(error))
-        self.cf.CFRelease(url)
-        if not deleted:
-            detail = self.describe(error.value) if error.value else "no error object"
-            raise RuntimeError(f"SecTranslocateDeleteSecureDirectory refused: {detail}")
-
-
-def quarantine_stamp(now=time.time, identifier=uuid.uuid4):
-    """A browser-download quarantine value the user has not approved yet."""
-    return f"0083;{int(now()):x};Safari;{str(identifier()).upper()}"
+def quarantine_stamp(flags=APPROVED_QUARANTINE_FLAGS, now=time.time, identifier=uuid.uuid4):
+    """A browser-download quarantine value carrying the given flags."""
+    return f"{flags};{int(now()):x};Safari;{str(identifier()).upper()}"
 
 
 class Relocation:
     """Moves the installed bundle to one scenario location and back."""
 
-    def __init__(self, scenario, installed, home, runner=subprocess.run, translocation=None):
+    def __init__(self, scenario, installed, home, runner=subprocess.run):
         if scenario not in LOCATIONS:
             raise ValueError(f"Unknown relocation scenario {scenario!r}")
         self.scenario = scenario
         self.installed = Path(installed)
         self.home = Path(home)
         self.runner = runner
-        self.translocation = translocation
         folder, link = LOCATIONS[scenario]
         self.folder = self.home / folder
         self.link = self.home / link if link else None
         self.moved = self.folder / self.installed.name
-        self.mounted = None
 
     def enter(self):
         """Return the bundle path to open; the installed path is empty until leave()."""
@@ -176,10 +81,6 @@ class Relocation:
                 ["xattr", "-r", "-w", "com.apple.quarantine", quarantine_stamp(), str(self.moved)],
                 check=True,
             )
-            if self.translocation is None:
-                self.translocation = Translocation()
-            self.mounted = self.translocation.create(self.moved)
-            return self.mounted
         return self.moved
 
     def candidates(self, opened):
@@ -190,17 +91,48 @@ class Relocation:
             found.append(resolved)
         return found
 
+    def find_running(self, opened, process_table):
+        """The bundle whose launcher runs in a `ps -axo pid=,command=` table, or None.
+
+        A translocated launch runs from a mount whose name macOS chooses, so it
+        is found by shape; it must be a translocation of this bundle's name.
+        """
+        commands = [
+            parts[1]
+            for parts in (line.strip().split(None, 1) for line in process_table.splitlines())
+            if len(parts) == 2
+        ]
+        if self.scenario == "translocated":
+            suffix = f"/d/{self.installed.name}/{LAUNCHER_RELATIVE}"
+            for command in commands:
+                if TRANSLOCATION_MARKER in command and command.endswith(suffix):
+                    return Path(command[: -len("/" + LAUNCHER_RELATIVE)])
+            return None
+        for bundle in self.candidates(opened):
+            if str(bundle / LAUNCHER_RELATIVE) in commands:
+                return bundle
+        return None
+
+    def translocation_mounts(self):
+        """The nullfs mount points macOS made for the moved bundle."""
+        listing = self.runner(["mount"], capture_output=True, text=True, check=True).stdout
+        return [
+            match.group("target")
+            for match in (NULLFS_MOUNT.match(line) for line in listing.splitlines())
+            if match and match.group("source") == str(self.moved)
+        ]
+
     def leave(self):
         """Undo enter(): unmount, unquarantine, move back and remove the folders."""
         problems = []
-        if self.mounted is not None:
-            try:
-                self.translocation.delete(self.mounted)
-            except Exception as error:
-                problems.append(f"{type(error).__name__}: {error}")
-        if self.moved.exists():
-            if self.scenario == "translocated":
+        if self.scenario == "translocated":
+            for target in self.translocation_mounts():
+                result = self.runner(["umount", target], capture_output=True, text=True)
+                if result.returncode != 0:
+                    problems.append(f"umount {target} failed: {result.stderr.strip()}")
+            if self.moved.exists():
                 self.runner(["xattr", "-dr", "com.apple.quarantine", str(self.moved)], check=True)
+        if self.moved.exists():
             shutil.move(str(self.moved), str(self.installed))
         if self.link is not None and self.link.is_symlink():
             self.link.unlink()
