@@ -75,10 +75,12 @@ global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
 ; budget than the tiny JSON API calls above. Reusing the 30 s API value made the
 ; WinHttpRequest receive timeout abort the transfer at 30 s on slow/metered links,
 ; defeating the 600 s SetTimer poll ceiling (updater-download-receive-timeout).
-global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000  ; binary download receive
+; Both bounds come from archive_transfer of the shared updater defaults, which
+; macOS and Linux read too (generated as UpdateArchiveTransferData()).
+global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := UpdateArchiveTransferData()["archive_idle_timeout_ms"]
 ; Absolute wall-clock owner for the complete download transaction. Per-read
 ; timeouts do not stop a peer that sends one byte before every read deadline.
-global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := 1200000
+global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := UpdateArchiveTransferData()["archive_phase_timeout_ms"]
 
 ; Floor for the downloaded exe size (512 KB). A real ErgoptiPlus binary is
 ; several MB; anything below this is certainly a partial download or a CDN
