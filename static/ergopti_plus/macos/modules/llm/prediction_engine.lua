@@ -2465,6 +2465,16 @@ function M.is_focus_blocked(excluded_apps)
 	return AppFilter.is_blocked(_state, type(excluded_apps) == "table" and excluded_apps or {}, false, true) == true
 end
 
+--- Whether the AI's excluded applications or filtered fields refuse a
+--- selection action here, as the tone rewrite asks before it runs: the
+--- translation asks it before it reads the selection, as Windows'
+--- LLM_Translate_Trigger does (_LLM_Engine_ShouldSuppressForDisabledApps, AIX-001).
+--- @return boolean excluded
+function M.selection_action_excluded()
+	if not require_state("selection_action_excluded") then return true end
+	return AppFilter.is_blocked(_state, excluded_apps, url_bar_filter_enabled, secure_field_filter_enabled) == true
+end
+
 --- Sends one answer request to the current backend: a plain chat turn with the
 --- caller's system prompt, answered unparsed, with no PREFIX/TAIL turn, no
 --- tooltip and no streaming.

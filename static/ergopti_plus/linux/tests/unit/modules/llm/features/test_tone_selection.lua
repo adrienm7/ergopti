@@ -207,6 +207,7 @@ local function scenario(opts, body)
 				return world.focus
 			end,
 			privacy_guard = opts.privacy_guard,
+			privacy_context = opts.privacy_context,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -417,6 +418,19 @@ end)
 -- ==============================================
 
 helpers.describe("tone actions: refusals and dropped answers", function()
+
+	helpers.it("(aix-001-excluded-app-selection) refuses in an app excluded from the AI, before reading", function()
+		local Trigger = require("modules.llm.trigger_settings")
+		scenario({ selection = "Salut", privacy_context = function()
+			return { app_id = "org.example.Excluded", title = "Draft", native_identity = "n1" }
+		end }, function(world)
+			assert(Trigger.set_disabled_apps({ "org.example.Excluded" }))
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+			helpers.assert_eq(world.reads, 0, "the selection is never read")
+			helpers.assert_eq(#world.posts, 0, "nothing is sent to the provider")
+			assert(Trigger.set_disabled_apps({}))
+		end)
+	end)
 
 	helpers.it("does nothing when nothing is selected", function()
 		scenario({ selection = nil }, function(world)

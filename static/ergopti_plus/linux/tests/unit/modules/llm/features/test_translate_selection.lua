@@ -150,6 +150,7 @@ local function scenario(opts, body)
 				return world.focus
 			end,
 			privacy_guard = opts.privacy_guard,
+			privacy_context = opts.privacy_context,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -395,6 +396,22 @@ helpers.it("translates a free language name without changing selection authority
 		helpers.assert_true(world.posts[1].body.messages[1].content:find("into Esperanto", 1, true) ~= nil)
 		helpers.assert_eq(world.reads, 1)
 		helpers.assert_eq(#world.replaced, 0, "no replacement before actual acceptance")
+	end)
+end)
+
+helpers.describe("a selected translation in an app excluded from the AI", function()
+	helpers.it("(aix-001-excluded-app-selection) refuses before reading, as Windows' translate action", function()
+		local Trigger = require("modules.llm.trigger_settings")
+		scenario({ selection = SELECTION, privacy_context = function()
+			return { app_id = "org.example.Excluded", title = "Draft", native_identity = "n1" }
+		end }, function(world)
+			assert(Trigger.set_disabled_apps({ "org.example.Excluded" }))
+			helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
+			helpers.assert_eq(world.reads, 0, "the selection is never read")
+			world.wait_for(1)
+			helpers.assert_eq(#world.posts, 0, "nothing is sent to the provider")
+			assert(Trigger.set_disabled_apps({}))
+		end)
 	end)
 end)
 
