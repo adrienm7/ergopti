@@ -89,6 +89,15 @@ function rewrite(file, text) {
 
 function run() {
 	withFakes(() => {
+		// A Lua pattern anchored on a path tail, embedded in a tool or in Lua.
+		assert.equal(
+			rewrite('tools/x.cjs', 'const lua = `if p:match("/zz_probe_mod/hotstrings/a%.json$") then`;'),
+			'const lua = `if p:match("/zz_probe_hs/data/a%.json$") then`;'
+		);
+		assert.equal(
+			rewrite(`${P}linux/y.lua`, "assert(path:find('/_shared/zz_probe_mod/hotstrings/a%.json$'))"),
+			"assert(path:find('/_shared/zz_probe_hs/data/a%.json$'))"
+		);
 		// A bare resolve imported from path, and a folder piece with its trailing
 		// slash concatenated onto a name: the locale catalogue read per code.
 		assert.equal(
