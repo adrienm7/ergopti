@@ -231,6 +231,56 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		end
 	end))
 
+	helpers.it("(nui-005-refused-reload-notice) tells a source-change reload once while it is refused and retried", with_scheduler_scope(function()
+		local prev_notifications = package.loaded["infra.notifications"]
+		local notices = 0
+		package.loaded["infra.notifications"] = { notify = function() notices = notices + 1; return true end }
+		package.loaded["infra.file_watchers"] = nil
+		local FW = require("infra.file_watchers")
+		local prev_pw, prev_timer, prev_attr, prev_reload = hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
+		local callbacks, pending, clock, attempts = {}, nil, 0, 0
+		hs.pathwatcher = { new = function(_path, callback)
+			callbacks[#callbacks + 1] = callback
+			local watcher = {}
+			function watcher:start() return watcher end
+			function watcher:stop() return watcher end
+			return watcher
+		end }
+		hs.timer = {
+			doAfter = function(_delay, callback)
+				pending = callback
+				local timer = {}
+				function timer:stop() return timer end
+				return timer
+			end,
+			secondsSinceEpoch = function() return clock end,
+			absoluteTime = function() return clock * 1e9 end,
+		}
+		hs.fs.attributes = function() return nil end
+		-- A global writer refuses the reload four times, then admits it.
+		hs.reload = function() attempts = attempts + 1; return attempts > 4 end
+		_G.script_watchers = nil
+		local ok, err = pcall(function()
+			FW.start({ hotstrings_dir = "/fake/hotstrings/", base_dir = "/fake/base/", personal_hotstrings_dir = "/fake/personal" })
+			clock = 10
+			callbacks[#callbacks]({ "/fake/base/modules/change.lua" })
+			for _ = 1, 40 do
+				if attempts > 4 or not pending then break end
+				clock = clock + 5
+				local fire = pending
+				pending = nil
+				fire()
+			end
+			helpers.assert_eq(attempts, 5, "the burst is retried until the reload is admitted")
+			helpers.assert_eq(notices, 1, "a refused and retried reload is told once, not on every 0.5 s retry")
+		end)
+		for _, owner in ipairs(_G.script_watchers or {}) do pcall(owner.stop, owner) end
+		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload = prev_pw, prev_timer, prev_attr, prev_reload
+		package.loaded["infra.notifications"] = prev_notifications
+		_G.script_watchers = nil
+		if not ok then error(err, 0) end
+	end))
+
 	helpers.it("watch_personal_hotstrings_dir terminates on a self-referential directory cycle (F-LOW-4)", with_scheduler_scope(function()
 		-- Simulate a self-referential symlink under the personal-hotstrings tree:
 		-- every directory contains one further "loop" entry that resolves back to
