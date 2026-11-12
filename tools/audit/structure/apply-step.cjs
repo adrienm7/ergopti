@@ -52,6 +52,7 @@ function newPathToken(row, movedRepo) {
 	let out;
 	if (r.form === 'repo') out = r.newRepo;
 	else if (r.form === 'tree') out = r.newRepo.slice(PREFIX.length);
+	else if (r.form === 'shared') out = r.newRepo.slice(`${PREFIX}_shared/`.length);
 	else if (r.form === 'root') {
 		const tree = r.newRepo.slice(PREFIX.length).split('/')[0];
 		out = r.lead + r.newRepo.slice(`${PREFIX}${tree}/`.length);
@@ -63,7 +64,7 @@ function newPathToken(row, movedRepo) {
 		out = r.lead + rel;
 	}
 	// A token spelled with a leading slash (DIR .. "/adapters/x.lua") keeps it.
-	if (row.old.startsWith('/') && !out.startsWith('/')) out = `/${out}`;
+	if (row.old.startsWith('/') && out !== '' && !out.startsWith('/')) out = `/${out}`;
 	return backslash ? out.replace(/\//g, '\\') : out;
 }
 
@@ -83,6 +84,75 @@ function rewriteOwnIncludes(text, oldRepo, newRepo, finalRepo) {
 	);
 }
 
+/**
+ * The dry run of the whole sequence on today's index. A later step runs on
+ * the tree its predecessors leave, so a per-step dry run on today's tree
+ * would not be the run phase 2 makes; instead this proves, for the full map:
+ * the rules are idempotent (a step recomputed after its predecessors moves
+ * nothing twice), no step leaves two Lua roots answering one name, no
+ * touched file has local changes, and every reference is either rewritten
+ * mechanically or listed for review, with nothing refused.
+ * @returns {number} The exit code: 0 when the sequence is clean.
+ */
+function checkAll(map, plan) {
+	const problems = [];
+	const targets = [...map.values()].filter(Boolean);
+	const again = Plan.moveMap(targets).map;
+	const twice = [...again].filter(([o, t]) => o !== t);
+	if (twice.length > 0)
+		problems.push(
+			`${twice.length} path(s) the rules would move a second time, e.g. ${twice[0].join(' -> ')}`
+		);
+	const left = Plan.luaCollisions(targets);
+	if (left.length > 0)
+		problems.push(
+			`${left.length} Lua module name(s) answered by two roots: ${left.map((c) => c.name).join(', ')}`
+		);
+	const refs = Plan.attributeSteps(plan, Plan.references(map));
+	const byStep = new Map(plan.map((s) => [s.id, []]));
+	for (const r of refs) (byStep.get(r.step) || byStep.set(r.step, []).get(r.step)).push(r);
+	const touched = new Set();
+	for (const s of plan)
+		for (const [o, t] of s.moves) touched.add(PREFIX + o).add(PREFIX + (t || o));
+	for (const r of refs) touched.add(r.file);
+	const dirty = git('status', '--porcelain', '-z')
+		.split('\0')
+		.filter(Boolean)
+		.map((l) => l.slice(3));
+	const dirtyTouched = dirty.filter((f) => touched.has(f));
+	if (dirtyTouched.length > 0)
+		problems.push(
+			`${dirtyTouched.length} touched file(s) have local changes: ${dirtyTouched.slice(0, 5).join(', ')}`
+		);
+	console.log('step\tfeature\tmoves\trenames\trewrites\treview\trefused');
+	for (const s of plan) {
+		const own = byStep.get(s.id) || [];
+		const renames = s.moves.filter(
+			([o, t]) => t && path.posix.basename(o) !== path.posix.basename(t)
+		).length;
+		const review = own.filter((r) => Plan.REVIEWED_KINDS.has(r.kind)).length;
+		const refused = own.filter((r) => Plan.REFUSED_KINDS.has(r.kind));
+		console.log(
+			`${s.id}\t${s.key}\t${s.moves.length}\t${renames}\t${own.length}\t${review}\t${refused.length}`
+		);
+		for (const r of refused.slice(0, 20))
+			problems.push(`${s.id} ${s.key}: ${r.kind} ${r.file}: ${r.old} ${r.new}`);
+		if (refused.length > 20)
+			problems.push(`${s.id} ${s.key}: ${refused.length - 20} more refusal(s)`);
+	}
+	const orphan = byStep.get('unknown') || [];
+	for (const r of orphan.filter((x) => Plan.REFUSED_KINDS.has(x.kind)).slice(0, 20))
+		problems.push(`no step: ${r.kind} ${r.file}: ${r.old}`);
+	if (problems.length > 0) {
+		console.error(`\n[REFUSED] ${problems.length} problem(s):\n  - ${problems.join('\n  - ')}`);
+		return 1;
+	}
+	console.log(
+		`\n[OK] ${plan.length} steps, ${refs.length} references: the sequence runs without design work.`
+	);
+	return 0;
+}
+
 function main() {
 	const args = process.argv.slice(2);
 	const { map } = Plan.moveMap();
@@ -90,6 +160,9 @@ function main() {
 	if (args.includes('--list') || args.length === 0) {
 		for (const s of plan) console.log(`${s.id}\t${s.key}\t${s.moves.length} move(s)`);
 		return;
+	}
+	if (args.includes('--check-all')) {
+		process.exit(checkAll(map, plan));
 	}
 	const wanted = args.find((a) => !a.startsWith('--'));
 	const step = plan.find((s) => s.key === wanted || s.id === wanted);
@@ -177,6 +250,7 @@ function main() {
 
 	// References first, in the files' current locations; then the moves.
 	for (const [file, rows] of edits) {
+		rows.sort((a, b) => b.old.length - a.old.length);
 		const abs = path.join(ROOT, file);
 		let text = fs.readFileSync(abs, 'utf8');
 		for (const row of rows) {
@@ -184,11 +258,28 @@ function main() {
 				console.log(`  review by hand: ${file} names retired ${row.old}`);
 				continue;
 			}
-			if (row.kind === 'lua-module') {
-				const esc = row.old.replace(/\./g, '\\.');
+			if (Plan.REFUSED_KINDS.has(row.kind))
+				throw new Error(`refused reference ${row.file}: ${row.old}`);
+			// A sentence naming a folder that scatters stays as written; the
+			// review list of the step names it.
+			if (row.new === Plan.SPLIT) continue;
+			const esc = row.old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			if (row.kind === 'lua-rewrite') {
+				if (!text.includes(row.old))
+					throw new Error(`${file}: the listed runtime edit no longer matches`);
+				text = text.split(row.old).join(row.new);
+				continue;
+			}
+			if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
 				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), `$1${row.new}$1`);
 			} else {
-				text = text.split(row.old).join(newPathToken(row, movedRepo));
+				// Whole tokens only: tests/unit/modules/llm must not rewrite
+				// inside tests/unit/modules/llm_extra or a longer path.
+				const bounded = new RegExp(
+					`(?<![A-Za-z0-9_.\\-/\\\\])${esc}(?![A-Za-z0-9_\\-]|\\.[A-Za-z0-9])`,
+					'g'
+				);
+				text = text.replace(bounded, newPathToken(row, movedRepo));
 			}
 		}
 		fs.writeFileSync(abs, text, 'utf8');

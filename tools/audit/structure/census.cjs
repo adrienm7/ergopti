@@ -49,6 +49,10 @@ const EXEMPT = [
 	{ re: /(^|\/)vendor(\/|$)/, why: 'third-party code keeps its upstream layout' },
 	{ re: /(^|\/)_generated(\/|$)/, why: 'codegen output; its generator owns the split' },
 	{
+		re: /(^|\/)desktop_focus\/(gnome|kwin)(\/|$)/,
+		why: 'GNOME Shell extension and KWin script package layouts'
+	},
+	{
 		re: /^macos\/launcher(\/|$)/,
 		why: 'SwiftPM package layout (Sources/<target>, Tests/<target>)'
 	},
