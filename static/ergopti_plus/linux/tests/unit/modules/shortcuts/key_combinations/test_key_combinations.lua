@@ -2190,22 +2190,19 @@ helpers.describe("owned roll journal action acknowledgement", function()
 	end)
 end)
 
--- One chord action this driver lacks (another OS's, in the shared
--- tap_hold.toml) used to drop every chord without a word (TCL-003).
-helpers.describe("chord slots read from the shared tap_hold.toml", function()
+-- One chord action this driver lacks (another OS's, written by a shared
+-- configuration) used to drop every chord without a word (TCL-003).
+helpers.describe("chord slots read from config.toml", function()
 	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
-		local chord_path = "/controlled/tap_hold.toml"
-		local chords_text = '[_meta]\nschema_version = 1\n[mod_combos]\nenabled = true\n'
+		local text = base_text .. '[mod_combos]\nenabled = true\n'
 			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "run_program"\n'
 			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "mission_control"\n'
 		local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
 			files = { read_with_status = function(file)
-				if file == chord_path then return chords_text, "ok" end
-				if file == path then return base_text, "ok" end
+				if file == path then return text, "ok" end
 				return nil, "absent"
 			end },
 			route = function() return path end,
-			chord_route = function() return chord_path end,
 			is_paused = function() return false end,
 			changed = function() return true end,
 			actions = { is_assignable = function(action) return action == "run_program" end } })
