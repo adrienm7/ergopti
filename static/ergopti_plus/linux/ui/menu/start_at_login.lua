@@ -10,6 +10,9 @@
 local M = {}
 local ShellRunner = require("adapters.shell_runner")
 local Paths = require("infra.paths")
+local Logger = require("logger.shim")
+
+local LOG = "ui.menu.start_at_login"
 
 --- Calls the installed startup helper, retaining external failure as a failure.
 --- @param action string
@@ -20,14 +23,35 @@ local function invoke(action, run)
 		.. ShellRunner.quote(Paths.driver_root() .. "/install/start_at_login.sh") .. " " .. action)
 end
 
+local last_read_failure = nil
+
+--- Reads the helper's answer: enabled, disabled or other, or nil after a logged
+--- failure. Each menu rebuild reads it, so one failure is logged once until a
+--- read succeeds again.
+--- @param run function|nil
+--- @return string|nil
+local function read_state(run)
+	local ok, output, err = invoke("status", run)
+	local state = ok and type(output) == "string" and output:match("^(%a+)%s*$") or nil
+	if state == "enabled" or state == "disabled" or state == "other" then
+		last_read_failure = nil
+		return state
+	end
+	local detail = ok and "unexpected answer" or tostring(err or "query failed")
+	if last_read_failure ~= detail then
+		last_read_failure = detail
+		Logger.error(LOG, "Startup state could not be read: %s.", detail)
+	end
+	return nil
+end
+
 --- Returns the effective startup state, or nil if the query failed.
 --- @param run function|nil
 --- @return boolean|nil
 function M.enabled(run)
-	local ok, output = invoke("status", run)
-	if not ok then return nil end
-	if output:match("^enabled%s*$") then return true end
-	if output:match("^disabled%s*$") then return false end
+	local state = read_state(run)
+	if state == "enabled" then return true end
+	if state == "disabled" then return false end
 	return nil
 end
 
@@ -36,10 +60,9 @@ end
 --- @param run function|nil
 --- @return boolean|nil
 function M.command_available(run)
-	local ok, output = invoke("status", run)
-	if not ok then return nil end
-	if output:match("^other%s*$") then return false end
-	if output:match("^enabled%s*$") or output:match("^disabled%s*$") then return true end
+	local state = read_state(run)
+	if state == "other" then return false end
+	if state == "enabled" or state == "disabled" then return true end
 	return nil
 end
 
@@ -48,9 +71,22 @@ end
 --- @return boolean
 function M.toggle(run)
 	local enabled = M.enabled(run)
-	if enabled == nil then return false end
-	if not invoke(enabled and "disable" or "enable", run) then return false end
-	return M.enabled(run) == not enabled
+	if enabled == nil then
+		Logger.error(LOG, "Startup setting not changed: its state is unknown.")
+		return false
+	end
+	local action = enabled and "disable" or "enable"
+	local changed, _, err = invoke(action, run)
+	if not changed then
+		Logger.error(LOG, "Startup %s failed: %s.", action, tostring(err or "helper failed"))
+		return false
+	end
+	if M.enabled(run) ~= not enabled then
+		Logger.error(LOG, "Startup %s was not confirmed by the next read.", action)
+		return false
+	end
+	Logger.info(LOG, "Startup %sd.", action)
+	return true
 end
 
 return M
