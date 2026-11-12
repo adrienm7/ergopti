@@ -32,7 +32,7 @@ helpers.describe("direct require", function()
 	helpers.it("(direct-require) calls the original with no walk of the loaded modules", function()
 		local env, world = hammerspoon_env()
 		helpers.assert_eq(DirectRequire.install(env), true)
-		for _ = 1, 3360 do helpers.assert_eq(env.require("user_action_parameter"), "module:user_action_parameter") end
+		for _ = 1, 3360 do helpers.assert_eq(env.require("direct_require_probe"), "module:direct_require_probe") end
 		helpers.assert_eq(world.walks, 0, "the wrapper must not run once per row")
 		helpers.assert_true(rawequal(env.require, env.rawrequire), "the global is the original itself")
 	end)
