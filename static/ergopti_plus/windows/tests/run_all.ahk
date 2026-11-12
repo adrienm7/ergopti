@@ -125,6 +125,7 @@ _TestResultsBeginRun()
 ; AppState fields directly, and before any infra/ file that reads AppState.
 #Include ../infra/app_state.ahk
 #Include support/native_cli_diagnostics.ahk
+#Include support/receiving_profile.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
@@ -427,6 +428,7 @@ InstallSendNoOps()
 #Include unit/adapters/test_adapter_contract_vectors.ahk
 #Include unit/adapters/test_adapter_contract_vectors_system.ahk
 #Include unit/adapters/input/test_clipboard_paste_transaction_ownership.ahk
+#Include unit/adapters/input/test_selection_capture_receiving.ahk
 #Include unit/adapters/input/test_suppressive_inputhook_ownership.ahk
 ; Runs startup/siho_boot_window_smoke.ahk as a child process. That harness is
 ; deliberately NOT included here: it must observe the state before the module's
@@ -578,6 +580,7 @@ InstallSendNoOps()
 #Include unit/infra/config/persistence/test_config.ahk
 #Include unit/infra/config/persistence/test_feature_state_boot.ahk
 #Include unit/ui/wpm/test_wpm_config_types.ahk
+#Include unit/ui/wpm/test_wpm_position_receiving.ahk
 #Include ../ui/wpm/wpm_gdiplus_ownership.ahk
 #Include ../ui/wpm/wpm_widget.ahk
 #Include ../ui/wpm/wpm_category_color.ahk
@@ -674,6 +677,7 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_release_notes.ahk
 #Include unit/modules/updater/test_updater_staging_transport.ahk
 #Include unit/modules/updater/test_updater_swap_transaction.ahk
+#Include unit/modules/updater/test_updater_swap_receiving.ahk
 #Include unit/modules/updater/test_updater_swap_cancellation.ahk
 #Include unit/modules/updater/test_updater_swap_shutdown.ahk
 #Include unit/modules/updater/test_updater_swap_recovery.ahk
@@ -946,6 +950,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/modules/llm/api/test_llm_sync_target.ahk
 #Include unit/modules/llm/menu/test_llm_menu_transactions.ahk
 #Include unit/modules/llm/menu/test_llm_api_entries_transactions.ahk
+#Include unit/modules/llm/test_api_token_crypto_receiving.ahk
 #Include unit/modules/llm/menu/test_llm_menu_display.ahk
 #Include unit/modules/llm/menu/test_llm_menu_generation.ahk
 #Include unit/modules/llm/menu/test_llm_menu_indentation.ahk
@@ -1029,6 +1034,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/gestures/test_system_actions_confirmed_targets.ahk
 #Include unit/modules/gestures/test_system_actions_query_pause.ahk
 #Include unit/modules/gestures/test_system_actions_process_lease.ahk
+#Include unit/modules/gestures/test_system_actions_receiving.ahk
 #Include unit/adapters/test_screen_brightness.ahk
 #Include unit/modules/llm/actions/test_llm_rewrite.ahk
 #Include unit/modules/llm/actions/test_llm_prompt_action.ahk
@@ -1082,6 +1088,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/config/migration/test_config_migrate_variant_metadata.ahk
 #Include unit/infra/config/migration/test_config_migrate_same_registry.ahk
 #Include unit/infra/config/migration/test_legacy_folder_migration.ahk
+#Include unit/infra/config/migration/test_legacy_folder_migration_receiving.ahk
 #Include unit/infra/config/migration/test_config_journal_boot.ahk
 #Include unit/infra/config/migration/test_config_journal_ai_admission.ahk
 #Include unit/infra/config/migration/test_config_journal_settlement.ahk
