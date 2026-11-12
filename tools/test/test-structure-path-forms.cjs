@@ -718,6 +718,24 @@ function run() {
 		const prefix = after.match(/'shared_llm_path' \? `([^`$]*)\$\{arg\}`/)[1];
 		assert.ok(after.includes(`'${prefix}fixture.json'`), `${resolverTest}: ${prefix} expected`);
 	}
+	// The gate coverage test probes a contract under each tree verify-change
+	// holds binding on every driver: both edits of _shared/core land together.
+	const rewritten = (file) => {
+		const before = fs.readFileSync(path.join(repo, file), 'utf8');
+		return Apply.rewriteText(before, Plan.scanFile(file, before, fullCtx), new Map(), file);
+	};
+	if (fs.existsSync(path.join(repo, P, '_shared/core/config_schema'))) {
+		const selector = rewritten('tools/test/verify-change.cjs');
+		const trees = rewritten('tools/test/test-shared-lua-gate-coverage.cjs')
+			.match(/for \(const tree of \[([^\]]*)\]\)/)[1]
+			.match(/'[^']*'/g)
+			.map((t) => t.slice(1, -1));
+		for (const tree of trees)
+			assert.ok(
+				selector.includes(`f.startsWith('static/ergopti_plus/_shared/${tree}/')`),
+				`verify-change holds _shared/${tree} binding on every driver`
+			);
+	}
 	// A file of synthetic coordinates keeps them all: rewriting the arguments of
 	// sibling() and not its fake source made the loader contract fail.
 	const moved = new Map([...full].filter(([o, t]) => t && o !== t).map(([o, t]) => [P + o, P + t]));
