@@ -1538,9 +1538,11 @@ function scanFile(file, text, ctx) {
 			}
 			return null;
 		};
-		// A load site quoted inside a string: 'params[require(\"config_keys\").KEY.X]'.
+		// A load site quoted inside a string: 'params[require(\"config_keys\").KEY.X]',
+		// or in a Lua pattern: 'require%(\"config_migrate\"%)%.boot%(' (an unescaped
+		// dot of the new name still matches itself).
 		for (const m of text.matchAll(
-			/(\b(?:require\s*\(?|package\.(?:loaded|preload)\s*\[)\s*)\\(["'])([A-Za-z_][\w.]*)\\\2/g
+			/(\b(?:require\s*%?\(?|package\.(?:loaded|preload)\s*%?\[)\s*)\\(["'])([A-Za-z_][\w.]*)\\\2/g
 		)) {
 			const hit = lookup(m[3]);
 			if (hit && hit[2])
