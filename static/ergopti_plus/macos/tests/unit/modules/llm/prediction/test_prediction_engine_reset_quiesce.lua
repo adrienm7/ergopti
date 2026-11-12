@@ -66,7 +66,6 @@ local function load_fixture(cancel_result)
 	package.loaded["modules.llm.prompt_builder"] = { build = function() return nil end }
 	package.loaded["modules.llm.streaming_handler"] = {
 		init = function() return true end,
-		stop_watchdog = function() return true end,
 		reset_failure_count = function() end,
 	}
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }

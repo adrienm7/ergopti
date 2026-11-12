@@ -144,7 +144,6 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["modules.llm.streaming_handler"] = {
-		arm_watchdog = function() return true end,
 		build_callbacks = function(config)
 			local function success(predictions)
 				config.pending_predictions_ref.value = predictions
@@ -155,7 +154,6 @@ local function load_fixture()
 		end,
 		init = function() return true end,
 		reset_failure_count = function() return true end,
-		stop_watchdog = function() return true end,
 	}
 	fixture.streaming_handler = package.loaded["modules.llm.streaming_handler"]
 	package.loaded["modules.llm.app_filter"] = {

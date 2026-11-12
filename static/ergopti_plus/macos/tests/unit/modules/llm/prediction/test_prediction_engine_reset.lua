@@ -99,8 +99,6 @@ package.loaded["modules.llm.prompt_builder"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) return true end,
-	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
 	cancel_streaming    = function() return true end,
 }
