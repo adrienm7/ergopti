@@ -42,7 +42,8 @@ local function build(state)
 		end,
 		writer_active = function() return state.writer == true end,
 		publication_pending = function() return state.publication == true end,
-		report_update_quit = function()
+		report_update_quit = function(reason)
+			assert(type(reason) == "string" and reason ~= "", "the watcher report names its source")
 			calls.order[#calls.order + 1] = "update watcher"
 			if state.report_throws then error("controlled watcher report failure") end
 		end,
@@ -67,6 +68,26 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 			helpers.assert_eq(calls.requests, { "tray quit" })
 		end)
 	end
+	helpers.it("(lcy-003-shortcut-quit) a shortcut Quit takes the same owner as the tray row", function()
+		local on_quit, calls = build({ reload = true })
+		helpers.assert_eq(on_quit("gesture or shortcut quit"), true)
+		helpers.assert_eq(calls.abandons, 1, "a shortcut Quit cancels the reload in flight")
+		helpers.assert_eq(calls.requests, { "gesture or shortcut quit" })
+		helpers.assert_eq(calls.order, { "update watcher", "shutdown" },
+			"a shortcut Quit tells the update watcher before the shutdown")
+		helpers.assert_true(not pcall(build({}), ""), "a user Quit names its source")
+	end)
+
+	helpers.it("(lcy-003-shortcut-quit) Main routes the shortcut and gesture Quit through that owner", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		helpers.assert_true(
+			source:find("quit = function(reason) return privacy_owners.tray_quit(reason) end", 1, true) ~= nil,
+			"the script_quit port must reach the user Quit owner")
+		helpers.assert_true(source:find('report_quit("the tray Quit")', 1, true) == nil,
+			"the watcher report names the Quit source it was given")
+	end)
+
 	helpers.it("admits a quit, applies the pause layout, then starts the shutdown", function()
 		local on_quit, calls = build({})
 		helpers.assert_eq(on_quit(), true)
