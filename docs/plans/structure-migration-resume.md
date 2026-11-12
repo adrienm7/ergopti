@@ -4,36 +4,47 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-12, 22:10)
+## Where things stand (2026-11-12, 22:40)
 
 - Branch: `claude/ergopti-todo-structure-phase2`. It is pushed fast-forward
   only and never rebased. A rebase would go to
   `claude/ergopti-todo-structure-phase2-night`.
-- Base: the **dev candidate `7f64feb00`**, not dev yet, until the
-  coordinator confirms its push. It is dev `3ec911b1` plus the tap-hold
-  series, the Windows batch, parity-b, parity-audit and one rehash, published
-  on `claude/ergopti-todo-linux-macos-tqq3lp`. It was merged into this branch
-  (`fc91eced`), and the plan appendices were regenerated on it (`dcb0579d`).
+- Base: **dev `520bb24c`**, the final dev of the evening: the candidate
+  `7f64feb00` plus three Windows/TODO commits and the TODO split. It was
+  merged in `ee1aa96f`, and the plan appendices were regenerated on it
+  (`e81e64b8`).
 - Steps landed on dev: none. The migration is not authorized to land yet.
 - S01 (`_shared`) is green locally. The last full cycle ran on `b4659a72` over
   dev `5755f454`, against a baseline run on that same dev commit:
   - Lua: 15 groups, the same failing tests as the baseline (0 new, 0 gone);
   - JS: 630 checks, no new red. One parallel-run race (js-0225, a temporary
     probe folder) passes when run alone.
-- S01 proof on the candidate:
-  - `claude/ergopti-todo-structure-phase2-proof` at `50b75362`: this branch's
-    tip plus the S01 step commit made by `run-phase2.cjs`, with its
-    Requalification section (868 moves, 17 048 references in 4 911 files);
-  - `ci.yml` was dispatched with `os_lanes=all` at 22:10. Compare its failing
-    jobs with run 43282880961, the candidate branch's last run.
+- S01 proof on dev `520bb24c`:
+  - `claude/ergopti-todo-structure-phase2-proof-2` at `244ef275`: this
+    branch's tip plus the S01 step commit made by `run-phase2.cjs`, with its
+    Requalification section (868 moves, 17 020 references in 4 911 files);
+  - CI: `ci.yml` run 43311674550 (`os_lanes=all`, dispatched 22:35), in
+    progress.
+- The first proof, `claude/ergopti-todo-structure-phase2-proof` (run
+  43304464415), stopped in the CI plan job before any lane ran. The merge of
+  the candidate had given two check ordinals both to dev's new checks and to
+  this branch's; `5cf3ff6b` renumbers this branch's six checks after dev's.
+- Baseline reds for CI (the coordinator, 22:00): any red outside this list
+  is S01's.
+  - Seen in tap-hold run 43294939933 (also red on dev): Windows meta; Linux
+    E2E desktop-webview, updater, platform-metrics, input-display; Common
+    Shared ui (App Cloner); Common Packaging and boot.
+  - Seen in Windows run 43291765266: Windows Build AV-surface ceilings; App
+    Cloner.
 - Decision C1 for the Windows cohort pins, decided by the coordinator on
-  2026-11-12, to review by the maintainer:
+  2026-11-12, to review by the maintainer, is implemented, and its TODO line
+  is in `TODO.md` under « Remaining code work »:
   - `edits.cjs` `REQUALIFIED_PINS` lists the five receipts;
   - `repin.cjs` records each old→new pin there, with the move that justifies
-    it, and fails fast on a pin there it cannot attribute (a file the step
-    removed, a hash shared by files the step made different, a derived pin);
+    it, and fails fast on a pin there it cannot attribute;
   - the runner writes a "Requalification" section into the step commit.
-    The TODO line waits for dev's TODO split.
+- The coordinator has stopped for the night. Report only through this file
+  and the commits.
 
 ## Next commands
 
