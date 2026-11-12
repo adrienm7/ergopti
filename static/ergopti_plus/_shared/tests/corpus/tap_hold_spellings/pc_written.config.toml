@@ -1,0 +1,6 @@
+# _shared/tests/corpus/tap_hold_spellings/pc_written.config.toml
+# The config.toml rows beside pc_written.toml: a key combination whose action
+# is spelled as on Windows and Linux.
+
+[mod_combos.config.escape_then_tab]
+combo = "enter"

@@ -1,0 +1,20 @@
+# _shared/tests/corpus/tap_hold_spellings/pc_written.toml
+# A tap_hold.toml as Windows and Linux write it: their action ids (enter,
+# one_shot_shift) and their thumb keys (left_alt, alt_gr), which macOS reads
+# under its own action ids and on the Mac keys at the same place.
+
+[_meta]
+schema_version = 1
+
+[tap_hold.keys.caps_lock]
+tap_action = "one_shot_shift"
+hold_modifier = "ctrl"
+
+[tap_hold.keys.tab]
+tap_action = "enter"
+
+[tap_hold.keys.left_alt]
+tap_action = "enter"
+
+[tap_hold.keys.alt_gr]
+tap_action = "caps_word"

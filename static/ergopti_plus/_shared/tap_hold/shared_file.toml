@@ -67,3 +67,25 @@ hs_names = { ctrl = "ctrl", shift = "shift", option = "alt", cmd = "cmd", fn = "
 # macOS holds that are a modifier but carry no `modifiers` list in the action
 # catalogue: their shared hold_modifier.
 hs_hold_actions = { altgr = "alt_gr" }
+
+
+
+
+
+# =================================
+# =================================
+# ======= 3. Thumb keys ===========
+# =================================
+# =================================
+
+# A thumb-key setting follows the key at the same place under the thumb
+# (maintainer decision TCL-004 of 2026-11-12, « follow the position »): each
+# Mac thumb key of [tap_hold.catalog] is written under the PC key at its
+# position. macOS translates on read and write; a file still holding a Mac
+# thumb id is read as its positional key by every driver, and the positional
+# entry wins when both are there. Keys: catalogue ids with only a macOS column;
+# values: catalogue ids with no macOS column.
+[thumb_positions]
+left_command = "left_alt"
+right_command = "alt_gr"
+right_option = "right_ctrl"

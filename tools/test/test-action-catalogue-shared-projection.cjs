@@ -112,6 +112,7 @@ function expectedCatalogue(model) {
 		catalogue.actions[id] = entry;
 	}
 	if (model.karabinerAliases) catalogue.karabiner_aliases = { ...model.karabinerAliases };
+	if (model.tapHoldSpellings) catalogue.tap_hold_spellings = { ...model.tapHoldSpellings };
 	if (model.slots)
 		catalogue.slots = { single: [...model.slots.single], axis: [...model.slots.axis] };
 	return canonical(catalogue);

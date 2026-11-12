@@ -101,6 +101,24 @@ local USER_FILE_NAME = require("tap_hold.shared_file").FILE_NAME
 -- The [tap_hold] leaves config.toml [tap_holds] owns since config schema v22.
 local CONFIG_OWNED_FIELDS = { "enabled", LONE_TAP_FIELD, ONE_SHOT_TIMEOUT_FIELD }
 
+-- The shared file's layout, read once: [thumb_positions] places each Mac thumb
+-- key on the PC key at its position (maintainer decision TCL-004).
+local shared_spec = nil
+
+--- The shared file's spec (_shared/tap_hold/shared_file.toml).
+--- @return table See tap_hold.shared_file.parse_spec.
+local function shared_file_spec()
+	if shared_spec == nil then
+		local path = require("infra.paths").shared("tap_hold/shared_file.toml")
+		local text, status = Writer.read_classified(path)
+		if status ~= "ok" or type(text) ~= "string" then
+			error("the shared tap-hold file spec is unreadable: " .. tostring(path), 0)
+		end
+		shared_spec = require("tap_hold.shared_file").parse_spec(TomlCodec.decode(text))
+	end
+	return shared_spec
+end
+
 --- Reads and decodes one TOML file.
 --- @param path string
 --- @return table|nil parsed, string|nil err ("absent" when the file does not exist)
@@ -392,7 +410,20 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes, confi
 	-- a catalogue key Linux lacks (Fn, the Mac Option and Command keys) is theirs.
 	local catalogued = {}
 	for _, entry in ipairs(defaults.tap_hold.catalog.keys) do catalogued[entry.id] = true end
+	-- A Mac thumb key a Mac wrote under its own id is the PC key at its place,
+	-- unless the file names that key too (shared_file.toml [thumb_positions]).
+	local placed = {}
 	for key_id, override in pairs(overrides) do
+		local positional = type(key_id) == "string" and require("tap_hold.shared_file").positional_key(shared_file_spec(), key_id)
+		if positional and positional ~= key_id and remappable[positional] and overrides[positional] == nil then
+			placed[positional] = override
+		end
+	end
+	-- A copy: the decoded document is the caller's.
+	local entries = {}
+	for key_id, override in pairs(overrides) do entries[key_id] = override end
+	for key_id, override in pairs(placed) do entries[key_id] = override end
+	for key_id, override in pairs(entries) do
 		if catalogued[key_id] and not remappable[key_id] then
 			-- Left as it is for the driver that has the key.
 		elseif not remappable[key_id] then

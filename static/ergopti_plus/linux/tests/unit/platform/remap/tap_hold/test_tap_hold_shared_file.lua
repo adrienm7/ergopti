@@ -67,6 +67,26 @@ local function with_writer(body)
 	if not ok then error(err, 0) end
 end
 
+-- Thumb keys a Mac spells its own way (TCL-004, « follow the position »).
+local SPELLINGS = Paths.shared("tests/corpus/tap_hold_spellings") .. "/"
+
+helpers.describe("Mac thumb keys in the shared tap_hold.toml on Linux (tap-hold-spellings)", function()
+	local expected = Codec.decode(assert(read(SPELLINGS .. "expected.toml"), "the spelling expectations are missing"))
+
+	helpers.it("Linux reads a Mac thumb id as the PC key at its place (tap-hold-spellings)", function()
+		local path = os.tmpname()
+		write(path, assert(read(SPELLINGS .. "mac_thumb.toml")))
+		local ok, loaded = pcall(Loader.load, DEFAULTS, path)
+		os.remove(path)
+		assert(ok, tostring(loaded))
+		for key_id, fields in pairs(expected.reads.mac_thumb.linux.keys) do
+			for field, value in pairs(fields) do
+				helpers.assert_eq(loaded.keys[key_id] and loaded.keys[key_id][field], value, key_id .. "." .. field)
+			end
+		end
+	end)
+end)
+
 helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", function()
 	local expected = Codec.decode(assert(read(CORPUS .. "expected.toml"), "the corpus expectations are missing"))
 

@@ -442,10 +442,71 @@ function buildModel(data, platform) {
 	const axItems = data.ax_order.items.filter((id) => actions[id] && actions[id].family === 'ax');
 	const model = { platform, sgItems, axItems, actions };
 	Object.defineProperty(model, 'sgOrders', { value: sgOrders, enumerable: false });
-	if (platform === 'hs') model.karabinerAliases = { ...(data.karabiner_aliases || {}) };
+	if (platform === 'hs') {
+		model.karabinerAliases = { ...(data.karabiner_aliases || {}) };
+		model.tapHoldSpellings = tapHoldSpellings(data);
+	}
 	if (platform === 'linux')
 		model.slots = { single: [...data.slots.single], axis: [...data.slots.axis] };
 	return model;
+}
+
+/**
+ * The PC spelling of each macOS remap action id that names a PC action under
+ * another id, for the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md): the
+ * file holds the id Windows and Linux bind, macOS translates. Sources are the
+ * one-to-one equivalents (`equivalent_hs` of a PC row, `equivalent_ahk` and
+ * `equivalent_linux` of a macOS row) and [karabiner_aliases]. A spelling must
+ * round-trip, so a PC id that several macOS ids name (`app_previous`), or a
+ * macOS id that names several PC ids (`win_app_next`), keeps no translation;
+ * a PC target must be an action both PC drivers claim.
+ * @param {object} data Decoded registry.
+ * @returns {object} macOS id -> PC id.
+ */
+function tapHoldSpellings(data) {
+	const pc = (id) => {
+		const row = data.sg_actions[id];
+		if (!row) return false;
+		const claimed = platformsOf(row.platform, `sg_actions.${id}`);
+		return claimed.includes('ahk') && claimed.includes('linux');
+	};
+	const candidates = [];
+	for (const [id, row] of Object.entries(data.sg_actions)) {
+		const claimed = platformsOf(row.platform, `sg_actions.${id}`);
+		const hs = row.equivalent_hs;
+		if (!claimed.includes('hs') && pc(id) && Array.isArray(hs) && hs.length === 1) {
+			candidates.push([hs[0], id]);
+		}
+		const ahk = row.equivalent_ahk;
+		const linux = row.equivalent_linux;
+		if (
+			claimed.includes('hs') &&
+			Array.isArray(ahk) &&
+			Array.isArray(linux) &&
+			ahk.length === 1 &&
+			linux.length === 1 &&
+			ahk[0] === linux[0] &&
+			pc(ahk[0])
+		) {
+			candidates.push([id, ahk[0]]);
+		}
+	}
+	for (const [alias, target] of Object.entries(data.karabiner_aliases || {})) {
+		if (pc(target)) candidates.push([alias, target]);
+	}
+	const sources = new Map();
+	const targets = new Map();
+	for (const [hs, shared] of candidates) {
+		if (!sources.has(shared)) sources.set(shared, new Set());
+		sources.get(shared).add(hs);
+		if (!targets.has(hs)) targets.set(hs, new Set());
+		targets.get(hs).add(shared);
+	}
+	const spellings = {};
+	for (const [hs, shared] of candidates) {
+		if (sources.get(shared).size === 1 && targets.get(hs).size === 1) spellings[hs] = shared;
+	}
+	return spellings;
 }
 
 /** A Lua double-quoted literal. */
@@ -586,6 +647,13 @@ function renderLua(model, refresh) {
 		out.push('\tkarabiner_aliases = {');
 		for (const alias of Object.keys(model.karabinerAliases).sort()) {
 			out.push(`\t\t[${luaQ(alias)}] = ${luaQ(model.karabinerAliases[alias])},`);
+		}
+		out.push('\t},');
+	}
+	if (model.tapHoldSpellings) {
+		out.push('\ttap_hold_spellings = {');
+		for (const id of Object.keys(model.tapHoldSpellings).sort()) {
+			out.push(`\t\t[${luaQ(id)}] = ${luaQ(model.tapHoldSpellings[id])},`);
 		}
 		out.push('\t},');
 	}
