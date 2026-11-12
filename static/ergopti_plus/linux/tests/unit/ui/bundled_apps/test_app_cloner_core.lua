@@ -71,6 +71,20 @@ helpers.describe("Linux App Cloner", function()
 		helpers.assert_eq(plan.desktop_path, "/home/u/.local/share/applications/ergopti-clone-work-browser.desktop")
 	end)
 
+	helpers.it("(bap-004-vscode-variants) a VSCodium or Insiders clone links its own settings and extensions", function()
+		for _, case in ipairs({
+			{ exec = "/usr/bin/codium %F", settings = "VSCodium", extensions = ".vscode-oss" },
+			{ exec = "/usr/bin/code-insiders %F", settings = "Code - Insiders", extensions = ".vscode-insiders" },
+			{ exec = "/usr/bin/code %F", settings = "Code", extensions = ".vscode" },
+		}) do
+			local plan = plan_for(case.exec)
+			helpers.assert_eq(plan.family, "vscode")
+			helpers.assert_eq(plan.links[1].target, "/home/u/.config/" .. case.settings .. "/User", case.exec)
+			helpers.assert_contains(plan.launcher_text,
+				"'--extensions-dir=/home/u/" .. case.extensions .. "/extensions'", case.exec)
+		end
+	end)
+
 	helpers.it("(bap-006-duplicate-name) app cloner: suffixes a taken name on its profile and its menu name", function()
 		local plan = plan_for("chromium", { taken = function(id) return id == "work-browser" end })
 		helpers.assert_eq(plan.id, "work-browser-2")

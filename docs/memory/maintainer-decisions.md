@@ -31,6 +31,47 @@ and clear). The Windows `A_IsSuspended` configuration gates are to remove
 (changelog, update check) keep their own rules. Do not add a pause gate to a
 configuration action; gate the typing runtime instead.
 
+## App Cloner clones of VS Code variants keep their own folders (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (BAP-004): a VSCodium or VS Code
+Insiders clone links its own settings and passes its own extensions folder,
+not VS Code's. `_shared/data/app_cloner/families.json` vscode `user_folders`
+names them per executable (`settings` under the platform's configuration
+folder, `extensions` under `{home}`) and marks the replaced argument
+`user_folder: "extensions"`; the change is additive, so the current AHK reader
+keeps working. macOS (`clone_app.sh`, variant from the bundled CLI) and Linux
+(`app_cloner_core.lua`) read it; Windows has its TODO line. Regressions
+`bap-004-vscode-variants`.
+
+## The Linux Encryptor opens only .enc files by default (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (BAP-008): Linux writes two Encryptor
+desktop entries. The visible one opens the dedicated type of
+`_shared/data/encryptor/format.json` `mime_type`
+(`application/x-ergopti-encrypted`, declared on `*.enc` by a shared-mime-info
+package) and is made its default opener with `xdg-mime`; a `NoDisplay=true`
+entry declares `application/octet-stream` and is never made a default, so «
+Open with » still offers it for any file, as Windows' Send To does.
+Regression `bap-008-encryptor-entries`.
+
+## A late macOS layer regeneration failure is notified (2026-11-12)
+
+Decided by the maintainer on 2026-11-12 (LEH-003): the macOS navigation layer
+editor still closes as soon as Karabiner accepts the regeneration; a
+regeneration that fails later sends an error notification through
+`infra.notifications` (the window title and `layer_editor.apply_failed`).
+Windows and Linux apply synchronously before their window closes, so they
+have no late failure. Regression `leh-003-late-regeneration-failure`.
+
+## The App Cloner item to open is validated alike everywhere (2026-11-12)
+
+Decided by the maintainer on 2026-11-12: the item a clone opens follows the
+macOS `validateOpenArg`: a path, absolute or under « ~ » (expanded), must
+exist; anything else needs « :// » or Teams' `msteams:/l/` and
+`msteams:/calendar` forms, so « https:/x » and « localhost:3000 » are refused.
+Linux follows it since BAP-005; Windows' `_AppCloner_InvalidOpenItem` has its
+TODO line.
+
 ## One configuration layout on every OS for tap-holds (2026-11-11)
 
 ## The Linux decoder judges millimetres (2026-11-11)
