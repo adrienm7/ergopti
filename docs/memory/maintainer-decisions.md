@@ -81,8 +81,8 @@ section (`_shared/tap_hold/SCHEMA.md`).
   `_shared/tap_hold/shared_file.toml` `[thumb_positions]`.
   `shared_file.lua` maps the Mac thumb ids to those ids on read and write, so
   Linux and Windows honour a key a Mac bound; a file still holding a Mac thumb
-  id is read as its positional key. Windows' AHK reader: TODO « Windows (the
-  PC agent's) ».
+  id is read as its positional key by the three drivers (Windows:
+  `tap_hold_loader.ahk` `_TapHoldPositionalKey`).
 
 ## The Linux decoder judges millimetres (2026-11-11)
 
