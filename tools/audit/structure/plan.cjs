@@ -724,13 +724,19 @@ let CONFIG_KEYS = null;
  */
 function configKeys() {
 	if (CONFIG_KEYS) return CONFIG_KEYS;
-	CONFIG_KEYS = new Set();
-	const source = [...EXISTING].find((f) =>
-		new RegExp(`^${PREFIX}_shared/(.+/)?config_keys\\.lua$`).test(f)
+	// The generator names its output (and the steps rewrite that name with the
+	// move): the key list is found wherever the plan has put it, renamed or not.
+	const generator = fs.readFileSync(
+		path.join(ROOT, 'tools/codegen/codegen-config-keys.cjs'),
+		'utf8'
 	);
-	if (!source)
-		throw new Error('config_keys.lua not found under _shared: the plan needs the key list');
-	for (const m of fs.readFileSync(path.join(ROOT, source), 'utf8').matchAll(/=\s*"([^"]+)"/g))
+	const output = (generator.match(/\bLUA_OUTPUT\s*=\s*'([^']+)'/) || [])[1];
+	if (!output || !fs.existsSync(path.join(ROOT, output)))
+		throw new Error(
+			`codegen-config-keys.cjs names no Lua output the index holds (${output}): the plan needs the key list`
+		);
+	CONFIG_KEYS = new Set();
+	for (const m of fs.readFileSync(path.join(ROOT, output), 'utf8').matchAll(/=\s*"([^"]+)"/g))
 		CONFIG_KEYS.add(m[1]);
 	return CONFIG_KEYS;
 }
@@ -787,7 +793,7 @@ const LUA_NAME_TABLE =
 
 /** Code just before a quoted name that loads it as a Lua module. */
 const MODULE_LOAD_BEFORE =
-	/(?:\brequire\s*(?:%?\()?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\(|\b\w*(?:load|fresh)_module\s*\(|\brawget\s*\(\s*package\.(?:loaded|preload)\s*,|\bsearchpath\s*\()\s*$/;
+	/(?:\brequire\s*(?:%?\()?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\(|\b\w*(?:load|fresh)_(?:module|with_stubs)\s*\(|\brawget\s*\(\s*package\.(?:loaded|preload)\s*,|\bsearchpath\s*\()\s*$/;
 
 /**
  * Tells whether the quoted token at `index` is a Lua module load: a require
@@ -1010,8 +1016,18 @@ function joinedPaths(text) {
 		}
 		// One literal joined onto a named base (path.join(DATA, 'x.json')) is a
 		// path too, when the base is a constant the file defines.
-		if (parts.length < 2 && !(parts.length === 1 && m[2].trim())) continue;
-		out.push({ text: text.slice(start, at), parts, quote, callee: m[1], before: m[2], separator });
+		// shared('keymap', vector.file): a folder handed on with a name to join.
+		const more = /^\s*,\s*[^\s'"`)]/.test(text.slice(at));
+		if (parts.length < 2 && !(parts.length === 1 && (m[2].trim() || more))) continue;
+		out.push({
+			more,
+			text: text.slice(start, at),
+			parts,
+			quote,
+			callee: m[1],
+			before: m[2],
+			separator
+		});
 	}
 	return out;
 }
@@ -1033,7 +1049,7 @@ function resolveJoinedPath(j, byRepoPath, byRepoDir, successors, env = new Map()
 	// resolve(SHARED_ROOT, 'modules/llm'): a base the file imports, named for _shared.
 	if (baseName && /^\w*shared\w*$/i.test(baseName))
 		return resolveOnBase(j, `${PREFIX}_shared`, joined, byRepoPath, byRepoDir, successors);
-	if (j.parts.length < 2) return null;
+	if (j.parts.length < 2 && !(j.more && /shared/i.test(j.callee))) return null;
 	const bases = [];
 	if (joined.startsWith(PREFIX)) bases.push('');
 	if (Census.TREES.some((t) => joined === t || joined.startsWith(`${t}/`))) bases.push(PREFIX);
@@ -1255,7 +1271,7 @@ function scanFile(file, text, ctx) {
 			const spelled = hit.form === 'repo' ? hit.newRepo : hit.newRepo.slice(PREFIX.length);
 			add('path-regex', m[0], spelled.replace(/\./g, '\\.').replace(/\//g, '\\/'), hit);
 		}
-	if (/\.(c?js|mjs)$/.test(file))
+	if (/\.(c?js|mjs|lua)$/.test(file))
 		for (const j of joinedPaths(text)) {
 			const hit = resolveJoinedPath(j, byRepoPath, byRepoDir, successors, jsEnv);
 			if (hit) add(hit.kind, j.text, hit.rendered, hit);
@@ -1291,7 +1307,17 @@ function scanFile(file, text, ctx) {
 			}
 		);
 	}
-	if (file.endsWith('.lua') && inTree) {
+	// A Lua file outside the trees (a tool's fixture) loads the modules of the
+	// drivers it names, shared ones first.
+	const luaRoots = Census.DRIVERS.includes(inTree)
+		? [inTree, '_shared']
+		: inTree === '_shared'
+			? ['_shared', 'macos', 'linux']
+			: [
+					'_shared',
+					...['macos', 'linux'].filter((d) => file.includes(d) || text.includes(`/${d}`))
+				];
+	if (file.endsWith('.lua')) {
 		// A quoted prefix completed by concatenation: "modules.llm." .. name.
 		for (const m of text.matchAll(
 			/(?:\brequire\s*\(?\s*|package\.loaded\s*\[\s*)["']((?:[A-Za-z_][A-Za-z0-9_]*\.)+)["']\s*\.\./g
@@ -1327,7 +1353,7 @@ function scanFile(file, text, ctx) {
 				}
 			);
 		}
-		const roots = inTree === '_shared' ? ['_shared', 'macos', 'linux'] : [inTree, '_shared'];
+		const roots = luaRoots;
 		// A name escaped for a Lua pattern: src:find('require%("test%.x"%)').
 		for (const m of text.matchAll(/(?<![\w%.])([A-Za-z_]\w*(?:%\.[A-Za-z_]\w*)+)(?![\w])/g)) {
 			const name = m[1].replace(/%\./g, '.');
@@ -1430,7 +1456,7 @@ function scanFile(file, text, ctx) {
 				}
 			}
 		}
-	} else if (/\.(c?js|mjs|py|sh|ya?ml|nix|lua)$/.test(file)) {
+	} else if (/\.(c?js|mjs|py|sh|ya?ml|nix)$/.test(file)) {
 		// Lua run from another language (luajit -e, a stdin chunk, a fixture
 		// written to disk): its require sites, and only those, move. The driver
 		// is the one the file names; a name both Lua drivers answer differently
@@ -1475,10 +1501,19 @@ function newFolder(dir, byRepoDir, successors) {
  */
 function resolveOnBase(j, base, joined, byRepoPath, byRepoDir, successors) {
 	const full = path.posix.normalize(base ? `${base}/${joined}` : joined);
-	if (!EXISTING.has(full)) return null;
 	const newBase = newFolder(base, byRepoDir, successors);
-	let newFull = byRepoPath.get(full) || null;
-	if (!newFull) newFull = newFolder(full, byRepoDir, successors);
+	let newFull = null;
+	if (EXISTING.has(full)) newFull = byRepoPath.get(full) || newFolder(full, byRepoDir, successors);
+	else {
+		// A fixture or a generated file in a folder that moves whole follows it.
+		for (let d = path.posix.dirname(full); d.length > base.length; d = path.posix.dirname(d)) {
+			if (!EXISTING.has(d)) continue;
+			const to = byRepoDir.get(d);
+			if (to && to !== SPLIT) newFull = to + full.slice(d.length);
+			break;
+		}
+		if (!newFull) return null;
+	}
 	if (newFull === full && newBase === base) return null;
 	if (newBase === null || newFull === null || newFull === PREFIX)
 		return { kind: 'join-split', rendered: '(split)', oldRepo: full, newRepo: null };
