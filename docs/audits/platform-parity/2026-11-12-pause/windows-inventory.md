@@ -11,7 +11,9 @@ pass with a Windows runtime. No AHK file was changed here: this session had no
 AutoHotkey to run, and the gates reach the configuration writers, not only the
 page handlers.
 
-The classes are a first reading by file, not a verdict per line:
+The classes are a first reading by file, not a verdict per line. Each A to C
+entry names the unit suite that already loads the file (preferring one that
+exercises Suspend), where its « a suspended save writes » regression goes:
 
 - **A, B**: page handlers, editors, configuration writers and installs. Their
   gates are to remove, each with a regression that a suspended save writes.
@@ -28,61 +30,61 @@ The classes are a first reading by file, not a verdict per line:
 
 ### A page or editor (65 sites in 15 files)
 
-- `windows/ui/action_picker/init.ahk`: 220
-- `windows/ui/action_picker_webview.ahk`: 421, 475, 500, 517, 883, 888, 896
-- `windows/ui/download_window/init.ahk`: 143, 539, 677
-- `windows/ui/editors.ahk`: 28, 60, 66, 71, 97, 270, 298, 304, 307, 336
-- `windows/ui/hotstrings_config_window/webview.ahk`: 289, 338
-- `windows/ui/layer_editor/init.ahk`: 144, 151, 581, 586, 666, 669, 695
-- `windows/ui/layout_manager/init.ahk`: 385, 990
-- `windows/ui/model_browser/init.ahk`: 426, 502, 548, 562, 1076, 1266, 1505, 1571, 1679
-- `windows/ui/onboarding/gesture_registration.ahk`: 157
-- `windows/ui/onboarding/webview.ahk`: 303, 530, 540, 636, 674, 686, 701
-- `windows/ui/paths_editor/init.ahk`: 240, 290, 296, 320, 329, 378
-- `windows/ui/personal_info_editor/init.ahk`: 238
-- `windows/ui/personal_toml_editor_webview.ahk`: 280, 422, 443, 467, 506
-- `windows/ui/physical_shortcuts/host.ahk`: 485
-- `windows/ui/prompt_editor/init.ahk`: 474, 547, 608
+- `windows/ui/action_picker/init.ahk`: 220 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/action_picker_webview.ahk`: 421, 475, 500, 517, 883, 888, 896 — candidate suite: none yet, add one beside the file
+- `windows/ui/download_window/init.ahk`: 143, 539, 677 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/editors.ahk`: 28, 60, 66, 71, 97, 270, 298, 304, 307, 336 — candidate suite: `tests/unit/modules/hotstrings/magic_key/test_magic_key_source_menu.ahk`
+- `windows/ui/hotstrings_config_window/webview.ahk`: 289, 338 — candidate suite: `tests/unit/ui/webview/test_webview_range_mount.ahk`, `tests/unit/ui/webview/test_webview_range_outcomes.ahk`
+- `windows/ui/layer_editor/init.ahk`: 144, 151, 581, 586, 666, 669, 695 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/layout_manager/init.ahk`: 385, 990 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/model_browser/init.ahk`: 426, 502, 548, 562, 1076, 1266, 1505, 1571, 1679 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/onboarding/gesture_registration.ahk`: 157 — candidate suite: none yet, add one beside the file
+- `windows/ui/onboarding/webview.ahk`: 303, 530, 540, 636, 674, 686, 701 — candidate suite: `tests/unit/ui/webview/test_webview_range_mount.ahk`, `tests/unit/ui/webview/test_webview_range_outcomes.ahk`
+- `windows/ui/paths_editor/init.ahk`: 240, 290, 296, 320, 329, 378 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/personal_info_editor/init.ahk`: 238 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/personal_toml_editor_webview.ahk`: 280, 422, 443, 467, 506 — candidate suite: none yet, add one beside the file
+- `windows/ui/physical_shortcuts/host.ahk`: 485 — candidate suite: `tests/unit/ui/webview/test_ui_warm_hosts.ahk`
+- `windows/ui/prompt_editor/init.ahk`: 474, 547, 608 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
 
 ### B configuration writer or install (43 sites in 14 files)
 
-- `windows/infra/config_io.ahk`: 2337
-- `windows/infra/hotstrings/hotstrings_scope.ahk`: 231
-- `windows/infra/hotstrings/personal_toml_io.ahk`: 268, 1486, 1529, 1719, 2018, 2254
-- `windows/infra/key_combinations.ahk`: 1258, 1271, 1292, 1330
-- `windows/infra/magic_editor.ahk`: 232, 396
-- `windows/infra/menu_startup_commands.ahk`: 222, 230
-- `windows/infra/wrap_symbols_config.ahk`: 448, 555, 814
-- `windows/modules/gestures/config.ahk`: 777, 785, 795, 804, 815, 823, 1073, 1238
-- `windows/modules/keymap/pause_layout_switch.ahk`: 184
-- `windows/modules/keymap/system_layout_install.ahk`: 198
-- `windows/modules/keystats/keystats_apps_editor.ahk`: 24, 131
-- `windows/modules/llm/local_model_offer.ahk`: 50
-- `windows/modules/llm/ollama_install_files_port.ahk`: 74, 295, 299
-- `windows/modules/llm/ollama_managed_bootstrap.ahk`: 476, 843, 892, 1230, 1242, 1252, 1255, 1269
+- `windows/infra/config_io.ahk`: 2337 — candidate suite: `tests/unit/ui/webview/test_model_browser_close_pause_owner.ahk`, `tests/unit/infra/config/persistence/test_feature_state_boot.ahk`
+- `windows/infra/hotstrings/hotstrings_scope.ahk`: 231 — candidate suite: `tests/unit/suite/test_runner_shard.ahk`, `tests/unit/infra/config/scope/test_hotstrings_scope.ahk`
+- `windows/infra/hotstrings/personal_toml_io.ahk`: 268, 1486, 1529, 1719, 2018, 2254 — candidate suite: `tests/unit/modules/hotstrings/personal/test_personal_toml_io.ahk`, `tests/unit/modules/hotstrings/engine/test_marker_substituted_in_replacement.ahk`
+- `windows/infra/key_combinations.ahk`: 1258, 1271, 1292, 1330 — candidate suite: `tests/unit/modules/shortcuts/test_shortcuts.ahk`
+- `windows/infra/magic_editor.ahk`: 232, 396 — candidate suite: `tests/unit/modules/keymap/test_layout_rows_policy.ahk`, `tests/unit/modules/hotstrings/magic_key/test_magic_editor.ahk`
+- `windows/infra/menu_startup_commands.ahk`: 222, 230 — candidate suite: `tests/unit/ui/menu/test_menu_startup_commands.ahk`
+- `windows/infra/wrap_symbols_config.ahk`: 448, 555, 814 — candidate suite: none yet, add one beside the file
+- `windows/modules/gestures/config.ahk`: 777, 785, 795, 804, 815, 823, 1073, 1238 — candidate suite: `tests/unit/ui/wpm/test_wpm_config_types.ahk`, `tests/unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk`
+- `windows/modules/keymap/pause_layout_switch.ahk`: 184 — candidate suite: `tests/unit/modules/keymap/test_pause_layout_switch.ahk`
+- `windows/modules/keymap/system_layout_install.ahk`: 198 — candidate suite: `tests/unit/modules/keymap/test_system_layout_install.ahk`
+- `windows/modules/keystats/keystats_apps_editor.ahk`: 24, 131 — candidate suite: none yet, add one beside the file
+- `windows/modules/llm/local_model_offer.ahk`: 50 — candidate suite: none yet, add one beside the file
+- `windows/modules/llm/ollama_install_files_port.ahk`: 74, 295, 299 — candidate suite: `tests/unit/modules/llm/servers/test_ollama_install_files_port.ahk`
+- `windows/modules/llm/ollama_managed_bootstrap.ahk`: 476, 843, 892, 1230, 1242, 1252, 1255, 1269 — candidate suite: `tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk`
 
 ### C menu row, tray greying or rebuild (118 sites in 20 files)
 
-- `windows/infra/lifecycle.ahk`: 57, 117, 192, 205, 258, 261, 263, 264, 265, 272, 403, 436, 442, 448, 476, 837, 863, 864, 885, 1266, 1718, 1743, 1756
-- `windows/infra/menu_population.ahk`: 286, 306, 402
-- `windows/ui/menu/menu_engine.ahk`: 481
-- `windows/ui/menu/menu_hotstring_order.ahk`: 126, 150, 167, 168, 177
-- `windows/ui/menu/menu_hotstrings.ahk`: 460, 466, 480, 614, 647, 952, 1576, 1621, 1629, 1639, 1656
-- `windows/ui/menu/menu_init.ahk`: 488
-- `windows/ui/menu/menu_layout.ahk`: 246
-- `windows/ui/menu/menu_llm/actions.ahk`: 387, 451, 623, 644, 725
-- `windows/ui/menu/menu_llm/aux_ownership.ahk`: 26, 77, 103, 224
-- `windows/ui/menu/menu_llm/backend_lifecycle.ahk`: 194, 227, 249, 293
-- `windows/ui/menu/menu_llm/enable_admission.ahk`: 22
-- `windows/ui/menu/menu_llm/init.ahk`: 168, 176, 235, 252
-- `windows/ui/menu/menu_llm/local_server_panel.ahk`: 102, 257, 273, 412, 433, 503, 552, 606, 631, 648, 722, 743, 806, 831, 868, 890
-- `windows/ui/menu/menu_llm/menu_api_entries.ahk`: 469, 547, 1057, 1569, 1599, 2051, 2340
-- `windows/ui/menu/menu_llm/menu_main.ahk`: 37, 93, 147, 258, 259, 620, 621
-- `windows/ui/menu/menu_llm/menu_models.ahk`: 235, 270, 273
-- `windows/ui/menu/menu_llm/menu_profiles.ahk`: 158, 896, 910, 974, 988, 1003, 1012
-- `windows/ui/menu/menu_llm/menu_settings.ahk`: 121, 129, 428, 474, 528, 555, 986, 1023, 1067, 1145, 1202
-- `windows/ui/menu/menu_rebuild.ahk`: 149, 260, 403
-- `windows/ui/tray_menu.ahk`: 27
+- `windows/infra/lifecycle.ahk`: 57, 117, 192, 205, 258, 261, 263, 264, 265, 272, 403, 436, 442, 448, 476, 837, 863, 864, 885, 1266, 1718, 1743, 1756 — candidate suite: `tests/unit/modules/shortcuts/test_shortcuts.ahk`, `tests/unit/ui/menu/test_menu_startup_commands.ahk`
+- `windows/infra/menu_population.ahk`: 286, 306, 402 — candidate suite: `tests/unit/ui/menu/test_menu_population.ahk`
+- `windows/ui/menu/menu_engine.ahk`: 481 — candidate suite: `tests/unit/modules/keymap/test_layout_supersession.ahk`, `tests/unit/infra/config/persistence/test_master_gates.ahk`
+- `windows/ui/menu/menu_hotstring_order.ahk`: 126, 150, 167, 168, 177 — candidate suite: none yet, add one beside the file
+- `windows/ui/menu/menu_hotstrings.ahk`: 460, 466, 480, 614, 647, 952, 1576, 1621, 1629, 1639, 1656 — candidate suite: `tests/unit/modules/hotstrings/catalogue/test_hotstring_delimiter_global_transaction.ahk`
+- `windows/ui/menu/menu_init.ahk`: 488 — candidate suite: none yet, add one beside the file
+- `windows/ui/menu/menu_layout.ahk`: 246 — candidate suite: none yet, add one beside the file
+- `windows/ui/menu/menu_llm/actions.ahk`: 387, 451, 623, 644, 725 — candidate suite: `tests/unit/infra/lifecycle/test_quit_admission.ahk`, `tests/unit/modules/gestures/test_system_actions.ahk`
+- `windows/ui/menu/menu_llm/aux_ownership.ahk`: 26, 77, 103, 224 — candidate suite: none yet, add one beside the file
+- `windows/ui/menu/menu_llm/backend_lifecycle.ahk`: 194, 227, 249, 293 — candidate suite: `tests/unit/modules/llm/api/test_llm_backend_lifecycle_dispatch.ahk`
+- `windows/ui/menu/menu_llm/enable_admission.ahk`: 22 — candidate suite: `tests/unit/modules/llm/api/test_llm_enable_admission.ahk`
+- `windows/ui/menu/menu_llm/init.ahk`: 168, 176, 235, 252 — candidate suite: `tests/unit/ui/windows/test_native_picker_retirement.ahk`
+- `windows/ui/menu/menu_llm/local_server_panel.ahk`: 102, 257, 273, 412, 433, 503, 552, 606, 631, 648, 722, 743, 806, 831, 868, 890 — candidate suite: `tests/unit/modules/llm/servers/test_local_server_panel.ahk`, `tests/unit/modules/llm/servers/test_local_server_panel_discovery.ahk`
+- `windows/ui/menu/menu_llm/menu_api_entries.ahk`: 469, 547, 1057, 1569, 1599, 2051, 2340 — candidate suite: none yet, add one beside the file
+- `windows/ui/menu/menu_llm/menu_main.ahk`: 37, 93, 147, 258, 259, 620, 621 — candidate suite: `tests/unit/modules/llm/menu/test_llm_menu_build_submenu.ahk`
+- `windows/ui/menu/menu_llm/menu_models.ahk`: 235, 270, 273 — candidate suite: `tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk`, `tests/unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk`
+- `windows/ui/menu/menu_llm/menu_profiles.ahk`: 158, 896, 910, 974, 988, 1003, 1012 — candidate suite: `tests/unit/modules/llm/menu/test_llm_menu_profiles.ahk`, `tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk`
+- `windows/ui/menu/menu_llm/menu_settings.ahk`: 121, 129, 428, 474, 528, 555, 986, 1023, 1067, 1145, 1202 — candidate suite: `tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk`, `tests/unit/modules/llm/menu/test_llm_menu_prediction_count.ahk`
+- `windows/ui/menu/menu_rebuild.ahk`: 149, 260, 403 — candidate suite: `tests/unit/modules/llm/menu/test_llm_menu_build_submenu.ahk`
+- `windows/ui/tray_menu.ahk`: 27 — candidate suite: `tests/unit/infra/config/scope/test_hotstring_dynamic_menu_scope.ahk`
 
 ### D own rules (updates, diagnostics) (44 sites in 10 files)
 
