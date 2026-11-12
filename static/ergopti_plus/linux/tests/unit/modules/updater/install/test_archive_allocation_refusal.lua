@@ -12,7 +12,8 @@ local function fixture(mode)
   clock = function() return h.now end,
   current = function() return h.active end,
   defaults = { archive_transfer = { schema_version = 1,
-   phase_timeout_ms = { checksum = 15000, archive = 300000, hash = 15000 } } },
+   phase_timeout_ms = { checksum = 15000, archive = 300000, hash = 15000 },
+   archive_idle_timeout_ms = 60000 } },
   headers = {}, owner = "updater", parse_checksum = function() error("no checksum dispatch admitted") end,
   http = {
    get_owned = function() h.requests = h.requests + 1; error("no allocation means no HTTP") end,

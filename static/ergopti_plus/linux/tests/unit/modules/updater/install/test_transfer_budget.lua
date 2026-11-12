@@ -18,6 +18,20 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 test("total is derived from all captured caps", function()
 	assert(Budget.deadline(Budget.capture(policy(), 100)) == 330100)
 end)
+test("(release-archive-budget) the archive limits come from the shared declaration", function()
+	local p = policy()
+	assert(Budget.archive_limits(p) == nil, "no idle bound declared")
+	p.archive_transfer.archive_idle_timeout_ms = 60000
+	local limits = assert(Budget.archive_limits(p))
+	assert(limits.absolute_ms == 300000 and limits.idle_ms == 60000)
+	p.archive_transfer.archive_idle_timeout_ms = 400000
+	assert(Budget.archive_limits(p) == nil, "an idle bound past the absolute cap is refused")
+	local file = assert(io.open(require("infra.paths").shared("modules/updater/defaults.json"), "rb"))
+	local shared = require("json").decode(file:read("*a")); file:close()
+	local declared = assert(Budget.archive_limits(shared), "the shipped defaults declare both bounds")
+	-- Decided by the maintainer on 2026-11-12, aligned on Windows' WinHTTP bounds.
+	assert(declared.absolute_ms == 1200000 and declared.idle_ms == 600000)
+end)
 test("noncanonical caps derive their own total", function()
 	local p = policy()
 	p.archive_transfer.phase_timeout_ms = { checksum = 2, archive = 3, hash = 4 }
@@ -137,7 +151,7 @@ end)
 -- Registration preserves every original case body and its literal expectation.
 local helpers = require("tests.helpers")
 helpers.describe("Captured Archive Phase Budget", function()
-	assert(#tests == 22, "Independent Captured Archive Phase Budget case floor changed")
+	assert(#tests == 23, "Independent Captured Archive Phase Budget case floor changed")
 	for _, case in ipairs(tests) do
 		assert(type(case[1]) == "string" and type(case[2]) == "function",
 			"Independent case registration refused")

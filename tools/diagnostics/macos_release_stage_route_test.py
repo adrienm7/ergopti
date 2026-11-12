@@ -282,9 +282,9 @@ elif name=='plutil':
     print('true' if v is True else 'false' if v is False else v)
 elif name=='ErgoptiPlus':
     raw=sys.stdin.buffer.read()
-    expected={'version':1,'url':c['url'],'sha256':c['digest'],'output':c['archive'],'timeout_ms':900000}
+    expected={'version':1,'url':c['url'],'sha256':c['digest'],'output':c['archive'],'timeout_ms':1200000,'idle_timeout_ms':600000}
     record('native', argv=a, stdin_hex=raw.hex(), stdin_eof=True, pid=os.getpid())
-    if a!=['--managed-bootstrap-download','900000'] or json.loads(raw)!=expected: sys.exit(91)
+    if a!=['--managed-bootstrap-download','1200000'] or json.loads(raw)!=expected: sys.exit(91)
     if c.get('deliver',True): Path(c['archive']).write_bytes(b'abc')
     if c.get('replace_launcher'):
         p=Path(sys.argv[0]); replacement=p.with_name('replacement')
@@ -385,6 +385,8 @@ def main():
                 "no_proxy",
                 "NO_PROXY",
                 "ERGOPTI_RELEASE_STAGE_REQUEST",
+                "ERGOPTI_RELEASE_STAGE_TIMEOUT_MS",
+                "ERGOPTI_RELEASE_STAGE_IDLE_MS",
                 "ERGOPTI_LAUNCHER_EXECUTABLE",
                 "ERGOPTI_LAUNCHER_DEVICE",
                 "ERGOPTI_LAUNCHER_INODE",
@@ -398,6 +400,9 @@ def main():
                 ERGOPTI_LAUNCHER_INODE=str(st.st_ino),
                 no_proxy="literal.bypass.invalid",
                 NO_PROXY="upper.bypass.invalid",
+                # The shared archive bounds (updater defaults archive_transfer).
+                ERGOPTI_RELEASE_STAGE_TIMEOUT_MS="1200000",
+                ERGOPTI_RELEASE_STAGE_IDLE_MS="600000",
             )
             env.update(case.get("proxies", {}))
             req = {
@@ -405,12 +410,13 @@ def main():
                 "url": URL,
                 "sha256": c["digest"],
                 "output": str(archive),
-                "timeout_ms": 900000,
+                "timeout_ms": 1200000,
+                "idle_timeout_ms": 600000,
             }
             if case.get("wrong_output"):
                 req["output"] = str(root / "foreign")
             if case.get("wrong_budget"):
-                req["timeout_ms"] = 900001
+                req["timeout_ms"] = 1200001
             if not case.get("manual"):
                 env["ERGOPTI_RELEASE_STAGE_REQUEST"] = json.dumps(req, separators=(",", ":"))
             if case.get("wrong_identity"):
@@ -470,7 +476,11 @@ def main():
                     "--proto-redir",
                     "=https",
                     "--max-time",
-                    "900",
+                    "1200",
+                    "--speed-limit",
+                    "1",
+                    "--speed-time",
+                    "600",
                     "--output",
                     str(archive),
                     URL,
@@ -483,7 +493,7 @@ def main():
             if native:
                 if (
                     len(native) != 1
-                    or native[0]["argv"] != ["--managed-bootstrap-download", "900000"]
+                    or native[0]["argv"] != ["--managed-bootstrap-download", "1200000"]
                     or native[0]["stdin_eof"] is not True
                 ):
                     errors.append("owned-native-invocation")

@@ -193,6 +193,20 @@ helpers.describe("native-private managed HTTP bridge", function()
 		helpers.assert_true(state.config:find("mutated", 1, true) == nil)
 	end)
 
+	helpers.it("(release-archive-budget) a receive idle bound stops a transfer that receives nothing", function()
+		local client, state = fresh_client()
+		local operation = client.dispatch_owned("https://example.invalid/archive", {}, nil, {
+			owner = "idle", method = "GET", buffered = true, timeout_ms = 500, receive_idle_timeout_ms = 600000,
+		}, nil, function() end)
+		helpers.assert_true(operation.started)
+		local argv = table.concat(state.options.args, " ")
+		helpers.assert_contains(argv, "--speed-limit 1 --speed-time 600")
+		local refused = fresh_client().dispatch_owned("https://example.invalid/", {}, nil, {
+			owner = "idle-bad", method = "GET", buffered = true, timeout_ms = 500, receive_idle_timeout_ms = 10,
+		}, nil, function() end)
+		helpers.assert_true(not refused or refused.started ~= true, "a sub-second idle bound is refused")
+	end)
+
 	helpers.it("(net-002-proxy-negotiate) a credential-free proxy is answered with the session's ticket", function()
 		for _, case in ipairs({
 			{ proxy = "http://proxy.corp.invalid:3128", negotiate = true, expected = true },
