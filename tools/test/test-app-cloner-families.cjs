@@ -89,6 +89,37 @@ scenario('(app-cloner-macos-vscode-names) clone_app.sh VS Code names are catalog
 	assert.ok(cloneApp.includes('--user-data-dir'), 'the macOS clone no longer isolates its profile');
 });
 
+scenario(
+	'(bap-002-macos-browser-profile) clone_app.sh gives catalogue browsers their own profile',
+	() => {
+		const match = cloneApp.match(
+			/case "\$\{SRC_EXE_NAME:l\}" in\n\s*([^)]+)\)\n\s*APP_FAMILY=chromium ;;\n\s*([^)]+)\)\n\s*APP_FAMILY=firefox ;;/
+		);
+		assert.ok(match, 'the browser executable case of clone_app.sh moved');
+		for (const [family, list] of [
+			['chromium', match[1]],
+			['firefox', match[2]]
+		]) {
+			for (const name of list.split('|').map((n) => n.replace(/"/g, '').trim())) {
+				assert.ok(
+					catalogue.families[family].executables.includes(name),
+					`${name} is a ${family} name`
+				);
+			}
+		}
+		assert.match(
+			cloneApp,
+			/electron\|chromium\)\n\s*ARGS=\(--user-data-dir "\$USER_DATA_DIR"\) ;;/
+		);
+		assert.match(cloneApp, /firefox\)\n\s*ARGS=\(--no-remote --profile "\$USER_DATA_DIR"\) ;;/);
+		assert.match(cloneApp, /chromium\) ARGS\+=\("--app=\$OPEN_ARG"\); OPEN_ARG="" ;;/);
+		assert.ok(
+			catalogue.families.chromium.web_app.startsWith('--app='),
+			'the web-app argument is --app'
+		);
+	}
+);
+
 if (failed > 0) {
 	console.error(`${failed} App Cloner family check(s) failed.`);
 	process.exit(1);
