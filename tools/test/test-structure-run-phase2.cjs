@@ -81,6 +81,24 @@ function run() {
 		['codegen', 'codegen (after staging)']
 	);
 	assert.equal(settle([0]).receipt.actions.length, 1, 'a clean run is not repeated');
+	// Every leaf generator runs too: npm run codegen alone left the layer editor
+	// and unicode case outputs to regenerate later with old paths. A generator
+	// the host already refuses is reported; one the step broke stops it.
+	const genOutput = '  \x1b[31mFAILED\x1b[0m  codegen/a.cjs\n  ok  codegen/b.cjs\n';
+	assert.deepEqual(Runner.failedGenerators(genOutput), ['codegen/a.cjs']);
+	const gen =
+		(output, status = 1) =>
+		() => ({ status, tail: '', output });
+	Runner.runGenerators('S', { actions: [] }, ['codegen/a.cjs'], { gen: gen(genOutput) });
+	assert.throws(
+		() => Runner.runGenerators('S', { actions: [] }, [], { gen: gen(genOutput) }),
+		/S: the step broke generator\(s\) codegen\/a\.cjs/
+	);
+	assert.throws(
+		() => Runner.runGenerators('S', { actions: [] }, [], { gen: gen('crashed') }),
+		/S: npm run gen failed/
+	);
+	assert.ok(source.indexOf('runGenerators(key') < source.indexOf('settleCodegen(key'));
 	console.log(
 		'[OK] the phase 2 runner refuses without its go and owns the follow-ups of each step.'
 	);
