@@ -338,14 +338,14 @@ helpers.describe("Linux shared AI outer parents with published available compone
 			end)
 		end)
 
-		helpers.it("preserves the native paused " .. kind .. " parent without an executable child", function()
+		-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+		helpers.it("keeps the native paused " .. kind .. " parent reachable (edd1-paused-writes)", function()
 			with_world(function(ctx)
 				ctx.paused = true
 				local row = parent(ctx, kind)
 				helpers.assert_type(row, "table", "the paused feature remains visible")
-				helpers.assert_eq(row.disabled, true)
-				helpers.assert_nil(row.menu, "the original pause owner removes every executable child")
-				helpers.assert_nil(row.fn, "the original parent still has no click action")
+				helpers.assert_true(row.disabled ~= true, "a pause no longer greys the parent")
+				helpers.assert_nil(row.fn, "the parent still has no click action")
 			end)
 		end)
 

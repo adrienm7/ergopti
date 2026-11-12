@@ -388,16 +388,16 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 			end
 		end)
 	end)
-	helpers.it("keeps the existing paused parent effect-free", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("keeps the paused parent reachable and effect-free (edd1-paused-writes)", function()
 		with_numeric_menu({ paused = true }, function(f)
 			local parent
 			for _, row in ipairs(f.rows) do
 				if row.title:find(f.strings["menu.llm.title"], 1, true) == 1 then parent = row end
 			end
 			helpers.assert_not_nil(parent)
-			helpers.assert_true(parent.disabled == true)
-			helpers.assert_nil(parent.menu)
-			helpers.assert_nil(parent.fn)
+			helpers.assert_true(parent.disabled ~= true)
+			helpers.assert_true(type(parent.menu) == "table", "a paused tray keeps the AI submenu")
 			helpers.assert_eq(#f.log.prompts, 0)
 			helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)
 		end)
