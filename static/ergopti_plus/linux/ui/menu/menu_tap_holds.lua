@@ -408,8 +408,8 @@ local function _build_tap_holds(ctx)
 	-- shared scope transaction at once: both files backed up, the engine
 	-- acknowledging the candidate before it is published.
 	local function apply_scope(mode)
-		if ctx.paused == true then return false end
-		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
+		-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+		local committed = require("infra.tap_hold_scope").apply(mode)
 		changed(committed)
 		return committed
 	end
