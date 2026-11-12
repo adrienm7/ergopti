@@ -170,3 +170,51 @@ helpers.describe("layout manager bridge: the layout editor's navigation layer", 
 		helpers.assert_true(#logs >= 1, "the refusal is logged")
 	end)
 end)
+
+--- A bridge whose host records layout changes.
+--- @return table instance, table changed
+local function host_bridge()
+	local changed = {}
+	local snapshot = { platform = "macos", index = INDEX, source = "network", installed = { ergol = { id = "ergol" } }, active = "" }
+	local instance = ManagerBridge.new({
+		registry = {
+			snapshot = function() return snapshot end,
+			refresh = function(on_done) on_done({}) end,
+			install = function(_, on_done) on_done(true, {}) end,
+			uninstall = function(_, on_done) on_done(true, {}) end,
+			select = function(_, on_done) on_done(true, {}) end,
+			composer_save = function(_, on_done) on_done(true) end,
+			composer_remove = function(on_done) on_done(true) end,
+		},
+		push = function() return true end,
+		strings = function() return {} end,
+		open_url = function() end,
+		close = function() end,
+		log = function() end,
+		layout_changed = function(id) changed[#changed + 1] = id end,
+	})
+	return instance, changed
+end
+
+helpers.describe("layout manager bridge: the emulation follows a changed layout", function()
+	helpers.it("(lmh-001-002-emulation-reload) tells the host of every install, update, uninstall and composition", function()
+		local instance, changed = host_bridge()
+		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
+		helpers.assert_true(instance.on_message({ action = "update", id = "ergol" }))
+		helpers.assert_true(instance.on_message({ action = "uninstall", id = "ergol" }))
+		helpers.assert_true(instance.on_message({ action = "select", id = "ergol" }))
+		helpers.assert_true(instance.on_message({ action = "composer_remove" }))
+		helpers.assert_true(instance.on_message({ action = "composer_save", source = "src", keylayout = "kl" }))
+		helpers.assert_eq(changed, { "ergol", "ergol", "ergol", "composed", "composed" },
+			"a select changes no layout; every other success reaches the emulation")
+	end)
+
+	helpers.it("(lmh-001-002-emulation-reload) the macOS host reloads the emulated layout and the menu", function()
+		local menu = assert(helpers.read_module_source("ui.menu"))
+		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
+		helpers.assert_contains(menu, "if Emulation.status().id ~= id then return end")
+		local host = assert(helpers.read_module_source("ui.layout_manager"))
+		helpers.assert_contains(host, "if _layout_change_handler then _layout_change_handler(id) end")
+	end)
+end)
+

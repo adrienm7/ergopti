@@ -1257,6 +1257,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
       `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
       which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
+- [ ] **Keep the emulated layout on uninstall or remove (maintainer decision, 2026-11-12).** `_LayMgrWeb_After`
+      (`ui/layout_manager/init.ahk`) writes `[layout] emulated_layout = ""` when the emulated layout is uninstalled, and
+      `_LayoutComposer_Remove` (`composer.ahk`) does the same for « composed ». Keep the stored choice instead, as macOS and
+      Linux now do: the menu row stays named, ticked and greyed (« — non appliqué »), the emulation stops and reloads, and
+      resumes by itself when the layout is installed again. Then update the AHK tests that expect the cleared selection.
 - [x] **Layout editor host on Windows (maintainer request, 2026-11-11).** One pass, as planned in
       [layout-editor.md « Windows host »](docs/design/layout-editor.md#windows-host): `init.ahk` accepts `source_open`,
       `source_save`, `nav_save`, `composer_emulate` and sends `source_editor`, `emulate`, `nav_apply`; a new
