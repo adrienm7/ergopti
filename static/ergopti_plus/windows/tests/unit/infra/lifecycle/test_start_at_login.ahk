@@ -49,6 +49,29 @@ _TestStartupApprovalState() {
 }
 Test("Startup: OS approval remains authoritative (login-startup)", _TestStartupApprovalState)
 
+; SAW-001: when Startup Apps keeps the new shortcut disabled, the toggle opens
+; ms-settings:startupapps and asks for the approval (informational, as macOS);
+; every other refusal keeps the failure dialog.
+_TestStartupApprovalNotice() {
+	Notices := []
+	Notice := (Text, Title, Options) => Notices.Push([Text, Title, Options])
+	_StartAtLoginReportFailure(StartupApprovalPending("Windows Startup Apps requires user approval"), Notice)
+	_StartAtLoginReportFailure(Error("Startup shortcut creation was not confirmed"), Notice)
+	AssertEqual(2, Notices.Length, "one dialog per refusal")
+	AssertEqual(t("dialog.start_at_login.approval"), Notices[1][1], "a pending approval asks for it")
+	AssertEqual("Iconi", Notices[1][3], "the approval dialog is informational")
+	AssertEqual(t("dialog.start_at_login.failed"), Notices[2][1], "another refusal is the failure")
+	AssertEqual("Icon!", Notices[2][3], "the failure dialog warns")
+	Toggle := _DriverFuncBody("StartAtLoginToggle")
+	Assert(Toggle != "", "StartAtLoginToggle must exist")
+	Assert(RegExMatch(Toggle, 'Run\("ms-settings:startupapps"\)\s*throw StartupApprovalPending\(') > 0,
+		"the Startup Apps branch raises the pending approval right after opening the page")
+	Assert(InStr(Toggle, "_StartAtLoginReportFailure(Err, NoticeFn)") > 0,
+		"the toggle tells its refusal through the shared report")
+}
+Test("Startup: a pending Startup Apps approval asks for it instead of failing (SAW-001)",
+	_TestStartupApprovalNotice)
+
 ; ==============================================================================
 ; Source command ownership: only private shortcuts and inert fixture files.
 ; The interpreter is shared, so script arguments and working directory must be

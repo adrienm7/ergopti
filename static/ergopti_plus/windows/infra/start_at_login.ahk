@@ -352,7 +352,7 @@ StartAtLoginToggle(RebuildFn := RebuildTrayMenu, NoticeFn := Ui_MsgBox) {
 				throw Error("Startup shortcut creation was not confirmed")
 			if !StartupFolderEnabled(Startup.Folder, Command, Startup.Approval) {
 				Run("ms-settings:startupapps")
-				throw Error("Windows Startup Apps requires user approval")
+				throw StartupApprovalPending("Windows Startup Apps requires user approval")
 			}
 		}
 		if !SetStartupFolder(!Enabled, Startup.Folder, Command)
@@ -362,8 +362,26 @@ StartAtLoginToggle(RebuildFn := RebuildTrayMenu, NoticeFn := Ui_MsgBox) {
 		RebuildFn.Call()
 		return true
 	} catch as Err {
-		LoggerError("Startup", "Startup setting could not be changed: {1}.", Err.Message)
-		NoticeFn.Call(t("dialog.start_at_login.failed"), t("menu.global.start_at_login"), "Icon!")
+		_StartAtLoginReportFailure(Err, NoticeFn)
 		return false
 	}
+}
+
+; Startup Apps keeps the new shortcut disabled until the user allows it in the
+; settings page the toggle just opened: that is a step for the user, not a failure.
+class StartupApprovalPending extends Error {
+}
+
+; Tells why the toggle did not confirm the state: the approval to give in the
+; opened Startup Apps page (informational, as macOS), else the failure (SAW-001).
+; @param Err {Error} What stopped the toggle.
+; @param NoticeFn {Object} Dialog, fn(Text, Title, Options).
+_StartAtLoginReportFailure(Err, NoticeFn) {
+	if Err is StartupApprovalPending {
+		LoggerInfo("Startup", "Startup waits for the user's approval in Startup Apps.")
+		NoticeFn.Call(t("dialog.start_at_login.approval"), t("menu.global.start_at_login"), "Iconi")
+		return
+	}
+	LoggerError("Startup", "Startup setting could not be changed: {1}.", Err.Message)
+	NoticeFn.Call(t("dialog.start_at_login.failed"), t("menu.global.start_at_login"), "Icon!")
 }
