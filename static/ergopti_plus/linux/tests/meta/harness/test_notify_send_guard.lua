@@ -99,4 +99,52 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 		helpers.assert_eq(Guard.report(function() error("an empty record reports nothing", 0) end, record), false,
 			"a run whose notices all went through a seam passes")
 	end)
+
+	-- A fixture double that outlives its case (tests/support/document_fixture.lua)
+	-- keeps the notifier until the fixture restores the recorder it saved; the
+	-- value outside the cases must never become that double.
+	local fixture_double = { send = function() return true end }
+	local saved_recorder, restored = nil, false
+	local before_fixture = package.loaded["adapters.notifier"]
+	helpers.it("keeps a fixture's notifier double installed across cases", function()
+		saved_recorder = package.loaded["adapters.notifier"]
+		package.loaded["adapters.notifier"] = fixture_double
+	end)
+	helpers.it("lets the fixture restore the recorder it saved", function()
+		if saved_recorder == nil then return end
+		helpers.assert_true(package.loaded["adapters.notifier"] == fixture_double, "the fixture still owns the notifier")
+		package.loaded["adapters.notifier"] = saved_recorder
+		restored = true
+	end)
+	local outside = package.loaded["adapters.notifier"]
+	-- A filtered run that skipped the fixture's restore still ends clean.
+	if outside == fixture_double then package.loaded["adapters.notifier"] = before_fixture end
+	helpers.it("puts back the notifier found outside the cases after the fixture restores", function()
+		if not restored then return end
+		helpers.assert_true(outside ~= fixture_double, "the fixture's double did not leak out of its cases")
+		helpers.assert_true(outside ~= NoticeRecorder.notifier(), "the recorder is installed only inside a case")
+	end)
+
+	helpers.it("leaves native modules loaded when a child builds the recorder", function()
+		if type(jit) ~= "table" then return end
+		local quote = require("text_utils").shell_quote
+		-- The recorder is built before luv is loaded, as in a fixture child that
+		-- requires tests.helpers first; reopening luv crashed such a child.
+		local child = [[
+package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+require("tests.helpers")
+-- A second luv instance crashed once the collector closed the first one's loop.
+collectgarbage("collect")
+local uv = require("luv")
+local fired = false
+local timer = uv.new_timer()
+timer:start(1, 0, function() fired = true; timer:close() end)
+uv.run()
+collectgarbage("collect")
+assert(fired, "the child's event loop ran")
+assert(package.loaded.luv == uv, "luv stays loaded once")
+]]
+		local status = os.execute("cd " .. quote(helpers.driver_root()) .. " && luajit -e " .. quote(child) .. " >/dev/null 2>&1")
+		helpers.assert_true(status == true or status == 0, "a child that builds the recorder keeps a working luv")
+	end)
 end)
