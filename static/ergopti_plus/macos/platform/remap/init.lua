@@ -7495,7 +7495,12 @@ function M.teardown_local()
 	if settle_bulk_settings_before_lifecycle("Karabiner local teardown", "local-teardown") ~= true then
 		return false
 	end
-	local status_ok, phase = xpcall(LeaseController.status, debug.traceback)
+	-- A quit before the lease controller started (first-run wizard, no
+	-- Karabiner) has no lease to fence; asking its status would log an error.
+	local status_ok, phase = true, "uninitialized"
+	if LeaseController.is_initialized() then
+		status_ok, phase = xpcall(LeaseController.status, debug.traceback)
+	end
 	if not status_ok then
 		Logger.error(LOG, "Cannot verify the exact lease before local teardown: %s.", tostring(phase))
 		return false
