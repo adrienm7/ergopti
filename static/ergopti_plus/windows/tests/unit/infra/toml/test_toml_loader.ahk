@@ -721,6 +721,59 @@ TestTL_EntryPatternPriorityOptional() {
 Test("HotstringEntryPattern: priority key stays optional",
 	TestTL_EntryPatternPriorityOptional)
 
+; HSE-002 (maintainer decision, 2026-11-12): an inline-table entry in another key
+; order, or carrying only `output`, loads as the Lua reader loads it (each missing
+; flag false). The fixed-order pattern dropped both at boot.
+TestTL_EntryPatternAnyKeyOrder() {
+	global _HOTSTRING_ENTRY_PATTERN
+	Line := '"qq" = { final_result = true, is_case_sensitive = true, output = "x", auto_expand = true, is_word = false, priority = 70 }'
+	AssertTrue(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &M) > 0,
+		"an entry whose keys come in another order must match the boot pattern")
+	AssertEqual("qq", M[1], "the trigger stays group 1")
+	AssertEqual("x", M[2], "the output stays group 2")
+	AssertEqual("false", M[3], "is_word is read wherever it sits")
+	AssertEqual("true", M[4], "auto_expand is read wherever it sits")
+	AssertEqual("true", M[5], "is_case_sensitive is read wherever it sits")
+	AssertEqual("true", M[6], "final_result is read wherever it sits")
+	AssertEqual("", M[7], "the absent strict flag stays empty")
+	AssertEqual("70", M[8], "priority is read wherever it sits")
+}
+Test("HotstringEntryPattern: accepts any key order (hse-002-short-entry-forms)",
+	TestTL_EntryPatternAnyKeyOrder)
+
+TestTL_EntryPatternOutputOnly() {
+	global _HOTSTRING_ENTRY_PATTERN, HS_PREFIX_ENTRY_PATTERN
+	Line := 'par = { output = "pour" }'
+	AssertTrue(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &M) > 0,
+		"a bare-key entry carrying only output must match the boot pattern")
+	AssertEqual("par", M[1], "the bare trigger is captured")
+	AssertEqual("pour", M[2], "the output is captured")
+	loop 6
+		AssertEqual("", M[A_Index + 2], "every absent flag reads as unset, so false")
+	AssertTrue(RegExMatch(Line, HS_PREFIX_ENTRY_PATTERN, &P) > 0,
+		"the preview index accepts the same entry the engine loads")
+	AssertEqual("pour", P[2], "the preview index reads the same output")
+}
+Test("HotstringEntryPattern: accepts an entry with only output (hse-002-short-entry-forms)",
+	TestTL_EntryPatternOutputOnly)
+
+TestTL_EntryPatternFlagsOutsideOutputOnly() {
+	global _HOTSTRING_ENTRY_PATTERN
+	Line := '"zz" = { output = "is_word = true, priority = 9 }", auto_expand = true }'
+	AssertTrue(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &M) > 0,
+		"an output spelling a key must still match")
+	AssertEqual("is_word = true, priority = 9 }", M[2], "the whole output is captured")
+	AssertEqual("", M[3], "a key spelled inside the output is not a flag")
+	AssertEqual("true", M[4], "the real flag after the output is read")
+	AssertEqual("", M[8], "a priority spelled inside the output is not a priority")
+	AssertFalse(RegExMatch('"zz" = { output = "x", bogus = true }', _HOTSTRING_ENTRY_PATTERN) > 0,
+		"an unknown member still refuses the entry")
+	AssertFalse(RegExMatch('"zz" = { is_word = true }', _HOTSTRING_ENTRY_PATTERN) > 0,
+		"an entry without output is still refused")
+}
+Test("HotstringEntryPattern: reads flags only from table members (hse-002-short-entry-forms)",
+	TestTL_EntryPatternFlagsOutsideOutputOnly)
+
 ; ParseTomlGroupConfig must read a file-level [_meta] priority and a per-section
 ; [_meta.sections.<sec>] priority into the Config struct — these are the
 ; package-shipped defaults the resolve cascade reads beneath the user override.
