@@ -277,6 +277,20 @@ function run() {
 			lone.some((r) => Plan.REFUSED_KINDS.has(r.kind)),
 			'a lone root-successor folder in live code refuses the step'
 		);
+		// A base built from a parameter that defaults to a known constant.
+		const fromParam = (folder, ...pieces) =>
+			[
+				"const ROOT = path.resolve(__dirname, '..', '..');",
+				'function main(root = ROOT) {',
+				`\tconst d = path.join(root, 'static/ergopti_plus/_shared${folder}');`,
+				`\treturn path.join(d, ${pieces.map((x) => `'${x}'`).join(', ')});`,
+				'}'
+			].join('\n');
+		assert.equal(
+			rewrite('tools/codegen/x.cjs', fromParam('/zz_probe_mod', 'hotstrings', 'a.toml')),
+			fromParam('', 'zz_probe_hs', 'data', 'a.toml'),
+			'joins onto a base derived from a defaulted parameter follow its folder'
+		);
 		// One folder name joined onto an unknown base is no reference; onto a
 		// base named for _shared it is.
 		assert.equal(
