@@ -530,6 +530,17 @@ if (fs.existsSync(deadToml)) {
 	pass('dead constants.toml is absent');
 }
 
+// The archive transfer budget is _shared/modules/updater/defaults.json
+// archive_transfer, read through transfer_budget.lua; a typed copy in the Linux
+// manager was never read (NET-004).
+if (/\bDOWNLOAD_TIMEOUT_MS\b/.test(fs.readFileSync(LINUX_UPDATER, 'utf8'))) {
+	fail(
+		'linux/modules/updater/manager.lua keeps a DOWNLOAD_TIMEOUT_MS copy of the archive transfer budget'
+	);
+} else {
+	pass('the Linux manager keeps no typed archive transfer budget');
+}
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 if (exitCode === 0) {
