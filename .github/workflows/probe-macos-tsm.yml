@@ -12,7 +12,12 @@ permissions:
 on:
   push:
     branches: [claude/ergopti-todo-ci-acceptance-3]
-    paths: ['.github/workflows/probe-macos-tsm.yml', 'tools/diagnostics/probe_*']
+    paths:
+      [
+        '.github/workflows/probe-macos-tsm.yml',
+        'tools/diagnostics/probe_*',
+        'tools/diagnostics/macos_app_relocation.py'
+      ]
 
 jobs:
   tsm:
@@ -101,4 +106,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Translocate a quarantined ad hoc application
-        run: python3 tools/diagnostics/probe_translocation.py
+        timeout-minutes: 6
+        run: python3 -u tools/diagnostics/probe_translocation.py

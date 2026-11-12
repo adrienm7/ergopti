@@ -1,111 +1,94 @@
 # tools/diagnostics/probe_translocation.py
 """Temporary probe: can a hosted runner produce an App Translocation mount?"""
 
-import ctypes
 import os
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
+import sys
 import time
-import uuid
+
+sys.path.insert(0, str(Path(__file__).parent))
+import macos_app_relocation as relocation  # noqa: E402
 
 home = Path.home()
-app = home / "probe-downloads" / "Probe Été.app"
-macos = app / "Contents/MacOS"
-macos.mkdir(parents=True, exist_ok=True)
-with (app / "Contents/Info.plist").open("wb") as handle:
-    plistlib.dump(
-        {
-            "CFBundleExecutable": "Probe",
-            "CFBundleIdentifier": "io.ergopti.probe.translocation",
-            "CFBundleName": "Probe",
-            "CFBundlePackageType": "APPL",
-        },
-        handle,
-    )
 marker = home / "probe-path.txt"
-(macos / "Probe").write_text(f'#!/bin/sh\necho "$0" > "{marker}"\nsleep 20\n')
-(macos / "Probe").chmod(0o755)
-subprocess.run(["codesign", "--force", "--deep", "-s", "-", str(app)], check=False)
-stamp = f"0083;{int(time.time()):x};Safari;{uuid.uuid4()}".upper()
-subprocess.run(["xattr", "-r", "-w", "com.apple.quarantine", stamp, str(app)], check=False)
-print(subprocess.run(["spctl", "--status"], capture_output=True, text=True))
-print(subprocess.run(["spctl", "-a", "-vv", str(app)], capture_output=True, text=True))
-
-sec = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/Security.framework/Security")
-cf = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
-cf.CFURLCreateFromFileSystemRepresentation.restype = ctypes.c_void_p
-cf.CFURLCreateFromFileSystemRepresentation.argtypes = [
-    ctypes.c_void_p,
-    ctypes.c_char_p,
-    ctypes.c_long,
-    ctypes.c_bool,
-]
-cf.CFURLGetFileSystemRepresentation.restype = ctypes.c_bool
-cf.CFURLGetFileSystemRepresentation.argtypes = [
-    ctypes.c_void_p,
-    ctypes.c_bool,
-    ctypes.c_char_p,
-    ctypes.c_long,
-]
-cf.CFCopyDescription.restype = ctypes.c_void_p
-cf.CFCopyDescription.argtypes = [ctypes.c_void_p]
-cf.CFStringGetCString.restype = ctypes.c_bool
-cf.CFStringGetCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
 
 
-def describe(ref):
-    if not ref:
-        return "null"
-    text = ctypes.create_string_buffer(4096)
-    cf.CFStringGetCString(cf.CFCopyDescription(ref), text, 4096, 0x08000100)
-    return text.value.decode("utf-8", "replace")
+def run(arguments, timeout=20):
+    try:
+        result = subprocess.run(arguments, capture_output=True, text=True, timeout=timeout)
+        print(
+            "$",
+            " ".join(arguments),
+            "->",
+            result.returncode,
+            result.stdout[-800:],
+            result.stderr[-800:],
+        )
+    except subprocess.TimeoutExpired:
+        print("$", " ".join(arguments), "-> TIMEOUT")
 
 
-raw = os.fsencode(app)
-url = cf.CFURLCreateFromFileSystemRepresentation(None, raw, len(raw), True)
-create = sec.SecTranslocateCreateSecureDirectoryForURL
-create.restype = ctypes.c_void_p
-create.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
-error = ctypes.c_void_p()
-translocated = create(url, None, ctypes.byref(error))
-print("create error:", describe(error.value))
-if translocated:
-    buffer = ctypes.create_string_buffer(4096)
-    cf.CFURLGetFileSystemRepresentation(translocated, True, buffer, 4096)
-    path = buffer.value.decode()
-    print("translocated:", path)
-    print(subprocess.run(["mount"], capture_output=True, text=True).stdout[-1500:])
-    print(subprocess.run(["open", "-n", path], capture_output=True, text=True))
-    time.sleep(4)
-    print("marker:", marker.read_text() if marker.exists() else "absent")
+def make(name):
+    app = home / "probe-downloads" / name / "Probe Été.app"
+    shutil.rmtree(app.parent, ignore_errors=True)
+    (app / "Contents/MacOS").mkdir(parents=True)
+    with (app / "Contents/Info.plist").open("wb") as handle:
+        plistlib.dump(
+            {
+                "CFBundleExecutable": "Probe",
+                "CFBundleIdentifier": "io.ergopti.probe." + name,
+                "CFBundleName": "Probe",
+                "CFBundlePackageType": "APPL",
+            },
+            handle,
+        )
+    (app / "Contents/MacOS/Probe").write_text(f'#!/bin/sh\necho "$0" > "{marker}"\nsleep 5\n')
+    (app / "Contents/MacOS/Probe").chmod(0o755)
+    run(["codesign", "--force", "--deep", "-s", "-", str(app)])
+    return app
+
+
+def launch(path):
     marker.unlink(missing_ok=True)
-print(subprocess.run(["open", "-n", str(app)], capture_output=True, text=True))
-time.sleep(4)
-print("natural marker:", marker.read_text() if marker.exists() else "absent")
-print(
-    subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.count(
-        "Probe"
-    )
+    run(["open", "-n", str(path)], timeout=15)
+    time.sleep(4)
+    print("marker:", marker.read_text().strip() if marker.exists() else "absent")
+
+
+run(["spctl", "--status"])
+mounts = relocation.Translocation()
+for name, flags in (("plain", None), ("pending", "0083"), ("approved", "00c3")):
+    print(f"===== variant {name} quarantine={flags}", flush=True)
+    app = make(name)
+    if flags:
+        stamp = relocation.quarantine_stamp().replace("0083", flags, 1)
+        run(["xattr", "-r", "-w", "com.apple.quarantine", stamp, str(app)])
+    try:
+        mounted = mounts.create(app)
+        print("translocated:", mounted, flush=True)
+        run(["ls", "-la", str(mounted)])
+        launch(mounted)
+        mounts.delete(mounted)
+        print("deleted mount; exists:", mounted.exists())
+    except Exception as error:
+        print("translocation error:", type(error).__name__, error)
+    print("--- natural open of the original")
+    launch(app)
+run(["mount"])
+run(
+    [
+        "log",
+        "show",
+        "--last",
+        "3m",
+        "--style",
+        "compact",
+        "--predicate",
+        'eventMessage CONTAINS[c] "translocat" OR eventMessage CONTAINS[c] "io.ergopti.probe"',
+    ],
+    timeout=60,
 )
-for line in subprocess.run(
-    ["ps", "-axo", "pid=,command="], capture_output=True, text=True
-).stdout.splitlines():
-    if "Probe" in line:
-        print(line)
-print(
-    subprocess.run(
-        [
-            "log",
-            "show",
-            "--last",
-            "2m",
-            "--style",
-            "compact",
-            "--predicate",
-            'eventMessage CONTAINS[c] "translocat" OR eventMessage CONTAINS[c] "io.ergopti.probe"',
-        ],
-        capture_output=True,
-        text=True,
-    ).stdout[-6000:]
-)
+os._exit(0)
