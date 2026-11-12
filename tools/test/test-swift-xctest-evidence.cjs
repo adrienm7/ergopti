@@ -496,8 +496,9 @@ try {
 		assert.equal(result.error, undefined);
 		assert.equal(result.status, expected, result.stdout + result.stderr);
 		const evidence = path.join(fixture, 'swift-launcher-evidence');
-		// The refusal receipt is written beside the transcript and never changes the verdict.
+		// The refusal receipt reads the same TIS session and never changes the verdict.
 		const refusal = JSON.parse(fs.readFileSync(path.join(evidence, 'tsm-refusal.json'), 'utf8'));
+		assert.equal(refusal.tis_session, 'read');
 		assert.deepEqual(
 			refusal.agent.map((phase) => phase.phase),
 			['before', 'after']
