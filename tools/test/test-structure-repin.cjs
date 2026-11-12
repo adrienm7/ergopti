@@ -142,6 +142,14 @@ function run() {
 		/frame\.json: [0-9a-f]{64} -> [0-9a-f]{64} \(w\/a\.txt -> x\/a\.txt\)/
 	);
 	assert.equal(requalificationSection([]), '');
+	// A requalified pin of a file the step removed names nothing: the step stops.
+	const orphan = scratch({ 'gone.txt': 'g\n', 'frame.json': `"${sha('g\n')}"\n` });
+	orphan.git('rm', '-q', 'gone.txt');
+	assert.throws(
+		() => repin({ root: orphan.root, derived: [], requalify: [{ file: 'frame.json' }] }),
+		/which the step removed: no file accounts for it/
+	);
+	fs.rmSync(orphan.root, { recursive: true, force: true });
 	assert.throws(
 		() =>
 			repin({
