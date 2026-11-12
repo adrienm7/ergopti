@@ -264,6 +264,35 @@ _BAT_ClonerFlow() {
 }
 Test("(bundled-apps-cloner-flow) reads the shortcut, refuses a missing path and writes the clone", _BAT_ClonerFlow)
 
+; The item to open follows macOS validateOpenArg and the Linux invalid_open_item
+; (maintainer decision, 2026-11-12): « ~ » is the profile folder, and a URL needs
+; « :// » or a Teams link, so « https:/x » and « localhost:3000 » are refused.
+_BAT_OpenItemValidation() {
+	Exists := (Path) => (Path == "C:\H" || Path == "C:\H\Docs")
+	for Row in [
+			["https://example.com", [], "https://example.com"],
+			["msteams:/l/meetup-join/x", [], "msteams:/l/meetup-join/x"],
+			["msteams:/calendar", [], "msteams:/calendar"],
+			["~", [], "C:\H"],
+			["~\Docs", [], "C:\H\Docs"],
+			["~/Docs", [], "C:\H\Docs"],
+			["C:\H\Docs", [], "C:\H\Docs"],
+			["~\Missing", ["apps.cloner.err_path_missing", "~\Missing"], ""],
+			["https:/x", ["apps.cloner.err_url_format", ""], ""],
+			["localhost:3000", ["apps.cloner.err_url_format", ""], ""],
+			["msteams:/other", ["apps.cloner.err_url_format", ""], ""]] {
+		Invalid := _AppCloner_InvalidOpenItem(Row[1], Exists, "C:\H", &Resolved)
+		AssertEqual(Row[2].Length, Invalid.Length, "verdict for '" . Row[1] . "'")
+		if Row[2].Length {
+			AssertEqual(Row[2][1], Invalid[1], "error key for '" . Row[1] . "'")
+			AssertEqual(Row[2][2], Invalid[2], "error value for '" . Row[1] . "'")
+		} else {
+			AssertEqual(Row[3], Resolved, "item to open for '" . Row[1] . "'")
+		}
+	}
+}
+Test("(bundled-apps-cloner-open-item) expands ~ and refuses an item without :// as macOS and Linux", _BAT_OpenItemValidation)
+
 
 
 
