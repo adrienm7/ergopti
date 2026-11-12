@@ -300,7 +300,12 @@ function main() {
 				text = text.split(row.old).join(row.new);
 				continue;
 			}
-			if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
+			if (row.kind === 'lua-module' && !row.old.includes('.')) {
+				// A one-word name moves only where it is loaded (Plan.isModuleLoadSite).
+				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), (whole, quote, offset, all) =>
+					Plan.isModuleLoadSite(all, offset) ? `${quote}${row.new}${quote}` : whole
+				);
+			} else if (row.kind === 'lua-module' || row.kind === 'lua-prefix') {
 				text = text.replace(new RegExp(`(["'])${esc}\\1`, 'g'), `$1${row.new}$1`);
 			} else {
 				// Whole tokens only: tests/unit/modules/llm must not rewrite
@@ -328,7 +333,13 @@ function main() {
 		git('mv', '--', oldRepo, newRepo);
 	}
 	for (const r of retiredRepo) git('rm', '-q', '--', r);
-	git('add', '--', ...[...edits.keys(), ...movedRepo.values()]);
+	// A rewritten file this step also moved is staged at its new path: the old
+	// one no longer exists once the move ran.
+	git(
+		'add',
+		'--',
+		...new Set([...[...edits.keys()].map((f) => movedRepo.get(f) || f), ...movedRepo.values()])
+	);
 	console.log(
 		'applied and staged; run the step gates of docs/design/structure-plan.md before committing.'
 	);
