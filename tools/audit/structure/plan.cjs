@@ -1535,6 +1535,16 @@ function scanFile(file, text, ctx) {
 				add('lua-module', m[1], hit[2], { oldRepo: PREFIX + hit[0], loadOnly: !dotted });
 		}
 	}
+	// A file whose path literals are synthetic coordinates (edits.cjs
+	// SYNTHETIC_PATHS) keeps them: only its module names, its own header and
+	// the shared root follow the plan.
+	if (Edits.SYNTHETIC_PATHS.some((e) => e.file === file))
+		return rows.filter(
+			(r) =>
+				r.kind.startsWith('lua-module') ||
+				r.kind === 'shared-root' ||
+				(r.resolution && r.resolution.oldRepo === file)
+		);
 	return rows;
 }
 

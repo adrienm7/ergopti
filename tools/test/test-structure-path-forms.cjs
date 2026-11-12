@@ -463,6 +463,16 @@ function run() {
 			.map((r) => r.kind);
 		assert.deepEqual(kinds, ['folder-edit'], `${e.file}: the listed edit applies`);
 	}
+	// A file of synthetic coordinates keeps them all: rewriting the arguments of
+	// sibling() and not its fake source made the loader contract fail.
+	const moved = new Map([...full].filter(([o, t]) => t && o !== t).map(([o, t]) => [P + o, P + t]));
+	for (const e of Edits.SYNTHETIC_PATHS) {
+		if (!fs.existsSync(path.join(repo, e.file))) continue;
+		const text = fs.readFileSync(path.join(repo, e.file), 'utf8');
+		const out = Apply.rewriteText(text, Plan.scanFile(e.file, text, fullCtx), moved, e.file);
+		const coordinates = (t) => t.split('\n').filter((l) => /@[A-Za-z]?:?[/.\\]/.test(l));
+		assert.deepEqual(coordinates(out), coordinates(text), `${e.file}: ${e.why}`);
+	}
 	console.log('[OK] every path form the structure plan rewrites follows the moved file.');
 }
 
