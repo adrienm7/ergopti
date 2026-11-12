@@ -12,7 +12,7 @@ local Logger = require("logger.shim")
 local ConfigKeys = require("config_keys")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
-local _editor_owner, _editor_path, _editor_pause, _editor_busy = nil, nil, nil, false
+local _editor_owner, _editor_path, _editor_busy = nil, nil, false
 require("infra.scope_registry").register("shortcuts_scope", function() return _owner ~= nil and _owner.pending() == true end)
 require("infra.scope_registry").register("shortcuts_editor_scope", function() return _editor_owner ~= nil and _editor_owner.pending() == true end)
 
@@ -68,12 +68,14 @@ local function keyboard_group_prefix(keyboard, only)
 end
 
 --- Builds one terminal transaction without acquiring or closing input devices.
---- @param options table Exact path, backup path, files and live pause getter;
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Exact path, backup path and files;
 ---   `only = "script_chords"` narrows it to the script chords' submenu,
 ---   `only = "keyboard_group:<prefix>"` to one modifier group of the keyboard slots.
 --- @return table owner Apply, pending and explicit compensation retry.
 function M.new(options)
-	assert(type(options) == "table" and type(options.is_paused) == "function", "shortcut scope requires live pause ownership")
+	assert(type(options) == "table", "shortcut scope requires its options")
 	local manager = options.manager or require("modules.shortcuts.manager")
 	local keyboard = options.keyboard or require("modules.shortcuts.keyboard_shortcuts")
 	local group_prefix = keyboard_group_prefix(keyboard, options.only)
@@ -143,7 +145,7 @@ function M.new(options)
 		end
 		return true
 	end
-	local function release(expected, restoring)
+	local function release(expected)
 		-- Any refused terminal acknowledgement must re-fence the exact Pair
 		-- owner after its native installation, before exposing inverse debt.
 		local function refuse()
@@ -178,7 +180,7 @@ function M.new(options)
 		local pair_index
 		for index, port in ipairs(held) do if port == pair_port then pair_index = index end end
 		if expected and pair_index then
-			if combinations.configuration_source_matches(owner, expected, restoring) ~= true then return refuse() end
+			if combinations.configuration_source_matches(owner, expected) ~= true then return refuse() end
 			local called, accepted = pcall(pair_port.release, owner)
 			if not called or accepted ~= true then return refuse() end
 			table.remove(held, pair_index)
@@ -189,9 +191,9 @@ function M.new(options)
 			if expected then
 				local exact = combinations.owns_configuration(owner)
 				if exact then
-					if combinations.configuration_source_matches(owner, expected, restoring) ~= true then return refuse() end
+					if combinations.configuration_source_matches(owner, expected) ~= true then return refuse() end
 				else
-					local receipt = combinations.capture_edit_source(owner, restoring)
+					local receipt = combinations.capture_edit_source(owner)
 					if type(receipt) ~= "table" or not same_frame(receipt, expected) or receipt.guard() ~= true then return refuse() end
 				end
 			end
@@ -205,7 +207,7 @@ function M.new(options)
 		if expected then
 			local parameter_guard = parameters.capture_parameter_source_guard(decoded, function() return true end)
 			if type(parameter_guard) ~= "function" then return refuse() end
-			local receipt = combinations.capture_edit_source(owner, restoring)
+			local receipt = combinations.capture_edit_source(owner)
 			if type(receipt) ~= "table" or receipt.path ~= expected.path or receipt.status ~= expected.status
 				or receipt.content ~= expected.content or receipt.guard() ~= true
 				or parameter_guard() ~= true then return refuse() end
@@ -338,9 +340,9 @@ function M.new(options)
 		after_publish = function() publication_acked = true; return release(published_source) end,
 		before_restore = function() return acquire() end,
 		after_restore = function()
-			local restored = combinations and (publication_acked and pair_source or combinations.configuration_source(owner, true)) or nil
+			local restored = combinations and (publication_acked and pair_source or combinations.configuration_source(owner)) or nil
 			if combinations and type(restored) ~= "table" then return false end
-			return release(restored, true)
+			return release(restored)
 		end,
 		validate_update = function(scope, row)
 			if scope ~= "shortcuts" or options.only ~= nil then return false end
@@ -375,9 +377,6 @@ function M.new(options)
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
 		apply = function(config, updates, _, candidate_bytes, rendered)
-			-- An editor's rows save while paused: a pause stops typing, not
-			-- configuration (EDD-1, maintainer decision 2026-11-12).
-			if not editing and options.is_paused() then return false end
 			if combinations and combinations.configuration_source_matches(owner, pair_source) ~= true then return false end
 			local chord = combinations and rendered.tap_hold or nil
 			local candidate = resolve(config, true, chord and chord.decoded)
@@ -453,10 +452,6 @@ function M.new(options)
 		if owner.pending() or (rows == nil and mode ~= "clear" and mode ~= "recommended")
 			or rows ~= nil and options.only ~= nil then return false end
 		busy = true
-		if rows == nil then
-			local observed, paused = pcall(options.is_paused)
-			if not observed or paused ~= false then busy = false; return false end
-		end
 		editing = rows ~= nil
 		if editing and edit_source then
 			local checked, current = pcall(edit_source.guard)
@@ -559,8 +554,6 @@ function M.new(options)
 	function owner.revert()
 		if owner.pending() then return false, "shortcut configuration is already owned" end
 		busy = true
-		local observed, paused = pcall(options.is_paused)
-		if not observed or paused ~= false then busy = false; return false end
 		local admitted, accepted = pcall(acquire)
 		if not admitted or accepted ~= true then
 			if not retiring then release() end
@@ -582,17 +575,16 @@ end
 
 --- Applies a menu request while retaining any refused runtime compensation.
 --- @param mode string Clear or recommended.
---- @param is_paused function Live pause getter.
 --- @param only string|nil "script_chords" for the script chords' submenu,
 ---   "keyboard_group:<prefix>" for one modifier group of the keyboard slots.
 --- @return boolean committed
-function M.apply(mode, is_paused, only)
-	if type(is_paused) ~= "function" or is_paused() or (mode ~= "clear" and mode ~= "recommended") then return false end
+function M.apply(mode, only)
+	if mode ~= "clear" and mode ~= "recommended" then return false end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false end
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
 	_owner = M.new({ path = path, backup_path = path .. ".shortcuts-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
-		is_paused = is_paused, only = only })
+		only = only })
 	Logger.start(LOG, "Shortcut preference scope %s started.", mode)
 	local committed, detail = _owner.apply(mode)
 	if committed == true then Logger.success(LOG, "Shortcut preference scope %s completed.", mode)
@@ -601,10 +593,9 @@ function M.apply(mode, is_paused, only)
 end
 
 --- Retains the native editor issuer and any refused edit debt across windows.
---- @param is_paused function Current native pause getter.
 --- @return table|nil owner The still-owned editor scope, or closed refusal.
-function M.editor_owner(is_paused)
-	if _editor_busy or type(is_paused) ~= "function" then return nil end
+function M.editor_owner()
+	if _editor_busy then return nil end
 	_editor_busy = true
 	local called, result = pcall(function()
 		-- A pause does not keep the editor closed (EDD-1, 2026-11-12).
@@ -614,14 +605,12 @@ function M.editor_owner(is_paused)
 		if require("infra.config_paths").config("config.toml") ~= path then return nil end
 		if _editor_owner and _editor_path ~= path then
 			_editor_owner.release()
-			_editor_owner, _editor_path, _editor_pause = nil, nil, nil
+			_editor_owner, _editor_path = nil, nil
 		end
-		_editor_pause = is_paused
 		if not _editor_owner then
 			_sequence = _sequence + 1
 			local owner = M.new({ path = path,
-				backup_path = path .. ".physical-shortcuts-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
-				is_paused = function() return _editor_pause and _editor_pause() end })
+				backup_path = path .. ".physical-shortcuts-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
 			if require("infra.config_paths").config("config.toml") ~= path then
 				owner.release()
 				return nil
@@ -635,11 +624,10 @@ function M.editor_owner(is_paused)
 end
 
 --- The shortcut participant of a composed scope, bound to the retained owner.
---- @param is_paused function Live pause getter.
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused)
+function M.participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused) end,
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end

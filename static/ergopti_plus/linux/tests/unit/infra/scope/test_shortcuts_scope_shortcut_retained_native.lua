@@ -298,35 +298,31 @@ end)
 
 
 helpers.describe("Linux paused shortcut compensation source custody", function()
-	helpers.it("settles a pause refusal through its exact fence while ordinary source admission stays closed", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision
+	-- 2026-11-12): the exact fence reads its source while paused, and only
+	-- runtime delivery stays closed (edd1-paused-writes).
+	helpers.it("reads the exact fenced source while paused and keeps runtime delivery closed (edd1-paused-writes)", function()
 		with_scope(function(_, owners, controls)
 			local pairs, token = owners.combinations, {}
 			helpers.assert_true(pairs.acquire_configuration(token))
 			helpers.assert_true(pairs.acquire_delivery_fence(token))
 			controls.paused = true
-			helpers.assert_eq(pairs.configuration_source(token), nil)
-			local source = pairs.configuration_source(token, true)
+			local source = pairs.configuration_source(token)
 			helpers.assert_type(source, "table")
-			helpers.assert_eq(pairs.configuration_source_matches(token, source), false)
-			helpers.assert_true(pairs.configuration_source_matches(token, source, true))
-			helpers.assert_eq(pairs.configuration_source_matches({}, source, true), false)
+			helpers.assert_true(pairs.configuration_source_matches(token, source))
+			helpers.assert_eq(pairs.configuration_source_matches({}, source), false)
 			helpers.assert_eq(pairs.capture_runtime(), nil)
 			helpers.assert_true(pairs.release_configuration(token))
-			local restored = pairs.capture_edit_source(token, true)
+			local restored = pairs.capture_edit_source(token)
 			helpers.assert_type(restored, "table")
 			helpers.assert_true(restored.guard())
-			helpers.assert_eq(pairs.capture_edit_source(token), nil)
-			helpers.assert_eq(pairs.capture_edit_source(nil, true), nil)
-			helpers.assert_eq(pairs.capture_edit_source({}, true), nil)
+			helpers.assert_eq(pairs.capture_edit_source(nil), nil)
+			helpers.assert_eq(pairs.capture_edit_source({}), nil)
 			local alias = setmetatable({}, { __eq = function() return true end })
-			helpers.assert_eq(pairs.capture_edit_source(alias, true), nil)
-			controls.paused = "unknown"
-			helpers.assert_eq(restored.guard(), false)
-			helpers.assert_eq(pairs.capture_edit_source(token, true), nil)
-			controls.paused = true
+			helpers.assert_eq(pairs.capture_edit_source(alias), nil)
 			helpers.assert_true(pairs.release_delivery_fence(token))
-			helpers.assert_eq(restored.guard(), false, "settled fence cannot grant later paused source currency")
-			helpers.assert_eq(pairs.capture_runtime(), nil)
+			helpers.assert_eq(pairs.capture_runtime(), nil, "a pause still keeps runtime delivery closed")
+			helpers.assert_type(pairs.capture_edit_source(), "table", "an ordinary editor reads the source while paused")
 		end)
 	end)
 
