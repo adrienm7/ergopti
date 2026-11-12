@@ -41,14 +41,12 @@ of two layouts and two settings sets. Each driver's `layout_emulation`
 exposes it, and the host falls back to the input source for a key the
 emulation passes.
 
-## Open
+## Decided and fixed after review (2026-11-12)
 
-- **LEH-003 (macOS, low, design):** a save closes the window as soon as
-  Karabiner accepts the regeneration request. A regeneration that fails later
-  (`on_done(false)`) is only logged, so the layer never takes effect without a
-  word to the user. Windows' apply is its synchronous reload. This is the
-  documented choice of `macos/ui/layer_editor/init.lua` (note 3). Holding the
-  window until `on_done`, or a notice after it closed, is a maintainer
-  decision.
+- **LEH-003 (macOS):** the window still closes as soon as Karabiner accepts
+  the regeneration. A regeneration that fails later sends an error
+  notification (the window title and `layer_editor.apply_failed`). Windows and
+  Linux apply synchronously before their window closes, so they have no such
+  gap. Regression `leh-003-late-regeneration-failure`.
 
 Native receiving is unqualified.

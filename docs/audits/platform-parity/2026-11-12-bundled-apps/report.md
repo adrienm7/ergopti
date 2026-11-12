@@ -44,23 +44,21 @@ corrupted file, which the message already names). The macOS AppleScript
 changes (BAP-003, BAP-007) need `main.scpt` recompiled on the Mac
 (`tools/dev/recompile-applescripts.py`).
 
+## Decided and fixed after review (2026-11-12)
+
+- **BAP-004 (macOS, Linux):** VSCodium and Insiders clones get their own
+  settings and extensions through families.json `user_folders`, an additive
+  field the AHK reader ignores. Regression `bap-004-vscode-variants`. Windows
+  has its TODO line.
+- **BAP-008 (Linux):** two desktop entries. The visible one opens the
+  dedicated `application/x-ergopti-encrypted` type of `*.enc` and is its
+  default opener. A `NoDisplay` entry keeps « Open with » for any file and is
+  never a default. Regression `bap-008-encryptor-entries`.
+- **BAP-005 on Windows:** a TODO line aligns `_AppCloner_InvalidOpenItem` with
+  the macOS and Linux validators.
+
 ## Open
 
-- **BAP-004 (all three, low-medium):** a VSCodium or VS Code Insiders clone is
-  linked to VS Code's settings (`Code/User`) and extensions
-  (`{home}/.vscode/extensions`, a shared catalogue argument); their own
-  folders are `VSCodium/User` with `~/.vscode-oss` and `Code - Insiders/User`.
-  Proposal: per-executable settings and extensions folders in
-  `families.json`, read by the three drivers. The Windows reader changes too,
-  so this needs a coordinated decision.
-- **BAP-005 on Windows (report):** `_AppCloner_InvalidOpenItem` accepts the
-  same scheme typos Linux accepted, and no `~` path.
-- **BAP-008 (Linux, low, plausible):** the Encryptor's desktop entry declares
-  `MimeType=application/octet-stream;`, which offers it in « Open with » for
-  any file (Windows offers it through Send To). On a desktop where no other
-  application handles that type, it could become the default opener.
-  Registering only `.enc` would end that risk but also drop « Open with »
-  for plain files: a maintainer decision.
 - `encryptor_convert.sh` relies on the default OpenSSL digest for PBKDF2
   (SHA-256 on OpenSSL 1.1+ and the LibreSSL of macOS 10.15+). Passing
   `-md sha256` would make that explicit.
