@@ -32,8 +32,8 @@ local function with_toml_staging(body)
 		local wrapped, changed = {}, false
 		local function alter()
 			if successor and not changed then
-				assert(rename(path .. ".tmp", folder .. "/retained"))
-				state.write(path .. ".tmp", "borrowed successor"); changed = true
+				assert(rename(helpers.stage_path(path), folder .. "/retained"))
+				state.write(helpers.stage_path(path), "borrowed successor"); changed = true
 			end
 		end
 		local function refuse()
@@ -63,25 +63,26 @@ local function with_toml_staging(body)
 			return proxy, detail, errno, cleanup, current
 		end
 		io.open = function(candidate, mode)
-			if candidate == path .. ".tmp" and mode == "w" then
+			if candidate == helpers.stage_path(path) and mode == "w" then
 				state.legacy = state.legacy + 1; return wrap(open(candidate, mode))
 			end
 			return open(candidate, mode)
 		end
 		Native.open = function(candidate, mode)
-			if candidate == path .. ".tmp" and state.fault and boundary == "open" then return refuse() end
-			if candidate == path .. ".tmp" then return wrap(native_open(candidate, mode)) end
+			if candidate == helpers.stage_path(path) and state.fault and boundary == "open" then return refuse() end
+			if candidate == helpers.stage_path(path) then return wrap(native_open(candidate, mode)) end
 			return native_open(candidate, mode)
 		end
 		os.rename = function(from, to)
-			if state.fault and boundary == "rename" and from == path .. ".tmp" then alter(); return refuse() end
+			if state.fault and boundary == "rename" and from == helpers.stage_path(path) then alter(); return refuse() end
 			return rename(from, to)
 		end
 	end
 	local okay, detail = xpcall(function() body(Writer, path, state) end, debug.traceback)
 	io.open, Native.open, os.rename = open, native_open, rename
 	for _, record in ipairs(state.handles) do if not record.closed then pcall(record.stream.close, record.stream) end end
-	for _, leaf in ipairs({ "source.toml", "source.toml.tmp", "retained", "target", "complete" }) do os.remove(folder .. "/" .. leaf) end
+	for _, leaf in ipairs({ "source.toml", "retained", "target", "complete" }) do os.remove(folder .. "/" .. leaf) end
+	os.remove(helpers.stage_path(folder .. "/source.toml"))
 	assert(os.remove(folder), "every owned staging fixture entry must be removed")
 	if not okay then error(detail, 0) end
 end
@@ -455,7 +456,7 @@ helpers.describe("Linux TOML staging admission", function()
 						local updates = { { section = "shortcuts", key = "enabled", value = true } }
 						helpers.assert_eq(Writer.batch_write(path, updates, adapter), false)
 						helpers.assert_eq(state.read(path), state.before)
-						helpers.assert_nil(state.read(path .. ".tmp"))
+						helpers.assert_nil(state.read(helpers.stage_path(path)))
 						helpers.assert_eq(state.legacy, 0, "an available but refused native owner never falls back to stdio")
 						state.fault = false
 						helpers.assert_true(Writer.batch_write(path, updates, adapter))
@@ -483,10 +484,10 @@ helpers.describe("Linux TOML staging admission", function()
 						helpers.assert_true(state.opened > 0)
 						helpers.assert_eq(state.closed, state.opened, "every acquired stream closes after any write result")
 						if successor then
-							helpers.assert_eq(state.read(path .. ".tmp"), "borrowed successor", "cleanup cannot unlink a later inode")
+							helpers.assert_eq(state.read(helpers.stage_path(path)), "borrowed successor", "cleanup cannot unlink a later inode")
 							helpers.assert_true(state.read(state.folder .. "/retained") ~= nil)
-							assert(os.remove(path .. ".tmp"))
-						else helpers.assert_nil(state.read(path .. ".tmp"), "our failed staging is removed for retry") end
+							assert(os.remove(helpers.stage_path(path)))
+						else helpers.assert_nil(state.read(helpers.stage_path(path)), "our failed staging is removed for retry") end
 						state.fault = false
 						helpers.assert_true(Writer.batch_write(path, updates, adapter, nil, nil, admission), "a repaired attempt remains retryable")
 						helpers.assert_true(require("toml_codec").decode(state.read(path)).shortcuts.enabled)
@@ -505,7 +506,7 @@ helpers.describe("Linux TOML staging image", function()
 					local Shell, uv = require("adapters.shell_runner"), require("luv")
 					local before, wanted, borrowed = "[demo]\nvalue = 1\n", "[demo]\nvalue = 2\n", "[demo]\nvalue = 9\n"
 					state.write(path, before)
-					local stage, retained, target = path .. ".tmp", state.folder .. "/retained", state.folder .. "/target"
+					local stage, retained, target = helpers.stage_path(path), state.folder .. "/retained", state.folder .. "/target"
 					local calls, changed, same_inode = 0, true, false
 					local function admit()
 						calls = calls + 1
@@ -567,7 +568,7 @@ helpers.describe("Linux TOML staging image", function()
 				local native, guards, cleanups, fault = Native.open, 0, 0, true
 				Native.open = function(candidate, mode)
 					local stream, detail, errno, cleanup, current = native(candidate, mode)
-					if candidate ~= path .. ".tmp" or not stream then return stream, detail, errno, cleanup, current end
+					if candidate ~= helpers.stage_path(path) or not stream then return stream, detail, errno, cleanup, current end
 					return stream, detail, errno, function() cleanups = cleanups + 1; return cleanup() end,
 						refusal ~= "missing" and function(bytes)
 							guards = guards + 1
@@ -583,8 +584,8 @@ helpers.describe("Linux TOML staging image", function()
 					helpers.assert_eq(guards, refusal == "missing" and 0 or 1)
 					helpers.assert_eq(cleanups, 0, "unproven staging is retained even when it might still be ours")
 					helpers.assert_eq(state.read(path), state.before)
-					helpers.assert_true(require("toml_codec").decode(state.read(path .. ".tmp")).shortcuts.enabled)
-					assert(os.remove(path .. ".tmp")); fault = false; Native.open = native
+					helpers.assert_true(require("toml_codec").decode(state.read(helpers.stage_path(path))).shortcuts.enabled)
+					assert(os.remove(helpers.stage_path(path))); fault = false; Native.open = native
 					helpers.assert_true(Writer.batch_write(path, updates))
 				end, debug.traceback)
 				Native.open = native
@@ -599,7 +600,7 @@ helpers.describe("Linux TOML staging image", function()
 			local wanted, borrowed = "[shortcuts]\nenabled = true\n", "# borrowed image\n"
 			local okay, detail = xpcall(function()
 				local committed = Writer.batch_write(path, { { section = "shortcuts", key = "enabled", value = true } }, nil, nil, nil, function()
-					state.write(path .. ".tmp", borrowed)
+					state.write(helpers.stage_path(path), borrowed)
 					Reader.open = function()
 						forged = forged + 1
 						return { read = function() return wanted end, close = function() return true end }
@@ -609,7 +610,7 @@ helpers.describe("Linux TOML staging image", function()
 				helpers.assert_eq(committed, false)
 				helpers.assert_eq(forged, 0, "the captured native port cannot be replaced by admission")
 				helpers.assert_eq(state.read(path), state.before)
-				helpers.assert_eq(state.read(path .. ".tmp"), borrowed)
+				helpers.assert_eq(state.read(helpers.stage_path(path)), borrowed)
 			end, debug.traceback)
 			Reader.open = native
 			if not okay then error(detail, 0) end
@@ -619,7 +620,7 @@ helpers.describe("Linux TOML staging image", function()
 		with_toml_staging(function(Writer, path, state)
 			local calls = 0
 			helpers.assert_true(Writer.publish_if_unchanged(path, state.before, nil, { status = "ok", content = state.before }, nil, function()
-				calls = calls + 1; helpers.assert_nil(state.read(path .. ".tmp")); return true
+				calls = calls + 1; helpers.assert_nil(state.read(helpers.stage_path(path))); return true
 			end))
 			helpers.assert_eq(calls, 1); helpers.assert_eq(state.read(path), state.before)
 		end)
@@ -631,15 +632,15 @@ helpers.describe("Linux TOML staging image", function()
 			local wanted = "[shortcuts]\nenabled = true\n"
 			local okay, detail = xpcall(function()
 				local committed = Writer.batch_write(path, { { section = "shortcuts", key = "enabled", value = true } }, nil, nil, nil, function()
-					assert(os.rename(path .. ".tmp", state.folder .. "/retained"))
+					assert(os.rename(helpers.stage_path(path), state.folder .. "/retained"))
 					state.write(state.folder .. "/target", wanted)
-					assert(uv.fs_symlink(state.folder .. "/target", path .. ".tmp"))
+					assert(uv.fs_symlink(state.folder .. "/target", helpers.stage_path(path)))
 					uv.fs_lstat = function() forged = forged + 1; return { type = "file" } end
 					return true
 				end)
 				helpers.assert_eq(committed, false)
 				helpers.assert_eq(forged, 0)
-				helpers.assert_eq(assert(lstat(path .. ".tmp")).type, "link")
+				helpers.assert_eq(assert(lstat(helpers.stage_path(path))).type, "link")
 				helpers.assert_eq(state.read(path), state.before)
 				helpers.assert_eq(state.read(state.folder .. "/target"), wanted)
 			end, debug.traceback)

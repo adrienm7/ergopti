@@ -224,6 +224,8 @@ graph TD
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
         WINDOWS_program_providers["ProgramProviders.ahk"]
         WINDOWS_proxy_override["ProxyOverride.ahk"]
+        WINDOWS_raw_input["RawInput.ahk"]
+        WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_screen_capture["ScreenCapture.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]

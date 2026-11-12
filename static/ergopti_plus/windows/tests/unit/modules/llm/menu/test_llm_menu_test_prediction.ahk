@@ -100,13 +100,12 @@ Test("AI menu test prediction: a failure says why, the switch-off withdraws it (
 _LTP_ActiveBackend() {
 	_LTP_Run(_Body)
 	_Body(Fx, Lines, Sent) {
-		global _LLM_Menu, _LLM_Engine, _LLM_Engine_RemoteTransport, LLM_Defaults
+		global _LLM_Menu, _LLM_Engine, LLM_Defaults
 		LLM_Defaults_Load()
 		_LLM_Engine["temperature"] := 0.1
-		SavedTransport := _LLM_Engine_RemoteTransport
 		Remote := [], OnDevice := []
+		SavedHttp := LLM_Engine_SetPort("http", _LPP_RecordingHttp((Args*) => Remote.Push(Args)))
 		try {
-			_LLM_Engine_RemoteTransport := (Args*) => Remote.Push(Args)
 			AssertTrue(LLM_Menu_TestPrediction())
 			AssertEqual(1, Remote.Length, "the API backend's transport is asked")
 			AssertEqual(LLM_Defaults["llm_test_prediction_temperature"] + 0.0, Remote[1][4], "at the test's own temperature")
@@ -119,7 +118,7 @@ _LTP_ActiveBackend() {
 			AssertEqual(1, OnDevice.Length, "the local backend is asked")
 			AssertEqual(LLM_Defaults["llm_test_prediction_temperature"] + 0.0, OnDevice[1][4], "at the test's own temperature")
 			AssertEqual(t("llm.test_prediction.sample"), OnDevice[1][3], "on the sample")
-		} finally _LLM_Engine_RemoteTransport := SavedTransport
+		} finally LLM_Engine_SetPort("http", SavedHttp)
 		_SendLocal() {
 			; Only the local readiness differs: the seam stands in for its probe.
 			_AAG_WithFn(_LLM_Menu_BackendIsReadyForUse, (*) => true, () => AssertTrue(LLM_Menu_TestPrediction()))

@@ -12,14 +12,25 @@ local REQUIRED_CALLBACKS = { "reset", "reload", "quit" }
 -- Prefix shared by every script-control action id in the shared catalogue.
 local SCRIPT_ACTION_PREFIX = "script_"
 
---- Whether an action id is a script-control action (pause, reload, quit…).
---- These stay live while the script is paused and while the shortcuts are
---- switched off: they are how a user gets the script back.
+--- Whether an action id belongs to the script-control family (pause, reload,
+--- quit…). This names the family only; whether an action still runs through a
+--- pause is runs_while_paused, read from the shared catalogue.
 --- @param action_name any
 --- @return boolean
 function M.is_script_action(action_name)
 	return type(action_name) == "string"
 		and action_name:sub(1, #SCRIPT_ACTION_PREFIX) == SCRIPT_ACTION_PREFIX
+end
+
+--- Whether an action still runs while the driver is paused: the shared
+--- `paused_actions` list of `_shared/modules/actions/script_chords.json`, the
+--- one Windows and macOS read, so a pause lets through the same actions on the
+--- three drivers (SCD-1, decided by the maintainer on 2026-11-11).
+--- @param action_name any
+--- @return boolean
+function M.runs_while_paused(action_name)
+	if type(action_name) ~= "string" then return false end
+	return require("modules.shortcuts.script_chords").catalogue().paused_actions[action_name] == true
 end
 
 --- Builds one pause/reload/quit controller for the running daemon.
@@ -93,11 +104,11 @@ function M.new(opts)
 	function controller.pause_epoch() return pause_epoch end
 
 	--- Whether an action may run now: everything while running, only the
-	--- script-control actions while paused.
+	--- shared catalogue's paused actions while paused.
 	--- @param action_name string
 	--- @return boolean
 	function controller.allows(action_name)
-		return not paused or M.is_script_action(action_name)
+		return not paused or M.runs_while_paused(action_name)
 	end
 
 	return controller

@@ -22,61 +22,52 @@
 ; ==========================================================
 ; ==========================================================
 
-; Retained for compatibility with live-rebuild callers. Boot no longer uses a
-; deferred emoji/symbol pass: ready is published only once all advertised triggers
-; and the preview index are available.
-global HS_DEFERRED_REGISTRATION_DELAY_MS := 1500
-
-; Delay (ms) before warming the prefix-watcher PREVIEW index off the boot path.
-; text_expansion now registers ON the critical path (it is the most-used feature),
-; so no heavy registration is deferred here — only the preview index is (re)built a
-; short moment after "ready" so tooltips appear quickly without paying the index
-; build on time-to-ready. The emoji/symbol pass rebuilds it again once those load.
-global HS_PREFIX_INDEX_WARM_DELAY_MS := 300
-
-; Registers the heavy magic-key emoji + symbol sections into the HSE. Shared by
-; the boot deferred pass and the live rebuild so the two code paths never diverge.
-_RegisterEmojisSymbolsSections() {
+; The magic-key emoji and symbol sections in their registration order, with the
+; options each loads with: the single list the inline load and the deferred boot
+; load both walk.
+; @return {Array} [Category, Section, FeatureNode, ExtraOptions] per section.
+_EmojisSymbolsSections() {
 	global Features
-	if Features["hotstrings"]["french_magickey"]["text_expansion_emojis"]["enabled"] {
-		LoadHotstringsSection("french_magickey", "text_expansion_emojis", Features["hotstrings"]["french_magickey"]["text_expansion_emojis"])
-	}
-	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols"])
-	}
-	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols_typst"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_symbols_typst", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols_typst"],
-			Map("OnlyText", False))
+	return [
+		["french_magickey", "text_expansion_emojis", Features["hotstrings"]["french_magickey"]["text_expansion_emojis"], Map()],
+		["magickey", "text_expansion_symbols", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols"], Map()],
+		["magickey", "text_expansion_symbols_typst", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols_typst"],
+			Map("OnlyText", False)]
+	]
+}
+
+; Registers the heavy magic-key emoji + symbol sections into the HSE at once: a
+; live rebuild, and a boot whose sections the cache does not all serve.
+_RegisterEmojisSymbolsSections() {
+	for Entry in _EmojisSymbolsSections() {
+		if Entry[3]["enabled"]
+			LoadHotstringsSection(Entry[1], Entry[2], Entry[3], Entry[4])
 	}
 }
 
-; Compatibility path for a live rebuild that deliberately queues registration.
-; Boot registers these sections synchronously before ready.
+; The boot load of the emoji and symbol sections (about 1,600 rows and 400
+; ms on a maintainer-sized setup): their sequence block is reserved here, at the
+; position they hold inline, and their rows register after ready in slices
+; (HSE_DeferredRegistrationStart), so the collision tie-break is the inline one.
+; A section the bundled cache does not serve (a layout-bound file) is read from
+; disk, which a slice under Critical must not do: then all load here.
 RegisterEmojisSymbolsDeferred() {
-	global HSE_RegistryByGroup
-	if (IsSet(HSE_RegistryByGroup) and (HSE_RegistryByGroup.Has("emojis.emojis") or HSE_RegistryByGroup.Has("french_magickey.text_expansion_emojis")))
-		return
-	try {
-		; Isolated wall-clock for the HSE registration alone. The BootProfile delta
-		; below folds in the 1.5 s SetTimer delay AND interleaving with the other
-		; deferred boot tasks (warm-up rebuild, Ollama probe, LLM bridge), so it
-		; massively overstates the true cost — this line shows the real registration time.
-		_emojiStart := A_TickCount
-		_RegisterEmojisSymbolsSections()
-		try LoggerInfo("Hotstrings", "Emoji/symbol HSE sections registered in {1} ms.", TickElapsed(_emojiStart))
-		; Build the prefix-watcher PREVIEW index ONCE, here, at the end of the deferred
-		; pass. This is the single index build (the earlier warm-up SetTimer was removed):
-		; by now HotstringsResolve is memoised for every section — including the emoji/
-		; symbol ones just registered above — and the boot has settled, so this rebuild is
-		; reliably ~220 ms instead of the erratic 250 ms–6 s the warm-up saw under boot
-		; contention. The index is built from the in-memory cache + Features, so it covers
-		; every category in one pass (pinned by test_prefix_watcher_deferred).
-		try HotstringPrefixWatcherRebuildIndex()
-		try BootProfile_Mark("Emoji/symbol hotstrings registered (deferred)")
-		try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
-	} catch as e {
-		try LoggerError("Hotstrings", "Deferred emoji/symbol registration failed: {1}", e.Message)
+	Steps := []
+	for Entry in _EmojisSymbolsSections() {
+		if !Entry[3]["enabled"]
+			continue
+		Step := HotstringsSectionCachedRows(Entry[1], Entry[2], Entry[3], Entry[4])
+		if !Step {
+			LoggerInfo("Hotstrings", "Section [{1}.{2}] is not served by the cache: the emoji and symbol sections load before ready.",
+				HotstringCategoryLogName(Entry[1]), Entry[2])
+			_RegisterEmojisSymbolsSections()
+			return false
+		}
+		Steps.Push(Step)
 	}
+	if Steps.Length
+		HSE_DeferRegistration("Emoji/symbol hotstrings", Steps)
+	return true
 }
 
 ; Registers the magic-key text-expansion sections into the HSE. Shared by the boot

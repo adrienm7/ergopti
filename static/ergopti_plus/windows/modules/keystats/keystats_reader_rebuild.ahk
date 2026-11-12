@@ -197,6 +197,10 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 		Resumed := _KLR_RebuildResume(State)
 		if !Resumed && !KLR_LoadSchema(db)
 			throw KLRRebuildRefusal("schema.sql missing or invalid")
+		; A checkpoint written before the utc_offset_min column gains it here, or
+		; every newer ledger row it resumes with would be refused.
+		if Resumed && !KLR_LoadPurgeSchema(db)
+			throw KLRRebuildRefusal("the resumed checkpoint could not take the current purge schema")
 		if !KLR_EnsureTypingProjectionTable(db) || !_KLR_RebuildInstallFirstWins(db)
 			throw KLRRebuildRefusal("temporary rebuild storage could not be prepared")
 		try LoggerStart("KLReader", "Newest-first metrics rebuild of {1} byte(s) in {2} ledger(s), {3} byte(s) resumed.",

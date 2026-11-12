@@ -1,24 +1,33 @@
 # physical_shortcuts (Windows)
 
-STATUS: unavailable; the native Windows host and physical input implementation
-are pending validation on the maintainer's Windows PC.
+STATUS: host and editor built; delivery refused. `PhysicalShortcutDeliveryAvailable`
+(`host.ahk`) answers false until the maintainer qualifies physical delivery on
+real Windows hardware (maintainer decision of 2026-11-11). The menu row is
+therefore greyed with `physical_shortcuts.delivery_unqualified`, the editor
+stays closed and no scope is captured.
 
-This Convention S marker records the feature's canonical driver path. It does
-not provide a runtime module, a bridge, a synthetic input adapter or a stub.
-The canonical shortcut menu keeps the editor disabled on Windows with its
-translated unavailable reason.
+The page, its strings and its policy are shared: `_shared/ui/physical_shortcuts/`
+is the page; this folder ports the Lua owners the page talks to, as the Windows
+driver has no Lua runtime.
 
-The form and policy live in `_shared/ui/physical_shortcuts/` and the shared
-`shortcuts.physical_slots`, `shortcuts.physical_entries` and physical editor
-modules. Native availability remains a separate decision: a structural
-counterpart and shared assets do not prove native keyboard support.
+- `slots.ahk` — `physical_slots.lua`: canonical `physical_<mods>_<W3C code>`
+  slots and the registry's `ahk` scan code (`SCnnn`).
+- `editor.ahk` — `physical_entries.lua`, `physical_editor.lua` and
+  `physical_editor_window.lua`: the planner, the page session (drafts, exact
+  source receipts, one key per capture request) and the closed message
+  protocol. The init packet carries `names` from the shared key name table
+  (`KeyNamePhysicalLabel`), never an id or a W3C code.
+- `host.ahk` — the WebView2 host (`PhysicalShortcutsWindow extends
+WebViewHost`, WebView only: no native fallback), the configuration scope
+  (`PhysicalShortcutsScope`) and the menu port (`PhysicalEditorMenu`,
+  `physical_editor_menu.lua`).
 
-Windows continuation requires a WebView2 host with exact window/bridge lifetime
-ownership, authoritative configuration receipts and acknowledged joint edits.
-Its init packet must carry `names` from the shared key name table, as
-`shortcuts.physical_editor_window` builds it: the page shows no key id or W3C
-code. Its physical input owner must qualify physical positions, modifiers, collision
-checks and output retirement with the shared model. Stale callbacks, refused
-cleanup and private parameter/source changes must refuse publication. Validate
-these contracts on Windows before enabling the canonical menu entry; retain
-all existing shortcut settings and legacy menus during that work.
+Key position capture is `KHCapturePosition` / `KHCancelPosition` /
+`KHPositionCaptureAvailable` in `adapters/keyboard_hook.ahk`: one key-down of
+the shared InputHook, physically down, hands `native_code` (`SCnnn`) and the
+physically held `mods`; AltGr is refused, nothing is suppressed.
+
+Before the getter may answer true, Windows also needs a collision owner (the
+Linux `physical_collisions` counterpart): `PhysicalShortcutsScope.Edit` refuses
+every mapping without one, and a delivery owner that dispatches a bound
+physical slot. The hardware qualification steps are in TODO.md.

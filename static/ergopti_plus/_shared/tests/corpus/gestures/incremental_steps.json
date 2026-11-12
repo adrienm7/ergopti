@@ -1,0 +1,38 @@
+{
+	"_comment": "The incremental swipe step rule of _shared/lua/gestures/incremental.lua, replayed by the macOS and Linux suites through that module and by the Windows suite through its port (windows/modules/gestures/incremental.ahk). Distances and steps are millimetres of travel along the swipe axis. steps = 0 below the first step (the smaller of first_step and the slot's step), then 1 + floor((distance - first) / step). reverse_min is how far a swipe must come back from its last action to reverse: the larger of the engine floor and half the first step. invalid lists inputs every consumer must refuse; non-finite numbers, which JSON cannot carry, are each consumer's own test.",
+	"first_step": 4.0,
+	"max_actions_per_frame": 100,
+	"reverse_floor_mm": 1.0,
+	"steps": [
+		{ "id": "nothing_before_any_travel", "distance": 0, "step": 3.5, "steps": 0 },
+		{ "id": "just_below_the_first_step", "distance": 3.99, "step": 6, "steps": 0 },
+		{ "id": "at_the_first_step", "distance": 4, "step": 6, "steps": 1 },
+		{ "id": "just_below_the_second", "distance": 9.99, "step": 6, "steps": 1 },
+		{ "id": "at_the_second", "distance": 10, "step": 6, "steps": 2 },
+		{ "id": "default_step_below_its_first", "distance": 3.49, "step": 3.5, "steps": 0 },
+		{ "id": "default_step_first", "distance": 3.5, "step": 3.5, "steps": 1 },
+		{ "id": "default_step_before_second", "distance": 6.99, "step": 3.5, "steps": 1 },
+		{ "id": "default_step_second", "distance": 7, "step": 3.5, "steps": 2 },
+		{ "id": "default_step_fourth", "distance": 14, "step": 3.5, "steps": 4 },
+		{ "id": "small_step_below_its_first", "distance": 1.99, "step": 2, "steps": 0 },
+		{ "id": "small_step_fires_after_one_step", "distance": 2, "step": 2, "steps": 1 },
+		{ "id": "small_step_second", "distance": 4, "step": 2, "steps": 2 },
+		{ "id": "smallest_step_below_its_first", "distance": 0.99, "step": 1, "steps": 0 },
+		{ "id": "smallest_step_full_swipe", "distance": 45, "step": 1, "steps": 45 },
+		{ "id": "large_step_still_fires_once", "distance": 24.99, "step": 25, "steps": 1 },
+		{ "id": "large_step_second", "distance": 29, "step": 25, "steps": 2 },
+		{ "id": "largest_step_one_action", "distance": 63.99, "step": 60, "steps": 1 }
+	],
+	"reverse_min": [
+		{ "id": "half_the_first_step", "step": 6, "floor": 0.5, "reverse_min": 2 },
+		{ "id": "floor_wins_over_half_a_small_step", "step": 2, "floor": 1.5, "reverse_min": 1.5 },
+		{ "id": "half_the_default_step", "step": 3.5, "floor": 1, "reverse_min": 1.75 },
+		{ "id": "smallest_step_at_the_floor", "step": 1, "floor": 1, "reverse_min": 1 },
+		{ "id": "large_step_half_the_first", "step": 25, "floor": 1, "reverse_min": 2 }
+	],
+	"invalid": [
+		{ "id": "negative_distance", "distance": -1, "step": 3.5 },
+		{ "id": "zero_step", "distance": 10, "step": 0 },
+		{ "id": "negative_step", "distance": 10, "step": -1 }
+	]
+}

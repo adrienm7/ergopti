@@ -785,7 +785,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			i18n.init()
 			local before_locale = i18n.get_locale()
 			os.rename = function(from, to)
-				if from == storage_path .. ".tmp" and to == storage_path then
+				if from == helpers.stage_path(storage_path) and to == storage_path then
 					captured.storage_attempts = captured.storage_attempts + 1
 					if options.rename == "throw" then error("owned locale rename refused") end
 					if options.rename == "false" then return nil, "owned locale rename refused", 13 end
@@ -833,7 +833,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		end, debug.traceback)
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-		os.remove(storage_path .. ".tmp"); os.remove(storage_path); os.remove(config_path)
+		os.remove(helpers.stage_path(storage_path)); os.remove(storage_path); os.remove(config_path)
 		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak "
 			.. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER)

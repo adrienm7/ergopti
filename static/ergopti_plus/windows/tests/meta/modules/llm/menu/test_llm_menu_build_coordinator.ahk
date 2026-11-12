@@ -311,7 +311,7 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot", "initMenu", "LLM_Menu_TrayTitle",
 			"_MI_TopLevelBuilders", "_MI_StageTopLevel", "_MI_StageLlm",
 			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle",
-			"TrayMenuRebindSubmenu"] {
+			"TrayMenuRebindSubmenu", "MenuDeferOrBuild"] {
 		Body := ReadBody.Call(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
@@ -354,6 +354,9 @@ global _LLM_Menu_Handle := 0, _LLM_Menu_InTray := true
 global _DriverInputInitPending := false, _IniCache := Map(), _LLM_Menu_Loaded := false
 global _TrayMenuStage := false
 global _TrayTitleCache := Map(), _FmtCountCache := Map(), _I18nSortedLocalesCache := false
+global _MenuPopulationBuilding := false
+class MenuPopulation {
+}
 LoggerInfo(Args*) => 0
 LoggerDebug(Args*) => 0
 LoggerError(Args*) => 0
@@ -426,14 +429,21 @@ _MI_StageMetrics() {
  _LMPC_State["siblings"] += 1
  TrayMenuStage_AddFeature("metrics", _LMPC_State["sibling"])
 }
-LLM_Menu_BuildSubmenu() {
+; A root build publishes the IA child deferred, built at its first open; this
+; harness opens it at once, so the recording builder sees the published child.
+MenuDeferred_Create(BuildFn, ListId) {
+ Child := Menu()
+ BuildFn.Call(Child)
+ return Child
+}
+LLM_Menu_BuildSubmenu(Target := 0) {
  global _LMPC_State
  State := _LMPC_State
  State["builds"] += 1
  if State["prepared"]
   State["prepared"] := false
  else State["queued"] += 1
- Candidate := Menu()
+ Candidate := (Target is Menu) ? Target : Menu()
  State["candidates"].Push(Candidate)
  return Candidate
 }

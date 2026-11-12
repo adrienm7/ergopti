@@ -16,7 +16,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"keystats-prefetch-range", "uia-selection-worker",
 		"keystats-text-migration", "keep-awake", "gesture-left-hold",
 		"gesture-right-hold", "caps-word", "hotstring-engine", "user-hotstrings",
-		"keyboard-layout", "wpm-tray-readout"
+		"keyboard-layout", "wpm-tray-readout", "raw-touchpad"
 	],
 	"resume", [
 		"user-programs", "navigation-event", "hotstring-prefix-watcher", "prefix-buffer",

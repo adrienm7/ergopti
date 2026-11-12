@@ -56,13 +56,16 @@ physical key observer releases the held buttons ahead of its privacy gate.
   re-arms it (`engine.lua` x1 branch of `triggerLiveAxisIfNeeded`), so one
   touch that goes right then back left fires two; Windows and Linux fire one
   action from the finished swipe.
-- **GSD-2, the Linux swipe threshold in device units.** Already recorded as
-  policy (linux-gestures report). Since the contact-join change
-  `start_reading` reads the pad's resolution but still creates the decoder
-  without `swipe_threshold`: the tracker counts millimetres while the
-  decoder's swipe minimum and pair-scroll travel stay 120 units (about 10 mm
-  at 12 units/mm, 4 mm at 30); the comment in `mt_decoder.lua` claiming a
-  scaled threshold is stale.
+- **GSD-2, the Linux swipe threshold in device units.** Decided by the
+  maintainer on 2026-11-11: the decoder's swipe minimum and pair-scroll travel
+  are millimetres through the pad's resolution, from the shared timings
+  registry's `[gestures]` `decoder_swipe_minimum_mm` and
+  `pair_scroll_travel_mm` (10.0 each, the former 120 units at 12 units per
+  mm, decided by the coordinator on 2026-11-11, to review by the maintainer)
+  and `touchpad_fallback_units_per_mm` for a pad reporting none; the stale
+  `mt_decoder.lua` comment is gone and
+  `test-gesture-defaults-single-source.cjs` pins the values
+  (`gsd2-decoder-mm`). Windows: no change (finished swipes).
 - **GSD-3, the two-finger incremental minimum.** The Linux tracker uses
   1.5 mm for every finger count; macOS 3.0 (diagonal 5.0) for two fingers
   (`geometry.lua`). Matters only for a two-finger incremental slot. Decided

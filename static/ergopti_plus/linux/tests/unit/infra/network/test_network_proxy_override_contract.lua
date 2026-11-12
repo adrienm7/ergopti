@@ -56,7 +56,7 @@ helpers.it("proxy edit refuses a source changed during staged publication", func
         local original, replaced = io.open, false
         io.open = function(name, mode)
             local handle, err = original(name, mode)
-            if name ~= path .. ".tmp" or mode ~= "wx" or not handle then return handle, err end
+            if name ~= helpers.stage_path(path) or mode ~= "wx" or not handle then return handle, err end
             return {
                 write = function(_, bytes) return handle:write(bytes) end,
                 close = function()
@@ -74,7 +74,7 @@ helpers.it("proxy edit refuses a source changed during staged publication", func
         if has_uv then
             uv.fs_open = function(name, mode, permissions)
                 local fd, err = uv_open(name, mode, permissions)
-                if name == path .. ".tmp" and mode == "wx" then staged_fd = fd end
+                if name == helpers.stage_path(path) and mode == "wx" then staged_fd = fd end
                 return fd, err
             end
             uv.fs_close = function(fd)

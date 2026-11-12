@@ -37,31 +37,44 @@ to read, or no owner able to restore the formats, still refuses before the
 clipboard changes. On Wayland, `wl-paste` falls back to an offered type, so
 the case did not arise there.
 
-## Decisions pending (behaviour left unchanged)
+## Decided
 
-- **ADD-1, password-manager applications.** macOS treats every field of a
-  listed password manager (1Password, Bitwarden, KeePassXC…) as secure
-  (`macos/modules/keymap/utils.lua` `isSecureApp`), so hotstrings and keymap
-  output are inert there. Linux (`adapters/secure_field_detector.lua`
-  `isSecureApp`) and Windows (`SFD_IsSecureApp`) keep such a list with no
-  production caller, and the Linux keystats comment that says the list is
-  « consulted in addition » is not true; the three lists also differ.
-  Recommendation: make the app-wide gate the contract on the three drivers,
-  from one shared list.
-- **ADD-2, restoring an empty clipboard.** Linux restores a clipboard nobody
-  owned as an owned empty string (pinned, `clipboard-unowned-empty`); macOS
-  clears the pasteboard and Windows restores an empty `ClipboardAll`.
-  Clipboard managers record the empty entry on Linux.
-- **ADD-3, the Linux application identity.** X11 reports `/proc/<pid>/comm`,
-  which the kernel cuts to 15 bytes (`window_info.lua`); Wayland reports the
-  `app_id` or window class. An exclusion list built under one session type
-  stops matching under the other. A change needs a migration of saved
-  exclusion lists.
+- **ADD-1, password-manager applications** (decided by the maintainer on
+  2026-11-11): every application of `_shared/data/secure_apps.json` (the
+  three driver lists merged) is a secure field as a whole on the three
+  drivers. macOS `isSecureApp` and Linux `isSecureApp` and the metrics read
+  the file (rule `_shared/lua/secure_apps.lua`); Linux
+  `keystats.is_context_protected` protects a listed application whatever the
+  metrics filters say, and the focus guard publishes that verdict to every
+  text consumer (hotstrings, AI, clipboard borrowers). The keystats comment
+  claiming the detector list was « consulted in addition » is replaced.
+  Regressions `add1-secure-app`; gate `test-secure-apps-single-source.cjs`.
+  Windows counterpart, for the maintainer
+  (`adapters/secure_field_detector.ahk`): build `SFD_SECURE_APPS` from the
+  file's `windows` names (a `Map` with `CaseSense := "Off"`, a read or parse
+  failure treating every application as secure), and return true at the top
+  of `SFD_IsSecureField` when `SFD_IsSecureApp` holds the focused window's
+  process name (`WinGetProcessName`); test in `test_secure_field_detector.ahk`
+  that a `RoboForm.exe` window is secure.
+- **ADD-2, restoring an empty clipboard** (decided by the maintainer on
+  2026-11-11): a Linux borrow of a clipboard nobody owned gives it back
+  unowned, as macOS clears its pasteboard (`clipboard.lua` snapshot
+  `unowned`, `x11_selection_stamp.disown`, `wl-copy --clear`), no longer as
+  an owned empty string. Regressions `clipboard-unowned-empty`, updated
+  deliberately. Windows: no change (an empty `ClipboardAll` empties the
+  clipboard).
+- **ADD-3, the Linux application identity** (decided by the maintainer on
+  2026-11-11): X11 reports the `WM_CLASS` class (`x11_focus.window_class`),
+  the identity Wayland's app_id and class already gave; `/proc/<pid>/comm`
+  (cut to 15 bytes) is only the fallback. Saved exclusion lists are
+  converted once (`infra/app_identity_migration.lua`, table
+  `_shared/data/linux_app_identities.json`), unknown entries kept and
+  logged. Regressions `add3-app-identity`. macOS and Windows: no change.
 
 ## Windows, report only
 
 `SFD_IsSecureApp` (`secure_field_detector.ahk:604`) has no production
-caller; it rides on ADD-1.
+caller; ADD-1 above gives its counterpart.
 
 ## Refuted
 

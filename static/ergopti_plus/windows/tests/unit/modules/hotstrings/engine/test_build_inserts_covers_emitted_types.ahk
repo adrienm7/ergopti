@@ -49,15 +49,68 @@ global _BICE_NOT_EVENT_TYPES := ["llm_", "shortcut"]
 ; ==================================================================
 ; ==================================================================
 
-; Event type literals as the keystats actually emits them.
-_BICE_EmittedTypes() {
+; The bracket that directly encloses each position, read outside string
+; literals. An emitter writes its type as a key/value pair of a Map(...) call;
+; a builder lists the entry fields it keeps out of meta_json as an array
+; ["type", "timestamp", ...], whose pair of literals is no event type.
+; @param Src {String} Comment-stripped source.
+; @param Positions {Map} 1-based positions to classify (keys).
+; @returns {Map} Position -> "(", "[", "{" or "" at top level.
+_BICE_EnclosingBrackets(Src, Positions) {
+	Result := Map()
+	Stack := []
+	Quote := ""
+	Idx := 1
+	Len := StrLen(Src)
+	while (Idx <= Len) {
+		Ch := SubStr(Src, Idx, 1)
+		if (Quote != "") {
+			; A literal never spans a line, so a stray quote cannot run on.
+			if (Ch == Chr(96))
+				Idx += 1
+			else if (Ch == Quote || Ch == "`n")
+				Quote := ""
+			Idx += 1
+			continue
+		}
+		if Positions.Has(Idx)
+			Result[Idx] := Stack.Length ? Stack[Stack.Length] : ""
+		; An inline comment (whitespace then ";") may hold an apostrophe.
+		if (Ch == ";" && Idx > 1 && InStr(" `t", SubStr(Src, Idx - 1, 1))) {
+			Next := InStr(Src, "`n", true, Idx)
+			Idx := Next ? Next : Len + 1
+			continue
+		}
+		if (Ch == '"' || Ch == "'")
+			Quote := Ch
+		else if (Ch == "(" || Ch == "[" || Ch == "{")
+			Stack.Push(Ch)
+		else if ((Ch == ")" || Ch == "]" || Ch == "}") && Stack.Length)
+			Stack.Pop()
+		Idx += 1
+	}
+	return Result
+}
+
+; Event type literals as written by an emitter Map in the given source.
+; @param Src {String} Comment-stripped source.
+; @returns {Map} Type -> true.
+_BICE_TypesIn(Src) {
 	global _BICE_NOT_EVENT_TYPES
-	Src := _StripFullLineComments(_DriverDirConcat("modules/keystats"))
-	Types := Map()
+	Found := []
+	Positions := Map()
 	Pos := 1
 	while (F := RegExMatch(Src, '"type",\s*"([a-z_]+)"', &M, Pos)) {
 		Pos := F + M.Len
-		Name := M[1]
+		Found.Push({pos: F, name: M[1]})
+		Positions[F] := true
+	}
+	Enclosing := _BICE_EnclosingBrackets(Src, Positions)
+	Types := Map()
+	for Match in Found {
+		if (Enclosing[Match.pos] == "[")
+			continue
+		Name := Match.name
 		Skip := false
 		for Excluded in _BICE_NOT_EVENT_TYPES
 			if (Excluded == Name)
@@ -66,6 +119,26 @@ _BICE_EmittedTypes() {
 			Types[Name] := true
 	}
 	return Types
+}
+
+; Event type literals as the keystats actually emits them.
+_BICE_EmittedTypes() {
+	return _BICE_TypesIn(_StripFullLineComments(_DriverDirConcat("modules/keystats")))
+}
+
+; The scan reads emitter Maps, not a builder's list of excluded entry fields:
+; KL_BuildInsertKindRow's callers once made "timestamp" look like an emitted
+; type. A string or an inline comment holding a bracket or an apostrophe must
+; not shift the reading either.
+_BICE_ScanSeparatesEmittersFromFieldLists() {
+	Src := 'e := Map("type", "mouse_click", "note", "a [ and a (") `; don' . "'" . 't`n'
+		. 'return Build("events_mouse", e, id, ["type", "timestamp", "app"])`n'
+		. 'KL_AppendLog(Map(`n`t"app", App,`n`t"type", "vpn_connected"))`n'
+	Types := _BICE_TypesIn(Src)
+	AssertTrue(Types.Has("mouse_click"), "a one-line emitter Map is read")
+	AssertTrue(Types.Has("vpn_connected"), "a multi-line emitter Map is read")
+	AssertFalse(Types.Has("timestamp"), "an excluded-field array is no emitter")
+	AssertEqual(2, Types.Count)
 }
 
 ; A minimal but well-formed event of the given type. KL_BuildInserts reads
@@ -124,6 +197,8 @@ _BICE_UnknownTypeIsStillSkipped() {
 
 Test("build-inserts-covers-emitted-types: every emitted type produces an insert",
 	_BICE_EveryEmittedTypeIsIngested)
+Test("build-inserts-covers-emitted-types: the scan reads emitter maps, not excluded-field lists",
+	_BICE_ScanSeparatesEmittersFromFieldLists)
 Test("build-inserts-covers-emitted-types: the LLM failure event lands in events_system",
 	_BICE_LlmFailureLandsInEventsSystem)
 Test("build-inserts-covers-emitted-types: an unknown type is still skipped",

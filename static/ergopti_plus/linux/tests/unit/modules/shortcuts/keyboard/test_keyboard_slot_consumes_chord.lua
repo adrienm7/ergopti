@@ -114,17 +114,31 @@ helpers.describe("Linux keyboard slots under the grab (keyboard-slot-consume)", 
 		end)
 	end)
 
-	helpers.it("forwards a bound chord a pause holds back, but not script control", function()
+	-- SCD-1 (decided by the maintainer on 2026-11-11): a keyboard slot bound to
+	-- a script action is suspended like every other slot, as on Windows and
+	-- macOS; the AltGr script chords are the way back.
+	helpers.it("forwards every bound chord a pause holds back, script control included (scd1-slot-paused)", function()
 		with_fixture({
 			["shortcuts.keyboard.primary_j"] = "select_line",
 			["shortcuts.keyboard.primary_r"] = "script_reload",
 		}, function(shortcuts, seen)
 			helpers.assert_eq(shortcuts.consume({ key = "j", mods = { ctrl = true } }, seen.opts(true)), false,
 				"while paused an ordinary binding must not eat the key it no longer runs")
-			helpers.assert_eq(shortcuts.consume({ key = "r", mods = { ctrl = true } }, seen.opts(true)), true,
-				"script control still runs through a pause, so its chord is still claimed")
+			helpers.assert_eq(shortcuts.consume({ key = "r", mods = { ctrl = true } }, seen.opts(true)), false,
+				"a slot bound to script_reload must not run through a pause")
 			seen.tick()
-			helpers.assert_eq(seen.executed[1], "script_reload@keyboard__primary_r")
+			helpers.assert_eq(#seen.executed, 0)
+		end)
+	end)
+
+	helpers.it("refuses a script-action slot the live admission reads as paused (scd1-slot-paused)", function()
+		with_fixture({ ["shortcuts.keyboard.primary_r"] = "script_reload" }, function(shortcuts, seen)
+			local opts = seen.opts(false)
+			opts.admission = function() return { master = true, paused = true, inhibited = false } end
+			helpers.assert_eq(shortcuts.consume({ key = "r", mods = { ctrl = true } }, opts), false,
+				"a paused native admission must stop a script-action slot like every other slot")
+			seen.tick()
+			helpers.assert_eq(#seen.executed, 0)
 		end)
 	end)
 

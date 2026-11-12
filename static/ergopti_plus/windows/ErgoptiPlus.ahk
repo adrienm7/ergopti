@@ -27,7 +27,7 @@
 ; Before any other statement a worker therefore releases those hotkeys and takes
 ; a title of its own. Every predicate reads only A_Args and is hoisted.
 global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
-	|| BundledApp_IsInvocation()
+	|| BundledApp_IsInvocation() || KbdRegister_IsInvocation()
 if _DriverIsDetachedWorker {
 	Suspend(true)
 	; A pure HWND reaches the hidden main window whatever DetectHiddenWindows
@@ -581,6 +581,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/keylayout/keylayout_parser.ahk
 #Include modules/keymap/keylayout/keylayout_tables.ahk
 #Include modules/keymap/keylayout/keylayout_emulation.ahk
+#Include modules/keymap/keylayout/source_emulation.ahk
 #Include modules/keymap/keylayout/layout_registry.ahk
 #Include modules/keymap/keylayout/layout_catalogue.ahk
 #Include modules/keymap/keylayout/layout_extension.ahk
@@ -647,6 +648,11 @@ if KLPF_IsWorkerInvocation()
 #Include apps/bundled_apps.ahk
 if BundledApp_IsInvocation()
 	BundledApp_Main(_SharedDir)
+; The elevated keyboard layout DLL registration (ui/layout_manager/kbd_register.ahk
+; in a source run) reuses this executable too, and exits from there.
+#Include ui/layout_manager/kbd_register_core.ahk
+if KbdRegister_IsInvocation()
+	KbdRegister_Main()
 KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
@@ -1416,10 +1422,12 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/init.ahk
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
+#Include ui/layout_manager/source_store.ahk
 #Include ui/field_check/network_check.ahk
 #Include ui/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
+#Include ui/physical_shortcuts/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk
 
@@ -1480,12 +1488,15 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; process stuck on the AltGr layer for the first keystrokes (transient
 ; « AltGr bloqué »). See _ReleasePhantomModifiers in infra/lifecycle.ahk.
 _ReleasePhantomModifiers()
-; Ready is an output contract: every advertised trigger, including emoji/symbol
-; sections and its preview index, must exist before the driver publishes ready.
-; Deferring these ~3000 registrations after ready made a first emoji/symbol trigger
-; literal for seconds and allowed the timer to stall the first typing burst.
+; Every trigger registers before ready except the emoji and symbol sections (about
+; 1,600 rows, 400 ms): their sequence block is reserved at their inline
+; position, so the collision tie-break is unchanged, and their rows register in
+; slices of a few tens of ms once ready (HSE_DeferredRegistrationStart below). An
+; earlier deferral ran them as one 1.5 s-late block that stalled the first typing
+; burst; a slice holds the keyboard for at most its budget. The preview catalogue
+; is built from the cache, complete, before ready.
 BootProfile_StageBegin("hotstrings")
-_BootHotstringsReceipt := RegisterAllHotstrings(false, true)
+_BootHotstringsReceipt := RegisterAllHotstrings(true, true)
 if !(_BootHotstringsReceipt is Map) || !_BootHotstringsReceipt.Get("committed", false)
 	throw Error("Cold hotstring registration did not return a committed receipt.")
 BootProfile_StageEnd("hotstrings")
@@ -1574,6 +1585,8 @@ PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepComp
 PerfCounters_Flush()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 _DriverBootTailPending := false
+; The emoji and symbol rows the hotstring stage queued at their boot rank.
+HSE_DeferredRegistrationStart()
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
 ; A tray clicked while the keyboard was registering opens now, from a timer, and
@@ -1755,6 +1768,8 @@ global _PENDING_KEYBOARD_HKL := 0
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
+; Sees a keyboard-layout registry change at once and runs the poll's capture.
+#Include modules/keymap/layout_registry_watch.ahk
 ; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
 #Include modules/keymap/pause_layout_switch.ahk
 #Include modules/keymap/system_layout_install.ahk
@@ -1802,3 +1817,5 @@ CheckKeyboardLayoutChange() {
 }
 AltGrFamilyStartFollowing()
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)
+; The poll stays the backstop; the watch captures a registry change at once.
+LayoutRegistryWatch_Start(CheckKeyboardLayoutChange)

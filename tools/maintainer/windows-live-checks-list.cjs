@@ -1778,7 +1778,7 @@ const CHECKS = [
 		title: 'The oldest supported config.toml climbs the registry at boot and keeps its actions',
 		async run(context) {
 			const version = registryVersion('core/config_schema/migrations.toml');
-			// Spellings Windows 1.0.0 wrote: the registry's oldest supported version.
+			// Spellings Windows 1.0.9 wrote: the registry's oldest supported version.
 			const old = [
 				'# from an old build',
 				'[_meta]',
@@ -1787,14 +1787,17 @@ const CHECKS = [
 				"locale = 'en'",
 				'[category_enabled]',
 				'shortcuts = true',
-				'dynamichotstrings = false',
 				'[llm]',
 				"trigger_shortcut = '^!a'",
 				'[hotstrings]',
-				'cascade_depth = 2',
+				'cascade_max_arrows = 3',
+				'[hotstrings.dynamic]',
+				'enabled = false',
+				'[hotstrings.order_overrides]',
+				'magickey = ["text_expansion", "replace"]',
 				'[shortcuts.keyboard]',
-				'ctrl_g = "open_hotstrings_editor"',
-				'win_e = "search_web"',
+				'primary_g = "open_hotstrings_editor"',
+				'meta_e = "search_web"',
 				''
 			].join('\n');
 			const session = context.newSession('oldconfig');
@@ -1812,6 +1815,8 @@ const CHECKS = [
 				'shortcuts.keyboard.meta_e': '"search_web"',
 				[KEY.HOTSTRINGS_DYNAMIC_ENABLED]: 'false',
 				[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: '3',
+				// The v20 -> v21 step copies the neutral order to the French group id.
+				'hotstrings.order_overrides.french_magickey': '["text_expansion","replace"]',
 				'llm.trigger_shortcut': '"^!a"'
 			};
 			for (const [key, value] of Object.entries(want))
@@ -1835,8 +1840,9 @@ const CHECKS = [
 		id: 'too-old-config-refused',
 		title: 'A config.toml older than the registry is refused in words and left byte for byte',
 		async run(context) {
-			// What a pre-release left: only a real stamp below the floor is refused.
-			const old = "# from a pre-release\n[_meta]\nschema_version = 11\n[script]\nlocale = 'en'\n";
+			// What 1.0.8 left: a released stamp below the squashed floor is refused.
+			const old =
+				"# from ErgoptiPlus 1.0.8\n[_meta]\nschema_version = 16\n[script]\nlocale = 'en'\n";
 			const session = context.newSession('tooold');
 			session.seed('autohotkey/config.toml', old);
 			await session.start();

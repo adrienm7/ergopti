@@ -3427,6 +3427,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
+          python3 static/ergopti_plus/linux/tests/hardware/test_llm_selection_focus_state.py
           python3 static/ergopti_plus/linux/tests/hardware/run_llm_selection_focus.py
           else
               exit 1
@@ -4442,14 +4443,14 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          # The installer switches through GNOME's input-source setting: dconf on a
-          # private session bus stands in for the desktop's settings store.
+          # The installer switches through GNOME's input-source setting: dconf on the
+          # probe's own private session bus stands in for the desktop's settings store.
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends x11-xkb-utils \
             dconf-service dconf-gsettings-backend gsettings-desktop-schemas dbus-daemon dbus-bin libglib2.0-bin
           export LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;"
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          dbus-run-session -- xvfb-run -a -s "-noreset" luajit tests/hardware/run_layout_editor_webview.lua ../../../static/layouts/sources/ergopti.toml
+          xvfb-run -a -s "-noreset" luajit tests/hardware/run_layout_editor_webview.lua ../../../static/layouts/sources/ergopti.toml
           else
               exit 1
           fi

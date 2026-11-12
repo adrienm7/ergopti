@@ -210,12 +210,17 @@ local function focused_x11()
 		return info, _x11_cache.identity, _x11_cache.pid
 	end
 
-	-- The identity is the process name, deliberately, and not WM_CLASS. It is
-	-- what this driver has always reported, what the keystroke metrics are
-	-- already attributed to, and what the other two drivers report; WM_CLASS
-	-- would be a nicer identity and a silent break of every stored attribution.
+	-- One identity under X11 and Wayland (ADD-3, decided by the maintainer on
+	-- 2026-11-11): the WM_CLASS class, the name sway and the desktop
+	-- compositors report, so an exclusion list built under one session type
+	-- matches under the other. /proc/<pid>/comm is only the fallback for a
+	-- window without WM_CLASS (or without the native transport): the kernel
+	-- cuts it to 15 bytes (TASK_COMM_LEN 16 with its NUL), so
+	-- gnome-terminal-server reads « gnome-terminal- ». Saved lists were
+	-- converted once by infra/app_identity_migration.lua.
 	local pid = native_pid
-	info.appId = comm_of(pid)
+	local class = native_reason == nil and X11Focus.has_transport() and X11Focus.window_class(win_id) or nil
+	info.appId = (type(class) == "string" and class ~= "") and class or comm_of(pid)
 
 	_x11_cache.id = win_id
 	_x11_cache.title = title
@@ -242,16 +247,18 @@ function M._parse_wmctrl_list(text)
 	return windows
 end
 
---- WindowInfo tables for a list of { title, pid } windows, naming each owner by its
---- process (one /proc read per process).
---- @param windows table Array of { title, pid }.
+--- WindowInfo tables for a list of { title, pid, class } windows, naming each by
+--- its WM_CLASS class, else its process (one /proc read per process).
+--- @param windows table Array of { title, pid, class }.
 --- @return table
 local function infos_of_windows(windows)
 	local infos, names = {}, {}
 	for _, window in ipairs(windows) do
 		local entry = empty_info()
 		entry.windowTitle = window.title
-		if window.pid and window.pid > 0 then
+		if type(window.class) == "string" and window.class ~= "" then
+			entry.appId = window.class
+		elseif window.pid and window.pid > 0 then
 			if names[window.pid] == nil then names[window.pid] = _read_proc_comm(window.pid) end
 			entry.appId = names[window.pid]
 		end
@@ -260,8 +267,8 @@ local function infos_of_windows(windows)
 	return infos
 end
 
---- Lists every managed window from the X server (libxcb in this process, else one wmctrl query), each named by the process
---- name focused_x11() reports, read from /proc without a spawn per window:
+--- Lists every managed window from the X server (libxcb in this process, else one wmctrl query), each named by the
+--- identity focused_x11() reports (WM_CLASS, else the process name read from /proc without a spawn per window):
 --- the excluded-applications picker builds this list on the menu path.
 --- @return table Array of WindowInfo.
 local function all_x11()

@@ -209,7 +209,7 @@ logged `Deferred submenu 'hotstrings_menu'` build and fails if none was logged.
 
 ### project-ahk-menu-submenus-build-at-first-open
 
-Layout, Hotstrings, each hotstring category, Shortcuts and Tap-holds are published
+Layout, Hotstrings, each hotstring category, Shortcuts, Tap-holds and AI are published
 with one disabled placeholder row and built in `WM_INITMENUPOPUP`, before paint,
 from the state of that moment (`MenuDeferred_*`, infra/menu_population.ahk). The
 placeholder keeps the row a parent: a declared group with an empty child is not
@@ -218,8 +218,10 @@ submenu opened next. Deferred children live in one global map because `SubMenus`
 outlives a refused publication and reaches the tray through the updater's bare
 `initMenu`. A log line a test reads must be `Format`ted first: the logger folds
 repeats of one template, and the Hotstrings line vanished behind the category
-builds. AI, Gestures and About stay eager: AI owns a persistent handle and
-hotkeys, and `BuildGesturesMenu` registers a menu watcher. A real popup can be
+builds. The AI handle is the published placeholder child itself
+(`MenuDeferOrBuild(LLM_Menu_BuildSubmenu, ...)`), so a narrow AI repaint still
+swaps that one row; its hotkeys belong to `LLM_Menu_ActivateRuntime`, not to the
+rows. Gestures and About stay eager: `BuildGesturesMenu` registers a menu watcher. A real popup can be
 driven from a test through `WM_ENTERIDLE` (test_menu_deferred_children.ahk): keys
 posted before `Show` are not consumed, and a bounded idle count must end the menu.
 
@@ -1196,9 +1198,10 @@ the Hotstrings master left every family on) and the dynamic gate in
 `ApplyMasterGatesToFeatures`. They now walk on into a member when the next path
 segment is a nested Map. Action: a new group switch beside nested features
 needs the same rule in any reader that stops at `enabled`. Windows has no
-`category_enabled.dynamichotstrings`: the retired spelling is renamed by the
-v12 to v13 config step, which also writes the master on for a configuration
-without one so live families stay live (its neutral default is off).
+`category_enabled.dynamichotstrings`: the retired spelling was renamed by the
+v12 to v13 config step (squashed since; 1.0.9 runs it), which also wrote the
+master on for a configuration without one so live families stayed live (its
+neutral default is off).
 
 ### project-windows-at-rest-store-is-data-sql
 

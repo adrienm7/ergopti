@@ -172,7 +172,7 @@ _KLQCat_SlotRefusals() {
 	}
 	Values := Map("device_id", "d", "id", 7, "ts", "t", "date", "x", "app", "a", "kind", "k", "trigger", "g", "replacement", "r")
 	Sql := KeystatsQuery("events.hotstring", Values)
-	AssertContains(Sql, "'r', NULL, NULL);", "both absent nullable slots are NULL")
+	AssertContains(Sql, "'r', NULL, NULL, NULL);", "the three absent nullable slots, utc_offset_min last, are NULL")
 	Values["id"] := "not a number"
 	AssertThrows(() => KeystatsQuery("events.hotstring", Values), "a non-number in an integer slot")
 	Values["id"] := 1e308 * 10

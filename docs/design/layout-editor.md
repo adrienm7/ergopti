@@ -71,18 +71,15 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
   same save and the remap manager reload) and answers `window.navResult({saved, applied, errors})`. The navigation
   layer editor window keeps working: Windows still needs it. Decided by the coordinator on 2026-11-11, to review by
   the maintainer.
-- **ErgoptiPlus, Windows (maintainer).** Until then the shared page shows the composer there; the full plan is in
-  [Windows host](#windows-host).
-  `windows/ui/layout_manager/init.ahk` needs `source_open`, `source_save` (and `source_pick` only if WebView2's own
-  file chooser is not enough) in
-  `LAYMGR_ACTIONS`, `source_editor: true` in its `initData`, and the store's rules: a plain lowercase file name
-  `^[a-z][a-z0-9_]*\.(toml|keylayout)$` of at most `max_name_length` characters, non-empty UTF-8 text of at most
-  `max_file_bytes`, written in `layout_sources\` of the driver's configuration folder, the last source name in
-  `last_file`, results pushed as `sourceData` / `sourceResult` through the WebView2 `ExecuteScript` path the page
-  already uses; `windows/ui/layout_manager/composer.ahk` needs to accept `composer_save` with `source` for « Install
-  and use », and `nav_save` routed to the AHK navigation layer editor's save with `nav_apply: true` in `initData`
-  for « Apply the navigation layer ». Then drop `windowsPending` in `tools/test/test-layout-manager-page.cjs`, and retire the composer
-  section (`layout_composer/composer_page.js` and its markup) once no host shows it.
+- **ErgoptiPlus, Windows.** Done on 2026-11-12 as planned in [Windows host](#windows-host): `init.ahk` accepts
+  every action of the page (`source_pick` is refused there, WebView2's own file chooser opens files) and sends
+  `source_editor`, `emulate` and `nav_apply`; the layout editor's strings travel with `sourceData`, since this host
+  does not seed `window._i18n_strings`; `source_store.ahk` keeps the files; `composer.ahk` takes the source form of
+  `composer_save` and `composer_emulate`; `kbd_register.ahk` is the elevated helper (`kbd_register_core.ahk` holds
+  its steps behind ports; the compiled driver runs them with `--kbd-register`); `keylayout_emulation.ahk` reads the
+  composer copy and performs the emulation table through `source_emulation.ahk`. Left: retire the composer section
+  (`layout_composer/composer_page.js` and its markup) now that no host shows it, and the maintainer's checks on a PC
+  (install, type, uninstall).
 
 ## Windows host
 
@@ -95,7 +92,7 @@ folder layout and `tools/kbd-dll.cjs`. Decided by the coordinator on 2026-11-11,
 | Action                   | Payload                                                      | Host answer                                                                      | Refusal codes                                                                                                         |
 | ------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `source_open`            | —                                                            | `sourceData {text, filename, folder}` (the last saved source, else `text: null`) | —                                                                                                                     |
-| `source_save`            | `{filename, text}`                                           | `sourceResult {ok, code, detail, filename}`                                      | `invalid_name`, `too_large`, `write_failed` (`source_store.lua`)                                                      |
+| `source_save`            | `{filename, text}`                                           | `sourceResult {ok, code, detail, filename}`                                      | `source_invalid_file`, `write_failed` (`source_store.lua`)                                                            |
 | `source_pick` (optional) | —                                                            | `sourcePicked {filename, text} \| {} \| {code, detail}`                          | as `source_save`                                                                                                      |
 | `composer_save`          | `{source, keylayout, emulation?, use: true, dll_name, dlls}` | `composerResult {action, ok, code, detail, used, pending}`                       | `invalid`, `write_failed`, `use_failed`, `install_failed`, `elevation_refused`, `foreign_layout`, `profile_not_added` |
 | `composer_emulate`       | `{source, keylayout, emulation?}`                            | `composerResult {action: "composer_emulate", ok, code, detail, used}`            | `invalid`, `write_failed`, `emulate_not_saved`, `emulate_failed`                                                      |
@@ -136,7 +133,7 @@ emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
 5. `windows/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
    `uninstall <dll>`.
 6. Menu: in `_shared/modules/menu/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
-   (and the locale key `platform_reason.layout_editor_host_pending_on_windows`); in `windows/ui/menu/menu_init.ahk`
+   (and the locale key `platform_reason.layout_editor_is_on_the_website_on_windows`); in `windows/ui/menu/menu_init.ahk`
    bind `Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
 
 **Installing from Windows.** No Node, no NSIS, no clang on the user's PC. The page writes the four DLL images itself
@@ -144,7 +141,7 @@ emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
 [layout-windows-dll.md](layout-windows-dll.md#what-is-proven-and-how)). On a host whose `initData` platform is
 `windows`, `composer_save` adds `dll_name` and `dlls: {x86, wow64, x64, arm64}`, each the image in base64
 (`LayoutSourceIO.installPayload`). The host checks each image before anything is elevated: decoded size at most
-1 MiB, an `MZ` header, and `dll_name` matching `^kbd[a-z0-9_]{1,5}$` (the model's DLL name rule).
+1 MiB, an `MZ` header, and `dll_name` matching `^[a-z][a-z0-9]{0,7}$` (the model's DLL name rule) and equal to the source's `exports.windows.dll_name`.
 
 1. **Staging (unprivileged, `composer.ahk`).** Decode the four images into
    `%LOCALAPPDATA%\Ergopti\layout_composer\dll\<dll>\<arch>\<dll>.dll`, and write `request.json` there:

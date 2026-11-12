@@ -130,12 +130,27 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 	helpers.it("moves a chord of two modifiers to the layout character's key (two-modifier-chord)", function()
 		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
 		M.reload()
-		for _, flags in ipairs({ { cmd = true, shift = true }, { ctrl = true, alt = true } }) do
+		for _, flags in ipairs({ { cmd = true, shift = true }, { cmd = true, alt = true } }) do
 			local e = event(flags, "q")
 			helpers.assert_true(not M.key_down(e, KC_Q), "the chord is kept")
 			helpers.assert_eq(e.keycode, 6, "Z where Ergopti has z")
 			helpers.assert_eq(e.flags, flags, "with the modifiers the hand holds")
 			helpers.assert_nil(e.unicode)
+		end
+	end)
+
+	-- Ctrl+AltGr (Ctrl+Option) sends Ctrl and the logical key with Option
+	-- suspended, as Linux does (ILD-2, decided by the maintainer on 2026-11-11;
+	-- ctrl-altgr-logical).
+	helpers.it("sends Ctrl and the logical key for Ctrl+AltGr, Option suspended (ctrl-altgr-logical)", function()
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
+		M.reload()
+		for _, held in ipairs({ { ctrl = true, alt = true }, { ctrl = true, alt = true, shift = true } }) do
+			local e = event(held, "q")
+			helpers.assert_true(not M.key_down(e, KC_Q), "the chord is kept")
+			helpers.assert_eq(e.keycode, 6, "Ctrl+Z where Ergopti has z")
+			helpers.assert_eq(e.flags, { ctrl = true, shift = held.shift }, "Ctrl kept, Option suspended")
+			helpers.assert_nil(e.unicode, "a chord's text is the application's")
 		end
 	end)
 

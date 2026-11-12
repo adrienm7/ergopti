@@ -1294,17 +1294,15 @@ type = "---"
 type = "command"
 id = "physical_shortcuts_editor"
 i18n = "physical_shortcuts.window_title"
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "physical_shortcuts.windows_unavailable"
 disabled_when = ["physical_shortcuts_editor_ready"]
 disabled_reason_key = "physical_shortcuts.window_unavailable"
-# Windows has no physical shortcut host (no editor, no delivery), as its
-# reason_key says. On macOS and Linux each driver's
+# Every driver hosts the editor. On macOS and Linux each driver's
 # keyboard_shortcuts.physical_delivery_available answers true since the
-# maintainer's decision of 2026-11-11 (LIN-004); should it answer false (the
-# safety refusal is kept), the editor stays closed and the row says so rather
-# than inviting a retry.
+# maintainer's decision of 2026-11-11 (LIN-004); Windows has its host, but its
+# PhysicalShortcutDeliveryAvailable answers false until the maintainer
+# qualifies it on real hardware (decision of 2026-11-11). A getter answering
+# false keeps the editor closed and the row says so rather than inviting a
+# retry.
 disabled_reasons = [
 	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
 ]
@@ -2153,16 +2151,10 @@ i18n = "menu.layout.manage"
 # Opens the layout manager window straight on the unified layout editor: create
 # a layout from scratch or from another, export it for every OS, install it on
 # the system or emulate it without installing it (docs/design/layout-editor.md).
-# Windows: the WebView2 host does not offer the editor's file operations yet, so
-# the row stays greyed with its reason (decided by the coordinator on
-# 2026-11-11, to review by the maintainer).
 [[menu.layout_menu]]
 type = "command"
 id = "open_layout_editor"
 i18n = "menu.layout.edit"
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_editor_host_pending_on_windows"
 
 # The two blocks macOS alone has. It installs a .bundle keyboard layout through
 # TIS — the OS's own input-source mechanism, with a user scope and a system scope
@@ -2947,42 +2939,32 @@ type = "check"
 id = "gesture_mode_single"
 i18n = "menu.gestures.mode_single"
 checked_when = ["gesture_mode_is_single"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_slot_mode_commands]]
 type = "check"
 id = "gesture_mode_incremental"
 i18n = "menu.gestures.mode_incremental"
 checked_when = ["gesture_mode_is_incremental"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "section_header"
 id = "gesture_sensitivity_heading"
 i18n = "menu.gestures.sensitivity_label"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "label"
 id = "gesture_sensitivity_hint"
 i18n = "menu.gestures.sensitivity_hint"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "---"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.gesture_change_action]]
 type = "command"
 id = "gesture_slot_change_action"
 i18n = "menu.gestures.change_action"
 disabled_when = ["gesture_slot_choice_ready"]
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 [[menu.tap_holds_menu]]
@@ -3390,13 +3372,15 @@ platforms = ["hs"]
 unavailable = "hide"
 
 # Fixed swipe child presentation only; native payloads remain actual child owners.
+# Windows renders it too since its raw touchpad reader follows the fingers
+# (modules/gestures/raw_touchpad.ahk); Linux draws its slot rows itself.
 [[menu.gesture_swipe_slot_menu]]
 type = "include"
 section = "gesture_change_action"
 
 [[menu.gesture_swipe_slot_menu]]
 type = "---"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 [[menu.gesture_swipe_slot_menu]]
@@ -3404,7 +3388,7 @@ type = "group"
 id = "gesture_mode_options"
 i18n = "menu.gestures.mode_current"
 caption_getter = "gesture_mode_current_label"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 [[menu.gesture_swipe_slot_menu]]
@@ -3413,7 +3397,7 @@ id = "gesture_sensitivity_options"
 i18n = "menu.gestures.sensitivity_current"
 caption_getter = "gesture_sensitivity_current_label"
 disabled_when = ["gesture_mode_incremental_ready"]
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 unavailable = "hide"
 
 # The fixed separator after each native About version/build identity row.

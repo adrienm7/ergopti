@@ -291,11 +291,46 @@ terminal_hotstring_key_delay_ms = 20
 # value for every driver (maintainer decision GSD-3 of 2026-11-11); the swipe
 # step itself is each slot's own [gestures.sensitivities] setting.
 # HS: modules/gestures/geometry.lua. LX: modules/gestures/incremental_tracker.lua.
-# Windows receives each swipe finished by the Precision Touchpad settings and
-# measures no travel, so it reads none of them.
+# AHK: modules/gestures/raw_touchpad.ahk, from the raw HID digitizer reports.
 swipe_minimum_mm = 1.5
 pair_swipe_minimum_mm = 3.0
 pair_diagonal_minimum_mm = 5.0
+
+# The Linux contact decoder's own distances, in millimetres through the
+# touchpad's resolution (maintainer decision GSD-2 of 2026-11-11): the travel a
+# finished swipe needs before it has a direction, and the travel after which a
+# pair that landed is a scroll, so a finger joining it is a resting thumb. Both
+# were 120 device units, which is this 10 mm on a pad of 12 units per mm and
+# 4 mm on one of 30 (the value kept: decided by the coordinator on 2026-11-11,
+# to review by the maintainer). A pad that reports neither its resolution nor
+# its axes is read at the fallback resolution.
+# LX: modules/gestures/mt_decoder.lua.
+decoder_swipe_minimum_mm = 10.0
+pair_scroll_travel_mm = 10.0
+touchpad_fallback_units_per_mm = 12
+
+# The incremental swipe step rule and the live direction lock, for a driver
+# that cannot require the shared Lua modules: travel before the first action
+# (FIRST_STEP), the most actions one frame may earn before a sensor jump is
+# refused (MAX_ACTIONS_PER_FRAME), the smallest reversal (macOS LIVE_AXIS_MIN,
+# Linux REVERSE_FLOOR_MM), the straight-axis sector (AXIS_MAX_DEGREES) and a
+# diagonal's minimum as a factor of the swipe's (DIAGONAL_MINIMUM_FACTOR). The
+# shared corpora (_shared/tests/corpus/gestures/incremental_steps.json and
+# direction_vectors.json) pin these to the Lua constants on every driver.
+# HS, LX: _shared/lua/gestures/incremental.lua, direction.lua.
+# AHK: modules/gestures/incremental.ahk, direction.ahk.
+incremental_first_step_mm = 4.0
+incremental_max_actions_per_frame = 100
+incremental_reverse_floor_mm = 1.0
+swipe_axis_max_degrees = 25
+swipe_diagonal_minimum_factor = 1.5
+
+# Windows: how long after a raw touch ends the Precision Touchpad settings'
+# shortcut for that swipe still belongs to it. A touch that stepped while
+# moving swallows the shortcut within this window; a touch whose frames stop
+# for this long without a lift frame is over, so a deferred shortcut fires.
+# AHK: modules/gestures/raw_touchpad.ahk.
+incremental_handoff_ms = 300
 
 # Windows: how long a gesture's synthetic keys stay marked, the settle after an
 # action's own window change, and the wait before the first auto-configuration.
@@ -712,6 +747,13 @@ complex_key_delay_multiplier = 2
 # the lag between releasing Shift and pressing the next key. Beyond it the
 # bonus is dropped so it cannot stretch an expansion on an unrelated key.
 complex_key_carry_ms = 300
+
+# Windows: the emoji and symbol sections register after ready, at their boot
+# rank, in slices of this length; the keyboard waits at most one slice. A gap
+# between two slices lets the input queued meanwhile run.
+# AHK: infra/hotstrings/hotstring_engine_main.ahk HSE_DeferredRegistrationSlice.
+deferred_registration_slice_ms = 25
+deferred_registration_gap_ms = 15
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1186,6 +1228,11 @@ input_probe_step_ms = 10
 input_probe_settle_ms = 40
 # Windows: an updater completion run off the current thread.
 updater_callback_defer_ms = 50
+# Windows: the poll of the keyboard-layout registry watch's change events
+# (RegNotifyChangeKeyValue): a change of the installed layouts is captured
+# within this delay rather than at the next one-second layout poll.
+# AHK: modules/keymap/layout_registry_watch.ahk.
+layout_registry_watch_poll_ms = 100
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).

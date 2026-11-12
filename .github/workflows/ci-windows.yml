@@ -765,6 +765,27 @@ jobs:
             ${{ runner.temp }}/stable-windows-native-desktop.json
           if-no-files-found: error
 
+      # The receiving scenarios of the recovery and flow audits (TODO [PHYS-W]),
+      # run for real inside one fresh temp profile: the AHK migration of a real
+      # configuration tree, a rename refused by an icacls deny, an old-locator
+      # journal left by a build that died, the running-image swap and its
+      # boot-ready event, DPAPI, the widget position in the Registry, the Recycle
+      # Bin worker failure and a foreground change during a selection capture.
+      - name: Receive the recovery and flow scenarios
+        if: matrix.lot == 'Native cohorts and contracts'
+        shell: powershell
+        timeout-minutes: 20
+        run: ./tools/test/run-windows-receiving-scenarios.ps1
+
+      - name: Retain the receiving scenario evidence
+        if: ${{ always() && matrix.lot == 'Native cohorts and contracts' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-receiving-scenarios-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/windows-receiving-scenarios/
+          if-no-files-found: error
+
       # hardening-a-startup-zero-error: the real ErgoptiPlus.ahk auto-execute
       # path, booted over a fresh folder, the neutral defaults and config.toml
       # files older releases wrote, must reach ready with no ERROR logged. The

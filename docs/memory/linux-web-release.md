@@ -621,9 +621,10 @@ depends on.
 
 ### project-linux-json-store-publication
 
-The Linux JSON store requires an object root, creates `storage.json.tmp`
-exclusively (a foreign staging file blocks the mutation and is never removed
-automatically) and publishes backups by no-replace rename on LuaJIT or checked
+The Linux JSON store requires an object root, creates its per-process stage
+`storage.json.ergopti-<pid>-<start>.tmp` exclusively (a foreign file under that
+name blocks the mutation and is never removed; a dead Ergopti process's stage
+is reaped at start, CFD-1, `infra/stage_owner.lua`) and publishes backups by no-replace rename on LuaJIT or checked
 link and unlink on stock Lua. The updater downloads into the inode reserved by
 `os.tmpname`, publishes with no-replace, and reuses its cache on a 304 only
 after a completed-response receipt.

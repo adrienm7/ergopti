@@ -1,0 +1,10 @@
+# _shared/tests/corpus/config_migrations/shipped_released_v12_refused/input.toml
+
+[_meta]
+schema_version = 12
+
+[category_enabled]
+dynamichotstrings = false
+
+[hotstrings]
+cascade_depth = 2
