@@ -252,8 +252,54 @@ try {
 	assert.equal(missing.receipt.selection_timeline, null);
 	assert.match(
 		missing.stdout,
-		/The TIS session holds no receipt for testFreshKeyboardEventsFollowLayoutAndShiftFlags\./
+		/The TIS session's 0 records hold none for testFreshKeyboardEventsFollowLayoutAndShiftFlags\./
 	);
+	checks++;
+
+	// The number-row probes name each selection's record after the case and the
+	// source it selects; job 131404916213 (43276494558) read such a session and
+	// reported no receipt for its refused case.
+	const carbon = 'testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI';
+	const probe = (source, events) => ({
+		version: 1,
+		test: {
+			state: 'present',
+			value: `-[ErgoptiPlusTests.NumberRowSourceProbeTests ${carbon}]:${source}`
+		},
+		pid: 1,
+		events,
+		omittedEvents: 0
+	});
+	const suffixed = classify(
+		'suffixed-identity',
+		[
+			TEST(carbon) + ' started.',
+			`${SOURCE}:62: error: -[ErgoptiPlusTests.NumberRowSourceProbeTests ${carbon}] : failed - Native selection was not observed before the fixture deadline: deadline`
+		],
+		[
+			probe('com.apple.keylayout.French', [
+				{ phase: 'original.capture', uptime: 10, current: abc },
+				{
+					phase: 'select.after',
+					uptime: 15.001,
+					status: 0,
+					target: french(true, false),
+					current: abc
+				}
+			]),
+			probe('com.apple.keylayout.US', [{ phase: 'original.capture', uptime: 16, current: abc }])
+		]
+	);
+	assert.deepEqual(
+		suffixed.receipt.selection_timeline.map((event) => [event.phase, event.offset_ms]),
+		[
+			['original.capture', 0],
+			['select.after', 5001],
+			['original.capture', 6000]
+		]
+	);
+	assert.equal(suffixed.receipt.tis_record_count, 2);
+	assert.match(suffixed.stdout, / Selection timeline: original\.capture \+0ms /);
 	checks++;
 
 	// Both steps that select native input sources bracket their cohort with the
