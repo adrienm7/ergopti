@@ -128,6 +128,8 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		for part in (FieldRun.PROTOCOL_PATH:match("^(.*)/[^/]+$") or ""):gmatch("[^/]+") do
 			at = at .. "/" .. part; assert(uv.fs_mkdir(at, 448)); folders[#folders + 1] = at
 		end
+		-- The protocol lives in a folder of the shared root; none made means the place was misread.
+		helpers.assert_true(#folders > 0, "the protocol's folders were made")
 		local fifo = dir .. "/" .. FieldRun.PROTOCOL_PATH
 		local made = os.execute("mkfifo " .. quote(fifo))
 		assert(made == true or made == 0)
