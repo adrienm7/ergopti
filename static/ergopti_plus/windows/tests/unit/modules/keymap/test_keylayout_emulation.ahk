@@ -206,6 +206,15 @@ _KLT_OptionsDecide(Press) {
 	; No hotkey exists for a key the layout table does not hold.
 	if !KLE_KeyCodes.Has(Sc)
 		return Pass
+	; Ctrl+AltGr+key: the AltGr hotkey catches the press, and _KLE_OnAltGr sends
+	; Ctrl and the logical key when a real Ctrl is held (ILD-2).
+	if Mods.Has("altgr") && Mods.Has("ctrl") {
+		if !_KLT_AltGrRowOnKanaFamily(_KLE_AltGrCriterion.Bind("SC138 & " . Sc))
+			return Pass
+		KeylayoutEmulation_ResetDeadKey()
+		Char := KeylayoutEmulation_ShortcutChar(Sc, _KLE_AltGrShortcutMods(true, Mods.Has("shift")))
+		return Char == "" ? Pass : Map("decides", "shortcut", "text", Char)
+	}
 	if Mods.Has("ctrl") || Mods.Has("alt") || Mods.Has("win") {
 		Prefix := _KLT_ChordPrefix(Mods)
 		if KLE_NATIVE_CHORD_KEYS.Has(Sc) || !_KLE_ShortcutCriterion(Prefix . Sc)
@@ -1079,3 +1088,29 @@ for Code in ["Backspace", "Escape", "Enter", "Tab", "Delete", "ArrowLeft", "Arro
 	"ArrowDown", "Home", "End", "PageUp", "PageDown"]
 	Test("keylayout emulation: " . Code . " cancels pending accents by physical identity (keylayout-dead-reset-identity)",
 		_KLT_WithEmulation.Bind(_KLT_ResetKeyCase.Bind(Code)))
+
+; ILD-2: only a Ctrl other than AltGr's own turns an AltGr press into a Ctrl
+; chord; the fake LCtrl of a standard AltGr layout never does.
+_KLT_RealCtrlHeldCase() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	SavedKana := _ALTGR_KANA_FIXUP, SavedProbe := _ALTGR_LAYOUT_PROBE.Clone()
+	try {
+		_ALTGR_KANA_FIXUP := false
+		_ALTGR_LAYOUT_PROBE["altgr_level"] := true
+		Down(Keys) => (Name) => InStr(" " . Keys . " ", " " . Name . " ") > 0
+		AssertTrue(_KLE_RealCtrlHeld(Down("RCtrl"), (Name) => 0), "a right Ctrl is a real Ctrl")
+		AssertFalse(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 0), "AltGr's fake LCtrl is not")
+		AssertTrue(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 1), "a left Ctrl the ledger knows as real is")
+		AssertFalse(_KLE_RealCtrlHeld(Down(""), (Name) => 1), "no Ctrl held, no chord")
+		_ALTGR_LAYOUT_PROBE["altgr_level"] := false
+		AssertTrue(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 0), "without a fake LCtrl, a left Ctrl is real")
+		AssertEqual("^", _KLE_AltGrShortcutMods(true, false))
+		AssertEqual("^+", _KLE_AltGrShortcutMods(true, true))
+		AssertEqual("", _KLE_AltGrShortcutMods(false, true), "AltGr alone types its level")
+	} finally {
+		_ALTGR_KANA_FIXUP := SavedKana
+		_ALTGR_LAYOUT_PROBE := SavedProbe
+	}
+}
+Test("keylayout emulation: Ctrl+AltGr sends Ctrl and the logical key only with a real Ctrl (ILD-2)",
+	_KLT_RealCtrlHeldCase)
