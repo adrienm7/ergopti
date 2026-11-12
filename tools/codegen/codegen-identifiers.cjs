@@ -136,6 +136,7 @@ const SHELL_PREFIX = {
 };
 
 const shell = `#!/bin/sh
+# _shared/data/identifiers.sh
 ${BANNER('#')}
 
 # Application names, bundle ids, service labels, external hosts and the field
@@ -148,7 +149,8 @@ ${PROJECTED_GROUPS.flatMap((group) =>
 ).join('\n')}
 `;
 
-const python = `${BANNER('#')}
+const python = `# _shared/data/identifiers.py
+${BANNER('#')}
 """Application names, bundle ids, service labels and external hosts.
 
 Hosts are bare names: build a URL as f"https://{HOSTS['github']}/...".
