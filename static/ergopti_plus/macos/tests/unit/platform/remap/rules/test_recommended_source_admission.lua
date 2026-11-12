@@ -180,7 +180,7 @@ helpers.describe("detached recommendation source admission", function()
 				local model = require("toml_codec").decode(fs.read_with_status(path))
 				helpers.assert_eq(model.tap_hold.keys.left_shift.tap_action, "escape")
 				-- The switch is a config.toml row since schema v22.
-				local config_path = require("platform.remap.config").config_toml_path_for(path)
+				local config_path = require("platform.remap.tap_hold_file").config_toml_path_for(path)
 				helpers.assert_eq(require("toml_codec").decode(fs.read_with_status(config_path)).tap_holds.enabled, true)
 				if not absent then
 					helpers.assert_eq(model.custom.keep, 19); helpers.assert_eq(model.karabiner.integration_enabled, false)
