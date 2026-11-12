@@ -20,8 +20,10 @@
  *      GestureSlotIds().
  *   2. Every slot each driver iterates has a manifest entry on that platform,
  *      so the build cannot fail at load.
- *   3. The swipe minimums (a pair's 3.0 mm, GSD-3) are the shared timings
- *      registry's [gestures] *_minimum_mm and no gesture source declares one.
+ *   3. The swipe minimums (a pair's 3.0 mm, GSD-3) and the Linux decoder's
+ *      own swipe minimum, pair-scroll travel and fallback resolution (GSD-2)
+ *      are the shared timings registry's [gestures] keys, and no gesture
+ *      source declares one, in millimetres or in device units.
  * A hand copy that is found is also compared value by value, so the report
  * names the slots that drifted. The Lua and AHK suites check the built values
  * at runtime.
@@ -280,10 +282,16 @@ for (const entry of linuxDefaults) {
 // GSD-3 (maintainer, 2026-11-11): the swipe minimums, a pair's 3.0 mm among
 // them, live once in the shared timings registry; macOS and Linux read them
 // through timings.count and no gesture source spells a copy.
+// GSD-2 (maintainer, 2026-11-11): the Linux decoder's swipe minimum and
+// pair-scroll travel moved from 120 device units to millimetres through the
+// pad's resolution, beside them in the same registry.
 const SWIPE_MINIMUMS = {
 	swipe_minimum_mm: 1.5,
 	pair_swipe_minimum_mm: 3.0,
-	pair_diagonal_minimum_mm: 5.0
+	pair_diagonal_minimum_mm: 5.0,
+	decoder_swipe_minimum_mm: 10.0,
+	pair_scroll_travel_mm: 10.0,
+	touchpad_fallback_units_per_mm: 12
 };
 const registryGestures = parseToml(read('_shared/modules/timings/constants.toml')).gestures || {};
 for (const [key, value] of Object.entries(SWIPE_MINIMUMS))
@@ -292,7 +300,7 @@ for (const [key, value] of Object.entries(SWIPE_MINIMUMS))
 			`[gestures] ${key} must be ${value} in the shared timings registry, found ${registryGestures[key]}.`
 		);
 const MINIMUM_LITERAL =
-	/\b(SWIPE_MIN\w*|DIAG_MIN\w*|\w*_MINIMUM_MM|PAIR_SCROLL_TRAVEL)\s*(?:=|:=)\s*-?\d/;
+	/\b(SWIPE_MIN\w*|DIAG_MIN\w*|\w*_MINIMUM_MM|PAIR_SCROLL_TRAVEL\w*|\w*SWIPE_THRESHOLD|\w*UNITS_PER_MM)\s*(?:=|:=)\s*-?\d/;
 const gestureSources = (dir) =>
 	fs.existsSync(path.join(SP, dir))
 		? fs
