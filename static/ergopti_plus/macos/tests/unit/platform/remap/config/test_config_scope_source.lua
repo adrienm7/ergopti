@@ -108,4 +108,62 @@ helpers.describe("remap configuration under a scope transaction", function()
 	end)
 end)
 
+
+-- The tap-hold switch, timings and [mod_combos] live in config.toml. The
+-- menus' scopes compare config.toml with the bytes the preferences loaded, so
+-- a remap save that rewrites those rows must hand the new bytes over, or the
+-- next participant of a global restore refuses its own scope.
+helpers.describe("remap save of config.toml rows and the preferences source", function()
+	--- Runs body with a fake preferences owner that loaded `loaded` for path.
+	local function with_preferences(loaded, body)
+		local previous = package.loaded["infra.preferences"]
+		local owner = { exchanges = 0, snapshots = {} }
+		function owner.source_snapshot(path) return owner.snapshots[path] end
+		function owner.replace_source(path, expected, replacement)
+			local current = owner.snapshots[path]
+			if type(current) ~= "table" or current.status ~= expected.status or current.content ~= expected.content then
+				return false
+			end
+			owner.exchanges, owner.snapshots[path] = owner.exchanges + 1, replacement
+			return true
+		end
+		package.loaded["infra.preferences"] = owner
+		local ok, err = pcall(body, owner, loaded)
+		package.loaded["infra.preferences"] = previous
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("moves the loaded preferences source to the published config.toml (global-restore-shortcuts)", function()
+		with_disk("[other]\nvalue = 17\n", function(config, disk)
+			disk.config = "[tap_holds]\nenabled = true\n"
+			with_preferences(nil, function(owner)
+				local config_path = config.config_toml_path_for("remap.toml")
+				owner.snapshots[config_path] = { status = "ok", content = disk.config }
+				local state = config.build_recommended_state(KEYS, COMBOS)
+				state.tap_holds_enabled = false
+				helpers.assert_true(config.save_user_config(state, "remap.toml", false,
+					{ status = "ok", content = "[other]\nvalue = 17\n" }))
+				helpers.assert_eq(disk.config_writes, 1, "the switch is a config.toml row")
+				helpers.assert_eq(owner.exchanges, 1)
+				helpers.assert_eq(owner.snapshots[config_path].content, disk.config,
+					"the preferences acknowledge the bytes now on disk")
+			end)
+		end)
+	end)
+
+	helpers.it("leaves a config.toml the preferences never loaded alone", function()
+		with_disk("[other]\nvalue = 17\n", function(config, disk)
+			disk.config = "[tap_holds]\nenabled = true\n"
+			with_preferences(nil, function(owner)
+				local state = config.build_recommended_state(KEYS, COMBOS)
+				state.tap_holds_enabled = false
+				helpers.assert_true(config.save_user_config(state, "remap.toml", false,
+					{ status = "ok", content = "[other]\nvalue = 17\n" }))
+				helpers.assert_eq(disk.config_writes, 1)
+				helpers.assert_eq(owner.exchanges, 0)
+			end)
+		end)
+	end)
+end)
+
 return true
