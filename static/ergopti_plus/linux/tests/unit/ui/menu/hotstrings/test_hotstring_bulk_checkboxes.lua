@@ -252,13 +252,13 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 end)
 
 helpers.describe("dynamic bulk menu: pause ownership", function()
-	helpers.it("dynamic bulk menu: paused snapshot keeps the feature disabled without starting capture", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("dynamic bulk menu: a paused tray keeps the menu without starting capture (edd1-paused-writes)", function()
 		local config = fake_config(false, true)
 		local dyn, log = fake_dyn(true, true)
 		local menu, row = hotstrings_menu(config, dyn, true, true)
-		helpers.assert_nil(menu, "the existing paused top-level policy strips feature descendants")
-		helpers.assert_true(row.disabled)
-		helpers.assert_nil(row.fn)
+		helpers.assert_true(type(menu) == "table", "a paused tray keeps the Hotstrings submenu")
+		helpers.assert_true(row.disabled ~= true)
 		helpers.assert_eq(log.scoped, {})
 		helpers.assert_eq(log.rules, {})
 		helpers.assert_eq(log.set_enabled, {})
