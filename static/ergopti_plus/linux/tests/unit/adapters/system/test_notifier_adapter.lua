@@ -24,32 +24,58 @@
 local helpers = require("tests.helpers")
 
 --- Loads the notifier over a recording shell runner.
---- @param opts table|nil { has_notify_send = boolean, run_fails = boolean }
---- @param body function Receives the notifier and the commands issued.
+--- @param opts table|nil { has_notify_send = boolean, run_fails = boolean,
+---   start_refused = boolean, exit = table|nil (the child's scripted result) }
+--- @param body function Receives the notifier, the commands issued (each argv
+---   rendered as one quoted line) and the log lines.
 local function with_shell(opts, body)
 	opts = opts or {}
 	local shell_name = "adapters.shell_runner"
 	local notifier_name = "adapters.notifier"
+	local logger_name = "logger.shim"
 	local previous_shell = package.loaded[shell_name]
 	local previous_notifier = package.loaded[notifier_name]
+	local previous_logger = package.loaded[logger_name]
 
-	local commands = {}
+	local commands, logs = {}, {}
+	local function quote(value) return "'" .. tostring(value):gsub("'", "'" .. [[\]] .. "''") .. "'" end
 	package.loaded[shell_name] = {
-		quote = function(value) return "'" .. tostring(value):gsub("'", "'" .. [[\]] .. "''") .. "'" end,
+		quote = quote,
 		has_command = function() return opts.has_notify_send ~= false end,
-		run = function(command)
-			commands[#commands + 1] = command
-			return not opts.run_fails
+		run = function() error("the notifier must not run notify-send through a shell line") end,
+		run_async = function(executable, args, options, callback)
+			local words = { executable }
+			for index, arg in ipairs(args) do
+				-- Options are rendered bare and operands quoted, as a reader would type them.
+				words[#words + 1] = (index <= 4) and arg or quote(arg)
+			end
+			commands[#commands + 1] = table.concat(words, " ")
+			helpers.assert_true(type(options) == "table" and type(options.timeout_ms) == "number",
+				"notify-send runs under the registry deadline")
+			if opts.start_refused then return nil, "spawn failed: ENOENT" end
+			local result = opts.exit or (opts.run_fails and { ok = false, code = 1, error = "exit code 1" })
+				or { ok = true, code = 0 }
+			callback(result)
+			return { cancel = function() return true end, on_settled = function() return true end }
 		end,
 		exec = function() return "" end,
 		exec_line = function() return "" end,
 	}
+	local logger = {}
+	for _, level in ipairs({ "debug", "info", "warn", "error", "success", "start", "done", "trace" }) do
+		logger[level] = function(_, fmt, ...)
+			local ok, text = pcall(string.format, tostring(fmt), ...)
+			logs[#logs + 1] = { level = level, text = ok and text or tostring(fmt) }
+		end
+	end
+	package.loaded[logger_name] = setmetatable(logger, { __index = previous_logger })
 	package.loaded[notifier_name] = nil
 
-	local ok, err = pcall(function() body(require(notifier_name), commands) end)
+	local ok, err = pcall(function() body(require(notifier_name), commands, logs) end)
 
 	package.loaded[shell_name] = previous_shell
 	package.loaded[notifier_name] = previous_notifier
+	package.loaded[logger_name] = previous_logger
 	helpers.assert_true(ok, "the notifier must not throw: " .. tostring(err))
 end
 
@@ -67,7 +93,7 @@ helpers.describe("notifier: sending", function()
 		with_shell(nil, function(notifier)
 			helpers.assert_eq(notifier.send("bonjour"), true)
 		end)
-		with_shell({ run_fails = true }, function(notifier)
+		with_shell({ start_refused = true }, function(notifier)
 			helpers.assert_eq(notifier.send("bonjour"), false)
 		end)
 		with_shell({ has_notify_send = false }, function(notifier)
@@ -108,10 +134,38 @@ helpers.describe("notifier: sending", function()
 	helpers.it("does not block the caller", function()
 		with_shell(nil, function(notifier, commands)
 			notifier.send("bonjour")
-			helpers.assert_true(commands[1]:find("&", 1, true) ~= nil,
+			helpers.assert_eq(#commands, 1,
 				"this can be reached from the keystroke path, and notify-send waits "
 					.. "for the notification daemon to acknowledge — a desktop service "
-					.. "that may be slow, or absent, or wedged")
+					.. "that may be slow, or absent, or wedged: it runs through run_async")
+		end)
+	end)
+
+	helpers.it("(nui-003-notify-send-failure) logs a notify-send that runs and fails, and keeps the notice", function()
+		for _, exit in ipairs({ { ok = false, code = 1, error = "exit code 1" }, { ok = false, error = "timeout", timed_out = true } }) do
+			with_shell({ exit = exit }, function(notifier, _, logs)
+				helpers.assert_true(notifier.send("Le clavier a été rechargé.", { title = "Ergopti+" }),
+					"notify-send started; its failure comes from its exit")
+				local failed, kept = false, false
+				for _, line in ipairs(logs) do
+					if line.level == "error" and line.text:find("notify-send failed (" .. exit.error .. ")", 1, true) then failed = true end
+					if line.level == "info" and line.text:find("Le clavier a été rechargé.", 1, true) then kept = true end
+				end
+				helpers.assert_true(failed, "a lost notice is reported, not counted as shown")
+				helpers.assert_true(kept, "its text reaches the log fallback")
+			end)
+		end
+		with_shell({ exit = { ok = false, code = 1, error = "exit code 1" } }, function(notifier, _, logs)
+			notifier.send("/home/ana/secret.txt", { private = true })
+			for _, line in ipairs(logs) do
+				helpers.assert_true(line.text:find("secret", 1, true) == nil, "a private notice stays out of the log")
+			end
+		end)
+		with_shell({ start_refused = true }, function(notifier, _, logs)
+			helpers.assert_eq(notifier.send("bonjour"), false)
+			local kept = false
+			for _, line in ipairs(logs) do if line.text:find("bonjour", 1, true) then kept = true end end
+			helpers.assert_true(kept, "a notify-send that cannot start keeps the notice in the log")
 		end)
 	end)
 

@@ -72,6 +72,7 @@ helpers.describe("opening selected content notifier privacy", function()
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function() return false end,
+				run_async = function() return nil, "controlled spawn refusal" end,
 			}
 			package.loaded["adapters.notifier"] = nil
 			package.loaded["modules.shortcuts.open_selection"] = nil
@@ -103,6 +104,7 @@ helpers.describe("copied path notifier privacy", function()
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function() return false end,
+				run_async = function() return nil, "controlled spawn refusal" end,
 			}
 			package.loaded["adapters.notifier"] = nil
 			package.loaded["modules.shortcuts.open_selection"] = nil
