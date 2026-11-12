@@ -1098,7 +1098,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
 		end,
 		reload                    = function()
-			return do_reload("menu")
+			local accepted = do_reload("menu")
+			if accepted ~= true then
+				-- Refused by a running global action or by the coordinator: say so,
+				-- as Windows' and Linux's generic reload refusal do, instead of
+				-- leaving the old settings in place in silence (NUI-002).
+				local told, told_err = pcall(notifications.notify, i18n.get("init.reload_refused_title"),
+					i18n.get("init.reload_refused_body"), "error")
+				if not told then Logger.warn(LOG, "Reload refusal notification failed: %s.", tostring(told_err)) end
+			end
+			return accepted
 		end,
 		quit                      = function()
 			-- What Quit does is decided by the one admission both drivers share
