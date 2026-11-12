@@ -1007,6 +1007,7 @@ const RUNTIME_PREFIXES = [
 	{
 		file: 'macos/tests/unit/ui/menu/state/test_boot_saves_read_only.lua',
 		old: 'modules.shortcuts.',
+		// config-key-literal-ok: these are folder names that share a config key's spelling.
 		names: ['bindings', 'keyboard_shortcuts', 'tap_keys', 'script_control']
 	}
 ];
