@@ -4,34 +4,36 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-12, 21:45)
+## Where things stand (2026-11-12, 22:10)
 
 - Branch: `claude/ergopti-todo-structure-phase2`. It is pushed fast-forward
   only and never rebased. A rebase would go to
   `claude/ergopti-todo-structure-phase2-night`.
-- Base dev commit of the tooling: `5755f454` (merge base with `origin/dev`).
-  `origin/dev` is now at `3ec911b1`; the branch has not merged it yet.
-- Steps landed: none. The migration itself is not authorized to land on dev.
-  This branch carries only the tooling that makes each step apply green.
-- Step in progress: S01 (`_shared`, 867 moves, about 17 000 references in
-  about 4 900 files). It applies cleanly with every format, lint and codegen
-  gate green.
-- Measured against the dev baseline:
-  - the 34 JS checks that were new reds: 1 red left on `3e4e387d` (the shared
-    helper ratchet), fixed by `b4659a72`;
-  - Linux and macOS Lua groups: 0 new reds at the last full cycle.
-- In progress: a full cycle on `b4659a72` (whole JS suite and both Lua
-  drivers' groups, S01 applied by the runner). When it shows no new reds, S01
-  is green locally. Windows is then proven on CI.
-- Decision C for the Windows cohort pins is implemented as C1 (`9e01a8e0`).
-  The (c) frames are the owner's input, not its output, so they are
-  requalified, not regenerated. C1 was decided by the coordinator on
+- Base: the **dev candidate `7f64feb00`**, not dev yet, until the
+  coordinator confirms its push. It is dev `3ec911b1` plus the tap-hold
+  series, the Windows batch, parity-b, parity-audit and one rehash, published
+  on `claude/ergopti-todo-linux-macos-tqq3lp`. It was merged into this branch
+  (`fc91eced`), and the plan appendices were regenerated on it (`dcb0579d`).
+- Steps landed on dev: none. The migration is not authorized to land yet.
+- S01 (`_shared`) is green locally. The last full cycle ran on `b4659a72` over
+  dev `5755f454`, against a baseline run on that same dev commit:
+  - Lua: 15 groups, the same failing tests as the baseline (0 new, 0 gone);
+  - JS: 630 checks, no new red. One parallel-run race (js-0225, a temporary
+    probe folder) passes when run alone.
+- S01 proof on the candidate:
+  - `claude/ergopti-todo-structure-phase2-proof` at `50b75362`: this branch's
+    tip plus the S01 step commit made by `run-phase2.cjs`, with its
+    Requalification section (868 moves, 17 048 references in 4 911 files);
+  - `ci.yml` was dispatched with `os_lanes=all` at 22:10. Compare its failing
+    jobs with run 43282880961, the candidate branch's last run.
+- Decision C1 for the Windows cohort pins, decided by the coordinator on
   2026-11-12, to review by the maintainer:
   - `edits.cjs` `REQUALIFIED_PINS` lists the five receipts;
   - `repin.cjs` records each old→new pin there, with the move that justifies
     it, and fails fast on a pin there it cannot attribute (a file the step
     removed, a hash shared by files the step made different, a derived pin);
   - the runner writes a "Requalification" section into the step commit.
+    The TODO line waits for dev's TODO split.
 
 ## Next commands
 
