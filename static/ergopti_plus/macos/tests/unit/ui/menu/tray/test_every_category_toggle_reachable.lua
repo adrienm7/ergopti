@@ -407,8 +407,9 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 			for index = 2, 3 do
 				if type(rows[index].fn) == "function" then rows[index].fn() end
 			end
-			helpers.assert_eq(requests, paused and {} or { "hotstrings:recommended", "hotstrings:clear" },
-				"a paused session never reaches the scope")
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+			helpers.assert_eq(requests, { "hotstrings:recommended", "hotstrings:clear" },
+				"a paused session still reaches the scope")
 			for _, line in ipairs(errors) do
 				helpers.assert_true(line:find("scope_", 1, true) == nil, "the renderer reported: " .. line)
 			end
