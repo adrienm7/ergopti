@@ -160,6 +160,19 @@ try {
 		assert.notEqual(refused.status, 0, 'OpenSSL reports the bad decrypt');
 	});
 
+	scenario('(bap-001-folder-destination) a folder destination is refused, not filled', () => {
+		const folder = fs.mkdtempSync(path.join(work, 'folder-'));
+		const clear = path.join(folder, 'notes.txt');
+		const sealed = `${clear}.enc`;
+		fs.writeFileSync(clear, 'sealed\n');
+		assert.equal(convert('encrypt', clear, sealed, passwordFile('f.pw', SENTINEL)).status, 0);
+		const target = path.join(folder, 'notes');
+		fs.mkdirSync(target);
+		const refused = convert('decrypt', sealed, target, passwordFile('f2.pw', SENTINEL));
+		assert.notEqual(refused.status, 0, 'a folder destination is reported as a failure');
+		assert.deepEqual(fs.readdirSync(target), [], 'no stage is moved into the folder');
+	});
+
 	scenario(
 		'(encryptor-failed-conversion-keeps-destination) a refused decrypt leaves the approved overwrite target intact',
 		() => {
