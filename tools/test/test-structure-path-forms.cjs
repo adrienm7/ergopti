@@ -417,6 +417,13 @@ function run() {
 		'for _, r in ipairs({ "x", "x/y", "x/y/z" }) do mkdir(w .. "/" .. r) end',
 		'the same with bare relative entries joined onto a base by the loop'
 	);
+	// A join that climbs out of the repository has no folder to follow; the
+	// search for one stopped at '.' forever and hung the first S01 apply.
+	Plan.scanFile(
+		'tools/test/z.cjs',
+		"const ROOT = path.resolve(__dirname, '..', '..');\nconst X = path.join(ROOT, '..', 'zz_nowhere', 'y.txt');\n",
+		Plan.referenceContext(MAP)
+	);
 	// A generated table is one long run of path characters with no file
 	// name in it; the scan stays linear (the first S01 apply spent three
 	// minutes on a 400 KB table, retrying the token at every position).
