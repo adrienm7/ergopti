@@ -116,6 +116,9 @@ function M.fetch_artifact(callback)
 	end
 	fetcher = fetcher or require("platform.remap.runtime_artifact_fetch").new({
 		exec = FieldCheckPorts.exec,
+		network_command = function(curl_args)
+			return require("platform.remap.network_download").command("REMAP-RUNTIME", curl_args)
+		end,
 		exists = FileSystem.exists,
 		read = FileSystem.read,
 		write = function(path, content) return FileSystem.write(path, content) == true end,
@@ -155,7 +158,10 @@ local function installer()
 			local Update = require("platform.remap.runtime_vhid_update")
 			local manifest = load_manifest()
 			if not manifest then return fetched(false, Update.REASON.UNPINNED, "the runtime manifest could not be read") end
-			vhid_updater = vhid_updater or Update.new({ exec = FieldCheckPorts.exec, expand = FileSystem.expand_path })
+			vhid_updater = vhid_updater or Update.new({ exec = FieldCheckPorts.exec, expand = FileSystem.expand_path,
+				network_command = function(curl_args)
+					return require("platform.remap.network_download").command("VIRTUAL-HID", curl_args)
+				end })
 			vhid_updater.fetch(manifest.virtual_hid_device, fetched)
 		end,
 	})

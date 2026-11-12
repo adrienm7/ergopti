@@ -29,27 +29,39 @@ SPNEGO, GSS-API or Kerberos; NTLM stays refused (`docs/design/proxy-auth-relay.m
 NET-003 is `[llm] ollama_request_timeout_ms`; the macOS connect timeout reads
 `stream_connect_timeout_ms`.
 
+## Fixed after review
+
+- **NET-001 (macOS):** the owned Karabiner runtime artifact, the
+  VirtualHIDDevice package and the Karabiner DMG ran `/usr/bin/curl` with the
+  inherited Hammerspoon environment (no proxy), the DMG without
+  `--proto =https`, so a Mac that reaches the internet only through its proxy
+  could not install the remap engine and was told it was offline.
+  `platform/remap/network_download.lua` now runs each behind the opaque system
+  network prelude for the new `karabiner` client of `route_origins.json`
+  (GitHub's release origins) and names a refused route by its shared managed
+  network class. Regressions `net-001-remap-route` (route command, wiring,
+  the DMG pipeline over https only).
+
+- **NET-003 follow-up (macOS), decided by the maintainer on 2026-11-12:** the
+  12 s no-token streaming watchdog is removed with `[llm] stream_watchdog_ms`;
+  only the request's own deadline ends a slow stream, as on Windows and Linux.
+  Regression `stream-watchdog-removed`.
+- **NET-004, decided by the maintainer on 2026-11-12:** the release archive is
+  bounded by one shared declaration aligned on Windows, `archive_transfer`
+  `phase_timeout_ms.archive = 1200000` and `archive_idle_timeout_ms = 600000`,
+  read on Linux (curl's speed bound) and macOS (staging script and launcher
+  request); the Windows side has its TODO line. Regression
+  `release-archive-budget`.
+
 ## Open
 
-- **NET-001 (macOS, medium):** the owned Karabiner runtime artifact
-  (`platform/remap/runtime_artifact_fetch.lua`), the VirtualHIDDevice package
-  (`runtime_vhid_update.lua`) and the Karabiner DMG (`onboarding.lua`, without
-  `--proto =https`) run `/usr/bin/curl` without the `network_env` prelude, so
-  a Mac that only reaches the internet through its proxy cannot install the
-  remap engine and is told it is offline. The fix runs each through the
-  prelude with a `route_origins.json` client and the shared failure classes;
-  left for its own batch.
-- **NET-003 follow-up (macOS):** the 12 s no-token streaming watchdog still
-  ends a cold load before its first token; the registry comment claims an AHK
-  equivalent that no Windows or Linux code reads. Needs a cross-driver
-  decision.
-- **NET-004 (macOS, Windows):** the macOS release download keeps a typed
-  900 s budget (`release_installer.lua`, `release_stage.sh`) and Windows 600 s
-  receive and 1,200 s absolute, while the shared `archive_transfer.archive` is
-  300 s. Which value is right is a maintainer decision.
 - **NET-005 (macOS, low, plausible):** `system_network_from_scutil` reads
   `ExcludeSimpleHostnames` for the fingerprint only, so a short internal host
   goes through the proxy where Windows' `<local>` bypass sends it direct.
+  `NO_PROXY` has no syntax for every single-label host, so curl, uv and Python
+  children cannot be told through the environment; the fix is a route-plan
+  step that sends a dot-free target origin direct, which needs each child's
+  target hosts at prelude time.
 
 ## Checked and kept
 

@@ -12,12 +12,14 @@ struct ManagedBootstrapRequest {
 	let sha256: String
 	let output: String
 	let timeoutMilliseconds: Int
+	/// How long the transfer may receive nothing; the absolute budget when absent.
+	let idleTimeoutMilliseconds: Int?
 	let size: Int64?
 
 	static func parse(_ bytes: Data) -> ManagedBootstrapRequest? {
 		guard bytes.count <= 65_536,
 			let fields = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
-			Set(fields.keys).subtracting(["version", "url", "sha256", "output", "timeout_ms", "size"]).isEmpty,
+			Set(fields.keys).subtracting(["version", "url", "sha256", "output", "timeout_ms", "idle_timeout_ms", "size"]).isEmpty,
 			let version = integer(fields["version"]), version == 1,
 			let text = fields["url"] as? String, !text.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }),
 			let url = URL(string: text), acceptable(url),
@@ -32,8 +34,15 @@ struct ManagedBootstrapRequest {
 			guard let parsed = integer(value), parsed > 0 else { return nil }
 			size = parsed
 		} else { size = nil }
+		// The release archive's idle bound (shared updater defaults); it never
+		// outlasts the absolute budget.
+		let idle: Int?
+		if let value = fields["idle_timeout_ms"] {
+			guard let parsed = integer(value), parsed > 0, parsed <= timeout else { return nil }
+			idle = Int(parsed)
+		} else { idle = nil }
 		return ManagedBootstrapRequest(url: url, sha256: digest, output: path,
-			timeoutMilliseconds: Int(timeout), size: size)
+			timeoutMilliseconds: Int(timeout), idleTimeoutMilliseconds: idle, size: size)
 	}
 
 	static func acceptable(_ url: URL) -> Bool {
@@ -431,7 +440,8 @@ enum ManagedBootstrapDownload {
 			let collector = ManagedBootstrapCollector(maximumBytes: request.size, remaining: remaining,
 				writeBody: { spool.write($0, remaining: remaining) })
 			let native = ManagedHTTPRequest(url: url, method: "GET", headers: [("Accept-Encoding", "identity")],
-				timeout: budget, idleTimeout: budget, direct: policy.direct(url, environment: environment))
+				timeout: budget, idleTimeout: request.idleTimeoutMilliseconds.map { Double($0) / 1000 } ?? budget,
+				direct: policy.direct(url, environment: environment))
 			let status = ManagedHTTPWorker.execute(native, maximumSelections: policy.maximumSelections,
 				started: started, settingsProvider: settingsProvider, environment: environment,
 				onDirectFallback: { stage in

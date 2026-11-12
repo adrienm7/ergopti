@@ -65,7 +65,7 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 			local called, accepted = pcall(on_quit)
 			helpers.assert_true(called, "a failed optional action cannot escape the quit owner")
 			helpers.assert_eq(accepted, true)
-			helpers.assert_eq(calls.requests, { "tray quit" })
+			helpers.assert_eq(calls.requests, { "tray_quit" })
 		end)
 	end
 	helpers.it("(lcy-003-shortcut-quit) a shortcut Quit takes the same owner as the tray row", function()
@@ -115,7 +115,7 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 		local on_quit, calls = build({})
 		helpers.assert_eq(on_quit(), true)
 		helpers.assert_eq(calls.layout, 1)
-		helpers.assert_eq(calls.requests, { "tray quit" })
+		helpers.assert_eq(calls.requests, { "tray_quit" })
 		helpers.assert_eq(calls.abandons, 0)
 	end)
 
@@ -144,7 +144,7 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 		helpers.assert_eq(on_quit(), true)
 		helpers.assert_eq(calls.abandons, 1, "the pending restart is cancelled")
 		helpers.assert_eq(calls.layout, 1)
-		helpers.assert_eq(calls.requests, { "tray quit" })
+		helpers.assert_eq(calls.requests, { "tray_quit" })
 	end)
 
 	helpers.it("lets Quit win over a relay reload whose shutdown already started", function()
@@ -158,7 +158,7 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 	helpers.it("still quits when the pending restart cannot be cancelled", function()
 		local on_quit, calls = build({ reload = true, abandon_fails = true })
 		helpers.assert_eq(on_quit(), true)
-		helpers.assert_eq(calls.requests, { "tray quit" })
+		helpers.assert_eq(calls.requests, { "tray_quit" })
 	end)
 
 	helpers.it("waits for a running write, then quits once, without a notice (quit-waits-for-writer)", function()
@@ -174,7 +174,7 @@ helpers.describe("Linux tray Quit follows the shared admission (quit-admission)"
 			state[field] = false
 			calls.clock = 2
 			table.remove(calls.timers, 1)()
-			helpers.assert_eq(calls.requests, { "tray quit" }, field .. ": quits once it settled")
+			helpers.assert_eq(calls.requests, { "tray_quit" }, field .. ": quits once it settled")
 			helpers.assert_eq(calls.notices, {})
 		end
 	end)
