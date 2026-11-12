@@ -226,7 +226,12 @@ function rewriteText(text, rows, movedRepo, file) {
 				'g'
 			);
 			const next = newPathToken(row, movedRepo);
-			text = text.replace(bounded, () => hold(next));
+			// A shared reading never applies where a driver-named base precedes
+			// the same spelling (${DRIVER_REL}/modules/llm is the driver's own).
+			const shared = row.resolution?.form === 'shared';
+			text = text.replace(bounded, (whole, offset, all) =>
+				shared && Plan.foreignBaseBefore(all, offset) ? whole : hold(next)
+			);
 		}
 	}
 	text = text.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[Number(i)]);

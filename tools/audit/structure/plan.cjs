@@ -879,6 +879,18 @@ function isListedModuleSite(file, text, index) {
 	);
 }
 
+/**
+ * True when the path at `index` is joined onto a base named for a driver
+ * (${DRIVER_REL}/modules/llm, WIN .. "/modules"): it is that driver's folder,
+ * not the shared one of the same name.
+ */
+function foreignBaseBefore(text, index) {
+	const base = text
+		.slice(Math.max(0, index - 40), index)
+		.match(/(?:\$\{\s*([\w$.]+)\s*\}|([\w$.]+)\s*\.\.\s*["'])$/);
+	return !!base && /driver|windows|macos|linux|\bwin\b|_WIN|WIN_/i.test(base[1] || base[2]);
+}
+
 let listText = null;
 let listRanges = [];
 /**
@@ -1516,9 +1528,12 @@ function scanFile(file, text, ctx) {
 	for (const m of text.matchAll(dirToken)) {
 		const raw = m[0].replace(/[\\/]$/, '');
 		if (/\.[A-Za-z0-9]+$/.test(raw) || !/[A-Za-z]/.test(raw)) continue;
+		// ${DRIVER_REL}/modules/llm: a base named for a driver keeps the folder
+		// the driver's own, whatever the file reads from _shared elsewhere.
+		const foreign = foreignBaseBefore(text, m.index);
 		const explicit =
 			isSharedArgument(text, m.index) ||
-			sharedFolders.has(raw.replace(/\\/g, '/').replace(/^\//, ''));
+			(!foreign && sharedFolders.has(raw.replace(/\\/g, '/').replace(/^\//, '')));
 		const hit = stays(raw, resolvePathToken(raw, file, inTree, byRepoDir, explicit));
 		if (!hit) continue;
 		// parent .. "/python" in live code: one folder name read against the
@@ -2575,6 +2590,7 @@ if (require.main === module) main();
 module.exports = {
 	SPLIT,
 	neverRewritten,
+	foreignBaseBefore,
 	isListedModuleSite,
 	EXISTING,
 	referenceContext,
