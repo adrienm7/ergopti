@@ -51,14 +51,44 @@ _SFD_IsSecureApp_UnknownApp() {
 Test("SFD_IsSecureApp: unknown app returns 0", _SFD_IsSecureApp_UnknownApp)
 
 _SFD_SecureApps_IsMap() {
-	AssertTrue(SFD_SECURE_APPS is Map)
+	AssertTrue(SFD_SecureApps() is Map)
 }
-Test("SFD_SECURE_APPS: is a Map", _SFD_SecureApps_IsMap)
+Test("SFD_SecureApps: is a Map", _SFD_SecureApps_IsMap)
 
 _SFD_SecureApps_HasEntries() {
-	AssertTrue(SFD_SECURE_APPS.Count > 0)
+	AssertTrue(SFD_SecureApps().Count > 0)
 }
-Test("SFD_SECURE_APPS: Count > 0", _SFD_SecureApps_HasEntries)
+Test("SFD_SecureApps: Count > 0", _SFD_SecureApps_HasEntries)
+
+; ADD-1: the list is the `windows` names of _shared/data/secure_apps.json,
+; compared without case, and a secure application's window is secure whatever
+; field has focus; an unreadable list makes every application secure.
+_SFD_SecureApps_Shared() {
+	global _SharedDir, SFD_SECURE_APPS, SFD_SECURE_APP_ROOT
+	Shared := JsonParse(FileRead(_SharedDir . "\data\secure_apps.json", "UTF-8"))
+	Count := 0
+	for Entry in Shared["apps"]
+		for Name in Entry["windows"] {
+			Count += 1
+			AssertTrue(SFD_IsSecureApp(Name), Name . " is a secure application")
+			AssertTrue(SFD_IsSecureApp(StrUpper(Name)), Name . " is compared without case")
+		}
+	AssertTrue(Count > 0, "the shared list names Windows processes")
+	AssertTrue(SFD_IsSecureApp("RoboForm.exe"), "RoboForm is secure")
+	Saved := SFD_SECURE_APPS, SavedRoot := SFD_SECURE_APP_ROOT.Clone()
+	try {
+		SFD_SECURE_APP_ROOT["hwnd"] := 0
+		SFD_ProcessNameOf.DefineProp("Call", { Call: (Self, Root) => "RoboForm.exe" })
+		try AssertTrue(SFD_IsSecureField(A_ScriptHwnd), "a RoboForm.exe window is secure")
+		finally SFD_ProcessNameOf.DeleteProp("Call")
+		SFD_SECURE_APPS := -1
+		AssertTrue(SFD_IsSecureApp("notepad.exe"), "an unreadable list makes every application secure")
+	} finally {
+		SFD_SECURE_APPS := Saved
+		SFD_SECURE_APP_ROOT := SavedRoot
+	}
+}
+Test("SFD secure applications: the shared list, a RoboForm.exe window is secure (ADD-1)", _SFD_SecureApps_Shared)
 
 ; Refresh must revoke negative focused-element verdicts. Otherwise a caller
 ; asking for a refresh can keep authorising an old browser field until TTL.
