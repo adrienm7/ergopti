@@ -108,6 +108,12 @@ global _KLE_ResetObserverRegistering := 0
 global _KLE_ResetObserverCohort := 0
 global _KLE_ResetObserverCapture := 0
 global _KLE_ResetObserverGeneration := 0
+; The layout source emulation (source_emulation.ahk) of the composed layout:
+; its session, or 0 while no emulation table is performed, and the scan code
+; of every physical key (KeyboardEvent.code) its actions send.
+global KLE_SourceSession := 0
+global KLE_SourceScans := Map()
+global KLE_SourceRegistered := false
 
 /**
  * The physical rows the layout emulation (a registry layout or the built-in
@@ -1229,14 +1235,30 @@ KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
 		return false
 	}
 	KeycodeTable := Deps["keycodes"].Call()
+	Composed := Id == LayoutRegistry_Composer()["id"]
+	; The source emulation registers first: AHK fires the earliest-created
+	; variant whose criterion holds, and its keys go on to the layout below.
+	if Composed
+		_KLE_SourceBoot(ConfigDir, Deps)
 	Hotkeys := Deps["register"].Call(KeycodeTable)
 	LoggerInfo("LayoutEmulation", "Registered {1} emulation hotkeys for the '{2}' layout.", Hotkeys, Id)
 	LocalDir := LayoutRegistry_LocalDir(ConfigDir)
 	try {
 		LocalCopy := Deps["read_local"].Call(Id, LocalDir)
 	} catch as Err {
-		if Id == LayoutRegistry_Composer()["id"] {
-			; The composition exists only on this machine: there is nothing to download.
+		if Composed {
+			; The composition exists only on this machine: there is nothing to
+			; download. A source stored for the emulation alone (composer_emulate)
+			; is read from the composer folder, as read_composed does on macOS and Linux.
+			try Stored := Deps.Get("read_composed", LayoutComposer_ReadComposed).Call(ConfigDir)
+			catch as StoredErr {
+				LoggerError("LayoutEmulation", "The composed layout source is not usable ({1}); save it again in the layout editor.", StoredErr.Message)
+				return false
+			}
+			if Stored is Map {
+				LoggerInfo("LayoutEmulation", "Emulating the layout source stored in the composer folder.")
+				return _KLE_Activate(Id, Stored, KeycodeTable)
+			}
 			LoggerError("LayoutEmulation", "The composed layout is not usable ({1}); save it again in the layout manager.", Err.Message)
 			return false
 		}
@@ -1761,4 +1783,238 @@ _KLE_CanonicalSourceOwner(Request, Args*) {
 /** Returns source data issued by the original loader, never by supplied maps. */
 KeylayoutEmulation_CaptureCanonicalSource() {
 	return _KLE_CanonicalSourceOwner("capture")
+}
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 8/ Source emulation =======
+; ===================================
+; ===================================
+
+; Keys the source emulation never takes: the built-in modifiers it reads the
+; state of, and the keys the source compiler reports as not emulated.
+_KLE_SourceUntaken() {
+	static Untaken := Map("ShiftLeft", true, "ShiftRight", true, "ControlLeft", true, "ControlRight", true,
+		"AltLeft", true, "AltRight", true, "MetaLeft", true, "MetaRight", true, "CapsLock", true, "ContextMenu", true)
+	return Untaken
+}
+
+; The hotkey names one source key takes: those of the layout below (so the
+; earlier variant wins whatever the precedence of a wildcard), then the wildcard.
+_KLE_SourceHotkeyNames(Sc) {
+	Names := [Sc, "+" . Sc]
+	for Prefix in KLE_SHORTCUT_PREFIXES
+		Names.Push(Prefix . Sc)
+	Names.Push("*" . Sc)
+	return Names
+}
+
+/**
+ * Loads the emulation table of the composed layout's source and registers its
+ * keys. Registered before the keylayout emulation and at the default input
+ * level 0, so only physical input reaches it: a key it leaves alone is sent on
+ * at SendLevel 1, which the layout emulation below (I2) receives.
+ * @param {Map} Model - From SourceEmulation_Compile.
+ * @param {Map} Registry - Decoded physical_keys.json.
+ * @param {Func} HotkeyFn - The Hotkey built-in, or a stand-in taking Name, Callback, Options.
+ * @param {Func} HotIfFn - The HotIf built-in, or a stand-in taking an optional Criterion.
+ * @returns {Integer} Number of hotkeys registered.
+ * @throws {Error} On a second registration or a key the registry does not know.
+ */
+KeylayoutEmulation_SourceLoad(Model, Registry, HotkeyFn := Hotkey, HotIfFn := HotIf) {
+	global KLE_SourceSession, KLE_SourceScans, KLE_SourceRegistered
+	if KLE_SourceRegistered
+		throw Error("The layout source emulation is already registered.")
+	Scans := Map()
+	for Code, Key in Registry["keys"]
+		if Key.Get("kind", "") == "key" && Key.Get("ahk", 0) is String
+			Scans[Code] := StrUpper(Key["ahk"])
+	Codes := SourceEmulation_Keys(Model)
+	; An emulated layer types nothing on the keys it does not map: it takes them all.
+	if SourceEmulation_HasEmulatedLayer(Model)
+		for Code, Key in Registry["keys"]
+			if Key.Get("group", "") == "alphanumeric" && Scans.Has(Code)
+				Codes[Code] := true
+	Taken := []
+	for Code in Codes {
+		if _KLE_SourceUntaken().Has(Code)
+			continue
+		if !Scans.Has(Code)
+			throw Error("The layout source emulation names the unknown key " . Code . ".")
+		Taken.Push(Code)
+	}
+	KLE_SourceScans := Scans
+	KLE_SourceSession := SourceEmulation_NewSession(Model)
+	KLE_SourceRegistered := true
+	Count := 0
+	HotIfFn.Call(_KLE_SourceCriterion)
+	try {
+		for Code in Taken {
+			Sc := Scans[Code]
+			for Name in _KLE_SourceHotkeyNames(Sc)
+				HotkeyFn.Call(Name, _KLE_SourceOnPress.Bind(Code, Sc), "I0"), Count += 1
+			HotkeyFn.Call("*" . Sc . " up", _KLE_SourceOnRelease.Bind(Code, Sc), "I0"), Count += 1
+		}
+	} finally HotIfFn.Call()
+	return Count
+}
+
+; Reads, compiles and registers the composed layout's emulation table, when the
+; source form stored one (composer_emulate or composer_save with a source).
+_KLE_SourceBoot(ConfigDir, Deps) {
+	global _SharedDir
+	try {
+		Table := Deps.Get("read_emulation", LayoutComposer_ReadEmulation).Call(ConfigDir)
+		if !(Table is Map)
+			return 0
+		Model := SourceEmulation_Compile(Table)
+		if !SourceEmulation_HasRecords(Model)
+			return 0
+		Registry := Deps.Has("physical_keys") ? Deps["physical_keys"]
+			: JsonParse(FSReadStrict(_SharedDir . "\data\keycodes\physical_keys.json"))
+		Count := KeylayoutEmulation_SourceLoad(Model, Registry, Deps.Get("source_hotkey", Hotkey),
+			Deps.Get("source_hotif", HotIf))
+	} catch as Err {
+		LoggerError("LayoutEmulation", "The layout source emulation table is not performed: {1}", Err.Message)
+		return 0
+	}
+	LoggerInfo("LayoutEmulation", "Registered {1} hotkeys of the layout source emulation.", Count)
+	return Count
+}
+
+/** Drops the source emulation's state, for a test or a stop. */
+KeylayoutEmulation_SourceUnload() {
+	global KLE_SourceSession, KLE_SourceScans, KLE_SourceRegistered
+	KLE_SourceSession := 0
+	KLE_SourceScans := Map()
+	KLE_SourceRegistered := false
+}
+
+_KLE_SourceCriterion(*) {
+	global KLE_SourceSession
+	return (KLE_SourceSession is Map) && !A_IsSuspended
+}
+
+/**
+ * The built-in modifiers held now, as the engine names them.
+ * @param {Func} StateFn - GetKeyState, or a stand-in for a test.
+ * @returns {Map}
+ */
+KeylayoutEmulation_SourceHeld(StateFn := GetKeyState) {
+	Held := Map()
+	if StateFn.Call("LShift", "P") || StateFn.Call("RShift", "P")
+		Held["shift"] := true
+	if StateFn.Call("LControl", "P") || StateFn.Call("RControl", "P")
+		Held["control"] := true
+	if StateFn.Call("LAlt", "P")
+		Held["alt"] := true
+	if StateFn.Call("RAlt", "P")
+		Held["alt_right"] := true
+	if StateFn.Call("LWin", "P") || StateFn.Call("RWin", "P")
+		Held["meta"] := true
+	if StateFn.Call("CapsLock", "T")
+		Held["caps_lock"] := true
+	return Held
+}
+
+/**
+ * What one engine action sends: the text to type, or the Send keys of a key or
+ * modifier action. Key actions release the hand's modifiers and press only
+ * theirs, as the macOS and Linux drivers post them.
+ * @param {Map} Action - From SourceEmulation_Press.
+ * @param {Map} Scans - KeyboardEvent.code -> scan code name.
+ * @returns {Map} "text" or "keys".
+ */
+KeylayoutEmulation_SourceSend(Action, Scans) {
+	static Prefixes := Map("shift", "+", "shift_left", "<+", "shift_right", ">+", "control", "^",
+		"control_left", "<^", "control_right", ">^", "alt", "!", "alt_left", "<!", "alt_right", ">!",
+		"meta", "#", "meta_left", "<#", "meta_right", ">#")
+	static Keys := Map("shift", "LShift", "shift_left", "LShift", "shift_right", "RShift",
+		"control", "LControl", "control_left", "LControl", "control_right", "RControl",
+		"alt", "LAlt", "alt_left", "LAlt", "alt_right", "RAlt", "meta", "LWin", "meta_left", "LWin",
+		"meta_right", "RWin")
+	switch Action["type"] {
+		case "text":
+			return Map("text", Action["text"])
+		case "key":
+			if !Scans.Has(Action["key"])
+				throw Error("The layout source emulation sends the unknown key " . Action["key"] . ".")
+			Prefix := ""
+			for Id in Action["modifiers"]
+				if Prefixes.Has(Id) && !InStr(Prefix, Prefixes[Id])
+					Prefix .= Prefixes[Id]
+			return Map("keys", Prefix . "{" . Scans[Action["key"]] . "}")
+		case "modifier":
+			if !Keys.Has(Action["id"])
+				throw Error("The layout source emulation holds the unknown modifier " . Action["id"] . ".")
+			return Map("keys", "{" . Keys[Action["id"]] . (Action["down"] ? " down}" : " up}"))
+	}
+	throw Error("The layout source emulation returned an unknown action.")
+}
+
+; Performs the engine's actions in order: text through the driver's text
+; sender, keys at SendLevel 1 so the layout emulation below interprets them.
+_KLE_SourcePerform(Actions) {
+	global KLE_SourceScans
+	for Action in Actions {
+		Emitted := KeylayoutEmulation_SourceSend(Action, KLE_SourceScans)
+		if Emitted.Has("text") {
+			SendNewResult(Emitted["text"])
+			continue
+		}
+		SendLevel(1)
+		SendEvent(Emitted["keys"])
+	}
+}
+
+; A tap-hold whose threshold passes starts its hold without waiting for a key.
+_KLE_SourceArmTick() {
+	global KLE_SourceSession
+	Delay := (KLE_SourceSession is Map) ? SourceEmulation_PendingDelay(KLE_SourceSession, A_TickCount) : 0
+	if Delay > 0
+		SetTimer(_KLE_SourceTick, -Delay)
+}
+
+_KLE_SourceTick() {
+	global KLE_SourceSession
+	if !(KLE_SourceSession is Map)
+		return
+	_AtCrit := Critical("On")
+	try {
+		; A timer still runs while the driver is paused: release what the engine holds.
+		Actions := A_IsSuspended ? SourceEmulation_Reset(KLE_SourceSession)
+			: SourceEmulation_Tick(KLE_SourceSession, A_TickCount)
+		_KLE_SourcePerform(Actions)
+	} finally Critical(_AtCrit)
+}
+
+_KLE_SourceOnPress(Code, Sc, *) {
+	global KLE_SourceSession
+	_AtCrit := Critical("On")
+	try {
+		Result := SourceEmulation_Press(KLE_SourceSession, Code, KeylayoutEmulation_SourceHeld(), A_TickCount)
+		_KLE_SourcePerform(Result["actions"])
+		if !Result["consumed"] {
+			SendLevel(1)
+			SendEvent("{Blind}{" . Sc . " down}")
+		}
+	} finally Critical(_AtCrit)
+	_KLE_SourceArmTick()
+}
+
+_KLE_SourceOnRelease(Code, Sc, *) {
+	global KLE_SourceSession
+	_AtCrit := Critical("On")
+	try {
+		Result := SourceEmulation_Release(KLE_SourceSession, Code, A_TickCount)
+		_KLE_SourcePerform(Result["actions"])
+		if !Result["consumed"] {
+			SendLevel(1)
+			SendEvent("{Blind}{" . Sc . " up}")
+		}
+	} finally Critical(_AtCrit)
 }

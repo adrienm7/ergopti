@@ -53,8 +53,10 @@ _LLM_Engine_CaptureAcceptSource() {
  * Called on every relevant keystroke. Resets the debounce timer.
  * Callers (llm_bridge.ahk) pass the current typed buffer.
  * @param {string} buffer - Full typed context up to the caret.
+ * @param {Func|Integer} ScheduleFn - A scheduler of SetTimer's signature that
+ *     arms this debounce, or 0 for the engine's TimerScheduler port.
  */
-LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer,
+LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := 0,
 		PublishGuard := unset, SourceReceipt := unset) {
 	global _LLM_Engine
 	local _c := Critical("On")
@@ -94,7 +96,7 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer,
 			return
 		_LLM_Engine["pending_timer"] := _LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource,
 			LLM_Engine_LiveOverride())
-		ScheduleFn.Call(_LLM_Engine["pending_timer"], _LLM_Engine_ArmPeriod(Decision, HasOverride))
+		_LLM_Engine_ArmTimer(_LLM_Engine["pending_timer"], _LLM_Engine_ArmPeriod(Decision, HasOverride), ScheduleFn)
 		_LLM_Engine["timer_active"] := true
 	} finally {
 		Critical(_c)
@@ -123,6 +125,21 @@ _LLM_Engine_ArmPeriod(Decision, HasOverride) {
 		: LLM_Option_DebounceTimerPeriod(Decision["delay_ms"])
 }
 
+/**
+ * Arms a debounce callback once: through the caller's scheduler when it passes
+ * one, else through the engine's TimerScheduler port.
+ * @param {Func} Callback The bound debounce callback, also its cancel handle.
+ * @param {Integer} Period The one-shot SetTimer period (negative milliseconds).
+ * @param {Func|Integer} ScheduleFn A scheduler of SetTimer's signature, or 0.
+ */
+_LLM_Engine_ArmTimer(Callback, Period, ScheduleFn) {
+	if HasMethod(ScheduleFn, "Call")
+		return ScheduleFn.Call(Callback, Period)
+	if !(ScheduleFn is Integer && ScheduleFn == 0)
+		throw TypeError("A debounce scheduler must be callable, or 0 for the engine's timer port.", -1)
+	return _LLM_Engine_Port("timer").After(Callback, -Period)
+}
+
 /** A timer the plan no longer holds was superseded: it never sends. */
 _LLM_Engine_FireArmed(Token, Buffer, AcceptSource, Override) {
 	if _LLM_Engine_Plan().OnTimer(Token)[1]["action"] != "fire"
@@ -137,9 +154,11 @@ _LLM_Engine_FireArmed(Token, Buffer, AcceptSource, Override) {
  * then falls back to the LLM bridge rolling context.
  * @param {number} delaySec - Optional timer delay in seconds (0 = immediate).
  * @param {string} buffer - Optional context override captured at schedule time.
+ * @param {Func|Integer} ScheduleFn - A scheduler of SetTimer's signature, or 0
+ *     for the engine's TimerScheduler port.
  */
 LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
-		ScheduleFn := SetTimer, SourceReceipt := unset) {
+		ScheduleFn := 0, SourceReceipt := unset) {
 	global _LLM_Engine
 	if !_LLM_Engine["enabled"]
 		return false
@@ -171,7 +190,7 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
 			return false
 		_LLM_Engine["last_buffer"] := buffer
 		_LLM_Engine["pending_timer"] := _LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource, Override)
-		ScheduleFn.Call(_LLM_Engine["pending_timer"], _LLM_Engine_ArmPeriod(Decision, HasOverride))
+		_LLM_Engine_ArmTimer(_LLM_Engine["pending_timer"], _LLM_Engine_ArmPeriod(Decision, HasOverride), ScheduleFn)
 		_LLM_Engine["timer_active"] := true
 	} finally {
 		Critical(PreviousCritical)
@@ -188,10 +207,10 @@ LLM_Engine_CancelTimer() {
 	try {
 		; Always clear state so callers that pre-delete pending_timer still get a clean
 		; result. The timer_active guard is skipped intentionally — an extra no-op
-		; SetTimer(0) on an already-elapsed timer is harmless and avoids subtle
-		; state divergence when the guard and the actual timer state disagree.
+		; cancel of an already-elapsed timer is harmless and avoids subtle state
+		; divergence when the guard and the actual timer state disagree.
 		if _LLM_Engine.Has("pending_timer") and IsObject(_LLM_Engine["pending_timer"])
-			SetTimer(_LLM_Engine["pending_timer"], 0)
+			_LLM_Engine_Port("timer").Cancel(_LLM_Engine["pending_timer"])
 		_LLM_Engine_Plan().OnCancel()
 		_LLM_Engine["pending_timer"] := ""
 		_LLM_Engine["timer_active"]  := false
@@ -257,7 +276,7 @@ LLM_Engine_StopGeneration() {
 		try LLM_OllamaCancelAllAsync()
 		; Spare the explicit user probe: typing during a Test-selected-API run
 		; must not silently kill it (the poller would fire neither callback).
-		try LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)
+		try _LLM_Engine_Port("http").Cancel(LLM_REMOTE_KIND_API_TEST)
 	} finally {
 		Critical(_c)
 	}
@@ -286,7 +305,7 @@ LLM_Engine_CancelInflight(PublishGuard := unset) {
 		try LLM_OllamaCancelAllAsync()
 		; Same owned-probe spare as StopGeneration: a per-keystroke cancel must
 		; never silently kill an explicit Test-selected-API run.
-		try LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)
+		try _LLM_Engine_Port("http").Cancel(LLM_REMOTE_KIND_API_TEST)
 	} finally {
 		Critical(_c)
 	}

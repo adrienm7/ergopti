@@ -1034,7 +1034,7 @@ _LVS_GenericRemoteRequesterAdmission(Boundary, Withdraw) {
 		_LLM_AuxOwners := SavedRemote[4]
 	}
 	Body(Calls, Lines, Sent, Fx) {
-		global _LLM_Engine_RemoteTransport, _LLM_Menu
+		global _LLM_Menu
 		Gate := Boundary == "target" ? _LLM_Engine_GetActiveApiEntry
 			: Boundary == "resolved" ? _LLMRemoteResolveEntry
 			: Boundary == "context" ? _LLMRemote_BuildRequestContext : _LLMRemoteBuildPayload
@@ -1046,7 +1046,7 @@ _LVS_GenericRemoteRequesterAdmission(Boundary, Withdraw) {
 		Callbacks := []
 		Seen := false
 		try {
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
@@ -1200,7 +1200,7 @@ _LVS_PublicAuxRemoteAdmission(Action, Boundary, Mode) {
 		_LLM_AuxOwners := Saved[4]
 	}
 	Body(Calls, Lines, Sent) {
-		global _LLM_Engine_RemoteTransport, _LLM_Menu, _LLM_Tone_ReadSelection
+		global _LLM_Menu, _LLM_Tone_ReadSelection
 		global _LLM_Tone_Generation, _LLM_Translate_Generation
 		Gate := Boundary == "target" ? _LLM_Engine_GetActiveApiEntry : _LLMRemote_BuildRequestContext
 		Dispatch := _LLMRemote_DispatchManagedCurl
@@ -1210,7 +1210,7 @@ _LVS_PublicAuxRemoteAdmission(Action, Boundary, Mode) {
 		State := _ManagedCurlControlState()
 		Seen := false
 		try {
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})

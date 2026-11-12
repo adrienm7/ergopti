@@ -27,7 +27,7 @@
 ; Before any other statement a worker therefore releases those hotkeys and takes
 ; a title of its own. Every predicate reads only A_Args and is hoisted.
 global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
-	|| BundledApp_IsInvocation()
+	|| BundledApp_IsInvocation() || KbdRegister_IsInvocation()
 if _DriverIsDetachedWorker {
 	Suspend(true)
 	; A pure HWND reaches the hidden main window whatever DetectHiddenWindows
@@ -581,6 +581,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/keylayout/keylayout_parser.ahk
 #Include modules/keymap/keylayout/keylayout_tables.ahk
 #Include modules/keymap/keylayout/keylayout_emulation.ahk
+#Include modules/keymap/keylayout/source_emulation.ahk
 #Include modules/keymap/keylayout/layout_registry.ahk
 #Include modules/keymap/keylayout/layout_catalogue.ahk
 #Include modules/keymap/keylayout/layout_extension.ahk
@@ -647,6 +648,11 @@ if KLPF_IsWorkerInvocation()
 #Include apps/bundled_apps.ahk
 if BundledApp_IsInvocation()
 	BundledApp_Main(_SharedDir)
+; The elevated keyboard layout DLL registration (ui/layout_manager/kbd_register.ahk
+; in a source run) reuses this executable too, and exits from there.
+#Include ui/layout_manager/kbd_register_core.ahk
+if KbdRegister_IsInvocation()
+	KbdRegister_Main()
 KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
@@ -1416,6 +1422,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/init.ahk
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
+#Include ui/layout_manager/source_store.ahk
 #Include ui/field_check/network_check.ahk
 #Include ui/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk

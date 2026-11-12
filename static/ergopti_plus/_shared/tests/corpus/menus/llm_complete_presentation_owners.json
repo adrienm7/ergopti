@@ -19,7 +19,7 @@
 				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk"
 			},
 			"signatures": {
-				"ahk": "LLM_Menu_BuildSubmenu() {"
+				"ahk": "LLM_Menu_BuildSubmenu(Target := 0) {"
 			}
 		},
 		{

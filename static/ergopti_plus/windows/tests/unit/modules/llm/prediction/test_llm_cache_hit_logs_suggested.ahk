@@ -140,7 +140,7 @@ _LCHS_CacheBranchesCancelBothBackends() {
 	}
 	Remote := 0
 	Pos := 1
-	while (F := InStr(Body, "LLM_RemoteCancelAllAsync(", false, Pos)) {
+	while (F := InStr(Body, '_LLM_Engine_Port("http").Cancel(', false, Pos)) {
 		Pos := F + 1
 		Remote += 1
 	}
