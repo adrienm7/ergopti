@@ -37,9 +37,15 @@ local function store(overrides)
 		settings = settings(),
 		config_dir = "/config/",
 		read = function(path) return disk[path] end,
+		read_bounded = function(path, max_bytes)
+			local text = disk[path]
+			if text == nil then return nil, "absent" end
+			if #text > max_bytes then return nil, "too_large" end
+			return text, "ok"
+		end,
 		exists = function(path) return disk[path] ~= nil end,
 		write = function(path, text) disk[path] = text; return true end,
-		log = function(level, message) logs[#logs + 1] = level .. ": " .. message end,
+		log = function(level, message, ...) logs[#logs + 1] = level .. ": " .. string.format(message, ...) end,
 	}
 	for key, value in pairs(overrides or {}) do env[key] = value end
 	return SourceStore.new(env), disk, logs
@@ -99,7 +105,7 @@ helpers.describe("layout editor source store", function()
 		save("latin1.toml", "caf\233")
 		save("surrogate.toml", "\237\160\128")
 		for index, code in ipairs(refused) do
-			helpers.assert_eq(code, SourceStore.FAILURE_INVALID, "refusal " .. index)
+			helpers.assert_eq(code, settings().failures.invalid, "refusal " .. index)
 		end
 		helpers.assert_eq(#refused, 8)
 		helpers.assert_eq(next(disk), nil, "nothing was written")
@@ -111,8 +117,58 @@ helpers.describe("layout editor source store", function()
 		local result
 		operations.save({ filename = "a.toml", text = "x" }, function(...) result = { ... } end)
 		helpers.assert_eq(result[1], false)
-		helpers.assert_eq(result[2], SourceStore.FAILURE_WRITE)
+		helpers.assert_eq(result[2], settings().failures.write)
 		helpers.assert_eq(result[3], "disk full")
+	end)
+
+	helpers.it("(lmh-007-store-settings) reads the export name and failure codes from the shared defaults", function()
+		local s = settings()
+		helpers.assert_eq(s.nav_file, "layers.toml")
+		helpers.assert_eq(s.failures, { invalid = "source_invalid_file", write = "write_failed" })
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local handle = assert(io.open(Paths.shared(DEFAULTS_PATH), "r"))
+		local defaults = Json.decode(handle:read("*a"))
+		handle:close()
+		defaults.source.nav_file = "navigation.toml"
+		defaults.source.failures.invalid = "refused_here"
+		local renamed = assert(SourceStore.settings(defaults))
+		helpers.assert_true(SourceStore.is_source(renamed, "layers.toml"), "the old name is a source again")
+		helpers.assert_true(not SourceStore.is_source(renamed, "navigation.toml"), "the configured export is not")
+		helpers.assert_eq(SourceStore.read_picked(renamed, "/u/x.sh", function() end).code, "refused_here")
+		defaults.source.failures = nil
+		local _, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "failures")
+		defaults.source.failures, defaults.source.nav_file = { invalid = "a", write = "b" }, nil
+		_, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "nav_file")
+	end)
+
+	helpers.it("(lmh-006-bounded-reopen) reopens the last source through a bounded read and as UTF-8 only", function()
+		local files
+		local operations, disk, logs = store({
+			-- Only the pointer is read whole; the source itself goes through read_bounded.
+			read = function(path)
+				if path:match("%.toml$") then error("the last source was read unbounded") end
+				return files[path]
+			end,
+		})
+		files = disk
+		disk["/config/layout_sources/last_source"] = "latin.toml\n"
+		disk["/config/layout_sources/latin.toml"] = "caf\233"
+		local opened
+		operations.open(function(data) opened = data end)
+		helpers.assert_eq(opened.text, nil, "a non-UTF-8 last source is not reopened")
+		helpers.assert_contains(logs[1], "not UTF-8")
+		disk["/config/layout_sources/latin.toml"] = string.rep("x", settings().max_file_bytes + 1)
+		operations.open(function(data) opened = data end)
+		helpers.assert_eq(opened.text, nil, "an oversized last source is not reopened")
+		helpers.assert_contains(logs[2], "too_large")
+		disk["/config/layout_sources/latin.toml"] = "caf\195\169 = 1\n"
+		operations.open(function(data) opened = data end)
+		helpers.assert_eq(opened.text, "caf\195\169 = 1\n")
+		local ok, err = pcall(SourceStore.new, { settings = settings(), config_dir = "/c/" })
+		helpers.assert_true(not ok and tostring(err):match("read_bounded") ~= nil, "a store needs the bounded read")
 	end)
 
 	helpers.it("opens nothing when the pointer names a missing or foreign file", function()
@@ -131,9 +187,9 @@ helpers.describe("layout editor source store", function()
 		local picked = SourceStore.read_picked(settings(), "/u/My Layout.TOML", read)
 		helpers.assert_eq(picked.filename, "My Layout.TOML")
 		helpers.assert_eq(picked.text, "a = 1\n")
-		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/x.sh", read).code, SourceStore.FAILURE_INVALID)
-		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/latin.keylayout", read).code, SourceStore.FAILURE_INVALID)
-		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/missing.toml", read).code, SourceStore.FAILURE_INVALID)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/x.sh", read).code, settings().failures.invalid)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/latin.keylayout", read).code, settings().failures.invalid)
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/missing.toml", read).code, settings().failures.invalid)
 	end)
 
 	helpers.it("accepts multi-byte UTF-8 and refuses overlong forms", function()

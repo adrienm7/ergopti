@@ -159,8 +159,25 @@ case "$SRC_EXE_NAME" in
 	"Slack"|"Discord"|"Notion"|"Spotify"|"Figma"|"Postman")
 		APP_FAMILY=electron ;;
 esac
+# Browsers get their own profile, as the catalogue's chromium and firefox
+# families do on Windows and Linux (BAP-002): matched by their macOS
+# executable names, lower-cased, which test-app-cloner-families.cjs holds to
+# _shared/data/app_cloner/families.json. Google Chrome ships a « Google Chrome
+# Framework », which the Chromium framework test above does not see.
+case "${SRC_EXE_NAME:l}" in
+	"google chrome"|"chromium"|"microsoft edge"|"brave browser"|"vivaldi"|"opera")
+		APP_FAMILY=chromium ;;
+	"firefox"|"librewolf"|"waterfox"|"thunderbird")
+		APP_FAMILY=firefox ;;
+esac
 # VSCode is Electron too but with extra CLI flags worth passing
-if [[ -f "$SOURCE_APP/Contents/Resources/app/bin/code" ]] \
+# The bundled CLI names the variant: VSCodium and the Insiders build keep their
+# own settings and extensions (families.json `user_folders`, BAP-004).
+VSCODE_CLI=""
+for cli in code code-insiders codium; do
+	[[ -f "$SOURCE_APP/Contents/Resources/app/bin/$cli" ]] && VSCODE_CLI=$cli
+done
+if [[ -n "$VSCODE_CLI" ]] \
    || [[ "$SRC_EXE_NAME" == "Code" ]] \
    || [[ "$SRC_EXE_NAME" == "Code - Insiders" ]]; then
 	APP_FAMILY=vscode
@@ -180,9 +197,19 @@ mkdir -p "$USER_DATA_DIR"
 # VSCode-specific extras: shared extensions dir + symlinked User/ subdir,
 # so the clone inherits settings/keybindings/snippets/themes/globalStorage
 # from the main VSCode instance and doesn't re-install extensions.
-SHARED_EXT_DIR="$HOME/.vscode/extensions"
+# The folders are families.json's vscode `user_folders`, held to it by
+# tools/test/test-app-cloner-families.cjs.
+case "${VSCODE_CLI:-${SRC_EXE_NAME:l}}" in
+	"code-insiders"|"code - insiders")
+		VSCODE_SETTINGS="Code - Insiders"; VSCODE_EXTENSIONS=".vscode-insiders" ;;
+	"codium"|"vscodium")
+		VSCODE_SETTINGS="VSCodium"; VSCODE_EXTENSIONS=".vscode-oss" ;;
+	*)
+		VSCODE_SETTINGS="Code"; VSCODE_EXTENSIONS=".vscode" ;;
+esac
+SHARED_EXT_DIR="$HOME/$VSCODE_EXTENSIONS/extensions"
 if [[ "$APP_FAMILY" == "vscode" ]]; then
-	MAIN_VSCODE_DATA="$HOME/Library/Application Support/Code"
+	MAIN_VSCODE_DATA="$HOME/Library/Application Support/$VSCODE_SETTINGS"
 	if [[ -d "$MAIN_VSCODE_DATA/User" && ! -e "$USER_DATA_DIR/User" ]]; then
 		ln -s "$MAIN_VSCODE_DATA/User" "$USER_DATA_DIR/User"
 		log "Symlinked User/ → main VSCode user data"
@@ -1036,8 +1063,10 @@ case "$APP_FAMILY" in
 			--extensions-dir "$SHARED_EXT_DIR"
 			--new-window
 		) ;;
-	electron)
+	electron|chromium)
 		ARGS=(--user-data-dir "$USER_DATA_DIR") ;;
+	firefox)
+		ARGS=(--no-remote --profile "$USER_DATA_DIR") ;;
 	native|*)
 		ARGS=() ;;
 esac
@@ -1053,6 +1082,16 @@ esac
 #                            no-ops because the app isn't yet a registered
 #                            URL handler in this process tree.
 URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*:'
+# A browser clone opens a web URL itself, as an argument: `open -a` would hand
+# it to the browser's main instance, not the clone's profile. A standalone web
+# window is the PWA mode's WKWebView launcher, so no browser app window is asked
+# for here.
+WEB_URL_RE='^https?://'
+if [[ -n "$OPEN_ARG" && "$OPEN_ARG" =~ $WEB_URL_RE ]]; then
+	case "$APP_FAMILY" in
+		chromium|firefox) ARGS+=("$OPEN_ARG"); OPEN_ARG="" ;;
+	esac
+fi
 if [[ -n "$OPEN_ARG" && ! "$OPEN_ARG" =~ $URL_SCHEME_RE ]]; then
 	ARGS+=("$OPEN_ARG")
 fi

@@ -25,14 +25,24 @@ end
 
 local last_read_failure = nil
 
---- Reads the helper's answer: enabled, disabled or other, or nil after a logged
---- failure. Each menu rebuild reads it, so one failure is logged once until a
---- read succeeds again.
+--- Reads the helper's answer: enabled, disabled, other or stale, or nil after a
+--- logged failure. Each menu rebuild reads it, so one failure, or one stale
+--- entry, is logged once until the answer changes.
 --- @param run function|nil
 --- @return string|nil
 local function read_state(run)
 	local ok, output, err = invoke("status", run)
 	local state = ok and type(output) == "string" and output:match("^(%a+)%s*$") or nil
+	if state == "stale" then
+		-- The entry names a launcher that no longer exists (a moved or deleted
+		-- checkout): nothing starts at login. Enabling rewrites it (SAD-1).
+		if last_read_failure ~= state then
+			last_read_failure = state
+			Logger.warn(LOG, "The login startup entry names a launcher that no longer exists: "
+				.. "nothing starts at login until startup is enabled again.")
+		end
+		return state
+	end
 	if state == "enabled" or state == "disabled" or state == "other" then
 		last_read_failure = nil
 		return state
@@ -51,7 +61,7 @@ end
 function M.enabled(run)
 	local state = read_state(run)
 	if state == "enabled" then return true end
-	if state == "disabled" then return false end
+	if state == "disabled" or state == "stale" then return false end
 	return nil
 end
 
@@ -62,7 +72,7 @@ end
 function M.command_available(run)
 	local state = read_state(run)
 	if state == "other" then return false end
-	if state == "enabled" or state == "disabled" then return true end
+	if state == "enabled" or state == "disabled" or state == "stale" then return true end
 	return nil
 end
 

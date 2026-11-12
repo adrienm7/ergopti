@@ -86,12 +86,11 @@ local function build_paused()
 end
 
 helpers.describe("the Shortcuts master toggle is pause-gated like its siblings", function()
-	helpers.it("greys the parent row out while the script is paused", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision
+	-- 2026-11-12): the submenu opens; the switch itself still refuses below.
+	helpers.it("keeps the parent row reachable while paused (edd1-paused-writes)", function()
 		local item = build_paused()
-		helpers.assert_eq(item.disabled, true,
-			"the Shortcuts row must be greyed while paused. Left enabled, a mid-pause toggle is "
-			.. "silently overwritten at resume — resume_all() restores bindings from the snapshot "
-			.. "pause_all() took, so the user's choice never survives")
+		helpers.assert_true(item.disabled ~= true, "the Shortcuts row stays reachable while paused")
 		helpers.assert_nil(item.action, "the parent opens a submenu and carries no action")
 	end)
 

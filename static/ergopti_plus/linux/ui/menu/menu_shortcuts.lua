@@ -159,8 +159,8 @@ local function wrap_symbol_rows(ctx, sc)
 		Logger.error(LOG, "The shortcuts owner has no wrap-symbol choices; the wrap controls are unavailable.")
 	end
 	local choices = type(sc.get_wrap_choices) == "function" and sc.get_wrap_choices() or nil
-	local paused = ctx.paused == true
-	local ready = choices ~= nil and not paused
+	-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+	local ready = choices ~= nil
 	local states = choices and choices.states or {}
 	local custom = choices and choices.custom or {}
 	local COMMAND = require("config_keys").COMMAND
@@ -426,8 +426,8 @@ local function _build_shortcuts(ctx)
 		-- and without a question, like every scope row.
 		local function group_scope_rows(prefix)
 			local function apply_group_scope(mode)
-				if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-				local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "keyboard_group:" .. prefix)
+				-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+				local committed = require("infra.shortcuts_scope").apply(mode, "keyboard_group:" .. prefix)
 				if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return committed
 			end
@@ -435,9 +435,8 @@ local function _build_shortcuts(ctx)
 				[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_group_scope("recommended") end,
 				[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_group_scope("clear") end,
 			}, {
-				["keyboard_group_ready"] = function()
-					return ctx.paused ~= true and type(ctx.is_paused) == "function" and ctx.is_paused() == false
-				end,
+				-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+				["keyboard_group_ready"] = function() return true end,
 			}, {})
 			-- A withdrawn declaration withdraws both rows: no half-declared group.
 			if type(rows) ~= "table" or #rows ~= 3 then
@@ -607,8 +606,7 @@ local function _build_shortcuts(ctx)
 			return rows
 		end
 		local function apply_chords_scope(mode)
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-			local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "script_chords")
+			local committed = require("infra.shortcuts_scope").apply(mode, "script_chords")
 			if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return committed
 		end
@@ -750,8 +748,7 @@ local function _build_shortcuts(ctx)
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	local function apply_shortcuts_scope(mode)
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
+		local committed = require("infra.shortcuts_scope").apply(mode)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
@@ -796,11 +793,7 @@ local function _build_shortcuts(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
-		paused = function()
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return nil end
-			return ctx.is_paused()
-		end,
-		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
+		scope = function() return require("infra.shortcuts_scope").editor_owner() end,
 		host = function() return require("ui.physical_shortcuts.bridge") end,
 		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
 	})

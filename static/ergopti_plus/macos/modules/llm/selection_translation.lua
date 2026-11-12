@@ -303,6 +303,10 @@ end
 function M.run(value, parent)
 	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
 	if not engine or not engine.admit_answer_request(LABEL) then return false end
+	if engine.selection_action_excluded() then
+		Logger.info(LOG, "Translation refused: the focused app is excluded from the AI.")
+		return false
+	end
 	local focus = WindowInfo.focused_identity()
 	if focus == nil then
 		Logger.warn(LOG, "Translation refused: the focused window cannot be identified.")

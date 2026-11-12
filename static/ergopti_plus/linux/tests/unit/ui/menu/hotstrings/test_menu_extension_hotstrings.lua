@@ -159,14 +159,15 @@ helpers.describe("complete installed extension shared frames (Linux)", function(
 			helpers.assert_eq(rows[7].checked, true)
 			local writes = 0
 			f.context.config.set_extension_sections_enabled = function() writes = writes + 1; return true end
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 			f.context.paused = true
-			helpers.assert_eq(rows[1].fn(), false); helpers.assert_eq(rows[2].fn(), false)
-			helpers.assert_eq(writes, 0)
+			helpers.assert_true(rows[1].fn()); helpers.assert_true(rows[2].fn())
+			helpers.assert_eq(writes, 2)
 		end)
 	end)
-	helpers.it("preserves the genuine paused top-level withdrawal of extension children", function()
+	helpers.it("keeps the extension children in a paused tray (edd1-paused-writes)", function()
 		with_extension_frame(function(f)
-			helpers.assert_eq(f.build(), nil)
+			helpers.assert_type(f.build(), "table")
 		end, true)
 	end)
 	for _, section in ipairs({ "hotstring_extension_bulk_controls", "hotstring_extension_content_frame", "hotstrings_parameter_boundary" }) do

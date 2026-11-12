@@ -491,6 +491,7 @@ local function default_deps(settings)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = FileSystem.read,
+		read_bounded = FileSystem.read_bounded,
 		write = write,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
@@ -1497,6 +1498,7 @@ local function source_operations(deps)
 		settings = settings,
 		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
 		read = deps.read,
+		read_bounded = deps.read_bounded,
 		exists = deps.exists,
 		write = function(path, content) return write_file(deps, path, content) end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
@@ -1537,7 +1539,7 @@ end
 --- @return boolean dispatched
 function M.source_save(payload, on_done, deps)
 	return with_source(deps, function(operations) operations.save(payload, on_done) end,
-		function(detail) on_done(false, SourceStore.FAILURE_WRITE, detail, nil) end)
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
 end
 
 --- Revokes every registry workflow before cancelling its external transports.

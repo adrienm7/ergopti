@@ -87,12 +87,13 @@ local function undo_layer(import, files)
 end
 
 --- Builds one transaction owner over tap_hold.toml and config.toml.
---- @param options table path, backup_path, tap_hold_path, tap_hold_backup_path,
----   is_paused and optional manager, loader, writer, parameters, files and
----   shared_root ports.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table path, backup_path, tap_hold_path, tap_hold_backup_path
+---   and optional manager, loader, writer, parameters, files and shared_root ports.
 --- @return table owner apply(mode), revert(), release(), pending(), retry_restore().
 function M.new(options)
-	assert(type(options) == "table" and type(options.is_paused) == "function", "tap-hold scope requires live pause ownership")
+	assert(type(options) == "table", "tap-hold scope requires its options")
 	for _, name in ipairs({ "path", "backup_path", "tap_hold_path", "tap_hold_backup_path" }) do
 		assert(type(options[name]) == "string" and options[name] ~= "", "tap-hold scope requires " .. name)
 	end
@@ -161,7 +162,6 @@ function M.new(options)
 			return snapshot
 		end,
 		apply = function(_, _, _, _, presets)
-			if options.is_paused() then return false end
 			local candidate = parameters.parameter_configuration_snapshot(owner)
 			if type(candidate) ~= "table" then return false end
 			for key in pairs(candidate) do
@@ -186,7 +186,7 @@ function M.new(options)
 	end
 	function owner.pending() return transaction.pending() or layer_debt or held end
 	function owner.apply(mode)
-		if owner.pending() or (mode ~= "clear" and mode ~= "recommended") or options.is_paused() then return false end
+		if owner.pending() or (mode ~= "clear" and mode ~= "recommended") then return false end
 		if not acquire() then return false, "tap-hold parameters are already owned" end
 		layer = nil
 		if mode == "recommended" then
@@ -245,18 +245,16 @@ end
 
 --- Applies a menu request, retaining any refused compensation for a retry.
 --- @param mode string "recommended" or "clear".
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
-	if type(is_paused) ~= "function" or is_paused() then return false, "tap-hold configuration is paused" end
+function M.apply(mode)
 	if mode ~= "clear" and mode ~= "recommended" then return false, "invalid tap-hold scope mode" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then
 		return false, "tap-hold rollback is pending"
 	end
 	local path, backup_path, tap_hold_path, tap_hold_backup_path = paths()
 	_owner = M.new({ path = path, backup_path = backup_path, tap_hold_path = tap_hold_path,
-		tap_hold_backup_path = tap_hold_backup_path, is_paused = is_paused })
+		tap_hold_backup_path = tap_hold_backup_path })
 	Logger.start(LOG, "Tap-hold scope %s started.", mode)
 	local committed, detail = _owner.apply(mode)
 	if committed == true then
@@ -268,11 +266,10 @@ function M.apply(mode, is_paused)
 end
 
 --- The tap-hold participant of a composed scope, bound to the retained owner.
---- @param is_paused function Live pause getter.
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused)
+function M.participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused) end,
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end

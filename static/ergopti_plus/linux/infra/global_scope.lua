@@ -46,18 +46,14 @@ end
 --- @return table registry
 function M.participants(ctx)
 	assert(type(ctx) == "table", "the global scope needs the menu context")
-	local function is_paused()
-		return ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
-	end
 	local registry = {}
+	-- A pause does not refuse a scope: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	if type(ctx.is_paused) == "function" then
-		registry.global = require("infra.script_scope").participant(function()
-			if ctx.paused == true then return true end
-			return ctx.is_paused()
-		end)
+		registry.global = require("infra.script_scope").participant()
 	end
-	if ctx.tap_holds then registry.tap_holds = require("infra.tap_hold_scope").participant(is_paused) end
-	if ctx.shortcuts then registry.shortcuts = require("infra.shortcuts_scope").participant(is_paused) end
+	if ctx.tap_holds then registry.tap_holds = require("infra.tap_hold_scope").participant() end
+	if ctx.shortcuts then registry.shortcuts = require("infra.shortcuts_scope").participant() end
 	-- Without a touchpad the gestures are skipped and reported: their
 	-- « recommended » reader could never start, which would refuse every row.
 	if ctx.gestures and type(ctx.gestures.scope_participant) == "function"
@@ -65,15 +61,15 @@ function M.participants(ctx)
 		registry.gestures = ctx.gestures.scope_participant()
 	end
 	if ctx.config then
-		registry.hotstrings = require("infra.hotstrings_scope").participant(is_paused,
+		registry.hotstrings = require("infra.hotstrings_scope").participant(
 			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	end
 	-- The layout rows, acknowledged once the session holds the layout that carries them.
 	if ctx.config then
-		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant(is_paused)
+		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant()
 	end
-	if ctx.llm then registry.llm = require("infra.llm_scope").participant(is_paused) end
-	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
+	if ctx.llm then registry.llm = require("infra.llm_scope").participant() end
+	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant() end
 	return registry
 end
 

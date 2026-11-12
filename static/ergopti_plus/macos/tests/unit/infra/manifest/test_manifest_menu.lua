@@ -689,7 +689,8 @@ local function observe_actual_fixed_parent(id, module, context, manifest, transl
 		helpers.assert_true(rawequal(row.submenu, completed), "the exact genuine completed child must reach its declared parent")
 		helpers.assert_true(#completed > 0, "a positive factory must build actual child rows")
 		if expected then helpers.assert_eq(row.checked, true) else helpers.assert_nil(row.checked) end
-		if id ~= "tap_holds" then helpers.assert_eq(row.disabled, context.paused or nil) end
+		-- A pause no longer greys the parent (EDD-1, edd1-paused-writes).
+		if id ~= "tap_holds" then helpers.assert_eq(row.disabled, nil) end
 		local before = {}
 		for index, child in ipairs(completed) do before[index] = {title = child.title, fn = child.fn, menu = child.menu, checked = child.checked, disabled = child.disabled} end
 		helpers.assert_eq(#before, #row.submenu)

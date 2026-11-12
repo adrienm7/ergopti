@@ -353,35 +353,29 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 		assert_same_order(rows, expected, "shuffled manifest")
 	end)
 
-	helpers.it("a pause greys exactly the rows the manifest marks, wherever they sit", function()
-		-- The mark moves from Metrics to Language here. A driver that keeps its
-		-- own list of the feature ids keeps greying Metrics and leaves Language
-		-- live, so it fails even while its list matches the shipped manifest.
+	helpers.it("a paused tray greys no row the manifest marks (edd1-paused-writes)", function()
+		-- A pause stops typing, not configuration (EDD-1, maintainer decision
+		-- 2026-11-12): `greyed_when_paused` is the AHK tray's alone. Moving the
+		-- mark onto Language must grey nothing either.
 		local marked = 0
 		local moved = {}
 		for index, row in ipairs(top_level) do
 			local copy = {}
 			for key, value in pairs(row) do copy[key] = value end
 			if copy.greyed_when_paused == true then marked = marked + 1 end
-			if copy.id == "metrics" then copy.greyed_when_paused = nil end
 			if copy.id == "language" then copy.greyed_when_paused = true end
 			moved[index] = copy
 		end
-		helpers.assert_true(marked >= 7,
-			"the manifest must mark the feature rows a pause greys, got " .. marked)
-		local expected = {}
-		for _, id in ipairs(project_for_hs(moved)) do
-			for _, row in ipairs(moved) do
-				if row.id == id and row.greyed_when_paused == true then expected[#expected + 1] = id end
+		helpers.assert_true(marked >= 7, "the manifest still carries the AHK tray's mark, got " .. marked)
+		local function greyed(paused)
+			local ids = {}
+			for _, row in ipairs(render_root(with_top_level(raw, moved), paused)) do
+				if row.title ~= "-" and row.disabled == true then ids[#ids + 1] = id_of(row) end
 			end
+			return table.concat(ids, ", ")
 		end
-		local rows = render_root(with_top_level(raw, moved), true)
-		local greyed = {}
-		for _, row in ipairs(rows) do
-			if row.title ~= "-" and row.disabled == true then greyed[#greyed + 1] = id_of(row) end
-		end
-		helpers.assert_eq(table.concat(greyed, ", "), table.concat(expected, ", "),
-			"a pause must grey the rows the manifest marks, and only those")
+		-- A row this fixture cannot build (no AI handler) is unavailable either way.
+		helpers.assert_eq(greyed(true), greyed(false), "a paused tray greys exactly what a running one does")
 	end)
 end)
 

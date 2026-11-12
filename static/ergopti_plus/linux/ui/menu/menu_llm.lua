@@ -477,8 +477,9 @@ local function _build_llm(ctx)
 				opts = editor_opts
 			end
 			if create and not create_ready() then return false end
+			-- The page's save runs while paused: a pause stops typing, not
+			-- configuration (EDD-1, maintainer decision 2026-11-12).
 			return Editor.open(existing, function(profile)
-				if create and not create_ready() then return false end
 				return save_profile(profile, activate, expected_existing)
 			end, opts)
 		end
@@ -1110,8 +1111,9 @@ local function _build_llm(ctx)
 	end
 	-- The AI rows that write config.toml: greyed, and their retained clicks
 	-- refused, while paused or while the configuration refuses writes.
+	-- A pause does not grey them: a pause stops typing, not configuration (EDD-1).
 	local function scope_ready()
-		return Preferences.admit() == true and ctx.paused ~= true
+		return Preferences.admit() == true
 	end
 	-- A configuration saved by a newer version names its own cause on those rows.
 	local function newer_schema()
@@ -1125,11 +1127,10 @@ local function _build_llm(ctx)
 	llm_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 		-- A retained row rechecks what greyed it when it was built.
 		if not scope_ready() then
-			Logger.warn(LOG, "AI settings restore refused: %s.", ctx.paused == true and "the script is paused"
-				or "the configuration is protected from writes")
+			Logger.warn(LOG, "AI settings restore refused: the configuration is protected from writes.")
 			return false
 		end
-		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
+		local committed = require("infra.llm_scope").apply("recommended")
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end

@@ -82,7 +82,7 @@ helpers.describe("Position capture native effect ownership", function()
 				local sent = #sends
 				paused = true
 				s.edge("a", 37, 1, 70)
-				helpers.assert_eq(#sends, sent, "live pause withdraws the actual host enrollment before Reader delivery")
+				helpers.assert_eq(#sends, sent + 1, "a capture keeps working after a pause (EDD-1, 2026-11-12)")
 				helpers.assert_true(host.close(), "page retirement cancels only observation")
 				s.edge("a", 36, 0, 80); s.edge("b", 42, 0, 90)
 				helpers.assert_eq(s.rows[#s.rows - 1], { 36, 0 }, "closing page cannot orphan primary physical UP")
@@ -157,7 +157,7 @@ helpers.describe("Position capture native effect ownership", function()
 				local sent = #sends
 				paused = true
 				s.edge("a", 37, 1, 70)
-				helpers.assert_eq(#sends, sent, "live pause withdraws the actual host enrollment before Reader delivery")
+				helpers.assert_eq(#sends, sent + 1, "a capture keeps working after a pause (EDD-1, 2026-11-12)")
 				helpers.assert_true(host.close(), "page retirement cancels only observation")
 				s.edge("a", 36, 0, 80); s.edge("b", 42, 0, 90)
 				helpers.assert_eq(s.rows[#s.rows - 1], { 36, 0 }, "closing page cannot orphan primary physical UP")

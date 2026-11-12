@@ -112,6 +112,8 @@
 	"apps.encryptor.lbl_file": "Plik:",
 	"apps.encryptor.prompt_confirm": "Potwierdź hasło:",
 	"apps.encryptor.prompt_password": "Hasło:",
+	"apps.encryptor.reason_cannot_write": "Nie można zapisać pliku w tym folderze.",
+	"apps.encryptor.reason_destination_folder": "Miejsce docelowe jest folderem.",
 	"apps.encryptor.success_decrypted": "Plik odszyfrowany:",
 	"apps.encryptor.success_encrypted": "Plik zaszyfrowany:",
 	"apps.encryptor.title_decrypt": "Odszyfruj plik",

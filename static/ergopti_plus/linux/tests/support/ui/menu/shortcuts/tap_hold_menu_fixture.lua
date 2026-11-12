@@ -63,8 +63,9 @@ local function build(calls, picked, user_text)
 	})
 	package.loaded[WRITER] = fake_writer(calls)
 	package.loaded[SCOPE] = {
-		apply = function(mode, is_paused)
-			calls[#calls + 1] = { "scope", mode, is_paused() }
+		apply = function(mode, ...)
+			-- A pause no longer reaches the scope (EDD-1, edd1-paused-writes).
+			calls[#calls + 1] = { "scope", mode, select("#", ...) }
 			return true
 		end,
 	}

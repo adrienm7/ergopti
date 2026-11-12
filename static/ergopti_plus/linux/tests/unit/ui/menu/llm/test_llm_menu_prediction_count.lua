@@ -395,8 +395,9 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				if row.title:find(f.strings["menu.llm.title"], 1, true) == 1 then parent = row end
 			end
 			helpers.assert_not_nil(parent)
+			-- The AI parent still greys itself while paused; the tray no longer strips
+			-- its submenu (EDD-1), and no row acts while it is greyed.
 			helpers.assert_true(parent.disabled == true)
-			helpers.assert_nil(parent.menu)
 			helpers.assert_nil(parent.fn)
 			helpers.assert_eq(#f.log.prompts, 0)
 			helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)

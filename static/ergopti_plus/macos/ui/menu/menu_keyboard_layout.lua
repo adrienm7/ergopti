@@ -674,7 +674,6 @@ function M.build(ctx)
 	-- state.layout_on_resume so they survive a reload via preferences.lua.
 	local state      = ctx and ctx.state
 	local save_prefs = ctx and ctx.save_prefs
-	local hs_paused_pre = ctx and ctx.paused
 
 	local function build_layout_switching_rows()
 		if not state then return {} end
@@ -689,7 +688,8 @@ function M.build(ctx)
 		end
 		local getters = {
 			layout_switch_checked = function() return feature_on end,
-			layout_switch_ready = function() return feature_on and not hs_paused_pre end,
+			-- A pause does not grey it: a pause stops typing, not configuration (EDD-1).
+			layout_switch_ready = function() return feature_on end,
 			layout_pause_caption = function() return target_label(cur_pause) end,
 			layout_resume_caption = function() return target_label(cur_resume) end,
 		}
@@ -834,7 +834,8 @@ function M.build(ctx)
 	render_ctx.commands[require("config_keys").COMMAND.OPEN_LAYOUT_EDITOR] = LayoutManagerWindow.editor_menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
-			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
+			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+			if type(ctx.apply_preference_scope) ~= "function" then return false end
 			local applied = ctx.apply_preference_scope("keyboard_layout", mode)
 			-- The scope holds the emulation's rows too: it types what was restored.
 			require("modules.keymap.layout_emulation").reload_if_started()

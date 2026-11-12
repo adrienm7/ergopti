@@ -451,8 +451,9 @@ function M.build(ctx)
 
 	-- `command` since 2026-08-07: the renderer builds the row and its label from
 	-- the declaration, so this supplies only what the click does.
+	--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 	local function apply_scope(mode)
-		if ctx.paused or type(ctx.apply_gesture_scope) ~= "function" then return false end
+		if type(ctx.apply_gesture_scope) ~= "function" then return false end
 		if gesture_toggle_debt ~= nil then
 			Logger.warn(LOG, "Gesture scope refused while the previous toggle rollback remains pending.")
 			return false
@@ -576,8 +577,8 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.state_getters = {
-		-- The switch's tick answers the stored preference. The pause greys the
-		-- whole submenu from its parent row, and the switch refuses while paused.
+		-- The switch's tick answers the stored preference. The switch refuses
+		-- while paused, since it starts the gesture engine at once.
 		gestures_enabled = function() return state.gestures == true end,
 	}
 
@@ -593,7 +594,8 @@ function M.build(ctx)
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })
-	if item then item.disabled = paused or nil end
+	-- A pause does not grey the parent: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	return item
 end
 

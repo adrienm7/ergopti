@@ -903,11 +903,6 @@ function M.build(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
-		paused = function()
-			if paused then return nil end
-			if type(ctx.physical_shortcuts_paused) ~= "function" then return nil end
-			return ctx.physical_shortcuts_paused()
-		end,
 		scope = function()
 			if type(ctx.physical_shortcuts_scope) == "function" then return ctx.physical_shortcuts_scope() end
 		end,
@@ -958,7 +953,8 @@ function M.build(ctx)
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 
 	local item = receive(s_menu, { shortcuts_enabled = function() return state.shortcuts or nil end })
-	if item then item.disabled = paused or nil end
+	-- A pause does not grey the parent: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	return item
 end
 

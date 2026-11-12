@@ -119,7 +119,7 @@ local function with_scope(tap_text, config_text, body)
 		return require("infra.tap_hold_scope").new({
 			path = config_path, backup_path = config_path .. ".bak",
 			tap_hold_path = tap_path, tap_hold_backup_path = tap_path .. ".bak",
-			is_paused = function() return s.paused end, parameters = s.parameters, files = s.files,
+			parameters = s.parameters, files = s.files,
 		})
 	end
 	local ok, err = pcall(body, s)
@@ -222,14 +222,12 @@ helpers.describe("Linux tap-hold scope: clear to system", function()
 end)
 
 helpers.describe("Linux tap-hold scope: refusals and revert", function()
-	helpers.it("refuses while paused without touching a file or the engine", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("clears with no pause owner (edd1-paused-writes)", function()
 		local source = '[tap_hold]\nenabled = true\ninherit_defaults = true\n'
 		with_scope(source, nil, function(s)
-			s.paused = true
-			local before = s.manager.keys()
-			helpers.assert_eq(s.owner().apply("clear"), false)
-			helpers.assert_eq(read(s.tap_path), source)
-			helpers.assert_eq(s.manager.keys(), before)
+			helpers.assert_eq(s.owner().apply("clear"), true)
+			helpers.assert_true(read(s.tap_path) ~= source, "the paused driver still writes tap_hold.toml")
 		end)
 	end)
 

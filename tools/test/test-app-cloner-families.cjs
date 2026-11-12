@@ -89,6 +89,77 @@ scenario('(app-cloner-macos-vscode-names) clone_app.sh VS Code names are catalog
 	assert.ok(cloneApp.includes('--user-data-dir'), 'the macOS clone no longer isolates its profile');
 });
 
+scenario(
+	'(bap-002-macos-browser-profile) clone_app.sh gives catalogue browsers their own profile',
+	() => {
+		const match = cloneApp.match(
+			/case "\$\{SRC_EXE_NAME:l\}" in\n\s*([^)]+)\)\n\s*APP_FAMILY=chromium ;;\n\s*([^)]+)\)\n\s*APP_FAMILY=firefox ;;/
+		);
+		assert.ok(match, 'the browser executable case of clone_app.sh moved');
+		for (const [family, list] of [
+			['chromium', match[1]],
+			['firefox', match[2]]
+		]) {
+			for (const name of list.split('|').map((n) => n.replace(/"/g, '').trim())) {
+				assert.ok(
+					catalogue.families[family].executables.includes(name),
+					`${name} is a ${family} name`
+				);
+			}
+		}
+		assert.match(
+			cloneApp,
+			/electron\|chromium\)\n\s*ARGS=\(--user-data-dir "\$USER_DATA_DIR"\) ;;/
+		);
+		assert.match(cloneApp, /firefox\)\n\s*ARGS=\(--no-remote --profile "\$USER_DATA_DIR"\) ;;/);
+		assert.match(cloneApp, /chromium\|firefox\) ARGS\+=\("\$OPEN_ARG"\); OPEN_ARG="" ;;/);
+		assert.ok(
+			catalogue.families.chromium.web_app.startsWith('--app='),
+			'the web-app argument is --app'
+		);
+	}
+);
+
+scenario(
+	'(bap-004-vscode-variants) clone_app.sh uses the catalogue folders of each VS Code variant',
+	() => {
+		const folders = catalogue.families.vscode.user_folders;
+		assert.ok(folders && folders.code, 'the vscode family names its user folders');
+		for (const name of Object.keys(folders)) {
+			assert.ok(
+				catalogue.families.vscode.executables.includes(name),
+				`${name} is a vscode executable`
+			);
+		}
+		assert.ok(
+			catalogue.families.vscode.arguments.some(
+				(argument) =>
+					argument.user_folder === 'extensions' && argument.value.startsWith('--extensions-dir=')
+			),
+			'the extensions argument is marked'
+		);
+		const block = cloneApp.match(/case "\$\{VSCODE_CLI:-\$\{SRC_EXE_NAME:l\}\}" in\n([^]*?)\nesac/);
+		assert.ok(block, 'the VS Code variant case of clone_app.sh moved');
+		const arms = [
+			...block[1].matchAll(
+				/\t(.+)\)\n\t\tVSCODE_SETTINGS="([^"]+)"; VSCODE_EXTENSIONS="([^"]+)" ;;/g
+			)
+		];
+		assert.equal(arms.length, 3, 'three variant arms');
+		for (const [, patterns, settings, extensions] of arms) {
+			const names =
+				patterns === '*' ? ['code'] : patterns.split('|').map((n) => n.replace(/"/g, ''));
+			for (const name of names) {
+				assert.deepEqual(folders[name], { settings, extensions }, `${name} folders`);
+			}
+		}
+		assert.ok(cloneApp.includes('SHARED_EXT_DIR="$HOME/$VSCODE_EXTENSIONS/extensions"'));
+		assert.ok(
+			cloneApp.includes('MAIN_VSCODE_DATA="$HOME/Library/Application Support/$VSCODE_SETTINGS"')
+		);
+	}
+);
+
 if (failed > 0) {
 	console.error(`${failed} App Cloner family check(s) failed.`);
 	process.exit(1);

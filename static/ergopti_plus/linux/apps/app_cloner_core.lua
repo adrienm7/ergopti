@@ -77,24 +77,44 @@ function M.family(catalogue, program, has_marker)
 	return "native"
 end
 
+--- The folders an executable keeps its own settings and extensions in
+--- (families.json `user_folders`), or nil when the family names none for it:
+--- VSCodium and the Insiders build do not share VS Code's (BAP-004).
+--- @param catalogue table
+--- @param family string
+--- @param program string|nil The source program.
+--- @return table|nil folders { settings, extensions }
+function M.user_folders(catalogue, family, program)
+	local definition = catalogue.families[family]
+	if not definition or type(definition.user_folders) ~= "table" or not program then return nil end
+	local name = (NativePath.basename(program) or program):lower():gsub("%.exe$", "")
+	return definition.user_folders[name]
+end
+
 --- The family's arguments for Linux with their placeholders filled.
 --- @param catalogue table
 --- @param family string
 --- @param values table { profile, window_class, home }
+--- @param program string|nil The source program, for its own user folders.
 --- @return table words
-function M.family_arguments(catalogue, family, values)
+function M.family_arguments(catalogue, family, values, program)
 	local words = {}
 	local definition = catalogue.families[family]
 	if not definition then return words end
+	local folders = M.user_folders(catalogue, family, program)
 	for _, argument in ipairs(definition.arguments or {}) do
 		local wanted = argument.platforms == nil
 		for _, platform in ipairs(argument.platforms or {}) do
 			if platform == "linux" then wanted = true end
 		end
 		if wanted then
-			words[#words + 1] = (argument.value:gsub("{([%a_]+)}", function(name)
+			local word = (argument.value:gsub("{([%a_]+)}", function(name)
 				return assert(values[name], "no value for {" .. name .. "}")
 			end))
+			if argument.user_folder == "extensions" and folders then
+				word = "--extensions-dir=" .. values.home .. "/" .. folders.extensions .. "/extensions"
+			end
+			words[#words + 1] = word
 		end
 	end
 	return words
@@ -229,10 +249,13 @@ function M.plan(request)
 	local family = M.family(catalogue, program, request.has_marker)
 
 	local base = M.slug(request.name)
-	local id, suffix = base, 1
+	-- A taken name gets the suffix on its id and on the name the menu shows,
+	-- "Name (2)" as Windows names the second shortcut (BAP-006).
+	local id, suffix, name = base, 1, request.name
 	while request.taken(id) do
 		suffix = suffix + 1
 		id = base .. "-" .. suffix
+		name = request.name .. " (" .. suffix .. ")"
 	end
 	local root = request.data_home .. "/ergopti/" .. catalogue.profile_folder .. "/" .. id
 	local profile = root .. "/profile"
@@ -246,14 +269,16 @@ function M.plan(request)
 	local launch = { program }
 	for _, word in ipairs(words) do launch[#launch + 1] = word end
 	for _, word in ipairs(M.family_arguments(catalogue, family,
-		{ profile = profile, window_class = window_class, home = request.home })) do
+		{ profile = profile, window_class = window_class, home = request.home }, program)) do
 		launch[#launch + 1] = word
 	end
 	local family_definition = catalogue.families[family]
 	if family_definition and family_definition.share_user_settings then
 		-- As macOS does: the clone reads the main instance's settings, keybindings
 		-- and snippets, while its windows, state and accounts stay its own.
-		plan.links[#plan.links + 1] = { target = request.home .. "/.config/Code/User", link = profile .. "/User" }
+		local folders = M.user_folders(catalogue, family, program)
+		plan.links[#plan.links + 1] = { target = request.home .. "/.config/" .. (folders and folders.settings or "Code")
+			.. "/User", link = profile .. "/User" }
 	end
 	local open_item = request.open_item
 	if open_item and open_item ~= "" then
@@ -282,7 +307,7 @@ function M.plan(request)
 	local desktop = {
 		"[Desktop Entry]",
 		"Type=Application",
-		"Name=" .. M.desktop_value(request.name),
+		"Name=" .. M.desktop_value(name),
 		"Exec=" .. M.desktop_exec_word("/bin/sh") .. " " .. M.desktop_exec_word(plan.launcher_path) .. " %U",
 		"Terminal=false",
 	}

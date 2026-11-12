@@ -162,6 +162,17 @@ function M.reload_if_started()
 	return M.reload()
 end
 
+--- What the running emulation types unshifted on a key, for the layer
+--- editor's legends (layouts/keylayout_emulation.lua M.legend).
+--- @param code string The key's KeyboardEvent.code.
+--- @return string|nil text nil when the emulation is off or leaves the key to
+---   the system layout.
+function M.legend(code)
+	if not _status.active or _session == nil then return nil end
+	local text = Emulation.legend(_session, code)
+	return text ~= "" and text or nil
+end
+
 --- What the emulation does now, for the menu.
 --- @return table status { active, id, error }
 function M.status()

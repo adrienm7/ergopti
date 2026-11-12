@@ -19,9 +19,13 @@
 ---    of the built-in Ergopti layout (LayoutManager_ActiveId): Ergopti+ for the
 ---    ergopti_plus variant, Ergopti for "ergopti" and "none" (no helper overlay).
 ---    The .keylayout is the one description every driver types.
+--- 4. An enum leaf written in another case (`ergopti_variant = "Ergopti_Plus"`)
+---    takes its manifest spelling, as Windows' loader admits it (CFX-001).
 --- ==============================================================================
 
 local ConfigKeys = require("config_keys")
+local ConfigOutdated = require("config_outdated")
+local ManifestData = require("features.manifest_data")
 local NumberRowPolicy = require("layout.number_row_policy")
 local RowsPolicy = require("layout.layout_rows_policy")
 local TableUtil = require("table_util")
@@ -32,6 +36,12 @@ local M = {}
 M.VARIANT_LAYOUTS = { none = "ergopti", ergopti = "ergopti", ergopti_plus = "ergopti_plus" }
 
 local KEY = ConfigKeys.KEY
+
+-- The manifest entry of each enum leaf, by path, for its canonical spelling.
+local ENUM_ENTRIES = {}
+for _, entry in ipairs(ManifestData.features) do
+	if entry.type == "enum" and type(entry.path) == "string" then ENUM_ENTRIES[entry.path] = entry end
+end
 local LEAF = ConfigKeys.LEAF
 
 local function boolean(value)
@@ -83,7 +93,7 @@ function M.resolve(config, default_for, report)
 		local node = config[section]
 		-- Not `and node[key] or nil`: a stored false must survive the read.
 		local value = nil
-		if type(node) == "table" then value = node[key] end
+		if type(node) == "table" then value = ConfigOutdated.canonical_enum_value(ENUM_ENTRIES[leaf.path], node[key]) end
 		if value ~= nil then
 			local valid, detail = leaf.valid(value)
 			if not valid then

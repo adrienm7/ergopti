@@ -118,10 +118,10 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				helpers.assert_true(enable.fn())
 				helpers.assert_eq(Config.is_section_checked("magickey", "replace"), true)
 				helpers.assert_eq(Config.is_section_checked("french_distancesreduction", "suffixes_a"), true)
+				-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 				local before = Choices.read(path); ctx.paused = true
-				helpers.assert_eq(item.fn(), false, "the retained section callback refuses a later pause")
-				helpers.assert_eq(disable.fn(), false, "the retained bulk callback refuses a later pause")
-				helpers.assert_eq(Choices.read(path), before)
+				helpers.assert_true(disable.fn(), "the retained bulk callback still writes after a pause")
+				helpers.assert_true(Choices.read(path) ~= before, "the paused bulk change is saved")
 				Source._reset_for_test(); Preferences._set_file_for_test(nil)
 			end)
 		end)

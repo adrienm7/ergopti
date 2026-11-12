@@ -24,7 +24,7 @@ local ConfigKeys = require("config_keys")
 local COMMAND, LEAF = ConfigKeys.COMMAND, ConfigKeys.LEAF
 
 --- Builds the three switching rows.
---- @param ctx table { paused, t, on_changed, show_error, preferences, switch }:
+--- @param ctx table { t, on_changed, show_error, preferences, switch }:
 ---   preferences reads and writes the settings (infra.pause_layout_preferences),
 ---   switch is the initialised modules.keymap.pause_layout_switch.
 --- @return table rows
@@ -87,7 +87,8 @@ function M.rows(ctx)
 		[COMMAND.LAYOUT_SWITCH_TOGGLE] = function() persist("enabled", not enabled) end,
 	}, {
 		["layout_switch_checked"] = function() return enabled end,
-		["layout_switch_ready"] = function() return enabled and not ctx.paused end,
+		-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+		["layout_switch_ready"] = function() return enabled end,
 		["layout_pause_caption"] = function() return label_for(settings.on_pause) end,
 		["layout_resume_caption"] = function() return label_for(settings.on_resume) end,
 	}, {

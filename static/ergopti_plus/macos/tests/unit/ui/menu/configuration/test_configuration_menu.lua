@@ -12,12 +12,8 @@
 --- Startup and Uninstall moved to Version / Updates
 --- (test_menu_about_uninstall.lua), with no separator left dangling here.
 ---
---- PAUSE GATING, carried over from the global actions: pause owns the bindings
---- axis for the whole pause window — pause_all() snapshots what was running and
---- resume_all() restores that snapshot — so a row that rewrites the
---- configuration mid-pause is either discarded on resume or breaks « pause =
---- tout éteint ». Those three rows are greyed AND stripped of their handler
---- while paused; the rows that only open a window stay live.
+--- PAUSE GATING: a pause stops typing, not configuration (EDD-1, maintainer
+--- decision 2026-11-12), so every Configuration row stays live while paused.
 ---
 --- Driven through Builder.generate, so the assertion is on what the menu offers.
 --- ==============================================================================
@@ -38,14 +34,15 @@ local EXPECTED = {
 }
 
 -- The rows that rewrite the configuration, and the action each one runs.
-local GATED = {
-	["common.restore_recommended"]   = "reset_defaults",
-	["common.clear_to_system"]       = "clear_to_system",
-	["menu.global.clean_unused_keys"] = "clean_unused_keys",
-}
+local GATED = {}
 
 -- Rows that do not modify the running keyboard, and the action each one runs.
+-- A pause stops typing, not configuration (EDD-1, maintainer decision
+-- 2026-11-12): the whole-configuration restore and clear stay live.
 local LIVE = {
+	["common.restore_recommended"] = "reset_defaults",
+	["common.clear_to_system"]     = "clear_to_system",
+	["menu.global.clean_unused_keys"] = "clean_unused_keys",
 	["menu.global.config_folder"] = "open_paths",
 	["menu.global.setup_wizard"]  = "show_setup_wizard",
 }
@@ -123,7 +120,7 @@ end)
 -- ================================
 
 helpers.describe("configuration submenu (macOS): a pause gates what rewrites the configuration", function()
-	helpers.it("greys the three rewriting rows and keeps independent actions live", function()
+	helpers.it("keeps every Configuration row live while paused (edd1-paused-writes)", function()
 		local fired = {}
 		local rows = configuration_rows(true, fired)
 		helpers.assert_true(type(rows) == "table", "the Configuration submenu stays reachable while paused")
@@ -139,8 +136,8 @@ helpers.describe("configuration submenu (macOS): a pause gates what rewrites the
 				helpers.assert_eq(type(row.fn), "function", row.title .. " must keep its handler")
 			end
 		end
-		helpers.assert_eq(gated, 3, "the three rewriting rows must be drawn")
-		helpers.assert_eq(live, 2, "all independent rows must be drawn")
+		helpers.assert_eq(gated, 0, "no Configuration row greys while paused")
+		helpers.assert_eq(live, 5, "all live rows must be drawn")
 		helpers.assert_eq(#fired, 0, "building the menu must not run any action")
 	end)
 end)

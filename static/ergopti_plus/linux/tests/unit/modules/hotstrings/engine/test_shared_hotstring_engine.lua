@@ -1030,3 +1030,39 @@ helpers.describe("shared hotstring engine — erasing what was typed starts a wo
 		helpers.assert_nil(type_into(typed, "c★"), "the forgotten word still sits left of the caret")
 	end)
 end)
+
+-- A no-break space typed inside a trigger counts as a space on every OS
+-- (maintainer decision HSE-003, 2026-11-12), as the macOS registry's
+-- add_with_space_variants made it there first.
+helpers.describe("shared engine: a no-break space inside a trigger", function()
+	local Engine = require("hotstring_engine")
+	--- The replacement a typed text fires, or nil.
+	local function fired(text)
+		local engine = Engine.new()
+		engine:load_mappings({ { trigger = "la notre", replacement = "la nôtre", is_word = true, auto_expand = true } })
+		engine:reset(true, true)
+		local result
+		for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			local match = engine:on_char(char)
+			if match then result = match; engine:apply_expansion(match) end
+		end
+		return result
+	end
+
+	helpers.it("(hse-003-nbsp-trigger) fires on a no-break or narrow no-break space as on a space", function()
+		for _, space in ipairs({ " ", "\194\160", "\226\128\175" }) do
+			local match = fired("la" .. space .. "notre")
+			helpers.assert_true(match ~= nil, "fires with " .. string.format("%q", space))
+			helpers.assert_eq(match.replacement, "la nôtre")
+		end
+	end)
+
+	helpers.it("(hse-003-nbsp-trigger) a trigger starting with a space keeps no variant", function()
+		local engine = Engine.new()
+		engine:load_mappings({ { trigger = " ab", replacement = "x", is_word = false, auto_expand = true } })
+		engine:reset(true, true)
+		engine:on_char("q")
+		local match = engine:on_char("\194\160") or engine:on_char("a") or engine:on_char("b")
+		helpers.assert_nil(match, "a word-boundary guard is typed with a plain space only")
+	end)
+end)

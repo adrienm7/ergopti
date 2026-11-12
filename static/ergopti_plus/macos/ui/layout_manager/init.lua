@@ -59,6 +59,15 @@ local _nav_applier = nil
 -- (M.set_emulation_applier); nil until then, and composer_emulate is refused.
 local _emulation_applier = nil
 
+-- Reloads the layout emulation and the menu after a layout changed, when it is
+-- the emulated one (LMH-001, LMH-002), bound by the menu
+-- (M.set_layout_change_handler); nil until then.
+local _layout_change_handler = nil
+
+-- Reloads the driver after a layout's hotstring extension changed (LMH-004),
+-- bound by the menu (M.set_extension_reloader); nil until then.
+local _extension_reloader = nil
+
 --- Settles exact window and callback owners before admitting another window.
 --- @return boolean settled Native cleanup committed or already consumed the window.
 local function settle_retired_window()
@@ -156,7 +165,7 @@ local function pick_source(on_done)
 	local settings, settings_err = SourceStore.settings(ok_defaults and defaults or nil)
 	if not settings then
 		Logger.error(LOG, "The layout editor cannot open files: %s.", tostring(settings_err))
-		on_done({ code = SourceStore.FAILURE_INVALID, detail = settings_err })
+		on_done({ code = require("modules.keymap.layout_registry").FAILURE_INVALID, detail = settings_err })
 		return
 	end
 	local path = DialogUtil.choose_layout_source(i18n.get("layout_editor.pick_message"),
@@ -187,6 +196,10 @@ local function controller_for(view)
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 		pick_source = pick_source,
+		layout_changed = function(id)
+			if _layout_change_handler then _layout_change_handler(id) end
+		end,
+		reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end,
 		apply_nav = _nav_applier and function(text, on_done)
 			local applier = _nav_applier
 			if not applier then
@@ -353,6 +366,25 @@ function M.set_emulation_applier(applier)
 		error("layout_manager.set_emulation_applier: a function or nil is required", 2)
 	end
 	_emulation_applier = applier
+end
+
+--- Binds the reload that follows a change of the emulated layout.
+--- @param handler function|nil handler(id) after a layout was installed, updated,
+---   uninstalled, saved or removed.
+function M.set_layout_change_handler(handler)
+	if handler ~= nil and type(handler) ~= "function" then
+		error("layout_manager.set_layout_change_handler: a function or nil is required", 2)
+	end
+	_layout_change_handler = handler
+end
+
+--- Binds the driver reload that follows a change of a layout's extension.
+--- @param reloader function|nil reloader(id) returns true when the reload started.
+function M.set_extension_reloader(reloader)
+	if reloader ~= nil and type(reloader) ~= "function" then
+		error("layout_manager.set_extension_reloader: a function or nil is required", 2)
+	end
+	_extension_reloader = reloader
 end
 
 --- Opens the layout manager straight on the layout editor (the menu's « Create

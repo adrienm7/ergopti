@@ -60,6 +60,26 @@
 			"condition": "Caps Lock set to Enter on tap and Ctrl on hold."
 		},
 		{
+			"id": "lalt_one_shot",
+			"title": "Left Command's one-shot Shift holds Shift and stands down",
+			"checks": [
+				{
+					"step": "guided_lalt_one_shot"
+				}
+			],
+			"condition": "Left Command set to the one-shot Shift on tap and no hold."
+		},
+		{
+			"id": "pair_press_order",
+			"title": "A pair takes the first key held earliest",
+			"checks": [
+				{
+					"step": "guided_pair_press_order"
+				}
+			],
+			"condition": "Two pairs sharing Tab as second key, CapsLock and Left Shift as first keys, on distinct tap actions."
+		},
+		{
 			"id": "mrt004_service_repair",
 			"title": "MRT-004 « Réparer le service »",
 			"checks": [],
@@ -750,6 +770,12 @@
 					"step": "guided_input_policies"
 				}
 			]
+		},
+		{
+			"id": "developer_app_login_item",
+			"title": "Start at login from the developer app (ad hoc signed)",
+			"checks": [],
+			"not_testable": "Changes the user's own Login Items and needs a logout: in the developer app, tick About > Start at login, approve it in System Settings > General > Login Items if asked, log out and in, then untick it."
 		}
 	]
 }

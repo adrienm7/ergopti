@@ -222,8 +222,8 @@ end
 --- tray in its old order — and a missing anchor emptied the tail, taking
 --- Reload, Quit and Debug with it.
 ---
---- Each entry keeps the manifest's `greyed_when_paused` mark: the feature rows a
---- pause greys, declared once for the three trays.
+--- Each entry keeps the manifest's `greyed_when_paused` mark, which only the
+--- AHK tray still honours (EDD-1).
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table Array of projected entries retaining their exact canonical source records.
 local function load_top_level()
@@ -506,9 +506,10 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- « Restore recommended » and « Clear » run the Hotstrings scope owner, which
 	-- asks first and changes config.toml and the override file as one
 	-- transaction; the ordinary save path never writes them.
+	-- A pause does not refuse them: a pause stops typing, not configuration (EDD-1).
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		hs_ctx.commands[command] = function()
-			if ctx.paused or type(ctx.apply_preference_scope) ~= "function" then return false end
+			if type(ctx.apply_preference_scope) ~= "function" then return false end
 			return ctx.apply_preference_scope("hotstrings", mode) == true
 		end
 	end
@@ -704,9 +705,8 @@ function M.generate(ctx, menu_mods, actions)
 			if root == nil then return {} end
 			-- Every row is `type = "command"` in the manifest: labels, order and
 			-- the separators are declared, and this file supplies only what each
-			-- row does. Read once, so the pause gate below can tell the rows apart
-			-- by the handler they carry. The global scope's restore and clear open
-			-- the menu, like every settings menu's.
+			-- row does. The global scope's restore and clear open the menu, like
+			-- every settings menu's.
 			local restore = actions.reset_defaults
 			local clear = actions.clear_to_system
 			local clean = actions.clean_unused_keys
@@ -723,30 +723,11 @@ function M.generate(ctx, menu_mods, actions)
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
-			-- Pause owns the bindings axis for the whole pause window: pause_all()
-			-- snapshots what was running and resume_all() restores that snapshot.
-			-- A row that rewrites the configuration in between is either discarded
-			-- on resume or breaks the « pause = tout éteint » invariant, so those
-			-- three are greyed AND stripped of their handler: a disabled row whose
-			-- fn survives still fires the moment the greying is rendered wrong
-			-- somewhere else. The rows that only open a window stay live.
-			local pause_gated = {}
-			-- pairs, not ipairs: an unregistered command is nil, and ipairs would
-			-- stop there and leave the rows after it ungated.
-			for _, fn in pairs({ restore = restore, clear = clear, clean = clean }) do
-				-- An unregistered command draws no row, so it has nothing to gate.
-				if type(fn) == "function" then pause_gated[fn] = true end
-			end
+			-- A pause stops typing, not configuration (EDD-1, maintainer decision
+			-- 2026-11-12): every row stays live while paused, the restore, the
+			-- clear and the unused-key clean included.
 			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
 			if not configuration_dense(rows, true) then return {} end
-			if ctx.paused then
-				for _, row in ipairs(rows) do
-					if row.fn ~= nil and pause_gated[row.fn] then
-						row.disabled = true
-						row.fn = nil
-					end
-				end
-			end
 			local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "hs")
 			if not rawequal(root, current_root) or not rawequal(top, current_top)
 				or not rawequal(section, current_section) or not rawequal(parent, current_parent)
@@ -875,19 +856,10 @@ function M.generate(ctx, menu_mods, actions)
 			item_timings[#item_timings + 1] = { id = id, ms = item_ms }
 			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 			for _, row in ipairs(children) do
-				-- « Pause = tout éteint »: every row the manifest marks as a feature
-				-- is greyed and stripped of its handler in one place. Each builder
-				-- used to decide this for itself, so Shortcuts and Gestures greyed
-				-- while Hotstrings, AI, Metrics and Tap-Holds stayed live (Metrics
-				-- could even be toggled mid-pause). The unmarked rows (configuration,
-				-- language, about, reload, quit, debug) and the title row that
-				-- resumes the script stay live: they are how the user inspects,
-				-- resumes or leaves a paused script.
-				if ctx.paused == true and entry.greyed_when_paused and type(row) == "table" and row.separator ~= true then
-					row.disabled = true
-					row.action = nil
-					row.fn = nil
-				end
+				-- A pause stops typing, not configuration (EDD-1, maintainer
+				-- decision 2026-11-12): the feature rows stay live while paused.
+				-- The manifest's `greyed_when_paused` is read by the AHK tray alone
+				-- until its Suspend gates go.
 				table.insert(items, row)
 			end
 		end

@@ -636,7 +636,7 @@ function orderedLinuxAdmission(declaration, sources) {
 		savedLinuxOneShotClosure(sources) &&
 		menu.includes('KeyCatalog.of_hand(keys,hand)') &&
 		menu.includes('Shared.pair(first.id,second.id)') &&
-		menu.includes('Scope.edit(rows,ctx.is_paused,source)')
+		menu.includes('Scope.edit(rows,source)')
 	);
 }
 const linuxSources = [
@@ -660,7 +660,7 @@ for (const [index, token] of [
 	[1, 'receipt.physical == true'],
 	[1, 'current.source == receipt.source'],
 	[2, 'action~=\"one_shot_shift\"'],
-	[3, 'Scope.edit(rows,ctx.is_paused,source)']
+	[3, 'Scope.edit(rows,source)']
 ]) {
 	const changed = linuxSources.slice();
 	changed[index] = changed[index].replace(token, 'OMITTED_BOUNDARY');

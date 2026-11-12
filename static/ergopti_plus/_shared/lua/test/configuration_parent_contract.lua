@@ -69,11 +69,13 @@ function M.register(helpers, fixture, corpus, platform)
 					local paused = find(build(true), expected.parent)
 					helpers.assert_true(paused ~= nil)
 					helpers.assert_true(paused.disabled ~= true)
-					for _, index in ipairs({ 1, 2, 4 }) do
-						if platform == "hs" then
-							helpers.assert_true(paused.menu[index].disabled == true)
-							helpers.assert_nil(paused.menu[index].fn)
-						elseif index ~= 4 then helpers.assert_eq(paused.menu[index].fn(), false) end
+					-- A pause stops typing, not configuration (EDD-1, 2026-11-12): the
+					-- restore, the clear and the macOS unused-key clean stay live while
+					-- paused; the composition is pinned by each global scope's
+					-- edd1-paused-writes regression.
+					for _, index in ipairs(platform == "hs" and { 1, 2, 4 } or { 1, 2 }) do
+						helpers.assert_true(paused.menu[index].disabled ~= true)
+						helpers.assert_eq(type(paused.menu[index].fn), "function")
 					end
 					for _, index in ipairs({ 6, 7 }) do
 						helpers.assert_true(paused.menu[index].disabled ~= true)

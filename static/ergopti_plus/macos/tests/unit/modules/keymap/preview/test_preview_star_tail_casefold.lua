@@ -133,35 +133,31 @@ helpers.describe("case-folded star-tail preview", function()
 			"the preview replacement must equal the real engine output")
 	end)
 
-	helpers.it("preserves an alphabetic magic suffix while casing only the trigger body", function()
+	helpers.it("(hse-004-magic-key-case) a letter magic key follows the word's case, as on Windows", function()
 		local effects = {}
-		local state, Registry, Bridge, Expander, hs_stub = fresh_runtime(effects, "a")
+		local state, Registry, Bridge, Expander = fresh_runtime(effects, "a")
 		Registry.add("btw" .. STAR, "expanded", { auto_expand = true })
 		Registry.sort_mappings()
 
-		local mapping
-		for _, candidate in ipairs(Registry.mappings_for_tail("a")) do
-			if candidate.trigger == "BTWa" then mapping = candidate; break end
+		local upper, mixed
+		for _, candidate in ipairs(Registry.mappings_for_tail("A")) do
+			if candidate.trigger == "BTWA" then upper = candidate end
 		end
-		helpers.assert_not_nil(mapping,
-			"uppercase registration must keep the configured lowercase magic action")
-		helpers.assert_true(mapping.has_magic,
-			"the reachable variant must retain canonical-magic provenance")
+		for _, candidate in ipairs(Registry.mappings_for_tail("a")) do
+			if candidate.trigger == "BTWa" then mixed = candidate end
+		end
+		helpers.assert_not_nil(upper, "the UPPER variant carries the uppercased magic key")
+		helpers.assert_nil(mixed, "BTWa is no trigger: Windows conforms against BTWA")
+		helpers.assert_true(upper.has_magic, "the variant keeps its canonical-magic provenance")
 
-		state.buffer = "BTWa"
-		local engine_output = Expander.would_fire(mapping, state.buffer)
-		helpers.assert_eq(engine_output, "EXPANDED")
-		local resolution = Expander.resolve_magic_action("BTW")
-		helpers.assert_not_nil(resolution,
-			"the prospective resolver must reach the same body-cased mapping")
-		helpers.assert_eq(resolution.winner.mapping, mapping)
-
-		effects.rows = nil
-		Bridge.update_preview("BTW")
-		hs_stub.timer.__fire_all()
-		helpers.assert_true(type(effects.rows) == "table" and #effects.rows > 0,
-			"the preview must find the same body-cased mapping before the magic press")
-		helpers.assert_eq(effects.rows[1].text, engine_output)
-		helpers.assert_eq(effects.rows[1].trigger_label, "a")
+		state.buffer = "BTWA"
+		helpers.assert_eq(Expander.would_fire(upper, state.buffer), "EXPANDED")
+		local resolution = Expander.resolve_magic_action("BTW", nil, "A")
+		helpers.assert_not_nil(resolution, "the Shift+magic press reaches the uppercase mapping")
+		helpers.assert_eq(resolution.winner.mapping, upper)
+		helpers.assert_nil(Expander.resolve_magic_action("BTW", nil, "a"), "a lowercase magic press after BTW fires nothing")
+		helpers.assert_eq(Expander.cased_magic("a"), "A")
+		helpers.assert_nil(Expander.cased_magic(STAR), "a magic key with no case has no cased form")
+		local _ = Bridge
 	end)
 end)
