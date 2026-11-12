@@ -309,6 +309,49 @@ TestHSE_CasedFamilyKeepsReplacementCapitals() {
 Test("HSE cased family keeps the replacement's own capitals at any priority",
     TestHSE_CasedFamilyKeepsReplacementCapitals)
 
+; HSE-003 (maintainer decision, 2026-11-12): a no-break or narrow no-break space
+; typed inside a trigger counts as a space, as on macOS and Linux; a trigger
+; starting with a space is a word-boundary guard and gets no variant.
+TestHSE_NbspInsideTriggerFires() {
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("", "la notre", "la nôtre")
+    for Space in [" ", Chr(0xA0), Chr(0x202F)] {
+        Match := _HSE_FeedWordThenSpace("la" . Space . "notre")
+        AssertTrue(Match != "", "la + U+" . Format("{:04X}", Ord(Space)) . " + notre fires")
+        AssertTrue(Match != "" && Match.Replacement == "la nôtre",
+            "the space variant types the entry's own output")
+    }
+}
+Test("HSE no-break space inside a trigger counts as a space (hse-003-nbsp-trigger)",
+    TestHSE_NbspInsideTriggerFires)
+
+TestHSE_NbspVariantsSkipLeadingSpace() {
+    global HSE_StarByTriggerCI
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("*", " qz k", "x")
+    AssertTrue(HSE_StarByTriggerCI.Has(" qz k"), "the trigger itself registers")
+    AssertFalse(HSE_StarByTriggerCI.Has(Chr(0xA0) . "qz" . Chr(0xA0) . "k"),
+        "a trigger starting with a space gets no no-break variant")
+    AssertFalse(HSE_StarByTriggerCI.Has(" qz" . Chr(0x202F) . "k"),
+        "nor a narrow no-break variant of its inner space")
+    CreateCaseSensitiveHotstrings("*", "qz k", "x")
+    AssertTrue(HSE_StarByTriggerCI.Has("qz" . Chr(0xA0) . "k")
+        && HSE_StarByTriggerCI.Has("qz" . Chr(0x202F) . "k"),
+        "an inner space registers both no-break variants")
+}
+Test("HSE no-break variants skip a trigger starting with a space (hse-003-nbsp-trigger)",
+    TestHSE_NbspVariantsSkipLeadingSpace)
+
+TestHSE_NbspLiteralFamilyFires() {
+    HSE_TestReset()
+    HSE_RegisterFromTomlFlags(true, "", "la notre", "la nôtre", Map())
+    Match := _HSE_FeedWordThenSpace("la" . Chr(0x202F) . "notre")
+    AssertTrue(Match != "" && Match.Replacement == "la nôtre",
+        "a literal (case-sensitive) entry fires with a narrow no-break space inside")
+}
+Test("HSE literal entry also takes the no-break variants (hse-003-nbsp-trigger)",
+    TestHSE_NbspLiteralFamilyFires)
+
 ; The literal registration (the editor's « Case sensitive » box) emits the output
 ; exactly as written whatever casing was typed: that is the setting for an output
 ; that must never change case, at the priority that wins the collision.
