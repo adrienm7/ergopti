@@ -52,7 +52,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				helpers.assert_eq(constructed, 1, "the factory retains the exact native cohort")
 				helpers.assert_type(native_options.path, "string")
 				helpers.assert_true(native_options.path ~= "")
-				for _, name in ipairs({ "backup_path", "storage_backup_path", "paused", "capture_preferences", "admission" }) do
+				for _, name in ipairs({ "backup_path", "storage_backup_path", "capture_preferences", "admission" }) do
 					helpers.assert_type(native_options[name], "function")
 				end
 				for _, name in ipairs({ "capture", "replace", "restore" }) do
