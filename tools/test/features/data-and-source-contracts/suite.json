@@ -681,6 +681,30 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-module-load-sites.cjs"],
 			"repro": "npm run test:structure-module-load-sites"
+		},
+		{
+			"id": "js-0512",
+			"ordinal": 629,
+			"name": "structure plan switches every spelling of the shared Lua root in the step that empties _shared/lua",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-shared-root-switch.cjs"],
+			"repro": "npm run test:structure-shared-root-switch"
+		},
+		{
+			"id": "js-0513",
+			"ordinal": 630,
+			"name": "structure plan follows every spelling of a moved Lua module name, and same-spelled words and keys stay",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-lua-name-forms.cjs"],
+			"repro": "npm run test:structure-lua-name-forms"
+		},
+		{
+			"id": "js-0514",
+			"ordinal": 631,
+			"name": "structure plan rewrites every form a moved path takes (joins, constants, Paths.shared, self-location, AHK and regex spellings)",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-path-forms.cjs"],
+			"repro": "npm run test:structure-path-forms"
 		}
 	]
 }

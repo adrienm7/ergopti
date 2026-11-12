@@ -1,0 +1,358 @@
+// tools/test/test-structure-path-forms.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Structure Plan Path Forms
+ * DESCRIPTION:
+ * A moved file is named in more forms than one path token. After S01 the
+ * suites and generators failed on each form the plan missed:
+ * - a path built from pieces, path.join(SP, '_shared', 'data', 'locales');
+ * - Paths.shared("modules/hotstrings"), read as the driver's own
+ *   modules/hotstrings folder because that one exists too;
+ * - repository .. "/static/ergopti_plus/…", a repository path behind a slash;
+ * - a redaction corpus's "<config>/hotstrings/x", read relative to the old
+ *   shared Lua root although it is a user path;
+ * - and a moved file finding itself: "../../vendor/x" from its own folder,
+ *   source:match("^(.*)/modules/llm/x%.lua$"), and three nested dirname()
+ *   climbs to _shared that need four from the new depth;
+ * - a path rewritten twice: the folder row _shared/core → _shared rewrote
+ *   inside the …/_shared/core/network/data/x.json a file row had just written;
+ * - a corpus captured byte for byte, whose header was rewritten under its pin;
+ * - driver_root() .. "/../_shared/modules/x" written in a _shared file, whose
+ *   "../_shared" was dropped, so it named a folder of the driver.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const assert = require('node:assert/strict');
+const Plan = require('../audit/structure/plan.cjs');
+const Apply = require('../audit/structure/apply-step.cjs');
+
+const P = 'static/ergopti_plus/';
+// Synthetic paths, so the test holds before and after phase 2.
+const FAKE = [
+	'_shared/zz_probe_data/locales/en.json',
+	'_shared/zz_probe_mod/hotstrings/a.toml',
+	'linux/zz_probe_mod/hotstrings/b.lua',
+	'_shared/zz_probe_lua/codec/x.lua',
+	'macos/zz_probe_vendor/manifest.lua',
+	'macos/zz_probe_llm/binary.lua',
+	'_shared/zz_probe_mod/other.json',
+	'_shared/lua/zz_probe_hot/p.lua',
+	'_shared/lua/zz_probe_hot/q.lua'
+];
+const MAP = new Map([
+	['_shared/zz_probe_data/locales/en.json', '_shared/core/zz_probe_i18n/data/locales/en.json'],
+	['_shared/zz_probe_mod/hotstrings/a.toml', '_shared/zz_probe_hs/data/a.toml'],
+	['_shared/zz_probe_lua/codec/x.lua', '_shared/zz_probe_text/codec/x.lua'],
+	['linux/zz_probe_mod/hotstrings/b.lua', 'linux/zz_probe_mod/hotstrings/b.lua'],
+	['macos/zz_probe_vendor/manifest.lua', 'macos/zz_probe_vendor/manifest.lua'],
+	['macos/zz_probe_llm/binary.lua', 'macos/zz_ai/adapters/binary.lua'],
+	['_shared/zz_probe_mod/other.json', '_shared/zz_other/data/other.json'],
+	['_shared/lua/zz_probe_hot/p.lua', '_shared/zz_hot/engine/p.lua'],
+	['_shared/lua/zz_probe_hot/q.lua', '_shared/zz_hot/engine/q.lua']
+]);
+
+function withFakes(fn) {
+	const added = [];
+	for (const f of FAKE) {
+		const parts = (P + f).split('/');
+		for (let i = 1; i <= parts.length; i++) {
+			const p = parts.slice(0, i).join('/');
+			if (!Plan.EXISTING.has(p)) {
+				Plan.EXISTING.add(p);
+				added.push(p);
+			}
+		}
+	}
+	try {
+		fn();
+	} finally {
+		for (const p of added) Plan.EXISTING.delete(p);
+	}
+}
+
+function rewrite(file, text) {
+	const rows = Plan.scanFile(file, text, Plan.referenceContext(MAP));
+	const moved = new Map([...MAP].filter(([o, t]) => o !== t).map(([o, t]) => [P + o, P + t]));
+	return Apply.rewriteText(text, rows, moved, file);
+}
+
+function run() {
+	withFakes(() => {
+		assert.equal(
+			rewrite('tools/x.cjs', "const L = path.join(SP, '_shared', 'zz_probe_data', 'locales');"),
+			"const L = path.join(SP, '_shared', 'core', 'zz_probe_i18n', 'data', 'locales');"
+		);
+		assert.equal(
+			rewrite(`${P}linux/y.lua`, 'local d = Paths.shared("zz_probe_mod/hotstrings")'),
+			'local d = Paths.shared("zz_probe_hs/data")',
+			'a Paths.shared argument names the shared folder, not the driver one'
+		);
+		assert.equal(
+			rewrite('tools/x.cjs', "const T = shared('zz_probe_mod/hotstrings/a.toml');"),
+			"const T = shared('zz_probe_hs/data/a.toml');",
+			'a tool reads _shared through shared() too'
+		);
+		assert.equal(
+			rewrite(
+				'tools/x.cjs',
+				'assert.match(text, /static\\/ergopti_plus\\/_shared\\/zz_probe_mod\\/hotstrings\\/a\\.toml/);'
+			),
+			'assert.match(text, /static\\/ergopti_plus\\/_shared\\/zz_probe_hs\\/data\\/a\\.toml/);',
+			'a path escaped in a regular expression'
+		);
+		assert.equal(
+			rewrite(
+				'tools/build/x.cjs',
+				"const S = require('../../static/ergopti_plus/_shared/zz_probe_mod/hotstrings/a.toml');"
+			),
+			"const S = require('../../static/ergopti_plus/_shared/zz_probe_hs/data/a.toml');",
+			'a tool spells a path relative to itself'
+		);
+		// MOD names a folder the plan scatters: it becomes _shared, and a join
+		// onto it is respelled from there.
+		assert.equal(
+			rewrite(
+				'tools/build/m.json',
+				'{"target": "ergopti_plus/_shared/zz_probe_data/locales/generated.json"}'
+			),
+			'{"target": "ergopti_plus/_shared/core/zz_probe_i18n/data/locales/generated.json"}',
+			'a generated file the index does not hold follows its folder'
+		);
+		for (const [file, before, after] of [
+			[
+				`${P}linux/z.lua`,
+				'local d = SHARED_DIR .. "/zz_probe_mod/hotstrings/"',
+				'local d = SHARED_DIR .. "/zz_probe_hs/data/"'
+			],
+			[
+				'tools/z.py',
+				'D = SHARED / "zz_probe_mod/hotstrings/a.toml"',
+				'D = SHARED / "zz_probe_hs/data/a.toml"'
+			],
+			[
+				`${P}linux/z.sh`,
+				'cp -r "${SRC_SHARED}/zz_probe_mod/hotstrings" x',
+				'cp -r "${SRC_SHARED}/zz_probe_hs/data" x'
+			],
+			[
+				'src/z.js',
+				"const D = resolve(SHARED_ROOT, 'zz_probe_mod/hotstrings');",
+				"const D = resolve(SHARED_ROOT, 'zz_probe_hs/data');"
+			]
+		])
+			assert.equal(rewrite(file, before), after, `joined onto a name for _shared: ${before}`);
+		assert.equal(
+			rewrite('tools/lib/z.cjs', "const A_REL = 'zz_probe_mod/hotstrings/a.toml';\nshared(A_REL);"),
+			"const A_REL = 'zz_probe_hs/data/a.toml';\nshared(A_REL);",
+			'a _shared-relative constant beside shared()'
+		);
+		assert.equal(
+			rewrite(
+				'tools/test/x.cjs',
+				"write(path.join(TMP, 'static', 'ergopti_plus', '_shared', 'zz_probe_data', 'locales', 'planted.json'));"
+			),
+			"write(path.join(TMP, 'static', 'ergopti_plus', '_shared', 'core', 'zz_probe_i18n', 'data', 'locales', 'planted.json'));",
+			'a planted file in a folder that moves whole follows it'
+		);
+		assert.equal(
+			rewrite(
+				`${P}windows/z.ahk`,
+				'Data := FileRead(_SharedDir . "\\zz_probe_mod\\hotstrings\\a.toml")'
+			),
+			'Data := FileRead(_SharedDir . "\\zz_probe_hs\\data\\a.toml")',
+			'an AHK path joined onto _SharedDir keeps its leading backslash'
+		);
+		assert.equal(
+			rewrite(
+				'tools/test/z.cjs',
+				'src.includes(\'FileRead(_SharedDir . "\\\\zz_probe_mod\\\\hotstrings\\\\a.toml")\')'
+			),
+			'src.includes(\'FileRead(_SharedDir . "\\\\zz_probe_hs\\\\data\\\\a.toml")\')',
+			'a tool spells the AHK path with escaped backslashes'
+		);
+		assert.equal(
+			rewrite(`${P}macos/z.lua`, 'return read(helpers.shared("zz_probe_data/" .. v.file))'),
+			'return read(helpers.shared("core/zz_probe_i18n/data/" .. v.file))',
+			'a one-folder prefix handed to shared()'
+		);
+		assert.equal(
+			rewrite('tools/test/z.cjs', "const fake = '/tmp/x/shared/zz_probe_mod/hotstrings/a.toml';"),
+			"const fake = '/tmp/x/shared/zz_probe_hs/data/a.toml';",
+			'a fake file system root named for _shared'
+		);
+		const constants = (mod, last) =>
+			[
+				"const ROOT = path.resolve(__dirname, '..', '..');",
+				`const MOD = path.join(ROOT, ${mod});`,
+				last
+			].join('\n');
+		assert.equal(
+			rewrite(
+				'tools/test/x.cjs',
+				constants(
+					"'static', 'ergopti_plus', '_shared', 'zz_probe_mod'",
+					"const T = fs.readFileSync(path.join(MOD, 'hotstrings', 'a.toml'));"
+				)
+			),
+			constants(
+				"'static', 'ergopti_plus', '_shared'",
+				"const T = fs.readFileSync(path.join(MOD, 'zz_probe_hs', 'data', 'a.toml'));"
+			),
+			'a join onto a constant the file defines follows the constant'
+		);
+		assert.equal(
+			rewrite(
+				'tools/x.cjs',
+				"const T = path.join(SHARED, 'zz_probe_mod', 'hotstrings', 'a.toml');"
+			),
+			"const T = path.join(SHARED, 'zz_probe_hs', 'data', 'a.toml');",
+			'pieces joined onto a _shared base'
+		);
+		assert.equal(
+			rewrite(
+				'tools/x.cjs',
+				"base = 'file:///A.app/Contents/Resources/_shared/zz_probe_mod/hotstrings/';"
+			),
+			"base = 'file:///A.app/Contents/Resources/_shared/zz_probe_hs/data/';",
+			'a bundle path embeds the tree'
+		);
+		assert.equal(
+			rewrite('tools/x.cjs', 'const T = `${SP}/_shared/zz_probe_mod/hotstrings/a.toml`;'),
+			'const T = `${SP}/_shared/zz_probe_hs/data/a.toml`;',
+			'a tree path joined onto the drivers root'
+		);
+		assert.equal(
+			rewrite(`${P}linux/y.lua`, 'local d = root .. "/zz_probe_mod/hotstrings"'),
+			'local d = root .. "/zz_probe_mod/hotstrings"',
+			'outside Paths.shared the driver folder wins, and it stays'
+		);
+		assert.equal(
+			rewrite(
+				`${P}linux/y.lua`,
+				'mkdir(base .. "/zz_probe_mod/hotstrings"); copy(base .. "/zz_probe_mod/hotstrings/a.toml")'
+			),
+			'mkdir(base .. "/zz_probe_hs/data"); copy(base .. "/zz_probe_hs/data/a.toml")',
+			'a fixture tree that spells a shared file names its folder as the shared one too'
+		);
+		assert.equal(
+			rewrite(
+				'tools/t.lua',
+				'loadfile(repo .. "/static/ergopti_plus/_shared/zz_probe_lua/codec/x.lua")'
+			),
+			'loadfile(repo .. "/static/ergopti_plus/_shared/zz_probe_text/codec/x.lua")'
+		);
+		assert.equal(
+			rewrite(`${P}_shared/tests/corpus/redaction.json`, '{"in": "<config>/zz_probe_hot"}'),
+			'{"in": "<config>/zz_probe_hot"}',
+			'a user path in a corpus is not a folder of the old shared Lua root'
+		);
+		const own = `${P}macos/zz_probe_llm/binary.lua`;
+		assert.equal(
+			rewrite(own, 'local m = dofile(dir .. "../zz_probe_vendor/manifest.lua")'),
+			'local m = dofile(dir .. "../../zz_probe_vendor/manifest.lua")',
+			'a moving file respells a relative path to a file that stays'
+		);
+		assert.equal(
+			rewrite(own, 'local root = source:match("^(.*)/zz_probe_llm/binary%.lua$")'),
+			'local root = source:match("^(.*)/zz_ai/adapters/binary%.lua$")'
+		);
+	});
+
+	const climbs = Plan.ownClimbs(
+		'local source = debug.getinfo(1, "S").source:gsub("^@", "")\n' +
+			'local shared = NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(source)))))',
+		'_shared/lua/test/x_contract.lua',
+		'_shared/tests/lua/core/x_contract.lua'
+	);
+	assert.deepEqual(climbs, [
+		{
+			old: 'NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(source)))))',
+			new: 'NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(source)))))))'
+		}
+	]);
+	// One climb per line: a folder deeper needs one line more.
+	assert.deepEqual(
+		Plan.ownClimbs(
+			[
+				'local src = debug and debug.getinfo and debug.getinfo(1, "S") and debug.getinfo(1, "S").source',
+				'\tlocal shared = NativePath.dirname(src)',
+				'\tshared = shared and NativePath.dirname(shared)',
+				'\tshared = shared and NativePath.dirname(shared)'
+			].join('\n'),
+			'_shared/lua/keycodes/evdev.lua',
+			'_shared/platform/input/keycodes/evdev.lua'
+		).map((c) => c.new.split('\n').length),
+		[5 - 1]
+	);
+	assert.deepEqual(
+		Plan.ownTails(
+			'local root = source:match("^(.*)" .. sep .. "lua" .. sep .. "test" .. sep .. "m_contract%.lua$")',
+			'_shared/lua/test/m_contract.lua',
+			'_shared/tests/lua/settings/m_contract.lua'
+		).map((t) => t.new),
+		['"^(.*)" .. sep .. "tests" .. sep .. "lua" .. sep .. "settings" .. sep .. "m_contract%.lua$"']
+	);
+	assert.deepEqual(
+		Plan.ownTails(
+			'return source:match("^(.*)/infra/[^/]+$")',
+			'macos/infra/dev_source.lua',
+			'macos/core/lifecycle/engine/dev_source.lua'
+		).map((t) => t.new),
+		['/core/lifecycle/engine/[^/]+$']
+	);
+	// A rewritten path is final: the folder row _shared/core → _shared must not
+	// rewrite inside the new …/_shared/core/network/data/x.json a file row wrote.
+	const repoRow = (old, next, kind = 'path') => ({
+		kind,
+		old,
+		new: next,
+		file: 'tools/x.cjs',
+		resolution: { form: 'repo', lead: '', newRepo: next }
+	});
+	assert.equal(
+		Apply.rewriteText(
+			"a = 'static/ergopti_plus/_shared/data/x.json'; b = 'static/ergopti_plus/_shared/core'",
+			[
+				repoRow(
+					'static/ergopti_plus/_shared/data/x.json',
+					'static/ergopti_plus/_shared/core/network/data/x.json'
+				),
+				repoRow('static/ergopti_plus/_shared/core', 'static/ergopti_plus/_shared', 'dir-successor')
+			],
+			new Map(),
+			'tools/x.cjs'
+		),
+		"a = 'static/ergopti_plus/_shared/core/network/data/x.json'; b = 'static/ergopti_plus/_shared'"
+	);
+	// driver_root() .. "/../_shared/x" in a _shared file climbs from a driver root.
+	assert.equal(
+		Apply.newPathToken(
+			{
+				old: '/../_shared/modules/menu/menu_manifest.json',
+				file: `${P}_shared/lua/test/m_contract.lua`,
+				resolution: { form: 'root', lead: '', newRepo: `${P}_shared/menu/data/menu_manifest.json` }
+			},
+			new Map()
+		),
+		'/../_shared/menu/data/menu_manifest.json'
+	);
+	// A corpus captured byte for byte (its SHA-256 pinned elsewhere) keeps the
+	// old paths it holds: rewriting its header broke the legacy reader's pin.
+	const pinned = Plan.pinnedBytes();
+	assert.ok(
+		pinned.has(
+			`${P}_shared/tests/corpus/hotstrings/common_autocorrection_legacy/autocorrection.toml`
+		),
+		'the captured legacy autocorrection corpus is pinned'
+	);
+	assert.ok(
+		![...pinned].some((f) => /\.(lua|ahk)$/.test(f)),
+		'no source file is exempt: a digest manifest follows its sources'
+	);
+	console.log('[OK] every path form the structure plan rewrites follows the moved file.');
+}
+
+run();
