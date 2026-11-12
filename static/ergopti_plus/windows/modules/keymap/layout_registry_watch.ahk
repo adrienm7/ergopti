@@ -27,6 +27,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\adapters\registry_notify.ahk
+
 
 
 
@@ -40,13 +42,9 @@
 ; Win32 predefined keys, sign-extended as the registry API expects them.
 global LAYOUT_REGISTRY_WATCH_HKEY_CURRENT_USER := -2147483647
 global LAYOUT_REGISTRY_WATCH_HKEY_LOCAL_MACHINE := -2147483646
-; KEY_NOTIFY: the only right RegNotifyChangeKeyValue needs.
-global LAYOUT_REGISTRY_WATCH_KEY_NOTIFY := 0x0010
 ; REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET: a subkey added or
 ; removed, a value added, removed or rewritten.
 global LAYOUT_REGISTRY_WATCH_FILTER := 0x0005
-; WaitForSingleObject results: PLC_WAIT_OBJECT_0 / PLC_WAIT_TIMEOUT
-; (adapters/process_lifecycle.ahk).
 ; The running watch, 0 when none: "capture", "port", "keys" (each "name",
 ; "handle", "event"), "tick" (the bound poll) and "captures" (count).
 global _LayoutRegistryWatch := 0
@@ -219,65 +217,27 @@ _LayoutRegistryWatchTick(Watch) {
 ; ==============================
 ; ==============================
 
-; The live registry, events and timer behind the watch.
+; The live registry, events and timer behind the watch
+; (adapters/registry_notify.ahk).
 _LayoutRegistryWatchNativePort() {
 	static Port := Map(
-		"open", _LayoutRegistryWatchOpen,
-		"event", _LayoutRegistryWatchEvent,
+		"open", RegistryNotifyOpenKey,
+		"event", RegistryNotifyCreateEvent,
 		"arm", _LayoutRegistryWatchArm,
-		"signaled", _LayoutRegistryWatchSignaled,
-		"close_key", _LayoutRegistryWatchCloseKey,
-		"close_event", _LayoutRegistryWatchCloseEvent,
-		"schedule", (Fn, Ms) => SetTimer(Fn, Ms))
+		"signaled", RegistryNotifySignaled,
+		"close_key", RegistryNotifyCloseKey,
+		"close_event", RegistryNotifyCloseEvent,
+		"schedule", _LayoutRegistryWatchSchedule)
 	return Port
 }
 
-_LayoutRegistryWatchOpen(Root, SubKey) {
-	global LAYOUT_REGISTRY_WATCH_KEY_NOTIFY
-	Handle := 0
-	Status := DllCall("Advapi32\RegOpenKeyExW", "Ptr", Root, "WStr", SubKey, "UInt", 0,
-		"UInt", LAYOUT_REGISTRY_WATCH_KEY_NOTIFY, "Ptr*", &Handle, "UInt")
-	if (Status != 0)
-		throw OSError(Status, -1, "RegOpenKeyExW " . SubKey)
-	return Handle
-}
-
-; An auto-reset event, unnamed and not inheritable (no security attributes).
-_LayoutRegistryWatchEvent() {
-	Handle := DllCall("CreateEventW", "Ptr", 0, "Int", false, "Int", false, "Ptr", 0, "Ptr")
-	if !Handle
-		throw OSError(A_LastError, -1, "CreateEventW")
-	return Handle
-}
-
-; Asynchronous: returns at once and signals Event at the next change of the
-; key or its subtree. The notification belongs to this (the only) thread.
+; A change of the key or its subtree: a subkey or a value.
 _LayoutRegistryWatchArm(Handle, Event) {
 	global LAYOUT_REGISTRY_WATCH_FILTER
-	Status := DllCall("Advapi32\RegNotifyChangeKeyValue", "Ptr", Handle, "Int", true,
-		"UInt", LAYOUT_REGISTRY_WATCH_FILTER, "Ptr", Event, "Int", true, "UInt")
-	if (Status != 0)
-		throw OSError(Status, -1, "RegNotifyChangeKeyValue")
+	RegistryNotifyArm(Handle, Event, LAYOUT_REGISTRY_WATCH_FILTER)
 }
 
-; Whether Event is signaled; a true answer resets the auto-reset event.
-_LayoutRegistryWatchSignaled(Event) {
-	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
-	Result := DllCall("WaitForSingleObject", "Ptr", Event, "UInt", 0, "UInt")
-	if (Result == PLC_WAIT_OBJECT_0)
-		return true
-	if (Result == PLC_WAIT_TIMEOUT)
-		return false
-	throw OSError(A_LastError, -1, "WaitForSingleObject")
-}
-
-_LayoutRegistryWatchCloseKey(Handle) {
-	Status := DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
-	if (Status != 0)
-		throw OSError(Status, -1, "RegCloseKey")
-}
-
-_LayoutRegistryWatchCloseEvent(Handle) {
-	if !DllCall("CloseHandle", "Ptr", Handle)
-		throw OSError(A_LastError, -1, "CloseHandle")
+; Arms or cancels the watch's poll; [adapters] layout_registry_watch_poll_ms.
+_LayoutRegistryWatchSchedule(Tick, PeriodMs) {
+	TimerSetCallback(Tick, PeriodMs)
 }
