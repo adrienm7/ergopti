@@ -140,6 +140,10 @@ function M.convert(format, mode, input, output, password, openssl)
 		local file = assert(io.open(password_file, "wb"), "cannot write the password file")
 		file:write(password)
 		file:close()
+		-- mv -f moves the stage into a folder named like the output and returns 0,
+		-- so a folder destination would be reported as converted; Windows'
+		-- MoveFileExW refuses to replace one (BAP-001).
+		if succeeded("test -d " .. quote(output)) then reason = "destination_is_folder" return end
 		local folder = output:match("^(.*)/[^/]*$") or "."
 		local base = output:match("([^/]*)$")
 		stage = read_line("mktemp " .. quote((folder == "" and "/" or folder) .. "/." .. base .. ".XXXXXX") .. " 2>/dev/null")
