@@ -130,7 +130,7 @@ helpers.describe("keymap: one clock read and no wasted allocation per keystroke"
 		local bucket_at = code:find("local star_bucket", 1, true)
 		local bare_at = bucket_at and code:find("local bare_star_bucket", bucket_at, true) or nil
 		local concat_at = bare_at and code:find(
-			"auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. magic) or nil",
+			"auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. typed_magic) or nil",
 			bare_at, true) or nil
 		helpers.assert_true(bucket_at ~= nil and bare_at ~= nil and concat_at ~= nil,
 			"the prospective resolver must still build the magic-key buffer when needed")
