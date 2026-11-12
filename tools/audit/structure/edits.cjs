@@ -141,6 +141,10 @@ const MODULE_NAME_FILES = [
 		why: 'its imports table names the modules the hotstring language menu requires'
 	},
 	{
+		file: 'tools/lib/config-key-tokens.cjs',
+		why: "it collapses require('config_keys').KEY.X by comparing the module's name"
+	},
+	{
 		file: 'tools/test/test-layouts-defaults-single-source.cjs',
 		why: 'it compares a parsed require argument with the layout registry module'
 	}

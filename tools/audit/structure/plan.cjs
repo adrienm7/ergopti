@@ -944,7 +944,7 @@ const LUA_NAME_TABLE =
 
 /** Code just before a quoted name that loads it as a Lua module. */
 const MODULE_LOAD_BEFORE =
-	/(?:\brequire\s*(?:%?\()?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\(|\b\w*(?:load|fresh)_(?:module|with_stubs)\s*\(|\brawget\s*\(\s*package\.(?:loaded|preload)\s*,|\bsearchpath\s*\()\s*$/;
+	/(?:\brequire\s*(?:[%\\]?\()?|\bpackage\.(?:loaded|preload)\s*\[|\bpcall\s*\(\s*require\s*,|\brequire_\w*\s*\(|\b\w*_require\s*\(|\b\w*(?:load|fresh)_(?:module|with_stubs)\s*\(|\brawget\s*\(\s*package\.(?:loaded|preload)\s*,|\bsearchpath\s*\()\s*$/;
 
 /**
  * Tells whether the quoted token at `index` is a Lua module load: a require

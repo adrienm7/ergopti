@@ -196,6 +196,17 @@ function run() {
 		'if (!/layouts\\.engine\\.terminators/.test(src)) fail();',
 		'a tool checks a source with a regular expression of a module name'
 	);
+	const escaped = 'if (!/require\\("json"\\)\\.decode/.test(src)) fail();';
+	assert.equal(
+		Apply.rewriteText(
+			escaped,
+			Plan.scanFile(tool, escaped, Plan.referenceContext(MAP)),
+			new Map(),
+			tool
+		),
+		'if (!/require\\("core.text.engine.json"\\)\\.decode/.test(src)) fail();',
+		'a regular expression spells the load site require\\( with an escaped parenthesis'
+	);
 	const pin = "if (!src.includes('keymap.terminators')) fail('menu.llm.app_profile_overrides');";
 	assert.equal(
 		Apply.rewriteText(pin, Plan.scanFile(tool, pin, Plan.referenceContext(MAP)), new Map(), tool),
