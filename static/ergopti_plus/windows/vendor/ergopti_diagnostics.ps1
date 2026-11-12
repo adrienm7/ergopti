@@ -154,7 +154,7 @@ if ($UiaChild) {
 		$taskWpf = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'WPF'
 		Add-Type -Path (Join-Path $taskWpf 'UIAutomationClient.dll'), (Join-Path $taskWpf 'UIAutomationTypes.dll')
 		$taskProxy = [Reflection.Assembly]::LoadFrom((Join-Path $taskWpf 'UIAutomationClientsideProviders.dll'))
-		# A real declaring type prevents .NET UIA's proxy stack scan from reaching a dynamic PowerShell frame.
+		# A real declaring type prevents .NET UIA's proxy stack scan from reaching a dynamically emitted script frame.
 		Add-Type -ReferencedAssemblies (Join-Path $taskWpf 'UIAutomationClient.dll'), (Join-Path $taskWpf 'UIAutomationTypes.dll') -TypeDefinition @"
 using System.Reflection;
 using System.Runtime.CompilerServices;

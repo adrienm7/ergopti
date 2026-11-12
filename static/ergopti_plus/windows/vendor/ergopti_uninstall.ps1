@@ -51,7 +51,7 @@ function Assert-ErgoptiRemovalTarget {
 function Get-ErgoptiFileIdentity {
 	param([IO.FileStream]$Stream)
 	# The volume serial and file index of the open object, which no rename or
-	# replacement of a name can fake. Windows PowerShell 5.1 has no public
+	# replacement of a name can fake. The stock Windows 5.1 shell has no public
 	# reader; its own hard-link code calls GetFileInformationByHandle, and the
 	# bundled scripts may not declare P/Invoke (tools/ci/windows-exe-av-surface.json).
 	$owner = [Management.Automation.PSObject].Assembly.GetType(
