@@ -1235,6 +1235,10 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
+- [ ] **Release archive budget from the shared defaults (maintainer decision, 2026-11-12).** `modules/updater/core.ahk`
+      keeps the WinHTTP release download bounds as literals (600 s receive, 1,200 s absolute); read them from
+      `_shared/modules/updater/defaults.json` `archive_transfer` (`archive_idle_timeout_ms`, `phase_timeout_ms.archive`),
+      which macOS and Linux now read, and extend `tools/test/test-updater-constants-single-source.cjs` to the AHK side.
 - [x] **Layout editor host on Windows (maintainer request, 2026-11-11).** One pass, as planned in
       [layout-editor.md « Windows host »](docs/design/layout-editor.md#windows-host): `init.ahk` accepts `source_open`,
       `source_save`, `nav_save`, `composer_emulate` and sends `source_editor`, `emulate`, `nav_apply`; a new

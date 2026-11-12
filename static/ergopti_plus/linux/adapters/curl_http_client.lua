@@ -578,6 +578,16 @@ local function curl_args(url, headers, body, options)
 		args[#args + 1] = "--max-filesize"
 		args[#args + 1] = tostring(options.max_download_bytes)
 	end
+	-- A transfer that receives nothing for this long is stopped, as Windows'
+	-- WinHTTP receive timeout does (the release archive's idle bound).
+	local idle_ms = options.receive_idle_timeout_ms
+	if idle_ms ~= nil then
+		if type(idle_ms) ~= "number" or idle_ms < 1000 or idle_ms % 1 ~= 0 then error("HTTP receive idle timeout refused") end
+		args[#args + 1] = "--speed-limit"
+		args[#args + 1] = "1"
+		args[#args + 1] = "--speed-time"
+		args[#args + 1] = string.format("%d", math.floor(idle_ms / 1000))
+	end
 	args[#args + 1] = "--write-out"
 	-- Streaming bodies go directly to NDJSON consumers. Curl's stderr channel
 	-- carries the receipt separately, so split status markers are never data.
@@ -1008,6 +1018,7 @@ local function admit_metadata(url, headers, body, options)
 		output_path = options.output_path,
 		output_target = output_target,
 		max_download_bytes = options.max_download_bytes,
+		receive_idle_timeout_ms = options.receive_idle_timeout_ms,
 		proxy_selection = options.proxy_selection,
 		-- The private runtime's curl unless the caller pinned one (infra/owned_programs.lua).
 		curl_executable = options.curl_executable or require("infra.owned_programs").path("curl"),

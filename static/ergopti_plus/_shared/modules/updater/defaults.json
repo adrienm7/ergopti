@@ -102,9 +102,10 @@
 		"schema_version": 1,
 		"phase_timeout_ms": {
 			"checksum": 15000,
-			"archive": 300000,
+			"archive": 1200000,
 			"hash": 15000
 		},
+		"archive_idle_timeout_ms": 600000,
 		"transport": {
 			"max_header_bytes": 262144,
 			"revocation_best_effort": false

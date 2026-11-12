@@ -323,10 +323,21 @@ function M.stage(asset, done)
 	stage_sequence = stage_sequence + 1
 	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-"
 		.. os.date("!%Y%m%d-%H%M%S") .. "-" .. tostring(stage_sequence)
+	-- The archive's absolute and idle bounds, declared once in the shared updater
+	-- defaults (decided by the maintainer on 2026-11-12, aligned on Windows).
+	local defaults_path = Paths.shared("modules/updater/defaults.json")
+	local defaults_raw = type(defaults_path) == "string" and FileSystem.read(defaults_path) or nil
+	local limits = require("updater.transfer_budget").archive_limits(
+		type(defaults_raw) == "string" and JsonCodec.decode(defaults_raw) or nil)
+	if not limits then
+		Logger.error(LOG, "Cannot stage %s: the shared release archive budget is unavailable.", tostring(asset.tag))
+		return false
+	end
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
-		output = stage_dir .. "/release." .. asset.format, timeout_ms = 900000 })
+		output = stage_dir .. "/release." .. asset.format, timeout_ms = limits.absolute_ms,
+		idle_timeout_ms = limits.idle_ms })
 	if request_err ~= nil or type(request) ~= "string" or request == "" or #request >= 65536 then
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
@@ -344,6 +355,8 @@ function M.stage(asset, done)
 	if not route then Logger.error(LOG, "The release proxy route is invalid."); return false end
 	if route.mode == "environment" and not require("adapters.system_curl").check("the release download") then return false end
 	environment.ERGOPTI_RELEASE_STAGE_REQUEST = request
+	environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS = string.format("%d", limits.absolute_ms)
+	environment.ERGOPTI_RELEASE_STAGE_IDLE_MS = string.format("%d", limits.idle_ms)
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)

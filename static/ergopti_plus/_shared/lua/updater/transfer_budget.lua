@@ -22,6 +22,23 @@ local function observation(record, now)
 	return now < record.deadline
 end
 
+--- The release archive's two bounds, declared once in the shared updater
+--- defaults (archive_transfer): its absolute phase cap and how long it may go
+--- without receiving data. Windows' release download is aligned on them
+--- (decided by the maintainer on 2026-11-12: 1,200 s absolute, 600 s idle).
+--- @param defaults table Decoded canonical updater defaults.
+--- @return table|nil limits { absolute_ms, idle_ms }, nil when either is invalid.
+function M.archive_limits(defaults)
+	if type(defaults) ~= "table" then return nil end
+	local policy = rawget(defaults, "archive_transfer")
+	if type(policy) ~= "table" or rawget(policy, "schema_version") ~= 1 then return nil end
+	local phases = rawget(policy, "phase_timeout_ms")
+	local absolute = type(phases) == "table" and rawget(phases, "archive") or nil
+	local idle = rawget(policy, "archive_idle_timeout_ms")
+	if not integer(absolute) or absolute == 0 or not integer(idle) or idle == 0 or idle > absolute then return nil end
+	return { absolute_ms = absolute, idle_ms = idle }
+end
+
 --- Captures canonical caps and the original admission time without OS ports.
 --- @param defaults table Decoded canonical updater defaults.
 --- @param now number Original native monotonic milliseconds.

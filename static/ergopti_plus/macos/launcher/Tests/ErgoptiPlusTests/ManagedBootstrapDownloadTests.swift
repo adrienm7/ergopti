@@ -47,6 +47,20 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		}
 	}
 
+	/// The release archive's idle bound (shared updater defaults archive_transfer):
+	/// optional, positive, never past the absolute budget.
+	func testIdleTimeoutIsOptionalAndBoundedByTheBudget() throws {
+		XCTAssertNil(try XCTUnwrap(ManagedBootstrapRequest.parse(JSONSerialization.data(withJSONObject: input))).idleTimeoutMilliseconds)
+		var idle = input
+		idle["idle_timeout_ms"] = 10_000
+		XCTAssertEqual(try XCTUnwrap(ManagedBootstrapRequest.parse(JSONSerialization.data(withJSONObject: idle))).idleTimeoutMilliseconds, 10_000)
+		for value in [0 as Any, 30_001, 10.5, "10000"] {
+			var invalid = input
+			invalid["idle_timeout_ms"] = value
+			XCTAssertNil(ManagedBootstrapRequest.parse(try JSONSerialization.data(withJSONObject: invalid)), "Refuse idle \(value)")
+		}
+	}
+
 	func testPrivateAdmissionKeepsExactPublicPinAndRefusesOtherJSONKinds() throws {
 		let parsed = try XCTUnwrap(ManagedBootstrapRequest.parse(JSONSerialization.data(withJSONObject: input)))
 		XCTAssertEqual(parsed.url.absoluteString, "https://release.example/exact/archive?q=pin")
