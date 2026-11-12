@@ -158,6 +158,51 @@ try {
 	);
 	assert.notEqual(again.status, 0, 'an existing receipt must be refused');
 	checks++;
+
+	// The macOS 26 full-suite refusal of job 131204789756 (shared selection
+	// fixture, no unanswered server line) is named, not passed over.
+	const fixture = '/Tests/ErgoptiPlusTests/KeyboardSourceSelectionFixture.swift';
+	const mapping = (name) => `Test Case '-[ErgoptiPlusTests.KeyboardCharacterMappingTests ${name}]'`;
+	const full = classify('full-suite', [
+		mapping('testFreshKeyboardEventsFollowLayoutAndShiftFlags') + ' started.',
+		`${fixture}:63: error: -[ErgoptiPlusTests.KeyboardCharacterMappingTests testFreshKeyboardEventsFollowLayoutAndShiftFlags] : failed - Native selection was not observed before the fixture deadline: deadline`,
+		`${fixture}:113: error: -[ErgoptiPlusTests.KeyboardCharacterMappingTests testFreshKeyboardEventsFollowLayoutAndShiftFlags] : failed - Temporary source cleanup remains unresolved: unavailable`
+	]);
+	assert.equal(full.receipt.state, 'fixture_refusal_unclassified');
+	assert.equal(full.receipt.first_refusal.case, 'testFreshKeyboardEventsFollowLayoutAndShiftFlags');
+	checks++;
+
+	// Both steps that select native input sources bracket their cohort with the
+	// agent snapshot and write this receipt beside their transcript.
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8');
+	for (const [step, transcript, evidence] of [
+		['Qualify actual selected number-row Carbon XCTest controls', '"$transcript"', '$evidence'],
+		[
+			'Run Swift launcher tests on macOS 26',
+			'"$xctest_log"',
+			'$RUNNER_TEMP/swift-launcher-evidence'
+		]
+	]) {
+		const start = workflow.indexOf(`      - name: ${step}\n`);
+		assert.ok(start >= 0, `missing step: ${step}`);
+		const end = workflow.indexOf('\n      - name: ', start + 1);
+		const body = workflow.slice(start, end < 0 ? undefined : end);
+		const before = body.indexOf(
+			`macos_text_input_agents.sh "${evidence}/text-input-agents.txt" before`
+		);
+		const suite = body.indexOf('swift test --package-path static/ergopti_plus/macos/launcher');
+		const after = body.indexOf(
+			`macos_text_input_agents.sh "${evidence}/text-input-agents.txt" after`
+		);
+		const receipt = body.indexOf(
+			`macos_tsm_refusal.py --log ${transcript} --agents "${evidence}/text-input-agents.txt" --receipt "${evidence}/tsm-refusal.json"`
+		);
+		assert.ok(
+			before >= 0 && before < suite && suite < after && after < receipt,
+			`${step} must bracket its cohort`
+		);
+		checks++;
+	}
 } finally {
 	fs.rmSync(folder, { recursive: true, force: true });
 }
