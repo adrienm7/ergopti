@@ -714,8 +714,8 @@ default_activation_ms = 200
 # The longest tap-vs-hold delay, the global one or a key's own: the bound of
 # _shared/tap_hold/SCHEMA.md (0 < x <= 10 s). A longer one is warned and not
 # used. HS: platform/remap/defaults.lua tap_hold_max_timeout_ms. LX:
-# platform/remap/tap_hold_loader.lua and tap_hold_writer.lua. AHK keeps its own
-# bound (TODO « Windows (the PC agent's) »).
+# platform/remap/tap_hold_loader.lua and tap_hold_writer.lua. AHK:
+# platform/remap/constants.ahk TapHoldsLoadTimings (TAPHOLD_MAX_ACTIVATION_SECONDS).
 max_activation_ms = 10000
 
 # One-shot shift: auto-cancel timeout if no subsequent key is pressed.
