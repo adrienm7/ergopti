@@ -934,13 +934,31 @@ end
 
 M._select_channel_release = _select_channel_release
 
+--- The URL of one named asset, bound to this repository's download path for
+--- the release's own tag, as Windows (_Updater_FindAsset) and the macOS archive
+--- selection bind it: an asset of the right name served from anywhere else is
+--- refused, since its checksum would come from the same answer (UPX-002).
+--- @param body string Raw release JSON.
+--- @param name string Exact asset name.
+--- @return string url The bound URL, or an empty string.
+local function _repository_asset_url(body, name)
+	local url = Parser.parse_asset_url(body, name)
+	if url == "" then return "" end
+	local expected = M.releases_page_url() .. "/download/" .. Parser.parse_tag(body) .. "/" .. name
+	if url ~= expected then
+		Logger.warn(LOG, "Release asset '%s' refused: it is not served from this repository's release path.", name)
+		return ""
+	end
+	return url
+end
+
 --- Selects only the canonical Linux self-update archive from one release.
 --- The shared parser binds name and URL from the same asset object and returns
 --- an empty string when the exact attachment is absent.
 --- @param body string Raw release JSON.
 --- @return string url Exact asset URL, or an empty string.
 local function _select_update_asset(body)
-	return Parser.parse_asset_url(body, LINUX_ASSET_NAME)
+	return _repository_asset_url(body, LINUX_ASSET_NAME)
 end
 
 M._select_update_asset = _select_update_asset
@@ -949,7 +967,7 @@ M._select_update_asset = _select_update_asset
 --- @param body string Raw release JSON.
 --- @return string url Exact checksum asset URL, or an empty string.
 local function _select_checksum_asset(body)
-	return Parser.parse_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
+	return _repository_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
 end
 
 M._select_checksum_asset = _select_checksum_asset
@@ -981,7 +999,7 @@ end
 --- @return string url
 local function _select_signature_asset(body)
 	local name = get_signature_gate().signature_name()
-	return name and Parser.parse_asset_url(body, name) or ""
+	return name and _repository_asset_url(body, name) or ""
 end
 
 M._select_signature_asset = _select_signature_asset

@@ -27,8 +27,8 @@ helpers.describe("modules.updater.manager", function()
 
 	local function release(tag, prerelease)
 		return string.format('{"tag_name":"%s","prerelease":%s,"assets":['
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/bundle"},'
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/sum"}]}',
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_ASSET_NAME .. '"},'
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_CHECKSUM_ASSET_NAME .. '"}]}',
 			tag, tostring(prerelease), M.LINUX_ASSET_NAME, tag, M.LINUX_CHECKSUM_ASSET_NAME, tag)
 	end
 
@@ -86,7 +86,7 @@ helpers.describe("modules.updater.manager", function()
 		local canonical_url = "https://github.com/adrienm7/ergopti/releases/download/v4.0.0/"
 			.. M.LINUX_ASSET_NAME
 		local checksum_url = canonical_url .. ".sha256"
-		local body = '{"assets":['
+		local body = '{"tag_name":"v4.0.0","assets":['
 			.. '{"name":"ErgoptiPlus-linux-amd64.deb","browser_download_url":"https://example.invalid/wrong.deb"},'
 			.. '{"name":"' .. M.LINUX_CHECKSUM_ASSET_NAME .. '","browser_download_url":"'
 			.. checksum_url .. '"},'
@@ -98,6 +98,30 @@ helpers.describe("modules.updater.manager", function()
 			"asset order and package kind must not affect exact selection")
 		helpers.assert_eq(M._select_checksum_asset(body), checksum_url,
 			"the checksum must be selected by its exact canonical name")
+	end)
+
+	-- Windows (_Updater_FindAsset) and the macOS archive selection bind each
+	-- asset to this repository's download path for the release's tag; Linux took
+	-- any URL, and the checksum came from the same answer (UPX-002).
+	helpers.it("refuses an asset served outside the repository's release path (upx-002-asset-url-binding)", function()
+		local root = "https://github.com/adrienm7/ergopti/releases/download/"
+		local function body(bundle_url, checksum_url)
+			return '{"tag_name":"v4.0.0","assets":['
+				.. '{"name":"' .. M.LINUX_ASSET_NAME .. '","browser_download_url":"' .. bundle_url .. '"},'
+				.. '{"name":"' .. M.LINUX_CHECKSUM_ASSET_NAME .. '","browser_download_url":"' .. checksum_url .. '"}]}'
+		end
+		local good_bundle = root .. "v4.0.0/" .. M.LINUX_ASSET_NAME
+		local good_sum = root .. "v4.0.0/" .. M.LINUX_CHECKSUM_ASSET_NAME
+		helpers.assert_eq(M._select_update_asset(body(good_bundle, good_sum)), good_bundle)
+		for _, foreign in ipairs({
+			"https://example.invalid/" .. M.LINUX_ASSET_NAME,
+			root .. "v3.9.0/" .. M.LINUX_ASSET_NAME,
+			"https://github.com/someone/ergopti/releases/download/v4.0.0/" .. M.LINUX_ASSET_NAME,
+		}) do
+			helpers.assert_eq(M._select_update_asset(body(foreign, good_sum)), "", foreign)
+			helpers.assert_nil(M.release_record(body(foreign, good_sum)), "no installable record from " .. foreign)
+		end
+		helpers.assert_eq(M._select_checksum_asset(body(good_bundle, "https://example.invalid/sum")), "")
 	end)
 
 	helpers.it("fails closed when the canonical Linux bundle is absent", function()

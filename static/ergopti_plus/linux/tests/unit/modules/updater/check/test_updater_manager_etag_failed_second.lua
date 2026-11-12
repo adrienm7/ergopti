@@ -27,8 +27,8 @@ helpers.describe("modules.updater.manager", function()
 
 	local function release(tag, prerelease)
 		return string.format('{"tag_name":"%s","prerelease":%s,"assets":['
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/bundle"},'
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/sum"}]}',
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_ASSET_NAME .. '"},'
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_CHECKSUM_ASSET_NAME .. '"}]}',
 			tag, tostring(prerelease), M.LINUX_ASSET_NAME, tag, M.LINUX_CHECKSUM_ASSET_NAME, tag)
 	end
 
