@@ -1682,7 +1682,7 @@ function scanFile(file, text, ctx) {
 						: hit.newRepo.slice(PREFIX.length);
 			add('path-regex', m[0], spelled.replace(/\./g, '\\.').replace(/\//g, '\\/'), hit);
 		}
-	if (/\.(c?js|mjs|lua)$/.test(file))
+	if (/\.(c?js|mjs|lua|py)$/.test(file))
 		for (const j of joinedPaths(text)) {
 			const hit = resolveJoinedPath(j, byRepoPath, byRepoDir, successors, jsEnv);
 			if (!hit) continue;
@@ -1698,6 +1698,19 @@ function scanFile(file, text, ctx) {
 			// With its call prefix, so the same pieces elsewhere ('lua' in a file
 			// name expression) are left alone.
 			add(hit.kind, j.prefix + j.text, j.prefix + hit.rendered, hit);
+		}
+	// SHARED_MODS=( "keycodes.evdev" … ) looped into pcall(require, '${mod}'): a
+	// shell array of the module names a Lua one-liner loads.
+	if (/\.sh$/.test(file))
+		for (const m of text.matchAll(/\b([A-Za-z_]\w*)=\(([^()]*)\)/g)) {
+			const loop = text.match(new RegExp(`\\bfor\\s+(\\w+)\\s+in\\s+"\\$\\{${m[1]}\\[@\\]\\}"`));
+			if (!loop || !new RegExp(`require\\s*[,(]\\s*['"]\\$\\{${loop[1]}\\}['"]`).test(text))
+				continue;
+			const next = m[0].replace(/"([A-Za-z_][\w.]*)"/g, (whole, name) => {
+				const hit = byLuaName.get(`_shared|${name}`);
+				return hit && hit[2] ? `"${hit[2]}"` : whole;
+			});
+			if (next !== m[0]) add('lua-module-list', m[0], next, { oldRepo: `${PREFIX}_shared` });
 		}
 	// A scan scope over a folder the plan scatters (edits.cjs FOLDER_EDITS):
 	// the step that empties the folder rewrites it as listed, and a listed
