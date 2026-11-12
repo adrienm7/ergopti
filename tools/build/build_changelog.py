@@ -34,9 +34,10 @@ from collections import defaultdict
 from pathlib import Path
 
 # The GitHub host is declared once in _shared/data/identifiers.json.
-sys.path.insert(
-    0, str(Path(__file__).resolve().parents[2] / "static" / "ergopti_plus" / "_shared" / "data")
+_IDENTIFIERS = (
+    Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared/data/identifiers.py"
 )
+sys.path.insert(0, str(_IDENTIFIERS.parent))
 _bytecode_default = sys.dont_write_bytecode
 sys.dont_write_bytecode = True  # a cache beside the shared data would ship in the bundles
 from identifiers import HOSTS  # noqa: E402
