@@ -316,7 +316,9 @@ _TH_UnknownHoldModifierKeepsTheTap() {
 	global _ALTGR_KANA_FIXUP
 	Known :="[tap_hold.keys.alt_gr]`n" . 'hold_modifier = "AltGr"' . "`n"
 		. "[tap_hold.keys.space]`n" . 'hold_modifier = "Ctrl + lShift"' . "`n"
-	for Source, Unknown in Map("user", "hyper", "defaults", "fn") {
+	; Not "fn" or "cmd": those are the shared file's macOS modifiers, warned
+	; and held as nothing rather than refused (_shared/tap_hold/SCHEMA.md).
+	for Source, Unknown in Map("user", "hyper", "defaults", "meta") {
 		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
 			. 'hold_modifier = "' . (Source == "defaults" ? Unknown : "ctrl") . '"' . "`n"
 		UserText := Known
