@@ -2083,6 +2083,9 @@ jobs:
               echo "Invalid package PAC qualification disposition" >&2
               exit 1
           fi
+          # The full suite selects input sources too; bracket it like the number-row step so a
+          # refusal here carries the text-input agents' state and a named receipt.
+          bash tools/diagnostics/macos_text_input_agents.sh "$RUNNER_TEMP/swift-launcher-evidence/text-input-agents.txt" before
           set +e
           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" ${pac_skip_args[@]+"${pac_skip_args[@]}"} 2>&1 | tee "$xctest_log"
           swift_pipeline_status=("${PIPESTATUS[@]}")
@@ -2093,6 +2096,9 @@ jobs:
           node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
           tis_evidence_status=$?
           set -e
+          bash tools/diagnostics/macos_text_input_agents.sh "$RUNNER_TEMP/swift-launcher-evidence/text-input-agents.txt" after
+          # Names a refusal the unanswered text-input UI server caused; never the verdict.
+          python3 tools/diagnostics/macos_tsm_refusal.py --log "$xctest_log" --agents "$RUNNER_TEMP/swift-launcher-evidence/text-input-agents.txt" --receipt "$RUNNER_TEMP/swift-launcher-evidence/tsm-refusal.json"
           if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi
           if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi
           if [ "$owned_program_evidence_status" -ne 0 ]; then exit "$owned_program_evidence_status"; fi
