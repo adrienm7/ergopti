@@ -1063,4 +1063,38 @@ helpers.with_fresh_modules({
 				"Shift+F17 is alt_tab_windows: the held Shift must not reach the trigger")
 		end)
 	end)
+
+	helpers.describe("Left Command's one-shot Shift with no hold (lalt-one-shot-held-shift)", function()
+		local rules = build({ left_command = { tap = "sticky_shift", hold = "none" } })
+		--- Whether the one-shot Shift was armed (its control sentinel was sent).
+		local function armed(engine)
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "key_90" and emission.flags.left_control == true
+					and emission.flags.left_option == true then return true end
+			end
+			return false
+		end
+
+		helpers.it("arms the one-shot and holds Shift while the key is down, as lalt.ahk 4.1", function()
+			local engine = engine_for(rules)
+			engine:down("left_command")
+			helpers.assert_true(armed(engine), "the one-shot is armed at key-down")
+			helpers.assert_true(engine:pressed().left_shift == true, "Shift is held while the key is down")
+			engine:up("left_command")
+			helpers.assert_true(engine:pressed().left_shift ~= true, "Shift is let go with the key")
+		end)
+
+		for _, blocker in ipairs({ "right_option", "caps_lock", "left_shift", "fn" }) do
+			helpers.it("stands down under a held " .. blocker .. ", as Windows under RCtrl, CapsLock, LShift or LCtrl", function()
+				local engine = engine_for(rules)
+				engine:down(blocker)
+				engine:clear()
+				local before = engine:pressed().left_shift == true
+				engine:down("left_command")
+				helpers.assert_true(not armed(engine), "no one-shot under " .. blocker)
+				helpers.assert_eq(engine:pressed().left_shift == true, before, "no Shift of its own under " .. blocker)
+				engine:up("left_command")
+			end)
+		end
+	end)
 end)
