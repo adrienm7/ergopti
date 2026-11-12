@@ -105,6 +105,51 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		from: "{ dir: '_shared/lua', excluded: '_shared/lua/test/', minFiles: 200 }",
 		to: "{ dir: '_shared', excluded: '_shared/tests/', minFiles: 200 }"
 	},
+	// The port compliance gate reads the AHK adapters of windows/adapters. S02
+	// moves the crypto adapter to windows/core/crypto, and the folder's nearest
+	// new home is the driver root, whose top level holds no adapter: the gate
+	// reads both homes instead.
+	{
+		file: 'tools/test/test-port-compliance.cjs',
+		moves: 'windows/adapters/crypto.ahk',
+		from: "const AHK_ADAPTERS_DIR = path.join(ROOT, 'static/ergopti_plus/windows/adapters');",
+		to:
+			'const AHK_ADAPTERS_DIRS = [\n' +
+			"\tpath.join(ROOT, 'static/ergopti_plus/windows/adapters'),\n" +
+			"\tpath.join(ROOT, 'static/ergopti_plus/windows/core/crypto')\n" +
+			'];'
+	},
+	{
+		file: 'tools/test/test-port-compliance.cjs',
+		moves: 'windows/adapters/crypto.ahk',
+		from:
+			'const ahkFiles = fs\n' +
+			'\t.readdirSync(AHK_ADAPTERS_DIR)\n' +
+			"\t.filter((f) => f.endsWith('.ahk'))\n" +
+			'\t.map((f) => path.join(AHK_ADAPTERS_DIR, f));',
+		to:
+			'const ahkFiles = AHK_ADAPTERS_DIRS.flatMap((dir) =>\n' +
+			'\tfs\n' +
+			'\t\t.readdirSync(dir)\n' +
+			"\t\t.filter((f) => f.endsWith('.ahk'))\n" +
+			'\t\t.map((f) => path.join(dir, f))\n' +
+			');'
+	},
+	{
+		file: 'tools/test/test-port-compliance.cjs',
+		moves: 'windows/adapters/crypto.ahk',
+		from:
+			'\tconst adapterFile = path.join(\n' +
+			'\t\tAHK_ADAPTERS_DIR,\n' +
+			"\t\tpascalToUpperSnake(portName).toLowerCase() + '.ahk'\n" +
+			'\t);',
+		to:
+			'\tconst adapterName = pascalToUpperSnake(portName).toLowerCase();\n' +
+			'\tconst adapterFile =\n' +
+			'\t\tAHK_ADAPTERS_DIRS.map((dir) => path.join(dir, `${adapterName}.ahk`)).find((f) =>\n' +
+			'\t\t\tfs.existsSync(f)\n' +
+			'\t\t) || path.join(AHK_ADAPTERS_DIRS[0], `${adapterName}.ahk`);'
+	},
 	{
 		// The locale is found relative to the page under test, a variable
 		// the scan cannot evaluate.
