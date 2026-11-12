@@ -33,7 +33,8 @@ require("tests.support.session_language").install()
 -- notifier to a recorder (tests/support/notice_recorder.lua), and a notice that
 -- still reaches notify-send hits a sentinel that fails the run
 -- (tests/support/notify_send_guard.lua).
-require("tests.support.notify_send_guard").install()
+local NotifySendGuard = require("tests.support.notify_send_guard")
+NotifySendGuard.install()
 local NoticeRecorder = require("tests.support.notice_recorder")
 NoticeRecorder.install()
 
@@ -382,6 +383,7 @@ function M.it(name, fn)
 	-- substring) so one behaviour can be re-run in isolation.
 	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
+	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
 	NoticeRecorder.begin_case()
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
@@ -392,6 +394,7 @@ function M.it(name, fn)
 		end)
 	end
 	NoticeRecorder.end_case()
+	NotifySendGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -522,6 +525,7 @@ function M.measure_module(name, callback)
 	for key, value in pairs(package.loaded) do before[key] = value end
 	local previous = _current_module
 	_current_module = name
+	NotifySendGuard.enter_case(name .. " (outside a test case)")
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)
