@@ -55,6 +55,7 @@
 		"test:layer-editor-page": "node ./tools/test/test-layer-editor-page.cjs",
 		"test:layer-editor-legends": "node ./tools/test/test-layer-editor-legends.cjs",
 		"test:linux-pages-post-ready": "node ./tools/test/test-linux-pages-post-ready.cjs",
+		"test:host-context-menu": "node ./tools/test/test-host-context-menu.cjs",
 		"test:layout-composer-model": "node ./tools/test/test-layout-composer-model.cjs",
 		"test:nav-layer-recommended-golden": "node ./tools/test/test-nav-layer-recommended-golden.cjs",
 		"test:keymap-layers-corpus": "node ./tools/test/test-keymap-layers-corpus.cjs",
