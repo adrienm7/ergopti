@@ -10,7 +10,8 @@
  *      name moved paths, so a step may rewrite the rules the next one reads;
  *   2. the mechanical follow-ups no rewrite can do: banner widths
  *      (lint-conventions --fix-banners), the formatter (format.cjs --write),
- *      the generated outputs (npm run codegen) and the folder-bounds baseline;
+ *      the generated outputs (npm run gen, then npm run codegen) and the
+ *      folder-bounds baseline;
  *   3. the step's gates: the strict format and convention lint, then every
  *      --gate command given, run from the repository root;
  *   4. one commit, `refactor(structure): move <step> into its feature folder`.
@@ -53,7 +54,8 @@ function run(cmd, args, options = {}) {
 		command: options.shell ? cmd : [cmd, ...args].join(' '),
 		status: result.status === null ? -1 : result.status,
 		seconds: Math.round((Date.now() - started) / 100) / 10,
-		tail: output.split('\n').slice(-40).join('\n')
+		tail: output.split('\n').slice(-40).join('\n'),
+		...(options.full ? { output } : {})
 	};
 }
 
@@ -90,6 +92,36 @@ function parseArgs(argv) {
 		else throw new Error(`unknown argument ${a}`);
 	}
 	return opts;
+}
+
+/** The generator scripts an `npm run gen` output reports as failed. */
+function failedGenerators(output) {
+	// eslint-disable-next-line no-control-regex
+	const plain = output.replace(/\x1b\[[0-9;]*m/g, '');
+	return [...plain.matchAll(/^\s*FAILED\s+(\S+)/gm)].map((m) => m[1]).sort();
+}
+
+/**
+ * Runs every registered generator (npm run gen) on the step's tree. One that
+ * already failed on the tree before the step (a host it refuses, such as a
+ * Node version a qualified projection does not admit) is reported; one the
+ * step broke stops it.
+ * @param {string[]} before The generators that failed before the step.
+ * @param {object} [io] The command, replaced in the runner's test.
+ */
+function runGenerators(key, receipt, before, io = {}) {
+	const gen = io.gen || (() => run('npm', ['run', '--silent', 'gen'], { full: true }));
+	const { output, ...result } = gen();
+	const failed = failedGenerators(output);
+	receipt.actions.push({ label: 'gen', ...result, failed });
+	const broken = failed.filter((g) => !before.includes(g));
+	if (result.status !== 0 && failed.length === 0)
+		throw Object.assign(new Error(`${key}: npm run gen failed:\n${result.tail}`), { receipt });
+	if (broken.length > 0)
+		throw Object.assign(
+			new Error(`${key}: the step broke generator(s) ${broken.join(', ')}:\n${result.tail}`),
+			{ receipt }
+		);
 }
 
 /**
@@ -137,6 +169,13 @@ function runStep(key, opts) {
 			throw Object.assign(new Error(`${key}: ${label} failed:\n${r.tail}`), { receipt });
 		return r;
 	};
+	// The generators that fail on the tree before the step, by the host alone.
+	const baseGen = run('npm', ['run', '--silent', 'gen'], { full: true });
+	receipt.baseGenerators = failedGenerators(baseGen.output);
+	if (git('status', '--porcelain').trim() !== '')
+		throw Object.assign(new Error(`${key}: npm run gen changes the tree before the step`), {
+			receipt
+		});
 	action('apply', process.execPath, [APPLY, key, '--apply'], {
 		env: { ERGOPTI_STRUCTURE_PHASE: '2' }
 	});
@@ -149,6 +188,8 @@ function runStep(key, opts) {
 		'--warn-only'
 	]);
 	action('format', process.execPath, ['tools/lint/format.cjs', '--write']);
+	// Every leaf generator, then the domain build with its drift check.
+	runGenerators(key, receipt, receipt.baseGenerators);
 	settleCodegen(key, receipt);
 	// The bounds only fall as the plan lands; a step lowers the ratchet.
 	action('folder bounds', process.execPath, [
@@ -228,4 +269,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArgs, settleCodegen };
+module.exports = { parseArgs, settleCodegen, runGenerators, failedGenerators };
