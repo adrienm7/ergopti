@@ -705,9 +705,8 @@ function M.generate(ctx, menu_mods, actions)
 			if root == nil then return {} end
 			-- Every row is `type = "command"` in the manifest: labels, order and
 			-- the separators are declared, and this file supplies only what each
-			-- row does. Read once, so the pause gate below can tell the rows apart
-			-- by the handler they carry. The global scope's restore and clear open
-			-- the menu, like every settings menu's.
+			-- row does. The global scope's restore and clear open the menu, like
+			-- every settings menu's.
 			local restore = actions.reset_defaults
 			local clear = actions.clear_to_system
 			local clean = actions.clean_unused_keys
@@ -725,24 +724,10 @@ function M.generate(ctx, menu_mods, actions)
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
 			-- A pause stops typing, not configuration (EDD-1, maintainer decision
-			-- 2026-11-12): the whole-scope restore and clear stay live while
-			-- paused, since every scope owner writes through its own transaction.
-			-- The unused-key clean was not part of that decision and stays greyed
-			-- AND stripped of its handler: a disabled row whose fn survives still
-			-- fires the moment the greying is rendered wrong somewhere else.
-			local pause_gated = {}
-			-- An unregistered command draws no row, so it has nothing to gate.
-			if type(clean) == "function" then pause_gated[clean] = true end
+			-- 2026-11-12): every row stays live while paused, the restore, the
+			-- clear and the unused-key clean included.
 			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
 			if not configuration_dense(rows, true) then return {} end
-			if ctx.paused then
-				for _, row in ipairs(rows) do
-					if row.fn ~= nil and pause_gated[row.fn] then
-						row.disabled = true
-						row.fn = nil
-					end
-				end
-			end
 			local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "hs")
 			if not rawequal(root, current_root) or not rawequal(top, current_top)
 				or not rawequal(section, current_section) or not rawequal(parent, current_parent)
