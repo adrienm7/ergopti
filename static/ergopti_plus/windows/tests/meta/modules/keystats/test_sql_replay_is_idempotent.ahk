@@ -36,35 +36,52 @@
 ; ==================================================
 ; ==================================================
 
+; Case-sensitive occurrences of a pattern.
+_SRII_Count(Src, Pattern) {
+	Count := 0
+	Pos := 1
+	while (Found := RegExMatch(Src, Pattern, &Match, Pos)) {
+		Count += 1
+		Pos := Found + Match.Len
+	}
+	return Count
+}
+
 _SRII_EveryInsertIsIgnoreOnConflict() {
 	; Comment-stripped AND case-sensitive, both deliberately. AHK's InStr is
 	; case-INSENSITIVE by default, and a prose comment in keystats_sensors.ahk
 	; reads "routes it into events_system", which a naive scan counts as a bare
 	; INSERT and fails against perfectly correct code — the comment-mention trap.
-	Src := _DriverSourceNoComments()
+	global _DriverDir
+	; The rendered catalogue statements (_shared/data/db/queries.sql) are
+	; generated, so the authored-source census leaves them out; they are half of
+	; the event writers and are read here explicitly.
+	Src := _DriverSourceNoComments() . "`n"
+		. _StripFullLineComments(FSReadStrict(_DriverDir . "\_generated\keystats_queries.ahk"))
 	Assert(Src != "", "the driver source must be readable")
 
 	; Scoped to the EVENT tables specifically. The walker's agg_*/ngram_* writers
 	; are a different mechanism — plain INSERT with ON CONFLICT ... DO UPDATE,
 	; i.e. deliberate upserts — and they are not on the ingest re-append path, so
-	; requiring OR IGNORE of them would assert something false.
-	Good := 0
-	Pos := 1
-	while (Pos := InStr(Src, "INSERT OR IGNORE INTO events_", true, Pos)) {
-		Good += 1
-		Pos += 29
-	}
-	Bare := 0
-	Pos := 1
-	while (Pos := InStr(Src, "INSERT INTO events_", true, Pos)) {
-		Bare += 1
-		Pos += 19
-	}
+	; requiring OR IGNORE of them would assert something false. A shared builder
+	; (KL_BuildInsertKindRow) names its events_* table through a Format
+	; placeholder, so "INTO {1}" counts as an event INSERT too.
+	Good := _SRII_Count(Src, "INSERT OR IGNORE INTO (?:events_|\{\d+\})")
+	Bare := _SRII_Count(Src, "INSERT INTO (?:events_|\{\d+\})")
 
 	Assert(Good >= 6,
 		"expected several INSERT OR IGNORE statements against events_* tables (found " . Good . ") — if this collapsed, the scan is looking at the wrong source and the guard is vacuous")
 	Assert(Bare == 0,
 		"every keystats INSERT must be INSERT OR IGNORE (found " . Bare . " that are not). A failed state save rolls today_log_offset back after the batch already reached data.sql, so the same block IS re-appended on the next tick; OR IGNORE against the (device_id, id) primary key is the only reason that is harmless rather than duplicate rows")
+}
+
+; The patterns read a shared builder's templated table as an event INSERT, so
+; dropping its OR IGNORE is caught as surely as on a literal events_* table.
+_SRII_TemplatedTableIsAnEventInsert() {
+	AssertEqual(1, _SRII_Count('Format("INSERT INTO {1} (device_id, id) VALUES ({2}, {3});"', "INSERT INTO (?:events_|\{\d+\})"))
+	AssertEqual(1, _SRII_Count('Format("INSERT OR IGNORE INTO {1} (device_id, id)"', "INSERT OR IGNORE INTO (?:events_|\{\d+\})"))
+	AssertEqual(0, _SRII_Count('"INSERT INTO agg_app_day (device_id) "', "INSERT INTO (?:events_|\{\d+\})"),
+		"an aggregate upsert is not on the replay path")
 }
 
 ; The primary key is the other half of the guarantee: OR IGNORE only deduplicates
@@ -86,6 +103,8 @@ _SRII_AppendAssignsIdentityBeforeQueuePublication() {
 
 Test("meta keystats: every INSERT tolerates a replayed batch",
 	_SRII_EveryInsertIsIgnoreOnConflict)
+Test("meta keystats: a templated event table counts as an event INSERT",
+	_SRII_TemplatedTableIsAnEventInsert)
 Test("meta keystats: the replay contract's primary key is documented",
 	_SRII_ReplayContractIsDocumented)
 Test("meta keystats: journal identity precedes queue publication (journal-stable-event-id)",
