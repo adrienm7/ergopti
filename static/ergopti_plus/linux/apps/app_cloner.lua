@@ -65,18 +65,29 @@ function M.native_ports()
 	}
 end
 
---- Validates the optional item to open, as the macOS builder does: a path
---- must exist, anything else must carry a URL scheme.
+--- Validates the optional item to open, as the macOS builder's
+--- validateOpenArg does (BAP-005): a path, absolute or under « ~ », must exist;
+--- anything else must be a URL with « :// », or Teams' documented single-slash
+--- forms. A typo such as « https:/x » or « localhost:3000 » is refused.
+--- @param item string The trimmed answer.
+--- @param exists function exists(path) -> boolean.
+--- @param home string The account's home folder.
 --- @return string|nil error_key
 --- @return string|nil value Substituted into the message.
-local function invalid_open_item(item, exists)
-	if item == "" then return nil end
-	if item:sub(1, 1) == "/" then
-		if exists(item) then return nil end
-		return "apps.cloner.err_path_missing", item
+--- @return string item The item to open, « ~ » expanded (the launcher's exec
+---   word is quoted, so no shell would expand it).
+local function invalid_open_item(item, exists, home)
+	if item == "" then return nil, nil, item end
+	local path = item
+	if item == "~" or item:sub(1, 2) == "~/" then path = home .. item:sub(2) end
+	if path:sub(1, 1) == "/" then
+		if exists(path) then return nil, nil, path end
+		return "apps.cloner.err_path_missing", item, item
 	end
-	if item:match("^[%a][%w+.%-]*:") then return nil end
-	return "apps.cloner.err_url_format"
+	if item:find("://", 1, true) or item:match("^msteams:/l/") or item:match("^msteams:/calendar") then
+		return nil, nil, item
+	end
+	return "apps.cloner.err_url_format", nil, item
 end
 
 --- Runs the clone dialogs and writes the clone.
@@ -116,8 +127,11 @@ function M.run(ports)
 			{ initial = "", ok = t("apps.cloner.btn_validate"), cancel = t("button.cancel") })
 		if open_item == nil then return "cancelled" end
 		open_item = require("text_utils").trim(open_item)
-		local key, value = invalid_open_item(open_item, ports.exists)
-		if not key then break end
+		local key, value, resolved = invalid_open_item(open_item, ports.exists, ports.home)
+		if not key then
+			open_item = resolved
+			break
+		end
 		dialogs.message("warning", t("apps.cloner.title_invalid_input"), t(key, value))
 	end
 
