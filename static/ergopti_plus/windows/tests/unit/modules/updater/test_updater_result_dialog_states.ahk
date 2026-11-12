@@ -135,7 +135,7 @@ Test("update check: an offered release seeds the page's notes with the repositor
 	_TUCD_ReleaseNotesSeed)
 
 ; A clicked link is served only for the offered release, reaches the allowlisted
-; opener with the URL as sent (PAR-52); a pause does not refuse it (UPD-2).
+; opener with the URL as sent, and is refused while paused (PAR-52).
 _TUCD_OpenUrlAction() {
 	_TUCD_Run(_TUCD_OpenUrlActionCase)
 }
@@ -144,20 +144,25 @@ _TUCD_OpenUrlActionCase() {
 	Request := _TUCD_Request()
 	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
 	Effects := _TUCD_NewEffects()
+	Refusals := []
+	Effects["refuse_paused"] := () => Refusals.Push(true)
 	Link := "https://github.com/owner/repo/pull/1"
 	Message := '{"action":"open_url","url":"' . Link . '"}'
 	_UC_WindowEpoch += 1
 	Epoch := _UC_WindowEpoch
 	_UC_ResetDone := false
 	try {
-		_UpdateCheck_HandleMessage(Epoch, Message, Effects)
+		_UpdateCheck_HandleMessage(Epoch, Message, false, Effects)
 		AssertEqual(0, _TUCD_Effects.Links.Length, "no link opens while checking")
 		Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: "" }
 		UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
 			"latest", Release.Tag, "others", [], "release", Release))
-		_UpdateCheck_HandleMessage(Epoch, '{"action":"open_url","url":1}', Effects)
+		_UpdateCheck_HandleMessage(Epoch, Message, true, Effects)
+		AssertEqual(0, _TUCD_Effects.Links.Length, "no link opens while paused")
+		AssertEqual(1, Refusals.Length, "the paused link is refused visibly")
+		_UpdateCheck_HandleMessage(Epoch, '{"action":"open_url","url":1}', false, Effects)
 		AssertEqual(0, _TUCD_Effects.Links.Length, "a URL that is not a string is refused")
-		_UpdateCheck_HandleMessage(Epoch, Message, Effects)
+		_UpdateCheck_HandleMessage(Epoch, Message, false, Effects)
 		AssertEqual(1, _TUCD_Effects.Links.Length, "the offered release's link is served")
 		AssertEqual(Link, _TUCD_Effects.Links[1])
 		AssertEqual(0, _TUCD_Effects.Closes, "opening a link leaves the window open")
@@ -255,37 +260,37 @@ _TUCD_ActionsCase() {
 Test("update check: the actions act only on the answer the window holds (update-check-window)",
 	_TUCD_Actions)
 
-; A pause stops typing, not what the user asks for (UPD-2, as macOS and Linux):
-; under a real Suspend, every action of the window still runs.
+; A page message and a native click bypass native Suspend: a click that arrives
+; while the driver is paused drives no updater action, and says so.
 _TUCD_PausedClicks() {
 	_TUCD_Run(_TUCD_PausedClicksCase)
 }
 _TUCD_PausedClicksCase() {
 	global _TUCD_Effects
 	Request := _TUCD_Request()
+	Refusals := []
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
 	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: "" }
-	Offer() {
-		UpdateCheck_Begin(Request, "v0.0.0-dev.144")
-		UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
-			"latest", Release.Tag, "others", [Map("channel", "main", "tag", "v1.0.0")], "release", Release))
-	}
+	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
+		"latest", Release.Tag, "others", [Map("channel", "main", "tag", "v1.0.0")], "release", Release))
 	Effects := _TUCD_NewEffects()
-	WasSuspended := A_IsSuspended
-	Suspend(true)
-	try {
-		; The install itself still refuses while paused, past this window
-		; (Updater_DownloadAndInstall, test_updater_request_pause.ahk).
-		for Name, Channel in Map("whats_new", "", "switch_channel", "main") {
-			Offer()
-			AssertTrue(UpdateCheck_Perform(Name, Channel, Effects)["ok"], Name . " runs while paused")
-		}
-		AssertEqual(1, _TUCD_Effects.Changelogs.Length, "the Versions window opens while paused")
-		AssertEqual(1, _TUCD_Effects.Switches.Length, "the channel switches while paused")
-		Offer()
-		AssertTrue(UpdateCheck_Perform("close", "", Effects)["closed"], "the window closes while paused")
-	} finally Suspend(WasSuspended)
+	Effects["refuse_paused"] := () => Refusals.Push(true)
+	for Name, Channel in Map("update", "", "whats_new", "", "switch_channel", "main")
+		AssertFalse(UpdateCheck_Perform(Name, Channel, Effects, true)["ok"], Name . " is refused while paused")
+	AssertEqual(3, Refusals.Length, "each refusal tells the user the driver is paused")
+	AssertEqual(0, _TUCD_Effects.Installs.Length, "nothing installs while paused")
+	AssertEqual(0, _TUCD_Effects.Changelogs.Length, "the Versions window stays closed while paused")
+	AssertEqual(0, _TUCD_Effects.Switches.Length, "the channel stays while paused")
+	AssertTrue(UpdateCheck_Perform("close", "", Effects, true)["closed"], "the window still closes while paused")
+
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	UpdateCheck_ShowResult(Request, Map("state", "error", "current", "v0.0.0-dev.144",
+		"reason", "no_connection", "detail", "GitHub could not be reached"))
+	AssertTrue(UpdateCheck_Perform("report", "", Effects, true)["ok"], "a failure is still reported while paused")
+	AssertTrue(UpdateCheck_Perform("open_log", "", Effects, true)["ok"], "the log still opens while paused")
+	AssertEqual(3, Refusals.Length, "the error window's actions are not refused")
 }
-Test("update check: a click while paused runs its updater action (upd-2-manual-check-while-paused)",
+Test("update check: a click while paused drives no updater action (update-check-window)",
 	_TUCD_PausedClicks)
 
 ; WebView2 can fail to start (no Evergreen runtime, a boot timeout, another
@@ -343,18 +348,23 @@ _TUCD_PageMessagesCase() {
 	UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", "v0.0.0-dev.144",
 		"latest", "v0.0.0-dev.144", "others", [Map("channel", "main", "tag", "v1.0.0")]))
 	Effects := _TUCD_NewEffects()
+	Refusals := []
+	Effects["refuse_paused"] := () => Refusals.Push(true)
 	SwitchMessage := '{"action":"switch_channel","channel":"main"}'
 	_UC_WindowEpoch += 1
 	Epoch := _UC_WindowEpoch
 	_UC_ResetDone := false
 	try {
-		_UpdateCheck_HandleMessage(Epoch - 1, SwitchMessage, Effects)
+		_UpdateCheck_HandleMessage(Epoch - 1, SwitchMessage, false, Effects)
 		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message of a closed window does nothing")
-		_UpdateCheck_HandleMessage(Epoch, "not json", Effects)
-		_UpdateCheck_HandleMessage(Epoch, '{"action":"run"}', Effects)
-		_UpdateCheck_HandleMessage(Epoch, '{"action":"switch_channel","channel":1}', Effects)
+		_UpdateCheck_HandleMessage(Epoch, "not json", false, Effects)
+		_UpdateCheck_HandleMessage(Epoch, '{"action":"run"}', false, Effects)
+		_UpdateCheck_HandleMessage(Epoch, '{"action":"switch_channel","channel":1}', false, Effects)
 		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message that is not an action does nothing")
-		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, Effects)
+		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, true, Effects)
+		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message that arrived while paused switches nothing")
+		AssertEqual(1, Refusals.Length, "the paused switch is refused visibly")
+		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, false, Effects)
 		AssertEqual(1, _TUCD_Effects.Switches.Length, "the page's switch reaches the channel owner")
 		AssertEqual("main", _TUCD_Effects.Switches[1])
 
@@ -362,7 +372,7 @@ _TUCD_PageMessagesCase() {
 		AssertFalse(_UC_ResetDone, "another check's cancellation leaves the window open")
 		UpdateCheck_Abandon(Request)
 		AssertTrue(_UC_ResetDone, "the check's cancellation closes its window")
-		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, Effects)
+		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, false, Effects)
 		AssertEqual(1, _TUCD_Effects.Switches.Length, "a closed window's message does nothing")
 	} finally {
 		_UC_ResetDone := true

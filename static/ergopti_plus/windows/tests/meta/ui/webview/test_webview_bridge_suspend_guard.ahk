@@ -72,14 +72,15 @@ _WBSG_CheckChangelogGuard() {
 
 	CapturePos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
 	ReadPos := CapturePos > 0 ? InStr(Body, "TryGetWebMessageAsString()", , CapturePos) : 0
-	PolicyPos := ReadPos > 0
-		? InStr(Body, "_Updater_RequestMayPublish(Request)", , ReadPos)
+	BornPausedPos := ReadPos > 0 ? InStr(Body, "Request.BornSuspended", , ReadPos) : 0
+	PolicyPos := BornPausedPos > 0
+		? InStr(Body, "_Updater_RequestMayPublish(Request)", , BornPausedPos)
 		: 0
 	CallPos := InStr(Body, "_CLW_FetchAndInject(")
 	Assert(CallPos > 0, "_CLW_OnWebMessage must still call _CLW_FetchAndInject(...) on a ready/fetch action")
-	Assert(CapturePos > 0 and ReadPos > CapturePos
-		and PolicyPos > ReadPos and CallPos > PolicyPos,
-		"_CLW_OnWebMessage must capture its request before the yielding COM read, then revalidate it (channel and validity; a pause no longer refuses, UPD-2) before a fetch mutates channel/network state")
+	Assert(CapturePos > 0 and ReadPos > CapturePos and BornPausedPos > ReadPos
+		and PolicyPos > BornPausedPos and CallPos > PolicyPos,
+		"_CLW_OnWebMessage must capture entry-time pause provenance before its yielding COM read, then reject born-paused or interrupted actions before a fetch mutates channel/network state")
 }
 Test("changelog: _CLW_OnWebMessage guards captured pause provenance before fetch mutation (webview-bridge-suspend-guard)",
 	_WBSG_CheckChangelogGuard)
@@ -170,9 +171,10 @@ _A0720WV_MessageHandlers() {
 ; captured before the yielding COM read, and every action is revalidated after it.
 _A0720WV_ManualBridgeHasSuspendPolicy(Fn, Body) {
 	ReadPos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
+	BornPos := InStr(Body, "Request.BornSuspended")
 	PolicyPos := InStr(Body, "_Updater_RequestMayPublish(Request)")
 	UrlPos := InStr(Body, "_Updater_OpenManualUrl(")
-	Assert(ReadPos > 0 and PolicyPos > ReadPos,
+	Assert(ReadPos > 0 and BornPos > ReadPos and PolicyPos > BornPos,
 		Fn . " must preserve entry-time suspend provenance across its yielding COM read and revalidate it before actions")
 	Assert(UrlPos > PolicyPos,
 		Fn . " must apply the shared suspend policy before opening a URL")

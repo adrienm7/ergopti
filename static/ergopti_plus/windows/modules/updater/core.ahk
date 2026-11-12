@@ -1133,10 +1133,14 @@ Updater_SetChannel(Channel, Request := unset, IsSuspended := unset, NotifyFn := 
 	}
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
+		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -1540,10 +1544,14 @@ Updater_SetCheckInterval(Seconds, Request := unset, IsSuspended := unset, Notify
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
+		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -1953,17 +1961,15 @@ _Updater_RequestPolicy(Request, IsSuspended := unset) {
 	}
 	if (Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
 		return UPDATER_REQUEST_POLICY_DROP
-	; A pause stops typing, not what the user asks for (UPD-2, the maintainer's
-	; real pause, as macOS check_now and Linux check_for_updates): a manual check,
-	; install or setting runs and answers whether or not the driver is paused.
+	if Request.BornSuspended
+		return UPDATER_REQUEST_POLICY_DROP
+	if (IsSuspended or Request.Generation != _UpdaterPauseGeneration)
+		return UPDATER_REQUEST_POLICY_NOTIFY
 	return UPDATER_REQUEST_POLICY_ALLOW
 }
 
-; Tells that an install waits for the end of the pause: the self-update
-; transaction still stops at one (UPD-2 keeps this refusal for installs only).
-; @param NotifyFn {Func|Integer} Replaces NotifierSend (tests only).
-; @returns {Boolean} false, the refused action's result.
-_Updater_RefuseInstallWhileSuspended(NotifyFn := 0) {
+; Visible terminal for a manual updater action attempted while paused.
+_Updater_RefuseManualWhileSuspended(NotifyFn := 0) {
 	try {
 		Message := t("script_control.paused")
 		Options := Map("title", t("updater.title_update"), "level", "warning")
@@ -1971,10 +1977,10 @@ _Updater_RefuseInstallWhileSuspended(NotifyFn := 0) {
 			NotifyFn.Call(Message, Options)
 		else
 			NotifierSend(Message, Options)
-		try LoggerWarn("Updater", "Install refused while suspended: the self-update stops at a pause.")
+		try LoggerWarn("Updater", "Manual updater action refused while suspended.")
 		return false
 	} catch as Err {
-		try LoggerError("Updater", "Could not surface the paused install refusal: {1}.", Err.Message)
+		try LoggerError("Updater", "Could not surface paused-action refusal: {1}.", Err.Message)
 		return false
 	}
 }
@@ -2516,10 +2522,14 @@ _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, Not
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
+		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -3530,27 +3540,14 @@ _Updater_SwapAsyncRequestsForBoundary(Reason, ReplacementRequests) {
 	global _UpdaterAsyncRequests, _UpdaterPauseGeneration
 	global _UpdaterBackgroundGeneration, _UpdaterPendingReleaseNotification
 	global _UpdaterActiveAsyncTerminalDeliveryCount
-	global UPDATER_CANCEL_REASON_SUSPEND, UPDATER_REQUEST_ORIGIN_MANUAL
+	global UPDATER_CANCEL_REASON_SUSPEND
 	if !(ReplacementRequests is Map)
 		throw TypeError("Updater replacement registry must be a Map")
-	PendingRequests := _UpdaterAsyncRequests
-	if (Reason == UPDATER_CANCEL_REASON_SUSPEND) {
+	if (Reason == UPDATER_CANCEL_REASON_SUSPEND)
 		_UpdaterPauseGeneration += 1
-		; A manual request runs through a pause (UPD-2): it keeps its owner and
-		; its poll; only the background checks stop.
-		Kept := Map()
-		for Id, Record in PendingRequests {
-			if (Record is Map) && _Updater_RequestContextValid(Record.Get("request", 0))
-					&& Record["request"].Origin == UPDATER_REQUEST_ORIGIN_MANUAL
-				Kept[Id] := Record
-		}
-		for Id, Record in Kept {
-			PendingRequests.Delete(Id)
-			ReplacementRequests[Id] := Record
-		}
-	}
 	_UpdaterBackgroundGeneration += 1
 	_UpdaterPendingReleaseNotification := 0
+	PendingRequests := _UpdaterAsyncRequests
 	; Claim non-leased terminals before an empty replacement becomes visible.
 	; Leased records remain covered by the send count and claim on lease release.
 	for _Id, Record in PendingRequests {

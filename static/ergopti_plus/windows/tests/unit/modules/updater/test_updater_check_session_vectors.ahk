@@ -66,7 +66,7 @@ _TUSV_ActionCase(Corpus, Name, Phase, Expected, Request, Shown) {
 	}
 	Effects := Map("install", Port, "changelog", Port, "open_url", Port, "set_channel", Port,
 		"report", Port, "open_log", Port, "close", Port)
-	UpdateCheck_Perform(Name, Corpus["switch_channel"], Effects, , Corpus["link"])
+	UpdateCheck_Perform(Name, Corpus["switch_channel"], Effects, false, , Corpus["link"])
 	AssertEqual(Expected ? 1 : 0, Reached.Length ? 1 : 0, Name . " in " . Phase)
 }
 Test("update check session vectors: each action reaches its effect in its phases only (PAR-76)", _TUSV_Actions)

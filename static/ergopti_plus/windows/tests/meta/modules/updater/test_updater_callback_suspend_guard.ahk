@@ -62,7 +62,7 @@ _UCSG_CoreOwnsImmutableRequestPolicy() {
 	BornAt := InStr(Policy, "Request.BornSuspended", , ValidateAt)
 	BackgroundAt := InStr(Policy, "UPDATER_REQUEST_ORIGIN_BACKGROUND", , ValidateAt)
 	Assert(ValidateAt > 0 and BornAt > ValidateAt and BackgroundAt > ValidateAt,
-		"the shared policy must validate first and silently drop background work born or caught paused (a manual request runs whatever the pause, UPD-2)")
+		"the shared policy must validate first, visibly refuse born-paused manual work and silently drop background work")
 	Assert(InStr(Policy, "Request.ChannelEpoch != _UpdaterChannelEpoch", , ValidateAt) > 0,
 		"request publication policy must reject stale channel epochs even after A-B-A")
 	Assert(InStr(Publisher, "_Updater_QueueManualPauseNotice(Request)") > 0,
@@ -196,11 +196,12 @@ _UCSG_ChangelogBridgeCapturesBeforeYieldAndThreadsRequest() {
 		"the changelog bridge, fetch context, queue and validity gate must remain defined")
 	CaptureAt := InStr(Bridge, "_Updater_ReadManualBridgeMessage(")
 	ReadAt := InStr(Bridge, "TryGetWebMessageAsString()", , CaptureAt)
-	PolicyAt := InStr(Bridge, "_Updater_RequestMayPublish(Request)", , ReadAt)
+	BornAt := InStr(Bridge, "Request.BornSuspended", , ReadAt)
+	PolicyAt := InStr(Bridge, "_Updater_RequestMayPublish(Request)", , BornAt)
 	FetchAt := InStr(Bridge, "_CLW_FetchAndInject(Ch, Request)", , PolicyAt)
 	UrlAt := InStr(Bridge, "_Updater_OpenManualUrl(() => Url, Request)", , PolicyAt)
-	Assert(CaptureAt > 0 and ReadAt > CaptureAt
-		and PolicyAt > ReadAt and FetchAt > PolicyAt and UrlAt > PolicyAt,
+	Assert(CaptureAt > 0 and ReadAt > CaptureAt and BornAt > ReadAt
+		and PolicyAt > BornAt and FetchAt > PolicyAt and UrlAt > PolicyAt,
 		"bridge actions must preserve entry-time provenance across the yielding COM read and revalidate before both outputs")
 	Assert(InStr(Fetch, "_CLW_BeginFetchRequest(Channel, Request, ExpectedWindowEpoch)") > 0
 		and InStr(FetchContext, "Request: Request") > 0,

@@ -1343,7 +1343,11 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 	global _VendorDir, _Updater_PromptGui
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if !IsSet(Request) {
+		if A_IsSuspended
+			return _Updater_RefuseManualWhileSuspended()
 		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+		if Request.BornSuspended
+			return _Updater_RefuseManualWhileSuspended()
 	}
 	if (Type(Release) != "Object")
 		return
@@ -1453,9 +1457,13 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 _Updater_OpenPromptReleaseUrl(Release, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	Request := HasSuspendOverride
 		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
@@ -1484,12 +1492,11 @@ _Updater_OpenPromptReleaseUrl(Release, IsSuspended := unset, NotifyFn := 0, RunF
 
 _Updater_InstallPromptRelease(G, Release) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
-	; The self-update transaction still stops at a pause (its staging monitor,
-	; completion and swap), so an install asked while paused is refused visibly
-	; rather than started and cancelled (UPD-2 leaves installs to a follow-up).
 	if A_IsSuspended
-		return _Updater_RefuseInstallWhileSuspended()
+		return _Updater_RefuseManualWhileSuspended()
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	_Updater_CloseGui(G)
@@ -1522,9 +1529,11 @@ Updater_ShowAvailableUpdate(*) {
 	return _Updater_ShowAvailableUpdateEntry()
 }
 
-; A pause does not refuse the prompt (UPD-2). ContinueFn replaces the running
-; path (tests only).
-_Updater_ShowAvailableUpdateEntry(ContinueFn := 0) {
+_Updater_ShowAvailableUpdateEntry(IsSuspended := unset, NotifyFn := 0, ContinueFn := 0) {
+	if !IsSet(IsSuspended)
+		IsSuspended := A_IsSuspended
+	if IsSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if IsObject(ContinueFn)
 		return ContinueFn.Call()
 	return _Updater_ShowAvailableUpdateRunning()
@@ -1534,6 +1543,8 @@ _Updater_ShowAvailableUpdateRunning() {
 	global UPDATER_LATEST_RELEASE, UPDATER_CHANNEL
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	if IsSet(UPDATER_LATEST_RELEASE) and Type(UPDATER_LATEST_RELEASE) == "Object" {
@@ -1940,16 +1951,12 @@ _Updater_RetireManagedFailure(ExpectedOwner := unset) {
 _Updater_ManagedFailureOwnerIsCurrent(Owner) {
 	global _UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSwapOwner
-	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_POLICY_ALLOW, _UpdaterPauseGeneration
+	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_POLICY_ALLOW
 	if !(Owner is Map) || !(_UpdaterManagedFailureOwner is Map)
 		|| Owner != _UpdaterManagedFailureOwner || !Owner.Get("terminal", false)
 		|| Owner.Get("retired", true) || Owner.Get("staging_epoch", 0) != _UpdaterSelfUpdateEpoch
 		|| _UpdaterDownloadInProgress || IsObject(_UpdaterDownloadWorker)
 		|| (_UpdaterSwapOwner is Map) || _UpdaterRecoveryPublishTarget != ""
-		return false
-	; An install still stops at a pause (UPD-2 leaves installs pause-sensitive), so
-	; a pause retires its retry consent even though the manual request runs on.
-	if !_Updater_RequestContextValid(Owner["request"]) || Owner["request"].Generation != _UpdaterPauseGeneration
 		return false
 	return _Updater_RequestPolicy(Owner["request"]) == UPDATER_REQUEST_POLICY_ALLOW
 }
@@ -2108,16 +2115,15 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	global _UpdaterInstallObserver
 	InstallObserver := _Updater_CaptureInstallObservation()
 	HasSuspendOverride := IsSet(IsSuspended)
-	; The self-update transaction still stops at a pause (its staging monitor,
-	; completion and swap), so an install asked while paused is refused visibly
-	; rather than started and cancelled (UPD-2 leaves installs to a follow-up).
-	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
-		return _Updater_RefuseInstallWhileSuspended(NotifyFn)
 	if !IsSet(Request) {
+		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false

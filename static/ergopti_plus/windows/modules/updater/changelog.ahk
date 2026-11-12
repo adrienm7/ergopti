@@ -72,7 +72,11 @@ Updater_GetUpdateMenuLabel() {
 Updater_OneClickUpdate(*) {
 	global UPDATER_CHANNEL, UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
 	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return
 	if Updater_IsLocalSource()
@@ -232,12 +236,9 @@ _Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildF
 }
 
 _Updater_ActivateCachedRelease(Release, Request, IsSuspended := unset, NotifyFn := 0, InstallFn := 0, SuccessFn := 0) {
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	HasSuspendOverride := IsSet(IsSuspended)
-	; The self-update transaction still stops at a pause (its staging monitor,
-	; completion and swap), so an install asked while paused is refused visibly
-	; rather than started and cancelled (UPD-2 leaves installs to a follow-up).
-	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
-		return _Updater_RefuseInstallWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
@@ -297,9 +298,13 @@ _Updater_RefreshInstallBtn(BtnInstall, Releases, Idx, IsLocal) {
 _Updater_OpenSelectedReleaseUrl(ListBox, Releases, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	Request := HasSuspendOverride
 		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
@@ -339,9 +344,13 @@ _Updater_ViewChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn := 0, C
 		return false
 	}
 	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	Request := HasSuspendOverride
 		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
@@ -366,9 +375,13 @@ _Updater_SubscribeChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn :=
 		return false
 	}
 	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	Request := HasSuspendOverride
 		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	Question := StrReplace(t("changelog_window.subscribe_restart"), "{channel}", _Updater_ChannelLabel(Channel))
 	Answer := IsObject(ConfirmFn)
 		? ConfirmFn.Call(Question)
@@ -395,9 +408,13 @@ _Updater_SubscribeChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn :=
 _Updater_RefreshChangelogSelection(ListBox, Releases, BtnInstall, IsLocal, ShowBodyFn, IsSuspended := unset, NotifyFn := 0, RefreshInstallFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	Request := HasSuspendOverride
 		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -438,8 +455,12 @@ _Updater_RefreshChangelogSelection(ListBox, Releases, BtnInstall, IsLocal, ShowB
 _Updater_OpenChangelogWindow(Channel, Request := unset) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if !IsSet(Request) {
+		if A_IsSuspended
+			return _Updater_RefuseManualWhileSuspended()
 		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	_Updater_FetchReleasesListJsonAsync(Channel, Request,
@@ -607,7 +628,11 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 ; @returns {Boolean} Whether the update path started.
 _Updater_InstallChosenRelease(G, Release) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	_Updater_CloseGui(G)
@@ -770,6 +795,8 @@ _Updater_OnReleaseNotesMessage(ExpectedSource, ExpectedSession, Handler, Args, O
 		return false
 	}
 	Request := Envelope.Request
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	Url := Payload.Get("url", "")

@@ -107,8 +107,11 @@ global _CLW_FeedStarter := 0
  */
 Changelog_Open(Channel) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
-	; A pause stops typing, not the changelog (UPD-2).
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	return _CLW_OpenCapturedRequest(Channel, Request)
 }
 
@@ -559,8 +562,10 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		_CLW_OnPageReady(ExpectedWindowEpoch)
 		return
 	}
-	; A click while paused is a click (UPD-2): the request policy still drops
-	; one whose channel changed meanwhile.
+	; WebMessageReceived bypasses native Suspend. A click born paused refuses
+	; visibly; a click interrupted during TryGet retains one resume terminal.
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
 	if !_Updater_RequestMayPublish(Request)
 		return
 
