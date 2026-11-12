@@ -12,8 +12,9 @@ Decided by the maintainer on 2026-11-12 (HSE-002): a bare-key entry
 hotstring with an end character, case-conform and final) load on every OS.
 The shared `toml_codec/reader.lua` accepts them only in a section the
 document's `[_meta] sections_order` lists, so `constants.toml`, the tap-hold
-defaults and the tooltip configuration parse as before. Windows has a TODO
-line for an inline-table entry in another key order or with only `output`.
+defaults and the tooltip configuration parse as before. Windows'
+`HS_EntryPattern` (`infra/toml/toml_loader.ahk`) also takes an inline-table
+entry in any key order or with only `output`, each missing flag false.
 Regression `hse-002-short-entry-forms`.
 
 ## A no-break space counts as a space inside a trigger (2026-11-12)
@@ -21,8 +22,9 @@ Regression `hse-002-short-entry-forms`.
 Decided by the maintainer on 2026-11-12 (HSE-003): a trigger with an inner
 space fires when typed with U+00A0 or U+202F there, on every OS; a trigger
 starting with a space (a word-boundary guard) keeps its own. macOS
-(`add_with_space_variants`) and the shared engine register the variants;
-Windows has a TODO line. Regression `hse-003-nbsp-trigger`.
+(`add_with_space_variants`), the shared engine and Windows
+(`HSE_NoBreakSpaceVariants`, cased and literal families) register the
+variants. Regression `hse-003-nbsp-trigger`.
 
 ## A letter magic key follows the word's case (2026-11-12)
 
@@ -42,8 +44,8 @@ names them per executable (`settings` under the platform's configuration
 folder, `extensions` under `{home}`) and marks the replaced argument
 `user_folder: "extensions"`; the change is additive, so the current AHK reader
 keeps working. macOS (`clone_app.sh`, variant from the bundled CLI) and Linux
-(`app_cloner_core.lua`) read it; Windows has its TODO line. Regressions
-`bap-004-vscode-variants`.
+(`app_cloner_core.lua`) and Windows (`AppCloner_UserFolders`) read it.
+Regressions `bap-004-vscode-variants`.
 
 ## The Linux Encryptor opens only .enc files by default (2026-11-12)
 
@@ -71,8 +73,7 @@ Decided by the maintainer on 2026-11-12: the item a clone opens follows the
 macOS `validateOpenArg`: a path, absolute or under « ~ » (expanded), must
 exist; anything else needs « :// » or Teams' `msteams:/l/` and
 `msteams:/calendar` forms, so « https:/x » and « localhost:3000 » are refused.
-Linux follows it since BAP-005; Windows' `_AppCloner_InvalidOpenItem` has its
-TODO line.
+Linux follows it since BAP-005, Windows' `_AppCloner_InvalidOpenItem` too.
 
 ## A pause stops typing, not configuration (2026-11-12)
 
